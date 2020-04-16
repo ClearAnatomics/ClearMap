@@ -1,0 +1,12 @@
+ Copyright Christoph Kirst
+This is a test version of ClearMap 2.0 
+
+This code is not to be distributed further and made avialble only to users on request.
+
+If used in research in any form, cite our publication:
+
+Kirst, Christoph, et al. "Mapping the Fine-Scale Organization and Plasticity of the Brain Vasculature." Cell 180.4 (2020): 780-795.
+
+
+For commmercial use please contact Christpoh Kirst
+christoph.kirst@ucsf.edu
