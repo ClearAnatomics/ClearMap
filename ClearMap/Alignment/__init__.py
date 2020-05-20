@@ -2,7 +2,7 @@
 Alignment
 =========
 
-his sub-package provides an interface to alignment tools in order to 
+This sub-package provides an interface to alignment tools in order to 
 register cleared samples to atlases or reference samples.
 
 Supported functionality:

@@ -20,5 +20,6 @@ Thumbs.db
 
 # unzipped resources
 ClearMap/Resources/Atlas/*.tif
-
+ClearMap/ImageProcessing/Binary/*.npy
+ClearMap/ImageProcessing/Skeletonization/*.npy
 

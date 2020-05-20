@@ -4,21 +4,13 @@ function to provide a softer version of the rank filters. E.g.
 instead of using [min, max]. It means that isolated bright or dark pixels will
 not produce halos.
 
-The local histogram is computed using a sliding window similar to the method
-described in [1]_.
+The local histogram is computed using a sliding window.
 
 Input image can be 8-bit or 16-bit, for 16-bit input images, the number of
 histogram bins is determined from the maximum value present in the image.
 
 Result image is 8-/16-bit or double with respect to the input image and the
 rank filter operation.
-
-References
-----------
-
-.. [1] Huang, T. ,Yang, G. ;  Tang, G.. "A fast two-dimensional
-       median filtering algorithm", IEEE Transactions on Acoustics, Speech and
-       Signal Processing, Feb 1979. Volume: 27 , Issue: 1, Page(s): 13 - 18.
 """
 __author__    = 'Christoph Kirst <ckirst@rockefeller.edu>'
 __license__   = 'MIT License <http://www.opensource.org/licenses/mit-license.php>'

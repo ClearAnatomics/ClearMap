@@ -1,28 +1,52 @@
 # -*- coding: utf-8 -*-
 """
-*ClearMap* is a python toolbox for the analysis and registration of volumetric 
-data from cleared tissues obtained with Light Sheet microscopy.
+*ClearMap* is a toolbox for the analysis and registration of volumetric data.
 
-The ClearMap code package is structured into four main modules:
+*ClearMap* has been designed to analyze O(TB) 3d datasets obtained 
+via light sheet microscopy from iDISCO+ cleared tissue samples 
+immunolabeled for proteins. 
 
-   * **IO** for reading and writing images and data
-   * **Alignment** for resampling, reorientation and registration of images onto references
-   * **Image Processing** for correcting and quantifying the image data
-   * **Analysis** for the statistical analysis of the data
+*ClearMap* includes 
+  * non-ridgid wobbly stitching,
+  * image registration to a 3D annotated references 
+    (e.g. the Allen Brain Institute Atlases), 
+  * a toolbox for large volumetric image processing O(TB), 
+  * object and cell detection,
+  * vasculature detection and graph construction,
+  * statistical analysis 
+  
+*ClearMap* has been written for mapping immediate early genes [Renier2016]_
+as well as vasculature networks of whole mouse brains [Kirst2020]_.
+
+*ClearMap* tools may also be useful for data obtained with other types
+of microscopes, types of markers, clearing techniques, as well as other 
+species, organs, or samples.
+
+*ClearMap* is written in Python 3 and is designed to take advantage of
+parallel processing capabilities of modern workstations. We hope the open 
+structure of the code will enable many new modules to be added to ClearMap to 
+broaden the range of applications to different types of biological objects or
+structures.
+
+More informatoin and downloads for *ClearMap* can be found in our 
+`repository <http://www.github.com/ChristophKirst/ClearMap2>`_.
+
+
+References
+----------
+.. [Renier2016] `Mapping of brain activity by automated volume analysis of immediate early genes.'Renier* N, Adams* EL, Kirst* C, Wu* Z, et al. Cell. 2016 165(7):1789-802 <https://doi.org/10.1016/j.cell.2016.05.007>`_
+
+.. [Kirst2020] `Mapping the Fine-Scale Organization and Plasticity of the Brain Vasculature. Kirst, C., Skriabine, S., Vieites-Prado, A., Topilko, T., Bertin, P., Gerschenfeld, G., Verny, F., Topilko, P., Michalski, N., Tessier-Lavigne, M. and Renier, N., Cell, 180(4):780-795 <https://doi.org/10.1016/j.cell.2020.01.028>`_
 
 """
 
 __title__ = 'ClearMap'
 
-__version__ = '0.5.0'
+__version__ = '2.0.0'
 
 __author__ = 'Christoph Kirst'
 
 __license__ = 'GNU GENERAL PUBLIC LICENSE Version 3'
 
-__copyright__ = '2016 Christoph Kirst'
+__copyright__ = '2020 Christoph Kirst'
 
-#__all__ = ["Settings", "Parameter", "IO", "ImageProcessing", "Analysis"]
-
-#import ClearMap.Settings
-#import ClearMap.Parameter

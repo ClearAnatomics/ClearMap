@@ -62,7 +62,7 @@ def set(parameter, key = None, value = None, **kwargs):
       Key in dictionary.
     value : object
       Value to set.
-    **kwargs
+    kwargs
       Key : value pairs.
     
     Returns
@@ -107,7 +107,7 @@ def write(parameter = None, head = None, **kwargs):
       Parameter dictionary.
     head : str or None
       Optional prefix of each line.
-    **kwargs
+    kwargs
       Additional parameter values as key=value arguments.
     
     Returns
@@ -149,7 +149,7 @@ def pprint(parameter = None, head = None, **args):
       Parameter dictionary.
     head : str or None
       prefix of each line
-    **args
+    args
       Additional parameter values as key=value arguments.
     """
     print(write(parameter = parameter, head = head, **args));
@@ -160,7 +160,7 @@ def join(*args):
     
     Arguments
     ---------
-    *args : dicts
+    args : dicts
       The parameter dictonaries to join.
     
     Returns

@@ -82,21 +82,21 @@ def process(function, source, sink = None,
   ---------
   function : function
     The main data processing script.
-  source : str, Source or list
+  source : str, Source, or list
     The source or list of sources to apply a function to 
-  sink : str, Source, list or None
+  sink : str, Source, list, or None
     The sink or list of sinks to write the result to.
     If None, return single array.
-  axes : int or list of ints or None
+  axes : int, list of ints, or None
     Axes along which to split the source. If None, the 
     splitting is determined automaticlly from the order of the array.
-  size_max : int or list of ints or None
+  size_max : int, list of ints or None
     Maximal size of a block along the axes. 
     If None, :const:`default_size_max` is used.
   size_min : int or list of ints
     Minial size of a block along the axes. 
     If None, :const:`default_size_min` is used.
-  overlap : int or list of ints or None.
+  overlap : int, list of ints or None
     Minimal overlap between blocks along the axes.
     If None, :const:`default_overlap` is used.
   optimization : bool or list of bools
@@ -108,6 +108,7 @@ def process(function, source, sink = None,
     If True, also include information about the neighbourhood in the blocks.
   function_type : 'array', 'source', 'block' or None
     The function type passed. If None, 'array' is used.
+    
     * 'array'
       Reading and writing the valid slices from the blocks is automatic 
       and the function gets passed numpy arrays.
@@ -116,6 +117,7 @@ def process(function, source, sink = None,
       and the function gets passed Source classes as inputs. 
     * 'block' 
       The function is assumed to act on and update blocks itself.
+    
   as_memory : bool
     If True, load full blocks into memory before applying the function.
     Can be useful to reduce frequent reading and writing operations of memmaps.
@@ -125,8 +127,6 @@ def process(function, source, sink = None,
     The number of parallel processes, if 'serial', use serial processing.
   verbose : bool
     Print information on sub-stack generation.
-  **kwargs
-    Optional parameter to be passed to the processing function.
       
   Returns
   -------

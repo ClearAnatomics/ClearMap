@@ -17,11 +17,10 @@ import numpy as np
 
 import matplotlib as mpl; # analysis:ignore
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D  # analysis:ignore
 
 import scipy.stats as st
 
-#%%############################################################################
+###############################################################################
 ### Density and Countour plots
 ###############################################################################
 
@@ -71,13 +70,15 @@ def plot_curve(coordinates, **kwargs):
   ---------
   coordinates : nx3 array.
     The coordinates of the curve.
-  **kwargs : matplotlib parameter.
+  kwargs 
+    Matplotlib parameter.
   
   Returns
   -------
   ax : ax
     3d axes object.
   """
+  from mpl_toolkits.mplot3d import Axes3D  # analysis:ignore
   ax = plt.gca(projection='3d');
   x,y,z = coordinates.T;
   ax.plot(x, y, z, **kwargs)

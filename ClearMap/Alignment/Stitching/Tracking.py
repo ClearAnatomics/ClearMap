@@ -33,11 +33,10 @@ def track_positions(positions, new_trajectory_cost = None, cutoff = None):
   Returns
   -------
   trajectories : list
-    The trajectories as a list of list of (time,particle) 
-    tuples.
+    The trajectories as a list of list of (time,particle) tuples.
     
-  Reference
-  ---------
+  References
+  ----------
   A shortest augmenting path algorithm for dense and sparse linear assignment problems
   Jonker, R, Volgenant, A, Computing 1987  
   """
@@ -109,11 +108,10 @@ def match(positions_pre, positions_post, new_trajectory_cost = None, cutoff = No
   cutoff : float or None:
     The maximal distance allowed to connect particles.
      
-  Results
+  Returns
   -------
   match : dict
-    The optimal association as a dictionary 
-    {index_pre : index_post}.
+    The optimal association as a dictionary {index_pre : index_post}.
   """
   #create distance matrices
   cost = ssd.cdist(positions_pre, positions_post);
@@ -151,8 +149,8 @@ def optimal_association_matrix(cost):
   It is assumed that creation/deletion of objects are the last 
   row and column in cost.
     
-  Reference
-  ---------
+  References
+  ----------
   A shortest augmenting path algorithm for dense and sparse linear assignment problems
   Jonker, R, Volgenant, A, Computing 1987 
   """

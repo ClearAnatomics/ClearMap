@@ -38,6 +38,7 @@ import json
 import ClearMap.Settings as settings
 
 import ClearMap.IO.IO as io
+import ClearMap.IO.FileUtils as fu
 
 import ClearMap.Alignment.Resampling as res
 
@@ -63,6 +64,8 @@ Note
   This file is by default the Allen brain annotated mouse atlas with 25um 
   isotropic resolution.
 """
+fu.uncompress(default_annotation_file)
+
 
 default_reference_file = os.path.join(atlas_path, 'ABA_25um_reference.tif');
 """Default volumetric annotated image file.
@@ -72,6 +75,7 @@ Note
   This file is by default the Allen brain annotated mouse atlas with 25um 
   isotropic resolution.
 """
+fu.uncompress(default_reference_file)
 
 
 default_distance_to_surface_file = os.path.join(atlas_path, 'ABA_25um_distance_to_surface.tif');
@@ -82,6 +86,8 @@ Note
   This file is by default the Allen brain annotated mouse atlas with 25um 
   isotropic resolution.
 """
+fu.uncompress(default_distance_to_surface_file)
+
 
 default_label_file = os.path.join(atlas_path, 'ABA_annotation.json');
 """Default list of labels and region names in the annotated image.
@@ -107,6 +113,9 @@ Note
   The form is a list of tuples, each tuple has the form 
   (atlas id, parent id, name, acronym).
 """
+
+
+
 
 
 class Label(object):
@@ -508,13 +517,15 @@ def convert_label_to_color(label, key = 'id', level = None, alpha = True, as_int
   return annotation.label_to_color(label, key=key, level=level, alpha=alpha, as_int=as_int, int_type=int_type);
 
 
-def count_label(label, key = 'order', hierarchical = True):
+def count_label(label, weights = None, key = 'order', hierarchical = True):
   """Counts the label within the various structures, taking into account the sub-structures.
   
   Arguments
   ---------
   label : array
     List of labels.
+  weights : array 
+    Optional list of weights for each label.
   key : str
     The key the lables are given in.
   hierarchical : bool
@@ -528,7 +539,7 @@ def count_label(label, key = 'order', hierarchical = True):
   if key != 'order':
     label = convert_label(label, key=key, value='order', invalid=0);
   
-  bins = np.bincount(label, minlength=n_structures);
+  bins = np.bincount(label, weights=weights, minlength=n_structures);
   
   if hierarchical:
     _recursive_count(annotation.root, bins);
@@ -545,15 +556,17 @@ def _recursive_count(node, counts):
   return counts[node['order']];
 
 
-def count_points(points, annotation_file = None, invalid = 0, hierarchical = True):
+def count_points(points, weights = None, annotation_file = None, invalid = 0, hierarchical = True):
   """Counts the points within the various structures, taking into account the sub-structures.
   
   Arguments
   ---------
   points : array
     Array of nxdim points to annotate and count.
+  weights : array or None
+    Optional intensity values to weight the count.
   annotation_file : str
-    File name of the atals annotation.
+    File name of the atlas annotation.
   invalid : int
     Label for invalid points.
   hierarchical : bool
@@ -565,7 +578,7 @@ def count_points(points, annotation_file = None, invalid = 0, hierarchical = Tru
     The counts for each label.
   """
   label = label_points(points, annotation_file=annotation_file, invalid=invalid, key='order');
-  return count_label(label, key='order', hierarchical=hierarchical);
+  return count_label(label, weights=weights, key='order', hierarchical=hierarchical);
 
 
 ###############################################################################

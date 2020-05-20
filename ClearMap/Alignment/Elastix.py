@@ -579,7 +579,7 @@ def transform(source, sink = [], transform_parameter_file = None, transform_dire
   Note
   ----
   If the map determined by elastix is
-  :math:`T \\mathrm{fixed} \\rightarrow \\mathrm{moving}`, 
+  :math:`T: \\mathrm{fixed} \\rightarrow \\mathrm{moving}`, 
   transformix on data works as :math:`T^{-1}(\\mathrm{data})`.
   """
   check_elastix_initialized();  

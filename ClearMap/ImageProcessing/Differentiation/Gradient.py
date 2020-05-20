@@ -9,7 +9,7 @@ __copyright__ = 'Copyright (c) 2017 by Christoph Kirst, The Rockefeller Universi
 import numpy as np
 
 
-__all__ = ['gradient', 'gradient_abs', 'gradient_square', 'hessian'];
+__all__ = ['gradient', 'gradient_abs', 'gradient_square'];
 
 
 ##############################################################################

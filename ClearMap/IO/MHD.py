@@ -1,4 +1,3 @@
-#!/usr/bin/env python2
 # -*- coding: utf-8 -*-
 """
 MHD IO Module
@@ -8,7 +7,7 @@ IO interface to mhd / raw files.
 
 Note
 ----
-Using the function :func:`write_header_from_source' a mhd header for a numpy
+Using the function :func:`write_header_from_source` a mhd header for a numpy
 binary array can be created to enable loading the numpy file into imagej.
 """
 __author__    = 'Christoph Kirst <ckirst@rockefeller.edu>'

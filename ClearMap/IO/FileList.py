@@ -646,9 +646,10 @@ def shape(expression = None, file_list = None, axes_order = None, axis = None):
   
   Arguments
   ---------
-  expression : str
+  expression : str or None
     The regular epression for the file list.
-  file_slit
+  file_list : list or None
+    List of files.
   axis : int or None
     The shape along a specific axis. Can speed up the shape calculation.
   axes_order : list or None

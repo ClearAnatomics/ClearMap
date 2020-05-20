@@ -235,6 +235,47 @@ def copy_file(source, sink):
 
 
 
+
+###############################################################################
+### Tests
+###############################################################################
+
+def uncompress(filename, extension = 'zip', check = True, verbose = True):
+  """Unzips a file if only the compressed zip file exists.
+  
+  Arguments
+  ---------
+  filename : str
+    The filename to search for.
+  extension : str
+    The extension for the compressed file.
+  check : bool
+    If True, check if the uncomressed file already exists.
+  verbose : bool
+    Print progrss info.
+  
+  Returns
+  -------
+  filename : str or None
+     The uncompressed filename or None if failed.
+  """
+  try:
+    if not os.path.exists(filename) or not check:
+      zip_filename = filename + "." + extension;
+      if os.path.exists(zip_filename):
+        if verbose:
+          print('Uncompressing source: %r' % zip_filename);
+        import zipfile
+        with zipfile.ZipFile(zip_filename, 'r') as zipf:
+          zipf.extractall(path=os.path.split(zip_filename)[0]);
+      else:
+        if verbose:
+          print('Cannot find compressed source: %r' % zip_filename)
+    return filename;
+  except:
+    return None;
+    
+
 ###############################################################################
 ### Tests
 ###############################################################################

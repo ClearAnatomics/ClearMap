@@ -1,7 +1,7 @@
 """Approximate bilateral rank filter for local (custom kernel) mean.
 
 The local histogram is computed using a sliding window similar to the method
-described in [1]_.
+described in [Huang]_.
 
 The pixel neighborhood is defined by:
 
@@ -17,7 +17,7 @@ rank filter operation.
 References
 ----------
 
-.. [1] Huang, T. ,Yang, G. ;  Tang, G.. "A fast two-dimensional
+.. [Huang] Huang, T. ,Yang, G. ;  Tang, G.. "A fast two-dimensional
        median filtering algorithm", IEEE Transactions on Acoustics, Speech and
        Signal Processing, Feb 1979. Volume: 27 , Issue: 1, Page(s): 13 - 18.
 
@@ -194,7 +194,7 @@ def sum_relative_bilateral(source, selem=None, sink=None, mask=None, s0=0.5, s1=
   Returns
   -------
   sink : array
-      The filtered array.
+    The filtered array.
   """
   return rnk._apply_code(code.sum, code.sum_masked, sink_dtype = float,
                          source=source, selem=selem, sink=sink, mask=mask, parameter_float=[s0,s1], **kwargs);
@@ -225,7 +225,7 @@ def mean_scale_bilateral(source, selem=None, sink=None, mask=None, s0=10, s1=10,
   Returns
   -------
   sink : array
-      The filtered array.
+    The filtered array.
   """
   return rnk._apply_code(code.mean_scale, code.mean_scale_masked, sink_dtype = float,
                          source=source, selem=selem, sink=sink, mask=mask, 

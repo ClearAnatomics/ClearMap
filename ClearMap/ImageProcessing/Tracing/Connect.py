@@ -11,8 +11,9 @@ import numpy as np
 
 import scipy.ndimage as ndi
 
-import ClearMap.DataProcessing.LargeData as ld
-import ClearMap.DataProcessing.ConvolvePointList as cpl
+#TODO:
+import ClearMap.ParallelProcessing.DataProcessing.ArrayProcessing as ap
+import ClearMap.ParallelProcessing.DataProcessing.ConvolvePointList as cpl
 
 import ClearMap.ImageProcessing.Tracing.Trace as trc
 import ClearMap.ImageProcessing.Differentiation.Hessian as cur
@@ -293,7 +294,7 @@ def connectPoint(data, mask, endpoints, start_index, radius,
   local_nbh = mask_nbh_label[tuple(center_nbh_xyz)] == mask_nbh_label;  
   
   # end point neighbours
-  nbs_flat = ld.findNeighbours(endpoints, start_index, shape, strides, radius);
+  nbs_flat = ap.findNeighbours(endpoints, start_index, shape, strides, radius);
   
   if len(nbs_flat) > 0:
     nbs_nbh_xyz  = np.vstack(np.unravel_index(nbs_flat, shape, order = 'F')).T - center_xyz + center_nbh_xyz;
@@ -579,7 +580,7 @@ def addConnections(data, mask, skeleton, points, radius = 20,
   return result;
 
 
-if __name__ == "__main__":
+def _test():
   #%%
   import numpy as np
   import scipy.ndimage as ndi
@@ -724,7 +725,7 @@ if __name__ == "__main__":
   i = 40;
   r = 25;
   center = np.unravel_index(ends[i], data.shape)
-  print center, data.shape
+  print(center, data.shape)
   mask = binary; 
   path = con.tracePointToMask(data, mask, center, radius= r, points = special_xyz, 
                               plot = True, skel = skel, binary = binary, 
@@ -734,7 +735,7 @@ if __name__ == "__main__":
 
   #%%
 
-  nbs = ld.findNeighbours(ends, i, skel.shape, skel.strides, r);
+  nbs = ap.findNeighbours(ends, i, skel.shape, skel.strides, r);
   center = np.unravel_index(ends[i], skel.shape)
 
   nbs_xyz = np.array(np.unravel_index(nbs, skel.shape)).T
@@ -744,7 +745,7 @@ if __name__ == "__main__":
   nb = np.argmin(dists)
     
   center = np.unravel_index(ends[i], data.shape)
-  print center, data.shape
+  print(center, data.shape)
   mask = binary; 
   path = con.tracePointToNeighbor(data, mask, center, nbs_xyz[nb],
                                   radius= r, points = special_xyz, 
@@ -780,7 +781,7 @@ if __name__ == "__main__":
   for i,e in enumerate(special):
     center = np.unravel_index(e, data.shape);
     
-    print i, e, center
+    print(i, e, center)
     path   = con.tracePointToMask(data, mask, center, radius= r, points = special_xyz, 
                                   plot = False, skel = skel, binary = binary, 
                                   tubeness = None, removeLocalMask = True, maxSteps = 15000,

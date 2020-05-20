@@ -43,30 +43,33 @@ def trace(source, score, start, stop,
   Arguments
   ----------
   srouce : array
-      Input source.
+    Input source.
   score : array
-      A measure at each point to score a path. The higher the more likely
-      is it that the path will go through and thus the score is a reward
-      like measure. The cost for the path is approximately 1/score.
-  start
+    A measure at each point to score a path. The higher the more likely
+    is it that the path will go through and thus the score is a reward
+    like measure. The cost for the path is approximately 1/score.
+  start : array
+    Start position.
+  stop : array
+    Stop position.
   costPerDistance : float
-      Cost used to when estimating remaining distance.
-      Can be used to weigh the estimated distance measure
+    Cost used to when estimating remaining distance.
+    Can be used to weigh the estimated distance measure.
   minimalCostperDistance : float
-      Minimal cost per distance used when tubeness measure is below this value.
+    Minimal cost per distance used when tubeness measure is below this value.
   tubenessMultipler : float
-      Multiply the tubeness measure by this value before estimating coadt via inverse.
-      Can be used to weigh tubness vs. distiance measures.
+    Multiply the tubeness measure by this value before estimating coadt via inverse.
+    Can be used to weigh tubness vs. distiance measures.
   minimalTubeness : float
-      Minimal tubness measure to use (note the inverse of the tubness measure is used
-      to calculate the cost, this effectively limits the maximal cost)
+    Minimal tubness measure to use (note the inverse of the tubness measure is used
+    to calculate the cost, this effectively limits the maximal cost).
   maxSteps : int or None
-      Number of maximal iteration steps.
+    Number of maximal iteration steps.
 
   Returns
   -------
   path : 2-D array
-      the path a list of coordinates
+    The path a list of coordinates.
   """
 
 #    if not source.flags.c_contiguous:

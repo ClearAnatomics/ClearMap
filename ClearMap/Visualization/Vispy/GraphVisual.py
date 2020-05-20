@@ -8,7 +8,7 @@ Module providing Graph visuals for rendering graphs.
 Note
 ----
 This module is porviding vispy visuals only. 
-See :mod:`PlotGraph3d' module for plotting.
+See :mod:`PlotGraph3d` module for plotting.
 """
 __author__    = 'Christoph Kirst <ckirst@rockefeller.edu>'
 __license__   = 'MIT License <http://www.opensource.org/licenses/mit-license.php>'

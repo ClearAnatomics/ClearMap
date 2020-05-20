@@ -16,14 +16,21 @@ __copyright__ = 'Copyright (c) 2017 by Christoph Kirst, The Rockefeller Universi
 import numpy as np
 
 import vispy
-try:
-  vispy.use(app='PyQt5');  #avoid use of ipynb_webgl
-except:
-  pass;
+
+#try:
+#  vispy.use(app='PyQt5');  #avoid use of ipynb_webgl
+#except:
+#  print('qt')
+#  try:
+#    vispy.use(app='PySide')
+#  except:
+#    print('no')
+#    print(vispy.app.backends.BACKENDMAP)
 
 import vispy.app
 import vispy.scene
-vispy.app.run();
+#vispy.app.run();
+
 
 import ClearMap.Visualization.Vispy.TurntableCamera as ttc
 import ClearMap.Visualization.Vispy.VolumeVisual as vvi

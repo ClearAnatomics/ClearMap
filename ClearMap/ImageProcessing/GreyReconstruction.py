@@ -59,7 +59,8 @@ def reconstruct(seed, mask = None, method = 'dilation', selem = None, offset = N
   
   The algorithm is taken from [1]_. Applications for greyscale 
   reconstruction are discussed in [2]_ and [3]_.
-      Operates on 2d images.
+  
+  Effectively operates on 2d images.
   
   Reference:
   

@@ -1181,8 +1181,8 @@ class Layout(SourceRegion, src.AbstractSource):
   def set_source_positions(self, positions = None, sources = None, update_alignments = False):
     """Sets the positions of the sources.
   
-    Aruments
-    --------
+    Arguments
+    ---------
     positions : list of tuple of ints or None
       The new positions of the sources, if None infer a consistent solution from the alignments.
     sources : list of Source classes

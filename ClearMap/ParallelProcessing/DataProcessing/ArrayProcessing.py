@@ -116,7 +116,7 @@ def apply_lut_to_index(source, kernel, lut, sink = None, processes = None, verbo
   source : array 
     The source array.
   kernel : array
-    
+    The correlation kernel.
   lut : array
     The lookup table.
   sink : array or None
@@ -582,9 +582,10 @@ def initialize_source(source, return_buffer = True, as_1d = False,
   
   Returns
   -------
-  source : Source or buffer
+  source : Source
     The intialized source.
   source_buffer
+    The initialized source as buffer.
   shape : tuple of int
     Shape of the source.
   return_Strides : tuple of int

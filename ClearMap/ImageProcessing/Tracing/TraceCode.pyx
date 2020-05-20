@@ -14,8 +14,6 @@ __license__   = 'MIT License <http://www.opensource.org/licenses/mit-license.php
 __copyright__ = 'Copyright (c) 2020 by Christoph Kirst'
 
 
-
-
 cimport numpy as np
 import numpy as np
 
@@ -72,7 +70,7 @@ cdef extern from "TraceCode.hpp":
         bool_t verbose
 
 
-cdef extern from "TraceCode.h":
+cdef extern from "TraceCode.hpp":
     cdef cppclass TracerToMask[D, I, M]:
         TracerToMask()
         

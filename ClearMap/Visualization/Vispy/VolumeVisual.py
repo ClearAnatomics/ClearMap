@@ -643,3 +643,4 @@ class VolumeVisual(Visual):
     def _prepare_draw(self, view):
         if self._need_vertex_update:
             self._create_vertex_data()
+

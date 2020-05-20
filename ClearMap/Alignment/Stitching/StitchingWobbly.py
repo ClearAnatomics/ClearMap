@@ -171,7 +171,8 @@ class WobblySource(strg.Source):
   def upper_wobbly(self):
     """The upper corner of the source.
     
-    Returns:
+    Returns
+    -------
     upper : tuple of int
       The coordinates of the upper corner of the source.
     """

@@ -18,6 +18,7 @@ import scipy.ndimage as ndi
 import multiprocessing as mp
 
 import ClearMap.IO.IO as io
+import ClearMap.IO.FileUtils as fu
 
 import ClearMap.ImageProcessing.Topology.Topology3d as t3d
 
@@ -292,12 +293,19 @@ def generate_lookup_table(function = index_to_smoothing, verbose = True, process
   return np.array(lut, dtype = bool);
 
 
-smooth_by_configuration_filename = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Smoothing.npy");
+smooth_by_configuration_filename = "Smoothing.npy";
 """Filename for the look up table mapping a cube configuration to the smoothing action for the center pixel."""
 
 
 def initialize_lookup_table(function = index_to_smoothing, filename = smooth_by_configuration_filename, verbose = True, processes = None):
   """Initialize the lookup table"""
+  
+  filename = os.path.join(os.path.dirname(os.path.abspath(__file__)), filename);
+  
+  #uncompress if only zip file exists.
+  fu.uncompress(filename);
+  
+  #load lookup table
   if os.path.exists(filename):
     if verbose:
       print('Smoothing: Loading look-up table from %s!' % filename)

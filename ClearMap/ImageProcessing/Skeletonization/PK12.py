@@ -27,6 +27,8 @@ import ClearMap.ParallelProcessing.DataProcessing.ConvolvePointList as cpl
 
 import ClearMap.Utils.Timer as tmr
 
+import ClearMap.IO.FileUtils as fu
+
 
 ###############################################################################
 ### Topology
@@ -244,12 +246,16 @@ filename = "PK12.npy";
 def initialize_lookup_table(function = match_index, filename = filename):
   """Initialize the lookup table"""
   
-  fn = os.path.join(os.path.dirname(os.path.abspath(__file__)), filename);
-  if os.path.exists(fn):
-    return np.load(fn);
+  filename = os.path.join(os.path.dirname(os.path.abspath(__file__)), filename);
+  
+  #check if only compressed file exists
+  fu.uncompress(filename)
+  
+  if os.path.exists(filename):
+    return np.load(filename);
   else:
     lut = generate_lookup_table(function=function);
-    np.save(fn, lut);
+    np.save(filename, lut);
     return lut;
 
 

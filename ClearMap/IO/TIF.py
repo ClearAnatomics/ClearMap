@@ -22,7 +22,7 @@ from ClearMap.Utils.Lazy import lazyattr
 class Source(src.Source):
   """Class to handle a tif file source
   
-  Noteregion
+  Note
   ----
   Its assumed that the image data is stored in a serregionies of the tif file.
   """

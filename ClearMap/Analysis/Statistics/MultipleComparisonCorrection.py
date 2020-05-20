@@ -184,5 +184,12 @@ def estimate_q_values(pvalues, m = None, pi0 = None, verbose = False, low_memory
   return qv
   
 
+###############################################################################
+### Tests
+###############################################################################
+
+def _test():
+  import numpy as np
+  import ClearMap.Analysis.Statistics.MultipleComparisonCorrection as mcc
 
 

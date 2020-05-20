@@ -40,7 +40,7 @@ def correct_lightsheet(source, percentile = 0.25, max_bin=2**12, mask=None,
     Optional mask.
   lightsheet : dict
     Parameter to pass to the percentile routine for the lightsheet artifact
-    estimate. See :func:`ClearMap.
+    estimate. See :func:`ImageProcessing.Filter.Rank.percentile`.
   background : dict
     Parameter to pass to the percentile rouitne for the background estimation.
   lightsheet_vs_background : float

@@ -52,7 +52,8 @@ def filter_kernel(ftype = 'Gaussian', shape = (5,5), radius = None, sigma = None
     Radius of the kernel (if applicable).
   sigma : tuple or float
     Std for the first gaussian (if applicable).
-  sigma2 (tuple or float): std of a second gaussian (if present)
+  sigma2 : tuple or float
+    Std of a second gaussian (if present).
   
   Returns
   -------
@@ -82,7 +83,8 @@ def filter_kernel_2d(ftype = 'Gaussian', shape = (5,5), sigma = None, sigma2 = N
     Radius of the kernel (if applicable).
   sigma : tuple or float
     Std for the first gaussian (if applicable).
-  sigma2 (tuple or float): std of a second gaussian (if present)
+  sigma2 : tuple or float
+    Std of a second gaussian (if present).
   
   Returns
   -------
@@ -220,7 +222,8 @@ def filter_kernel_3d(ftype = 'Gaussian', shape = (5,5,5), sigma = None, sigma2 =
     Radius of the kernel (if applicable).
   sigma : tuple or float
     Std for the first gaussian (if applicable).
-  sigma2 (tuple or float): std of a second gaussian (if present)
+  sigma2 : tuple or float
+    Std of a second gaussian (if present).
   
   Returns
   -------

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Resmapling
+Resampling
 ==========
 
 The *Resampling* module provides methods to resample and reorient data. 
@@ -207,6 +207,7 @@ def resample_shape(source_shape, sink_shape = None, source_resolution = None, si
   source_shape : tuple
     The shape of the source.
   sink_shape : tuple
+    The shape of the sink.
   source_resolution : tuple or None
     The resolution of the source.
   sink_resolution : tuple or None
