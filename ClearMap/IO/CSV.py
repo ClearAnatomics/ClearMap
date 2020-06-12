@@ -32,7 +32,7 @@ class Source(src.Source):
     Arguments
     ---------
     location : str
-      The file nameof the csv source.
+      The filename of the csv source.
     """
     self._location = location;
    

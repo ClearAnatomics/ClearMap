@@ -9,6 +9,7 @@ import glob
 import natsort
 import warnings
 import itertools
+import numbers
 
 import numpy as np
 import multiprocessing as mp
@@ -152,7 +153,7 @@ class Source(src.VirtualSource):
   @shape.setter
   def shape(self, value):
     self._shape = value;
-  
+
   
   @property 
   def dtype(self):
@@ -173,8 +174,46 @@ class Source(src.VirtualSource):
     #TODO:
     raise NotImplementedError();
   
-   
+  
+  @property
+  def ndim_file(self):
+    """Source dimension of the individual files."""
+    return len(self.shape_file);
+  
+  
+  @property 
+  def ndim_list(self):
+    """Source dimensions of the file list."""
+    return len(self.shape_list);
+  
+  
+  @property
+  def shape_file(self):
+    """Source shape of the individual files."""
+    return shape_file(expression=self._expression, file_list=self._file_list);
+  
+  
+  @property
+  def shape_list(self):
+    """Source shape of the file list."""
+    return shape_list(expression=self._expression, file_list=self._file_list, axes_order=self.axes_order);
+  
+  
+  @property
+  def axes_file(self):
+    """Source axes that constitute individual file dimensions in the full array."""
+    return tuple(i for i in range(self.ndim_file));
+  
+  
+  @property 
+  def axes_list(self):
+    """Source axes that constitute the dimensions of the file list in the full array."""
+    ndim_file = self.ndim_file;
+    return tuple(ndim_file + i for i in range(self.ndim_list));
+  
+  
   def tag_to_axes_order(self):
+    """Map from the tag list from the file expression and the axes of this source."""
     tag_names = self.expression.tag_names();
     axes_order = self.axes_order;
     tag_to_axes = [];
@@ -186,6 +225,7 @@ class Source(src.VirtualSource):
     return tag_to_axes;
     
   def axes_to_tag_order(self):
+    """Map from axes of this source to the tag list from the file expression."""
     tag_names = self.expression.tag_names();
     axes_order = self.axes_order;
     axes_to_tags = []
@@ -237,10 +277,10 @@ class Source(src.VirtualSource):
       elif isinstance(sl, (list, np.ndarray)):
         indices.append(np.array(sl) + i);
         n = len(indices[-1]);
-        slicing_list_indices.append(range(n));
+        slicing_list_indices.append(sl);
         shape_list_keep_dims += (n,);
         slicing_keep_dims_to_final += (slice(None),);
-      elif isinstance(sl, int):
+      elif isinstance(sl, numbers.Integral):
         indices.append([sl + i]);
         slicing_list_indices.append([0]);
         shape_list_keep_dims += (1,);
@@ -262,7 +302,7 @@ class Source(src.VirtualSource):
     
     dtype = self.dtype;
     
-    data = np.zeros(sliced_shape_file + shape_list_keep_dims, dtype = dtype, order = order);    
+    data = np.zeros(sliced_shape_file + shape_list_keep_dims, dtype=dtype, order=order);    
     
     @ptb.parallel_traceback
     def func(filename, index, data=data, slicing=slicing_file):
@@ -312,7 +352,7 @@ class Source(src.VirtualSource):
         indices.append(range(*slice_indices));
       elif isinstance(sl, (list, np.ndarray)):
         indices.append(np.array(sl) + i);
-      elif isinstance(sl, int):
+      elif isinstance(sl, numbers.Integral):
         indices.append([sl + i]);
       else:
         raise IndexError('Invalid slice specification %r!' % sl )
@@ -329,7 +369,7 @@ class Source(src.VirtualSource):
      
     #create directory if it does not exists
     #Note: move this to func if files need to be distributed accross several directories
-    fu.create_directory(fl[0], split = True);     
+    fu.create_directory(fl[0], split=True);     
     
     if processes is None:
       processes = mp.cpu_count();
@@ -641,6 +681,7 @@ def ndim(expression = None, file_list = None):
   return io.ndim(file_list[0]) + expression.ntags();
 
 
+#TODO: arbitrary axes mixing file and list dimensions
 def shape(expression = None, file_list = None, axes_order = None, axis = None):
   """Calculates the shape of the data in a file list.
   
@@ -662,6 +703,71 @@ def shape(expression = None, file_list = None, axes_order = None, axis = None):
     The shape of the array st  ored in a file list.
   """
   expression, file_list = _expression_and_file_list(expression=expression, file_list=file_list);
+
+  shapelist = shape_list(expression=expression, file_list=file_list, axes_order=axes_order);
+  
+  if axis is not None:
+    if axis < 0 and -axis < len(shapelist):
+      return shapelist[axis];
+    
+  #determine dimensions in each file
+  shapefile = shape_file(expression=expression, file_list=file_list);
+  
+  #full shape
+  shape_full = shapefile + shapelist;
+  
+  if axis is not None:
+    return shape_full[axis];
+  else:
+    return shape_full;
+
+
+def shape_file(expression = None, file_list = None):
+  """Calculates the shape of the data in a file list.
+  
+  Arguments
+  ---------
+  expression : str or None
+    The regular epression for the file list.
+  file_list : list or None
+    List of files.
+  
+  Returns
+  -------
+  shape : int or tuple of ints
+    The shape of the array st  ored in a file list.
+  """
+  expression, file_list = _expression_and_file_list(expression=expression, file_list=file_list);
+  
+  if len(file_list) == 0:
+    raise ValueError('Cannot determine dimension of the file list %r without files.!' % expression);
+  
+  #determine dimensions in each file
+  shape_file = io.shape(file_list[0]);
+  
+  return shape_file;
+
+  
+def shape_list(expression = None, file_list = None, axes_order = None):
+  """Calculates the shape of the data in a file list.
+  
+  Arguments
+  ---------
+  expression : str or None
+    The regular epression for the file list.
+  file_list : list or None
+    List of files.
+
+  axes_order : list or None
+    The names of how to order the different tag names in the expression. 
+    If None, use ordering of the tags in the expression.
+  
+  Returns
+  -------
+  shape : int or tuple of ints
+    The shape of the array along the dimensions created by the file list.
+  """
+  expression, file_list = _expression_and_file_list(expression=expression, file_list=file_list);
   
   if len(file_list) == 0:
     raise ValueError('Cannot determine dimension of the file list %r without files.!' % expression);
@@ -670,34 +776,22 @@ def shape(expression = None, file_list = None, axes_order = None, axis = None):
   if axes_order is None:
     axes_order = expression.tag_names();
   
-  #determine dimensions alond the file list
+  #determine dimensions along the file list
   values0 = expression.values(file_list[0]);
   if len(axes_order) == 1:
     shape_list = (len(file_list),);
   else:
-    shape_list = [];
+    shape_list = ();
     for a in axes_order:
       values = values0.copy();
       values.__delitem__(a);
       e = te.Expression(expression.string(values = values));
       search = re.compile(e.re()).search;
-      shape_list.append(len([f for f in file_list if search(f)]));
-    shape_list = tuple(shape_list);
-  
-  if axis is not None:
-    if axis < 0 and -axis < len(shape_list):
-      return shape_list[axis];
-    
-  #determine dimensions in each file
-  shape_file = io.shape(file_list[0]);
-  
-  #full shape
-  shape_full = shape_file + shape_list;
-  
-  if axis is not None:
-    return shape_full[axis];
-  else:
-    return shape_full;
+      shape_list += (len([f for f in file_list if search(f)]),);
+
+  return shape_list;
+
+ 
   
 
 def dtype(expression = None, file_list = None):
@@ -852,6 +946,78 @@ def _expression_or_file_list(expression = None, file_list = None):
 
 
 ###############################################################################
+### Conversions
+###############################################################################
+
+def convert(source, sink, processes = None, verbose = False):
+  """Converts list of files to a sink in parallel
+  
+  Arguments
+  ---------
+  source : Source
+    File list source.
+  sink : Source
+    A sink to write the source to.
+     
+  Returns
+  -------
+  sink : Source
+    The sink the data was converted to.
+  """
+  
+  # read files
+  if not isinstance(source, Source):
+    raise ValueError('Source should be a FileList source, found %r!' % source);
+  
+  expression  = source.expression;
+  shape = source.shape;
+  dtype = source.dtype;
+  shape_list = source.shape_list;
+  file_list = source.file_list;
+  
+  #genereate file lists and slicings
+  indices_file_start = expression.indices(file_list[0]);
+  indices_slice = [np.arange(s) for s in shape_list];
+  indices_file  = [s + i for i,s in zip(indices_file_start, indices_slice)];
+  
+  indices_file.reverse()
+  indices_file = itertools.product(*indices_file);
+  indices_file = [i[::-1] for i in indices_file];
+  
+  indices_slice.reverse()
+  indices_slice = itertools.product(*indices_slice);
+  indices_slice = [i[::-1] for i in indices_slice];
+    
+  axes_to_tags = source.axes_to_tag_order();
+  if len(axes_to_tags) > 1 and axes_to_tags != list(range(len(axes_to_tags))):
+    indices_file = [tuple(i[j] for j in axes_to_tags) for i in indices_file];
+  file_list = [expression.string_from_index(i) for i in indices_file];
+  
+  print(sink);
+  sink = io.create(sink, shape=shape, dtype=dtype);
+  sink_virtual = sink.as_virtual();
+  
+  if processes is None:
+    processes = mp.cpu_count();
+
+  @ptb.parallel_traceback
+  def _convert(filename, index_slicing, sink=sink_virtual, verbose=verbose):
+    slicing = (Ellipsis,) + index_slicing;
+    if verbose:
+      print('Converting slice %r' % (slicing,))
+    sink.as_real()[slicing] = io.read(filename, processes='serial');
+  
+  if processes == 'serial':
+    for f,i in zip(file_list, indices_slice):
+      _convert(f,i);
+  else:
+    with concurrent.futures.ThreadPoolExecutor(processes) as executor:
+      executor.map(_convert, file_list, indices_slice);
+
+  return sink;
+  
+
+###############################################################################
 ### Tests
 ###############################################################################
 
@@ -945,81 +1111,6 @@ def _test():
 #
 #
 #
-#def _convertToNPYParallel(arg):
-#    """Convert helper function to use for parallel conversion of image slices into a numpy memmap"""
-#    
-#    source = arg[0];
-#    sink = arg[1];
-#    z = arg[2];
-#    ii = arg[3];
-#    nn = arg[4];
-#    
-#    if ii is not None:
-#      pw = ProcessWriter(ii);
-#      pw.write("convertingData: converting image %d / %d" % (ii, nn))    
-#      #pw.write('%s -> %s' % (fileSource, fileSink));
-#
-#    data = io.readData(source);
-#    sink = np.lib.format.open_memmap(sink, 'r+');
-#    sink[:,:,z] = data[:,:];
-#    
-#
-#def convert(source, sink, verbose = True, processes = all):
-#  """Converts list of image files to a numpy array on disk
-#  
-#  Arguments:
-#    source (str): file expression of source
-#    sink (str): filename
-#  
-#  Return:
-#    str: filename of numpy file
-#  """
-#  
-#  # read files
-#  fpath, flist = readFileList(source);
-#  nz = len(flist);
-#  if nz == 0:
-#    raise RuntimeError('No files matching %s found  to convert !' % source);
-#  
-#  firstfile = os.path.join(fpath, flist[0]);
-#  shape = io.dataSize(firstfile) + (nz,);
-#  
-#  data = io.readData(firstfile);
-#  dtype = data.dtype;
-#  #TODO: dtype = io.dataType(firstfile);
-#  
-#  # create memmap
-#  memmap = np.lib.format.open_memmap(sink, 'w+', shape = shape, dtype = dtype, fortran_order = True);
-#    
-#  if processes is None:
-#    processes = 1;
-#  if processes is all:
-#    processes = multiprocessing.cpu_count();
-#    
-#  if processes > 1: #parallel processing
-#    pool = multiprocessing.Pool(processes=processes);
-#    argdata = [];
-#   
-#    for i,z in enumerate(range(nz)):
-#      if verbose:
-#        argdata.append( (os.path.join(fpath, flist[z]), sink, z, (i+1), (nz+1)) );    
-#      else:
-#        argdata.append( (os.path.join(fpath, flist[z]), sink, z, None, None) );
-#      
-#    pool.map(_convertToNPYParallel, argdata);
-#    
-#  else: # sequential processing
-#    for i,z in enumerate(range(nz)):
-#      if verbose:
-#        print "convertData: converting image %d / %d" % (i+1, nz+1);
-#      
-#      fileSource = os.path.join(fpath, flist[z]);
-#      data = io.readData(fileSource);
-#      memmap[:,:,z] = data[:,:];
-#        
-#    memmap.flush();
-#    
-#  return sink;
 #
 #
 #def _cropParallel(arg):

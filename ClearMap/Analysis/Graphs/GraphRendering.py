@@ -5,7 +5,14 @@ GraphVisualization
 ==================
 
 Module providing tools to create meshes and visualize graphs.
+
 """
+__author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
+__license__   = 'GPLv3 - GNU General Pulic License v3 (see LICENSE)'
+__copyright__ = 'Copyright © 2020 by Christoph Kirst'
+__webpage__   = 'http://idisco.info'
+__download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
+
 
 import numpy as np
 
@@ -225,7 +232,7 @@ def _parallel_mesh(i, coordinates_hdl, radii_hdl, indices_hdl, n_tube_points = 1
 def interpolate_edge_geometry(graph, smooth = 5, order = 2,
                               points_per_pixel = 0.5, 
                               processes = None, verbose = False):
-  """Smooth center linesa dn radii of the edge geometry."""
+  """Smooth center lines and radii of the edge geometry."""
   if not graph.has_edge_geometry():
     raise ValueError('Graph has no edge geometry!')
   
@@ -251,9 +258,9 @@ def interpolate_edge_geometry(graph, smooth = 5, order = 2,
 #  indices_interp_hdl     = smm.insert(indices_interp);
   
   func = ft.partial(_parallel_interpolate, 
-                  coordinates_hdl=coordinates_hdl, radii_hdl=radii_hdl, indices_hdl=indices_hdl,
-#                  coordinates_interp_hdl=coordinates_interp_hdl, radii_interp_hdl=radii_interp_hdl, indices_interp_hdl=indices_interp_hdl,   
-                  smooth=smooth, order=order, points_per_pixel=points_per_pixel, verbose=verbose);
+                    coordinates_hdl=coordinates_hdl, radii_hdl=radii_hdl, indices_hdl=indices_hdl,
+#                   coordinates_interp_hdl=coordinates_interp_hdl, radii_interp_hdl=radii_interp_hdl, indices_interp_hdl=indices_interp_hdl,   
+                    smooth=smooth, order=order, points_per_pixel=points_per_pixel, verbose=verbose);
   argdata = np.arange(len(indices));
   
   pool = smm.mp.Pool(processes = processes);    

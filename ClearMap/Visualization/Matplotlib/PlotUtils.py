@@ -13,6 +13,7 @@ __author__    = 'Christoph Kirst <ckirst@rockefeller.edu>'
 __license__   = 'MIT License <http://www.opensource.org/licenses/mit-license.php>'
 __copyright__ = 'Copyright (c) 2017 by Christoph Kirst, The Rockefeller University, New York City'
 
+import math
 import numpy as np
 
 import matplotlib as mpl; # analysis:ignore
@@ -84,3 +85,44 @@ def plot_curve(coordinates, **kwargs):
   ax.plot(x, y, z, **kwargs)
   return ax;
 
+
+def subplot_tiling(n, tiling = None):
+  """Finds a good tiling to arrange subplots.
+  
+  Arguments
+  ---------
+  n : int
+    Number of subplots.
+  tiling : None, 'automatic, int or tuple
+    The tiling to use. If None or 'automatic' calculate automatically.
+    If number use this for the number of subplots along the horizontal axis.
+    If tuple, (nx,ny) nx and ny can be numbes or None to indicate the number
+    of sub-plots in each axis. Iif one of them is None, it will be 
+    determined automatically to fit the total number of plots.
+  
+  Returns
+  -------
+  tiling : tuple of int
+    The subplot tiling.
+  """
+  if tiling is None:
+    tiling = 'automatic';
+  if tiling == "automatic":
+    nx = math.floor(math.sqrt(n));
+    ny = int(math.ceil(n / nx));
+    nx = int(nx);
+  else:
+    if not isinstance(tiling, tuple):
+      tiling = (tiling,None);
+    if tiling[0] is None:
+      ny = tiling[1];
+      if ny is None:
+        return subplot_tiling(n);
+      nx = int(math.ceil(n / ny));
+    if tiling[1] is None:
+      nx = tiling[0];
+      if nx is None:
+        return subplot_tiling(n);
+      ny = int(math.ceil(n / nx));  
+
+  return (nx,ny);

@@ -30,6 +30,8 @@ import ClearMap.IO.CSV as csv
 import ClearMap.IO.NPY as npy
 import ClearMap.IO.MMP as mmp
 import ClearMap.IO.SMA as sma
+import ClearMap.IO.MHD as mhd
+import ClearMap.IO.GT as gt
 import ClearMap.IO.FileList as fl
 import ClearMap.IO.FileUtils as fu
 
@@ -52,10 +54,10 @@ from ClearMap.IO.FileUtils import (is_file, is_directory, file_extension,   #ana
 ### Source associations 
 ###############################################################################
 
-source_modules = [npy, tif, mmp, sma, fl, nrrd, csv];
+source_modules = [npy, tif, mmp, sma, fl, nrrd, csv, gt];
 """The valid source modules."""
 
-file_extension_to_module = {"npy" : mmp, "tif" : tif, 'nrrd' : nrrd, 'nrdh' : nrrd, 'csv' : csv};
+file_extension_to_module = {"npy" : mmp, "tif" : tif, 'nrrd' : nrrd, 'nrdh' : nrrd, 'csv' : csv, 'gt' : gt};
 """Map between file extensions and modules that handle this file type."""        
 
 ###############################################################################
@@ -667,8 +669,8 @@ def min_value(source):
 
 
 
-def convert(source, sink, processes = None, verbose = False, **args):
-  """Transforms data from source format to sink format
+def convert(source, sink, processes = None, verbose = False, **kwargs):
+  """Transforms a source into another format.
   
   Arguments
   ---------
@@ -682,47 +684,54 @@ def convert(source, sink, processes = None, verbose = False, **args):
   sink : sink speicication
     The sink or list of sinkfs.
   """      
-  if source is None:
-    return None;
-  if not isinstance(source, (tuple, list)):
-    sources = [source];
+  source = as_source(source);
+  if verbose:
+    print('converting %s -> %s' % (source, sink)) 
+  mod = source_to_module(source);
+  if hasattr(mod, 'convert'):
+    return mod.convert(source, sink, processes=processes, verbose=verbose, **kwargs);
   else:
-    sources = source;
-  if not isinstance(sink, (tuple, list)):
-    sinks = [sink];
-  else:
-    sinks = sink;
-  
-  @ptb.parallel_traceback
-  def _convert(s,r, verbose = verbose):
-    s = as_source(s);
-    r = as_source(r);
-    if verbose:
-      print('converting %s -> %s' % (s,r))
-    write(s,r);
-  
+    write(sink, source);
+
   if not isinstance(processes, int) and processes != 'serial':
     processes = mp.cpu_count();
-  
-  if processes == 'serial':
-    [_convert(s,r) for s,r in zip(sources, sinks)];
-  else:
-    with concurrent.futures.ThreadPoolExecutor(processes) as executor:
-        executor.map(_convert, sources, sinks);
-  
-  return sinks;
 
 
-def convert_files(filenames, extension = None, path = None, processes = None, verbose = False, **args):
-  """Transforms data files to sink format.
+
+def convert_sources(sources, sinks, processes = None, verbose = False, **kwargs):
+  """Transforms a list of sources into another format in parallel.
+  
+  Arguments
+  ---------
+  sources : source specification
+    The source or list of sources.
+  sink : source specification
+    The sink or list of sinks.
+  
+  Returns
+  -------
+  sink : sink speicication
+    The sink or list of sinkfs.
+  """      
+  
+  
+
+
+def convert_files(filenames, extension = None, path = None, processes = None, verbose = False):
+  """Transforms list of files to their sink format in parallel.
   
   Arguments
   ---------
   filenames : list of str
     The filenames to convert
   extension : str
-    The new file name extension.
-    
+    The new file format extension.
+  path : str or None
+    Optional path speicfication.
+  processes : int, 'serial' or None
+    The number of processes to use for parallel conversion.
+  verbose : bool
+    If True, print progress information.
   
   Returns
   -------
@@ -746,10 +755,20 @@ def convert_files(filenames, extension = None, path = None, processes = None, ve
   if not isinstance(processes, int) and processes != 'serial':
     processes = mp.cpu_count();
   
+  @ptb.parallel_traceback
+  def _convert_files(source, sink, fid, n_files, extension, verbose):
+    source = as_source(source);              
+    if verbose:
+      print('Converting file %d/%d %s -> %s' % (fid,n_files,source,sink))
+    mod = file_extension_to_module[extension];    
+    if mod is None:
+      raise ValueError("Cannot determine module for extension %s!" % extension);
+    mod.write(sink,source);
+  
   _convert = functools.partial(_convert_files, n_files=n_files, extension=extension, verbose=verbose);
   
   if processes == 'serial':
-    [_convert(s,r,i) for i,s,r in zip(range(n_files), filenames, sinks)];
+    [_convert(source,sink,i) for i,source,sink in zip(range(n_files), filenames, sinks)];
   else:
     with concurrent.futures.ProcessPoolExecutor(processes) as executor:
       executor.map(_convert, filenames, sinks, range(n_files));
@@ -759,13 +778,7 @@ def convert_files(filenames, extension = None, path = None, processes = None, ve
   
   return sinks;
 
-#@ptb.parallel_traceback
-def _convert_files(s,r,fid,n_files, extension, verbose):
-  s = as_source(s);              
-  if verbose:
-    print('Converting file %d/%d %s -> %s' % (fid,n_files,s,r))
-  mod = file_extension_to_module[extension];    
-  mod.write(r,s);
+
 
 
 ###############################################################################

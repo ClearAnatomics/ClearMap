@@ -83,7 +83,7 @@ def list_line_plot_3d(coordinates, view = None, title = None, center_view = True
   return p;
 
 
-def list_plot_3d(coordinates, view = None, title = None, center_view = True,  **kwargs):
+def list_plot_3d(coordinates, view = None, title = None, center_view = True, color = None, **kwargs):
   """Scatter plot of points in 3d.
   
   Arguments
@@ -108,6 +108,10 @@ def list_plot_3d(coordinates, view = None, title = None, center_view = True,  **
   view = initialize_view(view, title=title);
   
   #style
+  if color and 'face_color' not in kwargs.keys():
+    kwargs.update(face_color=color);
+  if color and 'edge_color' not in kwargs.keys():
+    kwargs.update(edge_color=color);
   style = dict(face_color='blue', symbol='o', size=10,
                edge_width=0.5, edge_color='blue')
   style.update(**kwargs)
@@ -155,6 +159,7 @@ def plot_3d(source, colormap = None, view = None, title = None, center_view = Tr
   style.update(**kwargs);
   
   #source
+  source = io.as_source(source)[:];
   if source.dtype==bool:
     source = source.view(dtype='uint8');
   

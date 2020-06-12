@@ -210,8 +210,8 @@ def n_groups(expression):
   expression : str
     The regular expression.
   
-  Retuns
-  ------
+  Returns
+  -------
   n : int
    The number of groups in the epxression.
   """

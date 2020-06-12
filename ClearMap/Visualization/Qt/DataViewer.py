@@ -20,7 +20,7 @@ import functools as ft
 #from PyQt5.QtWidgets import *
 
 import pyqtgraph as pg
-pg.CONFIG_OPTIONS['useOpenGL'] = True
+pg.CONFIG_OPTIONS['useOpenGL'] = False  # set to False if trouble seeing data.
 
 if not pg.QAPP: 
   pg.mkQApp()
@@ -65,7 +65,7 @@ class LUTWidget(pg.GraphicsView):
     
   def __init__(self, parent = None,  *args, **kargs):
     background = kargs.get('background', 'default')
-    pg.GraphicsView.__init__(self, parent = parent, useOpenGL = False, background = background)
+    pg.GraphicsView.__init__(self, parent=parent, useOpenGL=True, background=background)
     self.item = LUTItem(*args, **kargs)
     self.setCentralItem(self.item)
     #self.setSizePolicy(pg.QtGui.QSizePolicy.Minimum, pg.QtGui.QSizePolicy.Expanding)
@@ -155,12 +155,13 @@ class LUT(pg.QtGui.QWidget):
       sl = tuple(sl);
       data = data[sl]
     return np.nanpercentile(data, percentiles);
-  
 
+  
 ############################################################################################################
 ###  DataViewer
 ############################################################################################################
-    
+
+
 class DataViewer(pg.QtGui.QWidget):
   def __init__(self, source, axis = None, scale = None, title = None, invertY = False, minMax = None, screen = None, parent = None, *args):
     ### Images soures
@@ -208,7 +209,8 @@ class DataViewer(pg.QtGui.QWidget):
     #print('image')
     
     #  Image plots
-    self.image_items = [pg.ImageItem(s[self.source_slice]) for s in self.sources];
+    image_options = dict(clipToView = True, autoDownsample = True, autoLevels = False, useOpenGL = None);
+    self.image_items = [pg.ImageItem(s[self.source_slice[:s.ndim]], **image_options) for s in self.sources];
     for i in self.image_items:
       i.setRect(pg.QtCore.QRect(0, 0, self.source_range_x, self.source_range_y))
       i.setCompositionMode(pg.QtGui.QPainter.CompositionMode_Plus);
@@ -318,28 +320,33 @@ class DataViewer(pg.QtGui.QWidget):
     if not isinstance(source, list):
       source = [source];
     self.nsources = len(source);
-    self.sources  = [io.as_source(s)[:] for s in source];
+    self.sources  = [io.as_source(s) for s in source];
     
     # avoid bools
-    for i,s in enumerate(self.sources):
-      if s.dtype == bool:
-        self.sources[i] = s.view('uint8');
+    #for i,s in enumerate(self.sources):
+    #  if s.dtype == bool:
+    #    self.sources[i] = s.view('uint8');
      
-    # ensure 3d images 
-    for i,s in enumerate(self.sources):
-      if s.ndim == 2:
-        s = s.view();
-        s.shape = s.shape + (1,);
-        self.sources[i] = s;
-      if s.ndim != 3:
-        raise RuntimeError('Sources dont have dimensions 2 or 3 but %d in source %d!' % (s.ndim, i));
+    # # ensure 3d images 
+    # for i,s in enumerate(self.sources):
+    #   if s.ndim == 2:
+    #     s = s.view();
+    #     s.shape = s.shape + (1,);
+    #     self.sources[i] = s;
+    #   if s.ndim != 3:
+    #     raise RuntimeError('Sources dont have dimensions 2 or 3 but %d in source %d!' % (s.ndim, i));
     
     # source shapes
-    self.source_shape = self.sources[0].shape;  
-    self.source_shape2 = np.array(np.array(self.source_shape, dtype = float) / 2, dtype = int);
-    for i,s in enumerate(self.sources):
-      if s.shape != self.source_shape:
-        raise RuntimeError('Sources dont have the same shape %r vs %r in source %d!' % (self.source_shape, s.shape, i));
+    self.source_shape = self.shape3d(self.sources[0].shape);  
+    for s in self.sources:
+      if s.ndim > 3:
+        raise RuntimeError('Source has %d > 3 dimensions: %r!' % (s.ndim, s));
+      if self.shape3d(s.shape) != self.source_shape:
+        raise RuntimeError('Sources shape %r vs %r in source %r!' % (self.source_shape, s.shape, s));
+        
+    self.source_shape2 = np.array(np.array(self.source_shape, dtype=float)/2, dtype=int);
+    # for i,s in enumerate(self.sources):
+    #  
     
     # slicing
     if axis is None:
@@ -354,6 +361,7 @@ class DataViewer(pg.QtGui.QWidget):
       scale = np.array(scale);
     scale = np.hstack([scale, [1]*3])[:3];
     self.source_scale = scale;
+    #print(self.source_shape, self.source_scale)
 
     self.updateSourceRange();
     self.updateSourceSlice();
@@ -390,7 +398,7 @@ class DataViewer(pg.QtGui.QWidget):
       if s.ndim != 3:
         raise RuntimeError('Sources dont have dimensions 2 or 3 but %d in source %d!' % (s.ndim, i));
       
-      self.image_items[i].updateImage(s[self.source_slice]);
+      self.image_items[i].updateImage(s[self.source_slice[:s.ndims]]);
     
     self.sources = source;
   
@@ -467,10 +475,18 @@ class DataViewer(pg.QtGui.QWidget):
       #print(self.source_slice)
       #print(self.source_shape);
       #print(self.source_scale)
-      i.updateImage(s[self.source_slice]);
+      image = s[self.source_slice[:s.ndim]];
+      if image.dtype == bool:
+        image = s.view('uint8');
+      #print(image.shape);
+      i.updateImage(image);
       
   def setMinMax(self, minMax, source = 0):
     self.luts[source].lut.region.setRegion(minMax);
+  
+    
+  def shape3d(self, shape):
+    return (shape + (1,) * 3)[:3];
   
 
 

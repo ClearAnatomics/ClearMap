@@ -337,7 +337,7 @@ def _memmap(location = None, shape = None, dtype = None, order = None, mode = No
   
   if array is None:
     if shape is None:
-      raise ValueError('Cannot create memmap without shape!');
+      raise ValueError('Cannot create memmap without shape at location %r!' % location);
     
     mode = 'w+' if mode is None else mode;
     fortran = order in ['F', None]; #default is 'F' for memmaps

@@ -119,7 +119,7 @@ def find_maxima(source, h_max = None, shape = 5, threshold = None, verbose = Non
   shape : int or tuple
     Shape for the structure element for the local maxima filter.
   threshold : float or None
-    If float, include only maxima larger the threshold.
+    If float, include only maxima larger than this threshold.
   verbose : bool
     Print progress info.
   
@@ -149,7 +149,7 @@ def find_maxima(source, h_max = None, shape = 5, threshold = None, verbose = Non
   
   #thresholding    
   if not threshold is None:
-    maxima = np.logical_and(maxima, maxima >= threshold);
+    maxima = np.logical_and(maxima, source >= threshold);
   
   if verbose:
     timer.print_elapsed_time(head='Find Maxima');

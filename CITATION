@@ -1,0 +1,21 @@
+@article{kirst2020mapping,
+  title={Mapping the fine-scale organization and plasticity of the brain vasculature},
+  author={Kirst, Christoph and Skriabine, Sophie and Vieites-Prado, Alba and Topilko, Thomas and Bertin, Paul and Gerschenfeld, Gaspard and Verny, Florine and Topilko, Piotr and Michalski, Nicolas and Tessier-Lavigne, Marc and others},
+  journal={Cell},
+  volume={180},
+  number={4},
+  pages={780--795},
+  year={2020},
+  publisher={Elsevier}
+}
+
+@article{renier2016mapping,
+  title={Mapping of brain activity by automated volume analysis of immediate early genes},
+  author={Renier, Nicolas and Adams, Eliza L and Kirst, Christoph and Wu, Zhuhao and Azevedo, Ricardo and Kohl, Johannes and Autry, Anita E and Kadiri, Lolahon and Venkataraju, Kannan Umadevi and Zhou, Yu and others},
+  journal={Cell},
+  volume={165},
+  number={7},
+  pages={1789--1802},
+  year={2016},
+  publisher={Elsevier}
+}

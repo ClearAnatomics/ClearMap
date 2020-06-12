@@ -225,19 +225,22 @@ def fill_vessels(source, sink,
     result_slicing = tuple(slice(None,min(ss, rs)) for ss,rs in zip(sink_shape, result_shape[2:]));
     data_slicing = (0,) + tuple(slice(None, s.stop) for s in result_slicing);
     sink_slicing = bp.blk.slc.sliced_slicing(result_slicing, sink_slicing, sink_shape);  
+    result_slicing = (0,0) + result_slicing;
+
+    #print('result', result.shape, result_slicing, 'data', data.shape, data_slicing, 'sink', sink_shape, sink_slicing)
     
     if threshold:
       sink_prev = torch.from_numpy(np.asarray(sink[sink_slicing], dtype='uint8'));
     else:
       sink_prev = torch.from_numpy(sink[sink_slicing]);
-    #print(sink_prev.shape, sink_shape, result_shape);
-    #print(sink_slicing, result_slicing, data_slicing)
     
     if cuda:
       sink_prev = sink_prev.cuda();
       sink_prev = tor.to(sink_prev, dtype=dtype);
     else:
       sink_prev  = sink_prev.float();
+
+    #print('slices:', result[result_slicing].shape, data[data_slicing].shape, sink_prev.shape)
     
     result = torch.max(torch.max(result[result_slicing], data[data_slicing]), sink_prev);
     if threshold:

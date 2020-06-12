@@ -69,7 +69,7 @@ class Source(src.Source):
   
   @property
   def array(self, processes = None):
-     array = self._tif.asarray(validate = False, maxworkers=processes);
+     array = self._tif.asarray(maxworkers=processes);
      return array_from_tif(array);
    
   @property
@@ -94,7 +94,7 @@ class Source(src.Source):
       slicing = slc.unpack_slicing(slicing, ndim);
 
       slicing_z  = slicing[-1];
-      array = self._tif.asarray(key = slicing_z, validate = False, maxworkers=processes);
+      array = self._tif.asarray(key = slicing_z, maxworkers=processes);
       array = array_from_tif(array);    
       
       slicing_xy = (Ellipsis,) + slicing[-3:-1];
@@ -103,7 +103,7 @@ class Source(src.Source):
       return array[slicing_xy];
     
     else:
-      array = self._tif.asarray(validate = False, maxworkers=processes);
+      array = self._tif.asarray(maxworkers=processes);
       array = array_from_tif(array)
       return array.__getitem__(slicing);
       

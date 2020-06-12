@@ -13,7 +13,7 @@ An expression is a filename with any number of tags.
 A tag has the format <Name,Type,Width>. 
   * Name : str that specifies the tag name
   * Type : 'I' or 'S' for integer or string, optional and defaults to 'I'
-  * width : int, if given indicates a fixed width  and missing digist or chars
+  * Width : int, if given indicates a fixed width  and missing digist or chars
     are replaced by trailing zeros or spaces.
 
 Example

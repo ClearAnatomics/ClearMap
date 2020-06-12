@@ -23,9 +23,11 @@ References
   - `Allen Brain Atlas <http://mouse.brain-map.org/static/atlas>`_
     
 """
-__author__    = 'Christoph Kirst <ckirst@rockefeller.edu>'
-__license__   = 'MIT License <http://www.opensource.org/licenses/mit-license.php>'
-__copyright__ = 'Copyright 2020 by Christoph Kirst'
+__author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
+__license__   = 'GPLv3 - GNU General Pulic License v3 (see LICENSE)'
+__copyright__ = 'Copyright © 2020 by Christoph Kirst'
+__webpage__   = 'http://idisco.info'
+__download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 
 
 import os
@@ -98,7 +100,7 @@ Note
   atlas with 25um isotropic resolution.
 """
 
-extra_label = [(182305696, 453, 'No label', 'NoL'), 
+default_extra_label = [(182305696, 453, 'No label', 'NoL'), 
                (182305712, 453, 'No label', 'NoL'), 
                (312782560, 315, 'No label', 'NoL'), 
                (312782592, 453, 'No label', 'NoL'), 
@@ -181,7 +183,7 @@ class Label(object):
 class Annotation(object):
   """Class that holds information of the annotated regions."""    
      
-  def __init__(self, label_file = None, extra_label = extra_label, annotation_file = None):  
+  def __init__(self, label_file = None, extra_label = None, annotation_file = None):  
     """Initialization
     
     Arguments
@@ -192,12 +194,17 @@ class Annotation(object):
     self.initialize(label_file=label_file, extra_label=extra_label, annotation_file=annotation_file);
   
   
-  def initialize(self, label_file = None, extra_label = extra_label, annotation_file = None):  
+  def initialize(self, label_file = None, extra_label = None, annotation_file = None):  
     # read json file 
     if label_file is None:
       label_file = default_label_file;
     if annotation_file is None:
       annotation_file = default_annotation_file;
+    if extra_label is None:
+      extra_label = default_extra_label;     
+    if extra_label in ['None', '', False]:   #add nodes for missing labels
+      extra_label = [];
+     
     self.label_file = label_file;
     self.annotation_file = annotation_file;
     self.extra_label = extra_label;
@@ -210,11 +217,7 @@ class Annotation(object):
 
     root = aba['msg'][0];
     self.root = self.initialze_tree(root);
-    
-    #add nodes for missing labels
-    if extra_label is None:
-      extra_label = [];
-    
+
     #maxgraph = max(self.get_list('graph_order'));
     for a in extra_label:
       i, p, n, l = a;
@@ -392,7 +395,7 @@ get_map         = annotation.get_map;
 find            = annotation.find;
 
 
-def initialize(label_file=None, extra_label = extra_label, annotation_file = None):
+def initialize(label_file=None, extra_label = None, annotation_file = None):
   global annotation, n_structures, get_dictionary, get_list, get_map, find
   annotation = Annotation(label_file=label_file, extra_label=extra_label, annotation_file=annotation_file);
   
@@ -406,7 +409,7 @@ def initialize(label_file=None, extra_label = extra_label, annotation_file = Non
 def set_annotation_file(annotation_file):
   initialize(annotation_file=annotation_file, label_file=annotation.label_file, extra_label=annotation.extra_label);
 
-def set_label_file(label_file, extra_label = extra_label):
+def set_label_file(label_file, extra_label = None):
   initialize(annotation_file = annotation.annotation_file, label_file=label_file, extra_label=extra_label);
 
 
@@ -663,9 +666,9 @@ def write_color_annotation(filename, annotation_file = None):
 
 def prepare_annotation_files(slicing = None, orientation = None, 
                              directory = None, postfix = None, 
-                             annotation_file = default_annotation_file, 
-                             reference_file = default_reference_file, 
-                             distance_to_surface_file = default_distance_to_surface_file,
+                             annotation_file = None, 
+                             reference_file = None, 
+                             distance_to_surface_file = None,
                              overwrite = False, verbose = False):
   """Crop the annotation, reference and distance files to match the data.
   
@@ -699,6 +702,12 @@ def prepare_annotation_files(slicing = None, orientation = None,
   distance_to_surface_file : str
     The distance cropped file.
   """
+  if annotation_file is None:
+    annotation_file = default_annotation_file;
+  if reference_file is None:
+    reference_file = default_reference_file;
+  if distance_to_surface_file is None:
+    distance_to_surface_file = default_distance_to_surface_file;
 
   files = [annotation_file, reference_file, distance_to_surface_file];
   

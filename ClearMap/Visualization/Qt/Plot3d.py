@@ -60,7 +60,7 @@ def plot(source, axis = None, scale = None, title = None, invert_y = True, min_m
 
 
 
-def multi_plot(sources, axis = None, scale = None, title = None, invert_y = True, min_max = None, arrange = True, screen = None):
+def multi_plot(sources, axis = None, scale = None, title = None, invert_y = True, min_max = None, arange = True, screen = None):
   """Plot a source as 2d slices.
   
   Arguments
@@ -94,12 +94,15 @@ def multi_plot(sources, axis = None, scale = None, title = None, invert_y = True
   dvs = [dv.DataViewer(source=s, axis=axis, scale=scale, title=t,
                        invertY=invert_y, minMax=min_max) for s,t in zip(sources, title)];
 
-  if arrange:
-    geo = qtu.tiled_layout(len(dvs), percent=80, screen=screen);
-  
-  for d,g in zip(dvs, geo):
-    #d.setFixedSize(int(0.95 * g[2]), int(0.9 * g[3]));                  
-    d.setGeometry(pg.QtCore.QRect(*g));
+  if arange:
+    try:      
+      geo = qtu.tiled_layout(len(dvs), percent=80, screen=screen);
+    
+      for d,g in zip(dvs, geo):
+        #d.setFixedSize(int(0.95 * g[2]), int(0.9 * g[3]));                  
+        d.setGeometry(pg.QtCore.QRect(*g));
+    except:
+      pass
 
   for d1,d2 in zip(dvs[:-1], dvs[1:]):
     synchronize(d1, d2);

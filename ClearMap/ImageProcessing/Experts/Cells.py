@@ -309,9 +309,24 @@ def detect_cells(source, sink = None, cell_detection_parameter = default_cell_de
   
   #merge results
   results = np.vstack([np.hstack(r) for r in results])
-  io.write(sink, results)
-    
-  return sink;                
+  
+  #create column headers
+  header = ['x','y','z'];
+  dtypes = [int, int, int];
+  if cell_detection_parameter['shape_detection'] is not None:
+    header += ['size'];
+    dtypes += [int];
+  measures = cell_detection_parameter['intensity_detection']['measure'];
+  header +=  measures
+  dtypes += [float] * len(measures)
+
+  dt = {'names' : header, 'formats' : dtypes};
+  cells = np.zeros(len(results), dtype=dt);
+  for i,h in enumerate(header):
+    cells[h] = results[:,i];
+  
+  #save results  
+  return io.write(sink, cells);
 
 
 def detect_cells_block(source, parameter = default_cell_detection_parameter):
@@ -596,6 +611,47 @@ def detect_maxima(source, h_max = None, shape = 5, threshold = None, verbose = F
 
 
 ###############################################################################
+### Cell filtering
+###############################################################################
+
+
+def filter_cells(source, sink, thresholds):
+  """Filter a array of detected cells according to the thresholds.
+  
+  Arguments
+  ---------
+  source : str, array or Source
+    The source for the cell data.
+  sink : str, array or Source
+    The sink for the results.
+  thresholds : dict
+    Dictionary of the form {name : threshold} where name refers to the 
+    column in the cell data and threshold can be None, a float 
+    indicating a minimal threshold or a tuple (min,max) where min,max can be
+    None or a minimal and maximal threshold value.
+  
+  Returns
+  -------
+  sink : str, array or Source
+    The thresholded cell data.
+  """
+  source = io.as_source(source);
+  
+  ids = np.ones(source.shape[0], dtype=bool);
+  for k,t in thresholds.items():
+    if t:
+      if not isinstance(t, (tuple, list)):
+        t = (t, None);
+      if t[0] is not None:
+        ids = np.logical_and(ids, t[0] <= source[k])
+      if t[1] is not None:
+        ids = np.logical_and(ids, t[1] > source[k]);
+  cells_filtered = source[ids];
+
+  return io.write(sink, cells_filtered)
+
+
+###############################################################################
 ### Tests
 ###############################################################################
 
@@ -605,32 +661,3 @@ def _test():
   import ClearMap.Visualization.Plot3d as p3d
   import ClearMap.Tests.Files as tsf
   import ClearMap.ImageProcessing.Experts.Cells as cells
-  
-  source = np.array(tsf.source('cfos')[:300,:300,80:120]);
-  source[:,:,[0,-1]] = 0;
-  source[:,[0,-1],:] = 0;
-  source[[0,-1],:,:] = 0;
-    
-  bpar = vasc.default_binarization_parameter.copy();
-  bpar['clip']['clip_range'] = (150, 7000)
-  bpar['as_memory'] = True
-  #bpar['binary_status'] = 'binary_status.npy'
-  
-  ppar = vasc.default_processing_parameter.copy();
-  ppar['processes'] = 10;
-  ppar['size_max'] = 10;
-  
-  sink='binary.npy'
-  #sink=None;
-  
-  binary = vasc.binarize(source, sink=sink, binarization_parameter=bpar, processing_parameter = ppar) 
-  p3d.plot([source, binary])
-
-  import ClearMap.IO.IO as io
-  io.delete_file(sink)
-  
-  pppar = vasc.default_postprocessing_parameter.copy();
-  pppar['smooth']['iterations'] = 3;
-  smoothed = vasc.postprocess(binary, postprocessing_parameter=pppar)
-  p3d.plot([binary, smoothed])
- 

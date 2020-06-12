@@ -914,7 +914,6 @@ def postprocess(source, sink = None, postprocessing_parameter = default_postproc
     timer.print_elapsed_time('Binary post processing');
   
   gc.collect()
-  print('done')
   return None;
   #return sink;
   

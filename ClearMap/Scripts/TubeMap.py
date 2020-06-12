@@ -7,9 +7,11 @@ TubeMap
 This script is the main processing script to generate annotated 
 graphs from vascualture lightsheet data.
 """
-__author__    = 'Christoph Kirst <christoph.kirst@ucsf.edu>'
-__license__   = 'MIT License <http://www.opensource.org/licenses/mit-license.php>'
-__copyright__ = 'Copyright (c) 2020 by Christoph Kirst'
+__author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
+__license__   = 'GPLv3 - GNU General Pulic License v3 (see LICENSE.txt)'
+__copyright__ = 'Copyright © 2020 by Christoph Kirst'
+__webpage__   = 'http://idisco.info'
+__download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 
 #%%############################################################################
 ### Initialization 
@@ -20,7 +22,7 @@ __copyright__ = 'Copyright (c) 2020 by Christoph Kirst'
 from ClearMap.Environment import *  #analysis:ignore
 
 #directories and files
-directory = '/home/ckirst/Science/Projects/WholeBrainClearing/Vasculature/Experiment/TubeMap_Example'    
+directory = '/home/ckirst/Programs/ClearMap2/ClearMap/Tests/Data/TubeMap_Example'    
 
 expression_raw      = 'Raw/20-54-41_acta2_555-podo_cd31l_647_UltraII[<Y,2> x <X,2>]_C00_UltraII Filter0001.ome.npy'          
 expression_arteries = 'Raw/20-54-41_acta2_555-podo_cd31l_647_UltraII[<Y,2> x <X,2>]_C00_UltraII Filter0000.ome.npy'       
@@ -32,13 +34,12 @@ ws = wsp.Workspace('TubeMap', directory=directory);
 ws.update(raw=expression_raw, arteries=expression_arteries, autofluorescence=expression_auto)
 ws.info()
 
-ws.debug = True
 
 #%% Initialize alignment 
 
 #init atals and reference files
 annotation_file, reference_file, distance_file=ano.prepare_annotation_files(
-    slicing=(slice(None),slice(None),slice(0,256)), orientation=(1,-2,3),
+    slicing=(slice(None),slice(None),slice(0,246)), orientation=(1,-2,3),
     overwrite=False, verbose=True);
 
 #alignment parameter files    
@@ -70,9 +71,9 @@ io.convert_files(ws.file_list('arteries', extension='tif'), extension='npy',
           
 layout = stw.WobblyLayout(expression=ws.filename('raw'), tile_axes=['X','Y'], overlaps=(45, 155));  
 
-st.align_layout_rigid_mip(layout, depth=[55, 165, None], max_shifts=[(-30,30),(-30,30),(-20,20)],
+st.align_layout_rigid_mip(layout, depth=[55, 155, None], max_shifts=[(-30,30),(-30,30),(-20,20)],
                           ranges = [None,None,None], background=(400, 100), clip=25000, 
-                           processes=None, verbose=True)
+                          processes=None, verbose=True)
 
 st.place_layout(layout, method='optimization', min_quality=-np.inf, lower_to_origin=True, verbose=True)
 
@@ -115,9 +116,9 @@ stw.stitch_layout(layout, sink = ws.filename('stitched'), method = 'interpolatio
 
 #%% Wobbly stitching - arteries
                                                                                                                                                                 
-layout.replace_source_location(expression_raw, expression_arteries)
+layout.replace_source_location(expression_raw, expression_arteries, method='expression')
 
-stw.stitch_layout(layout, sink = ws.filename('stitched', postfix='arteries'), method = 'interpolation', processes='!serial', verbose=True)
+stw.stitch_layout(layout, sink = ws.filename('stitched', postfix='arteries'), method = 'interpolation', processes='serial', verbose=True)
 
 #p3d.plot(ws.filename('stitched', postfix='arteries')) 
 #p3d.plot([ws.filename('stitched'), ws.filename('stitched', postfix='arteries')])
@@ -136,6 +137,8 @@ resample_parameter = {
     "verbose" : True,             
     };
 
+io.delete_file(ws.filename('resampled'));
+
 res.resample(ws.filename('stitched'), sink=ws.filename('resampled'), **resample_parameter)
 
 #%% Resample autofluorescence
@@ -146,6 +149,8 @@ resample_parameter_auto = {
     "processes" : None,
     "verbose" : True,                
     };    
+
+io.delete_file(ws.filename('resampled', postfix='autofluorescence'));
 
 res.resample(ws.filename('autofluorescence'), sink=ws.filename('resampled', postfix='autofluorescence'), **resample_parameter_auto)
 
@@ -229,6 +234,7 @@ source = ws.filename('binary');
 sink   = ws.filename('binary', postfix='postprocessed');
 
 postprocessing_parameter = vasc.default_postprocessing_parameter.copy();
+#postprocessing_parameter['fill'] = None;
 
 postprocessing_processing_parameter = vasc.default_postprocessing_processing_parameter.copy();
 postprocessing_processing_parameter.update(size_max=100);
@@ -300,6 +306,7 @@ vf.fill_vessels(source, sink, resample=1, threshold=0.5, cuda=None, processing_p
                  
 source = ws.filename('binary', postfix='arteries_postprocessed');
 sink   = ws.filename('binary', postfix='arteries_filled');
+io.delete_file(sink);
 
 processing_parameter = vf.default_fill_vessels_processing_parameter.copy();
 processing_parameter.update(size_max = 1000, 
@@ -490,8 +497,8 @@ graph_reduced.annotate_properties(annotation,
 
 #%% Distance to surface
 
-distance_atlas = io.read('/home/nicolas.renier/Documents/ClearMap_Ressources/annotation_25_1-246Ld_distance.tif');
-distance_atlas_shape = distance_atlas.shape;
+distance_atlas = io.as_source(distance_file)
+distance_atlas_shape = distance_atlas.shape
 
 def distance(coordinates):
   c = np.asarray(np.round(coordinates), dtype=int);
@@ -722,7 +729,7 @@ gs = grt.sub_slice((slice(1,300), slice(270,280), slice(1,240)));
 #Midline
 gs = gr.sub_slice((slice(500,1500), slice(3000,4000), slice(2910,2960)));                  
                   
-#%% Visualization - sub graphs wth veins and arteries
+#%% Visualization - sub graphs with veins and arteries
 
 #color edges
 edge_vein_label = gs.edge_property('vein');

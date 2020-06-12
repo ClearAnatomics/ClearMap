@@ -8,9 +8,11 @@ The *Resampling* module provides methods to resample and reorient data.
 Resampling the data is usually necessary as the first step to match the 
 resolution and orientation of the reference object. 
 """
-__author__    = 'Christoph Kirst <ckirst@rockefeller.edu>'
-__license__   = 'MIT License <http://www.opensource.org/licenses/mit-license.php>'
-__copyright__ = 'Copyright (c) 2018 by Christoph Kirst'
+__author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
+__license__   = 'GPLv3 - GNU General Pulic License v3 (see LICENSE)'
+__copyright__ = 'Copyright © 2020 by Christoph Kirst'
+__webpage__   = 'http://idisco.info'
+__download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 
 
 import tempfile
@@ -23,6 +25,8 @@ import numpy as np
 import cv2
 
 import ClearMap.IO.IO as io
+import ClearMap.IO.FileList as fl
+import ClearMap.IO.Slice as slc
 
 import ClearMap.ParallelProcessing.ProcessWriter as pw
 
@@ -337,7 +341,7 @@ def resample(source, sink = None, orientation = None,
     The method to use for interpolating to the resmapled array.
   axis_order : str, list of tuples of int or None
     The axes pairs along which to resample the data at each step.
-    If None, this is detertmined automatically. For a file list source, 
+    If None, this is detertmined automatically. For a FileList source, 
     setting the first tuple should point to axis not indicating files.
     If 'size' the axis order is determined automatically to maximally reduce 
     the size of the array in each resmapling step.
@@ -392,7 +396,7 @@ def resample(source, sink = None, orientation = None,
     processes = io.mp.cpu_count();
   
   #detemine order of resampling
-  axes_order, shape_order = _axes_order(axes_order, source_shape, sink_shape_in_source_orientation, order=order);
+  axes_order, shape_order = _axes_order(axes_order, source, sink_shape_in_source_orientation, order=order);
   #print(axes_order, shape_order) 
   
   if len(axes_order) == 0:
@@ -409,7 +413,7 @@ def resample(source, sink = None, orientation = None,
   delete_files = [];
   for step, axes, shape in zip(range(n_steps), axes_order, shape_order):
     if step == n_steps-1 and orientation is None:
-      resampled = io.initialize(source=sink, shape=sink_shape, dtype=dtype, memory='shared', as_source=True); 
+      resampled = io.initialize(source=sink, shape=sink_shape, dtype=dtype, as_source=True); 
     else:
       if method == 'shared':
         resampled = io.sma.create(shape, dtype=dtype, order=order, as_source=True);
@@ -434,7 +438,7 @@ def resample(source, sink = None, orientation = None,
       for index in indices:
         _resample(index=index);
     else:
-      print(processes);
+      #print(processes);
       with concurrent.futures.ProcessPoolExecutor(processes) as executor:
         executor.map(_resample, indices);
         
@@ -498,10 +502,11 @@ def _resample_2d(index, source, sink, axes, shape, interpolation, n_indices, ver
   #note cv2 takes reverse shape order !
 
 
-def _axes_order(axes_order, source_shape, sink_shape_in_source_orientation, order = None): 
+def _axes_order(axes_order, source, sink_shape_in_source_orientation, order = None): 
   """Helper to find axes order for subsequent 2d resampling steps."""
 
-  ndim = len(source_shape);
+  source_shape = source.shape;
+  ndim = source.ndim;
   
   if axes_order is not None and isinstance(axes_order, list):
     axes_order = [(a[0],a[1]) if a[0] < a[1] else (a[1],a[0]) for a in axes_order];
@@ -517,7 +522,7 @@ def _axes_order(axes_order, source_shape, sink_shape_in_source_orientation, orde
   else: #determine automatically
     if axes_order is None:
       axes_order = 'order';
-    if axes_order == 'order' and order is None:
+    if axes_order == 'order' and order is None and not isinstance(source, fl.Source):
       axes_order = 'size';
     
     if axes_order == 'size': #order to reduce size as much as possible in each sub-resampling step
@@ -527,6 +532,7 @@ def _axes_order(axes_order, source_shape, sink_shape_in_source_orientation, orde
       axes_order = [];
       shape_order = [];
       last_shape = source_shape;
+      
       while len(resample_axes) > 0:
         if len(resample_axes) >= 2: 
           #take largest two resampling factors
@@ -543,7 +549,7 @@ def _axes_order(axes_order, source_shape, sink_shape_in_source_orientation, orde
         else:
           axis = resample_axes[0];
           small_axis = np.argsort(last_shape);
-          small_axis = [a for d,a in enumerate(small_axis) if a != axis][0]                               
+          small_axis = [a for a in small_axis if a != axis][0] ;                              
           if axis < small_axis:
             axes = (axis, small_axis);
           else:
@@ -558,30 +564,79 @@ def _axes_order(axes_order, source_shape, sink_shape_in_source_orientation, orde
       return axes_order, shape_order;
     
     elif axes_order == 'order': #order axes according to array order for faster io
-      resample_axes = np.array([d for d,s,t in zip(range(ndim), sink_shape_in_source_orientation, source_shape) if s !=t]);
-      
-      axes_order = [];
-      shape_order = [];
-      last_shape = source_shape;
-      while len(resample_axes) > 0:
-        if len(resample_axes) >= 2:
-          if order == 'C':
-            slicing = slice(-2,None);
-          else:
-            slicing = slice(None,2);
-          axes = tuple(resample_axes[slicing]);
-        else:
-          if order == 'C':
-            axes = (resample_axes[0], axes_order[-1][0]); 
-          else:
-            axes = (axes_order[-1][1], resample_axes[0])
+    
+      if isinstance(source, fl.Source):
+        # FileList determine order according to file structure
+        axes_list = source.axes_list;
+        #axes_file = source.axes_file;
+
+        resample_axes = np.array([d for d,s,t in zip(range(ndim), sink_shape_in_source_orientation, source_shape) if s !=t]);
+        resample_factors = np.array([float(t)/float(s) for s,t in zip(sink_shape_in_source_orientation, source_shape) if s!=t]);
         
-        axes_order.append(axes);
-        last_shape = tuple([s if d not in axes else t for d,s,t in zip(range(ndim), last_shape, sink_shape_in_source_orientation)]);
-        shape_order.append(last_shape);
-        resample_axes = np.array([a for a in resample_axes if a not in axes]);
-      
-      return axes_order, shape_order;
+        axes_order = [];
+        shape_order = [];
+        last_shape = source_shape;
+        
+        #modify factors to account for file structure
+        max_resample_factor_list = np.max([f for a,f in zip(resample_axes, resample_factors) if a in axes_list]);      
+        resample_factors_sort = np.array([f if a in axes_list else f + max_resample_factor_list for a,f in zip(resample_axes,resample_factors)])
+        #print(resample_factors_sort, resample_factors)
+        
+        while len(resample_axes) > 0:
+          if len(resample_axes) >= 2: 
+            ids = np.argsort(resample_factors_sort)[-2:];
+            
+            axes = tuple(np.sort(resample_axes[ids]))
+            last_shape = tuple([s if d not in axes else t for d,s,t in zip(range(ndim), last_shape, sink_shape_in_source_orientation)]);
+          
+            axes_order.append(axes);
+            shape_order.append(last_shape);
+            
+            resample_axes = np.array([s for a,s in enumerate(resample_axes) if a not in ids]);
+            resample_factors = np.array([s for a,s in enumerate(resample_factors) if a not in ids]);
+            resample_factors_sort = np.array([s for a,s in enumerate(resample_factors_sort) if a not in ids]);  
+          else:
+            axis = resample_axes[0];
+            small_axis = np.argsort(last_shape);
+            small_axis = [a for a in small_axis if a != axis][0] ;                              
+            if axis < small_axis:
+              axes = (axis, small_axis);
+            else:
+              axes = (small_axis, axis);
+            last_shape = tuple([s if d not in axes else t for d,s,t in zip(range(ndim), last_shape, sink_shape_in_source_orientation)]);
+            
+            axes_order.append(axes);
+            shape_order.append(last_shape);
+            
+            resample_axes = [];
+        
+        return axes_order, shape_order;
+      else:
+        #not a FileList
+        resample_axes = np.array([d for d,s,t in zip(range(ndim), sink_shape_in_source_orientation, source_shape) if s !=t]);
+        
+        axes_order = [];
+        shape_order = [];
+        last_shape = source_shape;
+        while len(resample_axes) > 0:
+          if len(resample_axes) >= 2:
+            if order == 'C':
+              slicing = slice(-2,None);
+            else:
+              slicing = slice(None,2);
+            axes = tuple(resample_axes[slicing]);
+          else:
+            if order == 'C':
+              axes = (resample_axes[0], axes_order[-1][0]); 
+            else:
+              axes = (axes_order[-1][1], resample_axes[0])
+          
+          axes_order.append(axes);
+          last_shape = tuple([s if d not in axes else t for d,s,t in zip(range(ndim), last_shape, sink_shape_in_source_orientation)]);
+          shape_order.append(last_shape);
+          resample_axes = np.array([a for a in resample_axes if a not in axes]);
+        
+        return axes_order, shape_order;
     
     else:
       raise ValueError("axes_order %r not 'size','order' or list but %r!" % axes_order);
@@ -685,7 +740,7 @@ def resample_inverse(source, sink = None,
   
   sink_shape_in_source_orientation = orient_shape(sink_shape, orientation, inverse=True);
   
-  axes_order, shape_order = _axes_order(axes_order, source_shape, sink_shape_in_source_orientation);
+  axes_order, shape_order = _axes_order(axes_order, source, source_shape, sink_shape_in_source_orientation);
  
   interpolation = _interpolation_to_cv2(interpolation);                                   
 

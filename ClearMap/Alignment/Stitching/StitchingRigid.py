@@ -9,10 +9,11 @@ The module provides base classes and routines for stitching images. The
 :mod:`~ClearMap.Alignment.Stitching.StichingWobbly` module builds on this 
 module.
 """
-__author__    = 'Christoph Kirst <ckirst@rockefeller.edu>'
-__license__   = 'MIT License <http://www.opensource.org/licenses/mit-license.php>'
-__copyright__ = 'Copyright 2020 by Christoph Kirst'
-__version__   = '0.1'
+__author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
+__license__   = 'GPLv3 - GNU General Pulic License v3 (see LICENSE)'
+__copyright__ = 'Copyright © 2020 by Christoph Kirst'
+__webpage__   = 'http://idisco.info'
+__download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 
 import copy
 import warnings
@@ -1449,15 +1450,14 @@ class Layout(SourceRegion, src.AbstractSource):
         if not isinstance(l, str):
           raise RuntimeError('The layout contains sources without locations!');
       
-      #change location expressions
-      locations = [l.replace(match, replace) for l in locations];
-  
+      ##change location expressions
+      #locations = [l.replace(match, replace) for l in locations];
+      
       e_match = te.Expression(match);
       e_replace = te.Expression(replace);
       for s,l in zip(self.sources, locations):
         values = e_match.values(l);
-        r = e_replace.string(values);
-        s.location = r; 
+        s.location = l.replace(e_match.string(values), e_replace.string(values));
       
     elif method == 'replace':
       #get locations
@@ -1473,6 +1473,7 @@ class Layout(SourceRegion, src.AbstractSource):
         s.location = l;
     else:
       raise ValueError('Method %r not valid!' % method);
+  
   
   def sort_sources_by_position(self):
     """Sorts the sources of this layout by their current position."""

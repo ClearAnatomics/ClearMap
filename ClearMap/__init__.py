@@ -39,14 +39,11 @@ References
 .. [Kirst2020] `Mapping the Fine-Scale Organization and Plasticity of the Brain Vasculature. Kirst, C., Skriabine, S., Vieites-Prado, A., Topilko, T., Bertin, P., Gerschenfeld, G., Verny, F., Topilko, P., Michalski, N., Tessier-Lavigne, M. and Renier, N., Cell, 180(4):780-795 <https://doi.org/10.1016/j.cell.2020.01.028>`_
 
 """
-
-__title__ = 'ClearMap'
-
-__version__ = '2.0.0'
-
-__author__ = 'Christoph Kirst'
-
-__license__ = 'GNU GENERAL PUBLIC LICENSE Version 3'
-
-__copyright__ = '2020 Christoph Kirst'
+__title__     = 'ClearMap'
+__version__   = '2.0.0'
+__author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
+__license__   = 'GPLv3 - GNU General Pulic License v3 (see LICENSE)'
+__copyright__ = 'Copyright © 2020 by Christoph Kirst'
+__webpage__   = 'http://idisco.info'
+__download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 

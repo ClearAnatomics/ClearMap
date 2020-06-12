@@ -11,9 +11,11 @@ Reference
 ---------
 [1] Renier*, Adams*, Kirst*, Wu* et al. Cell 2016
 """
-__author__    = 'Christoph Kirst <christoph.kirst@ucsf.edu>'
-__license__   = 'MIT License <http://www.opensource.org/licenses/mit-license.php>'
-__copyright__ = 'Copyright (c) 2020 by Christoph Kirst'
+__author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
+__license__   = 'GPLv3 - GNU General Pulic License v3 (see LICENSE)'
+__copyright__ = 'Copyright © 2020 by Christoph Kirst'
+__webpage__   = 'http://idisco.info'
+__download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 
 #%%############################################################################
 ### Initialization 
@@ -24,7 +26,7 @@ __copyright__ = 'Copyright (c) 2020 by Christoph Kirst'
 from ClearMap.Environment import *  #analysis:ignore
 
 #directories and files
-directory = '/home/ckirst/Science/Projects/WholeBrainClearing/Vasculature/Experiment/CFos_Example'    
+directory = '/home/ckirst/Programs/ClearMap2/ClearMap/Tests/Data/CellMap_Example/'    
 
 expression_raw      = 'Raw/Fos/Z<Z,4>.tif'           
 expression_auto     = 'Autofluorescence/Auto/Z<Z,4>.tif'  
@@ -33,7 +35,7 @@ ws = wsp.Workspace('CellMap', directory=directory);
 ws.update(raw=expression_raw, autofluorescence=expression_auto)
 ws.info()
 
-ws.debug = False
+ws.debug = True
 
 resources_directory = settings.resources_path
 
@@ -51,6 +53,18 @@ align_reference_bspline_file = io.join(resources_directory, 'Alignment/align_bsp
 
 
 #%%############################################################################
+### Data conversion
+############################################################################### 
+
+#%% Convet raw data to npy file     
+             
+source = ws.source('raw');
+sink   = ws.filename('stitched')
+io.delete_file(sink)
+io.convert(source, sink, processes=None);
+
+
+#%%############################################################################
 ### Resampling and atlas alignment 
 ###############################################################################
       
@@ -59,18 +73,23 @@ align_reference_bspline_file = io.join(resources_directory, 'Alignment/align_bsp
 resample_parameter = {
     "source_resolution" : (4.0625, 4.0625, 3),
     "sink_resolution"   : (25,25,25),
-    "processes" : None,
+    "processes" : 4,
     "verbose" : True,             
     };
 
-res.resample(ws.filename('raw'), sink=ws.filename('resampled'), **resample_parameter)
+io.delete_file(ws.filename('resampled'))
+
+res.resample(ws.filename('stitched'), sink=ws.filename('resampled'), **resample_parameter)
+
+#%%
+p3d.plot(ws.filename('resampled'))
 
 #%% Resample autofluorescence
     
 resample_parameter_auto = {
     "source_resolution" : (5,5,6),
     "sink_resolution"   : (25,25,25),
-    "processes" : None,
+    "processes" : 4,
     "verbose" : True,                
     };    
 
@@ -123,7 +142,6 @@ elx.align(**align_reference_parameter);
 #select sublice for testing the pipeline
 slicing = (slice(2000,2200),slice(2000,2200),slice(50,80));
 ws.create_debug('stitched', slicing=slicing);
-ws.create_debug('stitched', postfix='arteries', slicing=slicing);
 ws.debug = True; 
 
 #p3d.plot(ws.filename('stitched'))
@@ -139,74 +157,78 @@ cell_detection_parameter = cells.default_cell_detection_parameter.copy();
 cell_detection_parameter['illumination'] = None;
 cell_detection_parameter['background'] = None;
 cell_detection_parameter['intensity_detection']['measure'] = ['source'];
+cell_detection_parameter['shape_detection']['threshold'] = 500;
 
+io.delete_file(ws.filename('cells', postfix='maxima'))
 cell_detection_parameter['maxima_detection']['save'] = ws.filename('cells', postfix='maxima')
 
 processing_parameter = cells.default_cell_detection_processing_parameter.copy();
 processing_parameter.update(
     processes = 'serial',
-    size_max = 100,
-    size_min = 50,
-    overlap  = 32,
+    size_max = 100, #35,
+    size_min = 30, #30,
+    overlap  = 32, #10,
     verbose = True
     )
 
-cells.detect_cells('test.npy', ws.filename('cells'),
+cells.detect_cells(ws.filename('stitched'), ws.filename('cells', postfix='raw'),
                    cell_detection_parameter=cell_detection_parameter, 
                    processing_parameter=processing_parameter)
 
-#%% Cell data structure
-
-header = ['x','y','z'];
-dtypes = [int, int, int]
-if cell_detection_parameter['shape_detection'] is not None:
-  header += ['size'];
-  dtypes += [int];
-header += cell_detection_parameter['intensity_detection']['measure'] 
-dtypes += [float] * len(cell_detection_parameter['intensity_detection']['measure'])
-
-structure = [(h,t) for h,t in zip(header, dtypes)];
-
-cells_raw = ws.source('cells');
-cells_raw = np.array([tuple(t) for t in cells_raw[:]], dtype=structure)
-
 #%% visualization
 
-p3d.plot([['test.npy', ws.filename('cells', postfix='maxima')]])
+p3d.plot([[ws.filename('stitched'), ws.filename('cells', postfix='maxima')]])
 
-p = p3d.list_plot_3d(ws.source('cells')[:,:3])
-p3d.plot_3d(io.as_source('test.npy'), view=p)
+#%%
+coordinates = np.hstack([ws.source('cells', postfix='raw')[c][:,None] for c in 'xyz']);
+p = p3d.list_plot_3d(coordinates)
+p3d.plot_3d(ws.filename('stitched'), view=p, cmap=p3d.grays_alpha(alpha=1))
 
+
+#%% Cell statistics
+
+source = ws.source('cells', postfix='raw')
+
+plt.figure(1); plt.clf();
+names = source.dtype.names;
+nx,ny = p3d.subplot_tiling(len(names));
+for i, name in enumerate(names):
+  plt.subplot(nx, ny, i+1)
+  plt.hist(source[name]);
+  plt.title(name)
+plt.tight_layout();
 
 #%% Filter cells
 
 thresholds = {
     'source' : None,
-    'size'   : (20,900)
+    'size'   : (20,None)
     }
 
-ids = np.ones(cells_raw.shape[0], dtype=bool);
-for k,t in thresholds.items():
-  if t:
-    if not isinstance(t, (tuple, list)):
-      t = (t, None);
-    if t[0] is not None:
-      ids = np.logical_and(ids, t[0] <= cells_raw[k])
-    if t[1] is not None:
-      ids = np.logical_and(ids, t[1] > cells_raw[k]);
-cells_filtered = cells_raw[ids];
+cells.filter_cells(source = ws.filename('cells', postfix='raw'), 
+                   sink = ws.filename('cells', postfix='filtered'), 
+                   thresholds=thresholds);
 
-io.write(ws.filename('cells', postfix='filtered'), cells_filtered)
+
+#%% Visualize
+
+coordinates = np.array([ws.source('cells', postfix='filtered')[c] for c in 'xyz']).T;
+p = p3d.list_plot_3d(coordinates, color=(1,0,0,0.5), size=10)
+p3d.plot_3d(ws.filename('stitched'), view=p, cmap=p3d.grays_alpha(alpha=1))
 
 
 #%%############################################################################
-### Cell atlas alignment
+### Cell atlas alignment and annotation
 ###############################################################################
+
+#%% Cell alignment
+
+source = ws.source('cells', postfix='filtered')
 
 def transformation(coordinates):
   coordinates = res.resample_points(
                   coordinates, sink=None, orientation=None, 
-                  source_shape=io.shape(ws.filename('raw')), 
+                  source_shape=io.shape(ws.filename('stitched')), 
                   sink_shape=io.shape(ws.filename('resampled')));
   
   coordinates = elx.transform_points(
@@ -222,7 +244,7 @@ def transformation(coordinates):
   return coordinates;
   
 
-coordinates = np.array([cells_filtered[c] for c in ('x','y','z')]).T;
+coordinates = np.array([source[c] for c in 'xyz']).T;
 
 coordinates_transformed = transformation(coordinates);
 
@@ -231,38 +253,51 @@ coordinates_transformed = transformation(coordinates);
 label = ano.label_points(coordinates_transformed, key='order');
 names = ano.convert_label(label, key='order', value='name');
 
+#%% Save results
 
-#%%############################################################################
-### Cell data generation
-###############################################################################
-
-#%% Data generation
-
-coordinates_transformed = np.array([tuple(t) for t in coordinates_transformed], dtype=[(t,float) for t in ('xt', 'yt', 'zt')])
+coordinates_transformed.dtype=[(t,float) for t in ('xt','yt','zt')]
 label = np.array(label, dtype=[('order', int)]);
 names = np.array(names, dtype=[('name', 'a256')])
 
 import numpy.lib.recfunctions as rfn
-cells_data = rfn.merge_arrays([cells_filtered, coordinates_transformed, label, names], flatten=True, usemask=False)
+cells_data = rfn.merge_arrays([source[:], coordinates_transformed, label, names], flatten=True, usemask=False)
 
-io.write(ws.filename('cells', postfix='data'), cells_data)
+io.write(ws.filename('cells'), cells_data)
+
+
+
+#%%############################################################################
+### Cell csv generation for external analysis
+###############################################################################
 
 #%% CSV export
 
-structure = cells_data.dtype.descr
-header = ', '.join([h[0] for h in structure]);
+source = ws.source('cells');
+header = ', '.join([h[0] for h in source.dtype.names]);
+np.savetxt(ws.filename('cells', extension='csv'), source[:], header=header, delimiter=',')
 
-np.savetxt(ws.filename('cells', extension='csv'), cells_data, header=header, delimiter=',')
+#%% ClearMap 1.0 export
+
+source = ws.source('cells');
+
+clearmap1_format = {'points' : ['x', 'y', 'z'], 
+                    'points_transformed' : ['xt', 'yt', 'zt'],
+                    'intensities' : ['source', 'dog', 'background', 'size']}
+
+for filename, names in clearmap1_format.items():
+  sink = ws.filename('cells', postfix=['ClearMap1', filename]);
+  data = np.array([source[name] if name in source.dtype.names else np.full(source.shape[0], np.nan) for name in names]);
+  io.write(sink, data);
 
 
 #%%############################################################################
 ### Voxelization - cell density
 ###############################################################################
 
-cells_data = np.load(ws.filename('cells', postfix='data'))
+source = ws.source('cells')
 
-coordinates = cells_data[['xt','yt','zt']];
-intensities = cellsd_data[['source']];
+coordinates = np.array([source[n] for n in ['xt','yt','zt']]).T;
+intensities = source['source'];
 
 #%% Unweighted 
 
@@ -277,13 +312,18 @@ voxelization_parameter = dict(
       verbose = True
     )
 
-vox.voxelize(points, sink=ws.filename('density', postfix='counts'), **voxelization_parameter);
+vox.voxelize(coordinates, sink=ws.filename('density', postfix='counts'), **voxelization_parameter);
+
+
+#%% 
+
+p3d.plot(ws.filename('density', postfix='counts'))
 
 
 #%% Weighted 
 
 voxelization_parameter = dict(
-      shape = None, 
+      shape = io.shape(annotation_file),
       dtype = None, 
       weights = intensities,
       method = 'sphere', 
@@ -295,4 +335,6 @@ voxelization_parameter = dict(
 
 vox.voxelize(points, sink=ws.filename('density', postfix='intensities'), **voxelization_parameter);
 
+#%%
 
+p3d.plot(ws.filename('density', postfix='intensities'))

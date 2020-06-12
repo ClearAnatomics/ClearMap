@@ -23,3 +23,10 @@ ClearMap/Resources/Atlas/*.tif
 ClearMap/ImageProcessing/Binary/*.npy
 ClearMap/ImageProcessing/Skeletonization/*.npy
 
+# test data
+ClearMap/Tests/Data/TubeMap_Example/*
+ClearMap/Tests/Data/CellMap_Example/*
+
+# documentation
+Documentation
+Documentation.zip

@@ -19,6 +19,7 @@ __copyright__ = 'Copyright (c) 2019 by Christoph Kirst'
 
 #TODO: add DataJoint or NWB data formats 
 
+import os
 import numpy as np
 
 from collections import OrderedDict as odict
@@ -49,7 +50,7 @@ default_file_type_to_name = odict(
 
 file_type_synonyms = dict(
     r  = "raw",
-    a  = "autofluorescent",
+    a  = "autofluorescence",
     st = "stitched",
     l  = "layout",
     bg = "background",
@@ -110,7 +111,7 @@ def filename(ftype, file_type_to_name = None, directory = None, expression = Non
     The values to use in case a tag expression is given.
   prefix : str or None
     Optional prefix to the file if not None.
-  postfix : str or Nonautoe
+  postfix : str or list of str or None
     Optional postfix to the file if not None.
   extension : str or None
     Optional extension to replace existing one.
@@ -148,24 +149,29 @@ def filename(ftype, file_type_to_name = None, directory = None, expression = Non
   if fname is None:
     raise ValueError('Cannot find name for type %r!' % ftype);
   
-  if prefix is not None and prefix != '':
+  if prefix and prefix != '':
+    if isinstance(prefix, list):
+      prefix = '_'.join(prefix);
     fname = prefix + '_' + fname;
   
   if postfix is not None and postfix != '':
+    if isinstance(postfix, list):
+      postfix = '_'.join(postfix);
     fname = fname.split('.');
     fname = '.'.join(fname[:-1]) + '_' + postfix + '.' + fname[-1];   
   
-  if debug is not None:
+  if debug:
     if not isinstance(debug, str):
       debug = 'debug';
-    fname = fname.split('.');
-    fname = '.'.join(fname[:-1]) + '_' + debug + '.' + fname[-1];   
+    #fname = fname.split('.');
+    #fname = '.'.join(fname[:-1]) + '_' + debug + '.' + fname[-1];   
+    fname = debug + '_' + fname;
   
-  if extension is not None:
+  if extension:
     fname = fname.split('.');
     fname = '.'.join(fname[:-1] + [extension]);                
   
-  if directory is not None:
+  if directory:
     fname = io.join(directory, fname);
   
   return fname;                 
@@ -181,7 +187,7 @@ class Workspace(object):
   def __init__(self, wtype = None, prefix = None, file_type_to_name = None, directory = None, debug = None, **kwargs):
     self._wtype = wtype;
     self._prefix = prefix;
-    self._directory = directory;
+    self.directory = directory;
     self._file_type_to_name = default_workspaces.get(wtype, default_file_type_to_name).copy();
     if file_type_to_name is not None:
       self._file_type_to_name.update(file_type_to_name);
@@ -211,6 +217,8 @@ class Workspace(object):
   
   @directory.setter
   def directory(self, value):
+    if value and len(value) > 0 and value[-1] == os.path.sep:
+      value = value[:-1];
     self._directory = value;
     
   @property
@@ -237,6 +245,8 @@ class Workspace(object):
     self._debug = value;
   
   def create_debug(self, ftype, slicing, debug = None, **kwargs):
+    if debug is None:
+      debug = self.debug;
     if debug is None:
       debug = 'debug';
     self.debug = None;
@@ -272,7 +282,11 @@ class Workspace(object):
                     directory=directory, expression=expression, 
                     values=values, prefix=prefix, extension=extension, 
                     debug=debug, **kwargs);
-                    
+  
+  def expression(self, *args,**kwargs):
+    return te.Expression(self.filename(*args, **kwargs));
+
+                  
   def extension(self, ftype, file_type_to_name = None, directory = None, expression = None, values = None, prefix = None, extension = None, debug = None, **kwargs):
     filename = self.filename(ftype=ftype,  file_type_to_name=file_type_to_name,
                              directory=directory, expression=expression,
@@ -339,36 +353,39 @@ class Workspace(object):
         else:
           extensions = [self.extension(k)];
         
-        kk = k;
-        for extension in extensions:
-          expression = te.Expression(self.filename(k, extension=extension));
-          tag_names = expression.tag_names();
-          if tile_axes is None:
-            tile_axes_ = tag_names;
-          else:
-            tile_axes_ = tile_axes;
-          for n in tile_axes_:
-            if not n in tag_names:
-              raise ValueError('The expression does not have the named pattern %s' % n);
-          for n in tag_names:
-            if not n in tile_axes_:
-              raise ValueError('The expression has the named pattern %s that is not in tile_axes=%r' % (n, tile_axes_));
-          
-          #construct tiling
-          files = io.file_list(expression);
-          if len(files) > 0:
-            tile_positions = [expression.values(f) for f in files];
-            tile_positions = [tuple(tv[n] for n in tile_axes_) for tv in tile_positions];
-            tile_lower = tuple(np.min(tile_positions, axis = 0)); 
-            tile_upper = tuple(np.max(tile_positions, axis = 0));
-            tag_names = tuple(tag_names);
-            
-            if kk is not None:
-              s += (l % kk) + ': ' 
-              kk = None;
+        if len(extensions) == 0:
+          s += l % k + ': no file\n';
+        else:
+          kk = k;
+          for extension in extensions:
+            expression = te.Expression(self.filename(k, extension=extension));
+            tag_names = expression.tag_names();
+            if tile_axes is None:
+              tile_axes_ = tag_names;
             else:
-              s += (l % '') + '  '
-            s+= ('%s {%d files, %r: %r -> %r}' % (expression.string()[len(self.directory)+1:], len(files), tag_names, tile_lower, tile_upper)) + '\n';   
+              tile_axes_ = tile_axes;
+            for n in tile_axes_:
+              if not n in tag_names:
+                raise ValueError('The expression does not have the named pattern %s' % n);
+            for n in tag_names:
+              if not n in tile_axes_:
+                raise ValueError('The expression has the named pattern %s that is not in tile_axes=%r' % (n, tile_axes_));
+            
+            #construct tiling
+            files = io.file_list(expression);
+            if len(files) > 0:
+              tile_positions = [expression.values(f) for f in files];
+              tile_positions = [tuple(tv[n] for n in tile_axes_) for tv in tile_positions];
+              tile_lower = tuple(np.min(tile_positions, axis = 0)); 
+              tile_upper = tuple(np.max(tile_positions, axis = 0));
+              tag_names = tuple(tag_names);
+              
+              if kk is not None:
+                s += (l % kk) + ': ' 
+                kk = None;
+              else:
+                s += (l % '') + '  '
+              s+= ('%s {%d files, %r: %r -> %r}' % (expression.string()[len(self.directory)+1:], len(files), tag_names, tile_lower, tile_upper)) + '\n';   
       
       else:
         fname = self.filename(k);

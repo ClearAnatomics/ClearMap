@@ -45,9 +45,11 @@ See Also
     `Elastix documentation <http://elastix.isi.uu.nl/>`_
     :mod:`~ClearMap.Alignment.Resampling`
 """
-__author__    = 'Christoph Kirst <ckirst@rockefeller.edu>'
-__license__   = 'MIT License <http://www.opensource.org/licenses/mit-license.php>'
-__copyright__ = 'Copyright (c) 2019 by Christoph Kirst'
+__author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
+__license__   = 'GPLv3 - GNU General Pulic License v3 (see LICENSE)'
+__copyright__ = 'Copyright © 2020 by Christoph Kirst'
+__webpage__   = 'http://idisco.info'
+__download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 
 
 import os
@@ -281,10 +283,10 @@ def transform_directory_and_file(transform_parameter_file = None, transform_dire
 def set_path_transform_files(result_directory):
   """Replaces relative with absolute path in the parameter files in the result directory.
   
-   Arguments
-   ---------
-   result_directory : str
-     Path to directory of elastix results.
+  Arguments
+  ---------
+  result_directory : str
+    Path to directory of elastix results.
 
   Notes
   -----
