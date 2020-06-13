@@ -22,7 +22,7 @@ References
        Signal Processing, Feb 1979. Volume: 27 , Issue: 1, Page(s): 13 - 18.
 
 """
-__note__ = "Code adpated to 3D images from skimage.filters.rank by Christoph Kirst, The Rockefeller University, New York City, 2017."
+__note__ = "Code adpated to 3D images from skimage.filters.rank by Christoph Kirst"
 
 
 import numpy as np

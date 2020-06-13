@@ -9,9 +9,11 @@ gene data.
 
 The routines are used in the :mod:`ClearMap.Scripts.CellMap` pipeline.
 """
-__author__    = 'Christoph Kirst <christoph.kirst@ucsf.edu>'
-__license__   = 'MIT License <http://www.opensource.org/licenses/mit-license.php>'
-__copyright__ = 'Copyright (c) 2020 by Christoph Kirst'
+__author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
+__license__   = 'GPLv3 - GNU General Pulic License v3 (see LICENSE.txt)'
+__copyright__ = 'Copyright © 2020 by Christoph Kirst'
+__webpage__   = 'http://idisco.info'
+__download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
       
 import numpy as np
 import tempfile as tmpf 
@@ -74,6 +76,7 @@ default_cell_detection_parameter = dict(
   maxima_detection = dict(h_max = None,
                           shape = 5,
                           threshold = 0,
+                          valid = True,
                           save = False),
 
   #cell shape detection                                  
@@ -253,6 +256,10 @@ def detect_cells(source, sink = None, cell_detection_parameter = default_cell_de
     threshold : float or None
       Only maxima above this threshold are detected. If None, all maxima
       are detected.
+      
+    valid : bool
+      If True, only detect cell centers in the valid range of the blocks with
+      overlap.
     
     save : str or None
       Save the result of this step to the specified file if not None.
@@ -305,7 +312,7 @@ def detect_cells(source, sink = None, cell_detection_parameter = default_cell_de
         
   cell_detection_parameter.update(verbose=processing_parameter.get('verbose', False));
   
-  results = bp.process(detect_cells_block, source, sink=None, function_type='block', return_result=True, parameter=cell_detection_parameter, **processing_parameter)                   
+  results, blocks = bp.process(detect_cells_block, source, sink=None, function_type='block', return_result=True, return_blocks=True, parameter=cell_detection_parameter, **processing_parameter)                   
   
   #merge results
   results = np.vstack([np.hstack(r) for r in results])
@@ -340,6 +347,9 @@ def detect_cells_block(source, parameter = default_cell_detection_parameter):
   
   base_slicing = source.valid.base_slicing;
   valid_slicing = source.valid.slicing;
+  valid_lower = source.valid.lower;
+  valid_upper = source.valid.upper;
+  lower = source.lower;
   
   parameter_intensity  = parameter.get('intensity_detection', None);
   measure_to_array = dict();
@@ -465,7 +475,7 @@ def detect_cells_block(source, parameter = default_cell_detection_parameter):
   
   if parameter_shape or parameter_intensity:
     if not parameter_maxima:
-      print(prefix + 'Warning: maxima detection need for shape and intensity detection!');
+      print(prefix + 'Warning: maxima detection needed for shape and intensity detection!');
       parameter_maxima = dict();
   
   if parameter_maxima: 
@@ -475,6 +485,7 @@ def detect_cells_block(source, parameter = default_cell_detection_parameter):
       hdict.pprint(parameter_maxima, head = prefix + 'Maxima detection:')    
     
     save = parameter_maxima.pop('save', None);
+    valid = parameter_maxima.pop('valid', None);
     
     # extended maxima
     maxima = md.find_maxima(source.array, **parameter_maxima, verbose=verbose);
@@ -491,6 +502,14 @@ def detect_cells_block(source, parameter = default_cell_detection_parameter):
 
     if verbose:
       timer.print_elapsed_time('Maxima detection');
+  
+    #correct for valid region
+    if valid:
+      ids = np.ones(len(centers), dtype=bool);
+      for c,l,u in zip(centers.T, valid_lower, valid_upper):
+        ids = np.logical_and(ids, np.logical_and(l <= c, c < u));
+      centers = centers[ids];
+      del ids;
   
   del dog, maxima;
   
@@ -552,7 +571,11 @@ def detect_cells_block(source, parameter = default_cell_detection_parameter):
   if valid is not None:
     results = tuple(r[valid] for r in results);
   
-  results = tuple(r[:,None] if r.ndim ==1 else r for r in results);
+  #correct coordinate offsets of blocks
+  results = (results[0] + lower,) + results[1:];
+  
+  #correct shapes for merging
+  results = tuple(r[:,None] if r.ndim == 1 else r for r in results);
   
   if verbose:
     total_time.print_elapsed_time('Cell detection')

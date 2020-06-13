@@ -12,10 +12,12 @@ histogram bins is determined from the maximum value present in the image.
 Result image is 8-/16-bit or double with respect to the input image and the
 rank filter operation.
 """
-__author__    = 'Christoph Kirst <ckirst@rockefeller.edu>'
-__license__   = 'MIT License <http://www.opensource.org/licenses/mit-license.php>'
-__copyright__ = 'Copyright 2018 by Christoph Kirst, The Rockefeller University, New York City'
-__note__ = "Code adpated from skimage.filters.rank by Christoph Kirst, The Rockefeller University, New York City, 2017."
+__author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
+__license__   = 'GPLv3 - GNU General Pulic License v3 (see LICENSE.txt)'
+__copyright__ = 'Copyright © 2020 by Christoph Kirst'
+__webpage__   = 'http://idisco.info'
+__download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
+__note__      = "Code adpated from skimage.filters.rank"
 
 
 import numpy as np

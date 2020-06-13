@@ -21,3 +21,9 @@ If you use this software anywhere we would appreciate if you cite the following 
 More information, including an extensive manual, can be found on the website: <http://elastix.isi.uu.nl/>. 
 
 You can also subscribe to the [mailing list](https://groups.google.com/forum/#!forum/elastix-imageregistration) for questions. Information on contributing to `elastix` can be found [here](CONTRIBUTING.md).
+
+
+# ClearMap
+
+This is a extension of elastix for use with ClearMap, allowing to transform
+coordaintes in binary files.

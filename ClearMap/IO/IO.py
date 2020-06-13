@@ -691,30 +691,8 @@ def convert(source, sink, processes = None, verbose = False, **kwargs):
   if hasattr(mod, 'convert'):
     return mod.convert(source, sink, processes=processes, verbose=verbose, **kwargs);
   else:
-    write(sink, source);
+    return write(sink, source);
 
-  if not isinstance(processes, int) and processes != 'serial':
-    processes = mp.cpu_count();
-
-
-
-def convert_sources(sources, sinks, processes = None, verbose = False, **kwargs):
-  """Transforms a list of sources into another format in parallel.
-  
-  Arguments
-  ---------
-  sources : source specification
-    The source or list of sources.
-  sink : source specification
-    The sink or list of sinks.
-  
-  Returns
-  -------
-  sink : sink speicication
-    The sink or list of sinkfs.
-  """      
-  
-  
 
 
 def convert_files(filenames, extension = None, path = None, processes = None, verbose = False):
@@ -755,16 +733,7 @@ def convert_files(filenames, extension = None, path = None, processes = None, ve
   if not isinstance(processes, int) and processes != 'serial':
     processes = mp.cpu_count();
   
-  @ptb.parallel_traceback
-  def _convert_files(source, sink, fid, n_files, extension, verbose):
-    source = as_source(source);              
-    if verbose:
-      print('Converting file %d/%d %s -> %s' % (fid,n_files,source,sink))
-    mod = file_extension_to_module[extension];    
-    if mod is None:
-      raise ValueError("Cannot determine module for extension %s!" % extension);
-    mod.write(sink,source);
-  
+  #print(n_files, extension, filenames, sinks)
   _convert = functools.partial(_convert_files, n_files=n_files, extension=extension, verbose=verbose);
   
   if processes == 'serial':
@@ -778,6 +747,16 @@ def convert_files(filenames, extension = None, path = None, processes = None, ve
   
   return sinks;
 
+
+@ptb.parallel_traceback
+def _convert_files(source, sink, fid, n_files, extension, verbose):
+  source = as_source(source);              
+  if verbose:
+    print('Converting file %d/%d %s -> %s' % (fid,n_files,source,sink))
+  mod = file_extension_to_module[extension];    
+  if mod is None:
+    raise ValueError("Cannot determine module for extension %s!" % extension);
+  mod.write(sink,source);
 
 
 

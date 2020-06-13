@@ -11,6 +11,7 @@ __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__   = 'http://idisco.info'
 __download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 
+
 import numpy as np
 from scipy.interpolate import splprep,splrep, splev
 

@@ -20,8 +20,7 @@ Notes
       
 References
 ----------
-  - `Allen Brain Atlas <http://mouse.brain-map.org/static/atlas>`_
-    
+  - `Allen Brain Atlas <http://mouse.brain-map.org/static/atlas>`_  
 """
 __author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
 __license__   = 'GPLv3 - GNU General Pulic License v3 (see LICENSE)'

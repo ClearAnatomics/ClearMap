@@ -35,7 +35,7 @@ class Slice(src.Source):
     slicing : int, slice, list of slices or None
       The slice specification.
     """
-    super(Slice, self).__init__(name = name);
+    super(Slice, self).__init__(name=name);
     
     self._source = source;
     self._slicing = slicing;
@@ -230,6 +230,78 @@ class Slice(src.Source):
     else:
       return self.source;
   
+  
+  @property
+  def position(self):
+    """Returns the indices of the lower corner of this slice in the underlying source.
+    
+    Returns
+    -------
+    position : tuple of int
+      The coordinates of the lower corner of this slice within the source.
+    """
+    return tuple(sl.indices(s)[0] for sl,s in zip(self.slicing, self.source.shape));
+             
+  
+  @property
+  def base_position(self):
+    """Returns the indices of the lower corner of this slice in the underlying base source.
+    
+    Returns
+    -------
+    position : tuple of int
+      The coordinates of the lower corner of this slice within the base source.
+    """
+    return tuple(sl.indices(s)[0] for sl,s in zip(self.base_slicing, self.base.shape)); 
+  
+  
+  @property
+  def lower(self):
+    """Returns the indices of the lower corner of this slice in the underlying source.
+    
+    Returns
+    -------
+    position : tuple of int
+      The coordinates of the lower corner of this slice within the source.
+    """
+    return self.position;
+             
+  
+  @property
+  def base_lower(self):
+    """Returns the indices of the lower corner of this slice in the underlying base source.
+    
+    Returns
+    -------
+    position : tuple of int
+      The coordinates of the lower corner of this slice within the base source.
+    """
+    return self.base_position;
+  
+  
+  @property
+  def upper(self):
+    """Returns the indices of the upper corner of this slice in the underlying source.
+    
+    Returns
+    -------
+    position : tuple of int
+      The coordinates of the upper corner of this slice within the source.
+    """
+    return tuple(sl.indices(s)[1] for sl,s in zip(self.slicing, self.source.shape));
+             
+  
+  @property
+  def base_upper(self):
+    """Returns the indices of the upper corner of this slice in the underlying base source.
+    
+    Returns
+    -------
+    position : tuple of int
+      The coordinates of the upper corner of this slice within the base source.
+    """
+    return tuple(sl.indices(s)[1] for sl,s in zip(self.base_slicing, self.base.shape));   
+ 
   
   @property
   def array(self):

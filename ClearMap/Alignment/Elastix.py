@@ -38,7 +38,7 @@ Summary
     * transformix applied to points gives :math:`T(\\mathrm{points})` !
     * point arrays are assumed to be in (x,y,z) coordinates consistent with (x,y,z) array represenation of images in ClearMap
     
-Main routines are: :func:`align`, :func:`transform_data` and :func:`transform_points`.
+Main routines are: :func:`align`, :func:`transform`.
     
 See Also
 --------

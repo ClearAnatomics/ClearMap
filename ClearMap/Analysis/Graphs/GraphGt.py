@@ -3,8 +3,8 @@
 GraphGt
 =======
 
-Module provides basic Graph interface to the graph_tool library.
-
+Module provides basic Graph interface to the
+`graph_tool <https://graph-tool.skewed.de>`_ library.
 """
 __author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
 __license__   = 'GPLv3 - GNU General Pulic License v3 (see LICENSE)'
@@ -15,7 +15,6 @@ __download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 
 import copy
 import numpy as np
-import functools as ft
 
 import graph_tool as gt
 import graph_tool.util as gtu

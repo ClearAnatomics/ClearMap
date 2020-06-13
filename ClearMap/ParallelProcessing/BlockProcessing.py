@@ -74,6 +74,7 @@ def process(function, source, sink = None,
             axes = None, size_max = None, size_min = None, overlap = None,  
             optimization = True, optimization_fix = 'all', neighbours = False,
             function_type = None, as_memory = False, return_result = False,
+            return_blocks = False,
             processes = None, verbose = False, 
             **kwargs):
   """Create blocks and process a function on them in parallel.
@@ -123,6 +124,8 @@ def process(function, source, sink = None,
     Can be useful to reduce frequent reading and writing operations of memmaps.
   return_result : bool
     If True, return the results of the proceessing functions.
+  return_blocks : bool
+    If True, return the block information used to distribute the processing.
   processes : int
     The number of parallel processes, if 'serial', use serial processing.
   verbose : bool
@@ -203,11 +206,14 @@ def process(function, source, sink = None,
     timer.print_elapsed_time("Processed %d blocks with function %r" % (n_blocks, function.__name__))
   
   #gc.collect();
-  
+
   if return_result:
-    return result;
+    ret = result;
   else:
-    return sink;
+    ret = sink;
+  if return_blocks:
+    ret = (ret, [source_blocks, sink_blocks]);
+  return ret;
 
 
 ###############################################################################
@@ -608,7 +614,6 @@ def split_into_blocks(source, processes = None, axes = None,
     index = np.unravel_index(i, blocks_shape);
     slicing = tuple(slice(b[0], b[1]) for b in [blocks_block_ranges[d][index[d]] for d in range(ndim)]);
     offsets = [(o[0], o[1]) for o in [blocks_offsets[d][index[d]] for d in range(ndim)]];   
-
     block = blk.Block(source=source, slicing=slicing, offsets=offsets, index=index, blocks_shape=blocks_shape);
     blocks.append(block);
     
@@ -689,13 +694,17 @@ def _test():
                         
   print(np.all(sink[:] == process_image(source)))
   
-  
   bp.process(process_image, source, sink,
              processes = None, size_max = 10, size_min = 6, overlap = 3, axes = all,
              optimization = True, verbose = True);
                         
   assert(np.all(sink[:] == process_image(source))) 
 
+    
+  result, blocks = bp.process(process_image, source, sink,
+                              size_max = 15, size_min = 4, overlap = 3, axes = [2], optimization = True, 
+                              return_blocks = True, processes = None, verbose = True);
+                        
 
   #memmaps loading
   source = io.mmp.create(location='source.npy', shape=shape);

@@ -3,7 +3,7 @@
 Resampling
 ==========
 
-The *Resampling* module provides methods to resample and reorient data. 
+This module provides methods to resample and reorient data. 
 
 Resampling the data is usually necessary as the first step to match the 
 resolution and orientation of the reference object. 
