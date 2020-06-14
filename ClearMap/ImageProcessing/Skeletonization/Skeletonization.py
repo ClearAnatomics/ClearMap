@@ -1,24 +1,31 @@
 # -*- coding: utf-8 -*-
 """
-Skeletonize
-===========
+Skeletonization
+===============
 
 Main routines for fast 3d skeletonization.
 
 Note
 ----
 Supported algorithsm are:
-  * PK12 - parallel 3d 12 sub-iteration thinning algorithm by Palagyi and Kuba
-  * RC6  - parallel 3d 6 sub-iteration istmus-based thinning algorithms
+  
+* :mod:`ClearMap.ImageProcessing.Skeletonization.PK12` - parallel 3d 12 
+  sub-iteration thinning algorithm by Palagyi and Kuba [Palagy1999]_.
+  
+* RC6  - parallel 3d 6 sub-iteration istmus-based thinning algorithms 
+  [Raynal]_.
 
 References
 ----------
-  * Palagyi & Kuba, A Parallel 3D 12-Subiteration Thinning Algorithm, Graphical Models and Image Processing 61, 199-221 (1999)
-  * B. Raynal and M. Couprie, Istmus-Based 6-Directional Parallel Thinning Algorithms
+.. [Palagy1999] Palagyi & Kuba, A Parallel 3D 12-Subiteration Thinning Algorithm, Graphical Models and Image Processing 61, 199-221 (1999).
+
+.. [Raynal2000] B. Raynal and M. Couprie, Istmus-Based 6-Directional Parallel Thinning Algorithms.
 """
-__author__    = 'Christoph Kirst <ckirst@rockefeller.edu>'
-__license__   = 'MIT License <http://www.opensource.org/licenses/mit-license.php>'
-__copyright__ = 'Copyright (c) 2019 by Christoph Kirst, The Rockefeller University, New York City'
+__author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
+__license__   = 'GPLv3 - GNU General Pulic License v3 (see LICENSE.txt)'
+__copyright__ = 'Copyright © 2020 by Christoph Kirst'
+__webpage__   = 'http://idisco.info'
+__download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 
 import numpy as np
 

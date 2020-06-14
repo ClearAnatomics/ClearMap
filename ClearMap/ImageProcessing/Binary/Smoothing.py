@@ -4,6 +4,11 @@ Smoothing
 =========
 
 Smooth a binary image based on the local configuration of voxels in a cube.
+
+See also
+--------
+The algortihm has similarities to the skeletonization algorithm using
+parallel thinning (:mod:`~ClearMap.ImageProcessing.Skeletonization`).
 """
 __author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
 __license__   = 'GPLv3 - GNU General Pulic License v3 (see LICENSE.txt)'

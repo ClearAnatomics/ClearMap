@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
 """
+Differentiation
+===============
+
 Module to calculate various gradient and curvature measures
 """
 __author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'

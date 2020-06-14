@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Vasculature
 ===========
@@ -12,7 +13,8 @@ __license__   = 'GPLv3 - GNU General Pulic License v3 (see LICENSE.txt)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__   = 'http://idisco.info'
 __download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
-                
+  
+              
 import numpy as np
 import tempfile as tmpf 
 import gc

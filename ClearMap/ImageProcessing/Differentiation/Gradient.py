@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
 """
+Gradient
+========
+
 Module to calculate various curvature and tube measures in 3D
 """
 __author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'

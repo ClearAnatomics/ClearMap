@@ -1,5 +1,9 @@
 """
-Hysteresis thresholding
+Thresholding
+============
+
+This module contains vairous thresholding routines, including 
+hysteresis thresholding.
 
 Module towards smart thresholding routines.
 """

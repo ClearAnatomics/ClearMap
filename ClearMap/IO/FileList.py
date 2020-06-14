@@ -78,7 +78,7 @@ class Source(src.VirtualSource):
   
   
   @property
-  def file_list(self, sort = False):
+  def file_list(self, sort = True):
     """The underlying file list.
     
     Returns
@@ -257,6 +257,7 @@ class Source(src.VirtualSource):
     
     #start indices
     indices_start = self.expression.indices(self.file_list[0]);
+    #print(indices_start)
     #TODO: steps in file list
     
     #genereate file list to read
@@ -293,18 +294,20 @@ class Source(src.VirtualSource):
     slicing_list_indices.reverse()
     slicing_list_indices = itertools.product(*slicing_list_indices);
     slicing_list_indices = [i[::-1] for i in slicing_list_indices];
+    #print(indices, slicing_list_indices, slicing_keep_dims_to_final)
     
     axes_to_tags = self.axes_to_tag_order();
     if len(axes_to_tags) > 1 and axes_to_tags != list(range(len(axes_to_tags))):
       indices = [tuple(i[j] for j in axes_to_tags) for i in indices];
     
     fl = [e.string_from_index(i) for i in indices];
+    #print(fl);
     
     dtype = self.dtype;
     
     data = np.zeros(sliced_shape_file + shape_list_keep_dims, dtype=dtype, order=order);    
     
-    @ptb.parallel_traceback
+    #@ptb.parallel_traceback
     def func(filename, index, data=data, slicing=slicing_file):
       index = (Ellipsis,) + index;
       data[index] = io.read(filename, slicing=slicing, processes = 'serial');

@@ -1,14 +1,17 @@
 # -*- coding: utf-8 -*-
 """
-Topology module.
+Topology3d
+==========
 
 Defines basic 3d discrete topology utils. 
 
 Note
 ----
 The definitions are compatible with a separable convolutional kernel with 
-weights along the 3 dimensions given by
-[[(2**(3**d))**k for k in range(3)] for d in range(3)].
+weights along the 3 dimensions given by:
+  
+>>> [[(2**(3**d))**k for k in range(3)] for d in range(3)]
+
 """
 __author__    = 'Christoph Kirst <ckirst@rockefeller.edu>'
 __license__   = 'MIT License <http://www.opensource.org/licenses/mit-license.php>'

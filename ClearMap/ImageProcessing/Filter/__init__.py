@@ -1,5 +1,9 @@
 # -*- coding: utf-8 -*-
-"""This sub-package provides various volumetric filter kernels and structure elments
+"""
+Rank
+====
+
+This sub-package provides various volumetric filter kernels and structure elments
 
 A set of linear filters can be applied to the data using 
 :mod:`~ClearMap.ImageProcessing.Filter.LinearFilter`. 

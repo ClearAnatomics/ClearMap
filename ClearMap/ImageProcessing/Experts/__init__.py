@@ -6,10 +6,10 @@ Experts
 This sub-package provides specialized image processing pipelines:
 
 * :mod:`~ClearMap.ImageProcessing.Experts.Cells` contains the image processing 
-functions used in :mod:`~ClearMap.Scripts.CellMap`. 
+  functions used in :mod:`~ClearMap.Scripts.CellMap`. 
 
 * :mod:`~ClearMap.ImageProcessing.Experts.Vasculature` contains the image 
-processing functions used in :mod:`~ClearMap.Scripts.TubeMap`. 
+  processing functions used in :mod:`~ClearMap.Scripts.TubeMap`. 
 
 Other experts can be added here combining the basic image processing routines
 of ClearMap.

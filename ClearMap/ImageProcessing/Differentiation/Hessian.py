@@ -1,4 +1,7 @@
 """
+Hessian
+=======
+
 Module to compute curvature measures based on Hessian Matrix
 
 Usefull for filtering vasculature data

@@ -8,11 +8,13 @@ Script to compile all ClearMap code.
 Note
 ----
 Cython or C++ coded modules are compiled in a lazy fashion in ClearMap.
-To compile all modules at once this module can be used. 
+To compile all modules this module can be used. 
 """
-__author__    = 'Christoph Kirst <ckirst@rockefeller.edu>'
-__license__   = 'MIT License <http://www.opensource.org/licenses/mit-license.php>'
-__copyright__ = 'Copyright (c) 2020 by Christoph Kirst'
+__author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
+__license__   = 'GPLv3 - GNU General Pulic License v3 (see LICENSE.txt)'
+__copyright__ = 'Copyright © 2020 by Christoph Kirst'
+__webpage__   = 'http://idisco.info'
+__download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 
 
 ###############################################################################

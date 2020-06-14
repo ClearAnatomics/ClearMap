@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
 """
+StrutureElement
+===============
+
 Routines to generate structure elements for filters.
 """
 __author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'

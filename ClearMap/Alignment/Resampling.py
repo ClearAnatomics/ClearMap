@@ -578,7 +578,11 @@ def _axes_order(axes_order, source, sink_shape_in_source_orientation, order = No
         last_shape = source_shape;
         
         #modify factors to account for file structure
-        max_resample_factor_list = np.max([f for a,f in zip(resample_axes, resample_factors) if a in axes_list]);      
+        resample_factors_list = [f for a,f in zip(resample_axes, resample_factors) if a in axes_list];
+        if len(resample_factors_list) > 0:
+          max_resample_factor_list = np.max(resample_factors_list);    
+        else:
+          max_resample_factor_list = 0;
         resample_factors_sort = np.array([f if a in axes_list else f + max_resample_factor_list for a,f in zip(resample_axes,resample_factors)])
         #print(resample_factors_sort, resample_factors)
         
