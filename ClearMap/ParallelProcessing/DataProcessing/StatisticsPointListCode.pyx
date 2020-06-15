@@ -1,17 +1,15 @@
 #cython: language_level=3, boundscheck=False, wraparound=False, nonecheck=False, initializedcheck=False, cdivision=True
 """
-DevolvePointListCode
-====================
+StatisticsPointListCode
+=======================
 
-Cython code for devolving or smearing out points in a large array.
-
-Note
-----
-This process is useful for integrating or visualizing points as densities.
+Cython code for calculating statistics around a set of points in a large array.
 """
-__author__    = 'Christoph Kirst <ckirst@rockefeller.edu>'
-__license__   = 'MIT License <http://www.opensource.org/licenses/mit-license.php>'
-__copyright__ = 'Copyright 2019 by Christoph Kirst, The Rockefeller University, New York City'
+__author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
+__license__   = 'GPLv3 - GNU General Pulic License v3 (see LICENSE)'
+__copyright__ = 'Copyright © 2020 by Christoph Kirst'
+__webpage__   = 'http://idisco.info'
+__download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 
 import numpy as np
 cimport numpy as np

@@ -4,11 +4,17 @@ DevolvePointList
 ================
 
 Converts point data into a devolved or smeared out image for 
-visulalization and analysis purposes.
+visulalization and analysis purposes. 
+
+Note
+----
+This is effecitively blurring with a specified kernel.
 """
-__author__    = 'Christoph Kirst <ckirst@rockefeller.edu>'
-__license__   = 'MIT License <http://www.opensource.org/licenses/mit-license.php>'
-__copyright__ = 'Copyright 2018 by Christoph Kirst, The Rockefeller University, New York City'
+__author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
+__license__   = 'GPLv3 - GNU General Pulic License v3 (see LICENSE)'
+__copyright__ = 'Copyright © 2020 by Christoph Kirst'
+__webpage__   = 'http://idisco.info'
+__download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 
 import math
 import numpy as np

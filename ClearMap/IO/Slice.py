@@ -1,15 +1,31 @@
 # -*- coding: utf-8 -*-
 """
-Slice module
+Slice
+=====
 
 This module provides basic handling of slicing of sources.
+
 The main functionality is to virtually slice an array and return its 
 expected shape and order. Virtual slices can also be used as handles with 
 low communication overhead in parallel processing.
+
+Example
+-------
+>>> import numpy as np
+>>> import ClearMap.IO as io
+>>> source = io.source(np.random.rand(30,40))
+>>> sliced = io.slc.Slice(source, slicing=(slice(None), slice(10,20)))
+>>> sliced
+Sliced-Numpy-Source(30, 10)[float64]
+
+>>> sliced.base
+Numpy-Source(30, 40)[float64]|C|
 """
-__author__    = 'Christoph Kirst <ckirst@rockefeller.edu>'
-__license__   = 'MIT License <http://www.opensource.org/licenses/mit-license.php>'
-__copyright__ = 'Copyright (c) 2018 by Christoph Kirst, The Rockefeller University, New York City'
+__author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
+__license__   = 'GPLv3 - GNU General Pulic License v3 (see LICENSE.txt)'
+__copyright__ = 'Copyright © 2020 by Christoph Kirst'
+__webpage__   = 'http://idisco.info'
+__download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 
 
 import numbers

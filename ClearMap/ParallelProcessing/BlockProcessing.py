@@ -1,9 +1,58 @@
-#!/usr/bin/env python2
 # -*- coding: utf-8 -*-
 """
+BlockProcessing
+===============
+
 Module to process data in parallel for large data sets
 
 This strategy allows memory intensive processing of larger data sets.
+
+Example
+-------
+
+>>> import numpy as np
+>>> import ClearMap.IO.IO as io
+>>> import ClearMap.ParallelProcessing.BlockProcessing as bp
+>>> source = io.as_source(np.asarray(np.random.rand(50,100,200), order = 'F'))
+>>> blocks = bp.split_into_blocks(source, processes=10, axes=[2], size_min=30, size_max=50, overlap=20);
+>>> blocks[0]
+Block-Numpy-Source(50, 100, 38)[float64]|F|
+
+>>> blocks[0].info()
+'0/10<(0, 0, 0)/(1, 1, 10)> (50, 100, 38)@(50, 100, 200)[(:,:,0:38)]'
+
+>>> b.valid
+'Sliced-Block-Numpy-Source(50, 100, 28)[float64]|F|'
+
+>>> b = blocks[0];
+>>> print(b.valid.base_shape)
+>>> print(b.valid.base_slicing)
+>>> print(b.iteration)
+(50, 100, 200)
+(slice(None, None, None), slice(None, None, None), slice(None, 28, None))
+0
+ 
+>>> shape = (2,3,20);
+>>> source = io.npy.Source(array = np.random.rand(*shape));
+>>> sink = io.npy.Source(array = np.zeros(shape))
+>>>  
+>>> def process_image(source, sink=None):
+>>>    if sink is None:
+>>>      sink = np.zeros(source.shape);
+>>>    sink[:] = 100 * source[:];
+>>>    return sink;
+>>> 
+>>> bp.process(process_image, source, sink,
+>>>            processes = 'serial', size_max = 4, size_min = 1, overlap = 0, axes = [2],
+>>>            optimization = True, verbose = True);
+>>>
+>>> print(np.all(sink[:] == process_image(source)))
+True
+  
+>>> bp.process(process_image, source, sink,
+>>>            processes = None, size_max = 10, size_min = 6, overlap = 3, axes = all,
+>>>            optimization = True, verbose = True);
+
 """
 __author__    = 'Christoph Kirst <ckirst@rockefeller.edu>'
 __license__   = 'MIT License <http://www.opensource.org/licenses/mit-license.php>'

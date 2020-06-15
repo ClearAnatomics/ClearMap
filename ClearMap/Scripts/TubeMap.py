@@ -9,6 +9,9 @@ lightsheet data [Kirst2020]_.
 
 See the :ref:`TubeMap tutorial </TubeMap.ipynb>` for a tutorial and usage.
 
+.. image:: Static/cell_abstract_2020.jpg
+   :target: https://doi.org/10.1016/j.cell.2016.05.007 
+   :width: 300  
 
 References
 ----------

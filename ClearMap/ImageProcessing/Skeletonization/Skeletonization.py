@@ -13,7 +13,7 @@ Supported algorithsm are:
   sub-iteration thinning algorithm by Palagyi and Kuba [Palagy1999]_.
   
 * RC6  - parallel 3d 6 sub-iteration istmus-based thinning algorithms 
-  [Raynal]_.
+  [Raynal2000]_.
 
 References
 ----------

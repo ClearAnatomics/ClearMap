@@ -3,7 +3,7 @@
 Workspace
 =========
 
-Workspace module and class to keep track of the data files of a project.
+The Workspace module keeps track of the data files of a project.
 Using this module will simplify access to data and results using coherent
 filenames accross experiments and samples.
 
@@ -11,13 +11,15 @@ One can think of a Workspace as a transparent data structure for ClearMap.
 
 Note
 ----
-Additional standard filenames can be added in the ftype_to_filename dict.
+Additional standard filenames can be added in the `ftype_to_filename dict`.
 """
-__author__    = 'Christoph Kirst <ckirst@rockefeller.edu>'
-__license__   = 'MIT License <http://www.opensource.org/licenses/mit-license.php>'
-__copyright__ = 'Copyright (c) 2019 by Christoph Kirst'
+__author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
+__license__   = 'GPLv3 - GNU General Pulic License v3 (see LICENSE.txt)'
+__copyright__ = 'Copyright © 2020 by Christoph Kirst'
+__webpage__   = 'http://idisco.info'
+__download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 
-#TODO: add DataJoint or NWB data formats 
+#TODO: integrate with DataJoint or NWB data formats 
 
 import os
 import numpy as np

@@ -1,10 +1,21 @@
 # -*- coding: utf-8 -*-
 """
+SMA
+===
+
 Shared memory arrays for parallel processing.
+
+Note
+----
+Usage of this array can help for parallel processing of shared memory
+arrays. However, using memmap sources (:mod:`~ClearMap.IO.MMP`) often enable 
+faster implementations.
 """
-__author__    = 'Christoph Kirst <ckirst@rockefeller.edu>'
-__license__   = 'MIT License <http://www.opensource.org/licenses/mit-license.php>'
-__copyright__ = 'Copyright (c) 2017 by Christoph Kirst, The Rockefeller University, New York City'
+__author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
+__license__   = 'GPLv3 - GNU General Pulic License v3 (see LICENSE.txt)'
+__copyright__ = 'Copyright © 2020 by Christoph Kirst'
+__webpage__   = 'http://idisco.info'
+__download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 
 import numpy as np
 
@@ -237,9 +248,8 @@ def _shared(shape = None, dtype = None, order = None, array=None, handle = None)
 
 def _test():
   #from importlib import reload
-  import numpy as np  #analysis:ignore
+  #import numpy as np  #analysis:ignore
   import ClearMap.IO.SMA as sma
-  reload(sma)
 
   n = 10;
   array = sma.zeros(n)

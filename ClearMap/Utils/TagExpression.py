@@ -16,24 +16,44 @@ A tag has the format <Name,Type,Width>.
   * Width : int, if given indicates a fixed width  and missing digist or chars
     are replaced by trailing zeros or spaces.
 
+The module also provides functions to infer the tag expressions from a list of
+file names via the function :func:`~ClearMap.Utils.TagExpression.detect`.
+
+Expressions can also be converted to glob or regular expressions.
+
+
 Example
 -------
-An example tag expression would be 
-'file_<X,2>_<Y,3>.npy' 
-and would for example match the filename
-'file_01_013.npy'
+An example tag expression would be 'file_<X,2>_<Y,3>.npy' and would for example
+match the filename 'file_01_013.npy'
 
-The module provides functions to infer the tag expressions from a list of
-file names via the function :func:`~ClearMap.Utils.TagExpression.detect`,
-and to convert to glob and regular expressions.
+>>> import ClearMap.Utils.TagExpression as te
+>>> e = te.Expression('file_<X,2>_<Y,3>.npy')
+>>> e.tag_names()
+e.tag_names()
+
+>>> e.glob()
+'file_[0-9][0-9]_[0-9][0-9].npy'
+
+>>> e.indices('file_01_013.npy')
+[1, 13]
+
+>>> e.re()
+'file_(?P<X>\\d{2})_(?P<Y>\\d{3})\\.npy'
+
+>>> e.string({'X':1, 'Y':10})
+'file_01_010.npy'
 
 See also
 --------
 :mod:`~ClearMap.Utils.RegularExpression`
 """
-__author__    = 'Christoph Kirst <ckirst@rockefeller.edu>'
-__license__   = 'MIT License <http://www.opensource.org/licenses/mit-license.php>'
-__docformat__ = 'rest'
+__author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
+__license__   = 'GPLv3 - GNU General Pulic License v3 (see LICENSE.txt)'
+__copyright__ = 'Copyright © 2020 by Christoph Kirst'
+__webpage__   = 'http://idisco.info'
+__download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
+
 
 import copy
 

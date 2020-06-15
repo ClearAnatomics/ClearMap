@@ -1,14 +1,20 @@
 # -*- coding: utf-8 -*-
 """
-DevolvePointList
-================
+StatisticsPointList
+===================
 
-Converts point data into a devolved or smeared out image for 
-visulalization and analysis purposes.
+Perform varous statistical measurements in local rregions around a list of 
+points.
+
+See also
+--------
+:mod:`~ClearMap.Analysis.Measurements`
 """
-__author__    = 'Christoph Kirst <ckirst@rockefeller.edu>'
-__license__   = 'MIT License <http://www.opensource.org/licenses/mit-license.php>'
-__copyright__ = 'Copyright 2018 by Christoph Kirst, The Rockefeller University, New York City'
+__author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
+__license__   = 'GPLv3 - GNU General Pulic License v3 (see LICENSE)'
+__copyright__ = 'Copyright © 2020 by Christoph Kirst'
+__webpage__   = 'http://idisco.info'
+__download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 
 import math
 import numpy as np

@@ -1,16 +1,20 @@
 # -*- coding: utf-8 -*-
 """
-IO interface to read image and array data
+IO
+==
 
-This is the main module to distribute the reading and writing of individual data formats to the specialized sub-modules.
+IO interface to read files as sources.
 
-A data source is either a specification to image or other array data.
+This is the main module to distribute the reading and writing of 
+individual data formats to the specialized sub-modules.
   
 See :mod:`ClearMap.IO` for details.
 """
-__author__    = 'Christoph Kirst <ckirst@rockefeller.edu>'
-__license__   = 'MIT License <http://www.opensource.org/licenses/mit-license.php>'
-__copyright__ = 'Copyright (c) 2018 by Christoph Kirst, The Rockefeller University, New York City'
+__author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
+__license__   = 'GPLv3 - GNU General Pulic License v3 (see LICENSE.txt)'
+__copyright__ = 'Copyright © 2020 by Christoph Kirst'
+__webpage__   = 'http://idisco.info'
+__download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 
 
 import importlib
@@ -39,7 +43,6 @@ import ClearMap.Utils.TagExpression as te
 import ClearMap.Utils.Timer as tmr
 
 import ClearMap.ParallelProcessing.ParallelTraceback as ptb
-
 
 
 ###############################################################################
@@ -204,6 +207,22 @@ def as_source(source, slicing = None, *args, **kwargs):
   if slicing is not None:
     source = slc.Slice(source=source, slicing=slicing);
   return source;
+
+
+def source(source, slicing = None, *args, **kwargs):
+  """Convert source specification to a Source class.
+  
+  Arguments
+  ---------
+  source : object
+    The source specification.
+      
+  Returns
+  -------
+  source : Source class
+    The source class.
+  """
+  return as_source(source, slicing=slicing, *args, **kwargs);
 
 
 def ndim(source):

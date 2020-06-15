@@ -9,6 +9,17 @@ data from iDISCO+ cleared tissue [Renier2016]_.
 
 See the :ref:`CellMap tutorial </CellMap.ipynb>` for a tutorial and usage.
 
+
+.. image:: Static/cell_abstract_2016.jpg
+   :target: https://doi.org/10.1016/j.cell.2020.01.028
+   :width: 300
+
+.. figure:: Static/CellMap_pipeline.png
+
+  iDISCO+ and ClearMap: A Pipeline for Cell Detection, Registration, and 
+  Mapping in Intact Samples Using Light Sheet Microscopy.
+
+
 References
 ----------
 .. [Renier2016] `Mapping of brain activity by automated volume analysis of immediate early genes. Renier* N, Adams* EL, Kirst* C, Wu* Z, et al. Cell. 2016 165(7):1789-802 <https://doi.org/10.1016/j.cell.2016.05.007>`_

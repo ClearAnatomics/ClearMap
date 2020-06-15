@@ -1,9 +1,16 @@
 # -*- coding: utf-8 -*-
 """
-Source module
+Source
+======
 
 This module provides the base class for data sources and sinks.
 """
+__author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
+__license__   = 'GPLv3 - GNU General Pulic License v3 (see LICENSE.txt)'
+__copyright__ = 'Copyright © 2020 by Christoph Kirst'
+__webpage__   = 'http://idisco.info'
+__download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
+
 
 import numpy as np
 
@@ -235,28 +242,28 @@ class Source(object):
       name = self.name;
       name = '%s' % name if name is not None else '';
     except:
-      print('name')
+      #print('name')
       name ='';
     
     try:
       shape = self.shape
       shape ='%r' % ((shape,)) if shape is not None else '';
     except:
-      print('shape')
+      #print('shape')
       shape = '';
 
     try:
       dtype = self.dtype;
       dtype = '[%s]' % dtype if dtype is not None else '';
     except:
-      print('dtype')
+      #print('dtype')
       dtype = '';
             
     try:
       order = self.order;
       order = '|%s|' % order if order is not None else '';
     except:
-      print('order')
+      #print('order')
       order = '';
     
 #    try:
@@ -273,7 +280,7 @@ class Source(object):
       if len(location) > 0:
         location = '{%s}' % location;
     except:
-      print('location')
+      #print('location')
       location = '';    
     
 #    try:
@@ -294,7 +301,7 @@ class Source(object):
 
 
 ###############################################################################
-### Abstract and virtualSource base class
+### Abstract and VirtualSource base class
 ###############################################################################
 
 #TODO: memory -> device argument
