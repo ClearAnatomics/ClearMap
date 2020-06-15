@@ -16,6 +16,12 @@ See Also
     * :const:`external_path`
     * :const:`ilastik_path`
 """
+__author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
+__license__   = 'GPLv3 - GNU General Pulic License v3 (see LICENSE)'
+__copyright__ = 'Copyright © 2020 by Christoph Kirst'
+__webpage__   = 'http://idisco.info'
+__download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
+
 
 import os
 import socket
@@ -65,7 +71,7 @@ Note
   `Elastix Webpage <http://elastix.isi.uu.nl/>`_
 """
 
-tera_stitcher_path = os.path.join(clearmap_path, 'External/TeraStitcher');
+tera_stitcher_path = None;
 """Absolue path to the TeraStitcher installation
 
 Note
@@ -134,7 +140,7 @@ def setup():
             #raise RuntimeWarning('Settings: elastix path %s does not exists, cf. Settings.py or type help(Settings) for details.' % elastix_path);
             print('Settings: Elastix path %s does not exists, cf. Settings.py or type help(Settings) for details.' % elastix_path);
             elastix_path = None;
-            
+
     if not tera_stitcher_path is None:
         if not os.path.exists(tera_stitcher_path):
             #raise RuntimeWarning('Settings: TeraStitcher path %s does not exists, cf. Settings.py or type help(Settings) for details.' % tera_stitcher_path);

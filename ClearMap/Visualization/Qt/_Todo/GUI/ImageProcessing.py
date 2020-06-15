@@ -1,11 +1,15 @@
 # -*- coding: utf-8 -*-
 """
-ImageProcessing Widgets
+ImageProcessing
+===============
 
 Provides GUI to run image processing analysis routines and pipelines of *ClearMap*
 """
-#:copyright: Copyright 2015 by Christoph Kirst, The Rockefeller University, New York City
-#:license: GNU, see LICENSE.txt for details.
+__author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
+__license__   = 'GPLv3 - GNU General Pulic License v3 (see LICENSE)'
+__copyright__ = 'Copyright © 2020 by Christoph Kirst'
+__webpage__   = 'http://idisco.info'
+__download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 
 import numpy
 
@@ -442,7 +446,7 @@ class ParameterWidget(ParameterTree):
       #print('  data:      %s' % str(change['data']))
       #print('  class:     %s' % change['data'].__class__.__name__)
       #print('  ----------') 
-      print self.parameterDict
+      print(self.parameterDict)
 
 
 

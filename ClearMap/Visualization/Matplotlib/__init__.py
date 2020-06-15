@@ -3,17 +3,18 @@
 Matplotlib
 ==========
 
-This sub-package provides Matplotlib based routines for ClearMap
+This sub-package provides Matplotlib based routines for ClearMap.
 
 Supported functionality:
 
     * contour plots
     
 Main routines are:
-    * :func:`~ClearMap.Visualziation.Matplotlib.PlotUtils.plot_denisty`.
+    * :func:`ClearMap.Visualziation.Matplotlib.PlotUtils.plot_density`
 
 """ 
-__author__    = 'Christoph Kirst <ckirst@rockefeller.edu>'
-__license__   = 'MIT License <http://www.opensource.org/licenses/mit-license.php>'
-__copyright__ = 'Copyright 2019 by Christoph Kirst, The Rockefeller University, New York City'
-__version__   = '0.1'
+__author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
+__license__   = 'GPLv3 - GNU General Pulic License v3 (see LICENSE)'
+__copyright__ = 'Copyright © 2020 by Christoph Kirst'
+__webpage__   = 'http://idisco.info'
+__download__  = 'http://www.github.com/ChristophKirst/ClearMap2'

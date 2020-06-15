@@ -4,10 +4,32 @@ HierarchicalDict
 ================
 
 Provides tools to handle / print hierarchical parameter dictionaries.
+
+Example
+-------
+
+>>> import ClearMap.Utils.HierarchicalDict as hdict
+>>> d = dict(x = 10, y = 100, z = dict(a = 10, b = 20));
+>>> print(hdict.get(d, 'z_a'))
+10
+
+>>>  hdict.set(d, 'z_c_q', 42)
+>>> hdict.pprint(d)
+x: 10
+y: 100
+z: dict
+   a: 10
+   b: 20
+   c: dict
+      q: 42
+
+
 """
-__author__    = 'Christoph Kirst <ckirst@rockefeller.edu>'
-__license__   = 'MIT License <http://www.opensource.org/licenses/mit-license.php>'
-__copyright__ = 'Copyright (c) 2017 by Christoph Kirst, The Rockefeller University, New York City'
+__author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
+__license__   = 'GPLv3 - GNU General Pulic License v3 (see LICENSE)'
+__copyright__ = 'Copyright © 2020 by Christoph Kirst'
+__webpage__   = 'http://idisco.info'
+__download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 
 
 DELIMITER = '_';
@@ -215,11 +237,10 @@ def prepend(parameter, key):
 ###############################################################################
 
 def _test():
-  import ClearMap.Utils.ParameterTools as par
+  import ClearMap.Utils.HierarchicalDict as hdict
   
 
-  d = dict(x = 10, y = 100);
-
-  par.setParameter(d, q_r = 2, q_p = 'hello')
-
-  print(d)    
+  d = dict(x = 10, y = 100, z = dict(a = 10, b = 20));
+  print(hdict.get(d, 'z_a'))
+  hdict.set(d, 'z_c_q', 42)
+  hdict.pprint(d)

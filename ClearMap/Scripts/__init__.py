@@ -5,14 +5,14 @@ Scripts
 
 Folder containing the main processing pipeline scripts.
 
-Published scripts include:
+Scripts include:
 
-================================ =============== ===================================== ==============================================================
-Script                           Documentation    Tutorial                             Description
-================================ =============== ===================================== ==============================================================
-:mod:`~ClearMap.Scripts.CellMap` :doc:`cellmap`  :ref:`CellMap.ipynb </CellMap.ipynb>` Cell detection pipeline, e.g. for immediate early gene mapping
-:mod:`~ClearMap.Scripts.TubeMap` :doc:`tubemap`  :ref:`TubeMap.ipynb </TubeMap.ipynb>` Vasculature network construction pipeline
-================================ =============== ===================================== ==============================================================
+================================ ==============================================================
+Script                           Description
+================================ ==============================================================
+:mod:`~ClearMap.Scripts.CellMap` Cell detection pipeline, e.g. for immediate early gene mapping
+:mod:`~ClearMap.Scripts.TubeMap` Vasculature network construction pipeline
+================================ ==============================================================
 
 """
 __author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'

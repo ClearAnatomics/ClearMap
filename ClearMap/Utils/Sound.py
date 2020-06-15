@@ -1,14 +1,21 @@
 # -*- coding: utf-8 -*-
 """
-Module providing some sound output to signal processes are done
+Sound
+=====
 
-Example:
-  >>> import ClearMap.Utils.Sound as snd
-  >>> snd.beep()
+Module providing some simple sound output to signal processes are done.
+
+Example
+-------
+
+>>> import ClearMap.Utils.Sound as snd
+>>> snd.beep()
 """
-__author__    = 'Christoph Kirst <ckirst@rockefeller.edu>'
-__license__   = 'MIT License <http://www.opensource.org/licenses/mit-license.php>'
-__copyright__ = 'Copyright (c) 2017 by Christoph Kirst, The Rockefeller University, New York City'
+__author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
+__license__   = 'GPLv3 - GNU General Pulic License v3 (see LICENSE)'
+__copyright__ = 'Copyright © 2020 by Christoph Kirst'
+__webpage__   = 'http://idisco.info'
+__download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 
 
 import os
@@ -21,5 +28,4 @@ def beep(duration = 1, frequency = 340):
  
 if __name__ == "__main__":
   import ClearMap.Utils.Sound as snd;
-  reload(snd)
   snd.beep(frequency= 440, duration = 0.5)  

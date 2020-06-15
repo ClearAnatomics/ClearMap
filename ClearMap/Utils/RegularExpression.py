@@ -6,7 +6,7 @@ RegularExpression
 Module providing routines to check and convert between regular and file 
 expressions. 
 
-Utility module for io modules :mod:`~ClearMap.IO`, :mod:`~ClearMap.IO.FileList`, and :mod:`~ClearMap.IO.FileArray`
+Utility module fused by :mod:`ClearMap.Utils.TagExpression`.
 """
 __author__    = 'Christoph Kirst <ckirst@rockefeller.edu>'
 __license__   = 'MIT License <http://www.opensource.org/licenses/mit-license.php>'
@@ -236,10 +236,10 @@ def group_names(expression):
   #parse regular expression for name expressions
   p = sre.parse(expression);
   gd = p.pattern.groupdict;
-  names = gd.keys();
+  names = list(gd.keys());
   
   #sort according to appearance
-  order = np.argsort(gd.values());
+  order = np.argsort(list(gd.values()));
   names = [names[o] for o in order];
   
   return names;

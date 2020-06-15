@@ -1,19 +1,25 @@
 # -*- coding: utf-8 -*-
 """
-Module provides tools for timing information
+Timer
+=====
+
+Module provides tools for timing information.
 
 Example
 -------
-  >>> import ClearMap.Utils.Timer as timer
-  >>> t = timer.Timer();
-  >>> for i in range(100000000):
-  >>>   x = 10 + i;
-  >>> t.print_elapsed_time('test')
-"""
-__author__    = 'Christoph Kirst <ckirst@rockefeller.edu>'
-__license__   = 'MIT License <http://www.opensource.org/licenses/mit-license.php>'
-__copyright__ = 'Copyright (c) 2020 by Christoph Kirst'
 
+>>> import ClearMap.Utils.Timer as timer
+>>> t = timer.Timer();
+>>> for i in range(100000000):
+>>>   x = 10 + i;
+>>> t.print_elapsed_time('test')
+
+"""
+__author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
+__license__   = 'GPLv3 - GNU General Pulic License v3 (see LICENSE)'
+__copyright__ = 'Copyright © 2020 by Christoph Kirst'
+__webpage__   = 'http://idisco.info'
+__download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 import time
 
 import ClearMap.Utils.Sound as snd;
