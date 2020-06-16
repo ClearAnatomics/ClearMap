@@ -1,10 +1,33 @@
 # ClearMap2
 
+[![DOI](https://zenodo.org/badge/59701678.svg)](https://zenodo.org/badge/latestdoi/59701678)
+[![GitHub stars](https://img.shields.io/github/stars/ChristophKirst/ClearMap2.svg?style=social&label=Star)](https://github.com/ChristophKirst/ClearMap2) 
+[![GitHub stars](https://img.shields.io/github/stars/ChristophKirst/ClearMap2.svg?style=social&label=Star)](https://github.com/ChristophKirst/ClearMap2)
+[![Follow on Twitter](https://img.shields.io/twitter/follow/clearmap_idisco?style=social&logo=twitter)](https://twitter.com/intent/follow?screen_name=clearmap_idisco)
+
+
+[![Generic badge](https://img.shields.io/badge/contributions-welcome-brightgreen.svg)](docs/contribute.md)
+[![License](https://img.shields.io/github/license/ChristophKirst/ClearMap?color=green&style=plastic)](https://github.com/ChristophKirst/ClearMap2/LICENSE.txt)
+[![Size](https://img.shields.io/github/repo-size/ChristophKirst/ClearMap2?style=plastic)
+[![Language](https://img.shields.io/github/languages/top/ChristophKirst/ClearMap?style=plastic)](https://github.com/ChristophKirst/ClearMap2)
+[![](https://github.com/ChristophKirst/RepoTracker/workflows/RepoTracker/badge.svg)](https://github.com/ChristophKirst/RepoTracker/actions)
+
+
 *ClearMap* is a toolbox for the analysis and registration of volumetric
 data from cleared tissues.
 
-*ClearMap's* tool box includes [Wobbly-Stitcher](), CellMap and TubeMap is a toolbox for the
-analysis and registration of volumetric data from cleared tissues.
+*ClearMap's* tool box includes 
+
+* [Wobbly-Stitcher](https://christophkirst.github.io/ClearMap2Documentation/html/wobblystitcher.html), 
+
+* [TubeMap](https://christophkirst.github.io/ClearMap2Documentation/html/tubemap.html),
+
+  [![TubeMap](https://christophkirst.github.io/ClearMap2Documentation/images/TubeMap_graph_movie_small.gif)](https://christophkirst.github.io/ClearMap2Documentation/html/TubeMap.html)
+
+* [CellMap](https://christophkirst.github.io/ClearMap2Documentation/html/cellmap.html)
+
+  [![CellMap](https://christophkirst.github.io/ClearMap2Documentation/images/CellMap_small_fast.gif)](https://christophkirst.github.io/ClearMap2Documentation/html/TubeMap.html)
+
 
 *ClearMap* has been designed to analyze O(TB) 3d datasets obtained 
 via light sheet microscopy from iDISCO+ cleared tissue samples 
@@ -32,42 +55,6 @@ to broaden the range of applications to different types of biological objects
 or structures.
 
 
-
-
-
-
-
-[![Follow on Twitter](https://img.shields.io/twitter/follow/clearmap_idisco?style=social&logo=twitter)](https://twitter.com/intent/follow?screen_name=clearmap_idisco)
-            alt="follow on Twitter">
-
-[![Downloads](https://img.shields.io/github/downloads/ChristophKirst/ClearMap2/total?color=GREEN&style=plastic)](https://github.com/ChristophKirst/ClearMap2/issues)
-         
-[![GitHub stars](https://img.shields.io/github/stars/ChristophKirst/ClearMap.svg?style=social&label=Star)](https://github.com/ChristophKirst/ClearMap)
-[![GitHub forks](https://img.shields.io/github/forks/ChristophKirst/ClearMap.svg?style=social&label=Fork)](https://github.com/ChristophKirst/ClearMap)
-
-[![Generic badge](https://img.shields.io/badge/Contributions-Welcome-brightgreen.svg)](docs/contribute.md)
-
-[![License](https://img.shields.io/github/license/ChristophKirst/ClearMap?color=green&style=plastic)](https://github.com/ChristophKirst/ClearMap2/LICENSE.txt)
-
-[![Size](https://img.shields.io/github/repo-size/ChristophKirst/ClearMap?style=plastic)
-
-[![Language](https://img.shields.io/github/languages/top/ChristophKirst/ClearMap?style=plastic)]((https://github.com/ChristophKirst/ClearMap2)
-
-
-
-ClearMap
-========
-
-ClearMap is a toolbox for the analysis and registration of volumetric data
-from cleared tissues.
-
-ClearMap is targeted towards large lightsheet volumetric imaging data
-of iDISCO+ cleared mouse brains samples, their registration to the Allen brain atlas,
-volumetric image processing and statistical analysis.
-
-The method is fully described in this `Cell paper <http://www.cell.com/cell/abstract/S0092-8674%2816%2930555-4>`_. 
-For further details visit the `iDISCO website <https://idisco.info/>`_ and 
-the `ClearMap documentation <https://rawgit.com/ChristophKirst/ClearMap/master/docs/_build/html/index.html>`_.
 
 
 Installation
