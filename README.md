@@ -8,7 +8,7 @@
 
 [![Generic badge](https://img.shields.io/badge/contributions-welcome-brightgreen.svg)](docs/contribute.md)
 [![License](https://img.shields.io/github/license/ChristophKirst/ClearMap?color=green&style=plastic)](https://github.com/ChristophKirst/ClearMap2/LICENSE.txt)
-[![Size](https://img.shields.io/github/repo-size/ChristophKirst/ClearMap2?style=plastic)
+![Size](https://img.shields.io/github/repo-size/ChristophKirst/ClearMap2?style=plastic)
 [![Language](https://img.shields.io/github/languages/top/ChristophKirst/ClearMap?style=plastic)](https://github.com/ChristophKirst/ClearMap2)
 [![](https://github.com/ChristophKirst/RepoTracker/workflows/RepoTracker/badge.svg)](https://github.com/ChristophKirst/RepoTracker/actions)
 
@@ -26,7 +26,7 @@ data from cleared tissues.
 
 * [CellMap](https://christophkirst.github.io/ClearMap2Documentation/html/cellmap.html)
 
-  [![CellMap](https://christophkirst.github.io/ClearMap2Documentation/images/CellMap_small_fast.gif)](https://christophkirst.github.io/ClearMap2Documentation/html/TubeMap.html)
+  [![CellMap](https://christophkirst.github.io/ClearMap2Documentation/images/CellMap_small_fast.gif)](https://christophkirst.github.io/ClearMap2Documentation/html/CellMap.html)
 
 
 *ClearMap* has been designed to analyze O(TB) 3d datasets obtained 
