@@ -15,7 +15,7 @@
 <p align="center">
 <img src="https://christophkirst.github.io/Test/html/test.gif" height="160">
 <img src="https://christophkirst.github.io/Test/html/CellMap_small_fast.gif" height="160">
-<img src="https://christophkirst.github.io/Test/html/tubeMap_raw_movie_small.gif" height="160">
+<img src="https://christophkirst.github.io/Test/html/TubeMap_raw_movie_small.gif" height="160">
 </p>
 
 
