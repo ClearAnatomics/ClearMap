@@ -11,6 +11,7 @@ ehthumbs.db
 Thumbs.db 
 .asv
 *rtf
+.ipynb_checkpoints
 
 # pyc files
 *.pyc
