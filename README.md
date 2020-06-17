@@ -13,6 +13,12 @@ ClearMap
 [![Language](https://img.shields.io/github/languages/top/ChristophKirst/ClearMap?style=plastic)](https://github.com/ChristophKirst/ClearMap2)
 [![](https://github.com/ChristophKirst/RepoTracker/workflows/RepoTracker/badge.svg)](https://github.com/ChristophKirst/RepoTracker/actions)
 
+<p align="center">
+<img src="https://christophkirst.github.io/Test/html/test.gif" height="160">
+<img src="https://christophkirst.github.io/Test/html/CellMap_small_fast.gif" height="160">
+<img src="https://christophkirst.github.io/Test/html/TubeMap_raw_movie_small.gif" height="160">
+</p>
+
 
 <p align="center">
 <img src="https://christophkirst.github.io/ClearMap2Documentation/images/TubeMap_graph_movie.gif" height="160">
