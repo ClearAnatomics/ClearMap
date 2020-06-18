@@ -156,13 +156,13 @@ and cite us if you use the sofware in any form:
 Authors
 =======
 
-ClearMap was originally desinged and developed by 
+ClearMap was originally designed and developed by 
 [Christoph Kirst](https://profiles.ucsf.edu/christoph.kirst). 
 
 Scripts and specific applications were developed by [Nicolas Renier](https://www.renier-lab.com/nicolasrenier)
 and [Christoph Kirst](https://profiles.ucsf.edu/christoph.kirst).
 
-The deep vessel filling network was desgined and created by Sophie Skriabine 
+The deep vessel filling network was designed and created by Sophie Skriabine 
 and integrated to ClearMap by [Christoph Kirst](https://profiles.ucsf.edu/christoph.kirst).
 
 The documentation was written by [Christoph Kirst](https://profiles.ucsf.edu/christoph.kirst).
