@@ -39,7 +39,7 @@ Extract vasculature and other tubular networks from TB data.
 Extract neuronal activity marker and cell shapes.
 
 
-## Applications
+## Background and Applications
 
 *ClearMap* has been designed to analyze O(TB) 3d datasets obtained 
 via light sheet microscopy from iDISCO+ cleared tissue samples 
@@ -49,7 +49,7 @@ immunolabeled for proteins.
 [Renier et al. Cell 2016](https://doi.org/10.1016/j.cell.2016.05.007)
 as well as vasculature networks of whole mouse brains 
 [Kirst et al. Cell 2020](https://doi.org/10.1016/j.cell.2020.01.028)
-Background
+
 <p align="center">
 <a href="https://doi.org/10.1016/j.cell.2016.05.007">
 <img src="https://christophkirst.github.io/ClearMap2Documentation/images/Cell_abstract_2016.jpg" 
