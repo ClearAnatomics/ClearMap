@@ -12,7 +12,7 @@ low communication overhead in parallel processing.
 Example
 -------
 >>> import numpy as np
->>> import ClearMap.IO as io
+>>> import ClearMap.IO.IO as io
 >>> source = io.source(np.random.rand(30,40))
 >>> sliced = io.slc.Slice(source, slicing=(slice(None), slice(10,20)))
 >>> sliced

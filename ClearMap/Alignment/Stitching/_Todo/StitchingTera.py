@@ -27,7 +27,7 @@ from lxml import etree
 
 
 import ClearMap.Settings as settings
-import ClearMap.IO as io
+import ClearMap.IO.IO as io
 import ClearMap.IO.FileList as filelist;
 import ClearMap.IO.FileUtils as fileutils;
 import ClearMap.Visualization.Plot as cplt;

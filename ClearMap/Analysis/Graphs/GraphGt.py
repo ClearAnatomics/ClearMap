@@ -52,7 +52,6 @@ gt.gt_io.libgraph_tool_core.set_unpickler(unpickler)
 
 import ClearMap.Analysis.Graphs.Graph as grp
 
-import ClearMap.IO.IO as io
 
 
 ###############################################################################
@@ -103,6 +102,7 @@ def ndim_from_source(source):
     ndim = source.ndim;
   else:
     try:
+      import ClearMap.IO.IO as io
       source = io.as_source(source);
       ndim = source.ndim;
     except:
@@ -127,6 +127,7 @@ def gtype_from_source(source, vectorize = True, graph_property = False):
       ndim = source.ndim;
     else:
       try:
+        import ClearMap.IO.IO as io
         source = io.as_source(source);
         dtype = source.dtype;
         gtype = dtype_to_gtype(dtype);
@@ -1296,6 +1297,7 @@ class Graph(grp.AnnotatedGraph):
     return self.sub_graph(vertex_filter=valid, view=view);   
   
   def sub_slice_vertex_filter(self, slicing, coordinates = None):
+    import ClearMap.IO.IO as io
     slicing = io.slc.unpack_slicing(slicing, self.ndim);
     valid = np.ones(self.n_vertices, dtype=bool);
     if coordinates is None:
@@ -1315,6 +1317,7 @@ class Graph(grp.AnnotatedGraph):
     return valid;
 
   def sub_slice_edge_filter(self, slicing, coordinates = None):
+    import ClearMap.IO.IO as io
     slicing = io.slc.unpack_slicing(slicing, self.ndim);
     valid = np.ones(self.n_edges, dtype=bool);
     if coordinates is None:

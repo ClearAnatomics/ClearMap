@@ -14,7 +14,7 @@ import math
 import pyximport;
 pyximport.install(setup_args={"include_dirs":numpy.get_include()}, reload_support=True)
 
-import ClearMap.IO as io
+import ClearMap.IO.IO as io
 import ClearMap.Analysis.OrientationCode as orc
 
 def voxelizeOrientations(points, orientations, dataSize = None, sink = None, size = (5,5,5), weights = None):

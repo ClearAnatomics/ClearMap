@@ -25,7 +25,7 @@ import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 
-import ClearMap.IO as io
+import ClearMap.IO.IO as io
 import ClearMap.Analysis.Voxelization as vox
 
 
