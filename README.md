@@ -39,7 +39,7 @@ Extract vasculature and other tubular networks from TB data.
 Extract neuronal activity marker and cell shapes.
 
 
-## Background
+## Applications
 
 *ClearMap* has been designed to analyze O(TB) 3d datasets obtained 
 via light sheet microscopy from iDISCO+ cleared tissue samples 
@@ -49,7 +49,7 @@ immunolabeled for proteins.
 [Renier et al. Cell 2016](https://doi.org/10.1016/j.cell.2016.05.007)
 as well as vasculature networks of whole mouse brains 
 [Kirst et al. Cell 2020](https://doi.org/10.1016/j.cell.2020.01.028)
-
+Background
 <p align="center">
 <a href="https://doi.org/10.1016/j.cell.2016.05.007">
 <img src="https://christophkirst.github.io/ClearMap2Documentation/images/Cell_abstract_2016.jpg" 
@@ -75,6 +75,17 @@ or structures.
 
 Please refer to our [documentation](https://christophkirst.github.io/ClearMap2Documentation)
 on how to [install](https://christophkirst.github.io/ClearMap2Documentation/html/installation.html) ClearMap.
+
+[Tutorials](https://christophkirst.github.io/ClearMap2Documentation/html/usage.html)
+====================================================================================
+
+Tutorials for [TubeMap](https://christophkirst.github.io/ClearMap2Documentation/html/tubemap.html) 
+and [CellMap](https://christophkirst.github.io/ClearMap2Documentation/html/tubemap.html) are
+avaialbe as [jupyer](https://jupyter.org/) notebooks:
+  
+  * [TubeMap](https://christophkirst.github.io/ClearMap2Documentation/html/TubeMap.html)
+  
+  * [CellMap](https://christophkirst.github.io/ClearMap2Documentation/html/TubeMap.html)
 
 
 [Documentation](https://christophkirst.github.io/ClearMap2Documentation)
@@ -142,13 +153,33 @@ and cite us if you use the sofware in any form:
        url={https://doi.org/10.1016/j.cell.2020.01.028}}
 
 
+Authors
+=======
+
+ClearMap was originally desinged and developed by 
+[Christoph Kirst](https://profiles.ucsf.edu/christoph.kirst). 
+
+Scripts and specific applications were developed by [Nicolas Renier](https://www.renier-lab.com/nicolasrenier)
+and [Christoph Kirst](https://profiles.ucsf.edu/christoph.kirst).
+
+The deep vessel filling network was desgined and created by Sophie Skriabine 
+and integrated to ClearMap by [Christoph Kirst](https://profiles.ucsf.edu/christoph.kirst).
+
+The documentation was written by [Christoph Kirst](https://profiles.ucsf.edu/christoph.kirst).
+and [Nicolas Renier](https://www.renier-lab.com/nicolasrenier).
+
+Contributions are very welcome.
+
+
 License
 =======
 
 This project is licensed under the [GNU General Public License v3.0](LICENSE). 
 
-For other licensing options contact the author Christoph Kirst (christoph.kirst.ck@gmail.com).
+For other options contact the author Christoph Kirst 
+(christoph.kirst.ck@gmail.com).
 
+Copyright © 2020 by Christoph Kirst
 
 Versions
 ========
@@ -163,4 +194,3 @@ VERSION 1.0
 First version of ClearMap. Implements [CellMap](https://christophkirst.github.io/ClearMap2Documentation/html/cellmap.html) 
 See https://github.com/ChristophKirst/ClearMap
 
-Copyright © 2020 by Christoph Kirst
