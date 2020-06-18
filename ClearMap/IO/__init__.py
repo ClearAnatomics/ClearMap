@@ -13,7 +13,7 @@ The :mod:`~ClearMap.IO.IO` module is the main module organizing all the IO
 functionailty.
 
 >>> import numpy as np
->>> import ClearMap.IO as io
+>>> import ClearMap.IO.IO as io
 >>> x = np.random.rand(30,40,50);
 >>> s = io.as_source(x);
 >>> print(s);
@@ -63,4 +63,4 @@ __webpage__   = 'http://idisco.info'
 __download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 
 
-from ClearMap.IO.IO import *
+#from ClearMap.IO.IO import *

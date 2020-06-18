@@ -19,8 +19,6 @@ __download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 import os
 import numpy as np
 
-import ClearMap.IO.IO as io
-
 
 ###############################################################################
 ### Source classe
@@ -121,6 +119,9 @@ def header_from_source(source, header = None):
   filename : str
     The filename of the mhd header.
   """
+  
+  import ClearMap.IO.IO as io
+
   source = io.as_source(source);
   
   if not isinstance(source, (io.mmp.Source,)):
@@ -177,6 +178,7 @@ def write_header_from_source(source, filename = None, header = None):
   filename : str
     The filename of the mhd header.
   """
+  import ClearMap.IO.IO as io
   source = io.as_source(source);
   
   mhd_header = header_from_source(source, header=header);
@@ -237,7 +239,7 @@ def write(filename, source, header = None, **kwargs):
   filename : str
     The filename of the mhd file.
   """ 
-  
+  import ClearMap.IO.IO as io
   fext = io.file_extension(filename);
   if fext == "raw":
     header_name = filename[:-3] + 'mhd';
@@ -266,7 +268,6 @@ def write(filename, source, header = None, **kwargs):
 def _test():
   import numpy as np
   import ClearMap.IO.MHD as mhd
-  reload(mhd)
   
   data = 255* np.random.rand(200,500,20)
   data = np.array(data, dtype = 'uint8');

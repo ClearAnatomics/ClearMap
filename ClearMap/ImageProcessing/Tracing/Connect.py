@@ -822,7 +822,7 @@ def _test():
   
   # write image
   
-  import ClearMap.IO as io
+  import ClearMap.IO.IO as io
   
   #r = np.asarray(128 * binary_new, dtype = 'uint8');
   #g = r.copy(); b = r.copy();

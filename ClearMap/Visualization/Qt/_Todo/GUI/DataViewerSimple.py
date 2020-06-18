@@ -21,7 +21,7 @@ import pyqtgraph as pg
 from functools import partial
 
 
-import ClearMap.IO as io;
+import ClearMap.IO.IO as io;
 
 
 ###############################################################################
