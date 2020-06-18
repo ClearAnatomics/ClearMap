@@ -3,7 +3,7 @@ ClearMap
 
 [![DOI](https://zenodo.org/badge/59701678.svg)](https://zenodo.org/badge/latestdoi/59701678)
 [![GitHub stars](https://img.shields.io/github/stars/ChristophKirst/ClearMap2.svg?style=social&label=Star)](https://github.com/ChristophKirst/ClearMap2) 
-[![GitHub stars](https://img.shields.io/github/stars/ChristophKirst/ClearMap2.svg?style=social&label=Star)](https://github.com/ChristophKirst/ClearMap2)
+[![GitHub forks](https://img.shields.io/github/forks/ChristophKirst/ClearMap2.svg?style=social&label=Fork)](https://github.com/ChristophKirst/ClearMap2)
 [![Follow on Twitter](https://img.shields.io/twitter/follow/clearmap_idisco?style=social&logo=twitter)](https://twitter.com/intent/follow?screen_name=clearmap_idisco)
 
 
@@ -156,13 +156,13 @@ and cite us if you use the sofware in any form:
 Authors
 =======
 
-ClearMap was originally desinged and developed by 
+ClearMap was originally designed and developed by 
 [Christoph Kirst](https://profiles.ucsf.edu/christoph.kirst). 
 
 Scripts and specific applications were developed by [Nicolas Renier](https://www.renier-lab.com/nicolasrenier)
 and [Christoph Kirst](https://profiles.ucsf.edu/christoph.kirst).
 
-The deep vessel filling network was desgined and created by Sophie Skriabine 
+The deep vessel filling network was designed and created by Sophie Skriabine 
 and integrated to ClearMap by [Christoph Kirst](https://profiles.ucsf.edu/christoph.kirst).
 
 The documentation was written by [Christoph Kirst](https://profiles.ucsf.edu/christoph.kirst).
