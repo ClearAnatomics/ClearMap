@@ -269,7 +269,7 @@ if __name__ == '__main__':
   binarization_parameter['equalize'] = None;
   binarization_parameter['vesselize'] = None;
   
-  processing_parameter = vasc.default_processing_parameter.copy();
+  processing_parameter = vasc.default_binarization_processing_parameter.copy();
   processing_parameter.update(processes = 20,
                               as_memory = True);
   
