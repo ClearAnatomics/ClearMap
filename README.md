@@ -15,9 +15,9 @@ ClearMap
 
 
 <p align="center">
-<img src="https://christophkirst.github.io/ClearMap2Documentation/images/TubeMap_graph_movie.gif" height="160">
-<img src="https://christophkirst.github.io/ClearMap2Documentation/images/CellMap_raw_movie.gif" height="160">
-<img src="https://christophkirst.github.io/ClearMap2Documentation/images/TubeMap_raw_movie.gif" height="160">
+<img src="https://christophkirst.github.io/ClearMap2Documentation/images/TubeMap_graph_movie.gif" height="150">
+<img src="https://christophkirst.github.io/ClearMap2Documentation/images/CellMap_raw_movie.gif" height="150">
+<img src="https://christophkirst.github.io/ClearMap2Documentation/images/TubeMap_raw_movie.gif" height="150">
 </p>
 
 
