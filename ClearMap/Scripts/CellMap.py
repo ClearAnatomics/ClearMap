@@ -348,7 +348,7 @@ if __name__ == "__main__":
         verbose = True
       )
   
-  vox.voxelize(points, sink=ws.filename('density', postfix='intensities'), **voxelization_parameter);
+  vox.voxelize(coordinates, sink=ws.filename('density', postfix='intensities'), **voxelization_parameter);
   
   #%%
   
