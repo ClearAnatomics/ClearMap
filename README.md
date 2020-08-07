@@ -103,9 +103,9 @@ ClearMap has been featured in differnet articles, interviews and a TEDx talk:
 
 <p align="center">
 <a href="https://www.ted.com/talks/christoph_kirst_a_transparent_journey_into_the_brain_and_its_flexible_function">
-<img src="https://christophkirst.github.io/ClearMap2Documentation/images/TEDx_video.jpeg" alt="Cell2016" height="240" hspace="40"/></a>
+<img src="https://christophkirst.github.io/ClearMap2Documentation/images/TEDx_video.jpeg" alt="Cell2016" height="200" hspace="40"/></a>
 <a href="https://www.youtube.com/watch?v=-LEfL55-EUU">
-<img src="https://img.youtube.com/vi/-LEfL55-EUU/0.jpg" alt="Cell2020" height="240" hspace="40"/></a>
+<img src="https://img.youtube.com/vi/-LEfL55-EUU/0.jpg" alt="Cell2020" height="200" hspace="40"/></a>
 </p>
 
 <p align="center">
