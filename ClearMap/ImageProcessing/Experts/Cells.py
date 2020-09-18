@@ -62,9 +62,9 @@ default_cell_detection_parameter = dict(
                                   scaling = 'mean'),
                        
   #background removal
-  background_correction = dict(shape = (7,7),
+  background_correction = dict(shape = (10,10),
                                form = 'Disk',
-                    save = False),
+                               save = False),
   
   #equalization
   equalization = None,
@@ -403,7 +403,7 @@ def detect_cells_block(source, parameter = default_cell_detection_parameter):
     
     if save:
       save = io.as_source(save);
-      save[base_slicing] = corrected[valid_slicing];
+      save[base_slicing] = background[valid_slicing];
     
     if verbose:
       timer.print_elapsed_time('Illumination correction');                          
@@ -490,7 +490,7 @@ def detect_cells_block(source, parameter = default_cell_detection_parameter):
     valid = parameter_maxima.pop('valid', None);
     
     # extended maxima
-    maxima = md.find_maxima(source.array, **parameter_maxima, verbose=verbose);
+    maxima = md.find_maxima(dog, **parameter_maxima, verbose=verbose);
   
     if save:
       save = io.as_source(save);
@@ -513,7 +513,7 @@ def detect_cells_block(source, parameter = default_cell_detection_parameter):
       centers = centers[ids];
       del ids;
   
-  del dog, maxima;
+  del maxima;
   
   results = (centers,);
   
@@ -527,7 +527,7 @@ def detect_cells_block(source, parameter = default_cell_detection_parameter):
     save = parameter_shape.pop('save', None);
     
     # shape detection
-    shape = sd.detect_shape(source, centers, **parameter_shape, verbose=verbose);
+    shape = sd.detect_shape(dog, centers, **parameter_shape, verbose=verbose);
 
     if save:
       save = io.as_source(save);
@@ -546,6 +546,8 @@ def detect_cells_block(source, parameter = default_cell_detection_parameter):
   else:
     valid = None;
     shape = None;
+    
+  del dog;
 
   #cell intensity detection
   if parameter_intensity: 
@@ -597,7 +599,7 @@ def remove_background(source, shape, form = 'Disk'):
   for z in range(source.shape[2]):
     #img[:,:,z] = img[:,:,z] - grey_opening(img[:,:,z], structure = structureElement('Disk', (30,30)));
     #img[:,:,z] = img[:,:,z] - morph.grey_opening(img[:,:,z], structure = self.structureELement('Disk', (150,150)));
-    removed[:,:,z] = source[:,:,z] - cv2.morphologyEx(source[:,:,z], cv2.MORPH_OPEN, selem)
+    removed[:,:,z] = source[:,:,z] - np.min(source[:,:,z], cv2.morphologyEx(source[:,:,z], cv2.MORPH_OPEN, selem))
   return removed; 
 
 

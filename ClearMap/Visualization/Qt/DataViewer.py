@@ -397,8 +397,8 @@ class DataViewer(pg.QtGui.QWidget):
       if s.shape != self.source_shape:
         raise RuntimeError('Shape of sources does not match!');
       
-      if s.dtype == bool:
-        self.sources[i] = s.view('uint8');
+      #if s.dtype == bool:
+      #  self.sources[i] = s.view('uint8');
      
       if s.ndim == 2:
         s.shape = s.shape + (1,);
@@ -484,7 +484,7 @@ class DataViewer(pg.QtGui.QWidget):
       #print(self.source_scale)
       image = s[self.source_slice[:s.ndim]];
       if image.dtype == bool:
-        image = s.view('uint8');
+        image = image.view('uint8');
       #print(image.shape);
       i.updateImage(image);
       

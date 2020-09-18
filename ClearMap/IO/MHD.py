@@ -146,7 +146,7 @@ def header_from_source(source, header = None):
   mhd_header['NDims'] = '%d' % source.ndim;
           
   shape = source.shape;
-  if source.order == 'F':
+  if source.order == 'C':
     shape = shape[::-1];
   mhd_header['DimSize'] = ' '.join(['%d' % s for s in shape])
   
@@ -269,8 +269,12 @@ def _test():
   import numpy as np
   import ClearMap.IO.MHD as mhd
   
-  data = 255* np.random.rand(200,500,20)
+  data = np.array(255* np.random.rand(200,500,20), order='C');
   data = np.array(data, dtype = 'uint8');
+  
+  data[:] = 0;
+  data[10:25,5:10,3:15] = 255;
+  
   fname = 'test.npy'
   np.save(fname, data);
 
