@@ -169,8 +169,8 @@ if __name__ == "__main__":
   #%% Cell detection:
   
   cell_detection_parameter = cells.default_cell_detection_parameter.copy();
-  cell_detection_parameter['illumination'] = None;
-  cell_detection_parameter['background'] = None;
+  cell_detection_parameter['illumination_correction'] = None;
+  cell_detection_parameter['background_correction'] = None;
   cell_detection_parameter['intensity_detection']['measure'] = ['source'];
   cell_detection_parameter['shape_detection']['threshold'] = 500;
   
@@ -272,7 +272,7 @@ if __name__ == "__main__":
   
   coordinates_transformed.dtype=[(t,float) for t in ('xt','yt','zt')]
   label = np.array(label, dtype=[('order', int)]);
-  names = np.array(names, dtype=[('name', 'a256')])
+  names = np.array(names, dtype=[('name' , 'U256')])
   
   import numpy.lib.recfunctions as rfn
   cells_data = rfn.merge_arrays([source[:], coordinates_transformed, label, names], flatten=True, usemask=False)
@@ -289,7 +289,7 @@ if __name__ == "__main__":
   
   source = ws.source('cells');
   header = ', '.join([h[0] for h in source.dtype.names]);
-  np.savetxt(ws.filename('cells', extension='csv'), source[:], header=header, delimiter=',')
+  np.savetxt(ws.filename('cells', extension='csv'), source[:], header=header, delimiter=',', fmt='%s')
   
   #%% ClearMap 1.0 export
   
@@ -348,7 +348,7 @@ if __name__ == "__main__":
         verbose = True
       )
   
-  vox.voxelize(points, sink=ws.filename('density', postfix='intensities'), **voxelization_parameter);
+  vox.voxelize(coordinates, sink=ws.filename('density', postfix='intensities'), **voxelization_parameter);
   
   #%%
   

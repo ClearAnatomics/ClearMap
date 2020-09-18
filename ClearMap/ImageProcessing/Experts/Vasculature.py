@@ -508,7 +508,7 @@ def binarize_block(source, sink, parameter = default_binarization_parameter):
     
   base_slicing = sink.valid.base_slicing;
   valid_slicing = source.valid.slicing;
-
+  
   #initialize binary status for inspection
   binary_status = parameter.get('binary_status', None);
   if binary_status:

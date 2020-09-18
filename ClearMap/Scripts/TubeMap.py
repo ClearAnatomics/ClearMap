@@ -723,23 +723,23 @@ if __name__ == '__main__':
   #%% Graph - sub-slice brain regions
   
   #Cerebellum
-  gs = grt.sub_slice((slice(1,270), slice(1,220), slice(210,220)));
+  #gs = graph.sub_slice((slice(1,270), slice(1,220), slice(210,220)));
   
   #Hippocampus sagittal
-  gs = grt.sub_slice((slice(1,300), slice(50,480), slice(165,185)));
-  gs = grt.sub_slice((slice(18,180), slice(150,280), slice(153,180)));
+  #gs = graph.sub_slice((slice(1,300), slice(50,480), slice(165,185)));
+  #gs = graph.sub_slice((slice(18,180), slice(150,280), slice(153,180)));
                     
   # Striatum coronal                 
-  gs = grt.sub_slice((slice(1,270), slice(100,108), slice(1,240)));
+  #gs = graph.sub_slice((slice(1,270), slice(100,108), slice(1,240)));
   
   # Auditory coronal
-  gs = grt.sub_slice((slice(1,270), slice(200,210), slice(1,240)));
+  #gs = graph.sub_slice((slice(1,270), slice(200,210), slice(1,240)));
                     
   #Cortex saggittal hippocampus                  
-  gs = grt.sub_slice((slice(1,300), slice(270,280), slice(1,240)));
+  #gs = graph.sub_slice((slice(1,300), slice(270,280), slice(1,240)));
                     
   #Midline
-  gs = gr.sub_slice((slice(500,1500), slice(3000,4000), slice(2910,2960)));                  
+  #gs = graph.sub_slice((slice(500,1500), slice(3000,4000), slice(2910,2960)));                  
                     
   #%% Visualization - sub graphs with veins and arteries
   
