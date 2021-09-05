@@ -9,7 +9,7 @@ data from iDISCO+ cleared tissue [Renier2016]_.
 
 See the :ref:`CellMap tutorial </CellMap.ipynb>` for a tutorial and usage.
 
-
+8:30am
 .. image:: ../Static/cell_abstract_2016.jpg
    :target: https://doi.org/10.1016/j.cell.2020.01.028
    :width: 300

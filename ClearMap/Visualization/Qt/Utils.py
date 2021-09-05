@@ -35,10 +35,16 @@ def screen_geometry(screen = None):
   """
   if screen is None:
     screen = -1;
-  if not pg.QAPP:
-    pg.mkQApp();
     
-  g = pg.QAPP.screens()[screen].geometry()
+  app = pg.QAPP;
+  if app is None:
+    app = pg.mkQApp();
+  
+  screens = app.screens();
+  if len(screens) <= screen:
+    screen = -1;
+  
+  g = screens[screen].geometry()
   return (g.left(), g.top(), g.width(), g.height())
 
 

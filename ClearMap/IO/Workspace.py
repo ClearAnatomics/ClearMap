@@ -32,7 +32,10 @@ import ClearMap.Utils.TagExpression as te
 
 import ClearMap.ParallelProcessing.DataProcessing.ArrayProcessing as ap
 
-import ClearMap.Visualization.Plot3d as p3d
+try:
+  import ClearMap.Visualization.Plot3d as p3d
+except:
+  p3d = None;
 
 
 ###############################################################################

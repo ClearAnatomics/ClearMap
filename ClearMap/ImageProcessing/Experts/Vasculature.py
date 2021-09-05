@@ -363,7 +363,6 @@ def binarize(source, sink = None, binarization_parameter = default_binarization_
     save : str or None
       Save the result of this step to the specified file if not None.   
 
-
   Equalization
   ------------
   equalize : dict or None
@@ -487,6 +486,14 @@ def binarize(source, sink = None, binarization_parameter = default_binarization_
       filename = par.get('save', None);
       if filename:
         ap.initialize_sink(filename, shape=shape, order=order, dtype='float');
+      
+      # higher level output saving
+      for key in par.keys():
+        par2 = par[key];
+        if isinstance(par2, dict):
+          filename = par2.get('save', None);
+        if filename:
+          ap.initialize_sink(filename, shape=shape, order=order, dtype='float');
         
   binarization_parameter.update(verbose=processing_parameter.get('verbose', False));
   

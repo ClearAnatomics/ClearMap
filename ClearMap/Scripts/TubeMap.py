@@ -81,7 +81,7 @@ if __name__ == '__main__':
   
   #%% Rigid z-alignment    
             
-  layout = stw.WobblyLayout(expression=ws.filename('raw'), tile_axes=['X','Y'], overlaps=(45, 155));  
+  layout = stw.WobblyLayout(expression=ws.filename('raw'), tile_axes=['B','A'], overlaps=(45, 155));  
   
   st.align_layout_rigid_mip(layout, depth=[55, 155, None], max_shifts=[(-30,30),(-30,30),(-20,20)],
                             ranges = [None,None,None], background=(400, 100), clip=25000, 

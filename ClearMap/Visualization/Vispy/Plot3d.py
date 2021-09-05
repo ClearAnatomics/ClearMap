@@ -32,8 +32,13 @@ import vispy.scene
 #vispy.app.run();
 
 
-import ClearMap.Visualization.Vispy.TurntableCamera as ttc
-import ClearMap.Visualization.Vispy.VolumeVisual as vvi
+try:
+  import ClearMap.Visualization.Vispy.TurntableCamera as ttc
+  import ClearMap.Visualization.Vispy.VolumeVisual as vvi
+except:
+  import vispy.scene.cameras.turntable as ttc
+  import vispy.visuals.volume as vvi
+
 
 import ClearMap.Visualization.Color as col
 
@@ -128,7 +133,7 @@ def list_plot_3d(coordinates, view = None, title = None, center_view = True, col
   return p;
     
 
-def plot_3d(source, colormap = None, view = None, title = None, center_view = True, **kwargs):  
+def plot_3d(source, colormap = None, view = None, title = None, center_view = True, volume_visual = None, **kwargs):  
   """Plot 3d volume.
   
   Arguments
@@ -146,8 +151,11 @@ def plot_3d(source, colormap = None, view = None, title = None, center_view = Tr
     The view of the plot.
   """
   #visual
-  #VolumePlot3D = vispy.scene.visuals.create_visual_node(vispy.visuals.VolumeVisual)
-  VolumePlot3D = vispy.scene.visuals.create_visual_node(vvi.VolumeVisual)
+  if volume_visual == 'vispy':
+    print('vispy');
+    VolumePlot3D = vispy.scene.visuals.create_visual_node(vispy.visuals.VolumeVisual)
+  else:
+    VolumePlot3D = vispy.scene.visuals.create_visual_node(vvi.VolumeVisual)
   
   #view
   title = title if title is not None else 'plot_3d';
@@ -186,7 +194,7 @@ def plot_mesh_3d(coordinates, faces, view = None, shading='smooth', color = None
   faces : array
     Indices of triangular faces, nx3 array.
   title : str or None
-    Window title.
+    Window title.plot_mesh_3d
   view : view or None
     Add plot to this view. if given.
     
@@ -295,7 +303,7 @@ def plot_box(lower, upper, face_color=(1,0,0,0.5), line_color=None, line_width=1
 
 #TODO: vispy.color.ColorMap([col1,col2,...]) is much easier!
 
-def single_color_colormap(color = (1,1,1), alpha = 0.075, inverse_alpha = False):
+def single_color_colormap(color = (1,1,1), alpha = 0.075, inverse = False, inverse_alpha = False):
   
   color = tuple(col.color(color, alpha=alpha));
   if inverse_alpha:
@@ -303,24 +311,34 @@ def single_color_colormap(color = (1,1,1), alpha = 0.075, inverse_alpha = False)
   else:
     opacity = lambda t : t
   
+  if inverse:
+    scale = lambda t : 1-t;
+  else:
+    scale = lambda t : t
+  
   class SingleColor(vispy.color.colormap.BaseColormap):
     glsl_map = """
     vec4 grays(float t) {
-      return vec4(%g * t, %g * t, %g * t, %g * %s);
+      return vec4(%g * x, %g * x, %g * x, %g * %s);
     }
     """  % (color + ('(1-t)' if inverse_alpha else 't',))
     
+    if not inverse:
+      glsl_map = glsl_map.replace('x', 't');
+    else:
+      glsl_map = glsl_map.replace('x', '(1-t)');
+      
     def map(self, t):
       if isinstance(t, np.ndarray):
-        return np.hstack([color[0] * t, color[1] * t, color[2] * t, color[3] * opacity(t)]).astype(np.float32)
+        return np.hstack([color[0] * scale(t), color[1] * scale(t), color[2] * scale(t), color[3] * opacity(t)]).astype(np.float32)
       else:
-        return np.array([color[0] * t, color[1] * t, color[2] * t, color[3] * opacity(t)], dtype=np.float32)
+        return np.array([color[0] * scale(t), color[1] * scale(t), color[2] * scale(t), color[3] * opacity(t)], dtype=np.float32)
       
   return SingleColor();
 
 
-def grays_alpha(alpha = 0.075, inverse=False):
-  return single_color_colormap(color = (1,1,1), alpha=alpha, inverse_alpha=inverse);
+def grays_alpha(alpha = 0.075, inverse = False, inverse_alpha=False):
+  return single_color_colormap(color = (1,1,1), alpha=alpha, inverse=inverse, inverse_alpha=inverse_alpha);
 
 
 

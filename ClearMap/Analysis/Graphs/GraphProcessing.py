@@ -126,13 +126,13 @@ def graph_from_skeleton(skeleton, points = None, radii = None, vertex_coordinate
   return g;
 
 
-def graph_to_skeleton(graph, sink = None, dtype = bool):
+def graph_to_skeleton(graph, sink = None, dtype = bool, values = True):
   """Create a binary skeleton from a graph."""
   if not graph.has_edge_geometry():
-    coordinates = graph.vertex_coordinates();
+    coordinates = np.asarray(graph.vertex_coordinates(), dtype=int);
   else:
     coordinates = graph.edge_geometry('coordinates');
-    coordinates = np.vstack(coordinates);
+    coordinates = np.asarray(np.vstack(coordinates), dtype=int);
 
   if sink is None:
     shape = graph.shape;
@@ -142,8 +142,8 @@ def graph_to_skeleton(graph, sink = None, dtype = bool):
   
   shape = io.shape(sink);
 
-  coordinates = list(coordinates.T);
-  sink[coordinates] = True;
+  coordinates = tuple(coordinates.T);
+  sink[coordinates] = values;
       
   return sink;
 
@@ -572,7 +572,7 @@ def _follow_branch(e, v0):
 
 
 
-def expand_graph_length(graph,length = 'length', return_edge_mapping = False):
+def expand_graph_length(graph, length = 'length', return_edge_mapping = False):
   """Expand a reduced graph to a full graph."""  
   #data
   ec = graph.edge_connectivity();

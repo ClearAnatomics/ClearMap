@@ -61,7 +61,7 @@ def plot(source, axis = None, scale = None, title = None, invert_y = True, min_m
 
 
 
-def multi_plot(sources, axis = None, scale = None, title = None, invert_y = True, min_max = None, arange = True, screen = None):
+def multi_plot(sources, axis = None, scale = None, title = None, invert_y = True, min_max = None, arange = True, screen = None, screen_percent = 90):
   """Plot a source as 2d slices.
   
   Arguments
@@ -97,7 +97,7 @@ def multi_plot(sources, axis = None, scale = None, title = None, invert_y = True
 
   if arange:
     try:      
-      geo = qtu.tiled_layout(len(dvs), percent=80, screen=screen);
+      geo = qtu.tiled_layout(len(dvs), percent=screen_percent, screen=screen);
     
       for d,g in zip(dvs, geo):
         #d.setFixedSize(int(0.95 * g[2]), int(0.9 * g[3]));                  
