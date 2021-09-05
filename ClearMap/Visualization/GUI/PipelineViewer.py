@@ -12,9 +12,9 @@ from functools import partial
 
 import pyqtgraph as pg
 
-import ClearMap.GUI.Parameter as guipar
-import ClearMap.GUI.DataViewer as guidv
-import ClearMap.ImageProcessing.Pipeline as pln
+import ClearMap.Visualization.GUI.Parameter as guipar
+import ClearMap.Visualization.GUI.DataViewer as guidv
+import ClearMap.Visualization.GUI.Pipeline as pln
 
 
 class ProcessViewer(pg.QtGui.QWidget):
@@ -213,7 +213,7 @@ def plot(pipeline, source, sink = None, title = None, scale = None, axis = None,
 if __name__ == "__main__":
   import pyqtgraph as pg
   import numpy as np #analysis:ignore
-  import ClearMap.ImageProcessing.Processing as imp
+  import ClearMap.Visualization.GUI.Pipeline as imp
   import ClearMap.Visualization.GUI.PipelineViewer as pv;
   
   def mul(source, sink = None, factor = 10):
@@ -234,8 +234,8 @@ if __name__ == "__main__":
   
   source = np.random.rand(*(100,80,30));
   
-  pv.ProcessViewer(process = p1, source = source);
+  #pv.ProcessViewer(process = p1, source = source);
   
-  pv.ProcessViewer(process = p, source = source);
+  #pv.ProcessViewer(process = p, source = source);
   
   pv.PipelineViewer(p, source = source)

@@ -14,7 +14,7 @@ from functools import partial
 
 import ClearMap.IO.IO as io;
 
-import ClearMap.GUI.Utils as guiutil;
+import ClearMap.Visualization.GUI.Utils as guiutil;
 
 pg.mkQApp()
 
