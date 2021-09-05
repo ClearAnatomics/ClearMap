@@ -214,8 +214,7 @@ if __name__ == "__main__":
   import pyqtgraph as pg
   import numpy as np #analysis:ignore
   import ClearMap.ImageProcessing.Processing as imp
-  import ClearMap.GUI.PipelineViewer as pv;
-  reload(pv);
+  import ClearMap.Visualization.GUI.PipelineViewer as pv;
   
   def mul(source, sink = None, factor = 10):
     if sink is None:

@@ -44,7 +44,7 @@ class TupleParameterItem(WidgetParameterItem):
     """TupleParameterItem provides tuple parameter input"""
     
     def getValue(self):      
-      text = unicode(self.widget.text());
+      text = str(self.widget.text());
       try :
         v = eval(text);
       except:
@@ -57,7 +57,7 @@ class TupleParameterItem(WidgetParameterItem):
         w = QtGui.QLineEdit()
         w.sigChanged = w.editingFinished
         w.value = self.getValue
-        w.setValue = lambda v: w.setText(unicode(v))
+        w.setValue = lambda v: w.setText(str(v))
         w.sigChanging = w.textChanged      
         self.widget = w
         return w
@@ -72,7 +72,7 @@ class ListParameterItem(WidgetParameterItem):
     """ListParameterItem provides list parameter input"""
 
     def getValue(self):
-      text = unicode(self.widget.text());
+      text = str(self.widget.text());
       try :
         v = eval(text);
       except:
@@ -85,7 +85,7 @@ class ListParameterItem(WidgetParameterItem):
         w = QtGui.QLineEdit()
         w.sigChanged = w.editingFinished
         w.value = self.getValue
-        w.setValue = lambda v: w.setText(unicode(v))
+        w.setValue = lambda v: w.setText(str(v))
         w.sigChanging = w.textChanged      
         self.widget = w
         return w  
@@ -104,7 +104,7 @@ class NumpyParameterItem(WidgetParameterItem):
 
     def getValue(self):
       dv = self.param.defaultValue();
-      text = unicode(self.widget.text());
+      text = str(self.widget.text());
       try :
         v = numpy.array(eval(text));
       except:
@@ -117,7 +117,7 @@ class NumpyParameterItem(WidgetParameterItem):
         w = QtGui.QLineEdit()
         w.sigChanged = w.editingFinished
         w.value = self.getValue
-        w.setValue = lambda v: w.setText(unicode(v.tolist()))
+        w.setValue = lambda v: w.setText(str(v.tolist()))
         w.sigChanging = w.textChanged      
         self.widget = w
         return w  
@@ -137,7 +137,7 @@ class NumpyParameterItem(WidgetParameterItem):
     def updateDisplayLabel(self, value=None):
         if value is None:
             value = self.param.value()
-        text = unicode('array(' + unicode(value.tolist()) + ')');
+        text = str('array(' + str(value.tolist()) + ')');
         self.displayLabel.setText(text)
 
 
@@ -182,7 +182,7 @@ class AnyParameterItem(WidgetParameterItem):
 
     def getValue(self):
       dv = self.param.defaultValue();
-      text = unicode(self.widget.text());
+      text = str(self.widget.text());
       try :
         v = eval(text);
       except:
@@ -196,7 +196,7 @@ class AnyParameterItem(WidgetParameterItem):
         w = QtGui.QLineEdit()
         w.sigChanged = w.editingFinished
         w.value = self.getValue
-        w.setValue = lambda v: w.setText(unicode(v))
+        w.setValue = lambda v: w.setText(str(v))
         w.sigChanging = w.textChanged      
         self.widget = w
         return w  
@@ -216,7 +216,7 @@ class AnyParameterItem(WidgetParameterItem):
     def updateDisplayLabel(self, value=None):
         if value is None:
             value = self.param.value()
-        text = unicode(value);
+        text = str(value);
         self.displayLabel.setText(text)
 
 
@@ -261,7 +261,7 @@ class FileParameterItem(WidgetParameterItem):
     """FileParameterItem provides file name parameter input"""
 
     def getValue(self):
-      text = unicode(self.widget.text());
+      text = str(self.widget.text());
       try :
         v = eval(text);
       except:
@@ -276,7 +276,7 @@ class FileParameterItem(WidgetParameterItem):
         w = QtGui.QLineEdit()
         w.sigChanged = w.editingFinished
         w.value = self.getValue
-        w.setValue = lambda v: w.setText(unicode(v))
+        w.setValue = lambda v: w.setText(str(v))
         w.sigChanging = w.textChanged      
         self.widget = w
         return w  
@@ -442,7 +442,7 @@ class ParameterWidget(ParameterTree):
       #print('  data:      %s' % str(change['data']))
       #print('  class:     %s' % change['data'].__class__.__name__)
       #print('  ----------') 
-      print self.parameterDict
+      print(self.parameterDict)
 
 
 
@@ -455,8 +455,9 @@ def show(widget, title='', width=800, height=800):
   QtGui.QApplication.instance().exec_()
 
 def test():
+  import numpy as np
   pg.mkQApp()
-  param = {'x' : 10, 'y' : 'abc', 'd' : {'t' : (100,5), 'x' : ['a', 'z'], 'n' : numpy.array([[5,6],[6,7]])}};
+  param = {'x' : 10, 'y' : 'abc', 'd' : {'t' : (100,5), 'x' : ['a', 'z'], 'n' : np.array([[5,6],[6,7]])}};
   paramwidget = ParameterWidget('Test', param);
   show(paramwidget, title = 'Testing');
 

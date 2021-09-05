@@ -31,15 +31,14 @@ class FileDialog(QtGui.QFileDialog):
 
 def test():
     from pyqtgraph import mkQApp
-    import ClearMap.GUI.FileDialog as fd
-    reload(fd)
+    import ClearMap.Visualization.GUI.FileDialog as fd
     
     mkQApp()
     dialog = fd.FileDialog()
 
     ret = dialog.exec_();
-    print 'return: ', ret;
-    print dialog.selectedFiles();
+    print('return: ', ret);
+    print(dialog.selectedFiles());
 
 
 if __name__ == '__main__':

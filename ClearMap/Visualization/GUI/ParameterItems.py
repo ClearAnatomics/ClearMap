@@ -71,7 +71,7 @@ class TupleParameterItem(WidgetParameterItem):
     """TupleParameterItem provides tuple parameter input"""
     
     def getValue(self):      
-      text = unicode(self.widget.text());
+      text = str(self.widget.text());
       try :
         v = eval(text);
       except:
@@ -84,7 +84,7 @@ class TupleParameterItem(WidgetParameterItem):
         w = QtGui.QLineEdit()
         w.sigChanged = w.editingFinished
         w.value = self.getValue
-        w.setValue = lambda v: w.setText(unicode(v))
+        w.setValue = lambda v: w.setText(str(v))
         w.sigChanging = w.textChanged      
         self.widget = w
         return w
@@ -100,7 +100,7 @@ class ListParameterItem(WidgetParameterItem):
     """ListParameterItem provides list parameter input"""
 
     def getValue(self):
-      text = unicode(self.widget.text());
+      text = str(self.widget.text());
       try :
         v = eval(text);
       except:
@@ -113,7 +113,7 @@ class ListParameterItem(WidgetParameterItem):
         w = QtGui.QLineEdit()
         w.sigChanged = w.editingFinished
         w.value = self.getValue
-        w.setValue = lambda v: w.setText(unicode(v))
+        w.setValue = lambda v: w.setText(str(v))
         w.sigChanging = w.textChanged      
         self.widget = w
         return w  
@@ -132,7 +132,7 @@ class NumpyParameterItem(WidgetParameterItem):
 
     def getValue(self):
       dv = self.param.defaultValue();
-      text = unicode(self.widget.text());
+      text = str(self.widget.text());
       try :
         v = np.array(eval(text));
       except:
@@ -145,7 +145,7 @@ class NumpyParameterItem(WidgetParameterItem):
         w = QtGui.QLineEdit()
         w.sigChanged = w.editingFinished
         w.value = self.getValue
-        w.setValue = lambda v: w.setText(unicode(v.tolist()))
+        w.setValue = lambda v: w.setText(str(v.tolist()))
         w.sigChanging = w.textChanged      
         self.widget = w
         return w  
@@ -165,7 +165,7 @@ class NumpyParameterItem(WidgetParameterItem):
     def updateDisplayLabel(self, value=None):
         if value is None:
             value = self.param.value()
-        text = unicode('array(' + unicode(value.tolist()) + ')');
+        text = str('array(' + str(value.tolist()) + ')');
         self.displayLabel.setText(text)
 
 
@@ -212,7 +212,7 @@ class AnyParameterItem(WidgetParameterItem):
 
     def getValue(self):
       dv = self.param.defaultValue();
-      text = unicode(self.widget.text());
+      text = str(self.widget.text());
       try :
         v = eval(text);
       except:
@@ -226,7 +226,7 @@ class AnyParameterItem(WidgetParameterItem):
         w = QtGui.QLineEdit()
         w.sigChanged = w.editingFinished
         w.value = self.getValue
-        w.setValue = lambda v: w.setText(unicode(v))
+        w.setValue = lambda v: w.setText(str(v))
         w.sigChanging = w.textChanged      
         self.widget = w
         return w  
@@ -246,7 +246,7 @@ class AnyParameterItem(WidgetParameterItem):
     def updateDisplayLabel(self, value=None):
         if value is None:
             value = self.param.value()
-        text = unicode(value);
+        text = str(value);
         self.displayLabel.setText(text)
 
 
@@ -335,7 +335,7 @@ class FileSelectionWidget(QtGui.QWidget):
     
   def value(self):
       if self.checkbox.isChecked():
-        return filestr(unicode(self.lineedit.text()));
+        return filestr(str(self.lineedit.text()));
       else:
         return None;
         
@@ -349,7 +349,7 @@ class FileSelectionWidget(QtGui.QWidget):
           self.lineedit.setText('');
       else:
         self.checkbox.setChecked(True);
-        self.lineedit.setText(unicode(value));      
+        self.lineedit.setText(str(value));      
       
       
 
@@ -412,7 +412,7 @@ class DirectorySelectionWidget(QtGui.QWidget):
     
   def value(self):
       if self.checkbox.isChecked():
-        return dirstr(unicode(self.lineedit.text()));
+        return dirstr(str(self.lineedit.text()));
       else:
         return None;
         
@@ -426,7 +426,7 @@ class DirectorySelectionWidget(QtGui.QWidget):
           self.lineedit.setText('');
       else:
         self.checkbox.setChecked(True);
-        self.lineedit.setText(unicode(value));      
+        self.lineedit.setText(str(value));      
       
       
 

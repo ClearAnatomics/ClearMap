@@ -15,10 +15,10 @@ __copyright__ = 'Copyright 2017 by Christoph Kirst, The Rockefeller University, 
 import pyqtgraph
 from pyqtgraph import QtGui
 
-import ClearMap.GUI.ParameterItems
-from ClearMap.GUI.ParameterItems import filestr, dirstr
+import ClearMap.Visualization.GUI.ParameterItems
+from ClearMap.Visualization.GUI.ParameterItems import filestr, dirstr
 
-import ClearMap.Utils.ParameterTools as pt
+import ClearMap.Visualization.GUI.ParameterTools as pt
 
 
 typeToType = {'int' : 'int', 'float': 'float', 'bool' : 'bool', 
@@ -54,7 +54,7 @@ def dictToTree(parameter, title = None):
     return [];
   
   tree = [];    
-  for key, value in parameter.iteritems():
+  for key, value in parameter.items():
 
     ptype = valueToType(value);    
     if ptype == 'group':
@@ -177,8 +177,8 @@ def test():
   import numpy as np
   import pyqtgraph as pg
   
-  import ClearMap.GUI.Parameter as par;
-  reload(par)
+  import ClearMap.Visualization.GUI.Parameter as par;
+
   
   def show(widget, title='', width=800, height=800):
     widget.setWindowTitle(title)
