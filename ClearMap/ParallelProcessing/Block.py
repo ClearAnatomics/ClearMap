@@ -126,7 +126,7 @@ class Block(slc.Slice):
   
   @iteration.setter
   def iteration(self, iteration):
-    self._teration = iteration;
+    self._iteration = iteration;
   
   
   @property
