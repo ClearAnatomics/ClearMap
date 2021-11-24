@@ -29,7 +29,6 @@ import ClearMap.Alignment.Stitching.StitchingRigid as stitching_rigid
 # noinspection PyPep8Naming
 import ClearMap.Alignment.Stitching.StitchingWobbly as stitching_wobbly
 from ClearMap.IO.metadata import define_auto_stitching_params, define_auto_resolution, get_file_path
-from ClearMap.Utils.logger import init_logging
 from ClearMap.config.config_loader import get_configs
 
 
@@ -55,8 +54,6 @@ class PreProcessor(object):
         self.resources_directory = settings.resources_path
         self.set_configs(cfg_paths)
         src_directory = os.path.expanduser(self.sample_config['base_directory'])
-
-        init_logging(src_directory, self.sample_config['sample_id'])  # FIXME: needs to be modified if sample_id changes
 
         self.workspace = workspace.Workspace(self.processing_config['pipeline_name'], directory=src_directory)
         src_paths = {k: v for k, v in self.sample_config['src_paths'].items() if v is not None}
