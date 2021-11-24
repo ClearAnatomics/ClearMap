@@ -7,10 +7,8 @@ import types
 
 import numpy as np
 import pygments
-import pyqtgraph
 from pygments.formatters.html import HtmlFormatter
 from pygments.lexers.python import PythonTracebackLexer
-import tifffile
 from skimage import transform as sk_transform
 
 from PyQt5 import QtGui
@@ -33,13 +31,13 @@ from ClearMap.config.config_loader import get_cfg
 
 from ClearMap.gui.gui_utils import Printer, QDARKSTYLE_BACKGROUND, DARK_BACKGROUND, np_to_qpixmap, clean_path, \
     html_to_ansi, html_to_plain_text, compute_grid, BLUE_COLOR_TABLE, runs_from_pycharm, surface_project, \
-    format_long_nb_to_str
+    format_long_nb_to_str, link_dataviewers_cursors
 from ClearMap.gui.params import SampleParameters, ConfigNotFoundError, GeneralStitchingParams, RigidStitchingParams, \
     WobblyStitchingParams, RegistrationParams, CellMapParams, PreferencesParams
 from ClearMap.gui.pyuic_utils import loadUiType
 from ClearMap.gui.widget_monkeypatch_callbacks import get_value, set_value, controls_enabled, get_check_box, \
     enable_controls, disable_controls, set_text, get_text, connect_apply
-from ClearMap.gui.widgets import RectItem, RedCross
+from ClearMap.gui.widgets import RectItem
 
 # TODO
 """
@@ -149,22 +147,11 @@ class ClearMapGui(QMainWindow, Ui_ClearMapGui):
         self.logoLabel.setPixmap(QtGui.QPixmap('icons/logo_cyber.png'))
 
         self.graphLayout.removeWidget(self.frame)  # FIXME:
-        dvs = plot_3d.plot([os.path.expanduser('~/Desktop/cell_map_test_images/auto.tif'),
-                            os.path.expanduser('~/Desktop/cell_map_test_images/resampled.tif')],
-                           arange=False, lut='white', parent=self.centralwidget)
-        self.crosses = []
-        for dv in dvs:
-            cross = RedCross()
-            dv.view.addItem(cross)
-            dv.cross = cross
-            self.crosses.append(cross)
-        dvs[0].pal = dvs[1]
-        dvs[1].pal = dvs[0]
-        # dv[0].graphicsView.scene().sigMouseMoved
-        # dv[1].graphicsView.scene().sigMouseMoved
-
-
-        self.setup_plots(dvs)
+        # dvs = plot_3d.plot([os.path.expanduser('~/Desktop/cell_map_test_images/auto.tif'),
+        #                     os.path.expanduser('~/Desktop/cell_map_test_images/resampled.tif')],
+        #                    arange=False, lut='white', parent=self.centralwidget)
+        # link_dataviewers_cursors(dvs)
+        # self.setup_plots(dvs)
 
         # self.graphDock.resized = types.ClassMethodDescriptorType(pyqtSignal()
         # self.graphDock.resizeEvent = types.MethodType(dock_resize_event, self.graphDock)
@@ -583,6 +570,7 @@ class ClearMapGui(QMainWindow, Ui_ClearMapGui):
         ]
         dvs = plot_3d.plot(image_sources, arange=False, sync=False, lut='white',
                            parent=self.centralWidget())  # TODO: lut as part of preferences # FIXME: why parenthesis
+        link_dataviewers_cursors(dvs)
         self.setup_plots(dvs, ['autofluo', 'aligned'])
 
     def plot_orthogonal_views(self, img):

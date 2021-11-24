@@ -9,6 +9,7 @@ from PyQt5 import QtGui
 from PyQt5.QtWidgets import QApplication
 from matplotlib.colors import cnames
 
+from ClearMap.gui.widgets import RedCross
 
 QDARKSTYLE_BACKGROUND = '#2E3436'
 DARK_BACKGROUND = '#282D2F'
@@ -152,3 +153,12 @@ def format_long_nb_to_str(nb):
         out += tick+c
     out = out[::-1]
     return out
+
+
+def link_dataviewers_cursors(dvs):  # TODO: move to DataViewer module
+    for dv in dvs:
+        cross = RedCross()
+        dv.view.addItem(cross)
+        dv.cross = cross
+    dvs[0].pal = dvs[1]  # FIXME: pals is all others (to work with != 2 dvs)
+    dvs[1].pal = dvs[0]
