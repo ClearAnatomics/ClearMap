@@ -53,14 +53,14 @@
     <layout class="QVBoxLayout" name="verticalLayout_2">
      <item>
       <layout class="QFormLayout" name="formLayout">
-       <item row="0" column="0">
+       <item row="2" column="0">
         <widget class="QLabel" name="label">
          <property name="text">
           <string>Verbosity</string>
          </property>
         </widget>
        </item>
-       <item row="0" column="1">
+       <item row="2" column="1">
         <widget class="QComboBox" name="verbosityComboBox">
          <item>
           <property name="text">
@@ -84,14 +84,14 @@
          </item>
         </widget>
        </item>
-       <item row="2" column="0">
+       <item row="7" column="0">
         <widget class="QLabel" name="label_2">
          <property name="text">
           <string>Number of processes for file conversion</string>
          </property>
         </widget>
        </item>
-       <item row="2" column="1">
+       <item row="7" column="1">
         <widget class="QSpinBox" name="nProcessesFileConversionSpinBox">
          <property name="minimum">
           <number>-1</number>
@@ -101,38 +101,24 @@
          </property>
         </widget>
        </item>
-       <item row="5" column="0">
-        <widget class="QLabel" name="label_3">
-         <property name="text">
-          <string>Start full screen</string>
-         </property>
-        </widget>
-       </item>
-       <item row="5" column="1">
-        <widget class="QCheckBox" name="startFullScreenCheckBox">
-         <property name="text">
-          <string/>
-         </property>
-        </widget>
-       </item>
-       <item row="3" column="0">
+       <item row="8" column="0">
         <widget class="QLabel" name="label_4">
          <property name="text">
           <string>Number of processes for cell detection</string>
          </property>
         </widget>
        </item>
-       <item row="3" column="1">
+       <item row="8" column="1">
         <widget class="QSpinBox" name="nProcessesCellDetectionSpinBox"/>
        </item>
-       <item row="4" column="0">
+       <item row="9" column="0">
         <widget class="QLabel" name="label_5">
          <property name="text">
           <string>Detection chunk size</string>
          </property>
         </widget>
        </item>
-       <item row="4" column="1">
+       <item row="9" column="1">
         <widget class="QFrame" name="frame_2">
          <property name="frameShape">
           <enum>QFrame::StyledPanel</enum>
@@ -178,7 +164,21 @@
          </layout>
         </widget>
        </item>
-       <item row="5" column="0">
+       <item row="0" column="0">
+        <widget class="QLabel" name="label_3">
+         <property name="text">
+          <string>Start full screen</string>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="1">
+        <widget class="QCheckBox" name="startFullScreenCheckBox">
+         <property name="text">
+          <string/>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="0">
         <widget class="QLabel" name="label_9">
          <property name="toolTip">
           <string>The base folder when clicking &quot;Source Folder&quot;</string>
@@ -188,7 +188,7 @@
          </property>
         </widget>
        </item>
-       <item row="5" column="1">
+       <item row="1" column="1">
         <widget class="QLineEdit" name="startFolderLineEdit"/>
        </item>
       </layout>
