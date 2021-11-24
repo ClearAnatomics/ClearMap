@@ -25,6 +25,8 @@ import ClearMap.Visualization.Qt.Utils as qtu
 ############################################################################################################
 
 #TODO: figure / windows handler to update data in existing windows
+from ClearMap.Utils.utilities import runs_on_spyder
+
 
 def plot(source, axis = None, scale = None, title = None, invert_y = True, min_max = None, screen = None):
   """Plot a source as 2d slices.
@@ -56,9 +58,14 @@ def plot(source, axis = None, scale = None, title = None, invert_y = True, min_m
   """
   
   if not isinstance(source, (list, tuple)):
-    source = [source];
-  return multi_plot(source, axis=axis, scale=scale, title=title, invert_y=invert_y, min_max=min_max, screen=screen);
-
+    source = [source]
+  m_plot = multi_plot(source, axis=axis, scale=scale, title=title, invert_y=invert_y,
+                      min_max=min_max, screen=screen, arange=arange, lut=lut, parent=parent, sync=sync)
+  if not runs_on_spyder():
+    inst = pg.QtGui.QApplication.instance()
+    # if inst is not None:
+    #   inst.exec_()
+  return m_plot
 
 
 def multi_plot(sources, axis = None, scale = None, title = None, invert_y = True, min_max = None, arange = True, screen = None):
