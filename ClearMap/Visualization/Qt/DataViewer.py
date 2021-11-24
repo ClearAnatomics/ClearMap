@@ -19,6 +19,7 @@ __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__   = 'http://idisco.info'
 __download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 
+import time
 
 import numpy as np
 import functools as ft
@@ -27,6 +28,9 @@ import functools as ft
 #from PyQt5.QtWidgets import *
 
 import pyqtgraph as pg
+
+from ClearMap.Utils.utilities import runs_on_spyder
+
 pg.CONFIG_OPTIONS['useOpenGL'] = False  # set to False if trouble seeing data.
 
 if not pg.QAPP: 
@@ -503,4 +507,15 @@ def _test():
   import ClearMap.Visualization.Qt.DataViewer as dv
   
   img1 = np.random.rand(*(100,80,30))
+  if not runs_on_spyder():
+    pg.mkQApp()
   dv.DataViewer(img1)
+  if not runs_on_spyder():
+    instance = pg.QtGui.QApplication.instance()
+    instance.exec_()
+
+
+if __name__ == '__main__':
+    print('testing')
+    _test()
+    time.sleep(60)
