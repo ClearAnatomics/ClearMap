@@ -1,0 +1,3 @@
+{
+    "files": ["sample_info_tab_widget.ui","form.ui","preprocessing_tab.ui","triplet_ctrl.ui","main.py","cell_map_tab.ui","design_editor.ui","tubemap_wizard.ui","graphics_resources.qrc"]
+}
