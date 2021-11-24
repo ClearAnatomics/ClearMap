@@ -594,8 +594,9 @@ def detect_cells_block(source, parameter = default_cell_detection_parameter):
 ###############################################################################
 
 def remove_background(source, shape, form = 'Disk'):
-  selem = se.structure_element(shape, form=form, ndim=2).astype('uint8');
-  removed = np.empty(source.shape, dtype=source.dtype);
+  selem = se.structure_element(shape, form=form, ndim=2)
+  selem = np.array(selem).astype('uint8')
+  removed = np.empty(source.shape, dtype=source.dtype)
   for z in range(source.shape[2]):
     #img[:,:,z] = img[:,:,z] - grey_opening(img[:,:,z], structure = structureElement('Disk', (30,30)));
     #img[:,:,z] = img[:,:,z] - morph.grey_opening(img[:,:,z], structure = self.structureELement('Disk', (150,150)));
