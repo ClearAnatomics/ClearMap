@@ -65,8 +65,13 @@ class PreProcessor(object):
         self.machine_config, self.sample_config, self.processing_config = get_configs(*cfg_paths)
 
     def setup_atlases(self):  # TODO: add possibility to load custom reference file (i.e. defaults to None in cfg)
+        self.sample_config.reload()
+        x_slice = slice(None) if self.sample_config['slice_x'] is None else slice(*self.sample_config['slice_x'])
+        y_slice = slice(None) if self.sample_config['slice_y'] is None else slice(*self.sample_config['slice_y'])
+        z_slice = slice(None) if self.sample_config['slice_z'] is None else slice(*self.sample_config['slice_z'])
+        xyz_slicing = (x_slice, y_slice, z_slice)
         results = annotation.prepare_annotation_files(
-            slicing=(self.sample_config['slice_x'], self.sample_config['slice_y'], self.sample_config['slice_z']),
+            slicing=xyz_slicing,
             orientation=self.sample_config['orientation'],
             overwrite=False, verbose=True)
         self.annotation_file_path, self.reference_file_path, self.distance_file_path = results
