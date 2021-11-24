@@ -314,7 +314,8 @@ class Workspace(object):
     return filename
   
   def source(self, *args, **kwargs):
-    return io.as_source(self.filename(*args, **kwargs));
+    f_name = self.filename(*args, **kwargs)
+    return io.as_source(f_name);
   
   def read(self, *args, **kwargs):
    return ap.read(self.filename(*args, **kwargs));
