@@ -12,7 +12,7 @@ __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__   = 'http://idisco.info'
 __download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 
-
+import numpy as np
 import tifffile as tif
 
 import ClearMap.IO.Source as src
@@ -100,6 +100,8 @@ class Source(src.Source):
       slicing = slc.unpack_slicing(slicing, ndim);
 
       slicing_z  = slicing[-1];
+      if isinstance(slicing_z, (np.int, np.int64)):
+        slicing_z = int(slicing_z)
       array = self._tif.asarray(key = slicing_z, maxworkers=processes);
       array = array_from_tif(array);    
       
