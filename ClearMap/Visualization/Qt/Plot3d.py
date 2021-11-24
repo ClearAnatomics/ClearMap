@@ -28,7 +28,8 @@ import ClearMap.Visualization.Qt.Utils as qtu
 from ClearMap.Utils.utilities import runs_on_spyder
 
 
-def plot(source, axis = None, scale = None, title = None, invert_y = True, min_max = None, screen = None):
+def plot(source, axis = None, scale = None, title = None, invert_y = True, min_max = None, screen = None, arange=True, lut=None, parent=None,
+         sync=True):
   """Plot a source as 2d slices.
   
   Arguments
@@ -68,7 +69,8 @@ def plot(source, axis = None, scale = None, title = None, invert_y = True, min_m
   return m_plot
 
 
-def multi_plot(sources, axis = None, scale = None, title = None, invert_y = True, min_max = None, arange = True, screen = None):
+def multi_plot(sources, axis = None, scale = None, title = None, invert_y = True, min_max = None, arange = True, screen = None, lut=None, parent=None,
+               sync=True):
   """Plot a source as 2d slices.
   
   Arguments
@@ -98,9 +100,10 @@ def multi_plot(sources, axis = None, scale = None, title = None, invert_y = True
   
   if not isinstance(title, (tuple, list)):
     title = [title] * len(sources);
-  
+
+  lut = lut if lut is not None else 'flame'
   dvs = [dv.DataViewer(source=s, axis=axis, scale=scale, title=t,
-                       invertY=invert_y, minMax=min_max) for s,t in zip(sources, title)];
+                       invertY=invert_y, minMax=min_max, default_lut=lut, parent=parent) for s,t in zip(sources, title)];
 
   if arange:
     try:      
@@ -112,8 +115,9 @@ def multi_plot(sources, axis = None, scale = None, title = None, invert_y = True
     except:
       pass
 
-  for d1,d2 in zip(dvs[:-1], dvs[1:]):
-    synchronize(d1, d2);
+  if sync:
+    for d1,d2 in zip(dvs[:-1], dvs[1:]):
+      synchronize(d1, d2);
   
   return dvs;
   
