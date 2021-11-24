@@ -603,11 +603,8 @@ class ClearMapGui(QMainWindow, Ui_ClearMapGui):
         self.setup_plots(dvs, list('xyz'))
 
         # After setup
-        # self.cell_map_tab.detectionSubsetXRangeMax.setValue(shape[0])
-        self.cell_map_tab.detectionSubsetXRangeMax.setMaximum(shape[0])
-        # self.cell_map_tab.detectionSubsetYRangeMax.setValue(shape[1])  # TODO: check if resets if set at more than max
+        self.cell_map_tab.detectionSubsetXRangeMax.setMaximum(shape[0])  # TODO: check if value resets if set at more than max
         self.cell_map_tab.detectionSubsetYRangeMax.setMaximum(shape[1])
-        # self.cell_map_tab.detectionSubsetZRangeMax.setValue(shape[2])
         self.cell_map_tab.detectionSubsetZRangeMax.setMaximum(shape[2])
 
     def _update_rect(self, axis, val, min_or_max='min'):
