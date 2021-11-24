@@ -758,6 +758,7 @@ class ClearMapGui(QMainWindow, Ui_ClearMapGui):
         self.setup_plots(dvs)
 
     def setup_atlas(self):  # TODO: call when value changed in atlas settings
+        self.sample_params.ui_to_cfg()  # To make sure we have the slicing up to date
         self.processing_params['registration'].ui_to_cfg()
         self.preprocessor.setup_atlases()
 
