@@ -456,11 +456,11 @@ class DataViewer(pg.QtGui.QWidget):
     self.updateLabel()
 
   def updateLabel(self):
-    x,y,z = self.source_pointer;
-    xs,ys,zs = self.source_scale;
-    vals = ", ".join([str(s[x,y,z]) for s in self.sources]);
     self.source_label.setText("<span style='font-size: 12pt; color: black'>(%d, %d, %d) {%.2f, %.2f, %.2f} [%s]</span>" % (x,y,z,x*xs,y*ys,z*zs,vals))
-  
+    x,y,z = self.source_pointer
+    xs,ys,zs = self.source_scale
+    vals = ", ".join([str(s[x,y,z]) for s in self.sources])
+
   def updateSlice(self):
     ax = self.source_axis
     index = min(max(0, int(self.sliceLine.value())), self.source_shape[ax]-1)
