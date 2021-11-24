@@ -1586,9 +1586,9 @@ class Layout(SourceRegion, src.AbstractSource):
     align_layout(self, max_shifts = max_shifts, clip = clip, background = background, processes = processes, verbose = verbose);
   
   
-  def place(self, method = 'optimization', lower_to_origin = False, processes = None, verbose = False):
+  def place(self, method = 'optimization', lower_to_origin = False, processes = None, verbose = False, min_quality=None):
     """Optimizes positions of the sources in this layout."""
-    place_layout(self, method = method, lower_to_origin = lower_to_origin, verbose = verbose);
+    place_layout(self, method = method,  min_quality=min_quality, lower_to_origin = lower_to_origin, verbose = verbose);
   
   
   def stitch(self, sink = None, method = 'interpolation', processes = None, verbose = False):
@@ -2446,7 +2446,7 @@ def save_layout(filename, layout):
   
   Returns
   -------
-  file_name : str
+  str
     The file name in which the layout was saved.
   """  
   s = np.array([layout.as_virtual()], dtype=object);
