@@ -214,7 +214,7 @@
    <attribute name="dockWidgetArea">
     <number>2</number>
    </attribute>
-   <widget class="QWidget" name="dockWidgetContents_2">
+   <widget class="QWidget" name="dataViewerDockWidgetContents">
     <property name="minimumSize">
      <size>
       <width>1529</width>
