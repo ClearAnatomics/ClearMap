@@ -182,11 +182,19 @@ class ClearMapGui(QMainWindow, Ui_ClearMapGui):
 
     def fix_btns_stylesheet(self):
         for btn in self.findChildren(QPushButton):
-            btn.setStyleSheet('background-color: #455364; '
+            btn.setStyleSheet('QPushButton {'
+                              'background-color: #455364; '
                               'color: #E0E1E3;'
                               'border-radius: 4px;'
                               'padding: 2px;'
-                              'outline: none;')
+                              # 'outline: none;'
+                              '}'
+                              'QPushButton:pressed {'
+                              'background-color: #259AE9; '
+                              # 'background-color: #60798B; '
+                              # 'border: 2px #259AE9;'
+                              '}'
+                              )
 
     def fix_widgets_backgrounds(self):
         for widget_type in (QSpinBox, QDoubleSpinBox, QComboBox, QLineEdit):
