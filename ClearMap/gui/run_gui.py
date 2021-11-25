@@ -530,8 +530,11 @@ class ClearMapGui(QMainWindow, Ui_ClearMapGui):
                 delattr(self, widg.objectName())
         self.graph_names = {}
 
+    def make_progress_dialog(self, msg, maximum=100, canceled_callback=None):
         dlg = QProgressDialog(msg, 'Abort', 0, maximum, parent=self)  # TODO: see if can have a notnativestyle on unity
         dlg.setMinimumDuration(0)  # TODO: add image
+        if canceled_callback is not None:
+            dlg.canceled().connect(canceled_callback)
         dlg.setValue(0)  # To force update
         self.progress_dialog = dlg  # TODO: bind was canceled
 
