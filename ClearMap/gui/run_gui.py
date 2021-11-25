@@ -7,15 +7,16 @@ import types
 
 import numpy as np
 import pygments
+from PyQt5.QtGui import QPixmap
 from pygments.formatters.html import HtmlFormatter
 from pygments.lexers.python import PythonTracebackLexer
 from skimage import transform as sk_transform
 
-from PyQt5 import QtGui
+from PyQt5 import QtGui, QtCore
 from PyQt5.QtCore import QRectF
 from PyQt5.QtWidgets import QApplication, QMainWindow, QFileDialog, QPushButton, QSpinBox, \
     QDoubleSpinBox, QFrame, QDialogButtonBox, QComboBox, QLineEdit, QStyle, QWidget, QMessageBox, QToolBox, \
-    QProgressDialog
+    QProgressDialog, QLabel
 
 import qdarkstyle
 
@@ -532,11 +533,17 @@ class ClearMapGui(QMainWindow, Ui_ClearMapGui):
 
     def make_progress_dialog(self, msg, maximum=100, canceled_callback=None):
         dlg = QProgressDialog(msg, 'Abort', 0, maximum, parent=self)  # TODO: see if can have a notnativestyle on unity
-        dlg.setMinimumDuration(0)  # TODO: add image
+        dlg.setMinimumDuration(0)
+        dlg.setWindowTitle(msg)
+        dlg.lbl = QLabel(msg, parent=dlg)
+        # dlg.lbl.setText(msg)  # TODO: check why this doesn't work with pixmap
+        dlg.lbl.setPixmap(QPixmap('ClearMap/gui/icons/searching_mouse.png'))
+        dlg.lbl.setAlignment(QtCore.Qt.AlignHCenter | QtCore.Qt.AlignVCenter)
+        dlg.setLabel(dlg.lbl)
         if canceled_callback is not None:
             dlg.canceled().connect(canceled_callback)
         dlg.setValue(0)  # To force update
-        self.progress_dialog = dlg  # TODO: bind was canceled
+        self.progress_dialog = dlg
 
     def run_stitching(self):
         stitched_rigid = False
