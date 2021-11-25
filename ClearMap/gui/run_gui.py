@@ -530,9 +530,9 @@ class ClearMapGui(QMainWindow, Ui_ClearMapGui):
                 delattr(self, widg.objectName())
         self.graph_names = {}
 
-    def make_progress_dialog(self, msg, maximum=100):
         dlg = QProgressDialog(msg, 'Abort', 0, maximum, parent=self)  # TODO: see if can have a notnativestyle on unity
-        dlg.setMinimumDuration(100)  # TODO: add image
+        dlg.setMinimumDuration(0)  # TODO: add image
+        dlg.setValue(0)  # To force update
         self.progress_dialog = dlg  # TODO: bind was canceled
 
     def run_stitching(self):
