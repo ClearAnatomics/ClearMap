@@ -115,3 +115,15 @@ def link_dataviewers_cursors(dvs):  # TODO: move to DataViewer module
         dv.cross = cross
     dvs[0].pal = dvs[1]  # FIXME: pals is all others (to work with != 2 dvs)
     dvs[1].pal = dvs[0]
+
+
+class TmpDebug(object):
+    def __init__(self, workspace):
+        self.workspace = workspace
+
+    def __enter__(self):
+        self.workspace.debug = True
+        return self.workspace
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.workspace.debug = False

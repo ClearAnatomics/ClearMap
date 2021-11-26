@@ -681,11 +681,8 @@ class ClearMapGui(ClearMapGuiBase):
         self.cell_map_params.ui_to_cfg()
         self.cell_map_params.crop_values_to_cfg(ratios=self.get_cell_map_scaling_ratios())
         self.cell_detector.run_cell_detection(tuning=True)
-        self.cell_detector.workspace.debug = True
-        try:
+        with self.cell_detector.workspace.tmp_debug:
             self.plot_detection_results()
-        finally:
-            self.cell_detector.workspace.debug = False
 
     def detect_cells(self):
         self.cell_map_params.ui_to_cfg()
@@ -711,18 +708,17 @@ class ClearMapGui(ClearMapGuiBase):
         self.setup_plots(dvs)
 
     def preview_cell_filter(self):
-        self.cell_detector.workspace.debug = True
-        debug_raw_cells_path = self.cell_detector.workspace.filename('cells', postfix='raw')
-        if os.path.exists(debug_raw_cells_path):
-            debug_filtered_cells_path = self.cell_detector.workspace.filename('cells', postfix='filtered')
-            if not os.path.exists(debug_filtered_cells_path):
-                self.cell_detector.filter_cells()
-            self.cell_detector.voxelize('filtered')
-        # self.plot_cell_map_results()
-        # self.plot_cell_filter_results()  # WARNING:
-        dvs = self.cell_detector.plot_voxelized_counts(arange=False, parent=self.centralWidget())
-        self.setup_plots(dvs)
-        self.cell_detector.workspace.debug = False
+        with self.cell_detector.workspace.tmp_debug:
+            debug_raw_cells_path = self.cell_detector.workspace.filename('cells', postfix='raw')
+            if os.path.exists(debug_raw_cells_path):
+                debug_filtered_cells_path = self.cell_detector.workspace.filename('cells', postfix='filtered')
+                if not os.path.exists(debug_filtered_cells_path):
+                    self.cell_detector.filter_cells()
+                self.cell_detector.voxelize('filtered')
+            # self.plot_cell_map_results()
+            # self.plot_cell_filter_results()  # WARNING:
+            dvs = self.cell_detector.plot_voxelized_counts(arange=False, parent=self.centralWidget())
+            self.setup_plots(dvs)
 
     def run_cell_map(self):
         self.cell_map_params.ui_to_cfg()
