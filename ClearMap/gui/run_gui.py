@@ -685,6 +685,11 @@ class ClearMapGui(QMainWindow, Ui_ClearMapGui):
         self.cell_map_params.ui_to_cfg()
         self.cell_map_params.crop_values_to_cfg(ratios=self.get_cell_map_scaling_ratios())
         self.cell_detector.run_cell_detection(tuning=True)
+        self.cell_detector.workspace.debug = True
+        try:
+            self.plot_detection_results()
+        finally:
+            self.cell_detector.workspace.debug = False
 
     def plot_mini_brain(self):
         img = self.__transform_mini_brain()
