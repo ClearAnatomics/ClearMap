@@ -37,7 +37,7 @@ from ClearMap.gui.params import SampleParameters, ConfigNotFoundError, GeneralSt
 from ClearMap.gui.pyuic_utils import loadUiType
 from ClearMap.gui.widget_monkeypatch_callbacks import get_value, set_value, controls_enabled, get_check_box, \
     enable_controls, disable_controls, set_text, get_text, connect_apply
-from ClearMap.gui.widgets import RectItem
+from ClearMap.gui.widgets import RectItem, OrthoViewer
 
 # TODO
 """
@@ -215,18 +215,13 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         dlg = make_progress_dialog(msg, maximum, canceled_callback, self)
         self.progress_dialog = dlg
 
-    def plot_orthogonal_views(self, img):
-        x = np.copy(img)
-        y = np.copy(img).swapaxes(0, 1)
-        z = np.copy(img).swapaxes(0, 2)
-        return plot_3d.plot([x, y, z], arange=False, lut='white', parent=self.centralwidget, sync=False)
-
 
 class ClearMapGui(ClearMapGuiBase):
     def __init__(self, preprocessor):
         super().__init__()
         self.preprocessor = preprocessor
         self.config_loader = ConfigLoader('')
+        self.ortho_viewer = OrthoViewer()
         self.machine_cfg_path = None
         self.sample_cfg_path = None
         self.processing_cfg_path = None
@@ -329,12 +324,12 @@ class ClearMapGui(ClearMapGuiBase):
             clicked.connect(self.plot_debug_cropping_interface)
         self.cell_map_tab.detectionPreviewTuningSampleButtonBox.connectApply(self.create_cell_detection_tuning_sample)
         self.cell_map_tab.detectionPreviewButtonBox.connectApply(self.run_tuning_cell_detection)
-        self.cell_map_tab.detectionSubsetXRangeMin.valueChanged.connect(self.update_x_min)
-        self.cell_map_tab.detectionSubsetXRangeMax.valueChanged.connect(self.update_x_max)
-        self.cell_map_tab.detectionSubsetYRangeMin.valueChanged.connect(self.update_y_min)
-        self.cell_map_tab.detectionSubsetYRangeMax.valueChanged.connect(self.update_y_max)
-        self.cell_map_tab.detectionSubsetZRangeMin.valueChanged.connect(self.update_z_min)
-        self.cell_map_tab.detectionSubsetZRangeMax.valueChanged.connect(self.update_z_max)
+        self.cell_map_tab.detectionSubsetXRangeMin.valueChanged.connect(self.ortho_viewer.update_x_min)
+        self.cell_map_tab.detectionSubsetXRangeMax.valueChanged.connect(self.ortho_viewer.update_x_max)
+        self.cell_map_tab.detectionSubsetYRangeMin.valueChanged.connect(self.ortho_viewer.update_y_min)
+        self.cell_map_tab.detectionSubsetYRangeMax.valueChanged.connect(self.ortho_viewer.update_y_max)
+        self.cell_map_tab.detectionSubsetZRangeMin.valueChanged.connect(self.ortho_viewer.update_z_min)
+        self.cell_map_tab.detectionSubsetZRangeMax.valueChanged.connect(self.ortho_viewer.update_z_max)
 
         # for ctrl in (self.cell_map_tab.backgroundCorrectionDiameter, self.cell_map_tab.detectionThreshold):
         #     ctrl.valueChanged.connect(self.reset_detected)  FIXME: find better way
@@ -485,7 +480,7 @@ class ClearMapGui(ClearMapGuiBase):
         self.sample_tab.srcFolderTxt.setText(src_folder)
 
     def get_graphs(self):
-        return [getattr(self, attr) for attr in dir(self) if attr.startswith('graph_')]
+        return sorted([getattr(self, attr) for attr in dir(self) if attr.startswith('graph_')])
 
     def resize_graphs(self):
         n_rows, n_cols = compute_grid(len(self.get_graphs()))  # WARNING: take care of placeholders
@@ -595,73 +590,25 @@ class ClearMapGui(ClearMapGuiBase):
     # ################################  CELL MAP  #################################
 
     def plot_debug_cropping_interface(self):
-        img = TIF.Source(self.preprocessor.workspace.filename('resampled'))
-        shape = img.shape
-        dvs = self.plot_orthogonal_views(img.array)
-        self.setup_plots(dvs, list('xyz'))
-
-        # FIXME: self.update_x_min, self.update_x_max...
-        self.x_rect_min = RectItem(QRectF(0, 0, 0, shape[1]))  # REFACTOR:
-        dvs[0].view.addItem(self.x_rect_min)
-        self.x_rect_max = RectItem(QRectF(shape[0], 0, 0, shape[1]))
-        dvs[0].view.addItem(self.x_rect_max)
-
-        self.y_rect_min = RectItem(QRectF(0, 0, 0, shape[0]))
-        dvs[1].view.addItem(self.y_rect_min)
-        self.y_rect_max = RectItem(QRectF(shape[1], 0, 0, shape[0]))
-        dvs[1].view.addItem(self.y_rect_max)
-
-        self.z_rect_min = RectItem(QRectF(0, 0, 0, shape[1]))
-        dvs[2].view.addItem(self.z_rect_min)
-        self.z_rect_max = RectItem(QRectF(shape[2], 0, 0, shape[1]))
-        dvs[2].view.addItem(self.z_rect_max)
+        img = self.cell_detector.workspace.source('resampled')
+        self.ortho_viewer.setup(img, parent=self.centralwidget)
+        dvs = self.ortho_viewer.plot_orthogonal_views()
+        self.ortho_viewer.add_cropping_bars()
+        self.setup_plots(dvs, ('x', 'y', 'z'))
 
         # WARNING: needs to be done after setup
-        self.cell_map_tab.detectionSubsetXRangeMax.setMaximum(shape[0])  # TODO: check if value resets if set at more than max
-        self.cell_map_tab.detectionSubsetYRangeMax.setMaximum(shape[1])
-        self.cell_map_tab.detectionSubsetZRangeMax.setMaximum(shape[2])
+        self.cell_map_tab.detectionSubsetXRangeMax.setMaximum(self.ortho_viewer.width)
+        self.cell_map_tab.detectionSubsetYRangeMax.setMaximum(self.ortho_viewer.height)
+        self.cell_map_tab.detectionSubsetZRangeMax.setMaximum(self.ortho_viewer.depth)
 
-    def _update_rect(self, axis, val, min_or_max='min'):
-        rect_item_name = '{}_rect_{}'.format(axis, min_or_max)
-        if not hasattr(self, rect_item_name):
-            return
-        rect_itm = getattr(self, rect_item_name)
-        if min_or_max == 'min':
-            rect_itm.rect.setWidth(val)
-        else:
-            rect_itm.rect.setLeft(val)
-        rect_itm._generate_picture()
-        graph = getattr(self, self.graph_names[axis])
-        graph.view.update()
-
-    def update_x_min(self, val):  # TODO: move to attribute object
-        self._update_rect('x', val, 'min')
-
-    def update_x_max(self, val):
-        self._update_rect('x', val, 'max')
-
-    def update_y_min(self, val):
-        self._update_rect('y', val, 'min')
-
-    def update_y_max(self, val):
-        self._update_rect('y', val, 'max')
-
-    def update_z_min(self, val):
-        self._update_rect('z', val, 'min')
-
-    def update_z_max(self, val):
-        self._update_rect('z', val, 'max')
+        self.ortho_viewer.update_ranges(self.cell_map_params)
 
     def create_cell_detection_tuning_sample(self):  # TODO add messages
         ratios = self.get_cell_map_scaling_ratios(direction='to_resampled')
         crops = self.cell_map_params.scale_crop_values(ratios)
-
-        # TODO: verify order
-        slicing = (
-            slice(crops[0], crops[1]),
-            slice(crops[2], crops[3]),
-            slice(crops[4], crops[5])
-        )
+        slicing = (slice(crops[0], crops[1]),
+                   slice(crops[2], crops[3]),
+                   slice(crops[4], crops[5]))
         self.cell_detector.create_test_dataset(slicing=slicing)
         self.cell_map_params.crop_values_to_cfg(self.get_cell_map_scaling_ratios(direction='to_original'))
 
