@@ -7,32 +7,30 @@ import types
 
 import numpy as np
 import pygments
-from PyQt5.QtGui import QPixmap
 from pygments.formatters.html import HtmlFormatter
 from pygments.lexers.python import PythonTracebackLexer
 from skimage import transform as sk_transform
 
-from PyQt5 import QtGui, QtCore
+from PyQt5 import QtGui
 from PyQt5.QtCore import QRectF
-from PyQt5.QtWidgets import QApplication, QMainWindow, QFileDialog, QPushButton, QSpinBox, \
-    QDoubleSpinBox, QFrame, QDialogButtonBox, QComboBox, QLineEdit, QStyle, QWidget, QMessageBox, QToolBox, \
-    QProgressDialog, QLabel
+from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QSpinBox, QDoubleSpinBox, QFrame, QDialogButtonBox,\
+    QComboBox, QLineEdit, QStyle, QWidget, QMessageBox, QToolBox
 
 import qdarkstyle
 
-import ClearMap.Visualization.Plot3d as plot_3d
 from ClearMap.IO import TIF
 from ClearMap.IO.MHD import mhd_read
 from ClearMap.Settings import resources_path
 
 from ClearMap.Scripts.cell_map import CellDetector
 from ClearMap.Scripts.sample_preparation import PreProcessor
+from ClearMap.Visualization import Plot3d as plot_3d
 
 from ClearMap.config.config_loader import get_cfg
 
 from ClearMap.gui.gui_utils import Printer, QDARKSTYLE_BACKGROUND, DARK_BACKGROUND, np_to_qpixmap, clean_path, \
-    html_to_ansi, html_to_plain_text, compute_grid, BLUE_COLOR_TABLE, runs_from_pycharm, surface_project, \
-    format_long_nb_to_str, link_dataviewers_cursors
+    html_to_ansi, html_to_plain_text, compute_grid, BLUE_COLOR_TABLE, surface_project, \
+    format_long_nb_to_str, link_dataviewers_cursors, get_directory_dlg, warning_popup, make_progress_dialog
 from ClearMap.gui.params import SampleParameters, ConfigNotFoundError, GeneralStitchingParams, RigidStitchingParams, \
     WobblyStitchingParams, RegistrationParams, CellMapParams, PreferencesParams
 from ClearMap.gui.pyuic_utils import loadUiType
@@ -60,29 +58,12 @@ Auto modes:
 Ui_ClearMapGui, _ = loadUiType('ClearMap/gui/mainwindow.ui', patch_parent_class=False)
 
 
-class ClearMapGui(QMainWindow, Ui_ClearMapGui):
-    def __init__(self, preprocessor):
-        super(ClearMapGui, self).__init__()
-
-        self.preprocessor = preprocessor
-        self.logger = None
-        self.machine_cfg_path = None
-        self.sample_cfg_path = None
-        self.processing_cfg_path = None
-        self.cell_map_params = None
+class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
+    def __init__(self):
+        super().__init__()
         self.graph_names = {}
-
-        atlas_path = os.path.join(resources_path, 'Atlas', 'ABA_25um_annotation.tif')  # WARNING: function of chosen atlas
-        arr = TIF.Source(atlas_path).array
-        self.mini_brain_scaling = (5, 5, 5)
-        self.mini_brain = sk_transform.downscale_local_mean(arr, self.mini_brain_scaling)
-
-        self.setWindowIcon(QtGui.QIcon('icons/logo_cyber.png'))  # REFACTOR: use qrc
-
-        self.setupUi(self)
-        self.amendUi()
-
-        self.actionPreferences.triggered.connect(self.config_window.exec)
+        self.__reload_icon = self.style().standardIcon(QStyle.SP_BrowserReload)
+        self.logger = None
 
     def find_child_by_name(self, child_name, child_type, parent=None):
         if parent is None:
@@ -90,13 +71,6 @@ class ClearMapGui(QMainWindow, Ui_ClearMapGui):
         for child in parent.findChildren(child_type):
             if child.objectName() == child_name:
                 return child
-
-    def swap_resolutions_group_box(self):
-        self.sample_tab.resolutionsGroupBox.setVisible(self.sample_tab.advancedCheckBox.isChecked())
-
-    def swap_preprocessing_tab_advanced(self):
-        checked = self.preprocessing_tab.advancedCheckBox.isChecked()
-        self.preprocessing_tab.atlasSettingsPage.setVisible(checked)
 
     def print_error_msg(self, msg):
         self.statusbar.setStyleSheet("color: red")
@@ -110,40 +84,10 @@ class ClearMapGui(QMainWindow, Ui_ClearMapGui):
         self.statusbar.setStyleSheet("color: white")
         self.statusbar.showMessage(msg)
 
-    def patch_stdout(self):
-        sys.stdout = self.logger
-        sys.stderr = self.error_logger
-
-    def amendUi(self):
-        self.logger = Printer(self.textBrowser)
-        self.error_logger = Printer(self.textBrowser, color='red')
-
-        self.setupIcons()
-
-        self.setup_sample_tab()
-        self.setup_preprocessing_tab()
-        self.setup_cell_map_tab()
-        self.tabWidget.setCurrentIndex(0)
-
-        self.setup_preferences_editor()
-
-        self.patch_compound_boxes()
-        self.patch_button_boxes()
-        self.patch_tool_boxes()
-        self.fix_styles()
-        self.logoLabel.setPixmap(QtGui.QPixmap('icons/logo_cyber.png'))
-
-        self.graphLayout.removeWidget(self.frame)  # FIXME:
-        # dvs = plot_3d.plot([os.path.expanduser('~/Desktop/cell_map_test_images/auto.tif'),
-        #                     os.path.expanduser('~/Desktop/cell_map_test_images/resampled.tif')],
-        #                    arange=False, lut='white', parent=self.centralwidget)
-        # link_dataviewers_cursors(dvs)
-        # self.setup_plots(dvs)
-
-        self.print_status_msg('Idle, waiting for input')
-
-    def setupIcons(self):
-        self.__reload_icon = self.style().standardIcon(QStyle.SP_BrowserReload)
+    def fix_btn_boxes_text(self):
+        for btn_box in self.findChildren(QDialogButtonBox):
+            if btn_box.property('applyText'):
+                btn_box.button(QDialogButtonBox.Apply).setText(btn_box.property('applyText'))
 
     def fix_styles(self):
         self.sample_tab.sampleIdButtonBox.button(QDialogButtonBox.Apply).setIcon(self.__reload_icon)
@@ -152,11 +96,6 @@ class ClearMapGui(QMainWindow, Ui_ClearMapGui):
 
         self.fix_btns_stylesheet()
         self.fix_widgets_backgrounds()
-
-    def fix_btn_boxes_text(self):
-        for btn_box in self.findChildren(QDialogButtonBox):
-            if btn_box.property('applyText'):
-                btn_box.button(QDialogButtonBox.Apply).setText(btn_box.property('applyText'))
 
     def fix_btns_stylesheet(self):
         for btn in self.findChildren(QPushButton):
@@ -178,6 +117,58 @@ class ClearMapGui(QMainWindow, Ui_ClearMapGui):
         for widget_type in (QSpinBox, QDoubleSpinBox, QComboBox, QLineEdit):
             for btn in self.findChildren(widget_type):
                 btn.setStyleSheet('background-color: {}; '.format(DARK_BACKGROUND))
+
+    def popup(self, msg, base_msg='Missing configuration file'):
+        self.print_warning_msg(html_to_plain_text(msg))
+        return warning_popup(base_msg, msg)
+
+    def file_exists(self, f_path):
+        if os.path.exists(f_path):
+            return True
+        else:
+            msg = 'File "{}" not found'.format(f_path)
+            self.print_error_msg(msg)
+            return False
+
+    def setup_plots(self, dvs, graph_names=None):
+        self._remove_old_plots()
+
+        n_rows, n_cols = compute_grid(len(dvs))
+        grid_size = (n_rows * n_cols)
+        n_spacers = grid_size - len(dvs)
+        for i in range(n_spacers):
+            if graph_names:
+                graph_names.append('spacer_{}'.format(i))
+            dvs.append(QWidget(parent=self))
+        for i, dv in enumerate(dvs):
+            graph_name = 'graph_{}'.format(i)
+            setattr(self, graph_name, dv)
+            dv.setObjectName(graph_name)
+            row = i // n_cols
+            col = i % n_cols
+            self.graphLayout.addWidget(dv, row, col, 1, 1)
+            self.__resize_graph(dv, n_cols, n_rows)
+            if graph_names:
+                self.graph_names[graph_names[i]] = graph_name
+
+    def __resize_graph(self, dv, n_cols, n_rows, margin=20):
+        size = round((self.graphDock.width() - margin) / n_cols), round((self.graphDock.height() - margin) / n_rows)
+        dv.resize(*size)
+        dv.setMinimumSize(*size)  # required to avoid wobbly dv
+        # dv.setMaximumSize(*size)
+
+    def _remove_old_plots(self):
+        for i in range(self.graphLayout.count(), -1, -1):
+            graph = self.graphLayout.takeAt(i)
+            if graph is not None:
+                widg = graph.widget()
+                widg.setParent(None)
+                widg.deleteLater()
+                delattr(self, widg.objectName())
+        self.graph_names = {}
+
+    def setupIcons(self):
+        self.__reload_icon = self.style().standardIcon(QStyle.SP_BrowserReload)
 
     def patch_compound_boxes(self):
         for bx in self.findChildren(QFrame):
@@ -205,6 +196,87 @@ class ClearMapGui(QMainWindow, Ui_ClearMapGui):
     def patch_tool_boxes(self):
         for tb in self.findChildren(QToolBox):
             tb.setCurrentIndex(0)
+
+    def monkey_patch(self):
+        self.patch_compound_boxes()
+        self.patch_button_boxes()
+        self.patch_tool_boxes()
+        self.fix_styles()
+
+    @staticmethod
+    def create_missing_file_msg(f_type, f_path, default_f_path):
+        base_msg = 'No {} file found at:<br>  <nobr><em>"{}"</em></nobr>.'.format(f_type, f_path)
+        msg = '{} <br><br>Do you want to load a default one from:<br>  <nobr><em>"{}"</em></nobr>' \
+            .format(base_msg, default_f_path)
+        return base_msg, msg
+
+    def make_progress_dialog(self, msg, maximum=100, canceled_callback=None):
+        dlg = make_progress_dialog(msg, maximum, canceled_callback, self)
+        self.progress_dialog = dlg
+
+    def plot_orthogonal_views(self, img):
+        x = np.copy(img)
+        y = np.copy(img).swapaxes(0, 1)
+        z = np.copy(img).swapaxes(0, 2)
+        return plot_3d.plot([x, y, z], arange=False, lut='white', parent=self.centralwidget, sync=False)
+
+
+class ClearMapGui(ClearMapGuiBase):
+    def __init__(self, preprocessor):
+        super().__init__()
+        self.preprocessor = preprocessor
+        self.machine_cfg_path = None
+        self.sample_cfg_path = None
+        self.processing_cfg_path = None
+        self.cell_map_params = None
+
+        self.mini_brain_scaling, self.mini_brain = self.setup_mini_brain()
+
+        self.setWindowIcon(QtGui.QIcon('icons/logo_cyber.png'))  # REFACTOR: use qrc
+
+        self.setupUi(self)
+        self.amendUi()
+
+        self.actionPreferences.triggered.connect(self.config_window.exec)
+
+    def patch_stdout(self):
+        sys.stdout = self.logger
+        sys.stderr = self.error_logger
+
+    def setup_mini_brain(self):
+        atlas_path = os.path.join(resources_path, 'Atlas',
+                                  'ABA_25um_annotation.tif')  # WARNING: function of chosen atlas
+        arr = TIF.Source(atlas_path).array
+        mini_brain_scaling = (5, 5, 5)  # TODO: prefs
+        return mini_brain_scaling, sk_transform.downscale_local_mean(arr, mini_brain_scaling)
+
+    def swap_resolutions_group_box(self):
+        self.sample_tab.resolutionsGroupBox.setVisible(self.sample_tab.advancedCheckBox.isChecked())
+
+    def swap_preprocessing_tab_advanced(self):
+        checked = self.preprocessing_tab.advancedCheckBox.isChecked()
+        self.preprocessing_tab.atlasSettingsPage.setVisible(checked)
+
+    def amendUi(self):
+        self.logger = Printer(self.textBrowser)
+        self.error_logger = Printer(self.textBrowser, color='red')
+
+        self.setupIcons()
+        self.setup_tabs()
+        self.setup_preferences_editor()
+
+        self.monkey_patch()
+        self.logoLabel.setPixmap(QtGui.QPixmap('icons/logo_cyber.png'))
+
+        self.graphLayout.removeWidget(self.frame)
+
+        self.print_status_msg('Idle, waiting for input')
+
+    def setup_tabs(self):
+        self.setup_sample_tab()
+        self.setup_preprocessing_tab()
+        self.setup_cell_map_tab()
+        self.tabWidget.setCurrentIndex(0)
 
     def setup_sample_tab(self):
         cls, _ = loadUiType('ClearMap/gui/sample_tab.ui', patch_parent_class='QTabWidget')
@@ -323,24 +395,6 @@ class ClearMapGui(QMainWindow, Ui_ClearMapGui):
         self.cell_map_cfg_path = cfg_path
         return cfg_path
 
-    @staticmethod
-    def create_missing_file_msg(f_type, f_path, default_f_path):
-        base_msg = 'No {} file found at:<br>  <nobr><em>"{}"</em></nobr>.'.format(f_type, f_path)
-        msg = '{} <br><br>Do you want to load a default one from:<br>  <nobr><em>"{}"</em></nobr>' \
-            .format(base_msg, default_f_path)
-        return base_msg, msg
-
-    def popup(self, msg):
-        self.print_warning_msg(html_to_plain_text(msg))
-        dlg = QMessageBox()
-        dlg.setIcon(QMessageBox.Warning)
-        dlg.setWindowTitle('Warning')
-        dlg.setText('<b>Missing configuration file</b>')
-        dlg.setInformativeText(msg)
-        dlg.setStandardButtons(QMessageBox.Ok | QMessageBox.Cancel)
-        dlg.setDefaultButton(QMessageBox.Ok)
-        return dlg.exec()
-
     def get_cfg_paths(self):  # REFACTOR: move to config module
         if not self.src_folder:
             msg = 'Missing source folder, please define first'
@@ -377,18 +431,10 @@ class ClearMapGui(QMainWindow, Ui_ClearMapGui):
             self.preferences.get_config(self.machine_cfg_path)
             self.preferences.cfg_to_ui()
         else:
-            self.print_error_msg('Missing machine config file. Please ensure a machine_params.cfg file '
-                                 'is available at {}. This should be done at installation'.format(machine_cfg_path))
-            raise FileNotFoundError('Missing machine config file. Please ensure a machine_params.cfg file '
-                                    'is available at {}. This should be done at installation'.format(machine_cfg_path))
-
-    def file_exists(self, f_path):
-        if os.path.exists(f_path):
-            return True
-        else:
-            msg = 'File "{}" not found'.format(f_path)
+            msg = 'Missing machine config file. Please ensure a machine_params.cfg file ' \
+                  'is available at {}. This should be done at installation'.format(machine_cfg_path)
             self.print_error_msg(msg)
-            return False
+            raise FileNotFoundError(msg)
 
     def parse_cfg(self):
         self.print_status_msg('Parsing configuration')
@@ -437,16 +483,8 @@ class ClearMapGui(QMainWindow, Ui_ClearMapGui):
                 self.cell_map_params.cfg_to_ui()
 
     def set_src_folder(self):
-        diag = QFileDialog()  # REFACTOR: move to gui_utils
-        if sys.platform == 'win32' or runs_from_pycharm():  # avoids bug with windows COM object init failed
-            opt = QFileDialog.Options(QFileDialog.DontUseNativeDialog)
-        else:
-            opt = QFileDialog.Options()
-        src_folder = diag.getExistingDirectory(parent=diag, caption="Choose the source directory",
-                                               directory=self.preferences.start_folder, options=opt)
-        diag.close()
-        self.src_folder = src_folder
-        self.sample_params = SampleParameters(self.sample_tab, src_folder)
+        self.src_folder = get_directory_dlg(self.preferences.start_folder)
+        self.sample_params = SampleParameters(self.sample_tab, self.src_folder)
 
     @property
     def src_folder(self):
@@ -458,67 +496,16 @@ class ClearMapGui(QMainWindow, Ui_ClearMapGui):
         self.error_logger.set_file(os.path.join(src_folder, 'errors.log'))
         self.sample_tab.srcFolderTxt.setText(src_folder)
 
-    def setup_plots(self, dvs, graph_names=None):
-        self._remove_old_plots()
-
-        n_rows, n_cols = compute_grid(len(dvs))
-        grid_size = (n_rows * n_cols)
-        n_spacers = grid_size - len(dvs)
-        for i in range(n_spacers):
-            if graph_names:
-                graph_names.append('spacer_{}'.format(i))
-            dvs.append(QWidget(parent=self))
-        for i, dv in enumerate(dvs):
-            graph_name = 'graph_{}'.format(i)
-            setattr(self, graph_name, dv)
-            dv.setObjectName(graph_name)
-            row = i // n_cols
-            col = i % n_cols
-            self.graphLayout.addWidget(dv, row, col, 1, 1)
-            self.__resize_graph(dv, n_cols, n_rows)
-            if graph_names:
-                self.graph_names[graph_names[i]] = graph_name
-
     def get_graphs(self):
         return [getattr(self, attr) for attr in dir(self) if attr.startswith('graph_')]
 
     def resize_graphs(self):
         n_rows, n_cols = compute_grid(len(self.get_graphs()))  # WARNING: take care of placeholders
-        for i in range(self.graphLayout.count(), -1, -1):
+        for i in range(self.graphLayout.count(), -1, -1):  # Necessary to count backwards to get all graphs
             graph = self.graphLayout.itemAt(i)
             if graph is not None:
                 widg = graph.widget()
                 self.__resize_graph(widg, n_cols, n_rows)
-
-    def __resize_graph(self, dv, n_cols, n_rows, margin=20):
-        size = round((self.graphDock.width() - margin) / n_cols), round((self.graphDock.height() - margin) / n_rows)
-        dv.resize(*size)
-        dv.setMinimumSize(*size)  # required to avoid wobbly dv
-        # dv.setMaximumSize(*size)
-
-    def _remove_old_plots(self):
-        for i in range(self.graphLayout.count(), -1, -1):
-            graph = self.graphLayout.takeAt(i)
-            if graph is not None:
-                widg = graph.widget()
-                widg.setParent(None)
-                widg.deleteLater()
-                delattr(self, widg.objectName())
-        self.graph_names = {}
-
-    def make_progress_dialog(self, msg, maximum=100, canceled_callback=None):
-        dlg = QProgressDialog(msg, 'Abort', 0, maximum, parent=self)  # TODO: see if can have a notnativestyle on unity
-        dlg.setMinimumDuration(0)
-        dlg.setWindowTitle(msg)
-        dlg.lbl = QLabel(msg, parent=dlg)
-        # dlg.lbl.setText(msg)  # TODO: check why this doesn't work with pixmap
-        dlg.lbl.setPixmap(QPixmap('ClearMap/gui/icons/searching_mouse.png'))
-        dlg.lbl.setAlignment(QtCore.Qt.AlignHCenter | QtCore.Qt.AlignVCenter)
-        dlg.setLabel(dlg.lbl)
-        if canceled_callback is not None:
-            dlg.canceled().connect(canceled_callback)
-        dlg.setValue(0)  # To force update
-        self.progress_dialog = dlg
 
     def plot_mini_brain(self):
         img = self.__transform_mini_brain()
@@ -644,12 +631,6 @@ class ClearMapGui(QMainWindow, Ui_ClearMapGui):
         self.cell_map_tab.detectionSubsetXRangeMax.setMaximum(shape[0])  # TODO: check if value resets if set at more than max
         self.cell_map_tab.detectionSubsetYRangeMax.setMaximum(shape[1])
         self.cell_map_tab.detectionSubsetZRangeMax.setMaximum(shape[2])
-
-    def plot_orthogonal_views(self, img):
-        x = np.copy(img)
-        y = np.copy(img).swapaxes(0, 1)
-        z = np.copy(img).swapaxes(0, 2)
-        return plot_3d.plot([x, y, z], arange=False, lut='white', parent=self.centralwidget, sync=False)
 
     def _update_rect(self, axis, val, min_or_max='min'):
         rect_item_name = '{}_rect_{}'.format(axis, min_or_max)
