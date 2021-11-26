@@ -737,7 +737,7 @@ class ClearMapGui(QMainWindow, Ui_ClearMapGui):
     #     self.cell_detector.detected = False
 
     def plot_detection_results(self):
-        dvs = self.cell_detector.preview_cell_detection(parent=self.centralWidget(), arange=False, sync=False)  # TODO: add close
+        dvs = self.cell_detector.preview_cell_detection(parent=self.centralWidget(), arange=False, sync=True)  # TODO: add close
         if len(dvs) == 1:
             self.print_warning_msg('Preview not run, will only display stitched image for memory space reasons')
         self.setup_plots(dvs)
