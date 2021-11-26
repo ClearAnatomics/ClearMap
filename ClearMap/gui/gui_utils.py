@@ -109,12 +109,13 @@ def format_long_nb_to_str(nb):
 
 
 def link_dataviewers_cursors(dvs):  # TODO: move to DataViewer module
-    for dv in dvs:
+    for i, dv in enumerate(dvs):
         cross = RedCross()
         dv.view.addItem(cross)
         dv.cross = cross
-    dvs[0].pal = dvs[1]  # FIXME: pals is all others (to work with != 2 dvs)
-    dvs[1].pal = dvs[0]
+        pals = dvs.copy()
+        pals.pop(i)
+        dv.pals = pals
 
 
 class TmpDebug(object):

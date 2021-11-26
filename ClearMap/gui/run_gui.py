@@ -239,7 +239,7 @@ class ClearMapGui(ClearMapGuiBase):
         self.setupUi(self)
         self.amendUi()
 
-        self.actionPreferences.triggered.connect(self.config_window.exec)
+        self.actionPreferences.triggered.connect(self.config_window.exec)  # TODO: check if move to setup_preferences
 
     def patch_stdout(self):
         sys.stdout = self.logger
@@ -701,6 +701,8 @@ class ClearMapGui(ClearMapGuiBase):
         dvs = self.cell_detector.preview_cell_detection(parent=self.centralWidget(), arange=False, sync=True)  # TODO: add close
         if len(dvs) == 1:
             self.print_warning_msg('Preview not run, will only display stitched image for memory space reasons')
+        else:
+            link_dataviewers_cursors(dvs)
         self.setup_plots(dvs)
 
     def plot_cell_filter_results(self):  # TODO: FIX, does not integrate as widget
