@@ -442,8 +442,9 @@ class DataViewer(pg.QtGui.QWidget):
     if hasattr(self, 'cross'):
       self.cross.set_coords([x, y])
       self.view.update()
-      self.pal.cross.set_coords([x, y])
-      self.pal.view.update()
+      for pal in self.pals:
+        pal.cross.set_coords([x, y])
+        pal.view.update()
     #print(x,y);    
     
     ax,ay = self.getXYAxes()
