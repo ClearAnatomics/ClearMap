@@ -3,6 +3,7 @@
 
 # IDE files
 .idea
+*pyproject.user*
 
 # OS generated files
 .DS_Store
@@ -30,6 +31,9 @@ ClearMap/ImageProcessing/Skeletonization/*.npy
 # test data
 ClearMap/Tests/Data/TubeMap_Example/*
 ClearMap/Tests/Data/CellMap_Example/*
+
+# Code spikes
+ClearMap/gui/spikes
 
 # documentation
 Documentation
