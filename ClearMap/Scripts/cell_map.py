@@ -242,6 +242,7 @@ class CellDetector(object):
 
     def run_cell_detection(self, tuning=False):
         self.workspace.debug = tuning
+        self.processing_config.reload()
         cell_detection_param = cell_detection.default_cell_detection_parameter.copy()
         cell_detection_param['illumination'] = None  # WARNING: illumination or illumination_correction
         cell_detection_param['background_correction']['shape'] = self.processing_config['detection']['background_correction']['diameter']
