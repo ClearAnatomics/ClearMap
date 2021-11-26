@@ -25,6 +25,9 @@ class UiParameter(object):
     def write_config(self):
         self.config.write()
 
+    def reload(self):
+        self.config.reload()
+
     def _translate_state(self, state):
         if state is True:
             state = Qt.Checked
