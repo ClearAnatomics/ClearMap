@@ -226,6 +226,7 @@ class ClearMapGui(ClearMapGuiBase):
     def __init__(self, preprocessor):
         super().__init__()
         self.preprocessor = preprocessor
+        self.config_loader = ConfigLoader('')
         self.machine_cfg_path = None
         self.sample_cfg_path = None
         self.processing_cfg_path = None
@@ -407,7 +408,7 @@ class ClearMapGui(ClearMapGuiBase):
         if was_copied:
             self.sample_params.fix_sample_cfg_file(sample_cfg_path)
         self.sample_cfg_path = sample_cfg_path
-        self.processing_cfg_path = self.__get_cfg_path('processing')
+        _, self.processing_cfg_path = self.__get_cfg_path('processing')
 
     def setup_preferences(self):
         self.preferences = PreferencesParams(self.config_window, self.src_folder)
@@ -431,7 +432,7 @@ class ClearMapGui(ClearMapGuiBase):
             return
 
         error = False
-        self.machine_config = self.config_loader.get_cfg(self.machine_cfg_path)
+        self.machine_config = self.config_loader.get_cfg('machine')
         if not self.machine_config:
             self.print_error_msg('Loading machine config file failed')
             error = True
@@ -470,7 +471,7 @@ class ClearMapGui(ClearMapGuiBase):
 
     def set_src_folder(self):
         self.src_folder = get_directory_dlg(self.preferences.start_folder)
-        self.config_loader = ConfigLoader(self.src_folder)
+        self.config_loader.src_dir = self.src_folder
         self.sample_params = SampleParameters(self.sample_tab, self.src_folder)
 
     @property

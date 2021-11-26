@@ -67,18 +67,22 @@ class ConfigLoader(object):
         raise FileNotFoundError('Could not find file {} in {}'.format(cfg_name, self.src_dir))
 
     def get_cfg(self, cfg_name):
-        # if cfg_name in ('machine', 'preferences')
-        cfg_path = self.get_cfg_path(cfg_name)
+        if self.is_machine_file(cfg_name):
+            cfg_path = self.get_default_path(cfg_name)
+        else:
+            cfg_path = self.get_cfg_path(cfg_name)
         ext = os.path.splitext(cfg_path)[-1]
-        self.loader_functions[ext](cfg_path)
+        return self.loader_functions[ext](cfg_path)
 
     def get_default_path(self, cfg_name):
         if not cfg_name.endswith('params') and 'sample' not in cfg_name:  # TODO: just ust sample_params instead
             cfg_name += '_params'
         for ext in self.supported_exts:
-            cfg_path = clean_path(os.path.join(self.default_dir, 'default_{}{}'.format(cfg_name, ext)))
+            prefix = 'default_' if not self.is_machine_file(cfg_name) else ''
+            cfg_name = '{}{}{}'.format(prefix, cfg_name, ext)
+            cfg_path = clean_path(os.path.join(self.default_dir, cfg_name))
             return cfg_path
         raise FileNotFoundError('Could not find file {} in {}'.format(cfg_name, self.default_dir))
 
-    def get_path_or_default(self):
-        raise NotImplementedError  # FIXME: implement and use
+    def is_machine_file(self, cfg_name):
+        return any([base in cfg_name for base in ('machine', 'preferences')])
