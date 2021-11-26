@@ -266,11 +266,13 @@ class CellDetector(object):
             verbose=True
         )
 
-        cell_detection.detect_cells(self.workspace.filename('stitched'),
-                                    self.workspace.filename('cells', postfix='raw'),
-                                    cell_detection_parameter=cell_detection_param,
-                                    processing_parameter=processing_parameter)
-        self.workspace.debug = False
+        try:
+            cell_detection.detect_cells(self.workspace.filename('stitched'),
+                                        self.workspace.filename('cells', postfix='raw'),
+                                        cell_detection_parameter=cell_detection_param,
+                                        processing_parameter=processing_parameter)
+        finally:
+            self.workspace.debug = False
 
     @property
     def detected(self):
