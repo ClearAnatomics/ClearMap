@@ -63,6 +63,23 @@ class PreProcessor(object):
         src_paths = {k: v for k, v in self.sample_config['src_paths'].items() if v is not None}
         self.workspace.update(**src_paths)
         self.workspace.info()
+        self.file_conversion()  # FIXME: add progress
+
+    @property
+    def verbose(self):
+        return self.machine_config['verbosity'] == 'debug'
+
+    def file_conversion(self):
+        is_numpy = self.workspace.filename('raw').endswith('.npy')
+        if is_numpy:
+            file_list = self.workspace.source('raw').file_list  # TODO: check if direct file_list would work
+            if not file_list:
+                clearmap_io.convert_files(self.workspace.file_list('raw', extension='tif'), extension='npy',
+                                          processes=self.machine_config['n_processes_file_conv'], verbose=self.verbose)
+                if self.sample_config['src_paths']['arteries']:
+                    clearmap_io.convert_files(self.workspace.file_list('arteries', extension='tif'), extension='npy',
+                                              processes=self.machine_config['n_processes_file_conv'],
+                                              verbose=self.verbose)
 
     def set_configs(self, cfg_paths):
         cfg_paths = [os.path.expanduser(p) for p in cfg_paths]
