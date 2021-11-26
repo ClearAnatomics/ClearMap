@@ -731,6 +731,7 @@ class PreferencesParams(UiParameter):
         cfg['detection_chunk_overlap'] = self.chunk_size_overlap
         cfg['start_folder'] = self.start_folder
         cfg['start_full_screen'] = self.start_full_screen
+        cfg['default_lut'] = self.lut
 
     def cfg_to_ui(self):
         cfg = self.config
@@ -742,6 +743,7 @@ class PreferencesParams(UiParameter):
         self.chunk_size_overlap = cfg['detection_chunk_overlap']
         self.start_folder = cfg['start_folder']
         self.start_full_screen = cfg['start_full_screen']
+        self.lut = cfg['default_lut']
 
     @property
     def start_folder(self):
@@ -806,3 +808,11 @@ class PreferencesParams(UiParameter):
     @chunk_size_overlap.setter
     def chunk_size_overlap(self, size):
         self.tab.chunkSizeOverlapSpinBox.setValue(size)
+
+    @property
+    def lut(self):
+        return self.tab.lutComboBox.currentText().lower()
+
+    @lut.setter
+    def lut(self, lut_name):
+        self.tab.lutComboBox.setCurrentText(lut_name)

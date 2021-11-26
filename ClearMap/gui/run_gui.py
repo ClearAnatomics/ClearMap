@@ -587,8 +587,8 @@ class ClearMapGui(ClearMapGuiBase):
             self.preprocessor.workspace.filename('resampled', postfix='autofluorescence'),
             mhd_read(os.path.join(self.preprocessor.workspace.filename('auto_to_reference'), 'result.1.mhd'))
         ]
-        dvs = plot_3d.plot(image_sources, arange=False, sync=False, lut='white',
-                           parent=self.centralWidget())  # TODO: lut as part of preferences # FIXME: why parenthesis
+        dvs = plot_3d.plot(image_sources, arange=False, sync=False, lut=self.preferences.lut,
+                           parent=self.centralWidget())  # FIXME: why parenthesis here only
         link_dataviewers_cursors(dvs)
         self.setup_plots(dvs, ['autofluo', 'aligned'])
 
