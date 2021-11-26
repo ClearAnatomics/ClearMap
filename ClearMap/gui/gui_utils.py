@@ -46,10 +46,6 @@ def np_to_qpixmap(img_array, alpha):
 #     return QtGui.QPixmap.fromImage(img)
 
 
-def clean_path(path):
-    return os.path.normpath(os.path.expanduser(path))
-
-
 def html_to_ansi(msg):  #  WARNING: Will not work correctly with colours
     codes_dict = {
         '<nobr>': '',

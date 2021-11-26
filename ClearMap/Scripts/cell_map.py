@@ -51,7 +51,7 @@ import ClearMap.Analysis.Measurements.Voxelization as voxelization
 # noinspection PyPep8Naming
 import ClearMap.Alignment.Annotation as annotation
 from ClearMap.Scripts.sample_preparation import PreProcessor
-from ClearMap.config.config_loader import get_cfg
+from ClearMap.config.config_loader import get_configobj_cfg
 
 
 class CellDetector(object):
@@ -75,7 +75,7 @@ class CellDetector(object):
             configs = preprocessor.get_configs()
             self.sample_config = configs['sample']
             self.machine_config = configs['machine']
-            self.processing_config = get_cfg(os.path.join(self.sample_config['base_directory'], 'cell_map_params.cfg'))
+            self.processing_config = get_configobj_cfg(os.path.join(self.sample_config['base_directory'], 'cell_map_params.cfg'))
 
     def run(self):
         # select sub-slice for testing the pipeline
