@@ -249,7 +249,9 @@ class CellDetector(object):
         cell_detection_param['intensity_detection']['measure'] = ['source']
         cell_detection_param['shape_detection']['threshold'] = self.processing_config['detection']['shape_detection']['threshold']
         if tuning:
+            clearmap_io.delete_file(self.workspace.filename('cells', postfix='bkg'))
             cell_detection_param['background_correction']['save'] = self.workspace.filename('cells', postfix='bkg')
+            clearmap_io.delete_file(self.workspace.filename('cells', postfix='shape'))
             cell_detection_param['shape_detection']['save'] = self.workspace.filename('cells', postfix='shape')
 
             # clearmap_io.delete_file(workspace.filename('cells', postfix='maxima'))
