@@ -26,7 +26,7 @@ from ClearMap.Scripts.cell_map import CellDetector
 from ClearMap.Scripts.sample_preparation import PreProcessor
 from ClearMap.Visualization import Plot3d as plot_3d
 
-from ClearMap.config.config_loader import get_cfg
+from ClearMap.config.config_loader import ConfigLoader
 
 from ClearMap.gui.gui_utils import QDARKSTYLE_BACKGROUND, DARK_BACKGROUND, np_to_qpixmap, \
     html_to_ansi, html_to_plain_text, compute_grid, surface_project,  format_long_nb_to_str, link_dataviewers_cursors
@@ -383,50 +383,35 @@ class ClearMapGui(ClearMapGuiBase):
         for param in self.processing_params.values():
             param.ui_to_cfg()
 
-    def get_cell_map_cfg_path(self):  # REFACTOR: move to config module
-        cfg_path = clean_path(os.path.join(self.src_folder, 'cell_map_params.cfg'))
+    def __get_cfg_path(self, cfg_name):
+        cfg_path = self.config_loader.get_cfg_path(cfg_name)
+        was_copied = False
         if not self.file_exists(cfg_path):
-            default_cfg_file_path = clean_path('~/.clearmap/default_cell_map_params.cfg')
-            base_msg, msg = self.create_missing_file_msg('CellMap', cfg_path, default_cfg_file_path)
+            default_cfg_file_path = self.config_loader.get_default_path(cfg_name)
+            base_msg, msg = self.create_missing_file_msg(cfg_name.title().replace('_', ''),
+                                                         cfg_path, default_cfg_file_path)
             ret = self.popup(msg)
             if ret == QMessageBox.Ok:
                 copyfile(default_cfg_file_path, cfg_path)
+                was_copied = True
             else:
                 raise FileNotFoundError(html_to_ansi(base_msg))
-        self.cell_map_cfg_path = cfg_path
-        return cfg_path
+        return was_copied, cfg_path
 
     def get_cfg_paths(self):  # REFACTOR: move to config module
         if not self.src_folder:
             msg = 'Missing source folder, please define first'
             self.print_error_msg(msg)
             raise FileNotFoundError(msg)
-        sample_cfg_path = clean_path(os.path.join(self.src_folder, 'sample.cfg'))
-        if not self.file_exists(sample_cfg_path):
-            default_sample_cfg_path = clean_path('~/.clearmap/default_sample.cfg')
-            base_msg, msg = self.create_missing_file_msg('sample', sample_cfg_path, default_sample_cfg_path)
-            ret = self.popup(msg)
-            if ret == QMessageBox.Ok:
-                copyfile(default_sample_cfg_path, sample_cfg_path)
-            else:
-                raise FileNotFoundError(html_to_ansi(base_msg))
+        was_copied, sample_cfg_path = self.__get_cfg_path('sample')
+        if was_copied:
             self.sample_params.fix_sample_cfg_file(sample_cfg_path)
         self.sample_cfg_path = sample_cfg_path
-        processing_cfg_path = clean_path(os.path.join(self.src_folder, 'processing_params.cfg'))
-        if not self.file_exists(processing_cfg_path):
-            default_processing_cfg_path = clean_path('~/.clearmap/default_processing_params.cfg')
-            base_msg, msg = self.create_missing_file_msg('processing params',
-                                                         processing_cfg_path, default_processing_cfg_path)
-            ret = self.popup(msg)
-            if ret == QMessageBox.Ok:
-                copyfile(default_processing_cfg_path, processing_cfg_path)
-            else:
-                raise FileNotFoundError(html_to_ansi(base_msg))
-        self.processing_cfg_path = processing_cfg_path
+        self.processing_cfg_path = self.__get_cfg_path('processing')
 
     def setup_preferences(self):
         self.preferences = PreferencesParams(self.config_window, self.src_folder)
-        machine_cfg_path = clean_path('~/.clearmap/machine_params.cfg')   # REFACTOR: move to config module
+        machine_cfg_path = self.config_loader.get_default_path('machine')
         if self.file_exists(machine_cfg_path):
             self.machine_cfg_path = machine_cfg_path
             self.preferences.get_config(self.machine_cfg_path)
@@ -446,7 +431,7 @@ class ClearMapGui(ClearMapGuiBase):
             return
 
         error = False
-        self.machine_config = get_cfg(self.machine_cfg_path)
+        self.machine_config = self.config_loader.get_cfg(self.machine_cfg_path)
         if not self.machine_config:
             self.print_error_msg('Loading machine config file failed')
             error = True
@@ -467,10 +452,10 @@ class ClearMapGui(ClearMapGuiBase):
             except ConfigNotFoundError:
                 self.print_error_msg('Loading preprocessing config file failed')
                 error = True
-        if self.processing_params['stitching'].config['pipeline_name'].lower() == 'cellmap':
+        if self.processing_params['stitching'].config['pipeline_name'].lower().replace('_', '') == 'cellmap':
             self.cell_map_params = CellMapParams(self.cell_map_tab)
             try:
-                self.cell_map_params.get_config(self.get_cell_map_cfg_path())
+                self.cell_map_params.get_config(self.__get_cfg_path('cell_map')[1])
             except ConfigNotFoundError:
                 self.print_error_msg('Loading Cell Map config file failed')
                 error = True
@@ -485,6 +470,7 @@ class ClearMapGui(ClearMapGuiBase):
 
     def set_src_folder(self):
         self.src_folder = get_directory_dlg(self.preferences.start_folder)
+        self.config_loader = ConfigLoader(self.src_folder)
         self.sample_params = SampleParameters(self.sample_tab, self.src_folder)
 
     @property

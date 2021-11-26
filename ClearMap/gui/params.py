@@ -4,7 +4,7 @@ import numpy as np
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QInputDialog
 
-from ClearMap.config.config_loader import get_cfg
+from ClearMap.config.config_loader import get_configobj_cfg
 
 
 class ConfigNotFoundError(Exception):
@@ -18,7 +18,7 @@ class UiParameter(object):
         self.config = None
 
     def get_config(self, cfg_path):
-        self.config = get_cfg(cfg_path)
+        self.config = get_configobj_cfg(cfg_path)  # FIXME:
         if not self.config:
             raise ConfigNotFoundError
 
@@ -88,12 +88,12 @@ class SampleParameters(UiParameter):
                 ctrl.setValue(v)
 
     def fix_sample_cfg_file(self, f_path):
-        cfg = get_cfg(f_path)
+        cfg = get_configobj_cfg(f_path)
         cfg['base_directory'] = os.path.dirname(f_path)
         if not self.sample_id:
-            id, ok = QInputDialog.getText(self.tab, 'Warning: missing ID',
-                                          '<b>Missing sample ID</b><br>Please input below')
-            self.sample_id = id
+            sample_id, ok = QInputDialog.getText(self.tab, 'Warning: missing ID',
+                                                 '<b>Missing sample ID</b><br>Please input below')
+            self.sample_id = sample_id
             if not ok:
                 raise ValueError('Missing sample ID')
         cfg['sample_id'] = self.sample_id
