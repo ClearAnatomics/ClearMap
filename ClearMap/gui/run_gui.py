@@ -44,31 +44,17 @@ from ClearMap.gui.widgets import RectItem
 """
 Previews:
     - Add rigid alignment : plane in middle of stack from each column + stitch with different colours
-    - CellMap Filtered cells (plot voxelize_unweighted from chunk (single dataviewer)
-    - CellMap Run: plot checkbox + plot button
 Delete intermediate files
-Analysis:
-(X)Check with Christophe slice range ...
-
-Progress bar
-
 
 preferences:
     (-) number of processes for all
-    (X) chunk size
+    
+Analysis:
     
 LATER:
 Auto modes:
     - Run all
     - Batch run
-
-
-DONE:
-CellMap:
-    (X) reset detected upon value changed
-Atlas space info:
-    (X) Add cropping to preview
-(X) Scale dataviewer 
 """
 
 Ui_ClearMapGui, _ = loadUiType('ClearMap/gui/mainwindow.ui', patch_parent_class=False)
@@ -130,7 +116,7 @@ class ClearMapGui(QMainWindow, Ui_ClearMapGui):
 
     def amendUi(self):
         self.logger = Printer(self.textBrowser)
-        self.error_logger = Printer(self.textBrowser, 'red')
+        self.error_logger = Printer(self.textBrowser, color='red')
 
         self.setupIcons()
 
@@ -154,16 +140,7 @@ class ClearMapGui(QMainWindow, Ui_ClearMapGui):
         # link_dataviewers_cursors(dvs)
         # self.setup_plots(dvs)
 
-        # self.graphDock.resized = types.ClassMethodDescriptorType(pyqtSignal()
-        # self.graphDock.resizeEvent = types.MethodType(dock_resize_event, self.graphDock)
-        # self.graphDock.resized.connect(self.resize_graphs)
-
         self.print_status_msg('Idle, waiting for input')
-
-    # def resizeEvent(self, event):
-    #     # dock_size = self.graphDock.size()
-    #     self.resize_graphs()
-    #     QMainWindow.resizeEvent(self, event)
 
     def setupIcons(self):
         self.__reload_icon = self.style().standardIcon(QStyle.SP_BrowserReload)
@@ -241,10 +218,6 @@ class ClearMapGui(QMainWindow, Ui_ClearMapGui):
 
         self.sample_tab.advancedCheckBox.stateChanged.connect(self.swap_resolutions_group_box)
         self.sample_tab.srcFolderBtn.clicked.connect(self.set_src_folder)
-
-        # src_folder = os.path.expanduser('~/Desktop/cell_map_test_images')
-        # self.src_folder = src_folder
-        # self.sample_params = SampleParameters(self.sample_tab, src_folder)  # FIXME: do upon folder selection
 
         self.sample_tab.sampleIdButtonBox.connectApply(self.parse_cfg)
         self.sample_tab.applyBox.connectApply(self.setup_preprocessor)
@@ -337,7 +310,7 @@ class ClearMapGui(QMainWindow, Ui_ClearMapGui):
         for param in self.processing_params.values():
             param.ui_to_cfg()
 
-    def get_cell_map_cfg_path(self):
+    def get_cell_map_cfg_path(self):  # REFACTOR: move to config module
         cfg_path = clean_path(os.path.join(self.src_folder, 'cell_map_params.cfg'))
         if not self.file_exists(cfg_path):
             default_cfg_file_path = clean_path('~/.clearmap/default_cell_map_params.cfg')
@@ -368,7 +341,7 @@ class ClearMapGui(QMainWindow, Ui_ClearMapGui):
         dlg.setDefaultButton(QMessageBox.Ok)
         return dlg.exec()
 
-    def get_cfg_paths(self):
+    def get_cfg_paths(self):  # REFACTOR: move to config module
         if not self.src_folder:
             msg = 'Missing source folder, please define first'
             self.print_error_msg(msg)
@@ -398,7 +371,7 @@ class ClearMapGui(QMainWindow, Ui_ClearMapGui):
 
     def setup_preferences(self):
         self.preferences = PreferencesParams(self.config_window, self.src_folder)
-        machine_cfg_path = clean_path('~/.clearmap/machine_params.cfg')
+        machine_cfg_path = clean_path('~/.clearmap/machine_params.cfg')   # REFACTOR: move to config module
         if self.file_exists(machine_cfg_path):
             self.machine_cfg_path = machine_cfg_path
             self.preferences.get_config(self.machine_cfg_path)
@@ -432,7 +405,7 @@ class ClearMapGui(QMainWindow, Ui_ClearMapGui):
             error = True
         try:
             self.sample_params.get_config(self.sample_cfg_path)
-        except ConfigNotFoundError as err:
+        except ConfigNotFoundError:
             self.print_error_msg('Loading sample config file failed')
             error = True
         self.processing_params = {
@@ -444,14 +417,14 @@ class ClearMapGui(QMainWindow, Ui_ClearMapGui):
         for param in self.processing_params.values():
             try:
                 param.get_config(self.processing_cfg_path)
-            except ConfigNotFoundError as err:
+            except ConfigNotFoundError:
                 self.print_error_msg('Loading preprocessing config file failed')
                 error = True
         if self.processing_params['stitching'].config['pipeline_name'].lower() == 'cellmap':
             self.cell_map_params = CellMapParams(self.cell_map_tab)
             try:
                 self.cell_map_params.get_config(self.get_cell_map_cfg_path())
-            except ConfigNotFoundError as err:
+            except ConfigNotFoundError:
                 self.print_error_msg('Loading Cell Map config file failed')
                 error = True
             self.cell_detector = CellDetector()
@@ -464,7 +437,7 @@ class ClearMapGui(QMainWindow, Ui_ClearMapGui):
                 self.cell_map_params.cfg_to_ui()
 
     def set_src_folder(self):
-        diag = QFileDialog()
+        diag = QFileDialog()  # REFACTOR: move to gui_utils
         if sys.platform == 'win32' or runs_from_pycharm():  # avoids bug with windows COM object init failed
             opt = QFileDialog.Options(QFileDialog.DontUseNativeDialog)
         else:
@@ -481,6 +454,8 @@ class ClearMapGui(QMainWindow, Ui_ClearMapGui):
 
     @src_folder.setter
     def src_folder(self, src_folder):
+        self.logger.set_file(os.path.join(src_folder, 'info.log'))
+        self.error_logger.set_file(os.path.join(src_folder, 'errors.log'))
         self.sample_tab.srcFolderTxt.setText(src_folder)
 
     def setup_plots(self, dvs, graph_names=None):
@@ -545,6 +520,38 @@ class ClearMapGui(QMainWindow, Ui_ClearMapGui):
         dlg.setValue(0)  # To force update
         self.progress_dialog = dlg
 
+    def plot_mini_brain(self):
+        img = self.__transform_mini_brain()
+        mask, proj = surface_project(img)
+        img = np_to_qpixmap(proj, mask, BLUE_COLOR_TABLE)
+        self.sample_tab.miniBrainLabel.setPixmap(img)
+
+    def __transform_mini_brain(self):
+        def scale_range(rng, scale):
+            for i in range(len(rng)):
+                if rng[i] is not None:
+                    rng[i] = round(rng[i] / scale)
+            return rng
+
+        def range_or_default(rng, scale):
+            if rng is not None:
+                return scale_range(rng, scale)
+            else:
+                return 0, None
+
+        orientation = self.sample_params.orientation
+        x_scale, y_scale, z_scale = self.mini_brain_scaling
+        img = self.mini_brain.copy()
+        axes_to_flip = [abs(axis) - 1 for axis in orientation if axis < 0]
+        if axes_to_flip:
+            img = np.flip(img, axes_to_flip)
+        img = img.transpose([abs(axis) - 1 for axis in orientation])
+        x_min, x_max = range_or_default(self.sample_params.slice_x, x_scale)
+        y_min, y_max = range_or_default(self.sample_params.slice_y, y_scale)
+        z_min, z_max = range_or_default(self.sample_params.slice_z, z_scale)
+        img = img[x_min:x_max, y_min:y_max:, z_min:z_max]
+        return img
+
     def run_stitching(self):
         stitched_rigid = False
         for param_name, param in self.processing_params.items():
@@ -581,6 +588,23 @@ class ClearMapGui(QMainWindow, Ui_ClearMapGui):
         self.preprocessor.convert_to_image_format()  # TODO: check if use checkbox state
         self.print_status_msg('Conversion finished')
 
+    def setup_atlas(self):  # TODO: call when value changed in atlas settings
+        self.sample_params.ui_to_cfg()  # To make sure we have the slicing up to date
+        self.processing_params['registration'].ui_to_cfg()
+        self.preprocessor.setup_atlases()
+
+    def run_registration(self):
+        self.print_status_msg('Registering')
+        self.make_progress_dialog('Registering')
+        self.setup_atlas()
+        self.progress_dialog.setValue(10)
+        self.print_status_msg('Resampling for registering')
+        self.preprocessor.resample_for_registration()
+        self.progress_dialog.setValue(30)
+        self.preprocessor.align()  # TODO: update value from within align
+        self.progress_dialog.setValue(self.progress_dialog.maximum())
+        self.print_status_msg('Registered')
+
     def plot_registration_results(self):
         image_sources = [
             self.preprocessor.workspace.filename('resampled', postfix='autofluorescence'),
@@ -591,11 +615,7 @@ class ClearMapGui(QMainWindow, Ui_ClearMapGui):
         link_dataviewers_cursors(dvs)
         self.setup_plots(dvs, ['autofluo', 'aligned'])
 
-    def plot_orthogonal_views(self, img):
-        x = np.copy(img)
-        y = np.copy(img).swapaxes(0, 1)
-        z = np.copy(img).swapaxes(0, 2)
-        return plot_3d.plot([x, y, z], arange=False, lut='white', parent=self.centralwidget, sync=False)
+    # CELL MAP
 
     def plot_debug_cropping_interface(self):
         img = TIF.Source(self.preprocessor.workspace.filename('resampled'))
@@ -624,6 +644,12 @@ class ClearMapGui(QMainWindow, Ui_ClearMapGui):
         self.cell_map_tab.detectionSubsetXRangeMax.setMaximum(shape[0])  # TODO: check if value resets if set at more than max
         self.cell_map_tab.detectionSubsetYRangeMax.setMaximum(shape[1])
         self.cell_map_tab.detectionSubsetZRangeMax.setMaximum(shape[2])
+
+    def plot_orthogonal_views(self, img):
+        x = np.copy(img)
+        y = np.copy(img).swapaxes(0, 1)
+        z = np.copy(img).swapaxes(0, 2)
+        return plot_3d.plot([x, y, z], arange=False, lut='white', parent=self.centralwidget, sync=False)
 
     def _update_rect(self, axis, val, min_or_max='min'):
         rect_item_name = '{}_rect_{}'.format(axis, min_or_max)
@@ -691,38 +717,6 @@ class ClearMapGui(QMainWindow, Ui_ClearMapGui):
         finally:
             self.cell_detector.workspace.debug = False
 
-    def plot_mini_brain(self):
-        img = self.__transform_mini_brain()
-        mask, proj = surface_project(img)
-        img = np_to_qpixmap(proj, mask, BLUE_COLOR_TABLE)
-        self.sample_tab.miniBrainLabel.setPixmap(img)
-
-    def __transform_mini_brain(self):
-        def scale_range(rng, scale):
-            for i in range(len(rng)):
-                if rng[i] is not None:
-                    rng[i] = round(rng[i] / scale)
-            return rng
-
-        def range_or_default(rng, scale):
-            if rng is not None:
-                return scale_range(rng, scale)
-            else:
-                return 0, None
-
-        orientation = self.sample_params.orientation
-        x_scale, y_scale, z_scale = self.mini_brain_scaling
-        img = self.mini_brain.copy()
-        axes_to_flip = [abs(axis) - 1 for axis in orientation if axis < 0]
-        if axes_to_flip:
-            img = np.flip(img, axes_to_flip)
-        img = img.transpose([abs(axis) - 1 for axis in orientation])
-        x_min, x_max = range_or_default(self.sample_params.slice_x, x_scale)
-        y_min, y_max = range_or_default(self.sample_params.slice_y, y_scale)
-        z_min, z_max = range_or_default(self.sample_params.slice_z, z_scale)
-        img = img[x_min:x_max, y_min:y_max:, z_min:z_max]
-        return img
-
     def detect_cells(self):
         self.cell_map_params.ui_to_cfg()
         self.make_progress_dialog('Detecting cells')
@@ -777,23 +771,6 @@ class ClearMapGui(QMainWindow, Ui_ClearMapGui):
         dvs = self.cell_detector.plot_voxelized_counts(arange=False)
         self.setup_plots(dvs)
 
-    def setup_atlas(self):  # TODO: call when value changed in atlas settings
-        self.sample_params.ui_to_cfg()  # To make sure we have the slicing up to date
-        self.processing_params['registration'].ui_to_cfg()
-        self.preprocessor.setup_atlases()
-
-    def run_registration(self):
-        self.print_status_msg('Registering')
-        self.make_progress_dialog('Registering')
-        self.setup_atlas()
-        self.progress_dialog.setValue(10)
-        self.print_status_msg('Resampling for registering')
-        self.preprocessor.resample_for_registration()
-        self.progress_dialog.setValue(30)
-        self.preprocessor.align()  # TODO: update value from within align
-        self.progress_dialog.setValue(self.progress_dialog.maximum())
-        self.print_status_msg('Registered')
-
 
 def main():
     app = QApplication([])
@@ -813,8 +790,8 @@ def main():
         clearmap_main_win.error_logger.write(formatted_traceback)
 
     clearmap_main_win.show()
-    clearmap_main_win.patch_stdout()
-    sys.excepthook = except_hook
+    clearmap_main_win.patch_stdout()  # FIXME: function of __debug__
+    sys.excepthook = except_hook  # FIXME: function of __debug__
     sys.exit(app.exec_())
 
 
