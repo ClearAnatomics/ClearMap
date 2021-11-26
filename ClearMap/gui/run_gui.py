@@ -28,9 +28,10 @@ from ClearMap.Visualization import Plot3d as plot_3d
 
 from ClearMap.config.config_loader import get_cfg
 
-from ClearMap.gui.gui_utils import Printer, QDARKSTYLE_BACKGROUND, DARK_BACKGROUND, np_to_qpixmap, clean_path, \
-    html_to_ansi, html_to_plain_text, compute_grid, BLUE_COLOR_TABLE, surface_project, \
-    format_long_nb_to_str, link_dataviewers_cursors, get_directory_dlg, warning_popup, make_progress_dialog
+from ClearMap.gui.gui_utils import QDARKSTYLE_BACKGROUND, DARK_BACKGROUND, np_to_qpixmap, \
+    html_to_ansi, html_to_plain_text, compute_grid, surface_project,  format_long_nb_to_str, link_dataviewers_cursors
+from ClearMap.gui.gui_logging import Printer
+from ClearMap.gui.dialogs import get_directory_dlg, warning_popup, make_progress_dialog
 from ClearMap.gui.params import SampleParameters, ConfigNotFoundError, GeneralStitchingParams, RigidStitchingParams, \
     WobblyStitchingParams, RegistrationParams, CellMapParams, PreferencesParams
 from ClearMap.gui.pyuic_utils import loadUiType
@@ -365,7 +366,7 @@ class ClearMapGui(ClearMapGuiBase):
         self.preferences.ui_to_cfg()
         self.config_window.close()
 
-    def save_sample_cfg(self):
+    def save_sample_cfg(self):  # FIXME: use this instead of direct calls to ui_to_cfg
         self.sample_params.ui_to_cfg()
         self.print_status_msg('Sample config saved')
 
@@ -510,7 +511,7 @@ class ClearMapGui(ClearMapGuiBase):
     def plot_mini_brain(self):
         img = self.__transform_mini_brain()
         mask, proj = surface_project(img)
-        img = np_to_qpixmap(proj, mask, BLUE_COLOR_TABLE)
+        img = np_to_qpixmap(proj, mask)
         self.sample_tab.miniBrainLabel.setPixmap(img)
 
     def __transform_mini_brain(self):
@@ -538,6 +539,8 @@ class ClearMapGui(ClearMapGuiBase):
         z_min, z_max = range_or_default(self.sample_params.slice_z, z_scale)
         img = img[x_min:x_max, y_min:y_max:, z_min:z_max]
         return img
+
+    # ###################################### PREPROCESSING ####################################
 
     def run_stitching(self):
         stitched_rigid = False
@@ -602,18 +605,19 @@ class ClearMapGui(ClearMapGuiBase):
         link_dataviewers_cursors(dvs)
         self.setup_plots(dvs, ['autofluo', 'aligned'])
 
-    # CELL MAP
+    # ################################  CELL MAP  #################################
 
     def plot_debug_cropping_interface(self):
         img = TIF.Source(self.preprocessor.workspace.filename('resampled'))
         shape = img.shape
         dvs = self.plot_orthogonal_views(img.array)
+        self.setup_plots(dvs, list('xyz'))
 
+        # FIXME: self.update_x_min, self.update_x_max...
         self.x_rect_min = RectItem(QRectF(0, 0, 0, shape[1]))  # REFACTOR:
         dvs[0].view.addItem(self.x_rect_min)
         self.x_rect_max = RectItem(QRectF(shape[0], 0, 0, shape[1]))
         dvs[0].view.addItem(self.x_rect_max)
-        # dvs[0].jumpFrames(round(shape[2] / 2))
 
         self.y_rect_min = RectItem(QRectF(0, 0, 0, shape[0]))
         dvs[1].view.addItem(self.y_rect_min)
@@ -625,9 +629,7 @@ class ClearMapGui(ClearMapGuiBase):
         self.z_rect_max = RectItem(QRectF(shape[2], 0, 0, shape[1]))
         dvs[2].view.addItem(self.z_rect_max)
 
-        self.setup_plots(dvs, list('xyz'))
-
-        # After setup
+        # WARNING: needs to be done after setup
         self.cell_map_tab.detectionSubsetXRangeMax.setMaximum(shape[0])  # TODO: check if value resets if set at more than max
         self.cell_map_tab.detectionSubsetYRangeMax.setMaximum(shape[1])
         self.cell_map_tab.detectionSubsetZRangeMax.setMaximum(shape[2])
@@ -669,7 +671,7 @@ class ClearMapGui(ClearMapGuiBase):
 
         # TODO: verify order
         slicing = (
-            slice(crops[0], crops[1]),  # TODO: check if dict better
+            slice(crops[0], crops[1]),
             slice(crops[2], crops[3]),
             slice(crops[4], crops[5])
         )
@@ -771,8 +773,9 @@ def main():
         clearmap_main_win.error_logger.write(formatted_traceback)
 
     clearmap_main_win.show()
-    clearmap_main_win.patch_stdout()  # FIXME: function of __debug__
-    sys.excepthook = except_hook  # FIXME: function of __debug__
+    if not __debug__:
+        clearmap_main_win.patch_stdout()
+        sys.excepthook = except_hook
     sys.exit(app.exec_())
 
 

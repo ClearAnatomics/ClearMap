@@ -1,101 +1,18 @@
 import os
-import sys
 from math import sqrt, ceil
 
-import lxml.html
 import matplotlib
 import numpy as np
 import skimage.io
-from PyQt5 import QtGui, QtCore
-from PyQt5.QtGui import QPixmap
-from PyQt5.QtWidgets import QApplication, QFileDialog, QMessageBox, QProgressDialog, QLabel
-from matplotlib.colors import cnames
+from PyQt5 import QtGui
 
 from ClearMap.gui.widgets import RedCross
 
 QDARKSTYLE_BACKGROUND = '#2E3436'
 DARK_BACKGROUND = '#282D2F'
 
-GRAY_COLOR_TABLE = []
-BLUE_COLOR_TABLE = []
-cmap = matplotlib.cm.get_cmap('GnBu')
-for i in range(256):
-    col = cmap(i / 256)
-    col = [int(c*256) for c in col[:-1]]
-    GRAY_COLOR_TABLE.append(QtGui.qRgb(i, i, i))
-    BLUE_COLOR_TABLE.append(QtGui.qRgb(*col))
 
-
-class Printer(object):
-    def __init__(self, text_widget, color=None, app=None):
-        self.widget = text_widget
-        self.color = color
-        self.win = self.widget.window()
-        if app is None:
-            self.app = QApplication.instance()
-
-    def write(self, msg):
-        self.widget.append(self._colourise(msg))
-
-    def flush(self):  # To be compatible with ClearMap.ParallelProcessing.ProcessWriting
-        pass
-        # self.app.processEvents()
-
-    def _colourise(self, msg):
-        if self.color is not None:
-            try:
-                html = lxml.html.fromstring(msg)
-                is_html = html.find('.//*') is not None
-            except lxml.etree.ParserError:
-                is_html = False
-            if not is_html:
-                colour_msg = '<p style="color:{}">{}</p>'.format(cnames[self.color], msg)
-            else:
-                colour_msg = msg
-        else:
-            colour_msg = msg
-        return colour_msg
-
-
-def get_directory_dlg(start_folder, title="Choose the source directory"):
-    diag = QFileDialog()  # REFACTOR: move to gui_utils
-    if sys.platform == 'win32' or runs_from_pycharm():  # avoids bug with windows COM object init failed
-        opt = QFileDialog.Options(QFileDialog.DontUseNativeDialog)
-    else:
-        opt = QFileDialog.Options()
-    src_folder = diag.getExistingDirectory(parent=diag, caption=title,
-                                           directory=start_folder, options=opt)
-    diag.close()
-    return src_folder
-
-
-def warning_popup(base_msg, msg):
-    dlg = QMessageBox()
-    dlg.setIcon(QMessageBox.Warning)
-    dlg.setWindowTitle('Warning')
-    dlg.setText('<b>{}</b>'.format(base_msg))
-    dlg.setInformativeText(msg)
-    dlg.setStandardButtons(QMessageBox.Ok | QMessageBox.Cancel)
-    dlg.setDefaultButton(QMessageBox.Ok)
-    return dlg.exec()
-
-
-def make_progress_dialog(msg, maximum, canceled_callback, parent):
-    dlg = QProgressDialog(msg, 'Abort', 0, maximum, parent=parent)  # TODO: see if can have a notnativestyle on unity
-    dlg.setMinimumDuration(0)
-    dlg.setWindowTitle(msg)
-    dlg.lbl = QLabel(msg, parent=dlg)
-    # dlg.lbl.setText(msg)  # TODO: check why this doesn't work with pixmap
-    dlg.lbl.setPixmap(QPixmap('ClearMap/gui/icons/searching_mouse.png'))
-    dlg.lbl.setAlignment(QtCore.Qt.AlignHCenter | QtCore.Qt.AlignVCenter)
-    dlg.setLabel(dlg.lbl)
-    if canceled_callback is not None:
-        dlg.canceled().connect(canceled_callback)
-    dlg.setValue(0)  # To force update
-    return dlg
-
-
-def np_to_qpixmap(img_array, alpha, color_table=GRAY_COLOR_TABLE):
+def np_to_qpixmap(img_array, alpha):
     img_array = img_array.copy().astype(np.float64)
     img_array -= img_array.min()  # normalise 0-1
     img_array /= img_array.max()
