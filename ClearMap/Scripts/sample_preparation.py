@@ -8,6 +8,9 @@ import numpy as np
 
 # noinspection PyPep8Naming
 import matplotlib
+
+from ClearMap.gui.gui_utils import TmpDebug
+
 matplotlib.use('Qt5Agg')
 from matplotlib import pyplot as plt
 
@@ -56,6 +59,7 @@ class PreProcessor(object):
         src_directory = os.path.expanduser(self.sample_config['base_directory'])
 
         self.workspace = workspace.Workspace(self.processing_config['pipeline_name'], directory=src_directory)
+        self.workspace.tmp_debug = TmpDebug(self.workspace)
         src_paths = {k: v for k, v in self.sample_config['src_paths'].items() if v is not None}
         self.workspace.update(**src_paths)
         self.workspace.info()
