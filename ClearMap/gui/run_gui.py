@@ -249,7 +249,7 @@ class ClearMapGui(ClearMapGuiBase):
         self.setupUi(self)
         self.amendUi()
 
-        self.actionPreferences.triggered.connect(self.config_window.exec)  # TODO: check if move to setup_preferences
+        self.actionPreferences.triggered.connect(self.preferences_editor.exec)  # TODO: check if move to setup_preferences
 
     def patch_stdout(self):
         sys.stdout = self.logger
@@ -359,16 +359,16 @@ class ClearMapGui(ClearMapGuiBase):
 
     def setup_preferences_editor(self):
         cls, _ = loadUiType('ClearMap/gui/preferences_editor.ui', patch_parent_class='QDialog')
-        self.config_window = cls()
-        self.config_window.setWindowTitle('Preferences')
-        self.config_window.setupUi()
-        self.patch_button_boxes(self.config_window)
+        self.preferences_editor = cls()
+        self.preferences_editor.setWindowTitle('Preferences')
+        self.preferences_editor.setupUi()
+        self.patch_button_boxes(self.preferences_editor)
 
         self.setup_preferences()
 
-        self.config_window.buttonBox.connectApply(self.preferences.ui_to_cfg)
-        self.config_window.buttonBox.button(QDialogButtonBox.Cancel).clicked.connect(self.config_window.close)
-        self.config_window.buttonBox.button(QDialogButtonBox.Ok).clicked.connect(self.apply_prefs_and_close)
+        self.preferences_editor.buttonBox.connectApply(self.preferences.ui_to_cfg)
+        self.preferences_editor.buttonBox.connectCancel(self.preferences_editor.close)
+        self.preferences_editor.buttonBox.connectOk(self.apply_prefs_and_close)
 
     def handle_tab_click(self, tab_index):
         if tab_index == 2:  # FIXME: handle other tabs (e.g. message if workspace not init when tab_index==1)
@@ -376,9 +376,9 @@ class ClearMapGui(ClearMapGuiBase):
 
     def apply_prefs_and_close(self):
         self.preferences.ui_to_cfg()
-        self.config_window.close()
+        self.preferences_editor.close()
 
-    def save_sample_cfg(self):  # FIXME: use this instead of direct calls to ui_to_cfg
+    def save_sample_cfg(self):  # REFACTOR: use this instead of direct calls to ui_to_cfg
         self.sample_params.ui_to_cfg()
         self.print_status_msg('Sample config saved')
 
@@ -418,7 +418,7 @@ class ClearMapGui(ClearMapGuiBase):
         _, self.processing_cfg_path = self.__get_cfg_path('processing')
 
     def setup_preferences(self):
-        self.preferences = PreferencesParams(self.config_window, self.src_folder)
+        self.preferences = PreferencesParams(self.preferences_editor, self.src_folder)
         machine_cfg_path = self.config_loader.get_default_path('machine')
         if self.file_exists(machine_cfg_path):
             self.machine_cfg_path = machine_cfg_path
