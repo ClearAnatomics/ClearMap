@@ -160,6 +160,26 @@ def connect_apply(instance, func):
     instance.button(QDialogButtonBox.Apply).clicked.connect(func)
 
 
+def connect_close(instance, func):
+    instance.button(QDialogButtonBox.Close).clicked.connect(func)
+
+
+def connect_open(instance, func):
+    instance.button(QDialogButtonBox.Open).clicked.connect(func)
+
+
+def connect_save(instance, func):
+    instance.button(QDialogButtonBox.Save).clicked.connect(func)
+
+
+def connect_ok(instance, func):
+    instance.button(QDialogButtonBox.Ok).clicked.connect(func)
+
+
+def connect_cancel(instance, func):
+    instance.button(QDialogButtonBox.Cancel).clicked.connect(func)
+
+
 def dock_resize_event(instance, event):
     super(QDockWidget, instance).__init__()
     instance.resized.emit()

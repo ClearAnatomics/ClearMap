@@ -203,6 +203,11 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
             parent = self
         for bx in parent.findChildren(QDialogButtonBox):
             bx.connectApply = types.MethodType(connect_apply, bx)
+            bx.connectClose = types.MethodType(connect_close, bx)
+            bx.connectSave = types.MethodType(connect_save, bx)
+            bx.connectOpen = types.MethodType(connect_open, bx)
+            bx.connectOk = types.MethodType(connect_ok, bx)
+            bx.connectCancel = types.MethodType(connect_cancel, bx)
 
     def patch_tool_boxes(self):
         for tb in self.findChildren(QToolBox):
@@ -293,14 +298,15 @@ class ClearMapGui(ClearMapGuiBase):
         self.tabWidget.removeTab(0)
         self.tabWidget.insertTab(0, self.sample_tab, 'Sample')
 
+        self.sample_tab.srcFolderBtn.clicked.connect(self.set_src_folder)
+        self.sample_tab.sampleIdButtonBox.connectApply(self.parse_cfg)
+
         self.sample_tab.plotMiniBrainPushButton.clicked.connect(self.plot_mini_brain)
 
-        self.sample_tab.advancedCheckBox.stateChanged.connect(self.swap_resolutions_group_box)
-        self.sample_tab.srcFolderBtn.clicked.connect(self.set_src_folder)
-
-        self.sample_tab.sampleIdButtonBox.connectApply(self.parse_cfg)
         self.sample_tab.applyBox.connectApply(self.setup_preprocessor)
-        self.sample_tab.applyBox.button(QDialogButtonBox.Save).clicked.connect(self.save_sample_cfg)  # TODO: check if could just be self.sample_cfg.ui_to_cfg
+        self.sample_tab.applyBox.connectSave(self.save_sample_cfg)
+
+        self.sample_tab.advancedCheckBox.stateChanged.connect(self.swap_resolutions_group_box)
 
     def setup_preprocessing_tab(self):
         cls, _ = loadUiType('ClearMap/gui/preprocessing_tab.ui', patch_parent_class='QTabWidget')
@@ -312,11 +318,12 @@ class ClearMapGui(ClearMapGuiBase):
 
         self.preprocessing_tab.runStitchingButtonBox.connectApply(self.run_stitching)
         self.preprocessing_tab.displayStitchingButtonBox.connectApply(self.plot_stitching_results)
-        self.preprocessing_tab.displayStitchingButtonBox.button(QDialogButtonBox.Close). \
-            clicked.connect(self._remove_old_plots)
+        self.preprocessing_tab.displayStitchingButtonBox.connectClose(self._remove_old_plots)
         self.preprocessing_tab.convertOutputButtonBox.connectApply(self.convert_output)
         self.preprocessing_tab.registerButtonBox.connectApply(self.run_registration)
         self.preprocessing_tab.plotRegistrationResultsButtonBox.connectApply(self.plot_registration_results)
+
+        # FIXME: connect alignemnt folder button
 
         self.preprocessing_tab.atlasSettingsPage.setVisible(False)
         self.preprocessing_tab.advancedCheckBox.stateChanged.connect(self.swap_preprocessing_tab_advanced)
@@ -330,8 +337,7 @@ class ClearMapGui(ClearMapGuiBase):
         self.tabWidget.insertTab(2, self.cell_map_tab, 'CellMap')
         self.tabWidget.tabBarClicked.connect(self.handle_tab_click)
 
-        self.cell_map_tab.detectionPreviewTuningButtonBox.button(QDialogButtonBox.Open). \
-            clicked.connect(self.plot_debug_cropping_interface)
+        self.cell_map_tab.detectionPreviewTuningButtonBox.connectOpen(self.plot_debug_cropping_interface)
         self.cell_map_tab.detectionPreviewTuningSampleButtonBox.connectApply(self.create_cell_detection_tuning_sample)
         self.cell_map_tab.detectionPreviewButtonBox.connectApply(self.run_tuning_cell_detection)
         self.cell_map_tab.detectionSubsetXRangeMin.valueChanged.connect(self.ortho_viewer.update_x_min)
