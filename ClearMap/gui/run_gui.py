@@ -32,15 +32,23 @@ from ClearMap.gui.gui_utils import QDARKSTYLE_BACKGROUND, DARK_BACKGROUND, np_to
     html_to_ansi, html_to_plain_text, compute_grid, surface_project,  format_long_nb_to_str, link_dataviewers_cursors
 from ClearMap.gui.gui_logging import Printer
 from ClearMap.gui.dialogs import get_directory_dlg, warning_popup, make_progress_dialog
-from ClearMap.gui.params import SampleParameters, ConfigNotFoundError, GeneralStitchingParams, RigidStitchingParams, \
-    WobblyStitchingParams, RegistrationParams, CellMapParams, PreferencesParams
+from ClearMap.gui.params import SampleParameters, ConfigNotFoundError, CellMapParams, \
+    PreferencesParams, PreprocessingParams, ParamsOrientationError
 from ClearMap.gui.pyuic_utils import loadUiType
 from ClearMap.gui.widget_monkeypatch_callbacks import get_value, set_value, controls_enabled, get_check_box, \
-    enable_controls, disable_controls, set_text, get_text, connect_apply
 from ClearMap.gui.widgets import RectItem, OrthoViewer
+    enable_controls, disable_controls, set_text, get_text, connect_apply, connect_close, connect_save, connect_open, \
+    connect_ok, connect_cancel, connect_value_changed, connect_text_changed
 
 # TODO
 """
+Handle reset detected correctly
+Ensure all button functions trigger a save of config and the inner operation triggers a reload
+Ensure clicking tabs checks that required actions have been triggered
+Improve progress bar
+Improve logging to GUI (capture multithreaded and elastix output)
+Test and check that works with secondary channel
+
 Previews:
     - Add rigid alignment : plane in middle of stack from each column + stitch with different colours
 Delete intermediate files
@@ -182,9 +190,11 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
                 if bx_name.startswith('triplet') or bx_name.endswith('let'):  # singlet double triplet
                     bx.getValue = types.MethodType(get_value, bx)
                     bx.setValue = types.MethodType(set_value, bx)
+                    bx.valueChangedConnect = types.MethodType(connect_value_changed, bx)
                 elif bx_name.endswith('optionallineedit'):
                     bx.setText = types.MethodType(set_text, bx)
                     bx.text = types.MethodType(get_text, bx)
+                    bx.textChangedConnect = types.MethodType(connect_text_changed, bx)
                 else:
                     print('Skipping box "{}", type not recognised'.format(bx_name))
 
@@ -372,12 +382,8 @@ class ClearMapGui(ClearMapGuiBase):
 
     def setup_cell_detector(self):
         if self.cell_detector.preprocessor is None and self.preprocessor.workspace is not None:  # preproc initialised
-            self.update_preprocessing_cfg()
+            self.processing_params.ui_to_cfg()
             self.cell_detector.setup(self.preprocessor)
-
-    def update_preprocessing_cfg(self):
-        for param in self.processing_params.values():
-            param.ui_to_cfg()
 
     def __get_cfg_path(self, cfg_name):
         cfg_path = self.config_loader.get_cfg_path(cfg_name)
@@ -436,19 +442,13 @@ class ClearMapGui(ClearMapGuiBase):
         except ConfigNotFoundError:
             self.print_error_msg('Loading sample config file failed')
             error = True
-        self.processing_params = {
-            'stitching': GeneralStitchingParams(self.preprocessing_tab),
-            'rigid_stitching': RigidStitchingParams(self.preprocessing_tab),
-            'wobbly_stitching': WobblyStitchingParams(self.preprocessing_tab),
-            'registration': RegistrationParams(self.preprocessing_tab)
-        }
-        for param in self.processing_params.values():
-            try:
-                param.get_config(self.processing_cfg_path)
-            except ConfigNotFoundError:
-                self.print_error_msg('Loading preprocessing config file failed')
-                error = True
-        if self.processing_params['stitching'].config['pipeline_name'].lower().replace('_', '') == 'cellmap':
+        self.processing_params = PreprocessingParams(self.preprocessing_tab)
+        try:
+            self.processing_params.get_config(self.processing_cfg_path)
+        except ConfigNotFoundError:
+            self.print_error_msg('Loading preprocessing config file failed')
+            error = True
+        if self.processing_params.pipeline_is_cell_map:
             self.cell_map_params = CellMapParams(self.cell_map_tab)
             try:
                 self.cell_map_params.get_config(self.__get_cfg_path('cell_map')[1])
@@ -458,9 +458,12 @@ class ClearMapGui(ClearMapGuiBase):
             self.cell_detector = CellDetector()
         if not error:
             self.print_status_msg('Config loaded')
-            self.sample_params.cfg_to_ui()
-            for param in self.processing_params.values():
-                param.cfg_to_ui()
+            try:
+                self.sample_params.cfg_to_ui()
+            except ParamsOrientationError as err:
+                self.popup(str(err), 'Invalid orientation. Defaulting')
+                self.sample_params.orientation = (1, 2, 3)
+            self.processing_params.cfg_to_ui()
             if self.cell_map_params is not None:
                 self.cell_map_params.cfg_to_ui()
 
@@ -526,21 +529,16 @@ class ClearMapGui(ClearMapGuiBase):
 
     def run_stitching(self):
         stitched_rigid = False
-        for param_name, param in self.processing_params.items():
-            if param_name.endswith('stitching'):
-                param.ui_to_cfg()
-                for param_name, param in self.processing_params.items():  # FIXME: make less hacky. required because otherwise the other dicts that overlap will not have been updated
-                    if param_name.endswith('stitching'):
-                        param.config.reload()  # FIXME: probably need to do that for registration too
+        self.processing_params.ui_to_cfg()
         self.preprocessor.reload_processing_cfg()
         self.make_progress_dialog('Stitching')
         self.print_status_msg('Stitching')
-        if not self.processing_params['rigid_stitching'].skip:
+        if not self.processing_params.stitching_rigid.skip:
             layout = self.preprocessor._stitch_rigid()
             stitched_rigid = True
             self.progress_dialog.setValue(30)
             self.print_status_msg('Stitched rigid')
-        if not self.processing_params['wobbly_stitching'].skip:
+        if not self.processing_params.stitching_wobbly.skip:
             if stitched_rigid:
                 self.preprocessor._stitch_wobbly(layout)
                 self.print_status_msg('Stitched wobbly')
@@ -549,20 +547,20 @@ class ClearMapGui(ClearMapGuiBase):
         self.progress_dialog.setValue(self.progress_dialog.maximum())  # TODO: make more progressive
 
     def plot_stitching_results(self):
-        self.processing_params['stitching'].ui_to_cfg()
+        self.processing_params.stitching_general.ui_to_cfg()
         dvs = self.preprocessor.plot_stitching_results(parent=self.centralwidget)
         self.setup_plots(dvs)
 
     def convert_output(self):
-        fmt = self.processing_params['stitching'].conversion_fmt
+        fmt = self.processing_params.stitching_general.conversion_fmt
         self.print_status_msg('Convertng stitched image to {}'.format(fmt))
-        self.processing_params['stitching'].ui_to_cfg()
+        self.processing_params.stitching_general.ui_to_cfg()
         self.preprocessor.convert_to_image_format()  # TODO: check if use checkbox state
         self.print_status_msg('Conversion finished')
 
     def setup_atlas(self):  # TODO: call when value changed in atlas settings
         self.sample_params.ui_to_cfg()  # To make sure we have the slicing up to date
-        self.processing_params['registration'].ui_to_cfg()
+        self.processing_params.registration.ui_to_cfg()
         self.preprocessor.setup_atlases()
 
     def run_registration(self):
@@ -614,7 +612,7 @@ class ClearMapGui(ClearMapGuiBase):
 
     def get_cell_map_scaling_ratios(self, direction='to_original'):
         raw_res = np.array(self.sample_params.raw_resolution)
-        atlas_res = np.array(self.processing_params['registration'].raw_atlas_resolution)
+        atlas_res = np.array(self.processing_params.registration.raw_atlas_resolution)
         if direction == 'to_original':
             ratios = raw_res / atlas_res
         elif direction == 'to_resampled':
