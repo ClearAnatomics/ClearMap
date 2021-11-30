@@ -87,6 +87,16 @@ def get_sorted_spin_boxes(instance):
     return sorted_spin_boxes
 
 
+def connect_value_changed(instance, callback):
+    spin_boxes = get_sorted_spin_boxes(instance)
+    for bx in spin_boxes:
+        bx.valueChanged.connect(callback)
+
+
+def connect_text_changed(instance, callback):
+    get_line_edit(instance).textChanged.connect(callback)
+
+
 def controls_enabled(instance):
     if instance.findChildren(QSpinBox) or instance.findChildren(QDoubleSpinBox):
         spin_boxes = get_sorted_spin_boxes(instance)
