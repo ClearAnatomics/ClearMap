@@ -597,7 +597,7 @@ class ClearMapGui(ClearMapGuiBase):
         self.ortho_viewer.setup(img, parent=self.centralwidget)
         dvs = self.ortho_viewer.plot_orthogonal_views()
         self.ortho_viewer.add_cropping_bars()
-        self.setup_plots(dvs, ('x', 'y', 'z'))
+        self.setup_plots(dvs, ['x', 'y', 'z'])
 
         # WARNING: needs to be done after setup
         self.cell_map_tab.detectionSubsetXRangeMax.setMaximum(self.ortho_viewer.width)
