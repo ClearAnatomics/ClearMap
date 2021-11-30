@@ -12,7 +12,6 @@ from pygments.lexers.python import PythonTracebackLexer
 from skimage import transform as sk_transform
 
 from PyQt5 import QtGui
-from PyQt5.QtCore import QRectF
 from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QSpinBox, QDoubleSpinBox, QFrame, QDialogButtonBox,\
     QComboBox, QLineEdit, QStyle, QWidget, QMessageBox, QToolBox
 
@@ -36,9 +35,9 @@ from ClearMap.gui.params import SampleParameters, ConfigNotFoundError, CellMapPa
     PreferencesParams, PreprocessingParams, ParamsOrientationError
 from ClearMap.gui.pyuic_utils import loadUiType
 from ClearMap.gui.widget_monkeypatch_callbacks import get_value, set_value, controls_enabled, get_check_box, \
-from ClearMap.gui.widgets import RectItem, OrthoViewer
     enable_controls, disable_controls, set_text, get_text, connect_apply, connect_close, connect_save, connect_open, \
     connect_ok, connect_cancel, connect_value_changed, connect_text_changed
+from ClearMap.gui.widgets import OrthoViewer
 
 # TODO
 """
@@ -288,6 +287,7 @@ class ClearMapGui(ClearMapGuiBase):
         self.setup_sample_tab()
         self.setup_preprocessing_tab()
         self.setup_cell_map_tab()
+        self.tabWidget.tabBarClicked.connect(self.handle_tab_click)
         self.tabWidget.setCurrentIndex(0)
 
     def setup_sample_tab(self):
@@ -335,7 +335,6 @@ class ClearMapGui(ClearMapGuiBase):
         self.patch_button_boxes(self.cell_map_tab)
         self.tabWidget.removeTab(2)
         self.tabWidget.insertTab(2, self.cell_map_tab, 'CellMap')
-        self.tabWidget.tabBarClicked.connect(self.handle_tab_click)
 
         self.cell_map_tab.detectionPreviewTuningButtonBox.connectOpen(self.plot_debug_cropping_interface)
         self.cell_map_tab.detectionPreviewTuningSampleButtonBox.connectApply(self.create_cell_detection_tuning_sample)
@@ -505,7 +504,7 @@ class ClearMapGui(ClearMapGuiBase):
         img = np_to_qpixmap(proj, mask)
         self.sample_tab.miniBrainLabel.setPixmap(img)
 
-    def __transform_mini_brain(self):
+    def __transform_mini_brain(self):  # FIXME: extract
         def scale_range(rng, scale):
             for i in range(len(rng)):
                 if rng[i] is not None:
