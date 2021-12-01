@@ -74,14 +74,16 @@ class OrthoViewer(object):
     def __init__(self, img=None, parent=None):
         self.img = img
         self.parent = parent
+        self.params = None
         if img is not None:
             self.shape = img.shape
         else:
             self.shape = None
         self.rectangles = []
 
-    def setup(self, img, parent=None):
+    def setup(self, img, params, parent=None):
         self.img = img
+        self.params = params
         self.parent = parent
         self.shape = img.shape
         self.rectangles = []
@@ -99,30 +101,42 @@ class OrthoViewer(object):
         return self.shape[2]
 
     def update_x_min(self, val):
+        if self.params is not None:
+            val = self.params.scale_x(val)
         self._update_rect('x', val, 'min')
 
     def update_x_max(self, val):
+        if self.params is not None:
+            val = self.params.scale_x(val)
         self._update_rect('x', val, 'max')
 
     def update_y_min(self, val):
+        if self.params is not None:
+            val = self.params.scale_y(val)
         self._update_rect('y', val, 'min')
 
     def update_y_max(self, val):
+        if self.params is not None:
+            val = self.params.scale_y(val)
         self._update_rect('y', val, 'max')
 
     def update_z_min(self, val):
+        if self.params is not None:
+            val = self.params.scale_z(val)
         self._update_rect('z', val, 'min')
 
     def update_z_max(self, val):
+        if self.params is not None:
+            val = self.params.scale_z(val)
         self._update_rect('z', val, 'max')
 
-    def update_ranges(self, param):
-        self.update_x_min(param.crop_x_min)
-        self.update_x_max(param.crop_x_max)
-        self.update_y_min(param.crop_y_min)
-        self.update_y_max(param.crop_y_max)
-        self.update_z_min(param.crop_z_min)
-        self.update_z_max(param.crop_z_max)
+    def update_ranges(self):
+        self.update_x_min(self.params.crop_x_min)
+        self.update_x_max(self.params.crop_x_max)
+        self.update_y_min(self.params.crop_y_min)
+        self.update_y_max(self.params.crop_y_max)
+        self.update_z_min(self.params.crop_z_min)
+        self.update_z_max(self.params.crop_z_max)
 
     def get_rect(self, axis, min_or_max):
         axes = ('x', 'y', 'z')
