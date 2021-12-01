@@ -591,26 +591,25 @@ class ClearMapGui(ClearMapGuiBase):
 
     def plot_debug_cropping_interface(self):
         img = self.cell_detector.workspace.source('resampled')
-        self.ortho_viewer.setup(img, parent=self.centralwidget)
+        self.ortho_viewer.setup(img, self.cell_map_params, parent=self)
         dvs = self.ortho_viewer.plot_orthogonal_views()
         self.ortho_viewer.add_cropping_bars()
         self.setup_plots(dvs, ['x', 'y', 'z'])
 
         # WARNING: needs to be done after setup
-        self.cell_map_tab.detectionSubsetXRangeMax.setMaximum(self.ortho_viewer.width)
-        self.cell_map_tab.detectionSubsetYRangeMax.setMaximum(self.ortho_viewer.height)
-        self.cell_map_tab.detectionSubsetZRangeMax.setMaximum(self.ortho_viewer.depth)
+        shape = self.preprocessor.workspace.source('stitched').shape  # TODO: test clearmap_io.shape(self.workspace('stitched'))
+        self.cell_map_tab.detectionSubsetXRangeMax.setMaximum(shape[0])
+        self.cell_map_tab.detectionSubsetYRangeMax.setMaximum(shape[1])
+        self.cell_map_tab.detectionSubsetZRangeMax.setMaximum(shape[2])
 
-        self.ortho_viewer.update_ranges(self.cell_map_params)
+        self.ortho_viewer.update_ranges()
 
     def create_cell_detection_tuning_sample(self):  # TODO add messages
-        ratios = self.get_cell_map_scaling_ratios(direction='to_resampled')
-        crops = self.cell_map_params.scale_crop_values(ratios)
-        slicing = (slice(crops[0], crops[1]),
-                   slice(crops[2], crops[3]),
-                   slice(crops[4], crops[5]))
+        slicing = (slice(self.cell_map_params.crop_x_min, self.cell_map_params.crop_x_max),
+                   slice(self.cell_map_params.crop_y_min, self.cell_map_params.crop_y_max),
+                   slice(self.cell_map_params.crop_z_min, self.cell_map_params.crop_z_max))
         self.cell_detector.create_test_dataset(slicing=slicing)
-        self.cell_map_params.crop_values_to_cfg(self.get_cell_map_scaling_ratios(direction='to_original'))
+        # self.cell_map_params.crop_values_to_cfg()
 
     def get_cell_map_scaling_ratios(self, direction='to_original'):
         raw_res = np.array(self.sample_params.raw_resolution)
@@ -626,7 +625,7 @@ class ClearMapGui(ClearMapGuiBase):
 
     def run_tuning_cell_detection(self):
         self.cell_map_params.ui_to_cfg()
-        self.cell_map_params.crop_values_to_cfg(ratios=self.get_cell_map_scaling_ratios())
+        # self.cell_map_params.crop_values_to_cfg()
         self.cell_detector.run_cell_detection(tuning=True)
         with self.cell_detector.workspace.tmp_debug:
             self.plot_detection_results()

@@ -782,29 +782,44 @@ class CellMapParams(UiParameter):
         self.tab.cellFilterThresholdSizeDoublet.valueChangedConnect(self.handle_filter_size_changed)
         self.tab.voxelizationRadiusTriplet.valueChangedConnect(self.handle_voxelization_radii_changed)
         self.tab.cellDetectionPlotCheckBox.stateChanged.connect(self.handle_plot_detected_cells_changed)
+        self.tab.detectionSubsetXRangeMin.valueChanged.connect(self.handle_x_val_change)
+        self.tab.detectionSubsetXRangeMax.valueChanged.connect(self.handle_x_val_change)
+        self.tab.detectionSubsetYRangeMin.valueChanged.connect(self.handle_y_val_change)
+        self.tab.detectionSubsetYRangeMax.valueChanged.connect(self.handle_y_val_change)
+        self.tab.detectionSubsetZRangeMin.valueChanged.connect(self.handle_z_val_change)
+        self.tab.detectionSubsetZRangeMax.valueChanged.connect(self.handle_z_val_change)
 
     @property
     def config(self):
         return self._config
 
-    def crop_values_to_cfg(self, ratios=None):
-        if ratios is not None:
-            self.scale_crop_values(ratios)
-        cfg = self._config['detection']['test_set_slicing']  # TODO: if 99.9 % source put to 100% (None)
-        cfg['dim_0'] = self.crop_x_min, self.crop_x_max
-        cfg['dim_1'] = self.crop_y_min, self.crop_y_max
-        cfg['dim_2'] = self.crop_z_min, self.crop_z_max
+    @property
+    def ratios(self):
+        raw_res = np.array(self.sample_params.raw_resolution)
+        atlas_res = np.array(self.preprocessing_params.registration.raw_atlas_resolution)
+        ratios = raw_res / atlas_res  # to original
+        return ratios
 
-    def scale_crop_values(self, ratios):  # FIXME: ensure scaling when reading and writing + add handlers
-        crop_values = []
-        ui_crops = self.crop_x_min, self.crop_x_max, self.crop_y_min, self.crop_y_max, self.crop_z_min, self.crop_z_max
-        for ratio, val in zip(np.repeat(ratios, 2), ui_crops):
-            crop_values.append(round(ratio * val))
-        return crop_values
+    # def _ui_to_cfg(self):
+    #     self.crop_values_to_cfg()
+    #
+    # def crop_values_to_cfg(self):
+    #     cfg = self._config['detection']['test_set_slicing']
+    #     cfg['dim_0'] = self.crop_x_min, self.crop_x_max
+    #     cfg['dim_1'] = self.crop_y_min, self.crop_y_max
+    #     cfg['dim_2'] = self.crop_z_min, self.crop_z_max
 
-    def _crop_values_from_cfg(self, ratios=None):
-        if ratios is not None:
-            self.scale_crop_values(ratios)
+    # def _scale_crop_values(self, ratios):
+    #     crop_values = []
+    #     ui_crops = self.crop_x_min, self.crop_x_max, self.crop_y_min, self.crop_y_max, self.crop_z_min, self.crop_z_max
+    #     for ratio, val in zip(np.repeat(ratios, 2), ui_crops):
+    #         crop_values.append(round(ratio * val))
+    #     return crop_values
+
+    # def get_crop_values(self):
+    #     return self.crop_x_min, self.crop_x_max, self.crop_y_min, self.crop_y_max, self.crop_z_min, self.crop_z_max
+
+    def _crop_values_from_cfg(self):
         cfg = self._config['detection']['test_set_slicing']  # TODO: if 99.9 % source put to 100% (None)
         self.crop_x_min, self.crop_x_max = cfg['dim_0']
         self.crop_y_min, self.crop_y_max = cfg['dim_1']
@@ -888,12 +903,18 @@ class CellMapParams(UiParameter):
         self.tab.detectionSubsetXRangeMin.setValue(val)
 
     @property
-    def crop_x_max(self):
+    def crop_x_max(self):  # TODO: if 99.9 % source put to 100% (None)
         return self.tab.detectionSubsetXRangeMax.value()
 
     @crop_x_max.setter
     def crop_x_max(self, val):
         self.tab.detectionSubsetXRangeMax.setValue(val)
+
+    def handle_x_val_change(self):
+        self.config['detection']['test_set_slicing']['dim_0'] = self.crop_x_min, self.crop_x_max
+
+    def scale_x(self, val):
+        return round(val * self.ratios[0])
 
     @property
     def crop_y_min(self):
@@ -904,12 +925,18 @@ class CellMapParams(UiParameter):
         self.tab.detectionSubsetYRangeMin.setValue(val)
 
     @property
-    def crop_y_max(self):
+    def crop_y_max(self):  # TODO: if 99.9 % source put to 100% (None)
         return self.tab.detectionSubsetYRangeMax.value()
 
     @crop_y_max.setter
     def crop_y_max(self, val):
         self.tab.detectionSubsetYRangeMax.setValue(val)
+
+    def handle_y_val_change(self):
+        self.config['detection']['test_set_slicing']['dim_1'] = self.crop_y_min, self.crop_y_max
+
+    def scale_y(self, val):
+        return round(val * self.ratios[1])
 
     @property
     def crop_z_min(self):
@@ -920,12 +947,18 @@ class CellMapParams(UiParameter):
         self.tab.detectionSubsetZRangeMin.setValue(val)
 
     @property
-    def crop_z_max(self):
+    def crop_z_max(self):  # TODO: if 99.9 % source put to 100% (None)
         return self.tab.detectionSubsetZRangeMax.value()
 
     @crop_z_max.setter
     def crop_z_max(self, val):
         self.tab.detectionSubsetZRangeMax.setValue(val)
+
+    def handle_z_val_change(self):
+        self.config['detection']['test_set_slicing']['dim_2'] = self.crop_z_min, self.crop_z_max
+
+    def scale_z(self, val):
+        return round(val * self.ratios[2])
 
     @property
     def plot_detected_cells(self):
