@@ -309,22 +309,6 @@ class SampleParameters(UiParameter):  # TODO: implement connect
             return
         self._config['orientation'] = orientation
 
-    @property
-    def auto_fluo_path_checked(self):
-        return self.is_checked(self.tab.autofluoCheckBox)
-
-    @auto_fluo_path_checked.setter
-    def auto_fluo_path_checked(self, state):
-        self.set_check_state(self.tab.autofluoCheckBox, state)
-
-    @property
-    def arteries_path_checked(self):
-        return self.is_checked(self.tab.arteriesPathCheckBox)
-
-    @arteries_path_checked.setter
-    def arteries_path_checked(self, state):
-        self.set_check_state(self.tab.arteriesPathCheckBox, state)
-
 
 class RigidStitchingParams(UiParameter):
     def connect(self):
@@ -786,6 +770,11 @@ class RegistrationParams(UiParameter):
 
 
 class CellMapParams(UiParameter):
+    def __init__(self, tab, sample_params=None, preprocessing_params=None, src_folder=None):
+        super().__init__(tab, src_folder)
+        self.sample_params = sample_params
+        self.preprocessing_params = preprocessing_params
+
     def connect(self):
         self.tab.runCellMapPlotCheckBox.stateChanged.connect(self.handle_plot_when_finished)
         self.tab.backgroundCorrectionDiameter.valueChanged.connect(self.handle_background_correction_diameter_changed)
@@ -951,6 +940,11 @@ class CellMapParams(UiParameter):
 
 
 class PreferencesParams(UiParameter):
+
+    @property
+    def config(self):
+        return self._config
+
     def _ui_to_cfg(self):  # TODO: check if live update (i.e. connected handlers) or only on save
         cfg = self._config
         cfg['verbosity'] = self.verbosity

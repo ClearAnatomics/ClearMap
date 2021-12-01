@@ -31,7 +31,7 @@ import ClearMap.Alignment.Resampling as resampling
 import ClearMap.Alignment.Stitching.StitchingRigid as stitching_rigid
 # noinspection PyPep8Naming
 import ClearMap.Alignment.Stitching.StitchingWobbly as stitching_wobbly
-from ClearMap.IO.metadata import define_auto_stitching_params, define_auto_resolution, get_file_path
+from ClearMap.IO.metadata import define_auto_stitching_params, define_auto_resolution
 from ClearMap.config.config_loader import get_configs
 
 
@@ -53,9 +53,22 @@ class PreProcessor(object):
         # self.setup(cfg_paths)
         # self.setup_atlases()
 
-    def setup(self, cfg_paths):
+    def setup(self, cfgs):
+        """
+
+        Parameters
+        ----------
+        cfgs tuple of (machine_cfg_path, sample_cfg_path, processing_fg_path) or (machine_cfg, sample_cfg, processing_cfg)
+
+        Returns
+        -------
+
+        """
         self.resources_directory = settings.resources_path
-        self.set_configs(cfg_paths)
+        if all([isinstance(cfg, str) for cfg in cfgs]):
+            self.set_configs(cfgs)
+        else:  # Directly the config
+            self.machine_config, self.sample_config, self.processing_config = cfgs
         src_directory = os.path.expanduser(self.sample_config['base_directory'])
 
         self.workspace = workspace.Workspace(self.processing_config['pipeline_name'], directory=src_directory)
@@ -86,7 +99,6 @@ class PreProcessor(object):
         self.machine_config, self.sample_config, self.processing_config = get_configs(*cfg_paths)
 
     def setup_atlases(self):  # TODO: add possibility to load custom reference file (i.e. defaults to None in cfg)
-        self.sample_config.reload()
         x_slice = slice(None) if self.sample_config['slice_x'] is None else slice(*self.sample_config['slice_x'])
         y_slice = slice(None) if self.sample_config['slice_y'] is None else slice(*self.sample_config['slice_y'])
         z_slice = slice(None) if self.sample_config['slice_z'] is None else slice(*self.sample_config['slice_z'])
@@ -308,9 +320,6 @@ class PreProcessor(object):
             paths = paths[0]
         dvs = plot_3d.plot(paths, arange=False, lut='white', parent=parent)
         return dvs
-
-    def reload_processing_cfg(self):
-        self.processing_config.reload()
 
 
 if __name__ == '__main__':
