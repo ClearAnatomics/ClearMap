@@ -75,7 +75,8 @@ class CellDetector(object):
             configs = preprocessor.get_configs()
             self.sample_config = configs['sample']
             self.machine_config = configs['machine']
-            self.processing_config = get_configobj_cfg(os.path.join(self.sample_config['base_directory'], 'cell_map_params.cfg'))
+            cfg_path = os.path.join(self.sample_config['base_directory'], 'cell_map_params.cfg')
+            self.processing_config = get_configobj_cfg(cfg_path)
 
     def run(self):
         # select sub-slice for testing the pipeline
@@ -242,7 +243,6 @@ class CellDetector(object):
 
     def run_cell_detection(self, tuning=False):
         self.workspace.debug = tuning
-        self.processing_config.reload()
         cell_detection_param = cell_detection.default_cell_detection_parameter.copy()
         cell_detection_param['illumination'] = None  # WARNING: illumination or illumination_correction
         cell_detection_param['background_correction']['shape'] = self.processing_config['detection']['background_correction']['diameter']

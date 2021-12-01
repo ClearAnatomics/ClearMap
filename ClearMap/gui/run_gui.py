@@ -44,8 +44,9 @@ from ClearMap.gui.widgets import OrthoViewer
 Handle reset detected correctly
 Ensure all button functions trigger a save of config and the inner operation triggers a reload
 Ensure clicking tabs checks that required actions have been triggered
-Improve progress bar
-Improve logging to GUI (capture multithreaded and elastix output)
+Improve progress display:
+    progress bar from inner functions
+    logging to GUI (capture multithreaded and elastix output)
 Test and check that works with secondary channel
 
 Previews:
@@ -383,7 +384,7 @@ class ClearMapGui(ClearMapGuiBase):
 
     def setup_preprocessor(self):
         self.save_sample_cfg()
-        self.preprocessor.setup((self.sample_cfg_path, self.processing_cfg_path, self.machine_cfg_path))
+        self.preprocessor.setup((self.preferences.config, self.sample_params.config, self.processing_params.config))
 
     def setup_cell_detector(self):
         if self.cell_detector.preprocessor is None and self.preprocessor.workspace is not None:  # preproc initialised
@@ -438,10 +439,6 @@ class ClearMapGui(ClearMapGuiBase):
             return
 
         error = False
-        self.machine_config = self.config_loader.get_cfg('machine')
-        if not self.machine_config:
-            self.print_error_msg('Loading machine config file failed')
-            error = True
         try:
             self.sample_params.get_config(self.sample_cfg_path)
         except ConfigNotFoundError:
@@ -454,7 +451,7 @@ class ClearMapGui(ClearMapGuiBase):
             self.print_error_msg('Loading preprocessing config file failed')
             error = True
         if self.processing_params.pipeline_is_cell_map:
-            self.cell_map_params = CellMapParams(self.cell_map_tab)
+            self.cell_map_params = CellMapParams(self.cell_map_tab, self.sample_params, self.processing_params)
             try:
                 self.cell_map_params.get_config(self.__get_cfg_path('cell_map')[1])
             except ConfigNotFoundError:
@@ -535,7 +532,7 @@ class ClearMapGui(ClearMapGuiBase):
     def run_stitching(self):
         stitched_rigid = False
         self.processing_params.ui_to_cfg()
-        self.preprocessor.reload_processing_cfg()
+        # self.preprocessor.config.reload()
         self.make_progress_dialog('Stitching')
         self.print_status_msg('Stitching')
         if not self.processing_params.stitching_rigid.skip:
