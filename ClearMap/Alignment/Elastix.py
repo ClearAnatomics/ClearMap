@@ -56,6 +56,7 @@ import os
 import tempfile
 import shutil
 import re
+import platform
 
 import numpy as np
 
@@ -131,13 +132,21 @@ def set_elastix_library_path(path = None):
   if path is None:
     path = settings.elastix_path;
   
-  if 'LD_LIBRARY_PATH' in os.environ.keys():
-    lp = os.environ['LD_LIBRARY_PATH'];
-    if not path in lp.split(':'):
-      os.environ['LD_LIBRARY_PATH'] = lp + ':' + path;
+  systemname = platform.system()
+  if systemname == 'Linux':
+    ldpath = 'LD_LIBRARY_PATH';
   else:
-    os.environ['LD_LIBRARY_PATH'] = path
+    ldpath = 'DYLD_LIBRARY_PATH';
+  print(ldpath)
 
+  if ldpath in os.environ:
+    lp = os.environ[ldpath];
+    if not path in lp.split(':'):
+      os.environ[ldpath] = lp + ':' + path;
+  else:
+    os.environ[ldpath] = path
+      
+  print(os.environ[ldpath])
 
 def initialize_elastix(path = None):
   """Initialize all paths and binaries of elastix
@@ -191,7 +200,12 @@ def initialize_elastix(path = None):
   initialized = True;
   
   print("Elastix sucessfully initialized from path: %s" % path);
-  
+
+  systemname = platform.system()
+  if systemname != 'Linux':
+      elastix_binary = 'DYLD_LIBRARY_PATH='+elastix_lib+' '+ elastix_binary
+      transformix_binary = 'DYLD_LIBRARY_PATH='+elastix_lib+' '+ transformix_binary
+
   return path;
 
 

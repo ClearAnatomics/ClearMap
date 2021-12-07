@@ -21,7 +21,7 @@ __download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 ### ClearMap - Cython
 ###############################################################################
 
-#ImageProcessing
+# compile ImageProcessing  (CellMap + tubemap)
 print('ClearMap.ImageProcessing.Binary.Filling')
 import ClearMap.ImageProcessing.Binary.Filling as fil
 print('ClearMap.ImageProcessing.Clipping.Clipping')
@@ -35,7 +35,8 @@ import ClearMap.ImageProcessing.Thresholding.Thresholding as thr
 print('ClearMap.ImageProcessing.Tracing.Trace')
 import ClearMap.ImageProcessing.Tracing.Trace as trc
 
-#ParallelProcessing
+#%%
+# compile ParallelProcessing (CellMap)
 print('ClearMap.ParallelProcessing.DataProcessing.ArrayProcessing')
 import ClearMap.ParallelProcessing.DataProcessing.ArrayProcessing as ap
 print('ClearMap.ParallelProcessing.DataProcessing.ConvolvePointList')

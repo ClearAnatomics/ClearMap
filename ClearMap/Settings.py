@@ -25,6 +25,7 @@ __download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 
 import os
 import socket
+import platform
 
 ###############################################################################
 ### Paths
@@ -62,8 +63,14 @@ test_data_path = os.path.join(test_path, 'Data');
 ###############################################################################
 ### Paths to external programs and resources
 ###############################################################################
+system = platform.system()
+if system == 'linux':
+    elastix_path = os.path.join(external_path, 'elastix/build_linux')
+elif system == 'darwin':
+    elastix_path = os.path.join(external_path, 'elastix/build_osx')
+else:
+    raise OSError(f'OS {system} not supported')
 
-elastix_path = os.path.join(external_path, 'elastix/build');
 """Absolue path to the elastix installation
 
 Note
@@ -125,7 +132,7 @@ def setup():
         ilastik_path       = None;
 
     elif hostname == 'ihu-renie-lf001' or hostname == 'icm-renie-lf004.icm-institute.org':  #Nico's Desktop 
-        elastix_path       = os.path.join(external_path, 'elastix/build');
+        elastix_path       = os.path.join(external_path, 'elastix/build_linux');
         tera_stitcher_path = os.path.join(external_path, 'TeraStitcher'); 
     
     elif hostname == 'mtllab-Ubuntu': #MTL workstation
