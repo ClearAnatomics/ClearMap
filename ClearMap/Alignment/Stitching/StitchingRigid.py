@@ -51,6 +51,7 @@ from ClearMap.Utils.Formatting import ensure
 ###############################################################################
 ### Geometry
 ###############################################################################
+from ClearMap.Utils.utilities import CancelableProcessPoolExecutor
 
 
 class Region(object):
@@ -3312,7 +3313,8 @@ def _align_layout_axis(src1, src2, aid, n_alignments, axis, axis_range, depth, m
 
 
 
-def align_layout_rigid_mip(layout, depth = 10, max_shifts = 10, ranges = None, clip = None, background = None, processes = None, verbose = False):
+def align_layout_rigid_mip(layout, depth = 10, max_shifts = 10, ranges = None, clip = None, background = None,
+                           processes = None, workspace=None, verbose = False):
   """Aligns sources in a layout in a single axis direction only.
   
   Arguments
@@ -3373,9 +3375,13 @@ def align_layout_rigid_mip(layout, depth = 10, max_shifts = 10, ranges = None, c
     layout.sources_as_virtual();                        
     alignments = layout.alignments;
     #print('align_axis')
-    with concurrent.futures.ProcessPoolExecutor(processes) as executor:
+    with CancelableProcessPoolExecutor(processes) as executor:
       results = executor.map(_align, [a.pre for a in alignments], [a.post for a in alignments], range(n_alignments));
-    results = list(results);                       
+      if workspace is not None:
+          workspace.executor = executor
+    if workspace is not None:
+        workspace.executor = None
+    results = list(results);
   
     #layout.sources_as_real();
   

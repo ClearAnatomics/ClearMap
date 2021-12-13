@@ -37,6 +37,8 @@ import ClearMap.Utils.Timer as tmr
 ########################################################################################
 ### Conversion
 ########################################################################################
+from ClearMap.Utils.utilities import CancelableProcessPoolExecutor
+
 
 def format_orientation(orientation, inverse = False, default = None):
   """Convert orientation to standard format.
@@ -320,7 +322,7 @@ def resample_factor(source_shape, sink_shape = None, source_resolution = None, s
 def resample(source, sink = None, orientation = None, 
              sink_shape = None, source_resolution = None, sink_resolution = None, 
              interpolation = 'linear', axes_order = None, method = 'shared',
-             processes = None, verbose = True):
+             processes = None, workspace=None, verbose = True):
   """Resample data of source in new shape/resolution and orientation.
   
   Arguments
@@ -439,8 +441,12 @@ def resample(source, sink = None, orientation = None,
         _resample(index=index);
     else:
       #print(processes);
-      with concurrent.futures.ProcessPoolExecutor(processes) as executor:
-        executor.map(_resample, indices);
+      with CancelableProcessPoolExecutor(processes) as executor:
+        executor.map(_resample, indices)
+        if workspace is not None:
+            workspace.executor = executor
+      if workspace is not None:
+          workspace.executor = None
         
     last_source = resampled;
   
@@ -662,14 +668,14 @@ def _interpolation_to_cv2(interpolation):
 
 
 
-def resample_inverse(source, sink = None, 
+def resample_inverse(source, sink = None,
                      resample_source = None, resample_sink = None,
-                     orientation = None, 
-                     source_shape = None, source_resolution = None, 
-                     sink_shape = None, sink_resolution = None, 
+                     orientation = None,
+                     source_shape = None, source_resolution = None,
+                     sink_shape = None, sink_resolution = None,
                      axes_order = None, method = 'memmap',
-                     interpolation = 'linear', 
-                     processes = None, verbose = True, **args):
+                     interpolation = 'linear',
+                     processes = None, verbose = True, workspace=None, **args):
   """Resample data inversely to :func:`resample` routine.
   
   Arguments
@@ -808,8 +814,12 @@ def resample_inverse(source, sink = None,
       for index in indices:
         _resample(index=index);
     else:
-      with concurrent.futures.ProcessPoolExecutor(processes) as executor:
-        executor.map(_resample, indices);
+      with CancelableProcessPoolExecutor(processes) as executor:
+        executor.map(_resample, indices)
+        if workspace is not None:
+            workspace.executor = executor
+      if workspace is not None:
+          workspace.executor = None
         
     last_source = resampled;
   

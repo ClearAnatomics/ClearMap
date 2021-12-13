@@ -31,6 +31,8 @@ __webpage__ = 'https://idisco.info'
 __download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
 
 import os
+import re
+from concurrent.futures.process import BrokenProcessPool
 
 import numpy as np
 from numpy.lib import recfunctions
@@ -50,12 +52,13 @@ import ClearMap.ImageProcessing.Experts.Cells as cell_detection
 import ClearMap.Analysis.Measurements.Voxelization as voxelization
 # noinspection PyPep8Naming
 import ClearMap.Alignment.Annotation as annotation
-from ClearMap.Scripts.sample_preparation import PreProcessor
+from ClearMap.Scripts.sample_preparation import PreProcessor, TabProcessor
 from ClearMap.config.config_loader import get_configobj_cfg
 
 
-class CellDetector(object):
+class CellDetector(TabProcessor):
     def __init__(self, preprocessor=None):
+        super().__init__()
         self.sample_config = None
         self.processing_config = None
         self.machine_config = None
@@ -63,6 +66,10 @@ class CellDetector(object):
         self.workspace = None
         self.annotation_file = None
         self.distance_file = None
+        self.cell_detection_re = re.compile(r'.*?Processing block \d+/\d+.*?\selapsed time:\s\d+:\d+:\d+\.\d+')
+        # self.cell_detection_re = re.compile(r'Processing block \d+/\d+<\(\d+, \d+, \d+\)/\(\d+, \d+, \d+\)>\s'
+        #                                     r'\(\d+, \d+, \d+\)@\(\d+, \d+, \d+\)\[\(:,:,\d+:36\)\]:\s'
+        #                                     r'elapsed time:\s\d+:\d+:\d+\.\d+')
         self.setup(preprocessor)
 
     def setup(self, preprocessor):
@@ -77,6 +84,8 @@ class CellDetector(object):
             self.machine_config = configs['machine']
             cfg_path = os.path.join(self.sample_config['base_directory'], 'cell_map_params.cfg')
             self.processing_config = get_configobj_cfg(cfg_path)
+
+            self.set_progress_watcher(self.preprocessor.progress_watcher)
 
     def run(self):
         # select sub-slice for testing the pipeline
@@ -242,7 +251,7 @@ class CellDetector(object):
                                     })
 
     def run_cell_detection(self, tuning=False):
-        self.workspace.debug = tuning
+        self.workspace.debug = tuning  # TODO: use context manager
         cell_detection_param = cell_detection.default_cell_detection_parameter.copy()
         cell_detection_param['illumination'] = None  # WARNING: illumination or illumination_correction
         cell_detection_param['background_correction']['shape'] = self.processing_config['detection']['background_correction']['diameter']
@@ -259,18 +268,24 @@ class CellDetector(object):
 
         processing_parameter = cell_detection.default_cell_detection_processing_parameter.copy()
         processing_parameter.update(  # TODO: store as other dict and run .update(**self.extra_detection_params)
-            processes=self.machine_config['n_processes_cell_detection'],  # FIXME: add machine_config
-            size_max=self.machine_config['detection_chunk_size_max'],
+            processes=self.machine_config['n_processes_cell_detection'],
             size_min=self.machine_config['detection_chunk_size_min'],
+            size_max=self.machine_config['detection_chunk_size_max'],
             overlap=self.machine_config['detection_chunk_overlap'],
             verbose=True
         )
 
+        n_steps = self.get_n_blocks(self.workspace.source('stitched').shape[2])  # OPTIMISE: read metadata w/out load  # TODO: round to processors
+        self.prepare_watcher_for_substep(n_steps, self.cell_detection_re, 'Detecting cells')
         try:
             cell_detection.detect_cells(self.workspace.filename('stitched'),
                                         self.workspace.filename('cells', postfix='raw'),
                                         cell_detection_parameter=cell_detection_param,
-                                        processing_parameter=processing_parameter)
+                                        processing_parameter=processing_parameter,
+                                        workspace=self.workspace)
+        except BrokenProcessPool as err:
+            print('Cell detection canceled')
+            return
         finally:
             self.workspace.debug = False
 
@@ -365,6 +380,12 @@ class CellDetector(object):
 
     def plot_voxelized_intensities(self, arange=True):
         return plot_3d.plot(self.workspace.filename('density', postfix='intensities'), arange=arange)
+
+    def get_n_blocks(self, dim_size):
+        blk_size = self.machine_config['detection_chunk_size_max']
+        overlap = self.machine_config['detection_chunk_overlap']
+        n_blocks = int(np.ceil((dim_size - blk_size) / (blk_size - overlap) + 1))
+        return n_blocks
 
 
 if __name__ == "__main__":
