@@ -52,13 +52,18 @@ def parse_overlaps(img_path):
         x_overlap = round(custom_props['xyz-Table_X_Overlap']['Value'])
         y_overlap = round(custom_props['xyz-Table_Y_Overlap']['Value'])
     elif parser == 'PIL':
-        custom_props = ome_dict['OME']['ca:CustomAttributes']['Properties']['prop']
-        for attr in custom_props:
-            if '@label' in attr.keys():
-                if attr['@label'] == 'xyz-Table X Overlap':
-                    x_overlap = round(attr['@Value'])
-                elif attr['@label'] == 'xyz-Table X Overlap':
-                    y_overlap = round(attr['@Value'])
+        try:
+            custom_props = ome_dict['OME']['ca:CustomAttributes']['PropArray']
+            x_overlap = round(float(custom_props['xyz-Table_X_Overlap']['@Value']))
+            y_overlap = round(float(custom_props['xyz-Table_Y_Overlap']['@Value']))
+        except KeyError:
+            custom_props = ome_dict['OME']['ca:CustomAttributes']['Properties']['prop']
+            for attr in custom_props:
+                if '@label' in attr.keys():
+                    if attr['@label'] == 'xyz-Table X Overlap':
+                        x_overlap = round(attr['@Value'])
+                    elif attr['@label'] == 'xyz-Table X Overlap':
+                        y_overlap = round(attr['@Value'])
     else:
         raise ValueError('parser type "{}" is not recognised'.format(parser))
 
