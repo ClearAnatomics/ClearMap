@@ -1,3 +1,3 @@
 {
-    "files": ["mainwindow.ui","sample_tab.ui","preprocessing_tab.ui","cell_map_tab.ui","preferences_editor.ui","graphics_resources.qrc"]
+    "files": ["sample_tab.ui","cell_map_tab.ui","preferences_editor.ui","mainwindow.ui","preprocessing_tab.ui","graphics_resources.qrc","nested_progress_dialog.ui"]
 }
