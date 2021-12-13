@@ -31,17 +31,18 @@ def loadUiType(uifile, from_imports=False, resource_suffix='_rc', import_from='.
         class_import = 'from PyQt5.QtWidgets import {}'.format(patch_parent_class)
         cls_list.insert(0, class_import)
         parent_name = None
-        for i, l in enumerate(cls_list):
-            if l.startswith('class'):
-                cls_list[i] = l.replace('object', patch_parent_class)
-            elif 'setupUi' in l:
-                parent_name = l.split(',')[-1].strip(' ):')
+        for i, ln in enumerate(cls_list):
+            if ln.startswith('class'):
+                cls_list[i] = ln.replace('object', patch_parent_class)
+            elif 'setupUi' in ln:
+                parent_name = ln.split(',')[-1].strip(' ):')
                 cls_list[i] = '    def setupUi(self):'
-            elif parent_name is not None and l.strip().startswith(parent_name):
-                cls_list[i] = ''
-            elif parent_name is not None and '({})'.format(parent_name) in l:
-                cls_list[i] = l.replace(parent_name, 'self')
-
+            # elif parent_name is not None and ln.strip().startswith(parent_name):
+            elif parent_name is not None and '{}.'.format(parent_name) in ln:  # Call to parent method
+                cls_list[i] = 'remove_me'  # TODO: find better keyword
+            elif parent_name is not None and '({})'.format(parent_name) in ln:
+                cls_list[i] = ln.replace(parent_name, 'self')
+        cls_list = [ln for ln in cls_list if ln != 'remove_me']
         code_string = '\n'.join(cls_list)
     else:
         code_string = code_string.getvalue()
