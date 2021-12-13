@@ -80,6 +80,7 @@ import ClearMap.Utils.Timer as tmr;
 ###############################################################################
 ### Default parameter
 ###############################################################################
+from ClearMap.Utils.utilities import CancelableProcessPoolExecutor
 
 default_size_max = None
 """Default maximal size of a block.
@@ -124,7 +125,7 @@ def process(function, source, sink = None,
             optimization = True, optimization_fix = 'all', neighbours = False,
             function_type = None, as_memory = False, return_result = False,
             return_blocks = False,
-            processes = None, verbose = False, 
+            processes = None, verbose = False, workspace=None,
             **kwargs):
   """Create blocks and process a function on them in parallel.
   
@@ -188,14 +189,14 @@ def process(function, source, sink = None,
   Note
   ----
   This implementation only supports processing into sinks with the same shape as the source.
-  """     
+  """
   #sources and sinks
   if isinstance(source, list):
     sources = source;
   else:
     sources = [source];
   sources = [io.as_source(s).as_virtual() for s in sources];
-  
+
   #if sink is None:
   #  sink = sma.Source(shape=sources[0].shape, dtype=sources[0].dtype, order=sources[0].order);
   if isinstance(sink, list):
@@ -204,25 +205,25 @@ def process(function, source, sink = None,
     sinks = [];
   else:
     sinks = [sink];
-  
+
   sinks = [io.initialize(s, hint=sources[0]) for s in sinks];
   sinks = [io.as_source(s).as_virtual() for s in sinks];
 
   axes = block_axes(sources[0], axes=axes);
 
-  split = ft.partial(split_into_blocks, processes=processes, axes=axes, 
-                     size_max=size_max, size_min=size_min, 
-                     overlap=overlap, optimization=optimization, 
+  split = ft.partial(split_into_blocks, processes=processes, axes=axes,
+                     size_max=size_max, size_min=size_min,
+                     overlap=overlap, optimization=optimization,
                      optimization_fix=optimization_fix, neighbours=neighbours,
-                     verbose=False); 
+                     verbose=False);
 
   source_blocks = [split(s) for s in sources];
   sink_blocks = [split(s) for s in sinks];
   n_blocks = len(source_blocks[0]);
-  
-  source_blocks = [[blocks[i] for blocks in source_blocks] for i in range(n_blocks)];  
-  sink_blocks =  [[blocks[i] for blocks in sink_blocks] for i in range(n_blocks)];  
-  
+
+  source_blocks = [[blocks[i] for blocks in source_blocks] for i in range(n_blocks)];
+  sink_blocks =  [[blocks[i] for blocks in sink_blocks] for i in range(n_blocks)];
+
   if function_type is None:
     function_type = 'array';
   if function_type == 'block':
@@ -233,27 +234,33 @@ def process(function, source, sink = None,
     func = ft.partial(process_block_source, function=function, as_memory=as_memory, as_array=True, verbose=verbose, **kwargs);
   else:
     raise ValueError("function type %r not 'array', 'source', 'block' or None!");
-  
+
   if not isinstance(processes, int) and processes != "serial":
     processes = mp.cpu_count();
-  
+
   if verbose:
     timer = tmr.Timer();
     print("Processing %d blocks with function %r." % (n_blocks, function.__name__))
-  
+
   if isinstance(processes, int):
     #from bounded_pool_executor import BoundedProcessPoolExecutor
-    with cf.ProcessPoolExecutor(max_workers=processes) as executor:
     #with BoundedProcessPoolExecutor(max_workers=processes) as executor:
+    #   executor.map(function, source_blocks, sink_blocks)
+    with CancelableProcessPoolExecutor(max_workers=processes) as executor:
       futures = [executor.submit(func, *args) for args in zip(source_blocks, sink_blocks)];
-      result  = [f.result() for f in futures];
-      #executor.map(function, source_blocks, sink_blocks)
+      # results = executor.map(func, source_blocks, sink_blocks)
+      if workspace is not None:
+        workspace.executor = executor
+      result = [f.result() for f in futures];  # To prevent keeping references to futures to avoid mem leaks
+    # result = list(results)
+    if workspace is not None:
+      workspace.executor = None
   else:
     result = [func(*args) for args in zip(source_blocks, sink_blocks)]; #analysis:ignore
-  
+
   if verbose:
     timer.print_elapsed_time("Processed %d blocks with function %r" % (n_blocks, function.__name__))
-  
+
   #gc.collect();
 
   if return_result:
@@ -469,7 +476,7 @@ def block_sizes(size, processes = None,
         if verbose:
           print("Optimized block size decreased to %d in %d blocks!" % (block_size, n_blocks));
                 
-      elif optimization_fix == 'decrease' and n_blocks > n_add:
+      elif optimization_fix == 'decrease' and n_blocks > n_add:  # FIXME: should be increase
         #try to increase chunk size and decrease chunk number to fit  processors
         n_blocks = n_blocks - n_add;
         block_size = float(size + (n_blocks-1) * overlap) / n_blocks;

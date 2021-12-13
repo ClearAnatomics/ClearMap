@@ -56,6 +56,7 @@ from ClearMap.IO.FileUtils import (is_file, is_directory, file_extension,   #ana
 ###############################################################################
 ### Source associations 
 ###############################################################################
+from ClearMap.Utils.utilities import CancelableProcessPoolExecutor
 
 source_modules = [npy, tif, mmp, sma, fl, nrrd, csv, gt];
 """The valid source modules."""
@@ -714,7 +715,7 @@ def convert(source, sink, processes = None, verbose = False, **kwargs):
 
 
 
-def convert_files(filenames, extension = None, path = None, processes = None, verbose = False):
+def convert_files(filenames, extension = None, path = None, processes = None, verbose = False, workspace=None):
   """Transforms list of files to their sink format in parallel.
   
   Arguments
@@ -758,8 +759,12 @@ def convert_files(filenames, extension = None, path = None, processes = None, ve
   if processes == 'serial':
     [_convert(source,sink,i) for i,source,sink in zip(range(n_files), filenames, sinks)];
   else:
-    with concurrent.futures.ProcessPoolExecutor(processes) as executor:
-      executor.map(_convert, filenames, sinks, range(n_files));
+    with CancelableProcessPoolExecutor(processes) as executor:
+      executor.map(_convert, filenames, sinks, range(n_files))
+      if workspace is not None:
+        workspace.executor = executor
+    if workspace is not None:
+      workspace.executor = None
                   
   if verbose:
     timer.print_elapsed_time('Converting %d files to %s' % (n_files, extension));

@@ -38,6 +38,7 @@ dependencies:
   - xmltodict  # to compensate for old tifffile
   - configobj
   - pyarrow
+  - psutil  # required for python < 3.9 for cancelable ProcessPoolExecutors
   - pip:
     - lxml
 #variables:

@@ -112,7 +112,8 @@ See :func:`ClearMap.ParallelProcessing.BlockProcessing.process` for details."""
 ### Cell detection
 ###############################################################################
                    
-def detect_cells(source, sink = None, cell_detection_parameter = default_cell_detection_parameter, processing_parameter = default_cell_detection_processing_parameter):
+def detect_cells(source, sink=None, cell_detection_parameter=default_cell_detection_parameter,
+                 processing_parameter=default_cell_detection_processing_parameter, workspace=None):
   """Cell detection pipeline.
   
   Arguments
@@ -313,8 +314,10 @@ def detect_cells(source, sink = None, cell_detection_parameter = default_cell_de
         ap.initialize_sink(filename, shape=shape, order=order, dtype='float');
         
   cell_detection_parameter.update(verbose=processing_parameter.get('verbose', False));
-  
-  results, blocks = bp.process(detect_cells_block, source, sink=None, function_type='block', return_result=True, return_blocks=True, parameter=cell_detection_parameter, **processing_parameter)                   
+
+  results, blocks = bp.process(detect_cells_block, source, sink=None, function_type='block', return_result=True,
+                               return_blocks=True, parameter=cell_detection_parameter, workspace=workspace,
+                               **processing_parameter)
   
   #merge results
   results = np.vstack([np.hstack(r) for r in results])
