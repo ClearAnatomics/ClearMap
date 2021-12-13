@@ -1,7 +1,11 @@
+import re
+
 import numpy as np
 import pyqtgraph as pg
-from PyQt5 import QtGui
+from PyQt5 import QtGui, QtCore
 from PyQt5.QtCore import QRectF
+from PyQt5.QtWidgets import QWidget
+
 from ClearMap.Visualization import Plot3d as plot_3d
 
 
@@ -181,3 +185,107 @@ class OrthoViewer(object):
         dvs = plot_3d.plot([x, y, z], arange=False, lut='white', parent=parent, sync=False)
         self.dvs = dvs
         return dvs
+
+
+class PbarWatcher(QWidget):  # Inspired from https://stackoverflow.com/a/66266068
+    progress_name_changed = QtCore.pyqtSignal(str)
+    progress_changed = QtCore.pyqtSignal(int)
+    max_changed = QtCore.pyqtSignal(int)
+
+    main_max_changed = QtCore.pyqtSignal(int)
+    main_progress_changed = QtCore.pyqtSignal(int)
+
+    def __init__(self, max_progress=100, main_max_progress=1, parent=None):
+        super().__init__(parent)
+        self.__progress = 0
+        self.__main_progress = 1
+        self.__max_progress = max_progress
+        self.__main_max_progress = main_max_progress
+        self.range_fraction = 1
+
+        self.log_path = None
+        self.previous_log_length = 0  # The log length at the end of the previous operation
+        self.n_dones = 0
+        self.match_str = 'done'
+
+    def get_progress(self):
+        return self.__progress
+
+    def set_progress(self, value):
+        if self.__progress == value:
+            return
+        self.__progress = round(value)
+        self.progress_changed.emit(self.__progress)
+
+    def set_main_progress(self, value):
+        if self.__main_progress == value:
+            return
+        self.__main_progress = round(value)
+        self.main_progress_changed.emit(self.__main_progress)
+
+    def increment_main_progress(self, increment=1):
+        self.set_main_progress(self.__main_progress + round(increment))
+
+    def increment(self, increment):
+        if isinstance(increment, float):
+            self.set_progress(self.__progress + int(self.max_progress * increment))
+        elif isinstance(increment, int):
+            self.set_progress(self.__progress + increment)
+
+    @property
+    def max_progress(self):
+        return self.__max_progress
+
+    @max_progress.setter
+    def max_progress(self, value):
+        self.__max_progress = round(value)
+        self.max_changed.emit(self.__max_progress)
+
+    @property
+    def main_max_progress(self):
+        return self.__main_max_progress
+
+    @main_max_progress.setter
+    def main_max_progress(self, value):
+        self.__main_max_progress = round(value)
+        self.main_max_changed.emit(self.__main_max_progress)
+
+    def __match(self, line):
+        if isinstance(self.match_str, str):
+            return self.match_str in line
+        elif isinstance(self.match_str, re.Pattern):
+            return self.match_str.match(line)
+
+    def count_dones(self):  # FIXME: buffer for speed and update self.previous_log_length
+        with open(self.log_path, 'r') as log:
+            log_lines = log.readlines()
+            new_lines = log_lines[self.previous_log_length:]
+            n_dones = len([ln for ln in new_lines if self.__match(ln)])  # OPTIMISE: check fastest solution
+            self.n_dones = n_dones
+            return n_dones
+
+    def reset_log_length(self):  # To bind
+        with open(self.log_path, 'r') as log:
+            self.previous_log_length = len(log.readlines())
+
+    def prepare_for_substep(self, step_length, match_str, step_name):
+        """
+
+        Parameters
+        ----------
+        step_name
+            str
+        step_length
+            int The number of steps in the operation
+        match_str
+            str or re.Pattern the text to look for in the logs to check for progress
+
+        Returns
+        -------
+
+        """
+        self.max_progress = step_length
+        self.match_str = match_str
+        self.reset_log_length()
+        self.set_progress(0)
+        self.progress_name_changed.emit(step_name)

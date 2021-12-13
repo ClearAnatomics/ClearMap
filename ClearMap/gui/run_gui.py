@@ -1,5 +1,6 @@
 import os
 import sys
+from multiprocessing.pool import ThreadPool
 
 from shutil import copyfile
 import traceback
@@ -27,34 +28,30 @@ from ClearMap.Visualization import Plot3d as plot_3d
 
 from ClearMap.config.config_loader import ConfigLoader
 
+
 from ClearMap.gui.gui_utils import QDARKSTYLE_BACKGROUND, DARK_BACKGROUND, np_to_qpixmap, \
     html_to_ansi, html_to_plain_text, compute_grid, surface_project,  format_long_nb_to_str, link_dataviewers_cursors
 from ClearMap.gui.gui_logging import Printer
-from ClearMap.gui.dialogs import get_directory_dlg, warning_popup, make_progress_dialog
+from ClearMap.gui.dialogs import get_directory_dlg, warning_popup, make_progress_dialog, make_nested_progress_dialog
 from ClearMap.gui.params import SampleParameters, ConfigNotFoundError, CellMapParams, \
     PreferencesParams, PreprocessingParams, ParamsOrientationError
 from ClearMap.gui.pyuic_utils import loadUiType
 from ClearMap.gui.widget_monkeypatch_callbacks import get_value, set_value, controls_enabled, get_check_box, \
     enable_controls, disable_controls, set_text, get_text, connect_apply, connect_close, connect_save, connect_open, \
     connect_ok, connect_cancel, connect_value_changed, connect_text_changed
-from ClearMap.gui.widgets import OrthoViewer
+from ClearMap.gui.widgets import OrthoViewer, PbarWatcher
 
 # TODO
 """
 Handle reset detected correctly
-Ensure all button functions trigger a save of config and the inner operation triggers a reload
-Ensure clicking tabs checks that required actions have been triggered
-Improve progress display:
-    progress bar from inner functions
-    logging to GUI (capture multithreaded and elastix output)
+Fix qrc resources (ui files should not be coded by path)
 Test and check that works with secondary channel
+Delete intermediate files
+Ensure all machine config params are in the preferences UI
 
 Previews:
     - Add rigid alignment : plane in middle of stack from each column + stitch with different colours
-Delete intermediate files
 
-preferences:
-    (-) number of processes for all
     
 Analysis:
     
@@ -227,8 +224,30 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         return base_msg, msg
 
     def make_progress_dialog(self, msg, maximum=100, canceled_callback=None):
-        dlg = make_progress_dialog(msg, maximum, canceled_callback, self)
-        self.progress_dialog = dlg
+        dialog = make_progress_dialog(msg, maximum, canceled_callback, self)
+        self.progress_dialog = dialog
+        self.progress_watcher.log_path = self.logger.file.name  # TODO: put in self.setup or like function
+        self.progress_watcher.progress_changed.connect(self.progress_dialog.setValue)
+        self.preprocessor.set_progress_watcher(self.progress_watcher)
+        # self.cell_detector.set_progress_watcher(self.progress_watcher)
+
+    def make_nested_progress_dialog(self, title='Processing', n_steps=1, sub_maximum=100,
+                                    sub_process_name='', abort_callback=None, parent=None):
+        dialog = make_nested_progress_dialog(title=title, overall_maximum=n_steps, sub_maximum=sub_maximum,
+                                             sub_process_name=sub_process_name, abort_callback=abort_callback,
+                                             parent=parent)
+        self.progress_dialog = dialog
+        self.progress_watcher.log_path = self.logger.file.name  # TODO: put in self.setup or like function
+        self.progress_watcher.progress_changed.connect(self.progress_dialog.subProgressBar.setValue)
+        self.progress_watcher.main_progress_changed.connect(self.progress_dialog.mainProgressBar.setValue)
+        self.progress_watcher.main_progress_changed.connect(self.progress_watcher.reset_log_length)
+        self.progress_watcher.max_changed.connect(self.progress_dialog.subProgressBar.setMaximum)
+        self.progress_watcher.main_max_changed.connect(self.progress_dialog.mainProgressBar.setMaximum)
+        self.progress_watcher.progress_name_changed.connect(self.progress_dialog.subProgressLabel.setText)
+
+        self.preprocessor.set_progress_watcher(self.progress_watcher)
+        if self.cell_detector.preprocessor is not None:  # If initialised
+            self.cell_detector.set_progress_watcher(self.progress_watcher)
 
 
 class ClearMapGui(ClearMapGuiBase):
@@ -251,6 +270,9 @@ class ClearMapGui(ClearMapGuiBase):
 
         self.actionPreferences.triggered.connect(self.preferences_editor.exec)  # TODO: check if move to setup_preferences
 
+        self.progress_watcher = PbarWatcher()
+        self.app = QApplication.instance()
+
     def patch_stdout(self):
         sys.stdout = self.logger
         sys.stderr = self.error_logger
@@ -270,8 +292,10 @@ class ClearMapGui(ClearMapGuiBase):
         self.preprocessing_tab.atlasSettingsPage.setVisible(checked)
 
     def amendUi(self):
-        self.logger = Printer(self.textBrowser)
-        self.error_logger = Printer(self.textBrowser, color='red')
+        self.logger = Printer()
+        self.logger.text_updated.connect(self.textBrowser.append)
+        self.error_logger = Printer(color='red')
+        self.error_logger.text_updated.connect(self.textBrowser.append)
 
         self.setupIcons()
         self.setup_tabs()
@@ -371,8 +395,16 @@ class ClearMapGui(ClearMapGuiBase):
         self.preferences_editor.buttonBox.connectOk(self.apply_prefs_and_close)
 
     def handle_tab_click(self, tab_index):
-        if tab_index == 2:  # FIXME: handle other tabs (e.g. message if workspace not init when tab_index==1)
-            self.setup_cell_detector()
+        if tab_index in (1, 2) and self.preprocessor.workspace is None:
+            self.popup('WARNING', 'Workspace not initialised, '
+                                  'cannot proceed to alignment')
+            self.tabWidget.setCurrentIndex(0)
+        if tab_index == 2:
+            if not os.path.exists(self.preprocessor.aligned_autofluo_path):
+                ok = self.popup('WARNING', 'Alignment not performed, please run first') == QMessageBox.Ok
+                self.tabWidget.setCurrentIndex(1)  # WARNING: does not work
+            else:
+                self.setup_cell_detector()
 
     def apply_prefs_and_close(self):
         self.preferences.ui_to_cfg()
@@ -529,24 +561,33 @@ class ClearMapGui(ClearMapGuiBase):
 
     # ###################################### PREPROCESSING ####################################
 
+    def wrap_in_thread(self, func, *args, **kwargs):
+        pool = ThreadPool(processes=1)
+        result = pool.apply_async(func, args, kwargs)
+        while not result.ready():
+            result.wait(0.1)
+            self.progress_watcher.set_progress(self.progress_watcher.count_dones())
+            self.app.processEvents()
+        return result.get()
+
     def run_stitching(self):
-        stitched_rigid = False
         self.processing_params.ui_to_cfg()
-        # self.preprocessor.config.reload()
-        self.make_progress_dialog('Stitching')
         self.print_status_msg('Stitching')
+        n_steps = self.preprocessor.n_rigid_steps_to_run + self.preprocessor.n_wobbly_steps_to_run
+        self.make_nested_progress_dialog('Stitching', n_steps=n_steps, sub_maximum=0, sub_process_name='Getting layout',
+                                         abort_callback=self.preprocessor.stop_process, parent=self)
+        self.progress_watcher.main_max_progress = n_steps
+        self.logger.n_lines = 0
         if not self.processing_params.stitching_rigid.skip:
-            layout = self.preprocessor._stitch_rigid()
-            stitched_rigid = True
-            self.progress_dialog.setValue(30)
+            self.wrap_in_thread(self.preprocessor._stitch_rigid, force=True)
             self.print_status_msg('Stitched rigid')
         if not self.processing_params.stitching_wobbly.skip:
-            if stitched_rigid:
-                self.preprocessor._stitch_wobbly(layout)
+            if self.preprocessor.was_stitched_rigid:
+                self.wrap_in_thread(self.preprocessor._stitch_wobbly, force=self.processing_params.stitching_rigid.skip)
                 self.print_status_msg('Stitched wobbly')
             else:
                 self.popup('Could not run wobbly stitching <br>without rigid stitching first')
-        self.progress_dialog.setValue(self.progress_dialog.maximum())  # TODO: make more progressive
+        self.progress_dialog.done(1)
 
     def plot_stitching_results(self):
         self.processing_params.stitching_general.ui_to_cfg()
@@ -555,32 +596,33 @@ class ClearMapGui(ClearMapGuiBase):
 
     def convert_output(self):
         fmt = self.processing_params.stitching_general.conversion_fmt
-        self.print_status_msg('Convertng stitched image to {}'.format(fmt))
+        self.print_status_msg('Converting stitched image to {}'.format(fmt))
+        self.make_progress_dialog('Converting files')
         self.processing_params.stitching_general.ui_to_cfg()
         self.preprocessor.convert_to_image_format()  # TODO: check if use checkbox state
         self.print_status_msg('Conversion finished')
 
     def setup_atlas(self):  # TODO: call when value changed in atlas settings
-        self.sample_params.ui_to_cfg()  # To make sure we have the slicing up to date
+        self.save_sample_cfg()  # To make sure we have the slicing up to date
         self.processing_params.registration.ui_to_cfg()
         self.preprocessor.setup_atlases()
 
     def run_registration(self):
         self.print_status_msg('Registering')
-        self.make_progress_dialog('Registering')
+        self.make_nested_progress_dialog('Registering', n_steps=4, sub_maximum=0,
+                                         abort_callback=self.preprocessor.stop_process, parent=self)
         self.setup_atlas()
-        self.progress_dialog.setValue(10)
         self.print_status_msg('Resampling for registering')
-        self.preprocessor.resample_for_registration()
-        self.progress_dialog.setValue(30)
-        self.preprocessor.align()  # TODO: update value from within align
-        self.progress_dialog.setValue(self.progress_dialog.maximum())
+        self.wrap_in_thread(self.preprocessor.resample_for_registration, force=True)
+        self.print_status_msg('Aligning')
+        self.wrap_in_thread(self.preprocessor.align)
+        self.progress_dialog.done(1)
         self.print_status_msg('Registered')
 
     def plot_registration_results(self):
         image_sources = [
             self.preprocessor.workspace.filename('resampled', postfix='autofluorescence'),
-            mhd_read(os.path.join(self.preprocessor.workspace.filename('auto_to_reference'), 'result.1.mhd'))
+            mhd_read(self.preprocessor.aligned_autofluo_path)
         ]
         dvs = plot_3d.plot(image_sources, arange=False, sync=False, lut=self.preferences.lut,
                            parent=self.centralWidget())  # FIXME: why parenthesis here only
@@ -597,7 +639,8 @@ class ClearMapGui(ClearMapGuiBase):
         self.setup_plots(dvs, ['x', 'y', 'z'])
 
         # WARNING: needs to be done after setup
-        shape = self.preprocessor.workspace.source('stitched').shape  # TODO: test clearmap_io.shape(self.workspace('stitched'))
+        # OPTIMISE: try clearmap_io.shape(self.preprocessor.workspace('stitched'))
+        shape = self.preprocessor.workspace.source('stitched').shape
         self.cell_map_tab.detectionSubsetXRangeMax.setMaximum(shape[0])
         self.cell_map_tab.detectionSubsetYRangeMax.setMaximum(shape[1])
         self.cell_map_tab.detectionSubsetZRangeMax.setMaximum(shape[2])
@@ -609,36 +652,29 @@ class ClearMapGui(ClearMapGuiBase):
                    slice(self.cell_map_params.crop_y_min, self.cell_map_params.crop_y_max),
                    slice(self.cell_map_params.crop_z_min, self.cell_map_params.crop_z_max))
         self.cell_detector.create_test_dataset(slicing=slicing)
-        # self.cell_map_params.crop_values_to_cfg()
-
-    def get_cell_map_scaling_ratios(self, direction='to_original'):
-        raw_res = np.array(self.sample_params.raw_resolution)
-        atlas_res = np.array(self.processing_params.registration.raw_atlas_resolution)
-        if direction == 'to_original':
-            ratios = raw_res / atlas_res
-        elif direction == 'to_resampled':
-            ratios = atlas_res / raw_res
-        else:
-            raise ValueError('Valid values for direction are to_original and to_resampled, got "{}" instead'
-                             .format(direction))
-        return ratios
 
     def run_tuning_cell_detection(self):
         self.cell_map_params.ui_to_cfg()
-        # self.cell_map_params.crop_values_to_cfg()
-        self.cell_detector.run_cell_detection(tuning=True)
+        self.wrap_in_thread(self.cell_detector.run_cell_detection, tuning=True)
+        if self.cell_detector.stopped:
+            return
         with self.cell_detector.workspace.tmp_debug:
             self.plot_detection_results()
 
-    def detect_cells(self):
+    def detect_cells(self):  # TODO: merge w/ above w/ tuning option
         self.cell_map_params.ui_to_cfg()
-        self.make_progress_dialog('Detecting cells')
-        self.cell_detector.run_cell_detection(tuning=False)
-        # self.progress_dialog.setValue(self.progress_dialog.maximum())  # TODO: see why doesn't work
+        self.print_status_msg('Starting cell detection')
+        self.make_nested_progress_dialog(title='Detecting cells', n_steps=0,
+                                         abort_callback=self.cell_detector.stop_process)
+        self.wrap_in_thread(self.cell_detector.run_cell_detection, tuning=False)
+        if self.cell_detector.stopped:
+            return
         if self.cell_map_params.plot_detected_cells:
             self.cell_detector.plot_cells()  # TODO: integrate into UI
         self.cell_map_tab.nDetectedCellsLabel.setText(
             format_long_nb_to_str(self.cell_detector.get_n_detected_cells()))
+        self.progress_dialog.done(1)
+        self.print_status_msg('Cell detection done')
 
     # def reset_detected(self):
     #     self.cell_detector.detected = False
@@ -704,10 +740,10 @@ def main():
         clearmap_main_win.error_logger.write(formatted_traceback)
 
     clearmap_main_win.show()
-    if not __debug__:
+    if clearmap_main_win.preferences.verbosity != 'debug':  # TODO: check if should be separate variable
         clearmap_main_win.patch_stdout()
         sys.excepthook = except_hook
-    sys.exit(app.exec_())
+    sys.exit(app.exec())
 
 
 if __name__ == "__main__":

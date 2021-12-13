@@ -2,7 +2,9 @@
 This is the part that is common to both pipelines (includes file conversion, stitching and registration)
 """
 import os
+import re
 import sys
+from concurrent.futures.process import BrokenProcessPool
 
 import numpy as np
 
@@ -35,11 +37,78 @@ from ClearMap.IO.metadata import define_auto_stitching_params, define_auto_resol
 from ClearMap.config.config_loader import get_configs
 
 
-class PreProcessor(object):
+class CanceledProcessing(BrokenProcessPool):  # TODO: better inheritance
+    pass
+
+
+class TabProcessor(object):
     def __init__(self):
-        self.resources_directory = None
+        self.stopped = False
+        self.progress_watcher = None
         self.workspace = None
         self.machine_config = {}
+
+    def set_progress_watcher(self, watcher):
+        self.progress_watcher = watcher
+
+    def update_watcher_progress(self, val):
+        if self.progress_watcher is not None:
+            self.progress_watcher.increment(val)
+
+    def update_watcher_main_progress(self, val=1):
+        if self.progress_watcher is not None:
+            self.progress_watcher.increment_main_progress(val)
+
+    def prepare_watcher_for_substep(self, counter_size, match_str, title, increment_main=False):
+        """
+        Prepare the progress watcher for the coming processing step. The watcher will in turn signal changes to the
+        progress bar
+
+        Arguments
+        ---------
+        counter_size: int
+            The progress bar maximum
+        match_str: str or Pattern[str]
+            The string to search for in the log to signal an increment of 1
+        title: str
+            The title of the step for the progress bar
+        increment_main: bool
+            Whether a new step should be added to the main progress bar
+        """
+        if self.progress_watcher is not None:
+            self.progress_watcher.prepare_for_substep(counter_size, match_str, title)
+            if increment_main:
+                self.progress_watcher.increment_main_progress()
+
+    def stop_process(self):  # REFACTOR: put in parent class ??
+        self.stopped = True
+        if hasattr(self.workspace, 'executor') and self.workspace.executor is not None:
+            if sys.version_info[:2] >= (3, 9):
+                self.workspace.executor.shutdown(cancel_futures=True)  # The new clean version
+            else:
+                self.workspace.executor.immediate_shutdown()  # Dirty but we have no choice in python < 3.9
+            self.workspace.executor = None
+            # raise BrokenProcessPool
+        elif hasattr(self.workspace, 'process') and self.workspace.process is not None:
+            self.workspace.process.terminate()
+            # self.workspace.process.wait()
+            raise CanceledProcessing
+
+    @property
+    def verbose(self):
+        return self.machine_config['verbosity'] == 'debug'
+
+    def run(self):
+        raise NotImplementedError
+
+    # def setup(self):
+    #     pass
+
+
+class PreProcessor(TabProcessor):
+    def __init__(self):
+        super().__init__()
+        self.resources_directory = None
         self.sample_config = {}
         self.processing_config = {}
         self.align_channels_affine_file = ''
@@ -48,17 +117,24 @@ class PreProcessor(object):
         self.annotation_file_path = ''
         self.reference_file_path = ''
         self.distance_file_path = ''
-        # if not any('SPYDER' in name for name in os.environ):
+        self.__align_auto_to_ref_re = re.compile(r"\d+\s-?\d+\.\d+\s\d+\.\d+\s\d+\.\d+\s\d+\.\d+")
+        self.__align_resampled_to_auto_re = re.compile(r"\d+\s-\d+\.\d+\s\d+\.\d+\s\d+\.\d+\s\d+\.\d+\s\d+\.\d+")
+        self.__resample_re = re.compile(r".*?Resampling:\sresampling\saxes\s.+\s?,\sslice\s.+\s/\s\d+")
+        self.__wobbly_stitching_place_re = 'done constructing constraints for component'  # TODO: use Regexp ?
+        self.__wobbly_stitching_algin_lyt_re = re.compile(r"Alignment:\sWobbly alignment \(\d+, \d+\)->\(\d+, \d+\) "
+                                                          r"along axis [0-3] done: elapsed time: \d+:\d{2}:\d{2}.\d+")
+        self.__wobbly_stitching_stitch_re = re.compile(r'Stitching: stitching wobbly slice \d+/\d+')
+        self.__rigid_stitching_align_re = 'done'  # TODO: use Regexp
+        # if not runs_on_spyder():
         #     pyqtgraph.mkQApp()
-        # self.setup(cfg_paths)
-        # self.setup_atlases()
 
-    def setup(self, cfgs):
+    def setup(self, cfgs, watcher=None):
         """
 
         Parameters
         ----------
-        cfgs tuple of (machine_cfg_path, sample_cfg_path, processing_fg_path) or (machine_cfg, sample_cfg, processing_cfg)
+        cfgs tuple of (machine_cfg_path, sample_cfg_path, processing_fg_path) or
+            (machine_cfg, sample_cfg, processing_cfg)
 
         Returns
         -------
@@ -71,28 +147,42 @@ class PreProcessor(object):
             self.machine_config, self.sample_config, self.processing_config = cfgs
         src_directory = os.path.expanduser(self.sample_config['base_directory'])
 
+        if watcher is not None:
+            self.progress_watcher = watcher
+
         self.workspace = workspace.Workspace(self.processing_config['pipeline_name'], directory=src_directory)
         self.workspace.tmp_debug = TmpDebug(self.workspace)
         src_paths = {k: v for k, v in self.sample_config['src_paths'].items() if v is not None}
         self.workspace.update(**src_paths)
         self.workspace.info()
-        self.file_conversion()  # FIXME: add progress
+        self.__file_conversion()
 
     @property
-    def verbose(self):
-        return self.machine_config['verbosity'] == 'debug'
+    def aligned_autofluo_path(self):
+        return os.path.join(self.workspace.filename('auto_to_reference'), 'result.1.mhd')
 
-    def file_conversion(self):
+    def __file_conversion(self):  # TODO: handle progress
+        if self.stopped:
+            return
         is_numpy = self.workspace.filename('raw').endswith('.npy')
         if is_numpy:
             file_list = self.workspace.source('raw').file_list  # TODO: check if direct file_list would work
             if not file_list:
-                clearmap_io.convert_files(self.workspace.file_list('raw', extension='tif'), extension='npy',
-                                          processes=self.machine_config['n_processes_file_conv'], verbose=self.verbose)
-                if self.sample_config['src_paths']['arteries']:
-                    clearmap_io.convert_files(self.workspace.file_list('arteries', extension='tif'), extension='npy',
+                try:
+                    clearmap_io.convert_files(self.workspace.file_list('raw', extension='tif'), extension='npy',
                                               processes=self.machine_config['n_processes_file_conv'],
                                               verbose=self.verbose)
+                except BrokenProcessPool:
+                    print('File conversion canceled')
+                    return
+                if self.sample_config['src_paths']['arteries']:
+                    try:
+                        clearmap_io.convert_files(self.workspace.file_list('arteries', extension='tif'), extension='npy',
+                                                  processes=self.machine_config['n_processes_file_conv'],
+                                                  verbose=self.verbose)
+                    except BrokenProcessPool:
+                        print('File conversion canceled')
+                        return
 
     def set_configs(self, cfg_paths):
         cfg_paths = [os.path.expanduser(p) for p in cfg_paths]
@@ -107,6 +197,7 @@ class PreProcessor(object):
             slicing=xyz_slicing,
             orientation=self.sample_config['orientation'],
             overwrite=False, verbose=True)
+        self.update_watcher_main_progress()
         self.annotation_file_path, self.reference_file_path, self.distance_file_path = results
         atlas_cfg = self.processing_config['registration']['atlas']
         align_dir = os.path.join(self.resources_directory, atlas_cfg['align_files_folder'])
@@ -115,148 +206,259 @@ class PreProcessor(object):
         self.align_reference_bspline_file = os.path.join(align_dir, atlas_cfg['align_reference_bspline_file'])
 
     def run(self):
-        self.convert_data()  # TODO: make optional
+        self.__convert_data()  # TODO: make optional
         self.stitch()
         self.resample_for_registration()
         self.align()
         return self.workspace, self.get_configs(), self.get_atlas_files()
 
-    def convert_data(self):
+    def __convert_data(self):  # FIXME: check that it does what it says (see __file_conversion above instead)
         """Convert raw data to npy file"""
+        if self.stopped:
+            return
         source = self.workspace.source('raw')
         sink = self.workspace.filename('stitched')
         clearmap_io.delete_file(sink)
+        # FIXME: not cancelable
         clearmap_io.convert(source, sink, processes=self.machine_config['n_processes_file_conv'], verbose=True)
 
     def stitch(self):
+        if self.stopped:
+            return
         stitching_cfg = self.processing_config['stitching']
         if not stitching_cfg['rigid']['skip']:
-            layout = self._stitch_rigid()
+            self._stitch_rigid()
 
         if not stitching_cfg['wobbly']['skip']:
-            self._stitch_wobbly(layout)
+            self._stitch_wobbly()
 
+        if self.stopped:
+            return
         self.plot_stitching_results()
 
         if not stitching_cfg['output_conversion']['skip']:
             self.convert_to_image_format()
 
-    def convert_to_image_format(self):
+    def convert_to_image_format(self):  # FIXME: try except
+        if self.stopped:
+            return
         fmt = self.processing_config['stitching']['output_conversion']['format'].strip('.')
         clearmap_io.convert_files(self.workspace.file_list('stitched', extension='npy'),  # FIXME: implement raw and arteries
-                                  extension=fmt, processes=12, verbose=True)
+                                  extension=fmt, processes=self.machine_config['n_processes_file_conv'],
+                                  workspace=self.workspace, verbose=True)
 
-    def _stitch_rigid(self):
+    @property
+    def was_stitched_rigid(self):
+        return os.path.exists(self.workspace.filename('layout', postfix='aligned_axis'))
+
+    @property
+    def n_rigid_steps_to_run(self):
+        return int(not self.processing_config['stitching']['rigid']['skip'])
+
+    def _stitch_rigid(self, force=False):
+        if force:
+            self.stopped = False
+        if self.stopped:
+            return
         stitching_cfg = self.processing_config['stitching']
         overlaps, projection_thickness = define_auto_stitching_params(self.workspace.source('raw').file_list[0],
                                                                       stitching_cfg)
-        layout = stitching_wobbly.WobblyLayout(expression=self.workspace.filename('raw'), tile_axes=['X', 'Y'],
-                                               overlaps=overlaps)
+        layout = self.get_wobbly_layout(overlaps)
         if stitching_cfg['rigid']['background_pixels'] is None:
             background_params = stitching_cfg['rigid']['background_level']
         else:
             background_params = (stitching_cfg['rigid']['background_level'],
                                  stitching_cfg['rigid']['background_pixels'])
         max_shifts = [stitching_cfg['rigid']['max_shifts_{}'.format(ax)] for ax in ('x', 'y', 'z')]
-        stitching_rigid.align_layout_rigid_mip(layout, depth=projection_thickness, max_shifts=max_shifts,
-                                               ranges=[None, None, None], background=background_params,
-                                               clip=25000, processes='!serial', verbose=True)  # TODO: check processes
-        # stitching_rigid.place_layout(layout, method='optimization', min_quality=-np.inf, lower_to_origin=True,
-        #                              verbose=True)
+        self.prepare_watcher_for_substep(len(layout.alignments), self.__rigid_stitching_align_re, 'Align layout rigid')
+        try:
+            stitching_rigid.align_layout_rigid_mip(layout, depth=projection_thickness, max_shifts=max_shifts,
+                                                   ranges=[None, None, None], background=background_params,
+                                                   clip=25000, processes=self.machine_config['n_processes_stitching'],
+                                                   workspace=self.workspace, verbose=True)
+        except BrokenProcessPool:
+            print('Stitching canceled')
+            return
         layout.place(method='optimization', min_quality=-np.inf, lower_to_origin=True, verbose=True)
-
-        # lyt = TiledLayout(tiling, overlaps=overlaps)
-        # print(lyt.tile_positions)
-        # lyt.center_tile_source()
-        # lyt.source_positions()
-        #
-        # lyt.align_on_tiling(max_shifts=max_shifts[0], verbose=True)  # TODO: chekc why axis 0
-        # lyt.place(method='optimization', lower_to_origin=True, verbose=True)
-        # lyt.plot_alignments()
-
-        # slc = layout.slice_along_axis(50, axis=2)
-        #
-        # slc.align(max_shifts=max_shifts[2][1], verbose=True, processes=None)  # TODO: check max_shifts
-        # slc.place(verbose=True)
-        # slc.plot_alignments()
+        self.update_watcher_main_progress()
 
         # layout.plot_alignments()  # TODO: TEST
         # plt.show()
 
         stitching_rigid.save_layout(self.workspace.filename('layout', postfix='aligned_axis'), layout)
+        self.layout = layout
+
+    def get_wobbly_layout(self, overlaps=None):
+        if overlaps is None:
+            overlaps, projection_thickness = define_auto_stitching_params(self.workspace.source('raw').file_list[0],
+                                                                          self.processing_config['stitching'])
+        layout = stitching_wobbly.WobblyLayout(expression=self.workspace.filename('raw'), tile_axes=['X', 'Y'],
+                                               overlaps=overlaps)
         return layout
 
-    def _stitch_wobbly(self, layout):
+    @property
+    def n_wobbly_steps_to_run(self):
+        return int(not self.processing_config['stitching']['wobbly']['skip']) * 3
+
+    def __align_layout_wobbly(self, layout):
         stitching_cfg = self.processing_config['stitching']
-        # layout = st.load_layout(_workspace.filename('layout', postfix='aligned_axis'))  # TODO: check if can be used to avoid passing arg
         max_shifts = [stitching_cfg['wobbly']['max_shifts_{}'.format(ax)] for ax in ('x', 'y', 'z')]
-        stitching_wobbly.align_layout(layout, axis_range=(None, None, 3), max_shifts=max_shifts, axis_mip=None,
-                                      validate=dict(method='foreground', valid_range=(200, None), size=None),
-                                      # FIXME: replace valid_range
-                                      prepare=dict(method='normalization', clip=None, normalize=True),
-                                      validate_slice=dict(method='foreground', valid_range=(200, 20000), size=1500),
-                                      # FIXME: replace valid_range
-                                      prepare_slice=None,
-                                      find_shifts=dict(method='tracing', cutoff=3 * np.sqrt(2)),
-                                      processes=None, verbose=True)
-        # noinspection Duplicates
-        stitching_rigid.save_layout(self.workspace.filename('layout', postfix='aligned'), layout)
-        # %% Wobbly placement
-        # layout = st.load_layout(_workspace.filename('layout', postfix='aligned'));
-        stitching_wobbly.place_layout(layout, min_quality=-np.inf,
-                                      method='optimization',
-                                      smooth=dict(method='window', window='bartlett', window_length=100, binary=None),
-                                      smooth_optimized=dict(method='window', window='bartlett',
-                                                            window_length=20, binary=10),
-                                      fix_isolated=False, lower_to_origin=True,
-                                      processes=None, verbose=True)
-        stitching_rigid.save_layout(self.workspace.filename('layout', postfix='placed'), layout)
-        # %% Wobbly stitching
+
+        n_pairs = len(layout.alignments)
+        self.prepare_watcher_for_substep(n_pairs, self.__wobbly_stitching_algin_lyt_re, 'Align layout wobbly')
+        try:
+            stitching_wobbly.align_layout(layout, axis_range=(None, None, 3), max_shifts=max_shifts, axis_mip=None,
+                                          validate=dict(method='foreground', valid_range=(200, None), size=None),
+                                          # FIXME: replace valid_range
+                                          prepare=dict(method='normalization', clip=None, normalize=True),
+                                          validate_slice=dict(method='foreground', valid_range=(200, 20000), size=1500),
+                                          # FIXME: replace valid_range
+                                          prepare_slice=None,
+                                          find_shifts=dict(method='tracing', cutoff=3 * np.sqrt(2)),
+                                          processes=self.machine_config['n_processes_stitching'],
+                                          workspace=self.workspace, verbose=True)
+        except BrokenProcessPool:
+            print('Wobbly stitching canceled')
+            return
+        self.update_watcher_main_progress()
+
+    def __place_layout_wobbly(self, layout):
+        self.prepare_watcher_for_substep(len(layout.alignments) / 2,  # WARNING: bad estimation
+                                         self.__wobbly_stitching_place_re, 'Place layout wobbly')
+        try:
+            stitching_wobbly.place_layout(layout, min_quality=-np.inf,
+                                          method='optimization',
+                                          smooth=dict(method='window', window='bartlett', window_length=100,
+                                                      binary=None),
+                                          smooth_optimized=dict(method='window', window='bartlett',
+                                                                window_length=20, binary=10),
+                                          fix_isolated=False, lower_to_origin=True,
+                                          processes=self.machine_config['n_processes_stitching'],
+                                          workspace=self.workspace, verbose=True)
+        except BrokenProcessPool:
+            print('Wobbly stitching canceled')
+            return
+        self.update_watcher_main_progress()
+
+    def __stitch_layout_wobbly(self):
         layout = stitching_rigid.load_layout(self.workspace.filename('layout', postfix='placed'))
-        stitching_wobbly.stitch_layout(layout, sink=self.workspace.filename('stitched'),
-                                       method='interpolation', processes='!serial', verbose=True)
+        n_slices = len(self.workspace.file_list('autofluorescence'))  # TODO: find better proxy
+        self.prepare_watcher_for_substep(n_slices, self.__wobbly_stitching_stitch_re, 'Stitch layout wobbly', True)
+        try:
+            stitching_wobbly.stitch_layout(layout, sink=self.workspace.filename('stitched'), method='interpolation',
+                                           processes=self.machine_config['n_processes_stitching'],
+                                           workspace=self.workspace, verbose=True)
+        except BrokenProcessPool:
+            print('Wobbly stitching canceled')
+            return
+        self.update_watcher_main_progress()
 
-    def resample_for_registration(self):
+    def _stitch_wobbly(self, force=False):
+        if force:
+            self.stopped = False
+        if self.stopped:
+            return
+        layout = stitching_rigid.load_layout(self.workspace.filename('layout', postfix='aligned_axis'))
+        self.__align_layout_wobbly(layout)
+        if self.stopped:
+            return
+        stitching_rigid.save_layout(self.workspace.filename('layout', postfix='aligned'), layout)
+
+        # layout = st.load_layout(_workspace.filename('layout', postfix='aligned'))  # FIXME: check if required
+        self.__place_layout_wobbly(layout)
+        if self.stopped:
+            return
+        stitching_rigid.save_layout(self.workspace.filename('layout', postfix='placed'), layout)
+
+        self.__stitch_layout_wobbly()
+        if self.stopped:
+            return
+
+    def __resample_raw(self):
         resampling_cfg = self.processing_config['registration']['resampling']
-        if not resampling_cfg['skip']:
-            default_resample_parameter = {
-                "processes": resampling_cfg['processes'],
-                # "verbose": False  # FIXME:
-                "verbose": resampling_cfg['verbose']
-            }
+        default_resample_parameter = {
+            "processes": resampling_cfg['processes'],
+            "verbose": resampling_cfg['verbose']
+        }  # WARNING: duplicate (use method ??)
+        clearmap_io.delete_file(self.workspace.filename('resampled'))  # FIXME:
+        src_res = define_auto_resolution(self.workspace.source('raw').file_list[0],
+                                         self.sample_config['resolutions']['raw'])
 
-            # Raw
-            clearmap_io.delete_file(self.workspace.filename('resampled'))
-            src_res = define_auto_resolution(self.workspace.source('raw').file_list[0],
-                                             self.sample_config['resolutions']['raw'])
-
+        n_planes = len(self.workspace.file_list('autofluorescence'))  # TODO: find more elegant solution for counter
+        self.prepare_watcher_for_substep(n_planes, self.__resample_re, 'Resampling raw')
+        try:
             result = resampling.resample(self.workspace.filename('stitched'),
-                                     source_resolution=src_res,
-                                     sink=self.workspace.filename('resampled'),
-                                     sink_resolution=resampling_cfg['raw_sink_resolution'],
-                                     **default_resample_parameter)
-            assert result.array.max() != 0, 'Resampled raw has no data'
-            if resampling_cfg['plot_raw']:  # FIXME: probably need to change params for UI
-                plot_3d.plot(self.workspace.filename('resampled'))
+                                         source_resolution=src_res,
+                                         sink=self.workspace.filename('resampled'),
+                                         sink_resolution=resampling_cfg['raw_sink_resolution'],
+                                         workspace=self.workspace,
+                                         **default_resample_parameter)
+        except BrokenProcessPool:
+            print('Resampling canceled')
+            return
+        assert result.array.max() != 0, 'Resampled raw has no data'
 
-            # Autofluorescence
-            auto_fluo_path = self.workspace.source('autofluorescence').file_list[0]
-            auto_res = define_auto_resolution(auto_fluo_path, self.sample_config['resolutions']['autofluorescence'])
+    def __resample_autofluorescence(self):
+        resampling_cfg = self.processing_config['registration']['resampling']
+        default_resample_parameter = {
+            "processes": resampling_cfg['processes'],
+            "verbose": resampling_cfg['verbose']
+        }  # WARNING: duplicate (use method ??)
+        auto_fluo_path = self.workspace.source('autofluorescence').file_list[0]
+        auto_res = define_auto_resolution(auto_fluo_path, self.sample_config['resolutions']['autofluorescence'])
+        n_planes = len(self.workspace.file_list('autofluorescence'))  # TODO: find more elegant solution for counter
+        self.prepare_watcher_for_substep(n_planes, self.__resample_re, 'Resampling autofluorescence', True)
+        try:
             result = resampling.resample(self.workspace.filename('autofluorescence'),
                                          source_resolution=auto_res,
                                          sink=self.workspace.filename('resampled', postfix='autofluorescence'),
                                          sink_resolution=resampling_cfg['autofluo_sink_resolution'],
+                                         workspace=self.workspace,
                                          **default_resample_parameter)
-            assert result.array.max() != 0, 'Resampled autofluorescence has no data'
-            if resampling_cfg['plot_autofluo']:
+        except BrokenProcessPool:
+            print('Resampling canceled')
+            return
+        assert result.array.max() != 0, 'Resampled autofluorescence has no data'
+
+    def resample_for_registration(self, force=False):
+        if force:
+            self.stopped = False
+        if self.stopped:
+            return
+        resampling_cfg = self.processing_config['registration']['resampling']
+        if not resampling_cfg['skip']:
+            # Raw
+            self.__resample_raw()
+            if self.stopped:
+                return
+            if resampling_cfg['plot_raw']:  # FIXME: probably need to change params for UI
+                plot_3d.plot(self.workspace.filename('resampled'))
+
+            # Autofluorescence
+            self.__resample_autofluorescence()
+            if self.stopped:
+                return
+            self.update_watcher_main_progress()
+            if resampling_cfg['plot_autofluo']:  # FIXME: probably need to change params for UI
                 plot_3d.plot([self.workspace.filename('resampled'),
                               self.workspace.filename('resampled', postfix='autofluorescence')])
 
-    def align(self):
-        self.__align_resampled_to_auto()
-        self.__align_auto_to_ref()
+    def align(self, force=False):
+        if force:
+            self.stopped = False
+        if self.stopped:
+            return
+        try:
+            self.__align_resampled_to_auto()
+            self.update_watcher_main_progress()
+            self.__align_auto_to_ref()
+            self.update_watcher_main_progress()
+        except CanceledProcessing:
+            print('Alignment canceled')
+        self.stopped = False
 
     def __align_resampled_to_auto(self):
+        self.prepare_watcher_for_substep(2000, self.__align_resampled_to_auto_re, 'Align res to auto')
         align_channels_parameter = {
             # moving and reference images
             "moving_image": self.workspace.filename('resampled', postfix='autofluorescence'),
@@ -267,11 +469,13 @@ class PreProcessor(object):
             "bspline_parameter_file": None,
 
             # directory of the alignment result '/home/nicolas.renier/Documents/ClearMap_Resources/Par0000affine.txt'
-            "result_directory": self.workspace.filename('resampled_to_auto')
+            "result_directory": self.workspace.filename('resampled_to_auto'),
+            'workspace': self.workspace
         }
         elastix.align(**align_channels_parameter)
 
     def __align_auto_to_ref(self):
+        self.prepare_watcher_for_substep(17000, self.__align_auto_to_ref_re, 'Align auto to ref')
         align_reference_parameter = {
             # moving and reference images
             "moving_image": self.reference_file_path,
@@ -281,7 +485,8 @@ class PreProcessor(object):
             "affine_parameter_file": self.align_reference_affine_file,
             "bspline_parameter_file": self.align_reference_bspline_file,
             # directory of the alignment result
-            "result_directory": self.workspace.filename('auto_to_reference')
+            "result_directory": self.workspace.filename('auto_to_reference'),
+            'workspace': self.workspace
         }
         for k, v in align_reference_parameter.items():
             if not v:
@@ -322,8 +527,12 @@ class PreProcessor(object):
         return dvs
 
 
-if __name__ == '__main__':
+def main():
     preprocessor = PreProcessor()
     preprocessor.setup(sys.argv[1:3])
     preprocessor.setup_atlases()
     preprocessor.run()
+
+
+if __name__ == '__main__':
+    main()
