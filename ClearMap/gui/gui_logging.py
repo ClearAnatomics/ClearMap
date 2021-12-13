@@ -1,21 +1,26 @@
+from time import time
 from io import UnsupportedOperation
 
 import lxml.html
-from PyQt5.QtWidgets import QApplication
+from PyQt5 import QtCore
+from PyQt5.QtWidgets import QApplication, QWidget
 from matplotlib.colors import cnames
 
 
-class Printer(object):
-    def __init__(self, text_widget, log_path=None, color=None, app=None, open_mode='a'):
-        super().__init__()
-        self.widget = text_widget
+class Printer(QWidget):
+    text_updated = QtCore.pyqtSignal(str)
+
+    def __init__(self, log_path=None, color=None, app=None, open_mode='a', parent=None):
+        super().__init__(parent)
+        # self.widget = text_widget
         self.file = None
         if log_path is not None:
             self.file = open(log_path, open_mode)
         self.color = color
-        self.win = self.widget.window()
+        # self.win = self.widget.window()
         if app is None:
             self.app = QApplication.instance()
+        self.n_lines = 0
 
     def __del__(self):
         if self.file is not None:
@@ -25,14 +30,18 @@ class Printer(object):
         if self.file is not None:
             self.file.close()
         self.file = open(log_path, open_mode)
+        self.n_lines = 0
 
     def write(self, msg):
         if self.file is not None:
-            self.file.write(msg)
-        self.widget.append(self._colourise(msg))
+            self.file.write(msg+'\n')
+            self.file.flush()
+        self.text_updated.emit(self._colourise(msg))
+        # self.widget.append(self._colourise(msg))
 
-    def flush(self):  # To be compatible with ClearMap.ParallelProcessing.ProcessWriting
-        pass
+    def flush(self):
+        if self.file is not None:
+            self.file.flush()
 
     def fileno(self):
         if self.file is not None:
