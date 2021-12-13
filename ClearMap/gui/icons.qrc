@@ -1,2 +1,7 @@
-<!DOCTYPE RCC>
-<RCC version="1.0"/>
+<RCC>
+    <qresource prefix="/icons">
+        <file>icons/logo.png</file>
+        <file>icons/logo_bright.png</file>
+        <file>icons/logo_cyber.png</file>
+    </qresource>
+</RCC>

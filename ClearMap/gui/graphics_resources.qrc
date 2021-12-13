@@ -1,7 +1,5 @@
 <RCC>
-    <qresource prefix="/icons">
-        <file>logo.png</file>
-        <file>logo_bright.png</file>
-        <file>logo_cyber.png</file>
+    <qresource prefix="/graphics_resources">
+        <file>graphics_resources/searching_mouse.png</file>
     </qresource>
 </RCC>
