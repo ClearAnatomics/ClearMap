@@ -206,7 +206,7 @@ class PbarWatcher(QWidget):  # Inspired from https://stackoverflow.com/a/6626606
         self.log_path = None
         self.previous_log_length = 0  # The log length at the end of the previous operation
         self.n_dones = 0
-        self.match_str = 'done'
+        self.pattern = None
 
     def get_progress(self):
         return self.__progress
@@ -251,24 +251,31 @@ class PbarWatcher(QWidget):  # Inspired from https://stackoverflow.com/a/6626606
         self.main_max_changed.emit(self.__main_max_progress)
 
     def __match(self, line):
-        if isinstance(self.match_str, str):
-            return self.match_str in line
-        elif isinstance(self.match_str, re.Pattern):
-            return self.match_str.match(line)
+        if isinstance(self.pattern, tuple):  # TODO: cache
+            return self.pattern[0] in line and self.pattern[1].match(line)  # Most efficient
+        elif isinstance(self.pattern, str):
+            return self.pattern in line
+        elif isinstance(self.pattern, re.Pattern):
+            return self.pattern.match(line)
 
-    def count_dones(self):  # FIXME: buffer for speed and update self.previous_log_length
+    def count_dones(self):
         with open(self.log_path, 'r') as log:
-            log_lines = log.readlines()
-            new_lines = log_lines[self.previous_log_length:]
-            n_dones = len([ln for ln in new_lines if self.__match(ln)])  # OPTIMISE: check fastest solution
-            self.n_dones = n_dones
-            return n_dones
+            log.seek(self.previous_log_length)
+            new_lines = log.readlines()
+        n_dones = len([ln for ln in new_lines if self.__match(ln)])
+        self.n_dones += n_dones
+        self.previous_log_length += self.__get_log_bytes(new_lines)
+        return self.n_dones
 
     def reset_log_length(self):  # To bind
         with open(self.log_path, 'r') as log:
-            self.previous_log_length = len(log.readlines())
+            self.previous_log_length = self.__get_log_bytes(log.readlines())
+            self.n_dones = 0
 
-    def prepare_for_substep(self, step_length, match_str, step_name):
+    def __get_log_bytes(self, log):
+        return sum([len(ln) for ln in log])
+
+    def prepare_for_substep(self, step_length, pattern, step_name):
         """
 
         Parameters
@@ -277,15 +284,15 @@ class PbarWatcher(QWidget):  # Inspired from https://stackoverflow.com/a/6626606
             str
         step_length
             int The number of steps in the operation
-        match_str
-            str or re.Pattern the text to look for in the logs to check for progress
+        pattern
+            str or re.Pattern or (str, re.Pattern) the text to look for in the logs to check for progress
 
         Returns
         -------
 
         """
         self.max_progress = step_length
-        self.match_str = match_str
+        self.pattern = pattern
         self.reset_log_length()
         self.set_progress(0)
         self.progress_name_changed.emit(step_name)

@@ -59,7 +59,7 @@ class TabProcessor(object):
         if self.progress_watcher is not None:
             self.progress_watcher.increment_main_progress(val)
 
-    def prepare_watcher_for_substep(self, counter_size, match_str, title, increment_main=False):
+    def prepare_watcher_for_substep(self, counter_size, pattern, title, increment_main=False):
         """
         Prepare the progress watcher for the coming processing step. The watcher will in turn signal changes to the
         progress bar
@@ -68,7 +68,7 @@ class TabProcessor(object):
         ---------
         counter_size: int
             The progress bar maximum
-        match_str: str or Pattern[str]
+        pattern: str or re.Pattern or (str, re.Pattern)
             The string to search for in the log to signal an increment of 1
         title: str
             The title of the step for the progress bar
@@ -76,7 +76,7 @@ class TabProcessor(object):
             Whether a new step should be added to the main progress bar
         """
         if self.progress_watcher is not None:
-            self.progress_watcher.prepare_for_substep(counter_size, match_str, title)
+            self.progress_watcher.prepare_for_substep(counter_size, pattern, title)
             if increment_main:
                 self.progress_watcher.increment_main_progress()
 
@@ -119,12 +119,18 @@ class PreProcessor(TabProcessor):
         self.distance_file_path = ''
         self.__align_auto_to_ref_re = re.compile(r"\d+\s-?\d+\.\d+\s\d+\.\d+\s\d+\.\d+\s\d+\.\d+")
         self.__align_resampled_to_auto_re = re.compile(r"\d+\s-\d+\.\d+\s\d+\.\d+\s\d+\.\d+\s\d+\.\d+\s\d+\.\d+")
-        self.__resample_re = re.compile(r".*?Resampling:\sresampling\saxes\s.+\s?,\sslice\s.+\s/\s\d+")
-        self.__wobbly_stitching_place_re = 'done constructing constraints for component'  # TODO: use Regexp ?
-        self.__wobbly_stitching_algin_lyt_re = re.compile(r"Alignment:\sWobbly alignment \(\d+, \d+\)->\(\d+, \d+\) "
-                                                          r"along axis [0-3] done: elapsed time: \d+:\d{2}:\d{2}.\d+")
-        self.__wobbly_stitching_stitch_re = re.compile(r'Stitching: stitching wobbly slice \d+/\d+')
-        self.__rigid_stitching_align_re = 'done'  # TODO: use Regexp
+        self.__resample_re = ('Resampling: resampling',
+                              re.compile(r".*?Resampling:\sresampling\saxes\s.+\s?,\sslice\s.+\s/\s\d+"))
+        self.__wobbly_stitching_place_re = 'done constructing constraints for component'
+        self.__wobbly_stitching_algin_lyt_re = ('Alignment: Wobbly alignment',
+                                                re.compile(r"Alignment:\sWobbly alignment \(\d+, \d+\)->\(\d+, \d+\) "
+                                                           r"along axis [0-3] done: elapsed time: \d+:\d{2}:\d{2}.\d+"))
+        self.__wobbly_stitching_stitch_re = ('Stitching: stitching',
+                                             re.compile(r'Stitching: stitching wobbly slice \d+/\d+'))
+        self.__rigid_stitching_align_re = ('done',
+                                           re.compile(r"Alignment: aligning \(\d+, \d+\) with \(\d+, \d+\), alignment"
+                                                      r" pair \d+/\d+ done, shift = \(-?\d+, -?\d+, -?\d+\),"
+                                                      r" quality = -\d+\.\d+e\+\d+!"))
         # if not runs_on_spyder():
         #     pyqtgraph.mkQApp()
 
