@@ -740,7 +740,7 @@ def main():
         clearmap_main_win.error_logger.write(formatted_traceback)
 
     clearmap_main_win.show()
-    if clearmap_main_win.preferences.verbosity != 'debug':  # TODO: check if should be separate variable
+    if clearmap_main_win.preferences.verbosity != 'trace':  # WARNING: will disable progress bars
         clearmap_main_win.patch_stdout()
         sys.excepthook = except_hook
     sys.exit(app.exec())
