@@ -982,6 +982,7 @@ class PreferencesParams(UiParameter):
         cfg = self._config
         cfg['verbosity'] = self.verbosity
         cfg['n_processes_file_conv'] = self.n_processes_file_conv
+        cfg['n_processes_stitching'] = self.n_processes_stitching
         cfg['n_processes_cell_detection'] = self.n_processes_cell_detection
         cfg['detection_chunk_size_min'] = self.chunk_size_min
         cfg['detection_chunk_size_max'] = self.chunk_size_max
@@ -994,6 +995,7 @@ class PreferencesParams(UiParameter):
         cfg = self._config
         self.verbosity = cfg['verbosity']
         self.n_processes_file_conv = cfg['n_processes_file_conv']
+        self.n_processes_stitching = cfg['n_processes_stitching']
         self.n_processes_cell_detection = cfg['n_processes_cell_detection']
         self.chunk_size_min = cfg['detection_chunk_size_min']
         self.chunk_size_max = cfg['detection_chunk_size_max']
@@ -1033,6 +1035,14 @@ class PreferencesParams(UiParameter):
     @n_processes_file_conv.setter
     def n_processes_file_conv(self, n_procs):
         self.tab.nProcessesFileConversionSpinBox.setValue(self.sanitize_nones(n_procs))
+
+    @property
+    def n_processes_stitching(self):
+        return self.sanitize_neg_one(self.tab.nProcessesStitchingSpinBox.value())
+
+    @n_processes_stitching.setter
+    def n_processes_stitching(self, value):
+        self.tab.nProcessesStitchingSpinBox.setValue(self.sanitize_nones(value))
 
     @property
     def n_processes_cell_detection(self):
