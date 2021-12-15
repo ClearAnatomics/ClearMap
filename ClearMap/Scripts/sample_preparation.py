@@ -426,6 +426,13 @@ class PreProcessor(TabProcessor):
             return
         assert result.array.max() != 0, 'Resampled autofluorescence has no data'
 
+    @property
+    def n_registration_steps(self):
+        resampling_cfg = self.processing_config['registration']['resampling']  # WARNING: probably 1 more when arteries included
+        n_steps_atlas_setup = 1
+        n_steps_align = 2  # WARNING: probably 1 more when arteries included
+        return n_steps_atlas_setup + int(not resampling_cfg['skip'])*2 + n_steps_align
+
     def resample_for_registration(self, force=False):
         if force:
             self.stopped = False
