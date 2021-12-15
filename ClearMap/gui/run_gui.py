@@ -233,6 +233,8 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
 
     def make_nested_progress_dialog(self, title='Processing', n_steps=1, sub_maximum=100,
                                     sub_process_name='', abort_callback=None, parent=None):
+        if n_steps:
+            n_steps += 1  # To avoid range shrinking because starting from 1 not 0
         dialog = make_nested_progress_dialog(title=title, overall_maximum=n_steps, sub_maximum=sub_maximum,
                                              sub_process_name=sub_process_name, abort_callback=abort_callback,
                                              parent=parent)
@@ -244,6 +246,8 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         self.progress_watcher.max_changed.connect(self.progress_dialog.subProgressBar.setMaximum)
         self.progress_watcher.main_max_changed.connect(self.progress_dialog.mainProgressBar.setMaximum)
         self.progress_watcher.progress_name_changed.connect(self.progress_dialog.subProgressLabel.setText)
+
+        self.progress_watcher.main_max_progress = n_steps
 
         self.preprocessor.set_progress_watcher(self.progress_watcher)
         if self.cell_detector.preprocessor is not None:  # If initialised
@@ -576,7 +580,6 @@ class ClearMapGui(ClearMapGuiBase):
         n_steps = self.preprocessor.n_rigid_steps_to_run + self.preprocessor.n_wobbly_steps_to_run
         self.make_nested_progress_dialog('Stitching', n_steps=n_steps, sub_maximum=0, sub_process_name='Getting layout',
                                          abort_callback=self.preprocessor.stop_process, parent=self)
-        self.progress_watcher.main_max_progress = n_steps
         self.logger.n_lines = 0
         if not self.processing_params.stitching_rigid.skip:
             self.wrap_in_thread(self.preprocessor._stitch_rigid, force=True)
