@@ -84,7 +84,7 @@ def project(img, axis, invalid_val=np.nan):
     return np.where(mask.any(axis=axis), mask.argmax(axis=axis), invalid_val)
 
 
-def runs_from_pycharm():
+def runs_from_pycharm():  # REFACTOR: should be in same module as runs_on_spyder
     return "PYCHARM_HOSTED" in os.environ
 
 
