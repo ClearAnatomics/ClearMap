@@ -23,6 +23,7 @@ def get_directory_dlg(start_folder, title="Choose the source directory"):
     return src_folder
 
 
+# REFACTOR: make class
 def warning_popup(base_msg, msg):
     dlg = QMessageBox()
     dlg.setIcon(QMessageBox.Warning)
@@ -34,6 +35,7 @@ def warning_popup(base_msg, msg):
     return dlg.exec()
 
 
+# REFACTOR: make class
 def make_progress_dialog(msg, maximum, canceled_callback, parent):
     dlg = QProgressDialog(msg, 'Abort', 0, maximum, parent=parent)
     dlg.setWindowTitle(msg)
@@ -49,6 +51,7 @@ def make_progress_dialog(msg, maximum, canceled_callback, parent):
     return dlg
 
 
+# REFACTOR: make class
 def make_nested_progress_dialog(title='Processing', overall_maximum=100, sub_maximum=100, sub_process_name='',
                                 abort_callback=None, parent=None):
     dlg_class, _ = loadUiType('ClearMap/gui/nested_progress_dialog.ui', patch_parent_class='QDialog')
@@ -57,9 +60,8 @@ def make_nested_progress_dialog(title='Processing', overall_maximum=100, sub_max
     dlg.setupUi()
     dlg.mainLabel.setText(title)
     dlg.progressImageLabel.setPixmap(QPixmap('ClearMap/gui/graphics_resources/searching_mouse.png'))  # TODO: why doesn't work w/ qrc ??
-    dlg.mainProgressBar.setMinimum(1)
+    dlg.mainProgressBar.setRange(1, overall_maximum)
     dlg.mainProgressBar.setValue(1)  # Because we use integer steps
-    dlg.mainProgressBar.setMaximum(overall_maximum)
     dlg.subProgressLabel.setText(sub_process_name)
     dlg.subProgressBar.setMaximum(sub_maximum)
     dlg.subProgressBar.setValue(0)
