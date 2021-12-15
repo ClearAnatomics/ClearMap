@@ -66,10 +66,8 @@ class CellDetector(TabProcessor):
         self.workspace = None
         self.annotation_file = None
         self.distance_file = None
-        self.cell_detection_re = re.compile(r'.*?Processing block \d+/\d+.*?\selapsed time:\s\d+:\d+:\d+\.\d+')
-        # self.cell_detection_re = re.compile(r'Processing block \d+/\d+<\(\d+, \d+, \d+\)/\(\d+, \d+, \d+\)>\s'
-        #                                     r'\(\d+, \d+, \d+\)@\(\d+, \d+, \d+\)\[\(:,:,\d+:36\)\]:\s'
-        #                                     r'elapsed time:\s\d+:\d+:\d+\.\d+')
+        self.cell_detection_re = ('Processing block',
+                                  re.compile(r'.*?Processing block \d+/\d+.*?\selapsed time:\s\d+:\d+:\d+\.\d+'))
         self.setup(preprocessor)
 
     def setup(self, preprocessor):
