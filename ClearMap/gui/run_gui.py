@@ -263,7 +263,7 @@ class ClearMapGui(ClearMapGuiBase):
 
         self.mini_brain_scaling, self.mini_brain = self.setup_mini_brain()
 
-        self.setWindowIcon(QtGui.QIcon('icons/logo_cyber.png'))  # REFACTOR: use qrc
+        self.setWindowIcon(QtGui.QIcon('ClearMap/gui/icons/logo_cyber.png'))  # REFACTOR: use qrc
 
         self.setupUi(self)
         self.amendUi()
