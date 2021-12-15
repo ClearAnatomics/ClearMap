@@ -612,8 +612,9 @@ class ClearMapGui(ClearMapGuiBase):
 
     def run_registration(self):
         self.print_status_msg('Registering')
-        self.make_nested_progress_dialog('Registering', n_steps=4, sub_maximum=0,
-                                         abort_callback=self.preprocessor.stop_process, parent=self)
+        self.make_nested_progress_dialog('Registering', n_steps=self.preprocessor.n_registration_steps,
+                                         sub_maximum=0, abort_callback=self.preprocessor.stop_process,
+                                         parent=self)
         self.setup_atlas()
         self.print_status_msg('Resampling for registering')
         self.wrap_in_thread(self.preprocessor.resample_for_registration, force=True)
