@@ -35,7 +35,7 @@ def warning_popup(base_msg, msg):
 
 
 def make_progress_dialog(msg, maximum, canceled_callback, parent):
-    dlg = QProgressDialog(msg, 'Abort', 0, maximum, parent=parent)  # TODO: see if can have a notnativestyle on unity
+    dlg = QProgressDialog(msg, 'Abort', 0, maximum, parent=parent)
     dlg.setWindowTitle(msg)
     dlg.lbl = QLabel(msg, parent=dlg)
     # dlg.lbl.setText(msg)  # TODO: check why this doesn't work with pixmap
@@ -65,5 +65,5 @@ def make_nested_progress_dialog(title='Processing', overall_maximum=100, sub_max
     dlg.subProgressBar.setValue(0)
     if abort_callback is not None:
         dlg.buttonBox.button(QDialogButtonBox.Abort).clicked.connect(abort_callback)
-    dlg.show()  # TODO: add onMaximumReached dlg.close binding
+    dlg.show()
     return dlg

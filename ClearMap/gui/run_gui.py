@@ -279,7 +279,7 @@ class ClearMapGui(ClearMapGuiBase):
 
     def setup_mini_brain(self):
         atlas_path = os.path.join(resources_path, 'Atlas',
-                                  'ABA_25um_annotation.tif')  # WARNING: function of chosen atlas
+                                  'ABA_25um_annotation.tif')  # FIXME: function of chosen atlas
         arr = TIF.Source(atlas_path).array
         mini_brain_scaling = (5, 5, 5)  # TODO: prefs
         return mini_brain_scaling, sk_transform.downscale_local_mean(arr, mini_brain_scaling)
@@ -533,7 +533,7 @@ class ClearMapGui(ClearMapGuiBase):
         img = np_to_qpixmap(proj, mask)
         self.sample_tab.miniBrainLabel.setPixmap(img)
 
-    def __transform_mini_brain(self):  # FIXME: extract
+    def __transform_mini_brain(self):  # REFACTOR: extract
         def scale_range(rng, scale):
             for i in range(len(rng)):
                 if rng[i] is not None:
