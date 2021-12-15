@@ -569,7 +569,7 @@ class ClearMapGui(ClearMapGuiBase):
         pool = ThreadPool(processes=1)
         result = pool.apply_async(func, args, kwargs)
         while not result.ready():
-            result.wait(0.1)
+            result.wait(0.25)
             self.progress_watcher.set_progress(self.progress_watcher.count_dones())
             self.app.processEvents()
         return result.get()
