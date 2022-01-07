@@ -46,7 +46,7 @@ To install the GUI you need to follow these steps:
   .. code-block:: bash
 
     $ conda activate ClearMapUi
-    $ pip install spyder<5
+    $ pip install 'spyder<5'
 
 4. Copy the configuration files to the proper location:
 
