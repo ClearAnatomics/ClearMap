@@ -157,8 +157,12 @@ class OrthoViewer(object):
             rect_itm.rect.setWidth(val)
         else:
             rect_itm.rect.setLeft(val)
+        try:
+            graph = getattr(self.parent, self.parent.graph_names[axis])  # REFACTOR: not the cleanest
+        except KeyError:
+            print('Wrong graphs displayed, skipping')
+            return
         rect_itm._generate_picture()
-        graph = getattr(self.parent, self.parent.graph_names[axis])  # REFACTOR: not the cleanest
         graph.view.update()
 
     def add_cropping_bars(self):
