@@ -697,12 +697,11 @@ class ClearMapGui(ClearMapGuiBase):
         self.setup_plots(dvs)
 
     def preview_cell_filter(self):
+        self.cell_map_params.ui_to_cfg()
         with self.cell_detector.workspace.tmp_debug:
             debug_raw_cells_path = self.cell_detector.workspace.filename('cells', postfix='raw')
             if os.path.exists(debug_raw_cells_path):
-                debug_filtered_cells_path = self.cell_detector.workspace.filename('cells', postfix='filtered')
-                if not os.path.exists(debug_filtered_cells_path):
-                    self.cell_detector.filter_cells()
+                self.cell_detector.filter_cells()
                 self.cell_detector.voxelize('filtered')
             # self.plot_cell_map_results()
             # self.plot_cell_filter_results()  # WARNING:
