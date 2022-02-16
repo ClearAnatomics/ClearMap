@@ -30,6 +30,7 @@ __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
 
+import copy
 import os
 import re
 from concurrent.futures.process import BrokenProcessPool
@@ -103,6 +104,7 @@ class CellDetector(TabProcessor):
         self.post_process_cells()
 
     def post_process_cells(self):
+        self.processing_config.reload()
         if self.processing_config['detection']['plot_cells']:
             self.plot_cells()
         self.filter_cells()
@@ -114,6 +116,7 @@ class CellDetector(TabProcessor):
         self.voxelize()
 
     def voxelize(self, postfix=''):
+        self.processing_config.reload()
         coordinates, source, voxelization_parameter = self.get_voxelization_params(postfix=postfix)
         # %% Unweighted
         coordinates, counts_file_path = self.voxelize_unweighted(coordinates, source, voxelization_parameter)
@@ -241,6 +244,7 @@ class CellDetector(TabProcessor):
         return coords
 
     def filter_cells(self):
+        self.processing_config.reload()
         cell_detection.filter_cells(source=self.workspace.filename('cells', postfix='raw'),
                                     sink=self.workspace.filename('cells', postfix='filtered'),
                                     thresholds={
@@ -249,8 +253,9 @@ class CellDetector(TabProcessor):
                                     })
 
     def run_cell_detection(self, tuning=False):
+        self.processing_config.reload()
         self.workspace.debug = tuning  # TODO: use context manager
-        cell_detection_param = cell_detection.default_cell_detection_parameter.copy()
+        cell_detection_param = copy.deepcopy(cell_detection.default_cell_detection_parameter)  # FIXME: check this is always done
         cell_detection_param['illumination'] = None  # WARNING: illumination or illumination_correction
         cell_detection_param['background_correction']['shape'] = self.processing_config['detection']['background_correction']['diameter']
         cell_detection_param['intensity_detection']['measure'] = ['source']
