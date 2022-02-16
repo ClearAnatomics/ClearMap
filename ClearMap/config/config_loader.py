@@ -47,7 +47,7 @@ class ConfigLoader(object):
         self.preferences_path = ''
         self.cell_map_cfg_path = ''
 
-    def get_cfg_path(self, cfg_name):
+    def get_cfg_path(self, cfg_name, must_exist=True):
         """
 
         Parameters
@@ -62,6 +62,8 @@ class ConfigLoader(object):
             cfg_name += '_params'
         for ext in self.supported_exts:
             cfg_path = clean_path(os.path.join(self.src_dir, '{}{}'.format(cfg_name, ext)))
+            if not must_exist:
+                return cfg_path
             if os.path.exists(cfg_path):
                 return cfg_path
         raise FileNotFoundError('Could not find file {} in {}'.format(cfg_name, self.src_dir))
