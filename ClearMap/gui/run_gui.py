@@ -428,7 +428,7 @@ class ClearMapGui(ClearMapGuiBase):
             self.cell_detector.setup(self.preprocessor)
 
     def __get_cfg_path(self, cfg_name):
-        cfg_path = self.config_loader.get_cfg_path(cfg_name)
+        cfg_path = self.config_loader.get_cfg_path(cfg_name, must_exist=False)
         was_copied = False
         if not self.file_exists(cfg_path):
             default_cfg_file_path = self.config_loader.get_default_path(cfg_name)
