@@ -602,6 +602,7 @@ class ClearMapGui(ClearMapGuiBase):
         self.make_progress_dialog('Converting files')
         self.processing_params.stitching_general.ui_to_cfg()
         self.preprocessor.convert_to_image_format()  # TODO: check if use checkbox state
+        self.progress_dialog.done(1)
         self.print_status_msg('Conversion finished')
 
     def setup_atlas(self):  # TODO: call when value changed in atlas settings
