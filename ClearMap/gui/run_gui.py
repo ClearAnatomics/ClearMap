@@ -651,11 +651,12 @@ class ClearMapGui(ClearMapGuiBase):
 
         self.ortho_viewer.update_ranges()
 
-    def create_cell_detection_tuning_sample(self):  # TODO add messages
+    def create_cell_detection_tuning_sample(self):
         slicing = (slice(self.cell_map_params.crop_x_min, self.cell_map_params.crop_x_max),
                    slice(self.cell_map_params.crop_y_min, self.cell_map_params.crop_y_max),
                    slice(self.cell_map_params.crop_z_min, self.cell_map_params.crop_z_max))
         self.cell_detector.create_test_dataset(slicing=slicing)
+        self.print_status_msg('Tuning sample created')  # TODO: progress bar
 
     def run_tuning_cell_detection(self):
         self.cell_map_params.ui_to_cfg()
