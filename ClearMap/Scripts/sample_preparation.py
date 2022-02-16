@@ -410,7 +410,11 @@ class PreProcessor(TabProcessor):
             "processes": resampling_cfg['processes'],
             "verbose": resampling_cfg['verbose']
         }  # WARNING: duplicate (use method ??)
-        auto_fluo_path = self.workspace.source('autofluorescence').file_list[0]
+        try:
+            auto_fluo_path = self.workspace.source('autofluorescence').file_list[0]
+        except IndexError:
+            print('Could not resample autofluorescence, file not found')
+            return
         auto_res = define_auto_resolution(auto_fluo_path, self.sample_config['resolutions']['autofluorescence'])
         n_planes = len(self.workspace.file_list('autofluorescence'))  # TODO: find more elegant solution for counter
         self.prepare_watcher_for_substep(n_planes, self.__resample_re, 'Resampling autofluorescence', True)
