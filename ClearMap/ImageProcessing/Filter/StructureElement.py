@@ -58,7 +58,7 @@ def structure_element(shape = (3,3), form = 'Disk', ndim = None):
     if isinstance(shape, int) and ndim is not None:
       shape = (shape,) * ndim;
     
-    if isinstance(shape, tuple):
+    if isinstance(shape, (list, tuple)):
       shape = np.array([shape]).flatten();   
       
       if ndim is None:
