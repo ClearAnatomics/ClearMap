@@ -179,7 +179,9 @@ class SampleParameters(UiParameter):  # TODO: implement connect
         self.tab.sampleIdTxt.setText(_id)
 
     def handle_sample_id_changed(self, _id):
-        self.config['sample_id'] = self.sample_id
+        if self.config is not None:
+            self.config['sample_id'] = self.sample_id
+
 
     @property
     def raw_path(self):
