@@ -226,7 +226,6 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
     def make_progress_dialog(self, msg, maximum=100, canceled_callback=None):
         dialog = make_progress_dialog(msg, maximum, canceled_callback, self)
         self.progress_dialog = dialog
-        self.progress_watcher.log_path = self.logger.file.name  # TODO: put in self.setup or like function
         self.progress_watcher.progress_changed.connect(self.progress_dialog.setValue)
         self.preprocessor.set_progress_watcher(self.progress_watcher)
         # self.cell_detector.set_progress_watcher(self.progress_watcher)
@@ -239,7 +238,6 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
                                              sub_process_name=sub_process_name, abort_callback=abort_callback,
                                              parent=parent)
         self.progress_dialog = dialog
-        self.progress_watcher.log_path = self.logger.file.name  # TODO: put in self.setup or like function
         self.progress_watcher.progress_changed.connect(self.progress_dialog.subProgressBar.setValue)
         self.progress_watcher.main_progress_changed.connect(self.progress_dialog.mainProgressBar.setValue)
         self.progress_watcher.main_progress_changed.connect(self.progress_watcher.reset_log_length)
@@ -517,6 +515,7 @@ class ClearMapGui(ClearMapGuiBase):
     @src_folder.setter
     def src_folder(self, src_folder):
         self.logger.set_file(os.path.join(src_folder, 'info.log'))
+        self.progress_watcher.log_path = self.logger.file.name
         self.error_logger.set_file(os.path.join(src_folder, 'errors.log'))
         self.sample_tab.srcFolderTxt.setText(src_folder)
 
