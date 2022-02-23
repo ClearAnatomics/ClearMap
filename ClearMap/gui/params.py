@@ -155,6 +155,9 @@ class SampleParameters(UiParameter):  # TODO: implement connect
                 ctrl = getattr(self.tab, '{}ResolutionTriplet'.format(k))
                 ctrl.enableControls()
                 ctrl.setValue(v)
+        self.slice_x = self._config['slice_x']
+        self.slice_y = self._config['slice_y']
+        self.slice_z = self._config['slice_z']
         self.orientation = self._config['orientation']  # Finish by orientation in case invalid
 
     def fix_sample_cfg_file(self, f_path):
