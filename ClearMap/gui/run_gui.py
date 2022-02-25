@@ -289,8 +289,8 @@ class ClearMapGui(ClearMapGuiBase):
         mini_brain_scaling = (5, 5, 5)  # TODO: prefs
         return mini_brain_scaling, sk_transform.downscale_local_mean(arr, mini_brain_scaling)
 
-    def swap_resolutions_group_box(self):
-        self.sample_tab.resolutionsGroupBox.setVisible(self.sample_tab.advancedCheckBox.isChecked())
+    def swap_sample_tab_advanced(self):  # TODO: implement
+        checked = self.sample_tab.advancedCheckBox.isChecked()
 
     def swap_preprocessing_tab_advanced(self):
         checked = self.preprocessing_tab.advancedCheckBox.isChecked()
@@ -336,7 +336,7 @@ class ClearMapGui(ClearMapGuiBase):
         self.sample_tab.applyBox.connectApply(self.setup_preprocessor)
         self.sample_tab.applyBox.connectSave(self.save_sample_cfg)
 
-        self.sample_tab.advancedCheckBox.stateChanged.connect(self.swap_resolutions_group_box)
+        self.sample_tab.advancedCheckBox.stateChanged.connect(self.swap_sample_tab_advanced)
 
     def setup_preprocessing_tab(self):
         cls, _ = loadUiType('ClearMap/gui/preprocessing_tab.ui', patch_parent_class='QTabWidget')
