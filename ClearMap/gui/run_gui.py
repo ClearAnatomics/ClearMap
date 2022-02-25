@@ -692,8 +692,8 @@ class ClearMapGui(ClearMapGuiBase):
             link_dataviewers_cursors(dvs)
         self.setup_plots(dvs)
 
-    def plot_cell_filter_results(self):  # TODO: FIX, does not integrate as widget
-        dvs = self.cell_detector.plot_filtered_cells()
+    def plot_cell_filter_results(self):
+        dvs = self.cell_detector.plot_filtered_cells(smarties=True)
         self.setup_plots(dvs)
 
     def preview_cell_filter(self):
@@ -703,10 +703,7 @@ class ClearMapGui(ClearMapGuiBase):
             if os.path.exists(debug_raw_cells_path):
                 self.cell_detector.filter_cells()
                 self.cell_detector.voxelize('filtered')
-            # self.plot_cell_map_results()
-            # self.plot_cell_filter_results()  # WARNING:
-            dvs = self.cell_detector.plot_voxelized_counts(arange=False, parent=self.centralWidget())
-            self.setup_plots(dvs)
+            self.plot_cell_filter_results()
 
     def run_cell_map(self):
         self.cell_map_params.ui_to_cfg()

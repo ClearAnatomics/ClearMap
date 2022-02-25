@@ -38,6 +38,7 @@ from concurrent.futures.process import BrokenProcessPool
 import numpy as np
 from numpy.lib import recfunctions
 from matplotlib import pyplot as plt
+import pyqtgraph as pg
 
 # noinspection PyPep8Naming
 import ClearMap.Alignment.Elastix as elastix
@@ -45,6 +46,7 @@ import ClearMap.Alignment.Elastix as elastix
 import ClearMap.IO.IO as clearmap_io
 # noinspection PyPep8Naming
 import ClearMap.Visualization.Plot3d as plot_3d
+import ClearMap.Visualization.Qt.Plot3d as qplot_3d
 # noinspection PyPep8Naming
 import ClearMap.Alignment.Resampling as resampling
 # noinspection PyPep8Naming
@@ -55,6 +57,7 @@ import ClearMap.Analysis.Measurements.Voxelization as voxelization
 import ClearMap.Alignment.Annotation as annotation
 from ClearMap.Scripts.sample_preparation import PreProcessor, TabProcessor
 from ClearMap.config.config_loader import get_configobj_cfg
+from ClearMap.gui.widgets import Scatter3D
 
 
 class CellDetector(TabProcessor):
@@ -339,10 +342,17 @@ class CellDetector(TabProcessor):
             plt.title(name)
         plt.tight_layout()
 
-    def plot_filtered_cells(self):
+    def plot_filtered_cells(self, parent=None, smarties=False):
         coordinates = self.get_coords('filtered')
-        p = plot_3d.list_plot_3d(coordinates, color=(1, 0, 0, 0.5), size=10)
-        return plot_3d.plot_3d(self.workspace.filename('stitched'), view=p, cmap=plot_3d.grays_alpha(alpha=1))
+        stitched_path = self.workspace.filename('stitched')
+        dvs = qplot_3d.plot(stitched_path, arange=False, lut='white', parent=parent)
+        self.filtered_cells = Scatter3D(coordinates, smarties=smarties)
+        scatter = pg.ScatterPlotItem()
+        dvs[0].view.addItem(scatter)
+        dvs[0].scatter_coords = self.filtered_cells
+        dvs[0].scatter = scatter
+        dvs[0].updateSlice()
+        return dvs
 
     def plot_background_substracted_img(self):
         coordinates = np.hstack([self.workspace.source('cells', postfix='raw')[c][:, None] for c in 'xyz'])
