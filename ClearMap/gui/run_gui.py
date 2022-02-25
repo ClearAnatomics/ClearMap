@@ -663,7 +663,9 @@ class ClearMapGui(ClearMapGuiBase):
 
     def run_tuning_cell_detection(self):
         self.cell_map_params.ui_to_cfg()
+        self.make_progress_dialog('Cell detection preview')
         self.wrap_in_thread(self.cell_detector.run_cell_detection, tuning=True)
+        self.progress_dialog.done(1)
         if self.cell_detector.stopped:
             return
         with self.cell_detector.workspace.tmp_debug:
