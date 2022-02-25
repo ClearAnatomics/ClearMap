@@ -18,6 +18,9 @@ from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QSpinBox, QD
 
 import qdarkstyle
 
+import pyqtgraph as pg
+pg.setConfigOption('background', '#1A1D1E')
+
 from ClearMap.IO import TIF
 from ClearMap.IO.MHD import mhd_read
 from ClearMap.Settings import resources_path
