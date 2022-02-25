@@ -631,8 +631,8 @@ class ClearMapGui(ClearMapGuiBase):
             self.preprocessor.workspace.filename('resampled', postfix='autofluorescence'),
             mhd_read(self.preprocessor.aligned_autofluo_path)
         ]
-        dvs = plot_3d.plot(image_sources, arange=False, sync=False, lut=self.preferences.lut,
-                           parent=self.centralWidget())  # FIXME: why parenthesis here only
+        dvs = plot_3d.plot(image_sources, arange=False, sync=True, lut=self.preferences.lut,
+                           parent=self.centralWidget())  # FIXME: why parenthesis to centralWidget requierd here only
         link_dataviewers_cursors(dvs)
         self.setup_plots(dvs, ['autofluo', 'aligned'])
 
