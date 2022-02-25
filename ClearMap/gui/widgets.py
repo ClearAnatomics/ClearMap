@@ -300,3 +300,42 @@ class PbarWatcher(QWidget):  # Inspired from https://stackoverflow.com/a/6626606
         self.reset_log_length()
         self.set_progress(0)
         self.progress_name_changed.emit(step_name)
+
+
+class Scatter3D:
+    def __init__(self, coordinates, smarties=False):
+        self.coordinates = coordinates
+        if smarties:
+            self.colours = np.random.randint(255, size=self.coordinates.shape)
+        else:
+            self.colours = None
+
+    def get_all_data(self, main_z, half_z_size=3):
+        pos = np.empty((0, 2))
+        colours = np.empty((0, 3))
+        sizes = np.empty(0)
+        for i in range(main_z - half_z_size, main_z + half_z_size):
+            if i < 0:
+                continue
+            else:
+                z = i
+            pos = np.vstack((pos, self.get_pos(z)))
+            if self.colours is not None:
+                colours = np.vstack((colours, self.get_colours(z)))
+            sizes = np.hstack((sizes, self.get_symbol_sizes(main_z, z)))
+        data = {'pos': pos,
+                'size': sizes}
+        if self.colours is not None:
+            data['pen'] = [pg.mkPen(c) for c in colours]
+        return data
+
+    def get_symbol_sizes(self, main_z, z, half_size=3):
+        marker_size = round(10 * ((half_size - abs(main_z - z)) / half_size))
+        n_markers = len(self.get_pos(z))
+        return np.full(n_markers, marker_size)
+
+    def get_colours(self, z):
+        return self.colours[self.coordinates[:, 2] == z]
+
+    def get_pos(self, z):
+        return self.coordinates[self.coordinates[:, 2] == z][:, :2]
