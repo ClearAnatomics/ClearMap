@@ -24,6 +24,10 @@ def runs_on_spyder():
     return any('SPYDER' in name for name in os.environ)
 
 
+def runs_from_pycharm():
+    return "PYCHARM_HOSTED" in os.environ
+
+
 class CancelableProcessPoolExecutor(ProcessPoolExecutor):
     def immediate_shutdown(self):
         with self._shutdown_lock:

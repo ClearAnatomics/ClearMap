@@ -84,10 +84,6 @@ def project(img, axis, invalid_val=np.nan):
     return np.where(mask.any(axis=axis), mask.argmax(axis=axis), invalid_val)
 
 
-def runs_from_pycharm():  # REFACTOR: should be in same module as runs_on_spyder
-    return "PYCHARM_HOSTED" in os.environ
-
-
 def surface_project(img):
     proj = project(img, 2, invalid_val=0.0)  # FIXME: check axis=0
     proj -= np.min(proj[np.nonzero(proj)])

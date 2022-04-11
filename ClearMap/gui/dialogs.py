@@ -1,4 +1,3 @@
-import os
 import sys
 
 from PyQt5 import QtCore
@@ -6,7 +5,7 @@ from PyQt5.QtGui import QPixmap
 from PyQt5.QtWidgets import QFileDialog, QMessageBox, QProgressDialog, QLabel, QDialogButtonBox
 
 from ClearMap.config.config_loader import clean_path
-from ClearMap.gui.gui_utils import runs_from_pycharm
+from ClearMap.Utils.utilities import runs_from_pycharm
 from ClearMap.gui.pyuic_utils import loadUiType
 
 
