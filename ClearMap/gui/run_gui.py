@@ -299,7 +299,7 @@ class ClearMapGui(ClearMapGuiBase):
     def amendUi(self):
         self.logger = Printer()
         self.logger.text_updated.connect(self.textBrowser.append)
-        self.error_logger = Printer(color='red')
+        self.error_logger = Printer(color='red', logger_type='error')
         self.error_logger.text_updated.connect(self.textBrowser.append)
 
         self.setupIcons()
@@ -519,7 +519,7 @@ class ClearMapGui(ClearMapGuiBase):
     def src_folder(self, src_folder):
         self.logger.set_file(os.path.join(src_folder, 'info.log'))
         self.progress_watcher.log_path = self.logger.file.name
-        self.error_logger.set_file(os.path.join(src_folder, 'errors.log'))
+        self.error_logger.set_file(os.path.join(src_folder, 'errors.html'))
         self.sample_tab.srcFolderTxt.setText(src_folder)
 
     def get_graphs(self):
