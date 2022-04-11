@@ -60,7 +60,9 @@ class RedCross(pg.GraphicsObject):
 
     def _generate_picture(self):
         painter = QtGui.QPainter(self.picture)
-        painter.setPen(pg.mkPen(self.color))
+        pen = pg.mkPen(self.color)
+        pen.setWidth(4)
+        painter.setPen(pen)
         painter.setBrush(pg.mkBrush(self.color))
         painter.drawLine(self._rect.topLeft(), self._rect.bottomRight())
         painter.drawLine(self._rect.bottomLeft(), self._rect.topRight())
