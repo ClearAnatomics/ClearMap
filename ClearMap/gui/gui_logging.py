@@ -1,3 +1,4 @@
+from datetime import datetime
 from time import time
 from io import UnsupportedOperation
 
@@ -10,13 +11,14 @@ from matplotlib.colors import cnames
 class Printer(QWidget):
     text_updated = QtCore.pyqtSignal(str)
 
-    def __init__(self, log_path=None, color=None, app=None, open_mode='a', parent=None):
+    def __init__(self, log_path=None, color=None, logger_type='info', app=None, open_mode='a', parent=None):
         super().__init__(parent)
         # self.widget = text_widget
         self.file = None
         if log_path is not None:
             self.file = open(log_path, open_mode)
         self.color = color
+        self.type = logger_type
         # self.win = self.widget.window()
         if app is None:
             self.app = QApplication.instance()
@@ -34,6 +36,8 @@ class Printer(QWidget):
 
     def write(self, msg):
         if self.file is not None:
+            if self.type == 'error':
+                self.file.write(datetime.now().isoformat())
             self.file.write(msg+'\n')
             self.file.flush()
         self.text_updated.emit(self._colourise(msg))
