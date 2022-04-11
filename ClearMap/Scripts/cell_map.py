@@ -126,9 +126,9 @@ class CellDetector(TabProcessor):
         if self.processing_config['voxelization']['preview']['counts']:
             self.plot_voxelized_counts()
         # %% Weighted
-        intensities_file_path = self.voxelize_weighted(coordinates, source, voxelization_parameter)
-        if self.processing_config['voxelization']['preview']['densities']:
-            self.plot_voxelized_intensities()
+        # intensities_file_path = self.voxelize_weighted(coordinates, source, voxelization_parameter)  # WARNING: Currently causing issies
+        # if self.processing_config['voxelization']['preview']['densities']:
+        #     self.plot_voxelized_intensities()
 
     def plot_voxelized_counts(self, arange=True, parent=None):
         return plot_3d.plot(self.workspace.filename('density', postfix='counts'), arange=arange, parent=parent)
@@ -186,7 +186,7 @@ class CellDetector(TabProcessor):
         counts_file_path = self.workspace.filename('density', postfix='counts')  # TODO: improve var name
         clearmap_io.delete_file(counts_file_path)
         voxelization.voxelize(coordinates, sink=counts_file_path, **voxelization_parameter)
-        self.remove_crust(coordinates, voxelization_parameter)
+        # self.remove_crust(coordinates, voxelization_parameter)  # WARNING: currently causing issues
         return coordinates, counts_file_path
 
     def voxelize_weighted(self, coordinates, source, voxelization_parameter):
