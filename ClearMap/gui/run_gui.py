@@ -1,48 +1,64 @@
 import os
 import sys
-from multiprocessing.pool import ThreadPool
 
+from multiprocessing.pool import ThreadPool
 from shutil import copyfile
 import traceback
 import types
 
 import numpy as np
-import pygments
-from pygments.formatters.html import HtmlFormatter
-from pygments.lexers.python import PythonTracebackLexer
-from skimage import transform as sk_transform
 
 from PyQt5 import QtGui
-from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QSpinBox, QDoubleSpinBox, QFrame, QDialogButtonBox,\
-    QComboBox, QLineEdit, QStyle, QWidget, QMessageBox, QToolBox
+from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QSpinBox, QDoubleSpinBox, QFrame, \
+    QDialogButtonBox, QComboBox, QLineEdit, QStyle, QWidget, QMessageBox, QToolBox
+
+# ########################################### SPLASH SCREEN ###########################################################
+from ClearMap.gui.dialogs import make_splash, update_pbar
+
+# To show splash before slow imports
+app = QApplication([])
+
+splash, progress_bar = make_splash()
+splash.show()
+update_pbar(app, progress_bar, 10)
+
+# ############################################  SLOW IMPORTS #########################################################
+
+import pygments
+from pygments.lexers.python import PythonTracebackLexer  # noqa
+from pygments.formatters.html import HtmlFormatter
 
 import qdarkstyle
 
 import pyqtgraph as pg
 pg.setConfigOption('background', '#1A1D1E')
 
+from skimage import transform as sk_transform  # Slowish
+
 from ClearMap.IO import TIF
 from ClearMap.IO.MHD import mhd_read
 from ClearMap.Settings import resources_path
-
-from ClearMap.Scripts.cell_map import CellDetector
-from ClearMap.Scripts.sample_preparation import PreProcessor
-from ClearMap.Visualization import Plot3d as plot_3d
-
-from ClearMap.config.config_loader import ConfigLoader
-
-
-from ClearMap.gui.gui_utils import QDARKSTYLE_BACKGROUND, DARK_BACKGROUND, np_to_qpixmap, \
-    html_to_ansi, html_to_plain_text, compute_grid, surface_project,  format_long_nb_to_str, link_dataviewers_cursors
 from ClearMap.gui.gui_logging import Printer
-from ClearMap.gui.dialogs import get_directory_dlg, warning_popup, make_progress_dialog, make_nested_progress_dialog
+from ClearMap.config.config_loader import ConfigLoader
 from ClearMap.gui.params import SampleParameters, ConfigNotFoundError, CellMapParams, \
     PreferencesParams, PreprocessingParams, ParamsOrientationError
-from ClearMap.gui.pyuic_utils import loadUiType
 from ClearMap.gui.widget_monkeypatch_callbacks import get_value, set_value, controls_enabled, get_check_box, \
     enable_controls, disable_controls, set_text, get_text, connect_apply, connect_close, connect_save, connect_open, \
     connect_ok, connect_cancel, connect_value_changed, connect_text_changed
-from ClearMap.gui.widgets import OrthoViewer, PbarWatcher
+from ClearMap.gui.pyuic_utils import loadUiType
+from ClearMap.gui.dialogs import get_directory_dlg, warning_popup, make_progress_dialog, make_nested_progress_dialog
+
+from ClearMap.gui.gui_utils import QDARKSTYLE_BACKGROUND, DARK_BACKGROUND, np_to_qpixmap, \
+    html_to_ansi, html_to_plain_text, compute_grid, surface_project, format_long_nb_to_str, \
+    link_dataviewers_cursors  # needs plot_3d
+
+from ClearMap.gui.widgets import OrthoViewer, PbarWatcher  # needs plot_3d
+from ClearMap.Visualization import Plot3d as plot_3d
+update_pbar(app, progress_bar, 20)
+from ClearMap.Scripts.sample_preparation import PreProcessor
+update_pbar(app, progress_bar, 50)
+from ClearMap.Scripts.cell_map import CellDetector
+update_pbar(app, progress_bar, 80)
 
 # TODO
 """
@@ -264,7 +280,11 @@ class ClearMapGui(ClearMapGuiBase):
         self.machine_cfg_path = None
         self.sample_cfg_path = None
         self.processing_cfg_path = None
+        self.sample_params = None
+        self.processing_params = None
         self.cell_map_params = None
+
+        self.cell_detector = None
 
         self.mini_brain_scaling, self.mini_brain = self.setup_mini_brain()
 
@@ -728,14 +748,20 @@ class ClearMapGui(ClearMapGuiBase):
         self.setup_plots(dvs)
 
 
-def main():
-    app = QApplication([])
-    # app.setAttribute(QtCore.Qt.AA_DontCreateNativeWidgetSiblings)
+
+def create_main_window(app):
     preprocessor = PreProcessor()
     clearmap_main_win = ClearMapGui(preprocessor)
     if clearmap_main_win.preferences.start_full_screen:
         clearmap_main_win.showMaximized()  # TODO: check if redundant with show
     app.setStyleSheet(qdarkstyle.load_stylesheet())
+    return clearmap_main_win
+
+
+def main(app, splash):
+    # app.setAttribute(QtCore.Qt.AA_DontCreateNativeWidgetSiblings)
+
+    clearmap_main_win = create_main_window(app)
 
     def except_hook(exc_type, exc_value, exc_tb):
         lexer = PythonTracebackLexer()
@@ -746,6 +772,7 @@ def main():
         clearmap_main_win.error_logger.write(formatted_traceback)
 
     clearmap_main_win.show()
+    splash.finish(clearmap_main_win)
     if clearmap_main_win.preferences.verbosity != 'trace':  # WARNING: will disable progress bars
         clearmap_main_win.patch_stdout()
         sys.excepthook = except_hook
@@ -753,4 +780,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    main(app, splash)

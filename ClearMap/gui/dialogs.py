@@ -1,8 +1,10 @@
 import sys
 
 from PyQt5 import QtCore
+from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPixmap
-from PyQt5.QtWidgets import QFileDialog, QMessageBox, QProgressDialog, QLabel, QDialogButtonBox
+from PyQt5.QtWidgets import QFileDialog, QMessageBox, QProgressDialog, QLabel, QDialogButtonBox, QSplashScreen, \
+    QProgressBar
 
 from ClearMap.config.config_loader import clean_path
 from ClearMap.Utils.utilities import runs_from_pycharm
@@ -68,3 +70,18 @@ def make_nested_progress_dialog(title='Processing', overall_maximum=100, sub_max
         dlg.buttonBox.button(QDialogButtonBox.Abort).clicked.connect(abort_callback)
     dlg.show()
     return dlg
+
+
+def make_splash():
+    splash_pix = QPixmap('ClearMap/gui/graphics_resources/splash.png')
+    splash = QSplashScreen(splash_pix, Qt.WindowStaysOnTopHint)
+    splash.setMask(splash_pix.mask())
+    progress_bar = QProgressBar(splash)
+    progress_bar.setMaximum(100)
+    progress_bar.setGeometry(50, splash_pix.height() - 50, splash_pix.width() - 100, 20)
+    return splash, progress_bar
+
+
+def update_pbar(app, pbar, value):
+    pbar.setValue(value)
+    app.processEvents()
