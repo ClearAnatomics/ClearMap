@@ -487,8 +487,12 @@ class DataViewer(pg.QtGui.QWidget):
           self.scatter.setData(pos=self.scatter_coords.get_pos(index),
                                pen='red', brush='red',
                                symbol='+', size=10)
-        self.scatter.addPoints(symbol='o', brush=pg.mkBrush((0, 0, 0, 0)),
-                               **self.scatter_coords.get_all_data(index))
+        # FIXME: check why some markers trigger errors
+        try:
+          self.scatter.addPoints(symbol='o', brush=pg.mkBrush((0, 0, 0, 0)),
+                                 **self.scatter_coords.get_all_data(index))
+        except KeyError as err:
+          print(err)
 
   
   def setSliceAxis(self, axis):
