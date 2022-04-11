@@ -1,5 +1,7 @@
 # Temporary Files
 *~
+*.autosave
+*.swp
 
 # IDE files
 .idea
