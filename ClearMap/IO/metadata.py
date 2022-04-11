@@ -102,6 +102,12 @@ def define_auto_stitching_params(img_path, stitching_cfg):
 
 
 def define_auto_resolution(img_path, cfg_res):
+    if cfg_res == 'auto':
+        cfg_res = ('auto', )*3
+    out_res = deepcopy(cfg_res)
+    if not cfg_res.count('auto'):
+        return out_res
+
     parsed_res = None
     try:
         parsed_res = parse_img_res(img_path)
@@ -111,14 +117,11 @@ def define_auto_resolution(img_path, cfg_res):
     except KeyError as e:
         print("Could not find resolution for image {}, defaulting to config".format(img_path))
 
-    if cfg_res == 'auto':
-        cfg_res = ('auto', )*3
     if parsed_res is None and cfg_res.count('auto'):
         raise MetadataError("Could not determine auto config for file {}".format(img_path))
 
-    out_res = deepcopy(cfg_res)
-    for i, ax in enumerate(cfg_res):
-        if ax == 'auto':
+    for i, ax_res in enumerate(cfg_res):
+        if ax_res == 'auto':
             out_res[i] = parsed_res[i]
 
     return out_res
