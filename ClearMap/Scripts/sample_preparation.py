@@ -357,6 +357,19 @@ class PreProcessor(TabProcessor):
         except BrokenProcessPool:
             print('Wobbly stitching canceled')
             return
+
+        if self.processing_config['stitching']['run']['arteries']:
+            self.prepare_watcher_for_substep(n_slices, self.__wobbly_stitching_stitch_re,
+                                             'Stitch layout wobbly arteries', True)
+            try:
+                layout.replace_source_location(self.workspace.filename('raw'), self.workspace.filename('arteries'))
+                stitching_wobbly.stitch_layout(layout, sink=self.workspace.filename('stitched', postfix='arteries'),
+                                               method='interpolation',
+                                               processes=self.machine_config['n_processes_stitching'],
+                                               workspace=self.workspace, verbose=True)
+            except BrokenProcessPool:
+                print('Wobbly stitching arteries canceled')
+                return
         self.update_watcher_main_progress()
 
     def _stitch_wobbly(self, force=False):
