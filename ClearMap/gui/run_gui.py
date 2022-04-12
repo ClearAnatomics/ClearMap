@@ -266,8 +266,8 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
 
         self.progress_watcher.main_max_progress = n_steps
 
-        self.preprocessor.set_progress_watcher(self.progress_watcher)
-        if self.cell_detector.preprocessor is not None:  # If initialised
+        self.preprocessor.set_progress_watcher(self.progress_watcher)  # FIXME: specific of subclass
+        if self.cell_detector is not None and self.cell_detector.preprocessor is not None:  # If initialised
             self.cell_detector.set_progress_watcher(self.progress_watcher)
 
 
