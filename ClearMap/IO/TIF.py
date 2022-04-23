@@ -444,7 +444,6 @@ def array_to_tif(array):
 def _test():
   import ClearMap.Tests.Files as tfs
   import ClearMap.IO.TIF as tif
-  reload(tif)
   
   filename = tfs.filename('tif_2d');
   t = tif.Source(location = filename);
@@ -464,7 +463,4 @@ def _test():
   print(q)
   
   
-  #filename = '/home/ckirst/Science/Projects/WholeBrainClearing/Vasculature/Experiment/17-19-19_IgG_UltraII[02 x 06]_C00_UltraII Filter0000.ome.tif';
-  #t = tif.Source(location = filename);
-  #print(t)  
   

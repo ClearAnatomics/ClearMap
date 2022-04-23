@@ -17,7 +17,8 @@ __download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 import pyqtgraph as pg
 import functools as ft
 
-import ClearMap.Visualization.Qt.DataViewer as dv
+#import ClearMap.Visualization.Qt.DataViewer as dv
+import ClearMap.Visualization.Qt.DataViewerMax as dv
 import ClearMap.Visualization.Qt.Utils as qtu
 
 ############################################################################################################

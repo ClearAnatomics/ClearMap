@@ -192,7 +192,9 @@ class Workspace(object):
   def __init__(self, wtype = None, prefix = None, file_type_to_name = None, directory = None, debug = None, **kwargs):
     self._wtype = wtype;
     self._prefix = prefix;
-    self.directory = directory;
+    if directory and len(directory) > 0 and directory[-1] == os.path.sep:
+      directory = directory[:-1];
+    self._directory = directory;
     self._file_type_to_name = default_workspaces.get(wtype, default_file_type_to_name).copy();
     if file_type_to_name is not None:
       self._file_type_to_name.update(file_type_to_name);

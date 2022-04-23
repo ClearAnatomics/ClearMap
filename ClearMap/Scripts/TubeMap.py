@@ -273,7 +273,8 @@ if __name__ == '__main__':
   processing_parameter.update(processes = 20,
                               as_memory = True);
   
-  vasc.binarize(source, sink, binarization_parameter=binarization_parameter, processing_parameter=processing_parameter);
+  vasc.binarize(source, sink, binarization_parameter=binarization_parameter, processing_parameter=processing_parameter
+                verbose = True);
   
   #p3d.plot([source, sink])
   
