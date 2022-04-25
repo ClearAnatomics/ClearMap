@@ -69,7 +69,7 @@
          </size>
         </property>
         <property name="currentIndex">
-         <number>1</number>
+         <number>3</number>
         </property>
         <widget class="QWidget" name="sample_tab">
          <attribute name="title">
@@ -84,6 +84,11 @@
         <widget class="QWidget" name="cell_map_tab">
          <attribute name="title">
           <string>CellMap</string>
+         </attribute>
+        </widget>
+        <widget class="QWidget" name="tab_2">
+         <attribute name="title">
+          <string>Vasculature</string>
          </attribute>
         </widget>
         <widget class="QWidget" name="tab">
