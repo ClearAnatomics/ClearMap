@@ -41,7 +41,7 @@ from ClearMap.Settings import resources_path
 from ClearMap.gui.gui_logging import Printer
 from ClearMap.config.config_loader import ConfigLoader
 from ClearMap.gui.params import SampleParameters, ConfigNotFoundError, CellMapParams, \
-    PreferencesParams, PreprocessingParams, ParamsOrientationError
+    PreferencesParams, PreprocessingParams, ParamsOrientationError, VesselParams
 from ClearMap.gui.widget_monkeypatch_callbacks import get_value, set_value, controls_enabled, get_check_box, \
     enable_controls, disable_controls, set_text, get_text, connect_apply, connect_close, connect_save, connect_open, \
     connect_ok, connect_cancel, connect_value_changed, connect_text_changed
@@ -56,8 +56,10 @@ from ClearMap.gui.widgets import OrthoViewer, PbarWatcher  # needs plot_3d
 from ClearMap.Visualization import Plot3d as plot_3d
 update_pbar(app, progress_bar, 20)
 from ClearMap.Scripts.sample_preparation import PreProcessor
-update_pbar(app, progress_bar, 50)
+update_pbar(app, progress_bar, 40)
 from ClearMap.Scripts.cell_map import CellDetector
+update_pbar(app, progress_bar, 60)
+from ClearMap.Scripts.tube_map import BinaryVesselProcessor, VesselGraphProcessor
 update_pbar(app, progress_bar, 80)
 
 # TODO
@@ -269,6 +271,10 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         self.preprocessor.set_progress_watcher(self.progress_watcher)  # FIXME: specific of subclass
         if self.cell_detector is not None and self.cell_detector.preprocessor is not None:  # If initialised
             self.cell_detector.set_progress_watcher(self.progress_watcher)
+        if self.binary_vessel_processor is not None and self.binary_vessel_processor.preprocessor is not None:
+            self.binary_vessel_processor.set_progress_watcher(self.progress_watcher)
+        if self.vessel_graph_processor is not None and self.vessel_graph_processor.preprocessor is not None:
+            self.vessel_graph_processor.set_progress_watcher(self.progress_watcher)
 
 
 class ClearMapGui(ClearMapGuiBase):
@@ -283,8 +289,11 @@ class ClearMapGui(ClearMapGuiBase):
         self.sample_params = None
         self.processing_params = None
         self.cell_map_params = None
+        self.vessel_params = None
 
         self.cell_detector = None
+        self.binary_vessel_processor = None
+        self.vessel_graph_processor = None
 
         self.mini_brain_scaling, self.mini_brain = self.setup_mini_brain()
 
@@ -337,6 +346,7 @@ class ClearMapGui(ClearMapGuiBase):
         self.setup_sample_tab()
         self.setup_preprocessing_tab()
         self.setup_cell_map_tab()
+        self.setup_vasculature_tab()
         self.tabWidget.tabBarClicked.connect(self.handle_tab_click)
         self.tabWidget.setCurrentIndex(0)
 
@@ -406,6 +416,20 @@ class ClearMapGui(ClearMapGuiBase):
         self.cell_map_tab.runCellMapButtonBox.connectApply(self.run_cell_map)
         self.cell_map_tab.runCellMapPlotButtonBox.connectApply(self.plot_cell_map_results)
 
+    def setup_vasculature_tab(self):
+        cls, _ = loadUiType('ClearMap/gui/vasculature_tab.ui', patch_parent_class='QTabWidget')
+        self.vasculature_tab = cls()
+        self.vasculature_tab.setupUi()
+        self.patch_button_boxes(self.vasculature_tab)
+        self.tabWidget.removeTab(3)
+        self.tabWidget.insertTab(3, self.vasculature_tab, 'Vasculature')
+
+        self.vasculature_tab.binarizationButtonBox.connectApply(self.binarize_vessels)
+        self.vasculature_tab.fillVesselsButtonBox.connectApply(self.fill_vessels)
+        # self.vasculature_tab.fillVesselsButtonBox.connectClose()  # FIXME:
+        self.vasculature_tab.buildGraphButtonBox.connectApply(self.build_graph)
+        self.vasculature_tab.postProcessVesselTypesButtonBox.connectApply(self.post_process_graph)
+
     def setup_preferences_editor(self):
         cls, _ = loadUiType('ClearMap/gui/preferences_editor.ui', patch_parent_class='QDialog')
         self.preferences_editor = cls()
@@ -430,6 +454,12 @@ class ClearMapGui(ClearMapGuiBase):
                 self.tabWidget.setCurrentIndex(1)  # WARNING: does not work
             else:
                 self.setup_cell_detector()
+        if tab_index == 3:
+            if not os.path.exists(self.preprocessor.aligned_autofluo_path):
+                ok = self.popup('WARNING', 'Alignment not performed, please run first') == QMessageBox.Ok
+                self.tabWidget.setCurrentIndex(1)  # WARNING: does not work
+            else:
+                self.setup_vessel_processors()
 
     def apply_prefs_and_close(self):
         self.preferences.ui_to_cfg()
@@ -447,6 +477,15 @@ class ClearMapGui(ClearMapGuiBase):
         if self.cell_detector.preprocessor is None and self.preprocessor.workspace is not None:  # preproc initialised
             self.processing_params.ui_to_cfg()
             self.cell_detector.setup(self.preprocessor)
+
+    def setup_vessel_processors(self):
+        if self.preprocessor.workspace is not None:  # Initied
+            if self.binary_vessel_processor.preprocessor is None:
+                self.processing_params.ui_to_cfg()
+                self.binary_vessel_processor.setup(self.preprocessor)
+            if self.vessel_graph_processor.preprocessor is None:
+                self.processing_params.ui_to_cfg()
+                self.vessel_graph_processor.setup(self.preprocessor)
 
     def __get_cfg_path(self, cfg_name):
         cfg_path = self.config_loader.get_cfg_path(cfg_name, must_exist=False)
@@ -472,7 +511,9 @@ class ClearMapGui(ClearMapGuiBase):
         if was_copied:
             self.sample_params.fix_sample_cfg_file(sample_cfg_path)
         self.sample_cfg_path = sample_cfg_path
-        _, self.processing_cfg_path = self.__get_cfg_path('processing')
+        was_copied, self.processing_cfg_path = self.__get_cfg_path('processing')
+        if was_copied:
+            self.processing_params.fix_pipeline_name(self.processing_cfg_path)
 
     def setup_preferences(self):
         self.preferences = PreferencesParams(self.preferences_editor, self.src_folder)
@@ -501,7 +542,6 @@ class ClearMapGui(ClearMapGuiBase):
         except ConfigNotFoundError:
             self.print_error_msg('Loading sample config file failed')
             error = True
-        self.processing_params = PreprocessingParams(self.preprocessing_tab)
         try:
             self.processing_params.get_config(self.processing_cfg_path)
         except ConfigNotFoundError:
@@ -515,6 +555,15 @@ class ClearMapGui(ClearMapGuiBase):
                 self.print_error_msg('Loading Cell Map config file failed')
                 error = True
             self.cell_detector = CellDetector()
+        if self.processing_params.pipeline_is_tube_map:  # WARNING: should not be exclusive
+            self.vessel_params = VesselParams(self.vasculature_tab)
+            try:
+                self.vessel_params.get_config(self.__get_cfg_path('tube_map')[1])
+            except ConfigNotFoundError:
+                self.print_error_msg('Loading Tube Map config file failed')
+                error = True
+            self.binary_vessel_processor = BinaryVesselProcessor()
+            self.vessel_graph_processor = VesselGraphProcessor()
         if not error:
             self.print_status_msg('Config loaded')
             try:
@@ -525,11 +574,14 @@ class ClearMapGui(ClearMapGuiBase):
             self.processing_params.cfg_to_ui()
             if self.cell_map_params is not None:
                 self.cell_map_params.cfg_to_ui()
+            if self.vessel_params is not None:
+                self.vessel_params.cfg_to_ui()
 
     def set_src_folder(self):
         self.src_folder = get_directory_dlg(self.preferences.start_folder)
         self.config_loader.src_dir = self.src_folder
         self.sample_params = SampleParameters(self.sample_tab, self.src_folder)
+        self.processing_params = PreprocessingParams(self.preprocessing_tab)
 
     @property
     def src_folder(self):
@@ -747,6 +799,52 @@ class ClearMapGui(ClearMapGuiBase):
         dvs = self.cell_detector.plot_voxelized_counts(arange=False)
         self.setup_plots(dvs)
 
+# TUBE MAP
+    def _get_n_binarize_steps(self):
+        n_steps = 1
+        n_steps += self.vessel_params.binarization_params.post_process_raw
+        n_steps += self.vessel_params.binarization_params.run_arteries_binarization
+        n_steps += self.vessel_params.binarization_params.post_process_arteries
+        return n_steps
+
+    def binarize_vessels(self):
+        self.vessel_params.ui_to_cfg()
+        self.print_status_msg('Starting vessel binarization')
+        self.make_nested_progress_dialog(title='Binarizing vessels', n_steps=self._get_n_binarize_steps(),
+                                         abort_callback=self.binary_vessel_processor.stop_process)
+        self.wrap_in_thread(self.binary_vessel_processor.binarize)
+        self.progress_dialog.done(1)
+        self.print_status_msg('Vessels binarized')
+
+    def fill_vessels(self):
+        self.vessel_params.ui_to_cfg()
+        self.print_status_msg('Starting vessel filling')
+        n_steps = self.vessel_params.binarization_params.fill_main_channel +\
+                  self.vessel_params.binarization_params.fill_secondary_channel
+        self.make_nested_progress_dialog(title='Filling vessels', n_steps=n_steps,
+                                         abort_callback=self.binary_vessel_processor.stop_process)
+        self.wrap_in_thread(self.binary_vessel_processor.fill_vessels)
+        self.wrap_in_thread(self.binary_vessel_processor.combine_binary)  # REFACTOR: not great location
+        self.progress_dialog.done(1)
+        self.print_status_msg('Vessel filling done')
+
+    def build_graph(self):
+        self.vessel_params.ui_to_cfg()
+        self.print_status_msg('Building vessel graph')
+        self.make_nested_progress_dialog(title='Building vessel graph', n_steps=4,
+                                         abort_callback=self.vessel_graph_processor.stop_process)
+        self.wrap_in_thread(self.vessel_graph_processor.pre_process)
+        self.progress_dialog.done(1)
+        self.print_status_msg('Building vessel graph done')
+
+    def post_process_graph(self):
+        self.vessel_params.ui_to_cfg()
+        self.print_status_msg('Post processing vasculature graph')
+        self.make_nested_progress_dialog(title='Post processing graph', n_steps=8,
+                                         abort_callback=self.vessel_graph_processor.stop_process)
+        self.wrap_in_thread(self.vessel_graph_processor.post_process)
+        self.progress_dialog.done(1)
+        self.print_status_msg('Vasculature graph post-processing DONE')
 
 
 def create_main_window(app):

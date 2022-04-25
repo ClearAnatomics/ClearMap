@@ -1,6 +1,8 @@
 import os
+import subprocess
 from concurrent.futures import ProcessPoolExecutor
 
+import numpy as np
 import psutil
 
 colors = {
@@ -28,6 +30,12 @@ def runs_from_pycharm():
     return "PYCHARM_HOSTED" in os.environ
 
 
+def get_free_v_ram():
+    cmd = 'nvidia-smi --query-gpu=memory.free --format=noheader,csv,nounits'
+    result = subprocess.check_output(cmd, shell=True)
+    return int(result)
+
+
 class CancelableProcessPoolExecutor(ProcessPoolExecutor):
     def immediate_shutdown(self):
         with self._shutdown_lock:
@@ -42,3 +50,7 @@ class CancelableProcessPoolExecutor(ProcessPoolExecutor):
             if not terminated_procs:
                 for proc in self._processes.values():
                     proc.terminate()
+
+
+def is_in_range(src_array, value_range):
+    return np.logical_and(src_array >= value_range[0], src_array <= value_range[1])

@@ -70,15 +70,18 @@ class UiParameter(object):
         return val if val != -1 else None
 
 
-class PreprocessingParams(object):
+class UiParameterCollection:
+    """
+    For multi-section UiParameters that share the same config file. This ensures the file remains consistent.
+    """
     def __init__(self, tab, src_folder=None):
         self.tab = tab
         self.src_folder = src_folder
         self.config = None
-        self.stitching_general = GeneralStitchingParams(tab, src_folder)
-        self.stitching_rigid = RigidStitchingParams(tab, src_folder)
-        self.stitching_wobbly = WobblyStitchingParams(tab, src_folder)
-        self.registration = RegistrationParams(tab, src_folder)
+
+    @property
+    def params(self):
+        raise NotImplementedError('Please subclass UiParameterCollection and implement params property')
 
     def get_config(self, cfg_path):
         self.config = get_configobj_cfg(cfg_path)  # FIXME: use format agnostic method
@@ -86,22 +89,6 @@ class PreprocessingParams(object):
             raise ConfigNotFoundError
         for param in self.params:
             param._config = self.config
-
-    @property
-    def pipeline_name(self):
-        return self.config['pipeline_name']
-
-    @property
-    def pipeline_is_cell_map(self):
-        return self.pipeline_name.lower().replace('_', '') == 'cellmap'
-
-    @property
-    def params(self):
-        return self.stitching_general, self.stitching_rigid, self.stitching_wobbly, self.registration
-
-    @property
-    def all_stitching_params(self):
-        return self.stitching_general, self.stitching_rigid, self.stitching_wobbly
 
     def write_config(self):
         self.config.write()
@@ -117,8 +104,49 @@ class PreprocessingParams(object):
             param.cfg_to_ui()
 
 
-class SampleParameters(UiParameter):  # TODO: implement connect
+class PreprocessingParams(UiParameterCollection):
+    def __init__(self, tab, src_folder=None):
+        super().__init__(tab, src_folder)
+        self.stitching_general = GeneralStitchingParams(tab, src_folder)
+        self.stitching_rigid = RigidStitchingParams(tab, src_folder)
+        self.stitching_wobbly = WobblyStitchingParams(tab, src_folder)
+        self.registration = RegistrationParams(tab, src_folder)
 
+    def fix_pipeline_name(self, f_path):
+        cfg = get_configobj_cfg(f_path)
+        pipeline_name, ok = QInputDialog.getItem(self.tab, 'Please select pipeline type',
+                                                 'Pipeline name:', ['CellMap', 'TubeMap'], 0, False)
+        if not ok:
+            raise ValueError('Missing sample ID')
+        cfg['pipeline_name'] = pipeline_name
+        cfg.write()
+
+    @property
+    def params(self):
+        return self.stitching_general, self.stitching_rigid, self.stitching_wobbly, self.registration
+
+    @property
+    def all_stitching_params(self):
+        return self.stitching_general, self.stitching_rigid, self.stitching_wobbly
+
+    @property
+    def pipeline_name(self):
+        return self.config['pipeline_name']
+
+    @pipeline_name.setter
+    def pipeline_name(self, name):
+        self.config['pipeline_name'] = name
+
+    @property
+    def pipeline_is_cell_map(self):
+        return self.pipeline_name.lower().replace('_', '') == 'cellmap'
+
+    @property
+    def pipeline_is_tube_map(self):
+        return self.pipeline_name.lower().replace('_', '') == 'tubemap'
+
+
+class SampleParameters(UiParameter):
     @property
     def config(self):
         return self._config
@@ -975,6 +1003,313 @@ class CellMapParams(UiParameter):
 
     def handle_plot_detected_cells_changed(self, state):
         self.config['detection']['plot_cells'] = self.plot_detected_cells
+
+
+class VesselParams(UiParameterCollection):
+    def __init__(self, tab, src_folder=None):
+        super().__init__(tab, src_folder)
+        # self.sample_params = sample_params  # TODO: check if required
+        # self.preprocessing_params = preprocessing_params  # TODO: check if required
+        self.binarization_params = VesselBinarizationParams(tab, src_folder)
+        self.graph_params = VesselGraphParams(tab, src_folder)
+        self.visualization_params = VesselVisualizationParams(tab, src_folder)
+
+    @property
+    def params(self):
+        return self.binarization_params, self.graph_params
+
+
+class VesselBinarizationParams(UiParameter):
+
+    def connect(self):
+        self.tab.rawBinarizationClipRangeDoublet.valueChangedConnect(self.handle_raw_binarization_clip_range_changed)
+        self.tab.rawBinarizationThresholdSpinBox.valueChanged.connect(self.handle_raw_binarization_treshold_changed)
+        self.tab.rawBinarizationPostprocessingCheckBox.stateChanged.connect(self.handle_post_process_raw_changed)
+
+        self.tab.runArteriesBinarizationCheckBox.stateChanged.connect(self.handle_run_arteries_binarization_changed)
+        self.tab.arteriesBinarizationClipRangeDoublet.valueChangedConnect(
+            self.handle_arteries_binarization_clip_range_changed)
+        self.tab.arteriesBinarizationThresholdSpinBox.valueChanged.connect(
+            self.handle_arteries_binarization_threshold_changed)
+        self.tab.arteriesBinarizationPostprocessingCheckBox.stateChanged.connect(
+            self.handle_post_process_arteries_changed)
+
+        self.tab.vesselFillingMainChannelCheckBox.stateChanged.connect(self.handle_fill_main_channel_changed)
+        self.tab.vesselFillingSecondaryChannelCheckBox.stateChanged.connect(self.handle_fill_secondary_channel_changed)
+
+    @property
+    def config(self):
+        return self._config['binarization']
+
+    def cfg_to_ui(self):
+        cfg = self.config
+        self.raw_binarization_clip_range = cfg['binarization']['raw']['clip_range']
+        self.raw_binarization_threshold = cfg['binarization']['raw']['threshold']
+        self.post_process_raw = self.config['binarization']['raw']['post_process']
+        self.run_arteries_binarization = not cfg['binarization']['arteries']['skip']
+        self.arteries_binarization_clip_range = cfg['binarization']['arteries']['clip_range']
+        self.arteries_binarization_threshold = cfg['binarization']['arteries']['threshold']
+        self.post_process_arteries = self.config['binarization']['arteries']['post_process']
+        self.fill_main_channel = self.config['vessel_filling']['main']
+        self.fill_secondary_channel = self.config['vessel_filling']['secondary']
+
+    @property
+    def raw_binarization_clip_range(self):
+        return self.tab.rawBinarizationClipRangeDoublet.getValue()
+
+    @raw_binarization_clip_range.setter
+    def raw_binarization_clip_range(self, value):
+        self.tab.rawBinarizationClipRangeDoublet.setValue(value)
+
+    def handle_raw_binarization_clip_range_changed(self, value):
+        self.config['binarization']['raw']['clip_range'] = self.raw_binarization_clip_range
+
+    @property
+    def raw_binarization_threshold(self):
+        return self.sanitize_neg_one(self.tab.rawBinarizationThresholdSpinBox.value())
+
+    @raw_binarization_threshold.setter
+    def raw_binarization_threshold(self, value):
+        self.tab.rawBinarizationThresholdSpinBox.setValue(self.sanitize_nones(value))
+
+    def handle_raw_binarization_treshold_changed(self, value):
+        self.config['binarization']['raw']['threshold'] = self.raw_binarization_threshold
+
+    @property
+    def post_process_raw(self):
+        return self.is_checked(self.tab.rawBinarizationPostprocessingCheckBox)
+
+    @post_process_raw.setter
+    def post_process_raw(self, state):
+        self.set_check_state(self.tab.rawBinarizationPostprocessingCheckBox, state)
+
+    def handle_post_process_raw_changed(self, state):
+        self.config['binarization']['raw']['post_process'] = self.post_process_raw
+
+    @property
+    def run_arteries_binarization(self):
+        return self.is_checked(self.tab.runArteriesBinarizationCheckBox)
+
+    @run_arteries_binarization.setter
+    def run_arteries_binarization(self, state):
+        self.set_check_state(self.tab.runArteriesBinarizationCheckBox, state)
+
+    def handle_run_arteries_binarization_changed(self, state):
+        self.config['binarization']['arteries']['skip'] = not self.run_arteries_binarization
+
+    @property
+    def arteries_binarization_clip_range(self):
+        return self.tab.arteriesBinarizationClipRangeDoublet.getValue()
+
+    @arteries_binarization_clip_range.setter
+    def arteries_binarization_clip_range(self, value):
+        self.tab.arteriesBinarizationClipRangeDoublet.setValue(value)
+
+    def handle_arteries_binarization_clip_range_changed(self, value):
+        self.config['binarization']['arteries']['clip_range'] = self.arteries_binarization_clip_range
+
+    @property
+    def arteries_binarization_threshold(self):
+        return self.sanitize_neg_one(self.tab.arteriesBinarizationThresholdSpinBox.value())
+
+    @arteries_binarization_threshold.setter
+    def arteries_binarization_threshold(self, value):
+        self.tab.arteriesBinarizationThresholdSpinBox.setValue(self.sanitize_nones(value))
+
+    def handle_arteries_binarization_threshold_changed(self, value):
+        self.config['binarization']['arteries']['threshold'] = self.arteries_binarization_threshold
+
+    @property
+    def post_process_arteries(self):
+        return self.is_checked(self.tab.arteriesBinarizationPostprocessingCheckBox)
+
+    @post_process_arteries.setter
+    def post_process_arteries(self, state):
+        self.set_check_state(self.tab.arteriesBinarizationPostprocessingCheckBox, state)
+
+    def handle_post_process_arteries_changed(self, state):
+        self.config['binarization']['arteries']['post_process'] = self.post_process_arteries
+
+    @property
+    def fill_main_channel(self):
+        return self.is_checked(self.tab.vesselFillingMainChannelCheckBox)
+
+    @fill_main_channel.setter
+    def fill_main_channel(self, state):
+        self.set_check_state(self.tab.vesselFillingMainChannelCheckBox, state)
+
+    def handle_fill_main_channel_changed(self, state):
+        self.config['vessel_filling']['main'] = self.fill_main_channel
+
+    @property
+    def fill_secondary_channel(self):
+        return self.is_checked(self.tab.vesselFillingSecondaryChannelCheckBox)
+
+    @fill_secondary_channel.setter
+    def fill_secondary_channel(self, state):
+        self.set_check_state(self.tab.vesselFillingSecondaryChannelCheckBox, state)
+
+    def handle_fill_secondary_channel_changed(self, state):
+        self.config['vessel_filling']['secondary'] = self.fill_secondary_channel
+
+
+class VesselGraphParams(UiParameter):
+    def connect(self):
+        self.tab.veinIntensityRangeOnArteriesChannelDoublet.valueChangedConnect(
+            self.handle_vein_intensity_range_on_arteries_channel_changed)
+        self.tab.restrictiveMinVeinRadiusSpinBox.valueChanged.connect(
+            self.handle_restrictive_min_vein_radius_changed)
+        self.tab.permissiveMinVeinRadiusSpinBox.valueChanged.connect(self.handle_permissive_min_vein_radius_changed)
+        self.tab.finalMinVeinRadiusSpinBox.valueChanged.connect(self.handle_final_min_vein_radius_changed)
+
+        self.tab.arteriesMinRadiusSpinBox.valueChanged.connect(self.handle_arteries_min_radius_changed)
+        self.tab.maxArteriesTracingIterationsSpinBox.valueChanged.connect(
+            self.handle_max_arteries_tracing_iterations_changed)
+        self.tab.maxVeinsTracingIterationsSpinBox.valueChanged.connect(self.handle_max_veins_tracing_iterations_changed)
+        self.tab.minArterySizeSpinBox.valueChanged.connect(self.handle_min_artery_size_changed)
+        self.tab.minVeinSizeSpinBox.valueChanged.connect(self.handle_min_vein_size_changed)
+
+    @property
+    def config(self):
+        return self._config['vessel_type_postprocessing']
+
+    def cfg_to_ui(self):
+        self.vein_intensity_range_on_arteries_channel = \
+            self.config['pre_filtering']['vein_intensity_range_on_arteries_ch']
+        self.restrictive_min_vein_radius = self.config['pre_filtering']['restrictive_vein_radius']
+        self.permissive_min_vein_radius = self.config['pre_filtering']['permissive_vein_radius']
+        self.final_min_vein_radius = self.config['pre_filtering']['final_vein_radius']
+        self.arteries_min_radius = self.config['pre_filtering']['arteries_min_radius']
+        self.max_arteries_tracing_iterations = self.config['tracing']['max_arteries_iterations']
+        self.max_veins_tracing_iterations = self.config['tracing']['max_veins_iterations']
+        self.min_artery_size = self.config['capillaries_removal']['min_artery_size']
+        self.min_vein_size = self.config['capillaries_removal']['min_vein_size']
+    
+    @property
+    def vein_intensity_range_on_arteries_channel(self):
+        return self.tab.veinIntensityRangeOnArteriesChannelDoublet.getValue()
+    
+    @vein_intensity_range_on_arteries_channel.setter
+    def vein_intensity_range_on_arteries_channel(self, value):
+        self.tab.veinIntensityRangeOnArteriesChannelDoublet.setValue(value)
+
+    def handle_vein_intensity_range_on_arteries_channel_changed(self, _):
+        self.config['pre_filtering']['vein_intensity_range_on_arteries_ch'] = \
+            self.vein_intensity_range_on_arteries_channel
+        
+    @property
+    def restrictive_min_vein_radius(self):
+        return self.tab.restrictiveMinVeinRadiusSpinBox.value()
+    
+    @restrictive_min_vein_radius.setter
+    def restrictive_min_vein_radius(self, value):
+        self.tab.restrictiveMinVeinRadiusSpinBox.setValue(value)
+
+    def handle_restrictive_min_vein_radius_changed(self, _):
+        self.config['pre_filtering']['restrictive_vein_radius'] = \
+            self.restrictive_min_vein_radius
+
+    @property
+    def permissive_min_vein_radius(self):
+        return self.tab.permissiveMinVeinRadiusSpinBox.value()
+
+    @permissive_min_vein_radius.setter
+    def permissive_min_vein_radius(self, value):
+        self.tab.permissiveMinVeinRadiusSpinBox.setValue(value)
+
+    def handle_permissive_min_vein_radius_changed(self, _):
+        self.config['pre_filtering']['permissive_vein_radius'] = \
+            self.permissive_min_vein_radius
+        
+    @property
+    def final_min_vein_radius(self):
+        return self.tab.finalMinVeinRadiusSpinBox.value()
+
+    @final_min_vein_radius.setter
+    def final_min_vein_radius(self, value):
+        self.tab.finalMinVeinRadiusSpinBox.setValue(value)
+
+    def handle_final_min_vein_radius_changed(self, _):
+        self.config['pre_filtering']['final_vein_radius'] = self.final_min_vein_radius
+
+    @property
+    def arteries_min_radius(self):
+        return self.tab.arteriesMinRadiusSpinBox.value()
+    
+    @arteries_min_radius.setter
+    def arteries_min_radius(self, value):
+        self.tab.arteriesMinRadiusSpinBox.setValue(value)
+
+    def handle_arteries_min_radius_changed(self, _):
+        self.config['pre_filtering']['arteries_min_radius'] = self.arteries_min_radius
+
+    @property
+    def max_arteries_tracing_iterations(self):
+        return self.tab.maxArteriesTracingIterationsSpinBox.value()
+
+    @max_arteries_tracing_iterations.setter
+    def max_arteries_tracing_iterations(self, value):
+        self.tab.maxArteriesTracingIterationsSpinBox.setValue(value)
+
+    def handle_max_arteries_tracing_iterations_changed(self, _):
+        self.config['tracing']['max_arteries_iterations'] = \
+            self.max_arteries_tracing_iterations
+
+    @property
+    def max_veins_tracing_iterations(self):
+        return self.tab.maxVeinsTracingIterationsSpinBox.value()
+
+    @max_veins_tracing_iterations.setter
+    def max_veins_tracing_iterations(self, value):
+        self.tab.maxVeinsTracingIterationsSpinBox.setValue(value)
+
+    def handle_max_veins_tracing_iterations_changed(self, _):
+        self.config['tracing']['max_veins_iterations'] = self.max_veins_tracing_iterations
+        
+    @property
+    def min_artery_size(self):
+        return self.tab.minArterySizeSpinBox.value()
+    
+    @min_artery_size.setter
+    def min_artery_size(self, value):
+        self.tab.minArterySizeSpinBox.setValue(value)
+
+    def handle_min_artery_size_changed(self, _):
+        self.config['capillaries_removal']['min_artery_size'] = self.min_artery_size
+
+    @property
+    def min_vein_size(self):
+        return self.tab.minVeinSizeSpinBox.value()
+
+    @min_vein_size.setter
+    def min_vein_size(self, value):
+        self.tab.minVeinSizeSpinBox.setValue(value)
+
+    def handle_min_vein_size_changed(self, _):
+        self.config['capillaries_removal']['min_vein_size'] = self.min_vein_size
+
+
+class VesselVisualizationParams(UiParameter):
+    def connect(self):
+        self.tab.vasculatureVoxelizationRadiusTriplet.valueChangedConnect(self.handle_voxelization_size_changed)
+
+    @property
+    def config(self):
+        return self._config['visualization']
+
+    def cfg_to_ui(self):
+        self.voxelization_size = self.config['voxelization']['size']
+
+    @property
+    def voxelization_size(self):
+        return self.tab.vasculatureVoxelizationRadiusTriplet.getValue()
+
+    @voxelization_size.setter
+    def voxelization_size(self, value):
+        self.tab.vasculatureVoxelizationRadiusTriplet.setValue(value)
+
+    def handle_voxelization_size_changed(self, _):
+        self.config['voxelization']['size'] = self.voxelization_size
 
 
 class PreferencesParams(UiParameter):

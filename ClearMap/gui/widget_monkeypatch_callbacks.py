@@ -40,7 +40,7 @@ def get_value(instance):
     values = []
     if not instance.controlsEnabled():
         disabled_value = instance.property('disabledValue')
-        if disabled_value == 'None':
+        if disabled_value == 'None' or disabled_value is None:  # FIXME: check is
             return None
         elif disabled_value == 'auto':
             return 'auto'
