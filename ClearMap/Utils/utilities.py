@@ -54,3 +54,11 @@ class CancelableProcessPoolExecutor(ProcessPoolExecutor):
 
 def is_in_range(src_array, value_range):
     return np.logical_and(src_array >= value_range[0], src_array <= value_range[1])
+
+
+def is_iterable(obj):
+    try:
+        iterator = iter(obj)
+        return True
+    except TypeError:
+        return False
