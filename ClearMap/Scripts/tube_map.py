@@ -110,8 +110,6 @@ class BinaryVesselProcessor(TabProcessor):
         self.machine_config = None
         self.preprocessor = None
         self.workspace = None
-        self.annotation_file = None
-        self.distance_file = None
         self.steps = BinaryVesselProcessorSteps(self.workspace)
         self.block_re = ('Processing block',
                          re.compile(r'.*?Processing block \d+/\d+.*?\selapsed time:\s\d+:\d+:\d+\.\d+'))
@@ -125,9 +123,6 @@ class BinaryVesselProcessor(TabProcessor):
         if preprocessor is not None:
             self.workspace = preprocessor.workspace
             self.steps.workspace = self.workspace
-            atlas_files = preprocessor.get_atlas_files()
-            self.annotation_file = atlas_files['annotation']
-            self.distance_file = atlas_files['distance']
             configs = preprocessor.get_configs()
             self.sample_config = configs['sample']
             self.machine_config = configs['machine']
@@ -307,17 +302,12 @@ class VesselGraphProcessor(TabProcessor):
         self.machine_config = None
         self.preprocessor = None
         self.workspace = None
-        self.annotation_file = None
-        self.distance_file = None
         self.setup(preprocessor)
 
     def setup(self, preprocessor):
         self.preprocessor = preprocessor
         if preprocessor is not None:
             self.workspace = preprocessor.workspace
-            atlas_files = preprocessor.get_atlas_files()
-            self.annotation_file = atlas_files['annotation']
-            self.distance_file = atlas_files['distance']
             configs = preprocessor.get_configs()
             self.sample_config = configs['sample']
             self.machine_config = configs['machine']
@@ -463,7 +453,6 @@ class VesselGraphProcessor(TabProcessor):
                 source_shape=clearmap_io.shape(self.workspace.filename('binary', postfix='final')),
                 sink_shape=clearmap_io.shape(self.workspace.filename('resampled')))
             return radii * np.mean(resample_factor)
-
 
         self.graph_reduced.transform_properties(transformation=scaling,
                                                 vertex_properties={'radii': 'radii_atlas'},

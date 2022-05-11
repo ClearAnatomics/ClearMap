@@ -68,8 +68,6 @@ class CellDetector(TabProcessor):
         self.machine_config = None
         self.preprocessor = None
         self.workspace = None
-        self.annotation_file = None
-        self.distance_file = None
         self.cell_detection_re = ('Processing block',
                                   re.compile(r'.*?Processing block \d+/\d+.*?\selapsed time:\s\d+:\d+:\d+\.\d+'))
         self.setup(preprocessor)
@@ -78,9 +76,6 @@ class CellDetector(TabProcessor):
         self.preprocessor = preprocessor
         if preprocessor is not None:
             self.workspace = preprocessor.workspace
-            atlas_files = preprocessor.get_atlas_files()
-            self.annotation_file = atlas_files['annotation']
-            self.distance_file = atlas_files['distance']
             configs = preprocessor.get_configs()
             self.sample_config = configs['sample']
             self.machine_config = configs['machine']
@@ -126,7 +121,7 @@ class CellDetector(TabProcessor):
         if self.processing_config['voxelization']['preview']['counts']:
             self.plot_voxelized_counts()
         # %% Weighted
-        # intensities_file_path = self.voxelize_weighted(coordinates, source, voxelization_parameter)  # WARNING: Currently causing issies
+        # intensities_file_path = self.voxelize_weighted(coordinates, source, voxelization_parameter)  # WARNING: Currently causing issues
         # if self.processing_config['voxelization']['preview']['densities']:
         #     self.plot_voxelized_intensities()
 
@@ -150,11 +145,14 @@ class CellDetector(TabProcessor):
             coordinates = np.array([source[n] for n in ['xt', 'yt', 'zt']]).T
         return coordinates, source, voxelization_parameter
 
+    def _get_voxelization_shape(self):
+        return clearmap_io.shape(self.preprocessor.annotation_file_path)
+
     # def voxelize_chunk(self):
     #     self.workspace.debug = True
     #     coordinates = self.get_coords()
     #
-    #     shape = clearmap_io.shape(self.annotation_file),
+    #     shape = clearmap_io.shape(self.preprocessor.annotation_file_path),
     #     # %% Unweighted
     #     counts_file_path = self.workspace.filename('density', postfix='counts_upperlayers')
     #     clearmap_io.delete_file(self.workspace.filename('density', postfix='counts'))  # WARNING: deletes different file
@@ -360,7 +358,7 @@ class CellDetector(TabProcessor):
         return plot_3d.plot_3d(self.workspace.filename('stitched'), view=p, cmap=plot_3d.grays_alpha(alpha=1))
 
     def remove_crust(self, coordinates,voxelization_parameter):
-        dist2surf = clearmap_io.read(self.distance_file)
+        dist2surf = clearmap_io.read(self.preprocessor.distance_file_path)
         threshold = 3
         shape = dist2surf.shape
 
