@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>753</width>
+    <width>797</width>
     <height>720</height>
    </rect>
   </property>
@@ -46,12 +46,11 @@
           </property>
           <property name="font">
            <font>
-            <weight>75</weight>
             <bold>true</bold>
            </font>
           </property>
           <property name="currentIndex">
-           <number>0</number>
+           <number>2</number>
           </property>
           <widget class="QWidget" name="page_82">
            <property name="geometry">
@@ -59,7 +58,7 @@
              <x>0</x>
              <y>0</y>
              <width>365</width>
-             <height>571</height>
+             <height>575</height>
             </rect>
            </property>
            <attribute name="label">
@@ -76,8 +75,8 @@
                 <rect>
                  <x>0</x>
                  <y>0</y>
-                 <width>347</width>
-                 <height>491</height>
+                 <width>101</width>
+                 <height>180</height>
                 </rect>
                </property>
                <attribute name="label">
@@ -296,6 +295,16 @@
                     </property>
                    </widget>
                   </item>
+                  <item>
+                   <widget class="QDialogButtonBox" name="plotBinarizationButtonBox">
+                    <property name="standardButtons">
+                     <set>QDialogButtonBox::Apply</set>
+                    </property>
+                    <property name="applyText" stdset="0">
+                     <string>Plot</string>
+                    </property>
+                   </widget>
+                  </item>
                  </layout>
                 </item>
                </layout>
@@ -306,7 +315,7 @@
                  <x>0</x>
                  <y>0</y>
                  <width>347</width>
-                 <height>491</height>
+                 <height>497</height>
                 </rect>
                </property>
                <attribute name="label">
@@ -362,10 +371,20 @@
                   <item>
                    <widget class="QDialogButtonBox" name="fillVesselsButtonBox">
                     <property name="standardButtons">
-                     <set>QDialogButtonBox::Apply|QDialogButtonBox::Close</set>
+                     <set>QDialogButtonBox::Apply</set>
                     </property>
                     <property name="applyText" stdset="0">
                      <string>Run</string>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <widget class="QDialogButtonBox" name="plotFillVesselsButtonBox">
+                    <property name="standardButtons">
+                     <set>QDialogButtonBox::Apply|QDialogButtonBox::Close</set>
+                    </property>
+                    <property name="applyText" stdset="0">
+                     <string>Plot</string>
                     </property>
                    </widget>
                   </item>
@@ -382,8 +401,8 @@
             <rect>
              <x>0</x>
              <y>0</y>
-             <width>365</width>
-             <height>571</height>
+             <width>373</width>
+             <height>561</height>
             </rect>
            </property>
            <attribute name="label">
@@ -402,6 +421,226 @@
                 </property>
                </widget>
               </item>
+              <item>
+               <widget class="QGroupBox" name="groupBox_4">
+                <property name="title">
+                 <string>Slicer</string>
+                </property>
+                <layout class="QHBoxLayout" name="horizontalLayout_8">
+                 <item>
+                  <layout class="QVBoxLayout" name="verticalLayout_4">
+                   <item>
+                    <widget class="QDialogButtonBox" name="graphConstructionSlicerButtonBox">
+                     <property name="standardButtons">
+                      <set>QDialogButtonBox::Open</set>
+                     </property>
+                     <property name="openText" stdset="0">
+                      <string>Load</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item>
+                    <layout class="QFormLayout" name="formLayout_5">
+                     <item row="0" column="0">
+                      <widget class="QLabel" name="label_15">
+                       <property name="text">
+                        <string>dim 0 range</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="0" column="1">
+                      <widget class="QFrame" name="graphConstructionSlicerXRangeDoublet">
+                       <property name="frameShape">
+                        <enum>QFrame::StyledPanel</enum>
+                       </property>
+                       <property name="frameShadow">
+                        <enum>QFrame::Raised</enum>
+                       </property>
+                       <layout class="QHBoxLayout" name="horizontalLayout_14">
+                        <item>
+                         <layout class="QHBoxLayout" name="horizontalLayout_15">
+                          <item>
+                           <widget class="QLabel" name="label_16">
+                            <property name="text">
+                             <string>min:</string>
+                            </property>
+                           </widget>
+                          </item>
+                          <item>
+                           <widget class="QSpinBox" name="graphConstructionSlicerXRangeMin">
+                            <property name="suffix">
+                             <string/>
+                            </property>
+                            <property name="prefix">
+                             <string/>
+                            </property>
+                            <property name="maximum">
+                             <number>65535</number>
+                            </property>
+                           </widget>
+                          </item>
+                          <item>
+                           <widget class="QLabel" name="label_17">
+                            <property name="text">
+                             <string>max:</string>
+                            </property>
+                           </widget>
+                          </item>
+                          <item>
+                           <widget class="QSpinBox" name="graphConstructionSlicerXRangeMax">
+                            <property name="suffix">
+                             <string/>
+                            </property>
+                            <property name="maximum">
+                             <number>65535</number>
+                            </property>
+                           </widget>
+                          </item>
+                         </layout>
+                        </item>
+                       </layout>
+                      </widget>
+                     </item>
+                     <item row="1" column="0">
+                      <widget class="QLabel" name="label_18">
+                       <property name="text">
+                        <string>dim 1 range</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="1" column="1">
+                      <widget class="QFrame" name="graphConstructionSlicerYRangeDoublet">
+                       <property name="frameShape">
+                        <enum>QFrame::StyledPanel</enum>
+                       </property>
+                       <property name="frameShadow">
+                        <enum>QFrame::Raised</enum>
+                       </property>
+                       <layout class="QHBoxLayout" name="horizontalLayout_16">
+                        <item>
+                         <layout class="QHBoxLayout" name="horizontalLayout_17">
+                          <item>
+                           <widget class="QLabel" name="label_19">
+                            <property name="text">
+                             <string>min:</string>
+                            </property>
+                           </widget>
+                          </item>
+                          <item>
+                           <widget class="QSpinBox" name="graphConstructionSlicerYRangeMin">
+                            <property name="suffix">
+                             <string/>
+                            </property>
+                            <property name="prefix">
+                             <string/>
+                            </property>
+                            <property name="maximum">
+                             <number>65535</number>
+                            </property>
+                           </widget>
+                          </item>
+                          <item>
+                           <widget class="QLabel" name="label_20">
+                            <property name="text">
+                             <string>max:</string>
+                            </property>
+                           </widget>
+                          </item>
+                          <item>
+                           <widget class="QSpinBox" name="graphConstructionSlicerYRangeMax">
+                            <property name="suffix">
+                             <string/>
+                            </property>
+                            <property name="maximum">
+                             <number>65535</number>
+                            </property>
+                           </widget>
+                          </item>
+                         </layout>
+                        </item>
+                       </layout>
+                      </widget>
+                     </item>
+                     <item row="2" column="0">
+                      <widget class="QLabel" name="label_21">
+                       <property name="text">
+                        <string>dim 2 range</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="2" column="1">
+                      <widget class="QFrame" name="graphConstructionSlicerZRangeDoublet">
+                       <property name="frameShape">
+                        <enum>QFrame::StyledPanel</enum>
+                       </property>
+                       <property name="frameShadow">
+                        <enum>QFrame::Raised</enum>
+                       </property>
+                       <layout class="QHBoxLayout" name="horizontalLayout_18">
+                        <item>
+                         <layout class="QHBoxLayout" name="horizontalLayout_19">
+                          <item>
+                           <widget class="QLabel" name="label_22">
+                            <property name="text">
+                             <string>min:</string>
+                            </property>
+                           </widget>
+                          </item>
+                          <item>
+                           <widget class="QSpinBox" name="graphConstructionSlicerZRangeMin">
+                            <property name="suffix">
+                             <string/>
+                            </property>
+                            <property name="prefix">
+                             <string/>
+                            </property>
+                            <property name="maximum">
+                             <number>65535</number>
+                            </property>
+                           </widget>
+                          </item>
+                          <item>
+                           <widget class="QLabel" name="label_23">
+                            <property name="text">
+                             <string>max:</string>
+                            </property>
+                           </widget>
+                          </item>
+                          <item>
+                           <widget class="QSpinBox" name="graphConstructionSlicerZRangeMax">
+                            <property name="suffix">
+                             <string/>
+                            </property>
+                            <property name="maximum">
+                             <number>65535</number>
+                            </property>
+                           </widget>
+                          </item>
+                         </layout>
+                        </item>
+                       </layout>
+                      </widget>
+                     </item>
+                    </layout>
+                   </item>
+                  </layout>
+                 </item>
+                </layout>
+               </widget>
+              </item>
+              <item>
+               <widget class="QDialogButtonBox" name="graphConstructionPlotGraphButtonBox">
+                <property name="standardButtons">
+                 <set>QDialogButtonBox::Apply|QDialogButtonBox::Close|QDialogButtonBox::Ok</set>
+                </property>
+                <property name="applyText" stdset="0">
+                 <string>Plot reduced</string>
+                </property>
+                <property name="okText" stdset="0">
+                 <string>Plot annotated</string>
+                </property>
+               </widget>
+              </item>
              </layout>
             </item>
            </layout>
@@ -412,7 +651,7 @@
              <x>0</x>
              <y>0</y>
              <width>365</width>
-             <height>571</height>
+             <height>575</height>
             </rect>
            </property>
            <attribute name="label">
@@ -424,19 +663,19 @@
               <x>20</x>
               <y>0</y>
               <width>331</width>
-              <height>361</height>
+              <height>501</height>
              </rect>
             </property>
             <property name="currentIndex">
-             <number>1</number>
+             <number>2</number>
             </property>
             <widget class="QWidget" name="arteries">
              <property name="geometry">
               <rect>
                <x>0</x>
                <y>0</y>
-               <width>271</width>
-               <height>107</height>
+               <width>331</width>
+               <height>411</height>
               </rect>
              </property>
              <attribute name="label">
@@ -497,7 +736,7 @@
                <x>0</x>
                <y>0</y>
                <width>331</width>
-               <height>299</height>
+               <height>411</height>
               </rect>
              </property>
              <attribute name="label">
@@ -508,22 +747,64 @@
                <rect>
                 <x>10</x>
                 <y>10</y>
-                <width>383</width>
+                <width>323</width>
                 <height>204</height>
                </rect>
               </property>
               <layout class="QFormLayout" name="formLayout_4">
+               <item row="0" column="0">
+                <widget class="QLabel" name="label_5">
+                 <property name="text">
+                  <string>Intensity range</string>
+                 </property>
+                </widget>
+               </item>
+               <item row="0" column="1">
+                <widget class="QFrame" name="veinIntensityRangeOnArteriesChannelDoublet">
+                 <property name="frameShape">
+                  <enum>QFrame::StyledPanel</enum>
+                 </property>
+                 <property name="frameShadow">
+                  <enum>QFrame::Raised</enum>
+                 </property>
+                 <layout class="QHBoxLayout" name="horizontalLayout_376">
+                  <item>
+                   <layout class="QHBoxLayout" name="horizontalLayout_379">
+                    <item>
+                     <widget class="QSpinBox" name="spinBox_264">
+                      <property name="suffix">
+                       <string/>
+                      </property>
+                      <property name="minimum">
+                       <number>0</number>
+                      </property>
+                      <property name="maximum">
+                       <number>65535</number>
+                      </property>
+                     </widget>
+                    </item>
+                    <item>
+                     <widget class="QSpinBox" name="spinBox_265">
+                      <property name="suffix">
+                       <string/>
+                      </property>
+                      <property name="minimum">
+                       <number>0</number>
+                      </property>
+                      <property name="maximum">
+                       <number>65535</number>
+                      </property>
+                     </widget>
+                    </item>
+                   </layout>
+                  </item>
+                 </layout>
+                </widget>
+               </item>
                <item row="1" column="0">
                 <widget class="QLabel" name="label_9">
                  <property name="text">
                   <string>Restrictive Min. Radius</string>
-                 </property>
-                </widget>
-               </item>
-               <item row="2" column="0">
-                <widget class="QLabel" name="label_10">
-                 <property name="text">
-                  <string>Permissive Min. Radius</string>
                  </property>
                 </widget>
                </item>
@@ -537,6 +818,13 @@
                  </property>
                  <property name="maximum">
                   <number>65535</number>
+                 </property>
+                </widget>
+               </item>
+               <item row="2" column="0">
+                <widget class="QLabel" name="label_10">
+                 <property name="text">
+                  <string>Permissive Min. Radius</string>
                  </property>
                 </widget>
                </item>
@@ -589,49 +877,258 @@
                  </property>
                 </widget>
                </item>
-               <item row="0" column="0">
-                <widget class="QLabel" name="label_5">
-                 <property name="text">
-                  <string>Intensity range</string>
+              </layout>
+             </widget>
+             <widget class="QDialogButtonBox" name="postProcessVesselTypesButtonBox">
+              <property name="geometry">
+               <rect>
+                <x>14</x>
+                <y>220</y>
+                <width>311</width>
+                <height>24</height>
+               </rect>
+              </property>
+              <property name="standardButtons">
+               <set>QDialogButtonBox::Apply</set>
+              </property>
+              <property name="applyText" stdset="0">
+               <string>Process</string>
+              </property>
+             </widget>
+            </widget>
+            <widget class="QWidget" name="page">
+             <property name="geometry">
+              <rect>
+               <x>0</x>
+               <y>0</y>
+               <width>331</width>
+               <height>411</height>
+              </rect>
+             </property>
+             <attribute name="label">
+              <string>Display result</string>
+             </attribute>
+             <widget class="QWidget" name="verticalLayoutWidget_2">
+              <property name="geometry">
+               <rect>
+                <x>9</x>
+                <y>9</y>
+                <width>321</width>
+                <height>351</height>
+               </rect>
+              </property>
+              <layout class="QVBoxLayout" name="verticalLayout_3">
+               <item>
+                <widget class="QGroupBox" name="groupBox_5">
+                 <property name="title">
+                  <string>Slicer</string>
                  </property>
-                </widget>
-               </item>
-               <item row="0" column="1">
-                <widget class="QFrame" name="veinIntensityRangeOnArteriesChannelDoublet">
-                 <property name="frameShape">
-                  <enum>QFrame::StyledPanel</enum>
-                 </property>
-                 <property name="frameShadow">
-                  <enum>QFrame::Raised</enum>
-                 </property>
-                 <layout class="QHBoxLayout" name="horizontalLayout_376">
+                 <layout class="QHBoxLayout" name="horizontalLayout_10">
                   <item>
-                   <layout class="QHBoxLayout" name="horizontalLayout_379">
+                   <layout class="QVBoxLayout" name="verticalLayout_6">
                     <item>
-                     <widget class="QSpinBox" name="spinBox_264">
-                      <property name="suffix">
-                       <string/>
+                     <widget class="QDialogButtonBox" name="postProcessVesselTypesSlicerButtonBox">
+                      <property name="standardButtons">
+                       <set>QDialogButtonBox::Open</set>
                       </property>
-                      <property name="minimum">
-                       <number>0</number>
-                      </property>
-                      <property name="maximum">
-                       <number>65535</number>
+                      <property name="openText" stdset="0">
+                       <string>Load</string>
                       </property>
                      </widget>
                     </item>
                     <item>
-                     <widget class="QSpinBox" name="spinBox_265">
-                      <property name="suffix">
-                       <string/>
-                      </property>
-                      <property name="minimum">
-                       <number>0</number>
-                      </property>
-                      <property name="maximum">
-                       <number>65535</number>
-                      </property>
-                     </widget>
+                     <layout class="QFormLayout" name="formLayout_7">
+                      <item row="0" column="0">
+                       <widget class="QLabel" name="label_33">
+                        <property name="text">
+                         <string>dim 0 range</string>
+                        </property>
+                       </widget>
+                      </item>
+                      <item row="0" column="1">
+                       <widget class="QFrame" name="vesselProcessingSlicerXRangeDoublet">
+                        <property name="frameShape">
+                         <enum>QFrame::StyledPanel</enum>
+                        </property>
+                        <property name="frameShadow">
+                         <enum>QFrame::Raised</enum>
+                        </property>
+                        <layout class="QHBoxLayout" name="horizontalLayout_26">
+                         <item>
+                          <layout class="QHBoxLayout" name="horizontalLayout_27">
+                           <item>
+                            <widget class="QLabel" name="label_34">
+                             <property name="text">
+                              <string>min:</string>
+                             </property>
+                            </widget>
+                           </item>
+                           <item>
+                            <widget class="QSpinBox" name="vesselProcessingSlicerXRangeMin">
+                             <property name="suffix">
+                              <string/>
+                             </property>
+                             <property name="prefix">
+                              <string/>
+                             </property>
+                             <property name="maximum">
+                              <number>65535</number>
+                             </property>
+                            </widget>
+                           </item>
+                           <item>
+                            <widget class="QLabel" name="label_35">
+                             <property name="text">
+                              <string>max:</string>
+                             </property>
+                            </widget>
+                           </item>
+                           <item>
+                            <widget class="QSpinBox" name="vesselProcessingSlicerXRangeMax">
+                             <property name="suffix">
+                              <string/>
+                             </property>
+                             <property name="maximum">
+                              <number>65535</number>
+                             </property>
+                            </widget>
+                           </item>
+                          </layout>
+                         </item>
+                        </layout>
+                       </widget>
+                      </item>
+                      <item row="1" column="0">
+                       <widget class="QLabel" name="label_36">
+                        <property name="text">
+                         <string>dim 1 range</string>
+                        </property>
+                       </widget>
+                      </item>
+                      <item row="1" column="1">
+                       <widget class="QFrame" name="vesselProcessingSlicerYRangeDoublet">
+                        <property name="frameShape">
+                         <enum>QFrame::StyledPanel</enum>
+                        </property>
+                        <property name="frameShadow">
+                         <enum>QFrame::Raised</enum>
+                        </property>
+                        <layout class="QHBoxLayout" name="horizontalLayout_28">
+                         <item>
+                          <layout class="QHBoxLayout" name="horizontalLayout_29">
+                           <item>
+                            <widget class="QLabel" name="label_37">
+                             <property name="text">
+                              <string>min:</string>
+                             </property>
+                            </widget>
+                           </item>
+                           <item>
+                            <widget class="QSpinBox" name="vesselProcessingSlicerYRangeMin">
+                             <property name="suffix">
+                              <string/>
+                             </property>
+                             <property name="prefix">
+                              <string/>
+                             </property>
+                             <property name="maximum">
+                              <number>65535</number>
+                             </property>
+                            </widget>
+                           </item>
+                           <item>
+                            <widget class="QLabel" name="label_38">
+                             <property name="text">
+                              <string>max:</string>
+                             </property>
+                            </widget>
+                           </item>
+                           <item>
+                            <widget class="QSpinBox" name="vesselProcessingSlicerYRangeMax">
+                             <property name="suffix">
+                              <string/>
+                             </property>
+                             <property name="maximum">
+                              <number>65535</number>
+                             </property>
+                            </widget>
+                           </item>
+                          </layout>
+                         </item>
+                        </layout>
+                       </widget>
+                      </item>
+                      <item row="2" column="0">
+                       <widget class="QLabel" name="label_39">
+                        <property name="text">
+                         <string>dim 2 range</string>
+                        </property>
+                       </widget>
+                      </item>
+                      <item row="2" column="1">
+                       <widget class="QFrame" name="vesselProcessingSlicerZRangeDoublet">
+                        <property name="frameShape">
+                         <enum>QFrame::StyledPanel</enum>
+                        </property>
+                        <property name="frameShadow">
+                         <enum>QFrame::Raised</enum>
+                        </property>
+                        <layout class="QHBoxLayout" name="horizontalLayout_30">
+                         <item>
+                          <layout class="QHBoxLayout" name="horizontalLayout_31">
+                           <item>
+                            <widget class="QLabel" name="label_40">
+                             <property name="text">
+                              <string>min:</string>
+                             </property>
+                            </widget>
+                           </item>
+                           <item>
+                            <widget class="QSpinBox" name="vesselProcessingSlicerZRangeMin">
+                             <property name="suffix">
+                              <string/>
+                             </property>
+                             <property name="prefix">
+                              <string/>
+                             </property>
+                             <property name="maximum">
+                              <number>65535</number>
+                             </property>
+                            </widget>
+                           </item>
+                           <item>
+                            <widget class="QLabel" name="label_41">
+                             <property name="text">
+                              <string>max:</string>
+                             </property>
+                            </widget>
+                           </item>
+                           <item>
+                            <widget class="QSpinBox" name="vesselProcessingSlicerZRangeMax">
+                             <property name="suffix">
+                              <string/>
+                             </property>
+                             <property name="maximum">
+                              <number>65535</number>
+                             </property>
+                            </widget>
+                           </item>
+                          </layout>
+                         </item>
+                        </layout>
+                       </widget>
+                      </item>
+                      <item row="3" column="1">
+                       <widget class="QDialogButtonBox" name="postProcessVesselTypesPlotButtonBox">
+                        <property name="standardButtons">
+                         <set>QDialogButtonBox::Apply|QDialogButtonBox::Close</set>
+                        </property>
+                        <property name="applyText" stdset="0">
+                         <string>Plot reduced</string>
+                        </property>
+                       </widget>
+                      </item>
+                     </layout>
                     </item>
                    </layout>
                   </item>
@@ -642,22 +1139,6 @@
              </widget>
             </widget>
            </widget>
-           <widget class="QDialogButtonBox" name="postProcessVesselTypesButtonBox">
-            <property name="geometry">
-             <rect>
-              <x>10</x>
-              <y>290</y>
-              <width>345</width>
-              <height>24</height>
-             </rect>
-            </property>
-            <property name="standardButtons">
-             <set>QDialogButtonBox::Apply</set>
-            </property>
-            <property name="applyText" stdset="0">
-             <string>Process</string>
-            </property>
-           </widget>
           </widget>
           <widget class="QWidget" name="Vasculature_Analysis">
            <property name="geometry">
@@ -665,7 +1146,7 @@
              <x>0</x>
              <y>0</y>
              <width>365</width>
-             <height>571</height>
+             <height>575</height>
             </rect>
            </property>
            <attribute name="label">
@@ -681,15 +1162,15 @@
              </rect>
             </property>
             <property name="currentIndex">
-             <number>1</number>
+             <number>0</number>
             </property>
             <widget class="QWidget" name="graphVisulization">
              <property name="geometry">
               <rect>
                <x>0</x>
                <y>0</y>
-               <width>100</width>
-               <height>30</height>
+               <width>501</width>
+               <height>121</height>
               </rect>
              </property>
              <attribute name="label">
@@ -701,8 +1182,8 @@
               <rect>
                <x>0</x>
                <y>0</y>
-               <width>501</width>
-               <height>119</height>
+               <width>100</width>
+               <height>30</height>
               </rect>
              </property>
              <attribute name="label">
@@ -803,12 +1284,12 @@
    <slot>setEnabled(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>56</x>
-     <y>289</y>
+     <x>59</x>
+     <y>112</y>
     </hint>
     <hint type="destinationlabel">
-     <x>62</x>
-     <y>317</y>
+     <x>65</x>
+     <y>151</y>
     </hint>
    </hints>
   </connection>

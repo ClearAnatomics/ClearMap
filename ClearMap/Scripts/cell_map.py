@@ -115,13 +115,13 @@ class CellDetector(TabProcessor):
 
     def voxelize(self, postfix=''):
         self.processing_config.reload()
-        coordinates, source, voxelization_parameter = self.get_voxelization_params(postfix=postfix)
+        coordinates, cells, voxelization_parameter = self.get_voxelization_params(postfix=postfix)
         # %% Unweighted
-        coordinates, counts_file_path = self.voxelize_unweighted(coordinates, source, voxelization_parameter)
+        coordinates, counts_file_path = self.voxelize_unweighted(coordinates, voxelization_parameter)
         if self.processing_config['voxelization']['preview']['counts']:
             self.plot_voxelized_counts()
         # %% Weighted
-        # intensities_file_path = self.voxelize_weighted(coordinates, source, voxelization_parameter)  # WARNING: Currently causing issues
+        # intensities_file_path = self.voxelize_weighted(coordinates, cells, voxelization_parameter)  # WARNING: Currently causing issues
         # if self.processing_config['voxelization']['preview']['densities']:
         #     self.plot_voxelized_intensities()
 
@@ -133,20 +133,17 @@ class CellDetector(TabProcessor):
 
     def get_voxelization_params(self, postfix=''):
         voxelization_parameter = {
-            'shape': clearmap_io.shape(self.annotation_file),
+            'shape': self.preprocessor.resampled_shape,
             'radius': self.processing_config['voxelization']['radii'],
             'verbose': True
         }
         if postfix:
-            source = self.workspace.source('cells', postfix=postfix)  # Hack to compensate for the fact that the realigned makes no sense in
-            coordinates = np.array([source[axis] for axis in 'xyz']).T
+            cells = self.workspace.source('cells', postfix=postfix)  # Hack to compensate for the fact that the realigned makes no sense in
+            coordinates = np.array([cells[axis] for axis in 'xyz']).T
         else:
-            source = self.workspace.source('cells')
-            coordinates = np.array([source[n] for n in ['xt', 'yt', 'zt']]).T
-        return coordinates, source, voxelization_parameter
-
-    def _get_voxelization_shape(self):
-        return clearmap_io.shape(self.preprocessor.annotation_file_path)
+            cells = self.workspace.source('cells')
+            coordinates = np.array([cells[n] for n in ['xt', 'yt', 'zt']]).T
+        return coordinates, cells, voxelization_parameter
 
     # def voxelize_chunk(self):
     #     self.workspace.debug = True
@@ -166,14 +163,16 @@ class CellDetector(TabProcessor):
         coordinates = np.array([table[axis] for axis in ['x', 'y', 'z']]).T
         return coordinates
 
-    def voxelize_unweighted(self, coordinates, source, voxelization_parameter):
+    def voxelize_unweighted(self, coordinates, voxelization_parameter):
         """
         Voxelize un weighted i.e. for cell counts
 
         Parameters
         ----------
-        source
-            Source.Source
+        coordinates
+            str, array or Source
+            Source of point of nxd coordinates.
+
         voxelization_parameter
             dict
 

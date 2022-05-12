@@ -1006,12 +1006,12 @@ class CellMapParams(UiParameter):
 
 
 class VesselParams(UiParameterCollection):
-    def __init__(self, tab, src_folder=None):
+    def __init__(self, tab, sample_params, preprocessing_params, src_folder=None):
         super().__init__(tab, src_folder)
         # self.sample_params = sample_params  # TODO: check if required
         # self.preprocessing_params = preprocessing_params  # TODO: check if required
         self.binarization_params = VesselBinarizationParams(tab, src_folder)
-        self.graph_params = VesselGraphParams(tab, src_folder)
+        self.graph_params = VesselGraphParams(tab,  sample_params, preprocessing_params, src_folder)
         self.visualization_params = VesselVisualizationParams(tab, src_folder)
 
     @property
@@ -1154,6 +1154,11 @@ class VesselBinarizationParams(UiParameter):
 
 
 class VesselGraphParams(UiParameter):
+    def __init__(self, tab, sample_params=None, preprocessing_params=None, src_folder=None):
+        super().__init__(tab, src_folder)
+        self.sample_params = sample_params
+        self.preprocessing_params = preprocessing_params
+
     def connect(self):
         self.tab.veinIntensityRangeOnArteriesChannelDoublet.valueChangedConnect(
             self.handle_vein_intensity_range_on_arteries_channel_changed)
@@ -1168,6 +1173,20 @@ class VesselGraphParams(UiParameter):
         self.tab.maxVeinsTracingIterationsSpinBox.valueChanged.connect(self.handle_max_veins_tracing_iterations_changed)
         self.tab.minArterySizeSpinBox.valueChanged.connect(self.handle_min_artery_size_changed)
         self.tab.minVeinSizeSpinBox.valueChanged.connect(self.handle_min_vein_size_changed)
+
+        self.tab.graphConstructionSlicerXRangeMin.valueChanged.connect(self.handle_x_val_change)  # REFACTOR: this feels messy having the repeats
+        self.tab.graphConstructionSlicerXRangeMax.valueChanged.connect(self.handle_x_val_change)
+        self.tab.graphConstructionSlicerYRangeMin.valueChanged.connect(self.handle_y_val_change)
+        self.tab.graphConstructionSlicerYRangeMax.valueChanged.connect(self.handle_y_val_change)
+        self.tab.graphConstructionSlicerZRangeMin.valueChanged.connect(self.handle_z_val_change)
+        self.tab.graphConstructionSlicerXRangeMax.valueChanged.connect(self.handle_z_val_change)
+
+        self.tab.vesselProcessingSlicerXRangeMin.valueChanged.connect(self.handle_x_val_change)
+        self.tab.vesselProcessingSlicerXRangeMax.valueChanged.connect(self.handle_x_val_change)
+        self.tab.vesselProcessingSlicerYRangeMin.valueChanged.connect(self.handle_y_val_change)
+        self.tab.vesselProcessingSlicerYRangeMax.valueChanged.connect(self.handle_y_val_change)
+        self.tab.vesselProcessingSlicerZRangeMin.valueChanged.connect(self.handle_z_val_change)
+        self.tab.vesselProcessingSlicerZRangeMax.valueChanged.connect(self.handle_z_val_change)
 
     @property
     def config(self):
@@ -1184,6 +1203,96 @@ class VesselGraphParams(UiParameter):
         self.max_veins_tracing_iterations = self.config['tracing']['max_veins_iterations']
         self.min_artery_size = self.config['capillaries_removal']['min_artery_size']
         self.min_vein_size = self.config['capillaries_removal']['min_vein_size']
+
+        try:
+            self._crop_values_from_cfg()
+        except KeyError as err:
+            print('Could not load crop values from tube_map_params.cfg, {}'.format(err))
+
+    def _crop_values_from_cfg(self):
+        cfg = self._config['graph_construction']['slicing']  # TODO: if 99.9 % source put to 100% (None)
+        self.crop_x_min, self.crop_x_max = cfg['dim_0']
+        self.crop_y_min, self.crop_y_max = cfg['dim_1']
+        self.crop_z_min, self.crop_z_max = cfg['dim_2']
+
+    @property
+    def ratios(self):
+        raw_res = np.array(self.sample_params.raw_resolution)
+        atlas_res = np.array(self.preprocessing_params.registration.raw_atlas_resolution)
+        ratios = raw_res / atlas_res  # to original
+        return ratios
+
+    @property
+    def crop_x_min(self):
+        return self.tab.graphConstructionSlicerXRangeMin.value()
+
+    @crop_x_min.setter
+    def crop_x_min(self, val):
+        self.tab.graphConstructionSlicerXRangeMin.setValue(val)
+        self.tab.vesselProcessingSlicerXRangeMin.setValue(val)
+
+    @property
+    def crop_x_max(self):  # TODO: if 99.9 % source put to 100% (None)
+        return self.tab.graphConstructionSlicerXRangeMax.value()
+
+    @crop_x_max.setter
+    def crop_x_max(self, val):
+        self.tab.graphConstructionSlicerXRangeMax.setValue(val)
+        self.tab.vesselProcessingSlicerXRangeMax.setValue(val)
+
+    def handle_x_val_change(self):
+        self._config['graph_construction']['slicing']['dim_0'] = self.crop_x_min, self.crop_x_max
+
+    def scale_x(self, val):
+        return round(val * self.ratios[0])
+
+    @property
+    def crop_y_min(self):
+        return self.tab.graphConstructionSlicerYRangeMin.value()
+
+    @crop_y_min.setter
+    def crop_y_min(self, val):
+        self.tab.graphConstructionSlicerYRangeMin.setValue(val)
+        self.tab.vesselProcessingSlicerYRangeMin.setValue(val)
+
+    @property
+    def crop_y_max(self):  # TODO: if 99.9 % source put to 100% (None)
+        return self.tab.graphConstructionSlicerYRangeMax.value()
+
+    @crop_y_max.setter
+    def crop_y_max(self, val):
+        self.tab.graphConstructionSlicerYRangeMax.setValue(val)
+        self.tab.vesselProcessingSlicerYRangeMax.setValue(val)
+
+    def handle_y_val_change(self):
+        self._config['graph_construction']['slicing']['dim_1'] = self.crop_y_min, self.crop_y_max
+
+    def scale_y(self, val):
+        return round(val * self.ratios[1])
+
+    @property
+    def crop_z_min(self):
+        return self.tab.graphConstructionSlicerZRangeMin.value()
+
+    @crop_z_min.setter
+    def crop_z_min(self, val):
+        self.tab.graphConstructionSlicerZRangeMin.setValue(val)
+        self.tab.vesselProcessingSlicerZRangeMin.setValue(val)
+
+    @property
+    def crop_z_max(self):  # TODO: if 99.9 % source put to 100% (None)
+        return self.tab.graphConstructionSlicerZRangeMax.value()
+
+    @crop_z_max.setter
+    def crop_z_max(self, val):
+        self.tab.graphConstructionSlicerZRangeMax.setValue(val)
+        self.tab.vesselProcessingSlicerZRangeMax.setValue(val)
+
+    def handle_z_val_change(self):
+        self._config['graph_construction']['slicing']['dim_2'] = self.crop_z_min, self.crop_z_max
+
+    def scale_z(self, val):
+        return round(val * self.ratios[2])
     
     @property
     def vein_intensity_range_on_arteries_channel(self):

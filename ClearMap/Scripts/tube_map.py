@@ -11,6 +11,7 @@ import os
 import re
 
 import numpy as np
+import vispy
 
 import ClearMap.IO.IO as clearmap_io
 import ClearMap.Alignment.Annotation as annotation_module
@@ -28,7 +29,7 @@ import ClearMap.Analysis.Measurements.Voxelization as voxelization
 import ClearMap.ParallelProcessing.BlockProcessing as block_processing
 
 from ClearMap.Visualization.Qt import Plot3d as q_p3d
-from ClearMap.Visualization.Vispy import PlotGraph3d as plot_graph_3d  # FIXME: vispy dependency
+from ClearMap.Visualization.Vispy import PlotGraph3d as plot_graph_3d  # WARNING: vispy dependency
 
 from ClearMap.Utils.utilities import is_in_range, get_free_v_ram
 
@@ -182,7 +183,7 @@ class BinaryVesselProcessor(TabProcessor):
                                 processing_parameter=postprocessing_processing_parameter,
                                 processes=None, verbose=True)
 
-        # q_p3d.plot([[source, sink]])
+        # q_p3d.plot([[source, sink]])  FIXME:
 
     def binarize(self):  # TODO: check real n blocks for post_processing
         # Raw
@@ -229,7 +230,7 @@ class BinaryVesselProcessor(TabProcessor):
             postfix_base += '_'
         source = self.steps.path(self.steps.postprocessed, step_back=True)
         sink = self.workspace.filename('binary', postfix='{}filled'.format(postfix_base))
-        q_p3d.plot([source, sink], arange=False, lut=self.machine_config['default_lut'], parent=parent)
+        return q_p3d.plot([source, sink], arange=False, lut=self.machine_config['default_lut'], parent=parent)
 
     def fill_vessels(self):
         if not get_free_v_ram() > 22000:
@@ -281,7 +282,7 @@ class BinaryVesselProcessor(TabProcessor):
                                 processes=None, verbose=True)
         # clearmap_io.delete_file(workspace.filename('binary', postfix='combined')  # TODO: check since temporary
         # if plot:
-        #     q_p3d.plot([source, sink])
+        #     return q_p3d.plot([source, sink], arange=False, parent=parent)
 
 
 class VesselGraphProcessor(TabProcessor):
@@ -413,31 +414,52 @@ class VesselGraphProcessor(TabProcessor):
         self.graph_reduced = graph_reduced
         # graph_reduced = graph_gt.load(self.workspace.filename('graph', postfix='reduced'))
 
-    def visualize_graph_annotations(self):
-        artery_label = self.graph_reduced.edge_property('artery_binary')
-        artery_color = np.array([[1, 0, 0, 1], [0, 0, 1, 1]])[artery_label]
-        plot_graph_3d.plot_graph_line(self.graph_reduced, edge_color=artery_color)
-        plot_graph_3d.plot_graph_mesh(self.graph_reduced, edge_colors=artery_color)
-        plot_graph_3d.plot_graph_edge_property(self.graph_reduced, edge_property='artery_raw',
-                                               percentiles=[2, 98], normalize=True, mesh=True)
+    def visualize_graph_annotations(self, chunk_range, plot_type='mesh', graph_step='reduced'):
+        graph_steps = {
+            'cleaned': self.graph_cleaned,
+            'reduced': self.graph_reduced,
+            'annotated': self.annotated_graph
+        }
+        try:
+            graph_chunk = graph_steps[graph_step].sub_slice(chunk_range)
+        except KeyError:
+            raise ValueError('graph step {} not recognised, available steps are {}'
+                             .format(graph_step, graph_steps.keys()))
+
+        # region_label = self.graph_reduced.vertex_properties('annotation')
+        # region_color = np.array([[1, 0, 0, 1], [0, 0, 1, 1]])[region_label]
+
+        region_color = annotation_module.convert_label(graph_chunk.vertex_annotation(), key='order', value='rgba')
+        if plot_type == 'line':
+            scene = plot_graph_3d.plot_graph_line(graph_chunk, vertex_colors=region_color)
+        elif plot_type == 'mesh':
+            scene = plot_graph_3d.plot_graph_mesh(graph_chunk, vertex_colors=region_color)
+        elif plot_type == 'edge_property':
+            scene = plot_graph_3d.plot_graph_edge_property(graph_chunk, edge_property='artery_raw',
+                                                           percentiles=[2, 98], normalize=True, mesh=True)
+        else:
+            raise ValueError('Unrecognised plot type  "{}"'.format(plot_type))
+        scene.canvas.bgcolor = vispy.color.color_array.Color(self.machine_config['three_d_plot_bg'])
+        return [scene.canvas.native]
 
     # Atlas registration and annotation
     def _transform(self):
         def transformation(coordinates):
             coordinates = resampling_module.resample_points(
-                coordinates, sink=None, orientation=None,  # FIXME: no orientation ?
+                coordinates, sink=None,
                 source_shape=clearmap_io.shape(self.workspace.filename('binary', postfix='final')),
                 sink_shape=clearmap_io.shape(self.workspace.filename('resampled')))
 
-            coordinates = elastix.transform_points(
-                coordinates, sink=None,
-                transform_directory=self.workspace.filename('resampled_to_auto'),
-                binary=True, indices=False)
+            if self.preprocessor.was_registered:
+                coordinates = elastix.transform_points(
+                    coordinates, sink=None,
+                    transform_directory=self.workspace.filename('resampled_to_auto'),
+                    binary=True, indices=False)
 
-            coordinates = elastix.transform_points(
-                coordinates, sink=None,
-                transform_directory=self.workspace.filename('auto_to_reference'),
-                binary=True, indices=False)
+                coordinates = elastix.transform_points(
+                    coordinates, sink=None,
+                    transform_directory=self.workspace.filename('auto_to_reference'),
+                    binary=True, indices=False)
 
             return coordinates
 
@@ -497,8 +519,9 @@ class VesselGraphProcessor(TabProcessor):
     def register(self):
         self._transform()
         self._scale()
-        self._annotate()
-        self._compute_distance_to_surface()
+        if self.preprocessor.was_registered:
+            self._annotate()
+            self._compute_distance_to_surface()
         annotated_graph = self.graph_reduced.largest_component()  # TODO: explanation
         annotated_graph.save(self.workspace.filename('graph', postfix='annotated'))
         self.annotated_graph = annotated_graph
@@ -667,5 +690,5 @@ class VesselGraphProcessor(TabProcessor):
                                                     dtype='float32',
                                                     **voxelize_branch_parameter)
 
-    def plot_voxelization(self):
-        q_p3d.plot(self.branch_density)
+    def plot_voxelization(self, parent):
+        return q_p3d.plot(self.branch_density, arange=False, parent=parent)

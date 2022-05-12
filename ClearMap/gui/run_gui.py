@@ -115,6 +115,11 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         for btn_box in self.findChildren(QDialogButtonBox):
             if btn_box.property('applyText'):
                 btn_box.button(QDialogButtonBox.Apply).setText(btn_box.property('applyText'))
+            if btn_box.property('okText'):
+                btn_box.button(QDialogButtonBox.Ok).setText(btn_box.property('okText'))
+            if btn_box.property('openText'):
+                btn_box.button(QDialogButtonBox.Open).setText(btn_box.property('openText'))
+
 
     def fix_styles(self):
         self.sample_tab.sampleIdButtonBox.button(QDialogButtonBox.Apply).setIcon(self.__reload_icon)
@@ -425,10 +430,22 @@ class ClearMapGui(ClearMapGuiBase):
         self.tabWidget.insertTab(3, self.vasculature_tab, 'Vasculature')
 
         self.vasculature_tab.binarizationButtonBox.connectApply(self.binarize_vessels)
+        self.vasculature_tab.plotBinarizationButtonBox.connectApply(self.plot_binarization_results)
         self.vasculature_tab.fillVesselsButtonBox.connectApply(self.fill_vessels)
-        # self.vasculature_tab.fillVesselsButtonBox.connectClose()  # FIXME:
+        self.vasculature_tab.plotFillVesselsButtonBox.connectApply(self.plot_vessel_filling_results)
+        self.vasculature_tab.plotFillVesselsButtonBox.connectClose(self._remove_old_plots)
         self.vasculature_tab.buildGraphButtonBox.connectApply(self.build_graph)
+
+        self.vasculature_tab.graphConstructionSlicerButtonBox.connectOpen(self.plot_graph_construction_chunk_slicer)
+        # self.display_cleaned_graph_chunk
+        self.vasculature_tab.graphConstructionPlotGraphButtonBox.connectApply(self.display_reduced_graph_chunk)
+        self.vasculature_tab.graphConstructionPlotGraphButtonBox.connectOk(self.display_annotated_graph_chunk)  # TODO: clean use other buttons
+        self.vasculature_tab.graphConstructionPlotGraphButtonBox.connectClose(self._remove_old_plots)
+
         self.vasculature_tab.postProcessVesselTypesButtonBox.connectApply(self.post_process_graph)
+        self.vasculature_tab.postProcessVesselTypesSlicerButtonBox.connectOpen(self.plot_graph_type_processing_chunk_slicer)
+        self.vasculature_tab.postProcessVesselTypesPlotButtonBox.connectApply(self.display_annotated_graph_chunk)
+        self.vasculature_tab.postProcessVesselTypesPlotButtonBox.connectClose(self._remove_old_plots)
 
     def setup_preferences_editor(self):
         cls, _ = loadUiType('ClearMap/gui/preferences_editor.ui', patch_parent_class='QDialog')
@@ -556,7 +573,7 @@ class ClearMapGui(ClearMapGuiBase):
                 error = True
             self.cell_detector = CellDetector()
         if self.processing_params.pipeline_is_tube_map:  # WARNING: should not be exclusive
-            self.vessel_params = VesselParams(self.vasculature_tab)
+            self.vessel_params = VesselParams(self.vasculature_tab, self.sample_params, self.processing_params)
             try:
                 self.vessel_params.get_config(self.__get_cfg_path('tube_map')[1])
             except ConfigNotFoundError:
@@ -710,21 +727,23 @@ class ClearMapGui(ClearMapGuiBase):
 
     # ################################  CELL MAP  #################################
 
-    def plot_debug_cropping_interface(self):
-        img = self.cell_detector.workspace.source('resampled')
-        self.ortho_viewer.setup(img, self.cell_map_params, parent=self)
+    def plot_slicer(self, slicer_prefix, tab, params):
+        if self.preprocessor.was_registered:
+            img = self.preprocessor.workspace.source(self.preprocessor.annotation_file_path)  # TEST:
+        else:
+            img = self.preprocessor.workspace.source(self.preprocessor.workspace.filename('resampled'))  # TEST:
+        self.ortho_viewer.setup(img, params, parent=self)
         dvs = self.ortho_viewer.plot_orthogonal_views()
         self.ortho_viewer.add_cropping_bars()
         self.setup_plots(dvs, ['x', 'y', 'z'])
 
         # WARNING: needs to be done after setup
-        # OPTIMISE: try clearmap_io.shape(self.preprocessor.workspace('stitched'))
-        shape = self.preprocessor.workspace.source('stitched').shape
-        self.cell_map_tab.detectionSubsetXRangeMax.setMaximum(shape[0])
-        self.cell_map_tab.detectionSubsetYRangeMax.setMaximum(shape[1])
-        self.cell_map_tab.detectionSubsetZRangeMax.setMaximum(shape[2])
-
+        for axis, ax_max in zip('XYZ', self.preprocessor.raw_stitched_shape):
+            getattr(tab, '{}XRangeMax'.format(slicer_prefix)).setMaximum(ax_max)
         self.ortho_viewer.update_ranges()
+
+    def plot_debug_cropping_interface(self):
+        self.plot_slicer('detectionSubset', self.cell_map_tab, self.cell_map_params)
 
     def create_cell_detection_tuning_sample(self):
         slicing = (slice(self.cell_map_params.crop_x_min, self.cell_map_params.crop_x_max),
@@ -770,7 +789,25 @@ class ClearMapGui(ClearMapGuiBase):
         self.setup_plots(dvs)
 
     def plot_cell_filter_results(self):
-        dvs = self.cell_detector.plot_filtered_cells(smarties=True)
+        # dvs = self.cell_detector.plot_filtered_cells(smarties=True)  FIXME: revert
+
+        import ClearMap.Visualization.Qt.Plot3d as qplot_3d
+        from ClearMap.gui.widgets import Scatter3D
+
+        # coordinates = self.get_coords('filtered')
+        dvs = qplot_3d.plot('/data/test_annotation_alignement/resampled.tif',
+                            arange=False, lut='white', parent=self)
+
+        coordinates = np.load('/data/test_annotation_alignement/cells.npy')
+        coordinates = np.vstack((coordinates['xt'], coordinates['yt'], coordinates['zt'])).T
+        coordinates = coordinates.astype(np.int64)
+        colors = np.load('/data/test_annotation_alignement/cells_colors.npy') * 255
+        cells = Scatter3D(coordinates, colors=colors)
+        scatter = pg.ScatterPlotItem()
+        dvs[0].view.addItem(scatter)
+        dvs[0].scatter_coords = cells
+        dvs[0].scatter = scatter
+        dvs[0].updateSlice()
         self.setup_plots(dvs)
 
     def preview_cell_filter(self):
@@ -816,6 +853,11 @@ class ClearMapGui(ClearMapGuiBase):
         self.progress_dialog.done(1)
         self.print_status_msg('Vessels binarized')
 
+    def plot_binarization_results(self):
+        dvs = self.binary_vessel_processor.plot_binarization_result(parent=self)
+        link_dataviewers_cursors(dvs)
+        self.setup_plots(dvs, ['stitched', 'binary'])
+
     def fill_vessels(self):
         self.vessel_params.ui_to_cfg()
         self.print_status_msg('Starting vessel filling')
@@ -828,6 +870,11 @@ class ClearMapGui(ClearMapGuiBase):
         self.progress_dialog.done(1)
         self.print_status_msg('Vessel filling done')
 
+    def plot_vessel_filling_results(self):
+        dvs = self.binary_vessel_processor.plot_vessel_filling_results()
+        link_dataviewers_cursors(dvs)
+        self.setup_plots(dvs)
+
     def build_graph(self):
         self.vessel_params.ui_to_cfg()
         self.print_status_msg('Building vessel graph')
@@ -836,6 +883,36 @@ class ClearMapGui(ClearMapGuiBase):
         self.wrap_in_thread(self.vessel_graph_processor.pre_process)
         self.progress_dialog.done(1)
         self.print_status_msg('Building vessel graph done')
+
+    def plot_graph_construction_chunk_slicer(self):
+        self.tube_map_params._crop_values_from_cfg()  # Fix for lack of binding between 2 sets of range interfaces
+        self.plot_slicer('graphConstructionSlicer', self.tube_map_tab, self.tube_map_params)
+
+    def plot_graph_type_processing_chunk_slicer(self):
+        self.tube_map_params._crop_values_from_cfg()  # Fix for lack of binding between 2 sets of range interfaces
+        self.plot_slicer('vesselProcessingSlicer', self.tube_map_tab, self.tube_map_params)
+
+    def __get_tube_map_slicing(self):
+        self.tube_map_params._crop_values_from_cfg()  # Fix for lack of binding between 2 sets of range interfaces
+        slicing = (slice(self.tube_map_params.crop_x_min, self.tube_map_params.crop_x_max),
+                   slice(self.tube_map_params.crop_y_min, self.tube_map_params.crop_y_max),
+                   slice(self.tube_map_params.crop_z_min, self.tube_map_params.crop_z_max))
+        return slicing
+
+    def display_cleaned_graph_chunk(self):
+        slicing = self.__get_tube_map_slicing()
+        dvs = self.vessel_graph_processor.visualize_graph_annotations(slicing, plot_type='mesh', graph_step='cleaned')
+        self.setup_plots(dvs)
+
+    def display_reduced_graph_chunk(self):
+        slicing = self.__get_tube_map_slicing()
+        dvs = self.vessel_graph_processor.visualize_graph_annotations(slicing, plot_type='mesh', graph_step='reduced')
+        self.setup_plots(dvs)
+
+    def display_annotated_graph_chunk(self):
+        slicing = self.__get_tube_map_slicing()
+        dvs = self.vessel_graph_processor.visualize_graph_annotations(slicing, plot_type='mesh', graph_step='annotated')
+        self.setup_plots(dvs)
 
     def post_process_graph(self):
         self.vessel_params.ui_to_cfg()
