@@ -52,7 +52,7 @@ from ClearMap.gui.gui_utils import QDARKSTYLE_BACKGROUND, DARK_BACKGROUND, np_to
     html_to_ansi, html_to_plain_text, compute_grid, surface_project, format_long_nb_to_str, \
     link_dataviewers_cursors  # needs plot_3d
 
-from ClearMap.gui.widgets import OrthoViewer, PbarWatcher  # needs plot_3d
+from ClearMap.gui.widgets import OrthoViewer, PbarWatcher, PatternDialog  # needs plot_3d
 from ClearMap.Visualization import Plot3d as plot_3d
 update_pbar(app, progress_bar, 20)
 from ClearMap.Scripts.sample_preparation import PreProcessor
@@ -366,6 +366,8 @@ class ClearMapGui(ClearMapGuiBase):
         self.sample_tab.srcFolderBtn.clicked.connect(self.set_src_folder)
         self.sample_tab.sampleIdButtonBox.connectApply(self.parse_cfg)
 
+        self.sample_tab.launchPatternWizzardPushButton.clicked.connect(self.launch_pattern_wizzard)
+
         self.sample_tab.plotMiniBrainPushButton.clicked.connect(self.plot_mini_brain)
 
         self.sample_tab.applyBox.connectApply(self.setup_preprocessor)
@@ -599,6 +601,11 @@ class ClearMapGui(ClearMapGuiBase):
         self.config_loader.src_dir = self.src_folder
         self.sample_params = SampleParameters(self.sample_tab, self.src_folder)
         self.processing_params = PreprocessingParams(self.preprocessing_tab)
+
+    def launch_pattern_wizzard(self):
+        dlg = PatternDialog(self.src_folder)
+        dlg.exec()  # FIXME: check result
+        self.sample_params.cfg_to_ui()
 
     @property
     def src_folder(self):

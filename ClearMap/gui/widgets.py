@@ -1,12 +1,17 @@
+import os
 import re
 
 import numpy as np
 import pyqtgraph as pg
 from PyQt5 import QtGui, QtCore
 from PyQt5.QtCore import QRectF
-from PyQt5.QtWidgets import QWidget
+from PyQt5.QtWidgets import QWidget, QDialogButtonBox
 
+from ClearMap.IO.metadata import pattern_finders_from_base_dir
 from ClearMap.Visualization import Plot3d as plot_3d
+from ClearMap.config.config_loader import ConfigLoader
+from ClearMap.gui.dialogs import make_splash
+from ClearMap.gui.pyuic_utils import loadUiType
 
 
 class RectItem(pg.GraphicsObject):  # Derived from https://stackoverflow.com/a/60012800
@@ -341,3 +346,112 @@ class Scatter3D:
 
     def get_pos(self, z):
         return self.coordinates[self.coordinates[:, 2] == z][:, :2]
+
+
+class PatternDialog:
+    def __init__(self, src_folder, app=None):
+        self.src_folder = src_folder
+        self.app = app
+
+        cls, _ = loadUiType('ClearMap/gui/pattern_prompt.ui', patch_parent_class='QDialog')
+        dlg = cls()
+        dlg.setWindowTitle('File paths wizzard')
+        dlg.setupUi()
+        self.dlg = dlg
+        self.fix_btn_boxes_text()
+        self.connect_buttons()
+
+        self.pattern_strings = {}
+        self.patterns_finders = self.get_patterns()
+
+        for pattern_idx, p_finder in enumerate(self.patterns_finders):
+            for subpattern_idx, digit_cluster in enumerate(p_finder.pattern.digit_clusters):
+                label_widget, pattern_widget, combo_widget = self.get_widgets(pattern_idx, subpattern_idx)
+                pattern_widget.setText(p_finder.pattern.highlight_digits(subpattern_idx))
+                self.enable_widgets((label_widget, pattern_widget, combo_widget))
+            for subpattern_idx in range(subpattern_idx + 1, 4):
+                self.hide_widgets(self.get_widgets(pattern_idx, subpattern_idx))
+
+    def connect_buttons(self):
+        self.dlg.pattern0ButtonBox.button(QDialogButtonBox.Apply).clicked.connect(self.validate_pattern0)
+        self.dlg.pattern1ButtonBox.button(QDialogButtonBox.Apply).clicked.connect(self.validate_pattern1)
+        self.dlg.pattern2ButtonBox.button(QDialogButtonBox.Apply).clicked.connect(self.validate_pattern2)
+
+        self.dlg.mainButtonBox.button(QDialogButtonBox.Apply).clicked.connect(self.save_results)
+
+    def save_results(self):
+        config_loader = ConfigLoader(self.src_folder)
+        sample_cfg = config_loader.get_cfg('sample')
+        for channel_name, pattern_string in self.pattern_strings.items():
+            sample_cfg['src_paths'][channel_name] = pattern_string
+        sample_cfg.write()
+
+    def __validate_pattern(self, pattern_idx):
+        pattern = self.patterns_finders[pattern_idx].pattern
+        for subpattern_idx, digit_cluster in enumerate(pattern.digit_clusters):
+            _, _, combo_widget = self.get_widgets(pattern_idx, subpattern_idx)
+            axis_name = combo_widget.currentText()
+            n_axis_chars = len(pattern.digit_clusters[subpattern_idx])
+
+            if axis_name == 'C':
+                raise NotImplementedError('Channel splitting is not implemented yet')
+            else:
+                pattern_element = '<{axis},{length}>'.format(axis=axis_name, length=n_axis_chars)
+                pattern.pattern_elements[subpattern_idx] = pattern_element
+
+        result_widget = getattr(self.dlg, 'result_{}'.format(pattern_idx))
+        pattern_string = pattern.get_formatted_pattern()
+        pattern_string = os.path.join(self.patterns_finders[pattern_idx].folder, pattern_string)
+
+        result_widget.setText(pattern_string)
+
+        channel_name = getattr(self.dlg, 'channelComboBox{}'.format(pattern_idx)).currentText()
+        self.pattern_strings[channel_name] = pattern_string
+
+    def validate_pattern0(self):
+        self.__validate_pattern(0)
+
+    def validate_pattern1(self):
+        self.__validate_pattern(1)
+
+    def validate_pattern2(self):
+        self.__validate_pattern(2)
+
+    def fix_btn_boxes_text(self):
+        for btn_box in self.dlg.findChildren(QDialogButtonBox):
+            if btn_box.property('applyText'):
+                btn_box.button(QDialogButtonBox.Apply).setText(btn_box.property('applyText'))
+
+    def get_patterns(self):
+        splash, progress_bar = make_splash(bar_max=0)
+        splash.show()  # TODO: other thread to show at the same time
+        # update_pbar(self.app, progress_bar, 10)
+        # self.app.processEvents()
+        pattern_finders = pattern_finders_from_base_dir(self.src_folder)
+        splash.finish(self.dlg)
+        return pattern_finders
+
+    def get_widgets(self, pattern_idx, subpattern_idx):
+        label_widget = getattr(self.dlg, 'label{}_{}'.format(pattern_idx, subpattern_idx))
+        pattern_widget = getattr(self.dlg, 'pattern{}_{}'.format(pattern_idx, subpattern_idx))
+        combo_widget = getattr(self.dlg, 'pattern{}_{}ComboBox'.format(pattern_idx, subpattern_idx))
+        return label_widget, pattern_widget, combo_widget
+
+    def enable_widgets(self, widget_list):  # REFACTOR: parent dialog class
+        for w in widget_list:
+            w.setEnabled(True)
+
+    def disable_widgets(self, widget_list):  # REFACTOR: parent dialog class
+        for w in widget_list:
+            w.setEnabled(False)
+
+    def hide_widgets(self, widget_list):  # REFACTOR: parent dialog class
+        for w in widget_list:
+            w.setHidden(True)
+
+    def unhide_widgets(self, widget_list):  # REFACTOR: parent dialog class
+        for w in widget_list:
+            w.setHidden(False)
+
+    def exec(self):
+        self.dlg.exec()

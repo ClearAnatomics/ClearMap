@@ -1,6 +1,9 @@
 import os
 from copy import deepcopy
 
+
+import pandas as pd
+
 import tifffile
 from PIL import Image
 
@@ -133,3 +136,136 @@ def get_file_path(cfg, path_name):
 
 def get_base_dir(cfg):
     return os.path.expanduser(cfg['base_directory'])
+
+
+##################################################################################################################
+
+def get_ome_tiffs(folder):
+    return [f_name for f_name in os.listdir(folder) if f_name.endswith('.ome.tif')]
+
+
+def get_ome_tiff_list_from_sample_folder(src_dir):
+    data_dirs = {}
+    for f_name in os.listdir(src_dir):
+        f_path = os.path.join(src_dir, f_name)
+        if os.path.isdir(f_path):
+            ome_tiffs = get_ome_tiffs(f_path)
+            if len(ome_tiffs) > 10:
+                data_dirs[f_path] = ome_tiffs
+    return data_dirs
+
+
+def pattern_finders_from_base_dir(src_dir):
+    data_dirs = get_ome_tiff_list_from_sample_folder(src_dir)
+    finders = []
+    for path in data_dirs.keys():
+        sub_dir = path.replace(src_dir, '')
+        sub_dir = sub_dir[1:] if sub_dir.startswith(os.sep) else sub_dir
+        finders.append(PatternFinder(sub_dir, data_dirs[path]))
+    return finders
+
+
+class PatternFinder:  # FIXME: needs dir
+    def __init__(self, folder, tiff_list):
+        self.folder = folder
+        self.df = self.get_df_from_file_list(tiff_list)
+        self.pattern = Pattern(self.pattern_from_df(self.df))
+
+    def get_df_from_file_list(self, file_names):
+        df = pd.DataFrame()
+        for f_name in file_names:
+            df = pd.concat((df, pd.DataFrame(data=[c for c in f_name]).T))
+        return df
+
+    def split_channel(self, channel_order):
+        last_channel_idx = self.pattern.digit_clusters[channel_order][-1]
+        channel_values = self.df.loc[:, last_channel_idx].sort_values().unique()
+        pattern_finders = []
+        for channel in channel_values:
+            channel_df = self.df[self.df[last_channel_idx == channel]]
+            pattern_finders.append(PatternFinder(channel_df))
+        return pattern_finders
+
+    def pattern_from_df(self, df):
+        pattern = ''
+        row1 = df.iloc[0]
+        for i, col in enumerate(df):
+            if (df[col] == row1[i]).all():
+                pattern += row1[i]
+            else:
+                pattern += '?'
+        return self.__fix_pattern(pattern)
+
+    def __fix_pattern(self, pattern):
+        """
+        When not all digits are used in a zero padded pattern and were not detected.
+
+        Parameters
+        ----------
+        pattern
+
+        Returns
+        -------
+
+        """
+        pattern = list(pattern)
+        for i, c in enumerate(pattern[::-1]):
+            # print(i, c)
+            if c == '?':
+                if pattern[::-1][i + 1] == '0':
+                    pattern[(len(pattern) - 1) - (i + 1)] = '?'
+        return ''.join(pattern)
+
+
+class Pattern:
+    def __init__(self, pattern_str):
+        self.chunks = []
+        self.digit_clusters = []
+        self.pattern_elements = []  # e.g. ['<X,2>', '<Y,2>']
+        self.pattern_str = pattern_str
+        self.parse_pattern(pattern_str)
+
+    def get_formatted_pattern(self):
+        out = ''
+        for i in range(len(self.chunks)):
+            out += self.chunks[i]
+            if i < len(self.pattern_elements):
+                out += self.pattern_elements[i]
+        return out
+
+    def get_chars_before_cluster_idx(self, cluster_idx):
+        start_idx = self.digit_clusters[cluster_idx][0]
+        return self.pattern_str[:start_idx]
+
+    def get_chars_after_cluster_idx(self, cluster_idx):
+        end_idx = self.digit_clusters[cluster_idx][-1]
+        return self.pattern_str[end_idx+1:]
+
+    def highlight_digits(self, cluster_idx):
+        return '{}{}{}'.format(self.get_chars_before_cluster_idx(cluster_idx),
+                               self.hightlighted_q_marks(len(self.digit_clusters[cluster_idx])),
+                               self.get_chars_after_cluster_idx(cluster_idx))
+
+    def hightlighted_q_marks(self, n):
+        return '<span style="background-color:#60798B;text-color:#1A72BB">{}</span>'.format('?'*n)
+
+    def parse_pattern(self, pattern_str):
+        current_chunk = ''
+        current_digit_cluster = []
+        for i, c in enumerate(pattern_str):
+            if c == '?':
+                current_digit_cluster.append(i)
+                if current_chunk:
+                    self.chunks.append(current_chunk)
+                    current_chunk = ''
+                    continue
+            else:
+                if current_digit_cluster:
+                    self.digit_clusters.append(current_digit_cluster)
+                    self.pattern_elements.append('')
+                    current_digit_cluster = []
+                current_chunk += c
+        if current_chunk:
+            self.chunks.append(current_chunk)
+
+# pattern_finders_from_base_dir(cfg)
