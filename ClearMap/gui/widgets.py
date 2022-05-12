@@ -310,10 +310,13 @@ class PbarWatcher(QWidget):  # Inspired from https://stackoverflow.com/a/6626606
 
 
 class Scatter3D:
-    def __init__(self, coordinates, smarties=False):
+    def __init__(self, coordinates, smarties=False, colors=None):
         self.coordinates = coordinates
-        if smarties:
-            self.colours = np.random.randint(255, size=self.coordinates.shape)
+        if smarties or colors is not None:
+            if colors is not None:
+                self.colours = colors
+            else:
+                self.colours = np.random.randint(255, size=self.coordinates.shape)
         else:
             self.colours = None
 
@@ -342,7 +345,8 @@ class Scatter3D:
         return np.full(n_markers, marker_size)
 
     def get_colours(self, z):
-        return self.colours[self.coordinates[:, 2] == z]
+        points_in_current_slice = self.coordinates[:, 2] == z
+        return self.colours[points_in_current_slice]
 
     def get_pos(self, z):
         return self.coordinates[self.coordinates[:, 2] == z][:, :2]
