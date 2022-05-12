@@ -214,32 +214,40 @@ class CellDetector(TabProcessor):
         source = self.workspace.source('cells', postfix='filtered')
         coordinates = np.array([source[c] for c in 'xyz']).T
         coordinates_transformed = self.transform_coordinates(coordinates)
-        # Cell annotation
-        label = annotation.label_points(coordinates_transformed, key='order')
-        names = annotation.convert_label(label, key='order', value='name')
+
+        if self.preprocessor.was_registered:
+            # Cell annotation
+            annotation.set_annotation_file(self.preprocessor.annotation_file_path)
+            label = annotation.label_points(coordinates_transformed,
+                                            annotation_file=self.preprocessor.annotation_file_path, key='order')
+            names = annotation.convert_label(label, key='order', value='name')
+
         # Save results
         coordinates_transformed.dtype = [(t, float) for t in ('xt', 'yt', 'zt')]
-        label = np.array(label, dtype=[('order', int)])
-        names = np.array(names, dtype=[('name', 'U256')])
-        cells_data = recfunctions.merge_arrays([source[:], coordinates_transformed, label, names],
-                                               flatten=True, usemask=False)
+        arrays = [source[:], coordinates_transformed]
+        if self.preprocessor.was_registered:
+            label = np.array(label, dtype=[('order', int)])
+            names = np.array(names, dtype=[('name', 'U256')])
+        arrays.extend([label, names])
+        cells_data = recfunctions.merge_arrays(arrays, flatten=True, usemask=False)
         clearmap_io.write(self.workspace.filename('cells'), cells_data)
 
     def transform_coordinates(self, coords):
         coords = resampling.resample_points(
-            coords, sink=None, orientation=None,
-            source_shape=clearmap_io.shape(self.workspace.filename('stitched')),
-            sink_shape=clearmap_io.shape(self.workspace.filename('resampled')))
-
-        coords = elastix.transform_points(
             coords, sink=None,
-            transform_directory=self.workspace.filename('resampled_to_auto'),
-            binary=True, indices=False)
+            source_shape=self.preprocessor.raw_stitched_shape,
+            sink_shape=self.preprocessor.resampled_shape)
 
-        coords = elastix.transform_points(
-            coords, sink=None,
-            transform_directory=self.workspace.filename('auto_to_reference'),
-            binary=True, indices=False)
+        if self.preprocessor.was_registered:
+            coords = elastix.transform_points(
+                coords, sink=None,
+                transform_directory=self.workspace.filename('resampled_to_auto'),
+                binary=True, indices=False)
+
+            coords = elastix.transform_points(
+                coords, sink=None,
+                transform_directory=self.workspace.filename('auto_to_reference'),
+                binary=True, indices=False)
 
         return coords
 
