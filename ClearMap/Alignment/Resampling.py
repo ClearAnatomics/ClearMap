@@ -845,7 +845,7 @@ def resample_points(source, sink = None, resample_source = None, resample_sink =
   source : str or array
     Points to be resampled.
   sink : str or None
-    Sink for the resmapled point coordinates.
+    Sink for the resampled point coordinates.
   orientation : tuple
     Orientation as specified in :func:`resample`.
   resample_source : str, array or None
