@@ -166,6 +166,20 @@ class PreProcessor(TabProcessor):
     @property
     def aligned_autofluo_path(self):
         return os.path.join(self.workspace.filename('auto_to_reference'), 'result.1.mhd')
+    
+    @property
+    def raw_stitched_shape(self):
+        if self.resampled_shape is not None:
+            raw_resampled_res_from_cfg = np.array(self.processing_config['registration']['resampling']['raw_sink_resolution'])
+            raw_res_from_cfg = np.array(self.sample_config['resolutions']['raw'])
+            return self.resampled_shape * (raw_resampled_res_from_cfg / raw_res_from_cfg)
+        else:
+            return clearmap_io.shape(self.workspace.filename('stitched'))
+
+    @property
+    def resampled_shape(self):
+        if os.path.exists(self.workspace.filename('resampled')):
+            return clearmap_io.shape(self.workspace.filename('resampled'))
 
     def __file_conversion(self):  # TODO: handle progress
         if self.stopped:
@@ -256,6 +270,10 @@ class PreProcessor(TabProcessor):
     @property
     def was_stitched_rigid(self):
         return os.path.exists(self.workspace.filename('layout', postfix='aligned_axis'))
+
+    @property
+    def was_registered(self):
+        return os.path.exists(self.workspace.filename('resampled_to_auto'))
 
     @property
     def n_rigid_steps_to_run(self):
