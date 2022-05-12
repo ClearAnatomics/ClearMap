@@ -72,12 +72,12 @@ def make_nested_progress_dialog(title='Processing', overall_maximum=100, sub_max
     return dlg
 
 
-def make_splash():
-    splash_pix = QPixmap('ClearMap/gui/graphics_resources/splash.png')
+def make_splash(img_source='ClearMap/gui/graphics_resources/splash.png', bar_max=100):
+    splash_pix = QPixmap(img_source)#.scaled(848, 480)
     splash = QSplashScreen(splash_pix, Qt.WindowStaysOnTopHint)
     splash.setMask(splash_pix.mask())
     progress_bar = QProgressBar(splash)
-    progress_bar.setMaximum(100)
+    progress_bar.setMaximum(bar_max)
     progress_bar.setGeometry(50, splash_pix.height() - 50, splash_pix.width() - 100, 20)
     return splash, progress_bar
 
