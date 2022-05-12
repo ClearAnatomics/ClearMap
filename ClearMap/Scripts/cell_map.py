@@ -79,7 +79,7 @@ class CellDetector(TabProcessor):
             configs = preprocessor.get_configs()
             self.sample_config = configs['sample']
             self.machine_config = configs['machine']
-            cfg_path = os.path.join(self.sample_config['base_directory'], 'cell_map_params.cfg')
+            cfg_path = os.path.join(os.path.dirname(self.sample_config.filename), 'cell_map_params.cfg')
             self.processing_config = get_configobj_cfg(cfg_path)
 
             self.set_progress_watcher(self.preprocessor.progress_watcher)
