@@ -151,7 +151,8 @@ class PreProcessor(TabProcessor):
             self.set_configs(cfgs)
         else:  # Directly the config
             self.machine_config, self.sample_config, self.processing_config = cfgs
-        src_directory = os.path.expanduser(self.sample_config['base_directory'])
+        # src_directory = os.path.expanduser(self.sample_config['base_directory'])
+        src_directory = os.path.dirname(self.sample_config.filename)
 
         if watcher is not None:
             self.progress_watcher = watcher
