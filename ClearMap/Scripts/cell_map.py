@@ -31,11 +31,13 @@ __webpage__ = 'https://idisco.info'
 __download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
 
 import copy
+import importlib
 import os
 import re
 from concurrent.futures.process import BrokenProcessPool
 
 import numpy as np
+import pandas as pd
 from numpy.lib import recfunctions
 from matplotlib import pyplot as plt
 import pyqtgraph as pg
@@ -228,9 +230,19 @@ class CellDetector(TabProcessor):
         if self.preprocessor.was_registered:
             label = np.array(label, dtype=[('order', int)])
             names = np.array(names, dtype=[('name', 'U256')])
-        arrays.extend([label, names])
+            arrays.extend([label, names])
         cells_data = recfunctions.merge_arrays(arrays, flatten=True, usemask=False)
+
+        df = pd.DataFrame(cells_data)
+        if self.preprocessor.was_registered:
+            def get_color(lbl):
+                return annotation.find(lbl, key='order')['rgb']
+
+            df['color'] = df['label'].apply(get_color)
+
         clearmap_io.write(self.workspace.filename('cells'), cells_data)
+        if importlib.util.find_spec('pyarrow'):
+            df.to_feather(os.path.splitext(self.workspace.filename('cells'))[0] + '.feather')
 
     def transform_coordinates(self, coords):
         coords = resampling.resample_points(
@@ -304,10 +316,8 @@ class CellDetector(TabProcessor):
     def detected(self):
         return os.path.exists(self.workspace.filename('cells', postfix='raw'))
 
-    def export_as_csv(self):  # FIXME: use pandas feather
-        source = self.workspace.source('cells')
-        header = ', '.join([h[0] for h in source.dtype.names])
-        np.savetxt(self.workspace.filename('cells', extension='csv'), source[:], header=header, delimiter=',', fmt='%s')
+    def export_as_csv(self):
+        pd.DataFrame(self.workspace.source('cells')).to_csv(self.workspace.filename('cells', extension='csv'))
 
     def export_to_clearmap1_fmt(self):
         """ClearMap 1.0 export (will generate the files cells_ClearMap1_intensities, cells_ClearMap1_points_transformed,
@@ -346,6 +356,28 @@ class CellDetector(TabProcessor):
             plt.hist(source[name])
             plt.title(name)
         plt.tight_layout()
+
+    def plot_cells_3d_scatter_w_atlas_colors(self):
+        dv = qplot_3d.plot(self.workspace.filename('resampled'),
+                           arange=False, lut='white', parent=self)[0]
+
+        feather_path = self.workspace.filename('cells').replace('.npy', '.feather')
+        if os.path.exists(feather_path):
+            df = pd.load_feather(feather_path)
+        else:
+            df = pd.DataFrame(np.load(self.workspace.filename('cells')))
+
+        coordinates = df[['xt', 'yt', 'zt']].values
+        colors = df['color'].values * 255
+
+        scatter = pg.ScatterPlotItem()
+
+        dv.view.addItem(scatter)
+        dv.scatter = scatter
+        dv.scatter_coords = Scatter3D(coordinates, colors=colors)
+        # dv.updateSlice()  # WARNING: does not work
+
+        return [dv]
 
     def plot_filtered_cells(self, parent=None, smarties=False):
         coordinates = self.get_coords('filtered')
