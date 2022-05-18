@@ -5,11 +5,7 @@ import matplotlib
 import numpy as np
 import skimage.io
 from PyQt5 import QtGui
-
-from ClearMap.gui.widgets import RedCross
-
-QDARKSTYLE_BACKGROUND = '#2E3436'
-DARK_BACKGROUND = '#282D2F'
+from matplotlib.colors import hsv_to_rgb
 
 
 def np_to_qpixmap(img_array, alpha):
@@ -104,17 +100,7 @@ def format_long_nb_to_str(nb):
     return out
 
 
-def link_dataviewers_cursors(dvs):  # TODO: move to DataViewer module
-    for i, dv in enumerate(dvs):
-        cross = RedCross()
-        dv.view.addItem(cross)
-        dv.cross = cross
-        pals = dvs.copy()
-        pals.pop(i)
-        dv.pals = pals
-
-
-class TmpDebug(object):
+class TmpDebug(object):  # FIXME: move as part of workspace
     def __init__(self, workspace):
         self.workspace = workspace
 
@@ -124,3 +110,11 @@ class TmpDebug(object):
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.workspace.debug = False
+
+def pseudo_random_rgb_array(n_samples):
+    hues = np.random.rand(n_samples)
+    saturations = np.random.rand(n_samples) / 2 + 0.5
+    values = np.random.rand(n_samples) / 2 + 0.5
+    hsvs = np.vstack((hues, saturations, values))
+    rgbs = np.apply_along_axis(hsv_to_rgb, 0, hsvs)
+    return rgbs

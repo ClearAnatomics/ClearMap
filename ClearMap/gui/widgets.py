@@ -16,6 +16,7 @@ from ClearMap.Settings import resources_path
 from ClearMap.Visualization import Plot3d as plot_3d
 from ClearMap.config.config_loader import ConfigLoader
 from ClearMap.gui.dialogs import make_splash
+from ClearMap.gui.gui_utils import pseudo_random_rgb_array
 from ClearMap.gui.pyuic_utils import loadUiType
 
 
@@ -327,7 +328,8 @@ class Scatter3D:
             if colors is not None:
                 self.colours = colors
             else:
-                self.colours = np.random.randint(255, size=self.coordinates.shape)
+                n_samples = self.coordinates.shape[0]
+                self.colours = pseudo_random_rgb_array(n_samples) * 255
         else:
             self.colours = None
 
