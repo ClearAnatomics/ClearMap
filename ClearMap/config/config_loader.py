@@ -53,26 +53,35 @@ class ConfigLoader(object):
         Parameters
         ----------
         cfg_name: str
+        must_exist: bool
 
         Returns
         -------
 
         """
-        if not cfg_name.endswith('params'):
-            cfg_name += '_params'
-        for ext in self.supported_exts:
-            cfg_path = clean_path(os.path.join(self.src_dir, '{}{}'.format(cfg_name, ext)))
-            if not must_exist:
-                return cfg_path
-            if os.path.exists(cfg_path):
-                return cfg_path
-        raise FileNotFoundError('Could not find file {} in {}'.format(cfg_name, self.src_dir))
+        variants = [cfg_name]  # For e.g. legacy names
+        if cfg_name == 'alignments':
+            variants.append('processing')
+        elif cfg_name == 'vasculature':
+            variants.append('tube_map')
+
+        for _cfg_name in variants:
+            if not _cfg_name.endswith('params'):
+                _cfg_name += '_params'
+            for ext in self.supported_exts:
+                cfg_path = clean_path(os.path.join(self.src_dir, '{}{}'.format(_cfg_name, ext)))
+                if os.path.exists(cfg_path):
+                    return cfg_path
+        if not must_exist:  # If none found but not necessary, return the first possible option
+            return clean_path(os.path.join(self.src_dir, '{}{}'.format(cfg_name, self.supported_exts[0])))
+        raise FileNotFoundError('Could not find file {} in {} with variants {}'
+                                .format(cfg_name, self.src_dir, variants))
 
     def get_cfg(self, cfg_name):
-        if self.is_machine_file(cfg_name):
-            cfg_path = self.get_default_path(cfg_name)
-        else:
+        if self.is_tab_file(cfg_name):
             cfg_path = self.get_cfg_path(cfg_name)
+        else:
+            cfg_path = self.get_default_path(cfg_name)
         ext = os.path.splitext(cfg_path)[-1]
         return self.loader_functions[ext](cfg_path)
 
@@ -80,7 +89,7 @@ class ConfigLoader(object):
         if not cfg_name.endswith('params') and 'sample' not in cfg_name:  # TODO: just ust sample_params instead
             cfg_name += '_params'
         for ext in self.supported_exts:
-            prefix = 'default_' if not self.is_machine_file(cfg_name) else ''
+            prefix = 'default_' if self.is_tab_file(cfg_name) else ''
             cfg_name = '{}{}{}'.format(prefix, cfg_name, ext)
             cfg_path = clean_path(os.path.join(self.default_dir, cfg_name))
             return cfg_path
@@ -88,3 +97,12 @@ class ConfigLoader(object):
 
     def is_machine_file(self, cfg_name):
         return any([base in cfg_name for base in ('machine', 'preferences')])
+
+    def is_tab_file(self, cfg_name):
+        return cfg_name in ('{}_params'.format(name) for name in ('sample',
+                                                                  'alignments',
+                                                                  'processing',
+                                                                  'cell_map',
+                                                                  'cells',
+                                                                  'vasculature',
+                                                                  'tube_map'))

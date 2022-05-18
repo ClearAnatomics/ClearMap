@@ -1,4 +1,5 @@
 import os
+import re
 import subprocess
 from concurrent.futures import ProcessPoolExecutor
 
@@ -62,3 +63,7 @@ def is_iterable(obj):
         return True
     except TypeError:
         return False
+
+
+def title_to_snake(string):
+    return re.sub('(?!^)([A-Z]+)', r'_\1', string).lower()

@@ -69,14 +69,14 @@
          </size>
         </property>
         <property name="currentIndex">
-         <number>3</number>
+         <number>1</number>
         </property>
         <widget class="QWidget" name="sample_tab">
          <attribute name="title">
           <string>Sample info</string>
          </attribute>
         </widget>
-        <widget class="QWidget" name="preprocessing_tab">
+        <widget class="QWidget" name="alignment_tab">
          <attribute name="title">
           <string>Alignment</string>
          </attribute>
@@ -121,7 +121,7 @@
      <x>0</x>
      <y>0</y>
      <width>1950</width>
-     <height>22</height>
+     <height>21</height>
     </rect>
    </property>
    <widget class="QMenu" name="file_menu">
