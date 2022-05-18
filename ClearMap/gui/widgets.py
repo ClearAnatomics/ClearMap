@@ -3,15 +3,26 @@ import re
 
 import numpy as np
 import pyqtgraph as pg
+from skimage import transform as sk_transform  # Slowish
+
+
 from PyQt5 import QtGui, QtCore
 from PyQt5.QtCore import QRectF
 from PyQt5.QtWidgets import QWidget, QDialogButtonBox
 
+from ClearMap.IO import TIF
 from ClearMap.IO.metadata import pattern_finders_from_base_dir
+from ClearMap.Settings import resources_path
 from ClearMap.Visualization import Plot3d as plot_3d
 from ClearMap.config.config_loader import ConfigLoader
 from ClearMap.gui.dialogs import make_splash
 from ClearMap.gui.pyuic_utils import loadUiType
+
+
+def setup_mini_brain(mini_brain_scaling=(5, 5, 5)):  # TODO: scaling in prefs
+    atlas_path = os.path.join(resources_path, 'Atlas', 'ABA_25um_annotation.tif')  # TODO: function of chosen atlas ?
+    arr = TIF.Source(atlas_path).array
+    return mini_brain_scaling, sk_transform.downscale_local_mean(arr, mini_brain_scaling)
 
 
 class RectItem(pg.GraphicsObject):  # Derived from https://stackoverflow.com/a/60012800

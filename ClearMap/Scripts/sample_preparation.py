@@ -248,10 +248,10 @@ class PreProcessor(TabProcessor):
             return
         stitching_cfg = self.processing_config['stitching']
         if not stitching_cfg['rigid']['skip']:
-            self._stitch_rigid()
+            self.stitch_rigid()
 
         if not stitching_cfg['wobbly']['skip']:
-            self._stitch_wobbly()
+            self.stitch_wobbly()
 
         if self.stopped:
             return
@@ -274,13 +274,14 @@ class PreProcessor(TabProcessor):
 
     @property
     def was_registered(self):
-        return os.path.exists(self.workspace.filename('resampled_to_auto'))
+        # return os.path.exists(self.workspace.filename('resampled_to_auto'))
+        return os.path.exists(self.aligned_autofluo_path)
 
     @property
     def n_rigid_steps_to_run(self):
         return int(not self.processing_config['stitching']['rigid']['skip'])
 
-    def _stitch_rigid(self, force=False):
+    def stitch_rigid(self, force=False):
         if force:
             self.stopped = False
         if self.stopped:
@@ -391,7 +392,7 @@ class PreProcessor(TabProcessor):
                 return
         self.update_watcher_main_progress()
 
-    def _stitch_wobbly(self, force=False):
+    def stitch_wobbly(self, force=False):
         if force:
             self.stopped = False
         if self.stopped:

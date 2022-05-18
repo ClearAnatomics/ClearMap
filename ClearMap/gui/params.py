@@ -15,7 +15,7 @@ class ParamsOrientationError(ValueError):
     pass
 
 
-class UiParameter(object):
+class UiParameter:
     def __init__(self, tab, src_folder=None):
         self.tab = tab
         self.src_folder = src_folder
@@ -25,6 +25,14 @@ class UiParameter(object):
     def connect(self):
         """Connect GUI slots here"""
         pass
+
+    def fix_cfg_file(self, f_path):
+        """Fix the file if it was copied from defaults, tailor to current sample"""
+        pass
+
+    @property
+    def path(self):
+        return self._config.filename
 
     def get_config(self, cfg_path):
         self._config = get_configobj_cfg(cfg_path)  # FIXME: use format agnostic method
@@ -79,6 +87,10 @@ class UiParameterCollection:
         self.src_folder = src_folder
         self.config = None
 
+    def fix_cfg_file(self, f_path):
+        """Fix the file if it was copied from defaults, tailor to current sample"""
+        pass
+
     @property
     def params(self):
         raise NotImplementedError('Please subclass UiParameterCollection and implement params property')
@@ -104,7 +116,7 @@ class UiParameterCollection:
             param.cfg_to_ui()
 
 
-class PreprocessingParams(UiParameterCollection):
+class AlignmentParams(UiParameterCollection):
     def __init__(self, tab, src_folder=None):
         super().__init__(tab, src_folder)
         self.stitching_general = GeneralStitchingParams(tab, src_folder)
@@ -112,7 +124,7 @@ class PreprocessingParams(UiParameterCollection):
         self.stitching_wobbly = WobblyStitchingParams(tab, src_folder)
         self.registration = RegistrationParams(tab, src_folder)
 
-    def fix_pipeline_name(self, f_path):
+    def fix_cfg_file(self, f_path):
         cfg = get_configobj_cfg(f_path)
         pipeline_name, ok = QInputDialog.getItem(self.tab, 'Please select pipeline type',
                                                  'Pipeline name:', ['CellMap', 'TubeMap'], 0, False)
@@ -188,7 +200,7 @@ class SampleParameters(UiParameter):
         self.slice_z = self._config['slice_z']
         self.orientation = self._config['orientation']  # Finish by orientation in case invalid
 
-    def fix_sample_cfg_file(self, f_path):
+    def fix_cfg_file(self, f_path):
         cfg = get_configobj_cfg(f_path)
         cfg['base_directory'] = os.path.dirname(f_path)
         if not self.sample_id:
@@ -212,7 +224,6 @@ class SampleParameters(UiParameter):
     def handle_sample_id_changed(self, _id):
         if self.config is not None:
             self.config['sample_id'] = self.sample_id
-
 
     @property
     def raw_path(self):

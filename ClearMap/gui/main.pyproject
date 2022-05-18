@@ -1,3 +1,0 @@
-{
-    "files": ["mainwindow.ui","cell_map_tab.ui","nested_progress_dialog.ui","vasculature_tab.ui","preprocessing_tab.ui","graphics_resources.qrc","sample_tab.ui","preferences_editor.ui","pattern_prompt.ui"]
-}
