@@ -88,11 +88,14 @@ default_file_type_to_name_cell_map.update(
 file_type_synonyms.update(
     c  = "cells"
     );
+
+default_file_type_to_name_both = {**default_file_type_to_name_cell_map, **default_file_type_to_name_tube_map}
     
 
 default_workspaces = odict(
     CellMap = default_file_type_to_name_cell_map,
-    TubeMap = default_file_type_to_name_tube_map
+    TubeMap = default_file_type_to_name_tube_map,
+    Both = default_file_type_to_name_both
     )
     
 
@@ -130,7 +133,7 @@ def filename(ftype, file_type_to_name = None, directory = None, expression = Non
     file_type_to_name = default_file_type_to_name;
   
   if ftype is None:
-    fname = directory;
+    fname = directory;  # FIXME: cannot be used because of if else below overwriting anyway
   if ftype in file_type_synonyms.keys():
     ftype = file_type_synonyms[ftype];
   if ftype == 'expression' or expression is not None:
