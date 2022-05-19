@@ -116,13 +116,17 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
                 btn_box.button(QDialogButtonBox.Open).setText(btn_box.property('openText'))
 
 
+
+    def fix_sizes(self):
+        # self.set_font_size()
+        self.tabWidget.setMinimumWidth(200)
+        self.tabWidget.setMinimumHeight(600)
+
     def fix_styles(self):
-        self.sample_tab.sampleIdButtonBox.button(QDialogButtonBox.Apply).setIcon(self.__reload_icon)
-
         self.fix_btn_boxes_text()
-
         self.fix_btns_stylesheet()
         self.fix_widgets_backgrounds()
+        self.fix_sizes()
 
     def fix_btns_stylesheet(self):
         for btn in self.findChildren(QPushButton):
