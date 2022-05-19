@@ -141,17 +141,17 @@ class PreferenceUi(GenericDialog):
     def __init__(self, main_window):
         super().__init__(main_window, 'Preferences', 'creator/preferences_editor.ui')
 
-    def set_params(self, *args):
-        self.params = PreferencesParams(self.ui, self.main_window.src_folder)
-
     def setup(self):  # FIXME: use
         self.init_ui()
 
         self.setup_preferences()
 
         self.ui.buttonBox.connectApply(self.params.ui_to_cfg)
-        self.ui.buttonBox.connectCancel(self.ui.close)
         self.ui.buttonBox.connectOk(self.apply_prefs_and_close)
+        self.ui.buttonBox.connectCancel(self.ui.close)
+
+    def set_params(self, *args):
+        self.params = PreferencesParams(self.ui, self.main_window.src_folder)
 
     def setup_preferences(self):
         self.set_params()
@@ -166,7 +166,7 @@ class PreferenceUi(GenericDialog):
             raise FileNotFoundError(msg)
 
     def open(self):
-        return self.ui.exec
+        return self.ui.exec()
 
     def apply_prefs_and_close(self):
         self.params.ui_to_cfg()
@@ -273,7 +273,10 @@ class AlignmentTab(GenericTab):
 
     def setup_workers(self):
         self.sample_params.ui_to_cfg()
-        self.preprocessor.setup((self.main_window.preference_editor.params.config, self.sample_params.config, self.params.config))
+        self.preprocessor.setup((self.main_window.preference_editor.params.config,
+                                 self.sample_params.config, self.params.config))
+
+        self.setup_atlas()
 
     def setup(self):
         self.init_ui()
