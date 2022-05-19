@@ -127,7 +127,7 @@ class AlignmentParams(UiParameterCollection):
     def fix_cfg_file(self, f_path):
         cfg = get_configobj_cfg(f_path)
         pipeline_name, ok = QInputDialog.getItem(self.tab, 'Please select pipeline type',
-                                                 'Pipeline name:', ['CellMap', 'TubeMap'], 0, False)
+                                                 'Pipeline name:', ['CellMap', 'TubeMap', 'Both'], 0, False)
         if not ok:
             raise ValueError('Missing sample ID')
         cfg['pipeline_name'] = pipeline_name
@@ -149,13 +149,17 @@ class AlignmentParams(UiParameterCollection):
     def pipeline_name(self, name):
         self.config['pipeline_name'] = name
 
-    @property
-    def pipeline_is_cell_map(self):
-        return self.pipeline_name.lower().replace('_', '') == 'cellmap'
-
-    @property
-    def pipeline_is_tube_map(self):
-        return self.pipeline_name.lower().replace('_', '') == 'tubemap'
+    # @property
+    # def pipeline_is_cell_map(self):
+    #     return self.pipeline_name.lower().replace('_', '') == 'cellmap'
+    #
+    # @property
+    # def pipeline_is_tube_map(self):
+    #     return self.pipeline_name.lower().replace('_', '') == 'tubemap'
+    #
+    # @property
+    # def pipeline_is_both(self):
+    #     return self.pipeline_name.lower().replace('_', '') == 'both'
 
 
 class SampleParameters(UiParameter):

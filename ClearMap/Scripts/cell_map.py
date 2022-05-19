@@ -58,6 +58,7 @@ import ClearMap.Analysis.Measurements.Voxelization as voxelization
 # noinspection PyPep8Naming
 import ClearMap.Alignment.Annotation as annotation
 from ClearMap.Scripts.sample_preparation import PreProcessor, TabProcessor
+from ClearMap.Utils.utilities import runs_on_ui
 from ClearMap.config.config_loader import get_configobj_cfg
 from ClearMap.gui.widgets import Scatter3D
 
@@ -105,10 +106,10 @@ class CellDetector(TabProcessor):
 
     def post_process_cells(self):
         self.processing_config.reload()
-        if self.processing_config['detection']['plot_cells']:
+        if self.processing_config['detection']['plot_cells'] and not runs_on_ui():
             self.plot_cells()
         self.filter_cells()
-        if self.processing_config['cell_filtration']['preview']:
+        if self.processing_config['cell_filtration']['preview'] and not runs_on_ui():
             self.plot_filtered_cells()
         self.atlas_align()
         self.export_as_csv()
@@ -120,7 +121,7 @@ class CellDetector(TabProcessor):
         coordinates, cells, voxelization_parameter = self.get_voxelization_params(postfix=postfix)
         # %% Unweighted
         coordinates, counts_file_path = self.voxelize_unweighted(coordinates, voxelization_parameter)
-        if self.processing_config['voxelization']['preview']['counts']:
+        if self.processing_config['voxelization']['preview']['counts'] and not runs_on_ui():
             self.plot_voxelized_counts()
         # %% Weighted
         # intensities_file_path = self.voxelize_weighted(coordinates, cells, voxelization_parameter)  # WARNING: Currently causing issues

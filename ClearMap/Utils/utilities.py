@@ -27,8 +27,12 @@ def runs_on_spyder():
     return any('SPYDER' in name for name in os.environ)
 
 
-def runs_from_pycharm():
+def runs_on_pycharm():
     return "PYCHARM_HOSTED" in os.environ
+
+
+def runs_on_ui():
+    return 'CLEARMAP_GUI_HOSTED' in os.environ
 
 
 def get_free_v_ram():

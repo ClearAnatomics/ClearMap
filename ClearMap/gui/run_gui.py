@@ -6,12 +6,11 @@ from shutil import copyfile
 import traceback
 import types
 
-import numpy as np
-
 from PyQt5 import QtGui
 from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QSpinBox, QDoubleSpinBox, QFrame, \
     QDialogButtonBox, QComboBox, QLineEdit, QStyle, QWidget, QMessageBox, QToolBox
 
+os.environ['CLEARMAP_GUI_HOSTED'] = "1"
 # ########################################### SPLASH SCREEN ###########################################################
 from ClearMap.gui.dialogs import make_splash, update_pbar
 
