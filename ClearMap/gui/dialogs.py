@@ -7,13 +7,13 @@ from PyQt5.QtWidgets import QFileDialog, QMessageBox, QProgressDialog, QLabel, Q
     QProgressBar
 
 from ClearMap.config.config_loader import clean_path
-from ClearMap.Utils.utilities import runs_from_pycharm
+from ClearMap.Utils.utilities import runs_on_pycharm
 from ClearMap.gui.pyuic_utils import loadUiType
 
 
 def get_directory_dlg(start_folder, title="Choose the source directory"):
     diag = QFileDialog()  # REFACTOR: move to gui_utils
-    if sys.platform == 'win32' or runs_from_pycharm():  # avoids bug with windows COM object init failed
+    if sys.platform == 'win32' or runs_on_pycharm():  # avoids bug with windows COM object init failed
         opt = QFileDialog.Options(QFileDialog.DontUseNativeDialog)
     else:
         opt = QFileDialog.Options()

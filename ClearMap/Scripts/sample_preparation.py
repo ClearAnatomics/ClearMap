@@ -11,6 +11,7 @@ import numpy as np
 # noinspection PyPep8Naming
 import matplotlib
 
+from ClearMap.Utils.utilities import runs_on_ui
 from ClearMap.gui.gui_utils import TmpDebug
 
 matplotlib.use('Qt5Agg')
@@ -41,7 +42,7 @@ class CanceledProcessing(BrokenProcessPool):  # TODO: better inheritance
     pass
 
 
-class TabProcessor(object):
+class TabProcessor:
     def __init__(self):
         self.stopped = False
         self.progress_watcher = None
@@ -151,7 +152,6 @@ class PreProcessor(TabProcessor):
             self.set_configs(cfgs)
         else:  # Directly the config
             self.machine_config, self.sample_config, self.processing_config = cfgs
-        # src_directory = os.path.expanduser(self.sample_config['base_directory'])
         src_directory = os.path.dirname(self.sample_config.filename)
 
         if watcher is not None:
@@ -163,6 +163,7 @@ class PreProcessor(TabProcessor):
         self.workspace.update(**src_paths)
         self.workspace.info()
         self.__file_conversion()
+        # FIXME: check if setup_atlas should go here
 
     @property
     def aligned_autofluo_path(self):
@@ -481,7 +482,7 @@ class PreProcessor(TabProcessor):
             self.__resample_raw()
             if self.stopped:
                 return
-            if resampling_cfg['plot_raw']:  # FIXME: probably need to change params for UI
+            if resampling_cfg['plot_raw'] and not runs_on_ui():
                 plot_3d.plot(self.workspace.filename('resampled'))
 
             # Autofluorescence
@@ -489,7 +490,7 @@ class PreProcessor(TabProcessor):
             if self.stopped:
                 return
             self.update_watcher_main_progress()
-            if resampling_cfg['plot_autofluo']:  # FIXME: probably need to change params for UI
+            if resampling_cfg['plot_autofluo'] and not runs_on_ui():
                 plot_3d.plot([self.workspace.filename('resampled'),
                               self.workspace.filename('resampled', postfix='autofluorescence')])
 
