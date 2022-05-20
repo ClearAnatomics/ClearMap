@@ -231,7 +231,8 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
     def patch_compound_boxes(self):
         for bx in self.findChildren(QFrame):
             bx_name = bx.objectName().lower()
-            if bx_name.startswith('triplet') or bx_name.endswith('let') or bx_name.endswith('optionallineedit'):
+            if bx_name.startswith('triplet') or bx_name.endswith('let') or \
+                    bx_name.endswith('optionallineedit') or bx_name.endswith('optionalplaintextedit'):
                 bx.controlsEnabled = types.MethodType(controls_enabled, bx)
                 bx.getCheckBox = types.MethodType(get_check_box, bx)
                 bx.enableControls = types.MethodType(enable_controls, bx)
@@ -240,7 +241,7 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
                     bx.getValue = types.MethodType(get_value, bx)
                     bx.setValue = types.MethodType(set_value, bx)
                     bx.valueChangedConnect = types.MethodType(connect_value_changed, bx)
-                elif bx_name.endswith('optionallineedit'):
+                elif bx_name.endswith('optionallineedit') or bx_name.endswith('optionalplaintextedit'):
                     bx.setText = types.MethodType(set_text, bx)
                     bx.text = types.MethodType(get_text, bx)
                     bx.textChangedConnect = types.MethodType(connect_text_changed, bx)

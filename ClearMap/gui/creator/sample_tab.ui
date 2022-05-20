@@ -106,7 +106,7 @@
         <property name="geometry">
          <rect>
           <x>0</x>
-          <y>-123</y>
+          <y>-102</y>
           <width>413</width>
           <height>310</height>
          </rect>
@@ -145,7 +145,7 @@
           </widget>
          </item>
          <item row="1" column="1">
-          <widget class="QFrame" name="autofluoPathOptionalLineEdit">
+          <widget class="QFrame" name="autofluoPathOptionalPlainTextEdit">
            <property name="frameShape">
             <enum>QFrame::StyledPanel</enum>
            </property>
@@ -184,7 +184,7 @@
           </widget>
          </item>
          <item row="2" column="1">
-          <widget class="QFrame" name="arteriesPathOptionalLineEdit">
+          <widget class="QFrame" name="arteriesPathOptionalPlainTextEdit">
            <property name="frameShape">
             <enum>QFrame::StyledPanel</enum>
            </property>
