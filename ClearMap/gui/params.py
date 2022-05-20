@@ -179,8 +179,8 @@ class SampleParameters(UiParameter):
         self.tab.orient_z.currentTextChanged.connect(self.handle_orientation_changed)
 
         self.tab.rawPath.textChanged.connect(self.handle_raw_path_changed)
-        self.tab.arteriesPathOptionalLineEdit.textChangedConnect(self.handle_arteries_path_changed)
-        self.tab.autofluoPathOptionalLineEdit.textChangedConnect(self.handle_autofluo_path_changed)
+        self.tab.arteriesPathOptionalPlainTextEdit.textChangedConnect(self.handle_arteries_path_changed)
+        self.tab.autofluoPathOptionalPlainTextEdit.textChangedConnect(self.handle_autofluo_path_changed)
 
         self.tab.rawResolutionTriplet.valueChangedConnect(self.handle_raw_resolution_changed)
         self.tab.autofluorescenceResolutionTriplet.valueChangedConnect(self.handle_autofluo_resolution_changed)
@@ -231,35 +231,35 @@ class SampleParameters(UiParameter):
 
     @property
     def raw_path(self):
-        return self.tab.rawPath.text()
+        return self.tab.rawPath.toPlainText()
 
     @raw_path.setter
     def raw_path(self, f_path):
-        self.tab.rawPath.setText(f_path)
+        self.tab.rawPath.setPlainText(f_path)
 
-    def handle_raw_path_changed(self, f_path):
+    def handle_raw_path_changed(self):
         self.config['src_paths']['raw'] = self.raw_path
 
     @property
     def autofluo_path(self):
-        return self.tab.autofluoPathOptionalLineEdit.text()
+        return self.tab.autofluoPathOptionalPlainTextEdit.text()
 
     @autofluo_path.setter
     def autofluo_path(self, f_path):
-        self.tab.autofluoPathOptionalLineEdit.setText(f_path)
+        self.tab.autofluoPathOptionalPlainTextEdit.setText(f_path)
 
-    def handle_autofluo_path_changed(self, f_path):
+    def handle_autofluo_path_changed(self):
         self.config['src_paths']['autofluorescence'] = self.autofluo_path
 
     @property
     def arteries_path(self):
-        return self.tab.arteriesPathOptionalLineEdit.text()
+        return self.tab.arteriesPathOptionalPlainTextEdit.text()
 
     @arteries_path.setter
     def arteries_path(self, f_path):
-        self.tab.arteriesPathOptionalLineEdit.setText(f_path)
+        self.tab.arteriesPathOptionalPlainTextEdit.setText(f_path)
 
-    def handle_arteries_path_changed(self, f_path):
+    def handle_arteries_path_changed(self):
         self.config['src_paths']['arteries'] = self.arteries_path
 
     @property

@@ -1,7 +1,8 @@
 from typing import Iterable
 
 from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QSpinBox, QDoubleSpinBox, QCheckBox, QLineEdit, QDialogButtonBox, QDockWidget
+from PyQt5.QtWidgets import QSpinBox, QDoubleSpinBox, QCheckBox, QLineEdit, QDialogButtonBox, QDockWidget, \
+    QPlainTextEdit, QTextEdit
 
 
 def none_str_to_literal(txt):
@@ -94,7 +95,7 @@ def connect_value_changed(instance, callback):
 
 
 def connect_text_changed(instance, callback):
-    get_line_edit(instance).textChanged.connect(callback)
+    get_text_edit(instance).textChanged.connect(callback)
 
 
 def controls_enabled(instance):
@@ -103,6 +104,8 @@ def controls_enabled(instance):
         return spin_boxes[0].isEnabled()
     elif instance.findChildren(QLineEdit):
         return instance.findChildren(QLineEdit)[0].isEnabled()
+    elif instance.findChildren(QPlainTextEdit):
+        return instance.findChildren(QPlainTextEdit)[0].isEnabled()
     else:
         raise NotImplementedError('Control type "{}" is not yet supported'.format(instance))
 
@@ -127,8 +130,13 @@ def disable_controls(instance):
         check_box.setCheckState(Qt.Unchecked)
 
 
-def get_line_edit(instance):
-    return instance.findChildren(QLineEdit)[0]
+def get_text_edit(instance):
+    children = instance.findChildren(QLineEdit)
+    if not children:
+        children = instance.findChildren(QPlainTextEdit)
+    if not children:
+        children = instance.findChildren(QTextEdit)
+    return children[0]
 
 
 def set_text(instance, txt):
@@ -136,14 +144,24 @@ def set_text(instance, txt):
         instance.disableControls()
     else:
         instance.enableControls()
-        line_edit = get_line_edit(instance)
-        line_edit.setText(txt)
+        text_edit = get_text_edit(instance)
+        if isinstance(text_edit, QLineEdit):
+            text_edit.setText(txt)
+        elif isinstance(text_edit, QPlainTextEdit):
+            text_edit.setPlainText(txt)
+        else:
+            raise ValueError('Expected QLineEdit or QPlainTextEdit, got "{}"'.format(type(text_edit)))
 
 
 def get_text(instance):
     if instance.controlsEnabled():
-        line_edit = get_line_edit(instance)
-        return line_edit.text()
+        text_edit = get_text_edit(instance)
+        if isinstance(text_edit, QLineEdit):
+            return text_edit.text()
+        elif isinstance(text_edit, QPlainTextEdit):
+            return text_edit.toPlainText()
+        else:
+            raise ValueError('Expected QLineEdit or QPlainTextEdit, got "{}"'.format(type(text_edit)))
     else:
         disabled_value = instance.property('disabledValue')
         if disabled_value == 'None':
