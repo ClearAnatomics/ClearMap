@@ -1454,6 +1454,7 @@ class PreferencesParams(UiParameter):
         cfg['start_folder'] = self.start_folder
         cfg['start_full_screen'] = self.start_full_screen
         cfg['default_lut'] = self.lut
+        cfg['font_size'] = self.font_size
 
     def cfg_to_ui(self):
         cfg = self._config
@@ -1467,6 +1468,7 @@ class PreferencesParams(UiParameter):
         self.start_folder = cfg['start_folder']
         self.start_full_screen = cfg['start_full_screen']
         self.lut = cfg['default_lut']
+        self.font_size = cfg['font_size']
 
     @property
     def start_folder(self):
@@ -1547,3 +1549,11 @@ class PreferencesParams(UiParameter):
     @lut.setter
     def lut(self, lut_name):
         self.tab.lutComboBox.setCurrentText(lut_name)
+
+    @property
+    def font_size(self):
+        return self.tab.fontSizeSpinBox.value()
+
+    @font_size.setter
+    def font_size(self, value):
+        self.tab.fontSizeSpinBox.setValue(value)

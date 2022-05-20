@@ -111,6 +111,23 @@ class TmpDebug(object):  # FIXME: move as part of workspace
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.workspace.debug = False
 
+
+def get_current_res(app):
+    screen = app.primaryScreen()
+    size = np.array((screen.size().width(), screen.size().height()))
+
+    hd_res = np.array((1920, 1080))
+    four_k_res = np.array((3840, 2160))
+
+    if (size < hd_res).any():
+        res = 'sd'
+    elif (size < four_k_res).any():
+        res = 'hd'
+    else:
+        res = '4k'
+    return res
+
+
 def pseudo_random_rgb_array(n_samples):
     hues = np.random.rand(n_samples)
     saturations = np.random.rand(n_samples) / 2 + 0.5
