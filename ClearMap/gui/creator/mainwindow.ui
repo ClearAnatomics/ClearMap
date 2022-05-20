@@ -56,18 +56,6 @@
       </item>
       <item>
        <widget class="QTabWidget" name="tabWidget">
-        <property name="minimumSize">
-         <size>
-          <width>400</width>
-          <height>780</height>
-         </size>
-        </property>
-        <property name="maximumSize">
-         <size>
-          <width>400</width>
-          <height>780</height>
-         </size>
-        </property>
         <property name="currentIndex">
          <number>1</number>
         </property>
