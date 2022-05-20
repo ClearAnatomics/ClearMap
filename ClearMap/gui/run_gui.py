@@ -19,7 +19,10 @@ ICONS_FOLDER = 'ClearMap/gui/icons/'   # REFACTOR: use qrc
 UI_FOLDER = 'ClearMap/gui/'  # REFACTOR: use constants module ?
 app = QApplication([])
 
-splash, progress_bar = make_splash()
+from ClearMap.gui.gui_utils import get_current_res
+CURRENT_RES = get_current_res(app)
+
+splash, progress_bar = make_splash(res=CURRENT_RES)
 splash.show()
 update_pbar(app, progress_bar, 10)
 
@@ -115,7 +118,26 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
             if btn_box.property('openText'):
                 btn_box.button(QDialogButtonBox.Open).setText(btn_box.property('openText'))
 
+    def set_font_size(self, target_font_size=DISPLAY_CONFIG[CURRENT_RES]['font_size']):
+        font_sizes = self.__get_font_sizes()
+        small, regular, big, huge = font_sizes
+        if target_font_size == regular:
+            return
 
+        font_swap = {
+            'small': target_font_size - 3,
+            'regular': target_font_size,
+            'big': target_font_size + 2,
+            'huge': target_font_size + 10
+        }
+
+        for widget in self.findChildren(QWidget):
+            font = widget.property("font")
+            try:
+                font.setPointSize(font_swap[widget.property('font_size_name')])
+            except KeyError:
+                print('Skipping widget {}'.format(widget.objectName()))
+            widget.setFont(font)
 
     def fix_sizes(self):
         # self.set_font_size()
@@ -127,6 +149,12 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         self.fix_btns_stylesheet()
         self.fix_widgets_backgrounds()
         self.fix_sizes()
+
+    def __get_font_sizes(self):
+        point_sizes = set()
+        for widg in self.findChildren(QWidget):
+            point_sizes.add(widg.property("font").pointSize())
+        return sorted(point_sizes)
 
     def fix_btns_stylesheet(self):
         for btn in self.findChildren(QPushButton):
@@ -234,10 +262,23 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         for tb in self.findChildren(QToolBox):
             tb.setCurrentIndex(0)
 
+    def patch_font_size_name(self):
+        font_names = {
+            9: 'small',
+            12: 'regular',
+            14: 'big',
+            22: 'huge'
+        }
+        for widget in self.findChildren(QWidget):
+            font = widget.property('font')
+            font_size_name = font_names[font.pointSize()]
+            widget.setProperty('font_size_name', font_size_name)
+
     def monkey_patch(self):
         self.patch_compound_boxes()
         self.patch_button_boxes()
         self.patch_tool_boxes()
+        self.patch_font_size_name()
         self.fix_styles()
 
     @staticmethod
@@ -336,7 +377,7 @@ class ClearMapGui(ClearMapGuiBase):
 
         self.setup_icons()
         self.setup_tabs()
-        self.preference_editor.setup()
+        self.preference_editor.setup(self.config_loader.get_cfg('display')[CURRENT_RES]['font_size'])
 
         self.monkey_patch()
 
@@ -351,6 +392,9 @@ class ClearMapGui(ClearMapGuiBase):
             tab.setup()
         self.tabWidget.tabBarClicked.connect(self.handle_tab_click)
         self.tabWidget.setCurrentIndex(0)
+
+    def reload_prefs(self):
+        self.set_font_size(self.preference_editor.params.font_size)
 
     def set_tabs_progress_watchers(self, nested=False):
         if nested:

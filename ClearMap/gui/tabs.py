@@ -83,7 +83,6 @@ class GenericTab(GenericUi):
     def init_ui(self):
         super().init_ui()
         self.ui.setMinimumWidth(self.minimum_width)
-        self.ui.setFixedWidth(self.minimum_width)
         self.main_window.tabWidget.removeTab(self.tab_idx)
         self.main_window.tabWidget.insertTab(self.tab_idx, self.ui, self.name.title())
 
@@ -141,7 +140,7 @@ class PreferenceUi(GenericDialog):
     def __init__(self, main_window):
         super().__init__(main_window, 'Preferences', 'creator/preferences_editor.ui')
 
-    def setup(self):  # FIXME: use
+    def setup(self, font_size):
         self.init_ui()
 
         self.setup_preferences()
@@ -149,6 +148,8 @@ class PreferenceUi(GenericDialog):
         self.ui.buttonBox.connectApply(self.params.ui_to_cfg)
         self.ui.buttonBox.connectOk(self.apply_prefs_and_close)
         self.ui.buttonBox.connectCancel(self.ui.close)
+
+        self.params.font_size = font_size
 
     def set_params(self, *args):
         self.params = PreferencesParams(self.ui, self.main_window.src_folder)
@@ -171,6 +172,7 @@ class PreferenceUi(GenericDialog):
     def apply_prefs_and_close(self):
         self.params.ui_to_cfg()
         self.ui.close()
+        self.main_window.reload_prefs()
 
 
 class SampleTab(GenericTab):

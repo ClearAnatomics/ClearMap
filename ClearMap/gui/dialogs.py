@@ -2,13 +2,17 @@ import sys
 
 from PyQt5 import QtCore
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QPixmap
+from PyQt5.QtGui import QPixmap, QFont
 from PyQt5.QtWidgets import QFileDialog, QMessageBox, QProgressDialog, QLabel, QDialogButtonBox, QSplashScreen, \
     QProgressBar
 
-from ClearMap.config.config_loader import clean_path
+from ClearMap.config.config_loader import clean_path, ConfigLoader
 from ClearMap.Utils.utilities import runs_on_pycharm
 from ClearMap.gui.pyuic_utils import loadUiType
+
+
+cfg_loader = ConfigLoader('')
+DISPLAY_CONFIG = cfg_loader.get_cfg('display')
 
 
 def get_directory_dlg(start_folder, title="Choose the source directory"):
@@ -72,13 +76,17 @@ def make_nested_progress_dialog(title='Processing', overall_maximum=100, sub_max
     return dlg
 
 
-def make_splash(img_source='ClearMap/gui/graphics_resources/splash.png', bar_max=100):
-    splash_pix = QPixmap(img_source)#.scaled(848, 480)
+def make_splash(img_source='ClearMap/gui/graphics_resources/splash.png', bar_max=100, res='hd'):
+    splash_pix = QPixmap(img_source)  # .scaled(848, 480)
     splash = QSplashScreen(splash_pix, Qt.WindowStaysOnTopHint)
     splash.setMask(splash_pix.mask())
     progress_bar = QProgressBar(splash)
+    progress_bar.setTextVisible(True)
+    progress_bar.setFont(QFont('Arial', DISPLAY_CONFIG[res]['splash_font_size'], QFont.Bold))
+    progress_bar.setFormat("Loading... \t\t%p%")
     progress_bar.setMaximum(bar_max)
-    progress_bar.setGeometry(50, splash_pix.height() - 50, splash_pix.width() - 100, 20)
+    margin = 50
+    progress_bar.setGeometry(margin, splash_pix.height() - margin, splash_pix.width() - 2 * margin, 20)
     return splash, progress_bar
 
 
