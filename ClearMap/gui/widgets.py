@@ -19,6 +19,8 @@ from ClearMap.gui.dialogs import make_splash
 from ClearMap.gui.gui_utils import pseudo_random_rgb_array
 from ClearMap.gui.pyuic_utils import loadUiType
 
+UI_FOLDER = 'ClearMap/gui/'  # REFACTOR: use constants module ?
+
 
 def setup_mini_brain(mini_brain_scaling=(5, 5, 5)):  # TODO: scaling in prefs
     atlas_path = os.path.join(resources_path, 'Atlas', 'ABA_25um_annotation.tif')  # TODO: function of chosen atlas ?
@@ -370,7 +372,7 @@ class PatternDialog:
         self.src_folder = src_folder
         self.app = app
 
-        cls, _ = loadUiType('ClearMap/gui/pattern_prompt.ui', patch_parent_class='QDialog')
+        cls, _ = loadUiType(os.path.join(UI_FOLDER, 'creator/pattern_prompt.ui'), patch_parent_class='QDialog')
         dlg = cls()
         dlg.setWindowTitle('File paths wizzard')
         dlg.setupUi()
