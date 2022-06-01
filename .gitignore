@@ -19,11 +19,19 @@ Thumbs.db
 *rtf
 .ipynb_checkpoints
 
+# Distutils files
+dist
+build
+ClearMap2.egg-info/
+
 # pyc files
 *.pyc
 *.pyxc
 *.pyxbldc
 
+# cythonized files  # TODO: check if include
+*.c
+*.cpp
 
 # unzipped resources
 ClearMap/Resources/Atlas/*.tif
