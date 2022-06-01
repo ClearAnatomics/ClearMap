@@ -1,3 +1,4 @@
+import inspect
 import os
 from math import sqrt, ceil
 
@@ -6,6 +7,8 @@ import numpy as np
 import skimage.io
 from PyQt5 import QtGui
 from matplotlib.colors import hsv_to_rgb
+
+UI_FOLDER = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 
 
 def np_to_qpixmap(img_array, alpha):

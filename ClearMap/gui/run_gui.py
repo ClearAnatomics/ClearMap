@@ -16,10 +16,11 @@ from ClearMap.gui.dialogs import make_splash, update_pbar
 
 # To show splash before slow imports
 ICONS_FOLDER = 'ClearMap/gui/icons/'   # REFACTOR: use qrc
-UI_FOLDER = 'ClearMap/gui/'  # REFACTOR: use constants module ?
+
 app = QApplication([])
 
-from ClearMap.gui.gui_utils import get_current_res
+from ClearMap.gui.gui_utils import get_current_res, UI_FOLDER
+
 CURRENT_RES = get_current_res(app)
 
 splash, progress_bar = make_splash(res=CURRENT_RES)
