@@ -38,6 +38,7 @@ from concurrent.futures.process import BrokenProcessPool
 
 import numpy as np
 import pandas as pd
+from PyQt5.QtGui import QColor
 from numpy.lib import recfunctions
 from matplotlib import pyplot as plt
 import pyqtgraph as pg
@@ -236,14 +237,17 @@ class CellDetector(TabProcessor):
 
         df = pd.DataFrame(cells_data)
         if self.preprocessor.was_registered:
-            def get_color(lbl):
-                return annotation.find(lbl, key='order')['rgb']
+            unique_labels = np.sort(df['order'].unique())
+            color_map = {lbl: annotation.find(lbl, key='order')['rgb'] for lbl in unique_labels}
 
-            df['color'] = df['label'].apply(get_color)
+            def lookup_color(lbl):
+                return color_map[lbl]
 
-        clearmap_io.write(self.workspace.filename('cells'), cells_data)
+            df['color'] = df['order'].apply(lookup_color)
+
+        clearmap_io.write(self.workspace.filename('cells'), cells_data)  # TEST: buggy ?
         if importlib.util.find_spec('pyarrow'):
-            df.to_feather(os.path.splitext(self.workspace.filename('cells'))[0] + '.feather')
+            df.to_feather(os.path.splitext(self.workspace.filename('cells'))[0] + '.feather')  # TODO: add to workspace
 
     def transform_coordinates(self, coords):
         coords = resampling.resample_points(
@@ -318,7 +322,8 @@ class CellDetector(TabProcessor):
         return os.path.exists(self.workspace.filename('cells', postfix='raw'))
 
     def export_as_csv(self):
-        pd.DataFrame(self.workspace.source('cells')).to_csv(self.workspace.filename('cells', extension='csv'))
+        csv_file_path = self.workspace.filename('cells', extension='csv')
+        self.get_cells_df().to_csv(csv_file_path)
 
     def export_to_clearmap1_fmt(self):
         """ClearMap 1.0 export (will generate the files cells_ClearMap1_intensities, cells_ClearMap1_points_transformed,
@@ -358,27 +363,37 @@ class CellDetector(TabProcessor):
             plt.title(name)
         plt.tight_layout()
 
-    def plot_cells_3d_scatter_w_atlas_colors(self):
-        dv = qplot_3d.plot(self.workspace.filename('resampled'),
-                           arange=False, lut='white', parent=self)[0]
-
-        feather_path = self.workspace.filename('cells').replace('.npy', '.feather')
-        if os.path.exists(feather_path):
-            df = pd.load_feather(feather_path)
+    def plot_cells_3d_scatter_w_atlas_colors(self, parent=None):
+        if self.preprocessor.was_registered:
+            dv = qplot_3d.plot(self.preprocessor.aligned_autofluo_path,
+                               arange=False, lut='white', parent=parent)[0]
         else:
-            df = pd.DataFrame(np.load(self.workspace.filename('cells')))
-
-        coordinates = df[['xt', 'yt', 'zt']].values
-        colors = df['color'].values * 255
+            dv = qplot_3d.plot(self.workspace.filename('resampled'),
+                               arange=False, lut='white', parent=parent)[0]
 
         scatter = pg.ScatterPlotItem()
 
         dv.view.addItem(scatter)
         dv.scatter = scatter
+
+        df = self.get_cells_df()
+
+        coordinates = df[['xt', 'yt', 'zt']].values.astype(np.int)  # required to match integer z
+        colors = df['color'].values * 255
+        colors = colors.astype(np.int)
+        colors = np.array([QColor(*cols) for cols in colors])
         dv.scatter_coords = Scatter3D(coordinates, colors=colors)
-        # dv.updateSlice()  # WARNING: does not work
+        dv.updateSlice()  # WARNING: does not work
 
         return [dv]
+
+    def get_cells_df(self):
+        feather_path = self.workspace.filename('cells').replace('.npy', '.feather')  # TODO: add to workspace
+        if os.path.exists(feather_path):
+            df = pd.read_feather(feather_path)
+        else:
+            df = pd.DataFrame(np.load(self.workspace.filename('cells')))
+        return df
 
     def plot_filtered_cells(self, parent=None, smarties=False):
         coordinates = self.get_coords('filtered')

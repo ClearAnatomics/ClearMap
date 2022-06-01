@@ -137,4 +137,4 @@ def pseudo_random_rgb_array(n_samples):
     values = np.random.rand(n_samples) / 2 + 0.5
     hsvs = np.vstack((hues, saturations, values))
     rgbs = np.apply_along_axis(hsv_to_rgb, 0, hsvs)
-    return rgbs
+    return rgbs.T

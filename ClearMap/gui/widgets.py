@@ -3,6 +3,7 @@ import re
 
 import numpy as np
 import pyqtgraph as pg
+from PyQt5.QtGui import QColor
 from skimage import transform as sk_transform  # Slowish
 
 
@@ -324,14 +325,12 @@ class PbarWatcher(QWidget):  # Inspired from https://stackoverflow.com/a/6626606
 class Scatter3D:
     def __init__(self, coordinates, smarties=False, colors=None):
         self.coordinates = coordinates
-        if smarties or colors is not None:
-            if colors is not None:
-                self.colours = colors
-            else:
-                n_samples = self.coordinates.shape[0]
-                self.colours = pseudo_random_rgb_array(n_samples) * 255
+        if smarties and colors is None:
+            n_samples = self.coordinates.shape[0]
+            self.colours = (pseudo_random_rgb_array(n_samples) * 255).astype(np.int)
+            self.colours = np.array([QColor(*col) for col in self.colours])
         else:
-            self.colours = None
+            self.colours = colors
 
     def get_all_data(self, main_z, half_z_size=3):
         pos = np.empty((0, 2))
