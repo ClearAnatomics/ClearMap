@@ -38,6 +38,7 @@ from concurrent.futures.process import BrokenProcessPool
 
 import numpy as np
 import pandas as pd
+from ClearMap.IO.MHD import mhd_read
 from PyQt5.QtGui import QColor
 from numpy.lib import recfunctions
 from matplotlib import pyplot as plt
@@ -365,7 +366,7 @@ class CellDetector(TabProcessor):
 
     def plot_cells_3d_scatter_w_atlas_colors(self, parent=None):
         if self.preprocessor.was_registered:
-            dv = qplot_3d.plot(self.preprocessor.aligned_autofluo_path,
+            dv = qplot_3d.plot(mhd_read(self.preprocessor.aligned_autofluo_path),
                                arange=False, lut='white', parent=parent)[0]
         else:
             dv = qplot_3d.plot(self.workspace.filename('resampled'),
@@ -380,8 +381,7 @@ class CellDetector(TabProcessor):
 
         coordinates = df[['xt', 'yt', 'zt']].values.astype(np.int)  # required to match integer z
         colors = df['color'].values * 255
-        colors = colors.astype(np.int)
-        colors = np.array([QColor(*cols) for cols in colors])
+        colors = np.array([QColor(*cols.astype(np.int)) for cols in colors])
         dv.scatter_coords = Scatter3D(coordinates, colors=colors)
         dv.updateSlice()  # WARNING: does not work
 
