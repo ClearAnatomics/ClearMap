@@ -50,13 +50,13 @@ def clean_path(path):
 
 
 def is_tab_file(cfg_name):
-    return cfg_name in ('{}_params'.format(name) for name in ('sample',
-                                                              'alignment',
-                                                              'processing',
-                                                              'cell_map',
-                                                              'cells',
-                                                              'vasculature',
-                                                              'tube_map'))  # FIXME: use alternatives
+    if not cfg_name.endswith('params'):
+        cfg_name += '_params'
+    params_names = (f'{name}_params' for name in ('sample',
+                                                  'alignment', 'processing',
+                                                  'cell_map', 'cells',
+                                                  'vasculature', 'tube_map'))  # FIXME: use alternatives
+    return cfg_name in params_names
 
 
 def is_machine_file(cfg_name):
@@ -125,3 +125,4 @@ class ConfigLoader(object):
 
 
 CONFIG_NAMES = ('alignment', 'cell_map', 'sample', 'tube_map', 'machine', 'display')
+
