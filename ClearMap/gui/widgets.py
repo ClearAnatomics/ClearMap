@@ -343,7 +343,8 @@ class Scatter3D:
                 z = i
             pos = np.vstack((pos, self.get_pos(z)))
             if self.colours is not None:
-                colours = np.vstack((colours, self.get_colours(z)))
+                current_z_colors = self.get_colours(z)
+                colours = np.vstack((colours, current_z_colors))
             sizes = np.hstack((sizes, self.get_symbol_sizes(main_z, z)))
         data = {'pos': pos,
                 'size': sizes}
