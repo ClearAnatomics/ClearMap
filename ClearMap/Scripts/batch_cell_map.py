@@ -2,6 +2,8 @@ import os.path
 import shutil
 import sys
 
+from tqdm import tqdm
+
 from ClearMap.Scripts.cell_map import CellDetector
 from ClearMap.Scripts.sample_preparation import PreProcessor
 from ClearMap.config.config_loader import get_configs, ConfigLoader
@@ -14,12 +16,14 @@ def backup_file(file_path):  # REFACTOR: put in workspace or IO
 
 
 def process_folders(folders):
-    for folder in folders:
+    for folder in tqdm(folders, desc='Processing sample ', unit='brain'):
         cfg_loader = ConfigLoader(folder)
         configs = get_configs(cfg_loader.get_cfg_path('sample'), cfg_loader.get_cfg_path('processing'))
 
         pre_proc = PreProcessor()
         pre_proc.setup(configs)
+        # print('Setting up atlases')
+        pre_proc.setup_atlases()
 
         cell_detector = CellDetector(pre_proc)
 
