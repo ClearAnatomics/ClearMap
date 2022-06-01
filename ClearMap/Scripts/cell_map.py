@@ -366,7 +366,7 @@ class CellDetector(TabProcessor):
 
     def plot_cells_3d_scatter_w_atlas_colors(self, parent=None):
         if self.preprocessor.was_registered:
-            dv = qplot_3d.plot(mhd_read(self.preprocessor.aligned_autofluo_path),
+            dv = qplot_3d.plot(clearmap_io.source(annotation.default_reference_file),  # FIXME: check that default is updated
                                arange=False, lut='white', parent=parent)[0]
         else:
             dv = qplot_3d.plot(self.workspace.filename('resampled'),
@@ -382,7 +382,7 @@ class CellDetector(TabProcessor):
         coordinates = df[['xt', 'yt', 'zt']].values.astype(np.int)  # required to match integer z
         colors = df['color'].values * 255
         colors = np.array([QColor(*cols.astype(np.int)) for cols in colors])
-        dv.scatter_coords = Scatter3D(coordinates, colors=colors)
+        dv.scatter_coords = Scatter3D(coordinates, colors=colors, half_z_size=0)
         dv.updateSlice()  # WARNING: does not work
 
         return [dv]

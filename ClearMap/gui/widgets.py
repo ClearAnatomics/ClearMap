@@ -323,7 +323,8 @@ class PbarWatcher(QWidget):  # Inspired from https://stackoverflow.com/a/6626606
 
 
 class Scatter3D:
-    def __init__(self, coordinates, smarties=False, colors=None):
+    def __init__(self, coordinates, smarties=False, colors=None, half_z_size=None):
+        self.half_z_size = half_z_size
         self.coordinates = coordinates
         if smarties and colors is None:
             n_samples = self.coordinates.shape[0]
@@ -334,8 +335,14 @@ class Scatter3D:
 
     def get_all_data(self, main_z, half_z_size=3):
         pos = np.empty((0, 2))
-        colours = np.empty((0, 3))
+        if self.colours is not None:
+            if self.colours.ndim == 1:
+                colours = np.empty(0)
+            else:
+                colours = np.empty((0, self.colours.shape[1]))
         sizes = np.empty(0)
+        if self.half_z_size is not None:
+            half_z_size = self.half_z_size
         for i in range(main_z - half_z_size, main_z + half_z_size):
             if i < 0:
                 continue
@@ -344,7 +351,7 @@ class Scatter3D:
             pos = np.vstack((pos, self.get_pos(z)))
             if self.colours is not None:
                 current_z_colors = self.get_colours(z)
-                colours = np.vstack((colours, current_z_colors))
+                colours = np.hstack((colours, current_z_colors))
             sizes = np.hstack((sizes, self.get_symbol_sizes(main_z, z)))
         data = {'pos': pos,
                 'size': sizes}
