@@ -106,10 +106,10 @@ class PostProcessingTab(GenericTab):
 
     def plot_slicer(self, slicer_prefix, tab, params):
         if self.preprocessor.was_registered:
-            img = self.preprocessor.workspace.source(self.preprocessor.annotation_file_path)  # TEST:
+            img = mhd_read(self.preprocessor.annotation_file_path)
         else:
-            img = self.preprocessor.workspace.source(self.preprocessor.workspace.filename('resampled'))  # TEST:
-        self.main_window.ortho_viewer.setup(img, params, parent=self)
+            img = self.preprocessor.workspace.source('resampled')
+        self.main_window.ortho_viewer.setup(img, params, parent=self.main_window)
         dvs = self.main_window.ortho_viewer.plot_orthogonal_views()
         self.main_window.ortho_viewer.add_cropping_bars()
         self.main_window.setup_plots(dvs, ['x', 'y', 'z'])
@@ -343,7 +343,7 @@ class AlignmentTab(GenericTab):
         self.main_window.print_status_msg('Registering')
         self.main_window.make_nested_progress_dialog('Registering', n_steps=self.preprocessor.n_registration_steps,
                                                      sub_maximum=0, abort_callback=self.preprocessor.stop_process,
-                                                     parent=self)
+                                                     parent=self.main_window)
         self.setup_atlas()
         self.main_window.print_status_msg('Resampling for registering')
         self.main_window.wrap_in_thread(self.preprocessor.resample_for_registration, force=True)
@@ -467,7 +467,7 @@ class CellCounterTab(PostProcessingTab):
         self.main_window.setup_plots(dvs)
 
     def plot_cells_scatter_w_atlas_colors(self):
-        dvs = self.cell_detector.plot_cells_3d_scatter_w_atlas_colors()
+        dvs = self.cell_detector.plot_cells_3d_scatter_w_atlas_colors(self.main_window)
         self.main_window.setup_plots(dvs)
 
     def preview_cell_filter(self):
@@ -575,7 +575,7 @@ class VasculatureTab(PostProcessingTab):
         self.main_window.print_status_msg('Vessels binarized')
 
     def plot_binarization_results(self):
-        dvs = self.binary_vessel_processor.plot_binarization_result(parent=self)
+        dvs = self.binary_vessel_processor.plot_binarization_result(parent=self.main_window)
         link_dataviewers_cursors(dvs)
         self.main_window.setup_plots(dvs, ['stitched', 'binary'])
 
