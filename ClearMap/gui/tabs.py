@@ -7,15 +7,13 @@ from ClearMap.IO.MHD import mhd_read
 from ClearMap.Scripts.cell_map import CellDetector
 from ClearMap.Scripts.sample_preparation import PreProcessor
 from ClearMap.Scripts.tube_map import BinaryVesselProcessor, VesselGraphProcessor
-from ClearMap.gui.gui_utils import format_long_nb_to_str, surface_project, np_to_qpixmap
+from ClearMap.gui.gui_utils import format_long_nb_to_str, surface_project, np_to_qpixmap, UI_FOLDER
 from ClearMap.gui.plots import link_dataviewers_cursors
 from ClearMap.gui.params import ParamsOrientationError, VesselParams, PreferencesParams, SampleParameters, \
     AlignmentParams, CellMapParams
 from ClearMap.gui.pyuic_utils import loadUiType
 from ClearMap.gui.widgets import PatternDialog
 from ClearMap.Visualization.Qt import Plot3d as plot_3d
-
-UI_FOLDER = 'ClearMap/gui/'
 
 
 # ############################################ INTERFACES ##########################################
@@ -263,7 +261,7 @@ class SampleTab(GenericTab):
 
 class AlignmentTab(GenericTab):
     def __init__(self, main_window, tab_idx=1):
-        super().__init__(main_window, 'Alignments', tab_idx, 'creator/alignment_tab.ui')
+        super().__init__(main_window, 'Alignment', tab_idx, 'creator/alignment_tab.ui')
 
         self.processing_type = 'pre'
         self.sample_params = None
@@ -455,7 +453,8 @@ class CellCounterTab(PostProcessingTab):
     #     self.cell_detector.detected = False
 
     def plot_detection_results(self):
-        dvs = self.cell_detector.preview_cell_detection(parent=self.main_window.centralWidget(), arange=False, sync=True)  # TODO: add close
+        dvs = self.cell_detector.preview_cell_detection(parent=self.main_window.centralWidget(),
+                                                        arange=False, sync=True)  # TODO: add close
         if len(dvs) == 1:
             self.main_window.print_warning_msg('Preview not run, '
                                                'will only display stitched image for memory space reasons')
