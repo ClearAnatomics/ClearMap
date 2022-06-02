@@ -1,5 +1,4 @@
 #distutils: language = c++
-#distutils: sources = trace.cpp
 #cython: language_level=3, boundscheck=False, wraparound=False, nonecheck=False, initializedcheck=False, cdivision=True
 
 """
