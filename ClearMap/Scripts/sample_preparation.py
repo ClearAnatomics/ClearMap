@@ -35,7 +35,7 @@ import ClearMap.Alignment.Stitching.StitchingRigid as stitching_rigid
 # noinspection PyPep8Naming
 import ClearMap.Alignment.Stitching.StitchingWobbly as stitching_wobbly
 from ClearMap.IO.metadata import define_auto_stitching_params, define_auto_resolution
-from ClearMap.config.config_loader import get_configs
+from ClearMap.config.config_loader import get_configs, ConfigLoader
 
 
 class CanceledProcessing(BrokenProcessPool):  # TODO: better inheritance
@@ -109,6 +109,8 @@ class TabProcessor:
 class PreProcessor(TabProcessor):
     def __init__(self):
         super().__init__()
+        self.config_loader = None
+        self.src_directory = None
         self.resources_directory = None
         self.sample_config = {}
         self.processing_config = {}
@@ -152,12 +154,13 @@ class PreProcessor(TabProcessor):
             self.set_configs(cfgs)
         else:  # Directly the config
             self.machine_config, self.sample_config, self.processing_config = cfgs
-        src_directory = os.path.dirname(self.sample_config.filename)
+        self.src_directory = os.path.dirname(self.sample_config.filename)
+        self.config_loader = ConfigLoader(self.src_directory)
 
         if watcher is not None:
             self.progress_watcher = watcher
 
-        self.workspace = workspace.Workspace(self.processing_config['pipeline_name'], directory=src_directory)
+        self.workspace = workspace.Workspace(self.processing_config['pipeline_name'], directory=self.src_directory)
         self.workspace.tmp_debug = TmpDebug(self.workspace)
         src_paths = {k: v for k, v in self.sample_config['src_paths'].items() if v is not None}
         self.workspace.update(**src_paths)

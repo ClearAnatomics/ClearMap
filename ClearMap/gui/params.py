@@ -4,7 +4,7 @@ import numpy as np
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QInputDialog
 
-from ClearMap.config.config_loader import get_configobj_cfg
+from ClearMap.config.config_loader import ConfigLoader
 
 
 class ConfigNotFoundError(Exception):
@@ -35,7 +35,7 @@ class UiParameter:
         return self._config.filename
 
     def get_config(self, cfg_path):
-        self._config = get_configobj_cfg(cfg_path)  # FIXME: use format agnostic method
+        self._config = ConfigLoader.get_cfg_from_path(cfg_path)
         if not self._config:
             raise ConfigNotFoundError
 
@@ -96,7 +96,7 @@ class UiParameterCollection:
         raise NotImplementedError('Please subclass UiParameterCollection and implement params property')
 
     def get_config(self, cfg_path):
-        self.config = get_configobj_cfg(cfg_path)  # FIXME: use format agnostic method
+        self.config = ConfigLoader.get_cfg_from_path(cfg_path)
         if not self.config:
             raise ConfigNotFoundError
         for param in self.params:
@@ -125,7 +125,7 @@ class AlignmentParams(UiParameterCollection):
         self.registration = RegistrationParams(tab, src_folder)
 
     def fix_cfg_file(self, f_path):
-        cfg = get_configobj_cfg(f_path)
+        cfg = ConfigLoader.get_cfg_from_path(f_path)
         pipeline_name, ok = QInputDialog.getItem(self.tab, 'Please select pipeline type',
                                                  'Pipeline name:', ['CellMap', 'TubeMap', 'Both'], 0, False)
         if not ok:
@@ -205,7 +205,7 @@ class SampleParameters(UiParameter):
         self.orientation = self._config['orientation']  # Finish by orientation in case invalid
 
     def fix_cfg_file(self, f_path):
-        cfg = get_configobj_cfg(f_path)
+        cfg = ConfigLoader.get_cfg_from_path(f_path)
         cfg['base_directory'] = os.path.dirname(f_path)
         if not self.sample_id:
             sample_id, ok = QInputDialog.getText(self.tab, 'Warning: missing ID',

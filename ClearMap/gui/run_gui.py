@@ -174,8 +174,7 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         if os.path.exists(f_path):
             return True
         else:
-            msg = 'File "{}" not found'.format(f_path)
-            self.print_error_msg(msg)
+            self.print_warning_msg(f'File "{f_path}" not found')
             return False
 
     def setup_plots(self, dvs, graph_names=None):
@@ -284,10 +283,9 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         self.fix_styles()
 
     @staticmethod
-    def create_missing_file_msg(f_type, f_path, default_f_path):
-        base_msg = 'No {} file found at:<br>  <nobr><em>"{}"</em></nobr>.'.format(f_type, f_path)
-        msg = '{} <br><br>Do you want to load a default one from:<br>  <nobr><em>"{}"</em></nobr>' \
-            .format(base_msg, default_f_path)
+    def create_missing_file_msg(f_type, f_path, default_path):
+        base_msg = f'No {f_type} file found at:<br>  <nobr><em>"{f_path}"</em></nobr>.'
+        msg = f'{base_msg} <br><br>Do you want to load a default one from:<br>  <nobr><em>"{default_path}"</em>?</nobr>'
         return base_msg, msg
 
     def make_progress_dialog(self, msg, maximum=100, canceled_callback=None):
@@ -441,7 +439,11 @@ class ClearMapGui(ClearMapGuiBase):
         cfg_path = self.config_loader.get_cfg_path(cfg_name, must_exist=False)
         was_copied = False
         if not self.file_exists(cfg_path):
-            default_cfg_file_path = self.config_loader.get_default_path(cfg_name)
+            try:
+                default_cfg_file_path = self.config_loader.get_default_path(cfg_name)
+            except FileNotFoundError as err:
+                self.print_error_msg(f'Could not locate file for "{cfg_name}"')
+                raise err
             base_msg, msg = self.create_missing_file_msg(cfg_name.title().replace('_', ''),
                                                          cfg_path, default_cfg_file_path)
             ret = self.popup(msg)
