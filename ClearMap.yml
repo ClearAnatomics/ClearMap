@@ -31,5 +31,5 @@ dependencies:
   - scikit-learn
   - graph-tool
   - pytorch
-#  - pip:
-#    - clearmap
+  - pip:
+    - lxml
