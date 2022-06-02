@@ -34,7 +34,6 @@ from ClearMap.Visualization.Vispy import PlotGraph3d as plot_graph_3d  # WARNING
 from ClearMap.Utils.utilities import is_in_range, get_free_v_ram
 
 from ClearMap.Scripts.sample_preparation import TabProcessor
-from ClearMap.config.config_loader import get_configobj_cfg
 
 
 # %%############################################################################
@@ -127,8 +126,7 @@ class BinaryVesselProcessor(TabProcessor):
             configs = preprocessor.get_configs()
             self.sample_config = configs['sample']
             self.machine_config = configs['machine']
-            cfg_path = os.path.join(os.path.dirname(self.sample_config.filename), 'tube_map_params.cfg')
-            self.processing_config = get_configobj_cfg(cfg_path)
+            self.processing_config = self.preprocessor.config_loader.get_cfg('vasculature')
 
             self.set_progress_watcher(self.preprocessor.progress_watcher)
 
@@ -312,8 +310,7 @@ class VesselGraphProcessor(TabProcessor):
             configs = preprocessor.get_configs()
             self.sample_config = configs['sample']
             self.machine_config = configs['machine']
-            cfg_path = os.path.join(os.path.dirname(self.sample_config.filename), 'tube_map_params.cfg')
-            self.processing_config = get_configobj_cfg(cfg_path)
+            self.processing_config = self.preprocessor.config_loader.get_cfg('vasculature')
 
             self.set_progress_watcher(self.preprocessor.progress_watcher)
 

@@ -19,7 +19,7 @@ def update_default_config():
     loader = ConfigLoader(None)
     for cfg_name in CONFIG_NAMES:
         default_cfg_path = get_default(cfg_name)
-        cfg_paths = [loader.get_default_path(alternative) for alternative in get_alternatives(cfg_name)]
+        cfg_paths = [loader.get_default_path(alternative, must_exist=False) for alternative in get_alternatives(cfg_name)]
         existing_paths = [os.path.exists(p) for p in cfg_paths]
         if not any(existing_paths):  # missing then copy
             print(f'Creating missing default config for {cfg_name}')

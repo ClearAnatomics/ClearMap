@@ -61,7 +61,6 @@ import ClearMap.Analysis.Measurements.Voxelization as voxelization
 import ClearMap.Alignment.Annotation as annotation
 from ClearMap.Scripts.sample_preparation import PreProcessor, TabProcessor
 from ClearMap.Utils.utilities import runs_on_ui
-from ClearMap.config.config_loader import get_configobj_cfg
 from ClearMap.gui.widgets import Scatter3D
 
 
@@ -84,8 +83,7 @@ class CellDetector(TabProcessor):
             configs = preprocessor.get_configs()
             self.sample_config = configs['sample']
             self.machine_config = configs['machine']
-            cfg_path = os.path.join(os.path.dirname(self.sample_config.filename), 'cell_map_params.cfg')
-            self.processing_config = get_configobj_cfg(cfg_path)
+            self.processing_config = self.preprocessor.config_loader.get_cfg('cell_map')
 
             self.set_progress_watcher(self.preprocessor.progress_watcher)
 

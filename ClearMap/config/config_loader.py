@@ -8,55 +8,71 @@ import configobj
 CLEARMAP_CFG_DIR = os.path.expanduser('~/.clearmap/')
 
 
-def get_alternatives(cfg_name):
-    alternative_names = [
-        {'alignment', 'processing'},
-        {'cell_map'},
-        {'sample'},
-        {'vasculature', 'tube_map'},
-        {'machine'},
-        {'display'}
-    ]
-    alternatives = [list(alt) for alt in alternative_names if cfg_name in alt]
-    if not alternatives:
-        raise ValueError(f'Could not find any alternative for {cfg_name}')
-    return alternatives[0]
-
-
-# TODO: add options to read different config file types (i.e. yaml and json)
-def get_configs(cfg_path, processing_params_path, machine_cfg_path=os.path.join(CLEARMAP_CFG_DIR, 'machine_params.cfg')):
-    sample_config = get_configobj_cfg(cfg_path)
-    processing_config = get_configobj_cfg(processing_params_path)
-    machine_config = get_configobj_cfg(machine_cfg_path)
-
-    return machine_config, sample_config, processing_config
-
-
 def get_configobj_cfg(cfg_path):
     cfg_path = clean_path(cfg_path)
     return configobj.ConfigObj(cfg_path, encoding="UTF8", indent_type='    ', unrepr=True, file_error=True)
 
 
 def get_yml_cfg(cfg_path):
+    """
+
+    Parameters
+    ----------
+    cfg_path (str)
+
+    Returns Should return a dict like object with a write method and filename that gives the path
+    -------
+
+    """
     raise NotImplementedError
 
 
 def get_json_cfg(cfg_path):
+    """
+
+    Parameters
+    ----------
+    cfg_path (str)
+
+    Returns Should return a dict like object with a write method and filename that gives the path
+    -------
+
+    """
     raise NotImplementedError
+
+
+tabs_alternatives = [
+    {'sample'},
+    {'alignment', 'processing'},
+    {'cell_map'},
+    {'vasculature', 'tube_map'},
+]
+
+
+alternative_names = tabs_alternatives + [{'machine'}, {'display'}]
+
+
+def get_alternatives(cfg_name):
+    alternatives = [list(alt) for alt in alternative_names if cfg_name in alt]
+    if not alternatives:
+        raise ValueError(f'Could not find any alternative for {cfg_name}')
+    return alternatives[0]
+
+
+def flatten_alternatives(alternatives):
+    flat = []
+    for names in alternatives:
+        flat.extend(names)
+    return flat
+
+
+def is_tab_file(cfg_name):
+    cfg_name = cfg_name.replace('_params', '')
+    return cfg_name in flatten_alternatives(tabs_alternatives)
 
 
 def clean_path(path):
     return os.path.normpath(os.path.expanduser(path))
-
-
-def is_tab_file(cfg_name):
-    if not cfg_name.endswith('params'):
-        cfg_name += '_params'
-    params_names = (f'{name}_params' for name in ('sample',
-                                                  'alignment', 'processing',
-                                                  'cell_map', 'cells',
-                                                  'vasculature', 'tube_map'))  # FIXME: use alternatives
-    return cfg_name in params_names
 
 
 def is_machine_file(cfg_name):
@@ -71,10 +87,10 @@ class ConfigLoader(object):
         '.yml': get_yml_cfg,
         '.json': get_json_cfg
     }
+    default_dir = CLEARMAP_CFG_DIR
 
     def __init__(self, src_dir):
         self.src_dir = src_dir
-        self.default_dir = CLEARMAP_CFG_DIR
         self.sample_cfg_path = ''  # OPTIMISE: could use cached property
         self.preferences_path = ''
         self.cell_map_cfg_path = ''
@@ -110,19 +126,42 @@ class ConfigLoader(object):
             cfg_path = self.get_cfg_path(cfg_name)
         else:
             cfg_path = self.get_default_path(cfg_name)
-        ext = os.path.splitext(cfg_path)[-1]
-        return self.loader_functions[ext](cfg_path)
+        return self.get_cfg_from_path(cfg_path)
 
-    def get_default_path(self, cfg_name):
+    @staticmethod
+    def get_cfg_from_path(cfg_path):
+        ext = os.path.splitext(cfg_path)[-1]
+        return ConfigLoader.loader_functions[ext](cfg_path)
+
+    @staticmethod
+    def get_default_path(cfg_name, must_exist=True):
         if not cfg_name.endswith('params'):
             cfg_name += '_params'
-        for ext in self.supported_exts:  # FIXME: only first since not exists check and return
-            prefix = 'default_' if is_tab_file(cfg_name) else ''
-            cfg_name = f'{prefix}{cfg_name}{ext}'
-            cfg_path = clean_path(os.path.join(self.default_dir, cfg_name))
-            return cfg_path
-        raise FileNotFoundError(f'Could not find file {cfg_name} in {self.default_dir}')
+        for ext in ConfigLoader.supported_exts:
+            cfg_path = ConfigLoader._name_to_default_path(cfg_name, ext)
+            if os.path.exists(cfg_path):
+                break
+        else:
+            if must_exist:
+                raise FileNotFoundError(f'Could not find file {cfg_name} in {ConfigLoader.default_dir}')
+            else:  # Return first (default) ext if none found
+                return ConfigLoader._name_to_default_path(cfg_name, ConfigLoader.supported_exts[0])
+        return cfg_path
+
+    @staticmethod
+    def _name_to_default_path(cfg_name, ext):
+        prefix = 'default_' if is_tab_file(cfg_name) else ''
+        cfg_name = f'{prefix}{cfg_name}{ext}'
+        cfg_path = clean_path(os.path.join(ConfigLoader.default_dir, cfg_name))
+        return cfg_path
 
 
 CONFIG_NAMES = ('alignment', 'cell_map', 'sample', 'tube_map', 'machine', 'display')
 
+
+def get_configs(cfg_path, processing_params_path, machine_cfg_path=ConfigLoader.get_default_path('machine')):
+    sample_config = ConfigLoader.get_cfg_from_path(cfg_path)
+    processing_config = ConfigLoader.get_cfg_from_path(processing_params_path)
+    machine_config = ConfigLoader.get_cfg_from_path(machine_cfg_path)
+
+    return machine_config, sample_config, processing_config
