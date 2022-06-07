@@ -136,10 +136,13 @@ class CellDetector(TabProcessor):
 
     def get_voxelization_params(self, postfix=''):
         voxelization_parameter = {
-            'shape': clearmap_io.shape(self.preprocessor.annotation_file_path),
             'radius': self.processing_config['voxelization']['radii'],
             'verbose': True
         }
+        if self.preprocessor.was_registered:
+            voxelization_parameter['shape'] = clearmap_io.shape(self.preprocessor.annotation_file_path),
+        else:
+            voxelization_parameter['shape'] = self.preprocessor.resampled_shape
         if postfix:
             cells = self.workspace.source('cells', postfix=postfix)  # Hack to compensate for the fact that the realigned makes no sense in
             coordinates = np.array([cells[axis] for axis in 'xyz']).T
