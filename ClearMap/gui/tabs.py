@@ -388,6 +388,8 @@ class CellCounterTab(PostProcessingTab):
     def setup(self):
         self.init_ui()
 
+        self.ui.toolBox.currentChanged.connect(self.handle_tool_tab_changed)
+
         self.ui.detectionPreviewTuningButtonBox.connectOpen(self.plot_debug_cropping_interface)
         self.ui.detectionPreviewTuningSampleButtonBox.connectApply(self.create_cell_detection_tuning_sample)
         self.ui.detectionPreviewButtonBox.connectApply(self.run_tuning_cell_detection)
@@ -417,6 +419,10 @@ class CellCounterTab(PostProcessingTab):
     def plot_debug_cropping_interface(self):
         self.plot_slicer('detectionSubset', self.ui, self.params)
 
+    def handle_tool_tab_changed(self, tab_idx):
+        if tab_idx == 3:
+            self.update_cell_number()
+
     def create_cell_detection_tuning_sample(self):
         slicing = (slice(self.params.crop_x_min, self.params.crop_x_max),
                    slice(self.params.crop_y_min, self.params.crop_y_max),
@@ -444,10 +450,15 @@ class CellCounterTab(PostProcessingTab):
             return
         if self.params.plot_detected_cells:
             self.cell_detector.plot_cells()  # TODO: integrate into UI
-        self.ui.nDetectedCellsLabel.setText(
-            format_long_nb_to_str(self.cell_detector.get_n_detected_cells()))
+        self.update_cell_number()
         self.main_window.progress_dialog.done(1)
         self.main_window.print_status_msg('Cell detection done')
+
+    def update_cell_number(self):
+        self.ui.nDetectedCellsLabel.setText(
+            format_long_nb_to_str(self.cell_detector.get_n_detected_cells()))
+        self.ui.nDetectedCellsAfterFilterLabel.setText(
+            format_long_nb_to_str(self.cell_detector.get_n_fitlered_cells()))
 
     # def reset_detected(self):
     #     self.cell_detector.detected = False
@@ -483,11 +494,9 @@ class CellCounterTab(PostProcessingTab):
         self.params.ui_to_cfg()
         if not self.cell_detector.detected:
             self.detect_cells()
-        self.ui.nDetectedCellsLabel.setText(
-            format_long_nb_to_str(self.cell_detector.get_n_detected_cells()))
+        self.update_cell_number()
         self.cell_detector.post_process_cells()
-        self.ui.nDetectedCellsAfterFilterLabel.setText(
-            format_long_nb_to_str(self.cell_detector.get_n_fitlered_cells()))
+        self.update_cell_number()
         if self.params.plot_when_finished:
             self.plot_cell_map_results()
         # WARNING: some plots in .post_process_cells() without UI params
