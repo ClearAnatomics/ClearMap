@@ -163,8 +163,8 @@ class CellDetector(TabProcessor):
     #     self.workspace.debug = False
 
     def get_coords(self, coord_type='filtered'):
-        if not coord_type in ('filtered', 'raw'):
-            raise ValueError('Coordinate type "{}" not recognised'.format(coord_type))
+        if coord_type not in ('filtered', 'raw'):
+            raise ValueError(f'Coordinate type "{coord_type}" not recognised')
         table = np.load(self.workspace.filename('cells', postfix=coord_type))
         coordinates = np.array([table[axis] for axis in ['x', 'y', 'z']]).T
         return coordinates
@@ -438,12 +438,18 @@ class CellDetector(TabProcessor):
         return plot_3d.plot(sources, arange=arange, sync=sync, lut='white', parent=parent)
 
     def get_n_detected_cells(self):
-        coords = self.get_coords(coord_type='raw')
-        return np.max(coords.shape)  # TODO: check dimension instead
+        if os.path.exists(self.workspace.filename('cells', postfix='raw')):
+            coords = self.get_coords(coord_type='raw')
+            return np.max(coords.shape)  # TODO: check dimension instead
+        else:
+            return 0
 
     def get_n_fitlered_cells(self):
-        coords = self.get_coords(coord_type='filtered')
-        return np.max(coords.shape)  # TODO: check dimension instead
+        if os.path.exists(self.workspace.filename('cells', postfix='filtered')):
+            coords = self.get_coords(coord_type='filtered')
+            return np.max(coords.shape)  # TODO: check dimension instead
+        else:
+            return 0
 
     def plot_voxelized_intensities(self, arange=True):
         return plot_3d.plot(self.workspace.filename('density', postfix='intensities'), arange=arange)
