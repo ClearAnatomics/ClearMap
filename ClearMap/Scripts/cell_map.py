@@ -136,7 +136,7 @@ class CellDetector(TabProcessor):
 
     def get_voxelization_params(self, postfix=''):
         voxelization_parameter = {
-            'shape': self.preprocessor.resampled_shape,
+            'shape': clearmap_io.shape(self.preprocessor.annotation_file_path),
             'radius': self.processing_config['voxelization']['radii'],
             'verbose': True
         }
