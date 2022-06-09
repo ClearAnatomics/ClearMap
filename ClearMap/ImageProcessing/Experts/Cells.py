@@ -58,7 +58,7 @@ import ClearMap.Utils.HierarchicalDict as hdict
 
 default_cell_detection_parameter = dict( 
   #flatfield
-  iullumination_correction = dict(flatfield = None,
+  illumination_correction = dict(flatfield = None,
                                   scaling = 'mean'),
                        
   #background removal
