@@ -16,9 +16,8 @@ from ClearMap.IO.metadata import pattern_finders_from_base_dir
 from ClearMap.Settings import resources_path
 from ClearMap.Visualization import Plot3d as plot_3d
 from ClearMap.config.config_loader import ConfigLoader
-from ClearMap.gui.dialogs import make_splash
-from ClearMap.gui.gui_utils import pseudo_random_rgb_array, UI_FOLDER
-from ClearMap.gui.pyuic_utils import loadUiType
+from ClearMap.gui.dialogs import make_splash, get_directory_dlg
+from ClearMap.gui.gui_utils import pseudo_random_rgb_array, create_clearmap_widget
 
 
 def setup_mini_brain(mini_brain_scaling=(5, 5, 5)):  # TODO: scaling in prefs
@@ -377,9 +376,8 @@ class PatternDialog:
         self.src_folder = src_folder
         self.app = app
 
-        cls, _ = loadUiType(os.path.join(UI_FOLDER, 'creator', 'pattern_prompt.ui'), patch_parent_class='QDialog')
-        dlg = cls()
-        dlg.setWindowTitle('File paths wizzard')
+        dlg = create_clearmap_widget('pattern_prompt.ui', patch_parent_class='QDialog')
+        dlg.setWindowTitle('File paths wizard')
         dlg.setupUi()
         self.dlg = dlg
         self.fix_btn_boxes_text()

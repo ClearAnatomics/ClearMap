@@ -79,7 +79,7 @@ Auto modes:
     - Batch run
 """
 
-Ui_ClearMapGui, _ = loadUiType(os.path.join(UI_FOLDER, 'creator/mainwindow.ui'), patch_parent_class=False)
+Ui_ClearMapGui, _ = loadUiType(os.path.join(UI_FOLDER, 'creator', 'mainwindow.ui'), patch_parent_class=False)
 
 
 class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):

@@ -8,6 +8,8 @@ import skimage.io
 from PyQt5 import QtGui
 from matplotlib.colors import hsv_to_rgb
 
+from ClearMap.gui.pyuic_utils import loadUiType
+
 UI_FOLDER = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 
 
@@ -138,3 +140,8 @@ def pseudo_random_rgb_array(n_samples):
     hsvs = np.vstack((hues, saturations, values))
     rgbs = np.apply_along_axis(hsv_to_rgb, 0, hsvs)
     return rgbs.T
+
+
+def create_clearmap_widget(ui_name, patch_parent_class):
+    widget_class, _ = loadUiType(os.path.join(UI_FOLDER, 'creator', ui_name), patch_parent_class=patch_parent_class)
+    return widget_class()

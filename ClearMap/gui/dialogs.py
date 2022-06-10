@@ -9,9 +9,7 @@ from PyQt5.QtWidgets import QFileDialog, QMessageBox, QProgressDialog, QLabel, Q
 
 from ClearMap.config.config_loader import clean_path, ConfigLoader
 from ClearMap.Utils.utilities import runs_on_pycharm
-from ClearMap.gui.gui_utils import UI_FOLDER
-from ClearMap.gui.pyuic_utils import loadUiType
-
+from ClearMap.gui.gui_utils import UI_FOLDER, create_clearmap_widget
 
 cfg_loader = ConfigLoader('')
 DISPLAY_CONFIG = cfg_loader.get_cfg('display')
@@ -61,8 +59,7 @@ def make_progress_dialog(msg, maximum, canceled_callback, parent):
 # REFACTOR: make class
 def make_nested_progress_dialog(title='Processing', overall_maximum=100, sub_maximum=100, sub_process_name='',
                                 abort_callback=None, parent=None):
-    dlg_class, _ = loadUiType(os.path.join(UI_FOLDER, 'creator', 'nested_progress_dialog.ui'), patch_parent_class='QDialog')
-    dlg = dlg_class()
+    dlg = create_clearmap_widget('nested_progress_dialog.ui', patch_parent_class='QDialog')
     dlg.setWindowTitle('Progress')
     dlg.setupUi()
     dlg.mainLabel.setText(title)
