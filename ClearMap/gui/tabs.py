@@ -116,7 +116,7 @@ class PostProcessingTab(GenericTab):
 
         # WARNING: needs to be done after setup
         for axis, ax_max in zip('XYZ', self.preprocessor.raw_stitched_shape):
-            getattr(tab, '{}XRangeMax'.format(slicer_prefix)).setMaximum(ax_max)
+            getattr(tab, f'{slicer_prefix}{axis}RangeMax').setMaximum(ax_max)
         self.main_window.ortho_viewer.update_ranges()
 
 
