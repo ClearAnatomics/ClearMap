@@ -53,7 +53,7 @@ from ClearMap.gui.style import QDARKSTYLE_BACKGROUND, DARK_BACKGROUND, PLOT_3D_B
 
 from ClearMap.gui.widgets import OrthoViewer, PbarWatcher, setup_mini_brain  # needs plot_3d
 update_pbar(app, progress_bar, 60)
-from ClearMap.gui.tabs import SampleTab, AlignmentTab, CellCounterTab, VasculatureTab, PreferenceUi
+from ClearMap.gui.tabs import SampleTab, AlignmentTab, CellCounterTab, VasculatureTab, PreferenceUi, BatchTab
 
 update_pbar(app, progress_bar, 80)
 
@@ -336,6 +336,7 @@ class ClearMapGui(ClearMapGuiBase):
         self.alignment_tab_mgr = AlignmentTab(self, tab_idx=1)
         self.cells_tab_mgr = CellCounterTab(self, tab_idx=2)
         self.vasculature_tab_mgr = VasculatureTab(self, tab_idx=3)
+        self.batch_tab_mgr = BatchTab(self, tab_idx=4)
 
         self.preference_editor = PreferenceUi(self)
 
@@ -359,7 +360,8 @@ class ClearMapGui(ClearMapGuiBase):
 
     @property
     def tab_mgrs(self):
-        return self.sample_tab_mgr, self.alignment_tab_mgr, self.cells_tab_mgr, self.vasculature_tab_mgr
+        return self.sample_tab_mgr, self.alignment_tab_mgr, self.cells_tab_mgr, \
+               self.vasculature_tab_mgr#, self.batch_tab_mgr
 
     @property
     def params(self):
@@ -404,7 +406,7 @@ class ClearMapGui(ClearMapGuiBase):
             self.alignment_tab_mgr.preprocessor.set_progress_watcher(self.progress_watcher)
 
     def handle_tab_click(self, tab_index):
-        if tab_index > 0 and self.alignment_tab_mgr.preprocessor.workspace is None:
+        if 0 < tab_index < 4 and self.alignment_tab_mgr.preprocessor.workspace is None:
             self.popup('WARNING', 'Workspace not initialised, '
                                   'cannot proceed to alignment')
             self.tabWidget.setCurrentIndex(0)
@@ -417,6 +419,24 @@ class ClearMapGui(ClearMapGuiBase):
                 processor_setup_functions[tab_index]()
             else:
                 self.__check_missing_alignment()
+
+        if tab_index == 4 and not self.batch_tab_mgr.inited:
+            cfg_name = title_to_snake(self.batch_tab_mgr.name)
+            try:
+                self.batch_tab_mgr.setup()
+                self.batch_tab_mgr.set_params()
+                results_folder = get_directory_dlg(self.preference_editor.params.start_folder,
+                                                   'Select the folder where results will be written')
+                was_copied, cfg_path = self.__get_cfg_path(cfg_name, ConfigLoader(results_folder))
+                if was_copied:
+                    self.batch_tab_mgr.params.fix_cfg_file(cfg_path)
+                self.batch_tab_mgr.params.get_config(cfg_path)  # FIXME: try to put with other tabs init (differentce with comfigloader)
+                self.batch_tab_mgr.initial_cfg_load()
+                self.batch_tab_mgr.setup_workers()
+            except ConfigNotFoundError:
+                self.conf_load_error_msg(cfg_name)
+            except FileNotFoundError:  # message already printed, just stop
+                return
 
     def __check_missing_alignment(self):
         ok = self.__warn_missing_alignment()  # TODO: use result
@@ -435,19 +455,23 @@ class ClearMapGui(ClearMapGuiBase):
             self.print_error_msg(msg)
             raise FileNotFoundError(msg)
 
-    def __get_cfg_path(self, cfg_name):
-        cfg_path = self.config_loader.get_cfg_path(cfg_name, must_exist=False)
+    def __get_cfg_path(self, cfg_name, config_loader=None):
+        if config_loader is None:
+            config_loader = self.config_loader
+        cfg_path = config_loader.get_cfg_path(cfg_name, must_exist=False)
         was_copied = False
         if not self.file_exists(cfg_path):
             try:
-                default_cfg_file_path = self.config_loader.get_default_path(cfg_name)
+                default_cfg_file_path = config_loader.get_default_path(cfg_name)
             except FileNotFoundError as err:
                 self.print_error_msg(f'Could not locate file for "{cfg_name}"')
                 raise err
             base_msg, msg = self.create_missing_file_msg(cfg_name.title().replace('_', ''),
                                                          cfg_path, default_cfg_file_path)
-            ret = self.popup(msg)
-            if ret == QMessageBox.Ok:
+            do_copy = self.popup(msg) == QMessageBox.Ok
+            if do_copy:
+                if not os.path.exists(os.path.dirname(cfg_path)):
+                    os.mkdir(os.path.dirname(cfg_path))
                 copyfile(default_cfg_file_path, cfg_path)
                 was_copied = True
             else:
@@ -468,7 +492,7 @@ class ClearMapGui(ClearMapGuiBase):
                 if was_copied:
                     tab.params.fix_cfg_file(cfg_path)
 
-                if tab.processing_type is None:
+                if tab.processing_type is None or tab.processing_type == 'batch':
                     tab.set_params()
                 elif tab.processing_type == 'pre':
                     tab.set_params(self.sample_tab_mgr.params)
@@ -476,7 +500,7 @@ class ClearMapGui(ClearMapGuiBase):
                     tab.set_params(self.sample_tab_mgr.params, self.alignment_tab_mgr.params)
                     tab.setup_preproc(self.alignment_tab_mgr.preprocessor)
                 else:
-                    raise ValueError('Processing type should be one of "pre", "post" or None, got "{}"'
+                    raise ValueError('Processing type should be one of "pre", "post", "batch" or None, got "{}"'
                                      .format(tab.processing_type))
                 tab.params.get_config(cfg_path)
                 tab.load_params()

@@ -57,7 +57,7 @@
       <item>
        <widget class="QTabWidget" name="tabWidget">
         <property name="currentIndex">
-         <number>1</number>
+         <number>4</number>
         </property>
         <widget class="QWidget" name="sample_tab">
          <attribute name="title">
@@ -81,7 +81,7 @@
         </widget>
         <widget class="QWidget" name="tab">
          <attribute name="title">
-          <string>Analysis</string>
+          <string>Batch</string>
          </attribute>
         </widget>
        </widget>

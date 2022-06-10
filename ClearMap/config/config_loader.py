@@ -46,6 +46,7 @@ tabs_alternatives = [
     {'alignment', 'processing'},
     {'cell_map'},
     {'vasculature', 'tube_map'},
+    {'batch'},
 ]
 
 
@@ -156,7 +157,7 @@ class ConfigLoader(object):
         return cfg_path
 
 
-CONFIG_NAMES = ('alignment', 'cell_map', 'sample', 'tube_map', 'machine', 'display')
+CONFIG_NAMES = ('alignment', 'cell_map', 'sample', 'tube_map', 'batch', 'machine', 'display')  # FIXME: derive from alternatives
 
 
 def get_configs(cfg_path, processing_params_path, machine_cfg_path=ConfigLoader.get_default_path('machine')):

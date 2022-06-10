@@ -1,8 +1,14 @@
 import os
+import string
+from itertools import combinations
 
 import numpy as np
+
+from ClearMap.gui.gui_utils import create_clearmap_widget
+
+from ClearMap.gui.dialogs import get_directory_dlg
 from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QInputDialog
+from PyQt5.QtWidgets import QInputDialog, QToolBox, QCheckBox, QLabel, QWidgetItem
 
 from ClearMap.config.config_loader import ConfigLoader
 
@@ -1557,3 +1563,144 @@ class PreferencesParams(UiParameter):
     @font_size.setter
     def font_size(self, value):
         self.tab.fontSizeSpinBox.setValue(value)
+
+
+class BatchParams(UiParameter):
+
+    def __init__(self, tab, src_folder=None, preferences=None):
+        super().__init__(tab, src_folder)
+        self.group_concatenator = ' vs '
+        self.preferences = preferences
+        self.tab.sampleFoldersToolBox = QToolBox(parent=self.tab)
+        self.tab.sampleFoldersPageLayout.addWidget(self.tab.sampleFoldersToolBox)
+
+        self.comparison_checkboxes = []
+
+    @property
+    def config(self):
+        return self._config
+
+    def _ui_to_cfg(self):
+        self.config['paths']['results_folder'] = self.results_folder
+        self.config['groups'] = self.groups
+        self.config['comparisons'] = {letter: pair for letter, pair in zip(string.ascii_lowercase,
+                                                                           self.selected_comparisons)}
+
+    def cfg_to_ui(self):
+        self.results_folder = self.config['paths']['results_folder']
+        for i in range(len(self.config['groups'].keys())):
+            self.add_group()
+        self.group_names = self.config['groups'].keys()  # FIXME: check that ordered
+        for i, paths in enumerate(self.config['groups'].values()):
+            self.set_paths(i+1, paths)
+        self.update_comparisons()
+        for chk_bx in self.comparison_checkboxes:
+            if chk_bx.text().split(self.group_concatenator) in self.config['comparisons'].values():
+                chk_bx.setChecked(True)
+
+    def connect(self):
+        self.tab.addGroupPushButton.clicked.connect(self.add_group)
+        self.tab.resultsFolderLineEdit.textChanged.connect(self.handle_results_folder_changed)
+
+    def connect_groups(self):
+        for btn in self.gp_add_folder_buttons:
+            btn.clicked.connect(self.handle_add_src_folder_clicked)
+        for ctrl in self.gp_group_name_ctrls:
+            ctrl.editingFinished.connect(self.update_comparisons)
+
+    @property
+    def comparisons(self):
+        """
+
+        Returns
+        -------
+            The list of all possible pairs of groups
+        """
+        return list(combinations(self.group_names, 2))
+
+    @property
+    def selected_comparisons(self):
+        return [box.text().split(self.group_concatenator) for box in self.comparison_checkboxes if box.isChecked()]
+
+    def update_comparisons(self):
+        self.comparison_checkboxes = []
+        for i in range(self.tab.comparisonsVerticalLayout.count(), -1, -1):  # Clear
+            item = self.tab.comparisonsVerticalLayout.takeAt(i)
+            if item is not None:
+                widg = item.widget()
+                widg.setParent(None)
+                widg.deleteLater()
+        for pair in self.comparisons:
+            chk = QCheckBox(self.group_concatenator.join(pair))
+            chk.setChecked(False)
+            self.tab.comparisonsVerticalLayout.addWidget(chk)
+            self.comparison_checkboxes.append(chk)
+
+    def add_group(self):  # REFACTOR: better in tab object
+        new_gp_id = self.n_groups + 1
+        group_controls = create_clearmap_widget('sample_group_controls.ui', patch_parent_class='QWidget')
+        group_controls.setupUi()
+        self.tab.sampleFoldersToolBox.addItem(group_controls, f'Group {new_gp_id}')
+
+        self.connect_groups()
+
+    @property
+    def n_groups(self):
+        return self.tab.sampleFoldersToolBox.count()
+
+    @property
+    def group_names(self):
+        return [lbl.text() for lbl in self.gp_group_name_ctrls]
+
+    @group_names.setter
+    def group_names(self, names):
+        for w, name in zip(self.gp_group_name_ctrls, names):
+            w.setText(name)
+
+    @property
+    def gp_group_name_ctrls(self):
+        return self.get_gp_ctrls('NameLineEdit')
+
+    @property
+    def gp_add_folder_buttons(self):
+        return self.get_gp_ctrls('AddSrcFolderBtn')
+    
+    @property
+    def gp_list_widget(self):
+        return self.get_gp_ctrls('ListWidget')
+
+    def get_gp_ctrls(self, ctrl_name):
+        return [getattr(self.tab.sampleFoldersToolBox.widget(i), f'gp{ctrl_name}') for i in range(self.n_groups)]
+
+    def set_paths(self, gp, paths):
+        list_widget = self.gp_list_widget[gp-1]
+        list_widget.clear()
+        list_widget.addItems(paths)
+
+    def get_paths(self, gp):  # TODO: should exist from group name
+        widg = self.gp_list_widget[gp-1]
+        return [widg.item(i) for i in range(widg.count())]
+
+    def get_all_paths(self):
+        return [self.get_paths(gp+1) for gp in range(self.n_groups)]
+
+    @property
+    def groups(self):
+        return {gp: paths for gp, paths in zip(self.group_names, self.get_all_paths())}
+
+    def handle_add_src_folder_clicked(self):
+        gp = self.tab.sampleFoldersToolBox.currentIndex() + 1
+        folder_path = get_directory_dlg(self.preferences.start_folder, 'Select sample folder')
+        if folder_path:
+            self.gp_list_widget[gp].append(folder_path)
+
+    @property
+    def results_folder(self):
+        return self.tab.resultsFolderLineEdit.text()
+
+    @results_folder.setter
+    def results_folder(self, value):
+        self.tab.resultsFolderLineEdit.setText(value)
+
+    def handle_results_folder_changed(self):
+        self.config['paths']['results_folder'] = self.results_folder

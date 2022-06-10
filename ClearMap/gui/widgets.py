@@ -3,13 +3,14 @@ import re
 
 import numpy as np
 import pyqtgraph as pg
+import qdarkstyle
 from PyQt5.QtGui import QColor
 from skimage import transform as sk_transform  # Slowish
 
 
 from PyQt5 import QtGui, QtCore
 from PyQt5.QtCore import QRectF
-from PyQt5.QtWidgets import QWidget, QDialogButtonBox
+from PyQt5.QtWidgets import QWidget, QDialogButtonBox, QListWidget, QHBoxLayout, QPushButton, QVBoxLayout
 
 from ClearMap.IO import TIF
 from ClearMap.IO.metadata import pattern_finders_from_base_dir
@@ -477,3 +478,192 @@ class PatternDialog:
 
     def exec(self):
         self.dlg.exec()
+
+
+# Adapted from https://stackoverflow.com/a/54917151 by https://stackoverflow.com/users/6622587/eyllanesc
+class TwoListSelection(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setup_layout()
+        # self.app = app
+
+    def setup_layout(self):
+        lay = QHBoxLayout(self)
+        self.mInput = QListWidget()
+        self.mOuput = QListWidget()
+
+        move_btns, up_down_btns = self.layout_buttons()
+
+        lay.addWidget(self.mInput)
+        lay.addLayout(move_btns)
+        lay.addWidget(self.mOuput)
+        lay.addLayout(up_down_btns)
+
+        self.update_buttons_status()
+        self.connections()
+
+    def layout_buttons(self):
+        self.mButtonToSelected = QPushButton(">>")
+        self.mBtnMoveToAvailable = QPushButton(">")
+        self.mBtnMoveToSelected = QPushButton("<")
+        self.mButtonToAvailable = QPushButton("<<")
+        move_btns = QVBoxLayout()
+        move_btns.addStretch()
+        move_btns.addWidget(self.mButtonToSelected)
+        move_btns.addWidget(self.mBtnMoveToAvailable)
+        move_btns.addWidget(self.mBtnMoveToSelected)
+        move_btns.addWidget(self.mButtonToAvailable)
+        move_btns.addStretch()
+
+        self.mBtnUp = QPushButton("Up")
+        self.mBtnDown = QPushButton("Down")
+        up_down_btns = QVBoxLayout()
+        up_down_btns.addStretch()
+        up_down_btns.addWidget(self.mBtnUp)
+        up_down_btns.addWidget(self.mBtnDown)
+        up_down_btns.addStretch()
+
+        return move_btns, up_down_btns
+
+    @QtCore.pyqtSlot()
+    def update_buttons_status(self):
+        self.mBtnUp.setDisabled(not bool(self.mOuput.selectedItems()) or self.mOuput.currentRow() == 0)
+        self.mBtnDown.setDisabled(not bool(self.mOuput.selectedItems()) or self.mOuput.currentRow() == (self.mOuput.count() -1))
+        self.mBtnMoveToAvailable.setDisabled(not bool(self.mInput.selectedItems()) or self.mOuput.currentRow() == 0)
+        self.mBtnMoveToSelected.setDisabled(not bool(self.mOuput.selectedItems()))
+
+    def connections(self):
+        self.mInput.itemSelectionChanged.connect(self.update_buttons_status)
+        self.mOuput.itemSelectionChanged.connect(self.update_buttons_status)
+        self.mBtnMoveToAvailable.clicked.connect(self.on_mBtnMoveToAvailable_clicked)
+        self.mBtnMoveToSelected.clicked.connect(self.on_mBtnMoveToSelected_clicked)
+        self.mButtonToAvailable.clicked.connect(self.on_mButtonToAvailable_clicked)
+        self.mButtonToSelected.clicked.connect(self.on_mButtonToSelected_clicked)
+        self.mBtnUp.clicked.connect(self.on_mBtnUp_clicked)
+        self.mBtnDown.clicked.connect(self.on_mBtnDown_clicked)
+
+    @QtCore.pyqtSlot()
+    def on_mBtnMoveToAvailable_clicked(self):
+        self.mOuput.addItem(self.mInput.takeItem(self.mInput.currentRow()))
+
+    @QtCore.pyqtSlot()
+    def on_mBtnMoveToSelected_clicked(self):
+        self.mInput.addItem(self.mOuput.takeItem(self.mOuput.currentRow()))
+
+    @QtCore.pyqtSlot()
+    def on_mButtonToAvailable_clicked(self):
+        while self.mOuput.count() > 0:
+            self.mInput.addItem(self.mOuput.takeItem(0))
+
+    @QtCore.pyqtSlot()
+    def on_mButtonToSelected_clicked(self):
+        while self.mInput.count() > 0:
+            self.mOuput.addItem(self.mInput.takeItem(0))
+
+    @QtCore.pyqtSlot()
+    def on_mBtnUp_clicked(self):
+        row = self.mOuput.currentRow()
+        currentItem = self.mOuput.takeItem(row)
+        self.mOuput.insertItem(row - 1, currentItem)
+        self.mOuput.setCurrentRow(row - 1)
+
+    @QtCore.pyqtSlot()
+    def on_mBtnDown_clicked(self):
+        row = self.mOuput.currentRow()
+        currentItem = self.mOuput.takeItem(row)
+        self.mOuput.insertItem(row + 1, currentItem)
+        self.mOuput.setCurrentRow(row + 1)
+
+    def addAvailableItems(self, items):
+        self.mInput.addItems(items)
+
+    def setSelectedItems(self, items):
+        self.mOuput.clear()
+        self.mOuput.addItems(items)
+
+    def get_left_elements(self):
+        r = []
+        for i in range(self.mInput.count()):
+            it = self.mInput.item(i)
+            r.append(it.text())
+        return r
+
+    def get_right_elements(self):
+        r = []
+        for i in range(self.mOuput.count()):
+            it = self.mOuput.item(i)
+            r.append(it.text())
+        return r
+
+
+class SamplePickerDialog:
+    def __init__(self, src_folder, params=None, app=None):
+        self.group_paths = [[]]
+        self.src_folder = src_folder
+        self.params = params
+        self.app = app
+
+        dlg = create_clearmap_widget('sample_picker.ui', patch_parent_class='QDialog')
+        dlg.setWindowTitle('File paths wizard')
+        dlg.setupUi()
+        self.dlg = dlg
+        self.dlg.setMinimumWidth(800)
+        self.dlg.setMinimumHeight(600)
+
+        self.fix_btn_boxes_text()
+        self.connect_buttons()
+
+        self.current_group = 1
+        for i in range(self.params.n_groups - 1):
+            self.handle_add_group()
+
+        self.list_selection = TwoListSelection()
+        self.dlg.listPickerLayout.addWidget(self.list_selection)
+        # self.dlg.setStyleSheet(qdarkstyle.load_stylesheet())
+        self.dlg.exec()
+
+    def fix_btn_boxes_text(self):
+        for btn_box in self.dlg.findChildren(QDialogButtonBox):
+            if btn_box.property('applyText'):
+                btn_box.button(QDialogButtonBox.Apply).setText(btn_box.property('applyText'))
+
+    def connect_buttons(self):
+        self.dlg.mainFolderPushButton.clicked.connect(self.handle_main_folder_clicked)
+        self.dlg.addGroupPushButton.clicked.connect(self.handle_add_group)
+        self.dlg.groupsComboBox.currentIndexChanged.connect(self.handle_group_changed)
+        self.dlg.buttonBox.accepted.connect(self.apply_changes)
+        self.dlg.buttonBox.rejected.connect(self.dlg.close)
+
+    def apply_changes(self):
+        for group, paths in enumerate(self.group_paths):
+            if group > self.params.n_groups:
+                self.params.add_group()
+            if paths:
+                self.params.set_paths(group+1, paths)
+        self.dlg.close()
+
+    def handle_group_changed(self):
+        self.group_paths[self.current_group - 1] = self.list_selection.get_right_elements()
+        idx = self.dlg.groupsComboBox.currentIndex()
+        self.current_group = (idx if idx >= 0 else 0) + 1
+        self.list_selection.setSelectedItems(self.group_paths[self.current_group - 1])
+
+    def handle_add_group(self):
+        self.dlg.groupsComboBox.addItem(f'{self.dlg.groupsComboBox.count() + 1}')
+        self.group_paths.append([])
+
+    def handle_main_folder_clicked(self):
+        self.src_folder = get_directory_dlg('~/')
+        if self.src_folder:
+            # self.dlg.groupsComboBox.clear()
+            # self.dlg.groupsComboBox.addItems(self.parse_sample_folders())
+            self.list_selection.addAvailableItems(self.parse_sample_folders())
+
+    def parse_sample_folders(self):
+        sample_folders = []
+        for root, dirs, files in os.walk(self.src_folder):
+            for fldr in dirs:
+                fldr = os.path.join(root, fldr)
+                if 'sample_params.cfg' in os.listdir(fldr):
+                    sample_folders.append(fldr)
+        return sample_folders
