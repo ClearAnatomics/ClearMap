@@ -268,9 +268,14 @@ class PreProcessor(TabProcessor):
         if self.stopped:
             return
         fmt = self.processing_config['stitching']['output_conversion']['format'].strip('.')
-        clearmap_io.convert_files(self.workspace.file_list('stitched', extension='npy'),  # FIXME: implement raw and arteries
-                                  extension=fmt, processes=self.machine_config['n_processes_file_conv'],
-                                  workspace=self.workspace, verbose=True)
+        if self.processing_config['stitching']['output_conversion']['raw']:
+            clearmap_io.convert_files(self.workspace.file_list('stitched', extension='npy'),
+                                      extension=fmt, processes=self.machine_config['n_processes_file_conv'],
+                                      workspace=self.workspace, verbose=True)
+        if self.processing_config['stitching']['output_conversion']['arteries']:
+            clearmap_io.convert_files(self.workspace.file_list('stitched', postfix='arteries', extension='npy'),
+                                      extension=fmt, processes=self.machine_config['n_processes_file_conv'],
+                                      workspace=self.workspace, verbose=True)
 
     @property
     def was_stitched_rigid(self):
