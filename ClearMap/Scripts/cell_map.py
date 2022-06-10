@@ -140,7 +140,7 @@ class CellDetector(TabProcessor):
             'verbose': True
         }
         if self.preprocessor.was_registered:
-            voxelization_parameter['shape'] = clearmap_io.shape(self.preprocessor.annotation_file_path),
+            voxelization_parameter['shape'] = clearmap_io.shape(self.preprocessor.annotation_file_path)
         else:
             voxelization_parameter['shape'] = self.preprocessor.resampled_shape
         if postfix:
