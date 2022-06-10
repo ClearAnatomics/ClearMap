@@ -7,7 +7,7 @@ from ClearMap.IO.MHD import mhd_read
 from ClearMap.Scripts.cell_map import CellDetector
 from ClearMap.Scripts.sample_preparation import PreProcessor
 from ClearMap.Scripts.tube_map import BinaryVesselProcessor, VesselGraphProcessor
-from ClearMap.gui.gui_utils import format_long_nb_to_str, surface_project, np_to_qpixmap, UI_FOLDER
+from ClearMap.gui.gui_utils import format_long_nb_to_str, surface_project, np_to_qpixmap, create_clearmap_widget
 from ClearMap.gui.plots import link_dataviewers_cursors
 from ClearMap.gui.params import ParamsOrientationError, VesselParams, PreferencesParams, SampleParameters, \
     AlignmentParams, CellMapParams
@@ -38,8 +38,7 @@ class GenericUi:
         self.progress_watcher = None
 
     def init_ui(self):
-        cls, _ = loadUiType(os.path.join(UI_FOLDER, self.ui_file_name), patch_parent_class=self.widget_class_name)
-        self.ui = cls()
+        self.ui = create_clearmap_widget(f'{self.ui_file_name}.ui', patch_parent_class=self.widget_class_name)
         self.ui.setupUi()
         self.patch_button_boxes()
 
@@ -136,7 +135,7 @@ class GenericDialog(GenericUi):
 
 class PreferenceUi(GenericDialog):
     def __init__(self, main_window):
-        super().__init__(main_window, 'Preferences', 'creator/preferences_editor.ui')
+        super().__init__(main_window, 'Preferences', 'preferences_editor')
 
     def setup(self, font_size):
         self.init_ui()
@@ -175,7 +174,7 @@ class PreferenceUi(GenericDialog):
 
 class SampleTab(GenericTab):
     def __init__(self, main_window, tab_idx=0):
-        super().__init__(main_window, 'Sample', tab_idx, 'creator/sample_tab.ui')
+        super().__init__(main_window, 'Sample', tab_idx, 'sample_tab')
         self.mini_brain_scaling = None
         self.mini_brain = None
 
@@ -261,7 +260,7 @@ class SampleTab(GenericTab):
 
 class AlignmentTab(GenericTab):
     def __init__(self, main_window, tab_idx=1):
-        super().__init__(main_window, 'Alignment', tab_idx, 'creator/alignment_tab.ui')
+        super().__init__(main_window, 'Alignment', tab_idx, 'alignment_tab')
 
         self.processing_type = 'pre'
         self.sample_params = None
@@ -365,7 +364,7 @@ class AlignmentTab(GenericTab):
 
 class CellCounterTab(PostProcessingTab):
     def __init__(self, main_window, tab_idx=2):
-        super().__init__(main_window, 'CellMap', tab_idx, 'creator/cell_map_tab.ui')
+        super().__init__(main_window, 'CellMap', tab_idx, 'cell_map_tab')
 
         self.preprocessor = None
         self.cell_detector = None
@@ -508,7 +507,7 @@ class CellCounterTab(PostProcessingTab):
 
 class VasculatureTab(PostProcessingTab):
     def __init__(self, main_window, tab_idx=3):
-        super().__init__(main_window, 'Vasculature', tab_idx, 'creator/vasculature_tab.ui')
+        super().__init__(main_window, 'Vasculature', tab_idx, 'vasculature_tab')
 
         self.params = None
         self.preprocessor = None
