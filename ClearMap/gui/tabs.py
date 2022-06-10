@@ -294,7 +294,7 @@ class AlignmentTab(GenericTab):
         self.ui.advancedCheckBox.stateChanged.connect(self.swap_tab_advanced)
 
     def set_progress_watcher(self, watcher):
-        self.progress_watcher = watcher
+        self.preprocessor.set_progress_watcher(watcher)
 
     def swap_tab_advanced(self):
         checked = self.ui.advancedCheckBox.isChecked()
