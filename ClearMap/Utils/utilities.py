@@ -1,5 +1,6 @@
 import os
 import re
+import shutil
 import subprocess
 from concurrent.futures import ProcessPoolExecutor
 
@@ -71,3 +72,9 @@ def is_iterable(obj):
 
 def title_to_snake(string):
     return re.sub('(?!^)([A-Z]+)', r'_\1', string).lower()
+
+
+def backup_file(file_path):  # REFACTOR: put in workspace or IO
+    base_path, ext = os.path.splitext(file_path)
+    new_path = base_path + '.bcp' + ext
+    shutil.copy(file_path, new_path)

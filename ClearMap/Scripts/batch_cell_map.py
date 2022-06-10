@@ -1,18 +1,11 @@
-import os.path
-import shutil
 import sys
 
 from tqdm import tqdm
 
 from ClearMap.Scripts.cell_map import CellDetector
 from ClearMap.Scripts.sample_preparation import PreProcessor
+from ClearMap.Utils.utilities import backup_file
 from ClearMap.config.config_loader import get_configs, ConfigLoader
-
-
-def backup_file(file_path):  # REFACTOR: put in workspace or IO
-    base_path, ext = os.path.splitext(file_path)
-    new_path = base_path + '.bcp' + ext
-    shutil.copy(file_path, new_path)
 
 
 def process_folders(folders):
@@ -31,7 +24,7 @@ def process_folders(folders):
         cell_detector.atlas_align()
 
         backup_file(cell_detector.workspace.filename('cells', extension='csv'))
-        cell_detector.export_as_csv()
+        # cell_detector.export_as_csv()
 
 
 def main():
