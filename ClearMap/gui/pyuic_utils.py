@@ -4,7 +4,7 @@ from PyQt5 import QtWidgets
 from PyQt5.uic.Compiler import compiler
 
 
-def loadUiType(uifile, from_imports=False, resource_suffix='_rc', import_from='.', patch_parent_class=''):
+def loadUiType(uifile, from_imports=False, resource_suffix='_rc', import_from='.', patch_parent_class='', replace_pairs=None):
     """loadUiType(uifile, from_imports=False, resource_suffix='_rc', import_from='.') -> (form class, base class)
 
     Load a Qt Designer .ui file and return the generated form class and the Qt
@@ -33,15 +33,24 @@ def loadUiType(uifile, from_imports=False, resource_suffix='_rc', import_from='.
         parent_name = None
         for i, ln in enumerate(cls_list):
             if ln.startswith('class'):
-                cls_list[i] = ln.replace('object', patch_parent_class)
+                ln = ln.replace('object', patch_parent_class)
             elif 'setupUi' in ln:
                 parent_name = ln.split(',')[-1].strip(' ):')
-                cls_list[i] = '    def setupUi(self):'
+                ln = '    def setupUi(self):'
             # elif parent_name is not None and ln.strip().startswith(parent_name):
-            elif parent_name is not None and '{}.'.format(parent_name) in ln:  # Call to parent method
-                cls_list[i] = 'remove_me'  # TODO: find better keyword
-            elif parent_name is not None and '({})'.format(parent_name) in ln:
-                cls_list[i] = ln.replace(parent_name, 'self')
+            elif parent_name is not None:
+                if f'({parent_name})' in ln:  # Parent class as arg
+                    ln = ln.replace(parent_name, 'self')
+                if f'{parent_name}.' in ln:  # Call to parent method
+                    # if f'{parent_name}.setObjectName' not in ln:
+                    ln = 'remove_me'  # TODO: find better keyword
+                    # continue
+            if replace_pairs is not None:
+                for pair in replace_pairs:
+                    old, new = pair
+                    if old in ln:
+                        ln = ln.replace(old, new)
+            cls_list[i] = ln
         cls_list = [ln for ln in cls_list if ln != 'remove_me']
         code_string = '\n'.join(cls_list)
     else:
