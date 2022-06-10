@@ -3,16 +3,17 @@ import os.path
 import numpy as np
 from PyQt5.QtWidgets import QDialogButtonBox
 
+from ClearMap.IO import IO as clearmap_io
 from ClearMap.IO.MHD import mhd_read
+from ClearMap.Scripts.average_pval_cm2 import compare_groups
 from ClearMap.Scripts.cell_map import CellDetector
 from ClearMap.Scripts.sample_preparation import PreProcessor
 from ClearMap.Scripts.tube_map import BinaryVesselProcessor, VesselGraphProcessor
 from ClearMap.gui.gui_utils import format_long_nb_to_str, surface_project, np_to_qpixmap, create_clearmap_widget
 from ClearMap.gui.plots import link_dataviewers_cursors
 from ClearMap.gui.params import ParamsOrientationError, VesselParams, PreferencesParams, SampleParameters, \
-    AlignmentParams, CellMapParams
-from ClearMap.gui.pyuic_utils import loadUiType
-from ClearMap.gui.widgets import PatternDialog
+    AlignmentParams, CellMapParams, BatchParams
+from ClearMap.gui.widgets import PatternDialog, SamplePickerDialog
 from ClearMap.Visualization.Qt import Plot3d as plot_3d
 
 
@@ -651,3 +652,50 @@ class VasculatureTab(PostProcessingTab):
         self.main_window.wrap_in_thread(self.vessel_graph_processor.post_process)
         self.main_window.progress_dialog.done(1)
         self.main_window.print_status_msg('Vasculature graph post-processing DONE')
+
+################################################################################################
+
+
+class BatchTab(GenericTab):
+    def __init__(self, main_window, tab_idx=4):
+        super().__init__(main_window, 'Batch', tab_idx, 'batch_tab')
+
+        self.params = None
+
+        self.processing_type = 'batch'
+
+    @property
+    def inited(self):
+        return self.params is not None
+
+    def set_params(self):
+        self.params = BatchParams(self.ui, '')
+        # self.params = BatchParams(self.ui, self.main_window.src_folder)
+
+    def setup(self):
+        self.init_ui()
+
+        self.ui.folderPickerHelperPushButton.clicked.connect(self.create_wizard)
+        self.ui.runPValsButtonBox.connectApply(self.run_p_vals)
+
+    def create_wizard(self):
+        return SamplePickerDialog('', params=self.params)
+
+    def run_p_vals(self):
+        self.params.ui_to_cfg()
+        groups = self.params.groups
+        p_vals_imgs = []
+        for pair in self.params.selected_comparisons:
+            gp1_name, gp2_name = pair
+            p_vals_imgs.append(compare_groups(self.params.result_directory, gp1_name, gp2_name,
+                                              groups[gp1_name], groups[gp2_name]))
+        if len(self.params.selected_comparisons) == 1:
+            gp1_img = clearmap_io.read(os.path.join(self.params.result_directory, f'condensed_{gp1_name}.tif'))
+            gp2_img = clearmap_io.read(os.path.join(self.params.result_directory, f'condensed_{gp2_name}.tif'))
+            dvs = plot_3d.plot([gp1_img, gp2_img, p_vals_imgs[0]])
+        else:
+            dvs = plot_3d.plot(p_vals_imgs, arange=False, sync=True,
+                               lut=self.main_window.preference_editor.params.lut,
+                               parent=self.main_window.centralWidget())
+            link_dataviewers_cursors(dvs)
+        self.main_window.setup_plots(dvs)
