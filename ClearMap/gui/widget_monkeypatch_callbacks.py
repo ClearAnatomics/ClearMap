@@ -92,6 +92,9 @@ def connect_value_changed(instance, callback):
     spin_boxes = get_sorted_spin_boxes(instance)
     for bx in spin_boxes:
         bx.valueChanged.connect(callback)
+    chk_bx = get_check_box(instance)
+    if chk_bx is not None:
+        chk_bx.stateChanged.connect(callback)
 
 
 def connect_text_changed(instance, callback):
