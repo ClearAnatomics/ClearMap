@@ -518,7 +518,7 @@ def initialize(source = None, shape = None, dtype = None, order = None, location
           mod = location_to_module(location);
           return mod.create(location=location, shape=shape, dtype=dtype, order=order, **kwargs);
         except Exception as error:
-          raise ValueError('Cannot initialize source for location %r - %r' % (location, error));
+          raise ValueError(f'Cannot initialize source for location {location} - {error}')
     
   if isinstance(source, np.ndarray):
     source = as_source(source);
