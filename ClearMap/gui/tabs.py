@@ -222,9 +222,8 @@ class SampleTab(GenericTab):
         checked = self.ui.advancedCheckBox.isChecked()
 
     def launch_pattern_wizard(self):
-        dlg = PatternDialog(self.src_folder)
+        dlg = PatternDialog(self.params, self.src_folder)
         dlg.exec()  # FIXME: use result
-        self.params.cfg_to_ui()
 
     def plot_mini_brain(self):
         img = self.__transform_mini_brain()
