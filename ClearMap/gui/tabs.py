@@ -149,6 +149,8 @@ class PreferenceUi(GenericDialog):
 
         self.params.font_size = font_size
 
+        self.ui.fontComboBox.currentFontChanged.connect(self.main_window.set_font)
+
     def set_params(self, *args):
         self.params = PreferencesParams(self.ui, self.main_window.src_folder)
 

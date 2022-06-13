@@ -1567,6 +1567,14 @@ class PreferencesParams(UiParameter):
     def font_size(self, value):
         self.tab.fontSizeSpinBox.setValue(value)
 
+    @property
+    def font_family(self):
+        return self.tab.fontComboBox.currentFont().family()
+
+    # @font_family.setter
+    # def font_family(self, font):
+    #     self.tab.fontComboBox.setCurrentFont(font)
+
 
 class BatchParams(UiParameter):
 
