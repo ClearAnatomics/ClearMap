@@ -1,0 +1,60 @@
+import sys
+
+from ClearMap.Scripts.tube_map import BinaryVesselProcessor, VesselGraphProcessor
+from tqdm import tqdm
+
+from ClearMap.Scripts.cell_map import CellDetector
+from ClearMap.Scripts.sample_preparation import PreProcessor
+from ClearMap.Utils.utilities import backup_file
+from ClearMap.config.config_loader import get_configs, ConfigLoader
+
+
+def process_sample(configs, align=True, cells=True, vasc=False):
+    patch_pipeline_name(configs, cells, vasc)
+
+    pre_proc = PreProcessor()
+    pre_proc.setup(configs)
+    pre_proc.setup_atlases()
+    if align:
+        pre_proc.run()
+    if cells:
+        cell_detector = CellDetector(pre_proc)
+        cell_detector.run_cell_detection()
+        cell_detector.post_process_cells()
+        # backup_file(cell_detector.workspace.filename('cells'))
+        # cell_detector.atlas_align()
+        # backup_file(cell_detector.workspace.filename('cells', extension='csv'))
+        # # cell_detector.export_as_csv()
+    if vasc:
+        binary_vessel_processor = BinaryVesselProcessor(pre_proc)
+        binary_vessel_processor.binarize()
+        binary_vessel_processor.fill_vessels()
+        binary_vessel_processor.combine_binary()
+
+        vessel_graph_processor = VesselGraphProcessor(pre_proc)
+        vessel_graph_processor.pre_process()
+        vessel_graph_processor.post_process()
+
+
+def patch_pipeline_name(configs, cells, vasc):
+    configs[2]['pipeline_name'] = 'CellMap' if cells else 'TubeMap'
+    if cells and vasc:
+        configs[2]['pipeline_name'] = 'Both'
+
+
+def process_folders(folders):
+    for folder in tqdm(folders, desc='Processing sample ', unit='brain'):
+        cfg_loader = ConfigLoader(folder)
+        configs = get_configs(cfg_loader.get_cfg_path('sample'), cfg_loader.get_cfg_path('processing'))
+        process_sample(configs)
+
+
+def main():
+    with open(sys.argv[1], 'r') as infile:
+        folders = infile.readlines()
+    folders = [f.strip() for f in folders if not f.startswith('#')]
+    process_folders(folders)
+
+
+if __name__ == '__main__':
+    main()
