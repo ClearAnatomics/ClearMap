@@ -140,6 +140,15 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
                 print('Skipping widget {}'.format(widget.objectName()))
             widget.setFont(font)
 
+    def set_font(self):
+        for widget in self.findChildren(QWidget):
+            font = widget.property("font")
+            try:
+                font.setFamily(self.preference_editor.params.font_family)  # FIXME: part of child class
+            except KeyError:
+                print('Skipping widget {}'.format(widget.objectName()))
+            widget.setFont(font)
+
     def fix_sizes(self):
         # self.set_font_size()
         self.tabWidget.setMinimumWidth(200)
