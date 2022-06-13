@@ -532,6 +532,7 @@ class PreProcessor(TabProcessor):
             'workspace': self.workspace
         }
         elastix.align(**align_channels_parameter)
+        self.__check_elastix_success('resampled_to_auto')
 
     def __align_auto_to_ref(self):
         self.prepare_watcher_for_substep(17000, self.__align_auto_to_ref_re, 'Align auto to ref')
@@ -551,6 +552,13 @@ class PreProcessor(TabProcessor):
             if not v:
                 raise ValueError('Registration missing parameter "{}"'.format(k))
         elastix.align(**align_reference_parameter)
+        self.__check_elastix_successs('auto_to_reference')
+
+    def __check_elastix_successs(self, results_dir_name):
+        with open(os.path.join(self.workspace.filename(results_dir_name), 'elastix.log'), 'r') as logfile:
+            if 'fail' in logfile.read():
+                results_msg = results_dir_name.replace('_', ' ')
+                raise ValueError(f'Alignment {results_msg} failed')  # TODO: change exception type
 
     def get_configs(self):
         cfg = {
