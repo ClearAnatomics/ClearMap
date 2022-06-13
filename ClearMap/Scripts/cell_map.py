@@ -112,7 +112,8 @@ class CellDetector(TabProcessor):
         if self.processing_config['cell_filtration']['preview'] and not runs_on_ui():
             self.plot_filtered_cells()
         self.atlas_align()
-        self.export_as_csv()
+        # self.export_as_csv()
+        self.export_collapsed_stats()
         self.export_to_clearmap1_fmt()
         self.voxelize()
 
@@ -237,19 +238,35 @@ class CellDetector(TabProcessor):
             arrays.extend([label, names])
         cells_data = recfunctions.merge_arrays(arrays, flatten=True, usemask=False)
 
-        df = pd.DataFrame(cells_data)
-        if self.preprocessor.was_registered:
-            unique_labels = np.sort(df['order'].unique())
-            color_map = {lbl: annotation.find(lbl, key='order')['rgb'] for lbl in unique_labels}
-
-            def lookup_color(lbl):
-                return color_map[lbl]
-
-            df['color'] = df['order'].apply(lookup_color)
+        df = self.cells_to_dataframe(cells_data)
 
         clearmap_io.write(self.workspace.filename('cells'), cells_data)  # TEST: buggy ?
         if importlib.util.find_spec('pyarrow'):
             df.to_feather(os.path.splitext(self.workspace.filename('cells'))[0] + '.feather')  # TODO: add to workspace
+
+    def cells_to_dataframe(self, cells_data):
+        df = pd.DataFrame(cells_data)
+        if self.preprocessor.was_registered:
+            unique_labels = np.sort(df['order'].unique())
+            color_map = {lbl: annotation.find(lbl, key='order')['rgb'] for lbl in unique_labels}
+            id_map = {lbl: annotation.find(lbl, key='order')['id'] for lbl in unique_labels}
+
+            atlas = self.workspace.source(self.preprocessor.annotation_file_path)
+            volumes = {_id: (atlas == _id).sum() for _id in id_map.values()}  # Volumes need a lookup on ID since the atlas is in ID space
+
+            def lookup_color(lbl):  # See if we can do lookup without specific function
+                return color_map[lbl]
+
+            def lookup_id(lbl):
+                return id_map[lbl]
+
+            def lookup_volume(_id):
+                return volumes[_id]
+
+            df['id'] = df['order'].apply(lookup_id)
+            df['color'] = df['order'].apply(lookup_color)
+            df['volume'] = df['id'].apply(lookup_volume)
+        return df
 
     def transform_coordinates(self, coords):
         coords = resampling.resample_points(
@@ -326,6 +343,24 @@ class CellDetector(TabProcessor):
     def export_as_csv(self):
         csv_file_path = self.workspace.filename('cells', extension='csv')
         self.get_cells_df().to_csv(csv_file_path)
+
+    def export_collapsed_stats(self):
+        df = self.get_cells_df()
+
+        grouped = df[['name', 'order', 'id', 'size']].groupby(['id'], as_index=False)
+
+        collapsed = pd.DataFrame()
+        collapsed['Structure name'] = grouped.first()['name']
+        collapsed['Structure order'] = grouped.first()['order']
+        collapsed['Structure ID'] = grouped.first()['id']
+        collapsed['Structure volume'] = grouped.first()['volume']
+        collapsed['Cell counts'] = grouped.count()['name']
+        collapsed['Average cell size'] = grouped.mean()['size']
+
+        collapsed = collapsed.sort_values(by='Structure ID')
+
+        csv_file_path = self.workspace.filename('cells', suffix='_stats', extension='csv')
+        collapsed.to_csv(csv_file_path, index=False)
 
     def export_to_clearmap1_fmt(self):
         """ClearMap 1.0 export (will generate the files cells_ClearMap1_intensities, cells_ClearMap1_points_transformed,
