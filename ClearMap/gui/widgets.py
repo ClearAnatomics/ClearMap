@@ -373,7 +373,8 @@ class Scatter3D:
 
 
 class PatternDialog:
-    def __init__(self, src_folder, app=None):
+    def __init__(self, params, src_folder, app=None):
+        self.params = params
         self.src_folder = src_folder
         self.app = app
 
@@ -396,11 +397,12 @@ class PatternDialog:
                 self.hide_widgets(self.get_widgets(pattern_idx, subpattern_idx))
 
     def connect_buttons(self):
-        self.dlg.pattern0ButtonBox.button(QDialogButtonBox.Apply).clicked.connect(self.validate_pattern0)
-        self.dlg.pattern1ButtonBox.button(QDialogButtonBox.Apply).clicked.connect(self.validate_pattern1)
-        self.dlg.pattern2ButtonBox.button(QDialogButtonBox.Apply).clicked.connect(self.validate_pattern2)
+        for i in range(self.dlg.patternToolBox.count()):
+            btn_box = getattr(self.dlg, f'pattern{i}ButtonBox')
+            btn_box.button(QDialogButtonBox.Apply).clicked.connect(self.validate_pattern)
 
         self.dlg.mainButtonBox.button(QDialogButtonBox.Apply).clicked.connect(self.save_results)
+        self.dlg.mainButtonBox.button(QDialogButtonBox.Cancel).clicked.connect(self.dlg.close)
 
     def save_results(self):
         config_loader = ConfigLoader(self.src_folder)
@@ -408,8 +410,11 @@ class PatternDialog:
         for channel_name, pattern_string in self.pattern_strings.items():
             sample_cfg['src_paths'][channel_name] = pattern_string
         sample_cfg.write()
+        self.params.cfg_to_ui()
+        self.dlg.close()
 
-    def __validate_pattern(self, pattern_idx):
+    def validate_pattern(self):
+        pattern_idx = self.dlg.patternToolBox.currentIndex()
         pattern = self.patterns_finders[pattern_idx].pattern
         for subpattern_idx, digit_cluster in enumerate(pattern.digit_clusters):
             _, _, combo_widget = self.get_widgets(pattern_idx, subpattern_idx)
@@ -430,15 +435,6 @@ class PatternDialog:
 
         channel_name = getattr(self.dlg, 'channelComboBox{}'.format(pattern_idx)).currentText()
         self.pattern_strings[channel_name] = pattern_string
-
-    def validate_pattern0(self):
-        self.__validate_pattern(0)
-
-    def validate_pattern1(self):
-        self.__validate_pattern(1)
-
-    def validate_pattern2(self):
-        self.__validate_pattern(2)
 
     def fix_btn_boxes_text(self):
         for btn_box in self.dlg.findChildren(QDialogButtonBox):

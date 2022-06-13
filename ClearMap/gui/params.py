@@ -196,6 +196,7 @@ class SampleParameters(UiParameter):
         self._config['base_directory'] = self.src_folder
 
     def cfg_to_ui(self):
+        self.reload()
         self.sample_id = self._config['sample_id']
         self.raw_path = self._config['src_paths']['raw']
         self.autofluo_path = self._config['src_paths']['autofluorescence']
@@ -880,6 +881,7 @@ class CellMapParams(UiParameter):
         self.crop_z_min, self.crop_z_max = cfg['dim_2']
 
     def cfg_to_ui(self):
+        self.reload()
         cfg = self._config
         self.background_correction_diameter = cfg['detection']['background_correction']['diameter']
         self.detection_threshold = cfg['detection']['shape_detection']['threshold']
@@ -1463,6 +1465,7 @@ class PreferencesParams(UiParameter):
         cfg['font_size'] = self.font_size
 
     def cfg_to_ui(self):
+        self.reload()
         cfg = self._config
         self.verbosity = cfg['verbosity']
         self.n_processes_file_conv = cfg['n_processes_file_conv']
@@ -1587,6 +1590,7 @@ class BatchParams(UiParameter):
                                                                            self.selected_comparisons)}
 
     def cfg_to_ui(self):
+        self.reload()
         self.results_folder = self.config['paths']['results_folder']
         for i in range(len(self.config['groups'].keys())):
             self.add_group()

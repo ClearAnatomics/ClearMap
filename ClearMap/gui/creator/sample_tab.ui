@@ -215,7 +215,10 @@
          <item row="3" column="1">
           <widget class="QPushButton" name="launchPatternWizzardPushButton">
            <property name="text">
-            <string>Start helper wizzard</string>
+            <string>  Start helper wizzard</string>
+           </property>
+           <property name="icon">
+            <iconset theme="help"/>
            </property>
           </widget>
          </item>
