@@ -186,12 +186,6 @@
    </widget>
   </widget>
   <widget class="QDockWidget" name="graphDock">
-   <property name="minimumSize">
-    <size>
-     <width>1529</width>
-     <height>900</height>
-    </size>
-   </property>
    <property name="baseSize">
     <size>
      <width>0</width>
@@ -208,12 +202,6 @@
     <number>2</number>
    </attribute>
    <widget class="QWidget" name="dataViewerDockWidgetContents">
-    <property name="minimumSize">
-     <size>
-      <width>1529</width>
-      <height>0</height>
-     </size>
-    </property>
     <layout class="QHBoxLayout" name="horizontalLayout_6">
      <item>
       <layout class="QGridLayout" name="graphLayout">
