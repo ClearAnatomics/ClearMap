@@ -22,7 +22,7 @@
       </font>
      </property>
      <property name="currentIndex">
-      <number>2</number>
+      <number>1</number>
      </property>
      <widget class="QWidget" name="sampleFoldersPage">
       <property name="geometry">
@@ -30,7 +30,7 @@
         <x>0</x>
         <y>0</y>
         <width>438</width>
-        <height>620</height>
+        <height>590</height>
        </rect>
       </property>
       <attribute name="label">
@@ -65,7 +65,53 @@
        </item>
       </layout>
      </widget>
+     <widget class="QWidget" name="page">
+      <attribute name="label">
+       <string>Process</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="verticalLayout_5">
+       <item>
+        <widget class="QCheckBox" name="batchAlignCheckBox">
+         <property name="text">
+          <string>Align</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QCheckBox" name="batchCountCellsCheckBox">
+         <property name="text">
+          <string>Count cells</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QCheckBox" name="batchVasculatureCheckBox">
+         <property name="text">
+          <string>Vasculature</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QDialogButtonBox" name="batchRunButtonBox">
+         <property name="standardButtons">
+          <set>QDialogButtonBox::Apply</set>
+         </property>
+         <property name="applyString" stdset="0">
+          <string>Run</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
      <widget class="QWidget" name="comparisonsPage">
+      <property name="geometry">
+       <rect>
+        <x>0</x>
+        <y>0</y>
+        <width>438</width>
+        <height>590</height>
+       </rect>
+      </property>
       <attribute name="label">
        <string>Comparisons</string>
       </attribute>
@@ -81,7 +127,7 @@
         <x>0</x>
         <y>0</y>
         <width>438</width>
-        <height>620</height>
+        <height>590</height>
        </rect>
       </property>
       <attribute name="label">

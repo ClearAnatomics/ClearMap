@@ -1608,7 +1608,7 @@ class BatchParams(UiParameter):
         self.update_comparisons()
         for chk_bx in self.comparison_checkboxes:
             if chk_bx.text().split(self.group_concatenator) in self.config['comparisons'].values():
-                chk_bx.setChecked(True)
+                self.set_check_state(chk_bx, True)
 
     def connect(self):
         self.tab.addGroupPushButton.clicked.connect(self.add_group)
@@ -1716,3 +1716,32 @@ class BatchParams(UiParameter):
 
     def handle_results_folder_changed(self):
         self.config['paths']['results_folder'] = self.results_folder
+
+    @property
+    def align(self):
+        return self.tab.batchAlignCheckBox.isChecked()
+
+    @align.setter
+    def align(self, value):
+        self.tab.batchAlignCheckBox.setChecked(value)
+
+    # def handle_algin_changed(self):
+    #     self.
+
+    @property
+    def count_cells(self):
+        return self.tab.batchCountCellsCheckBox.isChecked()
+
+    @count_cells.setter
+    def count_cells(self, value):
+        self.tab.batchCountCellsCheckBox.isChecked()
+
+    # def handle_count_cells_changed(self):
+
+    @property
+    def run_vaculature(self):
+        return self.tab.batchVasculatureCheckBox.isChecked()
+
+    @run_vaculature.setter
+    def run_vaculature(self, value):
+        self.tab.batchVasculatureCheckBox.setChecked(value)
