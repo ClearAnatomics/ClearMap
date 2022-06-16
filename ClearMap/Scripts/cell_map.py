@@ -34,6 +34,7 @@ import copy
 import importlib
 import os
 import re
+import warnings
 from concurrent.futures.process import BrokenProcessPool
 
 import numpy as np
@@ -86,6 +87,10 @@ class CellDetector(TabProcessor):
             self.processing_config = self.preprocessor.config_loader.get_cfg('cell_map')
 
             self.set_progress_watcher(self.preprocessor.progress_watcher)
+
+    @property
+    def detected(self):
+        return os.path.exists(self.workspace.filename('cells', postfix='raw'))
 
     def run(self):
         # select sub-slice for testing the pipeline
@@ -144,12 +149,10 @@ class CellDetector(TabProcessor):
             voxelization_parameter['shape'] = clearmap_io.shape(self.preprocessor.annotation_file_path)
         else:
             voxelization_parameter['shape'] = self.preprocessor.resampled_shape
-        if postfix:
-            cells = self.workspace.source('cells', postfix=postfix)  # Hack to compensate for the fact that the realigned makes no sense in
-            coordinates = np.array([cells[axis] for axis in 'xyz']).T
+        if postfix:  # Hack to compensate for the fact that the realigned makes no sense in
+            cells, coordinates = self.get_coords(coord_type=postfix, aligned=False)
         else:
-            cells = self.workspace.source('cells')
-            coordinates = np.array([cells[n] for n in ['xt', 'yt', 'zt']]).T
+            cells, coordinates = self.get_coords(coord_type=None, aligned=True)
         return coordinates, cells, voxelization_parameter
 
     # def voxelize_chunk(self):
@@ -163,12 +166,15 @@ class CellDetector(TabProcessor):
     #     voxelization.voxelize(coordinates, sink=counts_file_path, radius=(2, 2, 2), shape=shape)
     #     self.workspace.debug = False
 
-    def get_coords(self, coord_type='filtered'):
+    def get_coords(self, coord_type='filtered', aligned=False):  # FIXME: work with feather
         if coord_type not in ('filtered', 'raw'):
             raise ValueError(f'Coordinate type "{coord_type}" not recognised')
         table = np.load(self.workspace.filename('cells', postfix=coord_type))
-        coordinates = np.array([table[axis] for axis in ['x', 'y', 'z']]).T
-        return coordinates
+        if aligned:
+            coordinates = np.array([table[axis] for axis in ['xt', 'yt', 'zt']]).T
+        else:
+            coordinates = np.array([table[axis] for axis in ['x', 'y', 'z']]).T
+        return table, coordinates
 
     def voxelize_unweighted(self, coordinates, voxelization_parameter):
         """
@@ -328,11 +334,16 @@ class CellDetector(TabProcessor):
         finally:
             self.workspace.debug = False
 
-    @property
-    def detected(self):
-        return os.path.exists(self.workspace.filename('cells', postfix='raw'))
-
     def export_as_csv(self):
+        """
+        Export the cell coordinates to csv
+
+        .. deprecated:: 2.1
+            Use :func:`atlas_align` and `export_collapsed_stats` instead.
+        """
+        warnings.warn("export_as_csv is deprecated and will be removed in future versions;"
+                      "please use the new formats from atlas_align and export_collapsed_stats", DeprecationWarning, 2)
+
         csv_file_path = self.workspace.filename('cells', extension='csv')
         self.get_cells_df().to_csv(csv_file_path)
 
@@ -353,32 +364,6 @@ class CellDetector(TabProcessor):
 
         csv_file_path = self.workspace.filename('cells', suffix='_stats', extension='csv')
         collapsed.to_csv(csv_file_path, index=False)
-
-    def export_to_clearmap1_fmt(self):
-        """ClearMap 1.0 export (will generate the files cells_ClearMap1_intensities, cells_ClearMap1_points_transformed,
-        cells_ClearMap1_points necessaries to use the analysis script of ClearMap1.
-        In ClearMap2 the 'cells' file contains already all this information)
-        In order to align the coordinates when we have right and left hemispheres, if the orientation of the brain is left,
-         will calculate the new coordinates for the Y axes (resta a lonxitude do eixo Y),
-         this change will not affect the orientation of the heatmaps,
-        since these are generated from the ClearMap2 file 'cells'
-        """
-
-        source = self.workspace.source('cells')
-        clearmap1_format = {'points': ['x', 'y', 'z'],
-                            'points_transformed': ['xt', 'yt', 'zt'],
-                            'intensities': ['source', 'dog', 'background', 'size']}
-        for filename, names in clearmap1_format.items():
-            sink = self.workspace.filename('cells', postfix=['ClearMap1', filename])
-            print(filename, sink)
-            data = np.array(
-                [source[name] if name in source.dtype.names else np.full(source.shape[0], np.nan) for name in names]
-            )
-            data = data.T   # FIXME: seems hacky
-            # if self.sample_config['orientation'] == (1, -2, 3):  # WARNING: seems hacky, why that particular orientation
-            #     if filename == 'points_transformed':
-            #         data[:, 1] = 528 - data[:, 1]  # WARNING: why 528
-            clearmap_io.write(sink, data)
 
     def plot_cells(self):
         source = self.workspace.source('cells', postfix='raw')
@@ -424,7 +409,7 @@ class CellDetector(TabProcessor):
         return df
 
     def plot_filtered_cells(self, parent=None, smarties=False):
-        coordinates = self.get_coords('filtered')
+        _, coordinates = self.get_coords('filtered')
         stitched_path = self.workspace.filename('stitched')
         dvs = qplot_3d.plot(stitched_path, arange=False, lut='white', parent=parent)
         self.filtered_cells = Scatter3D(coordinates, smarties=smarties)
@@ -466,14 +451,14 @@ class CellDetector(TabProcessor):
 
     def get_n_detected_cells(self):
         if os.path.exists(self.workspace.filename('cells', postfix='raw')):
-            coords = self.get_coords(coord_type='raw')
+            _, coords = self.get_coords(coord_type='raw')
             return np.max(coords.shape)  # TODO: check dimension instead
         else:
             return 0
 
     def get_n_fitlered_cells(self):
         if os.path.exists(self.workspace.filename('cells', postfix='filtered')):
-            coords = self.get_coords(coord_type='filtered')
+            _, coords = self.get_coords(coord_type='filtered')
             return np.max(coords.shape)  # TODO: check dimension instead
         else:
             return 0
@@ -486,6 +471,37 @@ class CellDetector(TabProcessor):
         overlap = self.machine_config['detection_chunk_overlap']
         n_blocks = int(np.ceil((dim_size - blk_size) / (blk_size - overlap) + 1))
         return n_blocks
+
+    def export_to_clearmap1_fmt(self):
+        """
+        ClearMap 1.0 export (will generate the files cells_ClearMap1_intensities, cells_ClearMap1_points_transformed,
+        cells_ClearMap1_points necessaries to use the analysis script of ClearMap1.
+        In ClearMap2 the 'cells' file contains already all this information)
+        In order to align the coordinates when we have right and left hemispheres,
+        if the orientation of the brain is left, will calculate the new coordinates for the Y axes,
+        this change will not affect the orientation of the heatmaps, since these are generated from
+         the ClearMap2 file 'cells'
+
+        .. deprecated:: 2.1
+            Use :func:`atlas_align` and `export_collapsed_stats` instead.
+        """
+        warnings.warn("export_to_clearmap1_fmt is deprecated and will be removed in future versions;"
+                      "please use the new formats from atlas_align and export_collapsed_stats", DeprecationWarning, 2)
+        source = self.workspace.source('cells')
+        clearmap1_format = {'points': ['x', 'y', 'z'],
+                            'points_transformed': ['xt', 'yt', 'zt'],
+                            'intensities': ['source', 'dog', 'background', 'size']}
+        for filename, names in clearmap1_format.items():
+            sink = self.workspace.filename('cells', postfix=['ClearMap1', filename])
+            print(filename, sink)
+            data = np.array(
+                [source[name] if name in source.dtype.names else np.full(source.shape[0], np.nan) for name in names]
+            )
+            data = data.T   # FIXME: seems hacky
+            # if self.sample_config['orientation'] == (1, -2, 3):  # WARNING: seems hacky, why that particular orientation
+            #     if filename == 'points_transformed':
+            #         data[:, 1] = 528 - data[:, 1]  # WARNING: why 528
+            clearmap_io.write(sink, data)
 
 
 if __name__ == "__main__":
