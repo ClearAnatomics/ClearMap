@@ -6,6 +6,7 @@ from PyQt5.QtWidgets import QDialogButtonBox
 from ClearMap.IO import IO as clearmap_io
 from ClearMap.IO.MHD import mhd_read
 from ClearMap.Scripts.average_pval_cm2 import compare_groups
+from ClearMap.Scripts.batch_process import process_folders
 from ClearMap.Scripts.cell_map import CellDetector
 from ClearMap.Scripts.sample_preparation import PreProcessor
 from ClearMap.Scripts.tube_map import BinaryVesselProcessor, VesselGraphProcessor
@@ -678,6 +679,7 @@ class BatchTab(GenericTab):
 
         self.ui.folderPickerHelperPushButton.clicked.connect(self.create_wizard)
         self.ui.runPValsButtonBox.connectApply(self.run_p_vals)
+        self.ui.batchRunButtonBox.connectApply(self.run_batch_process)
 
     def create_wizard(self):
         return SamplePickerDialog('', params=self.params)
@@ -700,3 +702,7 @@ class BatchTab(GenericTab):
                                parent=self.main_window.centralWidget())
             link_dataviewers_cursors(dvs)
         self.main_window.setup_plots(dvs)
+
+    def run_batch_process(self):
+        self.params.ui_to_cfg()
+        self.main_window.wrap_in_thread(process_folders, self.params.self.get_all_paths())  # TODO: graphical progress
