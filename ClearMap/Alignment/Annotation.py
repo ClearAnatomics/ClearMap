@@ -53,11 +53,11 @@ import ClearMap.Visualization.Color as col
 ###############################################################################
 
 #TODO: move to settings ?
-atlas_path = os.path.join(settings.resources_path, 'Atlas');
+atlas_path = os.path.join(settings.resources_path, 'Atlas')
 """Default path to atlas infomration.
 """
 
-default_annotation_file = os.path.join(atlas_path, 'ABA_25um_annotation.tif');
+default_annotation_file = os.path.join(atlas_path, 'ABA_25um_annotation.tif')
 """Default volumetric annotated image file.
 
 Note
@@ -68,7 +68,10 @@ Note
 fu.uncompress(default_annotation_file)
 
 
-default_reference_file = os.path.join(atlas_path, 'ABA_25um_reference.tif');
+default_hemispheres_file = os.path.join(atlas_path, 'ABA_25um_hemispheres.tif')
+fu.uncompress(default_hemispheres_file)
+
+default_reference_file = os.path.join(atlas_path, 'ABA_25um_reference.tif')
 """Default volumetric annotated image file.
 
 Note
@@ -79,7 +82,7 @@ Note
 fu.uncompress(default_reference_file)
 
 
-default_distance_to_surface_file = os.path.join(atlas_path, 'ABA_25um_distance_to_surface.tif');
+default_distance_to_surface_file = os.path.join(atlas_path, 'ABA_25um_distance_to_surface.tif')
 """Default volumetric annotated image file.
 
 Note
@@ -90,7 +93,7 @@ Note
 fu.uncompress(default_distance_to_surface_file)
 
 
-default_label_file = os.path.join(atlas_path, 'ABA_annotation.json');
+default_label_file = os.path.join(atlas_path, 'ABA_annotation.json')
 """Default list of labels and region names in the annotated image.
 
 Note
@@ -663,16 +666,14 @@ def write_color_annotation(filename, annotation_file = None):
 ### Labeling
 ###############################################################################
 
-def prepare_annotation_files(slicing = None, orientation = None, 
-                             directory = None, postfix = None, 
-                             annotation_file = None, 
-                             reference_file = None, 
-                             distance_to_surface_file = None,
-                             overwrite = False, verbose = False):
+def prepare_annotation_files(slicing=None, orientation=None, directory=None, postfix=None, annotation_file=None,
+                             hemispheres_file=None, reference_file=None, distance_to_surface_file=None,
+                             hemispheres=False, overwrite=False, verbose=False):
   """Crop the annotation, reference and distance files to match the data.
   
   Arguments
   ---------
+  hemispheres
   slicing : tuple or None
     The slice specification after reorienting.
   orientation : tuple, str or None.
@@ -682,7 +683,7 @@ def prepare_annotation_files(slicing = None, orientation = None,
     The target directory. If None, use ClearMap resources folder.
   postfix : str or None
     Use this postfix for the cropped annotation file. If None and automatic 
-    label is choosen.
+    label is chosen.
   annotation_file : str or None
     The annotation file to use.
   reference_file : str or None
@@ -702,74 +703,91 @@ def prepare_annotation_files(slicing = None, orientation = None,
     The distance cropped file.
   """
   if annotation_file is None:
-    annotation_file = default_annotation_file;
+    annotation_file = default_annotation_file
+  if hemispheres_file is None:
+    hemispheres_file = default_hemispheres_file
   if reference_file is None:
-    reference_file = default_reference_file;
+    reference_file = default_reference_file
   if distance_to_surface_file is None:
-    distance_to_surface_file = default_distance_to_surface_file;
+    distance_to_surface_file = default_distance_to_surface_file
 
-  files = [annotation_file, reference_file, distance_to_surface_file];
+  files = [annotation_file, reference_file, distance_to_surface_file]
+  if hemispheres:
+    files.insert(1, hemispheres_file)
   
-  results = [];
-  for f in files:
-    if f is not None:
-      fn = format_annotation_filename(f, orientation=orientation, slicing=slicing, postfix=postfix, directory=directory);
+  results = []
+  for f_path in files:
+    if f_path is not None:
+      fn = format_annotation_filename(f_path, orientation=orientation, slicing=slicing, postfix=postfix, directory=directory)
       if verbose:
-        print('Preparing: %r' % fn);   
+        print('Preparing: %r' % fn)
       
       if not overwrite and io.is_file(fn):
-        results.append(fn);
-        continue;
+        results.append(fn)
+        continue
 
-      if not io.is_file(f):
-        raise ValueError('Cannot find annotation file: %s' % f);
+      if not io.is_file(f_path):
+        raise ValueError('Cannot find annotation file: %s' % f_path)
       
-      s = io.as_source(f);
+      s = io.as_source(f_path)
       if verbose:
-        print('Preparing: from source %r' % s);
+        print('Preparing: from source %r' % s)
       
-      data = np.array(s.array);
+      data = np.array(s.array)
       
-      if not orientation is None:
-        #permute
-        per = res.orientation_to_permuation(orientation);
-        data = data.transpose(per);
+      if orientation is not None:
+        # permute
+        per = res.orientation_to_permuation(orientation)
+        data = data.transpose(per)
 
-        #reverse axes
-        reslice = False;
-        sl = [slice(None)] * data.ndim;
-        for d,o in enumerate(orientation):
+        # reverse axes
+        reslice = False
+        sl = [slice(None)] * data.ndim
+        for d, o in enumerate(orientation):
           if o < 0:
-            sl[d] = slice(None, None, -1);
-            reslice = True;
+            sl[d] = slice(None, None, -1)
+            reslice = True
         if reslice:
-          data = data[tuple(sl)];
+          data = data[tuple(sl)]
       
       if slicing is not None:
-        data = data[slicing];
-      io.write(fn, data);
-      results.append(fn);
+        data = data[slicing]
+      io.write(fn, data)
+      results.append(fn)
     else:
-      results.append(None);
+      results.append(None)
       
-  return results;
+  return results
+
+
+def substitute_chars(s):
+  chars_to_strip = ' '
+  chars_to_substitute = '(,)'  # TODO: check if we add '[]'
+  for c in chars_to_strip:
+    s = s.replace(c, '')
+  for c in chars_to_substitute:
+    s = s.replace(c, '_')
+  return s
   
 
-def format_annotation_filename(filename, orientation = None, slicing = None, postfix = None, directory = None):
-  """Formats the annotation filename given oriantion and slicing.""" 
+def format_annotation_filename(filename, orientation=None, slicing=None, postfix=None, directory=None):
+  """Formats the annotation filename given orientation and slicing."""
   
   if postfix is None:
-    orientation = res.format_orientation(orientation, default=(1,2,3));
-    postfix = ('_%d_%d_%d_%r' % (orientation + (slicing,))).replace(' ', '').replace('(','_').replace(')','_').replace(',','_');
-    
-  fn = filename.split('.');
-  if postfix != '':
-    fn = '.'.join(fn[:-1]) + '_' + postfix + '.' + fn[-1];
+    orientation = res.format_orientation(orientation, default=(1, 2, 3))
+    x, y, z = orientation
+    postfix = f'{x}_{y}_{z}_{slicing}'
+    postfix = substitute_chars(postfix)
+
+  if postfix:
+    base, ext = os.path.splitext(filename)
+    fn = base + f'_{postfix}{ext}'
+  else:
+    fn = filename
   if directory is not None:
-    fn = os.path.split(fn);
-    fn = os.path.join(directory, fn[-1]);
+    fn = os.path.join(directory, os.path.basename(filename))
   
-  return fn;
+  return fn
 
 
 ###############################################################################
