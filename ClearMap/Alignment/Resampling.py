@@ -40,7 +40,7 @@ import ClearMap.Utils.Timer as tmr
 from ClearMap.Utils.utilities import CancelableProcessPoolExecutor
 
 
-def format_orientation(orientation, inverse = False, default = None):
+def format_orientation(orientation, inverse=False, default=None):
   """Convert orientation to standard format.
   
   Arguments
@@ -62,22 +62,23 @@ def format_orientation(orientation, inverse = False, default = None):
   `Orientation`_
   """
   if orientation is None:
-      return default;
+      return default
       
-  #fix named representations
+  # fix named representations
   if orientation == 'left':
       #orientation = (1,2,3);
-      orientation = None;
+      orientation = None
   elif orientation == 'right':
-      orientation = (-1,2,3);
+      orientation = (-1, 2, 3)
       
   if orientation is not None and len(orientation) != 3:
-    raise ValueError("orientation should be 'left', 'right' or a tuple of 3 intergers from 1 to 3, signed, found %r" % (orientation,))
+    raise ValueError("orientation should be 'left', 'right' or a tuple of 3 (signed) "
+                     "integers from 1 to 3, found %r" % (orientation,))
   
   if inverse:
-    orientation = inverse_orientation(orientation);
+    orientation = inverse_orientation(orientation)
   
-  return orientation;
+  return orientation
 
 
 def inverse_orientation(orientation):
