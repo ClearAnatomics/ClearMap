@@ -78,3 +78,12 @@ def backup_file(file_path):  # REFACTOR: put in workspace or IO
     base_path, ext = os.path.splitext(file_path)
     new_path = base_path + '.bcp' + ext
     shutil.copy(file_path, new_path)
+
+
+def make_abs(directory, file_name):
+    """Make file_name absolute if it is not"""
+    if os.path.isabs(file_name):
+        f_path = file_name
+    else:
+        f_path = os.path.join(directory, file_name)
+    return f_path
