@@ -218,37 +218,25 @@ class CellDetector(TabProcessor):
     def atlas_align(self):
         """Atlas alignment and annotation """
         # Cell alignment
-        source = self.workspace.source('cells', postfix='filtered')
-        coordinates = np.array([source[c] for c in 'xyz']).T
-        coordinates_transformed = self.transform_coordinates(coordinates)
+        table, coordinates = self.get_coords(coord_type='filtered')
+        df = pd.DataFrame({'x': coordinates[0], 'y': coordinates[1], 'z': coordinates[2]})  # FIXME: check if transpose
+        df['size'] = table['cell_size']
+        df['source'] = table['source']
 
         if self.preprocessor.was_registered:
-            # Cell annotation
-            annotation.set_annotation_file(self.preprocessor.annotation_file_path)
+            coordinates_transformed = self.transform_coordinates(coordinates)
             label = annotation.label_points(coordinates_transformed,
-                                            annotation_file=self.preprocessor.annotation_file_path, key='order')
+                                            annotation_file=self.preprocessor.annotation_file_path, key='order')  # Put key ID and get ID directly
+            hemisphere_label = annotation.label_points(coordinates_transformed,
+                                                       annotation_file=self.preprocessor.hemispheres_file_path, key='id')
             names = annotation.convert_label(label, key='order', value='name')
 
-        # Save results
-        coordinates_transformed.dtype = [(t, float) for t in ('xt', 'yt', 'zt')]
-        arrays = [source[:], coordinates_transformed]
-        if self.preprocessor.was_registered:
-            label = np.array(label, dtype=[('order', int)])
-            names = np.array(names, dtype=[('name', 'U256')])
-            arrays.extend([label, names])
-        cells_data = recfunctions.merge_arrays(arrays, flatten=True, usemask=False)
-
-        df = self.cells_to_dataframe(cells_data)
-
-        clearmap_io.write(self.workspace.filename('cells'), cells_data)  # TEST: buggy ?
-        if importlib.util.find_spec('pyarrow'):
-            df.to_feather(os.path.splitext(self.workspace.filename('cells'))[0] + '.feather')  # TODO: add to workspace
-
-    def cells_to_dataframe(self, cells_data):
-        df = pd.DataFrame(cells_data)
-        if self.preprocessor.was_registered:
+            df['xt'] = coordinates_transformed[0]  # FIXME: check if transpose
+            df['yt'] = coordinates_transformed[1]  # FIXME: check if transpose
+            df['zt'] = coordinates_transformed[2]  # FIXME: check if transpose
+            df['order'] = label
             unique_labels = np.sort(df['order'].unique())
-            color_map = {lbl: annotation.find(lbl, key='order')['rgb'] for lbl in unique_labels}
+            color_map = {lbl: annotation.find(lbl, key='order')['RGB'] for lbl in unique_labels}
             id_map = {lbl: annotation.find(lbl, key='order')['id'] for lbl in unique_labels}
 
             atlas = self.workspace.source(self.preprocessor.annotation_file_path)
@@ -264,9 +252,13 @@ class CellDetector(TabProcessor):
                 return volumes[_id]
 
             df['id'] = df['order'].apply(lookup_id)
+            df['hemisphere'] = hemisphere_label
+            df['name'] = names
             df['color'] = df['order'].apply(lookup_color)
             df['volume'] = df['id'].apply(lookup_volume)
-        return df
+
+        if importlib.util.find_spec('pyarrow'):
+            df.to_feather(os.path.splitext(self.workspace.filename('cells'))[0] + '.feather')  # TODO: add to workspace
 
     def transform_coordinates(self, coords):
         coords = resampling.resample_points(

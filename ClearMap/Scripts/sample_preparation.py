@@ -118,6 +118,7 @@ class PreProcessor(TabProcessor):
         self.align_reference_affine_file = ''
         self.align_reference_bspline_file = ''
         self.annotation_file_path = ''
+        self.hemispheres_file_path = ''
         self.reference_file_path = ''
         self.distance_file_path = ''
         self.__align_auto_to_ref_re = re.compile(r"\d+\s-?\d+\.\d+\s\d+\.\d+\s\d+\.\d+\s\d+\.\d+")
@@ -187,6 +188,13 @@ class PreProcessor(TabProcessor):
             return clearmap_io.shape(self.workspace.filename('resampled'))
 
     def __file_conversion(self):  # TODO: handle progress
+        """
+        Convert list of input files to numpy files for efficiency reasons
+
+        Returns
+        -------
+
+        """
         if self.stopped:
             return
         is_numpy = self.workspace.filename('raw').endswith('.npy')
@@ -219,11 +227,12 @@ class PreProcessor(TabProcessor):
         z_slice = slice(None) if self.sample_config['slice_z'] is None else slice(*self.sample_config['slice_z'])
         xyz_slicing = (x_slice, y_slice, z_slice)
         results = annotation.prepare_annotation_files(
-            slicing=xyz_slicing,
+            slicing=xyz_slicing, hemispheres=True,
             orientation=self.sample_config['orientation'],
             overwrite=False, verbose=True)
+        self.annotation_file_path, self.hemispheres_file_path, self.reference_file_path, self.distance_file_path = results
+
         self.update_watcher_main_progress()
-        self.annotation_file_path, self.reference_file_path, self.distance_file_path = results
         atlas_cfg = self.processing_config['registration']['atlas']
         align_dir = os.path.join(self.resources_directory, atlas_cfg['align_files_folder'])
         self.align_channels_affine_file = os.path.join(align_dir, atlas_cfg['align_channels_affine_file'])
@@ -237,7 +246,7 @@ class PreProcessor(TabProcessor):
         self.align()
         return self.workspace, self.get_configs(), self.get_atlas_files()
 
-    def __convert_data(self):  # FIXME: check that it does what it says (see __file_conversion above instead)
+    def __convert_data(self):  # FIXME: check that required and that it does what it says (see __file_conversion above instead)
         """Convert raw data to npy file"""
         if self.stopped:
             return
@@ -265,6 +274,12 @@ class PreProcessor(TabProcessor):
             self.convert_to_image_format()
 
     def convert_to_image_format(self):  # FIXME: try except
+        """
+        Convert (optionally) to image formats readable by e.g. Fiji
+        Returns
+        -------
+
+        """
         if self.stopped:
             return
         fmt = self.processing_config['stitching']['output_conversion']['format'].strip('.')
