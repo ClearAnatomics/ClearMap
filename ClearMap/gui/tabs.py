@@ -105,10 +105,10 @@ class PostProcessingTab(GenericTab):
         self.preprocessor = pre_processor
 
     def plot_slicer(self, slicer_prefix, tab, params):
-        if self.preprocessor.was_registered:
-            img = mhd_read(self.preprocessor.annotation_file_path)
-        else:
-            img = self.preprocessor.workspace.source('resampled')
+        # if self.preprocessor.was_registered:
+        #     img = mhd_read(self.preprocessor.annotation_file_path)  # FIXME: does not work (probably compressed format)
+        # else:
+        img = self.preprocessor.workspace.source('resampled')
         self.main_window.ortho_viewer.setup(img, params, parent=self.main_window)
         dvs = self.main_window.ortho_viewer.plot_orthogonal_views()
         self.main_window.ortho_viewer.add_cropping_bars()
