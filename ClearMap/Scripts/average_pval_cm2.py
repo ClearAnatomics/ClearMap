@@ -1,12 +1,14 @@
 import os
 
 import numpy as np
+import pandas as pd
 from scipy import stats
 import tifffile
 
 from ClearMap.Analysis.Statistics.GroupStatistics import remove_p_val_nans
 from ClearMap.IO import IO as clearmap_io
 from ClearMap.Analysis.Statistics import GroupStatistics as group_statistics
+import ClearMap.Analysis.Statistics.MultipleComparisonCorrection as clearmap_FDR
 from ClearMap.Utils.utilities import make_abs
 
 colors = {
@@ -16,7 +18,20 @@ colors = {
 }
 
 
-def process_condensed(directory, f_list, suffix):  # FIXME: description and better name
+def group_voxelizations(directory, f_list, suffix):
+    """
+    Regroup voxelisations to simplify further processing
+
+    Parameters
+    ----------
+    directory
+    f_list
+    suffix
+
+    Returns
+    -------
+
+    """
     for i, file_name in enumerate(f_list):
         img = clearmap_io.read(make_abs(directory, file_name))
         if i == 0:  # init on first image
@@ -24,10 +39,12 @@ def process_condensed(directory, f_list, suffix):  # FIXME: description and bett
         else:
             condensed = np.concatenate((condensed, img[:, :, :, np.newaxis]), axis=3)
     clearmap_io.write(os.path.join(directory, f'condensed_{suffix}.tif'), condensed)
+    return condensed
 
+
+def average_voxelization_groups(condensed, directory, suffix):
     condensed_avg = np.mean(condensed, axis=3)
     clearmap_io.write(os.path.join(directory, f'avg_{suffix}.tif'), condensed_avg)
-    return condensed
 
 
 def get_colored_p_vals(p_vals, t_vals, significance, color_names):
@@ -56,8 +73,7 @@ def dirs_to_density_files(directory, f_list):
 
 
 def get_p_vals_f(p_vals, t_vals, p_cutoff, new_orientation=(2, 0, 1)):  # FIXME: from sagittal to coronal view  specific to original orientation
-    p_vals2 = p_vals.copy()
-    p_vals2[p_vals2 > p_cutoff] = p_cutoff  # FIXME: clip
+    p_vals2 = np.clip(p_vals, None, p_cutoff)
     p_sign = np.sign(t_vals)
     return transpose_p_vals(new_orientation, p_sign, p_vals2)
 
@@ -67,14 +83,97 @@ def transpose_p_vals(new_orientation, p_sign, p_vals2):  # FIXME: check cm_rsp.s
     p_sign_f = np.transpose(p_sign, new_orientation)
     return p_vals2_f, p_sign_f
 
-def compare_groups(directory, gp1_name, gp2_name, gp1_f_list, gp2_f_list, prefix='p_val_colors'):
-    gp1_f_list = dirs_to_density_files(directory, gp1_f_list)
-    gp2_f_list = dirs_to_density_files(directory, gp2_f_list)
 
-    gp1_condensed = process_condensed(directory, gp1_f_list, suffix=gp1_name)
-    gp2_condensed = process_condensed(directory, gp2_f_list, suffix=gp2_name)
+def group_cells_counts(struct_ids, group_cells_dfs):  # WARNING: seems inefficient
+    output = pd.DataFrame(columns=['struct', 'hemisphere'] + [f'counts_{i}' for i in range(len(group_cells_dfs))])
+    for struct_id in struct_ids:
+        for hem_id in range(2):
+            row = pd.DataFrame(columns=output.columns)
+            row['struct'] = struct_id  # FIXME: check that can index non existing
+            row['hemisphere'] = hem_id  # FIXME: check that can index non existing
+            for j, sample_df in enumerate(group_cells_dfs):
+                row[f'counts_{j}'] = sample_df[sample_df['id'] == struct_id]['count']
+            output = pd.concat((output, row))
+    return output
 
-    t_vals, p_vals = stats.ttest_ind(gp1_condensed, gp2_condensed, axis=3, equal_var=False)
+
+def get_all_structs(dfs):
+    structs = pd.Series()
+    for df in dfs:
+        pd.concat((structs, df['id']))
+    return np.sort(structs.unique())
+
+
+def generate_summary_table(cells_dfs, p_cutoff=None):
+    gp_names = cells_dfs.keys()
+
+    grouped_counts = []
+
+    total_df = pd.DataFrame()
+    total_df['id'] = cells_dfs[gp_names[0]]['id']
+    total_df['name'] = cells_dfs[gp_names[0]]['name']
+    total_df['hemisphere'] = cells_dfs[gp_names[0]]['hemisphere']
+    for i, gp_name in enumerate(gp_names):
+        grouped_counts.append(pd.DataFrame())
+        for col_name in cells_dfs[gp_name].columns:
+            if 'count' in col_name:
+                col = cells_dfs[gp_name][col_name]
+                new_col_name = f'{gp_names[i]}_{col_name}'
+                total_df[new_col_name] = col
+                grouped_counts[i][new_col_name] = col
+        total_df[f'mean_{gp_name}'] = grouped_counts[i].mean(axis=1)
+        total_df[f'sd_{gp_name}'] = grouped_counts[i].std(axis=1)
+    p_vals, p_signs = group_statistics.t_test_region_counts(grouped_counts[0], grouped_counts[1],
+                                                            p_cutoff=p_cutoff, signed=True)
+    total_df['p_value'] = p_vals
+    total_df['q_value'] = clearmap_FDR.estimate_q_values(p_vals)
+    total_df['p_sign'] = p_signs
+    return total_df
+
+
+def find_cells_df(target_dir):
+    return [os.path.join(target_dir, f) for f in os.listdir(target_dir) if f.endswith('cells.feather')][0]
+
+
+def dirs_to_cells_dfs(directory, dirs):
+    out = []
+    for i, f_name in enumerate(dirs):
+        f_name = make_abs(directory, f_name)
+        if not f_name.endswith('cells.feather'):
+            f_name = find_cells_df(f_name)
+        out.append(f_name)
+    return out
+
+
+def make_summary(directory, gp1_name, gp2_name, gp1_dirs, gp2_dirs, output_path=None, save=True):
+    gp1_dfs = dirs_to_cells_dfs(directory, gp1_dirs)
+    gp2_dfs = dirs_to_cells_dfs(directory, gp2_dirs)
+    gp_cells_dfs = [gp1_dfs, gp2_dfs]
+    structs = get_all_structs(gp1_dfs + gp2_dfs)
+
+    aggregated_dfs = {gp_name: group_cells_counts(structs, gp_cells_dfs[i])
+                      for i, gp_name in enumerate((gp1_name, gp2_name))}
+    total_df = generate_summary_table(aggregated_dfs)
+
+    if output_path is None and save:
+        output_path = os.path.join(directory, f'statistics_{gp1_name}_{gp2_name}.csv')
+    if save:
+        total_df.to_csv(output_path)
+    return total_df
+
+
+def compare_groups(directory, gp1_name, gp2_name, gp1_dirs, gp2_dirs, prefix='p_val_colors'):
+    make_summary(directory, gp1_name, gp2_name, gp1_dirs, gp2_dirs)
+
+    gp1_f_list = dirs_to_density_files(directory, gp1_dirs)
+    gp2_f_list = dirs_to_density_files(directory, gp2_dirs)
+
+    gp1_grouped_voxelizations = group_voxelizations(directory, gp1_f_list, suffix=gp1_name)
+    average_voxelization_groups(gp1_grouped_voxelizations, directory, gp1_name)
+    gp2_grouped_voxelizations = group_voxelizations(directory, gp2_f_list, suffix=gp2_name)
+    average_voxelization_groups(gp2_grouped_voxelizations, directory, gp2_name)
+
+    t_vals, p_vals = stats.ttest_ind(gp1_grouped_voxelizations, gp2_grouped_voxelizations, axis=3, equal_var=False)
     p_vals, t_vals = remove_p_val_nans(p_vals, t_vals)
 
     colored_p_vals_05 = get_colored_p_vals(p_vals, t_vals, 0.05, ('red', 'green'))
