@@ -5,7 +5,7 @@ from PyQt5.QtWidgets import QDialogButtonBox
 
 from ClearMap.IO import IO as clearmap_io
 from ClearMap.IO.MHD import mhd_read
-from ClearMap.Scripts.average_pval_cm2 import compare_groups
+from ClearMap.Scripts.average_pval_cm2 import compare_groups, make_summary
 from ClearMap.Scripts.batch_process import process_folders
 from ClearMap.Scripts.cell_map import CellDetector
 from ClearMap.Scripts.sample_preparation import PreProcessor
@@ -14,11 +14,12 @@ from ClearMap.gui.gui_utils import format_long_nb_to_str, surface_project, np_to
 from ClearMap.gui.plots import link_dataviewers_cursors
 from ClearMap.gui.params import ParamsOrientationError, VesselParams, PreferencesParams, SampleParameters, \
     AlignmentParams, CellMapParams, BatchParams
-from ClearMap.gui.widgets import PatternDialog, SamplePickerDialog
+from ClearMap.gui.widgets import PatternDialog, SamplePickerDialog, DataFrameWidget
 from ClearMap.Visualization.Qt import Plot3d as plot_3d
 
 
 # ############################################ INTERFACES ##########################################
+
 
 class GenericUi:
     def __init__(self, main_window, name, ui_file_name, widget_class_name):
@@ -683,6 +684,17 @@ class BatchTab(GenericTab):
 
     def create_wizard(self):
         return SamplePickerDialog('', params=self.params)
+
+    def make_group_stats_tables(self):
+        dvs = []
+        groups = self.params.groups
+        for pair in self.params.selected_comparisons:
+            gp1_name, gp2_name = pair
+            df = make_summary(self.params.result_directory,
+                              gp1_name, gp2_name, groups[gp1_name], groups[gp2_name],
+                              output_path=None, save=True)
+            dvs.append(DataFrameWidget(df).table)
+        self.main_window.setup_plots(dvs)
 
     def run_p_vals(self):
         self.params.ui_to_cfg()
