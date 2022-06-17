@@ -10,7 +10,8 @@ from skimage import transform as sk_transform  # Slowish
 
 from PyQt5 import QtGui, QtCore
 from PyQt5.QtCore import QRectF
-from PyQt5.QtWidgets import QWidget, QDialogButtonBox, QListWidget, QHBoxLayout, QPushButton, QVBoxLayout
+from PyQt5.QtWidgets import QWidget, QDialogButtonBox, QListWidget, QHBoxLayout, QPushButton, QVBoxLayout, QTableWidget, \
+    QTableWidgetItem
 
 from ClearMap.IO import TIF
 from ClearMap.IO.metadata import pattern_finders_from_base_dir
@@ -663,3 +664,22 @@ class SamplePickerDialog:
                 if 'sample_params.cfg' in os.listdir(fldr):
                     sample_folders.append(fldr)
         return sample_folders
+
+
+class DataFrameWidget(QWidget):
+    def __init__(self, df, n_digits=2, parent=None):
+        super().__init__(parent)
+        self.df = df
+        self.n_digits = n_digits
+        self.table = QTableWidget(len(df.index), df.columns.size, parent=parent)
+        self.table.setHorizontalHeaderLabels(self.df.columns)
+        self.set_content()
+
+    def set_content(self):
+        for i in range(len(self.df.index)):
+            for j in range(self.df.columns.size):
+                v = self.df.iloc[i, j]
+                if self.df.dtypes[j] == np.float_:
+                    self.table.setItem(i, j, QTableWidgetItem(f'{v:.{self.n_digits}}'))
+                else:
+                    self.table.setItem(i, j, QTableWidgetItem(f'{v}'))
