@@ -242,7 +242,7 @@ class CellDetector(TabProcessor):
             df['zt'] = coordinates_transformed[2]  # FIXME: check if transpose
             df['order'] = label
             unique_labels = np.sort(df['order'].unique())
-            color_map = {lbl: annotation.find(lbl, key='order')['RGB'] for lbl in unique_labels}
+            color_map = {lbl: annotation.find(lbl, key='order')['RGB'] for lbl in unique_labels}  # TEST:
             id_map = {lbl: annotation.find(lbl, key='order')['id'] for lbl in unique_labels}
 
             atlas = self.workspace.source(self.preprocessor.annotation_file_path)
@@ -350,15 +350,20 @@ class CellDetector(TabProcessor):
     def export_collapsed_stats(self):
         df = self.get_cells_df()
 
-        grouped = df[['name', 'order', 'id', 'size']].groupby(['id'], as_index=False)
-
         collapsed = pd.DataFrame()
-        collapsed['Structure name'] = grouped.first()['name']
-        collapsed['Structure order'] = grouped.first()['order']
-        collapsed['Structure ID'] = grouped.first()['id']
-        collapsed['Structure volume'] = grouped.first()['volume']
-        collapsed['Cell counts'] = grouped.count()['name']
-        collapsed['Average cell size'] = grouped.mean()['size']
+        for i in range(2):
+            grouped = df[df['hemisphere'] == i][['name', 'order', 'id', 'size']].groupby(['id'], as_index=False)
+
+            tmp = pd.DataFrame()
+            tmp['Structure ID'] = grouped.first()['id']
+            tmp['Structure order'] = grouped.first()['order']
+            tmp['Structure name'] = grouped.first()['name']
+            tmp['Hemisphere'] = grouped.first()['hemisphere']
+            tmp['Structure volume'] = grouped.first()['volume']
+            tmp['Cell counts'] = grouped.count()['name']
+            tmp['Average cell size'] = grouped.mean()['size']
+
+            collapsed = pd.concat((collapsed, tmp))
 
         collapsed = collapsed.sort_values(by='Structure ID')
 
