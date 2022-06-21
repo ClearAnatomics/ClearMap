@@ -400,7 +400,7 @@ class CellDetector(TabProcessor):
         coordinates = df[['xt', 'yt', 'zt']].values.astype(np.int)  # required to match integer z
         colors = df['color'].values * 255
         colors = np.array([QColor(*cols.astype(np.int)) for cols in colors])
-        dv.scatter_coords = Scatter3D(coordinates, colors=colors, half_z_size=0)
+        dv.scatter_coords = Scatter3D(coordinates, colors=colors, hemispheres=df['hemisphere'], half_z_size=0)
         dv.updateSlice()  # WARNING: does not work
 
         return [dv]
