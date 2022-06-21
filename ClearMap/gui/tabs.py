@@ -690,7 +690,8 @@ class BatchTab(GenericTab):
         groups = self.params.groups
         for pair in self.params.selected_comparisons:
             gp1_name, gp2_name = pair
-            df = make_summary(self.params.result_directory,
+            # FIXME: wrap_in_thread
+            df = make_summary(self.params.results_folder,  # FIXME: Progress bar
                               gp1_name, gp2_name, groups[gp1_name], groups[gp2_name],
                               output_path=None, save=True)
             dvs.append(DataFrameWidget(df).table)
@@ -702,11 +703,11 @@ class BatchTab(GenericTab):
         p_vals_imgs = []
         for pair in self.params.selected_comparisons:
             gp1_name, gp2_name = pair
-            p_vals_imgs.append(compare_groups(self.params.result_directory, gp1_name, gp2_name,
+            p_vals_imgs.append(compare_groups(self.params.results_folder, gp1_name, gp2_name,
                                               groups[gp1_name], groups[gp2_name]))
         if len(self.params.selected_comparisons) == 1:
-            gp1_img = clearmap_io.read(os.path.join(self.params.result_directory, f'condensed_{gp1_name}.tif'))
-            gp2_img = clearmap_io.read(os.path.join(self.params.result_directory, f'condensed_{gp2_name}.tif'))
+            gp1_img = clearmap_io.read(os.path.join(self.params.results_folder, f'condensed_{gp1_name}.tif'))
+            gp2_img = clearmap_io.read(os.path.join(self.params.results_folder, f'condensed_{gp2_name}.tif'))
             dvs = plot_3d.plot([gp1_img, gp2_img, p_vals_imgs[0]])
         else:
             dvs = plot_3d.plot(p_vals_imgs, arange=False, sync=True,
