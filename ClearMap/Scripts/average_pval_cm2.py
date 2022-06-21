@@ -5,6 +5,7 @@ import pandas as pd
 from scipy import stats
 import tifffile
 
+from ClearMap.Alignment import Annotation as annotation
 from ClearMap.Analysis.Statistics.GroupStatistics import remove_p_val_nans
 from ClearMap.IO import IO as clearmap_io
 from ClearMap.Analysis.Statistics import GroupStatistics as group_statistics
@@ -38,6 +39,7 @@ def group_voxelizations(directory, f_list, suffix):
             condensed = img[:, :, :, np.newaxis]
         else:
             condensed = np.concatenate((condensed, img[:, :, :, np.newaxis]), axis=3)
+    condensed = condensed.astype(np.float32)
     clearmap_io.write(os.path.join(directory, f'condensed_{suffix}.tif'), condensed)
     return condensed
 
@@ -54,8 +56,9 @@ def get_colored_p_vals(p_vals, t_vals, significance, color_names):
                                            negative_color=colors[color_names[1]])
 
 
-def is_density_file(f_name):
-    return 'density' in f_name and f_name.endswith('.tif')
+def is_density_file(f_name):  # FIXME: exclude debug
+    # return 'density' in f_name and f_name.endswith('.tif')
+    return os.path.basename(f_name) == 'density_counts.tif'  # FIXME add menu for alternatives
 
 
 def find_density_file(target_dir):
@@ -84,34 +87,39 @@ def transpose_p_vals(new_orientation, p_sign, p_vals2):  # FIXME: check cm_rsp.s
     return p_vals2_f, p_sign_f
 
 
-def group_cells_counts(struct_ids, group_cells_dfs):  # WARNING: seems inefficient
-    output = pd.DataFrame(columns=['struct', 'hemisphere'] + [f'counts_{i}' for i in range(len(group_cells_dfs))])
-    for struct_id in struct_ids:
-        for hem_id in range(2):
-            row = pd.DataFrame(columns=output.columns)
-            row['struct'] = struct_id  # FIXME: check that can index non existing
-            row['hemisphere'] = hem_id  # FIXME: check that can index non existing
-            for j, sample_df in enumerate(group_cells_dfs):
-                row[f'counts_{j}'] = sample_df[sample_df['id'] == struct_id]['count']
-            output = pd.concat((output, row))
+def group_cells_counts(struct_ids, group_cells_dfs):
+    atlas = clearmap_io.read(annotation.default_annotation_file)
+    output = pd.DataFrame(columns=['id', 'hemisphere'] + [f'counts_{i}' for i in range(len(group_cells_dfs))])
+
+    output['id'] = np.tile(struct_ids, 2)  # for each hemisphere
+    output['name'] = np.tile([annotation.find(_id, key='id')['name'] for _id in struct_ids], 2)
+    output['volume'] = np.tile([(atlas == _id).sum() for _id in struct_ids], 2)
+    output['hemisphere'] = np.repeat((0, 255), len(struct_ids))
+
+    for multiplier, hem_id in zip((1, 2), (0, 255)):
+        for j, sample_df in enumerate(group_cells_dfs):
+            hem_sample_df = sample_df[sample_df['hemisphere'] == hem_id]
+            for i, struct_id in enumerate(struct_ids):
+                output.at[i*multiplier, f'counts_{j}'] = len(hem_sample_df[hem_sample_df['id'] == struct_id])  # FIXME: slow
     return output
 
 
 def get_all_structs(dfs):
     structs = pd.Series()
     for df in dfs:
-        pd.concat((structs, df['id']))
+        structs = pd.concat((structs, df['id']))
     return np.sort(structs.unique())
 
 
 def generate_summary_table(cells_dfs, p_cutoff=None):
-    gp_names = cells_dfs.keys()
+    gp_names = list(cells_dfs.keys())
 
     grouped_counts = []
 
     total_df = pd.DataFrame()
     total_df['id'] = cells_dfs[gp_names[0]]['id']
     total_df['name'] = cells_dfs[gp_names[0]]['name']
+    total_df['volume'] = cells_dfs[gp_names[0]]['volume']
     total_df['hemisphere'] = cells_dfs[gp_names[0]]['hemisphere']
     for i, gp_name in enumerate(gp_names):
         grouped_counts.append(pd.DataFrame())
@@ -123,12 +131,35 @@ def generate_summary_table(cells_dfs, p_cutoff=None):
                 grouped_counts[i][new_col_name] = col
         total_df[f'mean_{gp_name}'] = grouped_counts[i].mean(axis=1)
         total_df[f'sd_{gp_name}'] = grouped_counts[i].std(axis=1)
-    p_vals, p_signs = group_statistics.t_test_region_counts(grouped_counts[0], grouped_counts[1],
-                                                            p_cutoff=p_cutoff, signed=True)
+
+    total_df, grouped_counts = sanitize_df(gp_names, grouped_counts, total_df)
+
+    gp1 = grouped_counts[0].values.astype(np.int)
+    gp2 = grouped_counts[1].values.astype(np.int)
+    p_vals, p_signs = group_statistics.t_test_region_counts(gp1, gp2, p_cutoff=p_cutoff, signed=True)
     total_df['p_value'] = p_vals
     total_df['q_value'] = clearmap_FDR.estimate_q_values(p_vals)
     total_df['p_sign'] = p_signs
     return total_df
+
+
+def sanitize_df(gp_names, grouped_counts, total_df):
+    """
+    Remove rows with all 0 or NaN in at least 1 group
+    Args:
+        gp_names:
+        grouped_counts:
+        total_df:
+
+    Returns:
+
+    """
+    bad_idx = total_df[f'mean_{gp_names[0]}'] == 0  # FIXME: check that either not and
+    bad_idx = np.logical_or(bad_idx, total_df[f'mean_{gp_names[1]}'] == 0)
+    bad_idx = np.logical_or(bad_idx, np.isnan(total_df[f'mean_{gp_names[0]}']))
+    bad_idx = np.logical_or(bad_idx, np.isnan(total_df[f'mean_{gp_names[1]}']))
+
+    return total_df[~bad_idx], [grouped_counts[0][~bad_idx], grouped_counts[1][~bad_idx]]
 
 
 def find_cells_df(target_dir):
@@ -141,7 +172,7 @@ def dirs_to_cells_dfs(directory, dirs):
         f_name = make_abs(directory, f_name)
         if not f_name.endswith('cells.feather'):
             f_name = find_cells_df(f_name)
-        out.append(f_name)
+        out.append(pd.read_feather(f_name))
     return out
 
 

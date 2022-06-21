@@ -681,11 +681,13 @@ class BatchTab(GenericTab):
         self.ui.folderPickerHelperPushButton.clicked.connect(self.create_wizard)
         self.ui.runPValsButtonBox.connectApply(self.run_p_vals)
         self.ui.batchRunButtonBox.connectApply(self.run_batch_process)
+        self.ui.batchStatsButtonBox.connectApply(self.make_group_stats_tables)
 
     def create_wizard(self):
         return SamplePickerDialog('', params=self.params)
 
     def make_group_stats_tables(self):
+        self.main_window.print_status_msg('Computing stats table')
         dvs = []
         groups = self.params.groups
         for pair in self.params.selected_comparisons:
@@ -696,6 +698,7 @@ class BatchTab(GenericTab):
                               output_path=None, save=True)
             dvs.append(DataFrameWidget(df).table)
         self.main_window.setup_plots(dvs)
+        self.main_window.print_status_msg('Idle, waiting for input')
 
     def run_p_vals(self):
         self.params.ui_to_cfg()
