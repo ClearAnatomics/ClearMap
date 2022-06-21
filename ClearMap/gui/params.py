@@ -1690,8 +1690,8 @@ class BatchParams(UiParameter):
         list_widget.addItems(paths)
 
     def get_paths(self, gp):  # TODO: should exist from group name
-        widg = self.gp_list_widget[gp-1]
-        return [widg.item(i) for i in range(widg.count())]
+        list_widget = self.gp_list_widget[gp-1]
+        return [list_widget.item(i).text() for i in range(list_widget.count())]
 
     def get_all_paths(self):
         return [self.get_paths(gp+1) for gp in range(self.n_groups)]
