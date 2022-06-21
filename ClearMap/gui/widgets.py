@@ -624,7 +624,6 @@ class SamplePickerDialog:
         self.dlg.setMinimumHeight(600)
 
         self.fix_btn_boxes_text()
-        self.connect_buttons()
 
         self.current_group = 1
         for i in range(self.params.n_groups - 1):
@@ -633,6 +632,7 @@ class SamplePickerDialog:
         self.list_selection = TwoListSelection()
         self.dlg.listPickerLayout.addWidget(self.list_selection)
         # self.dlg.setStyleSheet(qdarkstyle.load_stylesheet())
+        self.connect_buttons()
         self.dlg.exec()
 
     def fix_btn_boxes_text(self):
@@ -647,6 +647,10 @@ class SamplePickerDialog:
         self.dlg.buttonBox.accepted.connect(self.apply_changes)
         self.dlg.buttonBox.rejected.connect(self.dlg.close)
 
+        selected_model = self.list_selection.mOuput.model()
+        selected_model.rowsInserted.connect(self.update_current_group_paths)  # Update group when selection updated
+        selected_model.rowsRemoved.connect(self.update_current_group_paths)  # Update group when selection updated
+
     def apply_changes(self):
         for group, paths in enumerate(self.group_paths):
             if group > self.params.n_groups:
@@ -656,10 +660,13 @@ class SamplePickerDialog:
         self.dlg.close()
 
     def handle_group_changed(self):
-        self.group_paths[self.current_group - 1] = self.list_selection.get_right_elements()
-        idx = self.dlg.groupsComboBox.currentIndex()
-        self.current_group = (idx if idx >= 0 else 0) + 1
+        self.update_current_group_paths()
+        current_gp_id = self.dlg.groupsComboBox.currentIndex()
+        self.current_group = max(0, current_gp_id) + 1  # WARNING: update current_group after update
         self.list_selection.setSelectedItems(self.group_paths[self.current_group - 1])
+
+    def update_current_group_paths(self):
+        self.group_paths[self.current_group - 1] = self.list_selection.get_right_elements()
 
     def handle_add_group(self):
         self.dlg.groupsComboBox.addItem(f'{self.dlg.groupsComboBox.count() + 1}')
