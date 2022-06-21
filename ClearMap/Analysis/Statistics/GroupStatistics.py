@@ -48,7 +48,8 @@ def t_test_voxelization(group1, group2, signed=False, remove_nan=True, p_cutoff=
     if remove_nan:
         p_vals, t_vals = remove_p_val_nans(p_vals, t_vals)
 
-    p_vals = np.clip(p_vals, None, p_cutoff)
+    if p_cutoff is not None:
+        p_vals = np.clip(p_vals, None, p_cutoff)
 
     if signed:
         return p_vals, np.sign(t_vals)
@@ -68,7 +69,8 @@ def t_test_region_counts(counts1, counts2, signed=False, remove_nan=True, p_cuto
     if remove_nan:
         p_vals, t_vals = remove_p_val_nans(p_vals, t_vals)
 
-    p_vals = np.clip(p_vals, None, p_cutoff)
+    if p_cutoff is not None:
+        p_vals = np.clip(p_vals, None, p_cutoff)
 
     # p_vals.shape = (1,) + p_vals.shape;
     # ids.shape = (1,) + ids.shape;
