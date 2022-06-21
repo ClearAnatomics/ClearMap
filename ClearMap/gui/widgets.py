@@ -324,7 +324,9 @@ class PbarWatcher(QWidget):  # Inspired from https://stackoverflow.com/a/6626606
 
 
 class Scatter3D:
-    def __init__(self, coordinates, smarties=False, colors=None, half_z_size=None):
+    def __init__(self, coordinates, smarties=False, colors=None, hemispheres=None, half_z_size=None):
+        self.default_symbol = '+'
+        self.alternate_symbol = 'p'
         self.half_z_size = half_z_size
         self.coordinates = coordinates
         if smarties and colors is None:
@@ -333,6 +335,12 @@ class Scatter3D:
             self.colours = np.array([QColor(*col) for col in self.colours])
         else:
             self.colours = colors
+        self.hemispheres = hemispheres
+        if self.hemispheres is not None:
+            self.symbols = np.chararray(self.hemispheres.shape)
+            self.symbols[self.hemispheres == 0] = self.default_symbol
+            self.symbols[self.hemispheres == 255] = self.alternate_symbol
+            self.symbols = self.symbols.decode()
 
     def get_all_data(self, main_z, half_z_size=3):
         pos = np.empty((0, 2))
@@ -366,11 +374,19 @@ class Scatter3D:
         return np.full(n_markers, marker_size)
 
     def get_colours(self, z):
-        points_in_current_slice = self.coordinates[:, 2] == z
-        return self.colours[points_in_current_slice]
+        return self.colours[self.current_slice_indices(z)]
+
+    def current_slice_indices(self, z):
+        return self.coordinates[:, 2] == z
 
     def get_pos(self, z):
-        return self.coordinates[self.coordinates[:, 2] == z][:, :2]
+        return self.coordinates[self.current_slice_indices(z)][:, :2]
+
+    def get_symbols(self, z):
+        if self.hemispheres is not None:
+            return self.symbols[self.current_slice_indices(z)]
+        else:
+            return self.default_symbol
 
 
 class PatternDialog:

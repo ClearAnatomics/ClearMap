@@ -479,18 +479,20 @@ class DataViewer(pg.QtGui.QWidget):
         self.scatter.clear()
         if self.scatter_coords.colours is not None:
           colours = self.scatter_coords.get_colours(index)
+          symbols = self.scatter_coords.get_symbols(index)
           self.scatter.setData(pos=self.scatter_coords.get_pos(index),
                                pen=[pg.mkPen(c) for c in colours],
                                brush=[pg.mkBrush(c) for c in colours],
-                               symbol='+', size=10)
+                               symbol=symbols, size=10)
         else:
           self.scatter.setData(pos=self.scatter_coords.get_pos(index),
                                pen='red', brush='red',
                                symbol='+', size=10)
         # FIXME: check why some markers trigger errors
         try:
-          self.scatter.addPoints(symbol='o', brush=pg.mkBrush((0, 0, 0, 0)),
-                                 **self.scatter_coords.get_all_data(index))
+          if self.scatter_coords.half_z_size is not None:
+            self.scatter.addPoints(symbol='o', brush=pg.mkBrush((0, 0, 0, 0)),
+                                   **self.scatter_coords.get_all_data(index))
         except KeyError as err:
           print(err)
 
