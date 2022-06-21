@@ -683,6 +683,8 @@ class BatchTab(GenericTab):
         self.ui.batchRunButtonBox.connectApply(self.run_batch_process)
         self.ui.batchStatsButtonBox.connectApply(self.make_group_stats_tables)
 
+        self.ui.batchToolBox.setCurrentIndex(0)
+
     def create_wizard(self):
         return SamplePickerDialog('', params=self.params)
 
