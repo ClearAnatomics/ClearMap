@@ -225,8 +225,8 @@ class CellDetector(TabProcessor):
         """Atlas alignment and annotation """
         # Cell alignment
         table, coordinates = self.get_coords(coord_type='filtered')
-        df = pd.DataFrame({'x': coordinates[0], 'y': coordinates[1], 'z': coordinates[2]})  # FIXME: check if transpose
-        df['size'] = table['cell_size']
+        df = pd.DataFrame({'x': coordinates[:, 0], 'y': coordinates[:, 1], 'z': coordinates[:, 2]})
+        df['size'] = table['size']
         df['source'] = table['source']
 
         if self.preprocessor.was_registered:
@@ -237,15 +237,15 @@ class CellDetector(TabProcessor):
                                                        annotation_file=self.preprocessor.hemispheres_file_path, key='id')
             names = annotation.convert_label(label, key='order', value='name')
 
-            df['xt'] = coordinates_transformed[0]  # FIXME: check if transpose
-            df['yt'] = coordinates_transformed[1]  # FIXME: check if transpose
-            df['zt'] = coordinates_transformed[2]  # FIXME: check if transpose
+            df['xt'] = coordinates_transformed[:, 0]
+            df['yt'] = coordinates_transformed[:, 1]
+            df['zt'] = coordinates_transformed[:, 2]
             df['order'] = label
             unique_labels = np.sort(df['order'].unique())
-            color_map = {lbl: annotation.find(lbl, key='order')['RGB'] for lbl in unique_labels}  # TEST:
+            color_map = {lbl: annotation.find(lbl, key='order')['rgb'] for lbl in unique_labels}  # WARNING RGB upper case should give integer but does not work
             id_map = {lbl: annotation.find(lbl, key='order')['id'] for lbl in unique_labels}
 
-            atlas = self.workspace.source(self.preprocessor.annotation_file_path)
+            atlas = clearmap_io.read(self.preprocessor.annotation_file_path)
             volumes = {_id: (atlas == _id).sum() for _id in id_map.values()}  # Volumes need a lookup on ID since the atlas is in ID space
 
             def lookup_color(lbl):  # See if we can do lookup without specific function
@@ -351,8 +351,9 @@ class CellDetector(TabProcessor):
         df = self.get_cells_df()
 
         collapsed = pd.DataFrame()
-        for i in range(2):
-            grouped = df[df['hemisphere'] == i][['name', 'order', 'id', 'size']].groupby(['id'], as_index=False)
+        relevant_columns = ['id', 'order', 'name', 'hemisphere', 'volume', 'size']
+        for i in (0, 255):  # Split by hemisphere to group by structure and reconcatenate hemispheres after
+            grouped = df[df['hemisphere'] == i][relevant_columns].groupby(['id'], as_index=False)
 
             tmp = pd.DataFrame()
             tmp['Structure ID'] = grouped.first()['id']
@@ -367,7 +368,7 @@ class CellDetector(TabProcessor):
 
         collapsed = collapsed.sort_values(by='Structure ID')
 
-        csv_file_path = self.workspace.filename('cells', suffix='_stats', extension='csv')
+        csv_file_path = self.workspace.filename('cells', postfix='_stats', extension='csv')
         collapsed.to_csv(csv_file_path, index=False)
 
     def plot_cells(self):
@@ -383,7 +384,7 @@ class CellDetector(TabProcessor):
         plt.tight_layout()
 
     def plot_cells_3d_scatter_w_atlas_colors(self, parent=None):
-        if self.preprocessor.was_registered:
+        if self.preprocessor.was_registered:  # REFACTORING: could extract
             dv = qplot_3d.plot(clearmap_io.source(annotation.default_reference_file),  # FIXME: check that default is updated
                                arange=False, lut='white', parent=parent)[0]
         else:
