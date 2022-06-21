@@ -2,6 +2,7 @@ import os
 
 import numpy as np
 import pandas as pd
+from ClearMap.config.config_loader import ConfigLoader
 from scipy import stats
 import tifffile
 
@@ -87,7 +88,7 @@ def transpose_p_vals(new_orientation, p_sign, p_vals2):  # FIXME: check cm_rsp.s
     return p_vals2_f, p_sign_f
 
 
-def group_cells_counts(struct_ids, group_cells_dfs):
+def group_cells_counts(struct_ids, group_cells_dfs, sample_ids):
     atlas = clearmap_io.read(annotation.default_annotation_file)
     output = pd.DataFrame(columns=['id', 'hemisphere'] + [f'counts_{i}' for i in range(len(group_cells_dfs))])
 
@@ -98,9 +99,10 @@ def group_cells_counts(struct_ids, group_cells_dfs):
 
     for multiplier, hem_id in zip((1, 2), (0, 255)):
         for j, sample_df in enumerate(group_cells_dfs):
+            col_name = f'counts_{sample_ids[j]}'  # TODO: option with f'counts_{j}'
             hem_sample_df = sample_df[sample_df['hemisphere'] == hem_id]
             for i, struct_id in enumerate(struct_ids):
-                output.at[i*multiplier, f'counts_{j}'] = len(hem_sample_df[hem_sample_df['id'] == struct_id])  # FIXME: slow
+                output.at[i*multiplier, col_name] = len(hem_sample_df[hem_sample_df['id'] == struct_id])  # FIXME: slow
     return output
 
 
@@ -176,13 +178,22 @@ def dirs_to_cells_dfs(directory, dirs):
     return out
 
 
+def dir_to_sample_id(folder):
+    cfg_loader = ConfigLoader(folder)
+    return cfg_loader.get_cfg('sample')['sample_id']
+
+
 def make_summary(directory, gp1_name, gp2_name, gp1_dirs, gp2_dirs, output_path=None, save=True):
     gp1_dfs = dirs_to_cells_dfs(directory, gp1_dirs)
     gp2_dfs = dirs_to_cells_dfs(directory, gp2_dirs)
     gp_cells_dfs = [gp1_dfs, gp2_dfs]
     structs = get_all_structs(gp1_dfs + gp2_dfs)
 
-    aggregated_dfs = {gp_name: group_cells_counts(structs, gp_cells_dfs[i])
+    gp1_sample_ids = [dir_to_sample_id(folder) for folder in gp1_dirs]
+    gp2_sample_ids = [dir_to_sample_id(folder) for folder in gp2_dirs]
+    sample_ids = [gp1_sample_ids, gp2_sample_ids]
+
+    aggregated_dfs = {gp_name: group_cells_counts(structs, gp_cells_dfs[i], sample_ids[i])
                       for i, gp_name in enumerate((gp1_name, gp2_name))}
     total_df = generate_summary_table(aggregated_dfs)
 
