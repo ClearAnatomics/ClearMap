@@ -441,6 +441,8 @@ class ClearMapGui(ClearMapGuiBase):
                     self.batch_tab_mgr.params.fix_cfg_file(cfg_path)
                 self.batch_tab_mgr.params.get_config(cfg_path)  # FIXME: try to put with other tabs init (differentce with comfigloader)
                 self.batch_tab_mgr.initial_cfg_load()
+                self.batch_tab_mgr.params.results_folder = results_folder
+                self.batch_tab_mgr.params.ui_to_cfg()
                 self.batch_tab_mgr.setup_workers()
             except ConfigNotFoundError:
                 self.conf_load_error_msg(cfg_name)
