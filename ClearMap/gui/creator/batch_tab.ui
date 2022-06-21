@@ -146,6 +146,23 @@
        </item>
       </layout>
      </widget>
+     <widget class="QWidget" name="page_2">
+      <attribute name="label">
+       <string>Stats</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="verticalLayout_6">
+       <item>
+        <widget class="QDialogButtonBox" name="batchStatsButtonBox">
+         <property name="standardButtons">
+          <set>QDialogButtonBox::Apply</set>
+         </property>
+         <property name="applyString" stdset="0">
+          <string>Run</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
     </widget>
    </item>
    <item>
