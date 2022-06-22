@@ -1,3 +1,4 @@
+import inspect
 import os
 
 import configobj
@@ -5,6 +6,7 @@ import configobj
 # FIXME: implement validation
 
 
+INSTALL_CFG_DIR = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))  # Where this file resides (w cfgs)
 CLEARMAP_CFG_DIR = os.path.expanduser('~/.clearmap/')
 
 
@@ -49,8 +51,8 @@ tabs_alternatives = [
     {'batch'},
 ]
 
-
 alternative_names = tabs_alternatives + [{'machine'}, {'display'}]
+CONFIG_NAMES = tuple(list(alt)[0] for alt in alternative_names)
 
 
 def get_alternatives(cfg_name):
@@ -81,13 +83,13 @@ def is_machine_file(cfg_name):
 
 
 class ConfigLoader(object):
-    supported_exts = ('.cfg', '.ini', '.yml', '.json')
     loader_functions = {
         '.cfg': get_configobj_cfg,
         '.ini': get_configobj_cfg,
         '.yml': get_yml_cfg,
         '.json': get_json_cfg
     }
+    supported_exts = tuple(loader_functions.keys())
     default_dir = CLEARMAP_CFG_DIR
 
     def __init__(self, src_dir):
@@ -114,13 +116,12 @@ class ConfigLoader(object):
             if not alternative_name.endswith('params'):
                 alternative_name += '_params'
             for ext in self.supported_exts:
-                cfg_path = clean_path(os.path.join(self.src_dir, '{}{}'.format(alternative_name, ext)))
+                cfg_path = clean_path(os.path.join(self.src_dir, f'{alternative_name}{ext}'))
                 if os.path.exists(cfg_path):
                     return cfg_path
         if not must_exist:  # If none found but not necessary, return the first possible option
-            return clean_path(os.path.join(self.src_dir, '{}{}'.format(cfg_name, self.supported_exts[0])))
-        raise FileNotFoundError('Could not find file {} in {} with variants {}'
-                                .format(cfg_name, self.src_dir, variants))
+            return clean_path(os.path.join(self.src_dir, f'{cfg_name}{self.supported_exts[0]}'))
+        raise FileNotFoundError(f'Could not find file {cfg_name} in {self.src_dir} with variants {variants}')
 
     def get_cfg(self, cfg_name):
         if is_tab_file(cfg_name):
@@ -135,29 +136,30 @@ class ConfigLoader(object):
         return ConfigLoader.loader_functions[ext](cfg_path)
 
     @staticmethod
-    def get_default_path(cfg_name, must_exist=True):
+    def get_default_path(cfg_name, must_exist=True, install_mode=False):
         if not cfg_name.endswith('params'):
             cfg_name += '_params'
         for ext in ConfigLoader.supported_exts:
-            cfg_path = ConfigLoader._name_to_default_path(cfg_name, ext)
+            cfg_path = ConfigLoader._name_to_default_path(cfg_name, ext, install_mode=install_mode)
             if os.path.exists(cfg_path):
                 break
         else:
             if must_exist:
-                raise FileNotFoundError(f'Could not find file {cfg_name} in {ConfigLoader.default_dir}')
+                cfg_dir = INSTALL_CFG_DIR if install_mode else ConfigLoader.default_dir
+                raise FileNotFoundError(f'Could not find file {cfg_name} in {cfg_dir}')
             else:  # Return first (default) ext if none found
-                return ConfigLoader._name_to_default_path(cfg_name, ConfigLoader.supported_exts[0])
+                return ConfigLoader._name_to_default_path(cfg_name, ConfigLoader.supported_exts[0],
+                                                          install_mode=install_mode)
         return cfg_path
 
     @staticmethod
-    def _name_to_default_path(cfg_name, ext):
+    def _name_to_default_path(cfg_name, ext, install_mode=False):
         prefix = 'default_' if is_tab_file(cfg_name) else ''
         cfg_name = f'{prefix}{cfg_name}{ext}'
-        cfg_path = clean_path(os.path.join(ConfigLoader.default_dir, cfg_name))
+
+        cfg_dir = INSTALL_CFG_DIR if install_mode else ConfigLoader.default_dir
+        cfg_path = clean_path(os.path.join(cfg_dir, cfg_name))
         return cfg_path
-
-
-CONFIG_NAMES = ('alignment', 'cell_map', 'sample', 'tube_map', 'batch', 'machine', 'display')  # FIXME: derive from alternatives
 
 
 def get_configs(cfg_path, processing_params_path, machine_cfg_path=ConfigLoader.get_default_path('machine')):
