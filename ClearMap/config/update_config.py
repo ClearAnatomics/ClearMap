@@ -3,23 +3,18 @@ import os.path
 import inspect
 import shutil
 
-from ClearMap.config.config_loader import ConfigLoader, get_alternatives, is_tab_file, CONFIG_NAMES
+from ClearMap.config.config_loader import ConfigLoader, get_alternatives, CONFIG_NAMES
 
 CFG_DIR = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
-CLEARMAP_DIR = os.path.dirname(os.path.dirname(CFG_DIR))
-
-
-def get_default(cfg_name):
-    prefix = 'default_' if is_tab_file(cfg_name) else ''
-    cfg_file_name = f'{prefix}{cfg_name}_params.cfg'
-    return os.path.join(CFG_DIR, cfg_file_name)
+CLEARMAP_DIR = os.path.dirname(os.path.dirname(CFG_DIR))  # used by shell script
 
 
 def update_default_config():
     loader = ConfigLoader(None)
     for cfg_name in CONFIG_NAMES:
-        default_cfg_path = get_default(cfg_name)
-        cfg_paths = [loader.get_default_path(alternative, must_exist=False) for alternative in get_alternatives(cfg_name)]
+        default_cfg_path = loader.get_default_path(cfg_name, must_exist=True, install_mode=True)
+        cfg_paths = [loader.get_default_path(alternative, must_exist=False, install_mode=False)
+                     for alternative in get_alternatives(cfg_name)]
         existing_paths = [os.path.exists(p) for p in cfg_paths]
         if not any(existing_paths):  # missing then copy
             print(f'Creating missing default config for {cfg_name}')
