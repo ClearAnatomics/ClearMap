@@ -570,5 +570,9 @@ def main(app, splash):
     sys.exit(app.exec())
 
 
+def entry_point():
+    main(app, splash)
+
+
 if __name__ == "__main__":
     main(app, splash)
