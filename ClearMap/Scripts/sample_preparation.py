@@ -444,8 +444,11 @@ class PreProcessor(TabProcessor):
             "verbose": resampling_cfg['verbose']
         }  # WARNING: duplicate (use method ??)
         clearmap_io.delete_file(self.workspace.filename('resampled'))  # FIXME:
-        src_res = define_auto_resolution(self.workspace.source('raw').file_list[0],
-                                         self.sample_config['resolutions']['raw'])
+        f_list = self.workspace.source('raw').file_list
+        if f_list:
+            src_res = define_auto_resolution(f_list[0], self.sample_config['resolutions']['raw'])
+        else:
+            src_res = self.sample_config['resolutions']['raw']
 
         n_planes = len(self.workspace.file_list('autofluorescence'))  # TODO: find more elegant solution for counter
         self.prepare_watcher_for_substep(n_planes, self.__resample_re, 'Resampling raw')
