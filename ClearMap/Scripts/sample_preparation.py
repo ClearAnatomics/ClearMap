@@ -567,9 +567,9 @@ class PreProcessor(TabProcessor):
             if not v:
                 raise ValueError('Registration missing parameter "{}"'.format(k))
         elastix.align(**align_reference_parameter)
-        self.__check_elastix_successs('auto_to_reference')
+        self.__check_elastix_success('auto_to_reference')
 
-    def __check_elastix_successs(self, results_dir_name):
+    def __check_elastix_success(self, results_dir_name):
         with open(os.path.join(self.workspace.filename(results_dir_name), 'elastix.log'), 'r') as logfile:
             if 'fail' in logfile.read():
                 results_msg = results_dir_name.replace('_', ' ')
