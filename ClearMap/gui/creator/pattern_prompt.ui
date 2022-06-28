@@ -1,54 +1,22 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
- <class>Dialog</class>
- <widget class="QDialog" name="Dialog">
-  <property name="geometry">
-   <rect>
-    <x>0</x>
-    <y>0</y>
-    <width>640</width>
-    <height>633</height>
-   </rect>
-  </property>
+ <class>PatternWizard</class>
+ <widget class="QDialog" name="PatternWizard">
   <property name="windowTitle">
    <string>Dialog</string>
   </property>
-  <widget class="QWidget" name="verticalLayoutWidget">
-   <property name="geometry">
-    <rect>
-     <x>0</x>
-     <y>0</y>
-     <width>631</width>
-     <height>531</height>
-    </rect>
-   </property>
-   <layout class="QVBoxLayout" name="verticalLayout">
-    <item>
-     <widget class="QToolBox" name="patternToolBox">
-      <property name="currentIndex">
-       <number>2</number>
-      </property>
-      <widget class="QWidget" name="page">
-       <property name="geometry">
-        <rect>
-         <x>0</x>
-         <y>0</y>
-         <width>629</width>
-         <height>405</height>
-        </rect>
-       </property>
-       <attribute name="label">
-        <string>Image group 1</string>
-       </attribute>
-       <widget class="QWidget" name="formLayoutWidget_2">
-        <property name="geometry">
-         <rect>
-          <x>-1</x>
-          <y>0</y>
-          <width>631</width>
-          <height>197</height>
-         </rect>
-        </property>
+  <layout class="QVBoxLayout" name="verticalLayout">
+   <item>
+    <widget class="QToolBox" name="patternToolBox">
+     <property name="currentIndex">
+      <number>2</number>
+     </property>
+     <widget class="QWidget" name="page">
+      <attribute name="label">
+       <string>Image group 1</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="verticalLayout_3">
+       <item>
         <layout class="QGridLayout" name="gridLayout">
          <item row="3" column="0">
           <widget class="QLabel" name="label0_1">
@@ -152,7 +120,7 @@
             </size>
            </property>
            <property name="currentText">
-            <string>Z</string>
+            <string>X</string>
            </property>
            <item>
             <property name="text">
@@ -249,7 +217,7 @@
             </size>
            </property>
            <property name="currentText">
-            <string>C</string>
+            <string>X</string>
            </property>
            <item>
             <property name="text">
@@ -303,45 +271,25 @@
           </widget>
          </item>
         </layout>
-       </widget>
-       <widget class="QDialogButtonBox" name="pattern0ButtonBox">
-        <property name="geometry">
-         <rect>
-          <x>450</x>
-          <y>340</y>
-          <width>166</width>
-          <height>25</height>
-         </rect>
-        </property>
-        <property name="standardButtons">
-         <set>QDialogButtonBox::Apply|QDialogButtonBox::Cancel</set>
-        </property>
-        <property name="applyText" stdset="0">
-         <string>Validate</string>
-        </property>
-       </widget>
-      </widget>
-      <widget class="QWidget" name="page_2">
-       <property name="geometry">
-        <rect>
-         <x>0</x>
-         <y>0</y>
-         <width>629</width>
-         <height>405</height>
-        </rect>
-       </property>
-       <attribute name="label">
-        <string>Image group 2</string>
-       </attribute>
-       <widget class="QWidget" name="formLayoutWidget_3">
-        <property name="geometry">
-         <rect>
-          <x>0</x>
-          <y>0</y>
-          <width>629</width>
-          <height>197</height>
-         </rect>
-        </property>
+       </item>
+       <item>
+        <widget class="QDialogButtonBox" name="pattern0ButtonBox">
+         <property name="standardButtons">
+          <set>QDialogButtonBox::Apply|QDialogButtonBox::Cancel</set>
+         </property>
+         <property name="applyText" stdset="0">
+          <string>Validate</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="page_2">
+      <attribute name="label">
+       <string>Image group 2</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="verticalLayout_2">
+       <item>
         <layout class="QGridLayout" name="gridLayout_2">
          <item row="1" column="1">
           <widget class="QLabel" name="pattern1_0">
@@ -608,40 +556,28 @@
           </widget>
          </item>
         </layout>
-       </widget>
-       <widget class="QDialogButtonBox" name="pattern1ButtonBox">
-        <property name="geometry">
-         <rect>
-          <x>440</x>
-          <y>320</y>
-          <width>166</width>
-          <height>25</height>
-         </rect>
-        </property>
-        <property name="standardButtons">
-         <set>QDialogButtonBox::Apply|QDialogButtonBox::Cancel</set>
-        </property>
-        <property name="applyText" stdset="0">
-         <string>Validate</string>
-        </property>
-       </widget>
-      </widget>
-      <widget class="QWidget" name="page_3">
-       <property name="enabled">
-        <bool>false</bool>
-       </property>
-       <attribute name="label">
-        <string>Image group 3</string>
-       </attribute>
-       <widget class="QWidget" name="">
-        <property name="geometry">
-         <rect>
-          <x>0</x>
-          <y>0</y>
-          <width>629</width>
-          <height>197</height>
-         </rect>
-        </property>
+       </item>
+       <item>
+        <widget class="QDialogButtonBox" name="pattern1ButtonBox">
+         <property name="standardButtons">
+          <set>QDialogButtonBox::Apply|QDialogButtonBox::Cancel</set>
+         </property>
+         <property name="applyText" stdset="0">
+          <string>Validate</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="page_3">
+      <property name="enabled">
+       <bool>false</bool>
+      </property>
+      <attribute name="label">
+       <string>Image group 3</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="verticalLayout_4">
+       <item>
         <layout class="QGridLayout" name="gridLayout_3">
          <item row="1" column="1">
           <widget class="QLabel" name="pattern2_0">
@@ -908,61 +844,39 @@
           </widget>
          </item>
         </layout>
-       </widget>
-       <widget class="QDialogButtonBox" name="pattern2ButtonBox">
-        <property name="geometry">
-         <rect>
-          <x>440</x>
-          <y>280</y>
-          <width>166</width>
-          <height>25</height>
-         </rect>
-        </property>
-        <property name="standardButtons">
-         <set>QDialogButtonBox::Apply|QDialogButtonBox::Cancel</set>
-        </property>
-        <property name="applyText" stdset="0">
-         <string>Validate</string>
-        </property>
-       </widget>
-      </widget>
+       </item>
+       <item>
+        <widget class="QDialogButtonBox" name="pattern2ButtonBox">
+         <property name="standardButtons">
+          <set>QDialogButtonBox::Apply|QDialogButtonBox::Cancel</set>
+         </property>
+         <property name="applyText" stdset="0">
+          <string>Validate</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
      </widget>
-    </item>
-    <item>
-     <widget class="QDialogButtonBox" name="mainButtonBox">
-      <property name="orientation">
-       <enum>Qt::Horizontal</enum>
-      </property>
-      <property name="standardButtons">
-       <set>QDialogButtonBox::Apply|QDialogButtonBox::Cancel</set>
-      </property>
-     </widget>
-    </item>
-   </layout>
-  </widget>
+    </widget>
+   </item>
+   <item>
+    <widget class="QDialogButtonBox" name="mainButtonBox">
+     <property name="orientation">
+      <enum>Qt::Horizontal</enum>
+     </property>
+     <property name="standardButtons">
+      <set>QDialogButtonBox::Apply|QDialogButtonBox::Cancel</set>
+     </property>
+    </widget>
+   </item>
+  </layout>
  </widget>
  <resources/>
  <connections>
   <connection>
    <sender>mainButtonBox</sender>
-   <signal>accepted()</signal>
-   <receiver>Dialog</receiver>
-   <slot>accept()</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>248</x>
-     <y>254</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>157</x>
-     <y>274</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
-   <sender>mainButtonBox</sender>
    <signal>rejected()</signal>
-   <receiver>Dialog</receiver>
+   <receiver>PatternWizard</receiver>
    <slot>reject()</slot>
    <hints>
     <hint type="sourcelabel">
@@ -971,6 +885,22 @@
     </hint>
     <hint type="destinationlabel">
      <x>286</x>
+     <y>274</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>mainButtonBox</sender>
+   <signal>accepted()</signal>
+   <receiver>PatternWizard</receiver>
+   <slot>accept()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>248</x>
+     <y>254</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>157</x>
      <y>274</y>
     </hint>
    </hints>
