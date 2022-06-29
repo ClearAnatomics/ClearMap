@@ -477,6 +477,7 @@ class DataViewer(pg.QtGui.QWidget):
       self.updateImage()
       if hasattr(self, 'scatter_coords'):
         self.scatter.clear()
+        self.scatter_coords.axis = ax
         if self.scatter_coords.colours is not None:
           colours = self.scatter_coords.get_colours(index)
           symbols = self.scatter_coords.get_symbols(index)
@@ -490,7 +491,7 @@ class DataViewer(pg.QtGui.QWidget):
                                symbol='+', size=10)
         # FIXME: check why some markers trigger errors
         try:
-          if self.scatter_coords.half_z_size is not None:
+          if self.scatter_coords.half_slice_thickness is not None:
             self.scatter.addPoints(symbol='o', brush=pg.mkBrush((0, 0, 0, 0)),
                                    **self.scatter_coords.get_all_data(index))
         except KeyError as err:

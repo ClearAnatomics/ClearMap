@@ -324,11 +324,12 @@ class PbarWatcher(QWidget):  # Inspired from https://stackoverflow.com/a/6626606
 
 
 class Scatter3D:
-    def __init__(self, coordinates, smarties=False, colors=None, hemispheres=None, half_z_size=None):
+    def __init__(self, coordinates, smarties=False, colors=None, hemispheres=None, half_slice_thickness=None):
         self.default_symbol = '+'
         self.alternate_symbol = 'p'
-        self.half_z_size = half_z_size
+        self.half_slice_thickness = half_slice_thickness
         self.coordinates = coordinates
+        self.axis = 2
         if smarties and colors is None:
             n_samples = self.coordinates.shape[0]
             self.colours = (pseudo_random_rgb_array(n_samples) * 255).astype(np.int)
@@ -342,7 +343,7 @@ class Scatter3D:
             self.symbols[self.hemispheres == 255] = self.alternate_symbol
             self.symbols = self.symbols.decode()
 
-    def get_all_data(self, main_z, half_z_size=3):
+    def get_all_data(self, main_slice_idx, half_slice_thickness=3):
         pos = np.empty((0, 2))
         if self.colours is not None:
             if self.colours.ndim == 1:
@@ -350,41 +351,41 @@ class Scatter3D:
             else:
                 colours = np.empty((0, self.colours.shape[1]))
         sizes = np.empty(0)
-        if self.half_z_size is not None:
-            half_z_size = self.half_z_size
-        for i in range(main_z - half_z_size, main_z + half_z_size):
+        if self.half_slice_thickness is not None:
+            half_slice_thickness = self.half_slice_thickness
+        for i in range(main_slice_idx - half_slice_thickness, main_slice_idx + half_slice_thickness):
             if i < 0:
                 continue
             else:
-                z = i
-            pos = np.vstack((pos, self.get_pos(z)))
+                current_slice = i
+            pos = np.vstack((pos, self.get_pos(current_slice)))
             if self.colours is not None:
-                current_z_colors = self.get_colours(z)
+                current_z_colors = self.get_colours(current_slice)
                 colours = np.hstack((colours, current_z_colors))
-            sizes = np.hstack((sizes, self.get_symbol_sizes(main_z, z)))
+            sizes = np.hstack((sizes, self.get_symbol_sizes(main_slice_idx, current_slice)))
         data = {'pos': pos,
                 'size': sizes}
         if self.colours is not None:
             data['pen'] = [pg.mkPen(c) for c in colours]
         return data
 
-    def get_symbol_sizes(self, main_z, z, half_size=3):
-        marker_size = round(10 * ((half_size - abs(main_z - z)) / half_size))
-        n_markers = len(self.get_pos(z))
+    def get_symbol_sizes(self, main_slice_idx, slice_idx, half_size=3):
+        marker_size = round(10 * ((half_size - abs(main_slice_idx - slice_idx)) / half_size))
+        n_markers = len(self.get_pos(slice_idx))
         return np.full(n_markers, marker_size)
 
-    def get_colours(self, z):
-        return self.colours[self.current_slice_indices(z)]
+    def get_colours(self, current_slice):
+        return self.colours[self.current_slice_indices(current_slice)]
 
-    def current_slice_indices(self, z):
-        return self.coordinates[:, 2] == z
+    def current_slice_indices(self, current_slice):
+        return self.coordinates[:, self.axis] == current_slice
 
-    def get_pos(self, z):
-        return self.coordinates[self.current_slice_indices(z)][:, :2]
+    def get_pos(self, current_slice):
+        return self.coordinates[self.current_slice_indices(current_slice)][:, :2]
 
-    def get_symbols(self, z):
+    def get_symbols(self, current_slice):
         if self.hemispheres is not None:
-            return self.symbols[self.current_slice_indices(z)]
+            return self.symbols[self.current_slice_indices(current_slice)]
         else:
             return self.default_symbol
 
