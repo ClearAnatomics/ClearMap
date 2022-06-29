@@ -405,7 +405,7 @@ class CellDetector(TabProcessor):
             hemispheres = df['hemisphere']
         else:
             hemispheres = None
-        dv.scatter_coords = Scatter3D(coordinates, colors=colors, hemispheres=hemispheres, half_z_size=0)
+        dv.scatter_coords = Scatter3D(coordinates, colors=colors, hemispheres=hemispheres, half_slice_thickness=0)
         dv.updateSlice()  # WARNING: does not work
 
         return [dv]
