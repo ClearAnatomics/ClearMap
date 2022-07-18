@@ -121,6 +121,8 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
 
     def set_font_size(self, target_font_size=DISPLAY_CONFIG[CURRENT_RES]['font_size']):
         font_sizes = self.__get_font_sizes()
+        if len(font_sizes) > 4:  # WARNING: Hacky
+            font_sizes = font_sizes[:4]
         small, regular, big, huge = font_sizes
         if target_font_size == regular:
             return
