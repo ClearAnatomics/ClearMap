@@ -169,12 +169,18 @@ class AlignmentParams(UiParameterCollection):
 
 
 class SampleParameters(UiParameter):
+
+    def __init__(self, tab, src_folder=None):
+        super().__init__(tab, src_folder=src_folder)
+        if self.sample_id:
+            self.handle_sample_id_changed(self.sample_id)
+
     @property
     def config(self):
         return self._config
 
     def connect(self):
-        self.tab.sampleIdTxt.textChanged.connect(self.handle_sample_id_changed)
+        self.tab.sampleIdTxt.editingFinished.connect(self.handle_sample_id_changed)
 
         self.tab.sliceXDoublet.valueChangedConnect(self.handle_slice_x_changed)
         self.tab.sliceYDoublet.valueChangedConnect(self.handle_slice_y_changed)
@@ -235,6 +241,7 @@ class SampleParameters(UiParameter):
     def handle_sample_id_changed(self, _id):
         if self.config is not None:
             self.config['sample_id'] = self.sample_id
+            self.ui_to_cfg()   # FIXME: check
 
     @property
     def raw_path(self):
