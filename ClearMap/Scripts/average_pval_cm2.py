@@ -89,8 +89,12 @@ def transpose_p_vals(new_orientation, p_sign, p_vals2):  # FIXME: check cm_rsp.s
 
 
 def group_cells_counts(struct_ids, group_cells_dfs, sample_ids):
+    all_ints = False
     atlas = clearmap_io.read(annotation.default_annotation_file)
-    output = pd.DataFrame(columns=['id', 'hemisphere'] + [f'counts_{i}' for i in range(len(group_cells_dfs))])
+    if all_ints:
+        output = pd.DataFrame(columns=['id', 'hemisphere'] + [f'counts_{str(sample_ids[i]).zfill(2)}' for i in range(len(group_cells_dfs))])
+    else:
+        output = pd.DataFrame(columns=['id', 'hemisphere'] + [f'counts_{sample_ids[i]}' for i in range(len(group_cells_dfs))])
 
     output['id'] = np.tile(struct_ids, 2)  # for each hemisphere
     output['name'] = np.tile([annotation.find(_id, key='id')['name'] for _id in struct_ids], 2)
@@ -99,7 +103,11 @@ def group_cells_counts(struct_ids, group_cells_dfs, sample_ids):
 
     for multiplier, hem_id in zip((1, 2), (0, 255)):
         for j, sample_df in enumerate(group_cells_dfs):
-            col_name = f'counts_{sample_ids[j]}'  # TODO: option with f'counts_{j}'
+            if all_ints:
+                col_name = f'counts_{str(sample_ids[j]).zfill(2)}'  # TODO: option with f'counts_{j}'
+            else:
+                col_name = f'counts_{sample_ids[j]}'
+
             hem_sample_df = sample_df[sample_df['hemisphere'] == hem_id]
             for i, struct_id in enumerate(struct_ids):
                 output.at[i*multiplier, col_name] = len(hem_sample_df[hem_sample_df['id'] == struct_id])  # FIXME: slow
