@@ -392,7 +392,7 @@ class CellDetector(TabProcessor):
 
     def plot_cells_3d_scatter_w_atlas_colors(self, parent=None):
         if self.preprocessor.was_registered:  # REFACTORING: could extract
-            dv = qplot_3d.plot(clearmap_io.source(annotation.default_reference_file),  # FIXME: check that default is updated
+            dv = qplot_3d.plot(clearmap_io.source(self.preprocessor.reference_file_path),
                                arange=False, lut='white', parent=parent)[0]
         else:
             dv = qplot_3d.plot(self.workspace.filename('resampled'),
