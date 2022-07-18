@@ -410,10 +410,16 @@ class CellCounterTab(PostProcessingTab):
         self.ui.runCellDetectionPlotButtonBox.connectApply(self.plot_detection_results)
         self.ui.previewCellFiltersButtonBox.connectApply(self.preview_cell_filter)
 
+        self.ui.cellMapVoxelizeButtonBox.connectApply(self.voxelize)
+
         self.ui.runCellMapButtonBox.connectApply(self.run_cell_map)
         self.ui.runCellMapPlotButtonBox.connectApply(self.plot_cell_map_results)
 
         self.ui.runCellMapPlot3DScatterButtonBox.connectApply(self.plot_cells_scatter_w_atlas_colors)
+
+    def voxelize(self):
+        self.params.ui_to_cfg()
+        self.cell_detector.voxelize()
 
     def set_progress_watcher(self, watcher):
         if self.cell_detector is not None and self.cell_detector.preprocessor is not None:  # If initialised

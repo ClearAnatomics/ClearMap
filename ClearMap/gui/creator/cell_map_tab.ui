@@ -555,6 +555,16 @@
            </layout>
           </widget>
          </item>
+         <item row="1" column="1">
+          <widget class="QDialogButtonBox" name="cellMapVoxelizeButtonBox">
+           <property name="standardButtons">
+            <set>QDialogButtonBox::Apply</set>
+           </property>
+           <property name="applyText" stdset="0">
+            <string>Run</string>
+           </property>
+          </widget>
+         </item>
         </layout>
        </widget>
        <widget class="QWidget" name="page_7">
