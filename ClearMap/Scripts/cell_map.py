@@ -166,10 +166,17 @@ class CellDetector(TabProcessor):
     #     voxelization.voxelize(coordinates, sink=counts_file_path, radius=(2, 2, 2), shape=shape)
     #     self.workspace.debug = False
 
-    def get_coords(self, coord_type='filtered', aligned=False):  # FIXME: work with feather
-        if coord_type not in ('filtered', 'raw'):
+    def get_coords(self, coord_type='filtered', aligned=False):
+        if coord_type not in ('filtered', 'raw', None):
             raise ValueError(f'Coordinate type "{coord_type}" not recognised')
-        table = np.load(self.workspace.filename('cells', postfix=coord_type))
+        if coord_type is None:
+            dataframe_path = self.workspace.filename('cells').replace('.npy', '.feather')  # TODO: add to workspace
+            if os.path.exists(dataframe_path):
+                table = pd.read_feather(dataframe_path)
+            else:
+                table = np.load(self.workspace.filename('cells')).T
+        else:
+            table = np.load(self.workspace.filename('cells', postfix=coord_type))
         if aligned:
             coordinates = np.array([table[axis] for axis in ['xt', 'yt', 'zt']]).T
         else:
