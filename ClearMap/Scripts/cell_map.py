@@ -375,7 +375,7 @@ class CellDetector(TabProcessor):
 
         collapsed = collapsed.sort_values(by='Structure ID')
 
-        csv_file_path = self.workspace.filename('cells', postfix='_stats', extension='csv')
+        csv_file_path = self.workspace.filename('cells', postfix='stats', extension='csv')
         collapsed.to_csv(csv_file_path, index=False)
 
     def plot_cells(self):
