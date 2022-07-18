@@ -96,7 +96,7 @@
          <property name="standardButtons">
           <set>QDialogButtonBox::Apply</set>
          </property>
-         <property name="applyString" stdset="0">
+         <property name="applyText" stdset="0">
           <string>Run</string>
          </property>
         </widget>
@@ -156,7 +156,7 @@
          <property name="standardButtons">
           <set>QDialogButtonBox::Apply</set>
          </property>
-         <property name="applyString" stdset="0">
+         <property name="applyText" stdset="0">
           <string>Run</string>
          </property>
         </widget>
