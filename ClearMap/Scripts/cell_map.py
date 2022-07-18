@@ -119,7 +119,7 @@ class CellDetector(TabProcessor):
         self.atlas_align()
         # self.export_as_csv()
         self.export_collapsed_stats()
-        self.export_to_clearmap1_fmt()
+        #self.export_to_clearmap1_fmt()
         self.voxelize()
 
     def voxelize(self, postfix=''):
