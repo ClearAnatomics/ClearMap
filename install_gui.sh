@@ -27,6 +27,10 @@ python -m ClearMap.config.update_config
 
 # CONFIG
 clearmap_install_path=$(python -c 'from ClearMap.config.update_config import CLEARMAP_DIR; print(CLEARMAP_DIR)')
+if [ "$clearmap_install_path" == "" ];then
+    echo "ERROR: could not get ClearMap install path"
+    exit 1
+fi
 echo "ClearMap installed at \"$clearmap_install_path\""
 
 menu_entry="[Desktop Entry]
@@ -52,7 +56,10 @@ echo "wrote $desktop_file"
 #$menu_entry"
 
 conda shell.bash hook >> "$clearmap_install_path/conda_init.sh"
+chmod u+x "$clearmap_install_path/conda_init.sh"
+chmod u+x "$clearmap_install_path/start_gui.sh"
 
+chmod u+x "$clearmap_install_path/ClearMap/External/elastix/build/bin/*"
 
 echo "
 ClearMapUi installed
