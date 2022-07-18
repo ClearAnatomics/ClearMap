@@ -500,8 +500,6 @@ class ClearMapGui(ClearMapGuiBase):
             cfg_name = title_to_snake(tab.name)
             try:
                 was_copied, cfg_path = self.__get_cfg_path(cfg_name)
-                if was_copied:
-                    tab.params.fix_cfg_file(cfg_path)
 
                 if tab.processing_type is None or tab.processing_type == 'batch':
                     tab.set_params()
@@ -514,6 +512,8 @@ class ClearMapGui(ClearMapGuiBase):
                     raise ValueError('Processing type should be one of "pre", "post", "batch" or None, got "{}"'
                                      .format(tab.processing_type))
                 tab.params.get_config(cfg_path)
+                if was_copied:
+                    tab.params.fix_cfg_file(cfg_path)  # FIXME: see if this should be moved
                 tab.load_params()
                 tab.setup_workers()
             except ConfigNotFoundError:
