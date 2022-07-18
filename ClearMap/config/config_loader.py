@@ -52,7 +52,7 @@ tabs_alternatives = [
 ]
 
 alternative_names = tabs_alternatives + [{'machine'}, {'display'}]
-CONFIG_NAMES = tuple(list(alt)[0] for alt in alternative_names)
+CONFIG_NAMES = ('sample', 'alignment', 'cell_map', 'vasculature', 'batch', 'machine', 'display')  # To get prefered alternative
 
 
 def get_alternatives(cfg_name):
@@ -120,7 +120,7 @@ class ConfigLoader(object):
                 if os.path.exists(cfg_path):
                     return cfg_path
         if not must_exist:  # If none found but not necessary, return the first possible option
-            return clean_path(os.path.join(self.src_dir, f'{cfg_name}{self.supported_exts[0]}'))
+            return clean_path(os.path.join(self.src_dir, f'{cfg_name}_params{self.supported_exts[0]}'))
         raise FileNotFoundError(f'Could not find file {cfg_name} in {self.src_dir} with variants {variants}')
 
     def get_cfg(self, cfg_name):
@@ -162,7 +162,9 @@ class ConfigLoader(object):
         return cfg_path
 
 
-def get_configs(cfg_path, processing_params_path, machine_cfg_path=ConfigLoader.get_default_path('machine')):
+def get_configs(cfg_path, processing_params_path, machine_cfg_path=None):
+    if machine_cfg_path is None:
+        machine_cfg_path = ConfigLoader.get_default_path('machine')
     sample_config = ConfigLoader.get_cfg_from_path(cfg_path)
     processing_config = ConfigLoader.get_cfg_from_path(processing_params_path)
     machine_config = ConfigLoader.get_cfg_from_path(machine_cfg_path)
