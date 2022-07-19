@@ -5,7 +5,7 @@ from PyQt5.QtWidgets import QDialogButtonBox
 
 from ClearMap.IO import IO as clearmap_io
 from ClearMap.IO.MHD import mhd_read
-from ClearMap.Scripts.average_pval_cm2 import compare_groups, make_summary
+from ClearMap.Scripts.average_pval_cm2 import compare_groups, make_summary, density_files_are_comparable
 from ClearMap.Scripts.batch_process import process_folders
 from ClearMap.Scripts.cell_map import CellDetector
 from ClearMap.Scripts.sample_preparation import PreProcessor
@@ -666,7 +666,7 @@ class VasculatureTab(PostProcessingTab):
 
 
 class BatchTab(GenericTab):
-    def __init__(self, main_window, tab_idx=4):
+    def __init__(self, main_window, tab_idx=4):  # FIXME: offload computations to BatchProcessor object
         super().__init__(main_window, 'Batch', tab_idx, 'batch_tab')
 
         self.params = None
@@ -698,12 +698,14 @@ class BatchTab(GenericTab):
         self.main_window.print_status_msg('Computing stats table')
         dvs = []
         groups = self.params.groups
+        self.main_window.make_nested_progress_dialog(title='Group stats',
+                                                     n_steps=len(self.params.selected_comparisons))  # TODO: see abort callback
         for pair in self.params.selected_comparisons:
             gp1_name, gp2_name = pair
-            # FIXME: wrap_in_thread
-            df = make_summary(self.params.results_folder,  # FIXME: Progress bar
-                              gp1_name, gp2_name, groups[gp1_name], groups[gp2_name],
-                              output_path=None, save=True)
+            df = self.main_window.wrap_in_thread(make_summary, self.params.results_folder,
+                                                 gp1_name, gp2_name, groups[gp1_name], groups[gp2_name],
+                                                 output_path=None, save=True)
+            self.main_window.progress_watcher.increment_main_progress()
             dvs.append(DataFrameWidget(df).table)
         self.main_window.setup_plots(dvs)
         self.main_window.print_status_msg('Idle, waiting for input')
@@ -712,21 +714,37 @@ class BatchTab(GenericTab):
         self.params.ui_to_cfg()
         groups = self.params.groups
         p_vals_imgs = []
+        self.main_window.print_status_msg('Computing p_val maps')
+        self.main_window.make_nested_progress_dialog(title='P value maps',
+                                                     n_steps=len(self.params.selected_comparisons))  # TODO: see abort callback
         for pair in self.params.selected_comparisons:
             gp1_name, gp2_name = pair
-            p_vals_imgs.append(compare_groups(self.params.results_folder, gp1_name, gp2_name,
-                                              groups[gp1_name], groups[gp2_name]))
-        if len(self.params.selected_comparisons) == 1:
-            gp1_img = clearmap_io.read(os.path.join(self.params.results_folder, f'condensed_{gp1_name}.tif'))
-            gp2_img = clearmap_io.read(os.path.join(self.params.results_folder, f'condensed_{gp2_name}.tif'))
-            dvs = plot_3d.plot([gp1_img, gp2_img, p_vals_imgs[0]])
-        else:
-            dvs = plot_3d.plot(p_vals_imgs, arange=False, sync=True,
-                               lut=self.main_window.preference_editor.params.lut,
-                               parent=self.main_window.centralWidget())
-            link_dataviewers_cursors(dvs)
-        self.main_window.setup_plots(dvs)
+            if not density_files_are_comparable(self.params.results_folder, groups[gp1_name], groups[gp2_name]):
+                self.main_window.popup('Could not compare files, sizes differ', base_msg='Cannot compare files')
+            res = self.main_window.wrap_in_thread(compare_groups, self.params.results_folder,
+                                                  gp1_name, gp2_name, groups[gp1_name], groups[gp2_name])
+            self.main_window.progress_watcher.increment_main_progress()
+            p_vals_imgs.append(res)
+
+        self.main_window.progress_dialog.done(1)
+        # self.main_window.print_status_msg('P vals computed')
+        self.main_window.print_status_msg('Idle, waiting for input')
+
+        return  # FIXME: add support for RGB images in DataViewer
+        # if len(self.params.selected_comparisons) == 1:
+        #     gp1_img = clearmap_io.read(os.path.join(self.params.results_folder, f'condensed_{gp1_name}.tif'))
+        #     gp2_img = clearmap_io.read(os.path.join(self.params.results_folder, f'condensed_{gp2_name}.tif'))
+        #     dvs = plot_3d.plot([gp1_img, gp2_img, p_vals_imgs[0]])
+        # else:
+        #     dvs = plot_3d.plot(p_vals_imgs, arange=False, sync=True,
+        #                        lut=self.main_window.preference_editor.params.lut,
+        #                        parent=self.main_window.centralWidget())
+        #     link_dataviewers_cursors(dvs)
+        # self.main_window.setup_plots(dvs)
 
     def run_batch_process(self):
         self.params.ui_to_cfg()
-        self.main_window.wrap_in_thread(process_folders, self.params.self.get_all_paths())  # TODO: graphical progress
+        paths = self.params.self.get_all_paths()
+        self.main_window.make_progress_dialog('Analysing samples', n_steps=len(paths), maximum=0)  # TODO: see abort callback
+        self.main_window.wrap_in_thread(process_folders, paths)  # TODO: pass bar to increment
+        self.main_window.progress_dialog.done(1)
