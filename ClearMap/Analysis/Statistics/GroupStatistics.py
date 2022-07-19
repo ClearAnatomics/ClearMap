@@ -149,7 +149,7 @@ def color_p_values(p_vals, p_sign, positive_color=[1, 0], negative_color=[0, 1],
 
         # color
         for sign, col in ((1, positive_color), (-1, negative_color)):
-            ids = sign * p_sign > 0  # positive of inverse for negative
+            ids = sign * (p_sign > 0)  # positive of inverse for negative
             p_vals_i = p_vals_inv[ids]
             for i in range(len(col)):
                 colored_p_vals[ids, i] = p_vals_i * col[i]
