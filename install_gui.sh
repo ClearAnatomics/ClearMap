@@ -61,10 +61,13 @@ chmod u+x "$clearmap_install_path/start_gui.sh"
 
 chmod u+x "$clearmap_install_path/ClearMap/External/elastix/build/bin/*"
 
+conda env config vars set "LD_LIBRARY_PATH=$clearmap_install_path/ClearMap/External/elastix/build/bin/:$LD_LIBRARY_PATH"
+
 echo "
 ClearMapUi installed
 To use it, open a terminal and run:
     clear_map_ui
-Alternatively, add a menu entry for the file 'start_gui.sh'"
+Alternatively, use the start menu menu_entry
+"
 
 conda deactivate
