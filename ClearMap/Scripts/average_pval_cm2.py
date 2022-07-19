@@ -212,6 +212,14 @@ def make_summary(directory, gp1_name, gp2_name, gp1_dirs, gp2_dirs, output_path=
     return total_df
 
 
+def density_files_are_comparable(directory, gp1_dirs, gp2_dirs):
+    gp1_f_list = dirs_to_density_files(directory, gp1_dirs)
+    gp2_f_list = dirs_to_density_files(directory, gp2_dirs)
+    all_files = gp1_f_list + gp2_f_list
+    sizes = [os.path.getsize(f) for f in all_files]
+    return all(s == sizes[0] for s in sizes)
+
+
 def compare_groups(directory, gp1_name, gp2_name, gp1_dirs, gp2_dirs, prefix='p_val_colors'):
     make_summary(directory, gp1_name, gp2_name, gp1_dirs, gp2_dirs)
 
