@@ -169,25 +169,26 @@ class LUT(pg.QtGui.QWidget):
 
 class DataViewer(pg.QtGui.QWidget):
     def __init__(self, source, axis=None, scale=None, title=None, invertY=False,
-                 minMax=None, screen=None, parent=None, default_lut='flame', *args):
+                 minMax=None, screen=None, parent=None, default_lut='flame', original_orientation='zcxy', *args):
+
+        pg.QtGui.QWidget.__init__(self, parent, *args)
+        # super().__init__(self, parent, *args)
 
         # ## Images sources
         self.sources = []
+        self.original_orientation = original_orientation
         self.n_sources = 0
+        self.scroll_axis = None
         self.source_shape = None
-        self.source_shape2 = None
-        self.source_axis = None
-        self.source_index = None
-        self.source_scale = None
+        self.source_scale = None  # xyz scaling factors between display and real coordinates
+        self.source_index = None  # The xyz center of the current view
         self.source_range_x = None
         self.source_range_y = None
-        self.source_slice = None  # current slice
+        self.source_slice = None  # current slice (in scroll axis)
 
         self.initializeSources(source, axis=axis, scale=scale)
 
         # ## Gui Construction
-        pg.QtGui.QWidget.__init__(self, parent, *args)
-
         if title is None:
             if isinstance(source, str):
                 title = source
@@ -222,7 +223,14 @@ class DataViewer(pg.QtGui.QWidget):
 
         # Image plots
         image_options = dict(clipToView=True, autoDownsample=True, autoLevels=False, useOpenGL=None)
-        self.image_items = [pg.ImageItem(s[self.source_slice[:s.ndim]], **image_options) for s in self.sources]
+        if self.all_colour:
+            self.image_items = []
+            for s in self.sources:
+                slc = self.source_slice[:s.ndim]
+                layer = self.color_last(s.array[slc])
+                self.image_items.append(pg.ImageItem(layer, **image_options))
+        else:
+            self.image_items = [pg.ImageItem(s[self.source_slice[:s.ndim]], **image_options) for s in self.sources]
         for itm in self.image_items:
             itm.setRect(pg.QtCore.QRect(0, 0, self.source_range_x, self.source_range_y))
             itm.setCompositionMode(pg.QtGui.QPainter.CompositionMode_Plus)
@@ -251,25 +259,16 @@ class DataViewer(pg.QtGui.QWidget):
         self.sliceLine.sigPositionChanged.connect(self.updateSlice)
 
         # Axis Tools
-        axis_tools_layout = pg.QtGui.QGridLayout()
         self.axis_buttons = []
-        axes_names = ['x', 'y', 'z']
-        for d in range(3):
-            button = pg.QtGui.QRadioButton(axes_names[d])
-            button.setMaximumWidth(50)
-            axis_tools_layout.addWidget(button, 0, d)
-            button.clicked.connect(ft.partial(self.setSliceAxis, d))
-            self.axis_buttons.append(button)
-        self.axis_buttons[self.source_axis].setChecked(True)
-        axis_tools_widget = pg.QtGui.QWidget()
-        axis_tools_widget.setLayout(axis_tools_layout)
+        axis_tools_layout, axis_tools_widget = self.__setup_axes_controls()
 
         # coordinate label
-        self.source_pointer = [0, 0, 0]
+        self.source_pointer = np.zeros(self.sources[0].ndim, dtype=np.int_)
         self.source_label = pg.QtGui.QLabel("")
         axis_tools_layout.addWidget(self.source_label, 0, 3)
 
         self.graphicsView.scene().sigMouseMoved.connect(self.updateLabelFromMouseMove)
+        self.graphicsView.scene().sigMouseClicked.connect(self.handleMouseClick)
 
         # compose the image viewer
         image_splitter.addWidget(self.graphicsView)
@@ -309,6 +308,19 @@ class DataViewer(pg.QtGui.QWidget):
 
         self.show()
 
+    def __setup_axes_controls(self):
+        axis_tools_layout = pg.QtGui.QGridLayout()
+        for d, ax in enumerate('xyz'):
+            button = pg.QtGui.QRadioButton(ax)
+            button.setMaximumWidth(50)
+            axis_tools_layout.addWidget(button, 0, d)
+            button.clicked.connect(ft.partial(self.setSliceAxis, d))
+            self.axis_buttons.append(button)
+        self.axis_buttons[self.space_axes.index(self.scroll_axis)].setChecked(True)
+        axis_tools_widget = pg.QtGui.QWidget()
+        axis_tools_widget.setLayout(axis_tools_layout)
+        return axis_tools_layout, axis_tools_widget
+
     def initializeSources(self, source, scale=None, axis=None, update=True):
         # initialize sources and axis settings
         if isinstance(source, tuple):
@@ -322,31 +334,44 @@ class DataViewer(pg.QtGui.QWidget):
         # self.__ensure_3d()
 
         # source shapes
-        self.source_shape = self.shape3d(self.sources[0].shape)
+        self.source_shape = self.padded_shape(self.sources[0].shape)
         for s in self.sources:
-            if s.ndim > 3:
-                raise RuntimeError('Source has %d > 3 dimensions: %r!' % (s.ndim, s))
-            if self.shape3d(s.shape) != self.source_shape:
-                raise RuntimeError('Sources shape %r vs %r in source %r!' % (self.source_shape, s.shape, s))
-
-        self.source_shape2 = np.array(np.array(self.source_shape, dtype=float)/2, dtype=int)
+            if s.ndim > 4:
+                raise RuntimeError(f'Source has {s.ndim} > 4 dimensions: {s}!')
+            if s.shape != self.source_shape:
+                raise RuntimeError(f'Sources shape {self.source_shape} vs {s.shape} in source {s}!')
 
         # slicing
-        if axis is None:
-            axis = 2
-        self.source_axis = axis
-        self.source_index = self.source_shape2
+        self.scroll_axis = axis if axis is not None else (self.sources[0].ndim - 1)
+        self.source_index = (np.array(self.source_shape, dtype=float) / 2).astype(np.int)
 
         # scaling
-        if scale is None:
-            scale = np.ones(3)
-        else:
-            scale = np.array(scale)
-        scale = np.hstack([scale, [1]*3])[:3]
-        self.source_scale = scale
+        scale = np.array(scale) if scale is not None else np.array([])
+        self.source_scale = np.pad(scale, (0, self.sources[0].ndim - len(scale)), 'constant', constant_values=1)
 
         self.updateSourceRange()
         self.updateSourceSlice()
+
+    def color_last(self, source):
+        shape = np.array(source.shape)
+        c_idx = np.where(shape == 3)[0]
+        indices = np.delete(np.arange(source.ndim), c_idx[0])
+        indices = np.hstack((indices, c_idx))
+        return source.transpose(indices)
+
+    def is_color(self, source):
+        return source.ndim > 3 and 3 in source.shape
+
+    @property
+    def color_axis(self):
+        try:
+            return self.source_shape.index(3)
+        except ValueError:
+            return None
+
+    @property
+    def all_colour(self):
+        return all([self.is_color(s) for s in self.sources])
 
     def setSource(self, source, index='all'):
         """initialize sources and axis settings"""
@@ -366,21 +391,24 @@ class DataViewer(pg.QtGui.QWidget):
             source = s
             index = [index]
 
+        # self.__cast_bools()
         for i in index:
             s = source[i]
             if s.shape != self.source_shape:
                 raise RuntimeError('Shape of sources does not match!')
-            # if s.dtype == bool:
-            #  self.sources[i] = s.view('uint8');
             if s.ndim == 2:
                 s.shape = s.shape + (1,)
-            if s.ndim != 3:
-                raise RuntimeError('Sources dont have dimensions 2 or 3 but %d in source %d!' % (s.ndim, i))
-            self.image_items[i].updateImage(s[self.source_slice[:s.ndims]])
+            if s.ndim != 4:  # FIXME: handle RGB
+                raise RuntimeError(f'Sources dont have dimensions 2, 3 or 4 but {s.ndim} in source {i}!')
+            if s.ndim == 4:
+                layer = self.color_last(s.array[self.source_slice[:s.ndim]])
+                self.image_items[i].updateImage(layer)
+            else:
+                self.image_items[i].updateImage(s[self.source_slice[:s.ndim]])
         self.sources = source
 
-    def getXYAxes(self):
-        return [a for a in [0, 1, 2] if a != self.source_axis]
+    def getXYAxes(self):  # FIXME: properties
+        return [ax for ax in range(self.sources[0].ndim) if ax not in (self.scroll_axis, self.color_axis)]
 
     def updateSourceRange(self):
         x, y = self.getXYAxes()
@@ -389,51 +417,74 @@ class DataViewer(pg.QtGui.QWidget):
 
     def updateSourceSlice(self):
         """Set the current slice of the source"""
-        self.source_slice = [slice(None)] * 3
-        self.source_slice[self.source_axis] = self.source_index[self.source_axis]
+        if self.all_colour:
+            self.source_slice = [slice(None)] * 4  # TODO: check if could use self.sources[0].ndim
+        else:
+            self.source_slice = [slice(None)] * 3
+        self.source_slice[self.scroll_axis] = self.source_index[self.scroll_axis]
         self.source_slice = tuple(self.source_slice)
 
     def updateSlicer(self):
-        ax = self.source_axis
+        ax = self.scroll_axis
         self.slicePlot.setXRange(0, self.source_shape[ax])
         self.sliceLine.setValue(self.source_index[ax])
         stop = self.source_shape[ax] + 0.5
         self.sliceLine.setBounds([0, stop])
 
     def updateLabelFromMouseMove(self, event):
+        x, y = self.get_coords(event)
+        self.sync_cursors(x, y)
+
+        x_axis, y_axis = self.getXYAxes()
+        pos = [None] * self.sources[0].ndim
+        scaled_x, scaled_y = self.scale_coords(x, x_axis, y, y_axis)
+        z = self.source_index[self.scroll_axis]
+        pos[x_axis] = scaled_x
+        pos[y_axis] = scaled_y
+        pos[self.scroll_axis] = z
+        self.source_pointer = np.array(pos)
+        self.updateLabel()
+
+    def scale_coords(self, x, x_axis, y, y_axis):
+        scaled_x = min(int(x / self.source_scale[x_axis]), self.source_shape[x_axis] - 1)
+        scaled_y = min(int(y / self.source_scale[y_axis]), self.source_shape[y_axis] - 1)
+        return scaled_x, scaled_y
+
+    def get_coords(self, event):
         mouse_point = self.view.mapSceneToView(event)
         x, y = mouse_point.x(), mouse_point.y()
         x = min(max(0, x), self.source_range_x)
         y = min(max(0, y), self.source_range_y)
-        if hasattr(self, 'cross'):
+        return x, y
+
+    def sync_cursors(self, x, y):
+        if hasattr(self, 'cross'):  # FIXME: extract attribute
             self.cross.set_coords([x, y])
             self.view.update()
-            for pal in self.pals:
+            for pal in self.pals:  # FIXME: extract attribute defaulting to []
                 pal.cross.set_coords([x, y])
                 pal.view.update()
 
-        ax, ay = self.getXYAxes()
-        x = min(int(x/self.source_scale[ax]), self.source_shape[ax]-1)
-        y = min(int(y/self.source_scale[ay]), self.source_shape[ay]-1)
-        z = self.source_index[self.source_axis]
-        pos = [z] * 3
-        pos[ax] = x
-        pos[ay] = y
-        self.source_pointer = pos
-        self.updateLabel()
-
     def updateLabel(self):
-        x, y, z = self.source_pointer
-        xs, ys, zs = self.source_scale
-        vals = ", ".join([str(s[x, y, z]) for s in self.sources])
-        coords = "(%d, %d, %d) {%.2f, %.2f, %.2f} [%s]" % (x, y, z, x * xs, y * ys, z * zs, vals)
-        if self.parent().objectName().lower().startswith('dataviewer'):
-            self.source_label.setText(coords)
+        x_axis, y_axis = self.getXYAxes()
+        x, y, z = self.source_pointer[[x_axis, y_axis, self.scroll_axis]]
+        xs, ys, zs = self.source_scale[[x_axis, y_axis, self.scroll_axis]]
+        slc = [Ellipsis] * max(3, self.sources[0].ndim)
+        slc[x_axis] = x
+        slc[y_axis] = y
+        slc[self.scroll_axis] = z
+        if self.all_colour:
+            vals = ", ".join([str(s.array[slc]) for s in self.sources])
         else:
-            self.source_label.setText("<span style='font-size: 12pt; color: black'>{}</span>".format(coords))
+            vals = ", ".join([str(s[slc]) for s in self.sources])  # FIXME: check why array does not work for grayscale
+        label = f"({x}, {y}, {z}) {{{x*xs:.2f}, {y*ys:.2f}, {z*zs:.2f}}} [{vals}]"
+        if self.parent().objectName().lower().startswith('dataviewer'):
+            self.source_label.setText(label)
+        else:
+            self.source_label.setText(f"<span style='font-size: 12pt; color: black'>{label}</span>")
 
     def updateSlice(self):
-        ax = self.source_axis
+        ax = self.scroll_axis
         index = min(max(0, int(self.sliceLine.value())), self.source_shape[ax]-1)
         if index != self.source_index[ax]:
             self.source_index[ax] = index
@@ -441,6 +492,7 @@ class DataViewer(pg.QtGui.QWidget):
             self.source_pointer[ax] = index
             self.updateLabel()
             self.updateImage()
+            # FIXME: add attribute to __init__ defaulting to None and extract plot function
             if hasattr(self, 'scatter_coords'):
                 self.scatter.clear()
                 self.scatter_coords.axis = ax
@@ -463,31 +515,49 @@ class DataViewer(pg.QtGui.QWidget):
                 except KeyError as err:
                     print(err)
 
+    @property
+    def space_axes(self):
+        color_axis = self.color_axis
+        if color_axis is None:
+            color_axis = -1  # Cannot use None with == testing because of implicit cast
+        return [ax for ax in range(self.sources[0].ndim) if ax != color_axis]
+
     def setSliceAxis(self, axis):
-        self.source_axis = axis
+        self.scroll_axis = self.space_axes[axis]
         self.updateSourceRange()
         self.updateSourceSlice()
 
-        for i, s in zip(self.image_items, self.sources):
-            i.updateImage(s[self.source_slice])
-            i.setRect(pg.QtCore.QRect(0, 0, self.source_range_x, self.source_range_y))
+        for img_itm, src in zip(self.image_items, self.sources):
+            slc = self.source_slice
+            if self.all_colour:
+                layer = src.array[slc]
+                img_itm.updateImage(self.color_last(layer))
+            else:
+                img_itm.updateImage(src[slc])
+            img_itm.setRect(pg.QtCore.QRect(0, 0, self.source_range_x, self.source_range_y))
         self.view.setXRange(0, self.source_range_x)
         self.view.setYRange(0, self.source_range_y)
 
         self.updateSlicer()
 
     def updateImage(self):
-        for i, s in zip(self.image_items, self.sources):
-            image = s[self.source_slice[:s.ndim]]
+        for img_item, src in zip(self.image_items, self.sources):
+            slc = self.source_slice[:src.ndim]
+            if self.all_colour:
+                image = src.array[slc]
+                image = self.color_last(image)
+            else:
+                image = src[slc]
             if image.dtype == bool:
                 image = image.view('uint8')
-            i.updateImage(image)
+            img_item.updateImage(image)
 
     def setMinMax(self, min_max, source=0):
         self.luts[source].lut.region.setRegion(min_max)
 
-    def shape3d(self, shape):
-        return (shape + (1,) * 3)[:3]
+    def padded_shape(self, shape):
+        pad_size = max(3, len(shape))
+        return (shape + (1,) * pad_size)[:pad_size]
 
     # def __cast_bools(self):
     #     for i, s in enumerate(self.sources):
