@@ -219,14 +219,14 @@ class Annotation(object):
         self.annotation_file = annotation_file
         self.extra_label = extra_label
 
-        # initialze label tree
+        # initialize label tree
         with open(label_file) as dfile:
             aba_json = dfile.read()
             dfile.close()
         aba = json.loads(aba_json)
 
         root = aba['msg'][0]
-        self.root = self.initialze_tree(root)
+        self.root = self.initialize_tree(root)
 
         # maxgraph = max(self.get_list('graph_order'))
         for a in extra_label:
@@ -257,9 +257,9 @@ class Annotation(object):
         self.names = self.get_list('name')
         self.acronyms = self.get_list('acronym')
 
-    def initialze_tree(self, root, parent=None, level=0):
+    def initialize_tree(self, root, parent=None, level=0):
         label = Label({key: root[key] for key in root.keys() if key not in ["children"]}, parent=parent, level=level)
-        label.children = [self.initialze_tree(c, parent=label, level=level + 1) for c in root['children']]
+        label.children = [self.initialize_tree(c, parent=label, level=level + 1) for c in root['children']]
         return label
 
     def get_list(self, key=None, node=None, level=None):
