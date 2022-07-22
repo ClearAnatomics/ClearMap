@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>484</width>
+    <width>498</width>
     <height>739</height>
    </rect>
   </property>
@@ -33,14 +33,14 @@
         </font>
        </property>
        <property name="currentIndex">
-        <number>0</number>
+        <number>1</number>
        </property>
        <widget class="QWidget" name="page">
         <property name="geometry">
          <rect>
           <x>0</x>
           <y>0</y>
-          <width>464</width>
+          <width>478</width>
           <height>440</height>
          </rect>
         </property>
@@ -57,8 +57,8 @@
             <property name="geometry">
              <rect>
               <x>0</x>
-              <y>-21</y>
-              <width>432</width>
+              <y>0</y>
+              <width>354</width>
               <height>392</height>
              </rect>
             </property>
@@ -401,7 +401,7 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>432</width>
+              <width>309</width>
               <height>334</height>
              </rect>
             </property>
@@ -694,8 +694,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>446</width>
-              <height>272</height>
+              <width>196</width>
+              <height>100</height>
              </rect>
             </property>
             <attribute name="label">
@@ -763,8 +763,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>446</width>
-              <height>272</height>
+              <width>196</width>
+              <height>100</height>
              </rect>
             </property>
             <attribute name="label">
@@ -832,7 +832,7 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>446</width>
+              <width>460</width>
               <height>272</height>
              </rect>
             </property>
@@ -901,7 +901,7 @@
          <rect>
           <x>0</x>
           <y>0</y>
-          <width>464</width>
+          <width>478</width>
           <height>440</height>
          </rect>
         </property>
@@ -912,14 +912,14 @@
          <item>
           <widget class="QToolBox" name="toolBox_3">
            <property name="currentIndex">
-            <number>2</number>
+            <number>0</number>
            </property>
            <widget class="QWidget" name="atlasSettingsPage">
             <property name="geometry">
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>629</width>
+              <width>460</width>
               <height>332</height>
              </rect>
             </property>
@@ -928,102 +928,55 @@
             </attribute>
             <layout class="QFormLayout" name="formLayout_5">
              <item row="0" column="0">
-              <widget class="QLabel" name="label_17">
+              <widget class="QLabel" name="label_16">
                <property name="text">
-                <string>Atlas folder</string>
+                <string>Atlas</string>
                </property>
               </widget>
              </item>
              <item row="0" column="1">
-              <widget class="QFrame" name="frame_14">
-               <property name="frameShape">
-                <enum>QFrame::StyledPanel</enum>
-               </property>
-               <property name="frameShadow">
-                <enum>QFrame::Raised</enum>
-               </property>
-               <layout class="QHBoxLayout" name="horizontalLayout_6">
-                <item>
-                 <widget class="QLabel" name="atlasFolderPath">
-                  <property name="text">
-                   <string>''</string>
-                  </property>
-                 </widget>
-                </item>
-                <item>
-                 <widget class="QPushButton" name="pushButton">
-                  <property name="text">
-                   <string> Select</string>
-                  </property>
-                  <property name="icon">
-                   <iconset theme="folder">
-                    <normaloff>.</normaloff>.</iconset>
-                  </property>
-                 </widget>
-                </item>
-               </layout>
+              <widget class="QComboBox" name="atlasIdComboBox">
+               <item>
+                <property name="text">
+                 <string>ABA - adult mouse - 25µm</string>
+                </property>
+               </item>
+               <item>
+                <property name="text">
+                 <string>CDMBA - P1 - 25µm</string>
+                </property>
+               </item>
+               <item>
+                <property name="text">
+                 <string>CDMBA - P3 - 25µm</string>
+                </property>
+               </item>
+               <item>
+                <property name="text">
+                 <string>CDMBA - P5 - 25µm</string>
+                </property>
+               </item>
+               <item>
+                <property name="text">
+                 <string>CDMBA - P7 - 25µm</string>
+                </property>
+               </item>
+               <item>
+                <property name="text">
+                 <string>CDMBA - P14 - 25µm</string>
+                </property>
+               </item>
               </widget>
              </item>
              <item row="1" column="0">
-              <widget class="QLabel" name="label_19">
+              <widget class="QLabel" name="label_15">
                <property name="text">
-                <string>Chan affine file</string>
-               </property>
-               <property name="buddy">
-                <cstring>channelAffineFilePath</cstring>
+                <string>Atlas resolution</string>
                </property>
               </widget>
              </item>
              <item row="1" column="1">
-              <widget class="QLineEdit" name="channelAffineFilePath">
-               <property name="text">
-                <string>align_affine.txt</string>
-               </property>
-              </widget>
-             </item>
-             <item row="2" column="0">
-              <widget class="QLabel" name="label_20">
-               <property name="text">
-                <string>Ref affine file</string>
-               </property>
-               <property name="buddy">
-                <cstring>refAffineFilePath</cstring>
-               </property>
-              </widget>
-             </item>
-             <item row="2" column="1">
-              <widget class="QLineEdit" name="refAffineFilePath">
-               <property name="text">
-                <string>align_affine.txt</string>
-               </property>
-              </widget>
-             </item>
-             <item row="3" column="0">
-              <widget class="QLabel" name="label_21">
-               <property name="text">
-                <string>Ref bspline file</string>
-               </property>
-               <property name="buddy">
-                <cstring>refBsplineFilePath</cstring>
-               </property>
-              </widget>
-             </item>
-             <item row="3" column="1">
-              <widget class="QLineEdit" name="refBsplineFilePath">
-               <property name="text">
-                <string>align_bspline.txt</string>
-               </property>
-              </widget>
-             </item>
-             <item row="4" column="0">
-              <widget class="QLabel" name="label_15">
-               <property name="text">
-                <string>Raw sink resolution</string>
-               </property>
-              </widget>
-             </item>
-             <item row="4" column="1">
-              <widget class="QFrame" name="rawAtlasResolutionTriplet">
+              <widget class="QFrame" name="atlasResolutionTriplet">
                <property name="frameShape">
                 <enum>QFrame::StyledPanel</enum>
                </property>
@@ -1043,30 +996,99 @@
                </layout>
               </widget>
              </item>
-             <item row="5" column="0">
-              <widget class="QLabel" name="label_16">
-               <property name="text">
-                <string>Autofluo sink resolution</string>
+             <item row="2" column="0" colspan="2">
+              <widget class="QGroupBox" name="advancedAtlasSettingsGroupBox">
+               <property name="title">
+                <string>Advanced atlas settings</string>
                </property>
-              </widget>
-             </item>
-             <item row="5" column="1">
-              <widget class="QFrame" name="autofluoAtlasResolutionTriplet">
-               <property name="frameShape">
-                <enum>QFrame::StyledPanel</enum>
-               </property>
-               <property name="frameShadow">
-                <enum>QFrame::Raised</enum>
-               </property>
-               <layout class="QHBoxLayout" name="horizontalLayout_17">
-                <item>
-                 <widget class="QSpinBox" name="spinBox_28"/>
+               <layout class="QFormLayout" name="formLayout_6">
+                <item row="0" column="0">
+                 <widget class="QLabel" name="label_17">
+                  <property name="text">
+                   <string>Atlas folder</string>
+                  </property>
+                 </widget>
                 </item>
-                <item>
-                 <widget class="QSpinBox" name="spinBox_29"/>
+                <item row="0" column="1">
+                 <widget class="QFrame" name="frame_14">
+                  <property name="frameShape">
+                   <enum>QFrame::StyledPanel</enum>
+                  </property>
+                  <property name="frameShadow">
+                   <enum>QFrame::Raised</enum>
+                  </property>
+                  <layout class="QHBoxLayout" name="horizontalLayout_6">
+                   <item>
+                    <widget class="QLabel" name="atlasFolderPath">
+                     <property name="text">
+                      <string>''</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item>
+                    <widget class="QPushButton" name="pushButton">
+                     <property name="text">
+                      <string> Select</string>
+                     </property>
+                     <property name="icon">
+                      <iconset theme="folder">
+                       <normaloff>.</normaloff>.</iconset>
+                     </property>
+                    </widget>
+                   </item>
+                  </layout>
+                 </widget>
                 </item>
-                <item>
-                 <widget class="QSpinBox" name="spinBox_30"/>
+                <item row="1" column="0">
+                 <widget class="QLabel" name="label_19">
+                  <property name="text">
+                   <string>Chan affine file</string>
+                  </property>
+                  <property name="buddy">
+                   <cstring>channelAffineFilePath</cstring>
+                  </property>
+                 </widget>
+                </item>
+                <item row="1" column="1">
+                 <widget class="QLineEdit" name="channelAffineFilePath">
+                  <property name="text">
+                   <string>align_affine.txt</string>
+                  </property>
+                 </widget>
+                </item>
+                <item row="2" column="0">
+                 <widget class="QLabel" name="label_20">
+                  <property name="text">
+                   <string>Ref affine file</string>
+                  </property>
+                  <property name="buddy">
+                   <cstring>refAffineFilePath</cstring>
+                  </property>
+                 </widget>
+                </item>
+                <item row="2" column="1">
+                 <widget class="QLineEdit" name="refAffineFilePath">
+                  <property name="text">
+                   <string>align_affine.txt</string>
+                  </property>
+                 </widget>
+                </item>
+                <item row="3" column="0">
+                 <widget class="QLabel" name="label_21">
+                  <property name="text">
+                   <string>Ref bspline file</string>
+                  </property>
+                  <property name="buddy">
+                   <cstring>refBsplineFilePath</cstring>
+                  </property>
+                 </widget>
+                </item>
+                <item row="3" column="1">
+                 <widget class="QLineEdit" name="refBsplineFilePath">
+                  <property name="text">
+                   <string>align_bspline.txt</string>
+                  </property>
+                 </widget>
                 </item>
                </layout>
               </widget>
@@ -1078,7 +1100,7 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>629</width>
+              <width>119</width>
               <height>332</height>
              </rect>
             </property>
@@ -1127,7 +1149,7 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>446</width>
+              <width>119</width>
               <height>332</height>
              </rect>
             </property>

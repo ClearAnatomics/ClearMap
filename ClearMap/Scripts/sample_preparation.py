@@ -117,6 +117,10 @@ class PreProcessor(TabProcessor):
         self.align_channels_affine_file = ''
         self.align_reference_affine_file = ''
         self.align_reference_bspline_file = ''
+        self.default_annotation_file_path = None
+        self.default_hemispheres_file_path = None
+        self.default_reference_file_path = None
+        self.default_distance_file_path = None
         self.annotation_file_path = ''
         self.hemispheres_file_path = ''
         self.reference_file_path = ''
@@ -168,6 +172,11 @@ class PreProcessor(TabProcessor):
         self.workspace.info()
         self.__file_conversion()
         # FIXME: check if setup_atlas should go here
+
+    def unpack_atlas(self, atlas_base_name):
+        res = annotation.uncompress_atlases(atlas_base_name)
+        self.default_annotation_file_path, self.default_hemispheres_file_path, \
+        self.default_reference_file_path, self.default_distance_file_path = res
 
     @property
     def aligned_autofluo_path(self):
@@ -227,8 +236,11 @@ class PreProcessor(TabProcessor):
         z_slice = slice(None) if self.sample_config['slice_z'] is None else slice(*self.sample_config['slice_z'])
         xyz_slicing = (x_slice, y_slice, z_slice)
         results = annotation.prepare_annotation_files(
-            slicing=xyz_slicing, hemispheres=True,
+            slicing=xyz_slicing,
             orientation=self.sample_config['orientation'],
+            annotation_file=self.default_annotation_file_path, hemispheres_file=self.default_hemispheres_file_path,
+            reference_file=self.default_reference_file_path, distance_to_surface_file=self.default_distance_file_path,
+            hemispheres=True,
             overwrite=False, verbose=True)
         self.annotation_file_path, self.hemispheres_file_path, self.reference_file_path, self.distance_file_path = results
 
