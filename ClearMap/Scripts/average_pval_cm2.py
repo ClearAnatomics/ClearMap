@@ -20,7 +20,7 @@ colors = {
 }
 
 
-def group_voxelizations(directory, f_list, suffix):
+def stack_voxelizations(directory, f_list, suffix):
     """
     Regroup voxelisations to simplify further processing
 
@@ -37,17 +37,20 @@ def group_voxelizations(directory, f_list, suffix):
     for i, file_name in enumerate(f_list):
         img = clearmap_io.read(make_abs(directory, file_name))
         if i == 0:  # init on first image
-            condensed = img[:, :, :, np.newaxis]
+            stacked_voxelizations = img[:, :, :, np.newaxis]
         else:
-            condensed = np.concatenate((condensed, img[:, :, :, np.newaxis]), axis=3)
-    condensed = condensed.astype(np.float32)
-    clearmap_io.write(os.path.join(directory, f'condensed_{suffix}.tif'), condensed)
-    return condensed
+            stacked_voxelizations = np.concatenate((stacked_voxelizations, img[:, :, :, np.newaxis]), axis=3)
+    stacked_voxelizations = stacked_voxelizations.astype(np.float32)
+    try:
+        clearmap_io.write(os.path.join(directory, f'stacked_density_{suffix}.tif'), stacked_voxelizations, bigtiff=True)
+    except ValueError:
+        pass
+    return stacked_voxelizations
 
 
-def average_voxelization_groups(condensed, directory, suffix):
-    condensed_avg = np.mean(condensed, axis=3)
-    clearmap_io.write(os.path.join(directory, f'avg_{suffix}.tif'), condensed_avg)
+def average_voxelization_groups(stacked_voxelizations, directory, suffix):
+    avg_voxelization = np.mean(stacked_voxelizations, axis=3)
+    clearmap_io.write(os.path.join(directory, f'avg_density_{suffix}.tif'), avg_voxelization)
 
 
 def get_colored_p_vals(p_vals, t_vals, significance, color_names):
@@ -226,12 +229,12 @@ def compare_groups(directory, gp1_name, gp2_name, gp1_dirs, gp2_dirs, prefix='p_
     gp1_f_list = dirs_to_density_files(directory, gp1_dirs)
     gp2_f_list = dirs_to_density_files(directory, gp2_dirs)
 
-    gp1_grouped_voxelizations = group_voxelizations(directory, gp1_f_list, suffix=gp1_name)
-    average_voxelization_groups(gp1_grouped_voxelizations, directory, gp1_name)
-    gp2_grouped_voxelizations = group_voxelizations(directory, gp2_f_list, suffix=gp2_name)
-    average_voxelization_groups(gp2_grouped_voxelizations, directory, gp2_name)
+    gp1_stacked_voxelizations = stack_voxelizations(directory, gp1_f_list, suffix=gp1_name)
+    average_voxelization_groups(gp1_stacked_voxelizations, directory, gp1_name)
+    gp2_stacked_voxelizations = stack_voxelizations(directory, gp2_f_list, suffix=gp2_name)
+    average_voxelization_groups(gp2_stacked_voxelizations, directory, gp2_name)
 
-    t_vals, p_vals = stats.ttest_ind(gp1_grouped_voxelizations, gp2_grouped_voxelizations, axis=3, equal_var=False)
+    t_vals, p_vals = stats.ttest_ind(gp1_stacked_voxelizations, gp2_stacked_voxelizations, axis=3, equal_var=False)
     p_vals, t_vals = remove_p_val_nans(p_vals, t_vals)
 
     colored_p_vals_05 = get_colored_p_vals(p_vals, t_vals, 0.05, ('red', 'green'))
