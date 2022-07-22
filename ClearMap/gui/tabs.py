@@ -411,6 +411,7 @@ class CellCounterTab(PostProcessingTab):
         self.ui.runCellDetectionButtonBox.connectApply(self.detect_cells)
         self.ui.runCellDetectionPlotButtonBox.connectApply(self.plot_detection_results)
         self.ui.previewCellFiltersButtonBox.connectApply(self.preview_cell_filter)
+        self.ui.previewCellFiltersButtonBox.connectOk(self.filter_cells)
 
         self.ui.cellMapVoxelizeButtonBox.connectApply(self.voxelize)
 
@@ -497,14 +498,21 @@ class CellCounterTab(PostProcessingTab):
         dvs = self.cell_detector.plot_cells_3d_scatter_w_atlas_colors(raw=True, parent=self.main_window)
         self.main_window.setup_plots(dvs)
 
+    def __filter_cells(self):
+        debug_raw_cells_path = self.cell_detector.workspace.filename('cells', postfix='raw')
+        if os.path.exists(debug_raw_cells_path):
+            self.cell_detector.filter_cells()
+            self.cell_detector.voxelize('filtered')
+        self.plot_cell_filter_results()
+
     def preview_cell_filter(self):
         self.params.ui_to_cfg()
         with self.cell_detector.workspace.tmp_debug:
-            debug_raw_cells_path = self.cell_detector.workspace.filename('cells', postfix='raw')
-            if os.path.exists(debug_raw_cells_path):
-                self.cell_detector.filter_cells()
-                self.cell_detector.voxelize('filtered')
-            self.plot_cell_filter_results()
+            self.__filter_cells()
+
+    def filter_cells(self):
+        self.params.ui_to_cfg()
+        self.__filter_cells()
 
     def run_cell_map(self):
         self.params.ui_to_cfg()
