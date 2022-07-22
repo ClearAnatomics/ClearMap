@@ -423,7 +423,11 @@ class CellCounterTab(PostProcessingTab):
 
     def voxelize(self):
         self.params.ui_to_cfg()
-        self.cell_detector.voxelize()
+        if os.path.exists(self.preprocessor.workspace.filename('cells', postfix='filtered')):
+            self.cell_detector.voxelize()
+        else:
+            self.main_window.popup('Could not run voxelization, missing filtered cells table. '
+                                   'Please ensure that cell filtering has been run.', base_msg='Missing file')
 
     def set_progress_watcher(self, watcher):
         if self.cell_detector is not None and self.cell_detector.preprocessor is not None:  # If initialised
