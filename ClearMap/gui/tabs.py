@@ -685,7 +685,7 @@ class BatchTab(GenericTab):
         return self.params is not None
 
     def set_params(self):
-        self.params = BatchParams(self.ui, '')
+        self.params = BatchParams(self.ui, '', preferences=self.main_window.preference_editor.params)
         # self.params = BatchParams(self.ui, self.main_window.src_folder)
 
     def setup(self):
@@ -751,7 +751,9 @@ class BatchTab(GenericTab):
 
     def run_batch_process(self):
         self.params.ui_to_cfg()
-        paths = self.params.self.get_all_paths()
-        self.main_window.make_progress_dialog('Analysing samples', n_steps=len(paths), maximum=0)  # TODO: see abort callback
-        self.main_window.wrap_in_thread(process_folders, paths)  # TODO: pass bar to increment
+        paths = [p for ps in self.params.get_all_paths() for p in ps]  # flatten list
+        self.main_window.make_progress_dialog('Analysing samples', maximum=0)  # TODO: see abort callback
+        # TODO: pass progress watcher to increment from within
+        self.main_window.wrap_in_thread(process_folders, paths,
+                                        self.params.align, self.params.count_cells, self.params.run_vaculature)
         self.main_window.progress_dialog.done(1)
