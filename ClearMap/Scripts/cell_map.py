@@ -253,7 +253,9 @@ class CellDetector(TabProcessor):
             id_map = {lbl: annotation.find(lbl, key='order')['id'] for lbl in unique_labels}
 
             atlas = clearmap_io.read(self.preprocessor.annotation_file_path)
-            volumes = {_id: (atlas == _id).sum() for _id in id_map.values()}  # Volumes need a lookup on ID since the atlas is in ID space
+            atlas_scale = self.preprocessor.processing_config['registration']['resampling']['autofluo_sink_resolution']
+            atlas_scale = np.prod(atlas_scale)
+            volumes = {_id: (atlas == _id).sum() * atlas_scale for _id in id_map.values()}  # Volumes need a lookup on ID since the atlas is in ID space
 
             def lookup_color(lbl):  # See if we can do lookup without specific function
                 return color_map[lbl]
