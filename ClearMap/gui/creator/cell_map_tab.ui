@@ -33,7 +33,7 @@
         </font>
        </property>
        <property name="currentIndex">
-        <number>3</number>
+        <number>1</number>
        </property>
        <widget class="QWidget" name="page">
         <property name="geometry">
@@ -484,10 +484,13 @@
             <string>Display results on the small data chunk detected</string>
            </property>
            <property name="standardButtons">
-            <set>QDialogButtonBox::Apply</set>
+            <set>QDialogButtonBox::Apply|QDialogButtonBox::Ok</set>
            </property>
            <property name="applyText" stdset="0">
             <string>Preview</string>
+           </property>
+           <property name="okText" stdset="0">
+            <string>Run</string>
            </property>
           </widget>
          </item>
