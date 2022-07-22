@@ -32,9 +32,11 @@ __download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
 import os
 import collections 
 
-import numpy as np
-
 import json
+
+import numpy as np
+from scipy.ndimage import distance_transform_edt
+
 
 import ClearMap.Settings as settings
 
@@ -57,40 +59,27 @@ atlas_path = os.path.join(settings.resources_path, 'Atlas')
 """Default path to atlas information.
 """
 
-default_annotation_file = os.path.join(atlas_path, 'ABA_25um_annotation.tif')
-"""Default volumetric annotated image file.
+def uncompress_atlases(atlas_base_name):
+    paths = []
+    atlas_component_names = ('annotation', 'hemispheres', 'reference', 'distance_to_surface')
+    for f_name in [f'{atlas_base_name}_{atlas_type}.tif' for atlas_type in atlas_component_names]:
+        f_path = os.path.join(atlas_path, f_name)
+        fu.uncompress(f_path)
+        paths.append(f_path)
+    return paths
+
+atlas_base_name = 'ABA_25um'  # FIXME: change if different atlas
+"""
+Default volumetric annotated image file.
 
 Note
 ----
   This file is by default the Allen brain annotated mouse atlas with 25um 
   isotropic resolution.
 """
-fu.uncompress(default_annotation_file)
 
-
-default_hemispheres_file = os.path.join(atlas_path, 'ABA_25um_hemispheres.tif')
-fu.uncompress(default_hemispheres_file)
-
-default_reference_file = os.path.join(atlas_path, 'ABA_25um_reference.tif')
-"""Default volumetric annotated image file.
-
-Note
-----
-  This file is by default the Allen brain annotated mouse atlas with 25um 
-  isotropic resolution.
-"""
-fu.uncompress(default_reference_file)
-
-
-default_distance_to_surface_file = os.path.join(atlas_path, 'ABA_25um_distance_to_surface.tif')
-"""Default volumetric annotated image file.
-
-Note
-----
-  This file is by default the Allen brain annotated mouse atlas with 25um 
-  isotropic resolution.
-"""
-fu.uncompress(default_distance_to_surface_file)
+default_annotation_file, default_hemispheres_file,\
+default_reference_file, default_distance_to_surface_file = uncompress_atlases(atlas_base_name)
 
 
 default_label_file = os.path.join(atlas_path, 'ABA_annotation.json')
@@ -183,7 +172,7 @@ class Label(object):
 class Annotation(object):
     """Class that holds information of the annotated regions."""
 
-    def __init__(self, label_file=None, extra_label=None, annotation_file=None):
+    def __init__(self, label_file=None, extra_label=None, annotation_file=None):  # FIXME: add warning if None
         """Initialization
 
         Arguments
@@ -390,10 +379,11 @@ get_dictionary = annotation.get_dictionary
 get_list = annotation.get_list
 get_map = annotation.get_map
 find = annotation.find
+initialized = False
 
 
 def initialize(label_file=None, extra_label=None, annotation_file=None):
-    global annotation, n_structures, get_dictionary, get_list, get_map, find  # FIXME: avoid global
+    global initialized, annotation, n_structures, get_dictionary, get_list, get_map, find  # FIXME: avoid global
     annotation = Annotation(label_file=label_file, extra_label=extra_label, annotation_file=annotation_file)
 
     n_structures = annotation.n_structures
@@ -401,6 +391,7 @@ def initialize(label_file=None, extra_label=None, annotation_file=None):
     get_list = annotation.get_list
     get_map = annotation.get_map
     find = annotation.find
+    initialized = True
 
 
 def set_annotation_file(annotation_file):
@@ -440,8 +431,7 @@ def label_points(points, annotation_file=None, invalid=0, key='order', level=Non
     n_points = points.shape[0]
     n_dim = points.shape[1]
 
-    if annotation_file is None:
-        annotation_file = annotation.annotation_file  # FIXME: remove default option and raise Error if not initialised
+    annotation_file = get_module_annotation_file(annotation_file)
 
     atlas = clearmap_io.read(annotation_file)
     atlas = np.array(atlas, dtype=int)
@@ -653,8 +643,7 @@ def write_color_annotation(filename, annotation_file=None):
       The name of the file to which the color atlas was written.
     """
     # load atlas and convert to order
-    if annotation_file is None:
-        annotation_file = annotation.annotation_file
+    annotation_file = get_module_annotation_file(annotation_file)
     atlas = np.array(clearmap_io.read(annotation_file), dtype=int)
     atlas = convert_label(atlas, key='id', value='order', method='map')
 
@@ -665,14 +654,28 @@ def write_color_annotation(filename, annotation_file=None):
     return clearmap_io.write(filename, atlas)
 
 
+def get_module_annotation_file(annotation_file):
+    if annotation_file is None:
+        if not initialized:
+            raise ValueError('Cannot use this function without an annotation file if'
+                             'the module has not been initialized. '
+                             'Please call set_annotation_file first.')
+        else:
+            return annotation.annotation_file
+    else:
+        return annotation_file
+
+
 ###############################################################################
 # ## Labeling
 ###############################################################################
-
+# FIXME: add use_default kwarg to signature to make explicit and make orientation necessary
+# FIXME: + replace defaults with currently computed
 def prepare_annotation_files(slicing=None, orientation=None, directory=None, postfix=None, annotation_file=None,
                              hemispheres_file=None, reference_file=None, distance_to_surface_file=None,
                              hemispheres=False, overwrite=False, verbose=False):
-    """Crop the annotation, reference and distance files to match the data.
+    """
+    Crop the annotation, reference and distance files to match the data.
 
     Arguments
     ---------
@@ -710,8 +713,7 @@ def prepare_annotation_files(slicing=None, orientation=None, directory=None, pos
     distance_to_surface_file : str
         The distance cropped file.
     """
-    if annotation_file is None:
-        annotation_file = default_annotation_file
+    annotation_file = get_module_annotation_file(annotation_file)
     if hemispheres_file is None:
         hemispheres_file = default_hemispheres_file
     if reference_file is None:
@@ -749,13 +751,13 @@ def prepare_annotation_files(slicing=None, orientation=None, directory=None, pos
                 data = data.transpose(per)
 
                 # reverse axes
-                reslice = False
+                re_slice = False
                 sl = [slice(None)] * data.ndim
                 for d, o in enumerate(orientation):
                     if o < 0:
                         sl[d] = slice(None, None, -1)
-                        reslice = True
-                if reslice:
+                        re_slice = True
+                if re_slice:
                     data = data[tuple(sl)]
 
             if slicing is not None:
@@ -798,6 +800,11 @@ def format_annotation_filename(filename, orientation=None, slicing=None, postfix
     return fn
 
 
+def annotation_to_distance_file(annotation_file):
+    ref = clearmap_io.read(annotation_file)
+    return distance_transform_edt(ref > 0)
+
+
 ###############################################################################
 # ## Tests
 ###############################################################################
@@ -808,16 +815,16 @@ def _test():
     label = label_points(points)
     print(label)
 
-    cnts = count_points(points)
-    print(cnts)
+    counts = count_points(points)
+    print(counts)
 
-    cnts = count_points(points, hierarchical=False)
-    print(cnts)
+    counts = count_points(points, hierarchical=False)
+    print(counts)
 
     write_color_annotation('test.tif')
     clearmap_io.delete_file('test.tif')
 
-    l = find(247, key='id')
-    print(l)
-    l.info(with_children=True)
-    print(l.level)
+    lbl = find(247, key='id')
+    print(lbl)
+    lbl.info(with_children=True)
+    print(lbl.level)

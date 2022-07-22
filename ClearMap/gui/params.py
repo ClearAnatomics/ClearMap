@@ -7,7 +7,7 @@ import numpy as np
 from ClearMap.gui.gui_utils import create_clearmap_widget
 
 from ClearMap.gui.dialogs import get_directory_dlg
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, pyqtSignal, QObject
 from PyQt5.QtWidgets import QInputDialog, QToolBox, QCheckBox, QLabel, QWidgetItem
 
 from ClearMap.config.config_loader import ConfigLoader
@@ -21,8 +21,9 @@ class ParamsOrientationError(ValueError):
     pass
 
 
-class UiParameter:
+class UiParameter(QObject):
     def __init__(self, tab, src_folder=None):
+        super().__init__()
         self.tab = tab
         self.src_folder = src_folder
         self._config = None
@@ -171,7 +172,7 @@ class AlignmentParams(UiParameterCollection):
 class SampleParameters(UiParameter):
 
     def __init__(self, tab, src_folder=None):
-        super().__init__(tab, src_folder=src_folder)
+        super().__init__(tab, src_folder)
         if self.sample_id:
             self.handle_sample_id_changed(self.sample_id)
 
@@ -730,20 +731,37 @@ class GeneralStitchingParams(UiParameter):
 
 
 class RegistrationParams(UiParameter):
+    atlas_id_changed = pyqtSignal(str)
+
+    def __init__(self, tab, src_folder=None):
+        self.atlas_info = {
+            'ABA - adult mouse - 25µm': {'resolution': 25, 'base_name': 'ABA_25um'},
+            'CDMBA - P1 - 25µm': {'resolution': 25, 'base_name': 'CDMBA_P1_25um'},
+            'CDMBA - P3 - 25µm': {'resolution': 25, 'base_name': 'CDMBA_P3_25um'},
+            'CDMBA - P5 - 25µm': {'resolution': 25, 'base_name': 'CDMBA_P5_25um'},
+            'CDMBA - P7 - 25µm': {'resolution': 25, 'base_name': 'CDMBA_P7_25um'},
+            'CDMBA - P14 - 25µm': {'resolution': 25, 'base_name': 'CDMBA_P14_25um'}
+        }
+        super().__init__(tab, src_folder)
+
     def connect(self):
         self.tab.skipRegistrationCheckBox.stateChanged.connect(self.handle_skip_changed)
-        self.tab.rawAtlasResolutionTriplet.valueChangedConnect(self.handle_raw_atlas_resolution_changed)
-        self.tab.autofluoAtlasResolutionTriplet.valueChangedConnect(self.handle_autofluo_atlas_resolution_changed)
+        self.tab.atlasResolutionTriplet.valueChangedConnect(self.handle_atlas_resolution_changed)
+        self.tab.atlasIdComboBox.currentTextChanged.connect(self.handle_atlas_id_changed)
         # self.tab.atlasFolderPath.textChanged.connect(self.handle_atlas_folder_changed)  # WARNING: ensure that set correctly by picking
         self.tab.channelAffineFilePath.textChanged.connect(self.handle_channel_affine_file_path_changed)
         self.tab.refAffineFilePath.textChanged.connect(self.handle_ref_affine_file_path_changed)
         self.tab.refBsplineFilePath.textChanged.connect(self.handle_ref_bspline_file_path_changed)
 
+    @property
+    def atlas_base_name(self):
+        return self.atlas_info[self.atlas_id]['base_name']
+
     def cfg_to_ui(self):
         cfg = self._config['registration']
         self.skip = cfg['resampling']['skip']
-        self.raw_atlas_resolution = cfg['resampling']['raw_sink_resolution']
-        self.autofluo_atlas_resolution = cfg['resampling']['autofluo_sink_resolution']
+        self.atlas_resolution = cfg['resampling']['raw_sink_resolution']
+        self.atlas_id = self.config['atlas']['id']
         self.atlas_folder = cfg['atlas']['align_files_folder']
         self.channel_affine_file_path = cfg['atlas']['align_channels_affine_file']
         self.ref_affine_file_path = cfg['atlas']['align_reference_affine_file']
@@ -765,26 +783,29 @@ class RegistrationParams(UiParameter):
         self.config['resampling']['skip'] = self.skip
         
     @property
-    def raw_atlas_resolution(self):
-        return self.tab.rawAtlasResolutionTriplet.getValue()
+    def atlas_resolution(self):
+        return self.tab.atlasResolutionTriplet.getValue()
 
-    @raw_atlas_resolution.setter
-    def raw_atlas_resolution(self, res):
-        self.tab.rawAtlasResolutionTriplet.setValue(res)
+    @atlas_resolution.setter
+    def atlas_resolution(self, res):
+        self.tab.atlasResolutionTriplet.setValue(res)
 
-    def handle_raw_atlas_resolution_changed(self, state):
-        self.config['resampling']['raw_sink_resolution'] = self.raw_atlas_resolution
+    def handle_atlas_resolution_changed(self, state):
+        self.config['resampling']['raw_sink_resolution'] = self.atlas_resolution
+        self.config['resampling']['autofluo_sink_resolution'] = self.atlas_resolution
 
     @property
-    def autofluo_atlas_resolution(self):
-        return self.tab.autofluoAtlasResolutionTriplet.getValue()
+    def atlas_id(self):
+        return self.tab.atlasIdComboBox.currentText()
 
-    @autofluo_atlas_resolution.setter
-    def autofluo_atlas_resolution(self, res):
-        self.tab.autofluoAtlasResolutionTriplet.setValue(res)
+    @atlas_id.setter
+    def atlas_id(self, value):
+        self.tab.atlasIdComboBox.setCurrentText(value)
 
-    def handle_autofluo_atlas_resolution_changed(self, res):
-        self.config['resampling']['autofluo_sink_resolution'] = self.autofluo_atlas_resolution
+    def handle_atlas_id_changed(self):
+        self.config['atlas']['id'] = self.atlas_id
+        self.atlas_resolution = self.atlas_info[self.atlas_id]['resolution']
+        self.atlas_id_changed.emit(self.atlas_base_name)
 
     @property
     def atlas_folder(self):

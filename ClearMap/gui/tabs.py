@@ -20,7 +20,6 @@ from ClearMap.Visualization.Qt import Plot3d as plot_3d
 
 # ############################################ INTERFACES ##########################################
 
-
 class GenericUi:
     def __init__(self, main_window, name, ui_file_name, widget_class_name):
         """
@@ -273,6 +272,7 @@ class AlignmentTab(GenericTab):
     def set_params(self, sample_params):
         self.sample_params = sample_params
         self.params = AlignmentParams(self.ui)
+        self.params.registration.atlas_id_changed.connect(self.preprocessor.unpack_atlas)
 
     def setup_workers(self):
         self.sample_params.ui_to_cfg()
@@ -293,7 +293,7 @@ class AlignmentTab(GenericTab):
 
         # TODO: ?? connect alignment folder button
 
-        self.ui.atlasSettingsPage.setVisible(False)
+        self.ui.advancedAtlasSettingsGroupBox.setVisible(False)
         self.ui.advancedCheckBox.stateChanged.connect(self.swap_tab_advanced)
 
     def set_progress_watcher(self, watcher):
@@ -301,7 +301,7 @@ class AlignmentTab(GenericTab):
 
     def swap_tab_advanced(self):
         checked = self.ui.advancedCheckBox.isChecked()
-        self.ui.atlasSettingsPage.setVisible(checked)
+        self.ui.advancedAtlasSettingsGroupBox.setVisible(checked)
 
     def run_stitching(self):
         self.params.ui_to_cfg()
@@ -340,6 +340,8 @@ class AlignmentTab(GenericTab):
     def setup_atlas(self):  # TODO: call when value changed in atlas settings
         self.sample_params.ui_to_cfg()  # To make sure we have the slicing up to date
         self.params.registration.ui_to_cfg()
+        # self.preprocessor.unpack_atlas(self.params.registration.atlas_info[self.params.registration.atlas_id]['base_name'])
+        self.preprocessor.unpack_atlas(self.params.registration.atlas_base_name)
         self.preprocessor.setup_atlases()
 
     def run_registration(self):
