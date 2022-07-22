@@ -418,6 +418,7 @@ class CellCounterTab(PostProcessingTab):
         self.ui.runCellMapPlotButtonBox.connectApply(self.plot_cell_map_results)
 
         self.ui.runCellMapPlot3DScatterButtonBox.connectApply(self.plot_cells_scatter_w_atlas_colors)
+        self.ui.runCellMapPlot3DScatterButtonBox.connectOk(self.plot_cells_scatter_w_atlas_colors_raw)  # FIXME: find less hacky way than apply & OK
 
     def voxelize(self):
         self.params.ui_to_cfg()
@@ -489,7 +490,11 @@ class CellCounterTab(PostProcessingTab):
         self.main_window.setup_plots(dvs)
 
     def plot_cells_scatter_w_atlas_colors(self):
-        dvs = self.cell_detector.plot_cells_3d_scatter_w_atlas_colors(self.main_window)
+        dvs = self.cell_detector.plot_cells_3d_scatter_w_atlas_colors(parent=self.main_window)
+        self.main_window.setup_plots(dvs)
+
+    def plot_cells_scatter_w_atlas_colors_raw(self):
+        dvs = self.cell_detector.plot_cells_3d_scatter_w_atlas_colors(raw=True, parent=self.main_window)
         self.main_window.setup_plots(dvs)
 
     def preview_cell_filter(self):

@@ -119,7 +119,7 @@ class CellDetector(TabProcessor):
         self.atlas_align()
         # self.export_as_csv()
         self.export_collapsed_stats()
-        #self.export_to_clearmap1_fmt()
+        # self.export_to_clearmap1_fmt()
         self.voxelize()
 
     def voxelize(self, postfix=''):
@@ -390,13 +390,16 @@ class CellDetector(TabProcessor):
             plt.title(name)
         plt.tight_layout()
 
-    def plot_cells_3d_scatter_w_atlas_colors(self, parent=None):
-        if self.preprocessor.was_registered:  # REFACTORING: could extract
-            dv = qplot_3d.plot(clearmap_io.source(self.preprocessor.reference_file_path),
-                               arange=False, lut='white', parent=parent)[0]
+    def plot_cells_3d_scatter_w_atlas_colors(self, raw=False, parent=None):
+        if raw:
+            dv = qplot_3d.plot(self.workspace.filename('stitched'), arange=False, lut='white', parent=parent)[0]
         else:
-            dv = qplot_3d.plot(self.workspace.filename('resampled'),
-                               arange=False, lut='white', parent=parent)[0]
+            if self.preprocessor.was_registered:  # REFACTORING: could extract
+                dv = qplot_3d.plot(clearmap_io.source(self.preprocessor.reference_file_path),
+                                   arange=False, lut='white', parent=parent)[0]
+            else:
+                dv = qplot_3d.plot(self.workspace.filename('resampled'),
+                                   arange=False, lut='white', parent=parent)[0]
 
         scatter = pg.ScatterPlotItem()
 
@@ -405,7 +408,10 @@ class CellDetector(TabProcessor):
 
         df = self.get_cells_df()
 
-        coordinates = df[['xt', 'yt', 'zt']].values.astype(np.int)  # required to match integer z
+        if raw:
+            coordinates = df[['x', 'y', 'z']].values.astype(np.int)  # required to match integer z
+        else:
+            coordinates = df[['xt', 'yt', 'zt']].values.astype(np.int)  # required to match integer z
         colors = df['color'].values * 255
         colors = np.array([QColor(*cols.astype(np.int)) for cols in colors])
         if 'hemisphere' in df.columns:
@@ -413,8 +419,7 @@ class CellDetector(TabProcessor):
         else:
             hemispheres = None
         dv.scatter_coords = Scatter3D(coordinates, colors=colors, hemispheres=hemispheres, half_slice_thickness=0)
-        dv.updateSlice()  # WARNING: does not work
-
+        dv.refresh()
         return [dv]
 
     def get_cells_df(self):

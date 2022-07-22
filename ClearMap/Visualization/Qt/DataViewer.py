@@ -168,6 +168,13 @@ class LUT(pg.QtGui.QWidget):
 
 
 class DataViewer(pg.QtGui.QWidget):
+    DEFAULT_SCATTER_PARAMS = {
+        'pen': 'red',
+        'brush': 'red',
+        'symbol': '+',
+        'size': 10
+    }
+
     def __init__(self, source, axis=None, scale=None, title=None, invertY=False,
                  minMax=None, screen=None, parent=None, default_lut='flame', original_orientation='zcxy', *args):
 
@@ -185,6 +192,9 @@ class DataViewer(pg.QtGui.QWidget):
         self.source_range_x = None
         self.source_range_y = None
         self.source_slice = None  # current slice (in scroll axis)
+
+        self.scatter = None
+        self.scatter_coords = None
 
         self.initializeSources(source, axis=axis, scale=scale)
 
@@ -465,6 +475,16 @@ class DataViewer(pg.QtGui.QWidget):
                 pal.cross.set_coords([x, y])
                 pal.view.update()
 
+    def refresh(self):
+        """
+        Forces the plot to refresh, notably to display scatter info on top
+        Returns
+        -------
+
+        """
+        self.sliceLine.setValue(self.sliceLine.value() + 1)
+        self.sliceLine.setValue(self.sliceLine.value() - 1)
+
     def updateLabel(self):
         x_axis, y_axis = self.getXYAxes()
         x, y, z = self.source_pointer[[x_axis, y_axis, self.scroll_axis]]
@@ -492,28 +512,29 @@ class DataViewer(pg.QtGui.QWidget):
             self.source_pointer[ax] = index
             self.updateLabel()
             self.updateImage()
-            # FIXME: add attribute to __init__ defaulting to None and extract plot function
-            if hasattr(self, 'scatter_coords'):
-                self.scatter.clear()
-                self.scatter_coords.axis = ax
-                if self.scatter_coords.colours is not None:
-                    colours = self.scatter_coords.get_colours(index)
-                    symbols = self.scatter_coords.get_symbols(index)
-                    self.scatter.setData(pos=self.scatter_coords.get_pos(index),
-                                         pen=[pg.mkPen(c) for c in colours],
-                                         brush=[pg.mkBrush(c) for c in colours],
-                                         symbol=symbols, size=10)
-                else:
-                    self.scatter.setData(pos=self.scatter_coords.get_pos(index),
-                                         pen='red', brush='red',
-                                         symbol='+', size=10)
-                # FIXME: check why some markers trigger errors
-                try:
-                    if self.scatter_coords.half_slice_thickness is not None:
-                        self.scatter.addPoints(symbol='o', brush=pg.mkBrush((0, 0, 0, 0)),
-                                               **self.scatter_coords.get_all_data(index))
-                except KeyError as err:
-                    print(err)
+            if self.scatter is not None:
+                self.plot_scatter_markers(ax, index)
+
+    def plot_scatter_markers(self, ax, index):
+        self.scatter.clear()
+        self.scatter_coords.axis = ax
+        scatter_params = DataViewer.DEFAULT_SCATTER_PARAMS.copy()  # TODO: check if copy required
+        if self.scatter_coords.colours is not None:
+            colours = self.scatter_coords.get_colours(index)
+            symbols = self.scatter_coords.get_symbols(index)
+            self.scatter.setData(pos=self.scatter_coords.get_pos(index),
+                                 pen=[pg.mkPen(c) for c in colours],
+                                 brush=[pg.mkBrush(c) for c in colours],
+                                 symbol=symbols, size=10)
+        else:
+            self.scatter.setData(pos=self.scatter_coords.get_pos(index), **scatter_params)
+        # FIXME: check why some markers trigger errors
+        try:
+            if self.scatter_coords.half_slice_thickness is not None:
+                self.scatter.addPoints(symbol='o', brush=pg.mkBrush((0, 0, 0, 0)),
+                                       **self.scatter_coords.get_all_data(index))
+        except KeyError as err:
+            print(err)
 
     @property
     def space_axes(self):
