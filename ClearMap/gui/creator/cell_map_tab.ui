@@ -58,8 +58,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>483</width>
-              <height>214</height>
+              <width>195</width>
+              <height>154</height>
              </rect>
             </property>
             <attribute name="label">
@@ -121,8 +121,8 @@
             <property name="geometry">
              <rect>
               <x>0</x>
-              <y>-2</y>
-              <width>469</width>
+              <y>0</y>
+              <width>367</width>
               <height>293</height>
              </rect>
             </property>
@@ -663,10 +663,13 @@
          <item>
           <widget class="QDialogButtonBox" name="runCellMapPlot3DScatterButtonBox">
            <property name="standardButtons">
-            <set>QDialogButtonBox::Apply</set>
+            <set>QDialogButtonBox::Apply|QDialogButtonBox::Ok</set>
            </property>
            <property name="applyText" stdset="0">
             <string>Plot 3D Scatter</string>
+           </property>
+           <property name="okText" stdset="0">
+            <string>Plot raw 3D Scatter</string>
            </property>
           </widget>
          </item>
