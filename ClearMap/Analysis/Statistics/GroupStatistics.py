@@ -148,8 +148,10 @@ def color_p_values(p_vals, p_sign, positive_color=[1, 0], negative_color=[0, 1],
         colored_p_vals = np.zeros(output_shape)
 
         # color
-        for sign, col in ((1, positive_color), (-1, negative_color)):
-            ids = sign * (p_sign > 0)  # positive of inverse for negative
+        for neg, col in ((False, positive_color), (True, negative_color)):
+            ids = p_sign > 0
+            if neg:
+                ids = np.logical_not(ids)
             p_vals_i = p_vals_inv[ids]
             for i in range(len(col)):
                 colored_p_vals[ids, i] = p_vals_i * col[i]
@@ -165,7 +167,11 @@ def color_p_values(p_vals, p_sign, positive_color=[1, 0], negative_color=[0, 1],
         # significant positive, non sig positive, sig neg, non sig neg
         for id_sign, idc_sign, w in ((1, 1, positive_color), (1, -1, positive_trend),
                                      (-1, 1, negative_color), (-1, -1, negative_trend)):
-            ii = np.logical_and(id_sign * ids, idc_sign * idc)
+            if id_sign < 0:
+                ids = np.logical_not(ids)
+            if idc_sign < 0:
+                idc = np.logical_not(idc)
+            ii = np.logical_and(ids, idc)
             p_vals_i = p_vals_inv[ii]
             for i in range(len(w)):
                 colored_p_vals[ii, i] = p_vals_i * w[i]
