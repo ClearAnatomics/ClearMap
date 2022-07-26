@@ -161,7 +161,11 @@ def pattern_finders_from_base_dir(src_dir):
     for path in data_dirs.keys():
         sub_dir = path.replace(src_dir, '')
         sub_dir = sub_dir[1:] if sub_dir.startswith(os.sep) else sub_dir
-        finders.append(PatternFinder(sub_dir, data_dirs[path]))
+        tmp = PatternFinder.from_mixed_tiff_lists(sub_dir, data_dirs[path])
+        if isinstance(tmp, (tuple, list)):
+            finders.extend(tmp)
+        else:
+            finders.append(tmp)
     return finders
 
 
@@ -171,22 +175,39 @@ class PatternFinder:  # FIXME: needs dir
         self.df = self.get_df_from_file_list(tiff_list)
         self.pattern = Pattern(self.pattern_from_df(self.df))
 
-    def get_df_from_file_list(self, file_names):
+    @classmethod
+    def from_mixed_tiff_lists(cls, folder, tiff_list):
+        df = cls.get_df_from_file_list(tiff_list)
+        pattern = Pattern(cls.pattern_from_df(df))
+        c_idx = [i for i, chunk in enumerate(pattern.chunks) if chunk.endswith('C')]
+        if c_idx:
+            cluster_idx = c_idx[0]
+            return [cls.split_channel(cluster_idx, pattern, df, folder)]
+        else:
+            print(f'Could not find different channels in Pattern {pattern}')
+            return cls(folder, tiff_list)
+
+    @staticmethod
+    def get_df_from_file_list(file_names):
         df = pd.DataFrame()
         for f_name in file_names:
             df = pd.concat((df, pd.DataFrame(data=[c for c in f_name]).T))
         return df
 
-    def split_channel(self, channel_order):
-        last_channel_idx = self.pattern.digit_clusters[channel_order][-1]
-        channel_values = self.df.loc[:, last_channel_idx].sort_values().unique()
+    @classmethod
+    def split_channel(cls, channel_order, pattern, df, folder):
+        last_channel_idx = pattern.digit_clusters[channel_order][-1]
+        channel_values = df.loc[:, last_channel_idx].sort_values().unique()
         pattern_finders = []
         for channel in channel_values:
-            channel_df = self.df[self.df[last_channel_idx == channel]]
-            pattern_finders.append(PatternFinder(channel_df))
+            channel_df = df[df[last_channel_idx == channel]]
+            expr = ''.join([f'{{0[{col}]}}' for col in channel_df.columns])
+            tiff_list = channel_df.agg(expr.format, axis=1)
+            pattern_finders.append(cls(folder, tiff_list))
         return pattern_finders
 
-    def pattern_from_df(self, df):
+    @staticmethod
+    def pattern_from_df(df):
         pattern = ''
         row1 = df.iloc[0]
         for i, col in enumerate(df):
@@ -194,9 +215,10 @@ class PatternFinder:  # FIXME: needs dir
                 pattern += row1[i]
             else:
                 pattern += '?'
-        return self.__fix_pattern(pattern)
+        return PatternFinder.__fix_pattern(pattern)
 
-    def __fix_pattern(self, pattern):
+    @staticmethod
+    def __fix_pattern(pattern):
         """
         When not all digits are used in a zero padded pattern and were not detected.
 
@@ -224,6 +246,9 @@ class Pattern:
         self.pattern_elements = []  # e.g. ['<X,2>', '<Y,2>']
         self.pattern_str = pattern_str
         self.parse_pattern(pattern_str)
+
+    def __str__(self):
+        return self.pattern_str
 
     def get_formatted_pattern(self):
         out = ''
