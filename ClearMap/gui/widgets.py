@@ -1,24 +1,28 @@
 import os
 import re
+from multiprocessing.pool import ThreadPool
+
 
 import numpy as np
 import pyqtgraph as pg
-import qdarkstyle
-from PyQt5.QtGui import QColor
+
 from skimage import transform as sk_transform  # Slowish
 
+import qdarkstyle
+from PyQt5.QtGui import QColor
 
-from PyQt5 import QtGui, QtCore
+
+from PyQt5 import QtGui, QtCore, QtWidgets
 from PyQt5.QtCore import QRectF
 from PyQt5.QtWidgets import QWidget, QDialogButtonBox, QListWidget, QHBoxLayout, QPushButton, QVBoxLayout, QTableWidget, \
-    QTableWidgetItem
+    QTableWidgetItem, QToolBox
 
 from ClearMap.IO import TIF
 from ClearMap.IO.metadata import pattern_finders_from_base_dir
 from ClearMap.Settings import resources_path
 from ClearMap.Visualization import Plot3d as plot_3d
 from ClearMap.config.config_loader import ConfigLoader
-from ClearMap.gui.dialogs import make_splash, get_directory_dlg
+from ClearMap.gui.dialogs import make_splash, get_directory_dlg, update_pbar
 from ClearMap.gui.gui_utils import pseudo_random_rgb_array, create_clearmap_widget
 
 
@@ -394,42 +398,69 @@ class PatternDialog:
     def __init__(self, params, src_folder, app=None):
         self.params = params
         self.src_folder = src_folder
+        if app is None:
+            app = QtWidgets.QApplication.instance()
         self.app = app
+
+        self.n_image_groups = 0
 
         dlg = create_clearmap_widget('pattern_prompt.ui', patch_parent_class='QDialog')
         dlg.setWindowTitle('File paths wizard')
         dlg.setupUi()
+        dlg.resize(600, dlg.height())
         self.dlg = dlg
+
+        self.dlg.patternToolBox = QToolBox(parent=self.dlg)
+        self.dlg.patternWizzardLayout.insertWidget(0, self.dlg.patternToolBox)
+
+        self.pattern_strings = {}
+
+        self.patterns_finders = self.get_patterns()
+        for pattern_idx, p_finder in enumerate(self.patterns_finders):
+            self.add_group()
+            for axis, digits_idx in enumerate(p_finder.pattern.digit_clusters):
+                label_widget, pattern_widget, combo_widget = self.get_widgets(pattern_idx, axis)
+                pattern_widget.setText(p_finder.pattern.highlight_digits(axis))
+                self.enable_widgets((label_widget, pattern_widget, combo_widget))
+            for axis in range(axis + 1, 4):  # Hide the rest
+                self.hide_widgets(self.get_widgets(pattern_idx, axis))
+
         self.fix_btn_boxes_text()
         self.connect_buttons()
 
-        self.pattern_strings = {}
-        self.patterns_finders = self.get_patterns()
+    def get_widgets(self, image_group_id, axis):
+        page = self.dlg.patternToolBox.widget(image_group_id)
+        if page is None:
+            raise IndexError(f'No widget at index {image_group_id}')
+        label_widget = getattr(page, f'label0_{axis}')
+        pattern_widget = getattr(page, f'pattern0_{axis}')
+        combo_widget = getattr(page, f'pattern0_{axis}ComboBox')
 
-        for pattern_idx, p_finder in enumerate(self.patterns_finders):
-            for subpattern_idx, digit_cluster in enumerate(p_finder.pattern.digit_clusters):
-                label_widget, pattern_widget, combo_widget = self.get_widgets(pattern_idx, subpattern_idx)
-                pattern_widget.setText(p_finder.pattern.highlight_digits(subpattern_idx))
-                self.enable_widgets((label_widget, pattern_widget, combo_widget))
-            for subpattern_idx in range(subpattern_idx + 1, 4):
-                self.hide_widgets(self.get_widgets(pattern_idx, subpattern_idx))
+        return label_widget, pattern_widget, combo_widget
+
+    @staticmethod
+    def enable_widgets(widgets):
+        for w in widgets:
+            w.setEnabled(True)
+
+    @staticmethod
+    def hide_widgets(widgets):
+        for w in widgets:
+            w.setVisible(False)
+
+    def add_group(self):
+        group_controls = create_clearmap_widget('image_group_ctrls.ui',
+                                                patch_parent_class='QWidget')
+        group_controls.setupUi()
+        self.dlg.patternToolBox.addItem(group_controls, f'Image group {self.n_image_groups}')
+
+        group_controls.patternButtonBox.button(QDialogButtonBox.Apply).clicked.connect(self.validate_pattern)
+
+        self.n_image_groups += 1
 
     def connect_buttons(self):
-        for i in range(self.dlg.patternToolBox.count()):
-            btn_box = getattr(self.dlg, f'pattern{i}ButtonBox')
-            btn_box.button(QDialogButtonBox.Apply).clicked.connect(self.validate_pattern)
-
         self.dlg.mainButtonBox.button(QDialogButtonBox.Apply).clicked.connect(self.save_results)
         self.dlg.mainButtonBox.button(QDialogButtonBox.Cancel).clicked.connect(self.dlg.close)
-
-    def save_results(self):
-        config_loader = ConfigLoader(self.src_folder)
-        sample_cfg = config_loader.get_cfg('sample')
-        for channel_name, pattern_string in self.pattern_strings.items():
-            sample_cfg['src_paths'][channel_name] = pattern_string
-        sample_cfg.write()
-        self.params.cfg_to_ui()
-        self.dlg.close()
 
     def validate_pattern(self):
         pattern_idx = self.dlg.patternToolBox.currentIndex()
@@ -445,13 +476,13 @@ class PatternDialog:
                 pattern_element = '<{axis},{length}>'.format(axis=axis_name, length=n_axis_chars)
                 pattern.pattern_elements[subpattern_idx] = pattern_element
 
-        result_widget = getattr(self.dlg, 'result_{}'.format(pattern_idx))
+        result_widget = self.dlg.patternToolBox.widget(pattern_idx).result
         pattern_string = pattern.get_formatted_pattern()
         pattern_string = os.path.join(self.patterns_finders[pattern_idx].folder, pattern_string)
 
         result_widget.setText(pattern_string)
 
-        channel_name = getattr(self.dlg, 'channelComboBox{}'.format(pattern_idx)).currentText()
+        channel_name = self.dlg.patternToolBox.widget(pattern_idx).channelComboBox.currentText()
         self.pattern_strings[channel_name] = pattern_string
 
     def fix_btn_boxes_text(self):
@@ -460,35 +491,27 @@ class PatternDialog:
                 btn_box.button(QDialogButtonBox.Apply).setText(btn_box.property('applyText'))
 
     def get_patterns(self):
-        splash, progress_bar = make_splash(bar_max=0)
-        splash.show()  # TODO: other thread to show at the same time
-        # update_pbar(self.app, progress_bar, 10)
-        # self.app.processEvents()
-        pattern_finders = pattern_finders_from_base_dir(self.src_folder)
+        splash, progress_bar = make_splash(bar_max=100)
+        splash.show()
+        pool = ThreadPool(processes=1)
+        result = pool.apply_async(pattern_finders_from_base_dir, [self.src_folder])
+        while not result.ready():
+            result.wait(0.25)
+            update_pbar(self.app, progress_bar, 1)  # TODO: real update
+            self.app.processEvents()
+        pattern_finders = result.get()
+        update_pbar(self.app, progress_bar, 100)
         splash.finish(self.dlg)
         return pattern_finders
 
-    def get_widgets(self, pattern_idx, subpattern_idx):
-        label_widget = getattr(self.dlg, 'label{}_{}'.format(pattern_idx, subpattern_idx))
-        pattern_widget = getattr(self.dlg, 'pattern{}_{}'.format(pattern_idx, subpattern_idx))
-        combo_widget = getattr(self.dlg, 'pattern{}_{}ComboBox'.format(pattern_idx, subpattern_idx))
-        return label_widget, pattern_widget, combo_widget
-
-    def enable_widgets(self, widget_list):  # REFACTOR: parent dialog class
-        for w in widget_list:
-            w.setEnabled(True)
-
-    def disable_widgets(self, widget_list):  # REFACTOR: parent dialog class
-        for w in widget_list:
-            w.setEnabled(False)
-
-    def hide_widgets(self, widget_list):  # REFACTOR: parent dialog class
-        for w in widget_list:
-            w.setHidden(True)
-
-    def unhide_widgets(self, widget_list):  # REFACTOR: parent dialog class
-        for w in widget_list:
-            w.setHidden(False)
+    def save_results(self):
+        config_loader = ConfigLoader(self.src_folder)
+        sample_cfg = config_loader.get_cfg('sample')
+        for channel_name, pattern_string in self.pattern_strings.items():
+            sample_cfg['src_paths'][channel_name] = pattern_string
+        sample_cfg.write()
+        self.params.cfg_to_ui()
+        self.dlg.close()
 
     def exec(self):
         self.dlg.exec()
