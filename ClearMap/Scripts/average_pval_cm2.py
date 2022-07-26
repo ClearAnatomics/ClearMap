@@ -91,6 +91,13 @@ def transpose_p_vals(new_orientation, p_sign, p_vals2):  # FIXME: check cm_rsp.s
     return p_vals2_f, p_sign_f
 
 
+def get_all_structs(dfs):
+    structs = pd.Series()
+    for df in dfs:
+        structs = pd.concat((structs, df['id']))
+    return np.sort(structs.unique())
+
+
 def group_cells_counts(struct_ids, group_cells_dfs, sample_ids):
     all_ints = False
     atlas = clearmap_io.read(annotation.default_annotation_file)
@@ -117,23 +124,12 @@ def group_cells_counts(struct_ids, group_cells_dfs, sample_ids):
     return output
 
 
-def get_all_structs(dfs):
-    structs = pd.Series()
-    for df in dfs:
-        structs = pd.concat((structs, df['id']))
-    return np.sort(structs.unique())
-
-
 def generate_summary_table(cells_dfs, p_cutoff=None):
     gp_names = list(cells_dfs.keys())
 
     grouped_counts = []
 
-    total_df = pd.DataFrame()
-    total_df['id'] = cells_dfs[gp_names[0]]['id']
-    total_df['name'] = cells_dfs[gp_names[0]]['name']
-    total_df['volume'] = cells_dfs[gp_names[0]]['volume']
-    total_df['hemisphere'] = cells_dfs[gp_names[0]]['hemisphere']
+    total_df = pd.DataFrame({k: cells_dfs[gp_names[0]][k] for k in ('id', 'name', 'volume', 'hemisphere')})
     for i, gp_name in enumerate(gp_names):
         grouped_counts.append(pd.DataFrame())
         for col_name in cells_dfs[gp_name].columns:
