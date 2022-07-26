@@ -278,7 +278,7 @@ class DataViewer(pg.QtGui.QWidget):
         axis_tools_layout.addWidget(self.source_label, 0, 3)
 
         self.graphicsView.scene().sigMouseMoved.connect(self.updateLabelFromMouseMove)
-        self.graphicsView.scene().sigMouseClicked.connect(self.handleMouseClick)
+        # self.graphicsView.scene().sigMouseClicked.connect(self.handleMouseClick)
 
         # compose the image viewer
         image_splitter.addWidget(self.graphicsView)
