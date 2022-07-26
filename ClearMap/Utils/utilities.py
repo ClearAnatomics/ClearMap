@@ -42,6 +42,14 @@ def get_free_v_ram():
     return int(result)
 
 
+def get_cuda_version():
+    cmd = 'nvidia-smi -q -u'
+    lines = subprocess.check_output(cmd, shell=True).splitlines()
+    lines = [ln.decode('ASCII') for ln in lines]
+    cuda_line = [ln for ln in lines if ln.lower().startswith('cuda version')][0]
+    return [int(e) for e in cuda_line.split(':')[-1].strip().split('.')]
+
+
 class CancelableProcessPoolExecutor(ProcessPoolExecutor):
     def immediate_shutdown(self):
         with self._shutdown_lock:
