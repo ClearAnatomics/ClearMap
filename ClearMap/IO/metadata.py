@@ -1,11 +1,14 @@
 import os
 from copy import deepcopy
 
-
 import pandas as pd
 
 import tifffile
 from PIL import Image
+from tqdm import tqdm
+
+from ClearMap.IO.Workspace import Workspace
+from ClearMap.IO import IO as clearmap_io
 
 
 class MetadataError(Exception):
@@ -415,4 +418,42 @@ class Pattern:
         if current_chunk:
             self.chunks.append(current_chunk)
 
-# pattern_finders_from_base_dir(cfg)
+
+def stack_tiles_to_columns(sample_folder, axes_order, remove_tiles=False):
+    """
+
+    Parameters
+    ----------
+    sample_folder str:
+        The folder where the data is located
+    axes_order dict:
+        A dictionary of the type {'x': 1, 'y': 0, 'z': 3, 'c': 2} indicating the order of each axis
+    remove_tiles bool:
+        Whether to remove the individual tiles at the end
+
+    Returns
+    -------
+
+    """
+    pattern_finders = pattern_finders_from_base_dir(sample_folder, axes_order=axes_order)
+    images_to_remove = []
+    for pat_finder in tqdm(pattern_finders):
+        for y in tqdm(pat_finder.y_values):
+            for x in tqdm(pat_finder.x_values, leave=False):
+                img_paths = pat_finder.get_sub_tiff_paths(x=x, y=y)
+                sub_pat = PatternFinder(folder=sample_folder, tiff_list=img_paths,
+                                        axes_order=pat_finder.pattern.axes_order)
+                ws = Workspace('CellMap', directory=sub_pat.folder)
+                ws.update({'raw': sub_pat.pattern.clearmap_pattern.replace(sub_pat.folder, '')})
+                # ws.info()
+                new_path = pat_finder.sub_pattern_str(x=x, y=y)
+                new_path = new_path.replace('_xyz-Table Z????', '')
+                new_path = os.path.join(pat_finder.folder, new_path)
+                clearmap_io.convert(ws.source('raw'), new_path)
+                images_to_remove.extend(img_paths)
+
+    with open('/tmp/file_to_rm.txt', 'a') as handle:
+        handle.write('\n'.join(images_to_remove))
+    if remove_tiles:
+        for f_path in images_to_remove:
+            os.remove(f_path)
