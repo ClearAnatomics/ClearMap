@@ -141,12 +141,12 @@ def get_base_dir(cfg):
 ##################################################################################################################
 
 def get_ome_tiffs(folder):
-    return [f_name for f_name in os.listdir(folder) if f_name.endswith('.ome.tif')]
+    return [f_name for f_name in sorted(os.listdir(folder)) if f_name.endswith('.ome.tif')]
 
 
 def get_ome_tiff_list_from_sample_folder(src_dir):
     data_dirs = {}
-    for f_name in os.listdir(src_dir):
+    for f_name in sorted(os.listdir(src_dir)):
         f_path = os.path.join(src_dir, f_name)
         if os.path.isdir(f_path):
             ome_tiffs = get_ome_tiffs(f_path)
@@ -155,13 +155,13 @@ def get_ome_tiff_list_from_sample_folder(src_dir):
     return data_dirs
 
 
-def pattern_finders_from_base_dir(src_dir):
+def pattern_finders_from_base_dir(src_dir, axes_order=None):
     data_dirs = get_ome_tiff_list_from_sample_folder(src_dir)
     finders = []
     for path in data_dirs.keys():
         sub_dir = path.replace(src_dir, '')
         sub_dir = sub_dir[1:] if sub_dir.startswith(os.sep) else sub_dir
-        tmp = PatternFinder.from_mixed_tiff_lists(sub_dir, data_dirs[path])
+        tmp = PatternFinder.from_mixed_tiff_lists(os.path.join(src_dir, sub_dir), data_dirs[path], axes_order=axes_order)
         if isinstance(tmp, (tuple, list)):
             finders.extend(tmp)
         else:
@@ -169,42 +169,109 @@ def pattern_finders_from_base_dir(src_dir):
     return finders
 
 
-class PatternFinder:  # FIXME: needs dir
-    def __init__(self, folder, tiff_list):
+class PatternFinder:  # TODO: from_df class_method
+    def __init__(self, folder, tiff_list=None, df=None, axes_order=None):
         self.folder = folder
-        self.df = self.get_df_from_file_list(tiff_list)
+
+        if tiff_list is not None:
+            self.df = self.get_df_from_file_list(tiff_list)
+        elif df is not None:
+            self.df = df
+        else:
+            raise ValueError('Must supply at least tiff_list or df')
         self.pattern = Pattern(self.pattern_from_df(self.df))
+        if axes_order is not None:
+            self.pattern.axes_order = axes_order
+
+    @property
+    def x_values(self):
+        return self.df.loc[:, self.pattern.x_rng].drop_duplicates().sort_values(self.pattern.x_rng).values
+
+    @property
+    def y_values(self):
+        return self.df.loc[:, self.pattern.y_rng].drop_duplicates().sort_values(self.pattern.y_rng).values
+
+    @property
+    def z_values(self):
+        return self.df.loc[:, self.pattern.z_rng].drop_duplicates().sort_values(self.pattern.z_rng).values
+
+    @property
+    def c_values(self):
+        return self.df.loc[:, self.pattern.c_rng].drop_duplicates().sort_values(self.pattern.c_rng).values
+
+    @property
+    def tiff_list(self):
+        return self.get_tiff_list(self.df)
+
+    @property
+    def tiff_paths(self):
+        return [os.path.join(self.folder, f_name) for f_name in self.tiff_list]
 
     @classmethod
-    def from_mixed_tiff_lists(cls, folder, tiff_list):
+    def from_mixed_tiff_lists(cls, folder, tiff_list, axes_order=None):
         df = cls.get_df_from_file_list(tiff_list)
         pattern = Pattern(cls.pattern_from_df(df))
-        c_idx = [i for i, chunk in enumerate(pattern.chunks) if chunk.endswith('C')]
-        if c_idx:
-            cluster_idx = c_idx[0]
-            return [cls.split_channel(cluster_idx, pattern, df, folder)]
+        finders = cls.split_channel(folder, df, pattern, axes_order=axes_order)
+        if finders is not None:
+            return finders
         else:
             print(f'Could not find different channels in Pattern {pattern}')
-            return cls(folder, tiff_list)
+            return cls(folder, tiff_list, axes_order=axes_order)
 
     @staticmethod
     def get_df_from_file_list(file_names):
-        df = pd.DataFrame()
+        data = []
         for f_name in file_names:
-            df = pd.concat((df, pd.DataFrame(data=[c for c in f_name]).T))
-        return df
+            data.append([c for c in f_name])
+        return pd.DataFrame(data)
 
     @classmethod
-    def split_channel(cls, channel_order, pattern, df, folder):
-        last_channel_idx = pattern.digit_clusters[channel_order][-1]
-        channel_values = df.loc[:, last_channel_idx].sort_values().unique()
+    def split_channel(cls, folder, df, pattern, axes_order=None):
+        return cls.split_axis(folder, df, pattern, 'C', axes_order=axes_order)
+
+    @classmethod
+    def split_axis(cls, folder, df, pattern, axis_letter, axes_order=None):
+        c_idx = [i for i, chunk in enumerate(pattern.chunks) if chunk.endswith(axis_letter)]
+        if c_idx:
+            cluster_idx = c_idx[0]
+        else:
+            return
+        for k in axes_order.keys():  # Remove C from axes_order if we split by C
+            if axes_order[k] > axes_order['c']:
+                axes_order[k] -= 1
+        axes_order['c'] = None
+        columns = pattern.digit_clusters[cluster_idx]
+        axis_values = df[columns].drop_duplicates().values
         pattern_finders = []
-        for channel in channel_values:
-            channel_df = df[df[last_channel_idx == channel]]
-            expr = ''.join([f'{{0[{col}]}}' for col in channel_df.columns])
-            tiff_list = channel_df.agg(expr.format, axis=1)
-            pattern_finders.append(cls(folder, tiff_list))
+        for axis_val in axis_values:
+            sub_df = df.copy()
+            for col, v in zip(columns, axis_val):
+                sub_df = sub_df[sub_df[col] == v]
+
+            tiff_list = cls.get_tiff_list(sub_df)
+            pattern_finders.append(cls(folder, tiff_list, axes_order=axes_order))
         return pattern_finders
+
+    def get_sub_tiff_list(self, x=None, y=None, z=None, c=None):
+        df = self.df.copy()
+        ranges = (self.pattern.x_rng, self.pattern.y_rng, self.pattern.z_rng, self.pattern.c_rng)
+        for axis_val, ax_rng in zip((x, y, z, c), ranges):
+            if axis_val is not None:
+                for col, v in zip(ax_rng, axis_val):
+                    df = df[df[col] == v]
+        return self.get_tiff_list(df)
+
+    def get_sub_tiff_paths(self, x=None, y=None, z=None, c=None):
+        return [os.path.join(self.folder, f_name) for f_name in self.get_sub_tiff_list(x, y, z, c)]
+
+    def sub_pattern_str(self, x=None, y=None, z=None, c=None):
+        return str(PatternFinder(self.folder, tiff_list=self.get_sub_tiff_list(x, y, z, c)).pattern)
+
+    @classmethod
+    def get_tiff_list(cls, df):
+        expr = ''.join([f'{{0[{col}]}}' for col in df.columns])
+        tiff_list = df.agg(expr.format, axis=1)
+        return tiff_list
 
     @staticmethod
     def pattern_from_df(df):
@@ -246,9 +313,64 @@ class Pattern:
         self.pattern_elements = []  # e.g. ['<X,2>', '<Y,2>']
         self.pattern_str = pattern_str
         self.parse_pattern(pattern_str)
+        self.axes_order = {'x': None, 'y': None, 'z': None, 'c': None}
 
     def __str__(self):
         return self.pattern_str
+
+    @property
+    def clearmap_pattern(self):
+        out = ''
+        for i in range(len(self.chunks)):
+            out += self.chunks[i]
+            if i < len(self.digit_clusters):
+                ax = [k for k, v in self.axes_order.items() if v == i][0]
+                out += f'<{ax.upper()},{len(self.digit_clusters[i])}>'
+        return out
+
+    @property
+    def x_order(self):
+        return self.axes_order['x']
+
+    @property
+    def y_order(self):
+        return self.axes_order['y']
+
+    @property
+    def z_order(self):
+        return self.axes_order['z']
+
+    @property
+    def c_order(self):
+        return self.axes_order['c']
+
+    @property
+    def x_rng(self):
+        if self.x_order is None:
+            return
+        else:
+            return self.digit_clusters[self.x_order]
+
+    @property
+    def y_rng(self):
+        if self.y_order is None:
+            return
+        else:
+            return self.digit_clusters[self.y_order]
+
+    @property
+    def z_rng(self):
+        if self.z_order is None:
+            return
+        else:
+            return self.digit_clusters[self.z_order]
+
+    @property
+    def c_rng(self):
+        if self.c_order is None:
+            return
+        else:
+            return self.digit_clusters[self.c_order]
 
     def get_formatted_pattern(self):
         out = ''
