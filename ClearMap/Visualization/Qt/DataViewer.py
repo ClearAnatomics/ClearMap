@@ -441,8 +441,8 @@ class DataViewer(pg.QtGui.QWidget):
         stop = self.source_shape[ax] + 0.5
         self.sliceLine.setBounds([0, stop])
 
-    def updateLabelFromMouseMove(self, event):
-        x, y = self.get_coords(event)
+    def updateLabelFromMouseMove(self, event_pos):
+        x, y = self.get_coords(event_pos)
         self.sync_cursors(x, y)
 
         x_axis, y_axis = self.getXYAxes()
@@ -460,8 +460,8 @@ class DataViewer(pg.QtGui.QWidget):
         scaled_y = min(int(y / self.source_scale[y_axis]), self.source_shape[y_axis] - 1)
         return scaled_x, scaled_y
 
-    def get_coords(self, event):
-        mouse_point = self.view.mapSceneToView(event)
+    def get_coords(self, pos):
+        mouse_point = self.view.mapSceneToView(pos)
         x, y = mouse_point.x(), mouse_point.y()
         x = min(max(0, x), self.source_range_x)
         y = min(max(0, y), self.source_range_y)
