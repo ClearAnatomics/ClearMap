@@ -287,14 +287,7 @@ class DataViewer(pg.QtGui.QWidget):
         image_splitter.setSizes([self.height()-35-20, 35, 20])
 
         # lut widgets
-        if self.n_sources == 1:
-            cols = [default_lut]
-        elif self.n_sources == 2:
-            cols = ['purple', 'green']
-        else:
-            cols = np.array(['white', 'green', 'red', 'blue', 'purple'] * self.n_sources)[:self.n_sources]
-
-        self.luts = [LUT(image=i, color=c) for i, c in zip(self.image_items, cols)]
+        self.luts = [LUT(image=i, color=c) for i, c in zip(self.image_items, self.__get_colors(default_lut))]
 
         lut_layout = pg.QtGui.QGridLayout()
 
@@ -317,6 +310,15 @@ class DataViewer(pg.QtGui.QWidget):
             self.setMinMax(minMax)
 
         self.show()
+
+    def __get_colors(self, default_lut):
+        if self.n_sources == 1:
+            cols = [default_lut]
+        elif self.n_sources == 2:
+            cols = ['purple', 'green']
+        else:
+            cols = np.array(['white', 'green', 'red', 'blue', 'purple'] * self.n_sources)[:self.n_sources]
+        return cols
 
     def __setup_axes_controls(self):
         axis_tools_layout = pg.QtGui.QGridLayout()
@@ -493,15 +495,15 @@ class DataViewer(pg.QtGui.QWidget):
         slc[x_axis] = x
         slc[y_axis] = y
         slc[self.scroll_axis] = z
+        slc = tuple(slc)
         if self.all_colour:
             vals = ", ".join([str(s.array[slc]) for s in self.sources])
-        else:
-            vals = ", ".join([str(s[slc]) for s in self.sources])  # FIXME: check why array does not work for grayscale
+        else:  # FIXME: check why array does not work for ndim = 3 (i.e. why we need 2 versions)
+            vals = ", ".join([str(s[slc]) for s in self.sources])
         label = f"({x}, {y}, {z}) {{{x*xs:.2f}, {y*ys:.2f}, {z*zs:.2f}}} [{vals}]"
-        if self.parent().objectName().lower().startswith('dataviewer'):
-            self.source_label.setText(label)
-        else:
-            self.source_label.setText(f"<span style='font-size: 12pt; color: black'>{label}</span>")
+        if self.parent() is None or not self.parent().objectName().lower().startswith('dataviewer'):
+            label = f"<span style='font-size: 12pt; color: black'>{label}</span>"
+        self.source_label.setText(label)
 
     def updateSlice(self):
         ax = self.scroll_axis
