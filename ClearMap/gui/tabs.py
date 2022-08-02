@@ -517,6 +517,8 @@ class CellCounterTab(PostProcessingTab):
     def filter_cells(self):
         self.params.ui_to_cfg()
         self.__filter_cells()
+        self.cell_detector.atlas_align()
+        self.cell_detector.export_collapsed_stats()
 
     def run_cell_map(self):
         self.params.ui_to_cfg()
@@ -693,7 +695,7 @@ class BatchTab(GenericTab):
         self.processing_type = 'batch'
 
     @property
-    def inited(self):
+    def initialised(self):
         return self.params is not None
 
     def set_params(self):
