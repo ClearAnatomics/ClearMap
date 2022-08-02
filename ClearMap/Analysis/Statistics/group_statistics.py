@@ -6,23 +6,37 @@ Statistics
 Create some statistics to test significant changes in voxelized and labeled 
 data.
 """
-__author__ = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
-__license__ = 'GPLv3 - GNU General Pulic License v3 (see LICENSE.txt)'
+__author__ = 'Christoph Kirst <christoph.kirst.ck@gmail.com>, Sophie Skriabine <sophie.skriabine@icm-institute.org>, Charly Rousseau <charly.rousseau@icm-institute.org>'
+__license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
 
+import os
 
 import numpy as np
+import pandas as pd
+import tifffile
 from scipy import stats
 
-import ClearMap.IO.IO as clearmap_io
-import ClearMap.Alignment.Annotation as annotation
 import ClearMap.Analysis.Statistics.StatisticalTests as clearmap_stat_tests
+from ClearMap.Alignment import Annotation as annotation
+from ClearMap.Alignment.utils import get_all_structs
+from ClearMap.Analysis.Statistics import MultipleComparisonCorrection as clearmap_FDR
+from ClearMap.IO import IO as clearmap_io
+from ClearMap.Utils.path_utils import is_density_file, find_density_file, find_cells_df, dir_to_sample_id
+from ClearMap.Utils.utilities import make_abs
+
+colors = {
+    'red': [255, 0, 0],
+    'green': [0, 255, 0],
+    'blue': [0, 0, 255]
+}
 
 
 def t_test_voxelization(group1, group2, signed=False, remove_nan=True, p_cutoff=None):
-    """t-Test on differences between the individual voxels in group1 and group2
+    """
+    t-Test on differences between the individual voxels in group1 and group2
 
     Arguments
     ---------
@@ -96,7 +110,7 @@ def read_group(sources, combine=True, **args):
     Returns
     -------
     group : array or list
-        The gorup data.
+        The group data.
     """
 
     # check if stack already:
@@ -122,14 +136,14 @@ def color_p_values(p_vals, p_sign, positive_color=[1, 0], negative_color=[0, 1],
 
     Parameters
     ----------
-    p_vals np.array
-    p_sign np.array
-    positive list
-    negative list
-    pcutoff float
-    positivetrend list
-    negativetrend list
-    pmax float
+    p_vals np.array:
+    p_sign np.array:
+    positive list:
+    negative list:
+    pcutoff float:
+    positivetrend list:
+    negativetrend list:
+    pmax float:
 
     Returns
     -------
@@ -187,70 +201,6 @@ def weights_from_precentiles(intensities, percentiles=[25, 50, 75, 100]):
         weights[ii] = weights[ii] + 1
 
     return weights
-
-
-# # needs clean up
-# def count_points_group_in_regions(point_group, annotation_file=annotation.default_annotation_file,
-#                                   weight_group=None, invalid=0, hierarchical=True):
-#     """Generates a table of counts for the various point datasets in pointGroup"""
-#
-#     if intensity_group is None:
-#         counts = [annotation.count_points(point_group[i], annotation_file=annotation_file, invalid=invalid, hierarchical=hierarchical) for i in range(len(point_group))]
-#     else:
-#         counts = [annotation.count_points(point_group[i], weight=weight_group[i], annotation_file=annotation_file, invalid=invalid, hierarchical=hierarchical) for i in range(len(point_group))]
-#
-#     counts = np.vstack(counts).T
-#
-#     if returnIds:
-#         ids = np.sort(lbl.Label.ids)
-#         if intensities is None:
-#             return ids, counts
-#         else:
-#             return ids, counts, intensities
-#     else:
-#         if intensities is None:
-#             return counts
-#         else:
-#             return counts, intensities
-#
-#
-# def countPointsGroupInRegions(pointGroup, labeledImage=lbl.DefaultLabeledImageFile, intensityGroup=None, intensityRow=0,  # FIXME: V1
-#                               returnIds=True, returnCounts=False, collapse=None):
-#     """Generates a table of counts for the various point datasets in pointGroup"""
-#
-#     if intensityGroup is None:
-#         counts = [
-#             lbl.countPointsInRegions(pointGroup[i], labeledImage=labeledImage, sort=True, allIds=True, returnIds=False,
-#                                      returnCounts=returnCounts, intensities=None, collapse=collapse) for i in
-#             range(len(pointGroup))]
-#     else:
-#         counts = [
-#             lbl.countPointsInRegions(pointGroup[i], labeledImage=labeledImage, sort=True, allIds=True, returnIds=False,
-#                                      returnCounts=returnCounts,
-#                                      intensities=intensityGroup[i], intensityRow=intensityRow, collapse=collapse) for i
-#             in range(len(pointGroup))]
-#
-#     if returnCounts and intensityGroup is not None:
-#         countsi = (c[1] for c in counts)
-#         counts = (c[0] for c in counts)
-#     else:
-#         countsi = None
-#
-#     counts = np.vstack((c for c in counts)).T
-#     if not countsi is None:
-#         countsi = np.vstack((c for c in countsi)).T
-#
-#     if returnIds:
-#         ids = np.sort(lbl.Label.ids)
-#         if countsi is None:
-#             return ids, counts
-#         else:
-#             return ids, counts, countsi
-#     else:
-#         if countsi is None:
-#             return counts
-#         else:
-#             return counts, countsi
 
 
 def __prepare_cumulative_data(data, offset):  # FIXME: use better variable names
@@ -331,10 +281,217 @@ def test_completed_inverted_cumulatives(data, method='AndersonDarling', offset=N
     return __run_cumulative_test(datac, k, method)
 
 
+def remove_p_val_nans(p_vals, t_vals):
+    invalid_idx = np.isnan(p_vals)
+    p_vals_c = p_vals.copy()
+    t_vals_c = t_vals.copy()
+    p_vals_c[invalid_idx] = 1.0
+    t_vals_c[invalid_idx] = 0
+    return p_vals_c, t_vals_c
+
+
+def stack_voxelizations(directory, f_list, suffix):
+    """
+    Regroup voxelizations to simplify further processing
+
+    Parameters
+    ----------
+    directory
+    f_list
+    suffix
+
+    Returns
+    -------
+
+    """
+    for i, file_name in enumerate(f_list):
+        img = clearmap_io.read(make_abs(directory, file_name))
+        if i == 0:  # init on first image
+            stacked_voxelizations = img[:, :, :, np.newaxis]
+        else:
+            stacked_voxelizations = np.concatenate((stacked_voxelizations, img[:, :, :, np.newaxis]), axis=3)
+    stacked_voxelizations = stacked_voxelizations.astype(np.float32)
+    try:
+        clearmap_io.write(os.path.join(directory, f'stacked_density_{suffix}.tif'), stacked_voxelizations, bigtiff=True)
+    except ValueError:
+        pass
+    return stacked_voxelizations
+
+
+def average_voxelization_groups(stacked_voxelizations, directory, suffix):
+    avg_voxelization = np.mean(stacked_voxelizations, axis=3)
+    clearmap_io.write(os.path.join(directory, f'avg_density_{suffix}.tif'), avg_voxelization)
+
+
+def get_colored_p_vals(p_vals, t_vals, significance, color_names):
+    p_vals2_f, p_sign_f = get_p_vals_f(p_vals, t_vals, significance)
+    return color_p_values(p_vals2_f, p_sign_f,
+                          positive_color=colors[color_names[0]],
+                          negative_color=colors[color_names[1]])
+
+
+def dirs_to_density_files(directory, f_list):
+    out = []
+    for i, f_name in enumerate(f_list):
+        f_name = make_abs(directory, f_name)
+        if not is_density_file(f_name):
+            f_name = find_density_file(f_name)
+        out.append(f_name)
+    return out
+
+
+def get_p_vals_f(p_vals, t_vals, p_cutoff, new_orientation=(2, 0, 1)):  # FIXME: from sagittal to coronal view  specific to original orientation
+    p_vals2 = np.clip(p_vals, None, p_cutoff)
+    p_sign = np.sign(t_vals)
+    return transpose_p_vals(new_orientation, p_sign, p_vals2)
+
+
+def transpose_p_vals(new_orientation, p_sign, p_vals2):  # FIXME: check cm_rsp.sagittalToCoronalData
+    p_vals2_f = np.transpose(p_vals2, new_orientation)
+    p_sign_f = np.transpose(p_sign, new_orientation)
+    return p_vals2_f, p_sign_f
+
+
+def group_cells_counts(struct_ids, group_cells_dfs, sample_ids):
+    all_ints = False
+    atlas = clearmap_io.read(annotation.default_annotation_file)
+    if all_ints:
+        output = pd.DataFrame(columns=['id', 'hemisphere'] + [f'counts_{str(sample_ids[i]).zfill(2)}' for i in range(len(group_cells_dfs))])
+    else:
+        output = pd.DataFrame(columns=['id', 'hemisphere'] + [f'counts_{sample_ids[i]}' for i in range(len(group_cells_dfs))])
+
+    output['id'] = np.tile(struct_ids, 2)  # for each hemisphere
+    output['name'] = np.tile([annotation.find(_id, key='id')['name'] for _id in struct_ids], 2)
+    output['volume'] = np.tile([(atlas == _id).sum() for _id in struct_ids], 2)
+    output['hemisphere'] = np.repeat((0, 255), len(struct_ids))
+
+    for multiplier, hem_id in zip((1, 2), (0, 255)):
+        for j, sample_df in enumerate(group_cells_dfs):
+            if all_ints:
+                col_name = f'counts_{str(sample_ids[j]).zfill(2)}'  # TODO: option with f'counts_{j}'
+            else:
+                col_name = f'counts_{sample_ids[j]}'
+
+            hem_sample_df = sample_df[sample_df['hemisphere'] == hem_id]
+            for i, struct_id in enumerate(struct_ids):
+                output.at[i*multiplier, col_name] = len(hem_sample_df[hem_sample_df['id'] == struct_id])  # FIXME: slow
+    return output
+
+
+def generate_summary_table(cells_dfs, p_cutoff=None):
+    gp_names = list(cells_dfs.keys())
+
+    grouped_counts = []
+
+    total_df = pd.DataFrame({k: cells_dfs[gp_names[0]][k] for k in ('id', 'name', 'volume', 'hemisphere')})
+    for i, gp_name in enumerate(gp_names):
+        grouped_counts.append(pd.DataFrame())
+        for col_name in cells_dfs[gp_name].columns:
+            if 'count' in col_name:
+                col = cells_dfs[gp_name][col_name]
+                new_col_name = f'{gp_names[i]}_{col_name}'
+                total_df[new_col_name] = col
+                grouped_counts[i][new_col_name] = col
+        total_df[f'mean_{gp_name}'] = grouped_counts[i].mean(axis=1)
+        total_df[f'sd_{gp_name}'] = grouped_counts[i].std(axis=1)
+
+    total_df, grouped_counts = sanitize_df(gp_names, grouped_counts, total_df)
+
+    gp1 = grouped_counts[0].values.astype(np.int)
+    gp2 = grouped_counts[1].values.astype(np.int)
+    p_vals, p_signs = t_test_region_counts(gp1, gp2, p_cutoff=p_cutoff, signed=True)
+    total_df['p_value'] = p_vals
+    total_df['q_value'] = clearmap_FDR.estimate_q_values(p_vals)
+    total_df['p_sign'] = p_signs
+    return total_df
+
+
+def sanitize_df(gp_names, grouped_counts, total_df):
+    """
+    Remove rows with all 0 or NaN in at least 1 group
+    Args:
+        gp_names:
+        grouped_counts:
+        total_df:
+
+    Returns:
+
+    """
+    bad_idx = total_df[f'mean_{gp_names[0]}'] == 0  # FIXME: check that either not and
+    bad_idx = np.logical_or(bad_idx, total_df[f'mean_{gp_names[1]}'] == 0)
+    bad_idx = np.logical_or(bad_idx, np.isnan(total_df[f'mean_{gp_names[0]}']))
+    bad_idx = np.logical_or(bad_idx, np.isnan(total_df[f'mean_{gp_names[1]}']))
+
+    return total_df[~bad_idx], [grouped_counts[0][~bad_idx], grouped_counts[1][~bad_idx]]
+
+
+def dirs_to_cells_dfs(directory, dirs):
+    out = []
+    for i, f_name in enumerate(dirs):
+        f_name = make_abs(directory, f_name)
+        if not f_name.endswith('cells.feather'):
+            f_name = find_cells_df(f_name)
+        out.append(pd.read_feather(f_name))
+    return out
+
+
+def make_summary(directory, gp1_name, gp2_name, gp1_dirs, gp2_dirs, output_path=None, save=True):
+    gp1_dfs = dirs_to_cells_dfs(directory, gp1_dirs)
+    gp2_dfs = dirs_to_cells_dfs(directory, gp2_dirs)
+    gp_cells_dfs = [gp1_dfs, gp2_dfs]
+    structs = get_all_structs(gp1_dfs + gp2_dfs)
+
+    gp1_sample_ids = [dir_to_sample_id(folder) for folder in gp1_dirs]
+    gp2_sample_ids = [dir_to_sample_id(folder) for folder in gp2_dirs]
+    sample_ids = [gp1_sample_ids, gp2_sample_ids]
+
+    aggregated_dfs = {gp_name: group_cells_counts(structs, gp_cells_dfs[i], sample_ids[i])
+                      for i, gp_name in enumerate((gp1_name, gp2_name))}
+    total_df = generate_summary_table(aggregated_dfs)
+
+    if output_path is None and save:
+        output_path = os.path.join(directory, f'statistics_{gp1_name}_{gp2_name}.csv')
+    if save:
+        total_df.to_csv(output_path)
+    return total_df
+
+
+def density_files_are_comparable(directory, gp1_dirs, gp2_dirs):
+    gp1_f_list = dirs_to_density_files(directory, gp1_dirs)
+    gp2_f_list = dirs_to_density_files(directory, gp2_dirs)
+    all_files = gp1_f_list + gp2_f_list
+    sizes = [os.path.getsize(f) for f in all_files]
+    return all(s == sizes[0] for s in sizes)
+
+
+def compare_groups(directory, gp1_name, gp2_name, gp1_dirs, gp2_dirs, prefix='p_val_colors'):
+    make_summary(directory, gp1_name, gp2_name, gp1_dirs, gp2_dirs)
+
+    gp1_f_list = dirs_to_density_files(directory, gp1_dirs)
+    gp2_f_list = dirs_to_density_files(directory, gp2_dirs)
+
+    gp1_stacked_voxelizations = stack_voxelizations(directory, gp1_f_list, suffix=gp1_name)
+    average_voxelization_groups(gp1_stacked_voxelizations, directory, gp1_name)
+    gp2_stacked_voxelizations = stack_voxelizations(directory, gp2_f_list, suffix=gp2_name)
+    average_voxelization_groups(gp2_stacked_voxelizations, directory, gp2_name)
+
+    t_vals, p_vals = stats.ttest_ind(gp1_stacked_voxelizations, gp2_stacked_voxelizations, axis=3, equal_var=False)
+    p_vals, t_vals = remove_p_val_nans(p_vals, t_vals)
+
+    colored_p_vals_05 = get_colored_p_vals(p_vals, t_vals, 0.05, ('red', 'green'))
+    colored_p_vals_01 = get_colored_p_vals(p_vals, t_vals, 0.01, ('green', 'blue'))
+    p_vals_col_f = np.swapaxes(np.maximum(colored_p_vals_05, colored_p_vals_01), 2, 0).astype(np.uint8)  # FIXME: reorientation specific of initial orientation
+
+    output_f_name = f'{prefix}_{gp1_name}_{gp2_name}.tif'
+    output_file_path = os.path.join(directory, output_f_name)
+    tifffile.imsave(output_file_path, p_vals_col_f, photometric='rgb', imagej=True)
+    return p_vals_col_f
+
+
 # def test_completed_cumulatives_in_spheres(points1, intensities1, points2, intensities2, shape = ano.default_annotation_file, radius = 100, method = 'AndresonDarling'):
 #   """Performs completed cumulative distribution tests for each pixel using points in a ball centered at that cooridnates, returns 4 arrays p value, statistic value, number in each group"""
 #
-#   #TODO: sinple implementation -> slow -> speed up
+#   # TODO: simple implementation -> slow -> speed up
 #   if not isinstance(shape, tuple):
 #     shape = io.shape(shape)
 #   if len(shape) != 3:
@@ -347,12 +504,12 @@ def test_completed_inverted_cumulatives(data, method='AndersonDarling', offset=N
 #   x2 = points2[:,0]; y2 = points2[:,1]; z2 = points2[:,2]; i2 = intensities2
 #   d2 = x2 * x2 + y2 * y2 + z2 * z2
 #
-#   r2 = radius * radius  # TODO: inhomogenous in 3d !
+#   r2 = radius * radius  # WARNING: inhomogenous in 3d !
 #
 #   p = np.zeros(dataSize)
 #   s = np.zeros(dataSize)
-#   n1 = np.zeros(dataSize, dtype = 'int')
-#   n2 = np.zeros(dataSize, dtype = 'int')
+#   n1 = np.zeros(dataSize, dtype='int')
+#   n2 = np.zeros(dataSize, dtype='int')
 #
 #   for x in range(dataSize[0]):
 #   #print x
@@ -401,12 +558,3 @@ def test_completed_inverted_cumulatives(data, method='AndersonDarling', offset=N
 #
 #     import ClearMap.Visualization.Plot3d as p3d
 #     p3d.plot(pvalscol)
-
-
-def remove_p_val_nans(p_vals, t_vals):
-    invalid_idx = np.isnan(p_vals)
-    p_vals_c = p_vals.copy()
-    t_vals_c = t_vals.copy()
-    p_vals_c[invalid_idx] = 1.0
-    t_vals_c[invalid_idx] = 0
-    return p_vals_c, t_vals_c
