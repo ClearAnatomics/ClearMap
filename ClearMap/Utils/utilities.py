@@ -7,6 +7,8 @@ from concurrent.futures import ProcessPoolExecutor
 import numpy as np
 import psutil
 
+from ClearMap.Utils.install_utils import get_cuda_line
+
 colors = {
     "WHITE": '\033[1;37m',
     "GREEN": '\033[0;32m',
@@ -40,14 +42,6 @@ def get_free_v_ram():
     cmd = 'nvidia-smi --query-gpu=memory.free --format=noheader,csv,nounits'
     result = subprocess.check_output(cmd, shell=True)
     return int(result)
-
-
-def get_cuda_version():
-    cmd = 'nvidia-smi -q -u'
-    lines = subprocess.check_output(cmd, shell=True).splitlines()
-    lines = [ln.decode('ASCII') for ln in lines]
-    cuda_line = [ln for ln in lines if ln.lower().startswith('cuda version')][0]
-    return [int(e) for e in cuda_line.split(':')[-1].strip().split('.')]
 
 
 class CancelableProcessPoolExecutor(ProcessPoolExecutor):

@@ -12,10 +12,12 @@
 # update:  conda env update -f ClearMap.yml 
 name: ClearMapUi
 channels:
+  - pytorch
   - conda-forge
   - defaults
+
 dependencies:
-  - python>=3.7
+  - python=3.7  # constraining seems to speed up resolution
   - pip
   - vispy<=0.5.3
   - pyopengl
@@ -31,7 +33,8 @@ dependencies:
   - scikit-image
   - scikit-learn
   - graph-tool
-  - pytorch
+  - pytorch<=1.11
+  - cudatoolkit=11.6
   - pygments
   - qdarkstyle
   - qtpy  # for qdarkstyle
@@ -44,4 +47,4 @@ dependencies:
   - pip:
     - lxml
 #variables:
-#  TMPDIR: /data/tmp
+#  TMPDIR: /data/tmp  # FIXME:

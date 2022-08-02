@@ -6,6 +6,15 @@ config_folder="$HOME/.clearmap"
 
 eval "$(conda shell.bash hook)"  # Required to activate conda envs
 
+
+python -c 'import os, sys; sys.path.append(os.getcwd()); \
+from ClearMap.Utils.install_utils import assert_cuda; assert_cuda()' || exit 1
+
+
+python -c 'import os, sys; sys.path.append(os.getcwd()); \
+from ClearMap.Utils.install_utils import patch_cuda_toolkit_version;\
+ patch_cuda_toolkit_version(os.path.join(os.getcwd(), "ClearMapUi.yml"))'
+
 conda env list | grep ClearMapUi
 if [ $? -eq 1 ]; then
   conda env create -f "$BASEDIR/ClearMapUi.yml"
