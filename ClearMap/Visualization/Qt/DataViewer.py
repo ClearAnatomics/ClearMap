@@ -168,6 +168,8 @@ class LUT(pg.QtGui.QWidget):
 
 
 class DataViewer(pg.QtGui.QWidget):
+    mouse_clicked = pg.QtCore.pyqtSignal(int, int, int)
+
     DEFAULT_SCATTER_PARAMS = {
         'pen': 'red',
         'brush': 'red',
@@ -574,6 +576,18 @@ class DataViewer(pg.QtGui.QWidget):
             if image.dtype == bool:
                 image = image.view('uint8')
             img_item.updateImage(image)
+
+    def handleMouseClick(self, event):
+        event.accept()
+        x, y = self.get_coords(event.scenePos())
+        btn = event.button()
+        double_click = event.double()
+        modifiers = event.modifiers()
+        print(btn, double_click, modifiers == pg.Qt.ShiftModifier)
+
+        x_axis, y_axis = self.getXYAxes()
+        scaled_x, scaled_y = self.scale_coords(x, x_axis, y, y_axis)
+        self.mouse_clicked.emit(scaled_x, scaled_y, self.source_index[self.scroll_axis])
 
     def setMinMax(self, min_max, source=0):
         self.luts[source].lut.region.setRegion(min_max)
