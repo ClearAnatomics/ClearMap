@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Setings
+Settings
 =======
 
 Module to set *ClearMap's* internal parameter and paths to external programs.
@@ -17,7 +17,7 @@ See Also
     * :const:`ilastik_path`
 """
 __author__ = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
-__license__ = 'GPLv3 - GNU General Pulic License v3 (see LICENSE)'
+__license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
@@ -30,7 +30,7 @@ import os
 ###############################################################################
 
 
-def path():
+def path():  # FIXME: use inspect and rename
     """Returns root path to the ClearMap software.
   
     Returns
@@ -49,6 +49,8 @@ clearmap_path = path()
 """Absolute path to the ClearMap's resources folder."""
 resources_path = os.path.join(clearmap_path, 'Resources')
 
+atlas_folder = os.path.join(resources_path, 'Atlas')
+
 """Absolute path to the ClearMap's external program folder."""
 external_path = os.path.join(clearmap_path, 'External')
 
@@ -63,7 +65,7 @@ test_data_path = os.path.join(test_path, 'Data')
 # ## Paths to external programs and resources
 ###############################################################################
 
-"""Absolue path to the elastix installation
+"""Absolute path to the elastix installation
 
 Note
 ----
@@ -71,7 +73,7 @@ Note
 """
 elastix_path = os.path.join(external_path, 'elastix', 'build')
 
-"""Absolue path to the TeraStitcher installation
+"""Absolute path to the TeraStitcher installation
 
 Note
 ----
@@ -79,7 +81,7 @@ Note
 """
 tera_stitcher_path = None
 
-"""Absolue path to the ImageJ/Fiji installation
+"""Absolute path to the ImageJ/Fiji installation
 
 Note
   `ImageJ/Fiji Webpage <https://fiji.sc/>`_

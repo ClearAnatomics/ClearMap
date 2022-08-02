@@ -54,16 +54,11 @@ import ClearMap.Visualization.Color as col
 # ## Atlas Structures
 ###############################################################################
 
-# TODO: move to settings ?
-atlas_path = os.path.join(settings.resources_path, 'Atlas')
-"""Default path to atlas information.
-"""
-
 def uncompress_atlases(atlas_base_name):
     paths = []
     atlas_component_names = ('annotation', 'hemispheres', 'reference', 'distance_to_surface')
     for f_name in [f'{atlas_base_name}_{atlas_type}.tif' for atlas_type in atlas_component_names]:
-        f_path = os.path.join(atlas_path, f_name)
+        f_path = os.path.join(settings.atlas_folder, f_name)
         fu.uncompress(f_path)
         paths.append(f_path)
     return paths
@@ -82,7 +77,7 @@ default_annotation_file, default_hemispheres_file,\
 default_reference_file, default_distance_to_surface_file = uncompress_atlases(atlas_base_name)
 
 
-default_label_file = os.path.join(atlas_path, 'ABA_annotation.json')
+default_label_file = os.path.join(settings.atlas_folder, 'ABA_annotation.json')
 """Default list of labels and region names in the annotated image.
 
 Note

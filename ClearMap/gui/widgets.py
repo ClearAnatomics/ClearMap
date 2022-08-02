@@ -19,7 +19,7 @@ from PyQt5.QtWidgets import QWidget, QDialogButtonBox, QListWidget, QHBoxLayout,
 
 from ClearMap.IO import TIF
 from ClearMap.IO.metadata import pattern_finders_from_base_dir
-from ClearMap.Settings import resources_path
+from ClearMap.Settings import atlas_folder
 from ClearMap.Visualization import Plot3d as plot_3d
 from ClearMap.config.config_loader import ConfigLoader
 from ClearMap.gui.dialogs import make_splash, get_directory_dlg, update_pbar
@@ -27,7 +27,7 @@ from ClearMap.gui.gui_utils import pseudo_random_rgb_array, create_clearmap_widg
 
 
 def setup_mini_brain(mini_brain_scaling=(5, 5, 5)):  # TODO: scaling in prefs
-    atlas_path = os.path.join(resources_path, 'Atlas', 'ABA_25um_annotation.tif')  # TODO: function of chosen atlas ?
+    atlas_path = os.path.join(atlas_folder, 'ABA_25um_annotation.tif')
     arr = TIF.Source(atlas_path).array
     return mini_brain_scaling, sk_transform.downscale_local_mean(arr, mini_brain_scaling)
 
