@@ -431,7 +431,7 @@ class ClearMapGui(ClearMapGuiBase):
             else:
                 self.__check_missing_alignment()
 
-        if tab_index == 4 and not self.batch_tab_mgr.inited:
+        if tab_index == 4 and not self.batch_tab_mgr.initialised:
             cfg_name = title_to_snake(self.batch_tab_mgr.name)
             try:
                 self.batch_tab_mgr.setup()
