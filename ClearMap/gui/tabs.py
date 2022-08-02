@@ -5,7 +5,7 @@ from PyQt5.QtWidgets import QDialogButtonBox
 
 from ClearMap.IO import IO as clearmap_io
 from ClearMap.IO.MHD import mhd_read
-from ClearMap.Scripts.average_pval_cm2 import compare_groups, make_summary, density_files_are_comparable
+from ClearMap.Analysis.Statistics.group_statistics import make_summary, density_files_are_comparable, compare_groups
 from ClearMap.Scripts.batch_process import process_folders
 from ClearMap.Scripts.cell_map import CellDetector
 from ClearMap.Scripts.sample_preparation import PreProcessor

@@ -7,7 +7,7 @@ import pandas as pd
 import pytest
 import tifffile
 
-from ClearMap.Scripts.average_pval_cm2 import compare_groups
+from ClearMap.Analysis.Statistics.group_statistics import compare_groups
 from ClearMap.Settings import clearmap_path
 from ClearMap.IO import IO as clearmap_io
 from ClearMap.Alignment import Annotation as annotation
