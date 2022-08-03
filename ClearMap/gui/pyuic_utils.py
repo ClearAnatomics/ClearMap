@@ -1,3 +1,11 @@
+# -*- coding: utf-8 -*-
+"""
+pyuic_utils
+===========
+
+Essentially a reimplementation of loadUiType from PyQt5 to allow monkey patching the classes
+"""
+
 from io import StringIO
 
 from PyQt5 import QtWidgets
@@ -5,7 +13,8 @@ from PyQt5.uic.Compiler import compiler
 
 
 def loadUiType(uifile, from_imports=False, resource_suffix='_rc', import_from='.', patch_parent_class='', replace_pairs=None):
-    """loadUiType(uifile, from_imports=False, resource_suffix='_rc', import_from='.') -> (form class, base class)
+    """
+    loadUiType(uifile, from_imports=False, resource_suffix='_rc', import_from='.') -> (form class, base class)
 
     Load a Qt Designer .ui file and return the generated form class and the Qt
     base class.

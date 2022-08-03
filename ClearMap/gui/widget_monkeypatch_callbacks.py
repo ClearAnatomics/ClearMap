@@ -1,8 +1,24 @@
+# -*- coding: utf-8 -*-
+"""
+widget_monkeypatch_callbacks
+============================
+
+A set of functions that will be monkey patched as methods to the graphical widgets,
+allowing notably compound widgets from QtCreator without defining plugins
+"""
+
 from typing import Iterable
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QSpinBox, QDoubleSpinBox, QCheckBox, QLineEdit, QDialogButtonBox, QDockWidget, \
     QPlainTextEdit, QTextEdit
+
+
+__author__ = 'Charly Rousseau <charly.rousseau@icm-institute.org>'
+__license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
+__copyright__ = 'Copyright © 2022 by Charly Rousseau'
+__webpage__ = 'https://idisco.info'
+__download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
 
 
 def none_str_to_literal(txt):

@@ -1,3 +1,11 @@
+# -*- coding: utf-8 -*-
+"""
+tabs
+====
+
+The different tabs that correspond to different functionalities of the GUI
+"""
+
 import os.path
 
 import numpy as np
@@ -11,11 +19,18 @@ from ClearMap.Scripts.cell_map import CellDetector
 from ClearMap.Scripts.sample_preparation import PreProcessor
 from ClearMap.Scripts.tube_map import BinaryVesselProcessor, VesselGraphProcessor
 from ClearMap.gui.gui_utils import format_long_nb_to_str, surface_project, np_to_qpixmap, create_clearmap_widget
-from ClearMap.gui.plots import link_dataviewers_cursors
+from ClearMap.Visualization.Qt.DataViewer import link_dataviewers_cursors
 from ClearMap.gui.params import ParamsOrientationError, VesselParams, PreferencesParams, SampleParameters, \
     AlignmentParams, CellMapParams, BatchParams
 from ClearMap.gui.widgets import PatternDialog, SamplePickerDialog, DataFrameWidget
 from ClearMap.Visualization.Qt import Plot3d as plot_3d
+
+
+__author__ = 'Charly Rousseau <charly.rousseau@icm-institute.org>'
+__license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
+__copyright__ = 'Copyright © 2022 by Charly Rousseau'
+__webpage__ = 'https://idisco.info'
+__download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
 
 
 # ############################################ INTERFACES ##########################################

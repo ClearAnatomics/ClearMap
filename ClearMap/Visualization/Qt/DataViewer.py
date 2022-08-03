@@ -13,8 +13,8 @@ Note
 ----
 This viewer is based on the pyqtgraph package.
 """
-__author__ = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
-__license__ = 'GPLv3 - GNU General Pulic License v3 (see LICENSE)'
+__author__ = 'Christoph Kirst <christoph.kirst.ck@gmail.com>, Charly Rousseau <charly.rousseau@icm-institute.org>'
+__license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
@@ -629,3 +629,13 @@ if __name__ == '__main__':
     print('testing')
     _test()
     time.sleep(60)
+
+
+def link_dataviewers_cursors(dvs):  # TODO: move to DataViewer module
+    for i, dv in enumerate(dvs):
+        cross = RedCross()
+        dv.view.addItem(cross)
+        dv.cross = cross
+        pals = dvs.copy()
+        pals.pop(i)
+        dv.pals = pals

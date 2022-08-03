@@ -1,3 +1,11 @@
+# -*- coding: utf-8 -*-
+"""
+widgets
+=======
+
+A set of custom widgets
+"""
+
 import os
 import re
 from multiprocessing.pool import ThreadPool
@@ -8,7 +16,6 @@ import pyqtgraph as pg
 
 from skimage import transform as sk_transform  # Slowish
 
-import qdarkstyle
 from PyQt5.QtGui import QColor
 
 
@@ -24,6 +31,13 @@ from ClearMap.Visualization import Plot3d as plot_3d
 from ClearMap.config.config_loader import ConfigLoader
 from ClearMap.gui.dialogs import make_splash, get_directory_dlg, update_pbar
 from ClearMap.gui.gui_utils import pseudo_random_rgb_array, create_clearmap_widget
+
+
+__author__ = 'Charly Rousseau <charly.rousseau@icm-institute.org>'
+__license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
+__copyright__ = 'Copyright © 2022 by Charly Rousseau'
+__webpage__ = 'https://idisco.info'
+__download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
 
 
 def setup_mini_brain(mini_brain_scaling=(5, 5, 5)):  # TODO: scaling in prefs

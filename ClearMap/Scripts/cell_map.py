@@ -4,10 +4,8 @@
 CellMap
 =======
 
-This script is the main pipeline to analyze immediate early gene expression 
-data from iDISCO+ cleared tissue [Renier2016]_.
-
-See the :ref:`CellMap tutorial </CellMap.ipynb>` for a tutorial and usage.
+This module contains the class to analyze (detect) individual cells,
+e.g. to analyze immediate early gene expression data from iDISCO+ cleared tissue [Renier2016]_.
 
 
 .. image:: ../Static/cell_abstract_2016.jpg
@@ -24,11 +22,7 @@ References
 ----------
 .. [Renier2016] `Mapping of brain activity by automated volume analysis of immediate early genes. Renier* N, Adams* EL, Kirst* C, Wu* Z, et al. Cell. 2016 165(7):1789-802 <https://doi.org/10.1016/j.cell.2016.05.007>`_
 """
-__author__ = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
-__license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE)'
-__copyright__ = 'Copyright © 2020 by Christoph Kirst'
-__webpage__ = 'https://idisco.info'
-__download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
+
 
 import copy
 import importlib
@@ -63,6 +57,13 @@ import ClearMap.Alignment.Annotation as annotation
 from ClearMap.Scripts.sample_preparation import PreProcessor, TabProcessor
 from ClearMap.Utils.utilities import runs_on_ui
 from ClearMap.gui.widgets import Scatter3D
+
+
+__author__ = 'Christoph Kirst <christoph.kirst.ck@gmail.com>, Charly Rousseau <charly.rousseau@icm-institute.org>'
+__license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE)'
+__copyright__ = 'Copyright © 2020 by Christoph Kirst'
+__webpage__ = 'https://idisco.info'
+__download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
 
 
 class CellDetector(TabProcessor):

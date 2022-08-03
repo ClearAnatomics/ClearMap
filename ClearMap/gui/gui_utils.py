@@ -1,3 +1,11 @@
+# -*- coding: utf-8 -*-
+"""
+gui_utils
+=========
+
+Various utility functions specific to the graphical interface
+"""
+
 import inspect
 import os
 from math import sqrt, ceil
@@ -9,6 +17,14 @@ from PyQt5 import QtGui
 from matplotlib.colors import hsv_to_rgb
 
 from ClearMap.gui.pyuic_utils import loadUiType
+
+
+__author__ = 'Charly Rousseau <charly.rousseau@icm-institute.org>'
+__license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
+__copyright__ = 'Copyright © 2022 by Charly Rousseau'
+__webpage__ = 'https://idisco.info'
+__download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
+
 
 UI_FOLDER = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 

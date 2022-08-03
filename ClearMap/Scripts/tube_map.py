@@ -4,7 +4,7 @@
 TubeMap
 =======
 
-This script is the main pipeline to generate annotated graphs from vasculature
+This module contains the classes to generate annotated graphs from vasculature
 lightsheet data [Kirst2020]_.
 """
 import os
@@ -13,7 +13,11 @@ import re
 import numpy as np
 import vispy
 
+
+from ClearMap.Scripts.sample_preparation import TabProcessor
+
 import ClearMap.IO.IO as clearmap_io
+
 import ClearMap.Alignment.Annotation as annotation_module
 import ClearMap.Alignment.Resampling as resampling_module
 import ClearMap.Alignment.Elastix as elastix
@@ -21,33 +25,27 @@ import ClearMap.Alignment.Elastix as elastix
 import ClearMap.ImageProcessing.Experts.Vasculature as vasculature
 import ClearMap.ImageProcessing.MachineLearning.VesselFilling.VesselFilling as vessel_filling
 import ClearMap.ImageProcessing.Skeletonization.Skeletonization as skeletonization
+
 import ClearMap.Analysis.Measurements.MeasureExpression as measure_expression
 import ClearMap.Analysis.Measurements.MeasureRadius as measure_radius
 import ClearMap.Analysis.Graphs.GraphProcessing as graph_processing
 import ClearMap.Analysis.Graphs.GraphGt as graph_gt
 import ClearMap.Analysis.Measurements.Voxelization as voxelization
+
 import ClearMap.ParallelProcessing.BlockProcessing as block_processing
 
 from ClearMap.Visualization.Qt import Plot3d as q_p3d
 from ClearMap.Visualization.Vispy import PlotGraph3d as plot_graph_3d  # WARNING: vispy dependency
 
+from ClearMap.gui.dialogs import warning_popup
 from ClearMap.Utils.utilities import is_in_range, get_free_v_ram
 
-from ClearMap.Scripts.sample_preparation import TabProcessor
 
-
-# %%############################################################################
-# ## Create test data
-###############################################################################
-
-# select sublice for testing the pipeline
-# slicing = (slice(None),slice(0,1000),slice(900,1500))
-# ws.create_debug('stitched', slicing=slicing);
-# ws.create_debug('stitched', postfix='arteries', slicing=slicing)
-# ws.debug = True
-
-# p3d.plot(ws.filename('stitched'))
-from ClearMap.gui.dialogs import warning_popup
+__author__ = 'Christoph Kirst <christoph.kirst.ck@gmail.com>, Sophie Skriabine <sophie.skriabine@icm-institute.org>, Charly Rousseau <charly.rousseau@icm-institute.org>'
+__license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE)'
+__copyright__ = 'Copyright © 2020 by Christoph Kirst'
+__webpage__ = 'https://idisco.info'
+__download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
 
 
 class BinaryVesselProcessorSteps:
