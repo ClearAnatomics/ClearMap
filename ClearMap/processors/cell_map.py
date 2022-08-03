@@ -33,9 +33,7 @@ from concurrent.futures.process import BrokenProcessPool
 
 import numpy as np
 import pandas as pd
-from ClearMap.IO.MHD import mhd_read
 from PyQt5.QtGui import QColor
-from numpy.lib import recfunctions
 from matplotlib import pyplot as plt
 import pyqtgraph as pg
 
@@ -54,7 +52,7 @@ import ClearMap.ImageProcessing.Experts.Cells as cell_detection
 import ClearMap.Analysis.Measurements.Voxelization as voxelization
 # noinspection PyPep8Naming
 import ClearMap.Alignment.Annotation as annotation
-from ClearMap.Scripts.sample_preparation import PreProcessor, TabProcessor
+from ClearMap.processors.sample_preparation import PreProcessor, TabProcessor
 from ClearMap.Utils.utilities import runs_on_ui
 from ClearMap.gui.widgets import Scatter3D
 

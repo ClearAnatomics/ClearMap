@@ -14,7 +14,7 @@ import numpy as np
 import vispy
 
 
-from ClearMap.Scripts.sample_preparation import TabProcessor
+from ClearMap.processors.sample_preparation import TabProcessor
 
 import ClearMap.IO.IO as clearmap_io
 
