@@ -1,3 +1,11 @@
+# -*- coding: utf-8 -*-
+"""
+params
+======
+
+All the classes that define parameters or group thereof for the tabs of the graphical interface
+"""
+
 import os
 import string
 from itertools import combinations
@@ -8,9 +16,16 @@ from ClearMap.gui.gui_utils import create_clearmap_widget
 
 from ClearMap.gui.dialogs import get_directory_dlg
 from PyQt5.QtCore import Qt, pyqtSignal, QObject
-from PyQt5.QtWidgets import QInputDialog, QToolBox, QCheckBox, QLabel, QWidgetItem
+from PyQt5.QtWidgets import QInputDialog, QToolBox, QCheckBox
 
 from ClearMap.config.config_loader import ConfigLoader
+
+
+__author__ = 'Charly Rousseau <charly.rousseau@icm-institute.org>'
+__license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
+__copyright__ = 'Copyright © 2022 by Charly Rousseau'
+__webpage__ = 'https://idisco.info'
+__download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
 
 
 class ConfigNotFoundError(Exception):

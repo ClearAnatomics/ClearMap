@@ -1,3 +1,11 @@
+# -*- coding: utf-8 -*-
+"""
+dialogs
+=======
+
+All the independent popup dialogs used by the GUI
+"""
+
 import os
 import sys
 
@@ -10,6 +18,12 @@ from PyQt5.QtWidgets import QFileDialog, QMessageBox, QProgressDialog, QLabel, Q
 from ClearMap.config.config_loader import clean_path, ConfigLoader
 from ClearMap.Utils.utilities import runs_on_pycharm
 from ClearMap.gui.gui_utils import UI_FOLDER, create_clearmap_widget
+
+__author__ = 'Charly Rousseau <charly.rousseau@icm-institute.org>'
+__license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
+__copyright__ = 'Copyright © 2022 by Charly Rousseau'
+__webpage__ = 'https://idisco.info'
+__download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
 
 cfg_loader = ConfigLoader('')
 DISPLAY_CONFIG = cfg_loader.get_cfg('display')

@@ -1,3 +1,12 @@
+# -*- coding: utf-8 -*-
+"""
+batch_process
+=============
+
+The processor for batch processing a group of samples.
+This can be used from the GUI, from the CLI or interactively from the python interpreter
+"""
+
 import sys
 
 from ClearMap.Scripts.tube_map import BinaryVesselProcessor, VesselGraphProcessor
@@ -7,6 +16,12 @@ from ClearMap.Scripts.cell_map import CellDetector
 from ClearMap.Scripts.sample_preparation import PreProcessor
 from ClearMap.Utils.utilities import backup_file
 from ClearMap.config.config_loader import get_configs, ConfigLoader
+
+__author__ = 'Charly Rousseau <charly.rousseau@icm-institute.org>'
+__license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
+__copyright__ = 'Copyright © 2022 by Charly Rousseau'
+__webpage__ = 'https://idisco.info'
+__download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
 
 
 def process_sample(configs, align=False, cells=False, vasc=False):

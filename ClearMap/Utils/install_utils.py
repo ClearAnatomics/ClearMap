@@ -1,8 +1,17 @@
 """
-Utilities module with minimal (only STL) dependencies for installation
+install_utils
+=========
+
+Utilities module with minimal dependencies (standard library only) for installation
 """
 import sys
 import subprocess
+
+__author__ = 'Charly Rousseau <charly.rousseau@icm-institute.org>'
+__license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
+__copyright__ = 'Copyright © 2022 by Charly Rousseau'
+__webpage__ = 'https://idisco.info'
+__download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
 
 
 def assert_cuda():

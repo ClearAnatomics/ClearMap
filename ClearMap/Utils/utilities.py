@@ -1,3 +1,11 @@
+# -*- coding: utf-8 -*-
+"""
+utilities
+=========
+
+Various utilities that do not have a specific category
+"""
+
 import os
 import re
 import shutil
@@ -7,7 +15,12 @@ from concurrent.futures import ProcessPoolExecutor
 import numpy as np
 import psutil
 
-from ClearMap.Utils.install_utils import get_cuda_line
+__author__ = 'Charly Rousseau <charly.rousseau@icm-institute.org>'
+__license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
+__copyright__ = 'Copyright © 2022 by Charly Rousseau'
+__webpage__ = 'https://idisco.info'
+__download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
+
 
 colors = {
     "WHITE": '\033[1;37m',

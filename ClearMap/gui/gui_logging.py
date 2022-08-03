@@ -1,11 +1,25 @@
+# -*- coding: utf-8 -*-
+"""
+gui_logging
+===========
+
+Defines the Printer class used to log to file and to the GUI widgets from simple prints
+"""
+
 from datetime import datetime
-from time import time
 from io import UnsupportedOperation
 
 import lxml.html
 from PyQt5 import QtCore
 from PyQt5.QtWidgets import QApplication, QWidget
 from matplotlib.colors import cnames
+
+
+__author__ = 'Charly Rousseau <charly.rousseau@icm-institute.org>'
+__license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
+__copyright__ = 'Copyright © 2022 by Charly Rousseau'
+__webpage__ = 'https://idisco.info'
+__download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
 
 
 class Printer(QWidget):

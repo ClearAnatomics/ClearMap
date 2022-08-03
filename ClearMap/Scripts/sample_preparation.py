@@ -1,5 +1,9 @@
 """
-This is the part that is common to both pipelines (includes file conversion, stitching and registration)
+sample_preparation
+==================
+
+This is the part that is common to both pipelines to process the raw images.
+It includes file conversion, stitching and registration
 """
 import os
 import re
@@ -36,6 +40,13 @@ import ClearMap.Alignment.Stitching.StitchingRigid as stitching_rigid
 import ClearMap.Alignment.Stitching.StitchingWobbly as stitching_wobbly
 from ClearMap.IO.metadata import define_auto_stitching_params, define_auto_resolution
 from ClearMap.config.config_loader import get_configs, ConfigLoader
+
+
+__author__ = 'Christoph Kirst <christoph.kirst.ck@gmail.com>, Charly Rousseau <charly.rousseau@icm-institute.org>'
+__license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE)'
+__copyright__ = 'Copyright © 2020 by Christoph Kirst'
+__webpage__ = 'https://idisco.info'
+__download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
 
 
 class CanceledProcessing(BrokenProcessPool):  # TODO: better inheritance
