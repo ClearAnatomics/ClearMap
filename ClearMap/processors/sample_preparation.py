@@ -14,6 +14,7 @@ import numpy as np
 
 # noinspection PyPep8Naming
 import matplotlib
+import tifffile
 
 from ClearMap.Utils.utilities import runs_on_ui
 from ClearMap.gui.gui_utils import TmpDebug
@@ -38,7 +39,7 @@ import ClearMap.Alignment.Resampling as resampling
 import ClearMap.Alignment.Stitching.StitchingRigid as stitching_rigid
 # noinspection PyPep8Naming
 import ClearMap.Alignment.Stitching.StitchingWobbly as stitching_wobbly
-from ClearMap.IO.metadata import define_auto_stitching_params, define_auto_resolution
+from ClearMap.IO.metadata import define_auto_stitching_params, define_auto_resolution, pattern_finders_from_base_dir
 from ClearMap.config.config_loader import get_configs, ConfigLoader
 
 
@@ -187,7 +188,16 @@ class PreProcessor(TabProcessor):
     def unpack_atlas(self, atlas_base_name):
         res = annotation.uncompress_atlases(atlas_base_name)
         self.default_annotation_file_path, self.default_hemispheres_file_path, \
-        self.default_reference_file_path, self.default_distance_file_path = res
+            self.default_reference_file_path, self.default_distance_file_path = res
+
+    def stack_columns(self):
+        pattern_finders = pattern_finders_from_base_dir(self.src_directory)
+        for pat_finder in pattern_finders:
+            for y in pat_finder.y_values:
+                for x in pat_finder.x_values:
+                    stack = np.vstack([tifffile.imread(f_path) for f_path in pat_finder.get_sub_tiff_paths(x=x, y=y)])
+                    new_path = pat_finder.sub_pattern_str(x=x, y=y)
+                    tifffile.imsave(new_path, stack)
 
     @property
     def aligned_autofluo_path(self):

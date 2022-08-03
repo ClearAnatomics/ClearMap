@@ -11,13 +11,12 @@ import os.path
 import numpy as np
 from PyQt5.QtWidgets import QDialogButtonBox
 
-from ClearMap.IO import IO as clearmap_io
 from ClearMap.IO.MHD import mhd_read
 from ClearMap.Analysis.Statistics.group_statistics import make_summary, density_files_are_comparable, compare_groups
-from ClearMap.Scripts.batch_process import process_folders
-from ClearMap.Scripts.cell_map import CellDetector
-from ClearMap.Scripts.sample_preparation import PreProcessor
-from ClearMap.Scripts.tube_map import BinaryVesselProcessor, VesselGraphProcessor
+from ClearMap.processors.batch_process import process_folders
+from ClearMap.processors.cell_map import CellDetector
+from ClearMap.processors.sample_preparation import PreProcessor
+from ClearMap.processors.tube_map import BinaryVesselProcessor, VesselGraphProcessor
 from ClearMap.gui.gui_utils import format_long_nb_to_str, surface_project, np_to_qpixmap, create_clearmap_widget
 from ClearMap.Visualization.Qt.DataViewer import link_dataviewers_cursors
 from ClearMap.gui.params import ParamsOrientationError, VesselParams, PreferencesParams, SampleParameters, \

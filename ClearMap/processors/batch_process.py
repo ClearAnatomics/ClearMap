@@ -9,12 +9,12 @@ This can be used from the GUI, from the CLI or interactively from the python int
 
 import sys
 
-from ClearMap.Scripts.tube_map import BinaryVesselProcessor, VesselGraphProcessor
+from ClearMap.processors.tube_map import BinaryVesselProcessor, VesselGraphProcessor
 from tqdm import tqdm
 
-from ClearMap.Scripts.cell_map import CellDetector
-from ClearMap.Scripts.sample_preparation import PreProcessor
 from ClearMap.Utils.utilities import backup_file
+from ClearMap.processors.cell_map import CellDetector
+from ClearMap.processors.sample_preparation import PreProcessor
 from ClearMap.config.config_loader import get_configs, ConfigLoader
 
 __author__ = 'Charly Rousseau <charly.rousseau@icm-institute.org>'
