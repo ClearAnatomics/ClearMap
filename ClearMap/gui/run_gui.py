@@ -385,8 +385,13 @@ class ClearMapGui(ClearMapGuiBase):
 
     @property
     def tab_mgrs(self):
-        return self.sample_tab_mgr, self.alignment_tab_mgr, self.cells_tab_mgr, \
-               self.vasculature_tab_mgr#, self.batch_tab_mgr
+        tabs = [self.sample_tab_mgr, self.alignment_tab_mgr]
+        if self.cells_tab_mgr.ui is None or self.cells_tab_mgr.ui.isEnabled():
+            tabs.append(self.cells_tab_mgr)
+        if self.vasculature_tab_mgr.ui is None or self.vasculature_tab_mgr.ui.isEnabled():
+            tabs.append(self.vasculature_tab_mgr)
+        # #self.batch_tab_mgr
+        return tabs
 
     @property
     def params(self):
@@ -491,7 +496,13 @@ class ClearMapGui(ClearMapGuiBase):
             config_loader = self.config_loader
         cfg_path = config_loader.get_cfg_path(cfg_name, must_exist=False)
         was_copied = False
-        if not self.file_exists(cfg_path):  # FIXME: do not complain for missing vasc if cellcount
+        if cfg_name in ('cell_map', 'vasculature', 'tube_map'):
+            pipeline_name = title_to_snake(self.alignment_tab_mgr.params.pipeline_name)
+            is_cell_map = (pipeline_name in ('cell_map', 'tube_map') and cfg_name in ('cell_map', 'tube_map'))
+            is_irrelevant_tab = not(pipeline_name == 'both' or pipeline_name == cfg_name or is_cell_map)
+            if is_irrelevant_tab:
+                return False, None
+        if not self.file_exists(cfg_path):
             try:
                 default_cfg_file_path = config_loader.get_default_path(cfg_name)
             except FileNotFoundError as err:
@@ -519,6 +530,9 @@ class ClearMapGui(ClearMapGuiBase):
             cfg_name = title_to_snake(tab.name)
             try:
                 was_copied, cfg_path = self.__get_cfg_path(cfg_name)
+                if cfg_path is None:  # skipped
+                    tab.ui.setEnabled(False)
+                    continue
 
                 if tab.processing_type is None or tab.processing_type == 'batch':
                     tab.set_params()
