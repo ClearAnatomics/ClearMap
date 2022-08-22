@@ -54,8 +54,7 @@ class Printer(QWidget):
                 self.file.write(datetime.now().isoformat())
             self.file.write(msg+'\n')
             self.file.flush()
-        self.text_updated.emit(self._colourise(msg))
-        # self.widget.append(self._colourise(msg))
+        self.text_updated.emit(self.colourise(msg))
 
     def flush(self):
         if self.file is not None:
@@ -67,14 +66,29 @@ class Printer(QWidget):
         else:
             raise UnsupportedOperation('Cannot access fileno without a file object')
 
-    def _colourise(self, msg):
+    def colourise(self, msg, force=False):
+        """
+        Convert msg to the self.color colour in html
+
+        Parameters
+        ----------
+        msg str:
+            The message to colourise
+        force bool:
+            By default, do not colorise html code (to avoid messing up existing colours). This
+            forces the colorise nonetheless.
+
+        Returns
+        -------
+
+        """
         if self.color is not None:
             try:
                 html = lxml.html.fromstring(msg)
                 is_html = html.find('.//*') is not None
             except lxml.etree.ParserError:
                 is_html = False
-            if not is_html:
+            if force or not is_html:
                 colour_msg = '<p style="color:{}">{}</p>'.format(cnames[self.color], msg)
             else:
                 colour_msg = msg
