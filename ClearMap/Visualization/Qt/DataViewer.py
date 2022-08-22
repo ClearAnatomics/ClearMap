@@ -159,7 +159,10 @@ class LUT(pg.QtGui.QWidget):
             sl[ax] = slice(None, None, 2)
             sl = tuple(sl)
             data = data[sl]
-        return np.nanpercentile(data, percentiles)
+        if data.dtype == np.bool_:
+            return np.nanpercentile(data.astype(np.uint8), percentiles)
+        else:
+            return np.nanpercentile(data, percentiles)
 
 
 ############################################################################################################
