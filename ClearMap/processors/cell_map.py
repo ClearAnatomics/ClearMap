@@ -305,7 +305,7 @@ class CellDetector(TabProcessor):
     def run_cell_detection(self, tuning=False):
         self.processing_config.reload()
         self.workspace.debug = tuning  # TODO: use context manager
-        cell_detection_param = copy.deepcopy(cell_detection.default_cell_detection_parameter)  # FIXME: check this is always done
+        cell_detection_param = copy.deepcopy(cell_detection.default_cell_detection_parameter)
         cell_detection_param['illumination'] = None  # WARNING: illumination or illumination_correction
         cell_detection_param['background_correction']['shape'] = self.processing_config['detection']['background_correction']['diameter']
         cell_detection_param['intensity_detection']['measure'] = ['source']
@@ -319,7 +319,7 @@ class CellDetector(TabProcessor):
             # clearmap_io.delete_file(workspace.filename('cells', postfix='maxima'))
             # cell_detection_param['maxima_detection']['save'] = workspace.filename('cells', postfix='maxima')
 
-        processing_parameter = cell_detection.default_cell_detection_processing_parameter.copy()
+        processing_parameter = copy.deepcopy(cell_detection.default_cell_detection_processing_parameter)
         processing_parameter.update(  # TODO: store as other dict and run .update(**self.extra_detection_params)
             processes=self.machine_config['n_processes_cell_detection'],
             size_min=self.machine_config['detection_chunk_size_min'],
