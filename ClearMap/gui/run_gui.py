@@ -491,7 +491,7 @@ class ClearMapGui(ClearMapGuiBase):
             config_loader = self.config_loader
         cfg_path = config_loader.get_cfg_path(cfg_name, must_exist=False)
         was_copied = False
-        if not self.file_exists(cfg_path):
+        if not self.file_exists(cfg_path):  # FIXME: do not complain for missing vasc if cellcount
             try:
                 default_cfg_file_path = config_loader.get_default_path(cfg_name)
             except FileNotFoundError as err:
@@ -506,9 +506,8 @@ class ClearMapGui(ClearMapGuiBase):
                 copyfile(default_cfg_file_path, cfg_path)
                 was_copied = True
             else:
-                formatted_msg = html_to_ansi(base_msg)
-                self.error_logger.write(str(formatted_msg))
-                raise FileNotFoundError(formatted_msg)
+                self.error_logger.write(self.error_logger.colourise(base_msg, force=True))
+                raise FileNotFoundError(html_to_ansi(base_msg))
         return was_copied, cfg_path
 
     def parse_cfg(self):
