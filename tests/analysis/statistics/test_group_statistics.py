@@ -1,3 +1,4 @@
+import copy
 import os
 import tempfile
 from shutil import rmtree
@@ -119,7 +120,7 @@ def distributed_stats_table(stats_table, n_samples, sd, mu=0, abs_min=0):
     # gaussian_distro = 1 / (sd * np.sqrt(2 * np.pi)) * np.exp(- (bins - mu)**2 / (2 * sd**2))
     # bins += mu
     for epsilon in bins:  # FIXME: gaussian distribution
-        tbl = stats_table.copy()
+        tbl = copy.deepcopy(stats_table)
         tbl['Cell counts'] = np.round(tbl['Cell counts'] + mu + epsilon + abs_min)
         tbl = tbl.astype({'Cell counts': 'int64'})
         dfs.append(tbl)

@@ -7,6 +7,7 @@ TubeMap
 This module contains the classes to generate annotated graphs from vasculature
 lightsheet data [Kirst2020]_.
 """
+import copy
 import os
 import re
 
@@ -142,13 +143,13 @@ class BinaryVesselProcessor(TabProcessor):
         source = self.workspace.filename('stitched', postfix=postfix)
         sink = self.workspace.filename('binary', postfix=postfix)
 
-        binarization_parameter = vasculature.default_binarization_parameter.copy()   # FIXME: deepcopy
+        binarization_parameter = copy.deepcopy(vasculature.default_binarization_parameter)
         binarization_parameter['clip']['clip_range'] = clip_range
         if deconvolve_threshold is not None:
             binarization_parameter['deconvolve']['threshold'] = 450
             binarization_parameter.update(equalize=None, vesselize=None)
 
-        processing_parameter = vasculature.default_binarization_processing_parameter.copy()
+        processing_parameter = copy.deepcopy(vasculature.default_binarization_processing_parameter)
         processing_parameter.update(processes=n_processes, as_memory=True, verbose=True)
 
         vasculature.binarize(source, sink,
@@ -169,10 +170,10 @@ class BinaryVesselProcessor(TabProcessor):
         sink_postfix = '{}_postprocessed'.format(postfix) if postfix else 'postprocessed'
         sink = self.workspace.filename('binary', postfix=sink_postfix)
 
-        postprocessing_parameter = vasculature.default_postprocessing_parameter.copy()
+        postprocessing_parameter = copy.deepcopy(vasculature.default_postprocessing_parameter)
         if not postfix:  # FIXME: for both for Elisa
             postprocessing_parameter['fill'] = None  # Dilate erode
-        postprocessing_processing_parameter = vasculature.default_postprocessing_processing_parameter.copy()
+        postprocessing_processing_parameter = copy.deepcopy(vasculature.default_postprocessing_processing_parameter)
         postprocessing_processing_parameter.update(size_max=50)
 
         vasculature.postprocess(source, sink, postprocessing_parameter=postprocessing_parameter,
@@ -212,7 +213,7 @@ class BinaryVesselProcessor(TabProcessor):
         sink = self.workspace.filename('binary', postfix='{}filled'.format(postfix_base))
         # clearmap_io.delete_file(sink)
 
-        processing_parameter = vessel_filling.default_fill_vessels_processing_parameter.copy()
+        processing_parameter = copy.deepcopy(vessel_filling.default_fill_vessels_processing_parameter)
         processing_parameter.update(size_max=size_max,
                                     size_min='fixed',
                                     axes=all,
@@ -268,8 +269,8 @@ class BinaryVesselProcessor(TabProcessor):
             clearmap_io.copy_file(source, sink)
 
         # POST_PROCESS
-        postprocessing_parameter = vasculature.default_postprocessing_parameter.copy()
-        postprocessing_processing_parameter = vasculature.default_postprocessing_processing_parameter.copy()
+        postprocessing_parameter = copy.deepcopy(vasculature.default_postprocessing_parameter)
+        postprocessing_processing_parameter = copy.deepcopy(vasculature.default_postprocessing_processing_parameter)
         postprocessing_processing_parameter['size_max'] = 50
         source = self.workspace.filename('binary', postfix='combined')
         sink = self.workspace.filename('binary', postfix='final')
