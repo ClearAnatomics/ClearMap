@@ -217,7 +217,7 @@ class PreProcessor(TabProcessor):
         if os.path.exists(self.workspace.filename('resampled')):
             return clearmap_io.shape(self.workspace.filename('resampled'))
 
-    def __file_conversion(self):  # TODO: handle progress
+    def __file_conversion(self):  # TODO: handle progress and pass workspace to be cancelable
         """
         Convert list of input files to numpy files for efficiency reasons
 
@@ -256,14 +256,14 @@ class PreProcessor(TabProcessor):
         y_slice = slice(None) if self.sample_config['slice_y'] is None else slice(*self.sample_config['slice_y'])
         z_slice = slice(None) if self.sample_config['slice_z'] is None else slice(*self.sample_config['slice_z'])
         xyz_slicing = (x_slice, y_slice, z_slice)
-        results = annotation.prepare_annotation_files(
+        res = annotation.prepare_annotation_files(
             slicing=xyz_slicing,
             orientation=self.sample_config['orientation'],
             annotation_file=self.default_annotation_file_path, hemispheres_file=self.default_hemispheres_file_path,
             reference_file=self.default_reference_file_path, distance_to_surface_file=self.default_distance_file_path,
             hemispheres=True,
             overwrite=False, verbose=True)
-        self.annotation_file_path, self.hemispheres_file_path, self.reference_file_path, self.distance_file_path = results
+        self.annotation_file_path, self.hemispheres_file_path, self.reference_file_path, self.distance_file_path = res
 
         self.update_watcher_main_progress()
         atlas_cfg = self.processing_config['registration']['atlas']
@@ -306,10 +306,9 @@ class PreProcessor(TabProcessor):
         if not stitching_cfg['output_conversion']['skip']:
             self.convert_to_image_format()
 
-    def convert_to_image_format(self):  # FIXME: try except
+    def convert_to_image_format(self):  # TODO: support progress
         """
         Convert (optionally) to image formats readable by e.g. Fiji
-        Returns
         -------
 
         """
@@ -317,13 +316,21 @@ class PreProcessor(TabProcessor):
             return
         fmt = self.processing_config['stitching']['output_conversion']['format'].strip('.')
         if self.processing_config['stitching']['output_conversion']['raw']:
-            clearmap_io.convert_files(self.workspace.file_list('stitched', extension='npy'),
-                                      extension=fmt, processes=self.machine_config['n_processes_file_conv'],
-                                      workspace=self.workspace, verbose=True)
+            try:
+                clearmap_io.convert_files(self.workspace.file_list('stitched', extension='npy'),
+                                          extension=fmt, processes=self.machine_config['n_processes_file_conv'],
+                                          workspace=self.workspace, verbose=True)
+            except BrokenProcessPool:
+                print('File conversion canceled')
+                return
         if self.processing_config['stitching']['output_conversion']['arteries']:
-            clearmap_io.convert_files(self.workspace.file_list('stitched', postfix='arteries', extension='npy'),
-                                      extension=fmt, processes=self.machine_config['n_processes_file_conv'],
-                                      workspace=self.workspace, verbose=True)
+            try:
+                clearmap_io.convert_files(self.workspace.file_list('stitched', postfix='arteries', extension='npy'),
+                                          extension=fmt, processes=self.machine_config['n_processes_file_conv'],
+                                          workspace=self.workspace, verbose=True)
+            except BrokenProcessPool:
+                print('File conversion canceled')
+                return
 
     @property
     def was_stitched_rigid(self):
