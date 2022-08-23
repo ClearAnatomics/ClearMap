@@ -645,7 +645,7 @@ class PreProcessor(TabProcessor):
             paths.append(self.workspace.filename('stitched'))
             title += 'Raw stitched'
         if cfg['arteries']:
-            paths.append(self.workspace.filename('stitched', postfix='arteries'))  # FIXME: hard coded postfix
+            paths.append(self.workspace.filename('stitched', postfix='arteries'))  # WARNING: hard coded postfix
             title += ' and arteries stitched'
         if len(paths) != 2:
             paths = paths[0]

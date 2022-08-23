@@ -198,6 +198,8 @@ class DataViewer(pg.QtGui.QWidget):
         self.source_range_y = None
         self.source_slice = None  # current slice (in scroll axis)
 
+        self.cross = None  # cursor
+        self.pals = []  # linked DataViewers
         self.scatter = None
         self.scatter_coords = None
 
@@ -475,10 +477,10 @@ class DataViewer(pg.QtGui.QWidget):
         return x, y
 
     def sync_cursors(self, x, y):
-        if hasattr(self, 'cross'):  # FIXME: extract attribute
+        if self.cross is not None:
             self.cross.set_coords([x, y])
             self.view.update()
-            for pal in self.pals:  # FIXME: extract attribute defaulting to []
+            for pal in self.pals:
                 pal.cross.set_coords([x, y])
                 pal.view.update()
 
@@ -634,11 +636,11 @@ if __name__ == '__main__':
     time.sleep(60)
 
 
-def link_dataviewers_cursors(dvs):  # TODO: move to DataViewer module
+def link_dataviewers_cursors(dvs, cursor_cls):  #  Needs to specify cursor class because cannot import from widget here (circular)
     for i, dv in enumerate(dvs):
-        cross = RedCross()
-        dv.view.addItem(cross)
-        dv.cross = cross
+        cursor = cursor_cls()
+        dv.view.addItem(cursor)
+        dv.cross = cursor
         pals = dvs.copy()
         pals.pop(i)
         dv.pals = pals

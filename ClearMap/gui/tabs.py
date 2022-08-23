@@ -21,7 +21,7 @@ from ClearMap.gui.gui_utils import format_long_nb_to_str, surface_project, np_to
 from ClearMap.Visualization.Qt.DataViewer import link_dataviewers_cursors
 from ClearMap.gui.params import ParamsOrientationError, VesselParams, PreferencesParams, SampleParameters, \
     AlignmentParams, CellMapParams, BatchParams
-from ClearMap.gui.widgets import PatternDialog, SamplePickerDialog, DataFrameWidget
+from ClearMap.gui.widgets import PatternDialog, SamplePickerDialog, DataFrameWidget, RedCross
 from ClearMap.Visualization.Qt import Plot3d as plot_3d
 
 
@@ -378,7 +378,7 @@ class AlignmentTab(GenericTab):
         ]
         dvs = plot_3d.plot(image_sources, arange=False, sync=True, lut=self.main_window.preference_editor.params.lut,
                            parent=self.main_window.centralWidget())  # TODO: why () to centralWidget required here only
-        link_dataviewers_cursors(dvs)
+        link_dataviewers_cursors(dvs, RedCross)
         self.main_window.setup_plots(dvs, ['autofluo', 'aligned'])
 
 
@@ -501,7 +501,7 @@ class CellCounterTab(PostProcessingTab):
             self.main_window.print_warning_msg('Preview not run, '
                                                'will only display stitched image for memory space reasons')
         else:
-            link_dataviewers_cursors(dvs)
+            link_dataviewers_cursors(dvs, RedCross)
         self.main_window.setup_plots(dvs)
 
     def plot_cell_filter_results(self):
@@ -629,7 +629,7 @@ class VasculatureTab(PostProcessingTab):
 
     def plot_binarization_results(self):
         dvs = self.binary_vessel_processor.plot_binarization_result(parent=self.main_window)
-        link_dataviewers_cursors(dvs)
+        link_dataviewers_cursors(dvs, RedCross)
         self.main_window.setup_plots(dvs, ['stitched', 'binary'])
 
     def fill_vessels(self):
@@ -646,7 +646,7 @@ class VasculatureTab(PostProcessingTab):
 
     def plot_vessel_filling_results(self):
         dvs = self.binary_vessel_processor.plot_vessel_filling_results()
-        link_dataviewers_cursors(dvs)
+        link_dataviewers_cursors(dvs, RedCross)
         self.main_window.setup_plots(dvs)
 
     def build_graph(self):
@@ -774,7 +774,7 @@ class BatchTab(GenericTab):
         #     dvs = plot_3d.plot(p_vals_imgs, arange=False, sync=True,
         #                        lut=self.main_window.preference_editor.params.lut,
         #                        parent=self.main_window.centralWidget())
-        #     link_dataviewers_cursors(dvs)
+        #     link_dataviewers_cursors(dvs, RedCross)
         # self.main_window.setup_plots(dvs)
 
     def run_batch_process(self):
