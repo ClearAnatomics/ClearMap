@@ -344,14 +344,14 @@ class AlignmentTab(GenericTab):
 
     def convert_output(self):
         fmt = self.params.stitching_general.conversion_fmt
-        self.main_window.print_status_msg('Converting stitched image to {}'.format(fmt))
-        self.main_window.make_progress_dialog('Converting files')
+        self.main_window.print_status_msg(f'Converting stitched image to {fmt}')
+        self.main_window.make_progress_dialog('Converting files', canceled_callback=self.preprocessor.stop_process)
         self.params.stitching_general.ui_to_cfg()
         self.preprocessor.convert_to_image_format()  # TODO: check if use checkbox state
         self.main_window.progress_dialog.done(1)
         self.main_window.print_status_msg('Conversion finished')
 
-    def setup_atlas(self):  # TODO: call when value changed in atlas settings
+    def setup_atlas(self):  # FIXME: call when value changed in atlas settings
         self.sample_params.ui_to_cfg()  # To make sure we have the slicing up to date
         self.params.registration.ui_to_cfg()
         # self.preprocessor.unpack_atlas(self.params.registration.atlas_info[self.params.registration.atlas_id]['base_name'])
