@@ -33,7 +33,7 @@
         </font>
        </property>
        <property name="currentIndex">
-        <number>1</number>
+        <number>0</number>
        </property>
        <widget class="QWidget" name="page">
         <property name="geometry">
@@ -51,14 +51,14 @@
          <item>
           <widget class="QToolBox" name="toolBox_2">
            <property name="currentIndex">
-            <number>4</number>
+            <number>2</number>
            </property>
            <widget class="QWidget" name="page_3">
             <property name="geometry">
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>354</width>
+              <width>446</width>
               <height>392</height>
              </rect>
             </property>
@@ -401,7 +401,7 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>309</width>
+              <width>446</width>
               <height>334</height>
              </rect>
             </property>
@@ -694,8 +694,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>196</width>
-              <height>100</height>
+              <width>460</width>
+              <height>272</height>
              </rect>
             </property>
             <attribute name="label">
@@ -704,21 +704,21 @@
             <layout class="QVBoxLayout" name="verticalLayout_5">
              <item>
               <layout class="QFormLayout" name="formLayout_7">
-               <item row="0" column="0">
+               <item row="1" column="0">
                 <widget class="QCheckBox" name="stitchingRunRawCheckBox">
                  <property name="text">
                   <string>Main channel</string>
                  </property>
                 </widget>
                </item>
-               <item row="1" column="0">
+               <item row="2" column="0">
                 <widget class="QCheckBox" name="stitchingRunArteriesCheckBox">
                  <property name="text">
                   <string>Secondary channel</string>
                  </property>
                 </widget>
                </item>
-               <item row="0" column="1">
+               <item row="1" column="1">
                 <spacer name="verticalSpacer_8">
                  <property name="orientation">
                   <enum>Qt::Vertical</enum>
@@ -731,7 +731,7 @@
                  </property>
                 </spacer>
                </item>
-               <item row="1" column="1">
+               <item row="2" column="1">
                 <spacer name="verticalSpacer_9">
                  <property name="orientation">
                   <enum>Qt::Vertical</enum>
@@ -743,6 +743,13 @@
                   </size>
                  </property>
                 </spacer>
+               </item>
+               <item row="0" column="0">
+                <widget class="QCheckBox" name="stitchingUseNpyCheckBox">
+                 <property name="text">
+                  <string>Use npy tiles</string>
+                 </property>
+                </widget>
                </item>
               </layout>
              </item>
@@ -763,8 +770,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>196</width>
-              <height>100</height>
+              <width>460</width>
+              <height>272</height>
              </rect>
             </property>
             <attribute name="label">
@@ -1100,8 +1107,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>119</width>
-              <height>332</height>
+              <width>99</width>
+              <height>72</height>
              </rect>
             </property>
             <attribute name="label">
@@ -1149,8 +1156,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>119</width>
-              <height>332</height>
+              <width>98</width>
+              <height>42</height>
              </rect>
             </property>
             <attribute name="label">

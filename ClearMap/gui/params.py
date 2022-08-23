@@ -632,6 +632,7 @@ class WobblyStitchingParams(UiParameter):
 class GeneralStitchingParams(UiParameter):
 
     def connect(self):
+        self.tab.stitchingUseNpyCheckBox.stateChanged.connect(self.handle_use_npy_changed)
         self.tab.stitchingRunRawCheckBox.stateChanged.connect(self.handle_run_raw_changed)
         self.tab.stitchingRunArteriesCheckBox.stateChanged.connect(self.handle_run_arteries_changed)
         self.tab.stitchingPreviewRawCheckBox.stateChanged.connect(self.handle_preview_raw_changed)
@@ -643,6 +644,7 @@ class GeneralStitchingParams(UiParameter):
 
     def cfg_to_ui(self):
         cfg = self.config
+        self.use_npy = self._config['conversion']['use_npy']
         self.run_raw = cfg['run']['raw']
         self.run_arteries = cfg['run']['arteries']
         self.preview_raw = cfg['preview']['raw']
@@ -655,6 +657,17 @@ class GeneralStitchingParams(UiParameter):
     @property
     def config(self):
         return self._config['stitching']
+
+    @property
+    def use_npy(self):
+        return self.tab.stitchingUseNpyCheckBox.isChecked()
+
+    @use_npy.setter
+    def use_npy(self, state):
+        self.tab.stitchingUseNpyCheckBox.setChecked(state)
+
+    def handle_use_npy_changed(self, state):
+        self._config['conversion']['use_npy'] = self.use_npy
 
     @property
     def run_raw(self):

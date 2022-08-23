@@ -217,7 +217,7 @@ class PreProcessor(TabProcessor):
         if os.path.exists(self.workspace.filename('resampled')):
             return clearmap_io.shape(self.workspace.filename('resampled'))
 
-    def __file_conversion(self):  # TODO: handle progress and pass workspace to be cancelable
+    def __file_conversion(self):  # FIXME: handle progress and pass workspace to be cancelable
         """
         Convert list of input files to numpy files for efficiency reasons
 
@@ -227,10 +227,9 @@ class PreProcessor(TabProcessor):
         """
         if self.stopped:
             return
-        is_numpy = self.workspace.filename('raw').endswith('.npy')
-        if is_numpy:
-            file_list = self.workspace.source('raw').file_list  # TODO: check if direct file_list would work
-            if not file_list:
+        if self.use_npy():
+            file_list = self.workspace.file_list('raw')
+            if not file_list or os.path.splitext(file_list[0])[-1] == '.tif':
                 try:
                     clearmap_io.convert_files(self.workspace.file_list('raw', extension='tif'), extension='npy',
                                               processes=self.machine_config['n_processes_file_conv'],
@@ -240,12 +239,18 @@ class PreProcessor(TabProcessor):
                     return
                 if self.sample_config['src_paths']['arteries']:
                     try:
-                        clearmap_io.convert_files(self.workspace.file_list('arteries', extension='tif'), extension='npy',
+                        clearmap_io.convert_files(self.workspace.file_list('arteries', extension='tif'),
+                                                  extension='npy',
                                                   processes=self.machine_config['n_processes_file_conv'],
                                                   verbose=self.verbose)
                     except BrokenProcessPool:
                         print('File conversion canceled')
                         return
+
+    def use_npy(self):
+        return self.processing_config['conversion']['use_npy'] or \
+               self.workspace.filename('raw').endswith('.npy') or \
+               os.path.exists(self.workspace.filename('raw', extension='npy'))
 
     def set_configs(self, cfg_paths):
         cfg_paths = [os.path.expanduser(p) for p in cfg_paths]
@@ -273,23 +278,12 @@ class PreProcessor(TabProcessor):
         self.align_reference_bspline_file = os.path.join(align_dir, atlas_cfg['align_reference_bspline_file'])
 
     def run(self):
-        self.__convert_data()  # TODO: make optional
         self.stitch()
         self.resample_for_registration()
         self.align()
         return self.workspace, self.get_configs(), self.get_atlas_files()
 
-    def __convert_data(self):  # FIXME: check that required and that it does what it says (see __file_conversion above instead)
-        """Convert raw data to npy file"""
-        if self.stopped:
-            return
-        source = self.workspace.source('raw')
-        sink = self.workspace.filename('stitched')
-        clearmap_io.delete_file(sink)
-        # FIXME: not cancelable
-        clearmap_io.convert(source, sink, processes=self.machine_config['n_processes_file_conv'], verbose=True)
-
-    def stitch(self):
+    def stitch(self):  # FIXME: make sure that uses .npy files not tiff
         if self.stopped:
             return
         stitching_cfg = self.processing_config['stitching']
@@ -382,8 +376,11 @@ class PreProcessor(TabProcessor):
         if overlaps is None:
             overlaps, projection_thickness = define_auto_stitching_params(self.workspace.source('raw').file_list[0],
                                                                           self.processing_config['stitching'])
-        layout = stitching_wobbly.WobblyLayout(expression=self.workspace.filename('raw'), tile_axes=['X', 'Y'],
-                                               overlaps=overlaps)
+        if self.use_npy():
+            raw_path = self.workspace.filename('raw', extension='npy')
+        else:
+            raw_path = self.workspace.filename('raw')
+        layout = stitching_wobbly.WobblyLayout(expression=raw_path, tile_axes=['X', 'Y'], overlaps=overlaps)
         return layout
 
     @property
@@ -446,7 +443,11 @@ class PreProcessor(TabProcessor):
             self.prepare_watcher_for_substep(n_slices, self.__wobbly_stitching_stitch_re,
                                              'Stitch layout wobbly arteries', True)
             try:
-                layout.replace_source_location(self.workspace.filename('raw'), self.workspace.filename('arteries'))
+                if self.use_npy():
+                    layout.replace_source_location(self.workspace.filename('raw', extension='npy'),
+                                                   self.workspace.filename('arteries', extension='npy'))
+                else:
+                    layout.replace_source_location(self.workspace.filename('raw'), self.workspace.filename('arteries'))
                 stitching_wobbly.stitch_layout(layout, sink=self.workspace.filename('stitched', postfix='arteries'),
                                                method='interpolation',
                                                processes=self.machine_config['n_processes_stitching'],
