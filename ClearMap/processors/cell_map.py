@@ -423,13 +423,19 @@ class CellDetector(TabProcessor):
         dv.refresh()
         return [dv]
 
-    def get_cells_df(self):
-        feather_path = self.workspace.filename('cells').replace('.npy', '.feather')  # TODO: add to workspace
-        if os.path.exists(feather_path):
-            df = pd.read_feather(feather_path)
+    @property
+    def df_path(self):
+        feather_path = self.workspace.filename('cells').replace('.npy', '.feather')
+        if os.path.exists:
+            return feather_path
         else:
-            df = pd.DataFrame(np.load(self.workspace.filename('cells')))
-        return df
+            return self.workspace.filename('cells')
+
+    def get_cells_df(self):
+        if self.df_path.endswith('.feather'):
+            return pd.read_feather(self.df_path)
+        else:
+            return pd.DataFrame(np.load(self.df_path))
 
     def plot_filtered_cells(self, parent=None, smarties=False):
         _, coordinates = self.get_coords('filtered')

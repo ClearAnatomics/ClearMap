@@ -102,6 +102,14 @@ class GenericTab(GenericUi):
     def set_params(self, *args):
         raise NotImplementedError()
 
+    def step_exists(self, step_name, file_list):
+        for f_path in file_list:
+            if not os.path.exists(f_path):
+                self.main_window.print_error_msg(f'Missing {step_name} file {f_path}.'
+                                                 f'Please ensure {step_name} is run first.')
+                return False
+        return True
+
     def setup_workers(self):
         pass
 
@@ -339,11 +347,15 @@ class AlignmentTab(GenericTab):
 
     def plot_stitching_results(self):
         self.params.stitching_general.ui_to_cfg()
+        if not self.step_exists('stitching', (self.preprocessor.workspace.filename('stitched'))):  # TODO: add arteries option
+            return
         dvs = self.preprocessor.plot_stitching_results(parent=self.main_window.centralwidget)
         self.main_window.setup_plots(dvs)
 
     def convert_output(self):
         fmt = self.params.stitching_general.conversion_fmt
+        if not self.step_exists('stitching', (self.preprocessor.workspace.filename('stitched'))):  # TODO: add arteries option
+            return
         self.main_window.print_status_msg(f'Converting stitched image to {fmt}')
         self.main_window.make_progress_dialog('Converting files', canceled_callback=self.preprocessor.stop_process)
         self.params.stitching_general.ui_to_cfg()
@@ -372,6 +384,10 @@ class AlignmentTab(GenericTab):
         self.main_window.print_status_msg('Registered')
 
     def plot_registration_results(self):
+        if not self.step_exists('registration',
+                                (self.preprocessor.workspace.filename('resampled', postfix='autofluorescence'),
+                                     self.preprocessor.aligned_autofluo_path)):
+            return
         image_sources = [
             self.preprocessor.workspace.filename('resampled', postfix='autofluorescence'),
             mhd_read(self.preprocessor.aligned_autofluo_path)
@@ -495,6 +511,10 @@ class CellCounterTab(PostProcessingTab):
     #     self.cell_detector.detected = False
 
     def plot_detection_results(self):
+        if not self.step_exists('cell detection', [self.preprocessor.workspace.filename('stitched'),
+                                                   self.preprocessor.workspace.filename('cells', postfix='bkg'),
+                                                   self.preprocessor.workspace.filename('cells', postfix='shape')]):
+            return
         dvs = self.cell_detector.preview_cell_detection(parent=self.main_window.centralWidget(),
                                                         arange=False, sync=True)  # TODO: add close
         if len(dvs) == 1:
@@ -505,14 +525,23 @@ class CellCounterTab(PostProcessingTab):
         self.main_window.setup_plots(dvs)
 
     def plot_cell_filter_results(self):
+        if not self.step_exists('cell filtering', [self.preprocessor.workspace.filename('stitched'),
+                                                   self.workspace.filename('cells', postfix='filtered')]):
+            return
         dvs = self.cell_detector.plot_filtered_cells(smarties=True)
         self.main_window.setup_plots(dvs)
 
     def plot_cells_scatter_w_atlas_colors(self):
+        if not self.step_exists('cell count', [self.preprocessor.workspace.filename('stitched'),
+                                               self.cell_detector.df_path]):
+            return
         dvs = self.cell_detector.plot_cells_3d_scatter_w_atlas_colors(parent=self.main_window)
         self.main_window.setup_plots(dvs)
 
     def plot_cells_scatter_w_atlas_colors_raw(self):
+        if not self.step_exists('cell count', [self.preprocessor.workspace.filename('stitched'),
+                                               self.cell_detector.df_path]):
+            return
         dvs = self.cell_detector.plot_cells_3d_scatter_w_atlas_colors(raw=True, parent=self.main_window)
         self.main_window.setup_plots(dvs)
 
@@ -546,6 +575,8 @@ class CellCounterTab(PostProcessingTab):
         # WARNING: some plots in .post_process_cells() without UI params
 
     def plot_cell_map_results(self):
+        if not self.step_exists('voxelization', [self.preprocessor.workspace.filename('density', postfix='counts')]):
+            return
         dvs = self.cell_detector.plot_voxelized_counts(arange=False)
         self.main_window.setup_plots(dvs)
 
@@ -628,6 +659,9 @@ class VasculatureTab(PostProcessingTab):
         self.main_window.print_status_msg('Vessels binarized')
 
     def plot_binarization_results(self):
+        if not self.step_exists('binarization', [self.preprocessor.workspace.filename('stitched'),
+                                                 self.preprocessor.workspace.filename('binary')]):
+            return
         dvs = self.binary_vessel_processor.plot_binarization_result(parent=self.main_window)
         link_dataviewers_cursors(dvs, RedCross)
         self.main_window.setup_plots(dvs, ['stitched', 'binary'])
@@ -644,7 +678,7 @@ class VasculatureTab(PostProcessingTab):
         self.main_window.progress_dialog.done(1)
         self.main_window.print_status_msg('Vessel filling done')
 
-    def plot_vessel_filling_results(self):
+    def plot_vessel_filling_results(self):  # TODO: add step_exists check
         dvs = self.binary_vessel_processor.plot_vessel_filling_results()
         link_dataviewers_cursors(dvs, RedCross)
         self.main_window.setup_plots(dvs)
