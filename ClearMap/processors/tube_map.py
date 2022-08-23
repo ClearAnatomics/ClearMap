@@ -158,11 +158,12 @@ class BinaryVesselProcessor(TabProcessor):
 
     def plot_binarization_result(self, parent=None, postfix=''):
         """
-        :param str postfix: empty for raw
+        postfix str:
+            empty for raw
         """
-        source = self.workspace.filename('stitched', postfix=postfix)
-        sink = self.workspace.filename('binary', postfix=postfix)
-        dvs = q_p3d.plot([source, sink], arange=False, lut=self.machine_config['default_lut'], parent=parent)
+        images = [(self.workspace.filename('stitched', postfix=postfix)),
+                  (self.workspace.filename('binary', postfix=postfix))]
+        dvs = q_p3d.plot(images, arange=False, lut=self.machine_config['default_lut'], parent=parent)
         return dvs
 
     def _smooth_and_fill(self, postfix=''):
@@ -225,9 +226,9 @@ class BinaryVesselProcessor(TabProcessor):
     def plot_vessel_filling_results(self, parent=None, postfix_base=''):
         if postfix_base:
             postfix_base += '_'
-        source = self.steps.path(self.steps.postprocessed, step_back=True)
-        sink = self.workspace.filename('binary', postfix='{}filled'.format(postfix_base))
-        return q_p3d.plot([source, sink], arange=False, lut=self.machine_config['default_lut'], parent=parent)
+        images = [(self.steps.path(self.steps.postprocessed, step_back=True)),
+                  (self.workspace.filename('binary', postfix='{}filled'.format(postfix_base)))]
+        return q_p3d.plot(images, arange=False, lut=self.machine_config['default_lut'], parent=parent)
 
     def fill_vessels(self):
         if not get_free_v_ram() > 22000:
