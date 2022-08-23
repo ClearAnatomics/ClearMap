@@ -283,7 +283,7 @@ class PreProcessor(TabProcessor):
         self.align()
         return self.workspace, self.get_configs(), self.get_atlas_files()
 
-    def stitch(self):  # FIXME: make sure that uses .npy files not tiff
+    def stitch(self):
         if self.stopped:
             return
         stitching_cfg = self.processing_config['stitching']
