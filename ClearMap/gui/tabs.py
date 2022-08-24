@@ -13,6 +13,7 @@ from PyQt5.QtWidgets import QDialogButtonBox
 
 from ClearMap.IO.MHD import mhd_read
 from ClearMap.Analysis.Statistics.group_statistics import make_summary, density_files_are_comparable, compare_groups
+from ClearMap.gui.dialogs import prompt_dialog
 from ClearMap.processors.batch_process import process_folders
 from ClearMap.processors.cell_map import CellDetector
 from ClearMap.processors.sample_preparation import PreProcessor
@@ -299,8 +300,12 @@ class AlignmentTab(GenericTab):
     def setup_workers(self):
         self.sample_params.ui_to_cfg()
         self.preprocessor.setup((self.main_window.preference_editor.params.config,
-                                 self.sample_params.config, self.params.config))
-
+                                 self.sample_params.config, self.params.config),
+                                convert_tiles=False)
+        if prompt_dialog('Tile conversion', 'Convert individual tiles to npy for efficiency'):
+            self.main_window.make_progress_dialog('Converting tiles', maximum=0, canceled_callback=self.preprocessor.stop_process)
+            self.main_window.wrap_in_thread(self.preprocessor.convert_tiles)
+            self.main_window.progress_dialog.done(1)
         self.setup_atlas()
 
     def setup(self):

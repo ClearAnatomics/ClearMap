@@ -42,6 +42,11 @@ def get_directory_dlg(start_folder, title="Choose the source directory"):
     return src_folder
 
 
+def prompt_dialog(title, msg):
+    pressed_btn = QMessageBox.question(None, title, msg)
+    return pressed_btn == QMessageBox.Yes
+
+
 # REFACTOR: make class
 def warning_popup(base_msg, msg):
     dlg = QMessageBox()
