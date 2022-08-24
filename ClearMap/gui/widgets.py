@@ -493,6 +493,7 @@ class PatternDialog:
         result_widget = self.dlg.patternToolBox.widget(pattern_idx).result
         pattern_string = pattern.get_formatted_pattern()
         pattern_string = os.path.join(self.patterns_finders[pattern_idx].folder, pattern_string)
+        pattern_string = os.path.relpath(pattern_string, start=self.src_folder)
 
         result_widget.setText(pattern_string)
 
