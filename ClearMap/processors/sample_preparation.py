@@ -154,7 +154,7 @@ class PreProcessor(TabProcessor):
         # if not runs_on_spyder():
         #     pyqtgraph.mkQApp()
 
-    def setup(self, cfgs, watcher=None):
+    def setup(self, cfgs, watcher=None, convert_tiles=True):
         """
 
         Parameters
@@ -182,7 +182,8 @@ class PreProcessor(TabProcessor):
         src_paths = {k: v for k, v in self.sample_config['src_paths'].items() if v is not None}
         self.workspace.update(**src_paths)
         self.workspace.info()
-        self.__file_conversion()
+        if convert_tiles:
+            self.convert_tiles()
         # FIXME: check if setup_atlas should go here
 
     def unpack_atlas(self, atlas_base_name):
@@ -217,7 +218,7 @@ class PreProcessor(TabProcessor):
         if os.path.exists(self.workspace.filename('resampled')):
             return clearmap_io.shape(self.workspace.filename('resampled'))
 
-    def __file_conversion(self):  # FIXME: handle progress and pass workspace to be cancelable
+    def convert_tiles(self):
         """
         Convert list of input files to numpy files for efficiency reasons
 
@@ -233,7 +234,7 @@ class PreProcessor(TabProcessor):
                 try:
                     clearmap_io.convert_files(self.workspace.file_list('raw', extension='tif'), extension='npy',
                                               processes=self.machine_config['n_processes_file_conv'],
-                                              verbose=self.verbose)
+                                              workspace=self.workspace, verbose=self.verbose)
                 except BrokenProcessPool:
                     print('File conversion canceled')
                     return
@@ -242,7 +243,7 @@ class PreProcessor(TabProcessor):
                         clearmap_io.convert_files(self.workspace.file_list('arteries', extension='tif'),
                                                   extension='npy',
                                                   processes=self.machine_config['n_processes_file_conv'],
-                                                  verbose=self.verbose)
+                                                  workspace=self.workspace, verbose=self.verbose)
                     except BrokenProcessPool:
                         print('File conversion canceled')
                         return
