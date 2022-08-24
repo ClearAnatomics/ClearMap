@@ -319,6 +319,16 @@ class Workspace(object):
  
     # def write(self, *args, **kwargs):
     #   return ap.write(self.filename(*args, **kwargs));
+
+    def __format_pattern_line(self, files, expression, tag_names, tile_axes_):
+        tile_positions = [expression.values(f) for f in files]
+        tile_positions = [tuple(tv[n] for n in tile_axes_) for tv in tile_positions]
+        tile_lower = tuple(np.min(tile_positions, axis=0))
+        tile_upper = tuple(np.max(tile_positions, axis=0))
+        tag_names = tuple(tag_names)
+        relative_file_pattern = os.path.relpath(expression.string(), start=self.directory)
+        pattern_line = f'{relative_file_pattern} {{{len(files)} files, {tag_names}: {tile_lower} -> {tile_upper}}}\n'
+        return pattern_line
   
     def __str__(self):
         s = "Workspace"  # self.__class__.__name__
@@ -343,24 +353,18 @@ class Workspace(object):
         for f_type, f_names in self.file_type_to_name.items():
             if Expression(f_names).tags:
                 if check_extensions:
-                    files = self.file_list(f_type, extension='*')
-                    extensions = np.unique([os.path.splitext(f)[-1] for f in files])
-                    # extensions = [clearmap_io.file_extension(f) for f in files]
-                    # extensions = np.unique(extensions)
+                    extensions = list(np.unique([os.path.splitext(f)[-1] for f in
+                                                 self.file_list(f_type, extension='*')]))
                 else:
                     extensions = [self.extension(f_type)]
 
-                if len(extensions) == 0:
+                if not extensions:
                     out += f'{f_type : padding}: no file\n'
                 else:
-                    tmp_f_type = f_type  # used for first extension only
-                    for extension in extensions:
+                    for i, extension in enumerate(extensions):
                         expression = Expression(self.filename(f_type, extension=extension))
                         tag_names = expression.tag_names()
-                        if tile_axes is None:
-                            tile_axes_ = tag_names
-                        else:
-                            tile_axes_ = tile_axes
+                        tile_axes_ = tile_axes if tile_axes is not None else tag_names
                         for n in tile_axes_:
                             if n not in tag_names:
                                 raise ValueError(f'The expression does not have the named pattern {n}')
@@ -371,18 +375,12 @@ class Workspace(object):
                         # construct tiling
                         files = clearmap_io.file_list(expression)
                         if files:
-                            tile_positions = [expression.values(f) for f in files]
-                            tile_positions = [tuple(tv[n] for n in tile_axes_) for tv in tile_positions]
-                            tile_lower = tuple(np.min(tile_positions, axis=0))
-                            tile_upper = tuple(np.max(tile_positions, axis=0))
-                            tag_names = tuple(tag_names)
-
-                            if tmp_f_type is not None:
-                                out += f'{tmp_f_type : >{padding}}: '
-                                tmp_f_type = None
+                            if i == 0:
+                                out += f'{f_type : >{padding}}: '
                             else:
                                 out += f'{"" : >{padding}}  '
-                            out += ('%s {%d files, %r: %r -> %r}' % (expression.string()[len(self.directory)+1:], len(files), tag_names, tile_lower, tile_upper)) + '\n'
+                            pattern_line = self.__format_pattern_line(files, expression, tag_names, tile_axes_)
+                            out += pattern_line
             else:
                 f_name = self.filename(f_type)
                 files = []
@@ -390,12 +388,14 @@ class Workspace(object):
                     files += [f_name]
                 f_name = self.filename(f_type, postfix='*')
                 files += clearmap_io.file_list(f_name)
-                if len(files) > 0:
-                    files = [f[len(self.directory)+1:] for f in files]
+                if files:
+                    files = [os.path.relpath(f, start=self.directory) for f in files]
 
-                    out += f'{f_type : >{padding}}: {files[0]}\n'  # REFACTOR: use header
-                    for f in files[1:]:
-                        out += f'{"" : >{padding}}  {f}\n'
+                    for i, f in enumerate(files):
+                        if i == 0:
+                            out += f'{f_type : >{padding}}: {f}\n'
+                        else:
+                            out += f'{"" : >{padding}}  {f}\n'
                 else:
                     out += f'{f_type : >{padding}}: no file\n'
 
