@@ -338,23 +338,22 @@ class Workspace(object):
     def info(self, tile_axes=None, check_extensions=True):  # REFACTOR:
         out = f'{self}\n'
 
-        l = np.max([len(k) for k in self.file_type_to_name])
-        l = '%' + '%d' % l + 's'
+        padding = np.max([len(k) for k in self.file_type_to_name])
 
         for f_type, f_names in self.file_type_to_name.items():
             if Expression(f_names).tags:
                 if check_extensions:
                     files = self.file_list(f_type, extension='*')
-                    # extensions = [clearmap_io.file_extension(f) for f in files]
                     extensions = np.unique([os.path.splitext(f)[-1] for f in files])
+                    # extensions = [clearmap_io.file_extension(f) for f in files]
                     # extensions = np.unique(extensions)
                 else:
                     extensions = [self.extension(f_type)]
 
                 if len(extensions) == 0:
-                    out += l % f_type + ': no file\n'
+                    out += f'{f_type : padding}: no file\n'
                 else:
-                    kk = f_type
+                    tmp_f_type = f_type  # used for first extension only
                     for extension in extensions:
                         expression = Expression(self.filename(f_type, extension=extension))
                         tag_names = expression.tag_names()
@@ -378,11 +377,11 @@ class Workspace(object):
                             tile_upper = tuple(np.max(tile_positions, axis=0))
                             tag_names = tuple(tag_names)
 
-                            if kk is not None:
-                                out += (l % kk) + ': '
-                                kk = None
+                            if tmp_f_type is not None:
+                                out += f'{tmp_f_type : >{padding}}: '
+                                tmp_f_type = None
                             else:
-                                out += (l % '') + '  '
+                                out += f'{"" : >{padding}}  '
                             out += ('%s {%d files, %r: %r -> %r}' % (expression.string()[len(self.directory)+1:], len(files), tag_names, tile_lower, tile_upper)) + '\n'
             else:
                 f_name = self.filename(f_type)
@@ -394,10 +393,10 @@ class Workspace(object):
                 if len(files) > 0:
                     files = [f[len(self.directory)+1:] for f in files]
 
-                    out += l % f_type + ': ' + files[0] + '\n'
+                    out += f'{f_type : >{padding}}: {files[0]}\n'  # REFACTOR: use header
                     for f in files[1:]:
-                        out += l % '' + '  ' + f + '\n'
+                        out += f'{"" : >{padding}}  {f}\n'
                 else:
-                    out += l % f_type + ': no file\n'
+                    out += f'{f_type : >{padding}}: no file\n'
 
         print(out)  # TODO: add print option or return s
