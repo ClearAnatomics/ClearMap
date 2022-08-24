@@ -248,7 +248,7 @@ class SampleTab(GenericTab):
 
     def launch_pattern_wizard(self):
         dlg = PatternDialog(self.params, self.src_folder)
-        dlg.exec()  # FIXME: use result
+        dlg.exec()
 
     def plot_mini_brain(self):
         img = self.__transform_mini_brain()
@@ -386,7 +386,7 @@ class AlignmentTab(GenericTab):
     def plot_registration_results(self):
         if not self.step_exists('registration',
                                 (self.preprocessor.workspace.filename('resampled', postfix='autofluorescence'),
-                                     self.preprocessor.aligned_autofluo_path)):
+                                 self.preprocessor.aligned_autofluo_path)):
             return
         image_sources = [
             self.preprocessor.workspace.filename('resampled', postfix='autofluorescence'),
@@ -449,7 +449,7 @@ class CellCounterTab(PostProcessingTab):
         self.ui.runCellMapPlotButtonBox.connectApply(self.plot_cell_map_results)
 
         self.ui.runCellMapPlot3DScatterButtonBox.connectApply(self.plot_cells_scatter_w_atlas_colors)
-        self.ui.runCellMapPlot3DScatterButtonBox.connectOk(self.plot_cells_scatter_w_atlas_colors_raw)  # FIXME: find less hacky way than apply & OK
+        self.ui.runCellMapPlot3DScatterButtonBox.connectOk(self.plot_cells_scatter_w_atlas_colors_raw)  # REFACTOR: find less hacky way than apply & OK
 
     def voxelize(self):
         self.params.ui_to_cfg()
