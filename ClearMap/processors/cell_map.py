@@ -526,7 +526,7 @@ class CellDetector(TabProcessor):
             data = np.array(
                 [source[name] if name in source.dtype.names else np.full(source.shape[0], np.nan) for name in names]
             )
-            data = data.T   # FIXME: seems hacky
+            data = data.T   # WARNING: seems hacky
             # if self.sample_config['orientation'] == (1, -2, 3):  # WARNING: seems hacky, why that particular orientation
             #     if filename == 'points_transformed':
             #         data[:, 1] = 528 - data[:, 1]  # WARNING: why 528
