@@ -64,7 +64,7 @@ def make_progress_dialog(msg, maximum, canceled_callback, parent):
     dlg.lbl.setAlignment(QtCore.Qt.AlignHCenter | QtCore.Qt.AlignVCenter)
     dlg.setLabel(dlg.lbl)
     if canceled_callback is not None:
-        dlg.canceled().connect(canceled_callback)
+        dlg.canceled.connect(canceled_callback)
     dlg.setMinimumDuration(0)
     dlg.forceShow()  # To force update
     return dlg
