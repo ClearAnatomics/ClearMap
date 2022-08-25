@@ -485,7 +485,7 @@ class CellDetector(TabProcessor):
         else:
             return 0
 
-    def get_n_fitlered_cells(self):
+    def get_n_filtered_cells(self):
         if os.path.exists(self.workspace.filename('cells', postfix='filtered')):
             _, coords = self.get_coords(coord_type='filtered')
             return np.max(coords.shape)  # TODO: check dimension instead
