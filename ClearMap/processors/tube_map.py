@@ -137,7 +137,9 @@ class BinaryVesselProcessor(TabProcessor):
 
     def _binarize(self, n_processes, clip_range, deconvolve_threshold, postfix=''):
         """
-        :param str postfix: empty for raw
+
+        postfix str
+            empty for raw
         """
 
         source = self.workspace.filename('stitched', postfix=postfix)
@@ -239,12 +241,12 @@ class BinaryVesselProcessor(TabProcessor):
             return
         if self.processing_config['binarization']['vessel_filling']['main']:
             self.prepare_watcher_for_substep(1200, self.vessel_filling_re, 'Filling main channel', True)  # FIXME: compute max
-            self._fill_vessels(500, 50)
+            self._fill_vessels(500, 50)  # FIXME: extact numbers
             self.steps.last_step = self.steps.filled
         if not self.processing_config['binarization']['binarization']['arteries']['skip'] and \
                 self.processing_config['binarization']['vessel_filling']['secondary']:
             self.prepare_watcher_for_substep(1200, self.vessel_filling_re, 'Filling secondary channel', True)  # FIXME: compute max
-            self._fill_vessels(1000, 100, 'arteries', resample_factor=2)
+            self._fill_vessels(1000, 100, 'arteries', resample_factor=2)   # FIXME: extact numbers
 
     def plot_combined(self, parent=None):  # TODO: final or not option
         raw = self.steps.path(self.steps.filled, step_back=True)

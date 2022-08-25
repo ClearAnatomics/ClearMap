@@ -506,11 +506,11 @@ class CellCounterTab(PostProcessingTab):
         self.main_window.progress_dialog.done(1)
         self.main_window.print_status_msg('Cell detection done')
 
-    def update_cell_number(self):
+    def update_cell_number(self):  # FIXME: try except or check that cells and cells filtered exist
         self.ui.nDetectedCellsLabel.setText(
             format_long_nb_to_str(self.cell_detector.get_n_detected_cells()))
         self.ui.nDetectedCellsAfterFilterLabel.setText(
-            format_long_nb_to_str(self.cell_detector.get_n_fitlered_cells()))
+            format_long_nb_to_str(self.cell_detector.get_n_filtered_cells()))
 
     # def reset_detected(self):
     #     self.cell_detector.detected = False
