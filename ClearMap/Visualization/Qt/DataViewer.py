@@ -528,20 +528,23 @@ class DataViewer(pg.QtGui.QWidget):
         self.scatter.clear()
         self.scatter_coords.axis = ax
         scatter_params = DataViewer.DEFAULT_SCATTER_PARAMS.copy()  # TODO: check if copy required
-        if self.scatter_coords.colours is not None:
-            colours = self.scatter_coords.get_colours(index)
-            symbols = self.scatter_coords.get_symbols(index)
-            self.scatter.setData(pos=self.scatter_coords.get_pos(index),
-                                 pen=[pg.mkPen(c) for c in colours],
-                                 brush=[pg.mkBrush(c) for c in colours],
-                                 symbol=symbols, size=10)
-        else:
-            self.scatter.setData(pos=self.scatter_coords.get_pos(index), **scatter_params)
-        # FIXME: check why some markers trigger errors
-        try:
+        pos = self.scatter_coords.get_pos(index)
+        if all(pos.shape):
+            if self.scatter_coords.colours is not None:
+                colours = self.scatter_coords.get_colours(index)
+                symbols = self.scatter_coords.get_symbols(index)
+                self.scatter.setData(pos=pos,
+                                     pen=[pg.mkPen(c) for c in colours],
+                                     brush=[pg.mkBrush(c) for c in colours],
+                                     symbol=symbols, size=10)  # FIXME: scale size as function of zoom
+            else:
+                self.scatter.setData(pos=pos, **scatter_params)
+        try:  # FIXME: check why some markers trigger errors
             if self.scatter_coords.half_slice_thickness is not None:
-                self.scatter.addPoints(symbol='o', brush=pg.mkBrush((0, 0, 0, 0)),
-                                       **self.scatter_coords.get_all_data(index))
+                marker_params = self.scatter_coords.get_all_data(index)
+                if marker_params['pos'].shape[0]:
+                    self.scatter.addPoints(symbol='o', brush=pg.mkBrush((0, 0, 0, 0)),
+                                           **marker_params)  # FIXME: scale size as function of zoom
         except KeyError as err:
             print(err)
 
