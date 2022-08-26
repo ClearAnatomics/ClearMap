@@ -10,6 +10,7 @@ import os.path
 
 import numpy as np
 from PyQt5.QtWidgets import QDialogButtonBox
+import pyqtgraph as pg
 
 from ClearMap.IO.MHD import mhd_read
 from ClearMap.Analysis.Statistics.group_statistics import make_summary, density_files_are_comparable, compare_groups
@@ -22,7 +23,8 @@ from ClearMap.gui.gui_utils import format_long_nb_to_str, surface_project, np_to
 from ClearMap.Visualization.Qt.DataViewer import link_dataviewers_cursors
 from ClearMap.gui.params import ParamsOrientationError, VesselParams, PreferencesParams, SampleParameters, \
     AlignmentParams, CellMapParams, BatchParams
-from ClearMap.gui.widgets import PatternDialog, SamplePickerDialog, DataFrameWidget, RedCross
+from ClearMap.gui.widgets import PatternDialog, SamplePickerDialog, DataFrameWidget, RedCross, LandmarksSelectorDialog, \
+    Scatter3D
 from ClearMap.Visualization.Qt import Plot3d as plot_3d
 
 
@@ -248,7 +250,7 @@ class SampleTab(GenericTab):
         checked = self.ui.advancedCheckBox.isChecked()
 
     def launch_pattern_wizard(self):
-        dlg = PatternDialog(self.params, self.src_folder)
+        dlg = PatternDialog(self.src_folder, self.params)
         dlg.exec()
 
     def plot_mini_brain(self):
@@ -322,6 +324,8 @@ class AlignmentTab(GenericTab):
 
         self.ui.advancedAtlasSettingsGroupBox.setVisible(False)
         self.ui.advancedCheckBox.stateChanged.connect(self.swap_tab_advanced)
+        self.ui.useAutoToRefLandmarksPushButton.clicked.connect(self.display_auto_to_ref_landmarks_dialog)
+        self.ui.useResampledToAutoLandmarksPushButton.clicked.connect(self.display_resampled_to_auto_landmarks_dialog)
 
     def set_progress_watcher(self, watcher):
         self.preprocessor.set_progress_watcher(watcher)
@@ -374,6 +378,64 @@ class AlignmentTab(GenericTab):
         # self.preprocessor.unpack_atlas(self.params.registration.atlas_info[self.params.registration.atlas_id]['base_name'])
         self.preprocessor.unpack_atlas(self.params.registration.atlas_base_name)
         self.preprocessor.setup_atlases()
+
+    def display_auto_to_ref_landmarks_dialog(self):
+        images = [self.preprocessor.workspace.filename('resampled', postfix='autofluorescence'),
+                  self.preprocessor.reference_file_path]
+        self.__display_landmarks_dialog(images, 'auto_to_reference')
+
+    def display_resampled_to_auto_landmarks_dialog(self):
+        images = [self.preprocessor.workspace.filename('resampled', postfix='autofluorescence'),
+                  self.preprocessor.workspace.filename('resampled')]
+        self.__display_landmarks_dialog(images, 'resampled_to_auto')
+
+    def __display_landmarks_dialog(self, images, direction):
+        dvs = plot_3d.plot(images, arange=False, sync=False, lut=self.main_window.preference_editor.params.lut,
+                           parent=self.main_window.centralWidget())
+        self.main_window.setup_plots(dvs)
+
+        landmark_selector = LandmarksSelectorDialog('', params=self.params)
+        landmark_selector.data_viewers = dvs
+        for i in range(2):
+            scatter = pg.ScatterPlotItem()
+            dvs[i].enable_mouse_clicks()
+            dvs[i].view.addItem(scatter)
+            dvs[i].scatter = scatter
+            coords = [landmark_selector.fixed_coords(), landmark_selector.moving_coords()][i]  # FIXME: check order (A to B)
+            dvs[i].scatter_coords = Scatter3D(coords, colors=np.array(landmark_selector.colors), half_slice_thickness=5)
+            callback = [landmark_selector.set_fixed_coords, landmark_selector.set_moving_coords][i]
+            dvs[i].mouse_clicked.connect(callback)
+        callbacks = {
+            'auto_to_reference': self.write_auto_to_ref_registration_landmark_coords,
+            'resampled_to_auto': self.write_resampled_to_auto_registration_landmark_coords
+        }
+        landmark_selector.dlg.buttonBox.accepted.connect(callbacks[direction])
+        self.landmark_selector = landmark_selector  # REFACTOR: find better way to keep in scope
+        # return landmark_selector
+
+    def write_auto_to_ref_registration_landmark_coords(self):
+        self.__write_registration_landmark_coords('auto_to_reference')
+
+    def write_resampled_to_auto_registration_landmark_coords(self):
+        self.__write_registration_landmark_coords('resampled_to_auto')
+
+    def __write_registration_landmark_coords(self, direction):
+        landmarks_file_paths = [self.preprocessor.get_autofluo_pts_path(direction)]
+        if direction == 'auto_to_reference':
+            landmarks_file_paths.append(self.preprocessor.ref_pts_path)
+        elif direction == 'resampled_to_auto':
+            landmarks_file_paths.append(self.preprocessor.resampled_pts_path)
+        else:
+            raise ValueError(f'Direction must be one of ("auto_to_reference", "resampled_to_auto"), got {direction}')
+        markers = [mrkr for mrkr in self.landmark_selector.coords if all(mrkr)]
+        for i, f_path in enumerate(landmarks_file_paths):
+            with open(f_path, 'w') as landmarks_file:
+                landmarks_file.write(f'point\n{len(markers)}\n')
+                for marker in markers:
+                    x, y, z = marker[i]
+                    landmarks_file.write(f'{x} {y} {z}\n')
+        self.landmark_selector.dlg.close()
+        self.landmark_selector = None
 
     def run_registration(self):
         self.main_window.print_status_msg('Registering')

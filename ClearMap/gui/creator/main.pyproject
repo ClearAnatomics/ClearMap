@@ -1,3 +1,3 @@
 {
-    "files": ["preferences_editor.ui","batch_tab.ui","alignment_tab.ui","cell_map_tab.ui","graphics_resources.qrc","vasculature_tab.ui","mainwindow.ui","sample_group_controls.ui","nested_progress_dialog.ui","pattern_prompt.ui","sample_picker.ui","sample_tab.ui","image_group_ctrls.ui"]
+    "files": ["nested_progress_dialog.ui","cell_map_tab.ui","pattern_prompt.ui","sample_group_controls.ui","vasculature_tab.ui","graphics_resources.qrc","alignment_tab.ui","image_group_ctrls.ui","sample_tab.ui","batch_tab.ui","preferences_editor.ui","mainwindow.ui","sample_picker.ui","landmark_selector.ui"]
 }
