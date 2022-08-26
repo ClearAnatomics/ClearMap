@@ -154,6 +154,18 @@ class PreProcessor(TabProcessor):
         # if not runs_on_spyder():
         #     pyqtgraph.mkQApp()
 
+    def get_autofluo_pts_path(self, direction='resampled_to_auto'):
+        elastix_folder = self.workspace.filename(direction)
+        return os.path.join(elastix_folder, 'autolfuorescence_landmarks.pts')  # TODO: use workspace
+
+    @property
+    def resampled_pts_path(self):
+        return os.path.join(self.workspace.filename('resampled_to_auto'), 'resampled_landmarks.pts')
+
+    @property
+    def ref_pts_path(self):
+        return os.path.join(self.workspace.filename('auto_to_reference'), 'reference_landmarks.pts')  # TODO: use workspace
+
     def setup(self, cfgs, watcher=None, convert_tiles=True):
         """
 
@@ -591,6 +603,10 @@ class PreProcessor(TabProcessor):
             "result_directory": self.workspace.filename('resampled_to_auto'),
             'workspace': self.workspace
         }
+        # FIXME: add use_landmarks to config
+        if os.path.exists(self.get_autofluo_pts_path('resampled_to_auto')) and os.path.exists(self.resampled_pts_path):
+            align_channels_parameter.update(moving_landmarks_path=self.resampled_pts_path,
+                                            fixed_landmarks_path=self.get_autofluo_pts_path('resampled_to_auto'))
         elastix.align(**align_channels_parameter)
         self.__check_elastix_success('resampled_to_auto')
 
@@ -608,6 +624,10 @@ class PreProcessor(TabProcessor):
             "result_directory": self.workspace.filename('auto_to_reference'),
             'workspace': self.workspace
         }
+        # FIXME: add use_landmarks to config
+        if os.path.exists(self.get_autofluo_pts_path('auto_to_reference')) and os.path.exists(self.ref_pts_path):
+            align_reference_parameter.update(moving_landmarks_path=self.ref_pts_path,
+                                             fixed_landmarks_path=self.get_autofluo_pts_path('auto_to_reference'))
         for k, v in align_reference_parameter.items():
             if not v:
                 raise ValueError('Registration missing parameter "{}"'.format(k))

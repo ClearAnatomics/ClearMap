@@ -16,13 +16,11 @@ import pyqtgraph as pg
 
 from skimage import transform as sk_transform  # Slowish
 
-from PyQt5.QtGui import QColor
-
-
 from PyQt5 import QtGui, QtCore, QtWidgets
+from PyQt5.QtGui import QColor
 from PyQt5.QtCore import QRectF
 from PyQt5.QtWidgets import QWidget, QDialogButtonBox, QListWidget, QHBoxLayout, QPushButton, QVBoxLayout, QTableWidget, \
-    QTableWidgetItem, QToolBox
+    QTableWidgetItem, QToolBox, QLabel, QRadioButton
 
 from ClearMap.IO import TIF
 from ClearMap.IO.metadata import pattern_finders_from_base_dir
@@ -30,8 +28,7 @@ from ClearMap.Settings import atlas_folder
 from ClearMap.Visualization import Plot3d as plot_3d
 from ClearMap.config.config_loader import ConfigLoader
 from ClearMap.gui.dialogs import make_splash, get_directory_dlg, update_pbar
-from ClearMap.gui.gui_utils import pseudo_random_rgb_array, create_clearmap_widget
-
+from ClearMap.gui.gui_utils import pseudo_random_rgb_array, create_clearmap_widget, get_random_color
 
 __author__ = 'Charly Rousseau <charly.rousseau@icm-institute.org>'
 __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
@@ -361,7 +358,20 @@ class Scatter3D:
             self.symbols[self.hemispheres == 255] = self.alternate_symbol
             self.symbols = self.symbols.decode()
 
-    def get_all_data(self, main_slice_idx, half_slice_thickness=3):
+    def get_all_data(self, main_slice_idx, half_slice_thickness=3):  # FIXME: rename
+        """
+        Get surrounding markers
+
+        Parameters
+        ----------
+        main_slice_idx int
+
+        half_slice_thickness int
+
+        Returns
+        -------
+
+        """
         pos = np.empty((0, 2))
         if self.colours is not None:
             if self.colours.ndim == 1:
@@ -372,7 +382,7 @@ class Scatter3D:
         if self.half_slice_thickness is not None:
             half_slice_thickness = self.half_slice_thickness
         for i in range(main_slice_idx - half_slice_thickness, main_slice_idx + half_slice_thickness):
-            if i < 0:
+            if i < 0:  # or i > self.coordinates[:, 2].max()
                 continue
             else:
                 current_slice = i
@@ -380,7 +390,7 @@ class Scatter3D:
             if self.colours is not None:
                 current_z_colors = self.get_colours(current_slice)
                 colours = np.hstack((colours, current_z_colors))
-            sizes = np.hstack((sizes, self.get_symbol_sizes(main_slice_idx, current_slice)))
+            sizes = np.hstack((sizes, self.get_symbol_sizes(main_slice_idx, current_slice, half_size=half_slice_thickness)))
         data = {'pos': pos,
                 'size': sizes}
         if self.colours is not None:
@@ -393,143 +403,32 @@ class Scatter3D:
         return np.full(n_markers, marker_size)
 
     def get_colours(self, current_slice):
-        return self.colours[self.current_slice_indices(current_slice)]
+        indices = self.current_slice_indices(current_slice)
+        if indices is not None:
+            return self.colours[indices]
+        else:
+            return np.array([])
 
     def current_slice_indices(self, current_slice):
-        return self.coordinates[:, self.axis] == current_slice
+        if len(self.coordinates):
+            return self.coordinates[:, self.axis] == current_slice
 
     def get_pos(self, current_slice):
-        return self.coordinates[self.current_slice_indices(current_slice)][:, :2]
+        indices = self.current_slice_indices(current_slice)
+        if indices is not None:
+            return self.coordinates[indices][:, :2]
+        else:
+            return np.empty((0, 2))
 
     def get_symbols(self, current_slice):
         if self.hemispheres is not None:
-            return self.symbols[self.current_slice_indices(current_slice)]
+            indices = self.current_slice_indices(current_slice)
+            if indices is not None:
+                return self.symbols[indices]
+            else:
+                return np.array([])
         else:
             return self.default_symbol
-
-
-class PatternDialog:
-    def __init__(self, params, src_folder, app=None):
-        self.params = params
-        self.src_folder = src_folder
-        if app is None:
-            app = QtWidgets.QApplication.instance()
-        self.app = app
-
-        self.n_image_groups = 0
-
-        dlg = create_clearmap_widget('pattern_prompt.ui', patch_parent_class='QDialog')
-        dlg.setWindowTitle('File paths wizard')
-        dlg.setupUi()
-        dlg.resize(600, dlg.height())
-        self.dlg = dlg
-
-        self.dlg.patternToolBox = QToolBox(parent=self.dlg)
-        self.dlg.patternWizzardLayout.insertWidget(0, self.dlg.patternToolBox)
-
-        self.pattern_strings = {}
-
-        self.patterns_finders = self.get_patterns()
-        for pattern_idx, p_finder in enumerate(self.patterns_finders):
-            self.add_group()
-            for axis, digits_idx in enumerate(p_finder.pattern.digit_clusters):
-                label_widget, pattern_widget, combo_widget = self.get_widgets(pattern_idx, axis)
-                pattern_widget.setText(p_finder.pattern.highlight_digits(axis))
-                self.enable_widgets((label_widget, pattern_widget, combo_widget))
-            for axis in range(axis + 1, 4):  # Hide the rest
-                self.hide_widgets(self.get_widgets(pattern_idx, axis))
-
-        self.fix_btn_boxes_text()
-        self.connect_buttons()
-
-    def get_widgets(self, image_group_id, axis):
-        page = self.dlg.patternToolBox.widget(image_group_id)
-        if page is None:
-            raise IndexError(f'No widget at index {image_group_id}')
-        label_widget = getattr(page, f'label0_{axis}')
-        pattern_widget = getattr(page, f'pattern0_{axis}')
-        combo_widget = getattr(page, f'pattern0_{axis}ComboBox')
-
-        return label_widget, pattern_widget, combo_widget
-
-    @staticmethod
-    def enable_widgets(widgets):
-        for w in widgets:
-            w.setEnabled(True)
-
-    @staticmethod
-    def hide_widgets(widgets):
-        for w in widgets:
-            w.setVisible(False)
-
-    def add_group(self):
-        group_controls = create_clearmap_widget('image_group_ctrls.ui',
-                                                patch_parent_class='QWidget')
-        group_controls.setupUi()
-        self.dlg.patternToolBox.addItem(group_controls, f'Image group {self.n_image_groups}')
-
-        group_controls.patternButtonBox.button(QDialogButtonBox.Apply).clicked.connect(self.validate_pattern)
-
-        self.n_image_groups += 1
-
-    def connect_buttons(self):
-        self.dlg.mainButtonBox.button(QDialogButtonBox.Apply).clicked.connect(self.save_results)
-        self.dlg.mainButtonBox.button(QDialogButtonBox.Cancel).clicked.connect(self.dlg.close)
-
-    def validate_pattern(self):
-        pattern_idx = self.dlg.patternToolBox.currentIndex()
-        pattern = self.patterns_finders[pattern_idx].pattern
-        for subpattern_idx, digit_cluster in enumerate(pattern.digit_clusters):
-            _, _, combo_widget = self.get_widgets(pattern_idx, subpattern_idx)
-            axis_name = combo_widget.currentText()
-            n_axis_chars = len(pattern.digit_clusters[subpattern_idx])
-
-            if axis_name == 'C':
-                raise NotImplementedError('Channel splitting is not implemented yet')
-            else:
-                pattern_element = '<{axis},{length}>'.format(axis=axis_name, length=n_axis_chars)
-                pattern.pattern_elements[subpattern_idx] = pattern_element
-
-        result_widget = self.dlg.patternToolBox.widget(pattern_idx).result
-        pattern_string = pattern.get_formatted_pattern()
-        pattern_string = os.path.join(self.patterns_finders[pattern_idx].folder, pattern_string)
-        pattern_string = os.path.relpath(pattern_string, start=self.src_folder)
-
-        result_widget.setText(pattern_string)
-
-        channel_name = self.dlg.patternToolBox.widget(pattern_idx).channelComboBox.currentText()
-        self.pattern_strings[channel_name] = pattern_string
-
-    def fix_btn_boxes_text(self):
-        for btn_box in self.dlg.findChildren(QDialogButtonBox):
-            if btn_box.property('applyText'):
-                btn_box.button(QDialogButtonBox.Apply).setText(btn_box.property('applyText'))
-
-    def get_patterns(self):
-        splash, progress_bar = make_splash(bar_max=100)
-        splash.show()
-        pool = ThreadPool(processes=1)
-        result = pool.apply_async(pattern_finders_from_base_dir, [self.src_folder])
-        while not result.ready():
-            result.wait(0.25)
-            update_pbar(self.app, progress_bar, 1)  # TODO: real update
-            self.app.processEvents()
-        pattern_finders = result.get()
-        update_pbar(self.app, progress_bar, 100)
-        splash.finish(self.dlg)
-        return pattern_finders
-
-    def save_results(self):
-        config_loader = ConfigLoader(self.src_folder)
-        sample_cfg = config_loader.get_cfg('sample')
-        for channel_name, pattern_string in self.pattern_strings.items():
-            sample_cfg['src_paths'][channel_name] = pattern_string
-        sample_cfg.write()
-        self.params.cfg_to_ui()
-        self.dlg.close()
-
-    def exec(self):
-        self.dlg.exec()
 
 
 # Adapted from https://stackoverflow.com/a/54917151 by https://stackoverflow.com/users/6622587/eyllanesc
@@ -648,36 +547,180 @@ class TwoListSelection(QWidget):
         return r
 
 
-class SamplePickerDialog:
-    def __init__(self, src_folder, params=None, app=None):
-        self.group_paths = [[]]
+class DataFrameWidget(QWidget):
+    def __init__(self, df, n_digits=2, parent=None):
+        super().__init__(parent)
+        self.df = df
+        self.n_digits = n_digits
+        self.table = QTableWidget(len(df.index), df.columns.size, parent=parent)
+        self.table.setHorizontalHeaderLabels(self.df.columns)
+        self.set_content()
+
+    def set_content(self):
+        for i in range(len(self.df.index)):
+            for j in range(self.df.columns.size):
+                v = self.df.iloc[i, j]
+                if self.df.dtypes[j] == np.float_:
+                    self.table.setItem(i, j, QTableWidgetItem(f'{v:.{self.n_digits}}'))
+                else:
+                    self.table.setItem(i, j, QTableWidgetItem(f'{v}'))
+
+
+class WizardDialog:
+    def __init__(self, src_folder, ui_name, ui_title, size, params=None, app=None):
         self.src_folder = src_folder
         self.params = params
+        if app is None:
+            app = QtWidgets.QApplication.instance()
         self.app = app
 
-        dlg = create_clearmap_widget('sample_picker.ui', patch_parent_class='QDialog')
-        dlg.setWindowTitle('File paths wizard')
+        dlg = create_clearmap_widget(f'{ui_name}.ui', patch_parent_class='QDialog')
+        dlg.setWindowTitle(ui_title)
         dlg.setupUi()
+
+        if size is not None:
+            if size[0] is None:
+                size[0] = dlg.width()
+            if size[1] is None:
+                size[1] = dlg.height()
+            dlg.resize(size[0], size[1])
+
         self.dlg = dlg
-        self.dlg.setMinimumWidth(800)
-        self.dlg.setMinimumHeight(600)
 
-        self.fix_btn_boxes_text()
+        self.setup()
 
-        self.current_group = 1
-        for i in range(self.params.n_groups - 1):
-            self.handle_add_group()
-
-        self.list_selection = TwoListSelection()
-        self.dlg.listPickerLayout.addWidget(self.list_selection)
         # self.dlg.setStyleSheet(qdarkstyle.load_stylesheet())
+        self.fix_btn_boxes_text()
         self.connect_buttons()
-        self.dlg.exec()
+
+    def setup(self):
+        raise NotImplementedError
 
     def fix_btn_boxes_text(self):
         for btn_box in self.dlg.findChildren(QDialogButtonBox):
             if btn_box.property('applyText'):
                 btn_box.button(QDialogButtonBox.Apply).setText(btn_box.property('applyText'))
+
+    def connect_buttons(self):
+        raise NotImplementedError
+
+    @staticmethod
+    def enable_widgets(widgets):
+        for w in widgets:
+            w.setEnabled(True)
+
+    @staticmethod
+    def hide_widgets(widgets):
+        for w in widgets:
+            w.setVisible(False)
+
+    def exec(self):
+        self.dlg.exec()
+
+
+class PatternDialog(WizardDialog):
+    def __init__(self, src_folder, params=None, app=None):
+        super(PatternDialog, self).__init__(src_folder, 'pattern_prompt', 'File paths wizard', (600, None), params, app)
+
+    def setup(self):
+        self.n_image_groups = 0
+        self.dlg.patternToolBox = QToolBox(parent=self.dlg)
+        self.dlg.patternWizzardLayout.insertWidget(0, self.dlg.patternToolBox)
+        self.pattern_strings = {}
+        self.patterns_finders = self.get_patterns()
+        for pattern_idx, p_finder in enumerate(self.patterns_finders):
+            self.add_group()
+            for axis, digits_idx in enumerate(p_finder.pattern.digit_clusters):
+                label_widget, pattern_widget, combo_widget = self.get_widgets(pattern_idx, axis)
+                pattern_widget.setText(p_finder.pattern.highlight_digits(axis))
+                self.enable_widgets((label_widget, pattern_widget, combo_widget))
+            for axis in range(axis + 1, 4):  # Hide the rest
+                self.hide_widgets(self.get_widgets(pattern_idx, axis))
+
+    def get_widgets(self, image_group_id, axis):
+        page = self.dlg.patternToolBox.widget(image_group_id)
+        if page is None:
+            raise IndexError(f'No widget at index {image_group_id}')
+        label_widget = getattr(page, f'label0_{axis}')
+        pattern_widget = getattr(page, f'pattern0_{axis}')
+        combo_widget = getattr(page, f'pattern0_{axis}ComboBox')
+
+        return label_widget, pattern_widget, combo_widget
+
+    def add_group(self):
+        group_controls = create_clearmap_widget('image_group_ctrls.ui',
+                                                patch_parent_class='QWidget')
+        group_controls.setupUi()
+        self.dlg.patternToolBox.addItem(group_controls, f'Image group {self.n_image_groups}')
+
+        group_controls.patternButtonBox.button(QDialogButtonBox.Apply).clicked.connect(self.validate_pattern)
+
+        self.n_image_groups += 1
+
+    def connect_buttons(self):
+        self.dlg.mainButtonBox.button(QDialogButtonBox.Apply).clicked.connect(self.save_results)
+        self.dlg.mainButtonBox.button(QDialogButtonBox.Cancel).clicked.connect(self.dlg.close)
+
+    def validate_pattern(self):
+        pattern_idx = self.dlg.patternToolBox.currentIndex()
+        pattern = self.patterns_finders[pattern_idx].pattern
+        for subpattern_idx, digit_cluster in enumerate(pattern.digit_clusters):
+            _, _, combo_widget = self.get_widgets(pattern_idx, subpattern_idx)
+            axis_name = combo_widget.currentText()
+            n_axis_chars = len(pattern.digit_clusters[subpattern_idx])
+
+            if axis_name == 'C':
+                raise NotImplementedError('Channel splitting is not implemented yet')
+            else:
+                pattern_element = '<{axis},{length}>'.format(axis=axis_name, length=n_axis_chars)
+                pattern.pattern_elements[subpattern_idx] = pattern_element
+
+        result_widget = self.dlg.patternToolBox.widget(pattern_idx).result
+        pattern_string = pattern.get_formatted_pattern()
+        pattern_string = os.path.join(self.patterns_finders[pattern_idx].folder, pattern_string)
+        pattern_string = os.path.relpath(pattern_string, start=self.src_folder)
+
+        result_widget.setText(pattern_string)
+
+        channel_name = self.dlg.patternToolBox.widget(pattern_idx).channelComboBox.currentText()
+        self.pattern_strings[channel_name] = pattern_string
+
+    def get_patterns(self):
+        splash, progress_bar = make_splash(bar_max=100)
+        splash.show()
+        pool = ThreadPool(processes=1)
+        result = pool.apply_async(pattern_finders_from_base_dir, [self.src_folder])
+        while not result.ready():
+            result.wait(0.25)
+            update_pbar(self.app, progress_bar, 1)  # TODO: real update
+            self.app.processEvents()
+        pattern_finders = result.get()
+        update_pbar(self.app, progress_bar, 100)
+        splash.finish(self.dlg)
+        return pattern_finders
+
+    def save_results(self):
+        config_loader = ConfigLoader(self.src_folder)
+        sample_cfg = config_loader.get_cfg('sample')
+        for channel_name, pattern_string in self.pattern_strings.items():
+            sample_cfg['src_paths'][channel_name] = pattern_string
+        sample_cfg.write()
+        self.params.cfg_to_ui()
+        self.dlg.close()
+
+
+class SamplePickerDialog(WizardDialog):
+    def __init__(self, src_folder, params=None, app=None):
+        super().__init__(src_folder, 'sample_picker', 'File paths wizard', (None, 600), params, app)
+        self.exec()
+
+    def setup(self):
+        self.group_paths = [[]]
+        self.current_group = 1
+        for i in range(self.params.n_groups - 1):
+            self.handle_add_group()
+        self.list_selection = TwoListSelection()
+        self.dlg.listPickerLayout.addWidget(self.list_selection)
 
     def connect_buttons(self):
         self.dlg.mainFolderPushButton.clicked.connect(self.handle_main_folder_clicked)
@@ -728,20 +771,101 @@ class SamplePickerDialog:
         return sample_folders
 
 
-class DataFrameWidget(QWidget):
-    def __init__(self, df, n_digits=2, parent=None):
-        super().__init__(parent)
-        self.df = df
-        self.n_digits = n_digits
-        self.table = QTableWidget(len(df.index), df.columns.size, parent=parent)
-        self.table.setHorizontalHeaderLabels(self.df.columns)
-        self.set_content()
+class LandmarksSelectorDialog(WizardDialog):  # TODO: bind qColorDialog to color buttons
 
-    def set_content(self):
-        for i in range(len(self.df.index)):
-            for j in range(self.df.columns.size):
-                v = self.df.iloc[i, j]
-                if self.df.dtypes[j] == np.float_:
-                    self.table.setItem(i, j, QTableWidgetItem(f'{v:.{self.n_digits}}'))
-                else:
-                    self.table.setItem(i, j, QTableWidgetItem(f'{v}'))
+    def __init__(self, src_folder, params=None, app=None):
+        super().__init__(src_folder, 'landmark_selector', 'Landmark selector', None, params, app)
+        # self.dlg.setModal(False)
+        self.dlg.show()
+
+    def setup(self):
+        btn = self.dlg.marker0RadioButton
+        btn.setChecked(True)
+        color_btn = self.dlg.marker0ColorBtn
+        self.markers = [(btn, color_btn)]
+        self.coords = [[None, None]]
+
+    def __len__(self):
+        return len(self.markers)
+
+    @property
+    def current_marker(self):
+        return [marker[0].isChecked() for marker in self.markers].index(True)
+
+    # def get_marker_btn(self, idx):
+    #     return getattr(self.dlg, f'marker{idx}RadioButton', None)
+    #
+    # def get_marker_color_label(self, idx):
+    #     return getattr(self.dlg, f'marker{idx}ColorLabel', None)
+
+    def connect_buttons(self):
+        self.dlg.addMarkerPushButton.clicked.connect(self.add_marker)
+        self.dlg.delMarkerPushButton.clicked.connect(self.remove_marker)
+        # self.dlg.buttonBox.accepted.connect(self.accept)
+        self.dlg.buttonBox.rejected.connect(self.dlg.close)
+
+    # def accept(self):
+    #     self.print_values()
+    #     self.dlg.close()
+    #
+    # def print_values(self):
+    #     print(self.current_marker)
+    #     print(self.colors)
+    #     print(self.coords)
+
+    def fixed_coords(self):
+        return np.array([c[0] for c in self.coords if c[0] is not None])
+
+    def moving_coords(self):
+        return np.array([c[1] for c in self.coords if c[1] is not None])
+
+    def set_fixed_coords(self, x, y, z):
+        self.coords[self.current_marker][0] = (x, y, z)
+        self.data_viewers[0].scatter_coords.coordinates = self.fixed_coords()
+        self.data_viewers[0].scatter_coords.colours = np.array([QColor(col) for col in self.colors])
+        self.data_viewers[0].refresh()
+
+    def set_moving_coords(self, x, y, z):
+        self.coords[self.current_marker][1] = (x, y, z)
+        self.data_viewers[1].scatter_coords.coordinates = self.moving_coords()
+        self.data_viewers[1].scatter_coords.colours = np.array([QColor(col) for col in self.colors])
+        self.data_viewers[1].refresh()
+
+    @property
+    def colors(self):
+        return [sheet.replace('background-color: ', '').strip() for sheet in self.style_sheets]
+
+    @property
+    def current_color(self):
+        return self.colors[self.current_marker]
+
+    @property
+    def style_sheets(self):
+        return [color_btn.styleSheet() for _, color_btn in self.markers]
+
+    def add_marker(self):
+        new_idx = len(self)
+        btn = QRadioButton(f'Marker {new_idx}:', self.dlg)
+        btn.setObjectName(f'marker{new_idx}RadioButton')
+        color_btn = QPushButton(self.dlg)
+        color_btn.setObjectName(f'marker{new_idx}ColorBtn')
+        color_btn.setStyleSheet(f'background-color: {self.get_new_color()}')
+        self.dlg.formLayout.insertRow(len(self), btn, color_btn)
+        self.markers.append((btn, color_btn))
+        self.coords.append([None, None])
+
+    def remove_marker(self):
+        if self.current_marker == len(self) - 1:
+            self.markers[-2][0].setChecked(True)
+        btn, color_btn = self.markers[len(self) - 1]
+        for widg in (btn, color_btn):
+            widg.setParent(None)
+            widg.deleteLater()
+        self.markers.pop()
+        self.coords.pop()
+
+    def get_new_color(self):
+        color = get_random_color()
+        while color.name() in self.colors:
+            color = get_random_color()
+        return color.name()
