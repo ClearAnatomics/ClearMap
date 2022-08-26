@@ -25,6 +25,7 @@ import functools as ft
 import numpy as np
 
 import pyqtgraph as pg
+from PyQt5.QtCore import Qt
 
 from ClearMap.Utils.utilities import runs_on_spyder
 from ClearMap.IO.IO import as_source
@@ -285,7 +286,6 @@ class DataViewer(pg.QtGui.QWidget):
         axis_tools_layout.addWidget(self.source_label, 0, 3)
 
         self.graphicsView.scene().sigMouseMoved.connect(self.updateLabelFromMouseMove)
-        # self.graphicsView.scene().sigMouseClicked.connect(self.handleMouseClick)
 
         # compose the image viewer
         image_splitter.addWidget(self.graphicsView)
@@ -582,13 +582,16 @@ class DataViewer(pg.QtGui.QWidget):
                 image = image.view('uint8')
             img_item.updateImage(image)
 
+    def enable_mouse_clicks(self):
+        self.graphicsView.scene().sigMouseClicked.connect(self.handleMouseClick)
+
     def handleMouseClick(self, event):
         event.accept()
         x, y = self.get_coords(event.scenePos())
         btn = event.button()
         double_click = event.double()
         modifiers = event.modifiers()
-        print(btn, double_click, modifiers == pg.Qt.ShiftModifier)
+        # print(btn, double_click, modifiers == Qt.ShiftModifier)
 
         x_axis, y_axis = self.getXYAxes()
         scaled_x, scaled_y = self.scale_coords(x, x_axis, y, y_axis)
