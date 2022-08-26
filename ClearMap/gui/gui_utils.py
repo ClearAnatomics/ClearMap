@@ -14,6 +14,7 @@ import matplotlib
 import numpy as np
 import skimage.io
 from PyQt5 import QtGui
+from PyQt5.QtGui import QColor
 from matplotlib.colors import hsv_to_rgb
 
 from ClearMap.gui.pyuic_utils import loadUiType
@@ -161,3 +162,7 @@ def pseudo_random_rgb_array(n_samples):
 def create_clearmap_widget(ui_name, patch_parent_class):
     widget_class, _ = loadUiType(os.path.join(UI_FOLDER, 'creator', ui_name), patch_parent_class=patch_parent_class)
     return widget_class()
+
+
+def get_random_color():
+    return QColor(*np.random.randint(0, 255, 3))
