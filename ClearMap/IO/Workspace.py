@@ -5,7 +5,7 @@ Workspace
 
 The Workspace module keeps track of the data files of a project.
 Using this module will simplify access to data and results using coherent
-filenames accross experiments and samples.
+filenames across experiments and samples.
 
 One can think of a Workspace as a transparent data structure for ClearMap.
 
@@ -14,7 +14,7 @@ Note
 Additional standard filenames can be added in the `ftype_to_filename dict`.
 """
 __author__ = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
-__license__ = 'GPLv3 - GNU General Pulic License v3 (see LICENSE.txt)'
+__license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
@@ -38,8 +38,8 @@ import ClearMap.Visualization.Plot3d as q_plot3d
 ###############################################################################
 
 default_file_type_to_name = OrderedDict(
-    raw                       = "/Raw/raw_<X,2>_<Y,2>.npy",
-    autofluorescence          = "/Autofluorescence/auto_<X,2>_<Y,2>.npy",
+    raw                       = "Raw/raw_<X,2>_<Y,2>.npy",
+    autofluorescence          = "Autofluorescence/auto_<X,2>_<Y,2>.npy",
     stitched                  = "stitched.npy", 
     layout                    = "layout.lyt",
     background                = "background.npy",
@@ -59,7 +59,7 @@ file_type_synonyms = dict(
   
 default_file_type_to_name_tube_map = default_file_type_to_name.copy()
 default_file_type_to_name_tube_map.update(
-    arteries                  = "/Raw/arteries_<X,2>_Y,2>.npy", 
+    arteries                  = "Raw/arteries_<X,2>_Y,2>.npy",
     binary                    = "binary.npy",
     binary_status             = "binary_status.npy",
     skeleton                  = 'skeleton.npy',
@@ -77,8 +77,8 @@ file_type_synonyms.update(
 
 default_file_type_to_name_cell_map = default_file_type_to_name.copy()
 default_file_type_to_name_cell_map.update(
-    raw                       = "/Raw/Z<Z,4>.tif",
-    autofluorescence          = "/Autofluorescence/Z<Z,4>.tif",
+    raw                       = "Raw/Z<Z,4>.tif",
+    autofluorescence          = "Autofluorescence/Z<Z,4>.tif",
     cells                     = 'cells.npy',
     density                   = "density.tif",
     )
