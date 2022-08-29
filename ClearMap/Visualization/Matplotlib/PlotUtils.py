@@ -144,7 +144,7 @@ def subplot_tiling(n, tiling=None):
     return nx, ny
 
 
-def plot_histogram(stats_df, aba_df, n_rows=20, sort_order=False, save_path=None,
+def plot_histogram(stats_df, aba_df, n_rows=20, sort_order=False, save_path=None, show=True,
                    fold_threshold=5, density_cutoff=0.05, fold_regions=False):
     stats_df = sanitize_df(stats_df)
 
@@ -200,10 +200,13 @@ def plot_histogram(stats_df, aba_df, n_rows=20, sort_order=False, save_path=None
 
     plt.subplots_adjust(wspace=0, top=0.85, bottom=0.1, left=0.18, right=0.95)
 
-    if save_path is None:
-        plt.show()
-    else:
+    if save_path:
         plt.savefig(save_path)
+    else:
+        if show:
+            plt.show()
+        else:
+            return fig
 
 
 def fold_dataframe(df, aba_df, fold_threshold):
@@ -261,7 +264,7 @@ def get_parent_name(df, _id, level):
     return get_parent_structure(df, _id, level)['name'].values[0]
 
 
-def volcano(df, group_names, save_path='', p_cutoff=0.05):
+def plot_volcano(df, group_names, p_cutoff=0.05, show=False, save_path=''):
     mean_0 = df[f'mean_{group_names[0]}'].values
     mean_1 = df[f'mean_{group_names[1]}'].values
     ratio = np.log2(mean_1 / mean_0)
@@ -272,17 +275,20 @@ def volcano(df, group_names, save_path='', p_cutoff=0.05):
     for i, col in enumerate(colors):
         hsv = rgb_to_hsv(col)
         if p_values[i] > p_cutoff:
-            hsv[1] *= 0.3  # desaturate
+            hsv[1] *= 0.3  # desaturate non significant p values
         colors[i] = hsv_to_rgb(hsv)
     # colors[p_values > p_cutoff] = (0.8, 0.8, 0.8)
-
+    fig = plt.figure()
     plt.scatter(ratio, -np.log10(p_values), marker='o', linestyle='None', color=colors, edgecolors=(0.9, 0.9, 0.9))
     plt.xlim((-5, 5))
     plt.hlines(-np.log10(p_cutoff), -5, 5, linestyles='dashed', color='grey')
     plt.xlabel('log2(fold change)')
     plt.ylabel('- log10(p value)')
 
-    if not save_path:
-        plt.show()
-    else:
+    if save_path:
         plt.savefig(save_path)
+    else:
+        if show:
+            plt.show()
+        else:
+            return fig
