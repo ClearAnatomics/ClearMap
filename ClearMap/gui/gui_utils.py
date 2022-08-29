@@ -150,6 +150,11 @@ def get_current_res(app):
     return res
 
 
+def create_clearmap_widget(ui_name, patch_parent_class):
+    widget_class, _ = loadUiType(os.path.join(UI_FOLDER, 'creator', ui_name), patch_parent_class=patch_parent_class)
+    return widget_class()
+
+
 def pseudo_random_rgb_array(n_samples):
     hues = np.random.rand(n_samples)
     saturations = np.random.rand(n_samples) / 2 + 0.5
@@ -159,10 +164,22 @@ def pseudo_random_rgb_array(n_samples):
     return rgbs.T
 
 
-def create_clearmap_widget(ui_name, patch_parent_class):
-    widget_class, _ = loadUiType(os.path.join(UI_FOLDER, 'creator', ui_name), patch_parent_class=patch_parent_class)
-    return widget_class()
-
-
 def get_random_color():
     return QColor(*np.random.randint(0, 255, 3))
+
+
+def get_pseudo_random_color():
+    """
+    Return a pseudo random colour. The hue is random but
+    The saturation and the value are kept in the upper half interval
+
+    Returns
+    -------
+
+    """
+    rand_gen = np.random.default_rng()
+    hsv = (rand_gen.uniform(0, 1),
+           rand_gen.uniform(0.5, 1),
+           rand_gen.uniform(0.5, 1))
+    rgb = hsv_to_rgb(hsv)
+    return rgb
