@@ -20,7 +20,7 @@ from PyQt5 import QtGui, QtCore, QtWidgets
 from PyQt5.QtGui import QColor
 from PyQt5.QtCore import QRectF
 from PyQt5.QtWidgets import QWidget, QDialogButtonBox, QListWidget, QHBoxLayout, QPushButton, QVBoxLayout, QTableWidget, \
-    QTableWidgetItem, QToolBox, QLabel, QRadioButton
+    QTableWidgetItem, QToolBox, QRadioButton
 
 from ClearMap.IO import TIF
 from ClearMap.IO.metadata import pattern_finders_from_base_dir
@@ -28,7 +28,7 @@ from ClearMap.Settings import atlas_folder
 from ClearMap.Visualization import Plot3d as plot_3d
 from ClearMap.config.config_loader import ConfigLoader
 from ClearMap.gui.dialogs import make_splash, get_directory_dlg, update_pbar
-from ClearMap.gui.gui_utils import pseudo_random_rgb_array, create_clearmap_widget, get_random_color
+from ClearMap.gui.gui_utils import pseudo_random_rgb_array, create_clearmap_widget, get_pseudo_random_color
 
 __author__ = 'Charly Rousseau <charly.rousseau@icm-institute.org>'
 __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
@@ -865,7 +865,7 @@ class LandmarksSelectorDialog(WizardDialog):  # TODO: bind qColorDialog to color
         self.coords.pop()
 
     def get_new_color(self):
-        color = get_random_color()
+        color = get_pseudo_random_color()
         while color.name() in self.colors:
-            color = get_random_color()
+            color = get_pseudo_random_color()
         return color.name()
