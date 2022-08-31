@@ -413,7 +413,7 @@ class VesselGraphProcessor(TabProcessor):
         self.graph_reduced = graph_reduced
         # graph_reduced = graph_gt.load(self.workspace.filename('graph', postfix='reduced'))
 
-    def visualize_graph_annotations(self, chunk_range, plot_type='mesh', graph_step='reduced'):
+    def visualize_graph_annotations(self, chunk_range, plot_type='mesh', graph_step='reduced', show=True):
         graph_steps = {
             'cleaned': self.graph_cleaned,
             'reduced': self.graph_reduced,
@@ -427,18 +427,21 @@ class VesselGraphProcessor(TabProcessor):
 
         # region_label = self.graph_reduced.vertex_properties('annotation')
         # region_color = np.array([[1, 0, 0, 1], [0, 0, 1, 1]])[region_label]
-
+        title = f'{graph_step.title()} Graph'
         region_color = annotation_module.convert_label(graph_chunk.vertex_annotation(), key='order', value='rgba')
         if plot_type == 'line':
-            scene = plot_graph_3d.plot_graph_line(graph_chunk, vertex_colors=region_color)
+            scene = plot_graph_3d.plot_graph_line(graph_chunk, vertex_colors=region_color, title=title,
+                                                  show=show, bg_color=self.machine_config['three_d_plot_bg'])
         elif plot_type == 'mesh':
-            scene = plot_graph_3d.plot_graph_mesh(graph_chunk, vertex_colors=region_color)
+            scene = plot_graph_3d.plot_graph_mesh(graph_chunk, vertex_colors=region_color, title=title,
+                                                  show=show, bg_color=self.machine_config['three_d_plot_bg'])
         elif plot_type == 'edge_property':
-            scene = plot_graph_3d.plot_graph_edge_property(graph_chunk, edge_property='artery_raw',
-                                                           percentiles=[2, 98], normalize=True, mesh=True)
+            scene = plot_graph_3d.plot_graph_edge_property(graph_chunk, edge_property='artery_raw', title=title,
+                                                           percentiles=[2, 98], normalize=True, mesh=True,
+                                                           show=show, bg_color=self.machine_config['three_d_plot_bg'])
         else:
-            raise ValueError('Unrecognised plot type  "{}"'.format(plot_type))
-        scene.canvas.bgcolor = vispy.color.color_array.Color(self.machine_config['three_d_plot_bg'])
+            raise ValueError(f'Unrecognised plot type  "{plot_type}"')
+        # scene.canvas.bgcolor = vispy.color.color_array.Color(self.machine_config['three_d_plot_bg'])
         return [scene.canvas.native]
 
     # Atlas registration and annotation
