@@ -776,17 +776,17 @@ class VasculatureTab(PostProcessingTab):
 
     def display_cleaned_graph_chunk(self):
         slicing = self.__get_tube_map_slicing()
-        dvs = self.vessel_graph_processor.visualize_graph_annotations(slicing, plot_type='mesh', graph_step='cleaned')
+        dvs = self.vessel_graph_processor.visualize_graph_annotations(slicing, plot_type='mesh', graph_step='cleaned', show=False)
         self.main_window.setup_plots(dvs)
 
     def display_reduced_graph_chunk(self):
         slicing = self.__get_tube_map_slicing()
-        dvs = self.vessel_graph_processor.visualize_graph_annotations(slicing, plot_type='mesh', graph_step='reduced')
+        dvs = self.vessel_graph_processor.visualize_graph_annotations(slicing, plot_type='mesh', graph_step='reduced', show=False)
         self.main_window.setup_plots(dvs)
 
     def display_annotated_graph_chunk(self):
         slicing = self.__get_tube_map_slicing()
-        dvs = self.vessel_graph_processor.visualize_graph_annotations(slicing, plot_type='mesh', graph_step='annotated')
+        dvs = self.vessel_graph_processor.visualize_graph_annotations(slicing, plot_type='mesh', graph_step='annotated', show=False)
         self.main_window.setup_plots(dvs)
 
     def post_process_graph(self):
