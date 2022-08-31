@@ -268,7 +268,7 @@ class BinaryVesselProcessor(TabProcessor):
             block_processing.process(np.logical_or, [source, source_arteries], sink,
                                      size_max=500, overlap=0, processes=None, verbose=True)
         else:
-            source = self.steps.path(self.steps.postprocessed, step_back=True)
+            source = self.steps.path(self.steps.filled, step_back=True)
             clearmap_io.copy_file(source, sink)
 
         # POST_PROCESS
