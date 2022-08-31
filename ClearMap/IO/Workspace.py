@@ -281,6 +281,11 @@ class Workspace(object):
                         directory=directory, expression=expression,
                         values=values, prefix=prefix, extension=extension,
                         debug=debug, **kwargs)
+
+    def exists(self, ftype, file_type_to_name=None, directory=None, expression=None, values=None, prefix=None, extension=None, debug=None, **kwargs):
+      return os.path.exists(self.filename(ftype, file_type_to_name=file_type_to_name, directory=directory,
+                                          expression=expression, values=values, prefix=prefix, extension=extension,
+                                          debug=debug, **kwargs))
   
     def expression(self, *args, **kwargs):
         return Expression(self.filename(*args, **kwargs))
