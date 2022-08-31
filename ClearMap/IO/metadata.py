@@ -239,10 +239,11 @@ class PatternFinder:  # TODO: from_df class_method
             cluster_idx = c_idx[0]
         else:
             return
-        for k in axes_order.keys():  # Remove C from axes_order if we split by C
-            if axes_order[k] > axes_order['c']:
-                axes_order[k] -= 1
-        axes_order['c'] = None
+        if axes_order is not None:  # FIXME: not supplied by UI
+            for k in axes_order.keys():  # Remove C from axes_order if we split by C
+                if axes_order[k] > axes_order['c']:
+                    axes_order[k] -= 1
+            axes_order['c'] = None
         columns = pattern.digit_clusters[cluster_idx]
         axis_values = df[columns].drop_duplicates().values
         pattern_finders = []
