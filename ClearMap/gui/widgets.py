@@ -120,6 +120,7 @@ class OrthoViewer(object):
         else:
             self.shape = None
         self.rectangles = []
+        self.dvs = []
 
     def setup(self, img, params, parent=None):
         self.img = img
@@ -203,12 +204,13 @@ class OrthoViewer(object):
 
     def add_cropping_bars(self):
         self.rectangles = []
-        matched_axes = (1, 0, 1)  # TODO: compute
+        y_axis_idx = (1, 2, 1)  # y is 1 except when 1 is swapped to z
         for i, dv in enumerate(self.dvs):
-            min_rect = RectItem(QRectF(0, 0, 0, self.shape[matched_axes[i]]))
+            height = self.shape[y_axis_idx[i]]
+            min_rect = RectItem(QRectF(0, 0, 0, height))
             self.rectangles.append(min_rect)
             dv.view.addItem(min_rect)
-            max_rect = RectItem(QRectF(self.shape[i], 0, 0, self.shape[matched_axes[i]]))
+            max_rect = RectItem(QRectF(self.shape[i], 0, 0, height))
             self.rectangles.append(max_rect)
             dv.view.addItem(max_rect)
 
@@ -220,8 +222,8 @@ class OrthoViewer(object):
             if parent is None:
                 raise ValueError('Parent not set')
         x = np.copy(img)
-        y = np.copy(img).swapaxes(0, 1)
-        z = np.copy(img).swapaxes(0, 2)
+        y = np.copy(img).swapaxes(2, 1)
+        z = np.copy(img).swapaxes(2, 0)
         dvs = plot_3d.plot([x, y, z], arange=False, lut='white', parent=parent, sync=False)
         self.dvs = dvs
         return dvs
@@ -620,7 +622,7 @@ class WizardDialog:
 
 class PatternDialog(WizardDialog):
     def __init__(self, src_folder, params=None, app=None):
-        super(PatternDialog, self).__init__(src_folder, 'pattern_prompt', 'File paths wizard', (600, None), params, app)
+        super().__init__(src_folder, 'pattern_prompt', 'File paths wizard', (600, None), params, app)
 
     def setup(self):
         self.n_image_groups = 0
