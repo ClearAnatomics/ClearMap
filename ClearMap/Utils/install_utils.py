@@ -1,6 +1,6 @@
 """
 install_utils
-=========
+=============
 
 Utilities module with minimal dependencies (standard library only) for installation
 """
