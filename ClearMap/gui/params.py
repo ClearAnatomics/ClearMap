@@ -1073,6 +1073,12 @@ class CellMapParams(UiParameter):
         return round(val * self.ratios[2])
 
     @property
+    def slicing(self):
+        return (slice(self.crop_x_min, self.crop_x_max),
+                slice(self.crop_y_min, self.crop_y_max),
+                slice(self.crop_z_min, self.crop_z_max))
+
+    @property
     def plot_detected_cells(self):
         return self.is_checked(self.tab.cellDetectionPlotCheckBox)
 
@@ -1369,9 +1375,16 @@ class VesselGraphParams(UiParameter):
 
     def handle_z_val_change(self):
         self._config['graph_construction']['slicing']['dim_2'] = self.crop_z_min, self.crop_z_max
+        self.crop_ranges_changed.emit()
 
     def scale_z(self, val):
         return round(val * self.ratios[2])
+
+    @property
+    def slicing(self):
+        return (slice(self.crop_x_min, self.crop_x_max),
+                slice(self.crop_y_min, self.crop_y_max),
+                slice(self.crop_z_min, self.crop_z_max))
     
     @property
     def vein_intensity_range_on_arteries_channel(self):
