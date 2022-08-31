@@ -21,6 +21,7 @@ import traceback
 import types
 
 from PyQt5 import QtGui
+from PyQt5.QtWebEngineWidgets import QWebEngineView  # WARNING: import required before app creation
 from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QSpinBox, QDoubleSpinBox, QFrame, \
     QDialogButtonBox, QComboBox, QLineEdit, QStyle, QWidget, QMessageBox, QToolBox
 
@@ -353,7 +354,8 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
 
     def signal_process_finished(self, msg='Idle, waiting for input'):
         self.print_status_msg(msg)
-        self.progress_dialog.done(1)
+        if self.progress_dialog is not None:
+            self.progress_dialog.done(1)
 
 
 class ClearMapGui(ClearMapGuiBase):
@@ -441,6 +443,7 @@ class ClearMapGui(ClearMapGuiBase):
             self.alignment_tab_mgr.preprocessor.set_progress_watcher(self.progress_watcher)
 
     def handle_tab_click(self, tab_index):
+        all_tabs = [self.sample_tab_mgr, self.alignment_tab_mgr, self.cells_tab_mgr, self.vasculature_tab_mgr, self.batch_tab_mgr]
         if 0 < tab_index < 4 and self.alignment_tab_mgr.preprocessor.workspace is None:
             self.popup('WARNING', 'Workspace not initialised, '
                                   'cannot proceed to alignment')
@@ -450,12 +453,13 @@ class ClearMapGui(ClearMapGuiBase):
             3: self.vasculature_tab_mgr.setup_vessel_processors
         }
         if tab_index in (2, 3):
+            if all_tabs[tab_index] is None or not all_tabs[tab_index].ui.isEnabled():
+                return
             if self.alignment_tab_mgr.preprocessor.was_registered:
                 processor_setup_functions[tab_index]()
             else:
                 self.__check_missing_alignment()
-
-        if tab_index == 4 and not self.batch_tab_mgr.initialised:
+        elif tab_index == 4 and not self.batch_tab_mgr.initialised:
             cfg_name = title_to_snake(self.batch_tab_mgr.name)
             try:
                 self.batch_tab_mgr.setup()
@@ -503,8 +507,9 @@ class ClearMapGui(ClearMapGuiBase):
         was_copied = False
         if cfg_name in ('cell_map', 'vasculature', 'tube_map'):
             pipeline_name = title_to_snake(self.alignment_tab_mgr.params.pipeline_name)
-            is_cell_map = (pipeline_name in ('cell_map', 'tube_map') and cfg_name in ('cell_map', 'tube_map'))
-            is_irrelevant_tab = not(pipeline_name == 'both' or pipeline_name == cfg_name or is_cell_map)
+            is_cell_map = pipeline_name == 'cell_map' and cfg_name == 'cell_map'
+            is_tube_map = pipeline_name == 'tube_map' and cfg_name in ('tube_map', 'vasculature')
+            is_irrelevant_tab = not(pipeline_name == 'both' or is_tube_map or is_cell_map)
             if is_irrelevant_tab:
                 return False, None
         if not self.file_exists(cfg_path):
