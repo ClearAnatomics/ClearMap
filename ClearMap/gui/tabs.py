@@ -8,15 +8,19 @@ The different tabs that correspond to different functionalities of the GUI
 
 import os.path
 
+import mpld3
 import numpy as np
+import pandas as pd
 
 import pyqtgraph as pg
+from PyQt5.QtWebEngineWidgets import QWebEngineView
 from PyQt5.QtWidgets import QDialogButtonBox
 
 import ClearMap.IO.IO as clearmap_io
 from ClearMap.IO.MHD import mhd_read
 from ClearMap.Alignment import Annotation as annotation
 from ClearMap.Analysis.Statistics.group_statistics import make_summary, density_files_are_comparable, compare_groups
+from ClearMap.Visualization.Matplotlib.PlotUtils import plot_sample_stats_histogram, plot_volcano
 
 from ClearMap.gui.dialogs import prompt_dialog
 from ClearMap.gui.gui_utils import format_long_nb_to_str, surface_project, np_to_qpixmap, create_clearmap_widget
@@ -830,8 +834,8 @@ class BatchTab(GenericTab):
         return self.params is not None
 
     def set_params(self):
-        self.params = BatchParams(self.ui, '', preferences=self.main_window.preference_editor.params)
-        # self.params = BatchParams(self.ui, self.main_window.src_folder)
+        self.params = BatchParams(self.ui, src_folder='', preferences=self.main_window.preference_editor.params)
+        # self.params = BatchParams(self.ui, src_folder=self.main_window.src_folder)
 
     def setup(self):
         self.init_ui()
@@ -845,6 +849,15 @@ class BatchTab(GenericTab):
 
     def create_wizard(self):
         return SamplePickerDialog('', params=self.params)
+
+    def run_batch_process(self):
+        self.params.ui_to_cfg()
+        paths = [p for ps in self.params.get_all_paths() for p in ps]  # flatten list
+        self.main_window.make_progress_dialog('Analysing samples', maximum=0)  # TODO: see abort callback
+        # TODO: pass progress watcher to increment from within
+        self.main_window.wrap_in_thread(process_folders, paths,
+                                        self.params.align, self.params.count_cells, self.params.run_vaculature)
+        self.main_window.signal_process_finished()
 
     def make_group_stats_tables(self):
         self.main_window.print_status_msg('Computing stats table')
@@ -864,39 +877,57 @@ class BatchTab(GenericTab):
 
     def run_p_vals(self):
         self.params.ui_to_cfg()
-        groups = self.params.groups
-        p_vals_imgs = []
+
         self.main_window.print_status_msg('Computing p_val maps')
         self.main_window.make_nested_progress_dialog(title='P value maps',
                                                      n_steps=len(self.params.selected_comparisons))  # TODO: set abort callback
+        p_vals_imgs = []
         for pair in self.params.selected_comparisons:
             gp1_name, gp2_name = pair
-            if not density_files_are_comparable(self.params.results_folder, groups[gp1_name], groups[gp2_name]):
-                self.main_window.popup('Could not compare files, sizes differ', base_msg='Cannot compare files')
+            gp1, gp2 = [self.params.groups[gp_name] for gp_name in pair]
+            if not density_files_are_comparable(self.params.results_folder, gp1, gp2):
+                self.main_window.popup('Could not compare files, sizes differ',
+                                       base_msg='Cannot compare files')
             res = self.main_window.wrap_in_thread(compare_groups, self.params.results_folder,
-                                                  gp1_name, gp2_name, groups[gp1_name], groups[gp2_name])
+                                                  gp1_name, gp2_name, gp1, gp2)
             self.main_window.progress_watcher.increment_main_progress()
             p_vals_imgs.append(res)
 
         self.main_window.signal_process_finished()
 
-        return  # FIXME: add support for RGB images in DataViewer
-        # if len(self.params.selected_comparisons) == 1:
-        #     gp1_img = clearmap_io.read(os.path.join(self.params.results_folder, f'condensed_{gp1_name}.tif'))
-        #     gp2_img = clearmap_io.read(os.path.join(self.params.results_folder, f'condensed_{gp2_name}.tif'))
-        #     dvs = plot_3d.plot([gp1_img, gp2_img, p_vals_imgs[0]])
-        # else:
-        #     dvs = plot_3d.plot(p_vals_imgs, arange=False, sync=True,
-        #                        lut=self.main_window.preference_editor.params.lut,
-        #                        parent=self.main_window.centralWidget())
-        #     link_dataviewers_cursors(dvs, RedCross)
-        # self.main_window.setup_plots(dvs)
+        if len(p_vals_imgs) == 1:
+            gp1_img = clearmap_io.read(os.path.join(self.params.results_folder, f'condensed_{gp1_name}.tif'))
+            gp2_img = clearmap_io.read(os.path.join(self.params.results_folder, f'condensed_{gp2_name}.tif'))
+            images = [gp1_img, gp2_img, p_vals_imgs[0]]
+        else:
+            images = p_vals_imgs
+        dvs = plot_3d.plot(images, arange=False, sync=True,
+                           lut=self.main_window.preference_editor.params.lut,
+                           parent=self.main_window.centralWidget())
+        link_dataviewers_cursors(dvs, RedCross)
+        self.main_window.setup_plots(dvs)
 
-    def run_batch_process(self):
-        self.params.ui_to_cfg()
-        paths = [p for ps in self.params.get_all_paths() for p in ps]  # flatten list
-        self.main_window.make_progress_dialog('Analysing samples', maximum=0)  # TODO: see abort callback
-        # TODO: pass progress watcher to increment from within
-        self.main_window.wrap_in_thread(process_folders, paths,
-                                        self.params.align, self.params.count_cells, self.params.run_vaculature)
-        self.main_window.progress_dialog.done(1)
+    def run_plots(self, plot_function, plot_kw_args):
+        dvs = []
+        for pair in self.params.selected_comparisons:
+            gp1_name, gp2_name = pair
+            if 'group_names' in plot_kw_args.keys() and plot_kw_args['group_names'] is None:
+                plot_kw_args['group_names'] = pair
+            stats_df_path = os.path.join(self.params.results_folder, f'statistics_{gp1_name}_{gp2_name}.csv')
+            fig = plot_function(pd.read_csv(stats_df_path), **plot_kw_args)
+            browser = QWebEngineView()
+            browser.setHtml(mpld3.fig_to_html(fig))  # WARNING: won't work if external objects. Then
+                                                     #   saving the html to URl (file///) and then
+                                                     #   .load(Url) would be required
+            dvs.append(browser)
+        self.main_window.setup_plots(dvs)
+
+    def plot_volcanoes(self):
+        self.run_plots(plot_volcano, {'group_names': None, 'p_cutoff': 0.05, 'show': False, 'save_path': ''})
+
+    def plot_histograms(self, fold_threshold=2):
+        aba_json_df_path = annotation.default_label_file  # FIXME: aba_json needs fold levels
+        self.run_plots(plot_sample_stats_histogram, {'aba_df': pd.read_csv(aba_json_df_path),
+                                                     'sort_by_order': True, 'value_cutoff': 0,
+                                                     'fold_threshold': fold_threshold, 'fold_regions': True,
+                                                     'show': False})
