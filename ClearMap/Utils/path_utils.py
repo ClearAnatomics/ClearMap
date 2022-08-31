@@ -3,9 +3,12 @@ import os
 from ClearMap.config.config_loader import ConfigLoader
 
 
-def is_density_file(f_name):  # FIXME: exclude debug
+def is_density_file(f_name):
+    f_name = os.path.basename(f_name)
+    if 'debug' in f_name:
+        return False
     # return 'density' in f_name and f_name.endswith('.tif')
-    return os.path.basename(f_name) == 'density_counts.tif'  # FIXME add menu for alternatives
+    return f_name == 'density_counts.tif'  # FIXME add menu for alternatives
 
 
 def find_density_file(target_dir):
