@@ -536,10 +536,8 @@ class CellCounterTab(PostProcessingTab):
             self.update_cell_number()
 
     def create_cell_detection_tuning_sample(self):
-        slicing = (slice(self.params.crop_x_min, self.params.crop_x_max),
-                   slice(self.params.crop_y_min, self.params.crop_y_max),
-                   slice(self.params.crop_z_min, self.params.crop_z_max))
-        self.cell_detector.create_test_dataset(slicing=slicing)
+        # FIXME: check if ui_to_cfg()
+        self.cell_detector.create_test_dataset(slicing=self.params.slicing)
         self.main_window.print_status_msg('Tuning sample created')  # TODO: progress bar
 
     def run_tuning_cell_detection(self):
@@ -762,11 +760,8 @@ class VasculatureTab(PostProcessingTab):
         self.plot_slicer('vesselProcessingSlicer', self.ui, self.params.graph_params)
 
     def __get_tube_map_slicing(self):
-        self.params.graph_params._crop_values_from_cfg()  # Fix for lack of binding between 2 sets of range interfaces
-        slicing = (slice(self.params.graph_params.crop_x_min, self.params.graph_params.crop_x_max),
-                   slice(self.params.graph_params.crop_y_min, self.params.graph_params.crop_y_max),
-                   slice(self.params.graph_params.crop_z_min, self.params.graph_params.crop_z_max))
-        return slicing
+        self.params.graph_params.ui_to_cfg()  # Fix for lack of binding between 2 sets of range interfaces
+        return self.params.graph_params.slicing
 
     def display_cleaned_graph_chunk(self):
         slicing = self.__get_tube_map_slicing()
