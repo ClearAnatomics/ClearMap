@@ -1239,6 +1239,7 @@ class VesselBinarizationParams(UiParameter):
 
 
 class VesselGraphParams(UiParameter):
+    crop_ranges_changed = pyqtSignal()
     def __init__(self, tab, sample_params=None, preprocessing_params=None, src_folder=None):
         super().__init__(tab, src_folder)
         self.sample_params = sample_params
@@ -1327,6 +1328,7 @@ class VesselGraphParams(UiParameter):
 
     def handle_x_val_change(self):
         self._config['graph_construction']['slicing']['dim_0'] = self.crop_x_min, self.crop_x_max
+        self.crop_ranges_changed.emit()
 
     def scale_x(self, val):
         return round(val * self.ratios[0])
@@ -1351,6 +1353,7 @@ class VesselGraphParams(UiParameter):
 
     def handle_y_val_change(self):
         self._config['graph_construction']['slicing']['dim_1'] = self.crop_y_min, self.crop_y_max
+        self.crop_ranges_changed.emit()
 
     def scale_y(self, val):
         return round(val * self.ratios[1])

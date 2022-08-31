@@ -9,23 +9,29 @@ The different tabs that correspond to different functionalities of the GUI
 import os.path
 
 import numpy as np
-from PyQt5.QtWidgets import QDialogButtonBox
-import pyqtgraph as pg
 
+import pyqtgraph as pg
+from PyQt5.QtWidgets import QDialogButtonBox
+
+import ClearMap.IO.IO as clearmap_io
 from ClearMap.IO.MHD import mhd_read
+from ClearMap.Alignment import Annotation as annotation
 from ClearMap.Analysis.Statistics.group_statistics import make_summary, density_files_are_comparable, compare_groups
+
 from ClearMap.gui.dialogs import prompt_dialog
-from ClearMap.processors.batch_process import process_folders
-from ClearMap.processors.cell_map import CellDetector
-from ClearMap.processors.sample_preparation import PreProcessor
-from ClearMap.processors.tube_map import BinaryVesselProcessor, VesselGraphProcessor
 from ClearMap.gui.gui_utils import format_long_nb_to_str, surface_project, np_to_qpixmap, create_clearmap_widget
-from ClearMap.Visualization.Qt.DataViewer import link_dataviewers_cursors
 from ClearMap.gui.params import ParamsOrientationError, VesselParams, PreferencesParams, SampleParameters, \
     AlignmentParams, CellMapParams, BatchParams
 from ClearMap.gui.widgets import PatternDialog, SamplePickerDialog, DataFrameWidget, RedCross, LandmarksSelectorDialog, \
     Scatter3D
+
+from ClearMap.Visualization.Qt.DataViewer import link_dataviewers_cursors
 from ClearMap.Visualization.Qt import Plot3d as plot_3d
+
+from ClearMap.processors.sample_preparation import PreProcessor
+from ClearMap.processors.cell_map import CellDetector
+from ClearMap.processors.tube_map import BinaryVesselProcessor, VesselGraphProcessor
+from ClearMap.processors.batch_process import process_folders
 
 
 __author__ = 'Charly Rousseau <charly.rousseau@icm-institute.org>'
@@ -754,10 +760,12 @@ class VasculatureTab(PostProcessingTab):
     def plot_graph_construction_chunk_slicer(self):
         self.params.graph_params._crop_values_from_cfg()  # Fix for lack of binding between 2 sets of range interfaces
         self.plot_slicer('graphConstructionSlicer', self.ui, self.params.graph_params)
+        self.params.graph_params.crop_ranges_changed.connect(self.main_window.ortho_viewer.update_ranges)
 
     def plot_graph_type_processing_chunk_slicer(self):
         self.params.graph_params._crop_values_from_cfg()  # Fix for lack of binding between 2 sets of range interfaces
         self.plot_slicer('vesselProcessingSlicer', self.ui, self.params.graph_params)
+        self.params.graph_params.crop_ranges_changed.connect(self.main_window.ortho_viewer.update_ranges)
 
     def __get_tube_map_slicing(self):
         self.params.graph_params.ui_to_cfg()  # Fix for lack of binding between 2 sets of range interfaces
