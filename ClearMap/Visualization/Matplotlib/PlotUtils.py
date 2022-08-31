@@ -21,13 +21,12 @@ import pandas as pd
 
 import scipy.stats as st
 
-import matplotlib as mpl  # analysis:ignore
 from matplotlib.colors import rgb_to_hsv, hsv_to_rgb
-from mpl_toolkits.mplot3d import Axes3D  # analysis:ignore
 import matplotlib.pyplot as plt
 
 
 from ClearMap.Alignment import Annotation as annotation
+from ClearMap.Analysis.Statistics.data_frame_operations import sanitize_df, normalise_df_column_names
 
 plt.rcParams['pdf.fonttype'] = 42
 plt.rcParams['pdf.use14corefonts'] = True
@@ -144,62 +143,7 @@ def subplot_tiling(n, tiling=None):
     return nx, ny
 
 
-def plot_histogram(stats_df, aba_df, n_rows=20, sort_order=False, save_path=None, show=True,
-                   fold_threshold=5, density_cutoff=0.05, fold_regions=False):
-    stats_df = sanitize_df(stats_df)
-
-    if fold_regions:
-        stats_df = fold_dataframe(stats_df, aba_df, fold_threshold)
-
-    # Compute density after fold
-    stats_df['density'] = stats_df['Cell counts'] / stats_df['Structure volume']
-    stats_df['color'] = [annotation.find(_id, key='id')['rgb'] for _id in stats_df['Structure ID']]
-    stats_df = stats_df.sort_values('density', ascending=False)
-
-
-    high_density_ids = np.unique(stats_df[stats_df['density'] >= density_cutoff]['Structure ID'])
-    stats_df = stats_df[stats_df['Structure ID'].isin(high_density_ids)]
-
-    fig, axes = plt.subplots(figsize=(10, 40), facecolor='#eaeaf2', ncols=2, sharey=True, gridspec_kw={'wspace': 0.2})
-    # fig.set_constrained_layout_pads(w_pad=2)
-    # fig.tight_layout()
-
-    plt.xlabel('Cell density')
-
-    titles = ['Left', 'Right']
-    for i, hem_id in enumerate((0, 255)):  # Split and plot
-        hem_df = stats_df[stats_df['Hemisphere'] == hem_id]
-        if sort_order:
-            hem_df = hem_df.sort_values('Structure order', ascending=False)
-        ax = axes[i]
-        ax.barh(hem_df['Structure name'], hem_df['density'], align='center', color=hem_df['color'], zorder=10)
-        ax.set_title(titles[i], fontsize=18, pad=15)
-        ax.tick_params(left=False)
-        ax.tick_params(right=False)
-        if i == 0:
-            # ax.set(yticks=hem_df['Structure name'])
-            pass
-        else:
-            # ax.set(yticks=hem_df['Structure name'], yticklabels=hem_df['Acronym'])
-            ax.set(yticklabels=hem_df['Acronym'])
-        ax.tick_params(axis='y', labelsize=15, zorder=0)
-
-        if i == 0:
-            ax.spines['left'].set_position(('axes', 1))
-            # ax.spines['bottom'].set_position(('axes', 1))
-            ax.tick_params(axis='y', direction='in')
-
-        # Eliminate upper and right axes
-        ax.spines['right'].set_color('none')
-
-        ax.spines['top'].set_color('none')
-
-    axes[0].invert_xaxis()
-
-    # plt.gca().invert_yaxis()    # To show data from highest to lowest
-
-    plt.subplots_adjust(wspace=0, top=0.85, bottom=0.1, left=0.18, right=0.95)
-
+def handle_fig_fate(fig, show, save_path):
     if save_path:
         plt.savefig(save_path)
     else:
@@ -209,32 +153,132 @@ def plot_histogram(stats_df, aba_df, n_rows=20, sort_order=False, save_path=None
             return fig
 
 
-def fold_dataframe(df, aba_df, fold_threshold):
-    df['fold_parent'] = [get_parent_id(aba_df, _id, fold_threshold) for _id in df['Structure ID']]
-    df = df.sort_values('Structure name')
+def plot_sample_stats_histogram(stats_df, aba_df, sort_by_order=False, split_criterion='hemisphere',
+                                metric_name='density', value_cutoff=0.05, fold_threshold=5, fold_regions=False,
+                                save_path=None, show=True):
+    stats_df = sanitize_df(stats_df)
+    is_gp_stats = is_gp_stats_df(stats_df)
+    if is_gp_stats:
+        group_names = [k.replace('mean_', '') for k in stats_df.columns if k.startswith('mean_')]
+        stats_df = gp_stats_df_to_counts(stats_df)  # Convert to same format for simplicity
+    stats_df = normalise_df_column_names(stats_df)
+
+    if fold_regions:
+        stats_df = fold_sample_stats_dataframe(stats_df, aba_df, fold_threshold)
+
+    stats_df['color'] = get_structure_colors(stats_df)
+
+    # Compute metric, sort and filter after fold
+    if metric_name == 'density':
+        stats_df['density'] = stats_df['cell_counts'] / stats_df['structure_volume']
+    stats_df = stats_df.sort_values(metric_name, ascending=False)
+    high_values = np.unique(stats_df[stats_df[metric_name] >= value_cutoff]['structure_id'])
+    stats_df = stats_df[stats_df['structure_id'].isin(high_values)]
+
+    fig, axes = plt.subplots(figsize=(10, 40), facecolor='#eaeaf2', ncols=2, sharey=True, gridspec_kw={'wspace': 0.2})
+    plt.xlabel(f'Cell {metric_name}')
+
+    if split_criterion == 'hemisphere':
+        titles = ['Left', 'Right']
+    elif split_criterion == 'group_id':
+        titles = group_names
+    else:
+        raise NotImplementedError(f'Split criterion {split_criterion} is not recognised yet, '
+                                  f'supported values are "hemisphere" and "group_id"')
+    for i, split_val in enumerate(np.sort(np.unique(stats_df[split_criterion]))):  # Split and plot
+        sub_df = stats_df[stats_df[split_criterion] == split_val]
+        plot_sub_df(sub_df, i, axes, titles, metric_name, sort_by_order)
+
+    axes[0].invert_xaxis()  # FIXME: check that correct axis
+
+    plt.subplots_adjust(wspace=0, top=0.85, bottom=0.1, left=0.18, right=0.95)
+
+    return handle_fig_fate(fig, show, save_path)
+
+
+def is_gp_stats_df(df):
+    return 'p_value' in df.columns
+
+
+def gp_stats_df_to_counts(df):
+    """
+    stack the df by group name
+    The only counts are the average for the group
+    A new column identifies the group. It is aimed to make it interchangeable with the DF of an individual sample
+
+    Parameters
+    ----------
+    df pd.DataFrame
+
+    Returns pd.DataFrame
+    -------
+
+    """
+    group_names = [k.replace('mean_', '') for k in df.columns if k.startswith('mean_')]
+    # gp1_name, gp2_name = group_names
+    out = pd.DataFrame({
+        'structure_id': np.tile(df['id'].values, 2),
+        'structure_name': np.tile(df['name'].values, 2),
+        'structure_volume': np.tile(df['volume'].values, 2),
+        'hemisphere': np.tile(df['hemisphere'].values, 2),
+        'group_id': np.hstack([np.repeat(group_names[i], df.shape[0]) for i in range(len(group_names))]),
+        'cell_counts': np.hstack([df[df[f'mean_{group_names[i]}']][f'mean_{group_names[i]}'].values for i in range(len(group_names))])
+    })
+    return out
+
+
+def plot_sub_df(sub_df, i, axes, titles, criterion_name, sort_by_order=False, struct_name_str='Structure name',
+                struct_acronym_str='Acronym', struct_color_str='color', struct_order_str='Structure order'):
+    if sort_by_order:
+        sub_df = sub_df.sort_values(struct_order_str, ascending=False)
+    ax = axes[i]
+    ax.barh(sub_df[struct_name_str], sub_df[criterion_name], align='center', color=sub_df[struct_color_str], zorder=10)
+    ax.set_title(titles[i], fontsize=18, pad=15)
+    ax.tick_params(left=False, right=False)
+    ax.tick_params(axis='y', labelsize=15, zorder=0)
+    if i != 0:
+        ax.set(yticklabels=sub_df[struct_acronym_str])
+    else:
+        ax.spines['left'].set_position(('axes', 1))
+        # ax.spines['bottom'].set_position(('axes', 1))
+        ax.tick_params(axis='y', direction='in')
+    # Eliminate upper and right axes
+    ax.spines['top'].set_color('none')
+    ax.spines['right'].set_color('none')
+
+
+def get_structure_colors(stats_df, id_col_name='Structure ID'):
+    return [annotation.find(_id, key='id')['rgb'] for _id in stats_df[id_col_name]]
+
+
+def fold_sample_stats_dataframe(df, aba_df, fold_threshold):
+    df['fold_parent'] = [get_parent_id(aba_df, _id, fold_threshold) for _id in df['structure_id']]  # TODO: extract
+    df = df.sort_values('structure_name')
     output = pd.DataFrame()
-    for hem_id in (0, 255):
-        grouped = df[df['Hemisphere'] == hem_id].groupby('fold_parent')
+    for hem_id in np.sort(np.unique(df['hemisphere'])):
+        sub_df = df[df['hemisphere'] == hem_id]
+        grouped = sub_df.groupby('fold_parent')
+
         half_df = pd.DataFrame()
-        half_df['Cell counts'] = grouped['Cell counts'].sum()
-        half_df['Structure volume'] = grouped['Structure volume'].sum()
-        half_df['Average cell size'] = grouped['Average cell size'].mean()
-        half_df['Structure ID'] = grouped['fold_parent'].first()
 
-        ids = half_df['Structure ID'].values
+        half_df['cell_counts'] = grouped['cell_counts'].sum()
+        half_df['structure_volume'] = grouped['structure_volume'].sum()
+        if 'average_cell_size' in sub_df.columns:
+            half_df['average_cell_size'] = grouped['average_cell_size'].mean()
+        half_df['structure_id'] = grouped['fold_parent'].first()
 
-        half_df['Structure order'] = [aba_df[aba_df['id'] == _id]['graph_order'].values[0] for _id in ids]
-        half_df['Structure name'] = [aba_df[aba_df['id'] == _id]['name'].values[0] for _id in ids]
-        half_df['Acronym'] = [aba_df[aba_df['id'] == _id]['acronym'].values[0] for _id in ids]
-        half_df['Hemisphere'] = hem_id
+        ids = half_df['structure_id'].values
+
+        half_df['structure_order'] = get_prop_from_aba_df(aba_df, ids, 'graph_order')
+        half_df['structure_name'] = get_prop_from_aba_df(aba_df, ids, 'name')
+        half_df['acronym'] = get_prop_from_aba_df(aba_df, ids, 'acronym')
+        half_df['hemisphere'] = hem_id
         output = pd.concat((output, half_df))  # , ignore_index=True)
     return output
 
 
-def sanitize_df(df):
-    df = df[np.logical_and(df['Structure ID'] > 0, df['Structure ID'] < 2 ** 16)]
-    df = df[df['Structure ID'] != 997]  # Not "brain"
-    return df
+def get_prop_from_aba_df(aba_df, ids, prop_name):
+    return [aba_df[aba_df['id'] == _id][prop_name].values[0] for _id in ids]
 
 
 def get_parent_structure(df, _id, level):
@@ -285,10 +329,4 @@ def plot_volcano(df, group_names, p_cutoff=0.05, show=False, save_path=''):
     plt.xlabel('log2(fold change)')
     plt.ylabel('- log10(p value)')
 
-    if save_path:
-        plt.savefig(save_path)
-    else:
-        if show:
-            plt.show()
-        else:
-            return fig
+    return handle_fig_fate(fig, show, save_path)

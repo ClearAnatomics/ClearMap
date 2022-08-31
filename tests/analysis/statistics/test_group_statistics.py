@@ -1,13 +1,13 @@
 import copy
 import os
 import tempfile
-from shutil import rmtree
 
 import numpy as np
 import pandas as pd
 import pytest
 import tifffile
 
+from ClearMap.Analysis.Statistics.data_frame_operations import fix_df_column_names
 from ClearMap.Analysis.Statistics.group_statistics import compare_groups
 from ClearMap.Settings import clearmap_path
 from ClearMap.IO import IO as clearmap_io
@@ -62,15 +62,6 @@ def cells_table_from_stats_table(stats_df):  # FIXME: slow
     cells_df['yt'] = yts
     cells_df['zt'] = zts
     return cells_df
-
-
-def fix_df_column_names(stats_df):
-    df = stats_df.rename(columns={'Structure ID': 's_id',
-                                  'Hemisphere': 'hem_id',
-                                  'Cell counts': 'cell_counts'},
-                         # 'Average cell size': 'average_cell_size'},
-                         errors='raise')
-    return df
 
 
 def fake_coords_from_struct(structure_id, hemisphere_id, n_cells):
