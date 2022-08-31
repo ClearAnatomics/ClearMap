@@ -349,6 +349,33 @@
                  </item>
                 </layout>
                </widget>
+               <widget class="QWidget" name="page">
+                <attribute name="label">
+                 <string>Combine</string>
+                </attribute>
+                <layout class="QVBoxLayout" name="verticalLayout_4">
+                 <item>
+                  <widget class="QDialogButtonBox" name="binarizationCombineRunButton">
+                   <property name="standardButtons">
+                    <set>QDialogButtonBox::Apply</set>
+                   </property>
+                   <property name="applyText" stdset="0">
+                    <string>Run</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QDialogButtonBox" name="binarizationCombinePlotButton">
+                   <property name="standardButtons">
+                    <set>QDialogButtonBox::Apply|QDialogButtonBox::Close</set>
+                   </property>
+                   <property name="applyText" stdset="0">
+                    <string>Plot</string>
+                   </property>
+                  </widget>
+                 </item>
+                </layout>
+               </widget>
               </widget>
              </item>
             </layout>

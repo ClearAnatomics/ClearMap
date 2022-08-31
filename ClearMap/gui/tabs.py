@@ -690,6 +690,10 @@ class VasculatureTab(PostProcessingTab):
         self.ui.fillVesselsButtonBox.connectApply(self.fill_vessels)
         self.ui.plotFillVesselsButtonBox.connectApply(self.plot_vessel_filling_results)
         self.ui.plotFillVesselsButtonBox.connectClose(self.main_window.remove_old_plots)
+        self.ui.binarizationCombineRunButton.connectApply(self.combine)
+        self.ui.binarizationCombinePlotButton.connectApply(self.plot_combined)
+        self.ui.binarizationCombinePlotButton.connectClose(self.main_window.remove_old_plots)
+
         self.ui.buildGraphButtonBox.connectApply(self.build_graph)
 
         self.ui.graphConstructionSlicerButtonBox.connectOpen(self.plot_graph_construction_chunk_slicer)
@@ -747,6 +751,18 @@ class VasculatureTab(PostProcessingTab):
     def plot_vessel_filling_results(self):  # TODO: add step_exists check
         dvs = self.binary_vessel_processor.plot_vessel_filling_results()
         link_dataviewers_cursors(dvs, RedCross)
+        self.main_window.setup_plots(dvs)
+
+    def combine(self):
+        self.params.ui_to_cfg()
+        self.main_window.print_status_msg('Combining channels')
+        self.main_window.make_nested_progress_dialog(title='Combining channels', n_steps=1,
+                                                     abort_callback=self.binary_vessel_processor.stop_process)
+        self.main_window.wrap_in_thread(self.binary_vessel_processor.combine_binary)  # REFACTOR: not great location
+        self.main_window.progress_dialog.done(1)
+
+    def plot_combined(self):
+        dvs = self.binary_vessel_processor.plot_combined(parent=self.main_window)
         self.main_window.setup_plots(dvs)
 
     def build_graph(self):
