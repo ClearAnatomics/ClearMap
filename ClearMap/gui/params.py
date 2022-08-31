@@ -907,7 +907,7 @@ class CellMapParams(UiParameter):
     @property
     def ratios(self):
         raw_res = np.array(self.sample_params.raw_resolution)
-        atlas_res = np.array(self.preprocessing_params.registration.raw_atlas_resolution)
+        atlas_res = np.array(self.preprocessing_params.registration.atlas_resolution)
         ratios = raw_res / atlas_res  # to original
         return ratios
 
@@ -1258,7 +1258,7 @@ class VesselGraphParams(UiParameter):
         self.tab.graphConstructionSlicerYRangeMin.valueChanged.connect(self.handle_y_val_change)
         self.tab.graphConstructionSlicerYRangeMax.valueChanged.connect(self.handle_y_val_change)
         self.tab.graphConstructionSlicerZRangeMin.valueChanged.connect(self.handle_z_val_change)
-        self.tab.graphConstructionSlicerXRangeMax.valueChanged.connect(self.handle_z_val_change)
+        self.tab.graphConstructionSlicerZRangeMax.valueChanged.connect(self.handle_z_val_change)
 
         self.tab.vesselProcessingSlicerXRangeMin.valueChanged.connect(self.handle_x_val_change)
         self.tab.vesselProcessingSlicerXRangeMax.valueChanged.connect(self.handle_x_val_change)
@@ -1297,7 +1297,7 @@ class VesselGraphParams(UiParameter):
     @property
     def ratios(self):
         raw_res = np.array(self.sample_params.raw_resolution)
-        atlas_res = np.array(self.preprocessing_params.registration.raw_atlas_resolution)
+        atlas_res = np.array(self.preprocessing_params.registration.atlas_resolution)
         ratios = raw_res / atlas_res  # to original
         return ratios
 
