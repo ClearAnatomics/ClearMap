@@ -297,6 +297,8 @@ class VesselGraphProcessor(TabProcessor):
     """
     def __init__(self, preprocessor=None):
         super().__init__()
+        self.graph_cleaned = None
+        self.graph_reduced = None
         self.annotated_graph = None
         self.sample_config = None
         self.processing_config = None
@@ -414,11 +416,7 @@ class VesselGraphProcessor(TabProcessor):
         # graph_reduced = graph_gt.load(self.workspace.filename('graph', postfix='reduced'))
 
     def visualize_graph_annotations(self, chunk_range, plot_type='mesh', graph_step='reduced', show=True):
-        graph_steps = {
-            'cleaned': self.graph_cleaned,
-            'reduced': self.graph_reduced,
-            'annotated': self.annotated_graph
-        }
+        graph_steps = self.get_graph_steps()
         try:
             graph_chunk = graph_steps[graph_step].sub_slice(chunk_range)
         except KeyError:
@@ -443,6 +441,17 @@ class VesselGraphProcessor(TabProcessor):
             raise ValueError(f'Unrecognised plot type  "{plot_type}"')
         # scene.canvas.bgcolor = vispy.color.color_array.Color(self.machine_config['three_d_plot_bg'])
         return [scene.canvas.native]
+
+    def get_graph_steps(self):  # FIXME: make dynamic
+        graph_steps = {
+            'cleaned': self.graph_cleaned,
+            'reduced': self.graph_reduced,
+            'annotated': self.annotated_graph
+        }
+        for k, v in graph_steps.items():
+            if v is None and self.workspace.exists('graph', postfix=k):
+                graph_steps[k] = graph_gt.load(self.workspace.filename('graph', postfix=k))
+        return graph_steps
 
     # Atlas registration and annotation
     def _transform(self):
