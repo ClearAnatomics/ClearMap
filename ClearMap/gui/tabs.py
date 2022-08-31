@@ -307,8 +307,8 @@ class AlignmentTab(GenericTab):
         if prompt_dialog('Tile conversion', 'Convert individual tiles to npy for efficiency'):
             self.main_window.make_progress_dialog('Converting tiles', maximum=0, canceled_callback=self.preprocessor.stop_process)
             self.main_window.wrap_in_thread(self.preprocessor.convert_tiles)
-            self.main_window.progress_dialog.done(1)
         self.setup_atlas()
+        self.main_window.signal_process_finished()
 
     def setup(self):
         self.init_ui()
@@ -352,7 +352,7 @@ class AlignmentTab(GenericTab):
                 self.main_window.print_status_msg('Stitched wobbly')
             else:
                 self.main_window.popup('Could not run wobbly stitching <br>without rigid stitching first')
-        self.main_window.progress_dialog.done(1)
+        self.main_window.signal_process_finished()
 
     def plot_stitching_results(self):
         self.params.stitching_general.ui_to_cfg()
@@ -369,8 +369,7 @@ class AlignmentTab(GenericTab):
         self.main_window.make_progress_dialog('Converting files', canceled_callback=self.preprocessor.stop_process)
         self.params.stitching_general.ui_to_cfg()
         self.preprocessor.convert_to_image_format()  # TODO: check if use checkbox state
-        self.main_window.progress_dialog.done(1)
-        self.main_window.print_status_msg('Conversion finished')
+        self.main_window.signal_process_finished('Conversion finished')
 
     def setup_atlas(self):  # FIXME: call when value changed in atlas settings
         self.sample_params.ui_to_cfg()  # To make sure we have the slicing up to date
@@ -447,8 +446,7 @@ class AlignmentTab(GenericTab):
         self.main_window.wrap_in_thread(self.preprocessor.resample_for_registration, force=True)
         self.main_window.print_status_msg('Aligning')
         self.main_window.wrap_in_thread(self.preprocessor.align)
-        self.main_window.progress_dialog.done(1)
-        self.main_window.print_status_msg('Registered')
+        self.main_window.signal_process_finished('Registered')
 
     def plot_registration_results(self):
         if not self.step_exists('registration',
@@ -548,7 +546,7 @@ class CellCounterTab(PostProcessingTab):
         self.params.ui_to_cfg()
         self.main_window.make_progress_dialog('Cell detection preview')
         self.main_window.wrap_in_thread(self.cell_detector.run_cell_detection, tuning=True)
-        self.main_window.progress_dialog.done(1)
+        self.main_window.signal_process_finished()
         if self.cell_detector.stopped:
             return
         with self.cell_detector.workspace.tmp_debug:
@@ -565,8 +563,7 @@ class CellCounterTab(PostProcessingTab):
         if self.params.plot_detected_cells:
             self.cell_detector.plot_cells()  # TODO: integrate into UI
         self.update_cell_number()
-        self.main_window.progress_dialog.done(1)
-        self.main_window.print_status_msg('Cell detection done')
+        self.main_window.signal_process_finished('Cell detection done')
 
     def update_cell_number(self):  # FIXME: try except or check that cells and cells filtered exist
         self.ui.nDetectedCellsLabel.setText(
@@ -722,8 +719,7 @@ class VasculatureTab(PostProcessingTab):
         self.main_window.make_nested_progress_dialog(title='Binarizing vessels', n_steps=self._get_n_binarize_steps(),
                                                      abort_callback=self.binary_vessel_processor.stop_process)
         self.main_window.wrap_in_thread(self.binary_vessel_processor.binarize)
-        self.main_window.progress_dialog.done(1)
-        self.main_window.print_status_msg('Vessels binarized')
+        self.main_window.signal_process_finished('Vessels binarized')
 
     def plot_binarization_results(self):
         if not self.step_exists('binarization', [self.preprocessor.workspace.filename('stitched'),
@@ -742,8 +738,7 @@ class VasculatureTab(PostProcessingTab):
                                                      abort_callback=self.binary_vessel_processor.stop_process)
         self.main_window.wrap_in_thread(self.binary_vessel_processor.fill_vessels)
         self.main_window.wrap_in_thread(self.binary_vessel_processor.combine_binary)  # REFACTOR: not great location
-        self.main_window.progress_dialog.done(1)
-        self.main_window.print_status_msg('Vessel filling done')
+        self.main_window.signal_process_finished('Vessel filling done')
 
     def plot_vessel_filling_results(self):  # TODO: add step_exists check
         dvs = self.binary_vessel_processor.plot_vessel_filling_results()
@@ -756,8 +751,7 @@ class VasculatureTab(PostProcessingTab):
         self.main_window.make_nested_progress_dialog(title='Building vessel graph', n_steps=4,
                                                      abort_callback=self.vessel_graph_processor.stop_process)
         self.main_window.wrap_in_thread(self.vessel_graph_processor.pre_process)
-        self.main_window.progress_dialog.done(1)
-        self.main_window.print_status_msg('Building vessel graph done')
+        self.main_window.signal_process_finished('Building vessel graph done')
 
     def plot_graph_construction_chunk_slicer(self):
         self.params.graph_params._crop_values_from_cfg()  # Fix for lack of binding between 2 sets of range interfaces
@@ -795,19 +789,22 @@ class VasculatureTab(PostProcessingTab):
         self.main_window.make_nested_progress_dialog(title='Post processing graph', n_steps=8,
                                                      abort_callback=self.vessel_graph_processor.stop_process)
         self.main_window.wrap_in_thread(self.vessel_graph_processor.post_process)
-        self.main_window.progress_dialog.done(1)
-        self.main_window.print_status_msg('Vasculature graph post-processing DONE')
+        self.main_window.signal_process_finished('Vasculature graph post-processing DONE')
 
 ################################################################################################
 
 
 class BatchTab(GenericTab):
-    def __init__(self, main_window, tab_idx=4):  # FIXME: offload computations to BatchProcessor object
+    def __init__(self, main_window, tab_idx=4):  # REFACTOR: offload computations to BatchProcessor object
         super().__init__(main_window, 'Batch', tab_idx, 'batch_tab')
 
         self.params = None
 
         self.processing_type = 'batch'
+    #     self.batch_processor = None
+    #
+    # def setup_workers(self):
+    #     self.batch_processor = BatchProcessor(self.params.config)
 
     @property
     def initialised(self):
@@ -835,7 +832,7 @@ class BatchTab(GenericTab):
         dvs = []
         groups = self.params.groups
         self.main_window.make_nested_progress_dialog(title='Group stats',
-                                                     n_steps=len(self.params.selected_comparisons))  # TODO: see abort callback
+                                                     n_steps=len(self.params.selected_comparisons))  # TODO: set abort callback
         for pair in self.params.selected_comparisons:
             gp1_name, gp2_name = pair
             df = self.main_window.wrap_in_thread(make_summary, self.params.results_folder,
@@ -844,7 +841,7 @@ class BatchTab(GenericTab):
             self.main_window.progress_watcher.increment_main_progress()
             dvs.append(DataFrameWidget(df).table)
         self.main_window.setup_plots(dvs)
-        self.main_window.print_status_msg('Idle, waiting for input')
+        self.main_window.signal_process_finished()
 
     def run_p_vals(self):
         self.params.ui_to_cfg()
@@ -852,7 +849,7 @@ class BatchTab(GenericTab):
         p_vals_imgs = []
         self.main_window.print_status_msg('Computing p_val maps')
         self.main_window.make_nested_progress_dialog(title='P value maps',
-                                                     n_steps=len(self.params.selected_comparisons))  # TODO: see abort callback
+                                                     n_steps=len(self.params.selected_comparisons))  # TODO: set abort callback
         for pair in self.params.selected_comparisons:
             gp1_name, gp2_name = pair
             if not density_files_are_comparable(self.params.results_folder, groups[gp1_name], groups[gp2_name]):
@@ -862,9 +859,7 @@ class BatchTab(GenericTab):
             self.main_window.progress_watcher.increment_main_progress()
             p_vals_imgs.append(res)
 
-        self.main_window.progress_dialog.done(1)
-        # self.main_window.print_status_msg('P vals computed')
-        self.main_window.print_status_msg('Idle, waiting for input')
+        self.main_window.signal_process_finished()
 
         return  # FIXME: add support for RGB images in DataViewer
         # if len(self.params.selected_comparisons) == 1:
