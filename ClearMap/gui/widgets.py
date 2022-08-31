@@ -115,10 +115,6 @@ class OrthoViewer(object):
         self.img = img
         self.parent = parent
         self.params = None
-        if img is not None:
-            self.shape = img.shape
-        else:
-            self.shape = None
         self.rectangles = []
         self.dvs = []
 
@@ -126,8 +122,11 @@ class OrthoViewer(object):
         self.img = img
         self.params = params
         self.parent = parent
-        self.shape = img.shape
         self.rectangles = []
+
+    @property
+    def shape(self):
+        return self.img.shape if self.img is not None else None
 
     @property
     def width(self):
@@ -204,7 +203,7 @@ class OrthoViewer(object):
 
     def add_cropping_bars(self):
         self.rectangles = []
-        y_axis_idx = (1, 2, 1)  # y is 1 except when 1 is swapped to z
+        y_axis_idx = (1, 2, 0)
         for i, dv in enumerate(self.dvs):
             height = self.shape[y_axis_idx[i]]
             min_rect = RectItem(QRectF(0, 0, 0, height))
@@ -221,11 +220,12 @@ class OrthoViewer(object):
             parent = self.parent
             if parent is None:
                 raise ValueError('Parent not set')
-        x = np.copy(img)
-        y = np.copy(img).swapaxes(2, 1)
-        z = np.copy(img).swapaxes(2, 0)
-        dvs = plot_3d.plot([x, y, z], arange=False, lut='white', parent=parent, sync=False)
+        xy = np.copy(img)
+        yz = np.copy(img).transpose((1, 2, 0))
+        zx = np.copy(img).transpose((2, 0, 1))
+        dvs = plot_3d.plot([xy, yz, zx], arange=False, lut='white', parent=parent, sync=False)
         self.dvs = dvs
+        # FIXME: disable axes buttons
         return dvs
 
 

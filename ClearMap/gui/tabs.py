@@ -151,7 +151,7 @@ class PostProcessingTab(GenericTab):
         self.main_window.setup_plots(dvs, ['x', 'y', 'z'])
 
         # WARNING: needs to be done after setup
-        for axis, ax_max in zip('XYZ', self.preprocessor.raw_stitched_shape):
+        for axis, ax_max in zip('XYZ', self.preprocessor.raw_stitched_shape):  # FIXME: not always raw stitched
             getattr(tab, f'{slicer_prefix}{axis}RangeMax').setMaximum(ax_max)
         self.main_window.ortho_viewer.update_ranges()
 
