@@ -364,7 +364,7 @@ class Workspace(object):
                     extensions = [self.extension(f_type)]
 
                 if not extensions:
-                    out += f'{f_type : padding}: no file\n'
+                    out += f'{f_type : >{padding}}: no file\n'
                 else:
                     for i, extension in enumerate(extensions):
                         expression = Expression(self.filename(f_type, extension=extension))
