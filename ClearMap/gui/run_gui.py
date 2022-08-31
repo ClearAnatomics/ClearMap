@@ -33,6 +33,7 @@ ICONS_FOLDER = 'ClearMap/gui/icons/'   # REFACTOR: use qrc
 
 app = QApplication([])
 
+
 from ClearMap.gui.gui_utils import get_current_res, UI_FOLDER
 
 CURRENT_RES = get_current_res(app)
@@ -210,10 +211,10 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         n_spacers = grid_size - len(dvs)
         for i in range(n_spacers):
             if graph_names:
-                graph_names.append('spacer_{}'.format(i))
+                graph_names.append(f'spacer_{i}')
             dvs.append(QWidget(parent=self))
         for i, dv in enumerate(dvs):
-            graph_name = 'graph_{}'.format(i)
+            graph_name = f'graph_{i}'
             setattr(self, graph_name, dv)
             dv.setObjectName(graph_name)
             row = i // n_cols
@@ -349,6 +350,10 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
             self.progress_watcher.set_progress(self.progress_watcher.count_dones())
             self.app.processEvents()
         return result.get()
+
+    def signal_process_finished(self, msg='Idle, waiting for input'):
+        self.print_status_msg(msg)
+        self.progress_dialog.done(1)
 
 
 class ClearMapGui(ClearMapGuiBase):
