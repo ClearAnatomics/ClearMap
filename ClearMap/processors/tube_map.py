@@ -426,7 +426,10 @@ class VesselGraphProcessor(TabProcessor):
         # region_label = self.graph_reduced.vertex_properties('annotation')
         # region_color = np.array([[1, 0, 0, 1], [0, 0, 1, 1]])[region_label]
         title = f'{graph_step.title()} Graph'
-        region_color = annotation_module.convert_label(graph_chunk.vertex_annotation(), key='order', value='rgba')
+        if graph_step == 'annotated':
+            region_color = annotation_module.convert_label(graph_chunk.vertex_annotation(), key='order', value='rgba')
+        else:
+            region_color = None
         if plot_type == 'line':
             scene = plot_graph_3d.plot_graph_line(graph_chunk, vertex_colors=region_color, title=title,
                                                   show=show, bg_color=self.machine_config['three_d_plot_bg'])
@@ -442,7 +445,7 @@ class VesselGraphProcessor(TabProcessor):
         # scene.canvas.bgcolor = vispy.color.color_array.Color(self.machine_config['three_d_plot_bg'])
         return [scene.canvas.native]
 
-    def get_graph_steps(self):  # FIXME: make dynamic
+    def get_graph_steps(self):  # FIXME: make dynamic w/ lazy loading
         graph_steps = {
             'cleaned': self.graph_cleaned,
             'reduced': self.graph_reduced,
