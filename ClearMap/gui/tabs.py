@@ -116,6 +116,8 @@ class GenericTab(GenericUi):
         raise NotImplementedError()
 
     def step_exists(self, step_name, file_list):
+        if isinstance(file_list, str):
+            file_list = [file_list]
         for f_path in file_list:
             if not os.path.exists(f_path):
                 self.main_window.print_error_msg(f'Missing {step_name} file {f_path}.'
