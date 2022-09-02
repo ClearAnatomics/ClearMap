@@ -896,6 +896,7 @@ class BatchTab(GenericTab):
         self.main_window.signal_process_finished()
 
         if len(p_vals_imgs) == 1:
+            gp1_name, gp2_name = self.params.selected_comparisons[0]
             gp1_img = clearmap_io.read(os.path.join(self.params.results_folder, f'condensed_{gp1_name}.tif'))
             gp2_img = clearmap_io.read(os.path.join(self.params.results_folder, f'condensed_{gp2_name}.tif'))
             images = [gp1_img, gp2_img, p_vals_imgs[0]]
