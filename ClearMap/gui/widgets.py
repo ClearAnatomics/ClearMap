@@ -621,7 +621,8 @@ class WizardDialog:
 
 
 class PatternDialog(WizardDialog):
-    def __init__(self, src_folder, params=None, app=None):
+    def __init__(self, src_folder, params=None, app=None, min_file_number=10):
+        self.min_file_number = min_file_number
         super().__init__(src_folder, 'pattern_prompt', 'File paths wizard', [600, None], params, app)
 
     def setup(self):
@@ -691,7 +692,7 @@ class PatternDialog(WizardDialog):
         splash, progress_bar = make_splash(bar_max=100)
         splash.show()
         pool = ThreadPool(processes=1)
-        result = pool.apply_async(pattern_finders_from_base_dir, [self.src_folder])
+        result = pool.apply_async(pattern_finders_from_base_dir, [self.src_folder, None, self.min_file_number])
         while not result.ready():
             result.wait(0.25)
             update_pbar(self.app, progress_bar, 1)  # TODO: real update

@@ -260,7 +260,7 @@ class SampleTab(GenericTab):
         checked = self.ui.advancedCheckBox.isChecked()
 
     def launch_pattern_wizard(self):
-        dlg = PatternDialog(self.src_folder, self.params)
+        dlg = PatternDialog(self.src_folder, self.params, min_file_number=6)  # FIXME: from machine_config
         dlg.exec()
 
     def plot_mini_brain(self):
