@@ -237,8 +237,9 @@ class CellDetector(TabProcessor):
 
         if self.preprocessor.was_registered:
             coordinates_transformed = self.transform_coordinates(coordinates)
+            # FIXME: Put key ID and get ID directly
             label = annotation.label_points(coordinates_transformed,
-                                            annotation_file=self.preprocessor.annotation_file_path, key='order')  # Put key ID and get ID directly
+                                            annotation_file=self.preprocessor.annotation_file_path, key='order')
             hemisphere_label = annotation.label_points(coordinates_transformed,
                                                        annotation_file=self.preprocessor.hemispheres_file_path, key='id')
             names = annotation.convert_label(label, key='order', value='name')
@@ -256,23 +257,13 @@ class CellDetector(TabProcessor):
             atlas_scale = np.prod(atlas_scale)
             volumes = {_id: (atlas == _id).sum() * atlas_scale for _id in id_map.values()}  # Volumes need a lookup on ID since the atlas is in ID space
 
-            def lookup_color(lbl):  # See if we can do lookup without specific function
-                return color_map[lbl]
-
-            def lookup_id(lbl):
-                return id_map[lbl]
-
-            def lookup_volume(_id):
-                return volumes[_id]
-
-            df['id'] = df['order'].apply(lookup_id)
+            df['id'] = df['order'].map(id_map)
             df['hemisphere'] = hemisphere_label
             df['name'] = names
-            df['color'] = df['order'].apply(lookup_color)
-            df['volume'] = df['id'].apply(lookup_volume)
+            df['color'] = df['order'].map(color_map)
+            df['volume'] = df['id'].map(volumes)
 
-        if importlib.util.find_spec('pyarrow'):
-            df.to_feather(os.path.splitext(self.workspace.filename('cells'))[0] + '.feather')  # TODO: add to workspace
+        df.to_feather(os.path.splitext(self.workspace.filename('cells'))[0] + '.feather')  # TODO: add to workspace
 
     def transform_coordinates(self, coords):
         coords = resampling.resample_points(
@@ -526,10 +517,7 @@ class CellDetector(TabProcessor):
             data = np.array(
                 [source[name] if name in source.dtype.names else np.full(source.shape[0], np.nan) for name in names]
             )
-            data = data.T   # WARNING: seems hacky
-            # if self.sample_config['orientation'] == (1, -2, 3):  # WARNING: seems hacky, why that particular orientation
-            #     if filename == 'points_transformed':
-            #         data[:, 1] = 528 - data[:, 1]  # WARNING: why 528
+            data = data.T
             clearmap_io.write(sink, data)
 
 
