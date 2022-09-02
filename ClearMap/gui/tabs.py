@@ -317,8 +317,10 @@ class AlignmentTab(GenericTab):
         self.preprocessor.setup((self.main_window.preference_editor.params.config,
                                  self.sample_params.config, self.params.config),
                                 convert_tiles=False)
-        if prompt_dialog('Tile conversion', 'Convert individual tiles to npy for efficiency'):
-            self.main_window.make_progress_dialog('Converting tiles', maximum=0, canceled_callback=self.preprocessor.stop_process)
+        has_tiles = len(clearmap_io.file_list(self.preprocessor.workspace.filename('raw')))
+        if has_tiles and prompt_dialog('Tile conversion', 'Convert individual tiles to npy for efficiency'):
+            self.main_window.make_progress_dialog('Converting tiles', maximum=0,
+                                                  canceled_callback=self.preprocessor.stop_process)
             self.main_window.wrap_in_thread(self.preprocessor.convert_tiles)
         self.setup_atlas()
         self.main_window.signal_process_finished()
@@ -355,7 +357,7 @@ class AlignmentTab(GenericTab):
                                                      sub_process_name='Getting layout',
                                                      abort_callback=self.preprocessor.stop_process,
                                                      parent=self.main_window)
-        self.main_window.logger.n_lines = 0
+        self.main_window.logger.n_lines = 0  # FIXME: check that done for all steps that require logger read for progress
         if not self.params.stitching_rigid.skip:
             self.main_window.wrap_in_thread(self.preprocessor.stitch_rigid, force=True)
             self.main_window.print_status_msg('Stitched rigid')
