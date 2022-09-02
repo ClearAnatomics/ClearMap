@@ -622,7 +622,7 @@ class WizardDialog:
 
 class PatternDialog(WizardDialog):
     def __init__(self, src_folder, params=None, app=None):
-        super().__init__(src_folder, 'pattern_prompt', 'File paths wizard', (600, None), params, app)
+        super().__init__(src_folder, 'pattern_prompt', 'File paths wizard', [600, None], params, app)
 
     def setup(self):
         self.n_image_groups = 0
@@ -713,7 +713,7 @@ class PatternDialog(WizardDialog):
 
 class SamplePickerDialog(WizardDialog):
     def __init__(self, src_folder, params=None, app=None):
-        super().__init__(src_folder, 'sample_picker', 'File paths wizard', (None, 600), params, app)
+        super().__init__(src_folder, 'sample_picker', 'File paths wizard', [None, 600], params, app)
         self.exec()
 
     def setup(self):
