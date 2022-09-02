@@ -1535,6 +1535,8 @@ class PreferencesParams(UiParameter):
         cfg['start_full_screen'] = self.start_full_screen
         cfg['default_lut'] = self.lut
         cfg['font_size'] = self.font_size
+        cfg['pattern_finder_min_n_files'] = self.pattern_finder_min_n_files
+        cfg['three_d_plot_bg'] = self.three_d_plot_bg
 
     def cfg_to_ui(self):
         self.reload()
@@ -1550,6 +1552,16 @@ class PreferencesParams(UiParameter):
         self.start_full_screen = cfg['start_full_screen']
         self.lut = cfg['default_lut']
         self.font_size = cfg['font_size']
+        self.pattern_finder_min_n_files = cfg['pattern_finder_min_n_files']
+        self.three_d_plot_bg = cfg['three_d_plot_bg']
+
+    @property
+    def three_d_plot_bg(self):
+        return self.tab.threeDPlotsBackgroundComboBox.currentText().lower()
+
+    @three_d_plot_bg.setter
+    def three_d_plot_bg(self, value):
+        self.tab.threeDPlotsBackgroundComboBox.setCurrentText(value)
 
     @property
     def start_folder(self):
@@ -1646,6 +1658,14 @@ class PreferencesParams(UiParameter):
     # @font_family.setter
     # def font_family(self, font):
     #     self.tab.fontComboBox.setCurrentFont(font)
+
+    @property
+    def pattern_finder_min_n_files(self):
+        self.tab.patternFinderMiNFilesSpinBox.value()
+
+    @pattern_finder_min_n_files.setter
+    def pattern_finder_min_n_files(self, n):
+        self.tab.patternFinderMiNFilesSpinBox.setValue(n)
 
 
 class BatchParams(UiParameter):
