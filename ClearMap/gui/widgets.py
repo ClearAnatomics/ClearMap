@@ -418,7 +418,9 @@ class Scatter3D:
     def get_pos(self, current_slice):
         indices = self.current_slice_indices(current_slice)
         if indices is not None:
-            return self.coordinates[indices][:, :2]
+            slice_coords = self.coordinates[indices]
+            return np.vstack([slice_coords[:, i] for i in range(3) if i != self.axis]).T  # coordinates in the two other axes
+            # return self.coordinates[indices][:, :2]
         else:
             return np.empty((0, 2))
 
