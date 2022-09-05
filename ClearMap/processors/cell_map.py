@@ -263,7 +263,7 @@ class CellDetector(TabProcessor):
             df['color'] = df['order'].map(color_map)
             df['volume'] = df['id'].map(volumes)
 
-        df.to_feather(os.path.splitext(self.workspace.filename('cells'))[0] + '.feather')  # TODO: add to workspace
+        df.to_feather(self.workspace.filename('cells', extension='feather'))
 
     def transform_coordinates(self, coords):
         coords = resampling.resample_points(
@@ -519,6 +519,41 @@ class CellDetector(TabProcessor):
             )
             data = data.T
             clearmap_io.write(sink, data)
+
+    def convert_cm2_to_cm2_1_fmt(self):
+        """Atlas alignment and annotation """
+        cells = np.load(self.workspace.filename('cells'))
+        df = pd.DataFrame({ax: cells[ax] for ax in 'xyz'})
+        df['size'] = cells['size']
+        df['source'] = cells['source']
+        for ax in 'xyz':
+            df[f'{ax}t'] = cells[f'{ax}t']
+        df['order'] = cells['order']
+        df['name'] = cells['name']
+
+        coordinates_transformed = np.vstack([cells[f'{ax}t'] for ax in 'xyz']).T
+
+        # FIXME: Put key ID and get ID directly
+        hemisphere_label = annotation.label_points(coordinates_transformed,
+                                                   annotation_file=self.preprocessor.hemispheres_file_path,
+                                                   key='id')
+        unique_labels = np.sort(df['order'].unique())
+        color_map = {lbl: annotation.find(lbl, key='order')['rgb'] for lbl in
+                     unique_labels}  # WARNING RGB upper case should give integer but does not work
+        id_map = {lbl: annotation.find(lbl, key='order')['id'] for lbl in unique_labels}
+
+        atlas = clearmap_io.read(self.preprocessor.annotation_file_path)
+        atlas_scale = self.preprocessor.processing_config['registration']['resampling']['autofluo_sink_resolution']
+        atlas_scale = np.prod(atlas_scale)
+        volumes = {_id: (atlas == _id).sum() * atlas_scale for _id in
+                   id_map.values()}  # Volumes need a lookup on ID since the atlas is in ID space
+
+        df['id'] = df['order'].map(id_map)
+        df['hemisphere'] = hemisphere_label
+        df['color'] = df['order'].map(color_map)
+        df['volume'] = df['id'].map(volumes)
+
+        df.to_feather(self.workspace.filename('cells', extension='feather'))
 
 
 if __name__ == "__main__":
