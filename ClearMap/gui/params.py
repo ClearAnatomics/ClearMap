@@ -261,10 +261,13 @@ class SampleParameters(UiParameter):
 
     @property
     def raw_path(self):
-        return self.tab.rawPath.toPlainText()
+        f_path = self.tab.rawPath.toPlainText()
+        f_path = f_path if f_path else None
+        return f_path
 
     @raw_path.setter
     def raw_path(self, f_path):
+        f_path = f_path if f_path is not None else ''
         self.tab.rawPath.setPlainText(f_path)
 
     def handle_raw_path_changed(self):
