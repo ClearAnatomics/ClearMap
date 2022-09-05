@@ -609,8 +609,12 @@ class CellCounterTab(PostProcessingTab):
         self.main_window.setup_plots(dvs)
 
     def plot_cells_scatter_w_atlas_colors(self):
-        if not self.step_exists('cell count', [self.preprocessor.workspace.filename('stitched'),
-                                               self.cell_detector.df_path]):
+        if self.preprocessor.was_registered:
+            requirement_paths = [self.preprocessor.reference_file_path]
+        else:
+            requirement_paths = [self.preprocessor.workspace.filename('resampled')]
+        requirement_paths.append(self.cell_detector.df_path)
+        if not self.step_exists('cell count', requirement_paths):
             return
         dvs = self.cell_detector.plot_cells_3d_scatter_w_atlas_colors(parent=self.main_window)
         self.main_window.setup_plots(dvs)
