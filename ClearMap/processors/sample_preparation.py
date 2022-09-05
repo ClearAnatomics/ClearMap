@@ -171,7 +171,7 @@ class PreProcessor(TabProcessor):
 
         Parameters
         ----------
-        cfgs tuple of (machine_cfg_path, sample_cfg_path, processing_fg_path) or
+        cfgs tuple of (machine_cfg_path, sample_cfg_path, processing_cfg_path) or
             (machine_cfg, sample_cfg, processing_cfg)
 
         Returns

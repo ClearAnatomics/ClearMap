@@ -652,7 +652,7 @@ def write_color_annotation(filename, annotation_file=None):
 def get_module_annotation_file(annotation_file):
     if annotation_file is None:
         if not initialized:
-            raise ValueError('Cannot use this function without an annotation file if'
+            raise ValueError('Cannot use this function without an annotation file if '
                              'the module has not been initialized. '
                              'Please call set_annotation_file first.')
         else:
@@ -708,7 +708,7 @@ def prepare_annotation_files(slicing=None, orientation=None, directory=None, pos
     distance_to_surface_file : str
         The distance cropped file.
     """
-    annotation_file = get_module_annotation_file(annotation_file)
+    annotation_file = get_module_annotation_file(annotation_file)  # FIXME:
     if hemispheres_file is None:
         hemispheres_file = default_hemispheres_file
     if reference_file is None:
