@@ -76,5 +76,16 @@ def main(samples_file):
     process_folders(folders)
 
 
+def convert_to_cm_2_1(folder, atlas_base_name='ABA_25um'):
+    cfg_loader = ConfigLoader(folder)
+    configs = get_configs(cfg_loader.get_cfg_path('sample'), cfg_loader.get_cfg_path('processing'))
+    pre_proc = PreProcessor()
+    pre_proc.unpack_atlas(atlas_base_name)
+    pre_proc.setup(configs)
+    pre_proc.setup_atlases()
+    cell_detector = CellDetector(pre_proc)
+    cell_detector.convert_cm2_to_cm2_1_fmt()
+
+
 if __name__ == '__main__':
     main(sys.argv[1])
