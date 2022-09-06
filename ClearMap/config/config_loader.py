@@ -44,19 +44,19 @@ def get_json_cfg(cfg_path):
 
 
 tabs_alternatives = [
-    {'sample'},
-    {'alignment', 'processing'},
-    {'cell_map'},
-    {'vasculature', 'tube_map'},
-    {'batch'},
+    ['sample'],
+    ['alignment', 'processing'],
+    ['cell_map'],
+    ['vasculature', 'tube_map'],
+    ['batch'],
 ]
 
-alternative_names = tabs_alternatives + [{'machine'}, {'display'}]
-CONFIG_NAMES = ('sample', 'alignment', 'cell_map', 'vasculature', 'batch', 'machine', 'display')  # To get prefered alternative
+alternative_names = tabs_alternatives + [['machine'], ['display']]
+CONFIG_NAMES = [names[0] for names in alternative_names]
 
 
 def get_alternatives(cfg_name):
-    alternatives = [list(alt) for alt in alternative_names if cfg_name in alt]
+    alternatives = [names for names in alternative_names if cfg_name in names]
     if not alternatives:
         raise ValueError(f'Could not find any alternative for {cfg_name}')
     return alternatives[0]
@@ -136,7 +136,7 @@ class ConfigLoader(object):
         return ConfigLoader.loader_functions[ext](cfg_path)
 
     @staticmethod
-    def get_default_path(cfg_name, must_exist=True, install_mode=False):
+    def get_default_path(cfg_name, must_exist=True, install_mode=False):  # FIXME: recursive w/ alternatives
         if not cfg_name.endswith('params'):
             cfg_name += '_params'
         for ext in ConfigLoader.supported_exts:
