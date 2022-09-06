@@ -1,6 +1,6 @@
 Introduction
 ============
-This module pertains to the graphical interface (henceforth referred to as GUI). It is built using
+This package pertains to the graphical interface (henceforth referred to as GUI). It is built using
 PyQt5 and currently creates a frontend to the CellMap script. Support for TubeMap is planned in the future.
 
 This module uses new versions of the *scripts* that are still located in ClearMap/Scripts
@@ -97,6 +97,39 @@ In the future, this will be simplified to simply
   .. code-block:: bash
 
     $ clearmap_gui
+
+Structure
+=========
+
+run_gui
+    The main module used to start the Graphical User Interface
+
+tabs
+    The module containing the classes for the tabs representing different steps in the analysis
+    (usually matched by a processor in ClearMap/processors)
+
+params
+    The parameters for the GUI of the different tabs. These are linked to the pertaining config files.
+
+widgets
+    Custom widgets for the graphical interface.
+
+dialogs
+    Custom dialogs (e.g. prompts, warnings ...) for the GUI
+
+widget_monkey_patch_callbacks
+    These are functions that will be bound as methods to the graphical widgets based on type and name
+    to enhance their abilities.
+
+gui_logging
+    A special widget used for normal and error logging. This is crucial to track progress.
+
+pyuic_utils
+    A customised version of the PyQt5 module of the same name to patch the classes built from
+    the **.ui** files.
+
+style
+    As the name indicates (defines e.g. colors)
 
 Bugs
 ====
