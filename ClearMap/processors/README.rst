@@ -2,7 +2,6 @@ processors
 ==========
 
 This package contains the classes to replace the scripts. These depend on the config files and serve as the backend to the graphical interface but can also be used independently.
-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 
 Composition

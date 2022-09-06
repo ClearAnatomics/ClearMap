@@ -21,20 +21,24 @@ def update_default_config():
             shutil.copy(default_cfg_path, cfg_paths[0])
         else:  # if present merge
             cfg_path = cfg_paths[existing_paths.index(True)]
-            ext = os.path.splitext(cfg_path)[-1]
-            read_cfg = loader.loader_functions[ext]
-            cfg = read_cfg(cfg_path)
-            default_cfg = read_cfg(default_cfg_path)
-            was_modified = False
-            for k in default_cfg.keys():
-                if k not in cfg.keys():
-                    cfg[k] = default_cfg[k]
-                    was_modified = True
-                else:
-                    if cfg[k] != default_cfg[k]:
-                        print(f'Value "{k}" in {cfg_name}_params has been modified, skipping.')
-            if was_modified:
-                cfg.write()
+            merge_config(loader, cfg_name, cfg_path, default_cfg_path)
+
+
+def merge_config(loader, cfg_name, cfg_path, default_cfg_path):
+    ext = os.path.splitext(cfg_path)[-1]
+    read_cfg = loader.loader_functions[ext]
+    cfg = read_cfg(cfg_path)
+    default_cfg = read_cfg(default_cfg_path)
+    was_modified = False
+    for k in default_cfg.keys():
+        if k not in cfg.keys():
+            cfg[k] = default_cfg[k]
+            was_modified = True
+        else:
+            if cfg[k] != default_cfg[k]:
+                print(f'Value "{k}" in {cfg_name}_params has been modified, skipping.')
+    if was_modified:
+        cfg.write()
 
 
 if __name__ == '__main__':
