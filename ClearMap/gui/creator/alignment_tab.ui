@@ -58,7 +58,7 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>446</width>
+              <width>354</width>
               <height>392</height>
              </rect>
             </property>
@@ -401,7 +401,7 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>446</width>
+              <width>309</width>
               <height>334</height>
              </rect>
             </property>
@@ -770,8 +770,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>460</width>
-              <height>272</height>
+              <width>196</width>
+              <height>100</height>
              </rect>
             </property>
             <attribute name="label">
@@ -839,8 +839,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>460</width>
-              <height>272</height>
+              <width>254</width>
+              <height>156</height>
              </rect>
             </property>
             <attribute name="label">
@@ -926,8 +926,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>460</width>
-              <height>332</height>
+              <width>325</width>
+              <height>270</height>
              </rect>
             </property>
             <attribute name="label">
@@ -1118,9 +1118,9 @@
              <item>
               <layout class="QGridLayout" name="gridLayout">
                <item row="2" column="0">
-                <widget class="QCheckBox" name="skipRegistrationCheckBox">
+                <widget class="QCheckBox" name="skipRegistrationResamplingCheckBox">
                  <property name="text">
-                  <string>Skip</string>
+                  <string>Skip resampling</string>
                  </property>
                 </widget>
                </item>
