@@ -776,7 +776,7 @@ class RegistrationParams(UiParameter):
         super().__init__(tab, src_folder)
 
     def connect(self):
-        self.tab.skipRegistrationCheckBox.stateChanged.connect(self.handle_skip_changed)
+        self.tab.skipRegistrationResamplingCheckBox.stateChanged.connect(self.handle_skip_resampling_changed)
         self.tab.atlasResolutionTriplet.valueChangedConnect(self.handle_atlas_resolution_changed)
         self.tab.atlasIdComboBox.currentTextChanged.connect(self.handle_atlas_id_changed)
         # self.tab.atlasFolderPath.textChanged.connect(self.handle_atlas_folder_changed)  # WARNING: ensure that set correctly by picking
@@ -790,7 +790,7 @@ class RegistrationParams(UiParameter):
 
     def cfg_to_ui(self):
         cfg = self._config['registration']
-        self.skip = cfg['resampling']['skip']
+        self.skip_resampling = cfg['resampling']['skip']
         self.atlas_resolution = cfg['resampling']['raw_sink_resolution']
         self.atlas_id = self.config['atlas']['id']
         self.atlas_folder = cfg['atlas']['align_files_folder']
@@ -803,15 +803,15 @@ class RegistrationParams(UiParameter):
         return self._config['registration']
 
     @property
-    def skip(self):  # WARNING: skip resampling not registration altogether
-        return self.is_checked(self.tab.skipRegistrationCheckBox)
+    def skip_resampling(self):  # WARNING: skip resampling not registration altogether
+        return self.is_checked(self.tab.skipRegistrationResamplingCheckBox)
 
-    @skip.setter
-    def skip(self, state):
-        self.set_check_state(self.tab.skipRegistrationCheckBox, state)
+    @skip_resampling.setter
+    def skip_resampling(self, state):
+        self.set_check_state(self.tab.skipRegistrationResamplingCheckBox, state)
 
-    def handle_skip_changed(self, state):
-        self.config['resampling']['skip'] = self.skip
+    def handle_skip_resampling_changed(self, state):
+        self.config['resampling']['skip'] = self.skip_resampling
         
     @property
     def atlas_resolution(self):

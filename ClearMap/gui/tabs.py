@@ -457,8 +457,9 @@ class AlignmentTab(GenericTab):
                                                      sub_maximum=0, abort_callback=self.preprocessor.stop_process,
                                                      parent=self.main_window)
         self.setup_atlas()
-        self.main_window.print_status_msg('Resampling for registering')
-        self.main_window.wrap_in_thread(self.preprocessor.resample_for_registration, force=True)
+        if not self.params.registration.skip_resampling:
+            self.main_window.print_status_msg('Resampling for registering')
+            self.main_window.wrap_in_thread(self.preprocessor.resample_for_registration, force=True)
         self.main_window.print_status_msg('Aligning')
         self.main_window.wrap_in_thread(self.preprocessor.align)
         self.main_window.signal_process_finished('Registered')
