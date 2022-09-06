@@ -203,6 +203,8 @@ class DataViewer(pg.QtGui.QWidget):
         self.pals = []  # linked DataViewers
         self.scatter = None
         self.scatter_coords = None
+        self.atlas = None
+        self.acronyms = None
 
         self.initializeSources(source, axis=axis, scale=scale)
 
@@ -508,6 +510,8 @@ class DataViewer(pg.QtGui.QWidget):
         else:  # FIXME: check why array does not work for ndim = 3 (i.e. why we need 2 versions)
             vals = ", ".join([str(s[slc]) for s in self.sources])
         label = f"({x}, {y}, {z}) {{{x*xs:.2f}, {y*ys:.2f}, {z*zs:.2f}}} [{vals}]"
+        if self.atlas is not None:
+            label += f' Region: {self.acronyms[self.atlas[slc]]}'
         if self.parent() is None or not self.parent().objectName().lower().startswith('dataviewer'):
             label = f"<span style='font-size: 12pt; color: black'>{label}</span>"
         self.source_label.setText(label)

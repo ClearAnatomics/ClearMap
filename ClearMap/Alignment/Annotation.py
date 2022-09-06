@@ -800,6 +800,10 @@ def annotation_to_distance_file(annotation_file):
     return distance_transform_edt(ref > 0)
 
 
+def get_acronyms_map():
+    return dict(zip(annotation.ids, annotation.acronyms))
+
+
 ###############################################################################
 # ## Tests
 ###############################################################################
