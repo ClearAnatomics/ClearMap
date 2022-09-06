@@ -238,17 +238,18 @@ class CellDetector(TabProcessor):
         if self.preprocessor.was_registered:
             coordinates_transformed = self.transform_coordinates(coordinates)
             # FIXME: Put key ID and get ID directly
-            label = annotation.label_points(coordinates_transformed,
-                                            annotation_file=self.preprocessor.annotation_file_path, key='order')
-            hemisphere_label = annotation.label_points(coordinates_transformed,
-                                                       annotation_file=self.preprocessor.hemispheres_file_path, key='id')
-            names = annotation.convert_label(label, key='order', value='name')
+            labels = annotation.label_points(coordinates_transformed,
+                                             annotation_file=self.preprocessor.annotation_file_path, key='order')
+            hemisphere_labels = annotation.label_points(coordinates_transformed,
+                                                        annotation_file=self.preprocessor.hemispheres_file_path,
+                                                        key='id')
+            names = annotation.convert_label(labels, key='order', value='name')
 
             df['xt'] = coordinates_transformed[:, 0]
             df['yt'] = coordinates_transformed[:, 1]
             df['zt'] = coordinates_transformed[:, 2]
-            df['order'] = label
-            unique_labels = np.sort(df['order'].unique())
+            df['order'] = labels
+            unique_labels = np.sort(df['order'].unique())  # FIXME: work in IDs
             color_map = {lbl: annotation.find(lbl, key='order')['rgb'] for lbl in unique_labels}  # WARNING RGB upper case should give integer but does not work
             id_map = {lbl: annotation.find(lbl, key='order')['id'] for lbl in unique_labels}
 
@@ -258,7 +259,7 @@ class CellDetector(TabProcessor):
             volumes = {_id: (atlas == _id).sum() * atlas_scale for _id in id_map.values()}  # Volumes need a lookup on ID since the atlas is in ID space
 
             df['id'] = df['order'].map(id_map)
-            df['hemisphere'] = hemisphere_label
+            df['hemisphere'] = hemisphere_labels
             df['name'] = names
             df['color'] = df['order'].map(color_map)
             df['volume'] = df['id'].map(volumes)
@@ -404,6 +405,8 @@ class CellDetector(TabProcessor):
             coordinates = df[['x', 'y', 'z']].values.astype(np.int)  # required to match integer z
         else:
             coordinates = df[['xt', 'yt', 'zt']].values.astype(np.int)  # required to match integer z
+            dv.atlas = clearmap_io.read(self.preprocessor.annotation_file_path)
+            dv.acronyms = annotation.get_acronyms_map()
         colors = df['color'].values * 255
         colors = np.array([QColor(*cols.astype(np.int)) for cols in colors])
         if 'hemisphere' in df.columns:
