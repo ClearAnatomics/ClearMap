@@ -24,6 +24,7 @@ dependencies:
   - natsort
   - tifffile==0.15.1  # Very important because the new tiffile breaks IO.TIF
   - pyqt
+  - pyqtwebengine
   - pyqtgraph
   - opencv
   - cython
@@ -44,6 +45,7 @@ dependencies:
   - pandas
   - psutil  # required for python < 3.9 for cancelable ProcessPoolExecutors
   - tqdm
+  - mpld3  # WARNING Maybe pip
   - pip:
     - lxml
 #variables:
