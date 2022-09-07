@@ -153,7 +153,7 @@ def get_ome_tiff_list_from_sample_folder(src_dir, min_file_number=10):
         f_path = os.path.join(src_dir, f_name)
         if os.path.isdir(f_path):
             ome_tiffs = get_ome_tiffs(f_path)
-            if len(ome_tiffs) > min_file_number:
+            if ome_tiffs and len(ome_tiffs) > min_file_number:
                 data_dirs[f_path] = ome_tiffs
     return data_dirs
 

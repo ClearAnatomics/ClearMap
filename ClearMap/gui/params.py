@@ -1664,7 +1664,7 @@ class PreferencesParams(UiParameter):
 
     @property
     def pattern_finder_min_n_files(self):
-        self.tab.patternFinderMiNFilesSpinBox.value()
+        return self.tab.patternFinderMiNFilesSpinBox.value()
 
     @pattern_finder_min_n_files.setter
     def pattern_finder_min_n_files(self, n):
