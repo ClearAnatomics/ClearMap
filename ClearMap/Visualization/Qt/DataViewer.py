@@ -206,9 +206,12 @@ class DataViewer(pg.QtGui.QWidget):
         self.atlas = None
         self.acronyms = None
 
+        self.z_cursor_width = 5
+
         self.initializeSources(source, axis=axis, scale=scale)
 
         # ## Gui Construction
+        original_title = title
         if title is None:
             if isinstance(source, str):
                 title = source
@@ -259,17 +262,26 @@ class DataViewer(pg.QtGui.QWidget):
         self.view.setYRange(0, self.source_range_y)
 
         # Slice Selector
-        self.slicePlot = pg.PlotWidget()
+        if original_title:
+            self.slicePlot = pg.PlotWidget(title=f"""
+            <html><head/><body>
+            <h1 style=" margin-top:18px; margin-bottom:12px; margin-left:0px; margin-right:0px;
+                       -qt-block-indent:0; text-indent:0px;">
+            <span style=" font-size:xx-large; font-weight:700;">{original_title}</span></h1></body></html>
+            """)
+        else:
+            self.slicePlot = pg.PlotWidget()
+
         size_policy = pg.QtGui.QSizePolicy(pg.QtGui.QSizePolicy.Preferred, pg.QtGui.QSizePolicy.Preferred)  # TODO: add option for sizepolicy
         size_policy.setHorizontalStretch(0)
         size_policy.setVerticalStretch(0)
         size_policy.setHeightForWidth(self.slicePlot.sizePolicy().hasHeightForWidth())
         self.slicePlot.setSizePolicy(size_policy)
-        self.slicePlot.setMinimumSize(pg.QtCore.QSize(0, 40))
+        self.slicePlot.setMinimumSize(pg.QtCore.QSize(0, 40 + 40*bool(original_title)))
         self.slicePlot.setObjectName("roiPlot")
 
         self.sliceLine = pg.InfiniteLine(0, movable=True)
-        self.sliceLine.setPen((255, 255, 255, 200))
+        self.sliceLine.setPen((255, 255, 255, 200), width=self.z_cursor_width)
         self.sliceLine.setZValue(1)
         self.slicePlot.addItem(self.sliceLine)
         self.slicePlot.hideAxis('left')

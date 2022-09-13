@@ -422,7 +422,9 @@ class AlignmentTab(GenericTab):
         self.__display_landmarks_dialog(images, 'resampled_to_auto')
 
     def __display_landmarks_dialog(self, images, direction):
-        dvs = plot_3d.plot(images, arange=False, sync=False, lut=self.main_window.preference_editor.params.lut,
+        titles = [os.path.basename(img) for img in images]
+        dvs = plot_3d.plot(images, title=titles, arange=False, sync=False,
+                           lut=self.main_window.preference_editor.params.lut,
                            parent=self.main_window.centralWidget())
         self.main_window.setup_plots(dvs)
 
@@ -491,7 +493,9 @@ class AlignmentTab(GenericTab):
             self.preprocessor.workspace.filename('resampled', postfix='autofluorescence'),
             mhd_read(self.preprocessor.aligned_autofluo_path)
         ]
-        dvs = plot_3d.plot(image_sources, arange=False, sync=True, lut=self.main_window.preference_editor.params.lut,
+        titles = [os.path.basename(img) for img in image_sources]
+        dvs = plot_3d.plot(image_sources, title=titles, arange=False, sync=True,
+                           lut=self.main_window.preference_editor.params.lut,
                            parent=self.main_window.centralWidget())  # TODO: why () to centralWidget required here only
         link_dataviewers_cursors(dvs, RedCross)
         self.main_window.setup_plots(dvs, ['autofluo', 'aligned'])
@@ -928,9 +932,11 @@ class BatchTab(GenericTab):
             gp1_img = clearmap_io.read(os.path.join(self.params.results_folder, f'condensed_{gp1_name}.tif'))
             gp2_img = clearmap_io.read(os.path.join(self.params.results_folder, f'condensed_{gp2_name}.tif'))
             images = [gp1_img, gp2_img, p_vals_imgs[0]]
+            titles = [gp1_name, gp2_name, 'P values']
         else:
             images = p_vals_imgs
-        dvs = plot_3d.plot(images, arange=False, sync=True,
+            titles = [f'{gp1_name} vs {gp2_name} p values' for gp1_name, gp2_name in self.params.selected_comparisons]
+        dvs = plot_3d.plot(images, title=titles, arange=False, sync=True,
                            lut=self.main_window.preference_editor.params.lut,
                            parent=self.main_window.centralWidget())
         link_dataviewers_cursors(dvs, RedCross)

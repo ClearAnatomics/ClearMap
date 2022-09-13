@@ -134,7 +134,9 @@ class CellDetector(TabProcessor):
         #     self.plot_voxelized_intensities()
 
     def plot_voxelized_counts(self, arange=True, parent=None):
-        return plot_3d.plot(self.workspace.filename('density', postfix='counts'), arange=arange, parent=parent)
+        return plot_3d.plot(self.workspace.filename('density', postfix='counts'),
+                            title='Cell density (voxelized)',
+                            arange=arange, parent=parent)
 
     def create_test_dataset(self, slicing):
         self.workspace.create_debug('stitched', slicing=slicing)
@@ -385,13 +387,15 @@ class CellDetector(TabProcessor):
 
     def plot_cells_3d_scatter_w_atlas_colors(self, raw=False, parent=None):
         if raw:
-            dv = qplot_3d.plot(self.workspace.filename('stitched'), arange=False, lut='white', parent=parent)[0]
+            dv = qplot_3d.plot(self.workspace.filename('stitched'), title='Stitched and cells',
+                               arange=False, lut='white', parent=parent)[0]
         else:
             if self.preprocessor.was_registered:  # REFACTORING: could extract
                 dv = qplot_3d.plot(clearmap_io.source(self.preprocessor.reference_file_path),
+                                   title='Reference and cells',
                                    arange=False, lut='white', parent=parent)[0]
             else:
-                dv = qplot_3d.plot(self.workspace.filename('resampled'),
+                dv = qplot_3d.plot(self.workspace.filename('resampled'), title='Resampled and cells',
                                    arange=False, lut='white', parent=parent)[0]
 
         scatter = pg.ScatterPlotItem()
@@ -434,7 +438,8 @@ class CellDetector(TabProcessor):
     def plot_filtered_cells(self, parent=None, smarties=False):
         _, coordinates = self.get_coords('filtered')
         stitched_path = self.workspace.filename('stitched')
-        dvs = qplot_3d.plot(stitched_path, arange=False, lut='white', parent=parent)
+        dvs = qplot_3d.plot(stitched_path, title='Stitched and filtered cells', arange=False,
+                            lut='white', parent=parent)
         self.filtered_cells = Scatter3D(coordinates, smarties=smarties)
         scatter = pg.ScatterPlotItem()
         dvs[0].view.addItem(scatter)
@@ -470,7 +475,8 @@ class CellDetector(TabProcessor):
                    self.workspace.filename('cells', postfix='shape')
                    ]
         sources = [s for s in sources if os.path.exists(s)]  # Remove missing files (if not tuning)
-        return plot_3d.plot(sources, arange=arange, sync=sync, lut='white', parent=parent)
+        titles = [os.path.basename(s) for s in sources]
+        return plot_3d.plot(sources, title=titles, arange=arange, sync=sync, lut='white', parent=parent)
 
     def get_n_detected_cells(self):
         if os.path.exists(self.workspace.filename('cells', postfix='raw')):

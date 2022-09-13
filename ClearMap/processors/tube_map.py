@@ -165,7 +165,8 @@ class BinaryVesselProcessor(TabProcessor):
         """
         images = [(self.workspace.filename('stitched', postfix=postfix)),
                   (self.workspace.filename('binary', postfix=postfix))]
-        dvs = q_p3d.plot(images, arange=False, lut=self.machine_config['default_lut'], parent=parent)
+        dvs = q_p3d.plot(images, title=[os.path.basename(img) for img in images],
+                         arange=False, lut=self.machine_config['default_lut'], parent=parent)
         return dvs
 
     def _smooth_and_fill(self, postfix=''):
@@ -230,7 +231,9 @@ class BinaryVesselProcessor(TabProcessor):
             postfix_base += '_'
         images = [(self.steps.path(self.steps.postprocessed, step_back=True)),
                   (self.workspace.filename('binary', postfix='{}filled'.format(postfix_base)))]
-        return q_p3d.plot(images, arange=False, lut=self.machine_config['default_lut'], parent=parent)
+        titles = [os.path.basename(img) for img in images]
+        return q_p3d.plot(images, title=titles, arange=False,
+                          lut=self.machine_config['default_lut'], parent=parent)
 
     def fill_vessels(self):
         if not get_free_v_ram() > 22000:
@@ -253,10 +256,11 @@ class BinaryVesselProcessor(TabProcessor):
         combined = self.steps.path(self.steps.combined)
         if not self.processing_config['binarization']['binarization']['arteries']['skip']:
             arteries_filled = self.workspace.filename('binary', postfix='arteries_filled')
-            dvs = q_p3d.plot([raw, arteries_filled, combined],
+            dvs = q_p3d.plot([raw, arteries_filled, combined], title=['Raw', 'arteries', 'combined'],
                              arange=False, lut=self.machine_config['default_lut'], parent=parent)
         else:
-            dvs = q_p3d.plot([raw, combined], arange=False, lut=self.machine_config['default_lut'], parent=parent)
+            dvs = q_p3d.plot([raw, combined], title=['Raw', 'combined'],
+                             arange=False, lut=self.machine_config['default_lut'], parent=parent)
         return dvs
 
     def combine_binary(self):

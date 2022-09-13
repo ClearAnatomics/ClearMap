@@ -661,16 +661,16 @@ class PreProcessor(TabProcessor):
     def plot_stitching_results(self, parent=None):
         cfg = self.processing_config['stitching']['preview']
         paths = []
-        title = ''
+        titles = []
         if cfg['raw']:
             paths.append(self.workspace.filename('stitched'))
-            title += 'Raw stitched'
+            titles.append('Raw stitched')
         if cfg['arteries']:
             paths.append(self.workspace.filename('stitched', postfix='arteries'))  # WARNING: hard coded postfix
-            title += ' and arteries stitched'
+            titles.append('Arteries stitched')
         if len(paths) != 2:
             paths = paths[0]
-        dvs = plot_3d.plot(paths, arange=False, lut='white', parent=parent)
+        dvs = plot_3d.plot(paths, title=titles, arange=False, lut='white', parent=parent)
         return dvs
 
 
