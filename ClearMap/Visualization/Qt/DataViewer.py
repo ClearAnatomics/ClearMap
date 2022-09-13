@@ -596,6 +596,8 @@ class DataViewer(pg.QtGui.QWidget):
         event.accept()
         x, y = self.get_coords(event.scenePos())
         btn = event.button()
+        if btn != 1:
+            return
         double_click = event.double()
         modifiers = event.modifiers()
         # print(btn, double_click, modifiers == Qt.ShiftModifier)
