@@ -115,6 +115,7 @@ def connect_value_changed(instance, callback):
 
 def connect_text_changed(instance, callback):
     get_text_edit(instance).textChanged.connect(callback)
+    get_check_box(instance).stateChanged.connect(callback)
 
 
 def controls_enabled(instance):
