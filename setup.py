@@ -101,7 +101,7 @@ setup(
     author='Christoph Kirst, Charly Rousseau',
     author_email='',
     package_data={'ClearMap.config': ['*.cfg'],
-                  'ClearMap.gui': ['creator/*.ui', 'graphics_resources/*.png', 'icons/*.png']},
+                  'ClearMap.gui': ['creator/*.ui', 'creator/graphics_resources/*.png', 'creator/icons/*.png']},
     data_files=data_files,
     zip_safe=False
 )

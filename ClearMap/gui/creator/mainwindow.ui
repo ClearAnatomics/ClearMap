@@ -19,6 +19,10 @@
   <property name="windowTitle">
    <string>ClearMapGui</string>
   </property>
+  <property name="windowIcon">
+   <iconset resource="icons.qrc">
+    <normaloff>:/icons/icons/logo_cyber.png</normaloff>:/icons/icons/logo_cyber.png</iconset>
+  </property>
   <property name="styleSheet">
    <string notr="true">background-color: rgb(46, 52, 54);</string>
   </property>
@@ -117,14 +121,14 @@
      <string>File</string>
     </property>
    </widget>
-   <widget class="QMenu" name="menuEdit">
+   <widget class="QMenu" name="menu_edit">
     <property name="title">
      <string>Edit</string>
     </property>
     <addaction name="actionPreferences"/>
    </widget>
    <addaction name="file_menu"/>
-   <addaction name="menuEdit"/>
+   <addaction name="menu_edit"/>
   </widget>
   <widget class="QStatusBar" name="statusbar">
    <property name="font">
@@ -227,7 +231,9 @@
    </property>
   </action>
  </widget>
- <resources/>
+ <resources>
+  <include location="icons.qrc"/>
+ </resources>
  <connections/>
  <slots>
   <slot>spin_slot()</slot>
