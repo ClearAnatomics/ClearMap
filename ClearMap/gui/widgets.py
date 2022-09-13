@@ -5,7 +5,7 @@ widgets
 
 A set of custom widgets
 """
-
+import json
 import os
 import re
 from multiprocessing.pool import ThreadPool
@@ -20,15 +20,16 @@ from PyQt5 import QtGui, QtCore, QtWidgets
 from PyQt5.QtGui import QColor
 from PyQt5.QtCore import QRectF
 from PyQt5.QtWidgets import QWidget, QDialogButtonBox, QListWidget, QHBoxLayout, QPushButton, QVBoxLayout, QTableWidget, \
-    QTableWidgetItem, QToolBox, QRadioButton
+    QTableWidgetItem, QToolBox, QRadioButton, QTreeWidget, QTreeWidgetItem
 
+from ClearMap.Alignment.Annotation import annotation
 from ClearMap.IO import TIF
 from ClearMap.IO.metadata import pattern_finders_from_base_dir
 from ClearMap.Settings import atlas_folder
 from ClearMap.Visualization import Plot3d as plot_3d
 from ClearMap.config.config_loader import ConfigLoader
 from ClearMap.gui.dialogs import make_splash, get_directory_dlg, update_pbar
-from ClearMap.gui.gui_utils import pseudo_random_rgb_array, create_clearmap_widget, get_pseudo_random_color
+from ClearMap.gui.gui_utils import pseudo_random_rgb_array, create_clearmap_widget, get_pseudo_random_color, is_dark
 
 __author__ = 'Charly Rousseau <charly.rousseau@icm-institute.org>'
 __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
@@ -874,3 +875,47 @@ class LandmarksSelectorDialog(WizardDialog):  # TODO: bind qColorDialog to color
         while color.name() in self.colors:
             color = get_pseudo_random_color()
         return color.name()
+
+
+class StructurePickerWidget(QTreeWidget):
+    LIGHT_COLOR = 'white'
+    DARK_COLOR = '#2E3436'
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setColumnCount(4)
+        # self.tree = QTreeWidget()
+        self.root = self.parse_json()
+        self.build_tree(self.root, self)
+        self.itemClicked.connect(self.print_id)
+
+    def print_id(self, itm, col):
+        print([itm.text(i) for i in range(3)])
+
+    @staticmethod
+    def parse_json():
+        with open(annotation.label_file, 'r') as json_handle:
+            aba = json.load(json_handle)
+            root = aba['msg'][0]
+        return root
+
+    @staticmethod
+    def build_tree(tree=None, parent=None):
+        for subtree in tree['children']:
+            if isinstance(subtree, dict):
+                struct = QTreeWidgetItem(parent)
+                struct.setText(0, subtree['name'])
+                color_hex = f"#{subtree['color_hex_triplet']}"
+                struct.setText(1, str(subtree['id']))
+                struct.setText(2, color_hex)
+                struct.setText(3, '')
+                bg = QColor(color_hex)
+                struct.setBackground(2, bg)
+                fg = QColor(StructurePickerWidget.LIGHT_COLOR if is_dark(bg) else StructurePickerWidget.DARK_COLOR)
+                struct.setForeground(2, fg)
+                if 'children' in subtree.keys() and subtree['children']:
+                    StructurePickerWidget.build_tree(tree=subtree, parent=struct)
+            elif isinstance(subtree, list):
+                StructurePickerWidget.build_tree(tree=subtree, parent=parent)
+            else:
+                raise ValueError(f'Unrecognised type {type(subtree)} for Tree: {subtree}')
