@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>447</width>
-    <height>391</height>
+    <width>448</width>
+    <height>428</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -34,8 +34,8 @@
          <rect>
           <x>0</x>
           <y>0</y>
-          <width>427</width>
-          <height>109</height>
+          <width>428</width>
+          <height>121</height>
          </rect>
         </property>
         <attribute name="label">
@@ -49,6 +49,12 @@
              <bold>true</bold>
             </font>
            </property>
+           <property name="toolTip">
+            <string>Select the sample forlder.</string>
+           </property>
+           <property name="whatsThis">
+            <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Select the sample folder.&lt;/p&gt;&lt;p&gt;This should be the main folder of the sample, not the subfolder containing e.g. the raw data as all files will be read from and saved to this folder.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+           </property>
            <property name="text">
             <string> Source folder</string>
            </property>
@@ -59,21 +65,42 @@
           </widget>
          </item>
          <item row="0" column="1">
-          <widget class="QLabel" name="srcFolderTxt">
-           <property name="text">
-            <string/>
-           </property>
-           <property name="wordWrap">
-            <bool>true</bool>
-           </property>
-          </widget>
+          <layout class="QHBoxLayout" name="horizontalLayout_10">
+           <item>
+            <widget class="QLabel" name="srcFolderTxt">
+             <property name="text">
+              <string/>
+             </property>
+             <property name="wordWrap">
+              <bool>true</bool>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QToolButton" name="srcFolderInfoToolButton">
+             <property name="text">
+              <string>...</string>
+             </property>
+             <property name="icon">
+              <iconset resource="icons.qrc">
+               <normaloff>:/icons/icons/info.svg</normaloff>:/icons/icons/info.svg</iconset>
+             </property>
+            </widget>
+           </item>
+          </layout>
          </item>
          <item row="1" column="0">
-          <widget class="QLabel" name="label_2">
+          <widget class="QLabel" name="sampleIdLabel">
            <property name="font">
             <font>
              <bold>true</bold>
             </font>
+           </property>
+           <property name="toolTip">
+            <string>The unique ID of the sample</string>
+           </property>
+           <property name="whatsThis">
+            <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The ID of the sample. Any string (ideally short) containing &lt;span style=&quot; font-weight:700;&quot;&gt;alphanumerical characters and underscores&lt;/span&gt;.&lt;/p&gt;&lt;p&gt;It is important that this ID remain &lt;span style=&quot; font-weight:700;&quot;&gt;unique within a study&lt;/span&gt; as this will be used to identify samples in the summary.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
            </property>
            <property name="text">
             <string>Sample ID*</string>
@@ -84,11 +111,26 @@
           </widget>
          </item>
          <item row="1" column="1">
-          <widget class="QLineEdit" name="sampleIdTxt">
-           <property name="placeholderText">
-            <string>exp1</string>
-           </property>
-          </widget>
+          <layout class="QHBoxLayout" name="horizontalLayout_9">
+           <item>
+            <widget class="QLineEdit" name="sampleIdTxt">
+             <property name="placeholderText">
+              <string>exp1</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QToolButton" name="sampleIdInfoToolButton">
+             <property name="text">
+              <string>...</string>
+             </property>
+             <property name="icon">
+              <iconset resource="icons.qrc">
+               <normaloff>:/icons/icons/info.svg</normaloff>:/icons/icons/info.svg</iconset>
+             </property>
+            </widget>
+           </item>
+          </layout>
          </item>
          <item row="2" column="1">
           <widget class="QDialogButtonBox" name="sampleIdButtonBox">
@@ -106,45 +148,82 @@
         <property name="geometry">
          <rect>
           <x>0</x>
-          <y>-102</y>
-          <width>413</width>
+          <y>0</y>
+          <width>414</width>
           <height>310</height>
          </rect>
         </property>
         <attribute name="label">
          <string>Raw images paths</string>
         </attribute>
-        <layout class="QFormLayout" name="formLayout_2">
-         <item row="0" column="0">
-          <widget class="QLabel" name="label_11">
+        <layout class="QGridLayout" name="gridLayout">
+         <item row="0" column="1">
+          <widget class="QPushButton" name="launchPatternWizzardPushButton">
+           <property name="toolTip">
+            <string>Launch the paths helper wizard popup window</string>
+           </property>
+           <property name="whatsThis">
+            <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;This will &lt;span style=&quot; font-weight:700;&quot;&gt;open a new window with a wizard&lt;/span&gt; to help you construct the patterns for the paths.&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:700;&quot;&gt;For each channel&lt;/span&gt;:&lt;/p&gt;&lt;p&gt;    ∙ Select what type this channel is (autofluorescence, raw ...)&lt;/p&gt;&lt;p&gt;    ∙ For each group of digits highlighted as question marks, select the corresponding axis from the drop down menu.&lt;/p&gt;&lt;p&gt;    ∙ Click &amp;quot;Validate&amp;quot;&lt;br/&gt;&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:700;&quot;&gt;Once done, click &amp;quot;Apply&amp;quot;&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+           </property>
+           <property name="text">
+            <string>  Start helper wizzard</string>
+           </property>
+           <property name="icon">
+            <iconset resource="icons.qrc">
+             <normaloff>:/icons/icons/magic_wand.svg</normaloff>:/icons/icons/magic_wand.svg</iconset>
+           </property>
+          </widget>
+         </item>
+         <item row="0" column="2">
+          <widget class="QToolButton" name="patternWizzardBtnInfoToolButton">
+           <property name="text">
+            <string>...</string>
+           </property>
+           <property name="icon">
+            <iconset resource="icons.qrc">
+             <normaloff>:/icons/icons/info.svg</normaloff>:/icons/icons/info.svg</iconset>
+           </property>
+          </widget>
+         </item>
+         <item row="1" column="0">
+          <widget class="QLabel" name="mainChannelPathLbl">
            <property name="font">
             <font>
              <bold>true</bold>
             </font>
+           </property>
+           <property name="toolTip">
+            <string>The main channel color of your sample</string>
+           </property>
+           <property name="whatsThis">
+            <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The main channel color of your sample.&lt;/p&gt;&lt;p&gt;This is usually the channel with &lt;span style=&quot; font-weight:700;&quot;&gt;cells or vessels&lt;/span&gt;.&lt;/p&gt;&lt;p&gt;This is a relative path (from the sample directory) and the channel digits are witten as follows&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-style:italic;&quot;&gt;&amp;lt;AXIS,n_digits&amp;gt;&lt;/span&gt;&lt;/p&gt;&lt;p&gt;with axis begin one of XYZ in caps. The number of digits includes the number of 0.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
            </property>
            <property name="text">
             <string>Main channel*</string>
            </property>
           </widget>
          </item>
-         <item row="0" column="1">
+         <item row="1" column="1" rowspan="2" colspan="2">
           <widget class="QPlainTextEdit" name="rawPath">
            <property name="placeholderText">
             <string>raw/18-04-07_exp1[&lt;Y,2&gt; x &lt;X,2&gt;]_C00.ome.tif</string>
            </property>
           </widget>
          </item>
-         <item row="1" column="0">
-          <widget class="QLabel" name="label_10">
+         <item row="3" column="0">
+          <widget class="QLabel" name="autofluoChannelPathLbl">
            <property name="toolTip">
             <string>The reference channel</string>
+           </property>
+           <property name="whatsThis">
+            <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;This is the channel that will be used for atlas alignement&lt;/p&gt;&lt;p&gt;This is a relative path (from the sample directory) and the channel digits are witten as follows&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-style:italic;&quot;&gt;&amp;lt;AXIS,n_digits&amp;gt;&lt;/span&gt;&lt;/p&gt;&lt;p&gt;with axis begin one of XYZ in caps. The number of digits includes the number of 0.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
            </property>
            <property name="text">
             <string>Autofluorescence</string>
            </property>
           </widget>
          </item>
-         <item row="1" column="1">
+         <item row="3" column="1" colspan="2">
           <widget class="QFrame" name="autofluoPathOptionalPlainTextEdit">
            <property name="frameShape">
             <enum>QFrame::StyledPanel</enum>
@@ -173,17 +252,31 @@
            </layout>
           </widget>
          </item>
-         <item row="2" column="0">
-          <widget class="QLabel" name="label_9">
+         <item row="3" column="3">
+          <widget class="QToolButton" name="autofluoChannelPathInfoToolButton">
+           <property name="text">
+            <string>...</string>
+           </property>
+           <property name="icon">
+            <iconset resource="icons.qrc">
+             <normaloff>:/icons/icons/info.svg</normaloff>:/icons/icons/info.svg</iconset>
+           </property>
+          </widget>
+         </item>
+         <item row="4" column="0">
+          <widget class="QLabel" name="secondaryChannelPathLbl">
            <property name="toolTip">
-            <string>e.g. arteries channel</string>
+            <string>Second data channel</string>
+           </property>
+           <property name="whatsThis">
+            <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;This is a secondary data channel&lt;/p&gt;&lt;p&gt;e.g. arteries channel&lt;/p&gt;&lt;p&gt;This is a relative path (from the sample directory) and the channel digits are witten as follows&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-style:italic;&quot;&gt;&amp;lt;AXIS,n_digits&amp;gt;&lt;/span&gt;&lt;/p&gt;&lt;p&gt;with axis begin one of XYZ in caps. The number of digits includes the number of 0.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
            </property>
            <property name="text">
             <string>Secondary channel</string>
            </property>
           </widget>
          </item>
-         <item row="2" column="1">
+         <item row="4" column="1" colspan="2">
           <widget class="QFrame" name="arteriesPathOptionalPlainTextEdit">
            <property name="frameShape">
             <enum>QFrame::StyledPanel</enum>
@@ -212,13 +305,25 @@
            </layout>
           </widget>
          </item>
-         <item row="3" column="1">
-          <widget class="QPushButton" name="launchPatternWizzardPushButton">
+         <item row="4" column="3">
+          <widget class="QToolButton" name="secondaryChannelPathInfoToolButton">
            <property name="text">
-            <string>  Start helper wizzard</string>
+            <string>...</string>
            </property>
            <property name="icon">
-            <iconset theme="help"/>
+            <iconset resource="icons.qrc">
+             <normaloff>:/icons/icons/info.svg</normaloff>:/icons/icons/info.svg</iconset>
+           </property>
+          </widget>
+         </item>
+         <item row="1" column="3">
+          <widget class="QToolButton" name="mainChannelPathInfoToolButton">
+           <property name="text">
+            <string>...</string>
+           </property>
+           <property name="icon">
+            <iconset resource="icons.qrc">
+             <normaloff>:/icons/icons/info.svg</normaloff>:/icons/icons/info.svg</iconset>
            </property>
           </widget>
          </item>
@@ -228,24 +333,30 @@
         <property name="geometry">
          <rect>
           <x>0</x>
-          <y>-65</y>
-          <width>413</width>
+          <y>-28</y>
+          <width>414</width>
           <height>252</height>
          </rect>
         </property>
         <attribute name="label">
          <string>Atlas space info</string>
         </attribute>
-        <layout class="QFormLayout" name="formLayout_4">
+        <layout class="QGridLayout" name="gridLayout_2">
          <item row="0" column="0">
-          <widget class="QLabel" name="label_5">
+          <widget class="QLabel" name="sampleOrientationLbl">
+           <property name="toolTip">
+            <string>The orientation of the sample during acquisition</string>
+           </property>
+           <property name="whatsThis">
+            <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The order in which are represented the X, Y and Z axes. A minus sign indicates an inversion of the axis direction. &lt;span style=&quot; color:#edd400;&quot;&gt;WARNING: do not select the same order for multiple axes.&lt;/span&gt;&lt;/p&gt;&lt;p&gt;Once selected, click on the magnifying glass to view the result.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+           </property>
            <property name="text">
             <string>Orientation
  (XYZ)</string>
            </property>
           </widget>
          </item>
-         <item row="0" column="1">
+         <item row="0" column="1" colspan="2">
           <widget class="QFrame" name="frame">
            <property name="frameShape">
             <enum>QFrame::StyledPanel</enum>
@@ -374,16 +485,33 @@
                <string/>
               </property>
               <property name="icon">
-               <iconset theme="search">
-                <normaloff>.</normaloff>.</iconset>
+               <iconset resource="icons.qrc">
+                <normaloff>:/icons/icons/search.svg</normaloff>:/icons/icons/search.svg</iconset>
               </property>
              </widget>
             </item>
            </layout>
           </widget>
          </item>
+         <item row="0" column="3" colspan="2">
+          <widget class="QToolButton" name="sampleOrientationInfoToolButton">
+           <property name="text">
+            <string>...</string>
+           </property>
+           <property name="icon">
+            <iconset resource="icons.qrc">
+             <normaloff>:/icons/icons/info.svg</normaloff>:/icons/icons/info.svg</iconset>
+           </property>
+          </widget>
+         </item>
          <item row="1" column="1">
-          <widget class="QFrame" name="frame_2">
+          <widget class="QFrame" name="miniBrainFrame">
+           <property name="toolTip">
+            <string>The orientation of the sample</string>
+           </property>
+           <property name="whatsThis">
+            <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;This is a sketch of the sample as it was oriented during your scan.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+           </property>
            <property name="frameShape">
             <enum>QFrame::StyledPanel</enum>
            </property>
@@ -405,14 +533,31 @@
            </layout>
           </widget>
          </item>
+         <item row="1" column="2">
+          <widget class="QToolButton" name="miniBrainFrameInfoToolButton">
+           <property name="text">
+            <string>...</string>
+           </property>
+           <property name="icon">
+            <iconset resource="icons.qrc">
+             <normaloff>:/icons/icons/info.svg</normaloff>:/icons/icons/info.svg</iconset>
+           </property>
+          </widget>
+         </item>
          <item row="2" column="0">
-          <widget class="QLabel" name="label">
+          <widget class="QLabel" name="sampleCropXLbl">
+           <property name="toolTip">
+            <string>How the sample is cropped along X</string>
+           </property>
+           <property name="whatsThis">
+            <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;How to crop the atlas along X to match the sample. &lt;span style=&quot; color:#729fcf;&quot;&gt;NOTE: Values in pixels.&lt;/span&gt; To select the appropriate values, open the atlas in the same orientation (in ClearMap/Resources/Atlas).&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+           </property>
            <property name="text">
             <string>Crop X</string>
            </property>
           </widget>
          </item>
-         <item row="2" column="1">
+         <item row="2" column="1" colspan="3">
           <widget class="QFrame" name="sliceXDoublet">
            <property name="frameShape">
             <enum>QFrame::StyledPanel</enum>
@@ -466,14 +611,31 @@
            </layout>
           </widget>
          </item>
+         <item row="2" column="4">
+          <widget class="QToolButton" name="sampleCropXLblInfoToolButton">
+           <property name="text">
+            <string>...</string>
+           </property>
+           <property name="icon">
+            <iconset resource="icons.qrc">
+             <normaloff>:/icons/icons/info.svg</normaloff>:/icons/icons/info.svg</iconset>
+           </property>
+          </widget>
+         </item>
          <item row="3" column="0">
-          <widget class="QLabel" name="label_3">
+          <widget class="QLabel" name="sampleCropYLbl">
+           <property name="toolTip">
+            <string>How the sample is cropped along Y</string>
+           </property>
+           <property name="whatsThis">
+            <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;How to crop the atlas along Y to match the sample. &lt;span style=&quot; color:#729fcf;&quot;&gt;NOTE: Values in pixels.&lt;/span&gt; To select the appropriate values, open the atlas in the same orientation (in ClearMap/Resources/Atlas).&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+           </property>
            <property name="text">
             <string>Crop Y</string>
            </property>
           </widget>
          </item>
-         <item row="3" column="1">
+         <item row="3" column="1" colspan="3">
           <widget class="QFrame" name="sliceYDoublet">
            <property name="frameShape">
             <enum>QFrame::StyledPanel</enum>
@@ -527,14 +689,31 @@
            </layout>
           </widget>
          </item>
+         <item row="3" column="4">
+          <widget class="QToolButton" name="sampleCropYLblInfoToolButton">
+           <property name="text">
+            <string>...</string>
+           </property>
+           <property name="icon">
+            <iconset resource="icons.qrc">
+             <normaloff>:/icons/icons/info.svg</normaloff>:/icons/icons/info.svg</iconset>
+           </property>
+          </widget>
+         </item>
          <item row="4" column="0">
-          <widget class="QLabel" name="label_4">
+          <widget class="QLabel" name="sampleCropZLbl">
+           <property name="toolTip">
+            <string>How the sample is cropped along Z</string>
+           </property>
+           <property name="whatsThis">
+            <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;How to crop the atlas along Z to match the sample. &lt;span style=&quot; color:#729fcf;&quot;&gt;NOTE: Values in pixels.&lt;/span&gt; To select the appropriate values, open the atlas in the same orientation (in ClearMap/Resources/Atlas).&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+           </property>
            <property name="text">
             <string>Crop Z</string>
            </property>
           </widget>
          </item>
-         <item row="4" column="1">
+         <item row="4" column="1" colspan="3">
           <widget class="QFrame" name="sliceZDoublet">
            <property name="frameShape">
             <enum>QFrame::StyledPanel</enum>
@@ -588,6 +767,17 @@
            </layout>
           </widget>
          </item>
+         <item row="4" column="4">
+          <widget class="QToolButton" name="sampleCropZLblInfoToolButton">
+           <property name="text">
+            <string>...</string>
+           </property>
+           <property name="icon">
+            <iconset resource="icons.qrc">
+             <normaloff>:/icons/icons/info.svg</normaloff>:/icons/icons/info.svg</iconset>
+           </property>
+          </widget>
+         </item>
         </layout>
        </widget>
        <widget class="QWidget" name="page_3">
@@ -595,8 +785,8 @@
          <rect>
           <x>0</x>
           <y>0</y>
-          <width>427</width>
-          <height>167</height>
+          <width>428</width>
+          <height>159</height>
          </rect>
         </property>
         <attribute name="label">
@@ -841,12 +1031,12 @@
    <slot>setEnabled(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>127</x>
-     <y>336</y>
+     <x>146</x>
+     <y>263</y>
     </hint>
     <hint type="destinationlabel">
-     <x>309</x>
-     <y>340</y>
+     <x>403</x>
+     <y>267</y>
     </hint>
    </hints>
   </connection>
@@ -857,12 +1047,12 @@
    <slot>setEnabled(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>127</x>
-     <y>336</y>
+     <x>146</x>
+     <y>263</y>
     </hint>
     <hint type="destinationlabel">
-     <x>218</x>
-     <y>340</y>
+     <x>303</x>
+     <y>267</y>
     </hint>
    </hints>
   </connection>
@@ -873,12 +1063,12 @@
    <slot>setEnabled(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>127</x>
-     <y>285</y>
+     <x>146</x>
+     <y>214</y>
     </hint>
     <hint type="destinationlabel">
-     <x>218</x>
-     <y>289</y>
+     <x>303</x>
+     <y>218</y>
     </hint>
    </hints>
   </connection>
@@ -889,12 +1079,12 @@
    <slot>setEnabled(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>127</x>
-     <y>285</y>
+     <x>146</x>
+     <y>214</y>
     </hint>
     <hint type="destinationlabel">
-     <x>309</x>
-     <y>289</y>
+     <x>403</x>
+     <y>218</y>
     </hint>
    </hints>
   </connection>
@@ -905,12 +1095,12 @@
    <slot>setEnabled(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>127</x>
-     <y>234</y>
+     <x>146</x>
+     <y>165</y>
     </hint>
     <hint type="destinationlabel">
-     <x>218</x>
-     <y>238</y>
+     <x>303</x>
+     <y>169</y>
     </hint>
    </hints>
   </connection>
@@ -921,12 +1111,12 @@
    <slot>setEnabled(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>127</x>
-     <y>234</y>
+     <x>146</x>
+     <y>165</y>
     </hint>
     <hint type="destinationlabel">
-     <x>309</x>
-     <y>238</y>
+     <x>403</x>
+     <y>169</y>
     </hint>
    </hints>
   </connection>
@@ -937,8 +1127,8 @@
    <slot>setEnabled(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>175</x>
-     <y>169</y>
+     <x>177</x>
+     <y>167</y>
     </hint>
     <hint type="destinationlabel">
      <x>184</x>
@@ -953,12 +1143,12 @@
    <slot>setEnabled(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>175</x>
-     <y>169</y>
+     <x>177</x>
+     <y>167</y>
     </hint>
     <hint type="destinationlabel">
-     <x>415</x>
-     <y>173</y>
+     <x>417</x>
+     <y>171</y>
     </hint>
    </hints>
   </connection>
@@ -969,8 +1159,8 @@
    <slot>setEnabled(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>175</x>
-     <y>169</y>
+     <x>177</x>
+     <y>167</y>
     </hint>
     <hint type="destinationlabel">
      <x>321</x>
@@ -985,12 +1175,12 @@
    <slot>setEnabled(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>175</x>
-     <y>220</y>
+     <x>177</x>
+     <y>216</y>
     </hint>
     <hint type="destinationlabel">
-     <x>335</x>
-     <y>224</y>
+     <x>337</x>
+     <y>220</y>
     </hint>
    </hints>
   </connection>
@@ -1001,12 +1191,12 @@
    <slot>setEnabled(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>175</x>
-     <y>220</y>
+     <x>177</x>
+     <y>216</y>
     </hint>
     <hint type="destinationlabel">
-     <x>415</x>
-     <y>224</y>
+     <x>417</x>
+     <y>220</y>
     </hint>
    </hints>
   </connection>
@@ -1017,12 +1207,12 @@
    <slot>setEnabled(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>175</x>
-     <y>220</y>
+     <x>177</x>
+     <y>216</y>
     </hint>
     <hint type="destinationlabel">
-     <x>255</x>
-     <y>224</y>
+     <x>257</x>
+     <y>220</y>
     </hint>
    </hints>
   </connection>
@@ -1033,12 +1223,12 @@
    <slot>setEnabled(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>175</x>
-     <y>271</y>
+     <x>177</x>
+     <y>265</y>
     </hint>
     <hint type="destinationlabel">
-     <x>335</x>
-     <y>275</y>
+     <x>337</x>
+     <y>269</y>
     </hint>
    </hints>
   </connection>
@@ -1049,12 +1239,12 @@
    <slot>setEnabled(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>175</x>
-     <y>271</y>
+     <x>177</x>
+     <y>265</y>
     </hint>
     <hint type="destinationlabel">
-     <x>415</x>
-     <y>275</y>
+     <x>417</x>
+     <y>269</y>
     </hint>
    </hints>
   </connection>
@@ -1065,12 +1255,12 @@
    <slot>setEnabled(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>175</x>
-     <y>271</y>
+     <x>177</x>
+     <y>265</y>
     </hint>
     <hint type="destinationlabel">
-     <x>255</x>
-     <y>275</y>
+     <x>257</x>
+     <y>269</y>
     </hint>
    </hints>
   </connection>
@@ -1081,12 +1271,12 @@
    <slot>setEnabled(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>169</x>
-     <y>237</y>
+     <x>173</x>
+     <y>368</y>
     </hint>
     <hint type="destinationlabel">
-     <x>226</x>
-     <y>240</y>
+     <x>265</x>
+     <y>344</y>
     </hint>
    </hints>
   </connection>
@@ -1097,12 +1287,12 @@
    <slot>setEnabled(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>172</x>
-     <y>135</y>
+     <x>173</x>
+     <y>268</y>
     </hint>
     <hint type="destinationlabel">
-     <x>199</x>
-     <y>135</y>
+     <x>238</x>
+     <y>241</y>
     </hint>
    </hints>
   </connection>

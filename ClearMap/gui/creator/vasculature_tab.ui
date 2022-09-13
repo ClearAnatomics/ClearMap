@@ -43,7 +43,7 @@
             </font>
            </property>
            <property name="currentIndex">
-            <number>1</number>
+            <number>2</number>
            </property>
            <widget class="QWidget" name="binarization">
             <property name="geometry">
@@ -61,7 +61,7 @@
              <item>
               <widget class="QToolBox" name="toolBox_26">
                <property name="currentIndex">
-                <number>1</number>
+                <number>2</number>
                </property>
                <widget class="QWidget" name="page_83">
                 <property name="geometry">
@@ -69,7 +69,7 @@
                   <x>0</x>
                   <y>0</y>
                   <width>565</width>
-                  <height>773</height>
+                  <height>743</height>
                  </rect>
                 </property>
                 <attribute name="label">
@@ -87,6 +87,12 @@
                    <layout class="QFormLayout" name="formLayout_6">
                     <item row="0" column="0">
                      <widget class="QLabel" name="label_3">
+                      <property name="toolTip">
+                       <string>The range for the vessel detection</string>
+                      </property>
+                      <property name="whatsThis">
+                       <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;For optimal values, open the stitched image and look at the pixel intensities inside the brain (ignore the pixels outside the brain).&lt;/p&gt;&lt;p&gt;Set the minimum based on the lowest intensities you see.&lt;/p&gt;&lt;p&gt;For the higher intensity, look at the large vessels at the surface. You should set to the limit to a value that still excludes the halo.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                      </property>
                       <property name="text">
                        <string>Clipping range</string>
                       </property>
@@ -132,6 +138,12 @@
                     </item>
                     <item row="1" column="0">
                      <widget class="QLabel" name="label_4">
+                      <property name="toolTip">
+                       <string>Pseudo deconvolution threshold.</string>
+                      </property>
+                      <property name="whatsThis">
+                       <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Pseudo deconvolution threshold. &lt;/p&gt;&lt;p&gt;Voxels above this threshold will be added to the &lt;/p&gt;&lt;p&gt;binarization result in the multi-path biniarization.&lt;/p&gt;&lt;p&gt;Select slightly below the clip range min.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                      </property>
                       <property name="text">
                        <string>Threshold</string>
                       </property>
@@ -139,6 +151,9 @@
                     </item>
                     <item row="1" column="1">
                      <widget class="QSpinBox" name="rawBinarizationThresholdSpinBox">
+                      <property name="toolTip">
+                       <string/>
+                      </property>
                       <property name="minimum">
                        <number>0</number>
                       </property>
@@ -178,6 +193,12 @@
                    <layout class="QFormLayout" name="formLayout_8">
                     <item row="0" column="0">
                      <widget class="QLabel" name="label_2">
+                      <property name="toolTip">
+                       <string>The range for the arteries detection</string>
+                      </property>
+                      <property name="whatsThis">
+                       <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;For optimal values, open the stitched image and look at the pixel intensities inside the brain (ignore the pixels outside the brain).&lt;/p&gt;&lt;p&gt;Set the minimum based on the lowest intensities you see.&lt;/p&gt;&lt;p&gt;For the higher intensity, look at the large vessels at the surface. You should set to the limit to a value that still excludes the halo.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                      </property>
                       <property name="text">
                        <string>Clipping range</string>
                       </property>
@@ -223,6 +244,12 @@
                     </item>
                     <item row="1" column="0">
                      <widget class="QLabel" name="label">
+                      <property name="toolTip">
+                       <string>Pseudo deconvolution threshold.</string>
+                      </property>
+                      <property name="whatsThis">
+                       <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Pseudo deconvolution threshold. &lt;/p&gt;&lt;p&gt;Voxels above this threshold will be added to the &lt;/p&gt;&lt;p&gt;binarization result in the multi-path biniarization.&lt;/p&gt;&lt;p&gt;Select slightly below the clip range min.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                      </property>
                       <property name="text">
                        <string>Threshold</string>
                       </property>
@@ -276,7 +303,7 @@
                   <x>0</x>
                   <y>0</y>
                   <width>565</width>
-                  <height>773</height>
+                  <height>743</height>
                  </rect>
                 </property>
                 <attribute name="label">
@@ -329,6 +356,12 @@
                  </item>
                  <item>
                   <widget class="QDialogButtonBox" name="fillVesselsButtonBox">
+                   <property name="toolTip">
+                    <string>Fill the tubular structure of vessels</string>
+                   </property>
+                   <property name="whatsThis">
+                    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;In this step a trained convolutional deep network &lt;/p&gt;&lt;p&gt;is applied to fill the holes of hollow vessels in the &lt;/p&gt;&lt;p&gt;vasculature and arteries data.&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                   </property>
                    <property name="standardButtons">
                     <set>QDialogButtonBox::Apply</set>
                    </property>
@@ -350,12 +383,23 @@
                 </layout>
                </widget>
                <widget class="QWidget" name="page">
+                <property name="geometry">
+                 <rect>
+                  <x>0</x>
+                  <y>0</y>
+                  <width>565</width>
+                  <height>743</height>
+                 </rect>
+                </property>
                 <attribute name="label">
                  <string>Combine</string>
                 </attribute>
                 <layout class="QVBoxLayout" name="verticalLayout_4">
                  <item>
                   <widget class="QDialogButtonBox" name="binarizationCombineRunButton">
+                   <property name="toolTip">
+                    <string>Combine the binary images of the different vasculature channels</string>
+                   </property>
                    <property name="standardButtons">
                     <set>QDialogButtonBox::Apply</set>
                    </property>
@@ -395,6 +439,12 @@
             <layout class="QVBoxLayout" name="verticalLayout_8">
              <item>
               <widget class="QDialogButtonBox" name="buildGraphButtonBox">
+               <property name="toolTip">
+                <string>Build, clean, reduce and register the graph to the atlas</string>
+               </property>
+               <property name="whatsThis">
+                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The combined binary image is first skeletonised (center line of the tubular structures) using a highly optimised algorithm.&lt;/p&gt;&lt;p&gt;The graph is then built by creating nodes at each center pixel of the skeleton and edges between neighbouring pixels.&lt;/p&gt;&lt;p&gt;Expression levels and geometric properties are then added (radii ...)&lt;/p&gt;&lt;p&gt;This graph is then cleaned and simplified (removing non branching nodes whilst preserving the geometry and removing floating nodes)&lt;/p&gt;&lt;p&gt;Finaly, the graph is registered to the atlas using the inverse of the transformation matrix computed earlier&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+               </property>
                <property name="standardButtons">
                 <set>QDialogButtonBox::Apply</set>
                </property>
@@ -405,6 +455,12 @@
              </item>
              <item>
               <widget class="QGroupBox" name="groupBox_4">
+               <property name="toolTip">
+                <string>Select which part of the graph to plot</string>
+               </property>
+               <property name="whatsThis">
+                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;It is generaly impossible to plot the vasculature graph of a whole brain.&lt;/p&gt;&lt;p&gt;You can here select the region you wish to display by selecting the range of coordinates from the image of the brain. The shadowed regions will be excluded.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+               </property>
                <property name="title">
                 <string>Slicer</string>
                </property>
@@ -621,7 +677,7 @@
              <item>
               <widget class="QToolBox" name="toolBox">
                <property name="currentIndex">
-                <number>1</number>
+                <number>2</number>
                </property>
                <widget class="QWidget" name="arteries">
                 <property name="geometry">
@@ -638,6 +694,9 @@
                 <layout class="QFormLayout" name="formLayout_3">
                  <item row="0" column="0">
                   <widget class="QLabel" name="label_6">
+                   <property name="toolTip">
+                    <string>Minimum artery radius</string>
+                   </property>
                    <property name="text">
                     <string>Minimum Radius</string>
                    </property>
@@ -652,8 +711,14 @@
                  </item>
                  <item row="1" column="0">
                   <widget class="QLabel" name="label_7">
+                   <property name="toolTip">
+                    <string>Maximum number of nodes to extend to bridge arteries.</string>
+                   </property>
+                   <property name="whatsThis">
+                    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The arteries will be traced by hysteresis to try and bridge artery segments with few nodes between them that were not labelled as arteries due to the weakness of the artery marker. This defines the maximum number of unlabelled nodes between two segments to attempt bridging them.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                   </property>
                    <property name="text">
-                    <string>Maximum Tracing Iteration</string>
+                    <string>Maximum Tracing Steps</string>
                    </property>
                   </widget>
                  </item>
@@ -666,8 +731,14 @@
                  </item>
                  <item row="2" column="0">
                   <widget class="QLabel" name="label_8">
+                   <property name="toolTip">
+                    <string>Minimum number of branches to qualify as artery</string>
+                   </property>
+                   <property name="whatsThis">
+                    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;To correct for errors due to isolated vessel branches or large veins that express low levels of Acta2, we require a minimum number of branches an artery must have.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                   </property>
                    <property name="text">
-                    <string>Minimum Size</string>
+                    <string>Minimum Branch Number</string>
                    </property>
                   </widget>
                  </item>
@@ -695,6 +766,12 @@
                 <layout class="QFormLayout" name="formLayout">
                  <item row="0" column="0">
                   <widget class="QLabel" name="label_5">
+                   <property name="toolTip">
+                    <string>Range of artery marker (acta2) expression for veins</string>
+                   </property>
+                   <property name="whatsThis">
+                    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Large veins are identified as vessels with a high radius and a low maximal Acta2 expression.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                   </property>
                    <property name="text">
                     <string>Intensity range</string>
                    </property>
@@ -740,6 +817,12 @@
                  </item>
                  <item row="1" column="0">
                   <widget class="QLabel" name="label_9">
+                   <property name="toolTip">
+                    <string>Minimum radius of large veins</string>
+                   </property>
+                   <property name="whatsThis">
+                    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Large veins are identified as vessels with a high radius and a low maximal Acta2 expression.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                   </property>
                    <property name="text">
                     <string>Restrictive Min. Radius</string>
                    </property>
@@ -760,6 +843,12 @@
                  </item>
                  <item row="2" column="0">
                   <widget class="QLabel" name="label_10">
+                   <property name="toolTip">
+                    <string>Temporary vein minimum radius</string>
+                   </property>
+                   <property name="whatsThis">
+                    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;After predefining veins, vessels that are quite large &lt;/p&gt;&lt;p&gt;(superior to &lt;span style=&quot; font-style:italic;&quot;&gt;permissive min radius&lt;/span&gt;) but not identified as&lt;/p&gt;&lt;p&gt;arteries are also added. This is then used to refine the definition&lt;/p&gt;&lt;p&gt;of arteries.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                   </property>
                    <property name="text">
                     <string>Permissive Min. Radius</string>
                    </property>
@@ -774,6 +863,12 @@
                  </item>
                  <item row="3" column="0">
                   <widget class="QLabel" name="label_11">
+                   <property name="toolTip">
+                    <string>Final vein minimum radius</string>
+                   </property>
+                   <property name="whatsThis">
+                    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Now that arteries have been refined, we redefine the veins&lt;/p&gt;&lt;p&gt;by adding, vessels that are quite large &lt;/p&gt;&lt;p&gt;(superior to &lt;span style=&quot; font-style:italic;&quot;&gt;final min radius&lt;/span&gt;) but not identified as&lt;/p&gt;&lt;p&gt;arteries.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                   </property>
                    <property name="text">
                     <string>Final Min. Radius</string>
                    </property>
@@ -788,8 +883,14 @@
                  </item>
                  <item row="4" column="0">
                   <widget class="QLabel" name="label_12">
+                   <property name="toolTip">
+                    <string>Maximum number of nodes between veins to be bridged</string>
+                   </property>
+                   <property name="whatsThis">
+                    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The veins will be traced by hysteresis to try and bridge vein segments with few nodes between them that were not labelled as veins due to the previous criteria. This defines the maximum number of unlabelled nodes between two segments to attempt bridging them.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                   </property>
                    <property name="text">
-                    <string>Max. Tracing Iteration</string>
+                    <string>Max. Tracing steps</string>
                    </property>
                   </widget>
                  </item>
@@ -802,6 +903,12 @@
                  </item>
                  <item row="5" column="0">
                   <widget class="QLabel" name="label_13">
+                   <property name="toolTip">
+                    <string>Minimum radius to qualify as vein</string>
+                   </property>
+                   <property name="whatsThis">
+                    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Radius below which a vessel is a capillary,&lt;/p&gt;&lt;p&gt; not a vein anymore.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                   </property>
                    <property name="text">
                     <string>Min. Size Radius</string>
                    </property>
@@ -841,6 +948,12 @@
                 <layout class="QHBoxLayout" name="horizontalLayout">
                  <item>
                   <widget class="QGroupBox" name="groupBox_5">
+                   <property name="toolTip">
+                    <string>Select which part of the graph to plot</string>
+                   </property>
+                   <property name="whatsThis">
+                    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;It is generaly impossible to plot the vasculature graph of a whole brain.&lt;/p&gt;&lt;p&gt;You can here select the region you wish to display by selecting the range of coordinates from the image of the brain. The shadowed regions will be excluded.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                   </property>
                    <property name="title">
                     <string>Slicer</string>
                    </property>
@@ -1149,7 +1262,7 @@
              <item>
               <widget class="QToolBox" name="toolBox_2">
                <property name="currentIndex">
-                <number>0</number>
+                <number>1</number>
                </property>
                <widget class="QWidget" name="graphVisulization">
                 <property name="geometry">

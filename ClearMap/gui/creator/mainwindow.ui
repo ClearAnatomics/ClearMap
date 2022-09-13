@@ -61,7 +61,7 @@
       <item>
        <widget class="QTabWidget" name="tabWidget">
         <property name="currentIndex">
-         <number>0</number>
+         <number>1</number>
         </property>
         <widget class="QWidget" name="sample_tab">
          <attribute name="title">
@@ -127,8 +127,15 @@
     </property>
     <addaction name="actionPreferences"/>
    </widget>
+   <widget class="QMenu" name="menu_help">
+    <property name="title">
+     <string>Help</string>
+    </property>
+    <addaction name="action_what_s_this"/>
+   </widget>
    <addaction name="file_menu"/>
    <addaction name="menu_edit"/>
+   <addaction name="menu_help"/>
   </widget>
   <widget class="QStatusBar" name="statusbar">
    <property name="font">
@@ -228,6 +235,15 @@
   <action name="actionPreferences">
    <property name="text">
     <string>Preferences</string>
+   </property>
+  </action>
+  <action name="action_what_s_this">
+   <property name="icon">
+    <iconset theme="dialog-question">
+     <normaloff>.</normaloff>.</iconset>
+   </property>
+   <property name="text">
+    <string>What's this ?</string>
    </property>
   </action>
  </widget>
