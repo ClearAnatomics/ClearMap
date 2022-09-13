@@ -522,6 +522,7 @@ class CellCounterTab(PostProcessingTab):
         if self.cell_detector.preprocessor is None and self.preprocessor.workspace is not None:  # preproc initialised
             self.params.ui_to_cfg()
             self.cell_detector.setup(self.preprocessor)
+            self.update_cell_number()
 
     def setup(self):
         self.init_ui()
