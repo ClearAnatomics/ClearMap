@@ -1,5 +1,7 @@
 <RCC>
     <qresource prefix="/graphics_resources">
         <file>graphics_resources/searching_mouse.png</file>
+        <file>graphics_resources/splash.png</file>
+        <file>graphics_resources/wobbly_stitcher_rigid.jpg</file>
     </qresource>
 </RCC>

@@ -606,7 +606,7 @@
          <item row="0" column="0">
           <widget class="QLabel" name="label_6">
            <property name="toolTip">
-            <string>Resolution of the raw dataset. Set to (0, 0, 0) for auto</string>
+            <string>Resolution of the raw dataset. Uncheck to read from the metadata.</string>
            </property>
            <property name="text">
             <string>Main channel</string>
@@ -668,7 +668,7 @@
          <item row="1" column="0">
           <widget class="QLabel" name="label_7">
            <property name="toolTip">
-            <string>Resolution of the fluorescence dataset. Set to (0, 0, 0) for auto</string>
+            <string>Resolution of the autolfuorescence dataset. Uncheck to read from the metadata.</string>
            </property>
            <property name="text">
             <string>Autofluorescence</string>
@@ -730,7 +730,7 @@
          <item row="2" column="0">
           <widget class="QLabel" name="label_8">
            <property name="toolTip">
-            <string>Resolution of the arteries dataset. Set to (0, 0, 0) for auto</string>
+            <string>Resolution of the secondary (e.g. arteries) dataset. Uncheck to read from the metadata.</string>
            </property>
            <property name="text">
             <string>Secondary channel</string>
@@ -830,7 +830,9 @@
    </item>
   </layout>
  </widget>
- <resources/>
+ <resources>
+  <include location="icons.qrc"/>
+ </resources>
  <connections>
   <connection>
    <sender>checkBox_3</sender>

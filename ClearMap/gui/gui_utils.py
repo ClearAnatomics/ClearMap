@@ -151,7 +151,8 @@ def get_current_res(app):
 
 
 def create_clearmap_widget(ui_name, patch_parent_class):
-    widget_class, _ = loadUiType(os.path.join(UI_FOLDER, 'creator', ui_name), patch_parent_class=patch_parent_class)
+    widget_class, _ = loadUiType(os.path.join(UI_FOLDER, 'creator', ui_name), from_imports=True,
+                                 import_from='ClearMap.gui.creator', patch_parent_class=patch_parent_class)
     return widget_class()
 
 
