@@ -7,8 +7,8 @@ TubeMap
 This module contains the classes to generate annotated graphs from vasculature
 lightsheet data [Kirst2020]_.
 """
-import copy
 import os
+import copy
 import re
 
 import numpy as np

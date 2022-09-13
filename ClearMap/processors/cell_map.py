@@ -171,7 +171,7 @@ class CellDetector(TabProcessor):
         if coord_type not in ('filtered', 'raw', None):
             raise ValueError(f'Coordinate type "{coord_type}" not recognised')
         if coord_type is None:
-            dataframe_path = self.workspace.filename('cells').replace('.npy', '.feather')  # TODO: add to workspace
+            dataframe_path = self.workspace.filename('cells', extension='.feather')
             if os.path.exists(dataframe_path):
                 table = pd.read_feather(dataframe_path)
             else:
@@ -266,7 +266,7 @@ class CellDetector(TabProcessor):
             df['color'] = df['order'].map(color_map)
             df['volume'] = df['id'].map(volumes)
 
-        df.to_feather(self.workspace.filename('cells', extension='feather'))
+        df.to_feather(self.workspace.filename('cells', extension='.feather'))
 
     def transform_coordinates(self, coords):
         coords = resampling.resample_points(
@@ -346,7 +346,7 @@ class CellDetector(TabProcessor):
         warnings.warn("export_as_csv is deprecated and will be removed in future versions;"
                       "please use the new formats from atlas_align and export_collapsed_stats", DeprecationWarning, 2)
 
-        csv_file_path = self.workspace.filename('cells', extension='csv')
+        csv_file_path = self.workspace.filename('cells', extension='.csv')
         self.get_cells_df().to_csv(csv_file_path)
 
     def export_collapsed_stats(self):
@@ -370,7 +370,7 @@ class CellDetector(TabProcessor):
 
         collapsed = collapsed.sort_values(by='Structure ID')
 
-        csv_file_path = self.workspace.filename('cells', postfix='stats', extension='csv')
+        csv_file_path = self.workspace.filename('cells', postfix='stats', extension='.csv')
         collapsed.to_csv(csv_file_path, index=False)
 
     def plot_cells(self):
@@ -423,7 +423,7 @@ class CellDetector(TabProcessor):
 
     @property
     def df_path(self):
-        feather_path = self.workspace.filename('cells').replace('.npy', '.feather')
+        feather_path = self.workspace.filename('cells', extension='.feather')
         if os.path.exists:
             return feather_path
         else:
@@ -562,7 +562,7 @@ class CellDetector(TabProcessor):
         df['color'] = df['order'].map(color_map)
         df['volume'] = df['id'].map(volumes)
 
-        df.to_feather(self.workspace.filename('cells', extension='feather'))
+        df.to_feather(self.workspace.filename('cells', extension='.feather'))
 
 
 if __name__ == "__main__":

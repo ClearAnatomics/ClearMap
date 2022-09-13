@@ -197,6 +197,7 @@ class SampleParameters(UiParameter):
 
     def connect(self):
         self.tab.sampleIdTxt.editingFinished.connect(self.handle_sample_id_changed)
+        self.tab.useIdAsPrefixCheckBox.stateChanged.connect(self.handle_use_id_as_prefix_changed)
 
         self.tab.sliceXDoublet.valueChangedConnect(self.handle_slice_x_changed)
         self.tab.sliceYDoublet.valueChangedConnect(self.handle_slice_y_changed)
@@ -220,6 +221,7 @@ class SampleParameters(UiParameter):
     def cfg_to_ui(self):
         self.reload()
         self.sample_id = self._config['sample_id']
+        self.use_id_as_prefix = self._config['use_id_as_prefix']
         self.raw_path = self._config['src_paths']['raw']
         self.autofluo_path = self._config['src_paths']['autofluorescence']
         self.arteries_path = self._config['src_paths']['arteries']
@@ -258,6 +260,17 @@ class SampleParameters(UiParameter):
         if self.config is not None:
             self.config['sample_id'] = self.sample_id
             self.ui_to_cfg()   # FIXME: check
+
+    @property
+    def use_id_as_prefix(self):
+        return self.ui.useIdAsPrefixCheckBox.isChecked()
+
+    @use_id_as_prefix.setter
+    def use_id_as_prefix(self, value):
+        self.set_check_state(self.ui.useIdAsPrefixCheckBox, value)
+
+    def handle_use_id_as_prefix_changed(self, _):
+        self._config['use_id_as_prefix'] = self.use_id_as_prefix
 
     @property
     def raw_path(self):

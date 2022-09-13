@@ -154,17 +154,24 @@ class PreProcessor(TabProcessor):
         # if not runs_on_spyder():
         #     pyqtgraph.mkQApp()
 
+    @property
+    def prefix(self):
+        return self.sample_config['sample_id'] if self.sample_config['use_id_as_prefix'] else None
+
+    def filename(self, *args, **kwargs):
+        return self.workspace.filename(*args, **kwargs)
+
     def get_autofluo_pts_path(self, direction='resampled_to_auto'):
-        elastix_folder = self.workspace.filename(direction)
+        elastix_folder = self.filename(direction)
         return os.path.join(elastix_folder, 'autolfuorescence_landmarks.pts')  # TODO: use workspace
 
     @property
     def resampled_pts_path(self):
-        return os.path.join(self.workspace.filename('resampled_to_auto'), 'resampled_landmarks.pts')
+        return os.path.join(self.filename('resampled_to_auto'), 'resampled_landmarks.pts')
 
     @property
     def ref_pts_path(self):
-        return os.path.join(self.workspace.filename('auto_to_reference'), 'reference_landmarks.pts')  # TODO: use workspace
+        return os.path.join(self.filename('auto_to_reference'), 'reference_landmarks.pts')  # TODO: use workspace
 
     def setup(self, cfgs, watcher=None, convert_tiles=True):
         """
@@ -189,7 +196,8 @@ class PreProcessor(TabProcessor):
         if watcher is not None:
             self.progress_watcher = watcher
 
-        self.workspace = workspace.Workspace(self.processing_config['pipeline_name'], directory=self.src_directory)
+        self.workspace = workspace.Workspace(self.processing_config['pipeline_name'], directory=self.src_directory,
+                                             prefix=self.prefix)
         self.workspace.tmp_debug = TmpDebug(self.workspace)
         src_paths = {k: v for k, v in self.sample_config['src_paths'].items() if v is not None}
         self.workspace.update(**src_paths)
@@ -214,7 +222,7 @@ class PreProcessor(TabProcessor):
 
     @property
     def aligned_autofluo_path(self):
-        return os.path.join(self.workspace.filename('auto_to_reference'), 'result.1.mhd')
+        return os.path.join(self.filename('auto_to_reference'), 'result.1.mhd')
     
     @property
     def raw_stitched_shape(self):
@@ -223,12 +231,12 @@ class PreProcessor(TabProcessor):
             raw_res_from_cfg = np.array(self.sample_config['resolutions']['raw'])
             return self.resampled_shape * (raw_resampled_res_from_cfg / raw_res_from_cfg)
         else:
-            return clearmap_io.shape(self.workspace.filename('stitched'))
+            return clearmap_io.shape(self.filename('stitched'))
 
     @property
     def resampled_shape(self):
-        if os.path.exists(self.workspace.filename('resampled')):
-            return clearmap_io.shape(self.workspace.filename('resampled'))
+        if os.path.exists(self.filename('resampled')):
+            return clearmap_io.shape(self.filename('resampled'))
 
     def convert_tiles(self):
         """
@@ -262,8 +270,8 @@ class PreProcessor(TabProcessor):
 
     def use_npy(self):
         return self.processing_config['conversion']['use_npy'] or \
-               self.workspace.filename('raw').endswith('.npy') or \
-               os.path.exists(self.workspace.filename('raw', extension='npy'))
+               self.filename('raw').endswith('.npy') or \
+               os.path.exists(self.filename('raw', extension='npy'))
 
     def set_configs(self, cfg_paths):
         cfg_paths = [os.path.expanduser(p) for p in cfg_paths]
@@ -324,7 +332,7 @@ class PreProcessor(TabProcessor):
         fmt = self.processing_config['stitching']['output_conversion']['format'].strip('.')
         if self.processing_config['stitching']['output_conversion']['raw']:
             try:
-                clearmap_io.convert_files(self.workspace.file_list('stitched', extension='npy'),
+                clearmap_io.convert_files(self.workspace.file_list('stitched', extension='npy', prefix=self.prefix),
                                           extension=fmt, processes=self.machine_config['n_processes_file_conv'],
                                           workspace=self.workspace, verbose=True)
             except BrokenProcessPool:
@@ -332,7 +340,8 @@ class PreProcessor(TabProcessor):
                 return
         if self.processing_config['stitching']['output_conversion']['arteries']:
             try:
-                clearmap_io.convert_files(self.workspace.file_list('stitched', postfix='arteries', extension='npy'),
+                clearmap_io.convert_files(self.workspace.file_list('stitched', postfix='arteries',
+                                                                   prefix=self.prefix, extension='npy'),
                                           extension=fmt, processes=self.machine_config['n_processes_file_conv'],
                                           workspace=self.workspace, verbose=True)
             except BrokenProcessPool:
@@ -341,11 +350,11 @@ class PreProcessor(TabProcessor):
 
     @property
     def was_stitched_rigid(self):
-        return os.path.exists(self.workspace.filename('layout', postfix='aligned_axis'))
+        return os.path.exists(self.filename('layout', postfix='aligned_axis'))
 
     @property
     def was_registered(self):
-        # return os.path.exists(self.workspace.filename('resampled_to_auto'))
+        # return os.path.exists(self.filename('resampled_to_auto'))
         return os.path.exists(self.aligned_autofluo_path)
 
     @property
@@ -382,7 +391,7 @@ class PreProcessor(TabProcessor):
         # layout.plot_alignments()  # TODO: TEST
         # plt.show()
 
-        stitching_rigid.save_layout(self.workspace.filename('layout', postfix='aligned_axis'), layout)
+        stitching_rigid.save_layout(self.filename('layout', postfix='aligned_axis'), layout)
         self.layout = layout
 
     def get_wobbly_layout(self, overlaps=None):
@@ -390,9 +399,9 @@ class PreProcessor(TabProcessor):
             overlaps, projection_thickness = define_auto_stitching_params(self.workspace.source('raw').file_list[0],
                                                                           self.processing_config['stitching'])
         if self.use_npy():
-            raw_path = self.workspace.filename('raw', extension='npy')
+            raw_path = self.filename('raw', extension='npy')
         else:
-            raw_path = self.workspace.filename('raw')
+            raw_path = self.filename('raw')
         layout = stitching_wobbly.WobblyLayout(expression=raw_path, tile_axes=['X', 'Y'], overlaps=overlaps)
         return layout
 
@@ -441,11 +450,11 @@ class PreProcessor(TabProcessor):
         self.update_watcher_main_progress()
 
     def __stitch_layout_wobbly(self):
-        layout = stitching_rigid.load_layout(self.workspace.filename('layout', postfix='placed'))
+        layout = stitching_rigid.load_layout(self.filename('layout', postfix='placed'))
         n_slices = len(self.workspace.file_list('autofluorescence'))  # TODO: find better proxy
         self.prepare_watcher_for_substep(n_slices, self.__wobbly_stitching_stitch_re, 'Stitch layout wobbly', True)
         try:
-            stitching_wobbly.stitch_layout(layout, sink=self.workspace.filename('stitched'), method='interpolation',
+            stitching_wobbly.stitch_layout(layout, sink=self.filename('stitched'), method='interpolation',
                                            processes=self.machine_config['n_processes_stitching'],
                                            workspace=self.workspace, verbose=True)
         except BrokenProcessPool:
@@ -457,11 +466,11 @@ class PreProcessor(TabProcessor):
                                              'Stitch layout wobbly arteries', True)
             try:
                 if self.use_npy():
-                    layout.replace_source_location(self.workspace.filename('raw', extension='npy'),
-                                                   self.workspace.filename('arteries', extension='npy'))
+                    layout.replace_source_location(self.filename('raw', extension='npy'),
+                                                   self.filename('arteries', extension='npy'))
                 else:
-                    layout.replace_source_location(self.workspace.filename('raw'), self.workspace.filename('arteries'))
-                stitching_wobbly.stitch_layout(layout, sink=self.workspace.filename('stitched', postfix='arteries'),
+                    layout.replace_source_location(self.filename('raw'), self.filename('arteries'))
+                stitching_wobbly.stitch_layout(layout, sink=self.filename('stitched', postfix='arteries'),
                                                method='interpolation',
                                                processes=self.machine_config['n_processes_stitching'],
                                                workspace=self.workspace, verbose=True)
@@ -475,17 +484,17 @@ class PreProcessor(TabProcessor):
             self.stopped = False
         if self.stopped:
             return
-        layout = stitching_rigid.load_layout(self.workspace.filename('layout', postfix='aligned_axis'))
+        layout = stitching_rigid.load_layout(self.filename('layout', postfix='aligned_axis'))
         self.__align_layout_wobbly(layout)
         if self.stopped:
             return
-        stitching_rigid.save_layout(self.workspace.filename('layout', postfix='aligned'), layout)
+        stitching_rigid.save_layout(self.filename('layout', postfix='aligned'), layout)
 
-        # layout = st.load_layout(_workspace.filename('layout', postfix='aligned'))  # FIXME: check if required
+        # layout = st.load_layout(self.filename('layout', postfix='aligned'))  # FIXME: check if required
         self.__place_layout_wobbly(layout)
         if self.stopped:
             return
-        stitching_rigid.save_layout(self.workspace.filename('layout', postfix='placed'), layout)
+        stitching_rigid.save_layout(self.filename('layout', postfix='placed'), layout)
 
         self.__stitch_layout_wobbly()
         if self.stopped:
@@ -497,7 +506,7 @@ class PreProcessor(TabProcessor):
             "processes": resampling_cfg['processes'],
             "verbose": resampling_cfg['verbose']
         }  # WARNING: duplicate (use method ??)
-        clearmap_io.delete_file(self.workspace.filename('resampled'))  # FIXME:
+        clearmap_io.delete_file(self.filename('resampled'))  # FIXME:
         f_list = self.workspace.source('raw').file_list
         if f_list:
             src_res = define_auto_resolution(f_list[0], self.sample_config['resolutions']['raw'])
@@ -507,9 +516,9 @@ class PreProcessor(TabProcessor):
         n_planes = len(self.workspace.file_list('autofluorescence'))  # TODO: find more elegant solution for counter
         self.prepare_watcher_for_substep(n_planes, self.__resample_re, 'Resampling raw')
         try:
-            result = resampling.resample(self.workspace.filename('stitched'),
+            result = resampling.resample(self.filename('stitched'),
                                          source_resolution=src_res,
-                                         sink=self.workspace.filename('resampled'),
+                                         sink=self.filename('resampled'),
                                          sink_resolution=resampling_cfg['raw_sink_resolution'],
                                          workspace=self.workspace,
                                          **default_resample_parameter)
@@ -533,9 +542,9 @@ class PreProcessor(TabProcessor):
         n_planes = len(self.workspace.file_list('autofluorescence'))  # TODO: find more elegant solution for counter
         self.prepare_watcher_for_substep(n_planes, self.__resample_re, 'Resampling autofluorescence', True)
         try:
-            result = resampling.resample(self.workspace.filename('autofluorescence'),
+            result = resampling.resample(self.filename('autofluorescence'),
                                          source_resolution=auto_res,
-                                         sink=self.workspace.filename('resampled', postfix='autofluorescence'),
+                                         sink=self.filename('resampled', postfix='autofluorescence'),
                                          sink_resolution=resampling_cfg['autofluo_sink_resolution'],
                                          workspace=self.workspace,
                                          **default_resample_parameter)
@@ -563,7 +572,7 @@ class PreProcessor(TabProcessor):
             if self.stopped:
                 return
             if resampling_cfg['plot_raw'] and not runs_on_ui():
-                plot_3d.plot(self.workspace.filename('resampled'))
+                plot_3d.plot(self.filename('resampled'))
 
             # Autofluorescence
             self.__resample_autofluorescence()
@@ -571,8 +580,8 @@ class PreProcessor(TabProcessor):
                 return
             self.update_watcher_main_progress()
             if resampling_cfg['plot_autofluo'] and not runs_on_ui():
-                plot_3d.plot([self.workspace.filename('resampled'),
-                              self.workspace.filename('resampled', postfix='autofluorescence')])
+                plot_3d.plot([self.filename('resampled'),
+                              self.filename('resampled', postfix='autofluorescence')])
 
     def align(self, force=False):
         if force:
@@ -592,15 +601,15 @@ class PreProcessor(TabProcessor):
         self.prepare_watcher_for_substep(2000, self.__align_resampled_to_auto_re, 'Align res to auto')
         align_channels_parameter = {
             # moving and reference images
-            "moving_image": self.workspace.filename('resampled', postfix='autofluorescence'),
-            "fixed_image": self.workspace.filename('resampled'),
+            "moving_image": self.filename('resampled', postfix='autofluorescence'),
+            "fixed_image": self.filename('resampled'),
 
             # elastix parameter files for alignment
             "affine_parameter_file": self.align_channels_affine_file,
             "bspline_parameter_file": None,
 
             # directory of the alignment result '/home/nicolas.renier/Documents/ClearMap_Resources/Par0000affine.txt'
-            "result_directory": self.workspace.filename('resampled_to_auto'),
+            "result_directory": self.filename('resampled_to_auto'),
             'workspace': self.workspace
         }
         # FIXME: add use_landmarks to config
@@ -615,13 +624,13 @@ class PreProcessor(TabProcessor):
         align_reference_parameter = {
             # moving and reference images
             "moving_image": self.reference_file_path,
-            "fixed_image": self.workspace.filename('resampled', postfix='autofluorescence'),
+            "fixed_image": self.filename('resampled', postfix='autofluorescence'),
 
             # elastix parameter files for alignment
             "affine_parameter_file": self.align_reference_affine_file,
             "bspline_parameter_file": self.align_reference_bspline_file,
             # directory of the alignment result
-            "result_directory": self.workspace.filename('auto_to_reference'),
+            "result_directory": self.filename('auto_to_reference'),
             'workspace': self.workspace
         }
         # FIXME: add use_landmarks to config
@@ -635,7 +644,7 @@ class PreProcessor(TabProcessor):
         self.__check_elastix_success('auto_to_reference')
 
     def __check_elastix_success(self, results_dir_name):
-        with open(os.path.join(self.workspace.filename(results_dir_name), 'elastix.log'), 'r') as logfile:
+        with open(os.path.join(self.filename(results_dir_name), 'elastix.log'), 'r') as logfile:
             if 'fail' in logfile.read():
                 results_msg = results_dir_name.replace('_', ' ')
                 raise ValueError(f'Alignment {results_msg} failed')  # TODO: change exception type
@@ -663,10 +672,10 @@ class PreProcessor(TabProcessor):
         paths = []
         titles = []
         if cfg['raw']:
-            paths.append(self.workspace.filename('stitched'))
+            paths.append(self.filename('stitched'))
             titles.append('Raw stitched')
         if cfg['arteries']:
-            paths.append(self.workspace.filename('stitched', postfix='arteries'))  # WARNING: hard coded postfix
+            paths.append(self.filename('stitched', postfix='arteries'))  # WARNING: hard coded postfix
             titles.append('Arteries stitched')
         if len(paths) != 2:
             paths = paths[0]
