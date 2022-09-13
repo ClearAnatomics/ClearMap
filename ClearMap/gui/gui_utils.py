@@ -184,3 +184,18 @@ def get_pseudo_random_color():
            rand_gen.uniform(0.5, 1))
     rgb = hsv_to_rgb(hsv)
     return rgb
+
+
+def is_dark(color):
+    """
+
+    Parameters
+    ----------
+    color QColor
+
+    Returns
+    -------
+
+
+    """
+    return color.getHsl()[2] < 128
