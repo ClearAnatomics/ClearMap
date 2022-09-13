@@ -33,7 +33,7 @@
         </font>
        </property>
        <property name="currentIndex">
-        <number>1</number>
+        <number>0</number>
        </property>
        <widget class="QWidget" name="page">
         <property name="geometry">
@@ -51,14 +51,14 @@
          <item>
           <widget class="QToolBox" name="toolBox_2">
            <property name="currentIndex">
-            <number>2</number>
+            <number>0</number>
            </property>
            <widget class="QWidget" name="page_3">
             <property name="geometry">
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>354</width>
+              <width>446</width>
               <height>392</height>
              </rect>
             </property>
@@ -75,6 +75,9 @@
              </item>
              <item row="1" column="0">
               <widget class="QLabel" name="label">
+               <property name="toolTip">
+                <string>Expected overlap between tiles along X dimension (in pixels)</string>
+               </property>
                <property name="text">
                 <string>X overlap</string>
                </property>
@@ -117,6 +120,9 @@
              </item>
              <item row="2" column="0">
               <widget class="QLabel" name="label_2">
+               <property name="toolTip">
+                <string>Expected overlap between tiles along Y dimension (in pixels)</string>
+               </property>
                <property name="text">
                 <string>Y overlap</string>
                </property>
@@ -159,6 +165,12 @@
              </item>
              <item row="3" column="0">
               <widget class="QLabel" name="label_3">
+               <property name="toolTip">
+                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Number of planes to average to compute&lt;/p&gt;&lt;p&gt;the optimum overlap along X and Y dimensions&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+               </property>
+               <property name="whatsThis">
+                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;h1 style=&quot; margin-top:18px; margin-bottom:12px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;&lt;span style=&quot; font-size:xx-large; font-weight:700;&quot;&gt;Rigid stitcher&lt;/span&gt;&lt;/h1&gt;&lt;p&gt;The &lt;span style=&quot; font-weight:700; font-style:italic;&quot;&gt;projection thickness&lt;/span&gt; is the width (short dimension) of the &lt;span style=&quot; font-weight:700;&quot;&gt;white area&lt;/span&gt; in the image below.&lt;/p&gt;&lt;p&gt;&lt;img src=&quot;qrc:///graphics_resources/graphics_resources/wobbly_stitcher_rigid.jpg&quot;/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+               </property>
                <property name="text">
                 <string>Projection thickness</string>
                </property>
@@ -220,6 +232,9 @@
              </item>
              <item row="4" column="0">
               <widget class="QLabel" name="label_4">
+               <property name="toolTip">
+                <string>Maximum number of pixels to shift in either direction along that axis to compute the alignment (correlograms).</string>
+               </property>
                <property name="text">
                 <string>Max shifts X</string>
                </property>
@@ -265,6 +280,9 @@
              </item>
              <item row="5" column="0">
               <widget class="QLabel" name="label_5">
+               <property name="toolTip">
+                <string>Maximum number of pixels to shift in either direction along that axis to compute the alignment (correlograms).</string>
+               </property>
                <property name="text">
                 <string>Max shifts Y</string>
                </property>
@@ -310,6 +328,9 @@
              </item>
              <item row="6" column="0">
               <widget class="QLabel" name="label_6">
+               <property name="toolTip">
+                <string>Maximum number of pixels to shift in either direction along that axis to compute the alignment (correlograms).</string>
+               </property>
                <property name="text">
                 <string>Max shifts Z</string>
                </property>
@@ -355,6 +376,9 @@
              </item>
              <item row="7" column="0">
               <widget class="QLabel" name="label_7">
+               <property name="toolTip">
+                <string>Ignore pixels below this value for stitching</string>
+               </property>
                <property name="text">
                 <string>Background level</string>
                </property>
@@ -369,6 +393,9 @@
              </item>
              <item row="8" column="0">
               <widget class="QLabel" name="label_8">
+               <property name="toolTip">
+                <string>Number of pixels that have to be above background to be considered</string>
+               </property>
                <property name="text">
                 <string>Background pixels</string>
                </property>
@@ -401,7 +428,7 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>309</width>
+              <width>446</width>
               <height>334</height>
              </rect>
             </property>
@@ -418,6 +445,9 @@
              </item>
              <item row="1" column="0">
               <widget class="QLabel" name="label_11">
+               <property name="toolTip">
+                <string>Maximum number of pixels to shift in either direction along that axis to compute the alignment (correlograms).</string>
+               </property>
                <property name="text">
                 <string>Max shifts X</string>
                </property>
@@ -463,6 +493,9 @@
              </item>
              <item row="2" column="0">
               <widget class="QLabel" name="label_10">
+               <property name="toolTip">
+                <string>Maximum number of pixels to shift in either direction along that axis to compute the alignment (correlograms).</string>
+               </property>
                <property name="text">
                 <string>Max shifts Y</string>
                </property>
@@ -508,6 +541,9 @@
              </item>
              <item row="3" column="0">
               <widget class="QLabel" name="label_9">
+               <property name="toolTip">
+                <string>Maximum number of pixels to shift in either direction along that axis to compute the alignment (correlograms).</string>
+               </property>
                <property name="text">
                 <string>Max shifts Z</string>
                </property>
@@ -598,6 +634,9 @@
              </item>
              <item row="5" column="0">
               <widget class="QLabel" name="label_13">
+               <property name="toolTip">
+                <string>Pixel intensity range for a typical tile. Tiles outside this range (typically oustide the brain) will be droppped.</string>
+               </property>
                <property name="text">
                 <string>Slice range</string>
                </property>
@@ -770,8 +809,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>196</width>
-              <height>100</height>
+              <width>460</width>
+              <height>272</height>
              </rect>
             </property>
             <attribute name="label">
@@ -839,8 +878,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>254</width>
-              <height>156</height>
+              <width>460</width>
+              <height>272</height>
              </rect>
             </property>
             <attribute name="label">
@@ -889,6 +928,9 @@
              </item>
              <item row="4" column="1">
               <widget class="QDialogButtonBox" name="convertOutputButtonBox">
+               <property name="toolTip">
+                <string>Convert the selected channels (stitched files) to the selected format for use outside ClearMap</string>
+               </property>
                <property name="standardButtons">
                 <set>QDialogButtonBox::Apply</set>
                </property>
@@ -919,15 +961,15 @@
          <item>
           <widget class="QToolBox" name="toolBox_3">
            <property name="currentIndex">
-            <number>1</number>
+            <number>2</number>
            </property>
            <widget class="QWidget" name="atlasSettingsPage">
             <property name="geometry">
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>325</width>
-              <height>270</height>
+              <width>460</width>
+              <height>332</height>
              </rect>
             </property>
             <attribute name="label">
@@ -936,6 +978,9 @@
             <layout class="QFormLayout" name="formLayout_5">
              <item row="0" column="0">
               <widget class="QLabel" name="label_16">
+               <property name="toolTip">
+                <string>The atlas to use for the registration</string>
+               </property>
                <property name="text">
                 <string>Atlas</string>
                </property>
@@ -943,6 +988,9 @@
              </item>
              <item row="0" column="1">
               <widget class="QComboBox" name="atlasIdComboBox">
+               <property name="enabled">
+                <bool>false</bool>
+               </property>
                <item>
                 <property name="text">
                  <string>ABA - adult mouse - 25µm</string>
@@ -977,6 +1025,9 @@
              </item>
              <item row="1" column="0">
               <widget class="QLabel" name="label_15">
+               <property name="toolTip">
+                <string>The XYZ resolution (μm/pixel) of the atlas</string>
+               </property>
                <property name="text">
                 <string>Atlas resolution</string>
                </property>
@@ -984,6 +1035,9 @@
              </item>
              <item row="1" column="1">
               <widget class="QFrame" name="atlasResolutionTriplet">
+               <property name="enabled">
+                <bool>false</bool>
+               </property>
                <property name="frameShape">
                 <enum>QFrame::StyledPanel</enum>
                </property>
@@ -1139,6 +1193,9 @@
                </item>
                <item row="0" column="0">
                 <widget class="QPushButton" name="useResampledToAutoLandmarksPushButton">
+                 <property name="toolTip">
+                  <string>Select matching pixels between autofluorescence raw channels</string>
+                 </property>
                  <property name="text">
                   <string>Use resampled landmarks</string>
                  </property>
@@ -1146,6 +1203,9 @@
                </item>
                <item row="1" column="0">
                 <widget class="QPushButton" name="useAutoToRefLandmarksPushButton">
+                 <property name="toolTip">
+                  <string>Select matching pixels between autofluorescence and reference channels</string>
+                 </property>
                  <property name="text">
                   <string>Use reference landmarks</string>
                  </property>
@@ -1170,8 +1230,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>98</width>
-              <height>42</height>
+              <width>460</width>
+              <height>332</height>
              </rect>
             </property>
             <attribute name="label">
@@ -1229,12 +1289,12 @@
    <slot>setEnabled(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>262</x>
-     <y>116</y>
+     <x>281</x>
+     <y>26</y>
     </hint>
     <hint type="destinationlabel">
-     <x>355</x>
-     <y>120</y>
+     <x>445</x>
+     <y>30</y>
     </hint>
    </hints>
   </connection>
@@ -1245,12 +1305,12 @@
    <slot>setEnabled(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>262</x>
-     <y>167</y>
+     <x>281</x>
+     <y>75</y>
     </hint>
     <hint type="destinationlabel">
-     <x>355</x>
-     <y>171</y>
+     <x>445</x>
+     <y>79</y>
     </hint>
    </hints>
   </connection>
@@ -1261,12 +1321,12 @@
    <slot>setEnabled(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>189</x>
-     <y>218</y>
+     <x>208</x>
+     <y>124</y>
     </hint>
     <hint type="destinationlabel">
-     <x>272</x>
-     <y>222</y>
+     <x>352</x>
+     <y>128</y>
     </hint>
    </hints>
   </connection>
@@ -1277,12 +1337,12 @@
    <slot>setEnabled(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>189</x>
-     <y>218</y>
+     <x>208</x>
+     <y>124</y>
     </hint>
     <hint type="destinationlabel">
-     <x>355</x>
-     <y>222</y>
+     <x>445</x>
+     <y>128</y>
     </hint>
    </hints>
   </connection>
@@ -1293,12 +1353,12 @@
    <slot>setEnabled(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>145</x>
-     <y>428</y>
+     <x>164</x>
+     <y>357</y>
     </hint>
     <hint type="destinationlabel">
-     <x>272</x>
-     <y>434</y>
+     <x>445</x>
+     <y>361</y>
     </hint>
    </hints>
   </connection>

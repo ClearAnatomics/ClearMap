@@ -14,7 +14,7 @@ import pandas as pd
 
 import pyqtgraph as pg
 from PyQt5.QtWebEngineWidgets import QWebEngineView
-from PyQt5.QtWidgets import QDialogButtonBox
+from PyQt5.QtWidgets import QDialogButtonBox, QWhatsThis
 
 import ClearMap.IO.IO as clearmap_io
 from ClearMap.IO.MHD import mhd_read
@@ -128,6 +128,12 @@ class GenericTab(GenericUi):
     def setup_workers(self):
         pass
 
+    def display_whats_this(self, widget):
+        QWhatsThis.showText(widget.pos(), widget.whatsThis(), widget)
+
+    def connect_whats_this(self, info_btn, whats_this_ctrl):
+        info_btn.clicked.connect(lambda: self.display_whats_this(whats_this_ctrl))
+
 
 class PostProcessingTab(GenericTab):
     def __init__(self, main_window, name, tab_idx, ui_file_name):
@@ -226,10 +232,22 @@ class SampleTab(GenericTab):
         self.init_ui()
 
         self.ui.srcFolderBtn.clicked.connect(self.main_window.set_src_folder)
+        self.connect_whats_this(self.ui.srcFolderInfoToolButton, self.ui.srcFolderBtn)
         self.ui.sampleIdButtonBox.connectApply(self.main_window.parse_cfg)
+        self.connect_whats_this(self.ui.sampleIdInfoToolButton, self.ui.sampleIdLabel)
 
         self.ui.launchPatternWizzardPushButton.clicked.connect(self.launch_pattern_wizard)
+        self.connect_whats_this(self.ui.patternWizzardBtnInfoToolButton, self.ui.launchPatternWizzardPushButton)
 
+        self.connect_whats_this(self.ui.mainChannelPathInfoToolButton, self.ui.mainChannelPathLbl)
+        self.connect_whats_this(self.ui.autofluoChannelPathInfoToolButton, self.ui.autofluoChannelPathLbl)
+        self.connect_whats_this(self.ui.secondaryChannelPathInfoToolButton, self.ui.secondaryChannelPathLbl)
+
+        self.connect_whats_this(self.ui.sampleOrientationInfoToolButton, self.ui.sampleOrientationLbl)
+        self.connect_whats_this(self.ui.miniBrainFrameInfoToolButton, self.ui.miniBrainFrame)
+        self.connect_whats_this(self.ui.sampleCropXLblInfoToolButton, self.ui.sampleCropXLbl)
+        self.connect_whats_this(self.ui.sampleCropYLblInfoToolButton, self.ui.sampleCropYLbl)
+        self.connect_whats_this(self.ui.sampleCropZLblInfoToolButton, self.ui.sampleCropZLbl)
         self.ui.plotMiniBrainPushButton.clicked.connect(self.plot_mini_brain)
 
         self.ui.applyBox.connectApply(self.main_window.alignment_tab_mgr.setup_workers)

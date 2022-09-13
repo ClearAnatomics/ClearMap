@@ -33,7 +33,7 @@
         </font>
        </property>
        <property name="currentIndex">
-        <number>1</number>
+        <number>2</number>
        </property>
        <widget class="QWidget" name="page">
         <property name="geometry">
@@ -51,15 +51,15 @@
          <item>
           <widget class="QToolBox" name="toolBox_2">
            <property name="currentIndex">
-            <number>2</number>
+            <number>0</number>
            </property>
            <widget class="QWidget" name="page_3">
             <property name="geometry">
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>195</width>
-              <height>154</height>
+              <width>483</width>
+              <height>214</height>
              </rect>
             </property>
             <attribute name="label">
@@ -68,6 +68,9 @@
             <layout class="QVBoxLayout" name="verticalLayout">
              <item>
               <widget class="QGroupBox" name="groupBox_2">
+               <property name="toolTip">
+                <string>The diameter of the filter to estimate the background. This should be larger than the typical cell size.</string>
+               </property>
                <property name="title">
                 <string>Background correction</string>
                </property>
@@ -91,6 +94,9 @@
              </item>
              <item>
               <widget class="QGroupBox" name="groupBox">
+               <property name="toolTip">
+                <string>The threshold for the maxima detection. Peaks below this value are ignored.</string>
+               </property>
                <property name="title">
                 <string>Shape detection</string>
                </property>
@@ -122,7 +128,7 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>367</width>
+              <width>469</width>
               <height>293</height>
              </rect>
             </property>
@@ -415,6 +421,9 @@
         <layout class="QVBoxLayout" name="verticalLayout_6">
          <item>
           <widget class="QGroupBox" name="groupBox_3">
+           <property name="toolTip">
+            <string>Filter out cells that are not within this size range</string>
+           </property>
            <property name="title">
             <string>Thresholds</string>
            </property>
@@ -511,6 +520,9 @@
         <layout class="QFormLayout" name="formLayout_2">
          <item row="0" column="0">
           <widget class="QLabel" name="label_8">
+           <property name="toolTip">
+            <string>The XYZ half width of the ellipsoid used to voxelize</string>
+           </property>
            <property name="text">
             <string>Sphere radius</string>
            </property>

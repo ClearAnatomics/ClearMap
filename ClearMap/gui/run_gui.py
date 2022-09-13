@@ -21,18 +21,24 @@ import traceback
 import types
 
 from PyQt5 import QtGui
+from PyQt5.QtGui import QPalette, QColor
 from PyQt5.QtWebEngineWidgets import QWebEngineView  # WARNING: import required before app creation
 from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QSpinBox, QDoubleSpinBox, QFrame, \
-    QDialogButtonBox, QComboBox, QLineEdit, QStyle, QWidget, QMessageBox, QToolBox
+    QDialogButtonBox, QComboBox, QLineEdit, QStyle, QWidget, QMessageBox, QToolBox, QVBoxLayout, QWhatsThis
+from qdarkstyle import DarkPalette
 
 os.environ['CLEARMAP_GUI_HOSTED'] = "1"
 # ########################################### SPLASH SCREEN ###########################################################
 from ClearMap.gui.dialogs import make_splash, update_pbar
 
 # To show splash before slow imports
-ICONS_FOLDER = 'ClearMap/gui/icons/'   # REFACTOR: use qrc
+ICONS_FOLDER = 'ClearMap/gui/creator/icons/'   # REFACTOR: use qrc
 
 app = QApplication([])
+palette = app.palette()  # WARNING: necessary because QWhatsThis does not follow stylesheets
+palette.setColor(QPalette.ColorRole.ToolTipBase, QColor(DarkPalette.COLOR_BACKGROUND_2))
+palette.setColor(QPalette.ColorRole.ToolTipText, QColor(DarkPalette.COLOR_TEXT_2))
+app.setPalette(palette)
 
 
 from ClearMap.gui.gui_utils import get_current_res, UI_FOLDER
@@ -65,7 +71,8 @@ update_pbar(app, progress_bar, 40)
 from ClearMap.gui.pyuic_utils import loadUiType
 from ClearMap.gui.dialogs import get_directory_dlg, warning_popup, make_progress_dialog, make_nested_progress_dialog, DISPLAY_CONFIG
 from ClearMap.gui.gui_utils import html_to_ansi, html_to_plain_text, compute_grid
-from ClearMap.gui.style import QDARKSTYLE_BACKGROUND, DARK_BACKGROUND, PLOT_3D_BG, BTN_STYLE_SHEET
+from ClearMap.gui.style import QDARKSTYLE_BACKGROUND, DARK_BACKGROUND, PLOT_3D_BG, BTN_STYLE_SHEET, \
+    VERY_LIGHT_BACKGROUND, TOOLTIP_STYLE_SHEET
 
 from ClearMap.gui.widgets import OrthoViewer, PbarWatcher, setup_mini_brain  # needs plot_3d
 update_pbar(app, progress_bar, 60)
@@ -95,7 +102,8 @@ Auto modes:
     - Batch run
 """
 
-Ui_ClearMapGui, _ = loadUiType(os.path.join(UI_FOLDER, 'creator', 'mainwindow.ui'), patch_parent_class=False)
+Ui_ClearMapGui, _ = loadUiType(os.path.join(UI_FOLDER, 'creator', 'mainwindow.ui'), from_imports=True,
+                               import_from='ClearMap.gui.creator', patch_parent_class=False)
 
 
 class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
@@ -155,7 +163,7 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
             try:
                 font.setPointSize(font_swap[widget.property('font_size_name')])
             except KeyError:
-                print('Skipping widget {}'.format(widget.objectName()))
+                print(f'Skipping widget {widget.objectName()}')
             widget.setFont(font)
 
     def set_font(self):
@@ -164,7 +172,7 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
             try:
                 font.setFamily(self.preference_editor.params.font_family)  # FIXME: part of child class
             except KeyError:
-                print('Skipping widget {}'.format(widget.objectName()))
+                print(f'Skipping widget {widget.objectName()}')
             widget.setFont(font)
 
     def fix_sizes(self):
@@ -177,6 +185,12 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         self.fix_btns_stylesheet()
         self.fix_widgets_backgrounds()
         self.fix_sizes()
+        self.fix_tootips_stylesheet()
+
+    def fix_tootips_stylesheet(self):
+        for widg in self.findChildren(QWidget):
+            if hasattr(widg, 'toolTip') and widg.toolTip():
+                widg.setStyleSheet(TOOLTIP_STYLE_SHEET)
 
     def __get_font_sizes(self):
         point_sizes = set()
@@ -190,8 +204,8 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
 
     def fix_widgets_backgrounds(self):
         for widget_type in (QSpinBox, QDoubleSpinBox, QComboBox, QLineEdit):
-            for btn in self.findChildren(widget_type):
-                btn.setStyleSheet('background-color: {}; '.format(DARK_BACKGROUND))
+            for widget in self.findChildren(widget_type):
+                widget.setStyleSheet(f'background-color: {DARK_BACKGROUND}; ')
 
     def popup(self, msg, base_msg='Missing configuration file'):
         self.print_warning_msg(html_to_plain_text(msg))
@@ -273,7 +287,7 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
                     bx.text = types.MethodType(get_text, bx)
                     bx.textChangedConnect = types.MethodType(connect_text_changed, bx)
                 else:
-                    print('Skipping box "{}", type not recognised'.format(bx_name))
+                    print(f'Skipping box "{bx_name}", type not recognised')
 
     def patch_button_boxes(self, parent=None):
         if parent is None:
@@ -424,6 +438,8 @@ class ClearMapGui(ClearMapGuiBase):
 
         self.graphLayout.removeWidget(self.frame)
 
+        self.action_what_s_this.triggered.connect(QWhatsThis.enterWhatsThisMode)
+
         self.print_status_msg('Idle, waiting for input')
 
     def setup_tabs(self):
@@ -492,7 +508,7 @@ class ClearMapGui(ClearMapGuiBase):
 
     def conf_load_error_msg(self, conf_name):
         conf_name = conf_name.replace('_', ' ').title()
-        self.print_error_msg('Loading {} config file failed'.format(conf_name))
+        self.print_error_msg(f'Loading {conf_name} config file failed')
 
     def assert_src_folder_set(self):
         if not self.src_folder:
@@ -552,8 +568,8 @@ class ClearMapGui(ClearMapGuiBase):
                     tab.set_params(self.sample_tab_mgr.params, self.alignment_tab_mgr.params)
                     tab.setup_preproc(self.alignment_tab_mgr.preprocessor)
                 else:
-                    raise ValueError('Processing type should be one of "pre", "post", "batch" or None, got "{}"'
-                                     .format(tab.processing_type))
+                    raise ValueError(f'Processing type should be one of "pre", "post", "batch" or None,'
+                                     f' got "{tab.processing_type}"')
                 tab.params.get_config(cfg_path)
                 if was_copied:
                     tab.params.fix_cfg_file(cfg_path)  # FIXME: see if this should be moved
