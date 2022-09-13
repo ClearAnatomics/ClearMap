@@ -242,7 +242,7 @@ class Annotation(object):
         self.acronyms = self.get_list('acronym')
 
     def initialize_tree(self, root, parent=None, level=0):
-        label = Label({key: root[key] for key in root.keys() if key not in ["children"]}, parent=parent, level=level)
+        label = Label({k: v for k, v in root.items() if k != "children"}, parent=parent, level=level)
         label.children = [self.initialize_tree(c, parent=label, level=level + 1) for c in root['children']]
         return label
 
