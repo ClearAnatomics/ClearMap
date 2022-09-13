@@ -335,7 +335,7 @@ class AlignmentTab(GenericTab):
         self.preprocessor.setup((self.main_window.preference_editor.params.config,
                                  self.sample_params.config, self.params.config),
                                 convert_tiles=False)
-        has_tiles = len(clearmap_io.file_list(self.preprocessor.workspace.filename('raw')))
+        has_tiles = len(clearmap_io.file_list(self.preprocessor.filename('raw')))
         if has_tiles and prompt_dialog('Tile conversion', 'Convert individual tiles to npy for efficiency'):
             self.main_window.make_progress_dialog('Converting tiles', maximum=0,
                                                   canceled_callback=self.preprocessor.stop_process)
@@ -389,14 +389,14 @@ class AlignmentTab(GenericTab):
 
     def plot_stitching_results(self):
         self.params.stitching_general.ui_to_cfg()
-        if not self.step_exists('stitching', (self.preprocessor.workspace.filename('stitched'))):  # TODO: add arteries option
+        if not self.step_exists('stitching', (self.preprocessor.filename('stitched'))):  # TODO: add arteries option
             return
         dvs = self.preprocessor.plot_stitching_results(parent=self.main_window.centralwidget)
         self.main_window.setup_plots(dvs)
 
     def convert_output(self):
         fmt = self.params.stitching_general.conversion_fmt
-        if not self.step_exists('stitching', (self.preprocessor.workspace.filename('stitched'))):  # TODO: add arteries option
+        if not self.step_exists('stitching', (self.preprocessor.filename('stitched'))):  # TODO: add arteries option
             return
         self.main_window.print_status_msg(f'Converting stitched image to {fmt}')
         self.main_window.make_progress_dialog('Converting files', canceled_callback=self.preprocessor.stop_process)
@@ -412,13 +412,13 @@ class AlignmentTab(GenericTab):
         self.preprocessor.setup_atlases()
 
     def display_auto_to_ref_landmarks_dialog(self):
-        images = [self.preprocessor.workspace.filename('resampled', postfix='autofluorescence'),
+        images = [self.preprocessor.filename('resampled', postfix='autofluorescence'),
                   self.preprocessor.reference_file_path]
         self.__display_landmarks_dialog(images, 'auto_to_reference')
 
     def display_resampled_to_auto_landmarks_dialog(self):
-        images = [self.preprocessor.workspace.filename('resampled', postfix='autofluorescence'),
-                  self.preprocessor.workspace.filename('resampled')]
+        images = [self.preprocessor.filename('resampled', postfix='autofluorescence'),
+                  self.preprocessor.filename('resampled')]
         self.__display_landmarks_dialog(images, 'resampled_to_auto')
 
     def __display_landmarks_dialog(self, images, direction):
@@ -486,11 +486,11 @@ class AlignmentTab(GenericTab):
 
     def plot_registration_results(self):
         if not self.step_exists('registration',
-                                (self.preprocessor.workspace.filename('resampled', postfix='autofluorescence'),
+                                (self.preprocessor.filename('resampled', postfix='autofluorescence'),
                                  self.preprocessor.aligned_autofluo_path)):
             return
         image_sources = [
-            self.preprocessor.workspace.filename('resampled', postfix='autofluorescence'),
+            self.preprocessor.filename('resampled', postfix='autofluorescence'),
             mhd_read(self.preprocessor.aligned_autofluo_path)
         ]
         titles = [os.path.basename(img) for img in image_sources]
@@ -556,7 +556,7 @@ class CellCounterTab(PostProcessingTab):
 
     def voxelize(self):
         self.params.ui_to_cfg()
-        if os.path.exists(self.preprocessor.workspace.filename('cells', postfix='filtered')):
+        if os.path.exists(self.preprocessor.filename('cells', postfix='filtered')):
             self.cell_detector.voxelize()
         else:
             self.main_window.popup('Could not run voxelization, missing filtered cells table. '
@@ -611,9 +611,9 @@ class CellCounterTab(PostProcessingTab):
     #     self.cell_detector.detected = False
 
     def plot_detection_results(self):
-        if not self.step_exists('cell detection', [self.preprocessor.workspace.filename('stitched'),
-                                                   self.preprocessor.workspace.filename('cells', postfix='bkg'),
-                                                   self.preprocessor.workspace.filename('cells', postfix='shape')]):
+        if not self.step_exists('cell detection', [self.preprocessor.filename('stitched'),
+                                                   self.preprocessor.filename('cells', postfix='bkg'),
+                                                   self.preprocessor.filename('cells', postfix='shape')]):
             return
         dvs = self.cell_detector.preview_cell_detection(parent=self.main_window.centralWidget(),
                                                         arange=False, sync=True)  # TODO: add close
@@ -625,8 +625,8 @@ class CellCounterTab(PostProcessingTab):
         self.main_window.setup_plots(dvs)
 
     def plot_cell_filter_results(self):
-        if not self.step_exists('cell filtering', [self.preprocessor.workspace.filename('stitched'),
-                                                   self.workspace.filename('cells', postfix='filtered')]):
+        if not self.step_exists('cell filtering', [self.preprocessor.filename('stitched'),
+                                                   self.preprocessor.filename('cells', postfix='filtered')]):
             return
         dvs = self.cell_detector.plot_filtered_cells(smarties=True)
         self.main_window.setup_plots(dvs)
@@ -635,7 +635,7 @@ class CellCounterTab(PostProcessingTab):
         if self.preprocessor.was_registered:
             requirement_paths = [self.preprocessor.reference_file_path]
         else:
-            requirement_paths = [self.preprocessor.workspace.filename('resampled')]
+            requirement_paths = [self.preprocessor.filename('resampled')]
         requirement_paths.append(self.cell_detector.df_path)
         if not self.step_exists('cell count', requirement_paths):
             return
@@ -643,14 +643,14 @@ class CellCounterTab(PostProcessingTab):
         self.main_window.setup_plots(dvs)
 
     def plot_cells_scatter_w_atlas_colors_raw(self):
-        if not self.step_exists('cell count', [self.preprocessor.workspace.filename('stitched'),
+        if not self.step_exists('cell count', [self.preprocessor.filename('stitched'),
                                                self.cell_detector.df_path]):
             return
         dvs = self.cell_detector.plot_cells_3d_scatter_w_atlas_colors(raw=True, parent=self.main_window)
         self.main_window.setup_plots(dvs)
 
     def __filter_cells(self):
-        debug_raw_cells_path = self.cell_detector.workspace.filename('cells', postfix='raw')
+        debug_raw_cells_path = self.preprocessor.filename('cells', postfix='raw')
         if os.path.exists(debug_raw_cells_path):
             self.cell_detector.filter_cells()
             self.cell_detector.voxelize('filtered')
@@ -679,7 +679,7 @@ class CellCounterTab(PostProcessingTab):
         # WARNING: some plots in .post_process_cells() without UI params
 
     def plot_cell_map_results(self):
-        if not self.step_exists('voxelization', [self.preprocessor.workspace.filename('density', postfix='counts')]):
+        if not self.step_exists('voxelization', [self.preprocessor.filename('density', postfix='counts')]):
             return
         dvs = self.cell_detector.plot_voxelized_counts(arange=False)
         self.main_window.setup_plots(dvs)
@@ -766,8 +766,8 @@ class VasculatureTab(PostProcessingTab):
         self.main_window.signal_process_finished('Vessels binarized')
 
     def plot_binarization_results(self):
-        if not self.step_exists('binarization', [self.preprocessor.workspace.filename('stitched'),
-                                                 self.preprocessor.workspace.filename('binary')]):
+        if not self.step_exists('binarization', [self.preprocessor.filename('stitched'),
+                                                 self.preprocessor.filename('binary')]):
             return
         dvs = self.binary_vessel_processor.plot_binarization_result(parent=self.main_window)
         link_dataviewers_cursors(dvs, RedCross)
