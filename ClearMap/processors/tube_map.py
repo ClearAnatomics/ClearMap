@@ -593,17 +593,21 @@ class VesselGraphProcessor(TabProcessor):
         return permissive_veins
 
     # TRACING
-    def _trace_arteries(self, max_tracing_iterations=5):
+    def _trace_arteries(self, veins, max_tracing_iterations=5):
         """
         Trace arteries by hysteresis thresholding
         Keeps small arteries that are too weakly immuno-positive but still too big to be capillaries
         stop at surface, vein or low artery expression
+
+        Parameters
+        ----------
+        veins
         """
         artery = self.annotated_graph.edge_property('artery')
         condition_args = {
             'distance_to_surface': self.annotated_graph.edge_property('distance_to_surface'),
             'distance_threshold': 15,
-            'vein': self.annotated_graph.edge_property('vein'),
+            'vein': veins,
             'radii': self.annotated_graph.edge_property('radii'),
             'artery_trace_radius': 4,  # FIXME: param
             'artery_intensity': self.annotated_graph.edge_property('artery_raw'),
@@ -665,19 +669,28 @@ class VesselGraphProcessor(TabProcessor):
         self.annotated_graph.define_edge_property(vessel_name, vessel)
 
     def post_process(self):  # FIXME: progress
+        """
+        Iteratively refine arteries and veins based on one another
+
+        Returns
+        -------
+
+        """
         if not self.processing_config['binarization']['binarization']['arteries']['skip']:
             cfg = self.processing_config['vessel_type_postprocessing']
+            # Definitely a vein because too big
             restrictive_veins = self._pre_filter_veins(cfg['pre_filtering']['vein_intensity_range_on_arteries_ch'],
                                                        min_vein_radius=cfg['pre_filtering']['restrictive_vein_radius'])
 
             artery = self._pre_filter_arteries(restrictive_veins, min_size=cfg['pre_filtering']['arteries_min_radius'])
             self.annotated_graph.define_edge_property('artery', artery)
 
-            vein = self._post_filter_veins(restrictive_veins, min_vein_radius=cfg['pre_filtering']['permissive_vein_radius'])
-            self.annotated_graph.define_edge_property('vein', vein)
+            # Not huge vein but not an artery so still a vein (with temporary radius for artery tracing)
+            tmp_veins = self._post_filter_veins(restrictive_veins,
+                                                min_vein_radius=cfg['pre_filtering']['permissive_vein_radius'])
+            self._trace_arteries(tmp_veins, max_tracing_iterations=cfg['tracing']['max_arteries_iterations'])
 
-            self._trace_arteries(max_tracing_iterations=cfg['tracing']['max_arteries_iterations'])
-
+            # The real vein size filtering
             vein = self._post_filter_veins(restrictive_veins, min_vein_radius=cfg['pre_filtering']['final_vein_radius'])
             self.annotated_graph.define_edge_property('vein', vein)
 
