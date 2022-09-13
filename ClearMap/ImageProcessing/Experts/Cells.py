@@ -183,11 +183,11 @@ def detect_cells(source, sink=None, cell_detection_parameter=default_cell_detect
     Background removal step parameter.
 
     shape : tuple
-      The shape of the structure lement to estimate the background.
+      The shape of the structure element to estimate the background.
       This should be larger than the typical cell size.
     
     form : str
-      The form of the structur element (e.g. 'Disk')
+      The form of the structure element (e.g. 'Disk')
         
     save : str or None
       Save the result of this step to the specified file if not None.
