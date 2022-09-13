@@ -25,7 +25,7 @@ import functools as ft
 import numpy as np
 
 import pyqtgraph as pg
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import QEvent
 
 from ClearMap.Utils.utilities import runs_on_spyder
 from ClearMap.IO.IO import as_source
@@ -286,6 +286,8 @@ class DataViewer(pg.QtGui.QWidget):
         self.slicePlot.addItem(self.sliceLine)
         self.slicePlot.hideAxis('left')
 
+        self.slicePlot.installEventFilter(self)
+
         self.updateSlicer()
 
         self.sliceLine.sigPositionChanged.connect(self.updateSlice)
@@ -331,6 +333,14 @@ class DataViewer(pg.QtGui.QWidget):
             self.setMinMax(minMax)
 
         self.show()
+
+    def eventFilter(self, source, event):
+        if event.type() == QEvent.Wheel:
+            angle = event.angleDelta().y()
+            # steps = angle / abs(angle)
+            steps = angle / 120
+            self.sliceLine.setValue(self.sliceLine.value() + steps)
+        return super().eventFilter(source, event)
 
     def __get_colors(self, default_lut):
         if self.n_sources == 1:
