@@ -204,7 +204,7 @@ class DataViewer(pg.QtGui.QWidget):
         self.scatter = None
         self.scatter_coords = None
         self.atlas = None
-        self.acronyms = None
+        self.structure_names = None
 
         self.z_cursor_width = 5
 
@@ -533,7 +533,8 @@ class DataViewer(pg.QtGui.QWidget):
             vals = ", ".join([str(s[slc]) for s in self.sources])
         label = f"({x}, {y}, {z}) {{{x*xs:.2f}, {y*ys:.2f}, {z*zs:.2f}}} [{vals}]"
         if self.atlas is not None:
-            label += f' Region: {self.acronyms[self.atlas[slc]]}'
+            _id = self.atlas[slc]
+            label += f' Region: {self.structure_names[_id]} ({_id})'
         if self.parent() is None or not self.parent().objectName().lower().startswith('dataviewer'):
             label = f"<span style='font-size: 12pt; color: black'>{label}</span>"
         self.source_label.setText(label)
