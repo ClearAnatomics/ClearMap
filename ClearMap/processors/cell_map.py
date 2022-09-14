@@ -410,7 +410,7 @@ class CellDetector(TabProcessor):
         else:
             coordinates = df[['xt', 'yt', 'zt']].values.astype(np.int)  # required to match integer z
             dv.atlas = clearmap_io.read(self.preprocessor.annotation_file_path)
-            dv.acronyms = annotation.get_acronyms_map()
+            dv.structure_names = annotation.get_names_map()
         colors = df['color'].values * 255
         colors = np.array([QColor(*cols.astype(np.int)) for cols in colors])
         if 'hemisphere' in df.columns:
