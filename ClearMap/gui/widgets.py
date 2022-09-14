@@ -871,9 +871,9 @@ class LandmarksSelectorDialog(WizardDialog):  # TODO: bind qColorDialog to color
         self.coords.pop()
 
     def get_new_color(self):
-        color = get_pseudo_random_color()
+        color = QColor(*[c*255 for c in get_pseudo_random_color()])
         while color.name() in self.colors:
-            color = get_pseudo_random_color()
+            color = QColor(*[c*255 for c in get_pseudo_random_color()])
         return color.name()
 
 
