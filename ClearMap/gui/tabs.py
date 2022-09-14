@@ -463,6 +463,8 @@ class AlignmentTab(GenericTab):
             raise ValueError(f'Direction must be one of ("auto_to_reference", "resampled_to_auto"), got {direction}')
         markers = [mrkr for mrkr in self.landmark_selector.coords if all(mrkr)]
         for i, f_path in enumerate(landmarks_file_paths):
+            if not os.path.exists(os.path.dirname(f_path)):
+                os.mkdir(os.path.dirname(f_path))
             with open(f_path, 'w') as landmarks_file:
                 landmarks_file.write(f'point\n{len(markers)}\n')
                 for marker in markers:
