@@ -65,7 +65,7 @@ def make_progress_dialog(msg, maximum, canceled_callback, parent):
     dlg.setWindowTitle(msg)
     dlg.lbl = QLabel(msg, parent=dlg)
     # dlg.lbl.setText(msg)  # TODO: check why this doesn't work with pixmap
-    dlg.lbl.setPixmap(QPixmap(os.path.join(UI_FOLDER, 'creator', 'creator/graphics_resources', 'searching_mouse.png')))
+    dlg.lbl.setPixmap(QPixmap(os.path.join(UI_FOLDER, 'creator', 'graphics_resources', 'searching_mouse.png')))
     dlg.lbl.setAlignment(QtCore.Qt.AlignHCenter | QtCore.Qt.AlignVCenter)
     dlg.setLabel(dlg.lbl)
     if canceled_callback is not None:
@@ -82,7 +82,7 @@ def make_nested_progress_dialog(title='Processing', overall_maximum=100, sub_max
     dlg.setWindowTitle('Progress')
     dlg.setupUi()
     dlg.mainLabel.setText(title)
-    dlg.progressImageLabel.setPixmap(QPixmap(os.path.join(UI_FOLDER, 'creator', 'creator/graphics_resources', 'searching_mouse.png')))  # TODO: why doesn't work w/ qrc ??
+    dlg.progressImageLabel.setPixmap(QPixmap(os.path.join(UI_FOLDER, 'creator', 'graphics_resources', 'searching_mouse.png')))  # TODO: why doesn't work w/ qrc ??
     dlg.mainProgressBar.setRange(1, overall_maximum)
     dlg.mainProgressBar.setValue(1)  # Because we use integer steps
     dlg.subProgressLabel.setText(sub_process_name)
@@ -94,7 +94,7 @@ def make_nested_progress_dialog(title='Processing', overall_maximum=100, sub_max
     return dlg
 
 
-def make_splash(img_source=os.path.join(UI_FOLDER, 'creator', 'creator/graphics_resources', 'splash.png'), bar_max=100, res='hd'):
+def make_splash(img_source=os.path.join(UI_FOLDER, 'creator', 'graphics_resources', 'splash.png'), bar_max=100, res='hd'):
     splash_pix = QPixmap(img_source)  # .scaled(848, 480)
     splash = QSplashScreen(splash_pix, Qt.WindowStaysOnTopHint)
     splash.setMask(splash_pix.mask())
