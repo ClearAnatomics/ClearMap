@@ -33,7 +33,7 @@
         </font>
        </property>
        <property name="currentIndex">
-        <number>0</number>
+        <number>1</number>
        </property>
        <widget class="QWidget" name="page">
         <property name="geometry">
@@ -51,7 +51,7 @@
          <item>
           <widget class="QToolBox" name="toolBox_2">
            <property name="currentIndex">
-            <number>0</number>
+            <number>4</number>
            </property>
            <widget class="QWidget" name="page_3">
             <property name="geometry">
@@ -65,13 +65,26 @@
             <attribute name="label">
              <string>Rigid</string>
             </attribute>
-            <layout class="QFormLayout" name="formLayout">
+            <layout class="QGridLayout" name="gridLayout_2">
              <item row="0" column="0">
               <widget class="QCheckBox" name="skipRigidCheckbox">
                <property name="text">
                 <string>Skip</string>
                </property>
               </widget>
+             </item>
+             <item row="0" column="1" colspan="2">
+              <spacer name="verticalSpacer">
+               <property name="orientation">
+                <enum>Qt::Vertical</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>20</width>
+                 <height>40</height>
+                </size>
+               </property>
+              </spacer>
              </item>
              <item row="1" column="0">
               <widget class="QLabel" name="label">
@@ -164,19 +177,19 @@
               </widget>
              </item>
              <item row="3" column="0">
-              <widget class="QLabel" name="label_3">
+              <widget class="QLabel" name="rigidProjectionThicknessLbl">
                <property name="toolTip">
                 <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Number of planes to average to compute&lt;/p&gt;&lt;p&gt;the optimum overlap along X and Y dimensions&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                </property>
                <property name="whatsThis">
-                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;h1 style=&quot; margin-top:18px; margin-bottom:12px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;&lt;span style=&quot; font-size:xx-large; font-weight:700;&quot;&gt;Rigid stitcher&lt;/span&gt;&lt;/h1&gt;&lt;p&gt;The &lt;span style=&quot; font-weight:700; font-style:italic;&quot;&gt;projection thickness&lt;/span&gt; is the width (short dimension) of the &lt;span style=&quot; font-weight:700;&quot;&gt;white area&lt;/span&gt; in the image below.&lt;/p&gt;&lt;p&gt;&lt;img src=&quot;qrc:///graphics_resources/graphics_resources/wobbly_stitcher_rigid.jpg&quot;/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;h1 style=&quot; margin-top:18px; margin-bottom:12px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;&lt;span style=&quot; font-size:xx-large; font-weight:700;&quot;&gt;Rigid stitcher&lt;/span&gt;&lt;/h1&gt;&lt;p&gt;The &lt;span style=&quot; font-weight:700; font-style:italic;&quot;&gt;projection thickness&lt;/span&gt; is the width (short dimension) of the &lt;span style=&quot; font-weight:700;&quot;&gt;white area&lt;/span&gt; in the image below.&lt;/p&gt;&lt;p&gt;&lt;img src=&quot;:/ClearMap/gui/creator/graphics_resources/graphics_resources/wobbly_stitcher_rigid.jpg&quot;/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                </property>
                <property name="text">
                 <string>Projection thickness</string>
                </property>
               </widget>
              </item>
-             <item row="3" column="1">
+             <item row="3" column="1" rowspan="2">
               <widget class="QFrame" name="projectionThicknessDoublet">
                <property name="frameShape">
                 <enum>QFrame::StyledPanel</enum>
@@ -230,7 +243,7 @@
                </layout>
               </widget>
              </item>
-             <item row="4" column="0">
+             <item row="5" column="0">
               <widget class="QLabel" name="label_4">
                <property name="toolTip">
                 <string>Maximum number of pixels to shift in either direction along that axis to compute the alignment (correlograms).</string>
@@ -240,7 +253,7 @@
                </property>
               </widget>
              </item>
-             <item row="4" column="1">
+             <item row="5" column="1">
               <widget class="QFrame" name="rigidMaxShiftsXDoublet">
                <property name="frameShape">
                 <enum>QFrame::StyledPanel</enum>
@@ -278,7 +291,7 @@
                </layout>
               </widget>
              </item>
-             <item row="5" column="0">
+             <item row="6" column="0">
               <widget class="QLabel" name="label_5">
                <property name="toolTip">
                 <string>Maximum number of pixels to shift in either direction along that axis to compute the alignment (correlograms).</string>
@@ -288,7 +301,7 @@
                </property>
               </widget>
              </item>
-             <item row="5" column="1">
+             <item row="6" column="1">
               <widget class="QFrame" name="rigidMaxShiftsYDoublet">
                <property name="frameShape">
                 <enum>QFrame::StyledPanel</enum>
@@ -326,7 +339,7 @@
                </layout>
               </widget>
              </item>
-             <item row="6" column="0">
+             <item row="7" column="0">
               <widget class="QLabel" name="label_6">
                <property name="toolTip">
                 <string>Maximum number of pixels to shift in either direction along that axis to compute the alignment (correlograms).</string>
@@ -336,7 +349,7 @@
                </property>
               </widget>
              </item>
-             <item row="6" column="1">
+             <item row="7" column="1">
               <widget class="QFrame" name="rigidMaxShiftsZDoublet">
                <property name="frameShape">
                 <enum>QFrame::StyledPanel</enum>
@@ -374,7 +387,7 @@
                </layout>
               </widget>
              </item>
-             <item row="7" column="0">
+             <item row="8" column="0">
               <widget class="QLabel" name="label_7">
                <property name="toolTip">
                 <string>Ignore pixels below this value for stitching</string>
@@ -384,14 +397,14 @@
                </property>
               </widget>
              </item>
-             <item row="7" column="1">
+             <item row="8" column="1">
               <widget class="QSpinBox" name="rigidBackgroundLevel">
                <property name="maximum">
                 <number>65535</number>
                </property>
               </widget>
              </item>
-             <item row="8" column="0">
+             <item row="9" column="0">
               <widget class="QLabel" name="label_8">
                <property name="toolTip">
                 <string>Number of pixels that have to be above background to be considered</string>
@@ -401,25 +414,23 @@
                </property>
               </widget>
              </item>
-             <item row="8" column="1">
+             <item row="9" column="1">
               <widget class="QSpinBox" name="rigidBackgroundPixels">
                <property name="maximum">
                 <number>1000000</number>
                </property>
               </widget>
              </item>
-             <item row="0" column="1">
-              <spacer name="verticalSpacer">
-               <property name="orientation">
-                <enum>Qt::Vertical</enum>
+             <item row="3" column="2">
+              <widget class="QToolButton" name="rigidProjectionThicknessLblInfoToolButton">
+               <property name="text">
+                <string/>
                </property>
-               <property name="sizeHint" stdset="0">
-                <size>
-                 <width>20</width>
-                 <height>40</height>
-                </size>
+               <property name="icon">
+                <iconset resource="icons.qrc">
+                 <normaloff>:/icons/icons/info.svg</normaloff>:/icons/icons/info.svg</iconset>
                </property>
-              </spacer>
+              </widget>
              </item>
             </layout>
            </widget>
@@ -427,7 +438,7 @@
             <property name="geometry">
              <rect>
               <x>0</x>
-              <y>0</y>
+              <y>-62</y>
               <width>446</width>
               <height>334</height>
              </rect>
@@ -961,7 +972,7 @@
          <item>
           <widget class="QToolBox" name="toolBox_3">
            <property name="currentIndex">
-            <number>2</number>
+            <number>1</number>
            </property>
            <widget class="QWidget" name="atlasSettingsPage">
             <property name="geometry">
@@ -1196,6 +1207,9 @@
                  <property name="toolTip">
                   <string>Select matching pixels between autofluorescence raw channels</string>
                  </property>
+                 <property name="whatsThis">
+                  <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;When you click this button a new window will appear with a list of markers and colors.&lt;/p&gt;&lt;p&gt;Select a landmark in the left image and &lt;span style=&quot; font-weight:700;&quot;&gt;left click&lt;/span&gt; to put the marker in this location.&lt;/p&gt;&lt;p&gt;Select the matching voxel of the right image and &lt;span style=&quot; font-weight:700;&quot;&gt;left click&lt;/span&gt; to label it too.&lt;/p&gt;&lt;p&gt;Once done, click &lt;span style=&quot; font-weight:700;&quot;&gt;Add Marker&lt;/span&gt; and reapeat the operation for each pair of markers.&lt;/p&gt;&lt;p&gt;When all markers are selected, click &lt;span style=&quot; font-weight:700;&quot;&gt;OK&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                 </property>
                  <property name="text">
                   <string>Use resampled landmarks</string>
                  </property>
@@ -1206,8 +1220,27 @@
                  <property name="toolTip">
                   <string>Select matching pixels between autofluorescence and reference channels</string>
                  </property>
+                 <property name="whatsThis">
+                  <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;When you click this button a new window will appear with a list of markers and colors.&lt;/p&gt;&lt;p&gt;Select a landmark in the left image and &lt;span style=&quot; font-weight:700;&quot;&gt;left click&lt;/span&gt; to put the marker in this location.&lt;/p&gt;&lt;p&gt;Select the matching voxel of the right image and &lt;span style=&quot; font-weight:700;&quot;&gt;left click&lt;/span&gt; to label it too.&lt;/p&gt;&lt;p&gt;Once done, click &lt;span style=&quot; font-weight:700;&quot;&gt;Add Marker&lt;/span&gt; and reapeat the operation for each pair of markers.&lt;/p&gt;&lt;p&gt;When all markers are selected, click &lt;span style=&quot; font-weight:700;&quot;&gt;OK&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                 </property>
                  <property name="text">
                   <string>Use reference landmarks</string>
+                 </property>
+                </widget>
+               </item>
+               <item row="0" column="1">
+                <widget class="QToolButton" name="resampledLandmarksInfoToolButton">
+                 <property name="icon">
+                  <iconset resource="icons.qrc">
+                   <normaloff>:/icons/icons/info.svg</normaloff>:/icons/icons/info.svg</iconset>
+                 </property>
+                </widget>
+               </item>
+               <item row="1" column="1">
+                <widget class="QToolButton" name="referenceLandmarksInfoToolButton">
+                 <property name="icon">
+                  <iconset resource="icons.qrc">
+                   <normaloff>:/icons/icons/info.svg</normaloff>:/icons/icons/info.svg</iconset>
                  </property>
                 </widget>
                </item>
@@ -1280,7 +1313,9 @@
    </item>
   </layout>
  </widget>
- <resources/>
+ <resources>
+  <include location="icons.qrc"/>
+ </resources>
  <connections>
   <connection>
    <sender>checkBox_8</sender>
