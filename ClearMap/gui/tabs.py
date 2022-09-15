@@ -391,7 +391,7 @@ class AlignmentTab(GenericTab):
         self.params.stitching_general.ui_to_cfg()
         if not self.step_exists('stitching', (self.preprocessor.filename('stitched'))):  # TODO: add arteries option
             return
-        dvs = self.preprocessor.plot_stitching_results(parent=self.main_window.centralwidget)
+        dvs = self.preprocessor.plot_stitching_results(parent=self.main_window.centralWidget())
         self.main_window.setup_plots(dvs)
 
     def convert_output(self):
@@ -498,7 +498,7 @@ class AlignmentTab(GenericTab):
         titles = [os.path.basename(img) for img in image_sources]
         dvs = plot_3d.plot(image_sources, title=titles, arange=False, sync=True,
                            lut=self.main_window.preference_editor.params.lut,
-                           parent=self.main_window.centralWidget())  # TODO: why () to centralWidget required here only
+                           parent=self.main_window.centralWidget())
         link_dataviewers_cursors(dvs, RedCross)
         self.main_window.setup_plots(dvs, ['autofluo', 'aligned'])
 
@@ -552,10 +552,10 @@ class CellCounterTab(PostProcessingTab):
         self.ui.cellMapVoxelizeButtonBox.connectApply(self.voxelize)
 
         self.ui.runCellMapButtonBox.connectApply(self.run_cell_map)
-        self.ui.runCellMapPlotButtonBox.connectApply(self.plot_cell_map_results)
 
-        self.ui.runCellMapPlot3DScatterButtonBox.connectApply(self.plot_cells_scatter_w_atlas_colors)
-        self.ui.runCellMapPlot3DScatterButtonBox.connectOk(self.plot_cells_scatter_w_atlas_colors_raw)  # REFACTOR: find less hacky way than apply & OK
+        self.ui.cellMapPlotVoxelizationPushButton.clicked.connect(self.plot_cell_map_results)
+        self.ui.cellMap3dScatterOnRefPushButton.clicked.connect(self.plot_cells_scatter_w_atlas_colors)
+        self.ui.cellMap3dScatterOnStitchedPushButton.clicked.connect(self.plot_cells_scatter_w_atlas_colors_raw)
 
     def voxelize(self):
         self.params.ui_to_cfg()
@@ -726,9 +726,11 @@ class VasculatureTab(PostProcessingTab):
 
         self.ui.binarizationButtonBox.connectApply(self.binarize_vessels)
         self.ui.plotBinarizationButtonBox.connectApply(self.plot_binarization_results)
+
         self.ui.fillVesselsButtonBox.connectApply(self.fill_vessels)
         self.ui.plotFillVesselsButtonBox.connectApply(self.plot_vessel_filling_results)
         self.ui.plotFillVesselsButtonBox.connectClose(self.main_window.remove_old_plots)
+
         self.ui.binarizationCombineRunButton.connectApply(self.combine)
         self.ui.binarizationCombinePlotButton.connectApply(self.plot_combined)
         self.ui.binarizationCombinePlotButton.connectClose(self.main_window.remove_old_plots)
@@ -743,9 +745,14 @@ class VasculatureTab(PostProcessingTab):
         self.ui.graphConstructionPlotGraphButtonBox.connectClose(self.main_window.remove_old_plots)
 
         self.ui.postProcessVesselTypesButtonBox.connectApply(self.post_process_graph)
+
         self.ui.postProcessVesselTypesSlicerButtonBox.connectOpen(self.plot_graph_type_processing_chunk_slicer)
         self.ui.postProcessVesselTypesPlotButtonBox.connectApply(self.display_annotated_graph_chunk)
         self.ui.postProcessVesselTypesPlotButtonBox.connectClose(self.main_window.remove_old_plots)
+
+        self.ui.voxelizeGraphPushButton.clicked.connect(self.voxelize)
+        self.ui.plotGraphVoxelizationPushButton.clicked.connect(self.plot_voxelization)
+
 
     def set_progress_watcher(self, watcher):
         if self.binary_vessel_processor is not None and self.binary_vessel_processor.preprocessor is not None:
@@ -848,6 +855,15 @@ class VasculatureTab(PostProcessingTab):
                                                      abort_callback=self.vessel_graph_processor.stop_process)
         self.main_window.wrap_in_thread(self.vessel_graph_processor.post_process)
         self.main_window.signal_process_finished('Vasculature graph post-processing DONE')
+
+    def voxelize(self):
+        self.params.ui_to_cfg()
+        self.main_window.print_status_msg('Running voxelization')
+        self.main_window.wrap_in_thread(self.vessel_graph_processor.voxelize)
+        self.main_window.signal_process_finished()
+
+    def plot_voxelization(self):
+        self.vessel_graph_processor.plot_voxelization(self.main_window.centralWidget())
 
 ################################################################################################
 
