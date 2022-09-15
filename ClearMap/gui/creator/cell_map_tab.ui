@@ -33,7 +33,7 @@
         </font>
        </property>
        <property name="currentIndex">
-        <number>2</number>
+        <number>3</number>
        </property>
        <widget class="QWidget" name="page">
         <property name="geometry">
@@ -51,7 +51,7 @@
          <item>
           <widget class="QToolBox" name="toolBox_2">
            <property name="currentIndex">
-            <number>0</number>
+            <number>1</number>
            </property>
            <widget class="QWidget" name="page_3">
             <property name="geometry">
@@ -127,7 +127,7 @@
             <property name="geometry">
              <rect>
               <x>0</x>
-              <y>0</y>
+              <y>-79</y>
               <width>469</width>
               <height>293</height>
              </rect>
@@ -594,8 +594,8 @@
         <attribute name="label">
          <string>Run</string>
         </attribute>
-        <layout class="QVBoxLayout" name="verticalLayout_7">
-         <item>
+        <layout class="QGridLayout" name="gridLayout">
+         <item row="0" column="0">
           <widget class="QDialogButtonBox" name="runCellMapButtonBox">
            <property name="standardButtons">
             <set>QDialogButtonBox::Apply</set>
@@ -605,86 +605,89 @@
            </property>
           </widget>
          </item>
-         <item>
-          <layout class="QFormLayout" name="formLayout_7">
-           <item row="3" column="0">
-            <widget class="QLabel" name="label_17">
-             <property name="toolTip">
-              <string/>
-             </property>
-             <property name="text">
-              <string>N cells</string>
-             </property>
-            </widget>
-           </item>
-           <item row="4" column="0">
-            <widget class="QLabel" name="label_18">
-             <property name="text">
-              <string>After filter</string>
-             </property>
-            </widget>
-           </item>
-           <item row="4" column="1">
-            <widget class="QLabel" name="nDetectedCellsAfterFilterLabel">
-             <property name="font">
-              <font>
-               <pointsize>22</pointsize>
-               <bold>true</bold>
-              </font>
-             </property>
-             <property name="text">
-              <string>0</string>
-             </property>
-             <property name="alignment">
-              <set>Qt::AlignCenter</set>
-             </property>
-            </widget>
-           </item>
-           <item row="3" column="1">
-            <widget class="QLabel" name="nDetectedCellsLabel">
-             <property name="font">
-              <font>
-               <pointsize>22</pointsize>
-               <bold>true</bold>
-              </font>
-             </property>
-             <property name="text">
-              <string>0</string>
-             </property>
-             <property name="alignment">
-              <set>Qt::AlignCenter</set>
-             </property>
-            </widget>
-           </item>
-           <item row="2" column="0">
-            <widget class="QCheckBox" name="runCellMapPlotCheckBox">
-             <property name="text">
-              <string>Plot when finished</string>
-             </property>
-            </widget>
-           </item>
-          </layout>
-         </item>
-         <item>
-          <widget class="QDialogButtonBox" name="runCellMapPlotButtonBox">
-           <property name="standardButtons">
-            <set>QDialogButtonBox::Apply</set>
-           </property>
-           <property name="applyText" stdset="0">
-            <string>Plot</string>
+         <item row="1" column="0" colspan="2">
+          <widget class="QCheckBox" name="runCellMapPlotCheckBox">
+           <property name="text">
+            <string>Plot when finished</string>
            </property>
           </widget>
          </item>
-         <item>
-          <widget class="QDialogButtonBox" name="runCellMapPlot3DScatterButtonBox">
-           <property name="standardButtons">
-            <set>QDialogButtonBox::Apply|QDialogButtonBox::Ok</set>
+         <item row="2" column="0">
+          <widget class="QLabel" name="label_17">
+           <property name="toolTip">
+            <string/>
            </property>
-           <property name="applyText" stdset="0">
-            <string>Plot 3D Scatter</string>
+           <property name="text">
+            <string>N cells</string>
            </property>
-           <property name="okText" stdset="0">
-            <string>Plot raw 3D Scatter</string>
+          </widget>
+         </item>
+         <item row="2" column="2">
+          <widget class="QLabel" name="nDetectedCellsLabel">
+           <property name="font">
+            <font>
+             <pointsize>22</pointsize>
+             <bold>true</bold>
+            </font>
+           </property>
+           <property name="text">
+            <string>0</string>
+           </property>
+           <property name="alignment">
+            <set>Qt::AlignCenter</set>
+           </property>
+          </widget>
+         </item>
+         <item row="3" column="0">
+          <widget class="QLabel" name="label_18">
+           <property name="text">
+            <string>After filter</string>
+           </property>
+          </widget>
+         </item>
+         <item row="3" column="2">
+          <widget class="QLabel" name="nDetectedCellsAfterFilterLabel">
+           <property name="font">
+            <font>
+             <pointsize>22</pointsize>
+             <bold>true</bold>
+            </font>
+           </property>
+           <property name="text">
+            <string>0</string>
+           </property>
+           <property name="alignment">
+            <set>Qt::AlignCenter</set>
+           </property>
+          </widget>
+         </item>
+         <item row="4" column="0">
+          <widget class="QPushButton" name="cellMapPlotVoxelizationPushButton">
+           <property name="toolTip">
+            <string>Display the results of the voxelization</string>
+           </property>
+           <property name="text">
+            <string>Plot voxelization</string>
+           </property>
+          </widget>
+         </item>
+         <item row="4" column="1" colspan="2">
+          <widget class="QPushButton" name="cellMap3dScatterOnRefPushButton">
+           <property name="toolTip">
+            <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Display a scatter of the cell coordinates &lt;/p&gt;&lt;p&gt;on top of the atlas reference (atlas coordinates)&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+           </property>
+           <property name="text">
+            <string> 3D scatter on reference</string>
+           </property>
+          </widget>
+         </item>
+         <item row="4" column="3">
+          <widget class="QPushButton" name="cellMap3dScatterOnStitchedPushButton">
+           <property name="toolTip">
+            <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Display a scatter of the cell coordinates&lt;/p&gt;&lt;p&gt;on top of the stitched image (sample coordinates)&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+           </property>
+           <property name="text">
+            <string>3D scatter on stitched</string>
            </property>
           </widget>
          </item>
