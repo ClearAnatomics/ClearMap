@@ -346,6 +346,8 @@ class AlignmentTab(GenericTab):
     def setup(self):
         self.init_ui()
 
+        self.connect_whats_this(self.ui.rigidProjectionThicknessLblInfoToolButton, self.ui.rigidProjectionThicknessLbl)
+
         self.ui.runStitchingButtonBox.connectApply(self.run_stitching)
         self.ui.displayStitchingButtonBox.connectApply(self.plot_stitching_results)
         self.ui.displayStitchingButtonBox.connectClose(self.main_window.remove_old_plots)
@@ -359,6 +361,8 @@ class AlignmentTab(GenericTab):
         self.ui.advancedCheckBox.stateChanged.connect(self.swap_tab_advanced)
         self.ui.useAutoToRefLandmarksPushButton.clicked.connect(self.display_auto_to_ref_landmarks_dialog)
         self.ui.useResampledToAutoLandmarksPushButton.clicked.connect(self.display_resampled_to_auto_landmarks_dialog)
+        self.connect_whats_this(self.ui.resampledLandmarksInfoToolButton, self.ui.useResampledToAutoLandmarksPushButton)
+        self.connect_whats_this(self.ui.referenceLandmarksInfoToolButton, self.ui.useAutoToRefLandmarksPushButton)
 
     def set_progress_watcher(self, watcher):
         self.preprocessor.set_progress_watcher(watcher)
@@ -724,10 +728,15 @@ class VasculatureTab(PostProcessingTab):
     def setup(self):
         self.init_ui()
 
+        self.connect_whats_this(self.ui.binarizationRawClippingRangeInfoToolButton, self.ui.binarizationRawClippingRangeLbl)
+        self.connect_whats_this(self.ui.binarizationRawThresholdInfoToolButton, self.ui.binarizationRawThresholdLbl)
+        self.connect_whats_this(self.ui.binarizationArteriesClippingRangeInfoToolButton, self.ui.binarizationArteriesClippingRangeLbl)
+        self.connect_whats_this(self.ui.binarizationArteriesThresholdInfoToolButton, self.ui.binarizationArteriesThresholdLbl)
         self.ui.binarizationButtonBox.connectApply(self.binarize_vessels)
         self.ui.plotBinarizationButtonBox.connectApply(self.plot_binarization_results)
 
         self.ui.fillVesselsButtonBox.connectApply(self.fill_vessels)
+        self.connect_whats_this(self.ui.fillVesselsButtonBoxInfoToolButton, self.ui.fillVesselsButtonBox)
         self.ui.plotFillVesselsButtonBox.connectApply(self.plot_vessel_filling_results)
         self.ui.plotFillVesselsButtonBox.connectClose(self.main_window.remove_old_plots)
 
@@ -736,17 +745,29 @@ class VasculatureTab(PostProcessingTab):
         self.ui.binarizationCombinePlotButton.connectClose(self.main_window.remove_old_plots)
 
         self.ui.buildGraphButtonBox.connectApply(self.build_graph)
+        self.connect_whats_this(self.ui.buildGraphButtonBoxInfoToolButton, self.ui.buildGraphButtonBox)
 
         self.ui.graphConstructionSlicerButtonBox.connectOpen(self.plot_graph_construction_chunk_slicer)
+        self.connect_whats_this(self.ui.buildGraphSlicerGroupBoxInfoToolButton, self.ui.buildGraphSlicerGroupBox)
         # self.display_cleaned_graph_chunk
         self.ui.graphConstructionPlotGraphButtonBox.connectApply(self.display_reduced_graph_chunk)
         # TODO: clean use other buttons
         self.ui.graphConstructionPlotGraphButtonBox.connectOk(self.display_annotated_graph_chunk)
         self.ui.graphConstructionPlotGraphButtonBox.connectClose(self.main_window.remove_old_plots)
 
+        self.connect_whats_this(self.ui.maxArteriesTracingIterationsInfoToolButton, self.ui.maxArteriesTracingIterationsLbl)
+        self.connect_whats_this(self.ui.minArterySizeInfoToolButton, self.ui.minArterySizeLbl)
+        self.connect_whats_this(self.ui.veinIntensityRangeOnArteriesChannelInfoToolButton, self.ui.veinIntensityRangeOnArteriesChannelLbl)
+        self.connect_whats_this(self.ui.restrictiveMinVeinRadiusInfoToolButton, self.ui.restrictiveMinVeinRadiusLbl)
+        self.connect_whats_this(self.ui.permissiveMinVeinRadiusInfoToolButton, self.ui.permissiveMinVeinRadiusLbl)
+        self.connect_whats_this(self.ui.finalMinVeinRadiusInfoToolButton, self.ui.finalMinVeinRadiusLbl)
+        self.connect_whats_this(self.ui.maxVeinsTracingIterationsInfoToolButton, self.ui.maxVeinsTracingIterationsLbl)
+        self.connect_whats_this(self.ui.minVeinSizeInfoToolButton, self.ui.minVeinSizeLbl)
         self.ui.postProcessVesselTypesButtonBox.connectApply(self.post_process_graph)
 
         self.ui.postProcessVesselTypesSlicerButtonBox.connectOpen(self.plot_graph_type_processing_chunk_slicer)
+        self.connect_whats_this(self.ui.postProcessVesselTypesSlicerInfoToolButton,
+                                self.ui.postProcessVesselTypesSlicerGroupBox)
         self.ui.postProcessVesselTypesPlotButtonBox.connectApply(self.display_annotated_graph_chunk)
         self.ui.postProcessVesselTypesPlotButtonBox.connectClose(self.main_window.remove_old_plots)
 
