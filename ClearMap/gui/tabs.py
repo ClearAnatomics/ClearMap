@@ -913,6 +913,7 @@ class BatchTab(GenericTab):
         self.init_ui()
 
         self.ui.folderPickerHelperPushButton.clicked.connect(self.create_wizard)
+        self.connect_whats_this(self.ui.folderPickerHelperInfoToolButton, self.ui.folderPickerHelperPushButton)
         self.ui.runPValsButtonBox.connectApply(self.run_p_vals)
         self.ui.batchRunButtonBox.connectApply(self.run_batch_process)
         self.ui.batchStatsButtonBox.connectApply(self.make_group_stats_tables)

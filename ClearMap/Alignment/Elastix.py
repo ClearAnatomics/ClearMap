@@ -550,12 +550,14 @@ def align(fixed_image, moving_image, affine_parameter_file, bspline_parameter_fi
 
   try:
     with subprocess.Popen(cmd, stdout=sys.stdout, stderr=sys.stdout) as proc:
-      workspace.process = proc
+      if workspace is not None:
+        workspace.process = proc
   except subprocess.SubprocessError as err:
     print('Align: failed executing: ' + ' '.join(cmd))
     raise err
   finally:
-    workspace.process = None
+    if workspace is not None:
+      workspace.process = None
   
   return result_directory
 
