@@ -63,6 +63,7 @@ def uncompress_atlases(atlas_base_name):
         paths.append(f_path)
     return paths
 
+
 atlas_base_name = 'ABA_25um'  # FIXME: change if different atlas
 """
 Default volumetric annotated image file.
@@ -708,7 +709,8 @@ def prepare_annotation_files(slicing=None, orientation=None, directory=None, pos
     distance_to_surface_file : str
         The distance cropped file.
     """
-    annotation_file = get_module_annotation_file(annotation_file)  # FIXME:
+    if annotation_file is None:
+        annotation_file = default_annotation_file
     if hemispheres_file is None:
         hemispheres_file = default_hemispheres_file
     if reference_file is None:
