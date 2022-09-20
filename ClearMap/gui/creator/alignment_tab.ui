@@ -972,15 +972,15 @@
          <item>
           <widget class="QToolBox" name="toolBox_3">
            <property name="currentIndex">
-            <number>2</number>
+            <number>0</number>
            </property>
            <widget class="QWidget" name="atlasSettingsPage">
             <property name="geometry">
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>325</width>
-              <height>270</height>
+              <width>460</width>
+              <height>332</height>
              </rect>
             </property>
             <attribute name="label">
@@ -999,9 +999,6 @@
              </item>
              <item row="0" column="1">
               <widget class="QComboBox" name="atlasIdComboBox">
-               <property name="enabled">
-                <bool>false</bool>
-               </property>
                <item>
                 <property name="text">
                  <string>ABA - adult mouse - 25µm</string>
@@ -1046,9 +1043,6 @@
              </item>
              <item row="1" column="1">
               <widget class="QFrame" name="atlasResolutionTriplet">
-               <property name="enabled">
-                <bool>false</bool>
-               </property>
                <property name="frameShape">
                 <enum>QFrame::StyledPanel</enum>
                </property>
