@@ -20,11 +20,12 @@ from shutil import copyfile
 import traceback
 import types
 
+import mpld3
 from PyQt5 import QtGui
 from PyQt5.QtGui import QPalette, QColor
 from PyQt5.QtWebEngineWidgets import QWebEngineView  # WARNING: import required before app creation
 from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QSpinBox, QDoubleSpinBox, QFrame, \
-    QDialogButtonBox, QComboBox, QLineEdit, QStyle, QWidget, QMessageBox, QToolBox, QVBoxLayout, QWhatsThis
+    QDialogButtonBox, QComboBox, QLineEdit, QStyle, QWidget, QMessageBox, QToolBox
 from qdarkstyle import DarkPalette
 
 os.environ['CLEARMAP_GUI_HOSTED'] = "1"
@@ -437,8 +438,6 @@ class ClearMapGui(ClearMapGuiBase):
         self.logoLabel.setPixmap(QtGui.QPixmap(os.path.join(ICONS_FOLDER, 'logo_cyber.png')))
 
         self.graphLayout.removeWidget(self.frame)
-
-        self.action_what_s_this.triggered.connect(QWhatsThis.enterWhatsThisMode)
 
         self.print_status_msg('Idle, waiting for input')
 
