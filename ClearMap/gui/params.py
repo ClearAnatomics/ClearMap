@@ -263,11 +263,11 @@ class SampleParameters(UiParameter):
 
     @property
     def use_id_as_prefix(self):
-        return self.ui.useIdAsPrefixCheckBox.isChecked()
+        return self.tab.useIdAsPrefixCheckBox.isChecked()
 
     @use_id_as_prefix.setter
     def use_id_as_prefix(self, value):
-        self.set_check_state(self.ui.useIdAsPrefixCheckBox, value)
+        self.set_check_state(self.tab.useIdAsPrefixCheckBox, value)
 
     def handle_use_id_as_prefix_changed(self, _):
         self._config['use_id_as_prefix'] = self.use_id_as_prefix
