@@ -3378,9 +3378,9 @@ def align_layout_rigid_mip(layout, depth = 10, max_shifts = 10, ranges = None, c
     with CancelableProcessPoolExecutor(processes) as executor:
       results = executor.map(_align, [a.pre for a in alignments], [a.post for a in alignments], range(n_alignments));
       if workspace is not None:
-          workspace.executor = executor
+        workspace.executor = executor
     if workspace is not None:
-        workspace.executor = None
+      workspace.executor = None
     results = list(results);
   
     #layout.sources_as_real();

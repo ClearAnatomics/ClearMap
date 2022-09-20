@@ -1029,9 +1029,9 @@ def align_layout(layout, axis_range=None, max_shifts=10, axis_mip=None,
     with CancelableProcessPoolExecutor(processes) as executor:
       results = executor.map(_align, [a.pre for a in alignments], [a.post for a in alignments]);
       if workspace is not None:
-          workspace.executor = executor
+        workspace.executor = executor
     if workspace is not None:
-        workspace.executor = None
+      workspace.executor = None
     results = list(results);                 
   
   for a,r in zip(layout.alignments, results):
@@ -1631,9 +1631,9 @@ def place_layout(layout, min_quality = None, method = 'optimization',
     with CancelableProcessPoolExecutor(processes) as executor:
       results = executor.map(_place, displacements, qualities, status)
       if workspace is not None:
-          workspace.executor = executor
+        workspace.executor = executor
     if workspace is not None:
-        workspace.executor = None
+      workspace.executor = None
     results = list(results);                 
   
   positions_new = np.array([r[0] for r in results]);             
@@ -1984,9 +1984,9 @@ def _optimize_slice_positions(positions, components, processes = None, workspace
       with CancelableProcessPoolExecutor(min(processes, ndim)) as executor:
         shifts = executor.map(_optimize_shifts, M, X)
         if workspace is not None:
-            workspace.executor = executor
+          workspace.executor = executor
       if workspace is not None:
-          workspace.executor = None
+        workspace.executor = None
       shifts = list(shifts);
       shifts = np.array(shifts).T;
     else:
@@ -2323,9 +2323,9 @@ def stitch_layout(layout, sink, method = 'interpolation', processes = None, verb
     with CancelableProcessPoolExecutor(processes) as executor:
       executor.map(_stitch, layout_slices, range(n_slices))
       if workspace is not None:
-          workspace.executor = executor
+        workspace.executor = executor
     if workspace is not None:
-        workspace.executor = None
+      workspace.executor = None
     
   
   if verbose:
