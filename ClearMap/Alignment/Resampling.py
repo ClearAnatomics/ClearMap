@@ -445,9 +445,9 @@ def resample(source, sink = None, orientation = None,
       with CancelableProcessPoolExecutor(processes) as executor:
         executor.map(_resample, indices)
         if workspace is not None:
-            workspace.executor = executor
+          workspace.executor = executor
       if workspace is not None:
-          workspace.executor = None
+        workspace.executor = None
         
     last_source = resampled;
   
@@ -818,9 +818,9 @@ def resample_inverse(source, sink = None,
       with CancelableProcessPoolExecutor(processes) as executor:
         executor.map(_resample, indices)
         if workspace is not None:
-            workspace.executor = executor
+          workspace.executor = executor
       if workspace is not None:
-          workspace.executor = None
+        workspace.executor = None
         
     last_source = resampled;
   
