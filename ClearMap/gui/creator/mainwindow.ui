@@ -127,15 +127,8 @@
     </property>
     <addaction name="actionPreferences"/>
    </widget>
-   <widget class="QMenu" name="menu_help">
-    <property name="title">
-     <string>Help</string>
-    </property>
-    <addaction name="action_what_s_this"/>
-   </widget>
    <addaction name="file_menu"/>
    <addaction name="menu_edit"/>
-   <addaction name="menu_help"/>
   </widget>
   <widget class="QStatusBar" name="statusbar">
    <property name="font">

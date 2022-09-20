@@ -5,7 +5,7 @@ tabs
 
 The different tabs that correspond to different functionalities of the GUI
 """
-
+import copy
 import os.path
 
 import mpld3
@@ -353,7 +353,10 @@ class AlignmentTab(GenericTab):
         self.ui.displayStitchingButtonBox.connectClose(self.main_window.remove_old_plots)
         self.ui.convertOutputButtonBox.connectApply(self.convert_output)
         self.ui.registerButtonBox.connectApply(self.run_registration)
-        self.ui.plotRegistrationResultsButtonBox.connectApply(self.plot_registration_results)
+        self.ui.plotRegistrationResultsSideBySidePushButton.clicked.connect(self.plot_registration_results_side_by_side)
+        self.ui.plotRegistrationResultsCompositePushButton.clicked.connect(self.plot_registration_results_composite)
+        self.ui.plotRegistrationResultsRawSideBySidePushButton.clicked.connect(self.plot_registration_results_side_by_side_raw)
+        self.ui.plotRegistrationResultsRawCompositePushButton.clicked.connect(self.plot_registration_results_composite_raw)
 
         # TODO: ?? connect alignment folder button
 
@@ -490,21 +493,55 @@ class AlignmentTab(GenericTab):
         self.main_window.wrap_in_thread(self.preprocessor.align)
         self.main_window.signal_process_finished('Registered')
 
-    def plot_registration_results(self):
-        if not self.step_exists('registration',
-                                (self.preprocessor.filename('resampled', postfix='autofluorescence'),
-                                 self.preprocessor.aligned_autofluo_path)):
+    def prepare_registration_results_graph(self, step='ref_to_auto'):
+        if step == 'ref_to_auto':
+            img_paths = (self.preprocessor.filename('resampled', postfix='autofluorescence'),
+                         self.preprocessor.aligned_autofluo_path)
+        elif step == 'auto_to_raw':
+            img_paths = (self.preprocessor.filename('resampled'),  # TODO: check direction
+                         os.path.join(self.preprocessor.filename('resampled_to_auto'), 'result.0.mhd'))
+        else:
+            raise ValueError(f'Unrecognised step option {step}, should be one of ["ref_to_auto", "auto_to_raw"]')
+        if not self.step_exists('registration', img_paths):
             return
-        image_sources = [
-            self.preprocessor.filename('resampled', postfix='autofluorescence'),
-            mhd_read(self.preprocessor.aligned_autofluo_path)
-        ]
-        titles = [os.path.basename(img) for img in image_sources]
+        image_sources = copy.deepcopy(list(img_paths))
+        for i, im_path in enumerate(image_sources):
+            if im_path.endswith('.mhd'):
+                image_sources[i] = mhd_read(im_path)
+        titles = [os.path.basename(img) for img in img_paths]
+        return image_sources, titles
+
+    def plot_registration_results_side_by_side_raw(self):
+        image_sources, titles = self.prepare_registration_results_graph('auto_to_raw')
         dvs = plot_3d.plot(image_sources, title=titles, arange=False, sync=True,
                            lut=self.main_window.preference_editor.params.lut,
                            parent=self.main_window.centralWidget())
         link_dataviewers_cursors(dvs, RedCross)
         self.main_window.setup_plots(dvs, ['autofluo', 'aligned'])
+
+    def plot_registration_results_side_by_side(self):
+        image_sources, titles = self.prepare_registration_results_graph()
+        dvs = plot_3d.plot(image_sources, title=titles, arange=False, sync=True,
+                           lut=self.main_window.preference_editor.params.lut,
+                           parent=self.main_window.centralWidget())
+        link_dataviewers_cursors(dvs, RedCross)
+        self.main_window.setup_plots(dvs, ['autofluo', 'aligned'])
+
+    def plot_registration_results_composite_raw(self):
+        image_sources, titles = self.prepare_registration_results_graph('auto_to_raw')
+        dvs = plot_3d.plot([image_sources, ], title=' '.join(titles), arange=False, sync=True,
+                           lut=self.main_window.preference_editor.params.lut,
+                           parent=self.main_window.centralWidget())
+        self.main_window.setup_plots(dvs)
+
+    def plot_registration_results_composite(self):
+        image_sources, titles = self.prepare_registration_results_graph()
+        dvs = plot_3d.plot([image_sources, ], title=' '.join(titles), arange=False, sync=True,
+                           lut=self.main_window.preference_editor.params.lut,
+                           parent=self.main_window.centralWidget())
+        self.main_window.setup_plots(dvs)
+
+
 
 
 class CellCounterTab(PostProcessingTab):
