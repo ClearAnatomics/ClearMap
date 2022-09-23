@@ -352,17 +352,30 @@ def transpose_p_vals(new_orientation, p_sign, p_vals2):  # FIXME: check cm_rsp.s
     return p_vals2_f, p_sign_f
 
 
-def group_cells_counts(struct_ids, group_cells_dfs, sample_ids):
+def group_cells_counts(struct_ids, group_cells_dfs, sample_ids, volume_map):
+    """
+
+    Parameters
+    ----------
+    struct_ids list:
+    group_cells_dfs: list(pd.DataFrame)
+    sample_ids: list
+    volume_map: dict
+        maps each id from structure_ids to the corresponding structure's volume (in pixel)
+
+    Returns
+    -------
+
+    """
     all_ints = False
-    atlas = clearmap_io.read(annotation.default_annotation_file)
     if all_ints:
         output = pd.DataFrame(columns=['id', 'hemisphere'] + [f'counts_{str(sample_ids[i]).zfill(2)}' for i in range(len(group_cells_dfs))])
     else:
         output = pd.DataFrame(columns=['id', 'hemisphere'] + [f'counts_{sample_ids[i]}' for i in range(len(group_cells_dfs))])
 
     output['id'] = np.tile(struct_ids, 2)  # for each hemisphere
-    output['name'] = np.tile([annotation.find(_id, key='id')['name'] for _id in struct_ids], 2)
-    output['volume'] = np.tile([(atlas == _id).sum() for _id in struct_ids], 2)
+    output['name'] = np.tile([annotation.find(id_, key='id')['name'] for id_ in struct_ids], 2)
+    output['volume'] = np.tile([volume_map[id_] for id_ in struct_ids], 2)
     output['hemisphere'] = np.repeat((0, 255), len(struct_ids))
 
     for multiplier, hem_id in zip((1, 2), (0, 255)):
@@ -445,7 +458,9 @@ def make_summary(directory, gp1_name, gp2_name, gp1_dirs, gp2_dirs, output_path=
     gp2_sample_ids = [dir_to_sample_id(folder) for folder in gp2_dirs]
     sample_ids = [gp1_sample_ids, gp2_sample_ids]
 
-    aggregated_dfs = {gp_name: group_cells_counts(structs, gp_cells_dfs[i], sample_ids[i])
+    volume_map = annotation.annotation.map_volume
+
+    aggregated_dfs = {gp_name: group_cells_counts(structs, gp_cells_dfs[i], sample_ids[i], volume_map)
                       for i, gp_name in enumerate((gp1_name, gp2_name))}
     total_df = generate_summary_table(aggregated_dfs)
 
