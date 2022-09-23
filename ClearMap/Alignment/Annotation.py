@@ -205,10 +205,8 @@ class Annotation(object):
         self.extra_label = extra_label
 
         # initialize label tree
-        with open(label_file) as dfile:
-            aba_json = dfile.read()
-            dfile.close()
-        aba = json.loads(aba_json)
+        with open(label_file, 'r') as file_in:
+            aba = json.load(file_in)
 
         root = aba['msg'][0]
         self.root = self.initialize_tree(root)
@@ -359,6 +357,20 @@ class Annotation(object):
             level -= 1
 
         return self.find(p0[level+1], key=key, value=value)
+
+    @property
+    def map_volume(self):
+        """
+
+
+        Returns
+        -------
+        dict[int, int]
+        """
+        atlas = clearmap_io.read(self.annotation_file)
+        uniques, counts = np.unique(atlas, return_counts=True)
+        self.map_volume = dict(zip(uniques, counts))
+        return self.map_volume
 
     def __str__(self):
         return f'Annotation({self.n_structures})[{self.max_level}]{{{self.label_file}}}'
