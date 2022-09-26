@@ -505,7 +505,8 @@ def rescale_size_and_spacing(size, spacing, scale):
 ##############################################################################
 
 def align(fixed_image, moving_image, affine_parameter_file, bspline_parameter_file=None,
-          result_directory=None, processes=None, workspace=None):
+          result_directory=None, processes=None,
+          workspace=None, moving_landmarks_path=None, fixed_landmarks_path=None):
   """
   Align images using elastix, estimates a transformation :math:`T:` fixed image :math:`\\rightarrow` moving image.
   
@@ -546,6 +547,8 @@ def align(fixed_image, moving_image, affine_parameter_file, bspline_parameter_fi
     cmd.extend(['-p', affine_parameter_file])
   if bspline_parameter_file is not None:
     cmd.extend(['-p', bspline_parameter_file])
+  if moving_landmarks_path is not None or fixed_landmarks_path is not None:
+    cmd.extend(['-mp', moving_landmarks_path, '-fp', fixed_landmarks_path])
   cmd.extend(['-out', result_directory])
 
   try:
