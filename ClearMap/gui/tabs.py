@@ -655,9 +655,7 @@ class CellCounterTab(PostProcessingTab):
     #     self.cell_detector.detected = False
 
     def plot_detection_results(self):
-        if not self.step_exists('cell detection', [self.preprocessor.filename('stitched'),
-                                                   self.preprocessor.filename('cells', postfix='bkg'),
-                                                   self.preprocessor.filename('cells', postfix='shape')]):
+        if not self.step_exists('cell detection', [self.preprocessor.filename('stitched')]):
             return
         dvs = self.cell_detector.preview_cell_detection(parent=self.main_window.centralWidget(),
                                                         arange=False, sync=True)  # TODO: add close
