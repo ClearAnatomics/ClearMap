@@ -480,8 +480,6 @@ def density_files_are_comparable(directory, gp1_dirs, gp2_dirs):
 
 
 def compare_groups(directory, gp1_name, gp2_name, gp1_dirs, gp2_dirs, prefix='p_val_colors'):
-    make_summary(directory, gp1_name, gp2_name, gp1_dirs, gp2_dirs)
-
     gp1_f_list = dirs_to_density_files(directory, gp1_dirs)
     gp2_f_list = dirs_to_density_files(directory, gp2_dirs)
 
