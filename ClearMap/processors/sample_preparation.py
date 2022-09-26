@@ -207,7 +207,7 @@ class PreProcessor(TabProcessor):
         # FIXME: check if setup_atlas should go here
 
     def unpack_atlas(self, atlas_base_name):
-        res = annotation.uncompress_atlases(atlas_base_name)
+        res = annotation.decompress_atlases(atlas_base_name)
         self.default_annotation_file_path, self.default_hemispheres_file_path, \
             self.default_reference_file_path, self.default_distance_file_path = res
 
