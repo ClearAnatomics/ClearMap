@@ -507,13 +507,18 @@ class PreProcessor(TabProcessor):
             "verbose": resampling_cfg['verbose']
         }  # WARNING: duplicate (use method ??)
         clearmap_io.delete_file(self.filename('resampled'))  # FIXME:
-        f_list = self.workspace.source('raw').file_list
+        try:
+            f_list = self.workspace.source('raw').file_list
+        except AttributeError:  # e.g. single file, force use of config
+            f_list = None
         if f_list:
             src_res = define_auto_resolution(f_list[0], self.sample_config['resolutions']['raw'])
         else:
             src_res = self.sample_config['resolutions']['raw']
 
         n_planes = len(self.workspace.file_list('autofluorescence'))  # TODO: find more elegant solution for counter
+        if n_planes < 2:  # e.g. 1 file
+            n_planes = clearmap_io.shape(self.workspace.filename('autofluorescence'))[-1]
         self.prepare_watcher_for_substep(n_planes, self.__resample_re, 'Resampling raw')
         try:
             result = resampling.resample(self.filename('stitched'),
@@ -534,12 +539,14 @@ class PreProcessor(TabProcessor):
             "verbose": resampling_cfg['verbose']
         }  # WARNING: duplicate (use method ??)
         try:
-            auto_fluo_path = self.workspace.source('autofluorescence').file_list[0]
+            auto_fluo_path = self.workspace.file_list('autofluorescence')[0]
         except IndexError:
             print('Could not resample autofluorescence, file not found')
             return
         auto_res = define_auto_resolution(auto_fluo_path, self.sample_config['resolutions']['autofluorescence'])
         n_planes = len(self.workspace.file_list('autofluorescence'))  # TODO: find more elegant solution for counter
+        if n_planes < 2:  # e.g. 1 file
+            n_planes = clearmap_io.shape(self.workspace.filename('autofluorescence'))[-1]
         self.prepare_watcher_for_substep(n_planes, self.__resample_re, 'Resampling autofluorescence', True)
         try:
             result = resampling.resample(self.filename('autofluorescence'),
