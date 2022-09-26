@@ -20,7 +20,6 @@ from shutil import copyfile
 import traceback
 import types
 
-import mpld3
 from PyQt5 import QtGui
 from PyQt5.QtGui import QPalette, QColor
 from PyQt5.QtWebEngineWidgets import QWebEngineView  # WARNING: import required before app creation
@@ -70,10 +69,11 @@ from ClearMap.gui.widget_monkeypatch_callbacks import get_value, set_value, cont
     connect_ok, connect_cancel, connect_value_changed, connect_text_changed
 update_pbar(app, progress_bar, 40)
 from ClearMap.gui.pyuic_utils import loadUiType
-from ClearMap.gui.dialogs import get_directory_dlg, warning_popup, make_progress_dialog, make_nested_progress_dialog, DISPLAY_CONFIG
+from ClearMap.gui.dialogs import get_directory_dlg, warning_popup, \
+    make_progress_dialog, make_nested_progress_dialog, DISPLAY_CONFIG
 from ClearMap.gui.gui_utils import html_to_ansi, html_to_plain_text, compute_grid
-from ClearMap.gui.style import QDARKSTYLE_BACKGROUND, DARK_BACKGROUND, PLOT_3D_BG, BTN_STYLE_SHEET, \
-    VERY_LIGHT_BACKGROUND, TOOLTIP_STYLE_SHEET, COMBOBOX_STYLE_SHEET
+from ClearMap.gui.style import QDARKSTYLE_BACKGROUND, DARK_BACKGROUND, PLOT_3D_BG, \
+    BTN_STYLE_SHEET, TOOLTIP_STYLE_SHEET, COMBOBOX_STYLE_SHEET
 
 from ClearMap.gui.widgets import OrthoViewer, PbarWatcher, setup_mini_brain  # needs plot_3d
 update_pbar(app, progress_bar, 60)
