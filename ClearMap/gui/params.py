@@ -12,6 +12,7 @@ from itertools import combinations
 
 import numpy as np
 
+from ClearMap.Utils.utilities import get_item_recursive
 from ClearMap.gui.gui_utils import create_clearmap_widget
 
 from ClearMap.gui.dialogs import get_directory_dlg
@@ -42,6 +43,9 @@ class UiParameter(QObject):
         self.tab = tab
         self.src_folder = src_folder
         self._config = None
+        self._default_config = None
+        self.params_dict = None
+        self.attrs_to_invert = []
         self.connect()
 
     def connect(self):
@@ -60,6 +64,8 @@ class UiParameter(QObject):
         self._config = ConfigLoader.get_cfg_from_path(cfg_path)
         if not self._config:
             raise ConfigNotFoundError
+        cfg_name = os.path.splitext(os.path.basename(cfg_path))[0]
+        self._default_config = ConfigLoader.get_cfg_from_path(ConfigLoader.get_default_path(cfg_name))
 
     def write_config(self):
         self._config.write()
@@ -84,7 +90,27 @@ class UiParameter(QObject):
         pass
 
     def cfg_to_ui(self):
-        raise NotImplementedError
+        if self.params_dict is None:
+            raise NotImplementedError
+        else:
+            any_amended = False
+            for attr, keys_list in self.params_dict.items():
+                current_amended = False
+                try:
+                    val = get_item_recursive(self.config, keys_list)
+                except KeyError:  # TODO: add msg
+                    val = get_item_recursive(self._default_config, keys_list)
+                    any_amended = True
+                    current_amended = True
+                if attr in self.attrs_to_invert:
+                    val = -val
+                # Update the UI
+                setattr(self, attr, val)
+                if current_amended:
+                    # Update the config
+                    get_item_recursive(self.config, keys_list[:-1])[keys_list[-1]] = val
+            if any_amended:
+                self.ui_to_cfg()  # Add the newly parsed field
 
     def is_checked(self, check_box):
         return check_box.checkState() == Qt.Checked
@@ -188,6 +214,20 @@ class SampleParameters(UiParameter):
 
     def __init__(self, tab, src_folder=None):
         super().__init__(tab, src_folder)
+        self.params_dict = {
+            'sample_id': ['sample_id'],
+            'use_id_as_prefix': ['use_id_as_prefix'],
+            'raw_path': ['src_paths', 'raw'],
+            'autofluo_path': ['src_paths', 'autofluorescence'],
+            'arteries_path': ['src_paths', 'arteries'],
+            'raw_resolution': ['resolutions', 'raw'],
+            'autofluorescence_resolution': ['resolutions', 'arteries'],
+            'arteries_resolution': ['resolutions', 'autofluorescence'],
+            'slice_x': ['slice_x'],
+            'slice_y': ['slice_y'],
+            'slice_z': ['slice_z'],
+            'orientation': ['orientation']  # WARNING: Finish by orientation in case invalid,
+        }
         if self.sample_id:
             self.handle_sample_id_changed(self.sample_id)
 
@@ -220,20 +260,7 @@ class SampleParameters(UiParameter):
 
     def cfg_to_ui(self):
         self.reload()
-        self.sample_id = self._config['sample_id']
-        self.use_id_as_prefix = self._config['use_id_as_prefix']
-        self.raw_path = self._config['src_paths']['raw']
-        self.autofluo_path = self._config['src_paths']['autofluorescence']
-        self.arteries_path = self._config['src_paths']['arteries']
-        for k, v in self._config['resolutions'].items():
-            if v is not None and v != 'auto':
-                ctrl = getattr(self.tab, '{}ResolutionTriplet'.format(k))
-                ctrl.enableControls()
-                ctrl.setValue(v)
-        self.slice_x = self._config['slice_x']
-        self.slice_y = self._config['slice_y']
-        self.slice_z = self._config['slice_z']
-        self.orientation = self._config['orientation']  # Finish by orientation in case invalid
+        super().cfg_to_ui()
 
     def fix_cfg_file(self, f_path):
         cfg = ConfigLoader.get_cfg_from_path(f_path)
@@ -405,6 +432,19 @@ class SampleParameters(UiParameter):
 
 
 class RigidStitchingParams(UiParameter):
+    def __init__(self, tab, src_folder=None):
+        super().__init__(tab, src_folder)
+        self.params_dict = {
+            'x_overlap': ['overlap_x'],
+            'y_overlap': ['overlap_y'],
+            'projection_thickness': ['project_thickness'],
+            'max_shifts_x': ['max_shifts_x'],
+            'max_shifts_y': ['max_shifts_y'],
+            'max_shifts_z': ['max_shifts_z'],
+            'background_level': ['background_level'],
+            'background_pixels': ['background_pixels']
+        }
+
     def connect(self):
         self.tab.skipRigidCheckbox.stateChanged.connect(self.handle_skip_state_changed)
         self.tab.xOverlapSinglet.valueChangedConnect(self.handle_x_overlap_value_changed)
@@ -415,17 +455,6 @@ class RigidStitchingParams(UiParameter):
         self.tab.rigidMaxShiftsZDoublet.valueChangedConnect(self.handle_max_shifts_z_changed)
         self.tab.rigidBackgroundLevel.valueChanged.connect(self.handle_background_level_changed)
         self.tab.rigidBackgroundPixels.valueChanged.connect(self.handle_background_pixels_changed)
-
-    def cfg_to_ui(self):
-        cfg = self.config
-        self.x_overlap = cfg['overlap_x']
-        self.y_overlap = cfg['overlap_y']
-        self.projection_thickness = cfg['project_thickness']
-        self.max_shifts_x = cfg['max_shifts_x']
-        self.max_shifts_y = cfg['max_shifts_y']
-        self.max_shifts_z = cfg['max_shifts_z']
-        self.background_level = cfg['background_level']
-        self.background_pixels = cfg['background_pixels']
 
     @property
     def config(self):
@@ -538,6 +567,18 @@ class RigidStitchingParams(UiParameter):
 
 class WobblyStitchingParams(UiParameter):
 
+    def __init__(self, tab, src_folder=None):
+        super().__init__(tab, src_folder)
+        self.params_dict = {
+            'skip': ['skip'],
+            'max_shifts_x': ['max_shifts_x'],
+            'max_shifts_y': ['max_shifts_y'],
+            'max_shifts_z': ['max_shifts_z'],
+            'valid_range': ['valid_range'],
+            'slice_range': ['slice_range'],
+            'slice_pixel_size': ['slice_pixel_size']
+        }
+
     def connect(self):
         self.tab.skipWobblyCheckBox.stateChanged.connect(self.handle_skip_changed)
         self.tab.wobblyMaxShiftsXDoublet.valueChangedConnect(self.handle_max_shifts_x_changed)
@@ -546,16 +587,6 @@ class WobblyStitchingParams(UiParameter):
         self.tab.wobblyValidRangeDoublet.valueChangedConnect(self.handle_valid_range_changed)
         self.tab.wobblySliceRangeDoublet.valueChangedConnect(self.handle_slice_range_changed)
         self.tab.wobblySlicePixelSizeSinglet.valueChangedConnect(self.handle_slice_pixel_size_changed)
-
-    def cfg_to_ui(self):
-        cfg = self.config
-        self.skip = cfg['skip']
-        self.max_shifts_x = cfg['max_shifts_x']
-        self.max_shifts_y = cfg['max_shifts_y']
-        self.max_shifts_z = cfg['max_shifts_z']
-        self.valid_range = cfg['valid_range']
-        self.slice_range = cfg['slice_range']
-        self.slice_pixel_size = cfg['slice_pixel_size']
 
     @property
     def config(self):
@@ -646,6 +677,20 @@ class WobblyStitchingParams(UiParameter):
 
 
 class GeneralStitchingParams(UiParameter):
+    def __init__(self, tab, src_folder=None):
+        super().__init__(tab, src_folder)
+        self.attrs_to_invert = ['convert_output']
+        self.params_dict = {
+            'use_npy': ['conversion', 'use_npy'],
+            'run_raw': ['stitching', 'run', 'raw'],
+            'run_arteries': ['stitching', 'run', 'arteries'],
+            'preview_raw': ['stitching', 'preview', 'raw'],
+            'preview_arteries': ['stitching', 'preview', 'arteries'],
+            'convert_output': ['stitching', 'output_conversion', 'skip'],
+            'convert_raw': ['stitching', 'output_conversion', 'raw'],
+            'convert_arteries': ['stitching', 'output_conversion', 'arteries'],
+            'conversion_fmt': ['stitching', 'output_conversion', 'format'],
+        }
 
     def connect(self):
         self.tab.stitchingUseNpyCheckBox.stateChanged.connect(self.handle_use_npy_changed)
@@ -658,21 +703,9 @@ class GeneralStitchingParams(UiParameter):
         self.tab.stitchingConvertArteriesCheckBox.stateChanged.connect(self.handle_convert_arteries_changed)
         self.tab.outputConversionFormat.currentTextChanged.connect(self.handle_conversion_fmt_changed)
 
-    def cfg_to_ui(self):
-        cfg = self.config
-        self.use_npy = self._config['conversion']['use_npy']
-        self.run_raw = cfg['run']['raw']
-        self.run_arteries = cfg['run']['arteries']
-        self.preview_raw = cfg['preview']['raw']
-        self.preview_arteries = cfg['preview']['arteries']
-        self.convert_output = not cfg['output_conversion']['skip']
-        self.convert_raw = cfg['output_conversion']['raw']
-        self.convert_arteries = cfg['output_conversion']['arteries']
-        self.conversion_fmt = cfg['output_conversion']['format']
-
     @property
     def config(self):
-        return self._config['stitching']
+        return self._config
 
     @property
     def use_npy(self):
@@ -694,7 +727,7 @@ class GeneralStitchingParams(UiParameter):
         self.set_check_state(self.tab.stitchingRunRawCheckBox, state)
 
     def handle_run_raw_changed(self, state):
-        self.config['run']['raw'] = self.run_raw
+        self.config['stitching']['run']['raw'] = self.run_raw
 
     @property
     def run_arteries(self):
@@ -705,7 +738,7 @@ class GeneralStitchingParams(UiParameter):
         self.set_check_state(self.tab.stitchingRunArteriesCheckBox, state)
 
     def handle_run_arteries_changed(self, state):
-        self.config['run']['arteries'] = self.run_arteries
+        self.config['stitching']['run']['arteries'] = self.run_arteries
 
     @property
     def preview_raw(self):
@@ -716,7 +749,7 @@ class GeneralStitchingParams(UiParameter):
         self.set_check_state(self.tab.stitchingPreviewRawCheckBox, state)
 
     def handle_preview_raw_changed(self, state):
-        self.config['preview']['raw'] = self.preview_raw
+        self.config['stitching']['preview']['raw'] = self.preview_raw
 
     @property
     def preview_arteries(self):
@@ -727,7 +760,7 @@ class GeneralStitchingParams(UiParameter):
         self.set_check_state(self.tab.stitchingPreviewArteriesCheckBox, state)
 
     def handle_preview_arteries_changed(self, state):
-        self.config['preview']['arteries'] = self.preview_arteries
+        self.config['stitching']['preview']['arteries'] = self.preview_arteries
 
     @property
     def convert_output(self):
@@ -738,7 +771,7 @@ class GeneralStitchingParams(UiParameter):
         self.set_check_state(self.tab.skipOutputConversioncheckBox, not skip)
 
     def handle_convert_output_changed(self, state):
-        self.config['output_conversion']['skip'] = not self.convert_output
+        self.config['stitching']['output_conversion']['skip'] = not self.convert_output
 
     @property
     def convert_raw(self):
@@ -749,7 +782,7 @@ class GeneralStitchingParams(UiParameter):
         self.set_check_state(self.tab.stitchingConvertRawCheckBox, state)
 
     def handle_convert_raw_changed(self, state):
-        self.config['output_conversion']['raw'] = self.convert_raw
+        self.config['stitching']['output_conversion']['raw'] = self.convert_raw
 
     @property
     def convert_arteries(self):
@@ -760,7 +793,7 @@ class GeneralStitchingParams(UiParameter):
         self.set_check_state(self.tab.stitchingConvertArteriesCheckBox, state)
 
     def handle_convert_arteries_changed(self, state):
-        self.config['output_conversion']['arteries'] = self.convert_arteries
+        self.config['stitching']['output_conversion']['arteries'] = self.convert_arteries
 
     @property
     def conversion_fmt(self):
@@ -771,7 +804,7 @@ class GeneralStitchingParams(UiParameter):
         self.tab.outputConversionFormat.setCurrentText(fmt)
 
     def handle_conversion_fmt_changed(self, fmt):
-        self.config['output_conversion']['format'] = self.conversion_fmt
+        self.config['stitching']['output_conversion']['format'] = self.conversion_fmt
 
 
 class RegistrationParams(UiParameter):
@@ -787,6 +820,15 @@ class RegistrationParams(UiParameter):
             'CDMBA - P14 - 25µm': {'resolution': 25, 'base_name': 'CDMBA_P14_25um'}
         }
         super().__init__(tab, src_folder)
+        self.params_dict = {
+            'skip_resampling': ['resampling', 'skip'],
+            'atlas_resolution': ['resampling', 'raw_sink_resolution'],
+            'atlas_id': ['atlas', 'id'],
+            'atlas_folder': ['atlas', 'align_files_folder'],
+            'channel_affine_file_path': ['atlas', 'align_channels_affine_file'],
+            'ref_affine_file_path': ['atlas', 'align_reference_affine_file'],
+            'ref_bspline_file_path': ['atlas', 'align_reference_bspline_file']
+        }
 
     def connect(self):
         self.tab.skipRegistrationResamplingCheckBox.stateChanged.connect(self.handle_skip_resampling_changed)
@@ -800,16 +842,6 @@ class RegistrationParams(UiParameter):
     @property
     def atlas_base_name(self):
         return self.atlas_info[self.atlas_id]['base_name']
-
-    def cfg_to_ui(self):
-        cfg = self._config['registration']
-        self.skip_resampling = cfg['resampling']['skip']
-        self.atlas_resolution = cfg['resampling']['raw_sink_resolution']
-        self.atlas_id = self.config['atlas']['id']
-        self.atlas_folder = cfg['atlas']['align_files_folder']
-        self.channel_affine_file_path = cfg['atlas']['align_channels_affine_file']
-        self.ref_affine_file_path = cfg['atlas']['align_reference_affine_file']
-        self.ref_bspline_file_path = cfg['atlas']['align_reference_bspline_file']
 
     @property
     def config(self):
@@ -899,6 +931,19 @@ class RegistrationParams(UiParameter):
 class CellMapParams(UiParameter):
     def __init__(self, tab, sample_params=None, preprocessing_params=None, src_folder=None):
         super().__init__(tab, src_folder)
+        self.params_dict = {
+            'background_correction_diameter': ['detection', 'background_correction', 'diameter'],
+            'detection_threshold': ['detection', 'shape_detection', 'threshold'],
+            'cell_filter_size': ['cell_filtration', 'thresholds', 'size'],
+            'voxelization_radii': ['voxelization', 'radii'],
+            'plot_when_finished': ['run', 'plot_when_finished'],
+            'crop_x_min': ['detection', 'test_set_slicing', 'dim_0', 0],
+            'crop_x_max': ['detection', 'test_set_slicing', 'dim_0', 1],
+            'crop_y_min': ['detection', 'test_set_slicing', 'dim_1', 0],
+            'crop_y_max': ['detection', 'test_set_slicing', 'dim_1', 1],
+            'crop_z_min': ['detection', 'test_set_slicing', 'dim_2', 0],
+            'crop_z_max': ['detection', 'test_set_slicing', 'dim_2', 1],
+        }
         self.sample_params = sample_params
         self.preprocessing_params = preprocessing_params
 
@@ -920,6 +965,14 @@ class CellMapParams(UiParameter):
     def config(self):
         return self._config
 
+    # def _ui_to_cfg(self):
+    #     self.crop_values_to_cfg()
+    #
+
+    def cfg_to_ui(self):
+        self.reload()
+        super().cfg_to_ui()
+
     @property
     def ratios(self):
         raw_res = np.array(self.sample_params.raw_resolution)
@@ -927,9 +980,6 @@ class CellMapParams(UiParameter):
         ratios = raw_res / atlas_res  # to original
         return ratios
 
-    # def _ui_to_cfg(self):
-    #     self.crop_values_to_cfg()
-    #
     # def crop_values_to_cfg(self):
     #     cfg = self._config['detection']['test_set_slicing']
     #     cfg['dim_0'] = self.crop_x_min, self.crop_x_max
@@ -945,25 +995,6 @@ class CellMapParams(UiParameter):
 
     # def get_crop_values(self):
     #     return self.crop_x_min, self.crop_x_max, self.crop_y_min, self.crop_y_max, self.crop_z_min, self.crop_z_max
-
-    def _crop_values_from_cfg(self):
-        cfg = self._config['detection']['test_set_slicing']  # TODO: if 99.9 % source put to 100% (None)
-        self.crop_x_min, self.crop_x_max = cfg['dim_0']
-        self.crop_y_min, self.crop_y_max = cfg['dim_1']
-        self.crop_z_min, self.crop_z_max = cfg['dim_2']
-
-    def cfg_to_ui(self):
-        self.reload()
-        cfg = self._config
-        self.background_correction_diameter = cfg['detection']['background_correction']['diameter']
-        self.detection_threshold = cfg['detection']['shape_detection']['threshold']
-        self.cell_filter_size = cfg['cell_filtration']['thresholds']['size']
-        self.voxelization_radii = cfg['voxelization']['radii']
-        self.plot_when_finished = cfg['run']['plot_when_finished']
-        try:
-            self._crop_values_from_cfg()
-        except KeyError as err:
-            print('Could not load crop values from CellMap config, {}'.format(err))
 
     @property
     def plot_when_finished(self):
@@ -1122,6 +1153,21 @@ class VesselParams(UiParameterCollection):
 
 class VesselBinarizationParams(UiParameter):
 
+    def __init__(self, tab, src_folder=None):
+        super().__init__(tab, src_folder)
+        self.attrs_to_invert = ['run_arteries_binarization']
+        self.params_dict = {
+            'raw_binarization_clip_range': ['binarization', 'raw', 'clip_range'],
+            'raw_binarization_threshold': ['binarization', 'raw', 'threshold'],
+            'post_process_raw': ['binarization', 'raw', 'post_process'],
+            'run_arteries_binarization': ['binarization', 'arteries', 'skip'],
+            'arteries_binarization_clip_range': ['binarization', 'arteries', 'clip_range'],
+            'arteries_binarization_threshold': ['binarization', 'arteries', 'threshold'],
+            'post_process_arteries': ['binarization', 'arteries', 'post_process'],
+            'fill_main_channel': ['vessel_filling', 'main'],
+            'fill_secondary_channel': ['vessel_filling', 'secondary']
+        }
+
     def connect(self):
         self.tab.rawBinarizationClipRangeDoublet.valueChangedConnect(self.handle_raw_binarization_clip_range_changed)
         self.tab.rawBinarizationThresholdSpinBox.valueChanged.connect(self.handle_raw_binarization_treshold_changed)
@@ -1141,18 +1187,6 @@ class VesselBinarizationParams(UiParameter):
     @property
     def config(self):
         return self._config['binarization']
-
-    def cfg_to_ui(self):
-        cfg = self.config
-        self.raw_binarization_clip_range = cfg['binarization']['raw']['clip_range']
-        self.raw_binarization_threshold = cfg['binarization']['raw']['threshold']
-        self.post_process_raw = self.config['binarization']['raw']['post_process']
-        self.run_arteries_binarization = not cfg['binarization']['arteries']['skip']
-        self.arteries_binarization_clip_range = cfg['binarization']['arteries']['clip_range']
-        self.arteries_binarization_threshold = cfg['binarization']['arteries']['threshold']
-        self.post_process_arteries = self.config['binarization']['arteries']['post_process']
-        self.fill_main_channel = self.config['vessel_filling']['main']
-        self.fill_secondary_channel = self.config['vessel_filling']['secondary']
 
     @property
     def raw_binarization_clip_range(self):
@@ -1258,6 +1292,23 @@ class VesselGraphParams(UiParameter):
     crop_ranges_changed = pyqtSignal()
     def __init__(self, tab, sample_params=None, preprocessing_params=None, src_folder=None):
         super().__init__(tab, src_folder)
+        self.params_dict = {
+            'crop_x_min': ['graph_construction', 'slicing', 'dim_0', 0],
+            'crop_x_max': ['graph_construction', 'slicing', 'dim_0', 1],
+            'crop_y_min': ['graph_construction', 'slicing', 'dim_1', 0],
+            'crop_y_max': ['graph_construction', 'slicing', 'dim_1', 1],
+            'crop_z_min': ['graph_construction', 'slicing', 'dim_2', 0],
+            'crop_z_max': ['graph_construction', 'slicing', 'dim_2', 1],
+            'vein_intensity_range_on_arteries_channel': ['vessel_type_postprocessing' 'pre_filtering', 'vein_intensity_range_on_arteries_ch'],
+            'restrictive_min_vein_radius': ['vessel_type_postprocessing', 'pre_filtering', 'restrictive_vein_radius'],
+            'permissive_min_vein_radius': ['vessel_type_postprocessing', 'pre_filtering', 'permissive_vein_radius'],
+            'final_min_vein_radius': ['vessel_type_postprocessing', 'pre_filtering', 'final_vein_radius'],
+            'arteries_min_radius': ['vessel_type_postprocessing', 'pre_filtering', 'arteries_min_radius'],
+            'max_arteries_tracing_iterations': ['vessel_type_postprocessing', 'tracing', 'max_arteries_iterations'],
+            'max_veins_tracing_iterations': ['vessel_type_postprocessing', 'tracing', 'max_veins_iterations'],
+            'min_artery_size': ['vessel_type_postprocessing', 'capillaries_removal', 'min_artery_size'],
+            'min_vein_size': ['vessel_type_postprocessing', 'capillaries_removal', 'min_vein_size'],
+        }
         self.sample_params = sample_params
         self.preprocessing_params = preprocessing_params
 
@@ -1292,30 +1343,7 @@ class VesselGraphParams(UiParameter):
 
     @property
     def config(self):
-        return self._config['vessel_type_postprocessing']
-
-    def cfg_to_ui(self):
-        self.vein_intensity_range_on_arteries_channel = \
-            self.config['pre_filtering']['vein_intensity_range_on_arteries_ch']
-        self.restrictive_min_vein_radius = self.config['pre_filtering']['restrictive_vein_radius']
-        self.permissive_min_vein_radius = self.config['pre_filtering']['permissive_vein_radius']
-        self.final_min_vein_radius = self.config['pre_filtering']['final_vein_radius']
-        self.arteries_min_radius = self.config['pre_filtering']['arteries_min_radius']
-        self.max_arteries_tracing_iterations = self.config['tracing']['max_arteries_iterations']
-        self.max_veins_tracing_iterations = self.config['tracing']['max_veins_iterations']
-        self.min_artery_size = self.config['capillaries_removal']['min_artery_size']
-        self.min_vein_size = self.config['capillaries_removal']['min_vein_size']
-
-        try:
-            self._crop_values_from_cfg()
-        except KeyError as err:
-            print('Could not load crop values from tube_map_params.cfg, {}'.format(err))
-
-    def _crop_values_from_cfg(self):
-        cfg = self._config['graph_construction']['slicing']  # TODO: if 99.9 % source put to 100% (None)
-        self.crop_x_min, self.crop_x_max = cfg['dim_0']
-        self.crop_y_min, self.crop_y_max = cfg['dim_1']
-        self.crop_z_min, self.crop_z_max = cfg['dim_2']
+        return self._config
 
     @property
     def ratios(self):
@@ -1414,7 +1442,7 @@ class VesselGraphParams(UiParameter):
         self.tab.veinIntensityRangeOnArteriesChannelDoublet.setValue(value)
 
     def handle_vein_intensity_range_on_arteries_channel_changed(self, _):
-        self.config['pre_filtering']['vein_intensity_range_on_arteries_ch'] = \
+        self.config['vessel_type_postprocessing']['pre_filtering']['vein_intensity_range_on_arteries_ch'] = \
             self.vein_intensity_range_on_arteries_channel
         
     @property
@@ -1426,7 +1454,7 @@ class VesselGraphParams(UiParameter):
         self.tab.restrictiveMinVeinRadiusSpinBox.setValue(value)
 
     def handle_restrictive_min_vein_radius_changed(self, _):
-        self.config['pre_filtering']['restrictive_vein_radius'] = \
+        self.config['vessel_type_postprocessing']['pre_filtering']['restrictive_vein_radius'] = \
             self.restrictive_min_vein_radius
 
     @property
@@ -1438,7 +1466,7 @@ class VesselGraphParams(UiParameter):
         self.tab.permissiveMinVeinRadiusSpinBox.setValue(value)
 
     def handle_permissive_min_vein_radius_changed(self, _):
-        self.config['pre_filtering']['permissive_vein_radius'] = \
+        self.config['vessel_type_postprocessing']['pre_filtering']['permissive_vein_radius'] = \
             self.permissive_min_vein_radius
         
     @property
@@ -1450,7 +1478,7 @@ class VesselGraphParams(UiParameter):
         self.tab.finalMinVeinRadiusSpinBox.setValue(value)
 
     def handle_final_min_vein_radius_changed(self, _):
-        self.config['pre_filtering']['final_vein_radius'] = self.final_min_vein_radius
+        self.config['vessel_type_postprocessing']['pre_filtering']['final_vein_radius'] = self.final_min_vein_radius
 
     @property
     def arteries_min_radius(self):
@@ -1461,7 +1489,7 @@ class VesselGraphParams(UiParameter):
         self.tab.arteriesMinRadiusSpinBox.setValue(value)
 
     def handle_arteries_min_radius_changed(self, _):
-        self.config['pre_filtering']['arteries_min_radius'] = self.arteries_min_radius
+        self.config['vessel_type_postprocessing']['pre_filtering']['arteries_min_radius'] = self.arteries_min_radius
 
     @property
     def max_arteries_tracing_iterations(self):
@@ -1472,7 +1500,7 @@ class VesselGraphParams(UiParameter):
         self.tab.maxArteriesTracingIterationsSpinBox.setValue(value)
 
     def handle_max_arteries_tracing_iterations_changed(self, _):
-        self.config['tracing']['max_arteries_iterations'] = \
+        self.config['vessel_type_postprocessing']['tracing']['max_arteries_iterations'] = \
             self.max_arteries_tracing_iterations
 
     @property
@@ -1484,7 +1512,7 @@ class VesselGraphParams(UiParameter):
         self.tab.maxVeinsTracingIterationsSpinBox.setValue(value)
 
     def handle_max_veins_tracing_iterations_changed(self, _):
-        self.config['tracing']['max_veins_iterations'] = self.max_veins_tracing_iterations
+        self.config['vessel_type_postprocessing']['tracing']['max_veins_iterations'] = self.max_veins_tracing_iterations
         
     @property
     def min_artery_size(self):
@@ -1495,7 +1523,7 @@ class VesselGraphParams(UiParameter):
         self.tab.minArterySizeSpinBox.setValue(value)
 
     def handle_min_artery_size_changed(self, _):
-        self.config['capillaries_removal']['min_artery_size'] = self.min_artery_size
+        self.config['vessel_type_postprocessing']['capillaries_removal']['min_artery_size'] = self.min_artery_size
 
     @property
     def min_vein_size(self):
@@ -1506,19 +1534,20 @@ class VesselGraphParams(UiParameter):
         self.tab.minVeinSizeSpinBox.setValue(value)
 
     def handle_min_vein_size_changed(self, _):
-        self.config['capillaries_removal']['min_vein_size'] = self.min_vein_size
+        self.config['vessel_type_postprocessing']['capillaries_removal']['min_vein_size'] = self.min_vein_size
 
 
 class VesselVisualizationParams(UiParameter):
+    def __init__(self, tab, src_folder=None):
+        super().__init__(tab, src_folder)
+        self.params_dict = {'voxelization_size': ['voxelization', 'size']}
+
     def connect(self):
         self.tab.vasculatureVoxelizationRadiusTriplet.valueChangedConnect(self.handle_voxelization_size_changed)
 
     @property
     def config(self):
         return self._config['visualization']
-
-    def cfg_to_ui(self):
-        self.voxelization_size = self.config['voxelization']['size']
 
     @property
     def voxelization_size(self):
@@ -1533,6 +1562,23 @@ class VesselVisualizationParams(UiParameter):
 
 
 class PreferencesParams(UiParameter):
+    def __init__(self, tab, src_folder=None):
+        super().__init__(tab, src_folder)
+        self.params_dict = {
+            'verbosity': ['verbosity'],
+            'n_processes_file_conv': ['n_processes_file_conv'],
+            'n_processes_stitching': ['n_processes_stitching'],
+            'n_processes_cell_detection': ['n_processes_cell_detection'],
+            'chunk_size_min': ['detection_chunk_size_min'],
+            'chunk_size_max': ['detection_chunk_size_max'],
+            'chunk_size_overlap': ['detection_chunk_overlap'],
+            'start_folder': ['start_folder'],
+            'start_full_screen': ['start_full_screen'],
+            'lut': ['default_lut'],
+            'font_size': ['font_size'],
+            'pattern_finder_min_n_files': ['pattern_finder_min_n_files'],
+            'three_d_plot_bg': ['three_d_plot_bg']
+        }
 
     @property
     def config(self):
@@ -1556,20 +1602,7 @@ class PreferencesParams(UiParameter):
 
     def cfg_to_ui(self):
         self.reload()
-        cfg = self._config
-        self.verbosity = cfg['verbosity']
-        self.n_processes_file_conv = cfg['n_processes_file_conv']
-        self.n_processes_stitching = cfg['n_processes_stitching']
-        self.n_processes_cell_detection = cfg['n_processes_cell_detection']
-        self.chunk_size_min = cfg['detection_chunk_size_min']
-        self.chunk_size_max = cfg['detection_chunk_size_max']
-        self.chunk_size_overlap = cfg['detection_chunk_overlap']
-        self.start_folder = cfg['start_folder']
-        self.start_full_screen = cfg['start_full_screen']
-        self.lut = cfg['default_lut']
-        self.font_size = cfg['font_size']
-        self.pattern_finder_min_n_files = cfg['pattern_finder_min_n_files']
-        self.three_d_plot_bg = cfg['three_d_plot_bg']
+        super().cfg_to_ui()
 
     @property
     def three_d_plot_bg(self):

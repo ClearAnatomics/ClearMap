@@ -11,6 +11,8 @@ import re
 import shutil
 import subprocess
 from concurrent.futures import ProcessPoolExecutor
+from functools import reduce
+from operator import getitem
 
 import numpy as np
 import psutil
@@ -102,3 +104,7 @@ def make_abs(directory, file_name):
     else:
         f_path = os.path.join(directory, file_name)
     return f_path
+
+
+def get_item_recursive(container, keys):
+    return reduce(getitem, keys, container)
