@@ -27,14 +27,14 @@
         </font>
        </property>
        <property name="currentIndex">
-        <number>0</number>
+        <number>2</number>
        </property>
        <widget class="QWidget" name="page">
         <property name="geometry">
          <rect>
           <x>0</x>
           <y>0</y>
-          <width>414</width>
+          <width>428</width>
           <height>132</height>
          </rect>
         </property>
@@ -358,7 +358,7 @@
         <property name="geometry">
          <rect>
           <x>0</x>
-          <y>-28</y>
+          <y>0</y>
           <width>414</width>
           <height>252</height>
          </rect>
@@ -392,11 +392,14 @@
            <layout class="QHBoxLayout" name="horizontalLayout">
             <item>
              <widget class="QComboBox" name="orient_x">
-              <property name="toolTip">
-               <string>X axis orientation. - means flip</string>
+              <property name="minimumSize">
+               <size>
+                <width>10</width>
+                <height>0</height>
+               </size>
               </property>
               <property name="currentText">
-               <string>-3</string>
+               <string>1</string>
               </property>
               <item>
                <property name="text">
@@ -432,8 +435,14 @@
             </item>
             <item>
              <widget class="QComboBox" name="orient_y">
+              <property name="minimumSize">
+               <size>
+                <width>10</width>
+                <height>0</height>
+               </size>
+              </property>
               <property name="currentText">
-               <string>-3</string>
+               <string>2</string>
               </property>
               <item>
                <property name="text">
@@ -469,8 +478,14 @@
             </item>
             <item>
              <widget class="QComboBox" name="orient_z">
+              <property name="minimumSize">
+               <size>
+                <width>10</width>
+                <height>0</height>
+               </size>
+              </property>
               <property name="currentText">
-               <string>-3</string>
+               <string>3</string>
               </property>
               <item>
                <property name="text">

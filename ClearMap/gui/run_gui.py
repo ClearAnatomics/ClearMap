@@ -73,7 +73,7 @@ from ClearMap.gui.pyuic_utils import loadUiType
 from ClearMap.gui.dialogs import get_directory_dlg, warning_popup, make_progress_dialog, make_nested_progress_dialog, DISPLAY_CONFIG
 from ClearMap.gui.gui_utils import html_to_ansi, html_to_plain_text, compute_grid
 from ClearMap.gui.style import QDARKSTYLE_BACKGROUND, DARK_BACKGROUND, PLOT_3D_BG, BTN_STYLE_SHEET, \
-    VERY_LIGHT_BACKGROUND, TOOLTIP_STYLE_SHEET
+    VERY_LIGHT_BACKGROUND, TOOLTIP_STYLE_SHEET, COMBOBOX_STYLE_SHEET
 
 from ClearMap.gui.widgets import OrthoViewer, PbarWatcher, setup_mini_brain  # needs plot_3d
 update_pbar(app, progress_bar, 60)
@@ -207,6 +207,9 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         for widget_type in (QSpinBox, QDoubleSpinBox, QComboBox, QLineEdit):
             for widget in self.findChildren(widget_type):
                 widget.setStyleSheet(f'background-color: {DARK_BACKGROUND}; ')
+                if widget_type == QComboBox:
+                    print(widget.objectName())
+                    widget.setStyleSheet(COMBOBOX_STYLE_SHEET)
 
     def popup(self, msg, base_msg='Missing configuration file'):
         self.print_warning_msg(html_to_plain_text(msg))
