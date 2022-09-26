@@ -385,7 +385,10 @@ class DataViewer(pg.QtGui.QWidget):
                 raise RuntimeError(f'Sources shape {self.source_shape} vs {s.shape} in source {s}!')
 
         # slicing
-        self.scroll_axis = axis if axis is not None else (self.sources[0].ndim - 1)
+        shape = list(range(self.sources[0].ndim))
+        if 3 in self.sources[0].shape:  # Color image
+            shape.pop(self.sources[0].shape.index(3))
+        self.scroll_axis = axis if axis is not None else shape[-1]  # Default to last axis
         self.source_index = (np.array(self.source_shape, dtype=float) / 2).astype(np.int)
 
         # scaling
