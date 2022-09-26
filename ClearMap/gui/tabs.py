@@ -1005,8 +1005,8 @@ class BatchTab(GenericTab):
 
         if len(p_vals_imgs) == 1:
             gp1_name, gp2_name = self.params.selected_comparisons[0]
-            gp1_img = clearmap_io.read(os.path.join(self.params.results_folder, f'condensed_{gp1_name}.tif'))
-            gp2_img = clearmap_io.read(os.path.join(self.params.results_folder, f'condensed_{gp2_name}.tif'))
+            gp1_img = clearmap_io.read(os.path.join(self.params.results_folder, f'stacked_density_{gp1_name}.tif'))
+            gp2_img = clearmap_io.read(os.path.join(self.params.results_folder, f'stacked_density_{gp2_name}.tif'))
             images = [gp1_img, gp2_img, p_vals_imgs[0]]
             titles = [gp1_name, gp2_name, 'P values']
         else:
