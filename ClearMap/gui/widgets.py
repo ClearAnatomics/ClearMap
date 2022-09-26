@@ -789,7 +789,8 @@ class LandmarksSelectorDialog(WizardDialog):  # TODO: bind qColorDialog to color
         btn.setChecked(True)
         color_btn = self.dlg.marker0ColorBtn
         self.markers = [(btn, color_btn)]
-        self.coords = [[None, None]]
+        self.coords = [[(np.nan, np.nan, np.nan),
+                        (np.nan, np.nan, np.nan)]]
 
     def __len__(self):
         return len(self.markers)
@@ -820,10 +821,12 @@ class LandmarksSelectorDialog(WizardDialog):  # TODO: bind qColorDialog to color
     #     print(self.coords)
 
     def fixed_coords(self):
-        return np.array([c[0] for c in self.coords if c[0] is not None])
+        return np.array([c[0] for c in self.coords])
+        # return np.array([c[0] for c in self.coords if c[0] is not None])
 
     def moving_coords(self):
-        return np.array([c[1] for c in self.coords if c[1] is not None])
+        return np.array([c[1] for c in self.coords])
+        # return np.array([c[1] for c in self.coords if c[1] is not None])
 
     def set_fixed_coords(self, x, y, z):
         self.coords[self.current_marker][0] = (x, y, z)
@@ -859,6 +862,7 @@ class LandmarksSelectorDialog(WizardDialog):  # TODO: bind qColorDialog to color
         self.dlg.formLayout.insertRow(len(self), btn, color_btn)
         self.markers.append((btn, color_btn))
         self.coords.append([None, None])
+        btn.click()
 
     def remove_marker(self):
         if self.current_marker == len(self) - 1:
