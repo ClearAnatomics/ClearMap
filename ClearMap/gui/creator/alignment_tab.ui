@@ -29,6 +29,7 @@
        </property>
        <property name="font">
         <font>
+         <weight>75</weight>
          <bold>true</bold>
         </font>
        </property>
@@ -41,7 +42,7 @@
           <x>0</x>
           <y>0</y>
           <width>478</width>
-          <height>440</height>
+          <height>438</height>
          </rect>
         </property>
         <attribute name="label">
@@ -58,8 +59,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>384</width>
-              <height>392</height>
+              <width>392</width>
+              <height>409</height>
              </rect>
             </property>
             <attribute name="label">
@@ -439,8 +440,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>309</width>
-              <height>334</height>
+              <width>311</width>
+              <height>347</height>
              </rect>
             </property>
             <attribute name="label">
@@ -744,8 +745,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>196</width>
-              <height>128</height>
+              <width>199</width>
+              <height>132</height>
              </rect>
             </property>
             <attribute name="label">
@@ -820,8 +821,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>196</width>
-              <height>100</height>
+              <width>199</width>
+              <height>103</height>
              </rect>
             </property>
             <attribute name="label">
@@ -890,7 +891,7 @@
               <x>0</x>
               <y>0</y>
               <width>460</width>
-              <height>272</height>
+              <height>265</height>
              </rect>
             </property>
             <attribute name="label">
@@ -962,7 +963,7 @@
           <x>0</x>
           <y>0</y>
           <width>478</width>
-          <height>440</height>
+          <height>438</height>
          </rect>
         </property>
         <attribute name="label">
@@ -980,7 +981,7 @@
               <x>0</x>
               <y>0</y>
               <width>460</width>
-              <height>332</height>
+              <height>327</height>
              </rect>
             </property>
             <attribute name="label">
@@ -1022,6 +1023,11 @@
                <item>
                 <property name="text">
                  <string>CDMBA - P7 - 25µm</string>
+                </property>
+               </item>
+               <item>
+                <property name="text">
+                 <string>CDMBA - P10 - 25µm</string>
                 </property>
                </item>
                <item>
@@ -1166,8 +1172,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>228</width>
-              <height>132</height>
+              <width>233</width>
+              <height>136</height>
              </rect>
             </property>
             <attribute name="label">
@@ -1257,8 +1263,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>460</width>
-              <height>332</height>
+              <width>415</width>
+              <height>74</height>
              </rect>
             </property>
             <attribute name="label">
