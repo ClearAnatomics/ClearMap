@@ -377,14 +377,15 @@ class AlignmentTab(GenericTab):
     def run_stitching(self):
         self.params.ui_to_cfg()
         self.main_window.print_status_msg('Stitching')
-        axes = self.preprocessor.workspace.expression('raw', prefix=self.preprocessor.prefix).tags_names()  # FIXME: only 1 axis
+        tags = self.preprocessor.workspace.expression('raw', prefix=self.preprocessor.prefix).tags  # FIXME: only 1 axis
+        axes = [tag.name for tag in tags]
         if axes == ['Z']:  # BYPASS stitching, just stack
             clearmap_io.convert(self.preprocessor.filename('raw'), self.preprocessor.filename('stitched'))
+            self.main_window.logger.n_lines = 0
             self.main_window.make_nested_progress_dialog('Stitching', n_steps=1, sub_maximum=0,
                                                          sub_process_name='Getting layout',
                                                          abort_callback=self.preprocessor.stop_process,
                                                          parent=self.main_window)
-            self.main_window.logger.n_lines = 0
         else:
             n_steps = self.preprocessor.n_rigid_steps_to_run + self.preprocessor.n_wobbly_steps_to_run
             self.main_window.make_nested_progress_dialog('Stitching', n_steps=n_steps, sub_maximum=0,

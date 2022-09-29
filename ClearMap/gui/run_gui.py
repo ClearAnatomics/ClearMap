@@ -208,7 +208,6 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
             for widget in self.findChildren(widget_type):
                 widget.setStyleSheet(f'background-color: {DARK_BACKGROUND}; ')
                 if widget_type == QComboBox:
-                    print(widget.objectName())
                     widget.setStyleSheet(COMBOBOX_STYLE_SHEET)
 
     def popup(self, msg, base_msg='Missing configuration file'):
