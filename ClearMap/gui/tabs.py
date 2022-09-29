@@ -377,21 +377,30 @@ class AlignmentTab(GenericTab):
     def run_stitching(self):
         self.params.ui_to_cfg()
         self.main_window.print_status_msg('Stitching')
-        n_steps = self.preprocessor.n_rigid_steps_to_run + self.preprocessor.n_wobbly_steps_to_run
-        self.main_window.make_nested_progress_dialog('Stitching', n_steps=n_steps, sub_maximum=0,
-                                                     sub_process_name='Getting layout',
-                                                     abort_callback=self.preprocessor.stop_process,
-                                                     parent=self.main_window)
-        self.main_window.logger.n_lines = 0  # FIXME: check that done for all steps that require logger read for progress
-        if not self.params.stitching_rigid.skip:
-            self.main_window.wrap_in_thread(self.preprocessor.stitch_rigid, force=True)
-            self.main_window.print_status_msg('Stitched rigid')
-        if not self.params.stitching_wobbly.skip:
-            if self.preprocessor.was_stitched_rigid:
-                self.main_window.wrap_in_thread(self.preprocessor.stitch_wobbly, force=self.params.stitching_rigid.skip)
-                self.main_window.print_status_msg('Stitched wobbly')
-            else:
-                self.main_window.popup('Could not run wobbly stitching <br>without rigid stitching first')
+        axes = self.preprocessor.workspace.expression('raw', prefix=self.preprocessor.prefix).tags_names()  # FIXME: only 1 axis
+        if axes == ['Z']:  # BYPASS stitching, just stack
+            clearmap_io.convert(self.preprocessor.filename('raw'), self.preprocessor.filename('stitched'))
+            self.main_window.make_nested_progress_dialog('Stitching', n_steps=1, sub_maximum=0,
+                                                         sub_process_name='Getting layout',
+                                                         abort_callback=self.preprocessor.stop_process,
+                                                         parent=self.main_window)
+            self.main_window.logger.n_lines = 0
+        else:
+            n_steps = self.preprocessor.n_rigid_steps_to_run + self.preprocessor.n_wobbly_steps_to_run
+            self.main_window.make_nested_progress_dialog('Stitching', n_steps=n_steps, sub_maximum=0,
+                                                         sub_process_name='Getting layout',
+                                                         abort_callback=self.preprocessor.stop_process,
+                                                         parent=self.main_window)
+            self.main_window.logger.n_lines = 0  # FIXME: check that done for all steps that require logger read for progress
+            if not self.params.stitching_rigid.skip:
+                self.main_window.wrap_in_thread(self.preprocessor.stitch_rigid, force=True)
+                self.main_window.print_status_msg('Stitched rigid')
+            if not self.params.stitching_wobbly.skip:
+                if self.preprocessor.was_stitched_rigid:
+                    self.main_window.wrap_in_thread(self.preprocessor.stitch_wobbly, force=self.params.stitching_rigid.skip)
+                    self.main_window.print_status_msg('Stitched wobbly')
+                else:
+                    self.main_window.popup('Could not run wobbly stitching <br>without rigid stitching first')
         self.main_window.signal_process_finished()
 
     def plot_stitching_results(self):
