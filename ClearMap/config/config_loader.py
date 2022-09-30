@@ -137,11 +137,15 @@ class ConfigLoader(object):
 
     @staticmethod
     def get_default_path(cfg_name, must_exist=True, install_mode=False):  # FIXME: recursive w/ alternatives
-        if not cfg_name.endswith('params'):
-            cfg_name += '_params'
-        for ext in ConfigLoader.supported_exts:
-            cfg_path = ConfigLoader._name_to_default_path(cfg_name, ext, install_mode=install_mode)
-            if os.path.exists(cfg_path):
+        if cfg_name.endswith('_params'):
+            cfg_name = cfg_name.replace('_params', '')
+        for name_variant in get_alternatives(cfg_name):
+            name_variant += '_params'
+            for ext in ConfigLoader.supported_exts:
+                cfg_path = ConfigLoader._name_to_default_path(name_variant, ext, install_mode=install_mode)
+                if os.path.exists(cfg_path):
+                    break
+            if os.path.exists(cfg_path):  # REFACTOR: avoid duplicate w/ above
                 break
         else:
             if must_exist:
