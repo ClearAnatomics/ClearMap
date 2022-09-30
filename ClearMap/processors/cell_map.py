@@ -146,7 +146,9 @@ class CellDetector(TabProcessor):
             'radius': self.processing_config['voxelization']['radii'],
             'verbose': True
         }
-        if self.preprocessor.was_registered:
+        if self.workspace.debug:  # Path will use debug
+            voxelization_parameter['shape'] = clearmap_io.shape(self.workspace.filename('cells', postfix='shape'))
+        elif self.preprocessor.was_registered:
             voxelization_parameter['shape'] = clearmap_io.shape(self.preprocessor.annotation_file_path)
         else:
             voxelization_parameter['shape'] = self.preprocessor.resampled_shape
