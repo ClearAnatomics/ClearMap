@@ -281,7 +281,8 @@ class SampleTab(GenericTab):
 
     def launch_pattern_wizard(self):
         dlg = PatternDialog(self.src_folder, self.params,
-                            min_file_number=self.main_window.preference_editor.params.pattern_finder_min_n_files)
+                            min_file_number=self.main_window.preference_editor.params.pattern_finder_min_n_files,
+                            tile_extension=self.params.tile_extension)
         dlg.exec()
 
     def plot_mini_brain(self):
