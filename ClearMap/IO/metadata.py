@@ -143,23 +143,24 @@ def get_base_dir(cfg):
 
 ##################################################################################################################
 
-def get_ome_tiffs(folder):
-    return [f_name for f_name in sorted(os.listdir(folder)) if f_name.endswith('.ome.tif')]
+def get_tiles_by_ext(folder, extension='.ome.tif'):
+    return [f_name for f_name in sorted(os.listdir(folder)) if f_name.endswith(extension)]
 
 
-def get_ome_tiff_list_from_sample_folder(src_dir, min_file_number=10):
+def get_tiles_list_from_sample_folder(src_dir, min_file_number=10, tile_extension='.ome.tif'):
     data_dirs = {}
     for f_name in sorted(os.listdir(src_dir)):
         f_path = os.path.join(src_dir, f_name)
         if os.path.isdir(f_path):
-            ome_tiffs = get_ome_tiffs(f_path)
+            ome_tiffs = get_tiles_by_ext(f_path, extension=tile_extension)
             if ome_tiffs and len(ome_tiffs) > min_file_number:
                 data_dirs[f_path] = ome_tiffs
     return data_dirs
 
 
-def pattern_finders_from_base_dir(src_dir, axes_order=None, min_file_number=10):
-    data_dirs = get_ome_tiff_list_from_sample_folder(src_dir, min_file_number=min_file_number)
+def pattern_finders_from_base_dir(src_dir, axes_order=None, min_file_number=10, tile_extension='.ome.tif'):
+    data_dirs = get_tiles_list_from_sample_folder(src_dir, min_file_number=min_file_number,
+                                                  tile_extension=tile_extension)
     finders = []
     for path in data_dirs.keys():
         sub_dir = path.replace(src_dir, '')

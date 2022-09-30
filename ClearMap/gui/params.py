@@ -221,6 +221,7 @@ class SampleParameters(UiParameter):
         self.params_dict = {
             'sample_id': ['sample_id'],
             'use_id_as_prefix': ['use_id_as_prefix'],
+            'tile_extension': ['src_paths', 'tile_extension'],
             'raw_path': ['src_paths', 'raw'],
             'autofluo_path': ['src_paths', 'autofluorescence'],
             'arteries_path': ['src_paths', 'arteries'],
@@ -243,17 +244,18 @@ class SampleParameters(UiParameter):
         self.tab.sampleIdTxt.editingFinished.connect(self.handle_sample_id_changed)
         self.tab.useIdAsPrefixCheckBox.stateChanged.connect(self.handle_use_id_as_prefix_changed)
 
-        self.tab.sliceXDoublet.valueChangedConnect(self.handle_slice_x_changed)
-        self.tab.sliceYDoublet.valueChangedConnect(self.handle_slice_y_changed)
-        self.tab.sliceZDoublet.valueChangedConnect(self.handle_slice_z_changed)
+        self.tab.tileExtensionLineEdit.textChanged.connect(self.handle_tile_extension_changed)
+        self.tab.rawPath.textChanged.connect(self.handle_raw_path_changed)
+        self.tab.arteriesPathOptionalPlainTextEdit.textChangedConnect(self.handle_arteries_path_changed)
+        self.tab.autofluoPathOptionalPlainTextEdit.textChangedConnect(self.handle_autofluo_path_changed)
 
         self.tab.orient_x.currentTextChanged.connect(self.handle_orientation_changed)
         self.tab.orient_y.currentTextChanged.connect(self.handle_orientation_changed)
         self.tab.orient_z.currentTextChanged.connect(self.handle_orientation_changed)
 
-        self.tab.rawPath.textChanged.connect(self.handle_raw_path_changed)
-        self.tab.arteriesPathOptionalPlainTextEdit.textChangedConnect(self.handle_arteries_path_changed)
-        self.tab.autofluoPathOptionalPlainTextEdit.textChangedConnect(self.handle_autofluo_path_changed)
+        self.tab.sliceXDoublet.valueChangedConnect(self.handle_slice_x_changed)
+        self.tab.sliceYDoublet.valueChangedConnect(self.handle_slice_y_changed)
+        self.tab.sliceZDoublet.valueChangedConnect(self.handle_slice_z_changed)
 
         self.tab.rawResolutionTriplet.valueChangedConnect(self.handle_raw_resolution_changed)
         self.tab.autofluorescenceResolutionTriplet.valueChangedConnect(self.handle_autofluo_resolution_changed)
@@ -302,6 +304,17 @@ class SampleParameters(UiParameter):
 
     def handle_use_id_as_prefix_changed(self, _):
         self._config['use_id_as_prefix'] = self.use_id_as_prefix
+
+    @property
+    def tile_extension(self):
+        return self.tab.tileExtensionLineEdit.text()
+
+    @tile_extension.setter
+    def tile_extension(self, value):
+        self.tab.tileExtensionLineEdit.setText(value)
+
+    def handle_tile_extension_changed(self):
+        self._config['src_paths']['tile_extension'] = self.tile_extension
 
     @property
     def raw_path(self):

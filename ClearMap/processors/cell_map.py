@@ -158,17 +158,6 @@ class CellDetector(TabProcessor):
             cells, coordinates = self.get_coords(coord_type=None, aligned=True)
         return coordinates, cells, voxelization_parameter
 
-    # def voxelize_chunk(self):
-    #     self.workspace.debug = True
-    #     coordinates = self.get_coords()
-    #
-    #     shape = clearmap_io.shape(self.preprocessor.annotation_file_path),
-    #     # %% Unweighted
-    #     counts_file_path = self.workspace.filename('density', postfix='counts_upperlayers')
-    #     clearmap_io.delete_file(self.workspace.filename('density', postfix='counts'))  # WARNING: deletes different file
-    #     voxelization.voxelize(coordinates, sink=counts_file_path, radius=(2, 2, 2), shape=shape)
-    #     self.workspace.debug = False
-
     def get_coords(self, coord_type='filtered', aligned=False):
         if coord_type not in ('filtered', 'raw', None):
             raise ValueError(f'Coordinate type "{coord_type}" not recognised')
