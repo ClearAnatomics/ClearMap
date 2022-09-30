@@ -972,20 +972,16 @@ class CellMapParams(UiParameter):
         self.tab.cellFilterThresholdSizeDoublet.valueChangedConnect(self.handle_filter_size_changed)
         self.tab.voxelizationRadiusTriplet.valueChangedConnect(self.handle_voxelization_radii_changed)
         self.tab.cellDetectionPlotCheckBox.stateChanged.connect(self.handle_plot_detected_cells_changed)
-        self.tab.detectionSubsetXRangeMin.valueChanged.connect(self.handle_x_val_change)
-        self.tab.detectionSubsetXRangeMax.valueChanged.connect(self.handle_x_val_change)
-        self.tab.detectionSubsetYRangeMin.valueChanged.connect(self.handle_y_val_change)
-        self.tab.detectionSubsetYRangeMax.valueChanged.connect(self.handle_y_val_change)
-        self.tab.detectionSubsetZRangeMin.valueChanged.connect(self.handle_z_val_change)
-        self.tab.detectionSubsetZRangeMax.valueChanged.connect(self.handle_z_val_change)
+        self.tab.detectionSubsetXRangeMin.valueChanged.connect(self.handle_x_val_min_change)
+        self.tab.detectionSubsetXRangeMax.valueChanged.connect(self.handle_x_val_max_change)
+        self.tab.detectionSubsetYRangeMin.valueChanged.connect(self.handle_y_val_min_change)
+        self.tab.detectionSubsetYRangeMax.valueChanged.connect(self.handle_y_val_max_change)
+        self.tab.detectionSubsetZRangeMin.valueChanged.connect(self.handle_z_val_min_change)
+        self.tab.detectionSubsetZRangeMax.valueChanged.connect(self.handle_z_val_max_change)
 
     @property
     def config(self):
         return self._config
-
-    # def _ui_to_cfg(self):
-    #     self.crop_values_to_cfg()
-    #
 
     def cfg_to_ui(self):
         self.reload()
@@ -998,21 +994,12 @@ class CellMapParams(UiParameter):
         ratios = raw_res / atlas_res  # to original
         return ratios
 
-    # def crop_values_to_cfg(self):
-    #     cfg = self._config['detection']['test_set_slicing']
-    #     cfg['dim_0'] = self.crop_x_min, self.crop_x_max
-    #     cfg['dim_1'] = self.crop_y_min, self.crop_y_max
-    #     cfg['dim_2'] = self.crop_z_min, self.crop_z_max
-
     # def _scale_crop_values(self, ratios):
     #     crop_values = []
     #     ui_crops = self.crop_x_min, self.crop_x_max, self.crop_y_min, self.crop_y_max, self.crop_z_min, self.crop_z_max
     #     for ratio, val in zip(np.repeat(ratios, 2), ui_crops):
     #         crop_values.append(round(ratio * val))
     #     return crop_values
-
-    # def get_crop_values(self):
-    #     return self.crop_x_min, self.crop_x_max, self.crop_y_min, self.crop_y_max, self.crop_z_min, self.crop_z_max
 
     @property
     def plot_when_finished(self):
@@ -1087,8 +1074,11 @@ class CellMapParams(UiParameter):
     def crop_x_max(self, val):
         self.tab.detectionSubsetXRangeMax.setValue(val)
 
-    def handle_x_val_change(self):
-        self.config['detection']['test_set_slicing']['dim_0'] = self.crop_x_min, self.crop_x_max
+    def handle_x_val_min_change(self):
+        self.config['detection']['test_set_slicing']['dim_0'][0] = self.crop_x_min
+
+    def handle_x_val_max_change(self):
+        self.config['detection']['test_set_slicing']['dim_0'][1] = self.crop_x_max
 
     def scale_x(self, val):
         return round(val * self.ratios[0])
@@ -1109,8 +1099,11 @@ class CellMapParams(UiParameter):
     def crop_y_max(self, val):
         self.tab.detectionSubsetYRangeMax.setValue(val)
 
-    def handle_y_val_change(self):
-        self.config['detection']['test_set_slicing']['dim_1'] = self.crop_y_min, self.crop_y_max
+    def handle_y_val_min_change(self):
+        self.config['detection']['test_set_slicing']['dim_1'][0] = self.crop_y_min
+
+    def handle_y_val_max_change(self):
+        self.config['detection']['test_set_slicing']['dim_1'][1] = self.crop_y_max
 
     def scale_y(self, val):
         return round(val * self.ratios[1])
@@ -1131,8 +1124,11 @@ class CellMapParams(UiParameter):
     def crop_z_max(self, val):
         self.tab.detectionSubsetZRangeMax.setValue(val)
 
-    def handle_z_val_change(self):
-        self.config['detection']['test_set_slicing']['dim_2'] = self.crop_z_min, self.crop_z_max
+    def handle_z_val_min_change(self):
+        self.config['detection']['test_set_slicing']['dim_2'][0] = self.crop_z_min
+
+    def handle_z_val_max_change(self):
+        self.config['detection']['test_set_slicing']['dim_2'][1] = self.crop_z_max
 
     def scale_z(self, val):
         return round(val * self.ratios[2])
@@ -1345,19 +1341,19 @@ class VesselGraphParams(UiParameter):
         self.tab.minArterySizeSpinBox.valueChanged.connect(self.handle_min_artery_size_changed)
         self.tab.minVeinSizeSpinBox.valueChanged.connect(self.handle_min_vein_size_changed)
 
-        self.tab.graphConstructionSlicerXRangeMin.valueChanged.connect(self.handle_x_val_change)  # REFACTOR: this feels messy having the repeats
-        self.tab.graphConstructionSlicerXRangeMax.valueChanged.connect(self.handle_x_val_change)
-        self.tab.graphConstructionSlicerYRangeMin.valueChanged.connect(self.handle_y_val_change)
-        self.tab.graphConstructionSlicerYRangeMax.valueChanged.connect(self.handle_y_val_change)
-        self.tab.graphConstructionSlicerZRangeMin.valueChanged.connect(self.handle_z_val_change)
-        self.tab.graphConstructionSlicerZRangeMax.valueChanged.connect(self.handle_z_val_change)
+        self.tab.graphConstructionSlicerXRangeMin.valueChanged.connect(self.handle_x_val_min_change)  # REFACTOR: this feels messy having the repeats
+        self.tab.graphConstructionSlicerXRangeMax.valueChanged.connect(self.handle_x_val_max_change)
+        self.tab.graphConstructionSlicerYRangeMin.valueChanged.connect(self.handle_y_val_min_change)
+        self.tab.graphConstructionSlicerYRangeMax.valueChanged.connect(self.handle_y_val_max_change)
+        self.tab.graphConstructionSlicerZRangeMin.valueChanged.connect(self.handle_z_val_min_change)
+        self.tab.graphConstructionSlicerZRangeMax.valueChanged.connect(self.handle_z_val_max_change)
 
-        self.tab.vesselProcessingSlicerXRangeMin.valueChanged.connect(self.handle_x_val_change)
-        self.tab.vesselProcessingSlicerXRangeMax.valueChanged.connect(self.handle_x_val_change)
-        self.tab.vesselProcessingSlicerYRangeMin.valueChanged.connect(self.handle_y_val_change)
-        self.tab.vesselProcessingSlicerYRangeMax.valueChanged.connect(self.handle_y_val_change)
-        self.tab.vesselProcessingSlicerZRangeMin.valueChanged.connect(self.handle_z_val_change)
-        self.tab.vesselProcessingSlicerZRangeMax.valueChanged.connect(self.handle_z_val_change)
+        self.tab.vesselProcessingSlicerXRangeMin.valueChanged.connect(self.handle_x_val_min_change)
+        self.tab.vesselProcessingSlicerXRangeMax.valueChanged.connect(self.handle_x_val_max_change)
+        self.tab.vesselProcessingSlicerYRangeMin.valueChanged.connect(self.handle_y_val_min_change)
+        self.tab.vesselProcessingSlicerYRangeMax.valueChanged.connect(self.handle_y_val_max_change)
+        self.tab.vesselProcessingSlicerZRangeMin.valueChanged.connect(self.handle_z_val_min_change)
+        self.tab.vesselProcessingSlicerZRangeMax.valueChanged.connect(self.handle_z_val_max_change)
 
     @property
     def config(self):
@@ -1388,8 +1384,12 @@ class VesselGraphParams(UiParameter):
         self.tab.graphConstructionSlicerXRangeMax.setValue(val)
         self.tab.vesselProcessingSlicerXRangeMax.setValue(val)
 
-    def handle_x_val_change(self):
-        self._config['graph_construction']['slicing']['dim_0'] = self.crop_x_min, self.crop_x_max
+    def handle_x_val_min_change(self):
+        self._config['graph_construction']['slicing']['dim_0'][0] = self.crop_x_min
+        self.crop_ranges_changed.emit()
+
+    def handle_x_val_max_change(self):
+        self._config['graph_construction']['slicing']['dim_0'][1] = self.crop_x_max
         self.crop_ranges_changed.emit()
 
     def scale_x(self, val):
@@ -1413,8 +1413,12 @@ class VesselGraphParams(UiParameter):
         self.tab.graphConstructionSlicerYRangeMax.setValue(val)
         self.tab.vesselProcessingSlicerYRangeMax.setValue(val)
 
-    def handle_y_val_change(self):
-        self._config['graph_construction']['slicing']['dim_1'] = self.crop_y_min, self.crop_y_max
+    def handle_y_val_min_change(self):
+        self._config['graph_construction']['slicing']['dim_1'][0] = self.crop_y_min
+        self.crop_ranges_changed.emit()
+
+    def handle_y_val_max_change(self):
+        self._config['graph_construction']['slicing']['dim_1'][1] = self.crop_y_max
         self.crop_ranges_changed.emit()
 
     def scale_y(self, val):
@@ -1438,8 +1442,12 @@ class VesselGraphParams(UiParameter):
         self.tab.graphConstructionSlicerZRangeMax.setValue(val)
         self.tab.vesselProcessingSlicerZRangeMax.setValue(val)
 
-    def handle_z_val_change(self):
-        self._config['graph_construction']['slicing']['dim_2'] = self.crop_z_min, self.crop_z_max
+    def handle_z_val_min_change(self):
+        self._config['graph_construction']['slicing']['dim_2'][0] = self.crop_z_min
+        self.crop_ranges_changed.emit()
+
+    def handle_z_val_max_change(self):
+        self._config['graph_construction']['slicing']['dim_2'][1] = self.crop_z_max
         self.crop_ranges_changed.emit()
 
     def scale_z(self, val):
