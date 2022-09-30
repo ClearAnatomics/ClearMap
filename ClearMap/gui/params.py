@@ -147,8 +147,12 @@ class UiParameterCollection:
         self.config = ConfigLoader.get_cfg_from_path(cfg_path)
         if not self.config:
             raise ConfigNotFoundError
+        cfg_name = os.path.splitext(os.path.basename(cfg_path))[0]
+        default_path = ConfigLoader.get_default_path(cfg_name)
+        self._default_config = ConfigLoader.get_cfg_from_path(default_path)
         for param in self.params:
             param._config = self.config
+            param._default_config = self._default_config
 
     def write_config(self):
         self.config.write()
