@@ -272,7 +272,7 @@ def uncompress(file_path, extension='zip', check=True, verbose=False):
         if extension == 'auto':
             for algo in ('zip', 'bz2', 'gzip', 'lzma'):
                 if os.path.exists(f'{file_path}.{algo}'):
-                    extension = f'.{algo}'
+                    extension = algo
                     break
             else:
                 raise ValueError(f'Could not find compressed source for {file_path}')
