@@ -629,7 +629,7 @@ class CellCounterTab(PostProcessingTab):
             self.update_cell_number()
 
     def create_cell_detection_tuning_sample(self):
-        # FIXME: check if ui_to_cfg()
+        self.params.ui_to_cfg()
         self.cell_detector.create_test_dataset(slicing=self.params.slicing)
         self.main_window.print_status_msg('Tuning sample created')  # TODO: progress bar
 
