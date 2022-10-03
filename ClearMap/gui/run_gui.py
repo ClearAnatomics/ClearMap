@@ -230,6 +230,19 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
             self.print_warning_msg(f'File "{f_path}" not found')
             return False
 
+    def get_graphs(self):
+        return sorted([getattr(self, attr) for attr in dir(self) if attr.startswith('graph_')])
+
+    def remove_old_plots(self):
+        for i in range(self.graphLayout.count(), -1, -1):
+            graph = self.graphLayout.takeAt(i)
+            if graph is not None:
+                widg = graph.widget()
+                widg.setParent(None)
+                widg.deleteLater()
+                delattr(self, widg.objectName())
+        self.graph_names = {}
+
     def setup_plots(self, dvs, graph_names=None):
         self.remove_old_plots()
 
@@ -247,36 +260,23 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
             row = i // n_cols
             col = i % n_cols
             self.graphLayout.addWidget(dv, row, col, 1, 1)
-            self.__resize_graph(dv, n_cols, n_rows)
+            # self.__resize_graph(dv, n_cols, n_rows)
             if graph_names:
                 self.graph_names[graph_names[i]] = graph_name
 
-    def get_graphs(self):
-        return sorted([getattr(self, attr) for attr in dir(self) if attr.startswith('graph_')])
-
-    def resize_graphs(self):
-        n_rows, n_cols = compute_grid(len(self.get_graphs()))  # WARNING: take care of placeholders
-        for i in range(self.graphLayout.count(), -1, -1):  # Necessary to count backwards to get all graphs
-            graph = self.graphLayout.itemAt(i)
-            if graph is not None:
-                widg = graph.widget()
-                self.__resize_graph(widg, n_cols, n_rows)
-
-    def __resize_graph(self, dv, n_cols, n_rows, margin=20):
-        size = round((self.graphDock.width() - margin) / n_cols), round((self.graphDock.height() - margin) / n_rows)
-        dv.resize(*size)
-        dv.setMinimumSize(*size)  # required to avoid wobbly dv
-        # dv.setMaximumSize(*size)
-
-    def remove_old_plots(self):
-        for i in range(self.graphLayout.count(), -1, -1):
-            graph = self.graphLayout.takeAt(i)
-            if graph is not None:
-                widg = graph.widget()
-                widg.setParent(None)
-                widg.deleteLater()
-                delattr(self, widg.objectName())
-        self.graph_names = {}
+    # def resize_graphs(self):  # The aim of this is to avoid the wobbly data viewers when the left panel resizes
+    #     n_rows, n_cols = compute_grid(len(self.get_graphs()))  # WARNING: take care of placeholders
+    #     for i in range(self.graphLayout.count(), -1, -1):  # Necessary to count backwards to get all graphs
+    #         graph = self.graphLayout.itemAt(i)
+    #         if graph is not None:
+    #             widg = graph.widget()
+    #             self.__resize_graph(widg, n_cols, n_rows)
+    #
+    # def __resize_graph(self, dv, n_cols, n_rows, margin=20):
+    #     size = round((self.graphDock.width() - margin) / n_cols), round((self.graphDock.height() - margin) / n_rows)
+    #     dv.resize(*size)
+    #     dv.setMinimumSize(*size)  # required to avoid wobbly dv
+    #     # dv.setMaximumSize(*size)
 
     def setup_icons(self):
         self._reload_icon = self.style().standardIcon(QStyle.SP_BrowserReload)
