@@ -34,6 +34,8 @@ import ClearMap.ParallelProcessing.ParallelTraceback as ptb
 import ClearMap.Utils.Timer as tmr
 import ClearMap.Utils.TagExpression as te
 
+from ClearMap.Utils.utilities import CancelableProcessPoolExecutor
+
 ###############################################################################
 ###  Layout
 ###############################################################################
@@ -995,11 +997,11 @@ def verbose_has_flag(verbose, flag):
 
     
 #TODO: use global plane wise coordinates if subsampling !
-def align_layout(layout, axis_range = None, max_shifts = 10, axis_mip = None,
-                 validate = None, prepare = 'normalization',
-                 validate_slice = None, prepare_slice = None,
-                 find_shifts = 'minimization',
-                 verbose = False, processes = None):
+def align_layout(layout, axis_range=None, max_shifts=10, axis_mip=None,
+                 validate=None, prepare='normalization',
+                 validate_slice=None, prepare_slice=None,
+                 find_shifts='minimization',
+                 verbose=False, processes=None, workspace= None):
   
   axis = layout.axis;
   alignments = layout.alignments;
@@ -1024,8 +1026,12 @@ def align_layout(layout, axis_range = None, max_shifts = 10, axis_mip = None,
     results = [_align(a.pre, a.post) for a in alignments];
   else:
     layout.sources_as_virtual();
-    with concurrent.futures.ProcessPoolExecutor(processes) as executor:
+    with CancelableProcessPoolExecutor(processes) as executor:
       results = executor.map(_align, [a.pre for a in alignments], [a.post for a in alignments]);
+      if workspace is not None:
+        workspace.executor = executor
+    if workspace is not None:
+      workspace.executor = None
     results = list(results);                 
   
   for a,r in zip(layout.alignments, results):
@@ -1148,7 +1154,7 @@ def align_wobbly_axis(source1, source2, axis = 2, axis_range = None, max_shifts 
   w1[slice_no_pad1] = 1;
   w1fft = np.fft.fftn(w1);
   
-  w2 = np.pad(np.zeros(shape1), pad1, 'constant');             
+  w2 = np.pad(np.zeros(shape1), pad1, 'constant');     # FIXME: check pad1
   w2[slice_no_pad2] = 1;
   w2fft = np.fft.fftn(w2);
    
@@ -1561,9 +1567,9 @@ def inspect_align_layout(alignment, verbose):
 ###############################################################################
 
 
-def place_layout(layout, min_quality = None, method = 'optimization', 
-                 smooth = None, smooth_optimized = None, fix_isolated = True,                       
-                 lower_to_origin = True, processes = None, verbose = False):
+def place_layout(layout, min_quality = None, method = 'optimization',
+                 smooth = None, smooth_optimized = None, fix_isolated = True,
+                 lower_to_origin = True, processes = None, verbose = False, workspace=None):
   """Place a layout with the WobblyAlignments."""
   
   #prepare methods dicts
@@ -1622,8 +1628,12 @@ def place_layout(layout, min_quality = None, method = 'optimization',
   if processes == 'serial':
     results = [_place(d,q,s) for d,q,s in zip(displacements, qualities, status)];
   else:
-    with concurrent.futures.ProcessPoolExecutor(processes) as executor:
-      results = executor.map(_place, displacements, qualities, status);
+    with CancelableProcessPoolExecutor(processes) as executor:
+      results = executor.map(_place, displacements, qualities, status)
+      if workspace is not None:
+        workspace.executor = executor
+    if workspace is not None:
+      workspace.executor = None
     results = list(results);                 
   
   positions_new = np.array([r[0] for r in results]);             
@@ -1647,7 +1657,8 @@ def place_layout(layout, min_quality = None, method = 'optimization',
   if method == 'optimization':
     if verbose:
       print('Placement: optimizing wobbly positions!')
-    positions_optimized = _optimize_slice_positions(positions_new, components, processes=processes, verbose=verbose);
+    positions_optimized = _optimize_slice_positions(positions_new, components, processes=processes,
+                                                    workspace=workspace, verbose=verbose)
   else:
     if verbose:
       print('Placement: combining wobbly positions!')      
@@ -1841,7 +1852,7 @@ def _cluster_components(components):
   return components_full, is_to_c, c_to_si
 
 
-def _optimize_slice_positions(positions, components, processes = None, verbose = False):
+def _optimize_slice_positions(positions, components, processes = None, workspace=None, verbose = False):
   """Helper to optimize the positions of the slices on top of each other"""
   
   #Setting:
@@ -1970,8 +1981,12 @@ def _optimize_slice_positions(positions, components, processes = None, verbose =
     if isinstance(processes, int):
       M = [io.sma.smm.insert(m) for m in M];
       X = [io.sma.smm.insert(x) for x in X];           
-      with concurrent.futures.ProcessPoolExecutor(min(processes, ndim)) as executer:
-        shifts = executer.map(_optimize_shifts, M, X);
+      with CancelableProcessPoolExecutor(min(processes, ndim)) as executor:
+        shifts = executor.map(_optimize_shifts, M, X)
+        if workspace is not None:
+          workspace.executor = executor
+      if workspace is not None:
+        workspace.executor = None
       shifts = list(shifts);
       shifts = np.array(shifts).T;
     else:
@@ -2243,7 +2258,7 @@ def fix_isolated(self, exclude_borders=False):
 ###############################################################################
 
 
-def stitch_layout(layout, sink, method = 'interpolation', processes = None, verbose = True):
+def stitch_layout(layout, sink, method = 'interpolation', processes = None, verbose = True, workspace=None):
   """Stitches the wobbly sources in a wobbly layout.
   
   Arguments
@@ -2305,8 +2320,12 @@ def stitch_layout(layout, sink, method = 'interpolation', processes = None, verb
   else:
     #for l in layout_slices:
     #  l.sources_as_virtual();
-    with concurrent.futures.ProcessPoolExecutor(processes) as executor:
-      executor.map(_stitch, layout_slices, range(n_slices));
+    with CancelableProcessPoolExecutor(processes) as executor:
+      executor.map(_stitch, layout_slices, range(n_slices))
+      if workspace is not None:
+        workspace.executor = executor
+    if workspace is not None:
+      workspace.executor = None
     
   
   if verbose:

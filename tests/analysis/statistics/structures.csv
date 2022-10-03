@@ -1,0 +1,8 @@
+,id,atlas_id,parent_structure_id,graph_order,acronym,name,fold_level,custom_level,alternate_level
+263,440,620,723,262,ORBl6a,"Orbital area, lateral part, layer 6a",8,4,
+874,7,283,1132,873,PSV,Principal sensory nucleus of the trigeminal,6,3,
+54,201,1015,329,53,SSp-bfd2/3,"Primary somatosensory area, barrel field, layer 2/3",9,4,
+55,1047,979,329,54,SSp-bfd4,"Primary somatosensory area, barrel field, layer 4",9,4,
+1175,776,662,983,1174,cc,corpus callosum,3,3,
+740,830,103,141,739,DMH,Dorsomedial nucleus of the hypothalamus,6,3,
+1014,928,398,645,1013,CUL,Culmen,5,2,

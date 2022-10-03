@@ -662,7 +662,7 @@ def expand_graph(graph):
 ### Label Tracing
 ###############################################################################
 
-def trace_vertex_label(graph, vertex_label, condition, dilation_steps = 1, max_iterations = None, pass_label = False):
+def trace_vertex_label(graph, vertex_label, condition, dilation_steps=1, max_iterations=None, pass_label=False, **condition_args):
   """Traces label within a graph.
   
   Arguments
@@ -699,12 +699,12 @@ def trace_vertex_label(graph, vertex_label, condition, dilation_steps = 1, max_i
       if pass_label:
         current_label = label.copy();
         for v in vertices_new:
-          if condition(graph, v, current_label):
+          if condition(graph, v, current_label, **condition_args):
             label[v] = True;
           not_checked[v] = False;
       else:
         for v in vertices_new:
-          if condition(graph, v):
+          if condition(graph, v, **condition_args):
             label[v] = True;
           not_checked[v] = False;
     iteration += 1;
@@ -718,7 +718,7 @@ def trace_vertex_label(graph, vertex_label, condition, dilation_steps = 1, max_i
 
 
 
-def trace_edge_label(graph, edge_label, condition, max_iterations = None, dilation_steps = 1, pass_label = False):
+def trace_edge_label(graph, edge_label, condition, max_iterations = None, dilation_steps = 1, pass_label = False, **condition_args):
   """Traces label within a graph.
   
   Arguments
@@ -735,11 +735,12 @@ def trace_edge_label(graph, edge_label, condition, max_iterations = None, dilati
   edge_label : array 
     The traced label.
   """
-  edge_graph, edge_map = graph.edge_graph(return_edge_map=True);
-  traced = trace_vertex_label(edge_graph, edge_label, condition, max_iterations=max_iterations, dilation_steps=dilation_steps, pass_label=pass_label);
-  label = np.zeros(len(traced), dtype=bool);
-  label[edge_map] = traced; #TODO: check if initial label need to be reordered too ?
-  return label;
+  edge_graph, edge_map = graph.edge_graph(return_edge_map=True)
+  traced = trace_vertex_label(edge_graph, edge_label, condition, max_iterations=max_iterations,
+                              dilation_steps=dilation_steps, pass_label=pass_label, **condition_args)
+  label = np.zeros(len(traced), dtype=bool)
+  label[edge_map] = traced  #TODO: check if initial label need to be reordered too ?
+  return label
   
 #  label = edge_label.copy();
 #  not_checked = np.logical_not(label);  

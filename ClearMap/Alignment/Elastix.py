@@ -53,6 +53,8 @@ __download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 
 
 import os
+import subprocess
+import sys
 import tempfile
 import shutil
 import re
@@ -502,8 +504,11 @@ def rescale_size_and_spacing(size, spacing, scale):
 ### Elastix Runs
 ##############################################################################
 
-def align(fixed_image, moving_image, affine_parameter_file, bspline_parameter_file = None, result_directory = None, processes = None):
-  """Align images using elastix, estimates a transformation :math:`T:` fixed image :math:`\\rightarrow` moving image.
+def align(fixed_image, moving_image, affine_parameter_file, bspline_parameter_file=None,
+          result_directory=None, processes=None,
+          workspace=None, moving_landmarks_path=None, fixed_landmarks_path=None):
+  """
+  Align images using elastix, estimates a transformation :math:`T:` fixed image :math:`\\rightarrow` moving image.
   
   Arguments
   ---------
@@ -526,30 +531,36 @@ def align(fixed_image, moving_image, affine_parameter_file, bspline_parameter_fi
     Path to elastix result directory.
   """
   
-  if processes is None:
-    processes = mp.cpu_count()
+  processes = processes if processes is not None else mp.cpu_count()
   
-  check_elastix_initialized();
+  check_elastix_initialized()
 
   # result directory
-  if result_directory == None:
-    result_directory = tempfile.gettempdir();
+  result_directory = result_directory if result_directory is not None else tempfile.gettempdir()
   
   if not os.path.exists(result_directory):
-    os.mkdir(result_directory);
+    os.mkdir(result_directory)
   
   # run elastix
-  if bspline_parameter_file is None:
-    cmd = '%s -threads %d -m %s -f %s -p %s -out %s' % (elastix_binary, processes, moving_image, fixed_image, affine_parameter_file, result_directory);
-  elif affine_parameter_file is None:
-    cmd = '%s -threads %d -m %s -f %s -p %s -out %s' % (elastix_binary, processes, moving_image, fixed_image, bspline_parameter_file, result_directory);
-  else:
-    cmd = '%s -threads %d -m %s -f %s -p %s -p %s -out %s' % (elastix_binary, processes, moving_image, fixed_image, affine_parameter_file, bspline_parameter_file, result_directory);
-  
-  res = os.system(cmd);
-  
-  if res != 0:
-    raise RuntimeError('align: failed executing: ' + cmd);
+  cmd = [elastix_binary, '-threads', str(processes), '-m', moving_image, '-f', fixed_image]
+  if affine_parameter_file is not None:
+    cmd.extend(['-p', affine_parameter_file])
+  if bspline_parameter_file is not None:
+    cmd.extend(['-p', bspline_parameter_file])
+  if moving_landmarks_path is not None or fixed_landmarks_path is not None:
+    cmd.extend(['-mp', moving_landmarks_path, '-fp', fixed_landmarks_path])
+  cmd.extend(['-out', result_directory])
+
+  try:
+    with subprocess.Popen(cmd, stdout=sys.stdout, stderr=sys.stdout) as proc:
+      if workspace is not None:
+        workspace.process = proc
+  except subprocess.SubprocessError as err:
+    print('Align: failed executing: ' + ' '.join(cmd))
+    raise err
+  finally:
+    if workspace is not None:
+      workspace.process = None
   
   return result_directory
 

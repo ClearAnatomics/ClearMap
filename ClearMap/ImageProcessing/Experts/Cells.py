@@ -112,7 +112,8 @@ See :func:`ClearMap.ParallelProcessing.BlockProcessing.process` for details."""
 ### Cell detection
 ###############################################################################
                    
-def detect_cells(source, sink = None, cell_detection_parameter = default_cell_detection_parameter, processing_parameter = default_cell_detection_processing_parameter):
+def detect_cells(source, sink=None, cell_detection_parameter=default_cell_detection_parameter,
+                 processing_parameter=default_cell_detection_processing_parameter, workspace=None):
   """Cell detection pipeline.
   
   Arguments
@@ -182,11 +183,11 @@ def detect_cells(source, sink = None, cell_detection_parameter = default_cell_de
     Background removal step parameter.
 
     shape : tuple
-      The shape of the structure lement to estimate the background.
+      The shape of the structure element to estimate the background.
       This should be larger than the typical cell size.
     
     form : str
-      The form of the structur element (e.g. 'Disk')
+      The form of the structure element (e.g. 'Disk')
         
     save : str or None
       Save the result of this step to the specified file if not None.
@@ -313,8 +314,10 @@ def detect_cells(source, sink = None, cell_detection_parameter = default_cell_de
         ap.initialize_sink(filename, shape=shape, order=order, dtype='float');
         
   cell_detection_parameter.update(verbose=processing_parameter.get('verbose', False));
-  
-  results, blocks = bp.process(detect_cells_block, source, sink=None, function_type='block', return_result=True, return_blocks=True, parameter=cell_detection_parameter, **processing_parameter)                   
+
+  results, blocks = bp.process(detect_cells_block, source, sink=None, function_type='block', return_result=True,
+                               return_blocks=True, parameter=cell_detection_parameter, workspace=workspace,
+                               **processing_parameter)
   
   #merge results
   results = np.vstack([np.hstack(r) for r in results])
@@ -594,8 +597,9 @@ def detect_cells_block(source, parameter = default_cell_detection_parameter):
 ###############################################################################
 
 def remove_background(source, shape, form = 'Disk'):
-  selem = se.structure_element(shape, form=form, ndim=2).astype('uint8');
-  removed = np.empty(source.shape, dtype=source.dtype);
+  selem = se.structure_element(shape, form=form, ndim=2)
+  selem = np.array(selem).astype('uint8')
+  removed = np.empty(source.shape, dtype=source.dtype)
   for z in range(source.shape[2]):
     #img[:,:,z] = img[:,:,z] - grey_opening(img[:,:,z], structure = structureElement('Disk', (30,30)));
     #img[:,:,z] = img[:,:,z] - morph.grey_opening(img[:,:,z], structure = self.structureELement('Disk', (150,150)));
