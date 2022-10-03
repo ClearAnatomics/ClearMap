@@ -40,8 +40,16 @@
        <string>Sample folders</string>
       </attribute>
       <layout class="QGridLayout" name="gridLayout">
-       <item row="0" column="0">
+       <item row="0" column="1">
         <layout class="QGridLayout" name="sampleFoldersPageLayout">
+         <item row="0" column="1">
+          <widget class="QToolButton" name="folderPickerHelperInfoToolButton">
+           <property name="icon">
+            <iconset resource="icons.qrc">
+             <normaloff>:/icons/icons/info.svg</normaloff>:/icons/icons/info.svg</iconset>
+           </property>
+          </widget>
+         </item>
          <item row="0" column="0">
           <widget class="QPushButton" name="folderPickerHelperPushButton">
            <property name="toolTip">
@@ -59,18 +67,21 @@
            </property>
           </widget>
          </item>
-         <item row="0" column="1">
-          <widget class="QToolButton" name="folderPickerHelperInfoToolButton">
-           <property name="icon">
-            <iconset resource="icons.qrc">
-             <normaloff>:/icons/icons/info.svg</normaloff>:/icons/icons/info.svg</iconset>
-           </property>
-          </widget>
-         </item>
          <item row="1" column="0">
           <widget class="QPushButton" name="addGroupPushButton">
            <property name="text">
             <string>Add group</string>
+           </property>
+           <property name="icon">
+            <iconset theme="add">
+             <normaloff>.</normaloff>.</iconset>
+           </property>
+          </widget>
+         </item>
+         <item row="1" column="1">
+          <widget class="QPushButton" name="removeGroupPushButton">
+           <property name="text">
+            <string>Remove group</string>
            </property>
            <property name="icon">
             <iconset theme="add">

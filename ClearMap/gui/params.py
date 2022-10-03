@@ -1779,6 +1779,7 @@ class BatchParams(UiParameter):
 
     def connect(self):
         self.tab.addGroupPushButton.clicked.connect(self.add_group)
+        self.tab.removeGroupPushButton.clicked.connect(self.remove_group)
         self.tab.resultsFolderLineEdit.textChanged.connect(self.handle_results_folder_changed)
 
     def connect_groups(self):
@@ -1822,6 +1823,13 @@ class BatchParams(UiParameter):
         self.tab.sampleFoldersToolBox.addItem(group_controls, f'Group {new_gp_id}')
 
         self.connect_groups()
+
+    def remove_group(self):
+        last_idx = self.tab.sampleFoldersToolBox.count() - 1
+        widg = self.tab.sampleFoldersToolBox.widget(last_idx)
+        self.tab.sampleFoldersToolBox.removeItem(last_idx)
+        widg.setParent(None)
+        widg.deleteLater()
 
     @property
     def n_groups(self):
