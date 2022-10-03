@@ -379,15 +379,16 @@ class AlignmentTab(GenericTab):
         self.params.ui_to_cfg()
         self.main_window.print_status_msg('Stitching')
         tags = self.preprocessor.workspace.expression('raw', prefix=self.preprocessor.prefix).tags  # FIXME: only 1 axis
-        axes = [tag.name for tag in tags]
-        if axes == ['Z']:  # BYPASS stitching, just stack
+        if tags is not None:
+            axes = [tag.name for tag in tags]
+        if tags is None or axes == ['Z']:  # BYPASS stitching, just copy or stack
             clearmap_io.convert(self.preprocessor.filename('raw'), self.preprocessor.filename('stitched'))
             self.main_window.logger.n_lines = 0
             self.main_window.make_nested_progress_dialog('Stitching', n_steps=1, sub_maximum=0,
                                                          sub_process_name='Getting layout',
                                                          abort_callback=self.preprocessor.stop_process,
                                                          parent=self.main_window)
-        else:
+        else:  # assume tiling
             n_steps = self.preprocessor.n_rigid_steps_to_run + self.preprocessor.n_wobbly_steps_to_run
             self.main_window.make_nested_progress_dialog('Stitching', n_steps=n_steps, sub_maximum=0,
                                                          sub_process_name='Getting layout',
@@ -551,8 +552,6 @@ class AlignmentTab(GenericTab):
                            lut=self.main_window.preference_editor.params.lut,
                            parent=self.main_window.centralWidget())
         self.main_window.setup_plots(dvs)
-
-
 
 
 class CellCounterTab(PostProcessingTab):
