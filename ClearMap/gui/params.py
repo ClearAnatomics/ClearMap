@@ -1750,7 +1750,7 @@ class BatchParams(UiParameter):
         self.group_concatenator = ' vs '
         self.preferences = preferences
         self.tab.sampleFoldersToolBox = QToolBox(parent=self.tab)
-        self.tab.sampleFoldersPageLayout.addWidget(self.tab.sampleFoldersToolBox)
+        self.tab.sampleFoldersPageLayout.addWidget(self.tab.sampleFoldersToolBox, 3, 0)
 
         self.comparison_checkboxes = []
 
@@ -1784,9 +1784,32 @@ class BatchParams(UiParameter):
 
     def connect_groups(self):
         for btn in self.gp_add_folder_buttons:
-            btn.clicked.connect(self.handle_add_src_folder_clicked)
+            try:
+                btn.clicked.connect(self.handle_add_src_folder_clicked, type=Qt.UniqueConnection)
+            except TypeError as err:
+                if err.args[0] == 'connection is not unique':
+                    btn.clicked.disconnect()
+                    btn.clicked.connect(self.handle_add_src_folder_clicked, type=Qt.UniqueConnection)
+                else:
+                    raise err
+        for btn in self.gp_remove_folder_buttons:
+            try:
+                btn.clicked.connect(self.handle_remove_src_folder_clicked, type=Qt.UniqueConnection)
+            except TypeError as err:
+                if err.args[0] == 'connection is not unique':
+                    btn.clicked.disconnect()
+                    btn.clicked.connect(self.handle_remove_src_folder_clicked, type=Qt.UniqueConnection)
+                else:
+                    raise err
         for ctrl in self.gp_group_name_ctrls:
-            ctrl.editingFinished.connect(self.update_comparisons)
+            try:
+                ctrl.editingFinished.connect(self.update_comparisons, type=Qt.UniqueConnection)
+            except TypeError as err:
+                if err.args[0] == 'connection is not unique':
+                    ctrl.editingFinished.disconnect()
+                    ctrl.editingFinished.connect(self.update_comparisons, type=Qt.UniqueConnection)
+                else:
+                    raise err
 
     @property
     def comparisons(self):
@@ -1853,6 +1876,10 @@ class BatchParams(UiParameter):
         return self.get_gp_ctrls('AddSrcFolderBtn')
     
     @property
+    def gp_remove_folder_buttons(self):
+        return self.get_gp_ctrls('RemoveSrcFolderBtn')
+
+    @property
     def gp_list_widget(self):
         return self.get_gp_ctrls('ListWidget')
 
@@ -1876,10 +1903,17 @@ class BatchParams(UiParameter):
         return {gp: paths for gp, paths in zip(self.group_names, self.get_all_paths())}
 
     def handle_add_src_folder_clicked(self):
-        gp = self.tab.sampleFoldersToolBox.currentIndex() + 1
+        gp = self.tab.sampleFoldersToolBox.currentIndex()
         folder_path = get_directory_dlg(self.preferences.start_folder, 'Select sample folder')
         if folder_path:
-            self.gp_list_widget[gp].append(folder_path)
+            self.gp_list_widget[gp].addItem(folder_path)
+
+    def handle_remove_src_folder_clicked(self):
+        print('call')
+        gp = self.tab.sampleFoldersToolBox.currentIndex()
+        sample_idx = self.gp_list_widget[gp].currentRow()
+        _ = self.gp_list_widget[gp].takeItem(sample_idx)
+        print(_.text())
 
     @property
     def results_folder(self):
@@ -1900,7 +1934,7 @@ class BatchParams(UiParameter):
     def align(self, value):
         self.tab.batchAlignCheckBox.setChecked(value)
 
-    # def handle_algin_changed(self):
+    # def handle_align_changed(self):
     #     self.
 
     @property
