@@ -14,6 +14,7 @@ __download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
 
 import os
 import sys
+import time
 
 from multiprocessing.pool import ThreadPool
 from shutil import copyfile
@@ -123,17 +124,25 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
             if child.objectName() == child_name:
                 return child
 
-    def print_error_msg(self, msg):
-        self.statusbar.setStyleSheet("color: red")
-        self.statusbar.showMessage(msg)
+    def __print_status_msg(self, msg, color, n_blinks=1, period=1):
+        for i in range(n_blinks):
+            self.statusbar.setStyleSheet(f'color: {color}')
+            self.statusbar.showMessage(msg)
+            if i < (n_blinks - 1):
+                self.app.processEvents()
+                time.sleep(period/2)
+                self.statusbar.clearMessage()
+                self.app.processEvents()
+                time.sleep(period/2)
 
-    def print_warning_msg(self, msg):
-        self.statusbar.setStyleSheet("color: yellow")
-        self.statusbar.showMessage(msg)
+    def print_error_msg(self, msg, n_blinks=1, period=1):
+        self.__print_status_msg(msg, 'red', n_blinks=n_blinks, period=period)
 
-    def print_status_msg(self, msg):
-        self.statusbar.setStyleSheet("color: white")
-        self.statusbar.showMessage(msg)
+    def print_warning_msg(self, msg, n_blinks=1, period=1):
+        self.__print_status_msg(msg, 'yellow', n_blinks=n_blinks, period=period)
+
+    def print_status_msg(self, msg, n_blinks=1, period=1):
+        self.__print_status_msg(msg, 'green', n_blinks=n_blinks, period=period)
 
     def fix_btn_boxes_text(self):
         for btn_box in self.findChildren(QDialogButtonBox):
@@ -370,7 +379,7 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         return result.get()
 
     def signal_process_finished(self, msg='Idle, waiting for input'):
-        self.print_status_msg(msg)
+        self.print_status_msg(msg, n_blinks=5, period=0.5)
         if self.progress_dialog is not None:
             self.progress_dialog.done(1)
 
