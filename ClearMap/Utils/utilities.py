@@ -1,0 +1,110 @@
+# -*- coding: utf-8 -*-
+"""
+utilities
+=========
+
+Various utilities that do not have a specific category
+"""
+
+import os
+import re
+import shutil
+import subprocess
+from concurrent.futures import ProcessPoolExecutor
+from functools import reduce
+from operator import getitem
+
+import numpy as np
+import psutil
+
+__author__ = 'Charly Rousseau <charly.rousseau@icm-institute.org>'
+__license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
+__copyright__ = 'Copyright © 2022 by Charly Rousseau'
+__webpage__ = 'https://idisco.info'
+__download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
+
+
+colors = {
+    "WHITE": '\033[1;37m',
+    "GREEN": '\033[0;32m',
+    "YELLOW": '\033[1;33;48m',
+    "RED": '\033[1;31;48m',
+    "BLINK": '\33[5m',
+    "BLINK2": '\33[6m',
+    "RESET": '\033[1;37;0m'
+}
+
+
+def colorize(msg, color):
+    color = color.upper()
+    color = colors[color]
+    return "{color}{msg}{reset_color}".format(color=color, msg=msg, reset_color=colors["RESET"])
+
+
+def runs_on_spyder():
+    return any('SPYDER' in name for name in os.environ)
+
+
+def runs_on_pycharm():
+    return "PYCHARM_HOSTED" in os.environ
+
+
+def runs_on_ui():
+    return 'CLEARMAP_GUI_HOSTED' in os.environ
+
+
+def get_free_v_ram():
+    cmd = 'nvidia-smi --query-gpu=memory.free --format=noheader,csv,nounits'
+    result = subprocess.check_output(cmd, shell=True)
+    return int(result)
+
+
+class CancelableProcessPoolExecutor(ProcessPoolExecutor):
+    def immediate_shutdown(self):
+        with self._shutdown_lock:
+            self._shutdown_thread = True
+            # statuses = [psutil.Process(_proc.pid).status() for _proc in self._processes.values()]
+            terminated_procs = 0
+            for proc in self._processes.values():
+                status = psutil.Process(proc.pid).status()
+                if status == 'sleeping':
+                    proc.terminate()
+                    terminated_procs += 1
+            if not terminated_procs:
+                for proc in self._processes.values():
+                    proc.terminate()
+
+
+def is_in_range(src_array, value_range):
+    return np.logical_and(src_array >= value_range[0], src_array <= value_range[1])
+
+
+def is_iterable(obj):
+    try:
+        iterator = iter(obj)
+        return True
+    except TypeError:
+        return False
+
+
+def title_to_snake(string):
+    return re.sub('(?!^)([A-Z]+)', r'_\1', string).lower()
+
+
+def backup_file(file_path):  # REFACTOR: put in workspace or IO
+    base_path, ext = os.path.splitext(file_path)
+    new_path = base_path + '.bcp' + ext
+    shutil.copy(file_path, new_path)
+
+
+def make_abs(directory, file_name):
+    """Make file_name absolute if it is not"""
+    if os.path.isabs(file_name):
+        f_path = file_name
+    else:
+        f_path = os.path.join(directory, file_name)
+    return f_path
+
+
+def get_item_recursive(container, keys):
+    return reduce(getitem, keys, container)

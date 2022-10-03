@@ -1,0 +1,52 @@
+# ClearMap.yml 
+#
+# ClearMap2.0 Toolbox
+# © Christoph Kirst
+# https://github.com/ChristophKirst/ClearMap2
+#
+# Licensed under GNU General Public License v3.0
+#
+# ClearMap anaconda environment
+#
+# install: conda env create -f ClearMap.yml 
+# update:  conda env update -f ClearMap.yml 
+name: ClearMapUi
+channels:
+  - pytorch
+  - conda-forge
+  - defaults
+
+dependencies:
+  - python=3.7  # constraining seems to speed up resolution
+  - pip
+  - vispy<=0.5.3
+  - pyopengl
+  - natsort
+  - tifffile==0.15.1  # Very important because the new tiffile breaks IO.TIF
+  - pyqt
+  - pyqtwebengine
+  - pyqtgraph
+  - opencv
+  - cython
+  - matplotlib
+  - numpy
+  - scipy
+  - scikit-image
+  - scikit-learn
+  - graph-tool
+  - pytorch<=1.11
+  - cudatoolkit=11.6
+  - pygments
+  - qdarkstyle
+  - qtpy  # for qdarkstyle
+  - xmltodict  # to compensate for old tifffile
+  - configobj
+  - pyarrow
+  - pandas
+  - psutil  # required for python < 3.9 for cancelable ProcessPoolExecutors
+  - tqdm
+  - mpld3  # WARNING Maybe pip
+  - pip:
+    - lxml
+#variables:
+#  TMPDIR: /data/tmp  # FIXME:

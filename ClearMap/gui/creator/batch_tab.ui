@@ -1,0 +1,292 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>Form</class>
+ <widget class="QWidget" name="Form">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>456</width>
+    <height>822</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Form</string>
+  </property>
+  <layout class="QVBoxLayout" name="verticalLayout_4">
+   <item>
+    <widget class="QToolBox" name="batchToolBox">
+     <property name="font">
+      <font>
+       <bold>true</bold>
+      </font>
+     </property>
+     <property name="toolTip">
+      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Compute the summary stats table for all the pairs of groups selected in the &lt;span style=&quot; font-style:italic;&quot;&gt;comparisons&lt;/span&gt; tab&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+     </property>
+     <property name="currentIndex">
+      <number>0</number>
+     </property>
+     <widget class="QWidget" name="sampleFoldersPage">
+      <property name="geometry">
+       <rect>
+        <x>0</x>
+        <y>0</y>
+        <width>438</width>
+        <height>560</height>
+       </rect>
+      </property>
+      <attribute name="label">
+       <string>Sample folders</string>
+      </attribute>
+      <layout class="QGridLayout" name="gridLayout">
+       <item row="0" column="1">
+        <layout class="QGridLayout" name="sampleFoldersPageLayout">
+         <item row="0" column="1">
+          <widget class="QToolButton" name="folderPickerHelperInfoToolButton">
+           <property name="icon">
+            <iconset resource="icons.qrc">
+             <normaloff>:/icons/icons/info.svg</normaloff>:/icons/icons/info.svg</iconset>
+           </property>
+          </widget>
+         </item>
+         <item row="0" column="0">
+          <widget class="QPushButton" name="folderPickerHelperPushButton">
+           <property name="toolTip">
+            <string>Launch the wizard to select sample folders</string>
+           </property>
+           <property name="whatsThis">
+            <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;When you click the batch tab, you should select a start folder. The helper will&lt;/p&gt;&lt;p&gt; browse this main folder recursively and find all the subfolders that correspond &lt;/p&gt;&lt;p&gt;to ClearMap samples (using the sample_params.cfg files).&lt;/p&gt;&lt;p&gt;In this window, you should select the grou p number from the drop down menu&lt;/p&gt;&lt;p&gt;and move to the right column the samples for that group.&lt;/p&gt;&lt;p&gt;Once done, move to the next group.&lt;/p&gt;&lt;p&gt;Finaly click OK. You will be able to customise the names of the groups in the &lt;/p&gt;&lt;p&gt;batch tab.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+           </property>
+           <property name="text">
+            <string>  Folder picker helper</string>
+           </property>
+           <property name="icon">
+            <iconset theme="gnome-help">
+             <normaloff>.</normaloff>.</iconset>
+           </property>
+          </widget>
+         </item>
+         <item row="1" column="0">
+          <widget class="QPushButton" name="addGroupPushButton">
+           <property name="text">
+            <string>Add group</string>
+           </property>
+           <property name="icon">
+            <iconset theme="add">
+             <normaloff>.</normaloff>.</iconset>
+           </property>
+          </widget>
+         </item>
+         <item row="2" column="0">
+          <widget class="QPushButton" name="removeGroupPushButton">
+           <property name="text">
+            <string>Remove group</string>
+           </property>
+           <property name="icon">
+            <iconset theme="add">
+             <normaloff>.</normaloff>.</iconset>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="page">
+      <property name="geometry">
+       <rect>
+        <x>0</x>
+        <y>0</y>
+        <width>438</width>
+        <height>560</height>
+       </rect>
+      </property>
+      <attribute name="label">
+       <string>Process</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="verticalLayout_5">
+       <item>
+        <widget class="QCheckBox" name="batchAlignCheckBox">
+         <property name="text">
+          <string>Align</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QCheckBox" name="batchCountCellsCheckBox">
+         <property name="text">
+          <string>Count cells</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QCheckBox" name="batchVasculatureCheckBox">
+         <property name="text">
+          <string>Vasculature</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QDialogButtonBox" name="batchRunButtonBox">
+         <property name="toolTip">
+          <string>Run these steps on all the samples selected previously</string>
+         </property>
+         <property name="standardButtons">
+          <set>QDialogButtonBox::Apply</set>
+         </property>
+         <property name="applyText" stdset="0">
+          <string>Run</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="comparisonsPage">
+      <property name="geometry">
+       <rect>
+        <x>0</x>
+        <y>0</y>
+        <width>438</width>
+        <height>560</height>
+       </rect>
+      </property>
+      <attribute name="label">
+       <string>Comparisons</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="verticalLayout_3">
+       <item>
+        <layout class="QVBoxLayout" name="comparisonsVerticalLayout"/>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="page_8">
+      <property name="geometry">
+       <rect>
+        <x>0</x>
+        <y>0</y>
+        <width>438</width>
+        <height>560</height>
+       </rect>
+      </property>
+      <attribute name="label">
+       <string>P Values</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="verticalLayout">
+       <item>
+        <widget class="QDialogButtonBox" name="runPValsButtonBox">
+         <property name="toolTip">
+          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Compute the p value maps for all the pairs of groups selected in the &lt;span style=&quot; font-style:italic;&quot;&gt;comparisons&lt;/span&gt; tab&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+         </property>
+         <property name="standardButtons">
+          <set>QDialogButtonBox::Apply</set>
+         </property>
+         <property name="applyText" stdset="0">
+          <string>Run</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="page_2">
+      <property name="geometry">
+       <rect>
+        <x>0</x>
+        <y>0</y>
+        <width>438</width>
+        <height>560</height>
+       </rect>
+      </property>
+      <attribute name="label">
+       <string>Stats</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="verticalLayout_6">
+       <item>
+        <widget class="QDialogButtonBox" name="batchStatsButtonBox">
+         <property name="toolTip">
+          <string/>
+         </property>
+         <property name="standardButtons">
+          <set>QDialogButtonBox::Apply</set>
+         </property>
+         <property name="applyText" stdset="0">
+          <string>Run</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </widget>
+   </item>
+   <item>
+    <widget class="QFrame" name="frame_2">
+     <property name="minimumSize">
+      <size>
+       <width>0</width>
+       <height>30</height>
+      </size>
+     </property>
+     <property name="frameShape">
+      <enum>QFrame::StyledPanel</enum>
+     </property>
+     <property name="frameShadow">
+      <enum>QFrame::Raised</enum>
+     </property>
+     <layout class="QHBoxLayout" name="horizontalLayout_4">
+      <property name="topMargin">
+       <number>0</number>
+      </property>
+      <property name="bottomMargin">
+       <number>0</number>
+      </property>
+      <item>
+       <widget class="QPushButton" name="pushButton_2">
+        <property name="toolTip">
+         <string>Where will the results be saved</string>
+        </property>
+        <property name="text">
+         <string>  Results folder</string>
+        </property>
+        <property name="icon">
+         <iconset theme="folder-open">
+          <normaloff>.</normaloff>.</iconset>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLineEdit" name="resultsFolderLineEdit">
+        <property name="minimumSize">
+         <size>
+          <width>0</width>
+          <height>20</height>
+         </size>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QCheckBox" name="advancedCheckBox_2">
+     <property name="text">
+      <string>Advanced</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QDialogButtonBox" name="applyBox_2">
+     <property name="standardButtons">
+      <set>QDialogButtonBox::Apply</set>
+     </property>
+     <property name="applyText" stdset="0">
+      <string>Run</string>
+     </property>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources>
+  <include location="icons.qrc"/>
+ </resources>
+ <connections/>
+</ui>

@@ -12,7 +12,7 @@ __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__   = 'http://idisco.info'
 __download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 
-
+import numpy as np
 import tifffile as tif
 
 import ClearMap.IO.Source as src
@@ -91,31 +91,33 @@ class Source(src.Source):
     ----
     The strides of the elements module itemsize instead of bytes.
     """
-    memmap = self.as_memmap();
-    return tuple(s // memmap.itemsize for s in memmap.strides);
+    memmap = self.as_memmap()
+    return tuple(s // memmap.itemsize for s in memmap.strides)
   
-  def __getitem__(self, slicing, processes = None):
-    ndim = self.ndim;
+  def __getitem__(self, slicing, processes=None):
+    ndim = self.ndim
     if ndim >= 3:
-      slicing = slc.unpack_slicing(slicing, ndim);
+      slicing = slc.unpack_slicing(slicing, ndim)
 
-      slicing_z  = slicing[-1];
-      array = self._tif.asarray(key = slicing_z, maxworkers=processes);
-      array = array_from_tif(array);    
+      slicing_z = slicing[-1]
+      if isinstance(slicing_z, (np.int, np.int64)):
+        slicing_z = int(slicing_z)
+      array = self._tif.asarray(key=slicing_z, maxworkers=processes)
+      array = array_from_tif(array)
       
-      slicing_xy = (Ellipsis,) + slicing[-3:-1];
+      slicing_xy = (Ellipsis,) + slicing[-3:-1]
       if len(array.shape) > len(self._tif.pages[0].shape):
-        slicing_xy = slicing_xy + (slice(None),);
-      return array[slicing_xy];
+        slicing_xy = slicing_xy + (slice(None),)
+      return array[slicing_xy]
     
     else:
-      array = self._tif.asarray(maxworkers=processes);
+      array = self._tif.asarray(maxworkers=processes)
       array = array_from_tif(array)
-      return array.__getitem__(slicing);
+      return array.__getitem__(slicing)
       
   def __setitem__(self, *args):
-    memmap = self.as_memmap();
-    memmap.__setitem__(*args);
+    memmap = self.as_memmap()
+    memmap.__setitem__(*args)
    
   
   def metadata(self, info = None):
