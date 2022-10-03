@@ -13,8 +13,24 @@
   <property name="windowTitle">
    <string>Form</string>
   </property>
-  <layout class="QVBoxLayout" name="verticalLayout">
-   <item>
+  <layout class="QGridLayout" name="gridLayout">
+   <item row="1" column="0">
+    <widget class="QPushButton" name="gpAddSrcFolderBtn">
+     <property name="font">
+      <font>
+       <bold>true</bold>
+      </font>
+     </property>
+     <property name="text">
+      <string>   Add Sample Folder</string>
+     </property>
+     <property name="icon">
+      <iconset theme="folder-new">
+       <normaloff>.</normaloff>.</iconset>
+     </property>
+    </widget>
+   </item>
+   <item row="0" column="0">
     <widget class="QFrame" name="frame_3">
      <property name="minimumSize">
       <size>
@@ -74,23 +90,22 @@
      </layout>
     </widget>
    </item>
-   <item>
-    <widget class="QPushButton" name="gpAddSrcFolderBtn">
+   <item row="1" column="1">
+    <widget class="QPushButton" name="gpRemoveSrcFolderBtn">
      <property name="font">
       <font>
        <bold>true</bold>
       </font>
      </property>
      <property name="text">
-      <string>   Add Sample Folder</string>
+      <string>   Remove Folder</string>
      </property>
      <property name="icon">
-      <iconset theme="folder-new">
-       <normaloff>.</normaloff>.</iconset>
+      <iconset theme="remove"/>
      </property>
     </widget>
    </item>
-   <item>
+   <item row="3" column="0" colspan="2">
     <widget class="QFrame" name="frame">
      <property name="frameShape">
       <enum>QFrame::StyledPanel</enum>
