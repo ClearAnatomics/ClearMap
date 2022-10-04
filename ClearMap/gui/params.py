@@ -1784,32 +1784,31 @@ class BatchParams(UiParameter):
 
     def connect_groups(self):
         for btn in self.gp_add_folder_buttons:
-            try:
-                btn.clicked.connect(self.handle_add_src_folder_clicked, type=Qt.UniqueConnection)
-            except TypeError as err:
-                if err.args[0] == 'connection is not unique':
-                    btn.clicked.disconnect()
-                    btn.clicked.connect(self.handle_add_src_folder_clicked, type=Qt.UniqueConnection)
-                else:
-                    raise err
+            self.__connect_btn(btn, self.handle_add_src_folder_clicked)
         for btn in self.gp_remove_folder_buttons:
-            try:
-                btn.clicked.connect(self.handle_remove_src_folder_clicked, type=Qt.UniqueConnection)
-            except TypeError as err:
-                if err.args[0] == 'connection is not unique':
-                    btn.clicked.disconnect()
-                    btn.clicked.connect(self.handle_remove_src_folder_clicked, type=Qt.UniqueConnection)
-                else:
-                    raise err
+            self.__connect_btn(btn, self.handle_remove_src_folder_clicked)
         for ctrl in self.gp_group_name_ctrls:
-            try:
-                ctrl.editingFinished.connect(self.update_comparisons, type=Qt.UniqueConnection)
-            except TypeError as err:
-                if err.args[0] == 'connection is not unique':
-                    ctrl.editingFinished.disconnect()
-                    ctrl.editingFinished.connect(self.update_comparisons, type=Qt.UniqueConnection)
-                else:
-                    raise err
+            self.__connect_line_edit(ctrl, self.update_comparisons)
+
+    def __connect_btn(self, btn, callback):
+        try:
+            btn.clicked.connect(callback, type=Qt.UniqueConnection)
+        except TypeError as err:
+            if err.args[0] == 'connection is not unique':
+                btn.clicked.disconnect()
+                btn.clicked.connect(callback, type=Qt.UniqueConnection)
+            else:
+                raise err
+
+    def __connect_line_edit(self, ctrl, callback):
+        try:
+            ctrl.editingFinished.connect(callback, type=Qt.UniqueConnection)
+        except TypeError as err:
+            if err.args[0] == 'connection is not unique':
+                ctrl.editingFinished.disconnect()
+                ctrl.editingFinished.connect(callback, type=Qt.UniqueConnection)
+            else:
+                raise err
 
     @property
     def comparisons(self):
