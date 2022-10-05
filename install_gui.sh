@@ -75,6 +75,7 @@ conda env config vars set "LD_LIBRARY_PATH=$clearmap_install_path/ClearMap/Exter
 echo "
 ClearMapUi installed
 To use it, open a terminal and run:
+    conda activate ClearMapUi
     clear_map_ui
 Alternatively, use the start menu menu_entry
 "
