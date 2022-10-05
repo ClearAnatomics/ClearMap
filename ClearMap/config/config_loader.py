@@ -152,7 +152,7 @@ class ConfigLoader(object):
                 cfg_dir = INSTALL_CFG_DIR if install_mode else ConfigLoader.default_dir
                 raise FileNotFoundError(f'Could not find file {cfg_name} in {cfg_dir}')
             else:  # Return first (default) ext if none found
-                return ConfigLoader._name_to_default_path(cfg_name, ConfigLoader.supported_exts[0],
+                return ConfigLoader._name_to_default_path(f'{cfg_name}_params', ConfigLoader.supported_exts[0],
                                                           install_mode=install_mode)
         return cfg_path
 
