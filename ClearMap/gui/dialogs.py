@@ -31,10 +31,7 @@ DISPLAY_CONFIG = cfg_loader.get_cfg('display')
 
 def get_directory_dlg(start_folder, title="Choose the source directory"):
     diag = QFileDialog()  # REFACTOR: move to gui_utils
-    if sys.platform == 'win32' or runs_on_pycharm():  # avoids bug with windows COM object init failed
-        opt = QFileDialog.Options(QFileDialog.DontUseNativeDialog)
-    else:
-        opt = QFileDialog.Options()
+    opt = QFileDialog.Options(QFileDialog.DontUseNativeDialog)
     start_folder = clean_path(start_folder)
     src_folder = diag.getExistingDirectory(parent=diag, caption=title,
                                            directory=start_folder, options=opt)
