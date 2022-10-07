@@ -40,6 +40,7 @@ import ClearMap.Alignment.Stitching.StitchingRigid as stitching_rigid
 # noinspection PyPep8Naming
 import ClearMap.Alignment.Stitching.StitchingWobbly as stitching_wobbly
 from ClearMap.IO.metadata import define_auto_stitching_params, define_auto_resolution, pattern_finders_from_base_dir
+from ClearMap.IO.elastix_config import ElastixParser
 from ClearMap.config.config_loader import get_configs, ConfigLoader
 
 
@@ -619,11 +620,14 @@ class PreProcessor(TabProcessor):
             "result_directory": self.filename('resampled_to_auto'),
             'workspace': self.workspace
         }
-        # FIXME: add use_landmarks to config
-        if os.path.exists(self.get_autofluo_pts_path('resampled_to_auto')) and os.path.exists(self.resampled_pts_path):
+        use_landmarks = os.path.exists(self.get_autofluo_pts_path('resampled_to_auto')) and os.path.exists(
+            self.resampled_pts_path)
+        if use_landmarks:  # FIXME: add use_landmarks to config
             align_channels_parameter.update(moving_landmarks_path=self.resampled_pts_path,
                                             fixed_landmarks_path=self.get_autofluo_pts_path('resampled_to_auto'))
+            self.patch_elastix_parameter_files([self.align_channels_affine_file])
         elastix.align(**align_channels_parameter)
+        self.restore_elastix_parameter_files([self.align_channels_affine_file])  # FIXME: do in try except
         self.__check_elastix_success('resampled_to_auto')
 
     def __align_auto_to_ref(self):
@@ -640,14 +644,16 @@ class PreProcessor(TabProcessor):
             "result_directory": self.filename('auto_to_reference'),
             'workspace': self.workspace
         }
-        # FIXME: add use_landmarks to config
-        if os.path.exists(self.get_autofluo_pts_path('auto_to_reference')) and os.path.exists(self.ref_pts_path):
+        use_landmarks = os.path.exists(self.get_autofluo_pts_path('auto_to_reference')) and os.path.exists(self.ref_pts_path)
+        if use_landmarks:  # FIXME: add use_landmarks to config
             align_reference_parameter.update(moving_landmarks_path=self.ref_pts_path,
                                              fixed_landmarks_path=self.get_autofluo_pts_path('auto_to_reference'))
+            self.patch_elastix_parameter_files([self.align_reference_affine_file, self.align_reference_bspline_file])
         for k, v in align_reference_parameter.items():
             if not v:
                 raise ValueError('Registration missing parameter "{}"'.format(k))
         elastix.align(**align_reference_parameter)
+        self.restore_elastix_parameter_files([self.align_reference_affine_file, self.align_reference_bspline_file])  # FIXME: do in try except
         self.__check_elastix_success('auto_to_reference')
 
     def __check_elastix_success(self, results_dir_name):
@@ -688,6 +694,22 @@ class PreProcessor(TabProcessor):
             paths = paths[0]
         dvs = plot_3d.plot(paths, title=titles, arange=False, lut='white', parent=parent)
         return dvs
+
+    @staticmethod
+    def patch_elastix_parameter_files(elastix_files):
+        for f_path in elastix_files:
+            cfg = ElastixParser(f_path)
+            cfg['Registration'] = ['MultiMetricMultiResolutionRegistration']
+            cfg['Metric'] = ["AdvancedMattesMutualInformation", "CorrespondingPointsEuclideanDistanceMetric"]
+            cfg.write()
+
+    @staticmethod
+    def restore_elastix_parameter_files(elastix_files):
+        for f_path in elastix_files:
+            cfg = ElastixParser(f_path)
+            cfg['Registration'] = ['MultiResolutionRegistration']
+            cfg['Metric'] = ["AdvancedMattesMutualInformation"]
+            cfg.write()
 
 
 def main():

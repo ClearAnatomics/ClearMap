@@ -2,6 +2,7 @@ import argparse
 
 from scipy import ndimage
 
+from ClearMap.Alignment.Annotation import annotation_to_distance_file
 from ClearMap.IO import IO as clearmap_io
 
 
@@ -15,9 +16,7 @@ def get_args():
 
 def main():
     annotation_file_path, dest_path = get_args()
-    brain_mask = (clearmap_io.read(annotation_file_path) > 1).astype(int)
-    distance_array = ndimage.distance_transform_edt(brain_mask)
-    clearmap_io.write(dest_path, distance_array)
+    clearmap_io.write(dest_path, annotation_to_distance_file(annotation_file_path))
 
 
 if __name__ == '__main__':
