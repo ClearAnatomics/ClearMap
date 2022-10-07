@@ -189,9 +189,17 @@ class Annotation(object):
         self.extra_label = None
         self.annotation_file = None
         self.label_file = None
+
+        self.dict_id_to_acronym = {}
+        self.dict_id_to_name = {}
+        self.dict_id_to_color = {}
+        # self.dict_id_to_path = {}
+        self.dict_acronym_to_id = {}
+        self.dict_name_to_id = {}
+
         self.initialize(label_file=label_file, extra_label=extra_label, annotation_file=annotation_file)
 
-    def get_dataframe(self):
+    def _initialize_dataframe(self):
         df = pd.DataFrame({
             "id": self.ids,
             "name": self.names,
@@ -204,6 +212,12 @@ class Annotation(object):
 
     def get_dict(self, from_='id', to='acronym'):
         return dict(zip(self.df[from_], self.df[to]))
+
+    def ids_to_acronyms(self, ids):
+        return [self.dict_id_to_acronym[id_] for id_ in ids]
+
+    def ids_to_names(self, names):
+        return [self.dict_id_to_acronym[name] for name in names]
 
     def initialize(self, label_file=None, extra_label=None, annotation_file=None):
         # read json file
@@ -257,7 +271,7 @@ class Annotation(object):
         self.acronyms = self.get_list('acronym')
 
         # build dataframe
-        self.df = self.get_dataframe()
+        self.df = self._initialize_dataframe()
 
         # build dictionaries
         self.dict_id_to_acronym = self.get_dict(from_='id', to='acronym')
@@ -415,17 +429,16 @@ class Annotation(object):
         xs, ys, zs = points.astype(int).T
         return atlas[xs, ys, zs]
 
-    def ids_to_acronyms(self, ids):
-        return [self.dict_id_to_acronym[id_] for id_ in ids]
-
-    def ids_to_names(self, names):
-        return [self.dict_id_to_acronym[name] for name in names]
-
     def __str__(self):
         return f'Annotation({self.n_structures})[{self.max_level}]{{{self.label_file}}}'
 
     def __repr__(self):
         return self.__str__()
+
+
+##########################################################################################
+# Handle singleton
+##########################################################################################
 
 
 annotation = Annotation()
@@ -485,18 +498,13 @@ def label_points(points, annotation_file=None, invalid=0, key='order', level=Non
     label : array
         Label of the points corresponding to the given key.
     """
-    if key == 'structure_id': #TODO test me
-        annotation_file = __get_module_annotation_file(annotation_file)
-        atlas = clearmap_io.read(annotation_file).astype(int)
-        xs, ys, zs = points.astype(int).T
-        structure_ids = atlas[xs, ys, zs]
-        return structure_ids
 
+    # TODO consider refactoring using annotation.label_points
 
     n_points = points.shape[0]
     n_dim = points.shape[1]
 
-    annotation_file = get_module_annotation_file(annotation_file)
+    annotation_file = __get_module_annotation_file(annotation_file)
 
     atlas = clearmap_io.read(annotation_file)
     atlas = np.array(atlas, dtype=int)
@@ -544,14 +552,8 @@ def convert_label(label, key='id', value='order', level=None, method=None):
         List of converted labels.
     """
 
-    ### new methods
-    #TODO test me and replace structure_id by id if behavior is consistent
-    if key == 'structure_id' and value == 'acronym':
-        return annotation.ids_to_acronyms(labels=label)
-    if key == 'structure_id' and value == 'name':
-        return annotation.ids_to_names(labels=label)
+    # TODO consider refactoring using instance attributes
 
-    ### older methods
     if value in ('rgb', 'rgba', 'RGB', 'RGBA'):
         alpha = value.lower().endswith('a')
         as_int = value[:3] == 'RGB'
@@ -559,176 +561,7 @@ def convert_label(label, key='id', value='order', level=None, method=None):
     return annotation.convert_label(label, key=key, value=value, level=level, method=method)
 
 
-def convert_label_to_color(label, key='id', level=None, alpha=True, as_int=False, int_type='uint8'):
-    """
-    Convert label using the atlas annotation colors.
-
-    Arguments
-    ---------
-    label : array
-        List of labels to convert.
-    key : str
-        The key corresponding to the label.
-    level : nt or None
-        Convert at this level of the hierarchy. If None use full hierarchy.
-    alpha : bool
-        If True, return rgba values.
-    as_int : bool
-        If True, return rgb value as as int between 0 and 255.
-    int_type : dtype
-        Type for the color array.
-
-    Returns
-    -------
-    colors : array
-        List of colors for each label.
-    """
-    return annotation.label_to_color(label, key=key, level=level, alpha=alpha, as_int=as_int, int_type=int_type)
-
-
-def count_label(label, weights=None, key='order', hierarchical=True):
-    """
-    Counts the label within the various structures, taking into account the sub-structures.
-
-    Arguments
-    ---------
-    label : array
-        List of labels.
-    weights : array
-        Optional list of weights for each label.
-    key : str
-        The key the labels are given in.
-    hierarchical : bool
-        If True, count all sub-labels.
-
-    Returns
-    -------
-    bins : array
-        The counts for each label.
-    """
-    if key != 'order':
-        label = convert_label(label, key=key, value='order', invalid=0)
-
-    bins = np.bincount(label, weights=weights, minlength=n_structures)
-
-    if hierarchical:
-        _recursive_count(annotation.root, bins)
-
-    return bins
-
-
-def _recursive_count(node, counts):
-    """Helper for label counting."""
-    n = 0
-    for c in node.children:
-        n += _recursive_count(c, counts)
-    counts[node['order']] += n
-    return counts[node['order']]
-
-
-def count_points(points, weights=None, annotation_file=None, invalid=0, hierarchical=True):
-    """Counts the points within the various structures, taking into account the sub-structures.
-
-    Arguments
-    ---------
-    points : array
-        Array of ndim points to annotate and count.
-    weights : array or None
-        Optional intensity values to weight the count.
-    annotation_file : str
-        File name of the atlas annotation.
-    invalid : int
-        Label for invalid points.
-    hierarchical : bool
-        If True, count all sub-labels.
-
-    Returns
-    -------
-    bins : array
-        The counts for each label.
-    """
-    label = label_points(points, annotation_file=annotation_file, invalid=invalid, key='order')
-    return count_label(label, weights=weights, key='order', hierarchical=hierarchical)
-
-
-###############################################################################
-# ## Color maps
-###############################################################################
-
-def color_map(alpha=True, as_int=False, int_type='uint8'):
-    """
-    Generates a color map from color ids to rgb
-
-    Arguments
-    ---------
-    alpha : bool
-        If True return a color map with alpha values.
-
-    Returns
-    -------
-    color_map : array
-        An array of rgb colors for each label.
-    """
-    cm = annotation.colors_rgb
-    return col.color(cm, alpha=alpha, as_int=as_int, int_type=int_type)
- 
-
-def write_color_palette(filename=None):
-    """
-    Creates a pal or lut file for Imaris or Imagej based on label colors of atlas.
-
-    Arguments
-    ---------
-    filename : str
-        The name of the color palette file.
-
-    Returns
-    -------
-    filename : str
-        The name of the file to which the color palette was written.
-    """
-
-    cm = color_map(alpha=False, as_int=True)
-
-    fext = clearmap_io.file_extension(filename)
-    if fext == 'pal':
-        col.write_PAL(filename, cm)
-    elif fext == 'lut':
-        col.write_LUT(filename, cm)
-    else:
-        raise RuntimeError(f'Color palette format: {fext} not lut or pal')
-
-    return filename
-
-
-def write_color_annotation(filename, annotation_file=None):
-    """Creates a rgb image from the atlas color data.
-
-    Arguments
-    ---------
-    filename : str
-      The name of the color palette file.
-    annotation_file : str
-      File name of the atlas annotation.
-
-    Returns
-    -------
-    filename : str
-      The name of the file to which the color atlas was written.
-    """
-    # load atlas and convert to order
-    annotation_file = get_module_annotation_file(annotation_file)
-    atlas = np.array(clearmap_io.read(annotation_file), dtype=int)
-    atlas = convert_label(atlas, key='id', value='order', method='map')
-
-    # apply color map
-    cm = color_map(alpha=False, as_int=True)
-    atlas = cm[atlas]
-
-    return clearmap_io.write(filename, atlas)
-
-
-def get_module_annotation_file(annotation_file):
+def __get_module_annotation_file(annotation_file):
     if annotation_file is None:
         if not initialized:
             raise ValueError('Cannot use this function without an annotation file if '
@@ -740,9 +573,6 @@ def get_module_annotation_file(annotation_file):
         return annotation_file
 
 
-###############################################################################
-# ## Labeling
-###############################################################################
 # FIXME: add use_default kwarg to signature to make explicit and make orientation necessary
 # FIXME: + replace defaults with currently computed
 def prepare_annotation_files(slicing=None, orientation=None, directory=None, postfix=None, annotation_file=None,
@@ -803,7 +633,7 @@ def prepare_annotation_files(slicing=None, orientation=None, directory=None, pos
     results = []
     for f_path in files:
         if f_path is not None:
-            fn = format_annotation_filename(f_path, orientation=orientation, slicing=slicing, postfix=postfix, directory=directory)
+            fn = __format_annotation_filename(f_path, orientation=orientation, slicing=slicing, postfix=postfix, directory=directory)
             if verbose:
                 print('Preparing: %r' % fn)
 
@@ -845,7 +675,7 @@ def prepare_annotation_files(slicing=None, orientation=None, directory=None, pos
     return results
 
 
-def substitute_chars(s):
+def __substitute_chars(s):
     chars_to_strip = ' '
     chars_to_substitute = '(,)'  # TODO: check if we add '[]'
     for c in chars_to_strip:
@@ -855,14 +685,14 @@ def substitute_chars(s):
     return s
   
 
-def format_annotation_filename(filename, orientation=None, slicing=None, postfix=None, directory=None):
+def __format_annotation_filename(filename, orientation=None, slicing=None, postfix=None, directory=None):
     """Formats the annotation filename given orientation and slicing."""
 
     if postfix is None:
         orientation = res.format_orientation(orientation, default=(1, 2, 3))
         x, y, z = orientation
         postfix = f'{x}_{y}_{z}_{slicing}'
-        postfix = substitute_chars(postfix)
+        postfix = __substitute_chars(postfix)
 
     if postfix:
         base, ext = os.path.splitext(filename)
@@ -875,9 +705,10 @@ def format_annotation_filename(filename, orientation=None, slicing=None, postfix
     return fn
 
 
-def annotation_to_distance_file(annotation_file):
-    ref = clearmap_io.read(annotation_file)
-    return distance_transform_edt(ref > 0)
+def annotation_to_distance_file(annotation_file_path):
+    brain_mask = (clearmap_io.read(annotation_file_path) > 0).astype(int)
+    distance_array = distance_transform_edt(brain_mask)
+    return distance_array
 
 
 def get_names_map():
@@ -887,26 +718,6 @@ def get_names_map():
 ###############################################################################
 # ## Tests
 ###############################################################################
-
-def _test():
-    points = np.array([[162, 200, 138], [246, 486, 138], [246, 486, 138]])
-
-    label = label_points(points)
-    print(label)
-
-    counts = count_points(points)
-    print(counts)
-
-    counts = count_points(points, hierarchical=False)
-    print(counts)
-
-    write_color_annotation('test.tif')
-    clearmap_io.delete_file('test.tif')
-
-    lbl = find(247, key='id')
-    print(lbl)
-    lbl.info(with_children=True)
-    print(lbl.level)
 
 if __name__ == "__main__":
     assert annotation.df.shape == (1319, 5)
