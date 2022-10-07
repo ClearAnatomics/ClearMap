@@ -35,6 +35,7 @@ import collections
 import json
 
 import numpy as np
+import pandas as pd
 from scipy.ndimage import distance_transform_edt
 
 
@@ -184,10 +185,25 @@ class Annotation(object):
         self.acronyms = None
         self.colors_rgb = None
         self.colors_hex = None
+        self.df = None
         self.extra_label = None
         self.annotation_file = None
         self.label_file = None
         self.initialize(label_file=label_file, extra_label=extra_label, annotation_file=annotation_file)
+
+    def get_dataframe(self):
+        df = pd.DataFrame({
+            "id": self.ids,
+            "name": self.names,
+            "acronym": self.acronyms,
+            "colors_hex": self.colors_hex,
+            #"colors_rgb": self.colors_rgb,
+        })
+        df["colors_rgb"] = df["colors_hex"].map(lambda x: col.hex_to_rgb(x))
+        return df
+
+    def get_dict(self, from_='id', to='acronym'):
+        return dict(zip(self.df[from_], self.df[to]))
 
     def initialize(self, label_file=None, extra_label=None, annotation_file=None):
         # read json file
@@ -239,6 +255,17 @@ class Annotation(object):
         self.labels = self.get_list('atlas_id')
         self.names = self.get_list('name')
         self.acronyms = self.get_list('acronym')
+
+        # build dataframe
+        self.df = self.get_dataframe()
+
+        # build dictionaries
+        self.dict_id_to_acronym = self.get_dict(from_='id', to='acronym')
+        self.dict_id_to_name = self.get_dict(from_='id', to='name')
+        self.dict_id_to_color = self.get_dict(from_='id', to='colors_hex')
+        # self.dict_id_to_path = self.get_dict(from_='id', to='structure_acronym_path') #TODO to be implemented
+        self.dict_acronym_to_id = self.get_dict(from_='acronym', to='id')
+        self.dict_name_to_id = self.get_dict(from_='name', to='id')
 
     def initialize_tree(self, root, parent=None, level=0):
         label = Label({k: v for k, v in root.items() if k != "children"}, parent=parent, level=level)
@@ -372,6 +399,28 @@ class Annotation(object):
         self.map_volume = dict(zip(uniques, counts))
         return self.map_volume
 
+    def label_points(self, points): #TODO Test me
+        """
+
+        Parameters
+        ----------
+        points: array representing coordinates (floats) of n points, shape (n_points, 3)
+
+        Returns
+        -------
+        array of structure ids, of shape (n_points,)
+
+        """
+        atlas = clearmap_io.read(self.annotation_file).astype(int)
+        xs, ys, zs = points.astype(int).T
+        return atlas[xs, ys, zs]
+
+    def ids_to_acronyms(self, ids):
+        return [self.dict_id_to_acronym[id_] for id_ in ids]
+
+    def ids_to_names(self, names):
+        return [self.dict_id_to_acronym[name] for name in names]
+
     def __str__(self):
         return f'Annotation({self.n_structures})[{self.max_level}]{{{self.label_file}}}'
 
@@ -436,6 +485,14 @@ def label_points(points, annotation_file=None, invalid=0, key='order', level=Non
     label : array
         Label of the points corresponding to the given key.
     """
+    if key == 'structure_id': #TODO test me
+        annotation_file = __get_module_annotation_file(annotation_file)
+        atlas = clearmap_io.read(annotation_file).astype(int)
+        xs, ys, zs = points.astype(int).T
+        structure_ids = atlas[xs, ys, zs]
+        return structure_ids
+
+
     n_points = points.shape[0]
     n_dim = points.shape[1]
 
@@ -472,9 +529,9 @@ def convert_label(label, key='id', value='order', level=None, method=None):
     label : array
         List of labels to convert.
     key : str
-        The key corresponding to the label.
+        The key corresponding to the label. #TODO list possible keys
     value : str
-        The key to convert the label to.
+        The key to convert the label to. #TODO list possible values
     level : nt or None
         Convert at this level of the hierarchy. If None use full hierarchy.
     method : 'map' or 'dictionary'
@@ -486,6 +543,15 @@ def convert_label(label, key='id', value='order', level=None, method=None):
     label : array
         List of converted labels.
     """
+
+    ### new methods
+    #TODO test me and replace structure_id by id if behavior is consistent
+    if key == 'structure_id' and value == 'acronym':
+        return annotation.ids_to_acronyms(labels=label)
+    if key == 'structure_id' and value == 'name':
+        return annotation.ids_to_names(labels=label)
+
+    ### older methods
     if value in ('rgb', 'rgba', 'RGB', 'RGBA'):
         alpha = value.lower().endswith('a')
         as_int = value[:3] == 'RGB'
@@ -841,3 +907,11 @@ def _test():
     print(lbl)
     lbl.info(with_children=True)
     print(lbl.level)
+
+if __name__ == "__main__":
+    assert annotation.df.shape == (1319, 5)
+    assert annotation.dict_id_to_acronym[1] == "TMv"
+    assert annotation.dict_name_to_id['Interpeduncular nucleus'] == 100
+    assert annotation.dict_id_to_name[1000] == 'extrapyramidal fiber systems'
+    assert annotation.dict_acronym_to_id['MO'] == 500
+    assert annotation.dict_id_to_color[200] == '61E7B7'
