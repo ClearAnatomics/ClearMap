@@ -281,6 +281,9 @@ class Annotation(object):
         self.dict_acronym_to_id = self.get_dict(from_='acronym', to='id')
         self.dict_name_to_id = self.get_dict(from_='name', to='id')
 
+        # import atlas
+        self.atlas = clearmap_io.read(self.annotation_file).astype(int)
+
     def initialize_tree(self, root, parent=None, level=0):
         label = Label({k: v for k, v in root.items() if k != "children"}, parent=parent, level=level)
         label.children = [self.initialize_tree(c, parent=label, level=level + 1) for c in root['children']]
@@ -408,8 +411,7 @@ class Annotation(object):
         -------
         dict[int, int]
         """
-        atlas = clearmap_io.read(self.annotation_file)
-        uniques, counts = np.unique(atlas, return_counts=True)
+        uniques, counts = np.unique(self.atlas, return_counts=True)
         self.map_volume = dict(zip(uniques, counts))
         return self.map_volume
 
@@ -425,9 +427,8 @@ class Annotation(object):
         array of structure ids, of shape (n_points,)
 
         """
-        atlas = clearmap_io.read(self.annotation_file).astype(int)
         xs, ys, zs = points.astype(int).T
-        return atlas[xs, ys, zs]
+        return self.atlas[xs, ys, zs]
 
     def __str__(self):
         return f'Annotation({self.n_structures})[{self.max_level}]{{{self.label_file}}}'
@@ -444,11 +445,11 @@ class Annotation(object):
 annotation = Annotation()
 """Information on the annotated regions"""
 
-n_structures = annotation.n_structures
-get_dictionary = annotation.get_dictionary
-get_list = annotation.get_list
-get_map = annotation.get_map
-find = annotation.find
+n_structures = annotation.n_structures  # remove
+get_dictionary = annotation.get_dictionary  # remove
+get_list = annotation.get_list  # remove
+get_map = annotation.get_map  # remove
+find = annotation.find  # Find and replace
 initialized = False
 
 
