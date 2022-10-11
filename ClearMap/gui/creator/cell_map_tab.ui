@@ -29,11 +29,12 @@
        </property>
        <property name="font">
         <font>
+         <weight>75</weight>
          <bold>true</bold>
         </font>
        </property>
        <property name="currentIndex">
-        <number>3</number>
+        <number>4</number>
        </property>
        <widget class="QWidget" name="page">
         <property name="geometry">
@@ -41,17 +42,17 @@
           <x>0</x>
           <y>0</y>
           <width>501</width>
-          <height>322</height>
+          <height>408</height>
          </rect>
         </property>
         <attribute name="label">
-         <string>Detection</string>
+         <string>Cell detection</string>
         </attribute>
         <layout class="QHBoxLayout" name="horizontalLayout_3">
          <item>
           <widget class="QToolBox" name="toolBox_2">
            <property name="currentIndex">
-            <number>1</number>
+            <number>2</number>
            </property>
            <widget class="QWidget" name="page_3">
             <property name="geometry">
@@ -59,7 +60,7 @@
               <x>0</x>
               <y>0</y>
               <width>483</width>
-              <height>214</height>
+              <height>297</height>
              </rect>
             </property>
             <attribute name="label">
@@ -127,9 +128,9 @@
             <property name="geometry">
              <rect>
               <x>0</x>
-              <y>-79</y>
+              <y>0</y>
               <width>469</width>
-              <height>293</height>
+              <height>304</height>
              </rect>
             </property>
             <attribute name="label">
@@ -355,11 +356,11 @@
               <x>0</x>
               <y>0</y>
               <width>483</width>
-              <height>214</height>
+              <height>297</height>
              </rect>
             </property>
             <attribute name="label">
-             <string>Run</string>
+             <string>Run detection</string>
             </attribute>
             <layout class="QVBoxLayout" name="verticalLayout_5">
              <item>
@@ -412,7 +413,7 @@
           <x>0</x>
           <y>0</y>
           <width>501</width>
-          <height>322</height>
+          <height>287</height>
          </rect>
         </property>
         <attribute name="label">
@@ -511,7 +512,7 @@
           <x>0</x>
           <y>0</y>
           <width>501</width>
-          <height>322</height>
+          <height>287</height>
          </rect>
         </property>
         <attribute name="label">
@@ -588,11 +589,11 @@
           <x>0</x>
           <y>0</y>
           <width>501</width>
-          <height>322</height>
+          <height>287</height>
          </rect>
         </property>
         <attribute name="label">
-         <string>Run</string>
+         <string>Run CellMap</string>
         </attribute>
         <layout class="QGridLayout" name="gridLayout">
          <item row="0" column="0">
@@ -627,6 +628,7 @@
            <property name="font">
             <font>
              <pointsize>22</pointsize>
+             <weight>75</weight>
              <bold>true</bold>
             </font>
            </property>
@@ -650,6 +652,7 @@
            <property name="font">
             <font>
              <pointsize>22</pointsize>
+             <weight>75</weight>
              <bold>true</bold>
             </font>
            </property>
@@ -661,7 +664,14 @@
            </property>
           </widget>
          </item>
-         <item row="4" column="0">
+        </layout>
+       </widget>
+       <widget class="QWidget" name="page_8">
+        <attribute name="label">
+         <string>Visualize</string>
+        </attribute>
+        <layout class="QVBoxLayout" name="verticalLayout_7">
+         <item>
           <widget class="QPushButton" name="cellMapPlotVoxelizationPushButton">
            <property name="toolTip">
             <string>Display the results of the voxelization</string>
@@ -671,7 +681,7 @@
            </property>
           </widget>
          </item>
-         <item row="4" column="1" colspan="2">
+         <item>
           <widget class="QPushButton" name="cellMap3dScatterOnRefPushButton">
            <property name="toolTip">
             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Display a scatter of the cell coordinates &lt;/p&gt;&lt;p&gt;on top of the atlas reference (atlas coordinates)&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
@@ -681,7 +691,7 @@
            </property>
           </widget>
          </item>
-         <item row="4" column="3">
+         <item>
           <widget class="QPushButton" name="cellMap3dScatterOnStitchedPushButton">
            <property name="toolTip">
             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Display a scatter of the cell coordinates&lt;/p&gt;&lt;p&gt;on top of the stitched image (sample coordinates)&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
