@@ -17,7 +17,7 @@ import matplotlib
 import tifffile
 
 from ClearMap.Utils.utilities import runs_on_ui
-from ClearMap.config.atlas import ATLAS_NAMES_MAP
+from ClearMap.config.atlas import ATLAS_NAMES_MAP, STRUCTURE_TREE_NAMES_MAP
 from ClearMap.gui.gui_utils import TmpDebug
 
 matplotlib.use('Qt5Agg')
@@ -296,6 +296,10 @@ class PreProcessor(TabProcessor):
             hemispheres=True,
             overwrite=False, verbose=True)
         self.annotation_file_path, self.hemispheres_file_path, self.reference_file_path, self.distance_file_path = res
+
+        structure_tree_id = self.processing_config['registration']['atlas']['structure_tree_id']
+        structure_file_name = STRUCTURE_TREE_NAMES_MAP[structure_tree_id]
+        annotation.set_label_file(os.path.join(settings.atlas_folder, structure_file_name))
 
         self.update_watcher_main_progress()
         atlas_cfg = self.processing_config['registration']['atlas']
