@@ -78,8 +78,8 @@ Note
 default_annotation_file, default_hemispheres_file,\
 default_reference_file, default_distance_to_surface_file = decompress_atlases(atlas_base_name)
 
-
 default_label_file = os.path.join(settings.atlas_folder, 'ABA_annotation.json')
+
 """Default list of labels and region names in the annotated image.
 
 Note
@@ -508,6 +508,7 @@ def label_points(points, annotation_file=None, invalid=0, key='order', level=Non
     atlas = clearmap_io.read(annotation_file)
     if atlas.dtype.kind == 'f':
         atlas = np.array(atlas, dtype=int)
+
     label = np.full(n_points, invalid, dtype=int)
 
     points_int = np.asarray(points, dtype=int)

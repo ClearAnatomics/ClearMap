@@ -330,6 +330,7 @@ class AlignmentTab(GenericTab):
         self.sample_params = sample_params
         self.params = AlignmentParams(self.ui)
         self.params.registration.atlas_id_changed.connect(self.preprocessor.setup_atlases)
+        self.params.registration.atlas_structure_tree_id_changed.connect(self.preprocessor.setup_atlases)
 
     def setup_workers(self):
         self.sample_params.ui_to_cfg()
@@ -423,11 +424,9 @@ class AlignmentTab(GenericTab):
         self.preprocessor.convert_to_image_format()  # TODO: check if use checkbox state
         self.main_window.signal_process_finished('Conversion finished')
 
-    def setup_atlas(self):  # FIXME: call when value changed in atlas settings
+    def setup_atlas(self):
         self.sample_params.ui_to_cfg()  # To make sure we have the slicing up to date
         self.params.registration.ui_to_cfg()
-        # self.preprocessor.unpack_atlas(self.params.registration.atlas_info[self.params.registration.atlas_id]['base_name'])
-        self.preprocessor.unpack_atlas(self.params.registration.atlas_base_name)
         self.preprocessor.setup_atlases()
 
     def display_auto_to_ref_landmarks_dialog(self):
