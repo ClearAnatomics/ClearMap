@@ -17,6 +17,7 @@ import matplotlib
 import tifffile
 
 from ClearMap.Utils.utilities import runs_on_ui
+from ClearMap.config.atlas import ATLAS_NAMES_MAP
 from ClearMap.gui.gui_utils import TmpDebug
 
 matplotlib.use('Qt5Agg')
@@ -279,6 +280,10 @@ class PreProcessor(TabProcessor):
         self.machine_config, self.sample_config, self.processing_config = get_configs(*cfg_paths)
 
     def setup_atlases(self):  # TODO: add possibility to load custom reference file (i.e. defaults to None in cfg)
+        if not self.processing_config:
+            return  # Not setup yet. FIXME: find better way around
+        atlas_base_name = ATLAS_NAMES_MAP[self.processing_config['registration']['atlas']['id']]['base_name']
+        self.unpack_atlas(atlas_base_name)
         x_slice = slice(None) if self.sample_config['slice_x'] is None else slice(*self.sample_config['slice_x'])
         y_slice = slice(None) if self.sample_config['slice_y'] is None else slice(*self.sample_config['slice_y'])
         z_slice = slice(None) if self.sample_config['slice_z'] is None else slice(*self.sample_config['slice_z'])

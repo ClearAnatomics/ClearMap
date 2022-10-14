@@ -329,7 +329,7 @@ class AlignmentTab(GenericTab):
     def set_params(self, sample_params):
         self.sample_params = sample_params
         self.params = AlignmentParams(self.ui)
-        self.params.registration.atlas_id_changed.connect(self.preprocessor.unpack_atlas)
+        self.params.registration.atlas_id_changed.connect(self.preprocessor.setup_atlases)
 
     def setup_workers(self):
         self.sample_params.ui_to_cfg()
