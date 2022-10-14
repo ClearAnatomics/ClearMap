@@ -290,7 +290,7 @@ class SampleParameters(UiParameter):
     def sample_id(self, _id):
         self.tab.sampleIdTxt.setText(_id)
 
-    def handle_sample_id_changed(self, _id):
+    def handle_sample_id_changed(self, id_=None):
         if self.config is not None:
             self.config['sample_id'] = self.sample_id
             self.ui_to_cfg()   # FIXME: check
