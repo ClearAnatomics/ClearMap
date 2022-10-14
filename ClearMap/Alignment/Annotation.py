@@ -502,25 +502,21 @@ def label_points(points, annotation_file=None, invalid=0, key='order', level=Non
 
     # TODO consider refactoring using annotation.label_points
 
-    n_points = points.shape[0]
-    n_dim = points.shape[1]
+    n_points, n_spatial_dim = points.shape
 
     annotation_file = __get_module_annotation_file(annotation_file)
-
     atlas = clearmap_io.read(annotation_file)
-    atlas = np.array(atlas, dtype=int)
-    atlas_shape = atlas.shape
-
+    if atlas.dtype.kind == 'f':
+        atlas = np.array(atlas, dtype=int)
     label = np.full(n_points, invalid, dtype=int)
 
     points_int = np.asarray(points, dtype=int)
-    for d in range(n_dim):
-        if d == 0:
-            valid = np.logical_and(points_int[:, d] >= 0, points_int[:, d] < atlas_shape[d])
-        else:
-            valid = np.logical_and(valid, np.logical_and(points_int[:, d] >= 0, points_int[:, d] < atlas_shape[d]))
+    valid = np.ones(n_points)
+    for d in range(n_spatial_dim):
+        in_dim_range = np.logical_and(points_int[:, d] >= 0, points_int[:, d] < atlas.shape[d])
+        valid = np.logical_and(valid, in_dim_range)
 
-    indices = [points_int[valid, d] for d in range(n_dim)]
+    indices = [points_int[valid, d] for d in range(n_spatial_dim)]
     label[valid] = atlas[indices]
 
     if key != 'id' or level is not None:
