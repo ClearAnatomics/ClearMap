@@ -27,7 +27,7 @@
         </font>
        </property>
        <property name="currentIndex">
-        <number>1</number>
+        <number>0</number>
        </property>
        <widget class="QWidget" name="page">
         <property name="geometry">
@@ -61,6 +61,9 @@
            <property name="icon">
             <iconset theme="folder">
              <normaloff>.</normaloff>.</iconset>
+           </property>
+           <property name="shortcut">
+            <string>Ctrl+O</string>
            </property>
           </widget>
          </item>
