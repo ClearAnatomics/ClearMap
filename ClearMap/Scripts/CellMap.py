@@ -264,7 +264,7 @@ if __name__ == "__main__":
   coordinates_transformed = transformation(coordinates);
   
   #%% Cell annotation
-  
+  ano.set_annotation_file(annotation_file)
   label = ano.label_points(coordinates_transformed, key='order');
   names = ano.convert_label(label, key='order', value='name');
   
