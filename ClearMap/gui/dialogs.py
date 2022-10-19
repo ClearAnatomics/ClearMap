@@ -7,7 +7,6 @@ All the independent popup dialogs used by the GUI
 """
 
 import os
-import sys
 
 from PyQt5 import QtCore
 from PyQt5.QtCore import Qt
@@ -16,7 +15,6 @@ from PyQt5.QtWidgets import QFileDialog, QMessageBox, QProgressDialog, QLabel, Q
     QProgressBar
 
 from ClearMap.config.config_loader import clean_path, ConfigLoader
-from ClearMap.Utils.utilities import runs_on_pycharm
 from ClearMap.gui.gui_utils import UI_FOLDER, create_clearmap_widget
 
 __author__ = 'Charly Rousseau <charly.rousseau@icm-institute.org>'
