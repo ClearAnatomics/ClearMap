@@ -36,6 +36,9 @@ from ClearMap.gui.dialogs import make_splash, update_pbar
 ICONS_FOLDER = 'ClearMap/gui/creator/icons/'   # REFACTOR: use qrc
 
 app = QApplication([])
+app.setApplicationName('ClearMap')
+app.setApplicationDisplayName('ClearMap')
+app.setApplicationVersion('2.1')
 palette = app.palette()  # WARNING: necessary because QWhatsThis does not follow stylesheets
 palette.setColor(QPalette.ColorRole.ToolTipBase, QColor(DarkPalette.COLOR_BACKGROUND_2))
 palette.setColor(QPalette.ColorRole.ToolTipText, QColor(DarkPalette.COLOR_TEXT_2))
@@ -192,7 +195,8 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
 
     def fix_styles(self):
         self.fix_btn_boxes_text()
-        self.fix_btns_stylesheet()
+        self.setStyleSheet(BTN_STYLE_SHEET)  # Makes it look qdarkstyle
+        # self.fix_btns_stylesheet()
         self.fix_widgets_backgrounds()
         self.fix_sizes()
         self.fix_tootips_stylesheet()
@@ -333,7 +337,7 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         self.patch_button_boxes()
         self.patch_tool_boxes()
         self.patch_font_size_name()
-        self.fix_styles()
+        # self.fix_styles()
 
     @staticmethod
     def create_missing_file_msg(f_type, f_path, default_path):
@@ -599,6 +603,7 @@ class ClearMapGui(ClearMapGuiBase):
     def set_src_folder(self):
         self.src_folder = get_directory_dlg(self.preference_editor.params.start_folder)
         self.config_loader.src_dir = self.src_folder
+        self.fix_styles()
 
     @property
     def src_folder(self):
@@ -616,12 +621,12 @@ def create_main_window(app):
     clearmap_main_win = ClearMapGui()
     if clearmap_main_win.preference_editor.params.start_full_screen:
         clearmap_main_win.showMaximized()  # TODO: check if redundant with show
-    app.setStyleSheet(qdarkstyle.load_stylesheet())
     return clearmap_main_win
 
 
 def main(app, splash):
     clearmap_main_win = create_main_window(app)
+    app.setStyleSheet(qdarkstyle.load_stylesheet(qt_api='pyqt5'))
 
     def except_hook(exc_type, exc_value, exc_tb):
         lexer = PythonTracebackLexer()
@@ -632,6 +637,7 @@ def main(app, splash):
         clearmap_main_win.error_logger.write(formatted_traceback)
 
     clearmap_main_win.show()
+    clearmap_main_win.fix_styles()
     splash.finish(clearmap_main_win)
     if clearmap_main_win.preference_editor.params.verbosity != 'trace':  # WARNING: will disable progress bars
         clearmap_main_win.patch_stdout()
