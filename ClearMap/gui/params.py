@@ -13,6 +13,7 @@ from itertools import combinations
 import numpy as np
 
 from ClearMap.Utils.utilities import get_item_recursive
+from ClearMap.config.atlas import ATLAS_NAMES_MAP
 from ClearMap.gui.gui_utils import create_clearmap_widget
 
 from ClearMap.gui.dialogs import get_directory_dlg
@@ -826,17 +827,10 @@ class GeneralStitchingParams(UiParameter):
 
 class RegistrationParams(UiParameter):
     atlas_id_changed = pyqtSignal(str)
+    atlas_structure_tree_id_changed = pyqtSignal(str)
 
     def __init__(self, tab, src_folder=None):
-        self.atlas_info = {
-            'ABA - adult mouse - 25µm': {'resolution': 25, 'base_name': 'ABA_25um'},
-            'CDMBA - P1 - 25µm': {'resolution': 25, 'base_name': 'CDMBA_P1_25um'},
-            'CDMBA - P3 - 25µm': {'resolution': 25, 'base_name': 'CDMBA_P3_25um'},
-            'CDMBA - P5 - 25µm': {'resolution': 25, 'base_name': 'CDMBA_P5_25um'},
-            'CDMBA - P7 - 25µm': {'resolution': 25, 'base_name': 'CDMBA_P7_25um'},
-            'CDMBA - P10 - 25µm': {'resolution': 25, 'base_name': 'CDMBA_P10_25um'},
-            'CDMBA - P14 - 25µm': {'resolution': 25, 'base_name': 'CDMBA_P14_25um'}
-        }
+        self.atlas_info = ATLAS_NAMES_MAP
         super().__init__(tab, src_folder)
         self.params_dict = {
             'skip_resampling': ['resampling', 'skip'],
@@ -852,6 +846,7 @@ class RegistrationParams(UiParameter):
         self.tab.skipRegistrationResamplingCheckBox.stateChanged.connect(self.handle_skip_resampling_changed)
         self.tab.atlasResolutionTriplet.valueChangedConnect(self.handle_atlas_resolution_changed)
         self.tab.atlasIdComboBox.currentTextChanged.connect(self.handle_atlas_id_changed)
+        self.tab.structureTreeIdComboBox.currentTextChanged.connect(self.handle_structure_tree_id_changed)
         # self.tab.atlasFolderPath.textChanged.connect(self.handle_atlas_folder_changed)  # WARNING: ensure that set correctly by picking
         self.tab.channelAffineFilePath.textChanged.connect(self.handle_channel_affine_file_path_changed)
         self.tab.refAffineFilePath.textChanged.connect(self.handle_ref_affine_file_path_changed)
@@ -899,7 +894,21 @@ class RegistrationParams(UiParameter):
     def handle_atlas_id_changed(self):
         self.config['atlas']['id'] = self.atlas_id
         self.atlas_resolution = self.atlas_info[self.atlas_id]['resolution']
+        self.ui_to_cfg()
         self.atlas_id_changed.emit(self.atlas_base_name)
+
+    @property
+    def structure_tree_id(self):
+        return self.tab.structureTreeIdComboBox.currentText()
+
+    @structure_tree_id.setter
+    def structure_tree_id(self, value):
+        self.tab.structureTreeIdComboBox.setCurrentText(value)
+
+    def handle_structure_tree_id_changed(self):
+        self.config['atlas']['structure_tree_id'] = self.structure_tree_id
+        self.ui_to_cfg()   # TODO: check if required
+        self.atlas_structure_tree_id_changed.emit(self.structure_tree_id)
 
     @property
     def atlas_folder(self):

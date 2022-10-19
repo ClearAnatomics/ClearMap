@@ -23,6 +23,7 @@
       <widget class="QToolBox" name="toolBox">
        <property name="font">
         <font>
+         <weight>75</weight>
          <bold>true</bold>
         </font>
        </property>
@@ -35,17 +36,18 @@
           <x>0</x>
           <y>0</y>
           <width>428</width>
-          <height>132</height>
+          <height>136</height>
          </rect>
         </property>
         <attribute name="label">
-         <string>General</string>
+         <string>Source</string>
         </attribute>
         <layout class="QFormLayout" name="formLayout">
          <item row="0" column="0">
           <widget class="QPushButton" name="srcFolderBtn">
            <property name="font">
             <font>
+             <weight>75</weight>
              <bold>true</bold>
             </font>
            </property>
@@ -96,6 +98,7 @@
           <widget class="QLabel" name="sampleIdLabel">
            <property name="font">
             <font>
+             <weight>75</weight>
              <bold>true</bold>
             </font>
            </property>
@@ -139,6 +142,7 @@
           <widget class="QLabel" name="sampleIdLabel_2">
            <property name="font">
             <font>
+             <weight>75</weight>
              <bold>true</bold>
             </font>
            </property>
@@ -178,7 +182,7 @@
           <x>0</x>
           <y>0</y>
           <width>414</width>
-          <height>339</height>
+          <height>342</height>
          </rect>
         </property>
         <attribute name="label">
@@ -236,6 +240,7 @@
           <widget class="QLabel" name="mainChannelPathLbl">
            <property name="font">
             <font>
+             <weight>75</weight>
              <bold>true</bold>
             </font>
            </property>
@@ -359,6 +364,7 @@
           <widget class="QLabel" name="mainChannelPathLbl_2">
            <property name="font">
             <font>
+             <weight>75</weight>
              <bold>true</bold>
             </font>
            </property>
@@ -388,7 +394,7 @@
           <x>0</x>
           <y>0</y>
           <width>414</width>
-          <height>252</height>
+          <height>261</height>
          </rect>
         </property>
         <attribute name="label">
@@ -854,7 +860,7 @@
           <x>0</x>
           <y>0</y>
           <width>428</width>
-          <height>159</height>
+          <height>165</height>
          </rect>
         </property>
         <attribute name="label">

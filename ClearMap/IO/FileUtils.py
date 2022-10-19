@@ -271,7 +271,8 @@ def uncompress(file_path, extension='zip', check=True, verbose=False):
     if not os.path.exists(file_path) or not check:
         if extension == 'auto':
             for algo in ('zip', 'bz2', 'gzip', 'lzma'):
-                if os.path.exists(f'{file_path}.{algo}'):
+                f_path_w_ext = f'{file_path}.{algo}'
+                if os.path.exists(f_path_w_ext):
                     extension = algo
                     break
             else:
@@ -285,7 +286,12 @@ def uncompress(file_path, extension='zip', check=True, verbose=False):
                 import zipfile
                 try:
                     with zipfile.ZipFile(compressed_path, 'r') as zipf:
-                        zipf.extractall(path=os.path.split(compressed_path)[0])
+                        if os.path.splitext(file_path)[-1] in ('.tif', '.nrrd'):
+                            zipf.extract(os.path.basename(file_path), path=os.path.dirname(compressed_path))
+                        else:
+                            zipf.extractall(path=os.path.dirname(compressed_path))
+                    if not os.path.exists(file_path):
+                        raise FileNotFoundError
                 except Exception as err:  # FIXME: TOO broad
                     print(err)
                     return
