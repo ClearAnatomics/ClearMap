@@ -12,7 +12,10 @@ CLEARMAP_CFG_DIR = os.path.expanduser('~/.clearmap/')
 
 def get_configobj_cfg(cfg_path):
     cfg_path = clean_path(cfg_path)
-    return configobj.ConfigObj(cfg_path, encoding="UTF8", indent_type='    ', unrepr=True, file_error=True)
+    try:
+        return configobj.ConfigObj(cfg_path, encoding="UTF8", indent_type='    ', unrepr=True, file_error=True)
+    except configobj.ConfigObjError as err:
+        print(f'Could not read config file "{cfg_path}", some errors were encountered: "{err}"')
 
 
 def get_yml_cfg(cfg_path):

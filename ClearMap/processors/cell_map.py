@@ -222,7 +222,6 @@ class CellDetector(TabProcessor):
 
     def atlas_align(self):
         """Atlas alignment and annotation """
-        # Cell alignment
         table, coordinates = self.get_coords(coord_type='filtered')
         df = pd.DataFrame({'x': coordinates[:, 0], 'y': coordinates[:, 1], 'z': coordinates[:, 2]})
         df['size'] = table['size']
@@ -238,10 +237,12 @@ class CellDetector(TabProcessor):
                                                     annotation_file=self.preprocessor.annotation_file_path,
                                                     key='id')
             df['id'] = structure_ids
+
             hemisphere_labels = annotation.label_points(coordinates_transformed,
                                                         annotation_file=self.preprocessor.hemispheres_file_path,
                                                         key='id')
             df['hemisphere'] = hemisphere_labels
+
             names = annotation.convert_label(structure_ids, key='id', value='name')
             df['name'] = names
 
@@ -253,13 +254,27 @@ class CellDetector(TabProcessor):
             color_map = {id_: annotation.find(id_, key='id')['rgb'] for id_ in unique_ids}  # WARNING RGB upper case should give integer but does not work
             df['color'] = df['id'].map(color_map)
 
-            atlas = clearmap_io.read(self.preprocessor.annotation_file_path)
-            atlas_scale = self.preprocessor.processing_config['registration']['resampling']['autofluo_sink_resolution']
-            uniques, counts = np.unique(atlas, return_counts=True)
-            volumes = dict(zip(uniques, counts * np.prod(atlas_scale)))  # FIXME: split by hemisphere
-            df['volume'] = df['id'].map(volumes)
+            volumes = self.prepare_volumes_map()
+            df['volume'] = df.set_index(['id', 'hemisphere']).index.map(volumes.get)
 
         df.to_feather(self.workspace.filename('cells', extension='.feather'))
+
+    def prepare_volumes_map(self):
+        atlas = clearmap_io.read(self.preprocessor.annotation_file_path)
+        hemispheres_atlas = clearmap_io.read(self.preprocessor.hemispheres_file_path)
+        atlas_scale = self.preprocessor.processing_config['registration']['resampling']['autofluo_sink_resolution']
+        is_sliced = any([self.preprocessor.sample_config[f'slice_{axis}'] is not None for axis in 'xyz'])
+        if not is_sliced:
+            unique_ids, counts = np.unique(atlas, return_counts=True)
+            volumes = dict(zip(unique_ids, counts * np.prod(atlas_scale)))
+        else:
+            volumes = {}
+            hem_ids = sorted(np.unique(hemispheres_atlas))
+            for hem_id in hem_ids:
+                unique_ids, counts = np.unique(atlas[hemispheres_atlas == hem_id], return_counts=True)
+                for id_, count in zip(unique_ids, counts):
+                    volumes[(id_, hem_id)] = count * np.prod(atlas_scale)
+        return volumes
 
     def transform_coordinates(self, coords):
         coords = resampling.resample_points(

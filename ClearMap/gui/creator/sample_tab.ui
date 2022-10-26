@@ -64,6 +64,9 @@
             <iconset theme="folder">
              <normaloff>.</normaloff>.</iconset>
            </property>
+           <property name="shortcut">
+            <string>Ctrl+O</string>
+           </property>
           </widget>
          </item>
          <item row="0" column="1">

@@ -45,6 +45,7 @@ class UiParameter(QObject):
         self.src_folder = src_folder
         self._config = None
         self._default_config = None
+        self.cfg_subtree = None
         self.params_dict = None
         self.attrs_to_invert = []
         self.connect()
@@ -67,6 +68,20 @@ class UiParameter(QObject):
             raise ConfigNotFoundError
         cfg_name = os.path.splitext(os.path.basename(cfg_path))[0]
         self._default_config = ConfigLoader.get_cfg_from_path(ConfigLoader.get_default_path(cfg_name))
+
+    @property
+    def config(self):
+        if self.cfg_subtree:
+            return get_item_recursive(self._config, self.cfg_subtree)
+        else:
+            return self._config
+
+    @property
+    def default_config(self):
+        if self.cfg_subtree:
+            return get_item_recursive(self._default_config, self.cfg_subtree)
+        else:
+            return self._default_config
 
     def write_config(self):
         self._config.write()
@@ -100,7 +115,7 @@ class UiParameter(QObject):
                 try:
                     val = get_item_recursive(self.config, keys_list)
                 except KeyError:  # TODO: add msg
-                    val = get_item_recursive(self._default_config, keys_list)
+                    val = get_item_recursive(self.default_config, keys_list)
                     any_amended = True
                     current_amended = True
                 if attr in self.attrs_to_invert:
@@ -227,8 +242,8 @@ class SampleParameters(UiParameter):
             'autofluo_path': ['src_paths', 'autofluorescence'],
             'arteries_path': ['src_paths', 'arteries'],
             'raw_resolution': ['resolutions', 'raw'],
-            'autofluorescence_resolution': ['resolutions', 'arteries'],
-            'arteries_resolution': ['resolutions', 'autofluorescence'],
+            'arteries_resolution': ['resolutions', 'arteries'],
+            'autofluorescence_resolution': ['resolutions', 'autofluorescence'],
             'slice_x': ['slice_x'],
             'slice_y': ['slice_y'],
             'slice_z': ['slice_z'],
@@ -236,10 +251,6 @@ class SampleParameters(UiParameter):
         }
         if self.sample_id:
             self.handle_sample_id_changed(self.sample_id)
-
-    @property
-    def config(self):
-        return self._config
 
     def connect(self):
         self.tab.sampleIdTxt.editingFinished.connect(self.handle_sample_id_changed)
@@ -287,8 +298,8 @@ class SampleParameters(UiParameter):
         return self.tab.sampleIdTxt.text()
 
     @sample_id.setter
-    def sample_id(self, _id):
-        self.tab.sampleIdTxt.setText(_id)
+    def sample_id(self, id_):
+        self.tab.sampleIdTxt.setText(id_)
 
     def handle_sample_id_changed(self, id_=None):
         if self.config is not None:
@@ -462,6 +473,7 @@ class RigidStitchingParams(UiParameter):
             'background_level': ['background_level'],
             'background_pixels': ['background_pixels']
         }
+        self.cfg_subtree = ['stitching', 'rigid']
 
     def connect(self):
         self.tab.skipRigidCheckbox.stateChanged.connect(self.handle_skip_state_changed)
@@ -473,10 +485,6 @@ class RigidStitchingParams(UiParameter):
         self.tab.rigidMaxShiftsZDoublet.valueChangedConnect(self.handle_max_shifts_z_changed)
         self.tab.rigidBackgroundLevel.valueChanged.connect(self.handle_background_level_changed)
         self.tab.rigidBackgroundPixels.valueChanged.connect(self.handle_background_pixels_changed)
-
-    @property
-    def config(self):
-        return self._config['stitching']['rigid']
 
     @property
     def skip(self):
@@ -596,6 +604,7 @@ class WobblyStitchingParams(UiParameter):
             'slice_range': ['slice_range'],
             'slice_pixel_size': ['slice_pixel_size']
         }
+        self.cfg_subtree = ['stitching', 'wobbly']
 
     def connect(self):
         self.tab.skipWobblyCheckBox.stateChanged.connect(self.handle_skip_changed)
@@ -606,10 +615,6 @@ class WobblyStitchingParams(UiParameter):
         self.tab.wobblySliceRangeDoublet.valueChangedConnect(self.handle_slice_range_changed)
         self.tab.wobblySlicePixelSizeSinglet.valueChangedConnect(self.handle_slice_pixel_size_changed)
 
-    @property
-    def config(self):
-        return self._config['stitching']['wobbly']
-        
     @property
     def skip(self):
         return self.is_checked(self.tab.skipWobblyCheckBox)
@@ -722,10 +727,6 @@ class GeneralStitchingParams(UiParameter):
         self.tab.outputConversionFormat.currentTextChanged.connect(self.handle_conversion_fmt_changed)
 
     @property
-    def config(self):
-        return self._config
-
-    @property
     def use_npy(self):
         return self.tab.stitchingUseNpyCheckBox.isChecked()
 
@@ -836,11 +837,13 @@ class RegistrationParams(UiParameter):
             'skip_resampling': ['resampling', 'skip'],
             'atlas_resolution': ['resampling', 'raw_sink_resolution'],
             'atlas_id': ['atlas', 'id'],
+            'structure_tree_id': ['atlas', 'structure_tree_id'],
             'atlas_folder': ['atlas', 'align_files_folder'],
             'channel_affine_file_path': ['atlas', 'align_channels_affine_file'],
             'ref_affine_file_path': ['atlas', 'align_reference_affine_file'],
             'ref_bspline_file_path': ['atlas', 'align_reference_bspline_file']
         }
+        self.cfg_subtree = ['registration']
 
     def connect(self):
         self.tab.skipRegistrationResamplingCheckBox.stateChanged.connect(self.handle_skip_resampling_changed)
@@ -855,10 +858,6 @@ class RegistrationParams(UiParameter):
     @property
     def atlas_base_name(self):
         return self.atlas_info[self.atlas_id]['base_name']
-
-    @property
-    def config(self):
-        return self._config['registration']
 
     @property
     def skip_resampling(self):  # WARNING: skip resampling not registration altogether
@@ -987,10 +986,6 @@ class CellMapParams(UiParameter):
         self.tab.detectionSubsetYRangeMax.valueChanged.connect(self.handle_y_val_max_change)
         self.tab.detectionSubsetZRangeMin.valueChanged.connect(self.handle_z_val_min_change)
         self.tab.detectionSubsetZRangeMax.valueChanged.connect(self.handle_z_val_max_change)
-
-    @property
-    def config(self):
-        return self._config
 
     def cfg_to_ui(self):
         self.reload()
@@ -1190,6 +1185,7 @@ class VesselBinarizationParams(UiParameter):
             'fill_main_channel': ['vessel_filling', 'main'],
             'fill_secondary_channel': ['vessel_filling', 'secondary']
         }
+        self.cfg_subtree = ['binarization']
 
     def connect(self):
         self.tab.rawBinarizationClipRangeDoublet.valueChangedConnect(self.handle_raw_binarization_clip_range_changed)
@@ -1206,10 +1202,6 @@ class VesselBinarizationParams(UiParameter):
 
         self.tab.vesselFillingMainChannelCheckBox.stateChanged.connect(self.handle_fill_main_channel_changed)
         self.tab.vesselFillingSecondaryChannelCheckBox.stateChanged.connect(self.handle_fill_secondary_channel_changed)
-
-    @property
-    def config(self):
-        return self._config['binarization']
 
     @property
     def raw_binarization_clip_range(self):
@@ -1363,10 +1355,6 @@ class VesselGraphParams(UiParameter):
         self.tab.vesselProcessingSlicerYRangeMax.valueChanged.connect(self.handle_y_val_max_change)
         self.tab.vesselProcessingSlicerZRangeMin.valueChanged.connect(self.handle_z_val_min_change)
         self.tab.vesselProcessingSlicerZRangeMax.valueChanged.connect(self.handle_z_val_max_change)
-
-    @property
-    def config(self):
-        return self._config
 
     @property
     def ratios(self):
@@ -1576,13 +1564,10 @@ class VesselVisualizationParams(UiParameter):
     def __init__(self, tab, src_folder=None):
         super().__init__(tab, src_folder)
         self.params_dict = {'voxelization_size': ['voxelization', 'size']}
+        self.cfg_subtree = ['visualization']
 
     def connect(self):
         self.tab.vasculatureVoxelizationRadiusTriplet.valueChangedConnect(self.handle_voxelization_size_changed)
-
-    @property
-    def config(self):
-        return self._config['visualization']
 
     @property
     def voxelization_size(self):
@@ -1614,10 +1599,6 @@ class PreferencesParams(UiParameter):
             'pattern_finder_min_n_files': ['pattern_finder_min_n_files'],
             'three_d_plot_bg': ['three_d_plot_bg']
         }
-
-    @property
-    def config(self):
-        return self._config
 
     def _ui_to_cfg(self):  # TODO: check if live update (i.e. connected handlers) or only on save
         cfg = self._config
@@ -1762,10 +1743,6 @@ class BatchParams(UiParameter):
         self.tab.sampleFoldersPageLayout.addWidget(self.tab.sampleFoldersToolBox, 3, 0)
 
         self.comparison_checkboxes = []
-
-    @property
-    def config(self):
-        return self._config
 
     def _ui_to_cfg(self):
         self.config['paths']['results_folder'] = self.results_folder
