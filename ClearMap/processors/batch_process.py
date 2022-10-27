@@ -6,16 +6,19 @@ batch_process
 The processor for batch processing a group of samples.
 This can be used from the GUI, from the CLI or interactively from the python interpreter
 """
-
+import multiprocessing
 import sys
 
-from ClearMap.processors.tube_map import BinaryVesselProcessor, VesselGraphProcessor
+import numpy as np
+from skimage.transform import rescale
 from tqdm import tqdm
 
+from ClearMap.processors.tube_map import BinaryVesselProcessor, VesselGraphProcessor
 from ClearMap.Utils.utilities import backup_file
 from ClearMap.processors.cell_map import CellDetector
 from ClearMap.processors.sample_preparation import PreProcessor
 from ClearMap.config.config_loader import get_configs, ConfigLoader
+from ClearMap.IO import IO as clearmap_io
 
 __author__ = 'Charly Rousseau <charly.rousseau@icm-institute.org>'
 __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
@@ -76,26 +79,68 @@ def main(samples_file):
     process_folders(folders)
 
 
-def convert_to_cm_2_1(folder, atlas_base_name='ABA_25um'):
+def init_preprocessor(folder, atlas_base_name):
     cfg_loader = ConfigLoader(folder)
     configs = get_configs(cfg_loader.get_cfg_path('sample'), cfg_loader.get_cfg_path('processing'))
     pre_proc = PreProcessor()
     pre_proc.unpack_atlas(atlas_base_name)
     pre_proc.setup(configs)
+    return pre_proc
+
+
+def convert_to_cm_2_1(folder, atlas_base_name='ABA_25um'):
+    pre_proc = init_preprocessor(folder, atlas_base_name)
     pre_proc.setup_atlases()
     cell_detector = CellDetector(pre_proc)
     cell_detector.convert_cm2_to_cm2_1_fmt()
 
 
 def realign(folder, atlas_base_name='ABA_25um'):
-    cfg_loader = ConfigLoader(folder)
-    configs = get_configs(cfg_loader.get_cfg_path('sample'), cfg_loader.get_cfg_path('processing'))
-    pre_proc = PreProcessor()
-    pre_proc.unpack_atlas(atlas_base_name)
-    pre_proc.setup(configs)
+    pre_proc = init_preprocessor(folder, atlas_base_name)
     pre_proc.setup_atlases()
     cell_detector = CellDetector(pre_proc)
     cell_detector.atlas_align()
+
+
+def rescale_img(f_path, scaling_factor):
+    print(f'Rescaling {f_path} by {scaling_factor}')
+    img = clearmap_io.read(f_path)
+    rescaled_img = rescale(img, scaling_factor, preserve_range=True, anti_aliasing=True)
+    clearmap_io.write(f_path, rescaled_img)
+
+
+def rescale_raw(folder, atlas_base_name='ABA_25um', dest_resolution=(3, 3, 6)):
+    """
+    Used to rescale to create e.g. test samples that can be ran quickly
+
+    Parameters
+    ----------
+    folder str:
+        The experiment folder with the
+    atlas_base_name str:
+        The base name of the atlas that serves as a file prefix for the atlas files
+    dest_resolution tuple:
+        The desired resolution
+
+    Returns
+    -------
+
+    """
+    pre_proc = init_preprocessor(folder, atlas_base_name)
+    print(f'Processing {pre_proc.workspace.file_list("raw")}')
+
+    scaling_factor = tuple(np.array(pre_proc.sample_config['resolutions']['raw']) / np.array(dest_resolution))
+
+    p = multiprocessing.Pool()
+    for f_path in pre_proc.workspace.file_list('raw'):
+        p.apply_async(rescale_img, [f_path, scaling_factor])
+
+    p.close()
+    p.join()
+
+    pre_proc.sample_config['resolutions']['raw'] = list(dest_resolution)
+    pre_proc.sample_config.write()
+    print('DONE')
 
 
 if __name__ == '__main__':
