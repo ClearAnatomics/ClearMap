@@ -1,6 +1,7 @@
 import copy
 import os
 import tempfile
+from shutil import rmtree
 
 import numpy as np
 import pandas as pd
@@ -14,6 +15,7 @@ from ClearMap.IO import IO as clearmap_io
 from ClearMap.Alignment import Annotation as annotation
 import ClearMap.Analysis.Measurements.Voxelization as voxelization
 
+BASE_SHIFTS = [-30, -10, 0, 30, -20, -10, 25]
 
 atlas = clearmap_io.read(annotation.default_annotation_file)
 hemispheres_atlas = clearmap_io.read(annotation.default_hemispheres_file)
@@ -30,7 +32,7 @@ def structures():
 @pytest.fixture
 def fake_stats_table(structures):
     ids = [440, 7, 201, 1047, 776, 830, 928]
-    counts = [20, 12, 50, 70, 8, 50, 203]
+    counts = [50, 120, 80, 140, 210, 130, 393]
     df = pd.DataFrame({
         'Structure ID': ids * 2,
         'Hemisphere': [0]*len(ids) + [255]*len(ids),
@@ -131,7 +133,7 @@ def fake_group_density_counts(n_groups=2):
 
 
 def voxelize(folder):
-    voxelization_parameter = {'radius': (15, 15, 15),
+    voxelization_parameter = {'radius': (10, 10, 10),
                               'shape': atlas.shape,
                               'verbose': True}
     cells = pd.read_feather(os.path.join(folder, 'cells.feather'))
@@ -170,9 +172,10 @@ def test_p_values_whole_region(fake_stats_table):
     #     rmtree(tmp_dir)
     # os.mkdir(tmp_dir)
     with tempfile.TemporaryDirectory() as tmp_dir:
+    # if True:
         all_gp_tables = []
         all_gp_dirs = []
-        base_shifts = np.tile(np.array([-30, -10, 0, 30, -20, -10, 25]), 2)  # negative t value = 2nd sample > first
+        base_shifts = np.tile(np.array(BASE_SHIFTS), 2)  # negative t value = 2nd sample > first
         for i in range(2):
             shifts = base_shifts * i
             gp_tables = distributed_stats_table(fake_stats_table, 5, 5, shifts, abs_min=35)
@@ -222,10 +225,11 @@ def test_p_values(fake_stats_table):
     #     rmtree(tmp_dir)
     # os.mkdir(tmp_dir)
     with tempfile.TemporaryDirectory() as tmp_dir:
+    # if True:
         all_gp_tables = []
         all_gp_dirs = []
         for i in range(2):
-            shifts = np.tile(np.array([15, -10, 0, 30, -20, -10, 25]) * i, 2)
+            shifts = np.tile(np.array(BASE_SHIFTS) * i, 2)
             gp_tables = distributed_stats_table(fake_stats_table, 5, 5, shifts, abs_min=35)
             gp_dirs = []
             for j, stats_table in enumerate(gp_tables):
