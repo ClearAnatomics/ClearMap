@@ -38,7 +38,7 @@ import numpy as np
 import pandas as pd
 from scipy.ndimage import distance_transform_edt
 
-
+import ClearMap.Settings
 import ClearMap.Settings as settings
 
 import ClearMap.IO.IO as clearmap_io
@@ -49,6 +49,8 @@ import ClearMap.Alignment.Resampling as res
 import ClearMap.Utils.HierarchicalDict as hdict
 
 import ClearMap.Visualization.Color as col
+
+from ClearMap.Alignment.utils import create_label_table
 
 
 ###############################################################################
@@ -283,6 +285,7 @@ class Annotation(object):
 
         # import atlas
         self.atlas = clearmap_io.read(self.annotation_file).astype(int)
+        self.children_df = create_label_table(self.label_file, save=False, from_cached=True)
 
     def initialize_tree(self, root, parent=None, level=0):
         label = Label({k: v for k, v in root.items() if k != "children"}, parent=parent, level=level)
@@ -404,16 +407,48 @@ class Annotation(object):
 
     @property
     def map_volume(self):
-        """
-
-
-        Returns
-        -------
-        dict[int, int]
-        """
         uniques, counts = np.unique(self.atlas, return_counts=True)
         self.map_volume = dict(zip(uniques, counts))
         return self.map_volume
+
+    def get_dict_parents_to_children(self, parents_ids=None, including_parents=False):
+        map_children = {}
+        for parent_id in parents_ids:
+            map_children[parent_id] = self.children_df.set_index('id').loc[parent_id, 'all_children_structures_ids'].copy()
+        if including_parents:
+            for parent in parents_ids:
+                map_children[parent].append(parent)
+        return map_children
+
+    def get_dict_children_to_parents(self, parents_ids=None, including_parents=False):
+        map_children = self.get_dict_parents_to_children(parents_ids=parents_ids, including_parents=including_parents).copy()
+        map_parent = {}
+        for parent in map_children:
+            for child in map_children[parent].copy():
+                map_parent[child] = parent
+        return map_parent
+
+    def get_map_to_parent(self, parent_ids):
+        """
+        uses annotation graph to map all possible children structures to its parent in parent_ids
+        """
+        return self.get_dict_children_to_parents(parent_ids, including_parents=True)
+
+    def get_children(self, structure_ids):
+        if isinstance(structure_ids, int):
+            structure_ids = [structure_ids]
+        map_children = self.get_dict_parents_to_children(parents_ids=structure_ids, including_parents=False)
+        children = []
+        for parent in map_children:
+            children.extend(map_children[parent])
+        return children
+
+    def enrich_df(self, df):
+        df = df.copy()
+        df['name'] = df['id'].map(self.dict_id_to_name)
+        df['acronym'] = df['id'].map(self.dict_id_to_acronym)
+        return df
+
 
     def label_points(self, points): #TODO Test me
         """
@@ -712,6 +747,10 @@ def annotation_to_distance_file(annotation_file_path):
 def get_names_map():
     return dict(zip(annotation.ids, annotation.names))
 
+### annotation_new contains last annotation atlas (2017) and last annotation graph (from Allen, October 2022
+annotation_fpath = os.path.join(ClearMap.Settings.atlas_folder, "ABA_25um_2017_annotation.tif")
+label_fpath = os.path.join(ClearMap.Settings.atlas_folder, "ABA_annotation_last.json")
+annotation_new = Annotation(label_file=label_fpath, annotation_file=annotation_fpath)
 
 ###############################################################################
 # ## Tests
@@ -724,3 +763,21 @@ if __name__ == "__main__":
     assert annotation.dict_id_to_name[1000] == 'extrapyramidal fiber systems'
     assert annotation.dict_acronym_to_id['MO'] == 500
     assert annotation.dict_id_to_color[200] == '61E7B7'
+
+    assert annotation_new.df.shape == (1336, 5)
+    assert annotation_new.dict_id_to_acronym[1] == "TMv"
+    assert annotation_new.dict_name_to_id['Interpeduncular nucleus'] == 100
+    assert annotation_new.dict_id_to_name[1000] == 'extrapyramidal fiber systems'
+    assert annotation_new.dict_acronym_to_id['MO'] == 500
+    assert annotation_new.dict_id_to_color[200] == '61E7B7'
+
+    assert annotation_new.children_df.shape == (1327, 9)
+    assert annotation_new.children_df.set_index('id').loc[100, 'structure_path'] == [997, 8, 343, 313, 348, 165, 100]
+    assert annotation_new.children_df.set_index('id').loc[997, 'direct_children_structures_ids'] == [8, 1009, 73, 1024, 304325711]
+    assert annotation_new.children_df.set_index('id').loc[65, 'all_children_structures_ids'] == []
+
+    assert annotation_new.get_dict_children_to_parents([1032]) == {1055: 1032, 1063: 1032, 1071: 1032, 1078: 1032}
+    assert annotation_new.get_dict_parents_to_children([1032]) == {1032: [1055, 1063, 1071, 1078]}
+    assert (annotation_new.enrich_df(pd.DataFrame([{"id": 1111}])).equals(
+        pd.DataFrame([{'id': 1111, 'name': 'Primary somatosensory area, trunk, layer 5',
+                       'acronym': 'SSp-tr5'}])))
