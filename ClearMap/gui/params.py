@@ -961,6 +961,7 @@ class CellMapParams(UiParameter):
             'background_correction_diameter': ['detection', 'background_correction', 'diameter'],
             'detection_threshold': ['detection', 'shape_detection', 'threshold'],
             'cell_filter_size': ['cell_filtration', 'thresholds', 'size'],
+            'cell_filter_intensity': ['cell_filtration', 'thresholds', 'intensity'],
             'voxelization_radii': ['voxelization', 'radii'],
             'plot_when_finished': ['run', 'plot_when_finished'],
             'crop_x_min': ['detection', 'test_set_slicing', 'dim_0', 0],
@@ -978,6 +979,7 @@ class CellMapParams(UiParameter):
         self.tab.backgroundCorrectionDiameter.valueChanged.connect(self.handle_background_correction_diameter_changed)
         self.tab.detectionThreshold.valueChanged.connect(self.handle_detection_threshold_changed)
         self.tab.cellFilterThresholdSizeDoublet.valueChangedConnect(self.handle_filter_size_changed)
+        self.tab.cellFilterThresholdIntensityDoublet.valueChangedConnect(self.handle_filter_intensity_changed)
         self.tab.voxelizationRadiusTriplet.valueChangedConnect(self.handle_voxelization_radii_changed)
         self.tab.cellDetectionPlotCheckBox.stateChanged.connect(self.handle_plot_detected_cells_changed)
         self.tab.detectionSubsetXRangeMin.valueChanged.connect(self.handle_x_val_min_change)
@@ -1050,6 +1052,24 @@ class CellMapParams(UiParameter):
 
     def handle_filter_size_changed(self, size):
         self.config['cell_filtration']['thresholds']['size'] = self.cell_filter_size
+
+    @property
+    def cell_filter_intensity(self):
+        intensities = self.tab.cellFilterThresholdIntensityDoublet.getValue()
+        if intensities is None:
+            return
+        else:
+            intensities = list(intensities)
+            if intensities[-1] == -1:
+                intensities[-1] = 65536  # FIXME: hard coded, should read max
+            return intensities
+
+    @cell_filter_intensity.setter
+    def cell_filter_intensity(self, intensity):
+        self.tab.cellFilterThresholdIntensityDoublet.setValue(intensity)
+
+    def handle_filter_intensity_changed(self, _):
+        self.config['cell_filtration']['thresholds']['intensity'] = self.cell_filter_intensity
 
     @property
     def voxelization_radii(self):
