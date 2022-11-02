@@ -12,6 +12,7 @@ __copyright__ = 'Copyright © 2022 by Charly Rousseau'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
 
+import math
 import os
 import sys
 import time
@@ -114,7 +115,7 @@ Ui_ClearMapGui, _ = loadUiType(os.path.join(UI_FOLDER, 'creator', 'mainwindow.ui
 class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
     def __init__(self):
         super().__init__()
-        self.graph_names = {}
+        self.graphs = []
         self._reload_icon = self.style().standardIcon(QStyle.SP_BrowserReload)
         self.logger = None
         self.error_logger = None
@@ -234,8 +235,8 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
             self.print_warning_msg(f'File "{f_path}" not found')
             return False
 
-    def get_graphs(self):
-        return sorted([getattr(self, attr) for attr in dir(self) if attr.startswith('graph_')])
+    def graph_by_name(self, name):
+        return [g for g in self.graphs if g.objectName() == name][0]
 
     def remove_old_plots(self):
         for i in range(self.graphLayout.count(), -1, -1):
@@ -244,43 +245,39 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
                 widg = graph.widget()
                 widg.setParent(None)
                 widg.deleteLater()
-                delattr(self, widg.objectName())
-        self.graph_names = {}
+        self.graphs = []
 
     def setup_plots(self, dvs, graph_names=None):
+        if graph_names is None:
+            graph_names = [f'graph_{i}' for i in range(len(dvs))]
+
         self.remove_old_plots()
 
         n_rows, n_cols = compute_grid(len(dvs))
-        grid_size = (n_rows * n_cols)
-        n_spacers = grid_size - len(dvs)
+        n_spacers = (n_rows * n_cols) - len(dvs)
         for i in range(n_spacers):
-            if graph_names:
-                graph_names.append(f'spacer_{i}')
-            dvs.append(QWidget(parent=self))
+            spacer = QWidget(parent=self)
+            spacer_name = f'spacer_{i}'
+            graph_names.append(spacer_name)
+            dvs.append(spacer)
+        dock_size = self.dataViewerDockWidgetContents.size()
         for i, dv in enumerate(dvs):
-            graph_name = f'graph_{i}'
-            setattr(self, graph_name, dv)
-            dv.setObjectName(graph_name)
+            dv.setObjectName(graph_names[i])
             row = i // n_cols
             col = i % n_cols
+            if len(dvs) > 1:
+                self.__resize_graph(dv, n_cols, n_rows, dock_size=dock_size)
             self.graphLayout.addWidget(dv, row, col, 1, 1)
-            # self.__resize_graph(dv, n_cols, n_rows)
-            if graph_names:
-                self.graph_names[graph_names[i]] = graph_name
+            self.graphs.append(dv)
+        self.app.processEvents()
+        self.dataViewerDockWidgetContents.resize(dock_size)
+        self.app.processEvents()
 
-    # def resize_graphs(self):  # The aim of this is to avoid the wobbly data viewers when the left panel resizes
-    #     n_rows, n_cols = compute_grid(len(self.get_graphs()))  # WARNING: take care of placeholders
-    #     for i in range(self.graphLayout.count(), -1, -1):  # Necessary to count backwards to get all graphs
-    #         graph = self.graphLayout.itemAt(i)
-    #         if graph is not None:
-    #             widg = graph.widget()
-    #             self.__resize_graph(widg, n_cols, n_rows)
-    #
-    # def __resize_graph(self, dv, n_cols, n_rows, margin=20):
-    #     size = round((self.graphDock.width() - margin) / n_cols), round((self.graphDock.height() - margin) / n_rows)
-    #     dv.resize(*size)
-    #     dv.setMinimumSize(*size)  # required to avoid wobbly dv
-    #     # dv.setMaximumSize(*size)
+    def __resize_graph(self, dv, n_cols, n_rows, dock_size, margin=9, spacing=6):
+        width = math.floor((dock_size.width() - (2*margin) - (n_cols-1)*spacing) / n_cols)
+        height = math.floor((dock_size.height() - (2*margin) - (n_rows-1)*spacing) / n_rows)
+        dv.resize(width, height)
+        dv.setMinimumSize(width, height)  # required to avoid wobbly dv
 
     def setup_icons(self):
         self._reload_icon = self.style().standardIcon(QStyle.SP_BrowserReload)
