@@ -21,17 +21,14 @@ __webpage__ = 'https://idisco.info'
 __download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
 
 
-def none_str_to_literal(txt):
-    if txt.lower() == 'none':
-        return None
-    else:
-        return txt
+def is_disableable(instance):
+    return has_prop(instance, 'disabledValue') and not has_prop(instance, 'individuallyDisableable')
 
 
 def minus_1_to_disabled(instance, vals):
     for i, val in enumerate(vals):
         if val == -1:
-            vals[i] = none_str_to_literal(instance.property('disabledValue'))
+            vals[i] = eval(instance.property('disabledValue'))
     return vals
 
 
@@ -45,10 +42,6 @@ def disabled_to_minus_1(instance, vals):
     return vals
 
 
-def is_disableable(instance):
-    return has_prop(instance, 'disabledValue') and not has_prop(instance, 'individuallyDisableable')
-
-
 def has_prop(instance, prop_name):
     return prop_name in instance.dynamicPropertyNames()
 
@@ -57,14 +50,10 @@ def get_value(instance):
     values = []
     if not instance.controlsEnabled():
         disabled_value = instance.property('disabledValue')
-        if disabled_value == 'None' or disabled_value is None:  # FIXME: check is
-            return None
-        elif disabled_value == 'auto':
-            return 'auto'
-        elif disabled_value == "[auto, auto]":
-            return ['auto', 'auto']
+        if disabled_value is None:  # FIXME: check whether this case exists
+            return
         else:
-            raise ValueError('Unsupported value for disabledValue: "{}"'.format(disabled_value))
+            return eval(disabled_value)
     sorted_spin_boxes = get_sorted_spin_boxes(instance)
     for spin_box in sorted_spin_boxes:
         values.append(spin_box.value())
