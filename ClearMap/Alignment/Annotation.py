@@ -747,11 +747,6 @@ def annotation_to_distance_file(annotation_file_path):
 def get_names_map():
     return dict(zip(annotation.ids, annotation.names))
 
-### annotation_new contains last annotation atlas (2017) and last annotation graph (from Allen, October 2022
-annotation_fpath = os.path.join(ClearMap.Settings.atlas_folder, "ABA_25um_2017_annotation.tif")
-label_fpath = os.path.join(ClearMap.Settings.atlas_folder, "ABA_annotation_last.json")
-annotation_new = Annotation(label_file=label_fpath, annotation_file=annotation_fpath)
-
 ###############################################################################
 # ## Tests
 ###############################################################################
@@ -763,6 +758,11 @@ if __name__ == "__main__":
     assert annotation.dict_id_to_name[1000] == 'extrapyramidal fiber systems'
     assert annotation.dict_acronym_to_id['MO'] == 500
     assert annotation.dict_id_to_color[200] == '61E7B7'
+
+    ### annotation_new contains last annotation atlas (2017) and last annotation graph (from Allen, October 2022
+    annotation_fpath = os.path.join(ClearMap.Settings.atlas_folder, "ABA_25um_2017_annotation.tif")
+    label_fpath = os.path.join(ClearMap.Settings.atlas_folder, "ABA_annotation_last.json")
+    annotation_new = Annotation(label_file=label_fpath, annotation_file=annotation_fpath)
 
     assert annotation_new.df.shape == (1336, 5)
     assert annotation_new.dict_id_to_acronym[1] == "TMv"
