@@ -8,7 +8,7 @@ def sanitize_df(df, id_col_name='Structure ID'):
     return df
 
 
-def sanitize_df_column_names(df):
+def _sanitize_df_column_names(df):
     columns = {c: c.lower().replace(' ', '_') for c in df.columns}
     return df.rename(columns=columns)
 
@@ -73,15 +73,20 @@ def group_counts(counts_s, sample_names) -> pd.DataFrame:
     df = df.reset_index()
     return df
 
-def collapse_structures(df: pd.DataFrame, map_collapse) -> pd.DataFrame:
+def collapse_structures(df: pd.DataFrame, map_collapse, collapse_hemispheres=False) -> pd.DataFrame:
     """
     collapses structures according to a dict map_collapse (id -> new_id)
     ids not in map_collapse are kept
     """
     df['id'] = df['id'].map(lambda x: map_collapse.get(x, x))
-    counts = (df.groupby(['id', 'hemisphere'], as_index=False)
-              .sum()
-              )
+    if not collapse_hemispheres:
+        counts = (df.groupby(['id', 'hemisphere'], as_index=False)
+                  .sum()
+                  )
+    else:
+        counts = (df.groupby(['id'], as_index=False)
+                  .sum()
+                  )
     return counts
 
 def filter_df(df: pd.DataFrame, structure_ids,
@@ -89,12 +94,18 @@ def filter_df(df: pd.DataFrame, structure_ids,
     """
     returns a df that includes only the
     """
-    if exclude is False:
-        df = df.loc[df["id"].isin(structure_ids) & df["hemisphere"].isin(hemispheres)].reset_index(drop=True)
-        return df.copy()
+    if not exclude:
+        if 'hemisphere' in df.columns:
+            mask = df["id"].isin(structure_ids) & df["hemisphere"].isin(hemispheres)
+        else:
+            mask = df["id"].isin(structure_ids)
     else:
-        df = df.loc[~(df["id"].isin(structure_ids) & df["hemisphere"].isin(hemispheres))].reset_index(drop=True)
-        return df.copy()
+        if 'hemisphere' in df.columns:
+            mask = ~df["id"].isin(structure_ids) & df["hemisphere"].isin(hemispheres)
+        else:
+            mask = ~df["id"].isin(structure_ids)
+    df = df.loc[mask].reset_index(drop=True)
+    return df.copy()
 
 def normalize_df(df: pd.DataFrame, df_normalize: pd.DataFrame) -> pd.DataFrame:
     df = df.set_index(['id', 'hemisphere']).copy()

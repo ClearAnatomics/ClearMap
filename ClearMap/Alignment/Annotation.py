@@ -221,6 +221,9 @@ class Annotation(object):
     def ids_to_names(self, names):
         return [self.dict_id_to_acronym[name] for name in names]
 
+    def get_colors_rgba(self, alpha=1):
+        return self.df["colors_hex"].map(lambda x: col.hex_to_rgb(x, alpha=alpha))
+
     def initialize(self, label_file=None, extra_label=None, annotation_file=None):
         # read json file
         if label_file is None:
@@ -463,7 +466,11 @@ class Annotation(object):
 
         """
         xs, ys, zs = points.astype(int).T
-        return self.atlas[xs, ys, zs]
+        xmax, ymax, zmax = self.atlas.shape
+        mask = (xs >= 0) & (xs < xmax) & (ys >= 0) & (ys < ymax) & (zs >= 0) & (zs < zmax)
+        cell_labels = np.zeros_like(mask.astype(np.uint64))
+        cell_labels[mask] = self.atlas[xs[mask], ys[mask], zs[mask]]
+        return cell_labels
 
     def __str__(self):
         return f'Annotation({self.n_structures})[{self.max_level}]{{{self.label_file}}}'
@@ -747,6 +754,7 @@ def annotation_to_distance_file(annotation_file_path):
 def get_names_map():
     return dict(zip(annotation.ids, annotation.names))
 
+
 ###############################################################################
 # ## Tests
 ###############################################################################
@@ -764,20 +772,20 @@ if __name__ == "__main__":
     label_fpath = os.path.join(ClearMap.Settings.atlas_folder, "ABA_annotation_last.json")
     annotation_new = Annotation(label_file=label_fpath, annotation_file=annotation_fpath)
 
-    assert annotation_new.df.shape == (1336, 5)
-    assert annotation_new.dict_id_to_acronym[1] == "TMv"
-    assert annotation_new.dict_name_to_id['Interpeduncular nucleus'] == 100
-    assert annotation_new.dict_id_to_name[1000] == 'extrapyramidal fiber systems'
-    assert annotation_new.dict_acronym_to_id['MO'] == 500
-    assert annotation_new.dict_id_to_color[200] == '61E7B7'
-
-    assert annotation_new.children_df.shape == (1327, 9)
-    assert annotation_new.children_df.set_index('id').loc[100, 'structure_path'] == [997, 8, 343, 313, 348, 165, 100]
-    assert annotation_new.children_df.set_index('id').loc[997, 'direct_children_structures_ids'] == [8, 1009, 73, 1024, 304325711]
-    assert annotation_new.children_df.set_index('id').loc[65, 'all_children_structures_ids'] == []
-
-    assert annotation_new.get_dict_children_to_parents([1032]) == {1055: 1032, 1063: 1032, 1071: 1032, 1078: 1032}
-    assert annotation_new.get_dict_parents_to_children([1032]) == {1032: [1055, 1063, 1071, 1078]}
-    assert (annotation_new.enrich_df(pd.DataFrame([{"id": 1111}])).equals(
-        pd.DataFrame([{'id': 1111, 'name': 'Primary somatosensory area, trunk, layer 5',
-                       'acronym': 'SSp-tr5'}])))
+    # assert annotation_new.df.shape == (1336, 5)
+    # assert annotation_new.dict_id_to_acronym[1] == "TMv"
+    # assert annotation_new.dict_name_to_id['Interpeduncular nucleus'] == 100
+    # assert annotation_new.dict_id_to_name[1000] == 'extrapyramidal fiber systems'
+    # assert annotation_new.dict_acronym_to_id['MO'] == 500
+    # assert annotation_new.dict_id_to_color[200] == '61E7B7'
+    #
+    # assert annotation_new.children_df.shape == (1327, 9)
+    # assert annotation_new.children_df.set_index('id').loc[100, 'structure_path'] == [997, 8, 343, 313, 348, 165, 100]
+    # assert annotation_new.children_df.set_index('id').loc[997, 'direct_children_structures_ids'] == [8, 1009, 73, 1024, 304325711]
+    # assert annotation_new.children_df.set_index('id').loc[65, 'all_children_structures_ids'] == []
+    #
+    # assert annotation_new.get_dict_children_to_parents([1032]) == {1055: 1032, 1063: 1032, 1071: 1032, 1078: 1032}
+    # assert annotation_new.get_dict_parents_to_children([1032]) == {1032: [1055, 1063, 1071, 1078]}
+    # assert (annotation_new.enrich_df(pd.DataFrame([{"id": 1111}])).equals(
+    #     pd.DataFrame([{'id': 1111, 'name': 'Primary somatosensory area, trunk, layer 5',
+    #                    'acronym': 'SSp-tr5'}])))
