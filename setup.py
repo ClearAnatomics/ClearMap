@@ -98,7 +98,7 @@ setup(
     },
     url='',
     license='MIT',
-    author='Christoph Kirst, Charly Rousseau',
+    author='Christoph Kirst, Sophie Skriabine, Charly Rousseau, Etienne Doumazane',
     author_email='',
     package_data={'ClearMap.config': ['*.cfg'],
                   'ClearMap.gui': ['creator/*.ui',
