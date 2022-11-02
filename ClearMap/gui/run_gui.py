@@ -380,7 +380,7 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         return result.get()
 
     def signal_process_finished(self, msg='Idle, waiting for input'):
-        self.print_status_msg(msg, n_blinks=5, period=0.5)
+        self.print_status_msg(msg)
         if self.progress_dialog is not None:
             self.progress_dialog.done(1)
 
