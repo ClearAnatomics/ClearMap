@@ -195,7 +195,7 @@ class OrthoViewer(object):
         else:
             rect_itm.rect.setLeft(val)
         try:
-            graph = getattr(self.parent, self.parent.graph_names[axis])  # REFACTOR: not the cleanest
+            graph = self.parent.graph_by_name(axis)
         except KeyError:
             print('Wrong graphs displayed, skipping')
             return
