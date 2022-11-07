@@ -26,6 +26,7 @@ from ClearMap.Analysis.Statistics import MultipleComparisonCorrection as clearma
 from ClearMap.IO import IO as clearmap_io
 from ClearMap.Utils.path_utils import is_density_file, find_density_file, find_cells_df, dir_to_sample_id
 from ClearMap.Utils.utilities import make_abs
+from ClearMap.processors.batch_process import init_preprocessor
 
 colors = {
     'red': [255, 0, 0],
@@ -375,8 +376,8 @@ def group_cells_counts(struct_ids, group_cells_dfs, sample_ids, volume_map):
 
     output['id'] = np.tile(struct_ids, 2)  # for each hemisphere
     output['name'] = np.tile([annotation.find(id_, key='id')['name'] for id_ in struct_ids], 2)
-    output['volume'] = np.tile([volume_map[id_] for id_ in struct_ids], 2)
     output['hemisphere'] = np.repeat((0, 255), len(struct_ids))
+    output['volume'] = output.set_index(['id', 'hemisphere']).index.map(volume_map.get)
 
     for multiplier, hem_id in zip((1, 2), (0, 255)):
         for j, sample_df in enumerate(group_cells_dfs):
@@ -448,6 +449,14 @@ def dirs_to_cells_dfs(directory, dirs):
     return out
 
 
+def get_volume_map(folder):
+    preproc = init_preprocessor(folder)
+    return annotation.annotation.get_lateralised_volume_map(
+        preproc.processing_config['registration']['resampling']['autofluo_sink_resolution'],
+        preproc.hemispheres_file_path
+    )
+
+
 def make_summary(directory, gp1_name, gp2_name, gp1_dirs, gp2_dirs, output_path=None, save=True):
     gp1_dfs = dirs_to_cells_dfs(directory, gp1_dirs)
     gp2_dfs = dirs_to_cells_dfs(directory, gp2_dirs)
@@ -458,7 +467,7 @@ def make_summary(directory, gp1_name, gp2_name, gp1_dirs, gp2_dirs, output_path=
     gp2_sample_ids = [dir_to_sample_id(folder) for folder in gp2_dirs]
     sample_ids = [gp1_sample_ids, gp2_sample_ids]
 
-    volume_map = annotation.annotation.map_volume
+    volume_map = get_volume_map(gp1_dirs[0])  # Hacky
 
     aggregated_dfs = {gp_name: group_cells_counts(structs, gp_cells_dfs[i], sample_ids[i], volume_map)
                       for i, gp_name in enumerate((gp1_name, gp2_name))}

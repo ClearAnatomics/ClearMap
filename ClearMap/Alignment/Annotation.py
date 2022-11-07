@@ -411,8 +411,17 @@ class Annotation(object):
     @property
     def map_volume(self):
         uniques, counts = np.unique(self.atlas, return_counts=True)
-        self.map_volume = dict(zip(uniques, counts))
-        return self.map_volume
+        return dict(zip(uniques, counts))
+
+    def get_lateralised_volume_map(self, atlas_scale, hemispheres_file_path):
+        hemispheres_atlas = clearmap_io.read(hemispheres_file_path)
+        volumes = {}
+        hem_ids = sorted(np.unique(hemispheres_atlas))
+        for hem_id in hem_ids:
+            unique_ids, counts = np.unique(self.atlas[hemispheres_atlas == hem_id], return_counts=True)
+            for id_, count in zip(unique_ids, counts):
+                volumes[(id_, hem_id)] = count * np.prod(atlas_scale)
+        return volumes
 
     def get_dict_parents_to_children(self, parents_ids=None, including_parents=False):
         map_children = {}
