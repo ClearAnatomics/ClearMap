@@ -13,6 +13,7 @@ import numpy as np
 from skimage.transform import rescale
 from tqdm import tqdm
 
+from ClearMap.config.atlas import ATLAS_NAMES_MAP
 from ClearMap.processors.tube_map import BinaryVesselProcessor, VesselGraphProcessor
 from ClearMap.Utils.utilities import backup_file
 from ClearMap.processors.cell_map import CellDetector
@@ -79,10 +80,12 @@ def main(samples_file):
     process_folders(folders)
 
 
-def init_preprocessor(folder, atlas_base_name):
+def init_preprocessor(folder, atlas_base_name=None):
     cfg_loader = ConfigLoader(folder)
     configs = get_configs(cfg_loader.get_cfg_path('sample'), cfg_loader.get_cfg_path('processing'))
     pre_proc = PreProcessor()
+    if atlas_base_name is None:
+        atlas_base_name = ATLAS_NAMES_MAP[configs[1]['registration']['atlas']['id']]['base_name']
     pre_proc.unpack_atlas(atlas_base_name)
     pre_proc.setup(configs)
     return pre_proc
