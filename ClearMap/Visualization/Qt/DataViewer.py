@@ -411,7 +411,7 @@ class DataViewer(pg.QtGui.QWidget):
     @property
     def color_axis(self):
         try:
-            return self.self.sources[0].shape.index(3)
+            return self.sources[0].shape.index(3)
         except ValueError:
             return None
 
