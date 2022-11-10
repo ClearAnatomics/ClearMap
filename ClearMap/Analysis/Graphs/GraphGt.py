@@ -23,11 +23,7 @@ import graph_tool.generation as gtg
 
 #fix graph tool saving / loading for very large arrays
 import sys
-if sys.version_info[0] < 3:
-  import ClearMap.External.pickle_python_2 as pickle
-else:
-  #import ClearMap.External.pickle_python_3 as pickle  
-  import ClearMap.External.pickle_python_3 as pickle
+import ClearMap.External.pickle_python_3 as pickle
   
 
 gt.gt_io.clean_picklers();
