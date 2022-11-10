@@ -770,12 +770,12 @@ def _test():
   import numpy as np
   import ClearMap.Tests.Files as tf
   import ClearMap.Analysis.Graphs.GraphProcessing as gp
-  #reload(gp)
+  # reload(gp)
 
   skeleton = tf.source('skeleton');
   
-  #import ClearMap.Visualization.Plot3d as p3d
-  #p3d.plot(skeleton)
+  # from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
+  # q_plot_3d.plot(skeleton)
 
   #reload(gp)
   g = gp.graph_from_skeleton(skeleton)
@@ -805,20 +805,19 @@ def _test():
   g.add_edge(np.array([[7,8],[7,9],[1,2],[2,3],[3,1],[1,4],[4,5],[2,6],[6,7]]));
   g.set_vertex_coordinates(np.array([[10,10,10],[0,0,0],[1,1,1],[1,1,0],[5,0,0],[8,0,1],[0,7,1],[0,10,2],[0,12,3],[3,7,7]], dtype=float));
   
-  import ClearMap.Visualization.Plot3d as p3d
-  p3d.plot_graph_line(g)
+  from ClearMap.Visualization.Vispy import PlotGraph3d as graph_plot_3d
+  graph_plot_3d.plot_graph_line(g)
   
   gc = gp.clean_graph(g, verbose=True); 
-  p3d.plot_graph_line(gc)
+  graph_plot_3d.plot_graph_line(gc)
   
   gr = gp.reduce_graph(gc, edge_geometry=True, verbose=True)
   #gr.set_edge_geometry(0.1*np.ones(gr.edge_geometry(as_list=False).shape[0]), 'radii')
 
 
-  import ClearMap.Visualization.Plot3d as p3d
   vertex_colors = np.random.rand(g.n_vertices, 4);
   vertex_colors[:,3] = 1;
-  p3d.plot_graph_mesh(gr, default_radius=1, vertex_colors=vertex_colors)
+  graph_plot_3d.plot_graph_mesh(gr, default_radius=1, vertex_colors=vertex_colors)
   
   eg = gr.edge_geometry(as_list=False);
   egs = 0.5 * eg;
@@ -826,7 +825,6 @@ def _test():
     
   #tracing
   import numpy as np
-  import ClearMap.Visualization.Plot3d as p3d
   import ClearMap.Analysis.Graphs.GraphProcessing as gp
   
   g = gp.ggt.Graph(n_vertices=10);
@@ -834,7 +832,7 @@ def _test():
   g.set_vertex_coordinates(np.array([[0,0,0],[1,0,0],[2,0,0],[2,2,0],[0,1,0],[0,0,1],[0,0,2],[0,0,3],[0,-1,0],[0,-1,-1]], dtype=float));
   g.set_vertex_radii(np.array([10,6,4,6,7,4,2,2,5,5]) * 0.02)
   vertex_colors = np.array([g.vertex_radii()]*4).T; vertex_colors = vertex_colors / vertex_colors.max(); vertex_colors[:,3] = 1;
-  p3d.plot_graph_mesh(g, default_radius=1, vertex_colors=vertex_colors)
+  graph_plot_3d.plot_graph_mesh(g, default_radius=1, vertex_colors=vertex_colors)
   
   def condition(graph, vertex):
     r = graph.vertex_radii(vertex=vertex);
@@ -847,7 +845,7 @@ def _test():
   print(traced)  
 
   vertex_colors = np.array([[1,0,0,1],[1,1,1,1]])[np.asarray(traced, dtype=int)]
-  p3d.plot_graph_mesh(g, default_radius=1, vertex_colors=vertex_colors)
+  graph_plot_3d.plot_graph_mesh(g, default_radius=1, vertex_colors=vertex_colors)
   
   from importlib import reload;
   reload(gp)
@@ -876,7 +874,6 @@ def _test():
   # expansion of edge lengths
   
   import numpy as np
-  import ClearMap.Tests.Files as tf
   import ClearMap.Analysis.Graphs.GraphProcessing as gp
   
   graph = gp.ggt.Graph(n_vertices=5);
@@ -889,7 +886,7 @@ def _test():
   pos = gp.ggt.vertex_property_map_to_python(gd.sfdp_layout(e.base))
   import matplotlib.pyplot as plt
   plt.figure(1); plt.clf();
-  import matplotlib.collections  as mc
+  import matplotlib.collections as mc
 
   import ClearMap.Visualization.Color as col
   colors = np.array([col.color(c) for c in ['red', 'blue', 'green', 'black', 'purple', 'orange']])

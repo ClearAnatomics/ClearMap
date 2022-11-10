@@ -140,7 +140,6 @@ def average(source, sink = None, shape = None, dtype = None,
 def _test():
   """Tests"""
   import numpy as np
-  import ClearMap.Visualization.Plot3d as p3d
   import ClearMap.ParallelProcessing.DataProcessing.StatisticsPointList as spl
   
   from importlib import reload

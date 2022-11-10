@@ -33,7 +33,7 @@ import ClearMap.IO.Workspace as workspace
 # noinspection PyPep8Naming
 import ClearMap.IO.IO as clearmap_io
 # noinspection PyPep8Naming
-import ClearMap.Visualization.Qt.Plot3d as plot_3d
+from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
 # noinspection PyPep8Naming
 import ClearMap.Alignment.Resampling as resampling
 # noinspection PyPep8Naming
@@ -589,7 +589,7 @@ class PreProcessor(TabProcessor):
             if self.stopped:
                 return
             if resampling_cfg['plot_raw'] and not runs_on_ui():
-                plot_3d.plot(self.filename('resampled'))
+                q_plot_3d.plot(self.filename('resampled'))
 
             # Autofluorescence
             self.__resample_autofluorescence()
@@ -597,8 +597,8 @@ class PreProcessor(TabProcessor):
                 return
             self.update_watcher_main_progress()
             if resampling_cfg['plot_autofluo'] and not runs_on_ui():
-                plot_3d.plot([self.filename('resampled'),
-                              self.filename('resampled', postfix='autofluorescence')])
+                q_plot_3d.plot([self.filename('resampled'),
+                                self.filename('resampled', postfix='autofluorescence')])
 
     def align(self, force=False):
         if force:
@@ -701,7 +701,7 @@ class PreProcessor(TabProcessor):
             titles.append('Arteries stitched')
         if len(paths) != 2:
             paths = paths[0]
-        dvs = plot_3d.plot(paths, title=titles, arange=False, lut='white', parent=parent)
+        dvs = q_plot_3d.plot(paths, title=titles, arange=False, lut='white', parent=parent)
         return dvs
 
     @staticmethod

@@ -171,9 +171,9 @@ def set_source(viewer, source):
 
 def _test():
     import numpy as np
-    import ClearMap.Visualization.Qt.Plot3d as p3d
+    from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
 
     img1 = np.random.rand(*(100, 80, 30))
     img2 = np.random.rand(*(100, 80, 30)) > 0.5
 
-    p = p3d.plot([img1, img2])  # analysis:ignore
+    p = q_plot_3d.plot([img1, img2])  # analysis:ignore

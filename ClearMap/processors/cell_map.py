@@ -25,7 +25,6 @@ References
 
 
 import copy
-import importlib
 import os
 import re
 import warnings
@@ -42,8 +41,9 @@ import ClearMap.Alignment.Elastix as elastix
 # noinspection PyPep8Naming
 import ClearMap.IO.IO as clearmap_io
 # noinspection PyPep8Naming
-import ClearMap.Visualization.Plot3d as plot_3d
-import ClearMap.Visualization.Qt.Plot3d as qplot_3d
+from ClearMap.Visualization.Matplotlib import PlotUtils as plot_utils
+from ClearMap.Visualization.Vispy import Plot3d as vispy_plot_3d
+from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
 # noinspection PyPep8Naming
 import ClearMap.Alignment.Resampling as resampling
 # noinspection PyPep8Naming
@@ -134,9 +134,9 @@ class CellDetector(TabProcessor):
         #     self.plot_voxelized_intensities()
 
     def plot_voxelized_counts(self, arange=True, parent=None):
-        return plot_3d.plot(self.workspace.filename('density', postfix='counts'),
-                            title='Cell density (voxelized)',
-                            arange=arange, parent=parent)
+        return q_plot_3d.plot(self.workspace.filename('density', postfix='counts'),
+                              title='Cell density (voxelized)',
+                              arange=arange, parent=parent)
 
     def create_test_dataset(self, slicing):
         self.workspace.create_debug('stitched', slicing=slicing)
@@ -389,7 +389,7 @@ class CellDetector(TabProcessor):
         plt.figure(1)
         plt.clf()
         names = source.dtype.names
-        nx, ny = plot_3d.subplot_tiling(len(names))
+        nx, ny = plot_utils.subplot_tiling(len(names))
         for i, name in enumerate(names):
             plt.subplot(nx, ny, i + 1)
             plt.hist(source[name])
@@ -398,16 +398,16 @@ class CellDetector(TabProcessor):
 
     def plot_cells_3d_scatter_w_atlas_colors(self, raw=False, parent=None):
         if raw:
-            dv = qplot_3d.plot(self.workspace.filename('stitched'), title='Stitched and cells',
-                               arange=False, lut='white', parent=parent)[0]
+            dv = q_plot_3d.plot(self.workspace.filename('stitched'), title='Stitched and cells',
+                                arange=False, lut='white', parent=parent)[0]
         else:
             if self.preprocessor.was_registered:  # REFACTORING: could extract
-                dv = qplot_3d.plot(clearmap_io.source(self.preprocessor.reference_file_path),
-                                   title='Reference and cells',
-                                   arange=False, lut='white', parent=parent)[0]
+                dv = q_plot_3d.plot(clearmap_io.source(self.preprocessor.reference_file_path),
+                                    title='Reference and cells',
+                                    arange=False, lut='white', parent=parent)[0]
             else:
-                dv = qplot_3d.plot(self.workspace.filename('resampled'), title='Resampled and cells',
-                                   arange=False, lut='white', parent=parent)[0]
+                dv = q_plot_3d.plot(self.workspace.filename('resampled'), title='Resampled and cells',
+                                    arange=False, lut='white', parent=parent)[0]
 
         scatter = pg.ScatterPlotItem()
 
@@ -449,8 +449,8 @@ class CellDetector(TabProcessor):
     def plot_filtered_cells(self, parent=None, smarties=False):
         _, coordinates = self.get_coords('filtered')
         stitched_path = self.workspace.filename('stitched')
-        dvs = qplot_3d.plot(stitched_path, title='Stitched and filtered cells', arange=False,
-                            lut='white', parent=parent)
+        dvs = q_plot_3d.plot(stitched_path, title='Stitched and filtered cells', arange=False,
+                             lut='white', parent=parent)
         self.filtered_cells = Scatter3D(coordinates, smarties=smarties)
         scatter = pg.ScatterPlotItem()
         dvs[0].view.addItem(scatter)
@@ -461,8 +461,8 @@ class CellDetector(TabProcessor):
 
     def plot_background_substracted_img(self):
         coordinates = np.hstack([self.workspace.source('cells', postfix='raw')[c][:, None] for c in 'xyz'])
-        p = plot_3d.list_plot_3d(coordinates)
-        return plot_3d.plot_3d(self.workspace.filename('stitched'), view=p, cmap=plot_3d.grays_alpha(alpha=1))
+        p = vispy_plot_3d.list_plot_3d(coordinates)
+        return vispy_plot_3d.plot_3d(self.workspace.filename('stitched'), view=p, cmap=vispy_plot_3d.grays_alpha(alpha=1))
 
     def remove_crust(self, coordinates,voxelization_parameter):
         dist2surf = clearmap_io.read(self.preprocessor.distance_file_path)
@@ -487,7 +487,7 @@ class CellDetector(TabProcessor):
                    ]
         sources = [s for s in sources if os.path.exists(s)]  # Remove missing files (if not tuning)
         titles = [os.path.basename(s) for s in sources]
-        return plot_3d.plot(sources, title=titles, arange=arange, sync=sync, lut='white', parent=parent)
+        return q_plot_3d.plot(sources, title=titles, arange=arange, sync=sync, lut='white', parent=parent)
 
     def get_n_detected_cells(self):
         if os.path.exists(self.workspace.filename('cells', postfix='raw')):
@@ -504,7 +504,7 @@ class CellDetector(TabProcessor):
             return 0
 
     def plot_voxelized_intensities(self, arange=True):
-        return plot_3d.plot(self.workspace.filename('density', postfix='intensities'), arange=arange)
+        return q_plot_3d.plot(self.workspace.filename('density', postfix='intensities'), arange=arange)
 
     def get_n_blocks(self, dim_size):
         blk_size = self.machine_config['detection_chunk_size_max']

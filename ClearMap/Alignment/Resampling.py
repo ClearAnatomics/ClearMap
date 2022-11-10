@@ -1017,7 +1017,7 @@ def _test():
   """Tests"""
   import ClearMap.Settings as settings 
   import ClearMap.IO.IO as io
-  import ClearMap.Visualization.Plot3d as p3d;
+  from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
   
   import ClearMap.Alignment.Resampling as res
   from importlib import reload
@@ -1041,21 +1041,21 @@ def _test():
   axes_order = res._axes_order(None, source_shape, sink_shape);
   print(axes_order)
   resampled = res.resample(source, sink, source_resolution=(1.,1.,1.), sink_resolution = (1.6,1.6,2), orientation=None, processes=None);
-  p3d.plot(resampled)
-  p3d.plot(source)
+  q_plot_3d.plot(resampled)
+  q_plot_3d.plot(source)
   
   inverse = res.resample_inverse(resampled, sink=None, resample_source=source, source_resolution=(1,1,1), sink_resolution = (10,10,2), orientation=None, processes='serial')
-  p3d.plot([source, inverse])
+  q_plot_3d.plot([source, inverse])
 
   
   resampled = res.resample(source, sink, source_resolution=(1,1,1), sink_resolution = (10,10,2), orientation=(2,-1,3), processes=None);
-  p3d.plot(resampled)
+  q_plot_3d.plot(resampled)
   
   inverse = res.resample_inverse(resampled, sink=None, resample_source=source, source_resolution=(1,1,1), sink_resolution = (10,10,2), orientation=(2,-1,3), processes=None)
-  p3d.plot([source, inverse])
+  q_plot_3d.plot([source, inverse])
   
   resampled = res.resample(source, sink=None, source_resolution=(1.6,1.6,2), sink_shape=(10,20,30), orientation=None, processes=None)
-  p3d.plot(resampled)
+  q_plot_3d.plot(resampled)
   
   
   # ponints

@@ -160,7 +160,7 @@ def search_indices_rectangle(radius, kernel = None):
 def _test():
   """Tests"""
   import numpy as np
-  import ClearMap.Visualization.Plot3d as p3d
+  from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
   import ClearMap.Analysis.Measurements.Voxelization as vox
   
   
@@ -169,22 +169,22 @@ def _test():
   points = np.array([[10,1,1]])  
   v = vox.voxelize(points, shape = (20,20,20), radius = (0,0,0));
   w = vox.voxelize(points, shape = (20,20,20), radius = (2,2,2));
-  p3d.plot([[v,w]])
+  q_plot_3d.plot([[v,w]])
   
   indices, kernel = vox.search_indices_sphere((2,2,2), kernel=None)
   print(indices)
   
   points = np.array([[10,10,18]])
   v = vox.voxelize(points, shape = (20,20,20),  weights=None, radius=(5,7,10));
-  p3d.plot(v)
+  q_plot_3d.plot(v)
   
   points = np.array([[10,10,10]]);
   weights = np.random.rand(len(points));
   v = vox.voxelize(points, shape = (20,20,20),  weights=weights, radius=(2,2,2), method = 'rectangle');
-  p3d.plot(v)
+  q_plot_3d.plot(v)
   
   def kernel(d):
     return np.exp(-d);
   v = vox.voxelize(points, shape = (20,20,20),  weights=None, radius=(5,5,8), kernel=kernel, method = 'sphere');
-  p3d.plot(v)
+  q_plot_3d.plot(v)
   

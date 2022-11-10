@@ -108,6 +108,6 @@ def _test():
 
   d = se.sphere((150,50,10));  
   
-  import ClearMap.Visualization.Plot3d as p3d
-  p3d.plot(d)             
+  from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
+  q_plot_3d.plot(d)
 

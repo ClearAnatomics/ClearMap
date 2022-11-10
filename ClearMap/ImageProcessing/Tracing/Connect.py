@@ -20,7 +20,7 @@ import ClearMap.ImageProcessing.Differentiation.Hessian as cur
 
 import ClearMap.ImageProcessing.Topology.Topology3d as t3d
 
-import ClearMap.Visualization.Plot3d as p3d
+from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
 
 
 def extractNeighbourhood(data, center, radius):
@@ -132,9 +132,9 @@ def plotData(data, skel, binary, ends = None, isolated = None, replot = True):
       viewer[0].setSource(data);
       viewer[1].setSource(data);
     except:
-      viewer = p3d.plot([data, img]);
+      viewer = q_plot_3d.plot([data, img]);
   else:
-    return p3d.plot([data, img]);
+    return q_plot_3d.plot([data, img]);
 
  
 def plotTracingResult(path, data_nbh, mask_nbh, center, radius, tubeness_nbh, skeleton = None, distance_nbh = None):
@@ -167,9 +167,9 @@ def plotTracingResult(path, data_nbh, mask_nbh, center, radius, tubeness_nbh, sk
       viewer[3].setSource(distance_nbh);
   except:
     if distance_nbh is not None:
-      viewer = p3d.plot([bin_nbh, img_nbh, tubeness_nbh, distance_nbh])
+      viewer = q_plot_3d.plot([bin_nbh, img_nbh, tubeness_nbh, distance_nbh])
     else:
-      viewer = p3d.plot([bin_nbh, img_nbh, tubeness_nbh])
+      viewer = q_plot_3d.plot([bin_nbh, img_nbh, tubeness_nbh])
 
 
 
@@ -584,8 +584,7 @@ def _test():
   #%%
   import numpy as np
   import scipy.ndimage as ndi
-  import ClearMap.DataProcessing.LargeData as ld
-  import ClearMap.Visualization.Plot3d as p3d
+  from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
   import ClearMap.DataProcessing.ConvolvePointList as cpl
   import ClearMap.ImageProcessing.Skeletonization.Topology3d as t3d
   import ClearMap.ImageProcessing.Skeletonization.SkeletonCleanUp as scu
@@ -654,7 +653,7 @@ def _test():
     con.viewer[0].setSource(mask_img);
     con.viewer[1].setSource(data_img);
   except:
-    con.viewer = p3d.plot([mask_img, data_img]);
+    con.viewer = q_plot_3d.plot([mask_img, data_img]);
   
   con.viewer[0].setMinMax([0, 8]);
   con.viewer[1].setMinMax([24, 160]);          
@@ -700,7 +699,7 @@ def _test():
     con.viewer[0].setSource(skel_new);
     con.viewer[1].setSource(data_new);
   except:
-    con.viewer = p3d.plot([skel_new, data_new]);
+    con.viewer = q_plot_3d.plot([skel_new, data_new]);
   
   con.viewer[0].setMinMax([0, 8]);
   con.viewer[1].setMinMax([24, 160]);          

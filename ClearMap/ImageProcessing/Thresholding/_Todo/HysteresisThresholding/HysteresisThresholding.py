@@ -62,7 +62,7 @@ def threshold(source, sink = None, threshold = None, hysteresis_threshold = None
 
 def _test():
   import numpy as np
-  import ClearMap.Visualization.Plot3d as p3d
+  from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
   import ClearMap.ImageProcessing.Filter.SeedThresholding.SeedThresholding as sth    
   
   from importlib import reload
@@ -75,14 +75,14 @@ def _test():
   m = sth.local_max(d, shape = (3,3,3));
   x,y,z = np.where(m);                   
   t = sth.threshold(d, sink = None, seeds_x = x, seeds_y = y, seeds_z = z, percentage = 0.5, absolute = 0.2);               
-  p3d.plot([[d,m,t]])     
+  q_plot_3d.plot([[d,m,t]])     
         
         
-  import ClearMap.Test.Files as tst        
+  import ClearMap.Test.Files as tst
   d = tst.init('v')[:200,:200,:100];
   import ClearMap.ImageProcessing.Filter.Rank as rnk
   d = np.array(d);
-  d = rnk.median(d, np.ones((3,3,3), dtype = bool));
+  d = rnk.median(d, np.ones((3,3,3), dtype = bool))
   
   m = sth.local_max(d, shape = (5,5,1));
   m = np.logical_and(m, d > 10);
@@ -91,4 +91,4 @@ def _test():
   s = np.argsort(v)[::-1];
   x,y,z = [i[s] for i in (x,y,z)];                 
   t = sth.threshold(d, sink = None, seeds_x = x, seeds_y = y, seeds_z = z, percentage = 0.25, absolute = 5);
-  p3d.plot([d, [d,m,t]])
+  q_plot_3d.plot([d, [d,m,t]])

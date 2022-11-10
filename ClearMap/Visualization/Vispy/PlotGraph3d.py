@@ -19,7 +19,7 @@ import numpy as np
 import vispy
 import vispy.scene
 
-import ClearMap.Visualization.Vispy.Plot3d as p3d
+from ClearMap.Visualization.Vispy import Plot3d as vispy_plot_3d
 import ClearMap.Visualization.Vispy.GraphVisual as gvi
 
 import ClearMap.Visualization.Color as col
@@ -55,8 +55,8 @@ def plot_graph_mesh(graph, view=None, coordinates=None, radii=None,
     GraphMesh = vispy.scene.visuals.create_visual_node(gvi.GraphMeshVisual)
 
     title = title if title is not None else 'plot_graph_mesh'
-    view = p3d.initialize_view(view, title=title, depth_value=100000000,
-                               fov=100, distance=0, elevation=0, azimuth=0, show=show, bg_color=bg_color)
+    view = vispy_plot_3d.initialize_view(view, title=title, depth_value=100000000,
+                                         fov=100, distance=0, elevation=0, azimuth=0, show=show, bg_color=bg_color)
 
     p = GraphMesh(graph, parent=view.scene,
                   coordinates=coordinates, radii=radii,
@@ -94,8 +94,8 @@ def plot_graph_line(graph, view=None, coordinates=None,
     GraphLine = vispy.scene.visuals.create_visual_node(gvi.GraphLineVisual)
 
     title = title if title is not None else 'plot_graph_line'
-    view = p3d.initialize_view(view, title=title, depth_value=100000000,
-                               fov=100, distance=0, elevation=0, azimuth=0, show=show, bg_color=bg_color)
+    view = vispy_plot_3d.initialize_view(view, title=title, depth_value=100000000,
+                                         fov=100, distance=0, elevation=0, azimuth=0, show=show, bg_color=bg_color)
 
     width = width if width is not None else 1
 

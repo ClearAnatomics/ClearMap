@@ -33,7 +33,7 @@ import ClearMap.IO.FileList as fl
 
 import ClearMap.ParallelProcessing.ParallelTraceback as ptb
 
-import ClearMap.Visualization.Plot3d as p3d
+from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
 import ClearMap.Visualization.Color as col
 
 import ClearMap.Utils.TagExpression as te
@@ -347,7 +347,7 @@ class Overlap(Region):
   
   def plot(self):
     """Plots the overlap region"""
-    return p3d.plot(self.source_arrays());
+    return q_plot_3d.plot(self.source_arrays());
   
   def __copy__(self):
     new = type(self)();
@@ -808,7 +808,7 @@ class AlignmentBase(object):
   
 def plot_overlay(self, **kwargs):
   ovl = self.overlay(**kwargs);
-  p3d.plot([ovl[...,0], ovl[...,1]]);
+  q_plot_3d.plot([ovl[..., 0], ovl[..., 1]]);
   
   
   
@@ -4360,7 +4360,7 @@ def plot_layout(layout, colors = None, percentile = 98, normalize = True, color_
     plt.imshow(np.transpose(img, [1,0,2])[:,:,:], origin = 'lower');
     plt.tight_layout()
   else:
-    p3d.plot(img);
+    q_plot_3d.plot(img);
   
 
 def plot_regions(regions, sources = None, cmap = plt.cm.rainbow, annotate = True, axes = [0,1]):
@@ -4616,7 +4616,7 @@ def _test():
   s.plot_alignments()
   
   d = s.stitch(verbose = True, method = 'max')
-  stb.p3d.plot(d)
+  stb.q_plot_3d.plot(d)
   
   np.all(d == data[:,:,50])
   

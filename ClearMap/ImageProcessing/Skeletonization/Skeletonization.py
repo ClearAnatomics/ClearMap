@@ -97,21 +97,19 @@ def skeletonize(source, sink = None, points = None, method = 'PK12i', steps = No
 ###############################################################################
   
 def _test():
-  import numpy as np;
-  import ClearMap.IO.IO as io
-  import ClearMap.ImageProcessing.Skeletonization.Skeletonization as skl;
-  import ClearMap.Visualization.Plot3d as p3d
+  import ClearMap.ImageProcessing.Skeletonization.Skeletonization as skl
+  from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
   import ClearMap.Tests.Files as tsf
   
   from importlib import reload
   reload(skl)
   
-  binary = tsf.skeleton_binary;
+  binary = tsf.skeleton_binary
   
   #default version
-  skeleton = skl.skeletonize(binary, delete_border=True, verbose=True);
-  p3d.plot([[binary, skeleton]])  
+  skeleton = skl.skeletonize(binary, delete_border=True, verbose=True)
+  q_plot_3d.plot([[binary, skeleton]])
   
   #fast index version
-  skeleton = skl.PK12.skeletonize_index(binary.copy(), delete_border=True, verbose = True);  
-  p3d.plot([[binary, skeleton]])  
+  skeleton = skl.PK12.skeletonize_index(binary.copy(), delete_border=True, verbose = True)
+  q_plot_3d.plot([[binary, skeleton]])

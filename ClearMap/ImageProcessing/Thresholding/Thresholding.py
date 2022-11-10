@@ -105,14 +105,13 @@ def threshold(source, sink = None, threshold = None, hysteresis_threshold = None
 
 def _test():
   import numpy as np
-  import ClearMap.Visualization.Plot3d as p3d
+  from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
   import ClearMap.ImageProcessing.Thresholding.Thresholding as th    
    
-  r = np.arange(50);        
-  x,y,z = np.meshgrid(r,r,r);
-  x,y,z = [i - 25 for i in (x,y,z)];                     
+  r = np.arange(50)
+  x,y,z = np.meshgrid(r,r,r)
+  x,y,z = [i - 25 for i in (x,y,z)]
   d = np.exp(-(x*x + y*y +z*z)/10.0**2)                  
                
-  t = th.threshold(d, sink = None, threshold = 0.9, hysteresis_threshold=0.5);               
-  p3d.plot([[d,t]])     
-        
+  t = th.threshold(d, sink = None, threshold = 0.9, hysteresis_threshold=0.5)
+  q_plot_3d.plot([[d,t]])

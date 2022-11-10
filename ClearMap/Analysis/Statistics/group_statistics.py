@@ -569,5 +569,5 @@ def compare_groups(directory, gp1_name, gp2_name, gp1_dirs, gp2_dirs, prefix='p_
 #
 #     pvalscol = st.color_p_values(pvals, psign, positive = [255,0,0], negative = [0,255,0])
 #
-#     import ClearMap.Visualization.Plot3d as p3d
-#     p3d.plot(pvalscol)
+#     from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
+#     q_plot_3d.plot(pvalscol)

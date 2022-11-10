@@ -143,7 +143,7 @@ def border_indices(source):
 def _test():
   """Tests."""
   import numpy as np
-  import ClearMap.Visualization.Plot3d as p3d
+  from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
   import ClearMap.ImageProcessing.Binary.Filling as bf
   
   from importlib import reload
@@ -156,4 +156,4 @@ def _test():
   test[8:12, 8:12, 27:32] = False;
   
   filled = bf.fill(test, sink=None, processes=10)
-  p3d.plot([test, filled])
+  q_plot_3d.plot([test, filled])

@@ -30,7 +30,7 @@ import numpy as np
 import ClearMap.IO.IO as clearmap_io
 from ClearMap.Utils.TagExpression import Expression
 import ClearMap.ParallelProcessing.DataProcessing.ArrayProcessing as array_processing
-import ClearMap.Visualization.Plot3d as q_plot3d
+from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
 
 
 ###############################################################################
@@ -254,7 +254,7 @@ class Workspace(object):
         return clearmap_io.write(self.filename(ftype, **kwargs), np.asarray(source[slicing], order='F'))
   
     def plot(self, ftype, **kwargs):
-        return q_plot3d.plot(self.filename(ftype, **kwargs))
+        return q_plot_3d.plot(self.filename(ftype, **kwargs))
   
     def load(self, filename):
         """Loads the configuration from disk"""

@@ -689,6 +689,6 @@ def filter_cells(source, sink, thresholds):
 def _test():
   """Tests."""
   import numpy as np
-  import ClearMap.Visualization.Plot3d as p3d
+  from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
   import ClearMap.Tests.Files as tsf
   import ClearMap.ImageProcessing.Experts.Cells as cells

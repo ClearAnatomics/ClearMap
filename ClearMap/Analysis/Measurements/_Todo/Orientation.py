@@ -94,8 +94,8 @@ def test():
     
     vo2 = cmaps.boys2rgb(vo.transpose([3,0,1,2]));
     
-    import ClearMap.Visualization.Plot3d as p3d
-    p3d.plot([[vo2[:,:,:,0], vo2[:,:,:,1], vo2[:,:,:,2]]])
+    from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
+    q_plot_3d.plot([[vo2[:,:,:,0], vo2[:,:,:,1], vo2[:,:,:,2]]])
     
    
     import ClearMap.Visualization.ColorMaps as cmaps;
@@ -107,7 +107,7 @@ def test():
     ob.shape = ob.shape + (1,)
     
     
-    p3d.plot([[ob[0], ob[1], ob[2]]])
+    q_plot_3d.plot([[ob[0], ob[1], ob[2]]])
     
     
     

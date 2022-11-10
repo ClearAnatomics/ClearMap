@@ -1145,10 +1145,10 @@ def _test():
   
   vertex_colors = col.boys_to_rgb(vertices, alpha=1.0);
   
-  import ClearMap.Visualization.Plot3d as p3d
-  p = p3d.plot_mesh_3d(vertices, faces, vertex_colors=vertex_colors)
+  from ClearMap.Visualization.Vispy import Plot3d as vispy_plot_3d
+  p = vispy_plot_3d.plot_mesh_3d(vertices, faces, vertex_colors=vertex_colors)
 
   vertex_colors = col.orientation_to_rgb(vertices, alpha=1.0)
-  p = p3d.plot_mesh_3d(vertices, faces, vertex_colors=vertex_colors)  
+  p = vispy_plot_3d.plot_mesh_3d(vertices, faces, vertex_colors=vertex_colors)
   
-  p3d.set_light_to_camera(p) 
+  vispy_plot_3d.set_light_to_camera(p)

@@ -223,8 +223,8 @@ def test():
   data[10:20, 15:25,10:20] = 1;
   data[15,20,15] = 2;
   
-  import ClearMap.Visualization.Plot3d as p3d
-  p3d.plot(data)
+  from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
+  q_plot_3d.plot(data)
   
   points = np.array([[15, 20, 15],[4,4,4]])
   d,i = mr.measure_radius(data, points, value = 0.0, max_radius = 10, scale = None, verbose = True, processes = None, return_indices=True);      

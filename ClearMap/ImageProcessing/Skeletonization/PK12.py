@@ -626,7 +626,7 @@ def skeletonize_index(binary, points = None, steps = None, removals = False, rad
 def _test():
   import numpy as np;
   import ClearMap.IO.IO as io
-  import ClearMap.Visualization.Plot3d as p3d
+  from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
   import ClearMap.Tests.Files as tsf
   import ClearMap.ImageProcessing.Skeletonization.PK12 as PK12;
   from importlib import reload
@@ -648,16 +648,16 @@ def _test():
   
   #default version
   skeleton = PK12.skeletonize(binary_array.copy(), delete_border=True, verbose=True);
-  p3d.plot([[binary_array, skeleton]])  
+  q_plot_3d.plot([[binary_array, skeleton]])
   
   #fast index version
   skeleton = PK12.skeletonize_index(binary_array.copy(), delete_border=True, verbose = True);  
-  p3d.plot([[binary_array, skeleton]])  
+  q_plot_3d.plot([[binary_array, skeleton]])
   
   # plotting
-  import ClearMap.Visualization.Plot3d as p3d
-  p3d.plot_3d(binary_array[:150,:150,:150], cmap=p3d.grays_alpha(0.05));
-  p3d.plot_3d(skeleton[:150,:150,:150], cmap=p3d.single_color_colormap('red', alpha = 0.8))
+  from ClearMap.Visualization.Vispy import Plot3d as vispy_plot_3d
+  vispy_plot_3d.plot_3d(binary_array[:150,:150,:150], cmap=vispy_plot_3d.grays_alpha(0.05));
+  vispy_plot_3d.plot_3d(skeleton[:150,:150,:150], cmap=vispy_plot_3d.single_color_colormap('red', alpha = 0.8))
   
   #save for figure
   import scipy.io as sio

@@ -26,7 +26,7 @@ from ClearMap.Alignment.Annotation import annotation
 from ClearMap.IO import TIF
 from ClearMap.IO.metadata import pattern_finders_from_base_dir
 from ClearMap.Settings import atlas_folder
-from ClearMap.Visualization import Plot3d as plot_3d
+from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
 from ClearMap.config.config_loader import ConfigLoader
 from ClearMap.gui.dialogs import make_splash, get_directory_dlg, update_pbar
 from ClearMap.gui.gui_utils import pseudo_random_rgb_array, create_clearmap_widget, get_pseudo_random_color, is_dark
@@ -224,7 +224,7 @@ class OrthoViewer(object):
         xy = np.copy(img)
         yz = np.copy(img).transpose((1, 2, 0))
         zx = np.copy(img).transpose((2, 0, 1))
-        dvs = plot_3d.plot([xy, yz, zx], arange=False, lut='white', parent=parent, sync=False)
+        dvs = q_plot_3d.plot([xy, yz, zx], arange=False, lut='white', parent=parent, sync=False)
         self.dvs = dvs
         # FIXME: disable axes buttons
         return dvs

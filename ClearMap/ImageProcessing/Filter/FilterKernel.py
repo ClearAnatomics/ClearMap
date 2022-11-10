@@ -368,10 +368,10 @@ def filter_kernel_3d(ftype = 'Gaussian', shape = (5,5,5), sigma = None, sigma2 =
 def _test():
     """Tests"""
     import ClearMap.ImageProcessing.Filter.FilterKernel as fk
-    import ClearMap.Visualization.Plot3d as p3d
+    from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
     
     k = fk.filter_kernel(ftype='dog', shape=(15,15,15), sigma=None, radius=None, sigma2=None);
-    p3d.plot(k)
+    q_plot_3d.plot(k)
     
     
     

@@ -322,8 +322,8 @@ def flatfield_line_from_regression(source, sink = None, positions = None, method
 
 def _test():
   """Tests"""
-  import ClearMap.Visualization.Plot3d as p3d
+  from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
   import ClearMap.ImageProcessing.IlluminationCorrection as ic
   
   ff = ic.flatfield_from_line(ic.default_flat_field_line_file_name, 100);
-  p3d.plot(ff)
+  q_plot_3d.plot(ff)

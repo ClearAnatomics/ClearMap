@@ -216,9 +216,9 @@ def grey_reconstruct(source, mask = None, sink = None, method = None, shape = 3,
 def _test():
   import numpy as np
   import ClearMap.ImageProcessing.GreyReconstruction as gr
-  import ClearMap.Visualization.Plot3d as p3d
+  from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
 
   x = np.random.rand(*(200,200,10));
   r = gr.grey_reconstruct(x, mask=0.5 * x, method='erosion', shape=3);
   
-  p3d.plot([x,r])
+  q_plot_3d.plot([x,r])

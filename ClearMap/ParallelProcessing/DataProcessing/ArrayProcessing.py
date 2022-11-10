@@ -724,8 +724,8 @@ def _test():
   
   result = ap.apply_lut_to_index(data, kernel, lut, sink=None, verbose=True)
 
-  import ClearMap.Visualization.Plot3d as p3d
-  p3d.plot([[data, result]])    
+  from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
+  q_plot_3d.plot([[data, result]])
   
   
   ### Correlation 

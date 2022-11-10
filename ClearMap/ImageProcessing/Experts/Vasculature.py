@@ -1040,7 +1040,7 @@ def binary_statistics(source):
 def _test():
   """Tests."""
   import numpy as np
-  import ClearMap.Visualization.Plot3d as p3d
+  from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
   import ClearMap.Tests.Files as tsf
   import ClearMap.ImageProcessing.Experts.Vasculature as vasc
   
@@ -1062,7 +1062,7 @@ def _test():
   #sink=None;
   
   binary = vasc.binarize(source, sink=sink, binarization_parameter=bpar, processing_parameter = ppar) 
-  p3d.plot([source, binary])
+  q_plot_3d.plot([source, binary])
 
   import ClearMap.IO.IO as io
   io.delete_file(sink)
@@ -1070,5 +1070,5 @@ def _test():
   pppar = vasc.default_postprocessing_parameter.copy();
   pppar['smooth']['iterations'] = 3;
   smoothed = vasc.postprocess(binary, postprocessing_parameter=pppar)
-  p3d.plot([binary, smoothed])
+  q_plot_3d.plot([binary, smoothed])
  

@@ -86,7 +86,7 @@ def _test():
   
   vertices, faces = ics.icosphere(n_refinements = 2);
   
-  import ClearMap.Visualization.Plot3d as p3d
-  p3d.plot_mesh_3d(vertices, faces)
+  from ClearMap.Visualization.Vispy import Plot3d as vispy_plot_3d
+  vispy_plot_3d.plot_mesh_3d(vertices, faces)
 
 

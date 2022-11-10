@@ -257,15 +257,15 @@ def local_percentile(source, percentile, selem = (50,50), spacing = None, step =
 def _test():
   """Tests."""
   import numpy as np
-  import ClearMap.Visualization.Plot3d as p3d
+  from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
 
   import ClearMap.ImageProcessing.LocalStatistics as ls     
   from importlib import reload
   reload(ls)                
                       
-  source = np.random.rand(100,200,150) + np.arange(100)[:,None,None];
-  p = ls.local_percentile(source, percentile=0.5, selem=(30,30,30), interpolate=1);
-  p3d.plot([source, p])
+  source = np.random.rand(100,200,150) + np.arange(100)[:,None,None]
+  p = ls.local_percentile(source, percentile=0.5, selem=(30,30,30), interpolate=1)
+  q_plot_3d.plot([source, p])
   
                            
                               

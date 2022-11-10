@@ -13,11 +13,9 @@ __download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 
 import numpy as np
 
-import matplotlib.pyplot as plt;
+import matplotlib.pyplot as plt
 
-import sklearn.manifold as sl;
-
-import ClearMap.Visualization.Plot3d as p3d
+import sklearn.manifold as sl
 
 ###############################################################################
 ### TSNE

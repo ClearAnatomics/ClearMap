@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Plot3d Module
+vispy_plot_3d Module
 =============
 
 Plotting routines for 3d display of data.
@@ -479,16 +479,16 @@ def save(location, view, transparent=None, *args, **kwargs):
     
 def _test():
     import numpy as np
-    import ClearMap.Visualization.Vispy.Plot3d as p3d
-    # reload(p3d)
+    from ClearMap.Visualization.Vispy import Plot3d as vispy_plot_3d
+    # reload(vispy_plot_3d)
 
     # plot
     coordinates = np.random.rand(40, 3)
-    p1 = p3d.list_plot_3d(coordinates, title='test')
+    p1 = vispy_plot_3d.list_plot_3d(coordinates, title='test')
 
     # plot something on top
     coordinates = np.random.rand(30, 3)
-    p2 = p3d.list_line_plot_3d(coordinates, color='white', face_color='red', view=p1)  # analysis:ignore
+    p2 = vispy_plot_3d.list_line_plot_3d(coordinates, color='white', face_color='red', view=p1)  # analysis:ignore
 
     # volumetric plot
     import numpy as np
@@ -498,8 +498,8 @@ def _test():
     center = tuple(s/2 for s in shape)
     distance = np.sum([(g-c)**2 for g, c in zip(grid, center)], axis=0)
     binary[distance <= 10**2] = True
-    p3 = p3d.plot_3d(binary)  # analysis:ignore
+    p3 = vispy_plot_3d.plot_3d(binary)  # analysis:ignore
 
-    # reload(p3d)
-    v = p3d.plot_box((0, 0, 0), (1, 2, 3), face_color=(1, 0, 0, 0), line_color='white', line_width=2, line_padding=0.015)
+    # reload(vispy_plot_3d)
+    v = vispy_plot_3d.plot_box((0, 0, 0), (1, 2, 3), face_color=(1, 0, 0, 0), line_color='white', line_width=2, line_padding=0.015)
     print(v)

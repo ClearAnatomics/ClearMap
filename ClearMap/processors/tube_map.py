@@ -35,7 +35,7 @@ import ClearMap.Analysis.Measurements.Voxelization as voxelization
 
 import ClearMap.ParallelProcessing.BlockProcessing as block_processing
 
-from ClearMap.Visualization.Qt import Plot3d as q_p3d
+from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
 from ClearMap.Visualization.Vispy import PlotGraph3d as plot_graph_3d  # WARNING: vispy dependency
 
 from ClearMap.gui.dialogs import warning_popup
@@ -165,8 +165,8 @@ class BinaryVesselProcessor(TabProcessor):
         """
         images = [(self.workspace.filename('stitched', postfix=postfix)),
                   (self.workspace.filename('binary', postfix=postfix))]
-        dvs = q_p3d.plot(images, title=[os.path.basename(img) for img in images],
-                         arange=False, lut=self.machine_config['default_lut'], parent=parent)
+        dvs = q_plot_3d.plot(images, title=[os.path.basename(img) for img in images],
+                             arange=False, lut=self.machine_config['default_lut'], parent=parent)
         return dvs
 
     def _smooth_and_fill(self, postfix=''):
@@ -232,8 +232,8 @@ class BinaryVesselProcessor(TabProcessor):
         images = [(self.steps.path(self.steps.postprocessed, step_back=True)),
                   (self.workspace.filename('binary', postfix='{}filled'.format(postfix_base)))]
         titles = [os.path.basename(img) for img in images]
-        return q_p3d.plot(images, title=titles, arange=False,
-                          lut=self.machine_config['default_lut'], parent=parent)
+        return q_plot_3d.plot(images, title=titles, arange=False,
+                              lut=self.machine_config['default_lut'], parent=parent)
 
     def fill_vessels(self):
         if not get_free_v_ram() > 22000:
@@ -256,11 +256,11 @@ class BinaryVesselProcessor(TabProcessor):
         combined = self.steps.path(self.steps.combined)
         if not self.processing_config['binarization']['binarization']['arteries']['skip']:
             arteries_filled = self.workspace.filename('binary', postfix='arteries_filled')
-            dvs = q_p3d.plot([raw, arteries_filled, combined], title=['Raw', 'arteries', 'combined'],
-                             arange=False, lut=self.machine_config['default_lut'], parent=parent)
+            dvs = q_plot_3d.plot([raw, arteries_filled, combined], title=['Raw', 'arteries', 'combined'],
+                                 arange=False, lut=self.machine_config['default_lut'], parent=parent)
         else:
-            dvs = q_p3d.plot([raw, combined], title=['Raw', 'combined'],
-                             arange=False, lut=self.machine_config['default_lut'], parent=parent)
+            dvs = q_plot_3d.plot([raw, combined], title=['Raw', 'combined'],
+                                 arange=False, lut=self.machine_config['default_lut'], parent=parent)
         return dvs
 
     def combine_binary(self):
@@ -722,4 +722,4 @@ class VesselGraphProcessor(TabProcessor):
                                                     **voxelize_branch_parameter)
 
     def plot_voxelization(self, parent):
-        return q_p3d.plot(self.branch_density, arange=False, parent=parent)
+        return q_plot_3d.plot(self.branch_density, arange=False, parent=parent)

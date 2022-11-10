@@ -136,7 +136,7 @@ def _test():
   pass
   #%%
 #  import numpy as np
-#  import ClearMap.Visualization.Plot3d as p3d;
+#  from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
 #  import ClearMap.DataProcessing.ConvolvePointList as cpl;
 #  import ClearMap.ImageProcessing.Skeletonization.SkeletonCleanUp as scu
 #  reload(scu);
@@ -175,7 +175,7 @@ def _test():
 #  
 #  #data_f = np.reshape(data, -1);   
 #  #data_f[points] = 160; 
-#  p3d.multi_plot([np.asarray(skel, dtype = int) + 2 * skel_3 + 4 * skel_1, 
+#  q_plot_3d.multi_plot([np.asarray(skel, dtype = int) + 2 * skel_3 + 4 * skel_1,
 #              np.asarray(skel, dtype = int) + 2 * skel_clean, minMax = [0,7]]);
 #  
 

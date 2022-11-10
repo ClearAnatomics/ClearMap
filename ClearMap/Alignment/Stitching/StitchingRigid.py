@@ -39,7 +39,7 @@ import ClearMap.IO.FileList as fl
 
 import ClearMap.ParallelProcessing.ParallelTraceback as ptb
 
-import ClearMap.Visualization.Plot3d as p3d
+from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
 import ClearMap.Visualization.Color as col
 
 import ClearMap.Utils.TagExpression as te
@@ -365,7 +365,7 @@ class Overlap(Region):
     plot : DataViewer
       The plot of the overlap.
     """
-    return p3d.plot(self.source_arrays());
+    return q_plot_3d.plot(self.source_arrays());
   
   def __copy__(self):
     new = type(self)();
@@ -599,7 +599,7 @@ class Source(SourceRegion, src.AbstractSource):
   
 
   def plot(self):
-    return p3d.plot(self.source);
+    return q_plot_3d.plot(self.source);
 
 
 class Slice(slc.Slice, SourceRegion):
@@ -857,7 +857,7 @@ class AlignmentBase(object):
   
   def plot_overlay(self, **kwargs):
     ovl = self.overlay(colors = 'ids', **kwargs);
-    return p3d.plot([ovl]);
+    return q_plot_3d.plot([ovl]);
   
   def overlay_overlap(self, max_shifts = 0):
     o1,o2 = _overlap_with_shifts(self.pre, self.post, max_shifts=max_shifts);         
@@ -867,7 +867,7 @@ class AlignmentBase(object):
   
   def plot_overlap(self, **kwargs):
     #cut overlap region
-    return p3d.plot([self.overlay_overlap(**kwargs)]);
+    return q_plot_3d.plot([self.overlay_overlap(**kwargs)]);
   
   def overlay_mip(self, *args, **kwargs):
     """Overlays this alignment using max intensity projection."""
@@ -4618,7 +4618,7 @@ def plot_layout(layout, colors = None, percentile = 98, normalize = True, color_
     plt.imshow(np.transpose(img, [1,0,2])[:,:,:], origin = 'lower');
     plt.tight_layout()
   else:
-    p3d.plot(img);
+    q_plot_3d.plot(img);
   
 
 def plot_regions(regions, sources = None, cmap = plt.cm.rainbow, annotate = True, axes = [0,1]):

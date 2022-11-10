@@ -115,14 +115,14 @@ def correct_lightsheet(source, percentile = 0.25, max_bin=2**12, mask=None,
 def _test():
   """Tests"""
   import ClearMap.Tests.Files as tsf
-  import ClearMap.Visualization.Plot3d as p3d
+  from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
   
   import ClearMap.ImageProcessing.LightsheetCorrection as ls
   from importlib import reload
   reload(ls)
   
   s = tsf.source('vasculature_lightsheet_raw')
-  #p3d.plot(s)
+  # q_plot_3d.plot(s)
   
   import ClearMap.ImageProcessing.Experts.Vasculature as vasc
   clipped, mask, high, low = vasc.clip(s[:,:,80:120], clip_range=(400,60000));
@@ -133,8 +133,8 @@ def _test():
                                                     spacing = (25,25,1), 
                                                     step=(2,2,1), 
                                                     interpolate=1),
-                                    lightsheet_vs_background = 2);
+                                    lightsheet_vs_background = 2)
                                                     
-  p3d.plot([clipped, corrected])
+  q_plot_3d.plot([clipped, corrected])
   
   

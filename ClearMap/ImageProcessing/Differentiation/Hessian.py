@@ -190,7 +190,7 @@ def _apply_code(function, source, sink, sink_dtype = None, sink_shape_per_pixel 
 def _test():
   import numpy as np
   import ClearMap.Test.Files as tst
-  import ClearMap.Visualization.Plot3d as p3d
+  from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
   
   import ClearMap.ImageProcessing.Differentiation as dif
   
@@ -200,22 +200,22 @@ def _test():
   source = tst.init('v')[:20, :20, :20]; 
   
   sink = dif.eigenvalues(source, sigma = 1.0);
-  p3d.plot([source] + list(sink.transpose([3,0,1,2])));
+  q_plot_3d.plot([source] + list(sink.transpose([3,0,1,2])));
     
   sink = np.zeros(source.shape + (3,), order = 'C');
   dif.eigenvalues(source, sink, sigma = 1.0);
-  p3d.plot([source] + list(sink.transpose([3,0,1,2])));
+  q_plot_3d.plot([source] + list(sink.transpose([3,0,1,2])));
 
   sink = np.zeros(source.shape + (3,), order = 'F');
   dif.eigenvalues(source, sink, sigma = 1.0);
-  p3d.plot([source] + list(sink.transpose([3,0,1,2])));
+  q_plot_3d.plot([source] + list(sink.transpose([3,0,1,2])));
   
   sink = np.zeros(source.shape);
   dif.lambda123(source, sink, sigma = 1.0);
-  p3d.plot([source, sink])
+  q_plot_3d.plot([source, sink])
   
   sink = dif.lambda123(source, sigma = 1.0, threshold = 0.2);
-  p3d.plot([source, sink]);
+  q_plot_3d.plot([source, sink]);
   
   #import ClearMap.ImageProcessing.Differentiation.Gradient as grd
   #res2 = grd.eigenvalues(data, sigma = 1.0);

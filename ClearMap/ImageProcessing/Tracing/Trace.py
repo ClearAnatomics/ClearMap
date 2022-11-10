@@ -150,9 +150,8 @@ def trace_to_mask(source, tubeness, start, mask,
 
 def _test():
   import numpy as np;
-  import scipy.ndimage as ndi;
-  
-  import ClearMap.Visualization.Plot3d as p3d
+
+  from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
   import ClearMap.ImageProcessing.Filter.Curvature.Curvature as cur 
   import ClearMap.ImageProcessing.Tracing.Trace as trc;
   
@@ -199,7 +198,7 @@ def _test():
     dd[0].setSource(xp);
     dd[1].setSource(t);
   except:
-    dd = p3d.plot([xp,t]);
+    dd = q_plot_3d.plot([xp,t]);
 
 
   import scipy.ndimage as ndi
@@ -219,4 +218,4 @@ def _test():
     dd[0].setSource(xp);
     dd[1].setSource(t);
   except:
-    dd = p3d.plot([xp,t]);
+    dd = q_plot_3d.plot([xp,t]);

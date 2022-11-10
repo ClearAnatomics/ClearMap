@@ -143,7 +143,7 @@ def _test():
     import numpy as np
     import vispy
     import ClearMap.Analysis.Graphs.GraphGt as ggt
-    import ClearMap.Visualization.Vispy.Plot3d as p3d
+    from ClearMap.Visualization.Vispy import Plot3d as vispy_plot_3d
     import ClearMap.Visualization.Vispy.GraphVisual as gv
     # reload(gv)
 
@@ -153,9 +153,9 @@ def _test():
     g.set_vertex_coordinates(20*np.random.rand(5, 3))
 
     v = vispy.scene.visuals.create_visual_node(gv.GraphLineVisual)
-    p = v(g, parent=p3d.initialize_view().scene)
-    p3d.center(p)
+    p = v(g, parent=vispy_plot_3d.initialize_view().scene)
+    vispy_plot_3d.center_view(p)
 
     v = vispy.scene.visuals.create_visual_node(gv.GraphMeshVisual)
-    p = v(g, parent=p3d.initialize_view().scene)
-    p3d.center(p)
+    p = v(g, parent=vispy_plot_3d.initialize_view().scene)
+    vispy_plot_3d.center_view(p)

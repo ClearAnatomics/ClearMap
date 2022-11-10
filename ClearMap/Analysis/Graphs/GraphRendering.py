@@ -342,8 +342,8 @@ def _test():
 
   skeleton = tf.source('skeleton');
   
-  #import ClearMap.Visualization.Plot3d as p3d
-  #p3d.plot(skeleton)
+  # from ClearMap.Visualization.Vispy import Plot3d as vispy_plot_3d
+  # vispy_plot_3d.plot(skeleton)
 
   #reload(gp)
   g = gp.graph_from_skeleton(skeleton)

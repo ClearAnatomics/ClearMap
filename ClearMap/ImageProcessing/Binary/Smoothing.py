@@ -460,8 +460,8 @@ def _test():
   noisy[np.logical_and(border, np.random.rand(*shape) > 0.925)] = True
   smoothed  = sm.smooth_by_configuration(noisy, iterations=3, verbose=True, processes='serial')
   
-  import ClearMap.Visualization.Plot3d as p3d
-  p3d.plot([noisy, smoothed])
+  from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
+  q_plot_3d.plot([noisy, smoothed])
   
   #import scipy.io as sio
   #sio.savemat('binary_noisy.mat', {'noisy' : noisy})

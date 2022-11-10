@@ -124,7 +124,7 @@ def devolve(source, sink = None, shape = None, dtype = None,
 def _test():
   """Tests"""
   import numpy as np
-  import ClearMap.Visualization.Plot3d as p3d
+  from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
   import ClearMap.ParallelProcessing.DataProcessing.DevolvePointList as dpl
   
   from importlib import reload
@@ -138,14 +138,14 @@ def _test():
   points = np.array([[10,10,18]])
   indices = [[-1,-1,-1],[0,0,0],[1,1,1]];
   v = dpl.devolve(points, shape=(20,20,20), indices=indices, weights=None);
-  p3d.plot(v)
+  q_plot_3d.plot(v)
   
   points = np.array([[10,10,10]]);
   weights = np.random.rand(len(points));
   v = dpl.devolve(points, shape=(20,20,20), indices=indices, weights=weights);
-  p3d.plot(v)
+  q_plot_3d.plot(v)
   
   kernel = np.random.rand(len(indices));
   v = dpl.devolve(points, shape=(20,20,20), indices=indices, weights=None, kernel=kernel);
-  p3d.plot(v)
+  q_plot_3d.plot(v)
   
