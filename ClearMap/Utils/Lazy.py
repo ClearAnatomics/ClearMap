@@ -11,6 +11,11 @@ __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__   = 'http://idisco.info'
 __download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 
+import warnings
+
+warnings.warn("This module is deprecated and will be removed in future versions;"
+              "please use cached_property instead", DeprecationWarning, 2)
+
 
 class lazyattr(object):
   """Attribute whose value is computed on first access."""
