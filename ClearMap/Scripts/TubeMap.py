@@ -17,11 +17,40 @@ References
 ----------
 .. [Kirst2020] `Mapping the Fine-Scale Organization and Plasticity of the Brain Vasculature. Kirst, C., Skriabine, S., Vieites-Prado, A., Topilko, T., Bertin, P., Gerschenfeld, G., Verny, F., Topilko, P., Michalski, N., Tessier-Lavigne, M. and Renier, N., Cell, 180(4):780-795 <https://doi.org/10.1016/j.cell.2020.01.028>`_
 """
-__author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
-__license__   = 'GPLv3 - GNU General Pulic License v3 (see LICENSE.txt)'
+__author__ = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
+__license__ = 'GPLv3 - GNU General Pulic License v3 (see LICENSE.txt)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
-__webpage__   = 'http://idisco.info'
-__download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
+__webpage__ = 'https://idisco.info'
+__download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
+
+import numpy as np
+
+from ClearMap import Settings as settings
+from ClearMap.IO import IO as io
+from ClearMap.IO import Workspace as wsp
+
+from ClearMap.Alignment.Stitching import StitchingRigid as st
+from ClearMap.Alignment.Stitching import StitchingWobbly as stw
+from ClearMap.Alignment import Resampling as res
+from ClearMap.Alignment import Annotation as ano
+from ClearMap.Alignment import Elastix as elx
+
+import ClearMap.Visualization.Color as col
+# from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
+from ClearMap.Visualization.Vispy import PlotGraph3d as graph_plot_3d
+
+import ClearMap.ImageProcessing.Experts.Vasculature as vasc
+import ClearMap.ImageProcessing.MachineLearning.VesselFilling.VesselFilling as vf
+import ClearMap.ImageProcessing.Skeletonization.Skeletonization as skl
+
+import ClearMap.ParallelProcessing.BlockProcessing as bp
+
+from ClearMap.Analysis.Measurements import Voxelization as vox
+import ClearMap.Analysis.Graphs.GraphGt as grp
+import ClearMap.Analysis.Graphs.GraphProcessing as gp
+import ClearMap.Analysis.Measurements.MeasureExpression as me
+import ClearMap.Analysis.Measurements.MeasureRadius as mr
+
 
 if __name__ == '__main__':
 
@@ -30,9 +59,7 @@ if __name__ == '__main__':
   ###############################################################################
   
   #%% Initialize workspace
-  
-  from ClearMap.Environment import *  #analysis:ignore
-  
+
   #directories and files
   directory = '/home/ckirst/Programs/ClearMap2/ClearMap/Tests/Data/TubeMap_Example'    
   
@@ -124,7 +151,7 @@ if __name__ == '__main__':
   
   stw.stitch_layout(layout, sink = ws.filename('stitched'), method = 'interpolation', processes='!serial', verbose=True)
   
-  #p3d.plot(ws.filename('stitched')) 
+  #q_plot_3d.plot(ws.filename('stitched'))
   
   #%% Wobbly stitching - arteries
                                                                                                                                                                   
@@ -132,8 +159,8 @@ if __name__ == '__main__':
   
   stw.stitch_layout(layout, sink = ws.filename('stitched', postfix='arteries'), method = 'interpolation', processes='serial', verbose=True)
   
-  #p3d.plot(ws.filename('stitched', postfix='arteries')) 
-  #p3d.plot([ws.filename('stitched'), ws.filename('stitched', postfix='arteries')])
+  #q_plot_3d.plot(ws.filename('stitched', postfix='arteries'))
+  #q_plot_3d.plot([ws.filename('stitched'), ws.filename('stitched', postfix='arteries')])
   
   
   #%%############################################################################
@@ -166,7 +193,7 @@ if __name__ == '__main__':
   
   res.resample(ws.filename('autofluorescence'), sink=ws.filename('resampled', postfix='autofluorescence'), **resample_parameter_auto)
   
-  #p3d.plot([ws.filename('resampled'), ws.filename('resampled', postfix='autofluorescence')])
+  #q_plot_3d.plot([ws.filename('resampled'), ws.filename('resampled', postfix='autofluorescence')])
   
   #%% Aignment - resampled to autofluorescence
   
@@ -216,7 +243,7 @@ if __name__ == '__main__':
   ws.create_debug('stitched', postfix='arteries', slicing=slicing);
   ws.debug = True; 
   
-  #p3d.plot(ws.filename('stitched'))
+  #q_plot_3d.plot(ws.filename('stitched'))
     
   
   #%%############################################################################
@@ -238,7 +265,7 @@ if __name__ == '__main__':
      
   vasc.binarize(source, sink, binarization_parameter=binarization_parameter, processing_parameter=processing_parameter);
   
-  #p3d.plot([[source, sink]])
+  #q_plot_3d.plot([[source, sink]])
   
   #%% Smoothing and filling
   
@@ -256,7 +283,7 @@ if __name__ == '__main__':
                    processing_parameter=postprocessing_processing_parameter, 
                    processes=None, verbose=True)
   
-  #p3d.plot([[source, sink]])
+  #q_plot_3d.plot([[source, sink]])
   
   #%% Binarization - arteries
   
@@ -275,7 +302,7 @@ if __name__ == '__main__':
   
   vasc.binarize(source, sink, binarization_parameter=binarization_parameter, processing_parameter=processing_parameter);
   
-  #p3d.plot([source, sink])
+  #q_plot_3d.plot([source, sink])
   
   #%% Smoothing and filling - arteries
   
@@ -292,7 +319,7 @@ if __name__ == '__main__':
                    processing_parameter=postprocessing_processing_parameter, 
                    processes=None, verbose=True)
   
-  #p3d.plot([source, sink])
+  #q_plot_3d.plot([source, sink])
   
   
   #%%############################################################################
@@ -312,7 +339,7 @@ if __name__ == '__main__':
                               
   vf.fill_vessels(source, sink, resample=1, threshold=0.5, cuda=None, processing_parameter=processing_parameter, verbose=True)
   
-  #p3d.plot([source, sink]);
+  #q_plot_3d.plot([source, sink]);
   
   #%% Vessel filling - arteries
                    
@@ -357,7 +384,7 @@ if __name__ == '__main__':
   graph_raw = gp.graph_from_skeleton(ws.filename('skeleton'), verbose=True)
   #graph_raw.save(ws.filename('graph', postfix='raw'))
   
-  #p3d.plot_graph_line(graph_raw)
+  #graph_plot_3d.plot_graph_line(graph_raw)
   
   #%% Measure radii
   
@@ -445,10 +472,10 @@ if __name__ == '__main__':
   
   #artery_label = graph_reduced.edge_property('artery_binary');
   #artery_color = np.array([[1,0,0,1],[0,0,1,1]])[artery_label]
-  #p3d.plot_graph_line(graph_reduced, edge_color = artery_color)
-  #p3d.plot_graph_mesh(graph_reduced, edge_colors=artery_color)
+  #graph_plot_3d.plot_graph_line(graph_reduced, edge_color = artery_color)
+  #graph_plot_3d.plot_graph_mesh(graph_reduced, edge_colors=artery_color)
   
-  #p3d.plot_graph_edge_property(graph_reduced, edge_property='artery_raw', 
+  #graph_plot_3d.plot_graph_edge_property(graph_reduced, edge_property='artery_raw',
   #                             percentiles=[2,98], normalize=True, mesh=True)
   
   
@@ -585,7 +612,7 @@ if __name__ == '__main__':
   #edge_id[graph.edge_property('artery_cleaned')>0] += 2;
   #edge_id[graph.edge_property('artery')>0] += 4;
   
-  #p3d.plot_graph_edge_property(graph, edge_property=edge_id, normalize=True, mesh=True)
+  #graph_plot_3d.plot_graph_edge_property(graph, edge_property=edge_id, normalize=True, mesh=True)
   
   
   #%% Artery tracing
@@ -705,12 +732,12 @@ if __name__ == '__main__':
   #%% Visualization - line graph - ABA colors
   
   vertex_colors = ano.convert_label(gs.vertex_annotation(), key='order', value='rgba');
-  p = p3d.plot_graph_line(gs, color=vertex_colors)
+  p = graph_plot_3d.plot_graph_line(gs, color=vertex_colors)
   
   #%% Visualization - ABA colors
   
   vertex_colors = ano.convert_label(gs.vertex_annotation(), key='order', value='rgba');
-  p = p3d.plot_graph_mesh(gs, default_radius=0.15, vertex_colors=vertex_colors, n_tube_points=5)
+  p = graph_plot_3d.plot_graph_mesh(gs, default_radius=0.15, vertex_colors=vertex_colors, n_tube_points=5)
   
   #%% Visualization -  add artery label
   
@@ -718,7 +745,7 @@ if __name__ == '__main__':
   colormap = np.array([[0.8,0.0,0.0,1.0], [0.0,0.0,0.8,1.0]]);
   edge_colors = colormap[np.asarray(artery_label, dtype=int)];
   
-  p = p3d.plot_graph_mesh(gs, edge_colors=edge_colors, n_tube_points=3);
+  p = graph_plot_3d.plot_graph_mesh(gs, edge_colors=edge_colors, n_tube_points=3);
   
   #%% Graph - sub-slice brain regions
   
@@ -754,7 +781,7 @@ if __name__ == '__main__':
   edge_colors[edge_artery_label>0] = [0.8,0.0,0.0,1.0]
   edge_colors[edge_vein_label  >0] = [0.0,0.0,0.8,1.0]
   
-  p = p3d.plot_graph_mesh(gs, edge_colors=edge_colors, n_tube_points=3);
+  p = graph_plot_3d.plot_graph_mesh(gs, edge_colors=edge_colors, n_tube_points=3);
   
   
   #%% Visualization - vessel orientation 
@@ -769,7 +796,7 @@ if __name__ == '__main__':
   edge_colors = col.orientation_to_boys(orientations, alpha=1.0);
   edge_artery_label = gs.edge_property('artery');
   edge_colors[edge_artery_label>0] = [0.8,0.0,0.0,1.0]
-  p = p3d.plot_graph_mesh(gs, edge_colors=edge_colors, n_tube_points=3);
+  p = graph_plot_3d.plot_graph_mesh(gs, edge_colors=edge_colors, n_tube_points=3);
   
   
   #%% Visualization - veins and arteries only
@@ -790,7 +817,7 @@ if __name__ == '__main__':
   edge_colors[edge_artery_label>0] = [0.8,0.0,0.0,1.0]
   #edge_colors[edge_vein_label>0] = [0.0,0.0,0.8,1.0]
   
-  p = p3d.plot_graph_mesh(gsrt, edge_colors=edge_colors, n_tube_points=5);
+  p = graph_plot_3d.plot_graph_mesh(gsrt, edge_colors=edge_colors, n_tube_points=5);
   
                          
   #%%############################################################################                  

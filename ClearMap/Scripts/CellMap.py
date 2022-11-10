@@ -24,11 +24,27 @@ References
 ----------
 .. [Renier2016] `Mapping of brain activity by automated volume analysis of immediate early genes. Renier* N, Adams* EL, Kirst* C, Wu* Z, et al. Cell. 2016 165(7):1789-802 <https://doi.org/10.1016/j.cell.2016.05.007>`_
 """
-__author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
-__license__   = 'GPLv3 - GNU General Pulic License v3 (see LICENSE)'
+__author__ = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
+__license__ = 'GPLv3 - GNU General Pulic License v3 (see LICENSE)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
-__webpage__   = 'http://idisco.info'
-__download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
+__webpage__ = 'https://idisco.info'
+__download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
+
+
+import numpy as np
+from matplotlib import pyplot as plt
+
+from ClearMap import Settings as settings
+from ClearMap.IO import IO as io
+from ClearMap.IO import Workspace as wsp
+from ClearMap.Alignment import Resampling as res
+from ClearMap.Alignment import Annotation as ano
+from ClearMap.Alignment import Elastix as elx
+from ClearMap.ImageProcessing.Experts import Cells as cells
+from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
+from ClearMap.Visualization.Vispy import Plot3d as vispy_plot_3d
+from ClearMap.Visualization.Matplotlib import PlotUtils as plot_utils
+from ClearMap.Analysis.Measurements import Voxelization as vox
 
 if __name__ == "__main__":
      
@@ -37,9 +53,7 @@ if __name__ == "__main__":
   ###############################################################################
   
   #%% Initialize workspace
-  
-  from ClearMap.Environment import *  #analysis:ignore
-  
+
   #directories and files
   directory = '/home/ckirst/Programs/ClearMap2/ClearMap/Tests/Data/CellMap_Example/'    
   
@@ -97,7 +111,7 @@ if __name__ == "__main__":
   res.resample(ws.filename('stitched'), sink=ws.filename('resampled'), **resample_parameter)
   
   #%%
-  p3d.plot(ws.filename('resampled'))
+  q_plot_3d.plot(ws.filename('resampled'))
   
   #%% Resample autofluorescence
       
@@ -192,12 +206,12 @@ if __name__ == "__main__":
   
   #%% visualization
   
-  p3d.plot([[ws.filename('stitched'), ws.filename('cells', postfix='maxima')]])
+  q_plot_3d.plot([[ws.filename('stitched'), ws.filename('cells', postfix='maxima')]])
   
   #%%
   coordinates = np.hstack([ws.source('cells', postfix='raw')[c][:,None] for c in 'xyz']);
-  p = p3d.list_plot_3d(coordinates)
-  p3d.plot_3d(ws.filename('stitched'), view=p, cmap=p3d.grays_alpha(alpha=1))
+  p = vispy_plot_3d.list_plot_3d(coordinates)
+  vispy_plot_3d.plot_3d(ws.filename('stitched'), view=p, cmap=vispy_plot_3d.grays_alpha(alpha=1))
   
   
   #%% Cell statistics
@@ -206,7 +220,7 @@ if __name__ == "__main__":
   
   plt.figure(1); plt.clf();
   names = source.dtype.names;
-  nx,ny = p3d.subplot_tiling(len(names));
+  nx,ny = plot_utils.subplot_tiling(len(names));
   for i, name in enumerate(names):
     plt.subplot(nx, ny, i+1)
     plt.hist(source[name]);
@@ -228,8 +242,8 @@ if __name__ == "__main__":
   #%% Visualize
   
   coordinates = np.array([ws.source('cells', postfix='filtered')[c] for c in 'xyz']).T;
-  p = p3d.list_plot_3d(coordinates, color=(1,0,0,0.5), size=10)
-  p3d.plot_3d(ws.filename('stitched'), view=p, cmap=p3d.grays_alpha(alpha=1))
+  p = vispy_plot_3d.list_plot_3d(coordinates, color=(1, 0, 0, 0.5), size=10)
+  vispy_plot_3d.plot_3d(ws.filename('stitched'), view=p, cmap=vispy_plot_3d.grays_alpha(alpha=1))
   
   
   #%%############################################################################
@@ -332,7 +346,7 @@ if __name__ == "__main__":
   
   #%% 
   
-  p3d.plot(ws.filename('density', postfix='counts'))
+  q_plot_3d.plot(ws.filename('density', postfix='counts'))
   
   
   #%% Weighted 
@@ -352,4 +366,4 @@ if __name__ == "__main__":
   
   #%%
   
-  p3d.plot(ws.filename('density', postfix='intensities'))
+  q_plot_3d.plot(ws.filename('density', postfix='intensities'))
