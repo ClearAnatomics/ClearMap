@@ -16,6 +16,7 @@ import math
 import os
 import sys
 import time
+from datetime import datetime
 
 from multiprocessing.pool import ThreadPool
 from shutil import copyfile
@@ -80,7 +81,7 @@ from ClearMap.gui.gui_utils import html_to_ansi, html_to_plain_text, compute_gri
 from ClearMap.gui.style import QDARKSTYLE_BACKGROUND, DARK_BACKGROUND, PLOT_3D_BG, \
     BTN_STYLE_SHEET, TOOLTIP_STYLE_SHEET, COMBOBOX_STYLE_SHEET
 
-from ClearMap.gui.widgets import OrthoViewer, PbarWatcher, setup_mini_brain  # needs plot_3d
+from ClearMap.gui.widgets import OrthoViewer, ProgressWatcher, setup_mini_brain  # needs plot_3d
 update_pbar(app, progress_bar, 60)
 from ClearMap.gui.tabs import SampleTab, AlignmentTab, CellCounterTab, VasculatureTab, PreferenceUi, BatchTab
 
@@ -118,8 +119,10 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         self.graphs = []
         self._reload_icon = self.style().standardIcon(QStyle.SP_BrowserReload)
         self.logger = None
+        self.progress_logger = Printer(logger_type='progress')
         self.error_logger = None
         self.progress_dialog = None
+        self.progress_watcher = ProgressWatcher()
 
     def find_child_by_name(self, child_name, child_type, parent=None):
         if parent is None:
@@ -342,28 +345,33 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         msg = f'{base_msg} <br><br>Do you want to load a default one from:<br>  <nobr><em>"{default_path}"</em>?</nobr>'
         return base_msg, msg
 
-    def make_progress_dialog(self, msg, maximum=100, canceled_callback=None):
-        dialog = make_progress_dialog(msg, maximum, canceled_callback, self)
+    def make_progress_dialog(self, msg, maximum=100, abort_callback=None):
+        dialog = make_progress_dialog(msg, maximum, abort_callback, self)
         self.progress_dialog = dialog
         self.progress_watcher.progress_changed.connect(self.progress_dialog.setValue)
         self.set_tabs_progress_watchers(nested=False)
 
-    def make_nested_progress_dialog(self, title='Processing', n_steps=1, sub_maximum=100,
-                                    sub_process_name='', abort_callback=None, parent=None):
+    def make_nested_progress_dialog(self, title='Processing', n_steps=1, sub_process_name='',
+                                    abort_callback=None, parent=None):
         if n_steps:
             n_steps += 1  # To avoid range shrinking because starting from 1 not 0
-        dialog = make_nested_progress_dialog(title=title, overall_maximum=n_steps, sub_maximum=sub_maximum,
-                                             sub_process_name=sub_process_name, abort_callback=abort_callback,
-                                             parent=parent)
+        dialog = make_nested_progress_dialog(overall_maximum=n_steps, sub_process_name=sub_process_name,
+                                             abort_callback=abort_callback, parent=parent)
         self.progress_dialog = dialog
-        self.progress_watcher.progress_changed.connect(self.progress_dialog.subProgressBar.setValue)
-        self.progress_watcher.main_progress_changed.connect(self.progress_dialog.mainProgressBar.setValue)
-        self.progress_watcher.main_progress_changed.connect(self.progress_watcher.reset_log_length)
-        self.progress_watcher.max_changed.connect(self.progress_dialog.subProgressBar.setMaximum)
-        self.progress_watcher.main_max_changed.connect(self.progress_dialog.mainProgressBar.setMaximum)
-        self.progress_watcher.progress_name_changed.connect(self.progress_dialog.subProgressLabel.setText)
 
-        self.progress_watcher.main_max_progress = n_steps
+        self.progress_watcher.main_max_changed.connect(self.progress_dialog.mainProgressBar.setMaximum)
+        self.progress_watcher.main_progress_changed.connect(self.progress_dialog.mainProgressBar.setValue)
+        self.progress_watcher.main_step_name_changed.connect(self.progress_dialog.mainLabel.setText)
+        self.progress_watcher.main_step_name_changed.connect(self.log_process_start)
+
+        self.progress_watcher.max_changed.connect(self.progress_dialog.subProgressBar.setMaximum)
+        self.progress_watcher.progress_changed.connect(self.progress_dialog.subProgressBar.setValue)
+        self.progress_watcher.sub_step_name_changed.connect(self.progress_dialog.subProgressLabel.setText)
+        self.progress_watcher.sub_step_name_changed.connect(self.log_progress)
+
+        self.progress_watcher.finished.connect(self.signal_process_finished)
+
+        self.progress_watcher.setup(main_step_name=title, main_step_length=n_steps, sub_step_name=sub_process_name)
 
         self.set_tabs_progress_watchers(nested=True)
 
@@ -380,9 +388,28 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         return result.get()
 
     def signal_process_finished(self, msg='Idle, waiting for input'):
+        if not any([kw in msg.lower() for kw in ('idle', 'done', 'finish')]):
+            msg += ' finished'
         self.print_status_msg(msg)
+        self.log_progress(msg)
         if self.progress_dialog is not None:
             self.progress_dialog.done(1)
+
+    def log_process_start(self, msg):
+        self.print_status_msg(msg)
+        self.log_progress(msg)
+        self.save_cfg()
+
+    def log_progress(self, msg):
+        self.progress_logger.write(msg)
+
+    def save_cfg(self):
+        cfg_folder = os.path.join(self.src_folder, 'cfg_logs', datetime.now().isoformat())
+        os.mkdir(cfg_folder)
+        for param in self.params:
+            cfg_f_name = os.path.basename(param._config.filename)
+            with open(os.path.join(cfg_folder, cfg_f_name), 'w') as file_obj:
+                param._config.write(file_object=file_obj)
 
 
 class ClearMapGui(ClearMapGuiBase):
@@ -408,7 +435,6 @@ class ClearMapGui(ClearMapGuiBase):
 
         self.actionPreferences.triggered.connect(self.preference_editor.open)
 
-        self.progress_watcher = PbarWatcher()
         self.app = QApplication.instance()
 
     def __len__(self):
@@ -611,6 +637,7 @@ class ClearMapGui(ClearMapGuiBase):
         self.logger.set_file(os.path.join(src_folder, 'info.log'))
         self.progress_watcher.log_path = self.logger.file.name
         self.error_logger.set_file(os.path.join(src_folder, 'errors.html'))
+        self.progress_logger.set_file(os.path.join(src_folder, 'progress.log'))
         self.sample_tab_mgr.src_folder = src_folder
 
 
