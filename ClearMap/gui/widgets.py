@@ -230,26 +230,84 @@ class OrthoViewer(object):
         return dvs
 
 
-class PbarWatcher(QWidget):  # Inspired from https://stackoverflow.com/a/66266068
-    progress_name_changed = QtCore.pyqtSignal(str)
+class ProgressWatcher(QWidget):  # Inspired from https://stackoverflow.com/a/66266068
+    main_step_name_changed = QtCore.pyqtSignal(str)
+    sub_step_name_changed = QtCore.pyqtSignal(str)
+
+    main_progress_changed = QtCore.pyqtSignal(int)
+    main_max_changed = QtCore.pyqtSignal(int)
+
     progress_changed = QtCore.pyqtSignal(int)
     max_changed = QtCore.pyqtSignal(int)
 
-    main_max_changed = QtCore.pyqtSignal(int)
-    main_progress_changed = QtCore.pyqtSignal(int)
+    finished = QtCore.pyqtSignal(str)
 
     def __init__(self, max_progress=100, main_max_progress=1, parent=None):
         super().__init__(parent)
-        self.__progress = 0
+        self._main_step_name = 'Processing'
+        self._sub_step_name = None
         self.__main_progress = 1
-        self.__max_progress = max_progress
         self.__main_max_progress = main_max_progress
-        self.range_fraction = 1
+        self.__progress = 0
+        self.__max_progress = max_progress
+        self.range_fraction = 1  # FIXME: unused
 
-        self.log_path = None
-        self.previous_log_length = 0  # The log length at the end of the previous operation
         self.n_dones = 0
+        self.previous_log_length = 0  # The log length at the end of the previous operation
+        self.log_path = None
         self.pattern = None
+
+    def __del__(self):
+        self.set_main_progress(self.main_max_progress)
+        self.set_progress(self.max_progress)
+        if self.parentWidget() is not None:
+            self.parentWidget().app.processEvents()
+
+    def reset(self):
+        self.main_step_name = 'Processing'
+        self.__main_progress = 1
+        self.__main_max_progress = 1
+        self.__progress = 0
+        self.__max_progress = 100
+        self.range_fraction = 1  # FIXME: unused
+
+        self.n_dones = 0
+        self.previous_log_length = 0  # The log length at the end of the previous operation
+        self.log_path = None
+        self.pattern = None
+
+    def setup(self, main_step_name, main_step_length, sub_step_name, sub_step_length=1, pattern=None):
+        self.main_step_name = main_step_name
+        self.main_max_progress = main_step_length
+        self.sub_step_name = sub_step_name
+        self.max_progress = sub_step_length
+        self.pattern = pattern
+
+        self.reset_log_length()
+        self.set_main_progress(1)
+        self.set_progress(0)
+
+    def prepare_for_substep(self, step_length, pattern, step_name):
+        """
+
+        Parameters
+        ----------
+        step_name
+            str
+        step_length
+            int The number of steps in the operation
+        pattern
+            str or re.Pattern or (str, re.Pattern) the text to look for in the logs to check for progress
+
+        Returns
+        -------
+
+        """
+        self.max_progress = step_length
+        self.pattern = pattern
+        self.reset_log_length()
+        self.set_progress(0)
+        self.sub_step_name = step_name
 
     def get_progress(self):
         return self.__progress
@@ -264,10 +322,14 @@ class PbarWatcher(QWidget):  # Inspired from https://stackoverflow.com/a/6626606
         if self.__main_progress == value:
             return
         self.__main_progress = round(value)
+        self.reset_log_length()
         self.main_progress_changed.emit(self.__main_progress)
+        if self.__main_progress != 0 and self.__main_progress == self.main_max_progress:
+            self.finished.emit(self.main_step_name)
 
     def increment_main_progress(self, increment=1):
         self.set_main_progress(self.__main_progress + round(increment))
+        self.reset_log_length()
 
     def increment(self, increment):
         if isinstance(increment, float):
@@ -293,6 +355,24 @@ class PbarWatcher(QWidget):  # Inspired from https://stackoverflow.com/a/6626606
         self.__main_max_progress = round(value)
         self.main_max_changed.emit(self.__main_max_progress)
 
+    @property
+    def main_step_name(self):
+        return self._main_step_name
+
+    @main_step_name.setter
+    def main_step_name(self, step_name):
+        self._main_step_name = step_name
+        self.main_step_name_changed.emit(self.main_step_name)
+
+    @property
+    def sub_step_name(self):
+        return self._sub_step_name
+
+    @sub_step_name.setter
+    def sub_step_name(self, step_name):
+        self._sub_step_name = step_name
+        self.sub_step_name_changed.emit(self.sub_step_name)
+
     def __match(self, line):
         if isinstance(self.pattern, tuple):  # TODO: cache
             return self.pattern[0] in line and self.pattern[1].match(line)  # Most efficient
@@ -310,7 +390,7 @@ class PbarWatcher(QWidget):  # Inspired from https://stackoverflow.com/a/6626606
         self.previous_log_length += self.__get_log_bytes(new_lines)
         return self.n_dones
 
-    def reset_log_length(self):  # To bind
+    def reset_log_length(self):  # TODO: bind
         with open(self.log_path, 'r') as log:
             self.previous_log_length = self.__get_log_bytes(log.readlines())
             self.n_dones = 0
@@ -318,27 +398,8 @@ class PbarWatcher(QWidget):  # Inspired from https://stackoverflow.com/a/6626606
     def __get_log_bytes(self, log):
         return sum([len(ln) for ln in log])
 
-    def prepare_for_substep(self, step_length, pattern, step_name):
-        """
-
-        Parameters
-        ----------
-        step_name
-            str
-        step_length
-            int The number of steps in the operation
-        pattern
-            str or re.Pattern or (str, re.Pattern) the text to look for in the logs to check for progress
-
-        Returns
-        -------
-
-        """
-        self.max_progress = step_length
-        self.pattern = pattern
-        self.reset_log_length()
-        self.set_progress(0)
-        self.progress_name_changed.emit(step_name)
+    def finish(self):
+        self.finished.emit(self.main_step_name)
 
 
 class Scatter3D:
@@ -579,9 +640,7 @@ class WizardDialog:
             app = QtWidgets.QApplication.instance()
         self.app = app
 
-        dlg = create_clearmap_widget(f'{ui_name}.ui', patch_parent_class='QDialog')
-        dlg.setWindowTitle(ui_title)
-        dlg.setupUi()
+        dlg = create_clearmap_widget(f'{ui_name}.ui', patch_parent_class='QDialog', window_title=ui_title)
 
         if size is not None:
             if size[0] is None:
@@ -655,9 +714,7 @@ class PatternDialog(WizardDialog):
         return label_widget, pattern_widget, combo_widget
 
     def add_group(self):
-        group_controls = create_clearmap_widget('image_group_ctrls.ui',
-                                                patch_parent_class='QWidget')
-        group_controls.setupUi()
+        group_controls = create_clearmap_widget('image_group_ctrls.ui', patch_parent_class='QWidget')
         self.dlg.patternToolBox.addItem(group_controls, f'Image group {self.n_image_groups}')
 
         group_controls.patternButtonBox.button(QDialogButtonBox.Apply).clicked.connect(self.validate_pattern)

@@ -150,10 +150,14 @@ def get_current_res(app):
     return res
 
 
-def create_clearmap_widget(ui_name, patch_parent_class):
+def create_clearmap_widget(ui_name, patch_parent_class, window_title=None):
     widget_class, _ = loadUiType(os.path.join(UI_FOLDER, 'creator', ui_name), from_imports=True,
                                  import_from='ClearMap.gui.creator', patch_parent_class=patch_parent_class)
-    return widget_class()
+    widget = widget_class()
+    if window_title is not None:
+        widget.setWindowTitle(window_title)
+    widget.setupUi()
+    return widget
 
 
 def pseudo_random_rgb_array(n_samples):

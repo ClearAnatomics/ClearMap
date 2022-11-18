@@ -5,12 +5,14 @@ tabs
 
 The different tabs that correspond to different functionalities of the GUI
 """
-import copy
 import os.path
+import copy
+from datetime import datetime
 
-import mpld3
 import numpy as np
 import pandas as pd
+
+import mpld3
 
 import pyqtgraph as pg
 from PyQt5.QtWebEngineWidgets import QWebEngineView
@@ -64,11 +66,10 @@ class GenericUi:
         self.widget_class_name = widget_class_name
         self.ui = None
         self.params = None
-        self.progress_watcher = None
+        self.progress_watcher = self.main_window.progress_watcher
 
     def init_ui(self):
         self.ui = create_clearmap_widget(f'{self.ui_file_name}.ui', patch_parent_class=self.widget_class_name)
-        self.ui.setupUi()
         self.patch_button_boxes()
 
     def initial_cfg_load(self):
@@ -133,6 +134,27 @@ class GenericTab(GenericUi):
 
     def connect_whats_this(self, info_btn, whats_this_ctrl):
         info_btn.clicked.connect(lambda: self.display_whats_this(whats_this_ctrl))
+
+    def wrap_step(self, title, step_callback, step_kw_args=None, abort_callback=None, save_cfg=False,
+                  create=True, nested=True, finish=True):
+        if step_kw_args is None:
+            step_kw_args = {}
+        if save_cfg:
+            self.params.ui_to_cfg()
+        if create:
+            if nested:
+                self.main_window.make_nested_progress_dialog(title=title, abort_callback=abort_callback)
+            else:
+                self.main_window.make_progress_dialog(title, abort_callback=abort_callback)
+        else:
+            self.progress_watcher.main_step_name = title
+        self.main_window.wrap_in_thread(step_callback, **step_kw_args)
+        if finish:
+            self.progress_watcher.finish()
+        else:
+            msg = f'{datetime.now().isoformat()}: {title} finished'
+            self.main_window.print_status_msg(msg)
+            self.main_window.log_progress(msg)
 
 
 class PostProcessingTab(GenericTab):
@@ -340,10 +362,10 @@ class AlignmentTab(GenericTab):
         has_tiles = len(clearmap_io.file_list(self.preprocessor.filename('raw')))
         if has_tiles and prompt_dialog('Tile conversion', 'Convert individual tiles to npy for efficiency'):
             self.main_window.make_progress_dialog('Converting tiles', maximum=0,
-                                                  canceled_callback=self.preprocessor.stop_process)
+                                                  abort_callback=self.preprocessor.stop_process)
             self.main_window.wrap_in_thread(self.preprocessor.convert_tiles)
         self.setup_atlas()
-        self.main_window.signal_process_finished()
+        self.progress_watcher.finish()
 
     def setup(self):
         self.init_ui()
@@ -377,35 +399,25 @@ class AlignmentTab(GenericTab):
         self.ui.advancedAtlasSettingsGroupBox.setVisible(checked)
 
     def run_stitching(self):
-        self.params.ui_to_cfg()
-        self.main_window.print_status_msg('Stitching')
         tags = self.preprocessor.workspace.expression('raw', prefix=self.preprocessor.prefix).tags  # FIXME: only 1 axis
         if tags is not None:
             axes = [tag.name for tag in tags]
+
         if tags is None or axes == ['Z']:  # BYPASS stitching, just copy or stack
             clearmap_io.convert(self.preprocessor.filename('raw'), self.preprocessor.filename('stitched'))
-            self.main_window.logger.n_lines = 0
-            self.main_window.make_nested_progress_dialog('Stitching', n_steps=1, sub_maximum=0,
-                                                         sub_process_name='Getting layout',
-                                                         abort_callback=self.preprocessor.stop_process,
-                                                         parent=self.main_window)
         else:  # assume tiling
-            n_steps = self.preprocessor.n_rigid_steps_to_run + self.preprocessor.n_wobbly_steps_to_run
-            self.main_window.make_nested_progress_dialog('Stitching', n_steps=n_steps, sub_maximum=0,
-                                                         sub_process_name='Getting layout',
-                                                         abort_callback=self.preprocessor.stop_process,
-                                                         parent=self.main_window)
-            self.main_window.logger.n_lines = 0  # FIXME: check that done for all steps that require logger read for progress
+            n_steps = self.preprocessor.n_rigid_steps_to_run + self.preprocessor.n_wobbly_steps_to_run  # FIXME: use
             if not self.params.stitching_rigid.skip:
-                self.main_window.wrap_in_thread(self.preprocessor.stitch_rigid, force=True)
-                self.main_window.print_status_msg('Stitched rigid')
+                self.wrap_step('Stitching ridig', self.preprocessor.stitch_rigid, step_kw_args={'force': True},
+                               abort_callback=self.preprocessor.stop_process, finish=False)
             if not self.params.stitching_wobbly.skip:
                 if self.preprocessor.was_stitched_rigid:
-                    self.main_window.wrap_in_thread(self.preprocessor.stitch_wobbly, force=self.params.stitching_rigid.skip)
-                    self.main_window.print_status_msg('Stitched wobbly')
+                    self.wrap_step('Stitching wobbly', self.preprocessor.stitch_wobbly,
+                                   step_kw_args={'force': self.params.stitching_rigid.skip})
+
                 else:
                     self.main_window.popup('Could not run wobbly stitching <br>without rigid stitching first')
-        self.main_window.signal_process_finished()
+        self.progress_watcher.finish()
 
     def plot_stitching_results(self):
         self.params.stitching_general.ui_to_cfg()
@@ -418,11 +430,9 @@ class AlignmentTab(GenericTab):
         fmt = self.params.stitching_general.conversion_fmt
         if not self.step_exists('stitching', (self.preprocessor.filename('stitched'))):  # TODO: add arteries option
             return
-        self.main_window.print_status_msg(f'Converting stitched image to {fmt}')
-        self.main_window.make_progress_dialog('Converting files', canceled_callback=self.preprocessor.stop_process)
         self.params.stitching_general.ui_to_cfg()
-        self.preprocessor.convert_to_image_format()  # TODO: check if use checkbox state
-        self.main_window.signal_process_finished('Conversion finished')
+        self.wrap_step(f'Converting stitched image to {fmt}', self.preprocessor.convert_to_image_format,
+                       abort_callback=self.preprocessor.stop_process, nested=False)
 
     def setup_atlas(self):
         self.sample_params.ui_to_cfg()  # To make sure we have the slicing up to date
@@ -492,17 +502,12 @@ class AlignmentTab(GenericTab):
         self.landmark_selector = None
 
     def run_registration(self):
-        self.main_window.print_status_msg('Registering')
-        self.main_window.make_nested_progress_dialog('Registering', n_steps=self.preprocessor.n_registration_steps,
-                                                     sub_maximum=0, abort_callback=self.preprocessor.stop_process,
+        self.main_window.make_nested_progress_dialog(title='Registering', abort_callback=self.preprocessor.stop_process,
                                                      parent=self.main_window)
         self.setup_atlas()
         if not self.params.registration.skip_resampling:
-            self.main_window.print_status_msg('Resampling for registering')
             self.main_window.wrap_in_thread(self.preprocessor.resample_for_registration, force=True)
-        self.main_window.print_status_msg('Aligning')
         self.main_window.wrap_in_thread(self.preprocessor.align)
-        self.main_window.signal_process_finished('Registered')
 
     def prepare_registration_results_graph(self, step='ref_to_auto'):
         if step == 'ref_to_auto':
@@ -627,32 +632,25 @@ class CellCounterTab(PostProcessingTab):
             self.update_cell_number()
 
     def create_cell_detection_tuning_sample(self):
-        self.params.ui_to_cfg()
-        self.cell_detector.create_test_dataset(slicing=self.params.slicing)
-        self.main_window.print_status_msg('Tuning sample created')  # TODO: progress bar
+        self.wrap_step('Creating tuning sample', self.cell_detector.create_test_dataset,
+                       step_kw_args={'slicing': self.params.slicing}, save_cfg=True, nested=False)
 
     def run_tuning_cell_detection(self):
-        self.params.ui_to_cfg()
-        self.main_window.make_progress_dialog('Cell detection preview')
-        self.main_window.wrap_in_thread(self.cell_detector.run_cell_detection, tuning=True)
-        self.main_window.signal_process_finished()
+        self.wrap_step('Cell detection preview', self.cell_detector.run_cell_detection,
+                       step_kw_args={'tuning': True}, save_cfg=True)
         if self.cell_detector.stopped:
             return
         with self.cell_detector.workspace.tmp_debug:
             self.plot_detection_results()
 
     def detect_cells(self):  # TODO: merge w/ above w/ tuning option
-        self.params.ui_to_cfg()
-        self.main_window.print_status_msg('Starting cell detection')
-        self.main_window.make_nested_progress_dialog(title='Detecting cells', n_steps=0,
-                                                     abort_callback=self.cell_detector.stop_process)
-        self.main_window.wrap_in_thread(self.cell_detector.run_cell_detection, tuning=False)
+        self.wrap_step('Detecting cells', self.cell_detector.run_cell_detection,
+                       step_kw_args={'tuning': False}, abort_callback=self.cell_detector.stop_process, save_cfg=True)
         if self.cell_detector.stopped:
             return
         if self.params.plot_detected_cells:
             self.cell_detector.plot_cells()  # TODO: integrate into UI
         self.update_cell_number()
-        self.main_window.signal_process_finished('Cell detection done')
 
     def update_cell_number(self):  # FIXME: try except or check that cells and cells filtered exist
         self.ui.nDetectedCellsLabel.setText(
@@ -834,11 +832,10 @@ class VasculatureTab(PostProcessingTab):
 
     def binarize_vessels(self):  # FIXME: factorise (wrap in sub_call function)
         self.params.ui_to_cfg()
-        self.main_window.print_status_msg('Starting vessel binarization')
-        self.main_window.make_nested_progress_dialog(title='Binarizing vessels', n_steps=self._get_n_binarize_steps(),
+        self.main_window.make_nested_progress_dialog(title='Vessel binarization',
                                                      abort_callback=self.binary_vessel_processor.stop_process)
         self.main_window.wrap_in_thread(self.binary_vessel_processor.binarize)
-        self.main_window.signal_process_finished('Vessels binarized')
+        self.progress_watcher.finish()
 
     def plot_binarization_results(self):
         if not self.step_exists('binarization', [self.preprocessor.filename('stitched'),
@@ -850,14 +847,13 @@ class VasculatureTab(PostProcessingTab):
 
     def fill_vessels(self):
         self.params.ui_to_cfg()
-        self.main_window.print_status_msg('Starting vessel filling')
         bin_params = self.params.binarization_params
         n_steps = bin_params.fill_main_channel + bin_params.fill_secondary_channel
-        self.main_window.make_nested_progress_dialog(title='Filling vessels', n_steps=n_steps,
+        self.main_window.make_nested_progress_dialog(title='Vessel filling',
                                                      abort_callback=self.binary_vessel_processor.stop_process)
         self.main_window.wrap_in_thread(self.binary_vessel_processor.fill_vessels)
         self.main_window.wrap_in_thread(self.binary_vessel_processor.combine_binary)  # REFACTOR: not great location
-        self.main_window.signal_process_finished('Vessel filling done')
+        self.progress_watcher.finish()
 
     def plot_vessel_filling_results(self):  # TODO: add step_exists check
         dvs = self.binary_vessel_processor.plot_vessel_filling_results()
@@ -866,11 +862,10 @@ class VasculatureTab(PostProcessingTab):
 
     def combine(self):
         self.params.ui_to_cfg()
-        self.main_window.print_status_msg('Combining channels')
-        self.main_window.make_nested_progress_dialog(title='Combining channels', n_steps=1,
+        self.main_window.make_nested_progress_dialog(title='Combining channels',
                                                      abort_callback=self.binary_vessel_processor.stop_process)
-        self.main_window.wrap_in_thread(self.binary_vessel_processor.combine_binary)  # REFACTOR: not great location
-        self.main_window.progress_dialog.done(1)
+        self.main_window.wrap_in_thread(self.binary_vessel_processor.combine_binary)
+        self.progress_watcher.finish()
 
     def plot_combined(self):
         dvs = self.binary_vessel_processor.plot_combined(parent=self.main_window)
@@ -878,11 +873,10 @@ class VasculatureTab(PostProcessingTab):
 
     def build_graph(self):
         self.params.ui_to_cfg()
-        self.main_window.print_status_msg('Building vessel graph')
-        self.main_window.make_nested_progress_dialog(title='Building vessel graph', n_steps=4,
+        self.main_window.make_nested_progress_dialog(title='Building vessel graph',
                                                      abort_callback=self.vessel_graph_processor.stop_process)
         self.main_window.wrap_in_thread(self.vessel_graph_processor.pre_process)
-        self.main_window.signal_process_finished('Building vessel graph done')
+        self.progress_watcher.finish()
 
     def plot_graph_construction_chunk_slicer(self):
         self.params.graph_params._crop_values_from_cfg()  # Fix for lack of binding between 2 sets of range interfaces
@@ -900,32 +894,28 @@ class VasculatureTab(PostProcessingTab):
 
     def display_cleaned_graph_chunk(self):
         slicing = self.__get_tube_map_slicing()
-        dvs = self.vessel_graph_processor.visualize_graph_annotations(slicing, plot_type='mesh', graph_step='cleaned', show=False)
+        dvs = self.vessel_graph_processor.visualize_graph_annotations(slicing, plot_type='mesh', graph_step='cleaned',
+                                                                      show=False)
         self.main_window.setup_plots(dvs)
 
     def display_reduced_graph_chunk(self):
         slicing = self.__get_tube_map_slicing()
-        dvs = self.vessel_graph_processor.visualize_graph_annotations(slicing, plot_type='mesh', graph_step='reduced', show=False)
+        dvs = self.vessel_graph_processor.visualize_graph_annotations(slicing, plot_type='mesh', graph_step='reduced',
+                                                                      show=False)
         self.main_window.setup_plots(dvs)
 
     def display_annotated_graph_chunk(self):
         slicing = self.__get_tube_map_slicing()
-        dvs = self.vessel_graph_processor.visualize_graph_annotations(slicing, plot_type='mesh', graph_step='annotated', show=False)
+        dvs = self.vessel_graph_processor.visualize_graph_annotations(slicing, plot_type='mesh', graph_step='annotated',
+                                                                      show=False)
         self.main_window.setup_plots(dvs)
 
     def post_process_graph(self):
-        self.params.ui_to_cfg()
-        self.main_window.print_status_msg('Post processing vasculature graph')
-        self.main_window.make_nested_progress_dialog(title='Post processing graph', n_steps=8,
-                                                     abort_callback=self.vessel_graph_processor.stop_process)
-        self.main_window.wrap_in_thread(self.vessel_graph_processor.post_process)
-        self.main_window.signal_process_finished('Vasculature graph post-processing DONE')
+        self.wrap_step('Post processing vasculature graph', self.vessel_graph_processor.post_process,
+                       abort_callback=self.vessel_graph_processor.stop_process, save_cfg=True)
 
     def voxelize(self):
-        self.params.ui_to_cfg()
-        self.main_window.print_status_msg('Running voxelization')
-        self.main_window.wrap_in_thread(self.vessel_graph_processor.voxelize)
-        self.main_window.signal_process_finished()
+        self.wrap_step('Running voxelization', self.vessel_graph_processor.voxelize,  save_cfg=True)
 
     def plot_voxelization(self):
         self.vessel_graph_processor.plot_voxelization(self.main_window.centralWidget())
@@ -980,8 +970,7 @@ class BatchTab(GenericTab):
         self.main_window.print_status_msg('Computing stats table')
         dvs = []
         groups = self.params.groups
-        self.main_window.make_nested_progress_dialog(title='Group stats',
-                                                     n_steps=len(self.params.selected_comparisons))  # TODO: set abort callback
+        self.main_window.make_nested_progress_dialog()  # TODO: set abort callback
         for pair in self.params.selected_comparisons:
             gp1_name, gp2_name = pair
             df = self.main_window.wrap_in_thread(make_summary, self.params.results_folder,
@@ -996,8 +985,7 @@ class BatchTab(GenericTab):
         self.params.ui_to_cfg()
 
         self.main_window.print_status_msg('Computing p_val maps')
-        self.main_window.make_nested_progress_dialog(title='P value maps',
-                                                     n_steps=len(self.params.selected_comparisons))  # TODO: set abort callback
+        self.main_window.make_nested_progress_dialog()  # TODO: set abort callback
         p_vals_imgs = []
         for pair in self.params.selected_comparisons:
             gp1_name, gp2_name = pair

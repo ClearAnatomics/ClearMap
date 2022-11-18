@@ -1847,7 +1847,6 @@ class BatchParams(UiParameter):
     def add_group(self):  # REFACTOR: better in tab object
         new_gp_id = self.n_groups + 1
         group_controls = create_clearmap_widget('sample_group_controls.ui', patch_parent_class='QWidget')
-        group_controls.setupUi()
         self.tab.sampleFoldersToolBox.addItem(group_controls, f'Group {new_gp_id}')
 
         self.connect_groups()

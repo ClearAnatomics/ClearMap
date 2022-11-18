@@ -71,18 +71,14 @@ def make_progress_dialog(msg, maximum, canceled_callback, parent):
 
 
 # REFACTOR: make class
-def make_nested_progress_dialog(title='Processing', overall_maximum=100, sub_maximum=100, sub_process_name='',
-                                abort_callback=None, parent=None):
-    dlg = create_clearmap_widget('nested_progress_dialog.ui', patch_parent_class='QDialog')
-    dlg.setWindowTitle('Progress')
-    dlg.setupUi()
-    dlg.mainLabel.setText(title)
-    dlg.progressImageLabel.setPixmap(QPixmap(os.path.join(UI_FOLDER, 'creator', 'graphics_resources', 'searching_mouse.png')))  # TODO: why doesn't work w/ qrc ??
+def make_nested_progress_dialog(overall_maximum=100, sub_process_name='', abort_callback=None, parent=None):
+    dlg = create_clearmap_widget('nested_progress_dialog.ui', patch_parent_class='QDialog', window_title='Progress')
+
+    progress_icon_path = os.path.join(UI_FOLDER, 'creator', 'graphics_resources', 'searching_mouse.png')
+    dlg.progressImageLabel.setPixmap(QPixmap(progress_icon_path))  # TODO: why doesn't work with qrc ??
+
     dlg.mainProgressBar.setRange(1, overall_maximum)
-    dlg.mainProgressBar.setValue(1)  # Because we use integer steps
     dlg.subProgressLabel.setText(sub_process_name)
-    dlg.subProgressBar.setMaximum(sub_maximum)
-    dlg.subProgressBar.setValue(0)
     if abort_callback is not None:
         dlg.buttonBox.button(QDialogButtonBox.Abort).clicked.connect(abort_callback)
     dlg.show()
