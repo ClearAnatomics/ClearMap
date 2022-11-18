@@ -296,6 +296,7 @@ class PreProcessor(TabProcessor):
             hemispheres=True,
             overwrite=False, verbose=True)
         self.annotation_file_path, self.hemispheres_file_path, self.reference_file_path, self.distance_file_path = res
+        annotation.set_annotation_file(self.annotation_file_path)
 
         structure_tree_id = self.processing_config['registration']['atlas']['structure_tree_id']
         structure_file_name = STRUCTURE_TREE_NAMES_MAP[structure_tree_id]
