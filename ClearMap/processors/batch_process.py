@@ -7,13 +7,16 @@ The processor for batch processing a group of samples.
 This can be used from the GUI, from the CLI or interactively from the python interpreter
 """
 import multiprocessing
+import os
 import sys
 
 import numpy as np
+from ClearMap import Settings
 from skimage.transform import rescale
 from tqdm import tqdm
 
-from ClearMap.config.atlas import ATLAS_NAMES_MAP
+from ClearMap.Alignment import Annotation as annotation
+from ClearMap.config.atlas import ATLAS_NAMES_MAP, STRUCTURE_TREE_NAMES_MAP
 from ClearMap.processors.tube_map import BinaryVesselProcessor, VesselGraphProcessor
 from ClearMap.Utils.utilities import backup_file
 from ClearMap.processors.cell_map import CellDetector
@@ -85,9 +88,13 @@ def init_preprocessor(folder, atlas_base_name=None):
     configs = get_configs(cfg_loader.get_cfg_path('sample'), cfg_loader.get_cfg_path('processing'))
     pre_proc = PreProcessor()
     if atlas_base_name is None:
-        atlas_base_name = ATLAS_NAMES_MAP[configs[1]['registration']['atlas']['id']]['base_name']
+        atlas_id = configs[2]['registration']['atlas']['id']
+        atlas_base_name = ATLAS_NAMES_MAP[atlas_id]['base_name']
+    json_file = os.path.join(Settings.atlas_folder, STRUCTURE_TREE_NAMES_MAP[configs[2]['registration']['atlas']['structure_tree_id']])
     pre_proc.unpack_atlas(atlas_base_name)
     pre_proc.setup(configs)
+    pre_proc.setup_atlases()
+    annotation.initialize(annotation_file=pre_proc.annotation_file_path, label_file=json_file)
     return pre_proc
 
 
