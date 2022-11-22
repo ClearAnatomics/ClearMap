@@ -360,10 +360,11 @@ class AlignmentTab(GenericTab):
         self.preprocessor.setup((self.main_window.preference_editor.params.config,
                                  self.sample_params.config, self.params.config),
                                 convert_tiles=False)
-        has_tiles = len(clearmap_io.file_list(self.preprocessor.filename('raw')))
-        if has_tiles and prompt_dialog('Tile conversion', 'Convert individual tiles to npy for efficiency'):
-            self.main_window.make_progress_dialog('Converting tiles', maximum=0,
-                                                  abort_callback=self.preprocessor.stop_process)
+
+        if self.preprocessor.has_tiles and not self.preprocessor.has_npy and\
+                prompt_dialog('Tile conversion', 'Convert individual tiles to npy for efficiency'):
+            self.main_window.make_simple_progress_dialog('Converting tiles', maximum=0,
+                                                         abort_callback=self.preprocessor.stop_process)
             self.main_window.wrap_in_thread(self.preprocessor.convert_tiles)
         self.setup_atlas()
         self.progress_watcher.finish()
