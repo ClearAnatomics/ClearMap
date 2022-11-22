@@ -167,6 +167,28 @@ class PreProcessor(TabProcessor):
     def filename(self, *args, **kwargs):
         return self.workspace.filename(*args, **kwargs)
 
+    def z_only(self, tags):
+        axes = [tag.name for tag in tags]
+        return axes == ['Z']
+
+    @property
+    def is_tiled(self):
+        tags = self.workspace.expression('raw', prefix=self.prefix).tags
+        if tags is None:
+            return False
+        else:
+            return not self.z_only(tags)
+
+    @property
+    def has_tiles(self):
+        # noinspection PyTypeChecker
+        return len(clearmap_io.file_list(self.filename('raw', prefix=self.prefix)))
+
+    @property
+    def has_npy(self):
+        # noinspection PyTypeChecker
+        return len(clearmap_io.file_list(self.filename('raw', prefix=self.prefix, extension='.npy')))
+
     def get_autofluo_pts_path(self, direction='resampled_to_auto'):
         elastix_folder = self.filename(direction)
         return os.path.join(elastix_folder, 'autolfuorescence_landmarks.pts')  # TODO: use workspace
