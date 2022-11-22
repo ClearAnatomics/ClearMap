@@ -51,7 +51,7 @@ class Printer(QWidget):
     def write(self, msg):
         if self.file is not None:
             if self.type in ('error', 'progress'):
-                self.file.write(f'{datetime.now().isoformat()}: ')
+                self.file.write(f'{datetime.now().strftime("%y-%m-%d %H:%M:%S")}: ')
             self.file.write(msg+'\n')
             self.file.flush()
         self.text_updated.emit(self.colourise(msg))
