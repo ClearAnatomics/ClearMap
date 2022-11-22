@@ -74,6 +74,10 @@ class TabProcessor:
         if self.progress_watcher is not None:
             self.progress_watcher.increment_main_progress(val)
 
+    def set_watcher_step(self, step_name):
+        if self.progress_watcher is not None:
+            self.progress_watcher.main_step_name = step_name
+
     def prepare_watcher_for_substep(self, counter_size, pattern, title, increment_main=False):
         """
         Prepare the progress watcher for the coming processing step. The watcher will in turn signal changes to the
@@ -377,6 +381,7 @@ class PreProcessor(TabProcessor):
             self.stopped = False
         if self.stopped:
             return
+        self.set_watcher_step('Stitching rigid')
         stitching_cfg = self.processing_config['stitching']
         overlaps, projection_thickness = define_auto_stitching_params(self.workspace.source('raw').file_list[0],
                                                                       stitching_cfg)
@@ -495,6 +500,7 @@ class PreProcessor(TabProcessor):
             self.stopped = False
         if self.stopped:
             return
+        self.set_watcher_step('Stitching wobbly')
         layout = stitching_rigid.load_layout(self.filename('layout', postfix='aligned_axis'))
         self.__align_layout_wobbly(layout)
         if self.stopped:

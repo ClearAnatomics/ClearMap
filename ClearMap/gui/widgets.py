@@ -276,16 +276,19 @@ class ProgressWatcher(QWidget):  # Inspired from https://stackoverflow.com/a/662
         self.log_path = None
         self.pattern = None
 
-    def setup(self, main_step_name, main_step_length, sub_step_name, sub_step_length=1, pattern=None):
+    def setup(self, main_step_name, main_step_length, sub_step_length=0, pattern=None):
         self.main_step_name = main_step_name
         self.main_max_progress = main_step_length
-        self.sub_step_name = sub_step_name
+        # self.sub_step_name = sub_step_name
         self.max_progress = sub_step_length
         self.pattern = pattern
 
         self.reset_log_length()
         self.set_main_progress(1)
         self.set_progress(0)
+        # Force update
+        self.main_progress_changed.emit(self.__main_progress)
+        self.progress_changed.emit(self.__progress)
 
     def prepare_for_substep(self, step_length, pattern, step_name):
         """
@@ -324,12 +327,11 @@ class ProgressWatcher(QWidget):  # Inspired from https://stackoverflow.com/a/662
         self.__main_progress = round(value)
         self.reset_log_length()
         self.main_progress_changed.emit(self.__main_progress)
-        if self.__main_progress != 0 and self.__main_progress == self.main_max_progress:
+        if self.__main_progress != 0 and self.__main_progress == self.main_max_progress + 1:
             self.finished.emit(self.main_step_name)
 
     def increment_main_progress(self, increment=1):
         self.set_main_progress(self.__main_progress + round(increment))
-        self.reset_log_length()
 
     def increment(self, increment):
         if isinstance(increment, float):

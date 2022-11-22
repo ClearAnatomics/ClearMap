@@ -467,7 +467,7 @@ def make_summary(directory, gp1_name, gp2_name, gp1_dirs, gp2_dirs, output_path=
     gp2_sample_ids = [dir_to_sample_id(folder) for folder in gp2_dirs]
     sample_ids = [gp1_sample_ids, gp2_sample_ids]
 
-    volume_map = get_volume_map(gp1_dirs[0])  # Hacky
+    volume_map = get_volume_map(gp1_dirs[0])  # WARNING Hacky
 
     aggregated_dfs = {gp_name: group_cells_counts(structs, gp_cells_dfs[i], sample_ids[i], volume_map)
                       for i, gp_name in enumerate((gp1_name, gp2_name))}
