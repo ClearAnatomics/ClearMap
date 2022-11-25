@@ -52,7 +52,8 @@ import ClearMap.ImageProcessing.Experts.Cells as cell_detection
 import ClearMap.Analysis.Measurements.Voxelization as voxelization
 # noinspection PyPep8Naming
 import ClearMap.Alignment.Annotation as annotation
-from ClearMap.processors.sample_preparation import PreProcessor, TabProcessor
+from ClearMap.processors.sample_preparation import PreProcessor
+from ClearMap.processors.generic_tab_processor import TabProcessor
 from ClearMap.Utils.utilities import runs_on_ui
 from ClearMap.gui.widgets import Scatter3D
 
@@ -140,6 +141,7 @@ class CellDetector(TabProcessor):
 
     def create_test_dataset(self, slicing):
         self.workspace.create_debug('stitched', slicing=slicing)
+        self.update_watcher_main_progress()
 
     def get_voxelization_params(self, postfix=''):
         voxelization_parameter = {
