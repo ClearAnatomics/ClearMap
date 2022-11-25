@@ -14,8 +14,13 @@ __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
 
+import itertools
+
+import numpy as np
 import pyqtgraph as pg
 import functools as ft
+
+from ClearMap.Utils import utilities
 
 import ClearMap.Visualization.Qt.DataViewer as dv
 import ClearMap.Visualization.Qt.Utils as qtu
@@ -104,9 +109,13 @@ def multi_plot(sources, axis=None, scale=None, title=None, invert_y=True, min_ma
         title = [title] * len(sources)
 
     lut = lut if lut is not None else 'flame'
-    dvs = [dv.DataViewer(source=s, axis=axis, scale=scale, title=t,
-                         invertY=invert_y, minMax=min_max, default_lut=lut, parent=parent)
-           for s, t in zip(sources, title)]
+    if not utilities.is_iterable(lut):
+        lut = [lut for i in range(len(sources))]
+    if min_max is None or np.isscalar(min_max[0]):
+        min_max = [min_max] * len(sources)
+    dvs = [dv.DataViewer(source=src, axis=axis, scale=scale, title=title_,
+                         invertY=invert_y, minMax=min_max_, default_lut=lut_, parent=parent)
+           for src, title_, lut_, min_max_ in zip(sources, title, lut, min_max)]
 
     if arrange:
         try:
@@ -118,7 +127,7 @@ def multi_plot(sources, axis=None, scale=None, title=None, invert_y=True, min_ma
             pass
 
     if sync:
-        for d1, d2 in zip(dvs[:-1], dvs[1:]):
+        for d1, d2 in itertools.combinations(dvs, 2):
             synchronize(d1, d2)
 
     return dvs
@@ -126,21 +135,29 @@ def multi_plot(sources, axis=None, scale=None, title=None, invert_y=True, min_ma
 
 def synchronize(viewer1, viewer2):
     """Synchronize scrolling between two data viewers"""
-    def sV():
+    def sync_d1_d2_scroll():
         """sync dv1 -> dv2"""
         viewer2.sliceLine.setValue(viewer1.sliceLine.value())
 
-    viewer1.sliceLine.sigPositionChanged.connect(sV)
-    for dv, button in enumerate(viewer1.axis_buttons):
-        button.clicked.connect(ft.partial(viewer2.setSliceAxis, dv))
+    def sync_d1_d2_button(button, ax):
+        viewer2.axis_buttons[ax].setChecked(button.isChecked())
 
-    def sV():
+    viewer1.sliceLine.sigPositionChanged.connect(sync_d1_d2_scroll)
+    for ax, button in enumerate(viewer1.axis_buttons):
+        button.clicked.connect(ft.partial(viewer2.setSliceAxis, ax))
+        button.clicked.connect(ft.partial(sync_d1_d2_button, button, ax))
+
+    def sync_d2_d1_scroll():
         """sync dv2 -> dv1"""
         viewer1.sliceLine.setValue(viewer2.sliceLine.value())
 
-    viewer2.sliceLine.sigPositionChanged.connect(sV)
-    for dv, button in enumerate(viewer2.axis_buttons):
-        button.clicked.connect(ft.partial(viewer1.setSliceAxis, dv))
+    def sync_d2_d1_button(button, ax):
+        viewer1.axis_buttons[ax].setChecked(button.isChecked())
+
+    viewer2.sliceLine.sigPositionChanged.connect(sync_d2_d1_scroll)
+    for ax, button in enumerate(viewer2.axis_buttons):
+        button.clicked.connect(ft.partial(viewer1.setSliceAxis, ax))
+        button.clicked.connect(ft.partial(sync_d2_d1_button, button, ax))
 
     viewer1.view.setXLink(viewer2.view)
     viewer1.view.setYLink(viewer2.view)
