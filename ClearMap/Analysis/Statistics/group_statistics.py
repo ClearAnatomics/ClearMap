@@ -341,16 +341,10 @@ def dirs_to_density_files(directory, f_list):
     return out
 
 
-def get_p_vals_f(p_vals, t_vals, p_cutoff, new_orientation=(2, 0, 1)):  # FIXME: from sagittal to coronal view  specific to original orientation
+def get_p_vals_f(p_vals, t_vals, p_cutoff):
     p_vals2 = np.clip(p_vals, None, p_cutoff)
     p_sign = np.sign(t_vals)
-    return transpose_p_vals(new_orientation, p_sign, p_vals2)
-
-
-def transpose_p_vals(new_orientation, p_sign, p_vals2):  # FIXME: check cm_rsp.sagittalToCoronalData
-    p_vals2_f = np.transpose(p_vals2, new_orientation)
-    p_sign_f = np.transpose(p_sign, new_orientation)
-    return p_vals2_f, p_sign_f
+    return p_vals2, p_sign
 
 
 def group_cells_counts(struct_ids, group_cells_dfs, sample_ids, volume_map):
@@ -505,11 +499,11 @@ def compare_groups(directory, gp1_name, gp2_name, gp1_dirs, gp2_dirs, prefix='p_
 
     colored_p_vals_05 = get_colored_p_vals(p_vals, t_vals, 0.05, ('red', 'green'))
     colored_p_vals_01 = get_colored_p_vals(p_vals, t_vals, 0.01, ('green', 'blue'))
-    p_vals_col_f = np.swapaxes(np.maximum(colored_p_vals_05, colored_p_vals_01), 2, 0).astype(np.uint8)  # FIXME: reorientation specific of initial orientation
+    p_vals_col_f = np.maximum(colored_p_vals_05, colored_p_vals_01).astype(np.uint8)
 
     output_f_name = f'{prefix}_{gp1_name}_{gp2_name}.tif'
     output_file_path = os.path.join(directory, output_f_name)
-    tifffile.imsave(output_file_path, p_vals_col_f, photometric='rgb', imagej=True)
+    clearmap_io.write(output_file_path, p_vals_col_f, photometric='rgb')#, imagej=True)
     return p_vals_col_f
 
 
