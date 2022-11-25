@@ -55,22 +55,6 @@ def warning_popup(base_msg, msg):
 
 
 # REFACTOR: make class
-def make_progress_dialog(msg, maximum, canceled_callback, parent):
-    dlg = QProgressDialog(msg, 'Abort', 0, maximum, parent=parent)
-    dlg.setWindowTitle(msg)
-    dlg.lbl = QLabel(msg, parent=dlg)
-    # dlg.lbl.setText(msg)  # TODO: check why this doesn't work with pixmap
-    dlg.lbl.setPixmap(QPixmap(os.path.join(UI_FOLDER, 'creator', 'graphics_resources', 'searching_mouse.png')))
-    dlg.lbl.setAlignment(QtCore.Qt.AlignHCenter | QtCore.Qt.AlignVCenter)
-    dlg.setLabel(dlg.lbl)
-    if canceled_callback is not None:
-        dlg.canceled.connect(canceled_callback)
-    dlg.setMinimumDuration(0)
-    dlg.forceShow()  # To force update
-    return dlg
-
-
-# REFACTOR: make class
 def make_nested_progress_dialog(title='Processing', overall_maximum=100, sub_process_name='', abort_callback=None, parent=None):
     dlg = create_clearmap_widget('nested_progress_dialog.ui', patch_parent_class='QDialog', window_title='Progress')
 
@@ -84,6 +68,14 @@ def make_nested_progress_dialog(title='Processing', overall_maximum=100, sub_pro
     if abort_callback is not None:
         dlg.buttonBox.button(QDialogButtonBox.Abort).clicked.connect(abort_callback)
     dlg.show()
+    return dlg
+
+
+def make_simple_progress_dialog(title='Processing', overall_maximum=100, sub_process_name='', abort_callback=None, parent=None):
+    dlg = make_nested_progress_dialog(title=title, overall_maximum=overall_maximum, sub_process_name=sub_process_name,
+                                      abort_callback=abort_callback, parent=parent)
+    dlg.mainProgressBar.setVisible(False)
+
     return dlg
 
 

@@ -32,7 +32,7 @@ from qdarkstyle import DarkPalette
 
 os.environ['CLEARMAP_GUI_HOSTED'] = "1"
 # ########################################### SPLASH SCREEN ###########################################################
-from ClearMap.gui.dialogs import make_splash, update_pbar
+from ClearMap.gui.dialogs import make_splash, update_pbar, make_simple_progress_dialog
 
 # To show splash before slow imports
 ICONS_FOLDER = 'ClearMap/gui/creator/icons/'   # REFACTOR: use qrc
@@ -75,8 +75,7 @@ from ClearMap.gui.widget_monkeypatch_callbacks import get_value, set_value, cont
     connect_ok, connect_cancel, connect_value_changed, connect_text_changed
 update_pbar(app, progress_bar, 40)
 from ClearMap.gui.pyuic_utils import loadUiType
-from ClearMap.gui.dialogs import get_directory_dlg, warning_popup, \
-    make_progress_dialog, make_nested_progress_dialog, DISPLAY_CONFIG
+from ClearMap.gui.dialogs import get_directory_dlg, warning_popup, make_nested_progress_dialog, DISPLAY_CONFIG
 from ClearMap.gui.gui_utils import html_to_ansi, html_to_plain_text, compute_grid
 from ClearMap.gui.style import QDARKSTYLE_BACKGROUND, DARK_BACKGROUND, PLOT_3D_BG, \
     BTN_STYLE_SHEET, TOOLTIP_STYLE_SHEET, COMBOBOX_STYLE_SHEET
@@ -345,28 +344,19 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         msg = f'{base_msg} <br><br>Do you want to load a default one from:<br>  <nobr><em>"{default_path}"</em>?</nobr>'
         return base_msg, msg
 
-    def make_progress_dialog(self, title='Processing', maximum=100, n_steps=1, abort_callback=None, parent=None):
-        if n_steps == 1:
-            self.make_simple_progress_dialog(msg=title, maximum=maximum, abort_callback=abort_callback)
-        else:
-            self.make_nested_progress_dialog(title=title, n_steps=n_steps, abort_callback=abort_callback, parent=parent)
-
-    def make_simple_progress_dialog(self, msg, maximum=100, abort_callback=None):
-        dialog = make_progress_dialog(msg, maximum, abort_callback, self)
-        self.progress_dialog = dialog
-        self.progress_watcher.progress_changed.connect(self.progress_dialog.setValue)
-        self.set_tabs_progress_watchers(nested=False)
-
-    def make_nested_progress_dialog(self, title='Processing', n_steps=1, abort_callback=None, parent=None):
+    def make_progress_dialog(self, title='Processing', n_steps=1, maximum=100, abort=None, parent=None):
         if n_steps:
             n_steps += 1  # To avoid range shrinking because starting from 1 not 0
-        dialog = make_nested_progress_dialog(title=title, overall_maximum=n_steps,
-                                             abort_callback=abort_callback, parent=parent)
-        self.progress_dialog = dialog
-
-        self.progress_watcher.main_max_changed.connect(self.progress_dialog.mainProgressBar.setMaximum)
-        self.progress_watcher.main_progress_changed.connect(self.progress_dialog.mainProgressBar.setValue)
-        self.progress_watcher.main_step_name_changed.connect(self.handle_step_name_change)
+            nested = True
+            self.progress_dialog = make_nested_progress_dialog(title=title, overall_maximum=n_steps,
+                                                               abort_callback=abort, parent=parent)
+            self.progress_watcher.main_max_changed.connect(self.progress_dialog.mainProgressBar.setMaximum)
+            self.progress_watcher.main_progress_changed.connect(self.progress_dialog.mainProgressBar.setValue)
+            self.progress_watcher.main_step_name_changed.connect(self.handle_step_name_change)
+        else:
+            nested = False
+            self.progress_dialog = make_simple_progress_dialog(title=title, abort_callback=abort,
+                                                               parent=parent)
 
         self.progress_watcher.max_changed.connect(self.progress_dialog.subProgressBar.setMaximum)
         self.progress_watcher.progress_changed.connect(self.progress_dialog.subProgressBar.setValue)
@@ -374,9 +364,12 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
 
         self.progress_watcher.finished.connect(self.signal_process_finished)
 
-        self.progress_watcher.setup(main_step_name=title, main_step_length=n_steps)
+        if nested:
+            self.progress_watcher.setup(main_step_name=title, main_step_length=n_steps)
+        else:
+            self.progress_watcher.setup(main_step_name='', main_step_length=1, sub_step_length=maximum, pattern=None)
 
-        self.set_tabs_progress_watchers(nested=True)
+        self.set_tabs_progress_watchers(nested=nested)
 
     def set_tabs_progress_watchers(self, nested=False):
         raise NotImplementedError()
@@ -423,6 +416,8 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
                 cfg = param.config
             elif isinstance(param, UiParameter):
                 cfg = param._config
+            else:
+                continue
             cfg_f_name = os.path.basename(cfg.filename)
             with open(os.path.join(cfg_folder, cfg_f_name), 'wb') as file_obj:
                 cfg.write(outfile=file_obj)
