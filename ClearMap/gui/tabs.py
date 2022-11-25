@@ -23,6 +23,7 @@ from ClearMap.IO.MHD import mhd_read
 from ClearMap.Alignment import Annotation as annotation
 from ClearMap.Analysis.Statistics.group_statistics import make_summary, density_files_are_comparable, compare_groups
 from ClearMap.Visualization.Matplotlib.PlotUtils import plot_sample_stats_histogram, plot_volcano
+from ClearMap.Visualization.atlas import create_color_annotation
 
 from ClearMap.gui.dialogs import prompt_dialog
 from ClearMap.gui.gui_utils import format_long_nb_to_str, surface_project, np_to_qpixmap, create_clearmap_widget
@@ -37,8 +38,7 @@ from ClearMap.Visualization.Qt import Plot3d as plot_3d
 from ClearMap.processors.sample_preparation import PreProcessor
 from ClearMap.processors.cell_map import CellDetector
 from ClearMap.processors.tube_map import BinaryVesselProcessor, VesselGraphProcessor
-from ClearMap.processors.batch_process import process_folders
-
+from ClearMap.processors.batch_process import process_folders, init_preprocessor
 
 __author__ = 'Charly Rousseau <charly.rousseau@icm-institute.org>'
 __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
@@ -970,38 +970,54 @@ class BatchTab(GenericTab):
         self.main_window.setup_plots(dvs)
         self.main_window.signal_process_finished()
 
-    def run_p_vals(self):
+    def run_p_vals(self):  # FIXME: split compute and display
         self.params.ui_to_cfg()
 
         self.main_window.print_status_msg('Computing p_val maps')
-        self.main_window.make_nested_progress_dialog(title='P value maps',
-                                                     n_steps=len(self.params.selected_comparisons))  # TODO: set abort callback
+        # TODO: set abort callback
+        self.main_window.make_progress_dialog('P value maps', n_steps=len(self.params.selected_comparisons))
         p_vals_imgs = []
-        for pair in self.params.selected_comparisons:
+        for pair in self.params.selected_comparisons:  # TODO: Move to processor object to be wrapped
             gp1_name, gp2_name = pair
             gp1, gp2 = [self.params.groups[gp_name] for gp_name in pair]
             if not density_files_are_comparable(self.params.results_folder, gp1, gp2):
                 self.main_window.popup('Could not compare files, sizes differ',
                                        base_msg='Cannot compare files')
-            res = self.main_window.wrap_in_thread(compare_groups, self.params.results_folder,
+            self.main_window.wrap_in_thread(compare_groups, self.params.results_folder,
                                                   gp1_name, gp2_name, gp1, gp2)
             self.main_window.progress_watcher.increment_main_progress()
-            p_vals_imgs.append(res)
+            p_val_path = os.path.join(self.params.results_folder, f'p_val_colors_{gp1_name}_{gp2_name}.tif')
+            # Reread because of cm_io orientation
+            p_vals_imgs.append(clearmap_io.read(p_val_path))
 
         self.main_window.signal_process_finished()
+
+        pre_proc = init_preprocessor(os.path.join(self.params.results_folder,
+                                                  self.params.groups[self.params.selected_comparisons[0][0]][0]))
+        atlas = clearmap_io.read(pre_proc.annotation_file_path)
 
         if len(p_vals_imgs) == 1:
             gp1_name, gp2_name = self.params.selected_comparisons[0]
             gp1_img = clearmap_io.read(os.path.join(self.params.results_folder, f'avg_density_{gp1_name}.tif'))
             gp2_img = clearmap_io.read(os.path.join(self.params.results_folder, f'avg_density_{gp2_name}.tif'))
-            images = [gp1_img, gp2_img, p_vals_imgs[0]]
-            titles = [gp1_name, gp2_name, 'P values']
+            colored_atlas = create_color_annotation(pre_proc.annotation_file_path)
+            images = [gp1_img, gp2_img, p_vals_imgs[0], colored_atlas]
+            titles = [gp1_name, gp2_name, 'P values', 'colored_atlas']
+            luts = ['flame', 'flame', None, None]
+            min_maxes = [None, None, None, (0, 255)]
         else:
             images = p_vals_imgs
             titles = [f'{gp1_name} vs {gp2_name} p values' for gp1_name, gp2_name in self.params.selected_comparisons]
+            luts = None
         dvs = plot_3d.plot(images, title=titles, arrange=False, sync=True,
-                           lut=self.main_window.preference_editor.params.lut,
+                           lut=luts, min_max=min_maxes,
                            parent=self.main_window.centralWidget())
+
+        names_map = annotation.get_names_map()
+        for dv in dvs:
+            # dv.atlas = atlas.copy()  #
+            dv.atlas = atlas
+            dv.structure_names = names_map
         link_dataviewers_cursors(dvs, RedCross)
         self.main_window.setup_plots(dvs)
 
