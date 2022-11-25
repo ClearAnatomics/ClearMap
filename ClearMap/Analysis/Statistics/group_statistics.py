@@ -376,8 +376,9 @@ def group_cells_counts(struct_ids, group_cells_dfs, sample_ids, volume_map):
 
     output['id'] = np.tile(struct_ids, 2)  # for each hemisphere
     output['name'] = np.tile([annotation.find(id_, key='id')['name'] for id_ in struct_ids], 2)
-    output['hemisphere'] = np.repeat((0, 255), len(struct_ids))
+    output['hemisphere'] = np.repeat((0, 255), len(struct_ids))  # FIXME: translate hemisphere to plain text
     output['volume'] = output.set_index(['id', 'hemisphere']).index.map(volume_map.get)
+    output = output[output['volume'].notna()]
 
     for multiplier, hem_id in zip((1, 2), (0, 255)):
         for j, sample_df in enumerate(group_cells_dfs):
@@ -387,8 +388,10 @@ def group_cells_counts(struct_ids, group_cells_dfs, sample_ids, volume_map):
                 col_name = f'counts_{sample_ids[j]}'
 
             hem_sample_df = sample_df[sample_df['hemisphere'] == hem_id]
+            # FIXME: replace loop (slow)
             for i, struct_id in enumerate(struct_ids):
-                output.at[i*multiplier, col_name] = len(hem_sample_df[hem_sample_df['id'] == struct_id])  # FIXME: slow
+                row_idx = output[(output['id'] == struct_id) & (output['hemisphere'] == hem_id)].index
+                output.loc[row_idx, col_name] = len(hem_sample_df[hem_sample_df['id'] == struct_id])
     return output
 
 
@@ -416,7 +419,7 @@ def generate_summary_table(cells_dfs, p_cutoff=None):
     p_vals, p_signs = t_test_region_counts(gp1, gp2, p_cutoff=p_cutoff, signed=True)
     total_df['p_value'] = p_vals
     total_df['q_value'] = clearmap_FDR.estimate_q_values(p_vals)
-    total_df['p_sign'] = p_signs
+    total_df['p_sign'] = p_signs.astype(np.int_)
     return total_df
 
 
