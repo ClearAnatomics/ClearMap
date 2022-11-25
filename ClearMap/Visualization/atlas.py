@@ -57,25 +57,41 @@ def write_color_annotation(filename, annotation_file=None):
     Arguments
     ---------
     filename : str
-      The name of the color palette file.
+        The name of the color palette file.
     annotation_file : str
-      File name of the atlas annotation.
+        File name of the atlas annotation.
 
     Returns
     -------
     filename : str
-      The name of the file to which the color atlas was written.
+        The name of the file to which the color atlas was written.
     """
     # load atlas and convert to order
-    annotation_file = __get_module_annotation_file(annotation_file)
-    atlas = np.array(clearmap_io.read(annotation_file), dtype=int)
-    atlas = convert_label(atlas, key='id', value='order', method='map')
+    atlas = create_color_annotation(annotation_file)
 
+    return clearmap_io.write(filename, atlas)
+
+
+def create_color_annotation(annotation_file_path):
+    """Creates a rgb image from the atlas color data.
+
+    Arguments
+    ---------
+    annotation_file_path : str
+        File name of the atlas annotation.
+
+    Returns
+    -------
+    filename : str
+        The name of the file to which the color atlas was written.
+    """
+    annotation_file_path = __get_module_annotation_file(annotation_file_path)
+    atlas = np.array(clearmap_io.read(annotation_file_path), dtype=int)
+    atlas = convert_label(atlas, key='id', value='order', method='map')
     # apply color map
     cm = color_map(alpha=False, as_int=True)
     atlas = cm[atlas]
-
-    return clearmap_io.write(filename, atlas)
+    return atlas
 
 
 def convert_label_to_color(label, key='id', level=None, alpha=True, as_int=False, int_type='uint8'):
