@@ -15,14 +15,13 @@ import numpy as np
 # noinspection PyPep8Naming
 import matplotlib
 import tifffile
+matplotlib.use('Qt5Agg')
+
 
 from ClearMap.Utils.utilities import runs_on_ui
 from ClearMap.config.atlas import ATLAS_NAMES_MAP, STRUCTURE_TREE_NAMES_MAP
-from ClearMap.gui.gui_utils import TmpDebug
-
-matplotlib.use('Qt5Agg')
-from matplotlib import pyplot as plt
-
+from ClearMap.gui.gui_utils import TmpDebug  # REFACTOR: move to workspace object
+from ClearMap.processors.generic_tab_processor import TabProcessor, CanceledProcessing
 import ClearMap.Settings as settings
 # noinspection PyPep8Naming
 import ClearMap.Alignment.Elastix as elastix
@@ -50,78 +49,6 @@ __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
-
-
-class CanceledProcessing(BrokenProcessPool):  # TODO: better inheritance
-    pass
-
-
-class TabProcessor:
-    def __init__(self):
-        self.stopped = False
-        self.progress_watcher = None
-        self.workspace = None
-        self.machine_config = {}
-
-    def set_progress_watcher(self, watcher):
-        self.progress_watcher = watcher
-
-    def update_watcher_progress(self, val):
-        if self.progress_watcher is not None:
-            self.progress_watcher.increment(val)
-
-    def update_watcher_main_progress(self, val=1):
-        if self.progress_watcher is not None:
-            self.progress_watcher.increment_main_progress(val)
-
-    def set_watcher_step(self, step_name):
-        if self.progress_watcher is not None:
-            self.progress_watcher.main_step_name = step_name
-
-    def prepare_watcher_for_substep(self, counter_size, pattern, title, increment_main=False):
-        """
-        Prepare the progress watcher for the coming processing step. The watcher will in turn signal changes to the
-        progress bar
-
-        Arguments
-        ---------
-        counter_size: int
-            The progress bar maximum
-        pattern: str or re.Pattern or (str, re.Pattern)
-            The string to search for in the log to signal an increment of 1
-        title: str
-            The title of the step for the progress bar
-        increment_main: bool
-            Whether a new step should be added to the main progress bar
-        """
-        if self.progress_watcher is not None:
-            self.progress_watcher.prepare_for_substep(counter_size, pattern, title)
-            if increment_main:
-                self.progress_watcher.increment_main_progress()
-
-    def stop_process(self):  # REFACTOR: put in parent class ??
-        self.stopped = True
-        if hasattr(self.workspace, 'executor') and self.workspace.executor is not None:
-            if sys.version_info[:2] >= (3, 9):
-                self.workspace.executor.shutdown(cancel_futures=True)  # The new clean version
-            else:
-                self.workspace.executor.immediate_shutdown()  # Dirty but we have no choice in python < 3.9
-            self.workspace.executor = None
-            # raise BrokenProcessPool
-        elif hasattr(self.workspace, 'process') and self.workspace.process is not None:
-            self.workspace.process.terminate()
-            # self.workspace.process.wait()
-            raise CanceledProcessing
-
-    @property
-    def verbose(self):
-        return self.machine_config['verbosity'] == 'debug'
-
-    def run(self):
-        raise NotImplementedError
-
-    # def setup(self):
-    #     pass
 
 
 class PreProcessor(TabProcessor):
@@ -295,6 +222,7 @@ class PreProcessor(TabProcessor):
                     except BrokenProcessPool:
                         print('File conversion canceled')
                         return
+            self.update_watcher_main_progress()
 
     def use_npy(self):
         return self.processing_config['conversion']['use_npy'] or \
@@ -358,6 +286,11 @@ class PreProcessor(TabProcessor):
         if not stitching_cfg['output_conversion']['skip']:
             self.convert_to_image_format()
 
+    @property
+    def n_channels_convert(self):
+        return [self.processing_config['stitching']['output_conversion']['raw'],
+                self.processing_config['stitching']['output_conversion']['arteries']].count(True)
+
     def convert_to_image_format(self):  # TODO: support progress
         """
         Convert (optionally) to image formats readable by e.g. Fiji
@@ -372,6 +305,7 @@ class PreProcessor(TabProcessor):
                 clearmap_io.convert_files(self.workspace.file_list('stitched', extension='npy', prefix=self.prefix),
                                           extension=fmt, processes=self.machine_config['n_processes_file_conv'],
                                           workspace=self.workspace, verbose=True)
+                self.update_watcher_main_progress()
             except BrokenProcessPool:
                 print('File conversion canceled')
                 return
@@ -381,6 +315,7 @@ class PreProcessor(TabProcessor):
                                                                    prefix=self.prefix, extension='npy'),
                                           extension=fmt, processes=self.machine_config['n_processes_file_conv'],
                                           workspace=self.workspace, verbose=True)
+                self.update_watcher_main_progress()
             except BrokenProcessPool:
                 print('File conversion canceled')
                 return
