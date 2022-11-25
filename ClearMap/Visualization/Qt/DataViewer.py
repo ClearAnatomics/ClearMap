@@ -481,6 +481,9 @@ class DataViewer(pg.QtGui.QWidget):
         x, y = self.get_coords(event_pos)
         self.sync_cursors(x, y)
 
+        self._updateCoords(x, y)
+
+    def _updateCoords(self, x, y):
         x_axis, y_axis = self.getXYAxes()
         pos = [None] * self.sources[0].ndim
         scaled_x, scaled_y = self.scale_coords(x, x_axis, y, y_axis)
@@ -509,6 +512,7 @@ class DataViewer(pg.QtGui.QWidget):
             self.view.update()
             for pal in self.pals:
                 pal.cross.set_coords([x, y])
+                pal._updateCoords(x, y)
                 pal.view.update()
 
     def refresh(self):
@@ -536,8 +540,8 @@ class DataViewer(pg.QtGui.QWidget):
             vals = ", ".join([str(s[slc]) for s in self.sources])
         label = f"({x}, {y}, {z}) {{{x*xs:.2f}, {y*ys:.2f}, {z*zs:.2f}}} [{vals}]"
         if self.atlas is not None:
-            _id = self.atlas[slc]
-            label += f' Region: {self.structure_names[_id]} ({_id})'
+            id_ = np.asscalar(self.atlas[slc])
+            label += f' Region: {self.structure_names[id_]} ({id_})'
         if self.parent() is None or not self.parent().objectName().lower().startswith('dataviewer'):
             label = f"<span style='font-size: 12pt; color: black'>{label}</span>"
         self.source_label.setText(label)
@@ -586,6 +590,7 @@ class DataViewer(pg.QtGui.QWidget):
         return [ax for ax in range(self.sources[0].ndim) if ax != color_axis]
 
     def setSliceAxis(self, axis):
+        # old_scroll_axis = self.scroll_axis
         self.scroll_axis = self.space_axes[axis]
         self.updateSourceRange()
         self.updateSourceSlice()
