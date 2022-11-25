@@ -80,7 +80,33 @@ def main(samples_file):
     with open(samples_file, 'r') as infile:
         folders = infile.readlines()
     folders = [f.strip() for f in folders if not f.startswith('#')]
-    process_folders(folders)
+    voxelize_folders(folders)
+
+
+def voxelize_sample(configs, align=False, cells=False, vasc=False):
+    patch_pipeline_name(configs, cells, vasc)
+
+    pre_proc = PreProcessor()
+    pre_proc.setup(configs)
+    pre_proc.setup_atlases()
+    if align:
+        pre_proc.run()
+    if cells:
+        cell_detector = CellDetector(pre_proc)
+
+        cell_detector.processing_config.reload()
+        # cell_detector.atlas_align()
+        # cell_detector.export_collapsed_stats()
+        cell_detector.processing_config['voxelization']['radii'] = (10, 10, 10)
+        cell_detector.processing_config.write()
+        cell_detector.voxelize()
+
+
+def voxelize_folders(folders, align=False, cells=True, vasc=False):
+    for folder in tqdm(folders, desc='Processing sample ', unit='brain'):
+        cfg_loader = ConfigLoader(folder)
+        configs = get_configs(cfg_loader.get_cfg_path('sample'), cfg_loader.get_cfg_path('processing'))
+        voxelize_sample(configs, align=align, cells=cells, vasc=vasc)
 
 
 def init_preprocessor(folder, atlas_base_name=None):
