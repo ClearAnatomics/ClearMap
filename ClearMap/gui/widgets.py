@@ -224,7 +224,7 @@ class OrthoViewer(object):
         xy = np.copy(img)
         yz = np.copy(img).transpose((1, 2, 0))
         zx = np.copy(img).transpose((2, 0, 1))
-        dvs = plot_3d.plot([xy, yz, zx], arange=False, lut='white', parent=parent, sync=False)
+        dvs = plot_3d.plot([xy, yz, zx], arrange=False, lut='white', parent=parent, sync=False)
         self.dvs = dvs
         # FIXME: disable axes buttons
         return dvs
@@ -615,7 +615,7 @@ class TwoListSelection(QWidget):
         return r
 
 
-class DataFrameWidget(QWidget):
+class DataFrameWidget(QWidget):  # TODO: optional format attribute with shape of df
     def __init__(self, df, n_digits=2, parent=None):
         super().__init__(parent)
         self.df = df

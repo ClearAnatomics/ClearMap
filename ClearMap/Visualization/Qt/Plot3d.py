@@ -29,7 +29,7 @@ from ClearMap.Utils.utilities import runs_on_spyder
 
 
 def plot(source, axis=None, scale=None, title=None, invert_y=True, min_max=None, screen=None,
-         arange=True, lut=None, parent=None, sync=True):
+         arrange=True, lut=None, parent=None, sync=True):
     """
     Plot a source as 2d slices.
 
@@ -62,7 +62,7 @@ def plot(source, axis=None, scale=None, title=None, invert_y=True, min_max=None,
     if not isinstance(source, (list, tuple)):
         source = [source]
     m_plot = multi_plot(source, axis=axis, scale=scale, title=title, invert_y=invert_y,
-                        min_max=min_max, screen=screen, arange=arange, lut=lut, parent=parent, sync=sync)
+                        min_max=min_max, screen=screen, arrange=arrange, lut=lut, parent=parent, sync=sync)
     if not runs_on_spyder():
         inst = pg.QtGui.QApplication.instance()
         # if inst is not None:
@@ -71,7 +71,7 @@ def plot(source, axis=None, scale=None, title=None, invert_y=True, min_max=None,
 
 
 def multi_plot(sources, axis=None, scale=None, title=None, invert_y=True, min_max=None,
-               arange=True, screen=None, lut=None, parent=None, sync=True):
+               arrange=True, screen=None, lut=None, parent=None, sync=True):
     """
     Plot a source as 2d slices.
 
@@ -108,7 +108,7 @@ def multi_plot(sources, axis=None, scale=None, title=None, invert_y=True, min_ma
                          invertY=invert_y, minMax=min_max, default_lut=lut, parent=parent)
            for s, t in zip(sources, title)]
 
-    if arange:
+    if arrange:
         try:
             geo = qtu.tiled_layout(len(dvs), percent=80, screen=screen)
             for d, g in zip(dvs, geo):
