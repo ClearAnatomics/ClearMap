@@ -415,12 +415,13 @@ class Annotation(object):
 
     def get_lateralised_volume_map(self, atlas_scale, hemispheres_file_path):
         hemispheres_atlas = clearmap_io.read(hemispheres_file_path)
-        volumes = {}
+        scale = np.prod(atlas_scale)
         hem_ids = sorted(np.unique(hemispheres_atlas))
+        volumes = {}
         for hem_id in hem_ids:
             unique_ids, counts = np.unique(self.atlas[hemispheres_atlas == hem_id], return_counts=True)
             for id_, count in zip(unique_ids, counts):
-                volumes[(id_, hem_id)] = count * np.prod(atlas_scale)
+                volumes[(id_, hem_id)] = count * scale
         return volumes
 
     def get_dict_parents_to_children(self, parents_ids=None, including_parents=False):
@@ -460,7 +461,6 @@ class Annotation(object):
         df['name'] = df['id'].map(self.dict_id_to_name)
         df['acronym'] = df['id'].map(self.dict_id_to_acronym)
         return df
-
 
     def label_points(self, points): #TODO Test me
         """
