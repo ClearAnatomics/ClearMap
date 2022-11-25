@@ -730,7 +730,7 @@ class PreProcessor(TabProcessor):
             titles.append('Arteries stitched')
         if len(paths) != 2:
             paths = paths[0]
-        dvs = plot_3d.plot(paths, title=titles, arange=False, lut='white', parent=parent)
+        dvs = plot_3d.plot(paths, title=titles, arrange=False, lut='white', parent=parent)
         return dvs
 
     @staticmethod

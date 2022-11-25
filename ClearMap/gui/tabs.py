@@ -452,7 +452,7 @@ class AlignmentTab(GenericTab):
 
     def __display_landmarks_dialog(self, images, direction):
         titles = [os.path.basename(img) for img in images]
-        dvs = plot_3d.plot(images, title=titles, arange=False, sync=False,
+        dvs = plot_3d.plot(images, title=titles, arrange=False, sync=False,
                            lut=self.main_window.preference_editor.params.lut,
                            parent=self.main_window.centralWidget())
         self.main_window.setup_plots(dvs)
@@ -530,7 +530,7 @@ class AlignmentTab(GenericTab):
 
     def plot_registration_results_side_by_side_raw(self):
         image_sources, titles = self.prepare_registration_results_graph('auto_to_raw')
-        dvs = plot_3d.plot(image_sources, title=titles, arange=False, sync=True,
+        dvs = plot_3d.plot(image_sources, title=titles, arrange=False, sync=True,
                            lut=self.main_window.preference_editor.params.lut,
                            parent=self.main_window.centralWidget())
         link_dataviewers_cursors(dvs, RedCross)
@@ -538,7 +538,7 @@ class AlignmentTab(GenericTab):
 
     def plot_registration_results_side_by_side(self):
         image_sources, titles = self.prepare_registration_results_graph()
-        dvs = plot_3d.plot(image_sources, title=titles, arange=False, sync=True,
+        dvs = plot_3d.plot(image_sources, title=titles, arrange=False, sync=True,
                            lut=self.main_window.preference_editor.params.lut,
                            parent=self.main_window.centralWidget())
         link_dataviewers_cursors(dvs, RedCross)
@@ -546,14 +546,14 @@ class AlignmentTab(GenericTab):
 
     def plot_registration_results_composite_raw(self):
         image_sources, titles = self.prepare_registration_results_graph('auto_to_raw')
-        dvs = plot_3d.plot([image_sources, ], title=' '.join(titles), arange=False, sync=True,
+        dvs = plot_3d.plot([image_sources, ], title=' '.join(titles), arrange=False, sync=True,
                            lut=self.main_window.preference_editor.params.lut,
                            parent=self.main_window.centralWidget())
         self.main_window.setup_plots(dvs)
 
     def plot_registration_results_composite(self):
         image_sources, titles = self.prepare_registration_results_graph()
-        dvs = plot_3d.plot([image_sources, ], title=' '.join(titles), arange=False, sync=True,
+        dvs = plot_3d.plot([image_sources, ], title=' '.join(titles), arrange=False, sync=True,
                            lut=self.main_window.preference_editor.params.lut,
                            parent=self.main_window.centralWidget())
         self.main_window.setup_plots(dvs)
@@ -666,7 +666,7 @@ class CellCounterTab(PostProcessingTab):
         if not self.step_exists('cell detection', [self.preprocessor.filename('stitched')]):
             return
         dvs = self.cell_detector.preview_cell_detection(parent=self.main_window.centralWidget(),
-                                                        arange=False, sync=True)  # TODO: add close
+                                                        arrange=False, sync=True)  # TODO: add close
         if len(dvs) == 1:
             self.main_window.print_warning_msg('Preview not run, '
                                                'will only display stitched image for memory space reasons')
@@ -731,7 +731,7 @@ class CellCounterTab(PostProcessingTab):
     def plot_cell_map_results(self):
         if not self.step_exists('voxelization', [self.preprocessor.filename('density', postfix='counts')]):
             return
-        dvs = self.cell_detector.plot_voxelized_counts(arange=False)
+        dvs = self.cell_detector.plot_voxelized_counts(arrange=False)
         self.main_window.setup_plots(dvs)
 
 
@@ -1003,7 +1003,7 @@ class BatchTab(GenericTab):
         else:
             images = p_vals_imgs
             titles = [f'{gp1_name} vs {gp2_name} p values' for gp1_name, gp2_name in self.params.selected_comparisons]
-        dvs = plot_3d.plot(images, title=titles, arange=False, sync=True,
+        dvs = plot_3d.plot(images, title=titles, arrange=False, sync=True,
                            lut=self.main_window.preference_editor.params.lut,
                            parent=self.main_window.centralWidget())
         link_dataviewers_cursors(dvs, RedCross)

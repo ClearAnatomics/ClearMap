@@ -14,8 +14,7 @@ import re
 import numpy as np
 import vispy
 
-
-from ClearMap.processors.sample_preparation import TabProcessor
+from ClearMap.processors.generic_tab_processor import TabProcessor
 
 import ClearMap.IO.IO as clearmap_io
 
@@ -158,7 +157,7 @@ class BinaryVesselProcessor(TabProcessor):
                              binarization_parameter=binarization_parameter,
                              processing_parameter=processing_parameter)
 
-    def plot_binarization_result(self, parent=None, postfix=''):
+    def plot_binarization_result(self, parent=None, postfix='', arrange=False):
         """
         postfix str:
             empty for raw
@@ -166,7 +165,7 @@ class BinaryVesselProcessor(TabProcessor):
         images = [(self.workspace.filename('stitched', postfix=postfix)),
                   (self.workspace.filename('binary', postfix=postfix))]
         dvs = q_p3d.plot(images, title=[os.path.basename(img) for img in images],
-                         arange=False, lut=self.machine_config['default_lut'], parent=parent)
+                         arrange=arrange, lut=self.machine_config['default_lut'], parent=parent)
         return dvs
 
     def _smooth_and_fill(self, postfix=''):
@@ -226,13 +225,13 @@ class BinaryVesselProcessor(TabProcessor):
         vessel_filling.fill_vessels(source, sink, resample=resample_factor, threshold=0.5,
                                     cuda=True, processing_parameter=processing_parameter, verbose=True)
 
-    def plot_vessel_filling_results(self, parent=None, postfix_base=''):
+    def plot_vessel_filling_results(self, parent=None, postfix_base='', arrange=False):
         if postfix_base:
             postfix_base += '_'
         images = [(self.steps.path(self.steps.postprocessed, step_back=True)),
                   (self.workspace.filename('binary', postfix='{}filled'.format(postfix_base)))]
         titles = [os.path.basename(img) for img in images]
-        return q_p3d.plot(images, title=titles, arange=False,
+        return q_p3d.plot(images, title=titles, arrange=arrange,
                           lut=self.machine_config['default_lut'], parent=parent)
 
     def fill_vessels(self):
@@ -251,16 +250,16 @@ class BinaryVesselProcessor(TabProcessor):
             self.prepare_watcher_for_substep(1200, self.vessel_filling_re, 'Filling secondary channel', True)  # FIXME: compute max
             self._fill_vessels(1000, 100, 'arteries', resample_factor=2)   # FIXME: extact numbers
 
-    def plot_combined(self, parent=None):  # TODO: final or not option
+    def plot_combined(self, parent=None, arrange=False):  # TODO: final or not option
         raw = self.steps.path(self.steps.filled, step_back=True)
         combined = self.steps.path(self.steps.combined)
         if not self.processing_config['binarization']['binarization']['arteries']['skip']:
             arteries_filled = self.workspace.filename('binary', postfix='arteries_filled')
             dvs = q_p3d.plot([raw, arteries_filled, combined], title=['Raw', 'arteries', 'combined'],
-                             arange=False, lut=self.machine_config['default_lut'], parent=parent)
+                             arrange=arrange, lut=self.machine_config['default_lut'], parent=parent)
         else:
             dvs = q_p3d.plot([raw, combined], title=['Raw', 'combined'],
-                             arange=False, lut=self.machine_config['default_lut'], parent=parent)
+                             arrange=arrange, lut=self.machine_config['default_lut'], parent=parent)
         return dvs
 
     def combine_binary(self):
@@ -286,7 +285,7 @@ class BinaryVesselProcessor(TabProcessor):
                                 processes=None, verbose=True)
         # clearmap_io.delete_file(workspace.filename('binary', postfix='combined')  # TODO: check since temporary
         # if plot:
-        #     return q_p3d.plot([source, sink], arange=False, parent=parent)
+        #     return q_p3d.plot([source, sink], arrange=False, parent=parent)
 
 
 class VesselGraphProcessor(TabProcessor):
@@ -722,4 +721,4 @@ class VesselGraphProcessor(TabProcessor):
                                                     **voxelize_branch_parameter)
 
     def plot_voxelization(self, parent):
-        return q_p3d.plot(self.branch_density, arange=False, parent=parent)
+        return q_p3d.plot(self.branch_density, arrange=False, parent=parent)
