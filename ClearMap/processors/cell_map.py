@@ -196,7 +196,9 @@ class CellDetector(TabProcessor):
         """
         counts_file_path = self.workspace.filename('density', postfix='counts')  # TODO: improve var name
         clearmap_io.delete_file(counts_file_path)
+        self.set_watcher_step('Unweighted voxelisation')
         voxelization.voxelize(coordinates, sink=counts_file_path, **voxelization_parameter)
+        self.update_watcher_main_progress()
         # self.remove_crust(coordinates, voxelization_parameter)  # WARNING: currently causing issues
         return coordinates, counts_file_path
 
@@ -335,6 +337,7 @@ class CellDetector(TabProcessor):
             return
         finally:
             self.workspace.debug = False
+            self.update_watcher_main_progress()
 
     def export_as_csv(self):
         """

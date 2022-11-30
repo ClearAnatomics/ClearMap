@@ -501,11 +501,12 @@ class AlignmentTab(GenericTab):
         self.landmark_selector = None
 
     def run_registration(self):
-        self.main_window.make_progress_dialog('Registering', abort=self.preprocessor.stop_process,
-                                              parent=self.main_window)
+        self.main_window.make_progress_dialog('Registering', n_steps=4, abort=self.preprocessor.stop_process,
+                                              parent=self.main_window)  # FIXME: compute n_steps (par of processor)
         self.setup_atlas()
         if not self.params.registration.skip_resampling:
             self.main_window.wrap_in_thread(self.preprocessor.resample_for_registration, force=True)
+            # self.main_window.print_status_msg('Resampled')
         self.main_window.wrap_in_thread(self.preprocessor.align)
 
     def prepare_registration_results_graph(self, step='ref_to_auto'):
@@ -612,9 +613,9 @@ class CellCounterTab(PostProcessingTab):
         self.ui.cellMap3dScatterOnStitchedPushButton.clicked.connect(self.plot_cells_scatter_w_atlas_colors_raw)
 
     def voxelize(self):
-        self.params.ui_to_cfg()
         if os.path.exists(self.preprocessor.filename('cells', postfix='filtered')):
-            self.cell_detector.voxelize()
+            self.wrap_step('Voxelization', self.cell_detector.voxelize,
+                           abort_func=self.cell_detector.stop_process, nested=False)
         else:
             self.main_window.popup('Could not run voxelization, missing filtered cells table. '
                                    'Please ensure that cell filtering has been run.', base_msg='Missing file')
@@ -696,22 +697,23 @@ class CellCounterTab(PostProcessingTab):
         dvs = self.cell_detector.plot_cells_3d_scatter_w_atlas_colors(raw=True, parent=self.main_window)
         self.main_window.setup_plots(dvs)
 
-    def __filter_cells(self):
-        debug_raw_cells_path = self.preprocessor.filename('cells', postfix='raw')
-        if os.path.exists(debug_raw_cells_path):
-            self.cell_detector.filter_cells()
-            self.cell_detector.voxelize('filtered')
+    def __filter_cells(self, is_last_step=True):
+        raw_cells_path = self.preprocessor.filename('cells', postfix='raw')
+        if os.path.exists(raw_cells_path):
+            self.wrap_step('Filtering cells', self.cell_detector.filter_cells, n_steps=2+(1 - is_last_step),
+                           abort_func=self.cell_detector.stop_process, close_when_done=False)
+            self.wrap_step('Voxelizing', self.cell_detector.voxelize, step_args=['filtered'], save_cfg=False,
+                           close_when_done=is_last_step)
         self.plot_cell_filter_results()
 
     def preview_cell_filter(self):
-        self.params.ui_to_cfg()
         with self.cell_detector.workspace.tmp_debug:
             self.__filter_cells()
 
     def filter_cells(self):
-        self.params.ui_to_cfg()
-        self.__filter_cells()
-        self.cell_detector.atlas_align()
+        self.__filter_cells(is_last_step=False)
+        self.wrap_step('Aligning', self.cell_detector.atlas_align, abort_func=self.cell_detector.stop_process,
+                       save_cfg=False)
         self.cell_detector.export_collapsed_stats()
 
     def run_cell_map(self):
@@ -719,7 +721,7 @@ class CellCounterTab(PostProcessingTab):
         if not self.cell_detector.detected:
             self.detect_cells()
         self.update_cell_number()
-        self.cell_detector.post_process_cells()
+        self.cell_detector.post_process_cells()  # FIXME: save cfg and use progress
         self.update_cell_number()
         if self.params.plot_when_finished:
             self.plot_cell_map_results()
