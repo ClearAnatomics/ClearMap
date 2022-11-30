@@ -541,7 +541,7 @@ class DataViewer(pg.QtGui.QWidget):
         label = f"({x}, {y}, {z}) {{{x*xs:.2f}, {y*ys:.2f}, {z*zs:.2f}}} [{vals}]"
         if self.atlas is not None:
             id_ = np.asscalar(self.atlas[slc])
-            label += f' Region: {self.structure_names[id_]} ({id_})'
+            label += f" <b style='color:#2d9cfc;'>Region: {self.structure_names[id_]} ({id_})</b>"
         if self.parent() is None or not self.parent().objectName().lower().startswith('dataviewer'):
             label = f"<span style='font-size: 12pt; color: black'>{label}</span>"
         self.source_label.setText(label)
