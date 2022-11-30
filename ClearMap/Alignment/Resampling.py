@@ -23,6 +23,7 @@ import concurrent.futures
 import numpy as np
 
 import cv2
+import psutil
 
 import ClearMap.IO.IO as io
 import ClearMap.IO.FileList as fl
@@ -387,13 +388,13 @@ def resample(source, sink = None, orientation = None,
   orientation = format_orientation(orientation);
   
   source_shape, sink_shape, source_resolution, sink_resolution = \
-     resample_shape(source_shape=source_shape, sink_shape=sink_shape, 
-                    source_resolution=source_resolution, sink_resolution=sink_resolution, 
+    resample_shape(source_shape=source_shape, sink_shape=sink_shape,
+                   source_resolution=source_resolution, sink_resolution=sink_resolution,
                     orientation=orientation);
   
   sink_shape_in_source_orientation = orient_shape(sink_shape, orientation, inverse=True);
                                    
-  interpolation = _interpolation_to_cv2(interpolation);                                   
+  interpolation = _interpolation_to_cv2(interpolation)
 
   if not isinstance(processes, int) and processes != 'serial':
     processes = io.mp.cpu_count();
@@ -416,7 +417,7 @@ def resample(source, sink = None, orientation = None,
   delete_files = [];
   for step, axes, shape in zip(range(n_steps), axes_order, shape_order):
     if step == n_steps-1 and orientation is None:
-      resampled = io.initialize(source=sink, shape=sink_shape, dtype=dtype, as_source=True); 
+      resampled = io.initialize(source=sink, shape=sink_shape, dtype=dtype, as_source=True)
     else:
       if method == 'shared':
         resampled = io.sma.create(shape, dtype=dtype, order=order, as_source=True);
@@ -434,25 +435,25 @@ def resample(source, sink = None, orientation = None,
     #resample step
     last_source_virtual = last_source.as_virtual();
     resampled_virtual = resampled.as_virtual();
-    _resample = ft.partial(_resample_2d, source=last_source_virtual, sink=resampled_virtual, axes=axes, shape=shape, 
-                                         interpolation=interpolation, n_indices=n_indices, verbose=verbose)                       
+    _resample = ft.partial(_resample_2d, source=last_source_virtual, sink=resampled_virtual, axes=axes, shape=shape,
+                           interpolation=interpolation, n_indices=n_indices, verbose=verbose)
     
-    if processes == 'serial': 
+    if processes == 'serial':
       for index in indices:
         _resample(index=index);
     else:
       #print(processes);
       with CancelableProcessPoolExecutor(processes) as executor:
-        executor.map(_resample, indices)
+        executor.map(_resample, indices, chunksize=20)
         if workspace is not None:
           workspace.executor = executor
-      if workspace is not None:
-        workspace.executor = None
-        
-    last_source = resampled;
+        print('Resampling mapped, waiting for all processes to finish')
+        if executor._processes is not None:
+          executor.shutdown()
+    last_source = resampled
   
   #fix orientation
-  if not orientation is None:
+  if orientation is not None:
     #permute
     per = orientation_to_permuation(orientation);
     resampled = resampled.transpose(per);
@@ -471,7 +472,7 @@ def resample(source, sink = None, orientation = None,
       print("resample: re-oriented shape %r!" % (resampled.shape,))
   
     sink = io.write(sink, resampled);
-  else: 
+  else:
     sink = resampled;
   
   for f in delete_files:
@@ -819,8 +820,8 @@ def resample_inverse(source, sink = None,
         executor.map(_resample, indices)
         if workspace is not None:
           workspace.executor = executor
-      if workspace is not None:
-        workspace.executor = None
+      # if workspace is not None:
+      #   workspace.executor = None
         
     last_source = resampled;
   
