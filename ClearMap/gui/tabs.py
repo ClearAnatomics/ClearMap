@@ -150,6 +150,8 @@ class GenericTab(GenericUi):
             self.main_window.make_progress_dialog(task_name, n_steps=n_steps, abort=abort_func)
 
         self.main_window.wrap_in_thread(func, *step_args, **step_kw_args)
+        if self.preprocessor is not None and self.preprocessor.workspace is not None:  # WARNING: hacky
+            self.preprocessor.workspace.executor = None
         if close_when_done:
             self.progress_watcher.finish()
         else:
