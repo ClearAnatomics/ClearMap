@@ -377,25 +377,35 @@ def create(location = None, shape = None, dtype = None, mode = None, as_source =
 ################################################################################
  
 def shape_from_tif(shape):
-  ndim = len(shape);
-  shape = shape[:max(0,ndim-3)] + shape[-3:][::-1];
-  return shape;
+  ndim = len(shape)
+  shape = shape[:max(0, ndim-3)] + shape[-3:][::-1]  # FIXME: rewrite for color and use in array_from_tiff too
+  return shape
 
   
 def shape_to_tif(shape):
-  return shape_from_tif(shape);
+  return shape_from_tif(shape)
 
 
 def array_from_tif(array):
-  ndim = array.ndim;
-  axes = [d for d in range(ndim)];
-  axes = axes[:max(0,ndim-3)] + axes[-3:][::-1];
-  array = array.transpose(axes);
-  return array;
+  ndim = array.ndim
+  n_colors = min(array.shape)  # valid if rgb
+  if ndim == 4 and n_colors in (3, 4):  # Put color last for RGB images
+    col_idx = array.shape.index(n_colors)
+
+    new_axes = list(range(ndim))
+    new_axes.pop(col_idx)
+    new_axes = new_axes[::-1]
+    new_axes.append(col_idx)
+    array = np.transpose(array, new_axes)
+  else:
+    axes = list(range(ndim))
+    axes = axes[:max(0, ndim-3)] + axes[-3:][::-1]
+    array = array.transpose(axes)
+  return array
 
 
 def array_to_tif(array):
-  return array_from_tif(array);
+  return array_from_tif(array)
 
 ################################################################################
 #### Meta data
