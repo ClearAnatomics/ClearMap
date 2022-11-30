@@ -384,6 +384,8 @@ class ProgressWatcher(QWidget):  # Inspired from https://stackoverflow.com/a/662
             return self.pattern.match(line)
 
     def count_dones(self):
+        if self.pattern is None:
+            return 0
         with open(self.log_path, 'r') as log:
             log.seek(self.previous_log_length)
             new_lines = log.readlines()
