@@ -329,7 +329,7 @@ def write(sink, data, **args):
   sink : str
     The name of the tif file.
   """ 
-  tif.imsave(sink, array_to_tif(data))
+  tif.imsave(sink, array_to_tif(data), **args)
   return sink;
 
 
