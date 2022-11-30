@@ -499,12 +499,12 @@ def compare_groups(directory, gp1_name, gp2_name, gp1_dirs, gp2_dirs, prefix='p_
 
     colored_p_vals_05 = get_colored_p_vals(p_vals, t_vals, 0.05, ('red', 'green'))
     colored_p_vals_01 = get_colored_p_vals(p_vals, t_vals, 0.01, ('green', 'blue'))
-    p_vals_col_f = np.maximum(colored_p_vals_05, colored_p_vals_01).astype(np.uint8)
+    colored_p_vals = np.maximum(colored_p_vals_05, colored_p_vals_01).astype(np.uint8)
 
     output_f_name = f'{prefix}_{gp1_name}_{gp2_name}.tif'
     output_file_path = os.path.join(directory, output_f_name)
-    clearmap_io.write(output_file_path, p_vals_col_f, photometric='rgb')#, imagej=True)
-    return p_vals_col_f
+    clearmap_io.write(output_file_path, colored_p_vals, photometric='rgb', imagej=True)
+    return colored_p_vals
 
 
 # def test_completed_cumulatives_in_spheres(points1, intensities1, points2, intensities2, shape = ano.default_annotation_file, radius = 100, method = 'AndresonDarling'):
