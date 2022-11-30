@@ -33,6 +33,8 @@
      <height>490</height>
     </size>
    </property>
+   <layout class="QVBoxLayout" name="verticalLayout_2">
+    <item>
    <widget class="QFrame" name="frame">
     <property name="geometry">
      <rect>
@@ -183,7 +185,7 @@
           </property>
          </widget>
         </item>
-        <item row="2" column="0">
+          <item row="3" column="0">
          <widget class="QLabel" name="label_4">
           <property name="toolTip">
            <string>The number of processor cores used for detecting cells.</string>
@@ -196,10 +198,10 @@
           </property>
          </widget>
         </item>
-        <item row="2" column="1">
+          <item row="3" column="1">
          <widget class="QSpinBox" name="nProcessesCellDetectionSpinBox"/>
         </item>
-        <item row="3" column="0">
+          <item row="5" column="0">
          <widget class="QLabel" name="label_5">
           <property name="toolTip">
            <string>Size of blocks for blockwise cell detection</string>
@@ -212,7 +214,7 @@
           </property>
          </widget>
         </item>
-        <item row="3" column="1">
+          <item row="5" column="1">
          <widget class="QFrame" name="frame_2">
           <property name="frameShape">
            <enum>QFrame::StyledPanel</enum>
@@ -270,6 +272,45 @@
            <string>Number of processes for stitching</string>
           </property>
          </widget>
+          </item>
+          <item row="2" column="0">
+           <widget class="QLabel" name="label_16">
+            <property name="toolTip">
+             <string>The number of processor cores used for stitching.</string>
+            </property>
+            <property name="whatsThis">
+             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;How many processor cores work at the same time.&lt;/p&gt;&lt;p&gt;Increasing the concurent core number will theoretically increase the computation speed but&lt;span style=&quot; color:#edd400;&quot;&gt; beware of the following drawbacks&lt;/span&gt;:&lt;/p&gt;&lt;p&gt;    ∙ More cores also means &lt;span style=&quot; font-weight:700;&quot;&gt;more system memory (RAM)&lt;/span&gt;. You can start with 10 and check if you get a memory error. If you do, you can decrease the number of processors. If it works fine, you can test with more processors.&lt;/p&gt;&lt;p&gt;    ∙ The performance vs core number relationship will &lt;span style=&quot; font-weight:700;&quot;&gt;hit a peak at a certain point and start to decrease&lt;/span&gt; if you keep increasing the core number. The reason is that the benefits of parallel processing will start to be overshadowed by the cost of communication between the processes.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            </property>
+            <property name="text">
+             <string>Number of processes for resampling</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="1">
+           <widget class="QSpinBox" name="nProcessesResamplingSpinBox">
+            <property name="minimum">
+             <number>-1</number>
+            </property>
+            <property name="value">
+             <number>2</number>
+            </property>
+           </widget>
+          </item>
+          <item row="4" column="0">
+           <widget class="QLabel" name="label_17">
+            <property name="toolTip">
+             <string>The number of processor cores used for detecting cells.</string>
+            </property>
+            <property name="whatsThis">
+             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;How many processor cores work at the same time.&lt;/p&gt;&lt;p&gt;Increasing the concurent core number will theoretically increase the computation speed but&lt;span style=&quot; color:#edd400;&quot;&gt; beware of the following drawbacks&lt;/span&gt;:&lt;/p&gt;&lt;p&gt;    ∙More cores also means &lt;span style=&quot; font-weight:700;&quot;&gt;more system memory (RAM)&lt;/span&gt;. You can start with 10 and check if you get a memory error. If you do, you can decrease the number of processors. If it works fine, you can test with more processors.&lt;/p&gt;&lt;p&gt;    ∙The performance vs core number relationship will &lt;span style=&quot; font-weight:700;&quot;&gt;hit a peak at a certain point and start to decrease&lt;/span&gt; if you keep increasing the core number. The reason is that the benefits of parallel processing will start to be overshadowed by the cost of communication between the processes.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            </property>
+            <property name="text">
+             <string>Number of processes for binarization</string>
+            </property>
+           </widget>
+          </item>
+          <item row="4" column="1">
+           <widget class="QSpinBox" name="nProcessesBinarizationSpinBox"/>
         </item>
        </layout>
       </widget>
@@ -294,6 +335,11 @@
          <widget class="QComboBox" name="lutComboBox">
           <item>
            <property name="text">
+              <string>grey</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
             <string>white</string>
            </property>
           </item>
@@ -393,6 +439,8 @@
      </item>
     </layout>
    </widget>
+    </item>
+   </layout>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
  </widget>
