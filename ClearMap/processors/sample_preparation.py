@@ -236,6 +236,7 @@ class PreProcessor(TabProcessor):
     def setup_atlases(self):  # TODO: add possibility to load custom reference file (i.e. defaults to None in cfg)
         if not self.processing_config:
             return  # Not setup yet. FIXME: find better way around
+        self.prepare_watcher_for_substep(0, None, 'Initialising atlases')
         atlas_base_name = ATLAS_NAMES_MAP[self.processing_config['registration']['atlas']['id']]['base_name']
         self.unpack_atlas(atlas_base_name)
         x_slice = slice(None) if self.sample_config['slice_x'] is None else slice(*self.sample_config['slice_x'])
@@ -477,8 +478,8 @@ class PreProcessor(TabProcessor):
     def __resample_raw(self):
         resampling_cfg = self.processing_config['registration']['resampling']
         default_resample_parameter = {
-            "processes": resampling_cfg['processes'],
-            "verbose": resampling_cfg['verbose']
+            'processes': self.machine_config['n_processes_resampling'],
+            'verbose': resampling_cfg['verbose']
         }  # WARNING: duplicate (use method ??)
         clearmap_io.delete_file(self.filename('resampled'))  # FIXME:
         try:
@@ -490,7 +491,7 @@ class PreProcessor(TabProcessor):
         else:
             src_res = self.sample_config['resolutions']['raw']
 
-        n_planes = len(self.workspace.file_list('autofluorescence'))  # TODO: find more elegant solution for counter
+        n_planes = len(self.workspace.file_list('autofluorescence'))  # FIXME: use uimg metadata or z pattern of raw instead
         if n_planes < 2:  # e.g. 1 file
             n_planes = clearmap_io.shape(self.workspace.filename('autofluorescence'))[-1]
         self.prepare_watcher_for_substep(n_planes, self.__resample_re, 'Resampling raw')
@@ -509,8 +510,8 @@ class PreProcessor(TabProcessor):
     def __resample_autofluorescence(self):
         resampling_cfg = self.processing_config['registration']['resampling']
         default_resample_parameter = {
-            "processes": resampling_cfg['processes'],
-            "verbose": resampling_cfg['verbose']
+            'processes': self.machine_config['n_processes_resampling'],
+            'verbose': resampling_cfg['verbose']
         }  # WARNING: duplicate (use method ??)
         try:
             auto_fluo_path = self.workspace.file_list('autofluorescence')[0]

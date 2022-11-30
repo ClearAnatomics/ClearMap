@@ -1607,8 +1607,10 @@ class PreferencesParams(UiParameter):
         self.params_dict = {
             'verbosity': ['verbosity'],
             'n_processes_file_conv': ['n_processes_file_conv'],
+            'n_processes_resampling': ['n_processes_resampling'],
             'n_processes_stitching': ['n_processes_stitching'],
             'n_processes_cell_detection': ['n_processes_cell_detection'],
+            'n_processes_binarization': ['n_processes_binarization'],
             'chunk_size_min': ['detection_chunk_size_min'],
             'chunk_size_max': ['detection_chunk_size_max'],
             'chunk_size_overlap': ['detection_chunk_overlap'],
@@ -1624,8 +1626,10 @@ class PreferencesParams(UiParameter):
         cfg = self._config
         cfg['verbosity'] = self.verbosity
         cfg['n_processes_file_conv'] = self.n_processes_file_conv
+        cfg['n_processes_resampling'] = self.n_processes_resampling
         cfg['n_processes_stitching'] = self.n_processes_stitching
         cfg['n_processes_cell_detection'] = self.n_processes_cell_detection
+        cfg['n_processes_binarization'] = self.n_processes_binarization
         cfg['detection_chunk_size_min'] = self.chunk_size_min
         cfg['detection_chunk_size_max'] = self.chunk_size_max
         cfg['detection_chunk_overlap'] = self.chunk_size_overlap
@@ -1689,12 +1693,28 @@ class PreferencesParams(UiParameter):
         self.tab.nProcessesStitchingSpinBox.setValue(self.sanitize_nones(value))
 
     @property
+    def n_processes_resampling(self):
+        return self.sanitize_neg_one(self.tab.nProcessesResamplingSpinBox.value())
+
+    @n_processes_resampling.setter
+    def n_processes_resampling(self, value):
+        self.tab.nProcessesResamplingSpinBox.setValue(self.sanitize_nones(value))
+
+    @property
     def n_processes_cell_detection(self):
         return self.sanitize_neg_one(self.tab.nProcessesCellDetectionSpinBox.value())
 
     @n_processes_cell_detection.setter
     def n_processes_cell_detection(self, n_procs):
         self.tab.nProcessesCellDetectionSpinBox.setValue(self.sanitize_nones(n_procs))
+
+    @property
+    def n_processes_binarization(self):
+        return self.sanitize_neg_one(self.tab.nProcessesBinarizationSpinBox.value())
+
+    @n_processes_binarization.setter
+    def n_processes_binarization(self, value):
+        self.tab.nProcessesBinarizationSpinBox.setValue(self.sanitize_nones(value))
 
     @property
     def chunk_size_min(self):
