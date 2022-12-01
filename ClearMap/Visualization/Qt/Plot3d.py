@@ -76,7 +76,7 @@ def plot(source, axis=None, scale=None, title=None, invert_y=True, min_max=None,
 
 
 def multi_plot(sources, axis=None, scale=None, title=None, invert_y=True, min_max=None,
-               arrange=True, screen=None, lut=None, parent=None, sync=True):
+               arrange=True, screen=None, lut='flame', parent=None, sync=True):
     """
     Plot a source as 2d slices.
 
@@ -107,12 +107,11 @@ def multi_plot(sources, axis=None, scale=None, title=None, invert_y=True, min_ma
 
     if not isinstance(title, (tuple, list)):
         title = [title] * len(sources)
-
-    lut = lut if lut is not None else 'flame'
-    if not utilities.is_iterable(lut):
-        lut = [lut for i in range(len(sources))]
+    if not isinstance(lut, (list, tuple)):
+        lut = [lut] * len(sources)
     if min_max is None or np.isscalar(min_max[0]):
         min_max = [min_max] * len(sources)
+
     dvs = [dv.DataViewer(source=src, axis=axis, scale=scale, title=title_,
                          invertY=invert_y, minMax=min_max_, default_lut=lut_, parent=parent)
            for src, title_, lut_, min_max_ in zip(sources, title, lut, min_max)]
