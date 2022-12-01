@@ -119,7 +119,7 @@ class UiParameter(QObject):
                     any_amended = True
                     current_amended = True
                 if attr in self.attrs_to_invert:
-                    val = -val
+                    val = not val
                 # Update the UI
                 setattr(self, attr, val)
                 if current_amended:
