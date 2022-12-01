@@ -1334,7 +1334,7 @@ class VesselGraphParams(UiParameter):
             'crop_y_max': ['graph_construction', 'slicing', 'dim_1', 1],
             'crop_z_min': ['graph_construction', 'slicing', 'dim_2', 0],
             'crop_z_max': ['graph_construction', 'slicing', 'dim_2', 1],
-            'vein_intensity_range_on_arteries_channel': ['vessel_type_postprocessing' 'pre_filtering', 'vein_intensity_range_on_arteries_ch'],
+            'vein_intensity_range_on_arteries_channel': ['vessel_type_postprocessing', 'pre_filtering', 'vein_intensity_range_on_arteries_ch'],
             'restrictive_min_vein_radius': ['vessel_type_postprocessing', 'pre_filtering', 'restrictive_vein_radius'],
             'permissive_min_vein_radius': ['vessel_type_postprocessing', 'pre_filtering', 'permissive_vein_radius'],
             'final_min_vein_radius': ['vessel_type_postprocessing', 'pre_filtering', 'final_vein_radius'],
