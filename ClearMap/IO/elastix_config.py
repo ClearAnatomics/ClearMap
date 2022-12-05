@@ -1,9 +1,10 @@
 from collections.abc import Iterable
 
+
 class ElastixEntry:
     def __init__(self, ln=None, key=None, values=None):
+        self.ln = ln
         if ln is not None:
-            self.ln = ln
             self.key = None
             self.values = None
             self.parse()
@@ -12,7 +13,7 @@ class ElastixEntry:
             if not isinstance(values, Iterable):
                 values = [values]
             self.values = values
-            self.ln = self.__buil_ln()
+            self.build_ln()
         else:
             raise ValueError('Missing arguments, at least ln or both key and values required')
 
@@ -36,9 +37,9 @@ class ElastixEntry:
     def __str__(self):
         return self.ln
 
-    def __buil_ln(self):
+    def build_ln(self):
         values_str = ' '.join(self.__format_value(v) for v in self.values)
-        return f'({self.key} {values_str})\n'
+        self.ln = f'({self.key} {values_str})\n'
 
     def __format_value(self, val):
         return f'"{val}"' if isinstance(val, str) else str(val)
@@ -77,6 +78,7 @@ class ElastixParser:
         for d in self.data:
             if d.key == key:
                 d.values = value
+                d.build_ln()
                 break
         else:
             self.data.append(ElastixEntry(key=key, values=value))
