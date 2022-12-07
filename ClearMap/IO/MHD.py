@@ -248,7 +248,7 @@ def write(filename, source, header=None, **kwargs):
 
 # The following reader functions were borrowed from the
 # Lasagna project (https://github.com/SainsburyWellcomeCentre/lasagna) with the permission of the author.
-# Please note that the built in reader does not support the compressed raw format.
+# Please note that the built-in reader does not support the compressed raw format.
 # If required, please install the vtk library for compressed raw support.
 
 def mhd_read(f_name, fall_back_mode=False):
@@ -264,7 +264,9 @@ def mhd_read(f_name, fall_back_mode=False):
             import vtk  # Seems not exist currently for Python 3 (Jan 2017)
             from vtk.util.numpy_support import vtk_to_numpy
         except ImportError:
-            print("Failed to find VTK. Falling back to built in (but slower) MHD reader")
+            print('Optional library VTK was not detected. Falling back to built in (but slower) MHD reader'
+                  'If you experience issues loading MHD files, please consider installing VTK.'
+                  '(try "conda install -c conda-forge vtk")')
             fall_back_mode = True
 
     if fall_back_mode:
