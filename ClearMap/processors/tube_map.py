@@ -147,7 +147,9 @@ class BinaryVesselProcessor(TabProcessor):
         binarization_parameter = copy.deepcopy(vasculature.default_binarization_parameter)
         binarization_parameter['clip']['clip_range'] = clip_range
         if deconvolve_threshold is not None:
-            binarization_parameter['deconvolve']['threshold'] = 450
+            binarization_parameter['deconvolve']['threshold'] = deconvolve_threshold
+
+        if postfix == 'arteries':  # FIXME: more flexible, do not use name
             binarization_parameter.update(equalize=None, vesselize=None)
 
         processing_parameter = copy.deepcopy(vasculature.default_binarization_processing_parameter)
