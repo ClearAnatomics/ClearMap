@@ -490,24 +490,23 @@ def _resample_2d(index, source, sink, axes, shape, interpolation, n_indices, ver
   if verbose:
     pw.ProcessWriter(index).write("Resampling: resampling axes %r, slice %r / %d" % (axes, index, n_indices))
   
-  #slicing
-  ndim = len(shape);   
-  slicing = ();
-  i = 0;
+  # slicing
+  ndim = len(shape)
+  slicing_ = ()
+  i = 0
   for d in range(ndim):
     if d in axes:
-      slicing += (slice(None),);
+      slicing_ += (slice(None),)
     else:
-      slicing += (index[i],);
-      i += 1;
+      slicing_ += (index[i],)
+      i += 1
   
-  #resample planeresizeresizeresize
+  # resample planeresizeresizeresize
   sink = sink.as_real()
-  source = source.as_real();
-  #print(source.shape, sink.shape, source[slicing].shape, sink[slicing].shape)
-  #print(shape, axes)
-  sink[slicing] = cv2.resize(source[slicing], (shape[axes[1]], shape[axes[0]]), interpolation=interpolation);
-  #note cv2 takes reverse shape order !
+  source = source.as_real()
+  new_shape = (shape[axes[1]], shape[axes[0]])
+  sink[slicing_] = cv2.resize(source[slicing_], new_shape, interpolation=interpolation)
+  # WARNING: cv2 takes reverse shape order !
 
 
 def _axes_order(axes_order, source, sink_shape_in_source_orientation, order = None): 
@@ -652,22 +651,19 @@ def _axes_order(axes_order, source, sink_shape_in_source_orientation, order = No
     
     else:
       raise ValueError("axes_order %r not 'size','order' or list but %r!" % axes_order);
-      
 
 
 def _interpolation_to_cv2(interpolation):
   """Helper to convert interpolation specification to CV2 format."""
   
   if interpolation in ['nearest', 'nn', None, cv2.INTER_NEAREST]:
-    interpolation = cv2.INTER_NEAREST;
+    interpolation = cv2.INTER_NEAREST
   elif interpolation in ['area', 'a', cv2.INTER_AREA]:
-    interpolation = cv2.INTER_AREA;
+    interpolation = cv2.INTER_AREA
   else:
-    interpolation = cv2.INTER_LINEAR;
+    interpolation = cv2.INTER_LINEAR
       
-  return interpolation;
-
-
+  return interpolation
 
 
 def resample_inverse(source, sink = None,
