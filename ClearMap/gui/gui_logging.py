@@ -89,7 +89,7 @@ class Printer(QWidget):
             except lxml.etree.ParserError:
                 is_html = False
             if force or not is_html:
-                colour_msg = '<p style="color:{}">{}</p>'.format(cnames[self.color], msg)
+                colour_msg = f'<p style="color:{cnames[self.color]}">{msg}</p>'
             else:
                 colour_msg = msg
         else:

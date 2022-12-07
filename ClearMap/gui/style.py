@@ -15,6 +15,7 @@ __download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
 from qdarkstyle import DarkPalette
 
 QDARKSTYLE_BACKGROUND = '#2E3436'
+WARNING_YELLOW = '#FADF11'
 DARK_BACKGROUND = '#282D2F'
 VERY_LIGHT_BACKGROUND = '#727A7E'
 PLOT_3D_BG = '#1A1D1E'

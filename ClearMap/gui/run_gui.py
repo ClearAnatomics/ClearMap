@@ -58,6 +58,7 @@ update_pbar(app, progress_bar, 10)
 # ############################################  SLOW IMPORTS #########################################################
 
 import pygments
+import pygments.styles
 from pygments.lexers.python import PythonTracebackLexer  # noqa
 from pygments.formatters.html import HtmlFormatter
 
@@ -78,7 +79,7 @@ from ClearMap.gui.pyuic_utils import loadUiType
 from ClearMap.gui.dialogs import get_directory_dlg, warning_popup, make_nested_progress_dialog, DISPLAY_CONFIG
 from ClearMap.gui.gui_utils import html_to_ansi, html_to_plain_text, compute_grid
 from ClearMap.gui.style import QDARKSTYLE_BACKGROUND, DARK_BACKGROUND, PLOT_3D_BG, \
-    BTN_STYLE_SHEET, TOOLTIP_STYLE_SHEET, COMBOBOX_STYLE_SHEET
+    BTN_STYLE_SHEET, TOOLTIP_STYLE_SHEET, COMBOBOX_STYLE_SHEET, WARNING_YELLOW
 
 from ClearMap.gui.widgets import OrthoViewer, ProgressWatcher, setup_mini_brain  # needs plot_3d
 update_pbar(app, progress_bar, 60)
@@ -665,11 +666,16 @@ def main(app, splash):
 
     def except_hook(exc_type, exc_value, exc_tb):
         lexer = PythonTracebackLexer()
-        formatter = HtmlFormatter(full=True, style='native', lineos='table', wrapcode=True, noclasses=True)
-        formatter.style.background_color = QDARKSTYLE_BACKGROUND
+        default_style = 'native'
+        style = 'nord-darker' if 'nord-darker' in pygments.styles.get_all_styles() else default_style
+        formatter = HtmlFormatter(full=True, style=style, lineos='table', wrapcode=True, noclasses=True)
+        formatter.style.background_color = DarkPalette.COLOR_BACKGROUND_1
         raw_traceback = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
         formatted_traceback = pygments.highlight(raw_traceback, lexer, formatter)
         clearmap_main_win.error_logger.write(formatted_traceback)
+        if isinstance(exc_type(), Warning):
+            clearmap_main_win.error_logger.write(f'<strong><p style="color:{WARNING_YELLOW}">'
+                                                 f'THIS IS A WARNING AND CAN NORMALLY BE SAFELY IGNORED</p></strong>')
 
     clearmap_main_win.show()
     clearmap_main_win.fix_styles()
