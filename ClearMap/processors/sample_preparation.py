@@ -101,7 +101,7 @@ class PreProcessor(TabProcessor):
     @property
     def is_tiled(self):
         tags = self.workspace.expression('raw', prefix=self.prefix).tags
-        if tags is None:
+        if tags:
             return False
         else:
             return not self.z_only(tags)
