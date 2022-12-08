@@ -403,6 +403,7 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         self.log_progress(msg)
         if self.progress_dialog is not None:
             self.progress_dialog.done(1)
+            self.progress_dialog = None  # del
 
     def handle_step_name_change(self, step_name):
         self.log_process_start(step_name)
@@ -410,7 +411,8 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         # self.progress_dialog.mainProgressBar.setFormat(f'step %v/%m  ({step_name})')
 
     def handle_sub_step_change(self, step_name):
-        self.progress_dialog.subProgressLabel.setText(step_name)
+        if self.progress_dialog is not None:
+            self.progress_dialog.subProgressLabel.setText(step_name)
         self.log_progress(f'    {step_name}')
 
     def log_process_start(self, msg):
