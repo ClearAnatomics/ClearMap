@@ -53,10 +53,25 @@ def runs_on_ui():
     return 'CLEARMAP_GUI_HOSTED' in os.environ
 
 
+def smi_query(var_name, units=False):
+    cmd = f'nvidia-smi --query-gpu={var_name} --format=noheader,csv'
+    if not units:
+        cmd += ',nounits'
+    return subprocess.check_output(cmd, shell=True)
+
+
 def get_free_v_ram():
-    cmd = 'nvidia-smi --query-gpu=memory.free --format=noheader,csv,nounits'
-    result = subprocess.check_output(cmd, shell=True)
-    return int(result)
+    return int(smi_query('memory.free'))
+
+
+def get_percent_v_ram_use():
+    percent = float(smi_query('memory.used')) / float(smi_query('memory.total'))
+    return percent * 100
+
+
+def gpu_util():
+    gpu_percent = smi_query('utilization.gpu', units=True).decode('ascii').replace('%', '').strip()
+    return int(gpu_percent)
 
 
 class CancelableProcessPoolExecutor(ProcessPoolExecutor):

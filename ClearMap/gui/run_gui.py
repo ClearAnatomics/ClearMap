@@ -23,11 +23,13 @@ from shutil import copyfile
 import traceback
 import types
 
+import psutil
 from PyQt5 import QtGui
+from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QPalette, QColor
 from PyQt5.QtWebEngineWidgets import QWebEngineView  # WARNING: import required before app creation
 from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QSpinBox, QDoubleSpinBox, QFrame, \
-    QDialogButtonBox, QComboBox, QLineEdit, QStyle, QWidget, QMessageBox, QToolBox
+    QDialogButtonBox, QComboBox, QLineEdit, QStyle, QWidget, QMessageBox, QToolBox, QProgressBar, QLabel
 from qdarkstyle import DarkPalette
 
 os.environ['CLEARMAP_GUI_HOSTED'] = "1"
@@ -67,7 +69,7 @@ import qdarkstyle
 import pyqtgraph as pg
 
 update_pbar(app, progress_bar, 20)
-from ClearMap.Utils.utilities import title_to_snake
+from ClearMap.Utils.utilities import title_to_snake, get_percent_v_ram_use, gpu_util
 from ClearMap.gui.gui_logging import Printer
 from ClearMap.config.config_loader import ConfigLoader
 from ClearMap.gui.params import ConfigNotFoundError, UiParameterCollection, UiParameter
@@ -78,7 +80,7 @@ update_pbar(app, progress_bar, 40)
 from ClearMap.gui.pyuic_utils import loadUiType
 from ClearMap.gui.dialogs import get_directory_dlg, warning_popup, make_nested_progress_dialog, DISPLAY_CONFIG
 from ClearMap.gui.gui_utils import html_to_ansi, html_to_plain_text, compute_grid
-from ClearMap.gui.style import QDARKSTYLE_BACKGROUND, DARK_BACKGROUND, PLOT_3D_BG, \
+from ClearMap.gui.style import DARK_BACKGROUND, PLOT_3D_BG, \
     BTN_STYLE_SHEET, TOOLTIP_STYLE_SHEET, COMBOBOX_STYLE_SHEET, WARNING_YELLOW
 
 from ClearMap.gui.widgets import OrthoViewer, ProgressWatcher, setup_mini_brain  # needs plot_3d
@@ -123,6 +125,15 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         self.error_logger = None
         self.progress_dialog = None
         self.progress_watcher = ProgressWatcher()
+
+        self.cpu_bar = QProgressBar()
+        self.ram_bar = QProgressBar()
+        self.gpu_bar = QProgressBar()
+        self.vram_bar = QProgressBar()
+
+        self.timer = QTimer()
+        self.timer.setInterval(200)
+        self.timer.timeout.connect(self.update_monitoring_bars)
 
     def find_child_by_name(self, child_name, child_type, parent=None):
         if parent is None:
@@ -204,6 +215,7 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         self.fix_widgets_backgrounds()
         self.fix_sizes()
         self.fix_tootips_stylesheet()
+        self.setup_monitoring_bars()  # FIXME: find better location
 
     def fix_tootips_stylesheet(self):
         for widg in self.findChildren(QWidget):
@@ -422,6 +434,20 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
             cfg_f_name = os.path.basename(cfg.filename)
             with open(os.path.join(cfg_folder, cfg_f_name), 'wb') as file_obj:
                 cfg.write(outfile=file_obj)
+
+    def setup_monitoring_bars(self):
+        for label, bar in zip(('CPU', 'RAM', 'GPU', 'VRAM'), (self.cpu_bar, self.ram_bar, self.gpu_bar, self.vram_bar)):
+            self.statusbar.addPermanentWidget(QLabel(label))
+            bar.setOrientation(Qt.Vertical)
+            bar.setMaximumHeight(40)
+            self.statusbar.addPermanentWidget(bar)
+            # cpu_bar.setValue(20)
+
+    def update_monitoring_bars(self):
+        self.cpu_bar.setValue(psutil.cpu_percent())
+        self.ram_bar.setValue(psutil.virtual_memory().percent)
+        self.gpu_bar.setValue(gpu_util())
+        self.vram_bar.setValue(get_percent_v_ram_use())
 
 
 class ClearMapGui(ClearMapGuiBase):
@@ -679,6 +705,7 @@ def main(app, splash):
 
     clearmap_main_win.show()
     clearmap_main_win.fix_styles()
+    clearmap_main_win.timer.start()
     splash.finish(clearmap_main_win)
     if clearmap_main_win.preference_editor.params.verbosity != 'trace':  # WARNING: will disable progress bars
         clearmap_main_win.patch_stdout()
