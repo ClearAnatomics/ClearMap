@@ -29,7 +29,6 @@
        </property>
        <property name="font">
         <font>
-         <weight>75</weight>
          <bold>true</bold>
         </font>
        </property>
@@ -42,7 +41,7 @@
           <x>0</x>
           <y>0</y>
           <width>478</width>
-          <height>438</height>
+          <height>440</height>
          </rect>
         </property>
         <attribute name="label">
@@ -59,8 +58,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>392</width>
-              <height>409</height>
+              <width>384</width>
+              <height>392</height>
              </rect>
             </property>
             <attribute name="label">
@@ -440,8 +439,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>311</width>
-              <height>347</height>
+              <width>309</width>
+              <height>334</height>
              </rect>
             </property>
             <attribute name="label">
@@ -749,7 +748,7 @@
               <x>0</x>
               <y>0</y>
               <width>460</width>
-              <height>265</height>
+              <height>272</height>
              </rect>
             </property>
             <attribute name="label">
@@ -824,8 +823,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>199</width>
-              <height>103</height>
+              <width>196</width>
+              <height>100</height>
              </rect>
             </property>
             <attribute name="label">
@@ -893,8 +892,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>257</width>
-              <height>161</height>
+              <width>254</width>
+              <height>156</height>
              </rect>
             </property>
             <attribute name="label">
@@ -966,7 +965,7 @@
           <x>0</x>
           <y>0</y>
           <width>478</width>
-          <height>438</height>
+          <height>440</height>
          </rect>
         </property>
         <attribute name="label">
@@ -984,7 +983,7 @@
               <x>0</x>
               <y>0</y>
               <width>460</width>
-              <height>327</height>
+              <height>332</height>
              </rect>
             </property>
             <attribute name="label">
@@ -1086,8 +1085,8 @@
                       <string> Select</string>
                      </property>
                      <property name="icon">
-                      <iconset theme="folder">
-                       <normaloff>.</normaloff>.</iconset>
+                      <iconset resource="icons.qrc">
+                       <normaloff>:/icons/icons/folder_open.svg</normaloff>:/icons/icons/folder_open.svg</iconset>
                      </property>
                     </widget>
                    </item>
@@ -1179,8 +1178,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>233</width>
-              <height>136</height>
+              <width>460</width>
+              <height>332</height>
              </rect>
             </property>
             <attribute name="label">
@@ -1270,8 +1269,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>415</width>
-              <height>74</height>
+              <width>400</width>
+              <height>72</height>
              </rect>
             </property>
             <attribute name="label">
