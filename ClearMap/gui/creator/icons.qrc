@@ -6,5 +6,6 @@
         <file>icons/info.svg</file>
         <file>icons/search.svg</file>
         <file>icons/magic_wand.svg</file>
+        <file>icons/folder_open.svg</file>
     </qresource>
 </RCC>
