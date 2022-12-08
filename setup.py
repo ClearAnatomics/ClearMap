@@ -91,10 +91,12 @@ setup(
     packages=packages,
     ext_modules=ext_modules,
     entry_points={
-        'gui_scripts': ['clear_map_ui = ClearMap.gui.run_gui:entry_point']
-        # 'console_scripts': [
-        #     'cell_map = ClearMap.Scripts.cell_map:main',
-        # ],
+        'gui_scripts': [
+            'clear_map_ui = ClearMap.gui.run_gui:entry_point'
+        ],
+        'console_scripts': [
+             'cell_map = ClearMap.Scripts.cell_map_new_api:main',
+        ],
     },
     url='',
     license='MIT',
