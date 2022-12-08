@@ -304,6 +304,7 @@ class CellDetector(TabProcessor):
         cell_detection_param = copy.deepcopy(cell_detection.default_cell_detection_parameter)
         cell_detection_param['illumination'] = None  # WARNING: illumination or illumination_correction
         cell_detection_param['background_correction']['shape'] = self.processing_config['detection']['background_correction']['diameter']
+        cell_detection_param['maxima_detection']['shape'] = self.processing_config['detection']['maxima_detection']['shape']
         cell_detection_param['intensity_detection']['measure'] = ['source']
         cell_detection_param['shape_detection']['threshold'] = self.processing_config['detection']['shape_detection']['threshold']
         if tuning:
