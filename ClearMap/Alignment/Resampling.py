@@ -19,6 +19,7 @@ import tempfile
 import itertools
 import functools as ft
 import concurrent.futures
+from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
 
@@ -34,11 +35,11 @@ import ClearMap.ParallelProcessing.ProcessWriter as pw
 import ClearMap.ParallelProcessing.ParallelTraceback as ptb
 
 import ClearMap.Utils.Timer as tmr
+from ClearMap.Utils.utilities import CancelableProcessPoolExecutor
 
 ########################################################################################
 ### Conversion
 ########################################################################################
-from ClearMap.Utils.utilities import CancelableProcessPoolExecutor
 
 
 def format_orientation(orientation, inverse=False, default=None):
@@ -442,14 +443,11 @@ def resample(source, sink = None, orientation = None,
       for index in indices:
         _resample(index=index);
     else:
-      #print(processes);
-      with CancelableProcessPoolExecutor(processes) as executor:
-        executor.map(_resample, indices, chunksize=20)
+      with ThreadPoolExecutor(processes) as executor:
+        chunk_size = round(len(indices) / (processes * 3))
+        executor.map(_resample, indices, chunksize=chunk_size)
         if workspace is not None:
           workspace.executor = executor
-        print('Resampling mapped, waiting for all processes to finish')
-        if executor._processes is not None:
-          executor.shutdown()
     last_source = resampled
   
   #fix orientation
