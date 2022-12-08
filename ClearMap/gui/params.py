@@ -959,6 +959,7 @@ class CellMapParams(UiParameter):
         super().__init__(tab, src_folder)
         self.params_dict = {
             'background_correction_diameter': ['detection', 'background_correction', 'diameter'],
+            'maxima_shape': ['detection', 'maxima_detection', 'shape'],
             'detection_threshold': ['detection', 'shape_detection', 'threshold'],
             'cell_filter_size': ['cell_filtration', 'thresholds', 'size'],
             'cell_filter_intensity': ['cell_filtration', 'thresholds', 'intensity'],
@@ -977,6 +978,7 @@ class CellMapParams(UiParameter):
     def connect(self):
         self.tab.runCellMapPlotCheckBox.stateChanged.connect(self.handle_plot_when_finished)
         self.tab.backgroundCorrectionDiameter.valueChanged.connect(self.handle_background_correction_diameter_changed)
+        self.tab.maximaShape.valueChanged.connect(self.handle_maxima_shape_changed)
         self.tab.detectionThreshold.valueChanged.connect(self.handle_detection_threshold_changed)
         self.tab.cellFilterThresholdSizeDoublet.valueChangedConnect(self.handle_filter_size_changed)
         self.tab.cellFilterThresholdIntensityDoublet.valueChangedConnect(self.handle_filter_intensity_changed)
@@ -1030,6 +1032,18 @@ class CellMapParams(UiParameter):
 
     def handle_background_correction_diameter_changed(self, val):
         self.config['detection']['background_correction']['diameter'] = self.background_correction_diameter
+
+    @property
+    def maxima_shape(self):
+        return self.tab.maximaShape.value()
+
+    @maxima_shape.setter
+    def maxima_shape(self, shape):
+        self.tab.maximaShape.setValue(shape)
+
+    def handle_maxima_shape_changed(self, val):
+        self.config['detection']['maxima_detection']['shape'] = self.maxima_shape
+
 
     @property
     def detection_threshold(self):

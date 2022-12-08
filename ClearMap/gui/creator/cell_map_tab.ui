@@ -94,6 +94,32 @@
               </widget>
              </item>
              <item>
+              <widget class="QGroupBox" name="groupBox_5">
+               <property name="toolTip">
+                <string/>
+               </property>
+               <property name="title">
+                <string>Maxima</string>
+               </property>
+               <layout class="QHBoxLayout" name="horizontalLayout_10">
+                <item>
+                 <widget class="QLabel" name="label_22">
+                  <property name="text">
+                   <string>shape</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QSpinBox" name="maximaShape">
+                  <property name="maximum">
+                   <number>65535</number>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </widget>
+             </item>
+             <item>
               <widget class="QGroupBox" name="groupBox">
                <property name="toolTip">
                 <string>The threshold for the maxima detection. Peaks below this value are ignored.</string>
