@@ -23,7 +23,7 @@ import functools as ft
 from ClearMap.Utils import utilities
 
 import ClearMap.Visualization.Qt.DataViewer as dv
-import ClearMap.Visualization.Qt.Utils as qtu
+import ClearMap.Visualization.Qt.utils as qtu
 
 ############################################################################################################
 ###  Plotting

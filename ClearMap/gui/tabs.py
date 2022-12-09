@@ -7,7 +7,6 @@ The different tabs that correspond to different functionalities of the GUI
 """
 import os.path
 import copy
-from datetime import datetime
 
 import numpy as np
 import pandas as pd
@@ -29,10 +28,10 @@ from ClearMap.gui.dialogs import prompt_dialog
 from ClearMap.gui.gui_utils import format_long_nb_to_str, surface_project, np_to_qpixmap, create_clearmap_widget
 from ClearMap.gui.params import ParamsOrientationError, VesselParams, PreferencesParams, SampleParameters, \
     AlignmentParams, CellMapParams, BatchParams
-from ClearMap.gui.widgets import PatternDialog, SamplePickerDialog, DataFrameWidget, RedCross, LandmarksSelectorDialog, \
+from ClearMap.gui.widgets import PatternDialog, SamplePickerDialog, DataFrameWidget, LandmarksSelectorDialog, \
     Scatter3D
 
-from ClearMap.Visualization.Qt.DataViewer import link_dataviewers_cursors
+from ClearMap.Visualization.Qt.utils import link_dataviewers_cursors
 from ClearMap.Visualization.Qt import Plot3d as plot_3d
 
 from ClearMap.processors.sample_preparation import PreProcessor
@@ -534,7 +533,7 @@ class AlignmentTab(GenericTab):
         dvs = plot_3d.plot(image_sources, title=titles, arrange=False, sync=True,
                            lut=self.main_window.preference_editor.params.lut,
                            parent=self.main_window.centralWidget())
-        link_dataviewers_cursors(dvs, RedCross)
+        link_dataviewers_cursors(dvs)
         self.main_window.setup_plots(dvs, ['autofluo', 'aligned'])
 
     def plot_registration_results_side_by_side(self):
@@ -542,7 +541,7 @@ class AlignmentTab(GenericTab):
         dvs = plot_3d.plot(image_sources, title=titles, arrange=False, sync=True,
                            lut=self.main_window.preference_editor.params.lut,
                            parent=self.main_window.centralWidget())
-        link_dataviewers_cursors(dvs, RedCross)
+        link_dataviewers_cursors(dvs)
         self.main_window.setup_plots(dvs, ['autofluo', 'aligned'])
 
     def plot_registration_results_composite_raw(self):
@@ -671,7 +670,7 @@ class CellCounterTab(PostProcessingTab):
             self.main_window.print_warning_msg('Preview not run, '
                                                'will only display stitched image for memory space reasons')
         else:
-            link_dataviewers_cursors(dvs, RedCross)
+            link_dataviewers_cursors(dvs)
         self.main_window.setup_plots(dvs)
 
     def plot_cell_filter_results(self):
@@ -841,7 +840,7 @@ class VasculatureTab(PostProcessingTab):
                                                  self.preprocessor.filename('binary')]):
             return
         dvs = self.binary_vessel_processor.plot_binarization_result(parent=self.main_window)
-        link_dataviewers_cursors(dvs, RedCross)
+        link_dataviewers_cursors(dvs)
         self.main_window.setup_plots(dvs, ['stitched', 'binary'])
 
     def fill_vessels(self):
@@ -855,7 +854,7 @@ class VasculatureTab(PostProcessingTab):
 
     def plot_vessel_filling_results(self):  # TODO: add step_exists check
         dvs = self.binary_vessel_processor.plot_vessel_filling_results()
-        link_dataviewers_cursors(dvs, RedCross)
+        link_dataviewers_cursors(dvs)
         self.main_window.setup_plots(dvs)
 
     def combine(self):
@@ -1022,7 +1021,7 @@ class BatchTab(GenericTab):
             # dv.atlas = atlas.copy()  #
             dv.atlas = atlas
             dv.structure_names = names_map
-        link_dataviewers_cursors(dvs, RedCross)
+        link_dataviewers_cursors(dvs)
         self.main_window.setup_plots(dvs)
 
     def run_plots(self, plot_function, plot_kw_args):

@@ -75,42 +75,6 @@ class RectItem(pg.GraphicsObject):  # Derived from https://stackoverflow.com/a/6
         return QRectF(self.picture.boundingRect())
 
 
-class RedCross(pg.GraphicsObject):
-    def __init__(self, coords=None, size=[10, 10], parent=None):
-        super().__init__(parent)
-        self.color = "#FF00007d"
-        if coords is None:
-            coords = [0, 0]
-        self.size = size
-        self._rect = QRectF(coords[0]-self.size[0]/2, coords[1]-self.size[1]/2, self.size[0], self.size[1])  # TODO@ set as fraction of image size
-        self.coords = coords
-        self.picture = QtGui.QPicture()
-
-    def set_coords(self, coords):
-        x, y = coords
-        self.coords = coords
-        self._rect.setCoords(x-self.size[0]/2, y-self.size[1]/2,
-                             x+self.size[0]/2, y+self.size[1]/2)
-        self._generate_picture()
-
-    def _generate_picture(self):
-        painter = QtGui.QPainter(self.picture)
-        pen = pg.mkPen(self.color)
-        pen.setWidth(4)
-        painter.setPen(pen)
-        painter.setBrush(pg.mkBrush(self.color))
-        painter.drawLine(self._rect.topLeft(), self._rect.bottomRight())
-        painter.drawLine(self._rect.bottomLeft(), self._rect.topRight())
-        painter.drawPicture(0, 0, self.picture)
-        painter.end()
-
-    def paint(self, painter, option, widget=None):
-        painter.drawPicture(0, 0, self.picture)
-
-    def boundingRect(self):  # TODO: check if we need this method
-        return QRectF(self.picture.boundingRect())
-
-
 class OrthoViewer(object):
     def __init__(self, img=None, parent=None):
         self.img = img
