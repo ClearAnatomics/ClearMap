@@ -30,145 +30,12 @@ from PyQt5.QtCore import QEvent
 from ClearMap.Utils.utilities import runs_on_spyder
 from ClearMap.IO.IO import as_source
 from ClearMap.IO.Source import Source
+from ClearMap.Visualization.Qt.data_viewer_luts import LUT
 
 pg.CONFIG_OPTIONS['useOpenGL'] = False  # set to False if trouble seeing data.
 
 if not pg.QAPP:
     pg.mkQApp()
-
-
-############################################################################################################
-# ##  Lookup tables
-############################################################################################################
-
-class LUTItem(pg.HistogramLUTItem):
-    """Lookup table item for the DataViewer"""
-
-    def __init__(self, *args, **kargs):
-        pg.HistogramLUTItem.__init__(self, *args, **kargs)
-        self.vb.setMaximumWidth(15)
-        self.vb.setMinimumWidth(10)
-
-    def imageChanged(self, autoLevel=False, autoRange=False):
-        if autoLevel:
-            mn, mx = self.quickMinMax(targetSize=500)
-            self.region.setRegion([mn, mx])
-
-    def quickMinMax(self, targetSize=1e3):
-        """
-        Estimate the min/max values of the image data by subsampling.
-        """
-        data = self.imageItem().image
-        while data.size > targetSize:
-            ax = np.argmax(data.shape)
-            sl = [slice(None)] * data.ndim
-            sl[ax] = slice(None, None, 2)
-            data = data[tuple(sl)]
-        return np.nanmin(data), np.nanmax(data)
-
-
-class LUTWidget(pg.GraphicsView):
-    """Lookup table widget for the DataViewer"""
-
-    def __init__(self, parent=None, *args, **kargs):
-        background = kargs.get('background', 'default')
-        pg.GraphicsView.__init__(self, parent=parent, useOpenGL=True, background=background)
-        self.item = LUTItem(*args, **kargs)
-        self.setCentralItem(self.item)
-        self.setSizePolicy(pg.QtGui.QSizePolicy.Preferred, pg.QtGui.QSizePolicy.Expanding)  # TODO: add option for sizepolicy
-        self.setMinimumWidth(120)
-
-    def sizeHint(self):
-        return pg.QtCore.QSize(120, 200)
-
-    def __getattr__(self, attr):
-        return getattr(self.item, attr)
-
-
-class LUT(pg.QtGui.QWidget):
-    def __init__(self, image=None, color='red', percentiles=[[-100, 0, 50], [50, 75, 100]],
-                 parent=None, *args):
-        pg.QtGui.QWidget.__init__(self, parent, *args)
-
-        self.layout = pg.QtGui.QGridLayout(self)
-        self.layout.setSpacing(0)
-        self.layout.setMargin(0)
-
-        self.lut = LUTWidget(parent=parent, image=image)
-        self.layout.addWidget(self.lut, 0, 0, 1, 1)
-
-        self.range_layout = pg.QtGui.QGridLayout()
-        self.range_buttons = []
-        pre = ['%d', '%d']
-        for r in range(2):
-            range_buttons_m = []
-            for i, p in enumerate(percentiles[r]):
-                button = pg.QtGui.QPushButton(pre[r] % (p))
-                button.setMaximumWidth(30)
-                font = button.font()
-                font.setPointSize(6)
-                button.setFont(font)
-                self.range_layout.addWidget(button, r, i)
-                range_buttons_m.append(button)
-            self.range_buttons.append(range_buttons_m)
-
-        self.layout.addLayout(self.range_layout, 1, 0, 1, 1)
-
-        self.precentiles = percentiles
-        self.percentile_id = [2, 2]
-
-        for m, ab in enumerate(self.range_buttons):
-            for p, abm in enumerate(ab):
-                abm.clicked.connect(ft.partial(self.updateRegionRange, m, p))
-
-        # default gradient
-        if color in pg.graphicsItems.GradientEditorItem.Gradients.keys():
-            self.lut.gradient.loadPreset(color)
-        else:
-            self.lut.gradient.getTick(0).color = pg.QtGui.QColor(0, 0, 0, 0)
-            self.lut.gradient.getTick(1).color = pg.QtGui.QColor(color)
-            self.lut.gradient.updateGradient()
-
-    def updateRegionRange(self, m, p):
-        self.percentile_id[m] = p
-        p_min = self.precentiles[0][self.percentile_id[0]]
-        p_max = self.precentiles[1][self.percentile_id[1]]
-        self.updateRegionPercentile(p_min, p_max)
-
-    def updateRegionPercentile(self, pmin, pmax):
-        iitem = self.lut.imageItem()
-        if iitem is not None:
-            pmax1 = max(0, min(pmax, 100))
-
-            if pmin < 0:
-                pmin1 = min(-pmin, 100)
-            else:
-                pmin1 = min(pmin, 100)
-
-            if pmax1 == 0:
-                pmax1 = 1; pmax = 1
-            if pmin1 == 0:
-                pmin1 = 1; pmin = 1
-
-            r = [float(pmin)/pmin1, float(pmax)/pmax1] * self.quickPercentile(iitem.image, [pmin1, pmax1])
-            self.lut.region.setRegion(r)
-
-    def quickPercentile(self, data, percentiles, targetSize=1e3):
-        while data.size > targetSize:
-            ax = np.argmax(data.shape)
-            sl = [slice(None)] * data.ndim
-            sl[ax] = slice(None, None, 2)
-            sl = tuple(sl)
-            data = data[sl]
-        if data.dtype == np.bool_:
-            return np.nanpercentile(data.astype(np.uint8), percentiles)
-        else:
-            return np.nanpercentile(data, percentiles)
-
-
-############################################################################################################
-# ##  DataViewer
-############################################################################################################
 
 
 class DataViewer(pg.QtGui.QWidget):
@@ -334,6 +201,13 @@ class DataViewer(pg.QtGui.QWidget):
 
         self.show()
 
+    @property
+    def space_axes(self):
+        color_axis = self.color_axis
+        if color_axis is None:
+            color_axis = -1  # Cannot use None with == testing because of implicit cast
+        return [ax for ax in range(self.sources[0].ndim) if ax != color_axis]
+
     def eventFilter(self, source, event):
         if event.type() == QEvent.Wheel:
             angle = event.angleDelta().y()
@@ -341,28 +215,6 @@ class DataViewer(pg.QtGui.QWidget):
             steps = angle / 120
             self.sliceLine.setValue(self.sliceLine.value() + steps)
         return super().eventFilter(source, event)
-
-    def __get_colors(self, default_lut):
-        if self.n_sources == 1:
-            cols = [default_lut]
-        elif self.n_sources == 2:
-            cols = ['purple', 'green']
-        else:
-            cols = np.array(['white', 'green', 'red', 'blue', 'purple'] * self.n_sources)[:self.n_sources]
-        return cols
-
-    def __setup_axes_controls(self):
-        axis_tools_layout = pg.QtGui.QGridLayout()
-        for d, ax in enumerate('xyz'):
-            button = pg.QtGui.QRadioButton(ax)
-            button.setMaximumWidth(50)
-            axis_tools_layout.addWidget(button, 0, d)
-            button.clicked.connect(ft.partial(self.setSliceAxis, d))
-            self.axis_buttons.append(button)
-        self.axis_buttons[self.space_axes.index(self.scroll_axis)].setChecked(True)
-        axis_tools_widget = pg.QtGui.QWidget()
-        axis_tools_widget.setLayout(axis_tools_layout)
-        return axis_tools_layout, axis_tools_widget
 
     def initializeSources(self, source, scale=None, axis=None, update=True):
         # initialize sources and axis settings
@@ -398,6 +250,28 @@ class DataViewer(pg.QtGui.QWidget):
         self.updateSourceRange()
         self.updateSourceSlice()
 
+    def __setup_axes_controls(self):
+        axis_tools_layout = pg.QtGui.QGridLayout()
+        for d, ax in enumerate('xyz'):
+            button = pg.QtGui.QRadioButton(ax)
+            button.setMaximumWidth(50)
+            axis_tools_layout.addWidget(button, 0, d)
+            button.clicked.connect(ft.partial(self.setSliceAxis, d))
+            self.axis_buttons.append(button)
+        self.axis_buttons[self.space_axes.index(self.scroll_axis)].setChecked(True)
+        axis_tools_widget = pg.QtGui.QWidget()
+        axis_tools_widget.setLayout(axis_tools_layout)
+        return axis_tools_layout, axis_tools_widget
+
+    def __get_colors(self, default_lut):
+        if self.n_sources == 1:
+            cols = [default_lut]
+        elif self.n_sources == 2:
+            cols = ['purple', 'green']
+        else:
+            cols = np.array(['white', 'green', 'red', 'blue', 'purple'] * self.n_sources)[:self.n_sources]
+        return cols
+
     def color_last(self, source):
         shape = np.array(source.shape)
         c_idx = np.where(shape == 3)[0]
@@ -419,7 +293,7 @@ class DataViewer(pg.QtGui.QWidget):
     def all_colour(self):
         return all([self.is_color(s) for s in self.sources])
 
-    def setSource(self, source, index='all'):
+    def setSource(self, source, index='all'):  # TODO: see if could factor with __init__
         """initialize sources and axis settings"""
 
         if index is 'all':
@@ -480,7 +354,6 @@ class DataViewer(pg.QtGui.QWidget):
     def updateLabelFromMouseMove(self, event_pos):
         x, y = self.get_coords(event_pos)
         self.sync_cursors(x, y)
-
         self._updateCoords(x, y)
 
     def _updateCoords(self, x, y):
@@ -515,16 +388,6 @@ class DataViewer(pg.QtGui.QWidget):
                 pal._updateCoords(x, y)
                 pal.view.update()
 
-    def refresh(self):
-        """
-        Forces the plot to refresh, notably to display scatter info on top
-        Returns
-        -------
-
-        """
-        self.sliceLine.setValue(self.sliceLine.value() + 1)
-        self.sliceLine.setValue(self.sliceLine.value() - 1)
-
     def updateLabel(self):
         x_axis, y_axis = self.getXYAxes()
         x, y, z = self.source_pointer[[x_axis, y_axis, self.scroll_axis]]
@@ -541,7 +404,7 @@ class DataViewer(pg.QtGui.QWidget):
         label = f"({x}, {y}, {z}) {{{x*xs:.2f}, {y*ys:.2f}, {z*zs:.2f}}} [{vals}]"
         if self.atlas is not None:
             id_ = np.asscalar(self.atlas[slc])
-            label += f" <b style='color:#2d9cfc;'>Region: {self.structure_names[id_]} ({id_})</b>"
+            label += f" <b style='color:#2d9cfc;'>{self.structure_names[id_]} ({id_})</b>"
         if self.parent() is None or not self.parent().objectName().lower().startswith('dataviewer'):
             label = f"<span style='font-size: 12pt; color: black'>{label}</span>"
         self.source_label.setText(label)
@@ -558,36 +421,15 @@ class DataViewer(pg.QtGui.QWidget):
             if self.scatter is not None:
                 self.plot_scatter_markers(ax, index)
 
-    def plot_scatter_markers(self, ax, index):
-        self.scatter.clear()
-        self.scatter_coords.axis = ax
-        scatter_params = DataViewer.DEFAULT_SCATTER_PARAMS.copy()  # TODO: check if copy required
-        pos = self.scatter_coords.get_pos(index)
-        if all(pos.shape):
-            if self.scatter_coords.colours is not None:
-                colours = self.scatter_coords.get_colours(index)
-                symbols = self.scatter_coords.get_symbols(index)
-                self.scatter.setData(pos=pos,
-                                     pen=[pg.mkPen(c) for c in colours],
-                                     brush=[pg.mkBrush(c) for c in colours],
-                                     symbol=symbols, size=10)  # FIXME: scale size as function of zoom
-            else:
-                self.scatter.setData(pos=pos, **scatter_params)
-        try:  # FIXME: check why some markers trigger errors
-            if self.scatter_coords.half_slice_thickness is not None:
-                marker_params = self.scatter_coords.get_all_data(index)
-                if marker_params['pos'].shape[0]:
-                    self.scatter.addPoints(symbol='o', brush=pg.mkBrush((0, 0, 0, 0)),
-                                           **marker_params)  # FIXME: scale size as function of zoom
-        except KeyError as err:
-            print(err)
+    def refresh(self):
+        """
+        Forces the plot to refresh, notably to display scatter info on top
+        Returns
+        -------
 
-    @property
-    def space_axes(self):
-        color_axis = self.color_axis
-        if color_axis is None:
-            color_axis = -1  # Cannot use None with == testing because of implicit cast
-        return [ax for ax in range(self.sources[0].ndim) if ax != color_axis]
+        """
+        self.sliceLine.setValue(self.sliceLine.value() + 1)
+        self.sliceLine.setValue(self.sliceLine.value() - 1)
 
     def setSliceAxis(self, axis):
         # old_scroll_axis = self.scroll_axis
@@ -620,6 +462,30 @@ class DataViewer(pg.QtGui.QWidget):
                 image = image.view('uint8')
             img_item.updateImage(image)
 
+    def plot_scatter_markers(self, ax, index):
+        self.scatter.clear()
+        self.scatter_coords.axis = ax
+        scatter_params = DataViewer.DEFAULT_SCATTER_PARAMS.copy()  # TODO: check if copy required
+        pos = self.scatter_coords.get_pos(index)
+        if all(pos.shape):
+            if self.scatter_coords.colours is not None:
+                colours = self.scatter_coords.get_colours(index)
+                symbols = self.scatter_coords.get_symbols(index)
+                self.scatter.setData(pos=pos,
+                                     pen=[pg.mkPen(c) for c in colours],
+                                     brush=[pg.mkBrush(c) for c in colours],
+                                     symbol=symbols, size=10)  # FIXME: scale size as function of zoom
+            else:
+                self.scatter.setData(pos=pos, **scatter_params)
+        try:  # FIXME: check why some markers trigger errors
+            if self.scatter_coords.half_slice_thickness is not None:
+                marker_params = self.scatter_coords.get_all_data(index)
+                if marker_params['pos'].shape[0]:
+                    self.scatter.addPoints(symbol='o', brush=pg.mkBrush((0, 0, 0, 0)),
+                                           **marker_params)  # FIXME: scale size as function of zoom
+        except KeyError as err:
+            print(err)
+
     def enable_mouse_clicks(self):
         self.graphicsView.scene().sigMouseClicked.connect(self.handleMouseClick)
 
@@ -629,9 +495,6 @@ class DataViewer(pg.QtGui.QWidget):
         btn = event.button()
         if btn != 1:
             return
-        double_click = event.double()
-        modifiers = event.modifiers()
-        # print(btn, double_click, modifiers == Qt.ShiftModifier)
 
         x_axis, y_axis = self.getXYAxes()
         scaled_x, scaled_y = self.scale_coords(x, x_axis, y, y_axis)
@@ -677,13 +540,3 @@ if __name__ == '__main__':
     print('testing')
     _test()
     time.sleep(60)
-
-
-def link_dataviewers_cursors(dvs, cursor_cls):  #  Needs to specify cursor class because cannot import from widget here (circular)
-    for i, dv in enumerate(dvs):
-        cursor = cursor_cls()
-        dv.view.addItem(cursor)
-        dv.cross = cursor
-        pals = dvs.copy()
-        pals.pop(i)
-        dv.pals = pals
