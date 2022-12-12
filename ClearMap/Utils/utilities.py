@@ -123,3 +123,15 @@ def make_abs(directory, file_name):
 
 def get_item_recursive(container, keys):
     return reduce(getitem, keys, container)
+
+
+def set_item_recursive(dictionary, keys_list, val, fix_missing_keys=True):
+    def add_keys(d, keys):
+        if keys[0] not in d.keys():
+            d[keys[0]] = {}
+        if keys[1:]:  # if keys left
+            add_keys(d[keys[0]], keys[1:])
+
+    if fix_missing_keys:
+        add_keys(dictionary, keys_list[:-1])  # Fix missing keys recursively
+    get_item_recursive(dictionary, keys_list[:-1])[keys_list[-1]] = val

@@ -12,7 +12,7 @@ from itertools import combinations
 
 import numpy as np
 
-from ClearMap.Utils.utilities import get_item_recursive
+from ClearMap.Utils.utilities import get_item_recursive, set_item_recursive
 from ClearMap.config.atlas import ATLAS_NAMES_MAP
 from ClearMap.gui.gui_utils import create_clearmap_widget
 
@@ -120,11 +120,11 @@ class UiParameter(QObject):
                     current_amended = True
                 if attr in self.attrs_to_invert:
                     val = not val
-                # Update the UI
-                setattr(self, attr, val)
                 if current_amended:
                     # Update the config
-                    get_item_recursive(self.config, keys_list[:-1])[keys_list[-1]] = val
+                    set_item_recursive(self.config, keys_list, val)
+                # Update the UI
+                setattr(self, attr, val)  # comes after the cfg otherwise, key will be missing in the callback
             if any_amended:
                 self.ui_to_cfg()  # Add the newly parsed field
 
@@ -1043,7 +1043,6 @@ class CellMapParams(UiParameter):
 
     def handle_maxima_shape_changed(self, val):
         self.config['detection']['maxima_detection']['shape'] = self.maxima_shape
-
 
     @property
     def detection_threshold(self):
