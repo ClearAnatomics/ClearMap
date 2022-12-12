@@ -287,7 +287,7 @@ class SampleTab(GenericTab):
 
     def initial_cfg_load(self):
         try:
-            self.save_cfg()
+            self.params.cfg_to_ui()
         except ParamsOrientationError as err:
             self.main_window.popup(str(err), 'Invalid orientation. Defaulting')
             self.params.orientation = (1, 2, 3)
@@ -299,6 +299,12 @@ class SampleTab(GenericTab):
     @src_folder.setter
     def src_folder(self, folder):
         self.ui.srcFolderTxt.setText(folder)
+
+    def display_sample_id(self, sample_id):
+        self.ui.sampleIdTxt.setText(sample_id)
+
+    def get_sample_id(self):
+        return self.ui.sampleIdTxt.text()
 
     def swap_tab_advanced(self):  # TODO: implement
         checked = self.ui.advancedCheckBox.isChecked()

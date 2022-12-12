@@ -566,7 +566,7 @@ class ClearMapGui(ClearMapGuiBase):
                 self.progress_watcher.log_path = self.logger.file.name
                 self.error_logger.set_file(os.path.join(results_folder, 'errors.html'))
                 self.progress_watcher.log_path = self.logger.file.name
-                self.batch_tab_mgr.params.get_config(cfg_path)  # FIXME: try to put with other tabs init (differentce with comfigloader)
+                self.batch_tab_mgr.params.get_config(cfg_path)  # FIXME: try to put with other tabs init (difference with config_loader)
                 self.batch_tab_mgr.initial_cfg_load()
                 self.batch_tab_mgr.params.results_folder = results_folder
                 self.batch_tab_mgr.params.ui_to_cfg()
@@ -632,7 +632,7 @@ class ClearMapGui(ClearMapGuiBase):
         for tab in self.tab_mgrs:
             cfg_name = title_to_snake(tab.name)
             try:
-                was_copied, cfg_path = self.__get_cfg_path(cfg_name)
+                loaded_from_defaults, cfg_path = self.__get_cfg_path(cfg_name)
                 if cfg_path is None:  # skipped
                     tab.ui.setEnabled(False)
                     continue
@@ -648,8 +648,9 @@ class ClearMapGui(ClearMapGuiBase):
                     raise ValueError(f'Processing type should be one of "pre", "post", "batch" or None,'
                                      f' got "{tab.processing_type}"')
                 tab.params.get_config(cfg_path)
-                if was_copied:
-                    tab.params.fix_cfg_file(cfg_path)  # FIXME: see if this should be moved
+                # patch config if loaded from defaults or sample ID if it was set
+                if loaded_from_defaults or (cfg_name == 'sample' and self.sample_tab_mgr.get_sample_id()):
+                    tab.params.fix_cfg_file(cfg_path)  # TODO: see if this should be moved
                 tab.load_params()
                 tab.setup_workers()
             except ConfigNotFoundError:
@@ -667,6 +668,15 @@ class ClearMapGui(ClearMapGuiBase):
         self.src_folder = get_directory_dlg(self.preference_editor.params.start_folder)
         self.config_loader.src_dir = self.src_folder
         self.fix_styles()
+        cfg_path = self.config_loader.get_cfg_path('sample', must_exist=False)
+        if self.file_exists(cfg_path):
+            cfg = self.config_loader.get_cfg_from_path(cfg_path)
+            sample_id = cfg['sample_id']
+            if sample_id == 'undefined':
+                sample_id = ''
+        else:
+            sample_id = ''
+        self.sample_tab_mgr.display_sample_id(sample_id)
 
     @property
     def src_folder(self):
