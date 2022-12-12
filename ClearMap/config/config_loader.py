@@ -85,6 +85,15 @@ def is_machine_file(cfg_name):
     return any([base in cfg_name for base in ('machine', 'preferences')])
 
 
+def patch_cfg(cfg, default_cfg):
+    for k, v in default_cfg.items():
+        if k not in cfg.keys():
+            cfg[k] = v  # everything below will match by definition
+        else:
+            if isinstance(v, dict):
+                patch_cfg(cfg[k], v)
+
+
 class ConfigLoader(object):
     loader_functions = {
         '.cfg': get_configobj_cfg,
@@ -139,6 +148,15 @@ class ConfigLoader(object):
         return ConfigLoader.loader_functions[ext](cfg_path)
 
     @staticmethod
+    def get_patched_cfg_from_path(cfg_path):
+        cfg_name = os.path.splitext(os.path.basename(cfg_path))[0]
+        cfg = ConfigLoader.get_cfg_from_path(cfg_path)
+        default_cfg = ConfigLoader.get_cfg_from_path(ConfigLoader.get_default_path(cfg_name))
+        patch_cfg(cfg, default_cfg)
+        cfg.write()
+        return cfg
+
+    @staticmethod
     def get_default_path(cfg_name, must_exist=True, install_mode=False):  # FIXME: recursive w/ alternatives
         if cfg_name.endswith('_params'):
             cfg_name = cfg_name.replace('_params', '')
@@ -169,11 +187,11 @@ class ConfigLoader(object):
         return cfg_path
 
 
-def get_configs(cfg_path, processing_params_path, machine_cfg_path=None):
+def get_configs(cfg_path, processing_params_path, machine_cfg_path=None):  # FIXME: fix missing stuff here
     if machine_cfg_path is None:
         machine_cfg_path = ConfigLoader.get_default_path('machine')
-    sample_config = ConfigLoader.get_cfg_from_path(cfg_path)
-    processing_config = ConfigLoader.get_cfg_from_path(processing_params_path)
-    machine_config = ConfigLoader.get_cfg_from_path(machine_cfg_path)
+    sample_config = ConfigLoader.get_patched_cfg_from_path(cfg_path)
+    processing_config = ConfigLoader.get_patched_cfg_from_path(processing_params_path)
+    machine_config = ConfigLoader.get_patched_cfg_from_path(machine_cfg_path)
 
     return machine_config, sample_config, processing_config
