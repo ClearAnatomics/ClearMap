@@ -798,6 +798,8 @@ class SamplePickerDialog(WizardDialog):
         sample_folders = []
         for root, dirs, files in os.walk(self.src_folder):
             for fldr in dirs:
+                if fldr == 'config_snapshots' or root.endswith('config_snapshots'):
+                    continue
                 fldr = os.path.join(root, fldr)
                 if 'sample_params.cfg' in os.listdir(fldr):
                     sample_folders.append(fldr)
