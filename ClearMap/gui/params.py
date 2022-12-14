@@ -1206,12 +1206,12 @@ class VesselBinarizationParams(UiParameter):
 
     def __init__(self, tab, src_folder=None):
         super().__init__(tab, src_folder)
-        self.attrs_to_invert = ['run_arteries_binarization']
         self.params_dict = {
-            'raw_binarization_clip_range': ['binarization', 'raw', 'clip_range'],
-            'raw_binarization_threshold': ['binarization', 'raw', 'threshold'],
-            'post_process_raw': ['binarization', 'raw', 'post_process'],
-            'run_arteries_binarization': ['binarization', 'arteries', 'skip'],
+            'run_raw_binarization': ['binarization', 'raw', 'binarization', 'run'],
+            'raw_binarization_clip_range': ['binarization', 'raw', 'binarization', 'clip_range'],
+            'raw_binarization_threshold': ['binarization', 'raw', 'binarization', 'threshold'],
+            'post_process_raw': ['binarization', 'raw', 'post_processing', 'run'],
+            'run_arteries_binarization': ['binarization', 'arteries', 'binarization', 'run'],
             'arteries_binarization_clip_range': ['binarization', 'arteries', 'clip_range'],
             'arteries_binarization_threshold': ['binarization', 'arteries', 'threshold'],
             'post_process_arteries': ['binarization', 'arteries', 'post_process'],
@@ -1221,6 +1221,7 @@ class VesselBinarizationParams(UiParameter):
         self.cfg_subtree = ['binarization']
 
     def connect(self):
+        self.tab.runRawBinarizationCheckBox.stateChanged.connect(self.handle_run_raw_binarization_changed)
         self.tab.rawBinarizationClipRangeDoublet.valueChangedConnect(self.handle_raw_binarization_clip_range_changed)
         self.tab.rawBinarizationThresholdSpinBox.valueChanged.connect(self.handle_raw_binarization_treshold_changed)
         self.tab.rawBinarizationPostprocessingCheckBox.stateChanged.connect(self.handle_post_process_raw_changed)
@@ -1233,8 +1234,19 @@ class VesselBinarizationParams(UiParameter):
         self.tab.arteriesBinarizationPostprocessingCheckBox.stateChanged.connect(
             self.handle_post_process_arteries_changed)
 
-        self.tab.vesselFillingMainChannelCheckBox.stateChanged.connect(self.handle_fill_main_channel_changed)
-        self.tab.vesselFillingSecondaryChannelCheckBox.stateChanged.connect(self.handle_fill_secondary_channel_changed)
+        self.tab.rawBinarizationDeepFillingCheckBox.stateChanged.connect(self.handle_fill_main_channel_changed)
+        self.tab.arteriesBinarizationDeepFillingCheckBox.stateChanged.connect(self.handle_fill_secondary_channel_changed)
+
+    @property
+    def run_raw_binarization(self):
+        return self.tab.runRawBinarizationCheckBox.isChecked()
+
+    @run_raw_binarization.setter
+    def run_raw_binarization(self, checked):
+        self.tab.runRawBinarizationCheckBox.setChecked(checked)
+
+    def handle_run_raw_binarization_changed(self, _):
+        self.config['binarization']['raw']['binarization']['run'] = self.run_raw_binarization
 
     @property
     def raw_binarization_clip_range(self):
@@ -1244,8 +1256,8 @@ class VesselBinarizationParams(UiParameter):
     def raw_binarization_clip_range(self, value):
         self.tab.rawBinarizationClipRangeDoublet.setValue(value)
 
-    def handle_raw_binarization_clip_range_changed(self, value):
-        self.config['binarization']['raw']['clip_range'] = self.raw_binarization_clip_range
+    def handle_raw_binarization_clip_range_changed(self, _):
+        self.config['binarization']['raw']['binarization']['clip_range'] = self.raw_binarization_clip_range
 
     @property
     def raw_binarization_threshold(self):
@@ -1255,8 +1267,8 @@ class VesselBinarizationParams(UiParameter):
     def raw_binarization_threshold(self, value):
         self.tab.rawBinarizationThresholdSpinBox.setValue(self.sanitize_nones(value))
 
-    def handle_raw_binarization_treshold_changed(self, value):
-        self.config['binarization']['raw']['threshold'] = self.raw_binarization_threshold
+    def handle_raw_binarization_treshold_changed(self, _):
+        self.config['binarization']['raw']['binarization']['threshold'] = self.raw_binarization_threshold
 
     @property
     def post_process_raw(self):
@@ -1266,8 +1278,8 @@ class VesselBinarizationParams(UiParameter):
     def post_process_raw(self, state):
         self.set_check_state(self.tab.rawBinarizationPostprocessingCheckBox, state)
 
-    def handle_post_process_raw_changed(self, state):
-        self.config['binarization']['raw']['post_process'] = self.post_process_raw
+    def handle_post_process_raw_changed(self, _):
+        self.config['binarization']['raw']['post_processing']['run'] = self.post_process_raw
 
     @property
     def run_arteries_binarization(self):
@@ -1277,8 +1289,8 @@ class VesselBinarizationParams(UiParameter):
     def run_arteries_binarization(self, state):
         self.set_check_state(self.tab.runArteriesBinarizationCheckBox, state)
 
-    def handle_run_arteries_binarization_changed(self, state):
-        self.config['binarization']['arteries']['skip'] = not self.run_arteries_binarization
+    def handle_run_arteries_binarization_changed(self, _):
+        self.config['binarization']['arteries']['binarization']['run'] = self.run_arteries_binarization
 
     @property
     def arteries_binarization_clip_range(self):
@@ -1288,8 +1300,8 @@ class VesselBinarizationParams(UiParameter):
     def arteries_binarization_clip_range(self, value):
         self.tab.arteriesBinarizationClipRangeDoublet.setValue(value)
 
-    def handle_arteries_binarization_clip_range_changed(self, value):
-        self.config['binarization']['arteries']['clip_range'] = self.arteries_binarization_clip_range
+    def handle_arteries_binarization_clip_range_changed(self, _):
+        self.config['binarization']['arteries']['binarization']['clip_range'] = self.arteries_binarization_clip_range
 
     @property
     def arteries_binarization_threshold(self):
@@ -1299,8 +1311,8 @@ class VesselBinarizationParams(UiParameter):
     def arteries_binarization_threshold(self, value):
         self.tab.arteriesBinarizationThresholdSpinBox.setValue(self.sanitize_nones(value))
 
-    def handle_arteries_binarization_threshold_changed(self, value):
-        self.config['binarization']['arteries']['threshold'] = self.arteries_binarization_threshold
+    def handle_arteries_binarization_threshold_changed(self, _):
+        self.config['binarization']['arteries']['binarization']['threshold'] = self.arteries_binarization_threshold
 
     @property
     def post_process_arteries(self):
@@ -1310,30 +1322,30 @@ class VesselBinarizationParams(UiParameter):
     def post_process_arteries(self, state):
         self.set_check_state(self.tab.arteriesBinarizationPostprocessingCheckBox, state)
 
-    def handle_post_process_arteries_changed(self, state):
-        self.config['binarization']['arteries']['post_process'] = self.post_process_arteries
+    def handle_post_process_arteries_changed(self, _):
+        self.config['binarization']['arteries']['post_processing']['run'] = self.post_process_arteries
 
     @property
     def fill_main_channel(self):
-        return self.is_checked(self.tab.vesselFillingMainChannelCheckBox)
+        return self.is_checked(self.tab.rawBinarizationDeepFillingCheckBox)
 
     @fill_main_channel.setter
     def fill_main_channel(self, state):
-        self.set_check_state(self.tab.vesselFillingMainChannelCheckBox, state)
+        self.set_check_state(self.tab.rawBinarizationDeepFillingCheckBox, state)
 
-    def handle_fill_main_channel_changed(self, state):
-        self.config['vessel_filling']['main'] = self.fill_main_channel
+    def handle_fill_main_channel_changed(self, _):
+        self.config['binarization']['raw']['deep_filling']['run'] = self.fill_main_channel
 
     @property
     def fill_secondary_channel(self):
-        return self.is_checked(self.tab.vesselFillingSecondaryChannelCheckBox)
+        return self.is_checked(self.tab.arteriesBinarizationDeepFillingCheckBox)
 
     @fill_secondary_channel.setter
     def fill_secondary_channel(self, state):
-        self.set_check_state(self.tab.vesselFillingSecondaryChannelCheckBox, state)
+        self.set_check_state(self.tab.arteriesBinarizationDeepFillingCheckBox, state)
 
-    def handle_fill_secondary_channel_changed(self, state):
-        self.config['vessel_filling']['secondary'] = self.fill_secondary_channel
+    def handle_fill_secondary_channel_changed(self, _):
+        self.config['binarization']['arteries']['deep_filling']['run'] = self.fill_secondary_channel
 
 
 class VesselGraphParams(UiParameter):
@@ -1341,6 +1353,12 @@ class VesselGraphParams(UiParameter):
     def __init__(self, tab, sample_params=None, preprocessing_params=None, src_folder=None):
         super().__init__(tab, src_folder)
         self.params_dict = {
+            'skeletonize': ['graph_construction', 'skeletonize'],
+            'build': ['graph_construction', 'build'],
+            'clean': ['graph_construction', 'clean'],
+            'reduce': ['graph_construction', 'reduce'],
+            'transform': ['graph_construction', 'transform'],
+            'annotate':  ['graph_construction', 'annotate'],
             'crop_x_min': ['graph_construction', 'slicing', 'dim_0', 0],
             'crop_x_max': ['graph_construction', 'slicing', 'dim_0', 1],
             'crop_y_min': ['graph_construction', 'slicing', 'dim_1', 0],
@@ -1361,6 +1379,13 @@ class VesselGraphParams(UiParameter):
         self.preprocessing_params = preprocessing_params
 
     def connect(self):
+        self.tab.buildGraphSkeletonizeCheckBox.stateChanged.connect(self.handle_skeletonize_changed)
+        self.tab.buildGraphBuildCheckBox.stateChanged.connect(self.handle_build_changed)
+        self.tab.buildGraphCleanCheckBox.stateChanged.connect(self.handle_clean_changed)
+        self.tab.buildGraphReduceCheckBox.stateChanged.connect(self.handle_reduce_changed)
+        self.tab.buildGraphTransformCheckBox.stateChanged.connect(self.handle_transform_changed)
+        self.tab.buildGraphRegisterCheckBox.stateChanged.connect(self.handle_annotate_changed)
+
         self.tab.veinIntensityRangeOnArteriesChannelDoublet.valueChangedConnect(
             self.handle_vein_intensity_range_on_arteries_channel_changed)
         self.tab.restrictiveMinVeinRadiusSpinBox.valueChanged.connect(
@@ -1388,6 +1413,72 @@ class VesselGraphParams(UiParameter):
         self.tab.vesselProcessingSlicerYRangeMax.valueChanged.connect(self.handle_y_val_max_change)
         self.tab.vesselProcessingSlicerZRangeMin.valueChanged.connect(self.handle_z_val_min_change)
         self.tab.vesselProcessingSlicerZRangeMax.valueChanged.connect(self.handle_z_val_max_change)
+
+    @property
+    def skeletonize(self):
+        return self.tab.buildGraphSkeletonizeCheckBox.isChecked()
+    
+    @skeletonize.setter
+    def skeletonize(self, status):
+        self.tab.buildGraphSkeletonizeCheckBox.setChecked(status)
+
+    def handle_skeletonize_changed(self):
+        self._config['graph_construction']['skeletonize'] = self.skeletonize
+    
+    @property
+    def build(self):
+        return self.tab.buildGraphBuildCheckBox.isChecked()
+    
+    @build.setter
+    def build(self, status):
+        self.tab.buildGraphBuildCheckBox.setChecked(status)
+
+    def handle_build_changed(self):
+        self._config['graph_construction']['build'] = self.build
+    
+    @property
+    def clean(self):
+        return self.tab.buildGraphCleanCheckBox.isChecked()
+    
+    @clean.setter
+    def clean(self, status):
+        self.tab.buildGraphCleanCheckBox.setChecked(status)
+
+    def handle_clean_changed(self):
+        self._config['graph_construction']['clean'] = self.clean
+
+    @property
+    def reduce(self):
+        return self.tab.buildGraphReduceCheckBox.isChecked()
+
+    @reduce.setter
+    def reduce(self, status):
+        self.tab.buildGraphReduceCheckBox.setChecked(status)
+
+    def handle_reduce_changed(self):
+        self._config['graph_construction']['reduce'] = self.reduce
+
+    @property
+    def transform(self):
+        return self.tab.buildGraphTransformCheckBox.isChecked()
+
+    @transform.setter
+    def transform(self, status):
+        self.tab.buildGraphTransformCheckBox.setChecked(status)
+
+    def handle_transform_changed(self):
+        self._config['graph_construction']['transform'] = self.transform
+    
+    @property
+    def annotate(self):
+        return self.tab.buildGraphRegisterCheckBox.isChecked()
+    
+    @annotate.setter
+    def annotate(self, status):
+        self.tab.buildGraphRegisterCheckBox.setChecked(status)
+
+    def handle_annotate_changed(self):
+        self._config['graph_construction']['annotate'] = self.annotate
 
     @property
     def ratios(self):
