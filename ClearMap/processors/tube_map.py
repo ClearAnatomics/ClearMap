@@ -38,8 +38,7 @@ from ClearMap.Visualization.Qt import Plot3d as q_p3d
 from ClearMap.Visualization.Vispy import PlotGraph3d as plot_graph_3d  # WARNING: vispy dependency
 
 from ClearMap.gui.dialogs import warning_popup
-from ClearMap.Utils.utilities import is_in_range, get_free_v_ram
-
+from ClearMap.Utils.utilities import is_in_range, get_free_v_ram, requires_files, FilePath
 
 __author__ = 'Christoph Kirst <christoph.kirst.ck@gmail.com>, Sophie Skriabine <sophie.skriabine@icm-institute.org>, Charly Rousseau <charly.rousseau@icm-institute.org>'
 __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE)'
@@ -49,8 +48,9 @@ __download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
 
 
 class BinaryVesselProcessorSteps:
-    def __init__(self, workspace):
+    def __init__(self, workspace, postfix=''):
         self.workspace = workspace
+        self.postfix = postfix
         self.stitched = 'stitched'
         self.binary = 'binary'
         self.postprocessed = 'postprocessed'
@@ -74,22 +74,21 @@ class BinaryVesselProcessorSteps:
     def steps(self):
         return self.stitched, self.binary, self.postprocessed, self.filled, self.combined, self.final
 
-    def path(self, step, step_back=False, n_before=0, arteries=False):
+    def path(self, step, step_back=False, n_before=0):
         if n_before:
             step = self.steps[self.steps.index(step) - n_before]
-        postfix = 'arteries' if arteries else ''
         if step in (self.stitched, self.binary):
-            f_path = self.workspace.filename(step, postfix=postfix)
+            f_path = self.workspace.filename(step, postfix=self.postfix)
         else:
             postfix_base = ''
-            if postfix and step in (self.postprocessed, self.filled):
-                postfix_base = '{}_'.format(postfix)
-            f_path = self.workspace.filename('binary', postfix='{}{}'.format(postfix_base, step))
+            if self.postfix and step in (self.postprocessed, self.filled):
+                postfix_base = f'{self.postfix}_'
+            f_path = self.workspace.filename('binary', postfix=f'{postfix_base}{step}')
         if not os.path.exists(f_path):
             if step_back:
                 f_path = self.path(self.steps[self.steps.index(step) - 1])
             else:
-                raise IndexError('Could not find path {} and not allowed to step back')
+                raise IndexError(f'Could not find path "{f_path}" and not allowed to step back')
         return f_path
 
     # def last_path(self, arteries=False):
@@ -108,7 +107,10 @@ class BinaryVesselProcessor(TabProcessor):
         self.machine_config = None
         self.preprocessor = None
         self.workspace = None
-        self.steps = BinaryVesselProcessorSteps(self.workspace)
+        self.steps = {
+            'raw': BinaryVesselProcessorSteps(self.workspace),
+            'arteries': BinaryVesselProcessorSteps(self.workspace, postfix='arteries'),
+        }
         self.block_re = ('Processing block',
                          re.compile(r'.*?Processing block \d+/\d+.*?\selapsed time:\s\d+:\d+:\d+\.\d+'))
         self.vessel_filling_re = ('Vessel filling',
@@ -120,7 +122,8 @@ class BinaryVesselProcessor(TabProcessor):
         self.preprocessor = preprocessor
         if preprocessor is not None:
             self.workspace = preprocessor.workspace
-            self.steps.workspace = self.workspace
+            for steps in self.steps.values():
+                steps.workspace = self.workspace
             configs = preprocessor.get_configs()
             self.sample_config = configs['sample']
             self.machine_config = configs['machine']
@@ -133,6 +136,29 @@ class BinaryVesselProcessor(TabProcessor):
         overlap = vasculature.default_binarization_processing_parameter['overlap']
         n_blocks = int(np.ceil((dim_size - blk_size) / (blk_size - overlap) + 1))
         return n_blocks
+
+    def binarize(self):  # TODO: check real n blocks for post_processing
+        # Raw
+        self.binarize_channel('raw')
+        if not self.processing_config['binarization']['binarization']['arteries']['skip']:
+            self.binarize_channel('arteries')
+
+    def binarize_channel(self, channel):
+        binarization_cfg = self.processing_config['binarization']['binarization']
+        postfix = channel if channel == 'arteries' else None
+
+        n_blocks = self.get_n_blocks(self.workspace.source('stitched', postfix=postfix).shape[2])
+        self.prepare_watcher_for_substep(n_blocks, self.block_re, f'{channel.title()} binarization',
+                                         channel == 'arteries')
+
+        self._binarize(self.machine_config['n_processes_binarization'],
+                       binarization_cfg[channel]['clip_range'],
+                       binarization_cfg[channel]['threshold'], postfix=postfix)
+        self.steps[channel].last_step = self.steps[channel].binary
+        self.prepare_watcher_for_substep(n_blocks, self.block_re, f'{channel.title()} postprocessing', True)
+        if binarization_cfg[channel]['post_process']:
+            self._smooth_and_fill(postfix)
+            self.steps[channel].last_step = self.steps[channel].postprocessed
 
     def _binarize(self, n_processes, clip_range, deconvolve_threshold, postfix=''):
         """
@@ -187,42 +213,15 @@ class BinaryVesselProcessor(TabProcessor):
 
         # q_p3d.plot([[source, sink]])  FIXME:
 
-    def binarize(self):  # TODO: check real n blocks for post_processing
-        # Raw
-        binarization_cfg = self.processing_config['binarization']['binarization']
-        n_blocks = self.get_n_blocks(self.workspace.source('stitched').shape[2])
-        self.prepare_watcher_for_substep(n_blocks, self.block_re, 'Raw binarization', False)
-        self._binarize(self.machine_config['n_processes_binarization'],
-                       binarization_cfg['raw']['clip_range'],
-                       binarization_cfg['raw']['threshold'])
-        self.steps.last_step = self.steps.binary
-        self.prepare_watcher_for_substep(n_blocks, self.block_re, 'Raw postprocessing', True)
-        if binarization_cfg['raw']['post_process']:
-            self._smooth_and_fill()
-            self.steps.last_step = self.steps.postprocessed
-
-        if not binarization_cfg['arteries']['skip']:
-            n_blocks = self.get_n_blocks(self.workspace.source('stitched', postfix='arteries').shape[2])
-            self.prepare_watcher_for_substep(n_blocks, self.block_re, 'Arteries binarization', True)
-            self._binarize(self.machine_config['n_processes_binarization'],
-                           binarization_cfg['arteries']['clip_range'],
-                           binarization_cfg['arteries']['threshold'], postfix='arteries')
-            self.prepare_watcher_for_substep(n_blocks, self.block_re, 'Arteries postprocessing', True)
-            if binarization_cfg['arteries']['post_process']:
-                self._smooth_and_fill('arteries')
-
     def _fill_vessels(self, size_max, overlap, postfix_base='', resample_factor=1):
         if postfix_base:
             postfix_base += '_'
-        source = self.workspace.filename('binary', postfix='{}postprocessed'.format(postfix_base))
-        sink = self.workspace.filename('binary', postfix='{}filled'.format(postfix_base))
+        source = self.workspace.filename('binary', postfix=f'{postfix_base}postprocessed')
+        sink = self.workspace.filename('binary', postfix=f'{postfix_base}filled')
         # clearmap_io.delete_file(sink)
 
         processing_parameter = copy.deepcopy(vessel_filling.default_fill_vessels_processing_parameter)
-        processing_parameter.update(size_max=size_max,
-                                    size_min='fixed',
-                                    axes=all,
-                                    overlap=overlap)
+        processing_parameter.update(size_max=size_max, size_min='fixed', axes=all, overlap=overlap)
 
         vessel_filling.fill_vessels(source, sink, resample=resample_factor, threshold=0.5,
                                     cuda=True, processing_parameter=processing_parameter, verbose=True)
@@ -230,7 +229,7 @@ class BinaryVesselProcessor(TabProcessor):
     def plot_vessel_filling_results(self, parent=None, postfix_base='', arrange=False):
         if postfix_base:
             postfix_base += '_'
-        images = [(self.steps.path(self.steps.postprocessed, step_back=True)),
+        images = [(self.steps['raw'].path(self.steps['raw'].postprocessed, step_back=True)),
                   (self.workspace.filename('binary', postfix='{}filled'.format(postfix_base)))]
         titles = [os.path.basename(img) for img in images]
         return q_p3d.plot(images, title=titles, arrange=arrange,
@@ -238,7 +237,7 @@ class BinaryVesselProcessor(TabProcessor):
 
     def fill_vessels(self):
         if not get_free_v_ram() > 22000:
-            warning_popup('Insufficient VRAM',
+            warning_popup('Insufficient VRAM',  # FIXME: raise ClearMapVRamException
                           'You do not have enough free memory on your graphics card to'
                           'run this operation. This step needs 22GB VRAM, {} were found.'
                           'Please free some or upgrade your hardware.'.format(get_free_v_ram()))
@@ -246,15 +245,15 @@ class BinaryVesselProcessor(TabProcessor):
         if self.processing_config['binarization']['vessel_filling']['main']:
             self.prepare_watcher_for_substep(1200, self.vessel_filling_re, 'Filling main channel', True)  # FIXME: compute max
             self._fill_vessels(500, 50)  # FIXME: extact numbers
-            self.steps.last_step = self.steps.filled
+            self.steps['raw'].last_step = self.steps['raw'].filled
         if not self.processing_config['binarization']['binarization']['arteries']['skip'] and \
                 self.processing_config['binarization']['vessel_filling']['secondary']:
             self.prepare_watcher_for_substep(1200, self.vessel_filling_re, 'Filling secondary channel', True)  # FIXME: compute max
             self._fill_vessels(1000, 100, 'arteries', resample_factor=2)   # FIXME: extact numbers
 
     def plot_combined(self, parent=None, arrange=False):  # TODO: final or not option
-        raw = self.steps.path(self.steps.filled, step_back=True)
-        combined = self.steps.path(self.steps.combined)
+        raw = self.steps['raw'].path(self.steps['raw'].filled, step_back=True)
+        combined = self.steps['raw'].path(self.steps['raw'].combined)
         if not self.processing_config['binarization']['binarization']['arteries']['skip']:
             arteries_filled = self.workspace.filename('binary', postfix='arteries_filled')
             dvs = q_p3d.plot([raw, arteries_filled, combined], title=['Raw', 'arteries', 'combined'],
@@ -273,7 +272,7 @@ class BinaryVesselProcessor(TabProcessor):
             block_processing.process(np.logical_or, [source, source_arteries], sink,
                                      size_max=500, overlap=0, processes=None, verbose=True)
         else:
-            source = self.steps.path(self.steps.filled, step_back=True)
+            source = self.steps['raw'].path(self.steps['raw'].filled, step_back=True)
             clearmap_io.copy_file(source, sink)
 
         # POST_PROCESS
@@ -302,6 +301,7 @@ class VesselGraphProcessor(TabProcessor):
     """
     def __init__(self, preprocessor=None):
         super().__init__()
+        self.graph_raw = None
         self.graph_cleaned = None
         self.graph_reduced = None
         self.annotated_graph = None
@@ -328,10 +328,15 @@ class VesselGraphProcessor(TabProcessor):
         self.post_process()
 
     def pre_process(self):
-        self.build_graph()  # WARNING: optional steps
-        self.clean_graph()  # WARNING: optional steps
-        self.reduce_graph()  # WARNING: optional steps
-        self.register()
+        graph_cfg = self.processing_config['graph_construction']
+        if graph_cfg['build'] or graph_cfg['skeletonize']:
+            self.build_graph()
+        if graph_cfg['clean']:
+            self.clean_graph()
+        if graph_cfg['reduce']:
+            self.reduce_graph()
+        if graph_cfg['transform'] or graph_cfg['annotate']:
+            self.register()
 
     def _measure_radii(self):
         coordinates = self.graph_raw.vertex_coordinates()
@@ -359,19 +364,27 @@ class VesselGraphProcessor(TabProcessor):
                                                            radii_measure, method='max')
         self.graph_raw.define_vertex_property('artery_raw', np.asarray(expression.array, dtype=float))
 
+    @requires_files([FilePath('skeleton')])
     def build_graph(self):
-        binary = self.workspace.filename('binary', postfix='final')
         skeleton = self.workspace.filename('skeleton')
-        skeletonization.skeletonize(binary, sink=skeleton, delete_border=True, verbose=True)
-        graph_raw = graph_processing.graph_from_skeleton(self.workspace.filename('skeleton'), verbose=True)
-        self.graph_raw = graph_raw
-        # p3d.plot_graph_line(graph_raw)
-        self._measure_radii()
-        if not self.processing_config['binarization']['binarization']['arteries']['skip']:
-            self._set_artery_binary()
-            self._set_arteriness()
-        graph_raw.save(self.workspace.filename('graph', postfix='raw'))
+        self.skeletonize(skeleton)
+        if self.processing_config['graph_construction']['build']:
+            graph_raw = graph_processing.graph_from_skeleton(skeleton, verbose=True)
+            self.graph_raw = graph_raw
+            # p3d.plot_graph_line(graph_raw)
+            self._measure_radii()
+            if not self.processing_config['binarization']['binarization']['arteries']['skip']:
+                self._set_artery_binary()
+                self._set_arteriness()
+            graph_raw.save(self.workspace.filename('graph', postfix='raw'))
 
+    @requires_files([FilePath('binary', postfix='final')])
+    def skeletonize(self, skeleton):
+        if self.processing_config['graph_construction']['skeletonize']:
+            binary = self.workspace.filename('binary', postfix='final')
+            skeletonization.skeletonize(binary, sink=skeleton, delete_border=True, verbose=True)
+
+    @requires_files([FilePath('graph', postfix='raw')])
     def clean_graph(self):
         """
         Remove spurious data e.g. outliers ...
@@ -389,10 +402,13 @@ class VesselGraphProcessor(TabProcessor):
                 'artery_binary': np.max,
                 'artery_raw': np.max
             })
+        if self.graph_raw is None:
+            self.graph_raw = clearmap_io.read(self.workspace.filename('graph', postfix='raw'))
         graph_cleaned = graph_processing.clean_graph(self.graph_raw, vertex_mappings=vertex_mappings, verbose=True)
         graph_cleaned.save(self.workspace.filename('graph', postfix='cleaned'))
-        self.graph_cleaned = graph_cleaned  # OPTIMISE: check if necessary to have attribute or better to reload
+        self.graph_cleaned = graph_cleaned
 
+    @requires_files([FilePath('graph', postfix='cleaned')])
     def reduce_graph(self):
         """
         Simplify straight segments between branches
@@ -410,6 +426,8 @@ class VesselGraphProcessor(TabProcessor):
                 'artery_binary': vote,
                 'artery_raw': np.max})
             edge_geometry_vertex_properties.extend(['artery_binary', 'artery_raw'])
+        if self.graph_cleaned is None:
+            self.graph_cleaned = clearmap_io.read(self.workspace.filename('graph', postfix='cleaned'))
         graph_reduced = graph_processing.reduce_graph(self.graph_cleaned, edge_length=True,
                                                       edge_to_edge_mappings={'length': np.sum},
                                                       vertex_to_edge_mappings=vertex_edge_mappings,
@@ -535,10 +553,14 @@ class VesselGraphProcessor(TabProcessor):
         distance_to_surface_edge = np.array([np.min(d) for d in distance_to_surface])
         self.graph_reduced.define_edge_property('distance_to_surface', distance_to_surface_edge)
 
+    @requires_files([FilePath('graph', postfix='reduced')])
     def register(self):
-        self._transform()
+        if self.graph_reduced is None:
+            self.graph_reduced = clearmap_io.read(self.workspace.filename('graph', postfix='reduced'))
+        if self.processing_config['graph_construction']['transform']:
+            self._transform()
         self._scale()
-        if self.preprocessor.was_registered:
+        if self.preprocessor.was_registered and self.processing_config['graph_construction']['annotate']:
             self._annotate()
             self._compute_distance_to_surface()
         annotated_graph = self.graph_reduced.largest_component()  # TODO: explanation
@@ -546,6 +568,7 @@ class VesselGraphProcessor(TabProcessor):
         self.annotated_graph = annotated_graph
 
     # POST PROCESS
+    @requires_files([FilePath('graph', postfix='annotated')])
     def _pre_filter_veins(self, vein_intensity_range_on_arteries_channel, min_vein_radius):
         """
         Filter veins based on radius and intensity in arteries channel
@@ -559,7 +582,7 @@ class VesselGraphProcessor(TabProcessor):
         -------
 
         """
-        if self.annotated_graph is None:  # FIXME: do similar loading wherever required
+        if self.annotated_graph is None:
             self.annotated_graph = graph_gt.load(self.workspace.filename('graph', postfix='annotated'))
         is_in_vein_range = is_in_range(self.annotated_graph.edge_property('artery_raw'),
                                        vein_intensity_range_on_arteries_channel)

@@ -72,7 +72,8 @@ update_pbar(app, progress_bar, 20)
 from ClearMap.Utils.utilities import title_to_snake, get_percent_v_ram_use, gpu_util
 from ClearMap.gui.gui_logging import Printer
 from ClearMap.config.config_loader import ConfigLoader
-from ClearMap.gui.params import ConfigNotFoundError, UiParameterCollection, UiParameter
+from ClearMap.Utils.exceptions import ConfigNotFoundError
+from ClearMap.gui.params_interfaces import UiParameter, UiParameterCollection
 from ClearMap.gui.widget_monkeypatch_callbacks import get_value, set_value, controls_enabled, get_check_box, \
     enable_controls, disable_controls, set_text, get_text, connect_apply, connect_close, connect_save, connect_open, \
     connect_ok, connect_cancel, connect_value_changed, connect_text_changed
@@ -239,8 +240,9 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
                 if widget_type == QComboBox:
                     widget.setStyleSheet(COMBOBOX_STYLE_SHEET)
 
-    def popup(self, msg, base_msg='Missing configuration file'):
-        self.print_warning_msg(html_to_plain_text(msg))
+    def popup(self, msg, base_msg='Missing configuration file', print_warning=True):
+        if print_warning:
+            self.print_warning_msg(html_to_plain_text(msg))
         return warning_popup(base_msg, msg)
 
     def file_exists(self, f_path):

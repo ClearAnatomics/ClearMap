@@ -133,7 +133,7 @@ class RedCross(pg.GraphicsObject):
         if coords is None:
             coords = [0, 0]
         self.size = size
-        self._rect = QRectF(coords[0]-self.size[0]/2, coords[1]-self.size[1]/2, self.size[0], self.size[1])  # TODO@ set as fraction of image size
+        self._rect = QRectF(coords[0]-self.size[0]/2, coords[1]-self.size[1]/2, self.size[0], self.size[1])  # TODO set as fraction of image size
         self.coords = coords
         self.picture = QtGui.QPicture()
 

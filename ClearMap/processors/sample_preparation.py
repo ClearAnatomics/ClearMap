@@ -18,7 +18,7 @@ import tifffile
 matplotlib.use('Qt5Agg')
 
 
-from ClearMap.Utils.utilities import runs_on_ui
+from ClearMap.Utils.utilities import runs_on_ui, requires_files, FilePath
 from ClearMap.config.atlas import ATLAS_NAMES_MAP, STRUCTURE_TREE_NAMES_MAP
 from ClearMap.gui.gui_utils import TmpDebug  # REFACTOR: move to workspace object
 from ClearMap.processors.generic_tab_processor import TabProcessor, CanceledProcessing
@@ -334,6 +334,7 @@ class PreProcessor(TabProcessor):
     def n_rigid_steps_to_run(self):
         return int(not self.processing_config['stitching']['rigid']['skip'])
 
+    @requires_files([FilePath('raw')])
     def stitch_rigid(self, force=False):
         if force:
             self.stopped = False
@@ -368,14 +369,13 @@ class PreProcessor(TabProcessor):
         stitching_rigid.save_layout(self.filename('layout', postfix='aligned_axis'), layout)
         self.layout = layout
 
+    @requires_files([FilePath('raw')])  # TODO: optional requires npy
     def get_wobbly_layout(self, overlaps=None):
         if overlaps is None:
             overlaps, projection_thickness = define_auto_stitching_params(self.workspace.source('raw').file_list[0],
                                                                           self.processing_config['stitching'])
-        if self.use_npy():
-            raw_path = self.filename('raw', extension='npy')
-        else:
-            raw_path = self.filename('raw')
+        extension = 'npy' if self.use_npy() else None  # TODO: optional requires
+        raw_path = self.filename('raw', extension=extension)
         layout = stitching_wobbly.WobblyLayout(expression=raw_path, tile_axes=['X', 'Y'], overlaps=overlaps)
         return layout
 
