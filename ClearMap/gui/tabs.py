@@ -21,6 +21,7 @@ import ClearMap.IO.IO as clearmap_io
 from ClearMap.IO.MHD import mhd_read
 from ClearMap.Alignment import Annotation as annotation
 from ClearMap.Analysis.Statistics.group_statistics import make_summary, density_files_are_comparable, compare_groups
+from ClearMap.Utils.exceptions import MissingRequirementException
 from ClearMap.Visualization.Matplotlib.PlotUtils import plot_sample_stats_histogram, plot_volcano
 from ClearMap.Visualization.atlas import create_color_annotation
 
@@ -148,15 +149,20 @@ class GenericTab(GenericUi):
                 n_steps = 0
             self.main_window.make_progress_dialog(task_name, n_steps=n_steps, abort=abort_func)
 
-        self.main_window.wrap_in_thread(func, *step_args, **step_kw_args)
-        if self.preprocessor is not None and self.preprocessor.workspace is not None:  # WARNING: hacky
-            self.preprocessor.workspace.executor = None
-        if close_when_done:
-            self.progress_watcher.finish()
-        else:
-            msg = f'{self.progress_watcher.main_step_name} finished'
-            self.main_window.print_status_msg(msg)
-            self.main_window.log_progress(f'    : {msg}')
+        try:
+            self.main_window.wrap_in_thread(func, *step_args, **step_kw_args)
+        except MissingRequirementException as ex:
+            self.main_window.print_error_msg(ex)
+            self.main_window.popup(str(ex), base_msg=f'Could not run operation {func.__name__}', print_warning=False)
+        finally:
+            if self.preprocessor is not None and self.preprocessor.workspace is not None:  # WARNING: hacky
+                self.preprocessor.workspace.executor = None
+            if close_when_done:
+                self.progress_watcher.finish()
+            else:
+                msg = f'{self.progress_watcher.main_step_name} finished'
+                self.main_window.print_status_msg(msg)
+                self.main_window.log_progress(f'    : {msg}')
 
 
 class PostProcessingTab(GenericTab):
@@ -208,6 +214,7 @@ class PreferenceUi(GenericDialog):
 
     def setup(self, font_size):
         self.init_ui()
+        self.ui.setMinimumHeight(700)  # FIXME: adapt to screen resolution
 
         self.setup_preferences()
 
@@ -688,11 +695,11 @@ class CellCounterTab(PostProcessingTab):
 
     def plot_cells_scatter_w_atlas_colors(self):
         if self.preprocessor.was_registered:
-            requirement_paths = [self.preprocessor.reference_file_path]
+            required_paths = [self.preprocessor.reference_file_path]
         else:
-            requirement_paths = [self.preprocessor.filename('resampled')]
-        requirement_paths.append(self.cell_detector.df_path)
-        if not self.step_exists('cell count', requirement_paths):
+            required_paths = [self.preprocessor.filename('resampled')]
+        required_paths.append(self.cell_detector.df_path)
+        if not self.step_exists('cell count', required_paths):
             return
         dvs = self.cell_detector.plot_cells_3d_scatter_w_atlas_colors(parent=self.main_window)
         self.main_window.setup_plots(dvs)
@@ -779,19 +786,13 @@ class VasculatureTab(PostProcessingTab):
 
         self.connect_whats_this(self.ui.binarizationRawClippingRangeInfoToolButton, self.ui.binarizationRawClippingRangeLbl)
         self.connect_whats_this(self.ui.binarizationRawThresholdInfoToolButton, self.ui.binarizationRawThresholdLbl)
+        self.connect_whats_this(self.ui.binarizationRawDeepFillingInfoToolButton, self.ui.rawBinarizationDeepFillingCheckBox)
+        self.ui.binarizeVesselsPushButton.clicked.connect(self.binarize_vessels)
         self.connect_whats_this(self.ui.binarizationArteriesClippingRangeInfoToolButton, self.ui.binarizationArteriesClippingRangeLbl)
         self.connect_whats_this(self.ui.binarizationArteriesThresholdInfoToolButton, self.ui.binarizationArteriesThresholdLbl)
-        self.ui.binarizationButtonBox.connectApply(self.binarize_vessels)
-        self.ui.plotBinarizationButtonBox.connectApply(self.plot_binarization_results)
-
-        self.ui.fillVesselsButtonBox.connectApply(self.fill_vessels)
-        self.connect_whats_this(self.ui.fillVesselsButtonBoxInfoToolButton, self.ui.fillVesselsButtonBox)
-        self.ui.plotFillVesselsButtonBox.connectApply(self.plot_vessel_filling_results)
-        self.ui.plotFillVesselsButtonBox.connectClose(self.main_window.remove_old_plots)
-
-        self.ui.binarizationCombineRunButton.connectApply(self.combine)
-        self.ui.binarizationCombinePlotButton.connectApply(self.plot_combined)
-        self.ui.binarizationCombinePlotButton.connectClose(self.main_window.remove_old_plots)
+        self.connect_whats_this(self.ui.binarizationArteriesDeepFillingInfoToolButton, self.ui.arteriesBinarizationDeepFillingCheckBox)
+        self.ui.binarizeArteriesPushButton.clicked.connect(self.binarize_arteries)
+        self.ui.binarizationCombinePushButton.clicked.connect(self.combine)
 
         self.ui.buildGraphButtonBox.connectApply(self.build_graph)
         self.connect_whats_this(self.ui.buildGraphButtonBoxInfoToolButton, self.ui.buildGraphButtonBox)
@@ -822,7 +823,7 @@ class VasculatureTab(PostProcessingTab):
 
         self.ui.voxelizeGraphPushButton.clicked.connect(self.voxelize)
         self.ui.plotGraphVoxelizationPushButton.clicked.connect(self.plot_voxelization)
-
+        self.ui.runAllVasculaturePushButton.clicked.connect(self.run_all)
 
     def set_progress_watcher(self, watcher):
         if self.binary_vessel_processor is not None and self.binary_vessel_processor.preprocessor is not None:
@@ -837,8 +838,16 @@ class VasculatureTab(PostProcessingTab):
         n_steps += self.params.binarization_params.post_process_arteries
         return n_steps
 
-    def binarize_vessels(self):
+    def binarize_all(self):
         self.wrap_step('Vessel binarization', self.binary_vessel_processor.binarize,
+                       abort_func=self.binary_vessel_processor.stop_process)
+
+    def binarize_vessels(self):
+        self.wrap_step('Vessel binarization', self.binary_vessel_processor.binarize_channel, step_args=['raw'],
+                       abort_func=self.binary_vessel_processor.stop_process)
+
+    def binarize_arteries(self):
+        self.wrap_step('Vessel binarization', self.binary_vessel_processor.binarize_channel, step_args=['arteries'],
                        abort_func=self.binary_vessel_processor.stop_process)
 
     def plot_binarization_results(self):
@@ -916,6 +925,15 @@ class VasculatureTab(PostProcessingTab):
 
     def plot_voxelization(self):
         self.vessel_graph_processor.plot_voxelization(self.main_window.centralWidget())
+
+    def run_all(self):
+        self.binarize_all()
+        self.fill_vessels()
+        self.combine()
+        self.build_graph()
+        self.post_process_graph()
+        self.voxelize()
+
 
 ################################################################################################
 
