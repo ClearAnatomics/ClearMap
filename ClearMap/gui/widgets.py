@@ -159,6 +159,7 @@ class ProgressWatcher(QWidget):  # Inspired from https://stackoverflow.com/a/662
     max_changed = QtCore.pyqtSignal(int)
 
     finished = QtCore.pyqtSignal(str)
+    aborted = QtCore.pyqtSignal(bool)  # FIXME: use
 
     def __init__(self, max_progress=100, main_max_progress=1, parent=None):
         super().__init__(parent)
@@ -705,13 +706,13 @@ class SamplePickerDialog(WizardDialog):
         self.group_paths = [[]]
         self.current_group = 1
         for i in range(self.params.n_groups - 1):
-            self.handle_add_group()
+            self.handle_add_group(add_to_params=False)
         self.list_selection = TwoListSelection()
         self.dlg.listPickerLayout.addWidget(self.list_selection)
 
     def connect_buttons(self):
         self.dlg.mainFolderPushButton.clicked.connect(self.handle_main_folder_clicked)
-        self.dlg.addGroupPushButton.clicked.connect(self.handle_add_group)
+        self.dlg.addGroupPushButton.clicked.connect(functools.partial(self.handle_add_group, add_to_params=True))
         self.dlg.groupsComboBox.currentIndexChanged.connect(self.handle_group_changed)
         self.dlg.buttonBox.accepted.connect(self.apply_changes)
         self.dlg.buttonBox.rejected.connect(self.dlg.close)
@@ -737,8 +738,10 @@ class SamplePickerDialog(WizardDialog):
     def update_current_group_paths(self):
         self.group_paths[self.current_group - 1] = self.list_selection.get_right_elements()
 
-    def handle_add_group(self):
+    def handle_add_group(self, add_to_params=True):
         self.dlg.groupsComboBox.addItem(f'{self.dlg.groupsComboBox.count() + 1}')
+        if add_to_params:
+            self.params.add_group()
         self.group_paths.append([])
 
     def handle_main_folder_clicked(self):

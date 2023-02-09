@@ -131,69 +131,6 @@ def read_group(sources, combine=True, **args):
         return group
 
 
-def color_p_values(p_vals, p_sign, positive_color=[1, 0], negative_color=[0, 1], p_cutoff=None,
-                   positive_trend=[0, 0, 1, 0], negative_trend=[0, 0, 0, 1], p_max=None):
-    """
-
-    Parameters
-    ----------
-    p_vals np.array:
-    p_sign np.array:
-    positive list:
-    negative list:
-    pcutoff float:
-    positivetrend list:
-    negativetrend list:
-    pmax float:
-
-    Returns
-    -------
-
-    """
-    if p_max is None:
-        p_max = p_vals.max()
-    p_vals_inv = p_max - p_vals
-
-    if p_cutoff is None:  # color given p values
-        if len(positive_color) != len(negative_color):
-            raise ValueError(f'Length of positive and negative colors do not match, '
-                             f'got {len(positive_color)} and {len(negative_color)}')
-        d = len(positive_color)  # 3D
-        output_shape = p_vals.shape + (d,)  # 3D + color
-        colored_p_vals = np.zeros(output_shape)
-
-        # color
-        for neg, col in ((False, positive_color), (True, negative_color)):
-            ids = p_sign > 0
-            if neg:
-                ids = np.logical_not(ids)
-            p_vals_i = p_vals_inv[ids]
-            for i in range(len(col)):
-                colored_p_vals[ids, i] = p_vals_i * col[i]
-    else:  # split p_values according to cutoff
-        if any([len(positive_color) != len(v) for v in (negative_color, positive_trend, negative_trend)]):
-            raise ValueError('color_p_values: positive, negative, positive_trend and '
-                             'negative_trend option must be equal length !')
-        output_shape = p_vals.shape + (len(positive_color),)
-        colored_p_vals = np.zeros(output_shape)
-
-        idc = p_vals < p_cutoff
-        ids = p_sign > 0
-        # significant positive, non sig positive, sig neg, non sig neg
-        for id_sign, idc_sign, w in ((1, 1, positive_color), (1, -1, positive_trend),
-                                     (-1, 1, negative_color), (-1, -1, negative_trend)):
-            if id_sign < 0:
-                ids = np.logical_not(ids)
-            if idc_sign < 0:
-                idc = np.logical_not(idc)
-            ii = np.logical_and(ids, idc)
-            p_vals_i = p_vals_inv[ii]
-            for i in range(len(w)):
-                colored_p_vals[ii, i] = p_vals_i * w[i]
-
-    return colored_p_vals
-
-
 def weights_from_precentiles(intensities, percentiles=[25, 50, 75, 100]):
     perc = np.percentiles(intensities, percentiles)
     weights = np.zeros(intensities.shape)
@@ -324,9 +261,81 @@ def average_voxelization_groups(stacked_voxelizations, directory, suffix):
     clearmap_io.write(os.path.join(directory, f'avg_density_{suffix}.tif'), avg_voxelization)
 
 
+def __validate_colors(positive_color, negative_color):
+    if len(positive_color) != len(negative_color):
+        raise ValueError(f'Length of positive and negative colors do not match, '
+                         f'got {len(positive_color)} and {len(negative_color)}')
+
+
+def color_p_values(p_vals, p_sign, positive_color=[1, 0], negative_color=[0, 1], p_cutoff=None,
+                   positive_trend=[0, 0, 1, 0], negative_trend=[0, 0, 0, 1], p_max=None):
+    """
+
+    Parameters
+    ----------
+    p_vals np.array:
+    p_sign np.array:
+    positive list:
+    negative list:
+    p_cutoff float:
+    positive_trend list:
+    negative_trend list:
+    p_max float:
+
+    Returns
+    -------
+
+    """
+    if p_max is None:
+        p_max = p_vals.max()
+
+    p_vals_inv = p_max - p_vals
+
+    if p_cutoff is None:  # color given p values
+        __validate_colors(positive_color, negative_color)
+
+        # 3D + color output array
+        d = len(positive_color)  # 3D
+        output_shape = p_vals.shape + (d,)  # 3D + color
+        colored_p_vals = np.zeros(output_shape)
+
+        # coloring
+        for neg, col in ((False, positive_color), (True, negative_color)):
+            if neg:
+                ids = p_sign < 0
+            else:
+                ids = p_sign > 0
+            p_vals_i = p_vals_inv[ids]
+            for i, channel_value in enumerate(col):  # [i] on R, G, B components
+                colored_p_vals[ids, i] = p_vals_i * channel_value
+    # else:  # split p_values according to cutoff
+    #     if any([len(positive_color) != len(v) for v in (negative_color, positive_trend, negative_trend)]):
+    #         raise ValueError('color_p_values: positive, negative, positive_trend and '
+    #                          'negative_trend option must be equal length !')
+    #     output_shape = p_vals.shape + (len(positive_color),)
+    #     colored_p_vals = np.zeros(output_shape)
+    #
+    #     idc = p_vals < p_cutoff
+    #     ids = p_sign > 0
+    #     # significant positive, non sig positive, sig neg, non sig neg
+    #     for id_sign, idc_sign, w in ((1, 1, positive_color), (1, -1, positive_trend),
+    #                                  (-1, 1, negative_color), (-1, -1, negative_trend)):
+    #         if id_sign < 0:
+    #             ids = np.logical_not(ids)
+    #         if idc_sign < 0:
+    #             idc = np.logical_not(idc)
+    #         ii = np.logical_and(ids, idc)
+    #         p_vals_i = p_vals_inv[ii]
+    #         for i in range(len(w)):
+    #             colored_p_vals[ii, i] = p_vals_i * w[i]
+
+    return colored_p_vals
+
+
 def get_colored_p_vals(p_vals, t_vals, significance, color_names):
-    p_vals2_f, p_sign_f = get_p_vals_f(p_vals, t_vals, significance)
-    return color_p_values(p_vals2_f, p_sign_f,
+    p_vals_f = np.clip(p_vals, None, significance)
+    p_sign = np.sign(t_vals)
+    return color_p_values(p_vals_f, p_sign,
                           positive_color=colors[color_names[0]],
                           negative_color=colors[color_names[1]])
 
@@ -341,10 +350,10 @@ def dirs_to_density_files(directory, f_list):
     return out
 
 
-def get_p_vals_f(p_vals, t_vals, p_cutoff):
-    p_vals2 = np.clip(p_vals, None, p_cutoff)
-    p_sign = np.sign(t_vals)
-    return p_vals2, p_sign
+# def get_p_vals_f(p_vals, t_vals, p_cutoff):
+#     p_vals2 = np.clip(p_vals, None, p_cutoff)
+#     p_sign = np.sign(t_vals)
+#     return p_vals2, p_sign
 
 
 def group_cells_counts(struct_ids, group_cells_dfs, sample_ids, volume_map):
@@ -507,8 +516,10 @@ def compare_groups(directory, gp1_name, gp2_name, gp1_dirs, gp2_dirs, prefix='p_
     return colored_p_vals
 
 
-# def test_completed_cumulatives_in_spheres(points1, intensities1, points2, intensities2, shape = ano.default_annotation_file, radius = 100, method = 'AndresonDarling'):
-#   """Performs completed cumulative distribution tests for each pixel using points in a ball centered at that cooridnates, returns 4 arrays p value, statistic value, number in each group"""
+# def test_completed_cumulatives_in_spheres(points1, intensities1, points2, intensities2,
+# shape=ano.default_annotation_file, radius = 100, method = 'AndresonDarling'):
+#   """Performs completed cumulative distribution tests for each pixel using points in a ball
+#   centered at that cooridnates, returns 4 arrays p value, statistic value, number in each group"""
 #
 #   # TODO: simple implementation -> slow -> speed up
 #   if not isinstance(shape, tuple):

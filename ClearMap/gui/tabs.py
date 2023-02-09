@@ -1028,11 +1028,17 @@ class BatchTab(GenericTab):
             self.main_window.wrap_in_thread(compare_groups, self.params.results_folder,
                                                   gp1_name, gp2_name, gp1, gp2)
             self.main_window.progress_watcher.increment_main_progress()
-            p_val_path = os.path.join(self.params.results_folder, f'p_val_colors_{gp1_name}_{gp2_name}.tif')
-            # Reread because of cm_io orientation
-            p_vals_imgs.append(clearmap_io.read(p_val_path))
-
         self.main_window.signal_process_finished()
+
+    def plot_p_vals(self):
+        self.main_window.print_status_msg('Plotting p_val maps')
+        p_vals_imgs = []
+        for pair in self.params.selected_comparisons:  # TODO: Move to processor object to be wrapped
+            gp1_name, gp2_name = pair
+            # Reread because of cm_io orientation
+            p_val_path = os.path.join(self.params.results_folder, f'p_val_colors_{gp1_name}_{gp2_name}.tif')
+
+            p_vals_imgs.append(clearmap_io.read(p_val_path))
 
         pre_proc = init_preprocessor(os.path.join(self.params.results_folder,
                                                   self.params.groups[self.params.selected_comparisons[0][0]][0]))
@@ -1051,6 +1057,7 @@ class BatchTab(GenericTab):
             images = p_vals_imgs
             titles = [f'{gp1_name} vs {gp2_name} p values' for gp1_name, gp2_name in self.params.selected_comparisons]
             luts = None
+            min_maxes = None
         dvs = plot_3d.plot(images, title=titles, arrange=False, sync=True,
                            lut=luts, min_max=min_maxes,
                            parent=self.main_window.centralWidget())

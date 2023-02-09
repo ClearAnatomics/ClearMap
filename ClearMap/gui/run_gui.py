@@ -110,7 +110,6 @@ Analysis:
 LATER:
 Auto modes:
     - Run all
-    - Batch run
 """
 
 Ui_ClearMapGui, _ = loadUiType(os.path.join(UI_FOLDER, 'creator', 'mainwindow.ui'), from_imports=True,
