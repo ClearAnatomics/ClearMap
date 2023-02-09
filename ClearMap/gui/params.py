@@ -237,7 +237,6 @@ class RigidStitchingParams(UiParameter):
 
     def connect(self):
         self.tab.projectionThicknessDoublet.valueChangedConnect(self.handle_projection_thickness_changed)
-        self.tab.rigidBackgroundPixels.valueChanged.connect(self.handle_background_pixels_changed)
         self.connect_simple_widgets()
 
     @property
@@ -254,7 +253,7 @@ class RigidStitchingParams(UiParameter):
         self.tab.projectionThicknessDoublet.setValue(thickness)
 
     def handle_projection_thickness_changed(self):
-        self.config['projection_thickness'] = self.projection_thickness
+        self.config['project_thickness'] = self.projection_thickness
 
 
 class WobblyStitchingParams(UiParameter):
@@ -313,7 +312,6 @@ class GeneralStitchingParams(UiParameter):
 
     def connect(self):
         self.tab.skipOutputConversioncheckBox.stateChanged.connect(self.handle_convert_output_changed)
-        self.tab.outputConversionFormat.currentTextChanged.connect(self.handle_conversion_fmt_changed)
         self.connect_simple_widgets()
 
     @property
@@ -348,7 +346,7 @@ class RegistrationParams(UiParameter):
             'atlas_resolution': ['resampling', 'raw_sink_resolution'],
             'atlas_id': ['atlas', 'id'],
             'structure_tree_id': ['atlas', 'structure_tree_id'],
-            'atlas_folder': ParamLink(['atlas', 'align_files_folder'], self.tab.atlasFolderPath), # FIXME: ensure that set correctly by picking
+            'atlas_folder': ParamLink(['atlas', 'align_files_folder'], self.tab.atlasFolderPath, connect=False),  # FIXME: ensure that set correctly by picking
             'channel_affine_file_path': ParamLink(['atlas', 'align_channels_affine_file'], self.tab.channelAffineFilePath),
             'ref_affine_file_path': ParamLink(['atlas', 'align_reference_affine_file'], self.tab.refAffineFilePath),
             'ref_bspline_file_path': ParamLink(['atlas', 'align_reference_bspline_file'], self.tab.refBsplineFilePath),
@@ -361,7 +359,6 @@ class RegistrationParams(UiParameter):
         self.tab.atlasResolutionTriplet.valueChangedConnect(self.handle_atlas_resolution_changed)
         self.tab.atlasIdComboBox.currentTextChanged.connect(self.handle_atlas_id_changed)
         self.tab.structureTreeIdComboBox.currentTextChanged.connect(self.handle_structure_tree_id_changed)
-        # self.tab.atlasFolderPath.textChanged.connect(self.handle_atlas_folder_changed)  # WARNING: ensure that set correctly by picking
         self.connect_simple_widgets()
 
     @property
