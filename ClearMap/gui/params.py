@@ -7,7 +7,7 @@ All the classes that define parameters or group thereof for the tabs of the grap
 """
 import os
 import string
-from itertools import combinations
+from itertools import permutations
 from typing import List
 
 import numpy as np
@@ -899,6 +899,7 @@ class BatchParams(UiParameter):
         self.tab.addGroupPushButton.clicked.connect(self.add_group)
         self.tab.removeGroupPushButton.clicked.connect(self.remove_group)
         self.tab.resultsFolderLineEdit.textChanged.connect(self.handle_results_folder_changed)
+        # self.connect_simple_widgets()
 
     def connect_groups(self):
         for btn in self.gp_add_folder_buttons:
@@ -936,7 +937,8 @@ class BatchParams(UiParameter):
         -------
             The list of all possible pairs of groups
         """
-        return list(combinations(self.group_names, 2))
+        # return list(combinations(self.group_names, 2))
+        return list(permutations(self.group_names, 2))
 
     @property
     def selected_comparisons(self):
@@ -1025,11 +1027,11 @@ class BatchParams(UiParameter):
             self.gp_list_widget[gp].addItem(folder_path)
 
     def handle_remove_src_folder_clicked(self):
-        print('call')
+        # print('call')
         gp = self.tab.sampleFoldersToolBox.currentIndex()
         sample_idx = self.gp_list_widget[gp].currentRow()
         _ = self.gp_list_widget[gp].takeItem(sample_idx)
-        print(_.text())
+        # print(_.text())
 
     @property
     def results_folder(self):

@@ -55,7 +55,6 @@ def process_sample(configs, align=False, cells=False, vasc=False):
     if vasc:
         binary_vessel_processor = BinaryVesselProcessor(pre_proc)
         binary_vessel_processor.binarize()
-        binary_vessel_processor.fill_vessels()
         binary_vessel_processor.combine_binary()
 
         vessel_graph_processor = VesselGraphProcessor(pre_proc)

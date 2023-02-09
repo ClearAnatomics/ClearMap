@@ -174,15 +174,19 @@
       </attribute>
       <layout class="QVBoxLayout" name="verticalLayout">
        <item>
-        <widget class="QDialogButtonBox" name="runPValsButtonBox">
+        <widget class="QPushButton" name="runPValsPushButton">
          <property name="toolTip">
           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Compute the p value maps for all the pairs of groups selected in the &lt;span style=&quot; font-style:italic;&quot;&gt;comparisons&lt;/span&gt; tab&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
          </property>
-         <property name="standardButtons">
-          <set>QDialogButtonBox::Apply</set>
-         </property>
-         <property name="applyText" stdset="0">
+         <property name="text">
           <string>Run</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="plotPValsPushButton">
+         <property name="text">
+          <string>Display</string>
          </property>
         </widget>
        </item>
