@@ -45,6 +45,7 @@ ClearMap/Tests/Data/CellMap_Example/*
 
 # Code spikes
 ClearMap/gui/spikes
+ClearMap/spikes
 
 # In progress
 todo
