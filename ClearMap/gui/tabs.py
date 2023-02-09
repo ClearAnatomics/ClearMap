@@ -379,7 +379,7 @@ class AlignmentTab(GenericTab):
 
         if self.preprocessor.has_tiles and not self.preprocessor.has_npy and\
                 prompt_dialog('Tile conversion', 'Convert individual tiles to npy for efficiency'):
-            self.wrap_step('Converting tiles', self.preprocessor.convert_tiles, n_steps=0,
+            self.wrap_step('Converting tiles', self.preprocessor.convert_tiles, step_kw_args={'force': True}, n_steps=0,
                            abort_func=self.preprocessor.stop_process, save_cfg=False, nested=False)
         self.wrap_step('Setting up atlas', self.setup_atlas, n_steps=1, save_cfg=False, nested=False)  # TODO: abort_func=self.preprocessor.stop_process
 
@@ -427,6 +427,10 @@ class AlignmentTab(GenericTab):
             n_steps = self.preprocessor.n_rigid_steps_to_run + self.preprocessor.n_wobbly_steps_to_run
             skip_wobbly = self.params.stitching_wobbly.skip
             if not self.params.stitching_rigid.skip:
+                if not self.preprocessor.check_has_all_tiles('raw'):
+                    self.progress_watcher.finish()
+                    self.main_window.popup('Missing tiles, stitching aborted')
+                    return
                 self.wrap_step('Stitching', self.preprocessor.stitch_rigid, step_kw_args={'force': True},
                                n_steps=n_steps, abort_func=self.preprocessor.stop_process, close_when_done=skip_wobbly)
             if not skip_wobbly:
@@ -521,6 +525,11 @@ class AlignmentTab(GenericTab):
                                               parent=self.main_window)  # FIXME: compute n_steps (par of processor)
         self.setup_atlas()
         if not self.params.registration.skip_resampling:
+            if self.preprocessor.autofluorescence_is_tiled and \
+                    not self.preprocessor.check_has_all_tiles('autofluorescence'):
+                self.main_window.progress_watcher.finish()
+                self.main_window.print_status_msg('Registration skipped because of missing tiles')
+                return
             self.main_window.wrap_in_thread(self.preprocessor.resample_for_registration, force=True)
             # self.main_window.print_status_msg('Resampled')
         self.main_window.wrap_in_thread(self.preprocessor.align)
