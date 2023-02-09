@@ -22,14 +22,14 @@ class NotAnOmeFile(Exception):
 
 def _get_ome_dict_tifffile(img_path):  # WARNING: works only with recent versions of tifffile not 0.15.1
     if not tifffile.TiffFile(img_path).is_ome:
-        raise NotAnOmeFile("File {} is not a valid ome.tif file".format(img_path))
+        raise NotAnOmeFile(f"File {img_path} is not a valid ome.tif file")
     ome_metadata = tifffile.tiffcomment(img_path)
     ome_dict = tifffile.xml2dict(ome_metadata)
     return ome_dict
 
 
 def _get_ome_dict_pil(img_path):
-    not_an_ome_msg = "File {} is not a valid ome.tif file".format(img_path)
+    not_an_ome_msg = f"File {img_path} is not a valid ome.tif file"
     if not img_path.endswith('.ome.tif'):  # Weak but can't rely on tifffile
         raise NotAnOmeFile(not_an_ome_msg)
     img = Image.open(img_path)
@@ -71,7 +71,7 @@ def parse_overlaps(img_path):
                     elif attr['@label'] == 'xyz-Table X Overlap':
                         y_overlap = round(attr['@Value'])
     else:
-        raise ValueError('parser type "{}" is not recognised'.format(parser))
+        raise ValueError(f'parser type "{parser}" is not recognised')
 
     # x_overlap = [elt['Value'] for elt in custom_props if elt['label'] == 'xyz-Table X Overlap'][0]
     # y_overlap = [elt['Value'] for elt in custom_props if elt['label'] == 'xyz-Table Y Overlap'][0]
@@ -81,17 +81,17 @@ def parse_overlaps(img_path):
 def parse_img_shape(img_path):
     parser, ome_dict = get_ome_dict(img_path)
     if parser == 'tifffile':
-        return [ome_dict['OME']['Image']['Pixels']['Size{}'.format(ax)] for ax in ('X', 'Y', 'Z')]
+        return [ome_dict['OME']['Image']['Pixels'][f'Size{ax}'] for ax in ('X', 'Y', 'Z')]
     elif parser == 'PIL':
-        return [ome_dict['OME']['Image']['Pixels']['@Size{}'.format(ax)] for ax in ('X', 'Y', 'Z')]
+        return [ome_dict['OME']['Image']['Pixels'][f'@Size{ax}'] for ax in ('X', 'Y', 'Z')]
 
 
 def parse_img_res(img_path):
     parser, ome_dict = get_ome_dict(img_path)
     if parser == 'tifffile':
-        return [ome_dict['OME']['Image']['Pixels']['PhysicalSize{}'.format(ax)] for ax in ('X', 'Y', 'Z')]
+        return [ome_dict['OME']['Image']['Pixels'][f'PhysicalSize{ax}'] for ax in ('X', 'Y', 'Z')]
     elif parser == 'PIL':
-        return [ome_dict['OME']['Image']['Pixels']['@PhysicalSize{}'.format(ax)] for ax in ('X', 'Y', 'Z')]
+        return [ome_dict['OME']['Image']['Pixels'][f'@PhysicalSize{ax}'] for ax in ('X', 'Y', 'Z')]
 
 
 def define_auto_stitching_params(img_path, stitching_cfg):
@@ -121,10 +121,10 @@ def define_auto_resolution(img_path, cfg_res):
         print(str(e))
         print('Defaulting to config values')
     except KeyError as e:
-        print("Could not find resolution for image {}, defaulting to config".format(img_path))
+        print(f"Could not find resolution for image {img_path}, defaulting to config")
 
     if parsed_res is None and cfg_res.count('auto'):
-        raise MetadataError("Could not determine auto config for file {}".format(img_path))
+        raise MetadataError(f"Could not determine auto config for file {img_path}")
 
     for i, ax_res in enumerate(cfg_res):
         if ax_res == 'auto':
@@ -399,7 +399,7 @@ class Pattern:
                                self.get_chars_after_cluster_idx(cluster_idx))
 
     def hightlighted_q_marks(self, n):
-        return '<span style="background-color:#60798B;text-color:#1A72BB">{}</span>'.format('?'*n)
+        return f'<span style="background-color:#60798B;text-color:#1A72BB">{"?" * n}</span>'
 
     def parse_pattern(self, pattern_str):
         current_chunk = ''

@@ -34,7 +34,6 @@ def main(src_directory, atlas_base_name='ABA_25um'):
     binary_vessel_processor.setup(pre_proc)
     binary_vessel_processor.binarize()
     binary_vessel_processor.plot_binarization_result(arrange=True)
-    binary_vessel_processor.fill_vessels()
     binary_vessel_processor.plot_vessel_filling_results(arrange=True)
     binary_vessel_processor.combine_binary()
     binary_vessel_processor.plot_combined(arrange=True)

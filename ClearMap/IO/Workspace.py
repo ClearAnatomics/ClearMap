@@ -282,11 +282,24 @@ class Workspace(object):
                         values=values, prefix=prefix, extension=extension,
                         debug=debug, **kwargs)
 
-    def exists(self, ftype, file_type_to_name=None, directory=None, expression=None, values=None, prefix=None, extension=None, debug=None, **kwargs):
-      return os.path.exists(self.filename(ftype, file_type_to_name=file_type_to_name, directory=directory,
-                                          expression=expression, values=values, prefix=prefix, extension=extension,
-                                          debug=debug, **kwargs))
-  
+    def exists(self, ftype, file_type_to_name=None, directory=None, expression=None, values=None, prefix=None,
+               extension=None, debug=None, **kwargs):
+        return os.path.exists(self.filename(ftype, file_type_to_name=file_type_to_name, directory=directory,
+                                            expression=expression, values=values, prefix=prefix, extension=extension,
+                                            debug=debug, **kwargs))
+
+    def all_tiles_exist(self, ftype, file_type_to_name=None, directory=None, expression=None, values=None, prefix=None,
+               extension=None, debug=None, **kwargs):
+        files = self.file_list(ftype, file_type_to_name=file_type_to_name, directory=directory, expression=expression,
+                               values=values, prefix=prefix, extension=extension, debug=debug, **kwargs)
+        exp = Expression(self.filename(ftype, extension=extension))
+        tile_axes_ = exp.tag_names()
+        positions = [exp.values(f) for f in files]
+        indices = [tuple(tv[n] for n in tile_axes_) for tv in positions]
+        shape = np.array(indices).max(axis=0)
+        shape += 1  # Because 0 indexing
+        return len(files) == shape.prod()
+
     def expression(self, *args, **kwargs):
         return Expression(self.filename(*args, **kwargs))
 
@@ -375,7 +388,8 @@ class Workspace(object):
                                 raise ValueError(f'The expression does not have the named pattern {n}')
                         for n in tag_names:
                             if n not in tile_axes_:
-                                raise ValueError(f'The expression has the named pattern {n} that is not in tile_axes={tile_axes_}')
+                                raise ValueError(f'The expression has the named pattern {n} '
+                                                 f'that is not in tile_axes={tile_axes_}')
 
                         # construct tiling
                         files = clearmap_io.file_list(expression)

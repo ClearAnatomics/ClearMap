@@ -23,6 +23,8 @@ __copyright__ = 'Copyright © 2022 by Charly Rousseau'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
 
+from ClearMap.Utils.TagExpression import Expression
+from ClearMap.Utils.exceptions import MissingRequirementException
 
 colors = {
     "WHITE": '\033[1;37m',
@@ -53,6 +55,7 @@ def runs_on_ui():
     return 'CLEARMAP_GUI_HOSTED' in os.environ
 
 
+# FIXME: raise specific exception if "Failed to initialize NVML: Driver/library version mismatch" in stdout
 def smi_query(var_name, units=False):
     cmd = f'nvidia-smi --query-gpu={var_name} --format=noheader,csv'
     if not units:
@@ -127,6 +130,8 @@ def get_item_recursive(container, keys):
 
 def set_item_recursive(dictionary, keys_list, val, fix_missing_keys=True):
     def add_keys(d, keys):
+        if not keys:
+            return
         if keys[0] not in d.keys():
             d[keys[0]] = {}
         if keys[1:]:  # if keys left
@@ -135,3 +140,35 @@ def set_item_recursive(dictionary, keys_list, val, fix_missing_keys=True):
     if fix_missing_keys:
         add_keys(dictionary, keys_list[:-1])  # Fix missing keys recursively
     get_item_recursive(dictionary, keys_list[:-1])[keys_list[-1]] = val
+
+
+def requires_files(file_paths):
+    def decorator(func):
+        def wraps(*args, **kwargs):
+            instance = args[0]
+            workspace = instance.workspace
+            for f_p in file_paths:
+                f_path = workspace.filename(f_p.base, prefix=f_p.prefix, postfix=f_p.postfix, extension=f_p.extension)
+                msg = f'{type(instance).__name__}.{func.__name__} missing path: "{f_path}"'
+                if Expression(f_path).tags:
+                    file_list = workspace.file_list(f_p.base, prefix=f_p.prefix, postfix=f_p.postfix,
+                                                    extension=f_p.extension)
+                    if not file_list:
+                        raise MissingRequirementException(msg + ' Pattern but no file')
+                    for f in file_list:
+                        if not os.path.exists(f):
+                            raise MissingRequirementException(msg + f' Missing tile {f}')
+                elif not os.path.exists(f_path):
+                    raise MissingRequirementException(msg)
+            return func(*args, **kwargs)
+        return wraps
+    return decorator
+
+
+# FIXME: move to io
+class FilePath:
+    def __init__(self, base, prefix=None, postfix=None, extension=None):
+        self.base = base
+        self.prefix = prefix
+        self.postfix = postfix
+        self.extension = extension

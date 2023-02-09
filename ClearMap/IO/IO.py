@@ -58,10 +58,11 @@ from ClearMap.IO.FileUtils import (is_file, is_directory, file_extension,   #ana
 ###############################################################################
 from ClearMap.Utils.utilities import CancelableProcessPoolExecutor
 
-source_modules = [npy, tif, mmp, sma, fl, nrrd, csv, gt];
+source_modules = [npy, tif, mmp, sma, fl, nrrd, csv, gt]
 """The valid source modules."""
 
-file_extension_to_module = {"npy" : mmp, "tif" : tif, 'nrrd' : nrrd, 'nrdh' : nrrd, 'csv' : csv, 'gt' : gt};
+file_extension_to_module = {"npy": mmp, "tif": tif, "tiff": tif, 'nrrd': nrrd,
+                            'nrdh': nrrd, 'csv': csv, 'gt': gt}
 """Map between file extensions and modules that handle this file type."""        
 
 ###############################################################################
