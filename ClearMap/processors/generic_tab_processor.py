@@ -1,5 +1,50 @@
+import os
 import sys
 from concurrent.futures.process import BrokenProcessPool
+
+
+class ProcessorSteps:
+    def __init__(self, workspace, postfix=''):
+        self.postfix = postfix
+        self.workspace = workspace
+
+    @property
+    def steps(self):
+        raise NotImplementedError
+
+    def path_from_step_name(self, step_name):
+        raise NotImplementedError
+
+    @property
+    def existing_steps(self):
+        return [s for s in self.steps if self.step_exists(s)]
+
+    @property
+    def last_step(self):
+        return self.existing_steps[-1]
+
+    def get_next_steps(self, step_name):
+        return self.steps[self.steps.index(step_name)+1:]
+
+    def step_exists(self, step_name):
+        return os.path.exists(self.path_from_step_name(step_name))
+
+    def remove_next_steps_files(self, target_step_name):
+        for step_name in self.get_next_steps(target_step_name):
+            f_path = self.path_from_step_name(step_name)
+            if os.path.exists(f_path):
+                os.remove(f_path)
+
+    def path(self, step, step_back=False, n_before=0):
+        if n_before:
+            step = self.steps[self.steps.index(step) - n_before]
+        f_path = self.path_from_step_name(step)
+        if not os.path.exists(f_path):
+            if step_back:  # FIXME: steps back only once ??
+                f_path = self.path(self.steps[self.steps.index(step) - 1])
+            else:
+                raise IndexError(f'Could not find path "{f_path}" and not allowed to step back')
+        return f_path
 
 
 class TabProcessor:

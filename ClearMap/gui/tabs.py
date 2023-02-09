@@ -5,6 +5,7 @@ tabs
 
 The different tabs that correspond to different functionalities of the GUI
 """
+import functools
 import os.path
 import copy
 
@@ -16,6 +17,7 @@ import mpld3
 import pyqtgraph as pg
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 from PyQt5.QtWidgets import QDialogButtonBox, QWhatsThis
+from qdarkstyle import DarkPalette
 
 import ClearMap.IO.IO as clearmap_io
 from ClearMap.IO.MHD import mhd_read
@@ -185,13 +187,13 @@ class PostProcessingTab(GenericTab):
         img = self.preprocessor.workspace.source('resampled')
         self.main_window.ortho_viewer.setup(img, params, parent=self.main_window)
         dvs = self.main_window.ortho_viewer.plot_orthogonal_views()
-        self.main_window.ortho_viewer.add_cropping_bars()
+        ranges = [[params.reverse_scale_axis(v, ax) for v in vals] for ax, vals in zip('xyz', params.slice_tuples)]
+        self.main_window.ortho_viewer.update_ranges(ranges)
         self.main_window.setup_plots(dvs, ['x', 'y', 'z'])
 
         # WARNING: needs to be done after setup
         for axis, ax_max in zip('XYZ', self.preprocessor.raw_stitched_shape):  # FIXME: not always raw stitched
             getattr(tab, f'{slicer_prefix}{axis}RangeMax').setMaximum(ax_max)
-        self.main_window.ortho_viewer.update_ranges()
 
 
 class GenericDialog(GenericUi):
@@ -603,12 +605,6 @@ class CellCounterTab(PostProcessingTab):
         self.ui.detectionPreviewTuningButtonBox.connectOpen(self.plot_debug_cropping_interface)
         self.ui.detectionPreviewTuningSampleButtonBox.connectApply(self.create_cell_detection_tuning_sample)
         self.ui.detectionPreviewButtonBox.connectApply(self.run_tuning_cell_detection)
-        self.ui.detectionSubsetXRangeMin.valueChanged.connect(self.main_window.ortho_viewer.update_x_min)
-        self.ui.detectionSubsetXRangeMax.valueChanged.connect(self.main_window.ortho_viewer.update_x_max)
-        self.ui.detectionSubsetYRangeMin.valueChanged.connect(self.main_window.ortho_viewer.update_y_min)
-        self.ui.detectionSubsetYRangeMax.valueChanged.connect(self.main_window.ortho_viewer.update_y_max)
-        self.ui.detectionSubsetZRangeMin.valueChanged.connect(self.main_window.ortho_viewer.update_z_min)
-        self.ui.detectionSubsetZRangeMax.valueChanged.connect(self.main_window.ortho_viewer.update_z_max)
 
         # for ctrl in (self.cell_map_tab.backgroundCorrectionDiameter, self.cell_map_tab.detectionThreshold):
         #     ctrl.valueChanged.connect(self.reset_detected)  FIXME: find better way
@@ -784,28 +780,28 @@ class VasculatureTab(PostProcessingTab):
     def setup(self):
         self.init_ui()
 
+        # ######################################## BINARIZATION ##############################
         self.connect_whats_this(self.ui.binarizationRawClippingRangeInfoToolButton, self.ui.binarizationRawClippingRangeLbl)
         self.connect_whats_this(self.ui.binarizationRawThresholdInfoToolButton, self.ui.binarizationRawThresholdLbl)
-        self.connect_whats_this(self.ui.binarizationRawDeepFillingInfoToolButton, self.ui.rawBinarizationDeepFillingCheckBox)
-        self.ui.binarizeVesselsPushButton.clicked.connect(self.binarize_vessels)
+        self.connect_whats_this(self.ui.binarizationRawDeepFillingInfoToolButton, self.ui.binarizationRawDeepFillingCheckBox)
+        self.ui.binarizeVesselsPushButton.clicked.connect(functools.partial(self.binarize_channel, channel='raw'))
         self.connect_whats_this(self.ui.binarizationArteriesClippingRangeInfoToolButton, self.ui.binarizationArteriesClippingRangeLbl)
         self.connect_whats_this(self.ui.binarizationArteriesThresholdInfoToolButton, self.ui.binarizationArteriesThresholdLbl)
-        self.connect_whats_this(self.ui.binarizationArteriesDeepFillingInfoToolButton, self.ui.arteriesBinarizationDeepFillingCheckBox)
-        self.ui.binarizeArteriesPushButton.clicked.connect(self.binarize_arteries)
+        self.connect_whats_this(self.ui.binarizationArteriesDeepFillingInfoToolButton, self.ui.binarizationArteriesDeepFillingCheckBox)
+        self.ui.binarizeArteriesPushButton.clicked.connect(functools.partial(self.binarize_channel, channel='arteries'))
         self.ui.binarizationCombinePushButton.clicked.connect(self.combine)
 
-        self.ui.buildGraphButtonBox.connectApply(self.build_graph)
-        self.connect_whats_this(self.ui.buildGraphButtonBoxInfoToolButton, self.ui.buildGraphButtonBox)
+        self.ui.binarizationPlotSideBySidePushButton.clicked.connect(
+            functools.partial(self.plot_binarization_results, plot_side_by_side=True))
+        self.ui.binarizationPlotOverlayPushButton.clicked.connect(
+            functools.partial(self.plot_binarization_results, plot_side_by_side=False))
 
-        self.ui.graphConstructionSlicerButtonBox.connectOpen(self.plot_graph_construction_chunk_slicer)
-        self.connect_whats_this(self.ui.buildGraphSlicerGroupBoxInfoToolButton, self.ui.buildGraphSlicerGroupBox)
-        # self.display_cleaned_graph_chunk
-        self.ui.graphConstructionPlotGraphButtonBox.connectApply(self.display_reduced_graph_chunk)
-        # TODO: clean use other buttons
-        self.ui.graphConstructionPlotGraphButtonBox.connectOk(self.display_annotated_graph_chunk)
-        self.ui.graphConstructionPlotGraphButtonBox.connectClose(self.main_window.remove_old_plots)
+        # ######################################## GRAPH ##############################
+        self.ui.buildGraphSelectAllCheckBox.stateChanged.connect(self.__select_all_graph_steps)
+        self.ui.buildGraphPushButton.clicked.connect(self.build_graph)
+        self.connect_whats_this(self.ui.buildGraphPushButtonInfoToolButton, self.ui.buildGraphPushButton)
 
-        self.connect_whats_this(self.ui.maxArteriesTracingIterationsInfoToolButton, self.ui.maxArteriesTracingIterationsLbl)
+        self.connect_whats_this(self.ui.maxArteriesTracingIterationsInfoToolButton, self.ui.maxArteriesTracingIterationsLbl)  # FIXME: try to automatise
         self.connect_whats_this(self.ui.minArterySizeInfoToolButton, self.ui.minArterySizeLbl)
         self.connect_whats_this(self.ui.veinIntensityRangeOnArteriesChannelInfoToolButton, self.ui.veinIntensityRangeOnArteriesChannelLbl)
         self.connect_whats_this(self.ui.restrictiveMinVeinRadiusInfoToolButton, self.ui.restrictiveMinVeinRadiusLbl)
@@ -813,13 +809,16 @@ class VasculatureTab(PostProcessingTab):
         self.connect_whats_this(self.ui.finalMinVeinRadiusInfoToolButton, self.ui.finalMinVeinRadiusLbl)
         self.connect_whats_this(self.ui.maxVeinsTracingIterationsInfoToolButton, self.ui.maxVeinsTracingIterationsLbl)
         self.connect_whats_this(self.ui.minVeinSizeInfoToolButton, self.ui.minVeinSizeLbl)
-        self.ui.postProcessVesselTypesButtonBox.connectApply(self.post_process_graph)
+        self.ui.postProcessVesselTypesPushButton.clicked.connect(self.post_process_graph)
 
-        self.ui.postProcessVesselTypesSlicerButtonBox.connectOpen(self.plot_graph_type_processing_chunk_slicer)
-        self.connect_whats_this(self.ui.postProcessVesselTypesSlicerInfoToolButton,
-                                self.ui.postProcessVesselTypesSlicerGroupBox)
-        self.ui.postProcessVesselTypesPlotButtonBox.connectApply(self.display_annotated_graph_chunk)
-        self.ui.postProcessVesselTypesPlotButtonBox.connectClose(self.main_window.remove_old_plots)
+        # ######################################## DISPLAY ##############################
+        # slicer
+        self.ui.graphSlicerButtonBox.connectOpen(self.plot_graph_type_processing_chunk_slicer)
+        self.connect_whats_this(self.ui.graphSlicerGroupBoxInfoToolButton, self.ui.graphSlicerGroupBox)
+
+        self.ui.plotGraphPickRegionPushButton.clicked.connect(self.pick_region)
+        self.ui.plotGraphChunkPushButton.clicked.connect(self.display_graph_chunk_from_cfg)
+        self.ui.plotGraphClearPlotPushButton.clicked.connect(self.main_window.remove_old_plots)
 
         self.ui.voxelizeGraphPushButton.clicked.connect(self.voxelize)
         self.ui.plotGraphVoxelizationPushButton.clicked.connect(self.plot_voxelization)
@@ -831,108 +830,115 @@ class VasculatureTab(PostProcessingTab):
         if self.vessel_graph_processor is not None and self.vessel_graph_processor.preprocessor is not None:
             self.vessel_graph_processor.set_progress_watcher(watcher)
 
-    def _get_n_binarize_steps(self):
-        n_steps = 1
-        n_steps += self.params.binarization_params.post_process_raw
-        n_steps += self.params.binarization_params.run_arteries_binarization
-        n_steps += self.params.binarization_params.post_process_arteries
-        return n_steps
+    def __select_all_graph_steps(self, state):
+        for chk_bx in (self.ui.buildGraphSkeletonizeCheckBox, self.ui.buildGraphBuildCheckBox,
+                       self.ui.buildGraphCleanCheckBox, self.ui.buildGraphReduceCheckBox,
+                       self.ui.buildGraphTransformCheckBox, self.ui.buildGraphRegisterCheckBox):
+            chk_bx.setCheckState(state)  # TODO: check that not tristate
 
-    def binarize_all(self):
-        self.wrap_step('Vessel binarization', self.binary_vessel_processor.binarize,
+    # ####################### BINARY  #######################
+
+    def binarize_channel(self, channel):
+        # FIXME: n_steps = self.params.binarization_params.n_steps
+        self.wrap_step('Vessel binarization', self.binary_vessel_processor.binarize_channel, step_args=[channel],
                        abort_func=self.binary_vessel_processor.stop_process)
-
-    def binarize_vessels(self):
-        self.wrap_step('Vessel binarization', self.binary_vessel_processor.binarize_channel, step_args=['raw'],
-                       abort_func=self.binary_vessel_processor.stop_process)
-
-    def binarize_arteries(self):
-        self.wrap_step('Vessel binarization', self.binary_vessel_processor.binarize_channel, step_args=['arteries'],
-                       abort_func=self.binary_vessel_processor.stop_process)
-
-    def plot_binarization_results(self):
-        if not self.step_exists('binarization', [self.preprocessor.filename('stitched'),
-                                                 self.preprocessor.filename('binary')]):
-            return
-        dvs = self.binary_vessel_processor.plot_binarization_result(parent=self.main_window)
-        link_dataviewers_cursors(dvs)
-        self.main_window.setup_plots(dvs, ['stitched', 'binary'])
-
-    def fill_vessels(self):
-        self.params.ui_to_cfg()
-        bin_params = self.params.binarization_params
-        n_steps = bin_params.fill_main_channel + bin_params.fill_secondary_channel
-        self.main_window.make_progress_dialog('Vessel filling', abort=self.binary_vessel_processor.stop_process)
-        self.main_window.wrap_in_thread(self.binary_vessel_processor.fill_vessels)
-        self.combine()  # REFACTOR: not great location
-        self.progress_watcher.finish()
-
-    def plot_vessel_filling_results(self):  # TODO: add step_exists check
-        dvs = self.binary_vessel_processor.plot_vessel_filling_results()
-        link_dataviewers_cursors(dvs)
-        self.main_window.setup_plots(dvs)
 
     def combine(self):
         self.wrap_step('Combining channels', self.binary_vessel_processor.combine_binary,
                        abort_func=self.binary_vessel_processor.stop_process)
 
-    def plot_combined(self):
-        dvs = self.binary_vessel_processor.plot_combined(parent=self.main_window)
-        self.main_window.setup_plots(dvs)
+    # FIXME: channel
+    def plot_binarization_results(self, plot_side_by_side=True):
+        binarization_params = self.params.binarization_params
+        steps = (binarization_params.plot_step_1,
+                 binarization_params.plot_step_2)
+        channels = (binarization_params.plot_channel_1,
+                    binarization_params.plot_channel_2)
+        channels = [c.replace('all vessels', 'raw') for c in channels]
+        channels = [c for s, c in zip(steps, channels) if s is not None]
+        steps = [s for s in steps if s is not None]
+        files = [self.binary_vessel_processor.steps[c].path_from_step_name(s) for s, c in zip(steps, channels)]
+        for f in files:
+            if not os.path.exists(f):
+                self.main_window.popup(f'Missing file {f}')
+                return
+
+        dvs = self.binary_vessel_processor.plot_results(steps, channels=channels,
+                                                        side_by_side=plot_side_by_side,
+                                                        arrange=False, parent=self.main_window)
+        self.main_window.setup_plots(dvs, steps)
+
+    # ###########################  GRAPH  #############################
+
+    def run_all(self):
+        self.binarize_channel('raw')
+        self.binarize_channel('arteries')
+        self.combine()
+        self.build_graph()
+        self.post_process_graph()
+        self.voxelize()
 
     def build_graph(self):
         self.wrap_step('Building vessel graph', self.vessel_graph_processor.pre_process,
                        abort_func=self.vessel_graph_processor.stop_process)  # FIXME: n_steps = 4
 
-    def plot_graph_construction_chunk_slicer(self):
-        self.params.graph_params._crop_values_from_cfg()  # Fix for lack of binding between 2 sets of range interfaces
-        self.plot_slicer('graphConstructionSlicer', self.ui, self.params.graph_params)
-        self.params.graph_params.crop_ranges_changed.connect(self.main_window.ortho_viewer.update_ranges)
-
     def plot_graph_type_processing_chunk_slicer(self):
-        self.params.graph_params._crop_values_from_cfg()  # Fix for lack of binding between 2 sets of range interfaces
-        self.plot_slicer('vesselProcessingSlicer', self.ui, self.params.graph_params)
-        self.params.graph_params.crop_ranges_changed.connect(self.main_window.ortho_viewer.update_ranges)
+        self.plot_slicer('graphConstructionSlicer', self.ui, self.params.visualization_params)
 
     def __get_tube_map_slicing(self):
-        self.params.graph_params.ui_to_cfg()  # Fix for lack of binding between 2 sets of range interfaces
-        return self.params.graph_params.slicing
+        self.params.visualization_params.ui_to_cfg()  # Fix for lack of binding between 2 sets of range interfaces
+        return self.params.visualization_params.slicing
 
-    def display_cleaned_graph_chunk(self):
+    def display_graph_chunk(self, graph_step):
         slicing = self.__get_tube_map_slicing()
-        dvs = self.vessel_graph_processor.visualize_graph_annotations(slicing, plot_type='mesh', graph_step='cleaned',
+        dvs = self.vessel_graph_processor.visualize_graph_annotations(slicing, plot_type='mesh', graph_step=graph_step,
                                                                       show=False)
         self.main_window.setup_plots(dvs)
 
-    def display_reduced_graph_chunk(self):
-        slicing = self.__get_tube_map_slicing()
-        dvs = self.vessel_graph_processor.visualize_graph_annotations(slicing, plot_type='mesh', graph_step='reduced',
-                                                                      show=False)
-        self.main_window.setup_plots(dvs)
+    def display_graph_chunk_from_cfg(self):  # REFACTOR: split ?
+        self.display_graph_chunk(self.params.visualization_params.graph_step)
 
-    def display_annotated_graph_chunk(self):
-        slicing = self.__get_tube_map_slicing()
-        dvs = self.vessel_graph_processor.visualize_graph_annotations(slicing, plot_type='mesh', graph_step='annotated',
-                                                                      show=False)
-        self.main_window.setup_plots(dvs)
+    def plot_graph_structure(self):
+        structure_id = self.params.visualization_params.structure_id
+        if structure_id is not None:
+            self._plot_graph_structure(structure_id, annotation.find(structure_id, key='id')['rgb'])
+        else:
+            print('No structure ID')
+        self.main_window.structure_selector.close()
 
     def post_process_graph(self):
         self.wrap_step('Post processing vasculature graph', self.vessel_graph_processor.post_process,
                        abort_func=self.vessel_graph_processor.stop_process)  # FIXME: n_steps = 8
 
+    def pick_region(self):
+        self.main_window.structure_selector.structure_selected.connect(
+            self.params.visualization_params.set_structure_id)
+        self.main_window.structure_selector.dlg.accepted.connect(self.plot_graph_structure)
+        # FIXME: connect cancel
+        self.main_window.structure_selector.show()
+
+    def _plot_graph_structure(self, structure_id, structure_color):
+        dvs = self.vessel_graph_processor._plot_graph_structure(structure_id,
+                                                                self.params.visualization_params.plot_type,
+                                                                structure_color)
+        print('Integrating graph')
+        self.main_window.setup_plots(dvs)
+        print('Graph integrated')
+
     def voxelize(self):
         self.wrap_step('Running voxelization', self.vessel_graph_processor.voxelize)
 
+    def voxelize_filtered(self):
+        self.wrap_step('Running voxelization', self.vessel_graph_processor.voxelize_filtered,
+                       step_args=[self.params.visualization_params.filter_name,
+                                  self.params.visualization_params.filter_value])
+
+    def voxelize_weighted(self):
+        self.wrap_step('Running voxelization', self.vessel_graph_processor.voxelize_weighted,
+                       step_args=[self.params.visualization_params.weight_name])
+
     def plot_voxelization(self):
         self.vessel_graph_processor.plot_voxelization(self.main_window.centralWidget())
-
-    def run_all(self):
-        self.binarize_all()
-        self.fill_vessels()
-        self.combine()
-        self.build_graph()
-        self.post_process_graph()
-        self.voxelize()
 
 
 ################################################################################################
@@ -963,7 +969,8 @@ class BatchTab(GenericTab):
 
         self.ui.folderPickerHelperPushButton.clicked.connect(self.create_wizard)
         self.connect_whats_this(self.ui.folderPickerHelperInfoToolButton, self.ui.folderPickerHelperPushButton)
-        self.ui.runPValsButtonBox.connectApply(self.run_p_vals)
+        self.ui.runPValsPushButton.clicked.connect(self.run_p_vals)
+        self.ui.plotPValsPushButton.clicked.connect(self.plot_p_vals)
         self.ui.batchRunButtonBox.connectApply(self.run_batch_process)
         self.ui.batchStatsButtonBox.connectApply(self.make_group_stats_tables)
 
@@ -1003,7 +1010,6 @@ class BatchTab(GenericTab):
         self.main_window.print_status_msg('Computing p_val maps')
         # TODO: set abort callback
         self.main_window.make_progress_dialog('P value maps', n_steps=len(self.params.selected_comparisons))
-        p_vals_imgs = []
         for pair in self.params.selected_comparisons:  # TODO: Move to processor object to be wrapped
             gp1_name, gp2_name = pair
             gp1, gp2 = [self.params.groups[gp_name] for gp_name in pair]
