@@ -409,7 +409,10 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
 
     def handle_step_name_change(self, step_name):
         self.log_process_start(step_name)
-        self.progress_dialog.mainStepNameLabel.setText(step_name)
+        try:
+            self.progress_dialog.mainStepNameLabel.setText(step_name)
+        except AttributeError as err:  # FIXME: find out why might be missing
+            self.error_logger.write(str(err))
         # self.progress_dialog.mainProgressBar.setFormat(f'step %v/%m  ({step_name})')
 
     def handle_sub_step_change(self, step_name):
