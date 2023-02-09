@@ -312,6 +312,9 @@ class SampleTab(GenericTab):
     def display_sample_id(self, sample_id):
         self.ui.sampleIdTxt.setText(sample_id)
 
+    def display_use_id_as_prefix(self, use_id):
+        self.ui.useIdAsPrefixCheckBox.setChecked(use_id)
+
     def get_sample_id(self):
         return self.ui.sampleIdTxt.text()
 

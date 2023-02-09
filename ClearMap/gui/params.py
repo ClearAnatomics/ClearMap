@@ -138,17 +138,20 @@ class SampleParameters(UiParameter):
         self.reload()
         super().cfg_to_ui()
 
-    def fix_cfg_file(self, f_path):
-        cfg = ConfigLoader.get_cfg_from_path(f_path)
-        cfg['base_directory'] = os.path.dirname(f_path)
+    def fix_cfg_file(self, f_path):  # FIXME: seems wrong to pass f_path just for that usage
+        # cfg = ConfigLoader.get_cfg_from_path(f_path)
+        self.config['base_directory'] = os.path.dirname(f_path)  # WARNING: needs to be self.config
+                                                                 #  to be sure that we are up to date
+                                                                 #  (otherwise write but potentially no reload)
         if not self.sample_id:
             sample_id, ok = QInputDialog.getText(self.tab, 'Warning: missing ID',
                                                  '<b>Missing sample ID</b><br>Please input below')
             self.sample_id = sample_id
             if not ok:
                 raise ValueError('Missing sample ID')
-        cfg['sample_id'] = self.sample_id
-        cfg.write()
+        self.config['sample_id'] = self.sample_id
+        self.config['use_id_as_prefix'] = self.use_id_as_prefix
+        self.config.write()
 
     # Sample params
     @property
