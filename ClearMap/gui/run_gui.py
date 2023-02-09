@@ -84,7 +84,8 @@ from ClearMap.gui.gui_utils import html_to_ansi, html_to_plain_text, compute_gri
 from ClearMap.gui.style import DARK_BACKGROUND, PLOT_3D_BG, \
     BTN_STYLE_SHEET, TOOLTIP_STYLE_SHEET, COMBOBOX_STYLE_SHEET, WARNING_YELLOW
 
-from ClearMap.gui.widgets import OrthoViewer, ProgressWatcher, setup_mini_brain  # needs plot_3d
+from ClearMap.gui.widgets import OrthoViewer, ProgressWatcher, setup_mini_brain, StructurePickerWidget, \
+    StructureSelector  # needs plot_3d
 update_pbar(app, progress_bar, 60)
 from ClearMap.gui.tabs import SampleTab, AlignmentTab, CellCounterTab, VasculatureTab, PreferenceUi, BatchTab
 
@@ -467,6 +468,7 @@ class ClearMapGui(ClearMapGuiBase):
         self.batch_tab_mgr = BatchTab(self, tab_idx=4)
 
         self.preference_editor = PreferenceUi(self)
+        self.structure_selector = StructureSelector('', app=self)
 
         self.sample_tab_mgr.mini_brain_scaling, self.sample_tab_mgr.mini_brain = setup_mini_brain()
 
@@ -476,6 +478,9 @@ class ClearMapGui(ClearMapGuiBase):
         self.amend_ui()
 
         self.actionPreferences.triggered.connect(self.preference_editor.open)
+        self.actionStructureSelector.triggered.connect(self.structure_selector.show)
+
+        # self.actionPreferences.triggered.connect(self.raise_warning)
 
         self.app = QApplication.instance()
 

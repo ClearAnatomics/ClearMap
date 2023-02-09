@@ -47,10 +47,21 @@ def warning_popup(base_msg, msg):
     dlg = QMessageBox()
     dlg.setIcon(QMessageBox.Warning)
     dlg.setWindowTitle('Warning')
-    dlg.setText('<b>{}</b>'.format(base_msg))
+    dlg.setText(f'<b>{base_msg}</b>')
     dlg.setInformativeText(msg)
     dlg.setStandardButtons(QMessageBox.Ok | QMessageBox.Cancel)
     dlg.setDefaultButton(QMessageBox.Ok)
+    return dlg.exec()
+
+
+def abort_retry_popup(base_msg, msg):  # REFACTOR: duplicate code
+    dlg = QMessageBox()
+    dlg.setIcon(QMessageBox.Warning)
+    dlg.setWindowTitle('Warning')
+    dlg.setText(f'<b>{base_msg}</b>')
+    dlg.setInformativeText(msg)
+    dlg.setStandardButtons(QMessageBox.Abort | QMessageBox.Retry)
+    dlg.setDefaultButton(QMessageBox.Abort)
     return dlg.exec()
 
 

@@ -116,7 +116,7 @@ def controls_enabled(instance):
     elif instance.findChildren(QPlainTextEdit):
         return instance.findChildren(QPlainTextEdit)[0].isEnabled()
     else:
-        raise NotImplementedError('Control type "{}" is not yet supported'.format(instance))
+        raise NotImplementedError(f'Control type "{instance}" is not yet supported')
 
 
 def get_check_box(instance):
@@ -130,13 +130,13 @@ def get_check_box(instance):
 def enable_controls(instance):
     check_box = instance.getCheckBox()
     if check_box:
-        check_box.setCheckState(Qt.Checked)
+        check_box.setChecked(True)
 
 
 def disable_controls(instance):
     check_box = instance.getCheckBox()
     if check_box:
-        check_box.setCheckState(Qt.Unchecked)
+        check_box.setChecked(False)
 
 
 def get_text_edit(instance):
@@ -159,7 +159,7 @@ def set_text(instance, txt):
         elif isinstance(text_edit, QPlainTextEdit):
             text_edit.setPlainText(txt)
         else:
-            raise ValueError('Expected QLineEdit or QPlainTextEdit, got "{}"'.format(type(text_edit)))
+            raise ValueError(f'Expected QLineEdit or QPlainTextEdit, got "{type(text_edit)}"')
 
 
 def get_text(instance):
@@ -170,7 +170,7 @@ def get_text(instance):
         elif isinstance(text_edit, QPlainTextEdit):
             return text_edit.toPlainText()
         else:
-            raise ValueError('Expected QLineEdit or QPlainTextEdit, got "{}"'.format(type(text_edit)))
+            raise ValueError(f'Expected QLineEdit or QPlainTextEdit, got "{type(text_edit)}"')
     else:
         disabled_value = instance.property('disabledValue')
         if disabled_value == 'None':
@@ -180,7 +180,7 @@ def get_text(instance):
         elif disabled_value == "[auto, auto]":
             return ['auto', 'auto']
         else:
-            raise ValueError('Unsupported value for disabledValue: "{}"'.format(disabled_value))
+            raise ValueError(f'Unsupported value for disabledValue: "{disabled_value}"')
 
 
 def connect_apply(instance, func):

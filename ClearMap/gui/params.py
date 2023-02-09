@@ -44,13 +44,16 @@ class AlignmentParams(UiParameterCollection):
         self.registration = RegistrationParams(tab, src_folder)
 
     def fix_cfg_file(self, f_path):
-        cfg = ConfigLoader.get_cfg_from_path(f_path)
+        # cfg = ConfigLoader.get_cfg_from_path(f_path)
         pipeline_name, ok = QInputDialog.getItem(self.tab, 'Please select pipeline type',
                                                  'Pipeline name:', ['CellMap', 'TubeMap', 'Both'], 0, False)
         if not ok:
             raise ValueError('Missing sample ID')
-        cfg['pipeline_name'] = pipeline_name
-        cfg.write()
+        self.config['pipeline_name'] = pipeline_name
+        # WARNING: needs to be self.config
+        #  to be sure that we are up to date
+        #  (otherwise write but potentially no reload)
+        self.write_config()
 
     @property
     def params(self):
@@ -192,9 +195,9 @@ class SampleParameters(UiParameter):
         if n_axes != 3:
             raise ParamsOrientationError('Number of different axis is only {} instead of 3. '
                                          'Please amend duplicate axes'.format(n_axes))
-        self.tab.orient_x.setCurrentText('{}'.format(orientation[0]))
-        self.tab.orient_y.setCurrentText('{}'.format(orientation[1]))
-        self.tab.orient_z.setCurrentText('{}'.format(orientation[2]))
+        self.tab.orient_x.setCurrentText(f'{orientation[0]}')
+        self.tab.orient_y.setCurrentText(f'{orientation[1]}')
+        self.tab.orient_z.setCurrentText(f'{orientation[2]}')
 
     def handle_orientation_changed(self, val):  # WARNING: does not seem to move up the stack because of pyqtsignals
         try:
@@ -222,7 +225,7 @@ class RigidStitchingParams(UiParameter):
             'skip': ParamLink(['skip'], self.tab.skipRigidCheckbox),
             'x_overlap': ParamLink(['overlap_x'], self.tab.xOverlapSinglet),
             'y_overlap': ParamLink(['overlap_y'], self.tab.yOverlapSinglet),
-            'projection_thickness': ['project_thickness'],
+            'projection_thickness': ['project_thickness'],  # FIXME: change to projection
             'max_shifts_x': ParamLink(['max_shifts_x'], self.tab.rigidMaxShiftsXDoublet),
             'max_shifts_y': ParamLink(['max_shifts_y'], self.tab.rigidMaxShiftsYDoublet),
             'max_shifts_z': ParamLink(['max_shifts_z'], self.tab.rigidMaxShiftsZDoublet),
@@ -256,12 +259,12 @@ class RigidStitchingParams(UiParameter):
 
 class WobblyStitchingParams(UiParameter):
     skip: bool
-    max_shifts_x: list
-    max_shifts_y: list
-    max_shifts_z: list
+    max_shifts_x: List[int]
+    max_shifts_y: List[int]
+    max_shifts_z: List[int]
     valid_range: list
-    slice_range: list
-    slice_pixel_size: list
+    slice_range: List[int]
+    slice_pixel_size: int
 
     def __init__(self, tab, src_folder=None):
         super().__init__(tab, src_folder)
@@ -282,6 +285,16 @@ class WobblyStitchingParams(UiParameter):
 
 
 class GeneralStitchingParams(UiParameter):
+    use_npy: bool
+    run_raw: bool
+    run_arteries: bool
+    preview_raw: bool
+    preview_arteries: bool
+    convert_output: bool
+    convert_raw: bool
+    convert_arteries: bool
+    conversion_fmt: str
+
     def __init__(self, tab, src_folder=None):
         super().__init__(tab, src_folder)
         self.params_dict = {
@@ -318,6 +331,15 @@ class GeneralStitchingParams(UiParameter):
 class RegistrationParams(UiParameter):
     atlas_id_changed = pyqtSignal(str)
     atlas_structure_tree_id_changed = pyqtSignal(str)
+
+    skip_resampling: bool
+    atlas_resolution: List[float]
+    atlas_id: str
+    structure_tree_id: str
+    atlas_folder: str
+    channel_affine_file_path: str
+    ref_affine_file_path: str
+    ref_bspline_file_path: str
 
     def __init__(self, tab, src_folder=None):
         super().__init__(tab, src_folder)
@@ -387,6 +409,21 @@ class RegistrationParams(UiParameter):
 
 
 class CellMapParams(UiParameter):
+    background_correction_diameter: List[int]
+    maxima_shape: int
+    detection_threshold: int
+    cell_filter_size: List[int]
+    cell_filter_intensity: int
+    voxelization_radii: List[int]
+    plot_when_finished: bool
+    plot_detected_cells: bool
+    crop_x_min: int
+    crop_x_max: int  # TODO: if 99.9 % source put to 100% (None)
+    crop_y_min: int
+    crop_y_max: int  # TODO: if 99.9 % source put to 100% (None)
+    crop_z_min: int
+    crop_z_max: int  # TODO: if 99.9 % source put to 100% (None)
+
     def __init__(self, tab, sample_params=None, preprocessing_params=None, src_folder=None):
         super().__init__(tab, src_folder)
         self.params_dict = {
@@ -421,7 +458,7 @@ class CellMapParams(UiParameter):
     def ratios(self):
         raw_res = np.array(self.sample_params.raw_resolution)
         atlas_res = np.array(self.preprocessing_params.registration.atlas_resolution)
-        ratios = raw_res / atlas_res  # to original
+        ratios = atlas_res / raw_res  # to original
         return ratios
 
     @property
@@ -455,24 +492,23 @@ class CellMapParams(UiParameter):
     def handle_filter_intensity_changed(self, _):
         self.config['cell_filtration']['thresholds']['intensity'] = self.cell_filter_intensity
 
-    # @property
-    # def crop_x_max(self):  # TODO: if 99.9 % source put to 100% (None)
-    #     return self.tab.detectionSubsetXRangeMax.value()
+    def scale_axis(self, val, axis='x'):
+        axis_ratio = self.ratios['xyz'.index(axis)]
+        return round(val * axis_ratio)
 
-    def scale_x(self, val):
-        return round(val * self.ratios[0])
+    def reverse_scale_axis(self, val, axis='x'):
+        axis_ratio = self.ratios['xyz'.index(axis)]
+        return round(val / axis_ratio)
 
-    def scale_y(self, val):
-        return round(val * self.ratios[1])
-
-    def scale_z(self, val):
-        return round(val * self.ratios[2])
+    @property
+    def slice_tuples(self):
+        return ((self.crop_x_min, self.crop_x_max),
+                (self.crop_y_min, self.crop_y_max),
+                (self.crop_z_min, self.crop_z_max))
 
     @property
     def slicing(self):
-        return (slice(self.crop_x_min, self.crop_x_max),
-                slice(self.crop_y_min, self.crop_y_max),
-                slice(self.crop_z_min, self.crop_z_max))
+        return tuple([slice(ax[0], ax[1]) for ax in self.slice_tuples])
 
 
 class VesselParams(UiParameterCollection):
@@ -481,25 +517,32 @@ class VesselParams(UiParameterCollection):
         # self.sample_params = sample_params  # TODO: check if required
         # self.preprocessing_params = preprocessing_params  # TODO: check if required
         self.binarization_params = VesselBinarizationParams(tab, src_folder)
-        self.graph_params = VesselGraphParams(tab,  sample_params, preprocessing_params, src_folder)
-        self.visualization_params = VesselVisualizationParams(tab, src_folder)
+        self.graph_params = VesselGraphParams(tab, src_folder)
+        self.visualization_params = VesselVisualizationParams(tab, sample_params, preprocessing_params, src_folder)
 
     @property
     def params(self):
-        return self.binarization_params, self.graph_params
+        return self.binarization_params, self.graph_params, self.visualization_params
 
 
 class VesselBinarizationParams(UiParameter):
     run_raw_binarization: bool
     raw_binarization_clip_range: List[int]
     raw_binarization_threshold: int
-    post_process_raw: bool
+    smooth_raw: bool
+    binary_fill_raw: bool
     fill_main_channel: bool
     run_arteries_binarization: bool
     arteries_binarization_clip_range: List[int]
     arteries_binarization_threshold: int
-    post_process_arteries: bool
+    smooth_arteries: bool
+    binary_fill_arteries: bool
     fill_secondary_channel: bool
+    fill_combined: bool
+    plot_step_1: str
+    plot_step_2: str
+    plot_channel_1: str
+    plot_channel_2: str
 
     def __init__(self, tab, src_folder=None):
         super().__init__(tab, src_folder)
@@ -508,28 +551,47 @@ class VesselBinarizationParams(UiParameter):
             'raw_binarization_clip_range': ParamLink(['raw', 'binarization', 'clip_range'],
                                                      self.tab.rawBinarizationClipRangeDoublet),
             'raw_binarization_threshold': ['raw', 'binarization', 'threshold'],
-            'post_process_raw': ParamLink(['raw', 'post_processing', 'run'],
-                                          self.tab.rawBinarizationPostprocessingCheckBox),
-            'fill_main_channel': ParamLink(['raw', 'deep_filling', 'run'], self.tab.rawBinarizationDeepFillingCheckBox),
+            'smooth_raw': ParamLink(['raw', 'smoothing', 'run'], self.tab.rawBinarizationSmoothingCheckBox),
+            'binary_fill_raw': ParamLink(['raw', 'binary_filling', 'run'], self.tab.rawBinarizationBinaryFillingCheckBox),
+            'fill_main_channel': ParamLink(['raw', 'deep_filling', 'run'], self.tab.binarizationRawDeepFillingCheckBox),
             'run_arteries_binarization': ParamLink(['arteries', 'binarization', 'run'],
                                                    self.tab.runArteriesBinarizationCheckBox),
-            'arteries_binarization_clip_range': ParamLink(['arteries', 'clip_range'],
+            'arteries_binarization_clip_range': ParamLink(['arteries', 'binarization', 'clip_range'],
                                                           self.tab.arteriesBinarizationClipRangeDoublet),
-            'arteries_binarization_threshold': ['arteries', 'threshold'],
-            'post_process_arteries': ParamLink(['arteries', 'post_process'],
-                                               self.tab.arteriesBinarizationPostprocessingCheckBox),
+            'arteries_binarization_threshold': ['arteries', 'binarization', 'threshold'],
+            'smooth_arteries': ParamLink(['arteries', 'smoothing', 'run'],
+                                         self.tab.arteriesBinarizationSmoothingCheckBox),
+            'binary_fill_arteries': ParamLink(['arteries', 'binary_filling', 'run'],
+                                              self.tab.arteriesBinarizationBinaryFillingCheckBox),
             'fill_secondary_channel': ParamLink(['arteries', 'deep_filling', 'run'],
-                                                self.tab.arteriesBinarizationDeepFillingCheckBox)
+                                                self.tab.binarizationArteriesDeepFillingCheckBox),
+            'fill_combined': ParamLink(['combined', 'binary_fill'], self.tab.binarizationConbineBinaryFillingCheckBox),
+            'plot_step_1': ParamLink(None, self.tab.binarizationPlotStep1ComboBox, connect=False),
+            'plot_step_2': ParamLink(None, self.tab.binarizationPlotStep2ComboBox, connect=False),
+            'plot_channel_1': ParamLink(None, self.tab.binarizationPlotChannel1ComboBox, connect=False),
+            'plot_channel_2': ParamLink(None, self.tab.binarizationPlotChannel2ComboBox, connect=False),
+
         }
         self.cfg_subtree = ['binarization']
         self.connect()
 
     def connect(self):
-        self.tab.rawBinarizationThresholdSpinBox.valueChanged.connect(self.handle_raw_binarization_treshold_changed)
+        self.tab.rawBinarizationThresholdSpinBox.valueChanged.connect(self.handle_raw_binarization_threshold_changed)
 
         self.tab.arteriesBinarizationThresholdSpinBox.valueChanged.connect(
             self.handle_arteries_binarization_threshold_changed)
         self.connect_simple_widgets()
+
+    @property
+    def n_steps(self):
+        n_steps = self.run_raw_binarization
+        n_steps += self.smooth_raw or self.binary_fill_raw
+        n_steps += self.fill_main_channel
+        n_steps += self.run_arteries_binarization
+        n_steps += self.smooth_arteries or self.binary_fill_arteries
+        n_steps += self.fill_secondary_channel
+        n_steps += self.fill_combined
+        return
 
     @property
     def raw_binarization_threshold(self):
@@ -539,6 +601,9 @@ class VesselBinarizationParams(UiParameter):
     def raw_binarization_threshold(self, value):
         self.tab.rawBinarizationThresholdSpinBox.setValue(self.sanitize_nones(value))
 
+    def handle_raw_binarization_threshold_changed(self):
+        self.config['raw']['binarization']['threshold'] = self.raw_binarization_threshold
+
     @property
     def arteries_binarization_threshold(self):
         return self.sanitize_neg_one(self.tab.arteriesBinarizationThresholdSpinBox.value())
@@ -546,6 +611,9 @@ class VesselBinarizationParams(UiParameter):
     @arteries_binarization_threshold.setter
     def arteries_binarization_threshold(self, value):
         self.tab.arteriesBinarizationThresholdSpinBox.setValue(self.sanitize_nones(value))
+
+    def handle_arteries_binarization_threshold_changed(self):
+        self.config['arteries']['binarization']['threshold'] = self.arteries_binarization_threshold
 
 
 class VesselGraphParams(UiParameter):
@@ -555,25 +623,17 @@ class VesselGraphParams(UiParameter):
     reduce: bool
     transform: bool
     annotate: bool
-    crop_x_min: bool
-    crop_x_max: bool
-    crop_y_min: bool
-    crop_y_max: bool
-    crop_z_min: bool
-    crop_z_max: bool
     vein_intensity_range_on_arteries_channel: List[int]
-    restrictive_min_vein_radius: int
-    permissive_min_vein_radius: int
-    final_min_vein_radius: int
-    arteries_min_radius: int
+    restrictive_min_vein_radius: float
+    permissive_min_vein_radius: float
+    final_min_vein_radius: float
+    arteries_min_radius: float
     max_arteries_tracing_iterations: int
     max_veins_tracing_iterations: int
     min_artery_size: int
     min_vein_size: int
 
-    crop_ranges_changed = pyqtSignal()
-
-    def __init__(self, tab, sample_params=None, preprocessing_params=None, src_folder=None):
+    def __init__(self, tab, src_folder=None):
         super().__init__(tab, src_folder)
         self.params_dict = {
             'skeletonize': ParamLink(['graph_construction', 'skeletonize'], self.tab.buildGraphSkeletonizeCheckBox),
@@ -582,12 +642,6 @@ class VesselGraphParams(UiParameter):
             'reduce': ParamLink(['graph_construction', 'reduce'], self.tab.buildGraphReduceCheckBox),
             'transform': ParamLink(['graph_construction', 'transform'], self.tab.buildGraphTransformCheckBox),
             'annotate':  ParamLink(['graph_construction', 'annotate'], self.tab.buildGraphRegisterCheckBox),
-            'crop_x_min': ['graph_construction', 'slicing', 'dim_0', 0],
-            'crop_x_max': ['graph_construction', 'slicing', 'dim_0', 1],
-            'crop_y_min': ['graph_construction', 'slicing', 'dim_1', 0],
-            'crop_y_max': ['graph_construction', 'slicing', 'dim_1', 1],
-            'crop_z_min': ['graph_construction', 'slicing', 'dim_2', 0],
-            'crop_z_max': ['graph_construction', 'slicing', 'dim_2', 1],
             'vein_intensity_range_on_arteries_channel': ParamLink(['vessel_type_postprocessing', 'pre_filtering', 'vein_intensity_range_on_arteries_ch'],
                                                                   self.tab.veinIntensityRangeOnArteriesChannelDoublet),
             'restrictive_min_vein_radius': ParamLink(['vessel_type_postprocessing', 'pre_filtering', 'restrictive_vein_radius'],
@@ -607,148 +661,77 @@ class VesselGraphParams(UiParameter):
             'min_vein_size': ParamLink(['vessel_type_postprocessing', 'capillaries_removal', 'min_vein_size'],
                                        self.tab.minVeinSizeSpinBox)
         }
+        self.connect()
+
+    def connect(self):
+        self.connect_simple_widgets()
+
+
+class VesselVisualizationParams(UiParameter):
+    crop_x_min: int
+    crop_x_max: int
+    crop_y_min: int
+    crop_y_max: int
+    crop_z_min: int
+    crop_z_max: int
+    graph_step: str
+    plot_type: str
+    voxelization_size: List[int]
+    filter_name: str
+    filter_value: str
+    weight_name: str
+
+    def __init__(self, tab, sample_params=None, preprocessing_params=None, src_folder=None):
+        super().__init__(tab, src_folder)
+        self.params_dict = {  # TODO: if 99.9 % source put to 100% (None)
+            'crop_x_min': ParamLink(['slicing', 'dim_0', 0], self.tab.graphConstructionSlicerXRangeMin),
+            'crop_x_max': ParamLink(['slicing', 'dim_0', 1], self.tab.graphConstructionSlicerXRangeMax),
+            'crop_y_min': ParamLink(['slicing', 'dim_1', 0], self.tab.graphConstructionSlicerYRangeMin),
+            'crop_y_max': ParamLink(['slicing', 'dim_1', 1], self.tab.graphConstructionSlicerYRangeMax),
+            'crop_z_min': ParamLink(['slicing', 'dim_2', 0], self.tab.graphConstructionSlicerZRangeMin),
+            'crop_z_max': ParamLink(['slicing', 'dim_2', 1], self.tab.graphConstructionSlicerZRangeMax),
+            'graph_step': ParamLink(None, self.tab.graphSlicerStepComboBox, connect=False),
+            'plot_type': ParamLink(None, self.tab.graphPlotTypeComboBox, connect=False),
+            'voxelization_size': ParamLink(['voxelization', 'size'], self.tab.vasculatureVoxelizationRadiusTriplet),
+            'filter_name': ParamLink(None, self.tab.voxelizationFitlerNameComboBox, connect=False),
+            'filter_value': ParamLink(None, self.tab.voxelizationFitlerValueLineEdit, connect=False),
+            'weight_name': ParamLink(None, self.tab.voxelizationWeightNameComboBox, connect=False),
+        }
+        self.structure_id = None
+        self.cfg_subtree = ['visualization']
         self.sample_params = sample_params
         self.preprocessing_params = preprocessing_params
         self.connect()
 
     def connect(self):
-        self.tab.graphConstructionSlicerXRangeMin.valueChanged.connect(self.handle_x_val_min_change)  # REFACTOR: this feels messy having the repeats
-        self.tab.graphConstructionSlicerXRangeMax.valueChanged.connect(self.handle_x_val_max_change)
-        self.tab.graphConstructionSlicerYRangeMin.valueChanged.connect(self.handle_y_val_min_change)
-        self.tab.graphConstructionSlicerYRangeMax.valueChanged.connect(self.handle_y_val_max_change)
-        self.tab.graphConstructionSlicerZRangeMin.valueChanged.connect(self.handle_z_val_min_change)
-        self.tab.graphConstructionSlicerZRangeMax.valueChanged.connect(self.handle_z_val_max_change)
+        self.connect_simple_widgets()
 
-        self.tab.vesselProcessingSlicerXRangeMin.valueChanged.connect(self.handle_x_val_min_change)
-        self.tab.vesselProcessingSlicerXRangeMax.valueChanged.connect(self.handle_x_val_max_change)
-        self.tab.vesselProcessingSlicerYRangeMin.valueChanged.connect(self.handle_y_val_min_change)
-        self.tab.vesselProcessingSlicerYRangeMax.valueChanged.connect(self.handle_y_val_max_change)
-        self.tab.vesselProcessingSlicerZRangeMin.valueChanged.connect(self.handle_z_val_min_change)
-        self.tab.vesselProcessingSlicerZRangeMax.valueChanged.connect(self.handle_z_val_max_change)
+    def set_structure_id(self, structure_widget):
+        self.structure_id = int(structure_widget.text(1))
 
     @property
     def ratios(self):
         raw_res = np.array(self.sample_params.raw_resolution)
         atlas_res = np.array(self.preprocessing_params.registration.atlas_resolution)
-        ratios = raw_res / atlas_res  # to original
+        ratios = atlas_res / raw_res  # to original
         return ratios
 
-    @property
-    def crop_x_min(self):
-        return self.tab.graphConstructionSlicerXRangeMin.value()
+    def scale_axis(self, val, axis='x'):
+        return round(val * self.ratios['xyz'.index(axis)])
 
-    @crop_x_min.setter
-    def crop_x_min(self, val):
-        self.tab.graphConstructionSlicerXRangeMin.setValue(val)
-        self.tab.vesselProcessingSlicerXRangeMin.setValue(val)
+    def reverse_scale_axis(self, val, axis='x'):
+        axis_ratio = self.ratios['xyz'.index(axis)]
+        return round(val / axis_ratio)
 
     @property
-    def crop_x_max(self):  # TODO: if 99.9 % source put to 100% (None)
-        return self.tab.graphConstructionSlicerXRangeMax.value()
-
-    @crop_x_max.setter
-    def crop_x_max(self, val):
-        self.tab.graphConstructionSlicerXRangeMax.setValue(val)
-        self.tab.vesselProcessingSlicerXRangeMax.setValue(val)
-
-    def handle_x_val_min_change(self):
-        self._config['graph_construction']['slicing']['dim_0'][0] = self.crop_x_min
-        self.crop_ranges_changed.emit()
-
-    def handle_x_val_max_change(self):
-        self._config['graph_construction']['slicing']['dim_0'][1] = self.crop_x_max
-        self.crop_ranges_changed.emit()
-
-    def scale_x(self, val):
-        return round(val * self.ratios[0])
-
-    @property
-    def crop_y_min(self):
-        return self.tab.graphConstructionSlicerYRangeMin.value()
-
-    @crop_y_min.setter
-    def crop_y_min(self, val):
-        self.tab.graphConstructionSlicerYRangeMin.setValue(val)
-        self.tab.vesselProcessingSlicerYRangeMin.setValue(val)
-
-    @property
-    def crop_y_max(self):  # TODO: if 99.9 % source put to 100% (None)
-        return self.tab.graphConstructionSlicerYRangeMax.value()
-
-    @crop_y_max.setter
-    def crop_y_max(self, val):
-        self.tab.graphConstructionSlicerYRangeMax.setValue(val)
-        self.tab.vesselProcessingSlicerYRangeMax.setValue(val)
-
-    def handle_y_val_min_change(self):
-        self._config['graph_construction']['slicing']['dim_1'][0] = self.crop_y_min
-        self.crop_ranges_changed.emit()
-
-    def handle_y_val_max_change(self):
-        self._config['graph_construction']['slicing']['dim_1'][1] = self.crop_y_max
-        self.crop_ranges_changed.emit()
-
-    def scale_y(self, val):
-        return round(val * self.ratios[1])
-
-    @property
-    def crop_z_min(self):
-        return self.tab.graphConstructionSlicerZRangeMin.value()
-
-    @crop_z_min.setter
-    def crop_z_min(self, val):
-        self.tab.graphConstructionSlicerZRangeMin.setValue(val)
-        self.tab.vesselProcessingSlicerZRangeMin.setValue(val)
-
-    @property
-    def crop_z_max(self):  # TODO: if 99.9 % source put to 100% (None)
-        return self.tab.graphConstructionSlicerZRangeMax.value()
-
-    @crop_z_max.setter
-    def crop_z_max(self, val):
-        self.tab.graphConstructionSlicerZRangeMax.setValue(val)
-        self.tab.vesselProcessingSlicerZRangeMax.setValue(val)
-
-    def handle_z_val_min_change(self):
-        self._config['graph_construction']['slicing']['dim_2'][0] = self.crop_z_min
-        self.crop_ranges_changed.emit()
-
-    def handle_z_val_max_change(self):
-        self._config['graph_construction']['slicing']['dim_2'][1] = self.crop_z_max
-        self.crop_ranges_changed.emit()
-
-    def scale_z(self, val):
-        return round(val * self.ratios[2])
+    def slice_tuples(self):
+        return ((self.crop_x_min, self.crop_x_max),
+                (self.crop_y_min, self.crop_y_max),
+                (self.crop_z_min, self.crop_z_max))
 
     @property
     def slicing(self):
-        return (slice(self.crop_x_min, self.crop_x_max),
-                slice(self.crop_y_min, self.crop_y_max),
-                slice(self.crop_z_min, self.crop_z_max))
-
-
-class VesselVisualizationParams(UiParameter):
-    voxelization_size: List[int]
-
-    def __init__(self, tab, src_folder=None):
-        super().__init__(tab, src_folder)
-        self.params_dict = {'voxelization_size': ['voxelization', 'size']}
-        self.cfg_subtree = ['visualization']
-        self.connect()
-
-    def connect(self):
-        self.tab.vasculatureVoxelizationRadiusTriplet.valueChangedConnect(self.handle_voxelization_size_changed)
-
-    @property
-    def voxelization_size(self):
-        return self.tab.vasculatureVoxelizationRadiusTriplet.getValue()
-
-    @voxelization_size.setter
-    def voxelization_size(self, value):
-        self.tab.vasculatureVoxelizationRadiusTriplet.setValue(value)
-
-    def handle_voxelization_size_changed(self, _):
-        self.config['voxelization']['size'] = self.voxelization_size
+        return tuple([slice(ax[0], ax[1]) for ax in self.slice_tuples])
 
 
 class PreferencesParams(UiParameter):
@@ -784,7 +767,8 @@ class PreferencesParams(UiParameter):
             'start_full_screen': ParamLink(['start_full_screen'], self.tab.startFullScreenCheckBox, connect=False),
             'lut': ['default_lut'],
             'font_size': ParamLink(['font_size'], self.tab.fontSizeSpinBox, connect=False),
-            'pattern_finder_min_n_files': ParamLink(['pattern_finder_min_n_files'], self.tab.patternFinderMinFilesSpinBox, connect=False),
+            'pattern_finder_min_n_files': ParamLink(['pattern_finder_min_n_files'],
+                                                    self.tab.patternFinderMinFilesSpinBox, connect=False),
             'three_d_plot_bg': ['three_d_plot_bg']
         }
         self.connect()

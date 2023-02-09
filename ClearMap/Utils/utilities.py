@@ -55,6 +55,7 @@ def runs_on_ui():
     return 'CLEARMAP_GUI_HOSTED' in os.environ
 
 
+# FIXME: raise specific exception if "Failed to initialize NVML: Driver/library version mismatch" in stdout
 def smi_query(var_name, units=False):
     cmd = f'nvidia-smi --query-gpu={var_name} --format=noheader,csv'
     if not units:

@@ -299,7 +299,7 @@ def mhd_read_fallback(header_file_path):
         the path of the mhd (header) file
     """
     if not os.path.exists(header_file_path):
-        print('File "{}" not found'.format(header_file_path))
+        print(f'File "{header_file_path}" not found')
         return
     else:
         hdr = mhd_read_header_file(header_file_path)
@@ -346,7 +346,7 @@ def mhd_read_raw_file(header_file_path, header):
     dim_size = [round(d) for d in header['dimsize']]
     # from: http://stackoverflow.com/questions/26542345/
     # reading-data-from-a-16-bit-unsigned-big-endian-raw-image-file-in-python
-    fmt = '{}{}{}'.format(endian, (np.prod(dim_size)), format_type)
+    fmt = f'{endian}{(np.prod(dim_size))}{format_type}'
     pix = np.asarray(struct.unpack(fmt, data))
 
     return pix.reshape((dim_size[2], dim_size[1], dim_size[0])).swapaxes(0, 2)  # FIXME: why swapaxes
@@ -415,11 +415,11 @@ def mhd_read_header_file(header_file_path):
         # Now we get the data
         m = re.match('\A\w+ *= * (.*) *', line)
         if m is None:
-            print("Can not get data for key {}".format(key))
+            print(f"Can not get data for key {key}")
             continue
 
         if len(m.groups()) > 1:
-            print("multiple matches found during mhd_read_header_file. skipping {}".format(key))
+            print(f"multiple matches found during mhd_read_header_file. skipping {key}")
             continue
 
         # If we're here, we found reasonable data

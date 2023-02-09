@@ -15,7 +15,7 @@ class ParamLink:
         self.widget = widget
         self.attr_name = attr_name
         self.default = default
-        self.connect = connect
+        self.connect = connect  # FIXME: can take function
 
 
 class UiParameter(QObject):
@@ -60,7 +60,7 @@ class UiParameter(QObject):
                     return widget.text()
                 else:
                     raise ValueError(f'Unrecognised frame with name "{name}"')
-            elif isinstance(widget, QComboBox):
+            elif isinstance(widget, QComboBox):  # FIXME: 'None' or '' = None
                 return widget.currentText()
             else:
                 raise NotImplementedError(f'Unhandled object of type {type(widget)}')
@@ -86,7 +86,7 @@ class UiParameter(QObject):
                 else:
                     raise ValueError(f'Unrecognised frame with name "{name}"')
             elif isinstance(widget, QComboBox):
-                widget.setCurrentText(value)
+                widget.setCurrentText(value)    # FIXME: None = 'None' or ''
             else:
                 raise NotImplementedError(f'Unhandled object of type {type(widget)}')
         else:
@@ -105,24 +105,27 @@ class UiParameter(QObject):
             widget.stateChanged.connect(callback)  # FIXME: change depending on type
         elif isinstance(widget, QSpinBox):
             widget.valueChanged.connect(callback)
+        elif isinstance(widget, (QLabel, QLineEdit)):  # WARNING: QLabel before QFrame because QLabel inherits QFrame
+            widget.textChanged.connect(callback)
         elif isinstance(widget, QFrame):
             name = widget.objectName()
             if name.endswith('let'):  # singlets, doublets and triplets
                 widget.valueChangedConnect(callback)
+            elif name.endswith('PlainTextEdit'):  # WARNING: plainTextEdit.textChanged is argument less
+                widget.textChangedConnect(functools.partial(self.handle_widget_changed, value=None, attr_name=key))
             elif name.endswith('TextEdit'):
                 widget.textChangedConnect(callback)
             else:
                 raise ValueError(f'Unrecognised frame with name "{name}"')
-        elif isinstance(widget, (QLabel, QLineEdit)):
-            widget.textChanged.connect(callback)
         elif isinstance(widget, QComboBox):
             widget.currentTextChanged.connect(callback)
         else:
             raise ValueError(f'Unhandled object of type {type(widget)}')
 
-    def handle_widget_changed(self, _, attr_name):
-        subtree = self.cfg_subtree if self.cfg_subtree is not None else []
-        set_item_recursive(self.config, subtree + self.params_dict[attr_name].keys, getattr(self, attr_name))
+    def handle_widget_changed(self, value, attr_name):
+        keys = self.params_dict[attr_name].keys
+        property_value = getattr(self, attr_name)
+        set_item_recursive(self.config, keys, property_value)
 
     def connect(self):
         """Connect GUI slots here"""
@@ -169,7 +172,7 @@ class UiParameter(QObject):
         elif state is False:
             state = Qt.Unchecked
         else:
-            raise NotImplementedError('Unknown state {}'.format(state))
+            raise NotImplementedError(f'Unknown state {state}')
         return state
 
     def ui_to_cfg(self):
@@ -179,7 +182,7 @@ class UiParameter(QObject):
     def _ui_to_cfg(self):
         pass
 
-    def cfg_to_ui(self):
+    def cfg_to_ui(self):  # FIXME: add reload here but make sure that compatible with all uses (especially UiParamCollection)
         if not self.params_dict:
             raise NotImplementedError('params_dict not set')
         else:
@@ -187,6 +190,8 @@ class UiParameter(QObject):
             for attr, keys_list in self.params_dict.items():
                 if isinstance(keys_list, ParamLink):
                     keys_list = keys_list.keys
+                    if keys_list is None:  # For params without cfg
+                        continue
                 current_amended = False
                 try:
                     val = get_item_recursive(self.config, keys_list)

@@ -99,7 +99,7 @@ def tiled_layout(n_windows, origin=None, shape=None, percent=None, screen=None):
     return geo
 
 
-def link_dataviewers_cursors(dvs):  # Needs to specify cursor class because cannot import from widget here (circular)
+def link_dataviewers_cursors(dvs):
     for i, dv in enumerate(dvs):
         cursor = RedCross()
         dv.view.addItem(cursor)
