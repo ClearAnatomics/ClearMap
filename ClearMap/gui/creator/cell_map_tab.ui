@@ -29,12 +29,11 @@
        </property>
        <property name="font">
         <font>
-         <weight>75</weight>
          <bold>true</bold>
         </font>
        </property>
        <property name="currentIndex">
-        <number>4</number>
+        <number>1</number>
        </property>
        <widget class="QWidget" name="page">
         <property name="geometry">
@@ -42,7 +41,7 @@
           <x>0</x>
           <y>0</y>
           <width>501</width>
-          <height>408</height>
+          <height>292</height>
          </rect>
         </property>
         <attribute name="label">
@@ -52,15 +51,15 @@
          <item>
           <widget class="QToolBox" name="toolBox_2">
            <property name="currentIndex">
-            <number>2</number>
+            <number>0</number>
            </property>
            <widget class="QWidget" name="page_3">
             <property name="geometry">
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>483</width>
-              <height>297</height>
+              <width>469</width>
+              <height>225</height>
              </rect>
             </property>
             <attribute name="label">
@@ -156,7 +155,7 @@
               <x>0</x>
               <y>0</y>
               <width>469</width>
-              <height>304</height>
+              <height>293</height>
              </rect>
             </property>
             <attribute name="label">
@@ -382,7 +381,7 @@
               <x>0</x>
               <y>0</y>
               <width>483</width>
-              <height>297</height>
+              <height>184</height>
              </rect>
             </property>
             <attribute name="label">
@@ -439,7 +438,7 @@
           <x>0</x>
           <y>0</y>
           <width>501</width>
-          <height>287</height>
+          <height>292</height>
          </rect>
         </property>
         <attribute name="label">
@@ -454,7 +453,7 @@
            <property name="title">
             <string>Thresholds</string>
            </property>
-           <layout class="QFormLayout" name="formLayout">
+           <layout class="QGridLayout" name="cellDetectionThresholdsLayout">
             <item row="0" column="0">
              <widget class="QLabel" name="label_7">
               <property name="text">
@@ -613,7 +612,7 @@
           <x>0</x>
           <y>0</y>
           <width>501</width>
-          <height>287</height>
+          <height>292</height>
          </rect>
         </property>
         <attribute name="label">
@@ -690,7 +689,7 @@
           <x>0</x>
           <y>0</y>
           <width>501</width>
-          <height>287</height>
+          <height>292</height>
          </rect>
         </property>
         <attribute name="label">
@@ -729,7 +728,6 @@
            <property name="font">
             <font>
              <pointsize>22</pointsize>
-             <weight>75</weight>
              <bold>true</bold>
             </font>
            </property>
@@ -753,7 +751,6 @@
            <property name="font">
             <font>
              <pointsize>22</pointsize>
-             <weight>75</weight>
              <bold>true</bold>
             </font>
            </property>
@@ -768,6 +765,14 @@
         </layout>
        </widget>
        <widget class="QWidget" name="page_8">
+        <property name="geometry">
+         <rect>
+          <x>0</x>
+          <y>0</y>
+          <width>501</width>
+          <height>292</height>
+         </rect>
+        </property>
         <attribute name="label">
          <string>Visualize</string>
         </attribute>

@@ -634,6 +634,15 @@ class CellCounterTab(PostProcessingTab):
         self.ui.cellMap3dScatterOnRefPushButton.clicked.connect(self.plot_cells_scatter_w_atlas_colors)
         self.ui.cellMap3dScatterOnStitchedPushButton.clicked.connect(self.plot_cells_scatter_w_atlas_colors_raw)
 
+    def setup_cell_param_histogram(self, cells, key='size'):
+        values = cells[key].values
+        hist, bin_edges = np.histogram(values, bins=20)
+        widget = pg.plot(hist, bin_edges[:-1], pen=pg.mkPen(DarkPalette.COLOR_ACCENT_2))
+        widget.setBackground(DarkPalette.COLOR_BACKGROUND_2)
+        # widget.setLogMode(x=True)
+        widget.resize(160, 80)
+        return widget
+
     def voxelize(self):
         if os.path.exists(self.preprocessor.filename('cells', postfix='filtered')):
             self.wrap_step('Voxelization', self.cell_detector.voxelize,
@@ -650,7 +659,21 @@ class CellCounterTab(PostProcessingTab):
         self.plot_slicer('detectionSubset', self.ui, self.params)
 
     def handle_tool_tab_changed(self, tab_idx):
-        if tab_idx == 3:
+        if tab_idx == 1:
+            try:
+                cells_df = self.cell_detector.get_cells_df()  # FIXME: debug or not
+                self.cell_size_histogram = self.setup_cell_param_histogram(cells_df, 'size')
+                # FIXME: add only if len(layout) ==2
+                a = self.ui.cellDetectionThresholdsLayout.takeAt(2).widget()
+                b = self.ui.cellDetectionThresholdsLayout.takeAt(2).widget()
+                self.ui.cellDetectionThresholdsLayout.addWidget(self.cell_size_histogram, 1, 0, 1, 2)
+                self.ui.cellDetectionThresholdsLayout.addWidget(a, 2, 0, 1, 1)
+                self.ui.cellDetectionThresholdsLayout.addWidget(b, 2, 1, 1, 1)
+                self.cell_intensity_histogram = self.setup_cell_param_histogram(cells_df, 'source')
+                self.ui.cellDetectionThresholdsLayout.addWidget(self.cell_intensity_histogram, 4, 0, 1, 2)
+            except FileNotFoundError:
+                print('Could not find cells dataframe file, skipping')
+        elif tab_idx == 3:
             self.update_cell_number()
 
     def create_cell_detection_tuning_sample(self):
