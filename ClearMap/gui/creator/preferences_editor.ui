@@ -35,243 +35,160 @@
    </property>
    <layout class="QVBoxLayout" name="verticalLayout_2">
     <item>
-   <widget class="QFrame" name="frame">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>10</y>
-      <width>640</width>
-      <height>585</height>
-     </rect>
-    </property>
-    <property name="minimumSize">
-     <size>
-      <width>640</width>
-      <height>480</height>
-     </size>
-    </property>
-    <property name="frameShape">
-     <enum>QFrame::StyledPanel</enum>
-    </property>
-    <property name="frameShadow">
-     <enum>QFrame::Raised</enum>
-    </property>
-    <layout class="QVBoxLayout" name="verticalLayout">
-     <item>
-      <widget class="QGroupBox" name="groupBox_4">
-       <property name="title">
-        <string>General</string>
-       </property>
-       <layout class="QFormLayout" name="formLayout_4">
-        <item row="0" column="0">
-         <widget class="QLabel" name="label_9">
-          <property name="toolTip">
-           <string>The base folder when clicking &quot;Source Folder&quot;</string>
-          </property>
-          <property name="text">
-           <string>Start folder</string>
-          </property>
-         </widget>
-        </item>
-        <item row="0" column="1">
-         <widget class="QLineEdit" name="startFolderLineEdit"/>
-        </item>
-        <item row="1" column="0">
-         <widget class="QLabel" name="label_14">
-          <property name="toolTip">
-           <string>The minimum of ome.tif files in a subfolder to be considered tiles</string>
-          </property>
-          <property name="text">
-           <string>Min nb files for pattern finder</string>
-          </property>
-         </widget>
-        </item>
-        <item row="1" column="1">
-         <widget class="QSpinBox" name="patternFinderMiNFilesSpinBox">
-          <property name="minimum">
-           <number>1</number>
-          </property>
-          <property name="maximum">
-           <number>65535</number>
-          </property>
-          <property name="value">
-           <number>10</number>
-          </property>
-         </widget>
-        </item>
-        <item row="2" column="0">
-         <widget class="QLabel" name="label">
-          <property name="toolTip">
-           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;How much information will be printed in the log window. &lt;/p&gt;&lt;p&gt;Select Trace to print in the debugger instead.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-          </property>
-          <property name="text">
-           <string>Verbosity</string>
-          </property>
-         </widget>
-        </item>
-        <item row="2" column="1">
-         <widget class="QComboBox" name="verbosityComboBox">
-          <item>
-           <property name="text">
-            <string>Trace</string>
-           </property>
+     <widget class="QFrame" name="frame">
+      <property name="minimumSize">
+       <size>
+        <width>640</width>
+        <height>480</height>
+       </size>
+      </property>
+      <property name="frameShape">
+       <enum>QFrame::StyledPanel</enum>
+      </property>
+      <property name="frameShadow">
+       <enum>QFrame::Raised</enum>
+      </property>
+      <layout class="QVBoxLayout" name="verticalLayout">
+       <item>
+        <widget class="QGroupBox" name="groupBox_4">
+         <property name="title">
+          <string>General</string>
+         </property>
+         <layout class="QFormLayout" name="formLayout_4">
+          <item row="0" column="0">
+           <widget class="QLabel" name="label_9">
+            <property name="toolTip">
+             <string>The base folder when clicking &quot;Source Folder&quot;</string>
+            </property>
+            <property name="text">
+             <string>Start folder</string>
+            </property>
+           </widget>
           </item>
-          <item>
-           <property name="text">
-            <string>Debug</string>
-           </property>
+          <item row="0" column="1">
+           <widget class="QLineEdit" name="startFolderLineEdit"/>
           </item>
-          <item>
-           <property name="text">
-            <string>Info</string>
-           </property>
+          <item row="1" column="0">
+           <widget class="QLabel" name="label_14">
+            <property name="toolTip">
+             <string>The minimum of ome.tif files in a subfolder to be considered tiles</string>
+            </property>
+            <property name="text">
+             <string>Min nb files for pattern finder</string>
+            </property>
+           </widget>
           </item>
-          <item>
-           <property name="text">
-            <string>Warning</string>
-           </property>
+          <item row="1" column="1">
+           <widget class="QSpinBox" name="patternFinderMinFilesSpinBox">
+            <property name="minimum">
+             <number>1</number>
+            </property>
+            <property name="maximum">
+             <number>65535</number>
+            </property>
+            <property name="value">
+             <number>10</number>
+            </property>
+           </widget>
           </item>
-          <item>
-           <property name="text">
-            <string>Error</string>
-           </property>
+          <item row="2" column="0">
+           <widget class="QLabel" name="label">
+            <property name="toolTip">
+             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;How much information will be printed in the log window. &lt;/p&gt;&lt;p&gt;Select Trace to print in the debugger instead.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            </property>
+            <property name="text">
+             <string>Verbosity</string>
+            </property>
+           </widget>
           </item>
-          <item>
-           <property name="text">
-            <string>Fatal</string>
-           </property>
+          <item row="2" column="1">
+           <widget class="QComboBox" name="verbosityComboBox">
+            <item>
+             <property name="text">
+              <string>Trace</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>Debug</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>Info</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>Warning</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>Error</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>Fatal</string>
+             </property>
+            </item>
+           </widget>
           </item>
-         </widget>
-        </item>
-       </layout>
-      </widget>
-     </item>
-     <item>
-      <widget class="QGroupBox" name="groupBox">
-       <property name="title">
-        <string>Performances</string>
-       </property>
-       <layout class="QFormLayout" name="formLayout">
-        <item row="0" column="0">
-         <widget class="QLabel" name="label_2">
-          <property name="toolTip">
-           <string>The number of processor cores used for converting files.</string>
-          </property>
-          <property name="whatsThis">
-           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;How many processor cores work at the same time.&lt;/p&gt;&lt;p&gt;Increasing the concurent core number will theoretically increase the computation speed but &lt;span style=&quot; color:#edd400;&quot;&gt;beware of the following drawbacks:&lt;/span&gt;&lt;/p&gt;&lt;p&gt;    ∙ More cores also means more system memory (RAM). You can start with 10 and check if you get a memory error. If you do, you can decrease the number of processors. If it works fine, you can test with more processors.&lt;/p&gt;&lt;p&gt;    ∙ The performance vs core number relationship will hit a peak at a certain point and start to decrease if you keep increasing the core number. The reason is that the benefits of parallel processing will start to be overshadowed by the cost of communication between the processes.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-          </property>
-          <property name="text">
-           <string>Number of processes for file conversion</string>
-          </property>
-         </widget>
-        </item>
-        <item row="0" column="1">
-         <widget class="QSpinBox" name="nProcessesFileConversionSpinBox">
-          <property name="minimum">
-           <number>-1</number>
-          </property>
-          <property name="value">
-           <number>2</number>
-          </property>
-         </widget>
-        </item>
-        <item row="1" column="1">
-         <widget class="QSpinBox" name="nProcessesStitchingSpinBox">
-          <property name="minimum">
-           <number>-1</number>
-          </property>
-          <property name="value">
-           <number>2</number>
-          </property>
-         </widget>
-        </item>
-          <item row="3" column="0">
-         <widget class="QLabel" name="label_4">
-          <property name="toolTip">
-           <string>The number of processor cores used for detecting cells.</string>
-          </property>
-          <property name="whatsThis">
-           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;How many processor cores work at the same time.&lt;/p&gt;&lt;p&gt;Increasing the concurent core number will theoretically increase the computation speed but&lt;span style=&quot; color:#edd400;&quot;&gt; beware of the following drawbacks&lt;/span&gt;:&lt;/p&gt;&lt;p&gt;    ∙More cores also means &lt;span style=&quot; font-weight:700;&quot;&gt;more system memory (RAM)&lt;/span&gt;. You can start with 10 and check if you get a memory error. If you do, you can decrease the number of processors. If it works fine, you can test with more processors.&lt;/p&gt;&lt;p&gt;    ∙The performance vs core number relationship will &lt;span style=&quot; font-weight:700;&quot;&gt;hit a peak at a certain point and start to decrease&lt;/span&gt; if you keep increasing the core number. The reason is that the benefits of parallel processing will start to be overshadowed by the cost of communication between the processes.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-          </property>
-          <property name="text">
-           <string>Number of processes for cell detection</string>
-          </property>
-         </widget>
-        </item>
-          <item row="3" column="1">
-         <widget class="QSpinBox" name="nProcessesCellDetectionSpinBox"/>
-        </item>
-          <item row="5" column="0">
-         <widget class="QLabel" name="label_5">
-          <property name="toolTip">
-           <string>Size of blocks for blockwise cell detection</string>
-          </property>
-          <property name="whatsThis">
-           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;This parameter is important for resource usage. If you encounter crashes after hitting the memory limit of your computer, you can decrease the sizes here. You can also reduce the number of parallel processes.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-          </property>
-          <property name="text">
-           <string>Detection chunk size</string>
-          </property>
-         </widget>
-        </item>
-          <item row="5" column="1">
-         <widget class="QFrame" name="frame_2">
-          <property name="frameShape">
-           <enum>QFrame::StyledPanel</enum>
-          </property>
-          <property name="frameShadow">
-           <enum>QFrame::Raised</enum>
-          </property>
-          <layout class="QHBoxLayout" name="horizontalLayout_2">
-           <item>
-            <layout class="QHBoxLayout" name="horizontalLayout">
-             <item>
-              <widget class="QLabel" name="label_6">
-               <property name="text">
-                <string>min</string>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QSpinBox" name="chunkSizeMinSpinBox"/>
-             </item>
-             <item>
-              <widget class="QLabel" name="label_7">
-               <property name="text">
-                <string>max</string>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QSpinBox" name="chunkSizeMaxSpinBox"/>
-             </item>
-             <item>
-              <widget class="QLabel" name="label_8">
-               <property name="text">
-                <string>overlap</string>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QSpinBox" name="chunkSizeOverlapSpinBox"/>
-             </item>
-            </layout>
-           </item>
-          </layout>
-         </widget>
-        </item>
-        <item row="1" column="0">
-         <widget class="QLabel" name="label_11">
-          <property name="toolTip">
-           <string>The number of processor cores used for stitching.</string>
-          </property>
-          <property name="whatsThis">
-           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;How many processor cores work at the same time.&lt;/p&gt;&lt;p&gt;Increasing the concurent core number will theoretically increase the computation speed but&lt;span style=&quot; color:#edd400;&quot;&gt; beware of the following drawbacks&lt;/span&gt;:&lt;/p&gt;&lt;p&gt;    ∙ More cores also means &lt;span style=&quot; font-weight:700;&quot;&gt;more system memory (RAM)&lt;/span&gt;. You can start with 10 and check if you get a memory error. If you do, you can decrease the number of processors. If it works fine, you can test with more processors.&lt;/p&gt;&lt;p&gt;    ∙ The performance vs core number relationship will &lt;span style=&quot; font-weight:700;&quot;&gt;hit a peak at a certain point and start to decrease&lt;/span&gt; if you keep increasing the core number. The reason is that the benefits of parallel processing will start to be overshadowed by the cost of communication between the processes.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-          </property>
-          <property name="text">
-           <string>Number of processes for stitching</string>
-          </property>
-         </widget>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="groupBox">
+         <property name="title">
+          <string>Performances</string>
+         </property>
+         <layout class="QFormLayout" name="formLayout">
+          <item row="0" column="0">
+           <widget class="QLabel" name="label_2">
+            <property name="toolTip">
+             <string>The number of processor cores used for converting files.</string>
+            </property>
+            <property name="whatsThis">
+             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;How many processor cores work at the same time.&lt;/p&gt;&lt;p&gt;Increasing the concurent core number will theoretically increase the computation speed but &lt;span style=&quot; color:#edd400;&quot;&gt;beware of the following drawbacks:&lt;/span&gt;&lt;/p&gt;&lt;p&gt;    ∙ More cores also means more system memory (RAM). You can start with 10 and check if you get a memory error. If you do, you can decrease the number of processors. If it works fine, you can test with more processors.&lt;/p&gt;&lt;p&gt;    ∙ The performance vs core number relationship will hit a peak at a certain point and start to decrease if you keep increasing the core number. The reason is that the benefits of parallel processing will start to be overshadowed by the cost of communication between the processes.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            </property>
+            <property name="text">
+             <string>Number of processes for file conversion</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <widget class="QSpinBox" name="nProcessesFileConversionSpinBox">
+            <property name="minimum">
+             <number>-1</number>
+            </property>
+            <property name="value">
+             <number>2</number>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="0">
+           <widget class="QLabel" name="label_11">
+            <property name="toolTip">
+             <string>The number of processor cores used for stitching.</string>
+            </property>
+            <property name="whatsThis">
+             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;How many processor cores work at the same time.&lt;/p&gt;&lt;p&gt;Increasing the concurent core number will theoretically increase the computation speed but&lt;span style=&quot; color:#edd400;&quot;&gt; beware of the following drawbacks&lt;/span&gt;:&lt;/p&gt;&lt;p&gt;    ∙ More cores also means &lt;span style=&quot; font-weight:700;&quot;&gt;more system memory (RAM)&lt;/span&gt;. You can start with 10 and check if you get a memory error. If you do, you can decrease the number of processors. If it works fine, you can test with more processors.&lt;/p&gt;&lt;p&gt;    ∙ The performance vs core number relationship will &lt;span style=&quot; font-weight:700;&quot;&gt;hit a peak at a certain point and start to decrease&lt;/span&gt; if you keep increasing the core number. The reason is that the benefits of parallel processing will start to be overshadowed by the cost of communication between the processes.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            </property>
+            <property name="text">
+             <string>Number of processes for stitching</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1">
+           <widget class="QSpinBox" name="nProcessesStitchingSpinBox">
+            <property name="minimum">
+             <number>-1</number>
+            </property>
+            <property name="value">
+             <number>2</number>
+            </property>
+           </widget>
           </item>
           <item row="2" column="0">
            <widget class="QLabel" name="label_16">
@@ -296,6 +213,22 @@
             </property>
            </widget>
           </item>
+          <item row="3" column="0">
+           <widget class="QLabel" name="label_4">
+            <property name="toolTip">
+             <string>The number of processor cores used for detecting cells.</string>
+            </property>
+            <property name="whatsThis">
+             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;How many processor cores work at the same time.&lt;/p&gt;&lt;p&gt;Increasing the concurent core number will theoretically increase the computation speed but&lt;span style=&quot; color:#edd400;&quot;&gt; beware of the following drawbacks&lt;/span&gt;:&lt;/p&gt;&lt;p&gt;    ∙More cores also means &lt;span style=&quot; font-weight:700;&quot;&gt;more system memory (RAM)&lt;/span&gt;. You can start with 10 and check if you get a memory error. If you do, you can decrease the number of processors. If it works fine, you can test with more processors.&lt;/p&gt;&lt;p&gt;    ∙The performance vs core number relationship will &lt;span style=&quot; font-weight:700;&quot;&gt;hit a peak at a certain point and start to decrease&lt;/span&gt; if you keep increasing the core number. The reason is that the benefits of parallel processing will start to be overshadowed by the cost of communication between the processes.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            </property>
+            <property name="text">
+             <string>Number of processes for cell detection</string>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="1">
+           <widget class="QSpinBox" name="nProcessesCellDetectionSpinBox"/>
+          </item>
           <item row="4" column="0">
            <widget class="QLabel" name="label_17">
             <property name="toolTip">
@@ -311,134 +244,199 @@
           </item>
           <item row="4" column="1">
            <widget class="QSpinBox" name="nProcessesBinarizationSpinBox"/>
-        </item>
-       </layout>
-      </widget>
-     </item>
-     <item>
-      <widget class="QGroupBox" name="groupBox_3">
-       <property name="title">
-        <string>Graphs</string>
-       </property>
-       <layout class="QFormLayout" name="formLayout_3">
-        <item row="0" column="0">
-         <widget class="QLabel" name="label_10">
-          <property name="toolTip">
-           <string>Default LUT for image display (white = grayscale)</string>
-          </property>
-          <property name="text">
-           <string>Default LUT</string>
-          </property>
-         </widget>
-        </item>
-        <item row="0" column="1">
-         <widget class="QComboBox" name="lutComboBox">
-          <item>
-           <property name="text">
+          </item>
+          <item row="5" column="0">
+           <widget class="QLabel" name="label_5">
+            <property name="toolTip">
+             <string>Size of blocks for blockwise cell detection</string>
+            </property>
+            <property name="whatsThis">
+             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;This parameter is important for resource usage. If you encounter crashes after hitting the memory limit of your computer, you can decrease the sizes here. You can also reduce the number of parallel processes.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            </property>
+            <property name="text">
+             <string>Detection chunk size</string>
+            </property>
+           </widget>
+          </item>
+          <item row="5" column="1">
+           <widget class="QFrame" name="frame_2">
+            <property name="minimumSize">
+             <size>
+              <width>0</width>
+              <height>50</height>
+             </size>
+            </property>
+            <property name="frameShape">
+             <enum>QFrame::StyledPanel</enum>
+            </property>
+            <property name="frameShadow">
+             <enum>QFrame::Raised</enum>
+            </property>
+            <layout class="QVBoxLayout" name="verticalLayout_3">
+             <item>
+              <layout class="QHBoxLayout" name="horizontalLayout">
+               <item>
+                <widget class="QLabel" name="label_6">
+                 <property name="text">
+                  <string>min</string>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QSpinBox" name="chunkSizeMinSpinBox"/>
+               </item>
+               <item>
+                <widget class="QLabel" name="label_7">
+                 <property name="text">
+                  <string>max</string>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QSpinBox" name="chunkSizeMaxSpinBox"/>
+               </item>
+               <item>
+                <widget class="QLabel" name="label_8">
+                 <property name="text">
+                  <string>overlap</string>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QSpinBox" name="chunkSizeOverlapSpinBox"/>
+               </item>
+              </layout>
+             </item>
+            </layout>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="groupBox_3">
+         <property name="title">
+          <string>Graphs</string>
+         </property>
+         <layout class="QFormLayout" name="formLayout_3">
+          <item row="0" column="0">
+           <widget class="QLabel" name="label_10">
+            <property name="toolTip">
+             <string>Default LUT for image display (white = grayscale)</string>
+            </property>
+            <property name="text">
+             <string>Default LUT</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <widget class="QComboBox" name="lutComboBox">
+            <item>
+             <property name="text">
               <string>grey</string>
              </property>
             </item>
             <item>
              <property name="text">
-            <string>white</string>
-           </property>
+              <string>white</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>fire</string>
+             </property>
+            </item>
+           </widget>
           </item>
-          <item>
-           <property name="text">
-            <string>fire</string>
-           </property>
+          <item row="1" column="0">
+           <widget class="QLabel" name="label_15">
+            <property name="toolTip">
+             <string>Background colour for 3D vector plots (e.g. vasculature graphs)</string>
+            </property>
+            <property name="text">
+             <string>3D plots background</string>
+            </property>
+           </widget>
           </item>
-         </widget>
-        </item>
-        <item row="1" column="0">
-         <widget class="QLabel" name="label_15">
-          <property name="toolTip">
-           <string>Background colour for 3D vector plots (e.g. vasculature graphs)</string>
-          </property>
-          <property name="text">
-           <string>3D plots background</string>
-          </property>
-         </widget>
-        </item>
-        <item row="1" column="1">
-         <widget class="QComboBox" name="threeDPlotsBackgroundComboBox">
-          <item>
-           <property name="text">
-            <string>grey</string>
-           </property>
+          <item row="1" column="1">
+           <widget class="QComboBox" name="threeDPlotsBackgroundComboBox">
+            <item>
+             <property name="text">
+              <string>grey</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>white</string>
+             </property>
+            </item>
+           </widget>
           </item>
-          <item>
-           <property name="text">
-            <string>white</string>
-           </property>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="groupBox_2">
+         <property name="title">
+          <string>Display</string>
+         </property>
+         <layout class="QFormLayout" name="formLayout_2">
+          <item row="0" column="0">
+           <widget class="QLabel" name="label_12">
+            <property name="text">
+             <string>Font size</string>
+            </property>
+           </widget>
           </item>
-         </widget>
-        </item>
-       </layout>
-      </widget>
-     </item>
-     <item>
-      <widget class="QGroupBox" name="groupBox_2">
-       <property name="title">
-        <string>Display</string>
-       </property>
-       <layout class="QFormLayout" name="formLayout_2">
-        <item row="0" column="0">
-         <widget class="QLabel" name="label_12">
-          <property name="text">
-           <string>Font size</string>
-          </property>
-         </widget>
-        </item>
-        <item row="0" column="1">
-         <widget class="QSpinBox" name="fontSizeSpinBox">
-          <property name="minimum">
-           <number>-1</number>
-          </property>
-          <property name="value">
-           <number>12</number>
-          </property>
-         </widget>
-        </item>
-        <item row="1" column="0">
-         <widget class="QLabel" name="label_13">
-          <property name="text">
-           <string>Font</string>
-          </property>
-         </widget>
-        </item>
-        <item row="1" column="1">
-         <widget class="QFontComboBox" name="fontComboBox"/>
-        </item>
-        <item row="2" column="0">
-         <widget class="QLabel" name="label_3">
-          <property name="text">
-           <string>Start full screen</string>
-          </property>
-         </widget>
-        </item>
-        <item row="2" column="1">
-         <widget class="QCheckBox" name="startFullScreenCheckBox">
-          <property name="text">
-           <string/>
-          </property>
-         </widget>
-        </item>
-       </layout>
-      </widget>
-     </item>
-     <item>
-      <widget class="QDialogButtonBox" name="buttonBox">
-       <property name="orientation">
-        <enum>Qt::Horizontal</enum>
-       </property>
-       <property name="standardButtons">
-        <set>QDialogButtonBox::Apply|QDialogButtonBox::Cancel|QDialogButtonBox::Ok</set>
-       </property>
-      </widget>
-     </item>
-    </layout>
-   </widget>
+          <item row="0" column="1">
+           <widget class="QSpinBox" name="fontSizeSpinBox">
+            <property name="minimum">
+             <number>-1</number>
+            </property>
+            <property name="value">
+             <number>12</number>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="0">
+           <widget class="QLabel" name="label_13">
+            <property name="text">
+             <string>Font</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1">
+           <widget class="QFontComboBox" name="fontComboBox"/>
+          </item>
+          <item row="2" column="0">
+           <widget class="QLabel" name="label_3">
+            <property name="text">
+             <string>Start full screen</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="1">
+           <widget class="QCheckBox" name="startFullScreenCheckBox">
+            <property name="text">
+             <string/>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QDialogButtonBox" name="buttonBox">
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
+         </property>
+         <property name="standardButtons">
+          <set>QDialogButtonBox::Apply|QDialogButtonBox::Cancel|QDialogButtonBox::Ok</set>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
     </item>
    </layout>
   </widget>

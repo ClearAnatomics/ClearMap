@@ -127,8 +127,15 @@
     </property>
     <addaction name="actionPreferences"/>
    </widget>
+   <widget class="QMenu" name="menuTools">
+    <property name="title">
+     <string>Tools</string>
+    </property>
+    <addaction name="actionStructureSelector"/>
+   </widget>
    <addaction name="file_menu"/>
    <addaction name="menu_edit"/>
+   <addaction name="menuTools"/>
   </widget>
   <widget class="QStatusBar" name="statusbar">
    <property name="font">
@@ -238,6 +245,11 @@
    </property>
    <property name="text">
     <string>What's this ?</string>
+   </property>
+  </action>
+  <action name="actionStructureSelector">
+   <property name="text">
+    <string>Structure selector</string>
    </property>
   </action>
  </widget>

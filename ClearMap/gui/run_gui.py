@@ -72,7 +72,8 @@ update_pbar(app, progress_bar, 20)
 from ClearMap.Utils.utilities import title_to_snake, get_percent_v_ram_use, gpu_util
 from ClearMap.gui.gui_logging import Printer
 from ClearMap.config.config_loader import ConfigLoader
-from ClearMap.gui.params import ConfigNotFoundError, UiParameterCollection, UiParameter
+from ClearMap.Utils.exceptions import ConfigNotFoundError
+from ClearMap.gui.params_interfaces import UiParameter, UiParameterCollection
 from ClearMap.gui.widget_monkeypatch_callbacks import get_value, set_value, controls_enabled, get_check_box, \
     enable_controls, disable_controls, set_text, get_text, connect_apply, connect_close, connect_save, connect_open, \
     connect_ok, connect_cancel, connect_value_changed, connect_text_changed
@@ -83,7 +84,8 @@ from ClearMap.gui.gui_utils import html_to_ansi, html_to_plain_text, compute_gri
 from ClearMap.gui.style import DARK_BACKGROUND, PLOT_3D_BG, \
     BTN_STYLE_SHEET, TOOLTIP_STYLE_SHEET, COMBOBOX_STYLE_SHEET, WARNING_YELLOW
 
-from ClearMap.gui.widgets import OrthoViewer, ProgressWatcher, setup_mini_brain  # needs plot_3d
+from ClearMap.gui.widgets import OrthoViewer, ProgressWatcher, setup_mini_brain, StructurePickerWidget, \
+    StructureSelector  # needs plot_3d
 update_pbar(app, progress_bar, 60)
 from ClearMap.gui.tabs import SampleTab, AlignmentTab, CellCounterTab, VasculatureTab, PreferenceUi, BatchTab
 
@@ -108,7 +110,6 @@ Analysis:
 LATER:
 Auto modes:
     - Run all
-    - Batch run
 """
 
 Ui_ClearMapGui, _ = loadUiType(os.path.join(UI_FOLDER, 'creator', 'mainwindow.ui'), from_imports=True,
@@ -239,8 +240,9 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
                 if widget_type == QComboBox:
                     widget.setStyleSheet(COMBOBOX_STYLE_SHEET)
 
-    def popup(self, msg, base_msg='Missing configuration file'):
-        self.print_warning_msg(html_to_plain_text(msg))
+    def popup(self, msg, base_msg='Missing configuration file', print_warning=True):
+        if print_warning:
+            self.print_warning_msg(html_to_plain_text(msg))
         return warning_popup(base_msg, msg)
 
     def file_exists(self, f_path):
@@ -407,7 +409,10 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
 
     def handle_step_name_change(self, step_name):
         self.log_process_start(step_name)
-        self.progress_dialog.mainStepNameLabel.setText(step_name)
+        try:
+            self.progress_dialog.mainStepNameLabel.setText(step_name)
+        except AttributeError as err:  # FIXME: find out why might be missing
+            self.error_logger.write(str(err))
         # self.progress_dialog.mainProgressBar.setFormat(f'step %v/%m  ({step_name})')
 
     def handle_sub_step_change(self, step_name):
@@ -465,6 +470,7 @@ class ClearMapGui(ClearMapGuiBase):
         self.batch_tab_mgr = BatchTab(self, tab_idx=4)
 
         self.preference_editor = PreferenceUi(self)
+        self.structure_selector = StructureSelector('', app=self)
 
         self.sample_tab_mgr.mini_brain_scaling, self.sample_tab_mgr.mini_brain = setup_mini_brain()
 
@@ -474,6 +480,9 @@ class ClearMapGui(ClearMapGuiBase):
         self.amend_ui()
 
         self.actionPreferences.triggered.connect(self.preference_editor.open)
+        self.actionStructureSelector.triggered.connect(self.structure_selector.show)
+
+        # self.actionPreferences.triggered.connect(self.raise_warning)
 
         self.app = QApplication.instance()
 
@@ -667,16 +676,19 @@ class ClearMapGui(ClearMapGuiBase):
     def set_src_folder(self):
         self.src_folder = get_directory_dlg(self.preference_editor.params.start_folder)
         self.config_loader.src_dir = self.src_folder
-        self.fix_styles()
+        # self.fix_styles()  # WARNING here because if set too early, theme is not fully applied
         cfg_path = self.config_loader.get_cfg_path('sample', must_exist=False)
         if self.file_exists(cfg_path):
             cfg = self.config_loader.get_cfg_from_path(cfg_path)
             sample_id = cfg['sample_id']
+            use_id_as_prefix = cfg['use_id_as_prefix']
             if sample_id == 'undefined':
                 sample_id = ''
         else:
             sample_id = ''
+            use_id_as_prefix = False
         self.sample_tab_mgr.display_sample_id(sample_id)
+        self.sample_tab_mgr.display_use_id_as_prefix(use_id_as_prefix)
 
     @property
     def src_folder(self):

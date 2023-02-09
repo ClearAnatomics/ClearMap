@@ -105,7 +105,7 @@ class CellDetector(TabProcessor):
             self.preview_cell_detection()
 
         self.run_cell_detection()
-        # print("Number of cells detected: {}".format(self.get_n_detected_cells()))
+        # print(f"Number of cells detected: {self.get_n_detected_cells()}")
 
         self.post_process_cells()
 
@@ -442,17 +442,18 @@ class CellDetector(TabProcessor):
     def plot_filtered_cells(self, parent=None, smarties=False):
         _, coordinates = self.get_coords('filtered')
         stitched_path = self.workspace.filename('stitched')
-        dvs = qplot_3d.plot(stitched_path, title='Stitched and filtered cells', arrange=False,
-                            lut='white', parent=parent)
-        self.filtered_cells = Scatter3D(coordinates, smarties=smarties)
+        dv = qplot_3d.plot(stitched_path, title='Stitched and filtered cells', arrange=False,
+                           lut='white', parent=parent)[0]
         scatter = pg.ScatterPlotItem()
-        dvs[0].view.addItem(scatter)
-        dvs[0].scatter_coords = self.filtered_cells
-        dvs[0].scatter = scatter
-        dvs[0].updateSlice()
-        return dvs
 
-    def plot_background_substracted_img(self):
+        dv.view.addItem(scatter)
+        dv.scatter = scatter
+
+        dv.scatter_coords = Scatter3D(coordinates, smarties=smarties, half_slice_thickness=3)  # FIXME: circles
+        dv.refresh()
+        return [dv]
+
+    def plot_background_subtracted_img(self):
         coordinates = np.hstack([self.workspace.source('cells', postfix='raw')[c][:, None] for c in 'xyz'])
         p = plot_3d.list_plot_3d(coordinates)
         return plot_3d.plot_3d(self.workspace.filename('stitched'), view=p, cmap=plot_3d.grays_alpha(alpha=1))

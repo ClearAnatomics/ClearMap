@@ -99,7 +99,7 @@ def tiled_layout(n_windows, origin=None, shape=None, percent=None, screen=None):
     return geo
 
 
-def link_dataviewers_cursors(dvs):  # Needs to specify cursor class because cannot import from widget here (circular)
+def link_dataviewers_cursors(dvs):
     for i, dv in enumerate(dvs):
         cursor = RedCross()
         dv.view.addItem(cursor)
@@ -133,7 +133,7 @@ class RedCross(pg.GraphicsObject):
         if coords is None:
             coords = [0, 0]
         self.size = size
-        self._rect = QRectF(coords[0]-self.size[0]/2, coords[1]-self.size[1]/2, self.size[0], self.size[1])  # TODO@ set as fraction of image size
+        self._rect = QRectF(coords[0]-self.size[0]/2, coords[1]-self.size[1]/2, self.size[0], self.size[1])  # TODO set as fraction of image size
         self.coords = coords
         self.picture = QtGui.QPicture()
 

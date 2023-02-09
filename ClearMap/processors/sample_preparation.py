@@ -18,7 +18,7 @@ import tifffile
 matplotlib.use('Qt5Agg')
 
 
-from ClearMap.Utils.utilities import runs_on_ui
+from ClearMap.Utils.utilities import runs_on_ui, requires_files, FilePath
 from ClearMap.config.atlas import ATLAS_NAMES_MAP, STRUCTURE_TREE_NAMES_MAP
 from ClearMap.gui.gui_utils import TmpDebug  # REFACTOR: move to workspace object
 from ClearMap.processors.generic_tab_processor import TabProcessor, CanceledProcessing
@@ -94,22 +94,39 @@ class PreProcessor(TabProcessor):
     def filename(self, *args, **kwargs):
         return self.workspace.filename(*args, **kwargs)
 
-    def z_only(self, tags):
+    def z_only(self, channel='raw'):
+        tags = self.workspace.expression(channel, prefix=self.prefix).tags
         axes = [tag.name for tag in tags]
         return axes == ['Z']
 
     @property
     def is_tiled(self):
-        tags = self.workspace.expression('raw', prefix=self.prefix).tags
+        return self.__is_tiled('raw')
+
+    def __is_tiled(self, channel):
+        tags = self.workspace.expression(channel, prefix=self.prefix).tags
         if not tags:
             return False
         else:
-            return not self.z_only(tags)
+            return not self.z_only(channel)
+
+    @property
+    def autofluorescence_is_tiled(self):
+        return self.__is_tiled('autofluorescence')
+
+    def __has_tiles(self, channel):
+        # extension = 'npy' if self.use_npy() else None
+        # return len(clearmap_io.file_list(self.filename(channel, prefix=self.prefix, extension=extension)))
+        # noinspection PyTypeChecker
+        return len(clearmap_io.file_list(self.filename(channel, prefix=self.prefix)))
 
     @property
     def has_tiles(self):
-        # noinspection PyTypeChecker
-        return len(clearmap_io.file_list(self.filename('raw', prefix=self.prefix)))
+        return self.__has_tiles('raw')
+
+    def check_has_all_tiles(self, channel):
+        extension = 'npy' if self.use_npy() else None
+        return self.workspace.all_tiles_exist(channel, extension=extension)
 
     @property
     def has_npy(self):
@@ -193,7 +210,7 @@ class PreProcessor(TabProcessor):
         if os.path.exists(self.filename('resampled')):
             return clearmap_io.shape(self.filename('resampled'))
 
-    def convert_tiles(self):
+    def convert_tiles(self, force=False):
         """
         Convert list of input files to numpy files for efficiency reasons
 
@@ -203,7 +220,7 @@ class PreProcessor(TabProcessor):
         """
         if self.stopped:
             return
-        if self.use_npy():
+        if force or self.use_npy():
             file_list = self.workspace.file_list('raw')
             if not file_list or os.path.splitext(file_list[0])[-1] == '.tif':
                 try:
@@ -334,6 +351,7 @@ class PreProcessor(TabProcessor):
     def n_rigid_steps_to_run(self):
         return int(not self.processing_config['stitching']['rigid']['skip'])
 
+    @requires_files([FilePath('raw')])
     def stitch_rigid(self, force=False):
         if force:
             self.stopped = False
@@ -349,7 +367,7 @@ class PreProcessor(TabProcessor):
         else:
             background_params = (stitching_cfg['rigid']['background_level'],
                                  stitching_cfg['rigid']['background_pixels'])
-        max_shifts = [stitching_cfg['rigid']['max_shifts_{}'.format(ax)] for ax in ('x', 'y', 'z')]
+        max_shifts = [stitching_cfg['rigid'][f'max_shifts_{ax}'] for ax in 'xyz']
         self.prepare_watcher_for_substep(len(layout.alignments), self.__rigid_stitching_align_re, 'Align layout rigid')
         try:
             stitching_rigid.align_layout_rigid_mip(layout, depth=projection_thickness, max_shifts=max_shifts,
@@ -358,7 +376,8 @@ class PreProcessor(TabProcessor):
                                                    workspace=self.workspace, verbose=True)
         except BrokenProcessPool:
             print('Stitching canceled')
-            return
+            self.stopped = True  # FIXME: see if appropriate solution
+            return  # FIXME: do not run stiching_wobbly if rigid failed
         layout.place(method='optimization', min_quality=-np.inf, lower_to_origin=True, verbose=True)
         self.update_watcher_main_progress()
 
@@ -368,14 +387,13 @@ class PreProcessor(TabProcessor):
         stitching_rigid.save_layout(self.filename('layout', postfix='aligned_axis'), layout)
         self.layout = layout
 
+    @requires_files([FilePath('raw')])  # TODO: optional requires npy
     def get_wobbly_layout(self, overlaps=None):
         if overlaps is None:
             overlaps, projection_thickness = define_auto_stitching_params(self.workspace.source('raw').file_list[0],
                                                                           self.processing_config['stitching'])
-        if self.use_npy():
-            raw_path = self.filename('raw', extension='npy')
-        else:
-            raw_path = self.filename('raw')
+        extension = 'npy' if self.use_npy() else None  # TODO: optional requires
+        raw_path = self.filename('raw', extension=extension)
         layout = stitching_wobbly.WobblyLayout(expression=raw_path, tile_axes=['X', 'Y'], overlaps=overlaps)
         return layout
 
@@ -385,7 +403,7 @@ class PreProcessor(TabProcessor):
 
     def __align_layout_wobbly(self, layout):
         stitching_cfg = self.processing_config['stitching']
-        max_shifts = [stitching_cfg['wobbly']['max_shifts_{}'.format(ax)] for ax in ('x', 'y', 'z')]
+        max_shifts = [stitching_cfg['wobbly'][f'max_shifts_{ax}'] for ax in 'xyz']
 
         n_pairs = len(layout.alignments)
         self.prepare_watcher_for_substep(n_pairs, self.__wobbly_stitching_algin_lyt_re, 'Align layout wobbly')
@@ -625,7 +643,7 @@ class PreProcessor(TabProcessor):
             self.patch_elastix_parameter_files([self.align_reference_affine_file, self.align_reference_bspline_file])
         for k, v in align_reference_parameter.items():
             if not v:
-                raise ValueError('Registration missing parameter "{}"'.format(k))
+                raise ValueError(f'Registration missing parameter "{k}"')
         elastix.align(**align_reference_parameter)
         self.restore_elastix_parameter_files([self.align_reference_affine_file, self.align_reference_bspline_file])  # FIXME: do in try except
         self.__check_elastix_success('auto_to_reference')

@@ -12,6 +12,7 @@
 # update:  conda env update -f ClearMap.yml 
 name: ClearMapUi
 channels:
+  - cuda
   - pytorch
   - conda-forge
   - defaults
@@ -21,7 +22,7 @@ dependencies:
   - pip
   - vispy<=0.5.3
   - pyopengl
-  - pyqt
+  - pyqt<6
   - pyqtwebengine
   - pyqtgraph=0.12  # Problem with pyqtgraph import of QWidgets with 0.13
   - opencv

@@ -5,6 +5,7 @@ widgets
 
 A set of custom widgets
 """
+import functools
 import json
 import os
 import re
@@ -13,6 +14,7 @@ from multiprocessing.pool import ThreadPool
 
 import numpy as np
 import pyqtgraph as pg
+from qdarkstyle import DarkPalette
 
 from skimage import transform as sk_transform  # Slowish
 
@@ -53,7 +55,7 @@ class RectItem(pg.GraphicsObject):  # Derived from https://stackoverflow.com/a/6
         self.name = 'rect'
 
     def __str__(self):
-        return 'Rect {}, coordinates: {}'.format(self.name, self.rect.getCoords())
+        return f'Rect {self.name}, coordinates: {self.rect.getCoords()}'
 
     @property
     def rect(self):
@@ -80,14 +82,14 @@ class OrthoViewer(object):
         self.img = img
         self.parent = parent
         self.params = None
-        self.rectangles = []
+        self.linear_regions = []
         self.dvs = []
 
     def setup(self, img, params, parent=None):
         self.img = img
         self.params = params
         self.parent = parent
-        self.rectangles = []
+        self.linear_regions = []
 
     @property
     def shape(self):
@@ -105,78 +107,27 @@ class OrthoViewer(object):
     def depth(self):
         return self.shape[2]
 
-    def update_x_min(self, val):
+    def update_ranges(self, ranges):
+        for i, rng in enumerate(ranges):
+            region_item = self.linear_regions[i]
+            region_item.setRegion(rng)
+            self.__update_range(region_item, axis=i)
+
+    def __update_range(self, region_item, axis=0):
+        rng = region_item.getRegion()
         if self.params is not None:
-            val = self.params.scale_x(val)
-        self._update_rect('x', val, 'min')
+            rng = [self.params.scale_axis(val, 'xyz'[axis]) for val in rng]
+            setattr(self.params, f'crop_{"xyz"[axis]}_min', rng[0])
+            setattr(self.params, f'crop_{"xyz"[axis]}_max', rng[1])
 
-    def update_x_max(self, val):
-        if self.params is not None:
-            val = self.params.scale_x(val)
-        self._update_rect('x', val, 'max')
-
-    def update_y_min(self, val):
-        if self.params is not None:
-            val = self.params.scale_y(val)
-        self._update_rect('y', val, 'min')
-
-    def update_y_max(self, val):
-        if self.params is not None:
-            val = self.params.scale_y(val)
-        self._update_rect('y', val, 'max')
-
-    def update_z_min(self, val):
-        if self.params is not None:
-            val = self.params.scale_z(val)
-        self._update_rect('z', val, 'min')
-
-    def update_z_max(self, val):
-        if self.params is not None:
-            val = self.params.scale_z(val)
-        self._update_rect('z', val, 'max')
-
-    def update_ranges(self):
-        self.update_x_min(self.params.crop_x_min)
-        self.update_x_max(self.params.crop_x_max)
-        self.update_y_min(self.params.crop_y_min)
-        self.update_y_max(self.params.crop_y_max)
-        self.update_z_min(self.params.crop_z_min)
-        self.update_z_max(self.params.crop_z_max)
-
-    def get_rect(self, axis, min_or_max):
-        axes = ('x', 'y', 'z')
-        if axis in axes:
-            axis = axes.index(axis)
-        idx = axis * 2 + (min_or_max == 'max')
-        return self.rectangles[idx]
-
-    def _update_rect(self, axis, val, min_or_max='min'):
-        if not self.rectangles:
-            return
-        rect_itm = self.get_rect(axis, min_or_max)
-        if min_or_max == 'min':
-            rect_itm.rect.setWidth(val)
-        else:
-            rect_itm.rect.setLeft(val)
-        try:
-            graph = self.parent.graph_by_name(axis)
-        except KeyError:
-            print('Wrong graphs displayed, skipping')
-            return
-        rect_itm._generate_picture()
-        graph.view.update()
-
-    def add_cropping_bars(self):
-        self.rectangles = []
-        y_axis_idx = (1, 2, 0)
+    def add_regions(self):
+        # y_axis_idx = (1, 2, 0)
         for i, dv in enumerate(self.dvs):
-            height = self.shape[y_axis_idx[i]]
-            min_rect = RectItem(QRectF(0, 0, 0, height))
-            self.rectangles.append(min_rect)
-            dv.view.addItem(min_rect)
-            max_rect = RectItem(QRectF(self.shape[i], 0, 0, height))
-            self.rectangles.append(max_rect)
-            dv.view.addItem(max_rect)
+            transparency = '4B'
+            linear_region = pg.LinearRegionItem([0, self.shape[i]], brush=DarkPalette.COLOR_BACKGROUND_2 + transparency)
+            linear_region.sigRegionChanged.connect(functools.partial(self.__update_range, axis=i))
+            self.linear_regions.append(linear_region)
+            dv.view.addItem(linear_region)
 
     def plot_orthogonal_views(self, img=None, parent=None):
         if img is None:
@@ -190,7 +141,10 @@ class OrthoViewer(object):
         zx = np.copy(img).transpose((2, 0, 1))
         dvs = plot_3d.plot([xy, yz, zx], arrange=False, lut='white', parent=parent, sync=False)
         self.dvs = dvs
-        # FIXME: disable axes buttons
+        self.add_regions()
+        for dv in self.dvs:
+            for btn in dv.axis_buttons:
+                btn.setEnabled(False)
         return dvs
 
 
@@ -205,6 +159,7 @@ class ProgressWatcher(QWidget):  # Inspired from https://stackoverflow.com/a/662
     max_changed = QtCore.pyqtSignal(int)
 
     finished = QtCore.pyqtSignal(str)
+    aborted = QtCore.pyqtSignal(bool)  # FIXME: use
 
     def __init__(self, max_progress=100, main_max_progress=1, parent=None):
         super().__init__(parent)
@@ -751,13 +706,13 @@ class SamplePickerDialog(WizardDialog):
         self.group_paths = [[]]
         self.current_group = 1
         for i in range(self.params.n_groups - 1):
-            self.handle_add_group()
+            self.handle_add_group(add_to_params=False)
         self.list_selection = TwoListSelection()
         self.dlg.listPickerLayout.addWidget(self.list_selection)
 
     def connect_buttons(self):
         self.dlg.mainFolderPushButton.clicked.connect(self.handle_main_folder_clicked)
-        self.dlg.addGroupPushButton.clicked.connect(self.handle_add_group)
+        self.dlg.addGroupPushButton.clicked.connect(functools.partial(self.handle_add_group, add_to_params=True))
         self.dlg.groupsComboBox.currentIndexChanged.connect(self.handle_group_changed)
         self.dlg.buttonBox.accepted.connect(self.apply_changes)
         self.dlg.buttonBox.rejected.connect(self.dlg.close)
@@ -783,8 +738,10 @@ class SamplePickerDialog(WizardDialog):
     def update_current_group_paths(self):
         self.group_paths[self.current_group - 1] = self.list_selection.get_right_elements()
 
-    def handle_add_group(self):
+    def handle_add_group(self, add_to_params=True):
         self.dlg.groupsComboBox.addItem(f'{self.dlg.groupsComboBox.count() + 1}')
+        if add_to_params:
+            self.params.add_group()
         self.group_paths.append([])
 
     def handle_main_folder_clicked(self):
@@ -917,10 +874,11 @@ class StructurePickerWidget(QTreeWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setColumnCount(4)
-        # self.tree = QTreeWidget()
         self.root = self.parse_json()
         self.build_tree(self.root, self)
-        self.itemClicked.connect(self.print_id)
+        self.header().resizeSection(0, 300)
+        self.setHeaderLabels(['Structure name', 'ID', 'Color', ''])  # TODO: see why 4 columns
+        # self.itemClicked.connect(self.print_id)
 
     def print_id(self, itm, col):
         print([itm.text(i) for i in range(3)])
@@ -952,3 +910,23 @@ class StructurePickerWidget(QTreeWidget):
                 StructurePickerWidget.build_tree(tree=subtree, parent=parent)
             else:
                 raise ValueError(f'Unrecognised type {type(subtree)} for Tree: {subtree}')
+
+
+class StructureSelector(WizardDialog):
+    def __init__(self, src_folder, params=None, app=None):
+        super().__init__(src_folder, 'structure_selector', 'Structure selector', None, params, app)
+        self.structure_selected = self.picker_widget.itemClicked
+        # self.dlg.show()
+
+    def show(self):
+        self.dlg.show()
+
+    def close(self):
+        self.dlg.close()
+
+    def setup(self):
+        self.picker_widget = StructurePickerWidget(self.dlg)
+        self.dlg.structureLayout.addWidget(self.picker_widget)
+
+    def connect_buttons(self):
+        pass
