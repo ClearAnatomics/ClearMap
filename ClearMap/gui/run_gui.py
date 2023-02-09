@@ -673,16 +673,19 @@ class ClearMapGui(ClearMapGuiBase):
     def set_src_folder(self):
         self.src_folder = get_directory_dlg(self.preference_editor.params.start_folder)
         self.config_loader.src_dir = self.src_folder
-        self.fix_styles()
+        # self.fix_styles()  # WARNING here because if set too early, theme is not fully applied
         cfg_path = self.config_loader.get_cfg_path('sample', must_exist=False)
         if self.file_exists(cfg_path):
             cfg = self.config_loader.get_cfg_from_path(cfg_path)
             sample_id = cfg['sample_id']
+            use_id_as_prefix = cfg['use_id_as_prefix']
             if sample_id == 'undefined':
                 sample_id = ''
         else:
             sample_id = ''
+            use_id_as_prefix = False
         self.sample_tab_mgr.display_sample_id(sample_id)
+        self.sample_tab_mgr.display_use_id_as_prefix(use_id_as_prefix)
 
     @property
     def src_folder(self):
