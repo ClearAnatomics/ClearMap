@@ -33,7 +33,7 @@
         </font>
        </property>
        <property name="currentIndex">
-        <number>1</number>
+        <number>0</number>
        </property>
        <widget class="QWidget" name="page">
         <property name="geometry">
@@ -41,7 +41,7 @@
           <x>0</x>
           <y>0</y>
           <width>478</width>
-          <height>440</height>
+          <height>631</height>
          </rect>
         </property>
         <attribute name="label">
@@ -58,8 +58,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>384</width>
-              <height>392</height>
+              <width>460</width>
+              <height>463</height>
              </rect>
             </property>
             <attribute name="label">
@@ -439,8 +439,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>309</width>
-              <height>334</height>
+              <width>460</width>
+              <height>463</height>
              </rect>
             </property>
             <attribute name="label">
@@ -748,7 +748,7 @@
               <x>0</x>
               <y>0</y>
               <width>460</width>
-              <height>272</height>
+              <height>463</height>
              </rect>
             </property>
             <attribute name="label">
@@ -771,32 +771,6 @@
                  </property>
                 </widget>
                </item>
-               <item row="1" column="1">
-                <spacer name="verticalSpacer_8">
-                 <property name="orientation">
-                  <enum>Qt::Vertical</enum>
-                 </property>
-                 <property name="sizeHint" stdset="0">
-                  <size>
-                   <width>20</width>
-                   <height>40</height>
-                  </size>
-                 </property>
-                </spacer>
-               </item>
-               <item row="2" column="1">
-                <spacer name="verticalSpacer_9">
-                 <property name="orientation">
-                  <enum>Qt::Vertical</enum>
-                 </property>
-                 <property name="sizeHint" stdset="0">
-                  <size>
-                   <width>20</width>
-                   <height>40</height>
-                  </size>
-                 </property>
-                </spacer>
-               </item>
                <item row="0" column="0">
                 <widget class="QCheckBox" name="stitchingUseNpyCheckBox">
                  <property name="text">
@@ -805,6 +779,19 @@
                 </widget>
                </item>
               </layout>
+             </item>
+             <item>
+              <spacer name="verticalSpacer_5">
+               <property name="orientation">
+                <enum>Qt::Vertical</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>20</width>
+                 <height>40</height>
+                </size>
+               </property>
+              </spacer>
              </item>
              <item>
               <widget class="QDialogButtonBox" name="runStitchingButtonBox">
@@ -823,8 +810,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>196</width>
-              <height>100</height>
+              <width>460</width>
+              <height>463</height>
              </rect>
             </property>
             <attribute name="label">
@@ -840,19 +827,6 @@
                  </property>
                 </widget>
                </item>
-               <item row="0" column="1">
-                <spacer name="verticalSpacer_5">
-                 <property name="orientation">
-                  <enum>Qt::Vertical</enum>
-                 </property>
-                 <property name="sizeHint" stdset="0">
-                  <size>
-                   <width>20</width>
-                   <height>40</height>
-                  </size>
-                 </property>
-                </spacer>
-               </item>
                <item row="1" column="0">
                 <widget class="QCheckBox" name="stitchingPreviewArteriesCheckBox">
                  <property name="text">
@@ -860,20 +834,20 @@
                  </property>
                 </widget>
                </item>
-               <item row="1" column="1">
-                <spacer name="verticalSpacer_6">
-                 <property name="orientation">
-                  <enum>Qt::Vertical</enum>
-                 </property>
-                 <property name="sizeHint" stdset="0">
-                  <size>
-                   <width>20</width>
-                   <height>40</height>
-                  </size>
-                 </property>
-                </spacer>
-               </item>
               </layout>
+             </item>
+             <item>
+              <spacer name="verticalSpacer_10">
+               <property name="orientation">
+                <enum>Qt::Vertical</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>20</width>
+                 <height>40</height>
+                </size>
+               </property>
+              </spacer>
              </item>
              <item>
               <widget class="QDialogButtonBox" name="displayStitchingButtonBox">
@@ -892,8 +866,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>254</width>
-              <height>156</height>
+              <width>460</width>
+              <height>463</height>
              </rect>
             </property>
             <attribute name="label">
@@ -940,7 +914,7 @@
                </item>
               </widget>
              </item>
-             <item row="4" column="1">
+             <item row="5" column="1">
               <widget class="QDialogButtonBox" name="convertOutputButtonBox">
                <property name="toolTip">
                 <string>Convert the selected channels (stitched files) to the selected format for use outside ClearMap</string>
@@ -952,6 +926,19 @@
                 <string>Convert</string>
                </property>
               </widget>
+             </item>
+             <item row="4" column="1">
+              <spacer name="verticalSpacer_7">
+               <property name="orientation">
+                <enum>Qt::Vertical</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>20</width>
+                 <height>40</height>
+                </size>
+               </property>
+              </spacer>
              </item>
             </layout>
            </widget>
@@ -965,7 +952,7 @@
           <x>0</x>
           <y>0</y>
           <width>478</width>
-          <height>440</height>
+          <height>631</height>
          </rect>
         </property>
         <attribute name="label">
@@ -983,7 +970,7 @@
               <x>0</x>
               <y>0</y>
               <width>460</width>
-              <height>332</height>
+              <height>523</height>
              </rect>
             </property>
             <attribute name="label">
@@ -1179,7 +1166,7 @@
               <x>0</x>
               <y>0</y>
               <width>460</width>
-              <height>332</height>
+              <height>523</height>
              </rect>
             </property>
             <attribute name="label">
@@ -1194,19 +1181,6 @@
                   <string>Skip resampling</string>
                  </property>
                 </widget>
-               </item>
-               <item row="2" column="1">
-                <spacer name="verticalSpacer_7">
-                 <property name="orientation">
-                  <enum>Qt::Vertical</enum>
-                 </property>
-                 <property name="sizeHint" stdset="0">
-                  <size>
-                   <width>20</width>
-                   <height>40</height>
-                  </size>
-                 </property>
-                </spacer>
                </item>
                <item row="0" column="0">
                 <widget class="QPushButton" name="useResampledToAutoLandmarksPushButton">
@@ -1253,6 +1227,19 @@
               </layout>
              </item>
              <item>
+              <spacer name="verticalSpacer_2">
+               <property name="orientation">
+                <enum>Qt::Vertical</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>20</width>
+                 <height>40</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+             <item>
               <widget class="QDialogButtonBox" name="registerButtonBox">
                <property name="standardButtons">
                 <set>QDialogButtonBox::Apply</set>
@@ -1269,41 +1256,72 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>400</width>
-              <height>72</height>
+              <width>460</width>
+              <height>523</height>
              </rect>
             </property>
             <attribute name="label">
              <string>Display results</string>
             </attribute>
-            <layout class="QGridLayout" name="gridLayout_3">
-             <item row="2" column="0">
-              <widget class="QPushButton" name="plotRegistrationResultsSideBySidePushButton">
-               <property name="text">
-                <string>Plot ref to auto side by side</string>
+            <layout class="QVBoxLayout" name="verticalLayout_6">
+             <item>
+              <widget class="QGroupBox" name="groupBox">
+               <property name="title">
+                <string>Autofluorescence to data</string>
                </property>
+               <layout class="QHBoxLayout" name="horizontalLayout_17">
+                <item>
+                 <widget class="QPushButton" name="plotRegistrationResultsRawCompositePushButton">
+                  <property name="text">
+                   <string>Plot composite</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QPushButton" name="plotRegistrationResultsRawSideBySidePushButton">
+                  <property name="text">
+                   <string>Plot side by side</string>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
               </widget>
              </item>
-             <item row="0" column="0">
-              <widget class="QPushButton" name="plotRegistrationResultsRawSideBySidePushButton">
-               <property name="text">
-                <string>Plot auto to raw side by side</string>
+             <item>
+              <widget class="QGroupBox" name="groupBox_2">
+               <property name="title">
+                <string>Reference to autofluorescence</string>
                </property>
+               <layout class="QHBoxLayout" name="horizontalLayout_18">
+                <item>
+                 <widget class="QPushButton" name="plotRegistrationResultsCompositePushButton">
+                  <property name="text">
+                   <string>Plot composite</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QPushButton" name="plotRegistrationResultsSideBySidePushButton">
+                  <property name="text">
+                   <string>Plot side by side</string>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
               </widget>
              </item>
-             <item row="2" column="4">
-              <widget class="QPushButton" name="plotRegistrationResultsCompositePushButton">
-               <property name="text">
-                <string>Plot ref to auto composite</string>
+             <item>
+              <spacer name="verticalSpacer_4">
+               <property name="orientation">
+                <enum>Qt::Vertical</enum>
                </property>
-              </widget>
-             </item>
-             <item row="0" column="4">
-              <widget class="QPushButton" name="plotRegistrationResultsRawCompositePushButton">
-               <property name="text">
-                <string>Plot auto to raw composite</string>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>20</width>
+                 <height>40</height>
+                </size>
                </property>
-              </widget>
+              </spacer>
              </item>
             </layout>
            </widget>
@@ -1312,19 +1330,6 @@
         </layout>
        </widget>
       </widget>
-     </item>
-     <item>
-      <spacer name="verticalSpacer_2">
-       <property name="orientation">
-        <enum>Qt::Vertical</enum>
-       </property>
-       <property name="sizeHint" stdset="0">
-        <size>
-         <width>20</width>
-         <height>40</height>
-        </size>
-       </property>
-      </spacer>
      </item>
      <item>
       <widget class="QCheckBox" name="advancedCheckBox">

@@ -769,38 +769,16 @@ class VesselGraphProcessor(TabProcessor):
                                                     dtype='float32',
                                                     **voxelize_branch_parameter)
 
-    def voxelize(self):
+    def voxelize(self, weight_by_radius=False, vertex_degrees=None):
         vertices = self.graph_annotated.vertex_coordinates()
         voxelize_branch_parameter = self.__get_branch_voxelization_params()
-        self.__voxelize(vertices, voxelize_branch_parameter)
 
-    def voxelize_filtered(self, attr_name, attr_value):
-        """
+        if vertex_degrees and vertex_degrees >= 1:
+            degrees = self.graph_annotated.vertex_degrees() == vertex_degrees
+            vertices = vertices[degrees]
 
-        Parameters
-        ----------
-        attr_name str:
-            example "vertex_degrees"
-        attr_value:
-            example 1
-
-        Returns
-        -------
-
-        """
-        voxelize_branch_parameter = self.__get_branch_voxelization_params()
-
-        coordinates = self.graph_annotated.vertex_coordinates()
-        attr = getattr(self.graph_annotated, attr_name)() == attr_value
-        vertices = coordinates[attr]
-
-        self.__voxelize(vertices, voxelize_branch_parameter)
-
-    def voxelize_weighted(self, attr):
-        vertices = self.graph_annotated.vertex_coordinates()
-
-        voxelize_branch_parameter = self.__get_branch_voxelization_params()
-        voxelize_branch_parameter.update(weights=getattr(self.graph_annotated, attr)())
+        if weight_by_radius:
+            voxelize_branch_parameter.update(weights=self.graph_annotated.vertex_radii())
 
         self.__voxelize(vertices, voxelize_branch_parameter)
 

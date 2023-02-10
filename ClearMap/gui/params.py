@@ -677,9 +677,8 @@ class VesselVisualizationParams(UiParameter):
     graph_step: str
     plot_type: str
     voxelization_size: List[int]
-    filter_name: str
-    filter_value: str
-    weight_name: str
+    vertex_degrees: str
+    weight_by_radius: bool
 
     def __init__(self, tab, sample_params=None, preprocessing_params=None, src_folder=None):
         super().__init__(tab, src_folder)
@@ -693,9 +692,10 @@ class VesselVisualizationParams(UiParameter):
             'graph_step': ParamLink(None, self.tab.graphSlicerStepComboBox, connect=False),
             'plot_type': ParamLink(None, self.tab.graphPlotTypeComboBox, connect=False),
             'voxelization_size': ParamLink(['voxelization', 'size'], self.tab.vasculatureVoxelizationRadiusTriplet),
-            'filter_name': ParamLink(None, self.tab.voxelizationFitlerNameComboBox, connect=False),
-            'filter_value': ParamLink(None, self.tab.voxelizationFitlerValueLineEdit, connect=False),
-            'weight_name': ParamLink(None, self.tab.voxelizationWeightNameComboBox, connect=False),
+            'vertex_degrees': ParamLink(None, self.tab.vasculatureVoxelizationFilterDegreesSinglet, connect=False),
+            'weight_by_radius': ParamLink(None, self.tab.voxelizationWeightByRadius, connect=False)
+            # 'filter_name': ParamLink(None, self.tab.voxelizationFitlerNameComboBox, connect=False),
+            # 'weight_name': ParamLink(None, self.tab.voxelizationWeightNameComboBox, connect=False),
         }
         self.structure_id = None
         self.cfg_subtree = ['visualization']

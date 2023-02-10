@@ -590,6 +590,8 @@ class CellCounterTab(PostProcessingTab):
     def __init__(self, main_window, tab_idx=2):
         super().__init__(main_window, 'CellMap', tab_idx, 'cell_map_tab')
 
+        self.cell_intensity_histogram = None
+        self.cell_size_histogram = None
         self.preprocessor = None
         self.cell_detector = None
 
@@ -634,13 +636,16 @@ class CellCounterTab(PostProcessingTab):
         self.ui.cellMap3dScatterOnRefPushButton.clicked.connect(self.plot_cells_scatter_w_atlas_colors)
         self.ui.cellMap3dScatterOnStitchedPushButton.clicked.connect(self.plot_cells_scatter_w_atlas_colors_raw)
 
-    def setup_cell_param_histogram(self, cells, key='size'):
+    def setup_cell_param_histogram(self, cells, plot_item, key='size', x_log=False):
         values = cells[key].values
         hist, bin_edges = np.histogram(values, bins=20)
-        widget = pg.plot(hist, bin_edges[:-1], pen=pg.mkPen(DarkPalette.COLOR_ACCENT_2))
+        if plot_item is None:
+            widget = pg.plot(hist, bin_edges[:-1], pen=pg.mkPen(DarkPalette.COLOR_ACCENT_2))
+        else:
+            widget = plot_item
+            widget.plot(hist, bin_edges[:-1], pen=pg.mkPen(DarkPalette.COLOR_ACCENT_2), clear=True)
         widget.setBackground(DarkPalette.COLOR_BACKGROUND_2)
-        # widget.setLogMode(x=True)
-        widget.resize(160, 80)
+        widget.setLogMode(x=x_log)
         return widget
 
     def voxelize(self):
@@ -662,15 +667,22 @@ class CellCounterTab(PostProcessingTab):
         if tab_idx == 1:
             try:
                 cells_df = self.cell_detector.get_cells_df()  # FIXME: debug or not
-                self.cell_size_histogram = self.setup_cell_param_histogram(cells_df, 'size')
-                # FIXME: add only if len(layout) ==2
-                a = self.ui.cellDetectionThresholdsLayout.takeAt(2).widget()
-                b = self.ui.cellDetectionThresholdsLayout.takeAt(2).widget()
-                self.ui.cellDetectionThresholdsLayout.addWidget(self.cell_size_histogram, 1, 0, 1, 2)
-                self.ui.cellDetectionThresholdsLayout.addWidget(a, 2, 0, 1, 1)
-                self.ui.cellDetectionThresholdsLayout.addWidget(b, 2, 1, 1, 1)
-                self.cell_intensity_histogram = self.setup_cell_param_histogram(cells_df, 'source')
-                self.ui.cellDetectionThresholdsLayout.addWidget(self.cell_intensity_histogram, 4, 0, 1, 2)
+
+                self.cell_size_histogram = self.setup_cell_param_histogram(cells_df, self.cell_size_histogram, 'size')
+                self.cell_intensity_histogram = self.setup_cell_param_histogram(cells_df, self.cell_intensity_histogram, 'source')
+                if self.ui.cellDetectionThresholdsLayout.count() <= 4:
+                    label = self.ui.cellDetectionThresholdsLayout.takeAt(2).widget()
+                    controls = self.ui.cellDetectionThresholdsLayout.takeAt(2).widget()
+                    graph_width = label.width() + controls.width()
+                    graph_height = 50
+                    self.cell_size_histogram.resize(graph_width, graph_height)
+                    self.cell_size_histogram.setMaximumSize(graph_width, graph_height)
+                    self.ui.cellDetectionThresholdsLayout.addWidget(self.cell_size_histogram, 1, 0, 1, 2)
+                    self.ui.cellDetectionThresholdsLayout.addWidget(label, 2, 0, 1, 1)
+                    self.ui.cellDetectionThresholdsLayout.addWidget(controls, 2, 1, 1, 1)
+                    self.cell_intensity_histogram.resize(graph_width, graph_height)
+                    self.cell_intensity_histogram.setMaximumSize(graph_width, graph_height)
+                    self.ui.cellDetectionThresholdsLayout.addWidget(self.cell_intensity_histogram, 4, 0, 1, 2)
             except FileNotFoundError:
                 print('Could not find cells dataframe file, skipping')
         elif tab_idx == 3:
@@ -961,16 +973,12 @@ class VasculatureTab(PostProcessingTab):
         print('Graph integrated')
 
     def voxelize(self):
-        self.wrap_step('Running voxelization', self.vessel_graph_processor.voxelize)
-
-    def voxelize_filtered(self):
-        self.wrap_step('Running voxelization', self.vessel_graph_processor.voxelize_filtered,
-                       step_args=[self.params.visualization_params.filter_name,
-                                  self.params.visualization_params.filter_value])
-
-    def voxelize_weighted(self):
-        self.wrap_step('Running voxelization', self.vessel_graph_processor.voxelize_weighted,
-                       step_args=[self.params.visualization_params.weight_name])
+        voxelization_params = {
+            'weight_by_radius': self.params.visualization_params.weight_by_radius,
+            'vertex_degrees': self.params.visualization_params.vertex_degrees
+        }
+        self.wrap_step('Running voxelization', self.vessel_graph_processor.voxelize,
+                       step_kw_args=voxelization_params)
 
     def plot_voxelization(self):
         self.vessel_graph_processor.plot_voxelization(self.main_window.centralWidget())

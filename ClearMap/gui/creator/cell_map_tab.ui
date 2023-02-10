@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>521</width>
-    <height>938</height>
+    <height>894</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -17,6 +17,9 @@
    <string notr="true">background-color: rgb(46, 52, 54);</string>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout_10">
+   <property name="sizeConstraint">
+    <enum>QLayout::SetMinimumSize</enum>
+   </property>
    <item>
     <layout class="QVBoxLayout" name="verticalLayout_2">
      <item>
@@ -41,7 +44,7 @@
           <x>0</x>
           <y>0</y>
           <width>501</width>
-          <height>292</height>
+          <height>450</height>
          </rect>
         </property>
         <attribute name="label">
@@ -58,8 +61,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>469</width>
-              <height>225</height>
+              <width>483</width>
+              <height>342</height>
              </rect>
             </property>
             <attribute name="label">
@@ -154,7 +157,7 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>469</width>
+              <width>367</width>
               <height>293</height>
              </rect>
             </property>
@@ -380,8 +383,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>483</width>
-              <height>184</height>
+              <width>98</width>
+              <height>96</height>
              </rect>
             </property>
             <attribute name="label">
@@ -438,7 +441,7 @@
           <x>0</x>
           <y>0</y>
           <width>501</width>
-          <height>292</height>
+          <height>450</height>
          </rect>
         </property>
         <attribute name="label">
@@ -457,7 +460,7 @@
             <item row="0" column="0">
              <widget class="QLabel" name="label_7">
               <property name="text">
-               <string>Cell size range</string>
+               <string>Cell size</string>
               </property>
              </widget>
             </item>
@@ -513,7 +516,7 @@
             <item row="1" column="0">
              <widget class="QLabel" name="label_19">
               <property name="text">
-               <string>Cell intensity range</string>
+               <string>Cell intensity</string>
               </property>
              </widget>
             </item>
@@ -589,6 +592,19 @@
           </widget>
          </item>
          <item>
+          <spacer name="verticalSpacer">
+           <property name="orientation">
+            <enum>Qt::Vertical</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>20</width>
+             <height>40</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
+         <item>
           <widget class="QDialogButtonBox" name="previewCellFiltersButtonBox">
            <property name="toolTip">
             <string>Display results on the small data chunk detected</string>
@@ -612,7 +628,7 @@
           <x>0</x>
           <y>0</y>
           <width>501</width>
-          <height>292</height>
+          <height>450</height>
          </rect>
         </property>
         <attribute name="label">
@@ -689,7 +705,7 @@
           <x>0</x>
           <y>0</y>
           <width>501</width>
-          <height>292</height>
+          <height>450</height>
          </rect>
         </property>
         <attribute name="label">
@@ -770,7 +786,7 @@
           <x>0</x>
           <y>0</y>
           <width>501</width>
-          <height>292</height>
+          <height>450</height>
          </rect>
         </property>
         <attribute name="label">
@@ -810,19 +826,6 @@
         </layout>
        </widget>
       </widget>
-     </item>
-     <item>
-      <spacer name="verticalSpacer">
-       <property name="orientation">
-        <enum>Qt::Vertical</enum>
-       </property>
-       <property name="sizeHint" stdset="0">
-        <size>
-         <width>20</width>
-         <height>40</height>
-        </size>
-       </property>
-      </spacer>
      </item>
      <item>
       <widget class="QCheckBox" name="advancedCheckBox">
