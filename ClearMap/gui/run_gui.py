@@ -672,6 +672,7 @@ class ClearMapGui(ClearMapGuiBase):
             self.print_status_msg('Config loaded')
             for tab in self.tab_mgrs:
                 tab.initial_cfg_load()
+        self.sample_tab_mgr.plot_mini_brain()
 
     def set_src_folder(self):
         self.src_folder = get_directory_dlg(self.preference_editor.params.start_folder)
