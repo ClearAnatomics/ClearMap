@@ -296,7 +296,7 @@ class DataViewer(pg.QtGui.QWidget):
     def setSource(self, source, index='all'):  # TODO: see if could factor with __init__
         """initialize sources and axis settings"""
 
-        if index is 'all':
+        if index == 'all':
             if isinstance(source, tuple):
                 source = list(source)
             if not isinstance(source, list):

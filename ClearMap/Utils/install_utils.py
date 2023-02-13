@@ -112,6 +112,7 @@ class CudaVersionManager:
         self.python_version = python_version
         self.pytorch_version = pytorch_version
         self.__cuda_version = None
+        self.used_cuda_major = None
         self._pytorch_info = None
 
     @staticmethod
@@ -184,14 +185,19 @@ class CudaVersionManager:
         else:
             raise ValueError('No matching versions found')
 
-    def get_pytorch_info(self, cuda_major=None):
-        cuda_major = self.cuda_version[0] if cuda_major is None else cuda_major
+    def get_pytorch_info(self):
+        cuda_major = self.cuda_version[0] if self.used_cuda_major is None else self.used_cuda_major
         version_pattern = f'{self.pytorch_version}=py{self.python_version}_cuda{cuda_major}*'
         return CondaParser.get_conda_pkg_info('pytorch', ['pytorch'], version_pattern)
 
-    def get_toolkit_info(self, cuda_major=None):
-        cuda_major = self.cuda_version[0] if cuda_major is None else cuda_major
-        return CondaParser.get_conda_pkg_info('cudatoolkit', ['nvidia'], cuda_major)
+    def get_toolkit_info(self):
+        cuda_major = self.cuda_version[0] if self.used_cuda_major is None else self.used_cuda_major
+        while cuda_major > 9:
+            try:
+                return CondaParser.get_conda_pkg_info('cudatoolkit', ['nvidia'], cuda_major)
+            except subprocess.CalledProcessError:
+                cuda_major -= 1
+                self.used_cuda_major = cuda_major
 
     def get_toolkit_versions(self):
         return [[int(e) for e in pkg['version'].split('.')[:2]] for pkg in self.get_toolkit_info()]

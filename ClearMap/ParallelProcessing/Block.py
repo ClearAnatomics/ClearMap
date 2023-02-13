@@ -252,10 +252,10 @@ def _offsets_to_slicing(offsets, ndim = None, shape = None):
     if shape is not None:
       if o[0] is not None:
         if o[0] >= shape[d] or -o[0] > shape[d]:
-          raise ValueError('Offset %r out of range %d in dimenion %d!' (o, shape[d], d));
+          raise ValueError('Offset %r out of range %d in dimenion %d!' % (o, shape[d], d));
       if o[1] is not None:
         if o[1] >= shape[d] or -o[1] > shape[d]:
-          raise ValueError('Offset %r out of range %d in dimenion %d!' (o, shape[d], d));
+          raise ValueError('Offset %r out of range %d in dimenion %d!' % (o, shape[d], d));
     new_offsets.append(o);
  
   new_offsets = tuple(slice(o[0], o[1]) for o in new_offsets);  
