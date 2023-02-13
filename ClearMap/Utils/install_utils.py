@@ -6,7 +6,10 @@ Utilities module with minimal dependencies (standard library only) for installat
 """
 import sys
 import subprocess
-import yaml  # WARNING: Only guaranteed to be here in the tmp env
+try:
+    import yaml  # WARNING: Only guaranteed to be here in the tmp env
+except ImportError:
+    pass
 
 __author__ = 'Charly Rousseau <charly.rousseau@icm-institute.org>'
 __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
