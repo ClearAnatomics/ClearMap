@@ -1,12 +1,5 @@
 #!/usr/bin/env bash
 
-BASEDIR=$(dirname "$0")
-if [ "$1" == "" ]; then
-    ENV_FILE_PATH="ClearMapUi.yml"
-else
-    ENV_FILE_PATH=$1
-fi
-
 function red(){  #  From https://stackoverflow.com/a/57096493
     echo -e "\x1B[31m $1 \x1B[0m"
     if [ -n "${2}" ]; then
@@ -20,6 +13,14 @@ function green(){
     fi
 }
 
+BASEDIR=$(dirname "$0")
+if [ "$1" == "" ]; then
+    ENV_FILE_PATH="ClearMapUi.yml"
+else
+    ENV_FILE_PATH=$1
+fi
+
+green "Using env file $ENV_FILE_PATH"
 
 config_folder="$HOME/.clearmap"
 prep_python="import os, sys; sys.path.append(os.getcwd());"
@@ -57,7 +58,7 @@ green "Done"
 
 echo "Getting env name"
 ENV_NAME=$(python -c "from ClearMap.Utils.install_utils import EnvFileManager; \
-env_mgr = EnvFileManager('$BASEDIR/$ENV_FILE_PATH'); \
+env_mgr = EnvFileManager('$BASEDIR/$ENV_FILE_PATH', None); \
 env_name=env_mgr.get_env_name(); print(env_name)")
 green "Env name: $ENV_NAME"
 
@@ -149,4 +150,4 @@ Alternatively, use the ClearMap entry in the start menu
 
 # Cleanup
 conda deactivate
-rm 'tmp_env_file.yml'
+rm tmp_env_file.yml
