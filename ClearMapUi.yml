@@ -12,7 +12,7 @@
 # update:  conda env update -f ClearMap.yml 
 name: ClearMapUi
 channels:
-  - cuda
+  - nvidia
   - pytorch
   - conda-forge
   - defaults
