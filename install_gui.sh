@@ -45,7 +45,7 @@ esac
 # Verify CUDA is functional
 echo "Checking CUDA installation"
 python -c "$prep_python \
-from ClearMap.Utils.install_utils import assert_cuda; assert_cuda()" || exit 1
+from ClearMap.Utils.install_utils import CudaVersionManager; CudaVersionManager.assert_cuda()" || exit 1
 green "OK"
 
 # Amend environment file for compatibility with installed CUDA version
@@ -56,8 +56,9 @@ conda activate clearmap_tmp_env || exit 1
 green "Done"
 
 echo "Getting env name"
-ENV_NAME=$(python -c "from ClearMap.Utils.install_utils import get_env_name; \
-env_name=get_env_name('$BASEDIR/$ENV_FILE_PATH'); print(env_name)")
+ENV_NAME=$(python -c "from ClearMap.Utils.install_utils import EnvFileManager; \
+env_mgr = EnvFileManager('$BASEDIR/$ENV_FILE_PATH'); \
+env_name=env_mgr.get_env_name(); print(env_name)")
 green "Env name: $ENV_NAME"
 
 echo "Patching environment file"
@@ -87,7 +88,7 @@ python "setup.py" install || exit 1
 echo "Done"
 echo "Checking pytorch installation"
 python -c "$prep_python \
-from ClearMap.Utils.install_utils import check_pytorch; check_pytorch()" || exit 1
+from ClearMap.Utils.install_utils import CudaVersionManager; CudaVersionManager.check_pytorch()" || exit 1
 green "Pytorch installed and functional with CUDA support"
 
 # Create config folder if missing
@@ -146,4 +147,6 @@ To use it, open a terminal and run:
 Alternatively, use the ClearMap entry in the start menu
 "
 
+# Cleanup
 conda deactivate
+rm 'tmp_env_file.yml'
