@@ -558,6 +558,18 @@ class VesselGraphProcessor(TabProcessor):
                                                vertex_properties={'coordinates_atlas': 'annotation'},
                                                edge_geometry_properties={'coordinates_atlas': 'annotation'})
 
+	
+	def annotation_hemisphere(coordinates):
+            hemisphere_labels = annotation_module.label_points(coordinates, 
+            							annotation_file=self.preprocessor.hemispheres_file_path,
+            							key='id')
+            return hemisphere_labels
+	
+	self.graph_reduced.annotate_properties(annotation_hemisphere,
+                                               vertex_properties={'coordinates_atlas': 'hemisphere'},
+                                               edge_geometry_properties={'coordinates_atlas': 'hemisphere'})
+                                               
+
     def _compute_distance_to_surface(self):
         """add distance to brain surface as vertices properties"""
         # %% Distance to surface
