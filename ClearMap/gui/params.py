@@ -693,7 +693,7 @@ class VesselVisualizationParams(UiParameter):
             'plot_type': ParamLink(None, self.tab.graphPlotTypeComboBox, connect=False),
             'voxelization_size': ParamLink(['voxelization', 'size'], self.tab.vasculatureVoxelizationRadiusTriplet),
             'vertex_degrees': ParamLink(None, self.tab.vasculatureVoxelizationFilterDegreesSinglet, connect=False),
-            'weight_by_radius': ParamLink(None, self.tab.voxelizationWeightByRadius, connect=False)
+            'weight_by_radius': ParamLink(None, self.tab.voxelizationWeightByRadiusCheckBox, connect=False)
             # 'filter_name': ParamLink(None, self.tab.voxelizationFitlerNameComboBox, connect=False),
             # 'weight_name': ParamLink(None, self.tab.voxelizationWeightNameComboBox, connect=False),
         }
