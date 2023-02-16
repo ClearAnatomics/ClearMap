@@ -4,6 +4,7 @@ install_utils
 
 Utilities module with minimal dependencies (standard library only) for installation
 """
+import json
 import sys
 import subprocess
 try:
@@ -67,46 +68,19 @@ class EnvFileManager:
 
 class CondaParser:
     @staticmethod
-    def parse_conda_info(lines, package_name):
-        info_blocks = []
-        block = None
-        current_key = None
-        for ln in lines:
-            if ln.startswith(package_name):
-                if block:
-                    info_blocks.append(block)
-                block = {}
-                continue
-            elif ln.startswith('----'):
-                continue
-            if block is not None:
-                if ln.startswith('  - '):
-                    block[current_key].append(ln[4:].strip())
-                else:
-                    elements = ln.split(':')
-                    current_key = elements[0].strip()
-                    if len(elements) > 1 and elements[1].strip():
-                        block[current_key] = elements[1].strip()  # WARNING: pb if ':' in elements[1]
-                    else:
-                        block[current_key] = []
-        if block:
-            info_blocks.append(block)
-        return info_blocks
-
-    @staticmethod
     def pkg_to_v_string(pkg):
         return f'{pkg["version"]}={pkg["build"]}'
 
     @staticmethod
     def get_conda_pkg_info(pkg_name, channels, version_pattern):
         channels_str = ' '.join([f'-c {c}' for c in channels])
-        cmd = f'conda search {channels_str} {pkg_name}={version_pattern} --info'
-        lines = subprocess.check_output(cmd, shell=True).decode('ascii').splitlines()
-        info_blocks = CondaParser.parse_conda_info(lines, pkg_name)
+        cmd = f'conda search {channels_str} {pkg_name}={version_pattern} --info --json'
+        cmd_output = subprocess.check_output(cmd, shell=True).decode('ascii')
+        info_blocks = json.loads(cmd_output)[pkg_name]
         return info_blocks
 
 
-class CudaVersionManager:
+class CudaVersionManager:  # TODO: inherit from condaparser ??
     def __init__(self, cfg_path, python_version, pytorch_version='1.11'):
         self.cfg_path = cfg_path
         self.python_version = python_version
@@ -171,7 +145,7 @@ class CudaVersionManager:
         return [int(e) for e in version_str.split('.')]
 
     def toolkit_version_from_torch_pkg(self, pkg):
-        for dep in pkg['dependencies']:
+        for dep in pkg['depends']:
             if 'cudatoolkit' in dep:
                 return self.toolkit_dep_to_version(dep)
         raise ValueError('Dependency not found')
