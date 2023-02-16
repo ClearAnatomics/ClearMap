@@ -69,7 +69,7 @@ import qdarkstyle
 import pyqtgraph as pg
 
 update_pbar(app, progress_bar, 20)
-from ClearMap.Utils.utilities import title_to_snake, get_percent_v_ram_use, gpu_util
+from ClearMap.Utils.utilities import title_to_snake, get_percent_v_ram_use, gpu_util, gpu_params
 from ClearMap.gui.gui_logging import Printer
 from ClearMap.config.config_loader import ConfigLoader
 from ClearMap.Utils.exceptions import ConfigNotFoundError
@@ -133,8 +133,11 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         self.vram_bar = QProgressBar()
 
         self.timer = QTimer()
-        self.timer.setInterval(200)
-        self.timer.timeout.connect(self.update_monitoring_bars)
+        self.timer.setInterval(500)
+        self.timer.timeout.connect(self.update_cpu_bars)
+        self.slow_timer = QTimer()
+        self.slow_timer.setInterval(3000)
+        self.slow_timer.timeout.connect(self.update_gpu_bars)
 
     def find_child_by_name(self, child_name, child_type, parent=None):
         if parent is None:
@@ -450,11 +453,14 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
             self.statusbar.addPermanentWidget(bar)
             # cpu_bar.setValue(20)
 
-    def update_monitoring_bars(self):
+    def update_cpu_bars(self):
         self.cpu_bar.setValue(psutil.cpu_percent())
         self.ram_bar.setValue(psutil.virtual_memory().percent)
-        self.gpu_bar.setValue(gpu_util())
-        self.vram_bar.setValue(get_percent_v_ram_use())
+
+    def update_gpu_bars(self):  # WARNING: these commands are much slower
+        percent_vram, percent_gpu = gpu_params()
+        self.gpu_bar.setValue(percent_gpu)
+        self.vram_bar.setValue(percent_vram)
 
 
 class ClearMapGui(ClearMapGuiBase):
@@ -731,6 +737,7 @@ def main(app, splash):
     clearmap_main_win.show()
     clearmap_main_win.fix_styles()
     clearmap_main_win.timer.start()
+    clearmap_main_win.slow_timer.start()
     splash.finish(clearmap_main_win)
     if clearmap_main_win.preference_editor.params.verbosity != 'trace':  # WARNING: will disable progress bars
         clearmap_main_win.patch_stdout()
