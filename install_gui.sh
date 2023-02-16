@@ -37,38 +37,38 @@ case "$answer" in
         ;;
     *)
         green "Using libmamba";
-        conda install -n base conda-libmamba-solver;
+        conda install -y -n base conda-libmamba-solver;
         solver_string="--experimental-solver=libmamba";
         ;;
 esac
 
 
 # Verify CUDA is functional
-echo "Checking CUDA installation"
+green "Checking nVIDIA drivers and system CUDA installation"
 python -c "$prep_python \
 from ClearMap.Utils.install_utils import CudaVersionManager; CudaVersionManager.assert_cuda()" || exit 1
 green "OK"
 
 # Amend environment file for compatibility with installed CUDA version
 echo "Updating CUDA dependencies for ClearMap"
-echo "Creating temporary environment"
-conda create -n clearmap_tmp_env python pyyaml $solver_string || exit 1
+echo "  Creating temporary environment"
+conda create -y -n clearmap_tmp_env python pyyaml "$solver_string" || exit 1
 conda activate clearmap_tmp_env || exit 1
 green "Done"
 
-echo "Getting env name"
+echo "  Getting env name"
 ENV_NAME=$(python -c "from ClearMap.Utils.install_utils import EnvFileManager; \
 env_mgr = EnvFileManager('$BASEDIR/$ENV_FILE_PATH', None); \
 env_name=env_mgr.get_env_name(); print(env_name)")
 green "Env name: $ENV_NAME"
 
-echo "Patching environment file"
+echo "  Patching environment file"
 python -c "$prep_python \
 from ClearMap.Utils.install_utils import patch_env; \
 patch_env(os.path.join(os.getcwd(), '$ENV_FILE_PATH'), 'tmp_env_file.yml')" || exit 1
-green "Done"
 conda deactivate
 conda env remove -n clearmap_tmp_env
+green "Done"
 
 # Create environment if not present, otherwise update the packages and activate
 echo "Checking ClearMap env"
@@ -82,15 +82,15 @@ else
     conda env update --name "$ENV_NAME" --file "$BASEDIR/tmp_env_file.yml" $solver_string || exit 1
 fi
 conda activate "$ENV_NAME" || exit 1
+echo "Checking pytorch installation"
+python -c "$prep_python \
+from ClearMap.Utils.install_utils import CudaVersionManager; \
+CudaVersionManager.check_pytorch()" && green "Pytorch installed and functional with CUDA support" || { red "Pytorch installation failed"; exit 1; }
 
 # Install ClearMap
 echo "Installing"
 python "setup.py" install || exit 1
 echo "Done"
-echo "Checking pytorch installation"
-python -c "$prep_python \
-from ClearMap.Utils.install_utils import CudaVersionManager; CudaVersionManager.check_pytorch()" || exit 1
-green "Pytorch installed and functional with CUDA support"
 
 # Create config folder if missing
 if [ ! -d "$config_folder" ]; then
@@ -98,12 +98,11 @@ if [ ! -d "$config_folder" ]; then
 fi
 
 # Install or update ClearMap config
-cd "$HOME" || exit 1 # Should not be in same folder to import from installed version
+srcdir=$(pwd)
+cd "$HOME" || exit 1 # Exit source folder to import from installed version
 python -m ClearMap.config.update_config  || exit 1
-#python ClearMap/Environment.py  # Makes sure everything is compiled
 
-
-# TODO: Prompt for env variables: (tmp, elastix ...)
+# TODO: Prompt for environment variables (tmp, elastix ...) to be set in env activate
 
 # CONFIG
 clearmap_install_path=$(python -c "from ClearMap.config.update_config import CLEARMAP_DIR; print(CLEARMAP_DIR)")
@@ -150,4 +149,5 @@ Alternatively, use the ClearMap entry in the start menu
 
 # Cleanup
 conda deactivate
+cd "$srcdir" || exit 1
 rm tmp_env_file.yml
