@@ -123,7 +123,7 @@ class GenericTab(GenericUi):
             file_list = [file_list]
         for f_path in file_list:
             if not os.path.exists(f_path):
-                self.main_window.print_error_msg(f'Missing {step_name} file {f_path}.'
+                self.main_window.print_error_msg(f'Missing {step_name} file {f_path}. '
                                                  f'Please ensure {step_name} is run first.')
                 return False
         return True
@@ -289,6 +289,7 @@ class SampleTab(GenericTab):
         self.ui.advancedCheckBox.stateChanged.connect(self.swap_tab_advanced)
 
         self.ui.sampleIdButtonBox.button(QDialogButtonBox.Apply).setIcon(self.main_window._reload_icon)  # REFACTOR: put inside style that overrides ?
+        # self.ui.sampleIdButtonBox.button(QDialogButtonBox.Apply).clicked.connect(self.plot_mini_brain)
 
     def save_cfg(self):  # REFACTOR: use this instead of direct calls to ui_to_cfg
         self.params.ui_to_cfg()
