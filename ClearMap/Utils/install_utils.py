@@ -47,7 +47,7 @@ class EnvFileManager:
         Parameters
         ----------
         package_name
-        pkg_version_fn
+        pkg_version
 
         Returns
         -------
@@ -63,7 +63,16 @@ class EnvFileManager:
         self.cfg['dependencies'] = patched_dependencies
         dest_path = self.dest_path if self.dest_path else self.cfg_path
         with open(dest_path, 'w', encoding='utf8') as out_file:
-            yaml.dump(self.cfg, out_file, default_flow_style=False, allow_unicode=True)
+            yaml.dump(self.cfg, out_file, default_flow_style=False, allow_unicode=True, sort_keys=False)
+
+    def patch_env_var(self, var_name, var_val):
+        if 'variables' in self.cfg.keys():
+            self.cfg['variables'][var_name] = var_val
+        else:
+            self.cfg['variables'] = {var_name: var_val}
+        dest_path = self.dest_path if self.dest_path else self.cfg_path
+        with open(dest_path, 'w', encoding='utf8') as out_file:
+            yaml.dump(self.cfg, out_file, default_flow_style=False, allow_unicode=True, sort_keys=False)
 
 
 class CondaParser:
@@ -180,7 +189,7 @@ class CudaVersionManager:  # TODO: inherit from condaparser ??
         return [e.replace('cuda', '') for e in build.split('_') if 'cuda' in e][0]
 
 
-def patch_env(cfg_path, dest_path):
+def patch_env(cfg_path, dest_path, tmp_dir=None):
     env_mgr = EnvFileManager(cfg_path, dest_path)
 
     cuda_mgr = CudaVersionManager(cfg_path, env_mgr.python_version, env_mgr.get_package_version('pytorch'))
@@ -191,3 +200,8 @@ def patch_env(cfg_path, dest_path):
     env_mgr.patch_environment_package_line('cudatoolkit', toolkit_v_string)
     torch_v_string = f"{torch_pkg['version']}={torch_pkg['build']}"
     env_mgr.patch_environment_package_line('pytorch', torch_v_string)
+
+    print(tmp_dir)
+    if tmp_dir not in ('/tmp', '/tmp/'):
+        print(f'Patching tmp_dir to {tmp_dir}')
+        env_mgr.patch_env_var('TMP', tmp_dir)

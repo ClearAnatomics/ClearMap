@@ -13,6 +13,21 @@ function green(){
     fi
 }
 
+function yellow(){
+    echo -e "\x1B[33m $1 \x1B[0m"
+    if [ ! -z "${2}" ]; then
+    echo -e "\x1B[33m $($2) \x1B[0m"
+    fi
+}
+
+function green_n(){  # FIXME: parametrise above instead
+    echo -n -e "\x1B[32m $1 \x1B[0m"
+    if [ -n "${2}" ]; then
+        echo -n -e "\x1B[32m $($2) \x1B[0m"
+    fi
+}
+
+
 BASEDIR=$(dirname "$0")
 if [ "$1" == "" ]; then
     ENV_FILE_PATH="ClearMapUi.yml"
@@ -49,7 +64,7 @@ python -c "$prep_python \
 from ClearMap.Utils.install_utils import CudaVersionManager; CudaVersionManager.assert_cuda()" || exit 1
 green "OK"
 
-# Amend environment file for compatibility with installed CUDA version
+# Amend environment file (notably for compatibility with installed CUDA version)
 echo "Updating CUDA dependencies for ClearMap"
 echo "  Creating temporary environment"
 conda create -y -n clearmap_tmp_env python pyyaml "$solver_string" || exit 1
@@ -63,9 +78,21 @@ env_name=env_mgr.get_env_name(); print(env_name)")
 green "Env name: $ENV_NAME"
 
 echo "  Patching environment file"
+green_n "ClearMap writes large amounts of data to the temporary folder of the system (~200GB).
+If your system tmp folder is not located on a large of fast partition,
+you can define an other path here. Default: /tmp"
+read tmp_dir
+if [ -z "$tmp_dir" ]; then
+    tmp_dir="/tmp/"
+fi
+if [ ! -d "$tmp_dir" ]; then
+    yellow "Folder missing $tmp_dir, it will be created"
+fi
+green "Using temp folder: $tmp_dir"
+
 python -c "$prep_python \
 from ClearMap.Utils.install_utils import patch_env; \
-patch_env(os.path.join(os.getcwd(), '$ENV_FILE_PATH'), 'tmp_env_file.yml')" || exit 1
+patch_env(os.path.join(os.getcwd(), '$ENV_FILE_PATH'), 'tmp_env_file.yml', '$tmp_dir')" || exit 1
 conda deactivate
 conda env remove -n clearmap_tmp_env
 green "Done"
@@ -102,7 +129,7 @@ srcdir=$(pwd)
 cd "$HOME" || exit 1 # Exit source folder to import from installed version
 python -m ClearMap.config.update_config  || exit 1
 
-# TODO: Prompt for environment variables (tmp, elastix ...) to be set in env activate
+# TODO: Prompt for environment variables (elastix ...) to be set in env activate
 
 # CONFIG
 clearmap_install_path=$(python -c "from ClearMap.config.update_config import CLEARMAP_DIR; print(CLEARMAP_DIR)")
