@@ -67,8 +67,8 @@ def get_two_views():
     Get two views in order to plot two graphs/images in a consistent manner
     """
     canvas = vispy.scene.SceneCanvas(keys='interactive', title='plot3d', show=True)
-    vb1 = scene.widgets.ViewBox(border_color='yellow', parent=canvas.scene, camera=tc.TurntableCamera())
-    vb2 = scene.widgets.ViewBox(border_color='blue', parent=canvas.scene, camera=tc.TurntableCamera())
+    vb1 = scene.widgets.ViewBox(border_color='yellow', parent=canvas.scene, camera=tc.ArbitraryRotationCamera())
+    vb2 = scene.widgets.ViewBox(border_color='blue', parent=canvas.scene, camera=tc.ArbitraryRotationCamera())
 
     grid = canvas.central_widget.add_grid()
     grid.padding = 6
@@ -76,7 +76,7 @@ def get_two_views():
     grid.add_widget(vb2, 0, 1)
 
     for view in vb1, vb2:
-        view.camera = 'turntable'
+        # view.camera = 'turntable'
         view.camera.fov = 100
         view.camera.distance = 0
         view.camera.elevation = 0
@@ -88,15 +88,14 @@ def get_two_views():
     return vb1, vb2
 
 
-
-def plot3d(data, colormap = FireMap(), view=None):
+def plot3d(data, colormap=FireMap(), view=None):
     VolumePlot3D = vispy.scene.visuals.create_visual_node(vispy.visuals.VolumeVisual)
     # Add a ViewBox to let the user zoom/rotate
     # build canvas
     if view is None:
         canvas = vispy.scene.SceneCanvas(keys='interactive', title='plot3d', show=True)
-        view = canvas.central_widget.add_view(camera=tc.TurntableCamera())
-        view.camera = 'turntable'
+        view = canvas.central_widget.add_view(camera=tc.ArbitraryRotationCamera())
+        # view.camera = 'turntable'
         view.camera.fov = 0
         view.camera.distance = 7200
         view.camera.elevation = 31

@@ -32,7 +32,7 @@ import vispy.scene
 #vispy.app.run();
 
 
-import ClearMap.Visualization.Vispy.TurntableCamera as ttc
+import ClearMap.Visualization.Vispy.arbitrary_rotation_camera as ttc
 import ClearMap.Visualization.Vispy.VolumeVisual as volume_visual
 
 import ClearMap.Visualization.Color as col
@@ -439,8 +439,8 @@ def initialize_view(view=None, title=None, show=True, fov=None, distance=None, e
         # build canvas
         canvas = vispy.scene.SceneCanvas(keys='interactive', title=title, show=show, bgcolor=bg_color)
 
-        view = canvas.central_widget.add_view(camera=ttc.TurntableCamera())
-        view.camera = 'turntable'
+        view = canvas.central_widget.add_view(camera=ttc.ArbitraryRotationCamera())
+        # view.camera = 'turntable'  # WARNING: This overwrites the cam defined above
         if fov is not None:
             view.camera.fov = fov
         if distance is not None:

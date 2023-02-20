@@ -69,7 +69,7 @@ import qdarkstyle
 import pyqtgraph as pg
 
 update_pbar(app, progress_bar, 20)
-from ClearMap.Utils.utilities import title_to_snake, get_percent_v_ram_use, gpu_util, gpu_params
+from ClearMap.Utils.utilities import title_to_snake, gpu_params
 from ClearMap.gui.gui_logging import Printer
 from ClearMap.config.config_loader import ConfigLoader
 from ClearMap.Utils.exceptions import ConfigNotFoundError
@@ -84,8 +84,7 @@ from ClearMap.gui.gui_utils import html_to_ansi, html_to_plain_text, compute_gri
 from ClearMap.gui.style import DARK_BACKGROUND, PLOT_3D_BG, \
     BTN_STYLE_SHEET, TOOLTIP_STYLE_SHEET, COMBOBOX_STYLE_SHEET, WARNING_YELLOW
 
-from ClearMap.gui.widgets import OrthoViewer, ProgressWatcher, setup_mini_brain, StructurePickerWidget, \
-    StructureSelector  # needs plot_3d
+from ClearMap.gui.widgets import OrthoViewer, ProgressWatcher, setup_mini_brain, StructureSelector  # needs plot_3d
 update_pbar(app, progress_bar, 60)
 from ClearMap.gui.tabs import SampleTab, AlignmentTab, CellCounterTab, VasculatureTab, PreferenceUi, BatchTab
 
