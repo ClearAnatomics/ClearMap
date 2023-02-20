@@ -33,6 +33,9 @@ conda_init.sh
 # cythonized files  # TODO: check if include
 *.c
 *.cpp
+# Custom compiled
+*cpython*.so
+
 
 # unzipped resources
 ClearMap/Resources/Atlas/*.tif
