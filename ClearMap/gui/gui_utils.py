@@ -37,7 +37,7 @@ def np_to_qpixmap(img_array, alpha):
     # img = np.uint8(matplotlib.cm.Blues_r(img_array)*255)
     img = np.uint8(matplotlib.cm.copper(img_array)*255)
 
-    if alpha.dtype == np.bool:
+    if alpha.dtype == bool:
         alpha = alpha.astype(np.uint8)
         alpha[alpha != 0] = 255  # reestablish full range
 

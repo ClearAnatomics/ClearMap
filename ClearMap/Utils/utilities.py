@@ -80,7 +80,7 @@ def gpu_util():
 def gpu_params():  # Uses 1 query instead of 3 because too time-consuming
     res = smi_query('memory.used,memory.total,utilization.gpu').decode('ascii')
     mem_used, mem_total, gpu_percent = [s.strip() for s in res.split(',')]
-    percent_mem = (float(mem_used) / float(mem_total)) * 100
+    percent_mem = int((float(mem_used) / float(mem_total)) * 100)
     return percent_mem, int(gpu_percent)
 
 

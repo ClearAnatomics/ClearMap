@@ -453,8 +453,8 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
             # cpu_bar.setValue(20)
 
     def update_cpu_bars(self):
-        self.cpu_bar.setValue(psutil.cpu_percent())
-        self.ram_bar.setValue(psutil.virtual_memory().percent)
+        self.cpu_bar.setValue(round(psutil.cpu_percent()))
+        self.ram_bar.setValue(round(psutil.virtual_memory().percent))
 
     def update_gpu_bars(self):  # WARNING: these commands are much slower
         percent_vram, percent_gpu = gpu_params()
