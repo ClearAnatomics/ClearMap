@@ -392,12 +392,12 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         raise NotImplementedError()
 
     def wrap_in_thread(self, func, *args, **kwargs):
-        pool = ThreadPool(processes=1)
-        result = pool.apply_async(func, args, kwargs)
-        while not result.ready():
-            result.wait(0.25)
-            self.progress_watcher.set_progress(self.progress_watcher.count_dones())
-            self.app.processEvents()
+        with ThreadPool(processes=1) as pool:
+            result = pool.apply_async(func, args, kwargs)
+            while not result.ready():
+                result.wait(0.25)
+                self.progress_watcher.set_progress(self.progress_watcher.count_dones())
+                self.app.processEvents()
         return result.get()
 
     def signal_process_finished(self, msg='Idle, waiting for input'):
