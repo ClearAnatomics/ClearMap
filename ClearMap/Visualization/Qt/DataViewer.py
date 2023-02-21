@@ -25,7 +25,10 @@ import functools as ft
 import numpy as np
 
 import pyqtgraph as pg
-from PyQt5.QtCore import QEvent
+from PyQt5 import QtWidgets
+from PyQt5.QtCore import QEvent, QRect, QSize, pyqtSignal, Qt
+from PyQt5.QtGui import QPainter
+from PyQt5.QtWidgets import QWidget, QRadioButton, QLabel, QSplitter, QApplication, QSizePolicy
 
 from ClearMap.Utils.utilities import runs_on_spyder
 from ClearMap.IO.IO import as_source
@@ -38,8 +41,8 @@ if not pg.QAPP:
     pg.mkQApp()
 
 
-class DataViewer(pg.QtGui.QWidget):
-    mouse_clicked = pg.QtCore.pyqtSignal(int, int, int)
+class DataViewer(QWidget):
+    mouse_clicked = pyqtSignal(int, int, int)
 
     DEFAULT_SCATTER_PARAMS = {
         'pen': 'red',
@@ -51,7 +54,7 @@ class DataViewer(pg.QtGui.QWidget):
     def __init__(self, source, axis=None, scale=None, title=None, invertY=False,
                  minMax=None, screen=None, parent=None, default_lut='flame', original_orientation='zcxy', *args):
 
-        pg.QtGui.QWidget.__init__(self, parent, *args)
+        QWidget.__init__(self, parent, *args)
         # super().__init__(self, parent, *args)
 
         # ## Images sources
@@ -89,7 +92,7 @@ class DataViewer(pg.QtGui.QWidget):
         self.setWindowTitle(title)
         self.resize(1600, 1200)
 
-        self.layout = pg.QtGui.QGridLayout(self)
+        self.layout = QtWidgets.QGridLayout(self)
         self.layout.setContentsMargins(0, 0, 0, 0)
 
         # image pane
@@ -101,14 +104,14 @@ class DataViewer(pg.QtGui.QWidget):
         self.graphicsView.setObjectName("GraphicsView")
         self.graphicsView.setCentralItem(self.view)
 
-        splitter = pg.QtGui.QSplitter()
-        splitter.setOrientation(pg.QtCore.Qt.Horizontal)
+        splitter = QSplitter()
+        splitter.setOrientation(Qt.Horizontal)
         splitter.setSizes([self.width() - 10, 10])
         self.layout.addWidget(splitter)
 
-        image_splitter = pg.QtGui.QSplitter()
-        image_splitter.setOrientation(pg.QtCore.Qt.Vertical)
-        image_splitter.setSizePolicy(pg.QtGui.QSizePolicy.Expanding, pg.QtGui.QSizePolicy.Expanding)
+        image_splitter = QSplitter()
+        image_splitter.setOrientation(Qt.Vertical)
+        image_splitter.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         splitter.addWidget(image_splitter)
 
         # Image plots
@@ -122,8 +125,8 @@ class DataViewer(pg.QtGui.QWidget):
         else:
             self.image_items = [pg.ImageItem(s[self.source_slice[:s.ndim]], **image_options) for s in self.sources]
         for itm in self.image_items:
-            itm.setRect(pg.QtCore.QRect(0, 0, self.source_range_x, self.source_range_y))
-            itm.setCompositionMode(pg.QtGui.QPainter.CompositionMode_Plus)
+            itm.setRect(QRect(0, 0, self.source_range_x, self.source_range_y))
+            itm.setCompositionMode(QPainter.CompositionMode_Plus)
             self.view.addItem(itm)
         self.view.setXRange(0, self.source_range_x)
         self.view.setYRange(0, self.source_range_y)
@@ -139,12 +142,12 @@ class DataViewer(pg.QtGui.QWidget):
         else:
             self.slicePlot = pg.PlotWidget()
 
-        size_policy = pg.QtGui.QSizePolicy(pg.QtGui.QSizePolicy.Preferred, pg.QtGui.QSizePolicy.Preferred)  # TODO: add option for sizepolicy
+        size_policy = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)  # TODO: add option for sizepolicy
         size_policy.setHorizontalStretch(0)
         size_policy.setVerticalStretch(0)
         size_policy.setHeightForWidth(self.slicePlot.sizePolicy().hasHeightForWidth())
         self.slicePlot.setSizePolicy(size_policy)
-        self.slicePlot.setMinimumSize(pg.QtCore.QSize(0, 40 + 40*bool(original_title)))
+        self.slicePlot.setMinimumSize(QSize(0, 40 + 40*bool(original_title)))
         self.slicePlot.setObjectName("roiPlot")
 
         self.sliceLine = pg.InfiniteLine(0, movable=True)
@@ -164,8 +167,8 @@ class DataViewer(pg.QtGui.QWidget):
         axis_tools_layout, axis_tools_widget = self.__setup_axes_controls()
 
         # coordinate label
-        self.source_label = pg.QtGui.QLabel("")
         self.source_pointer = np.zeros(self.sources[0].ndim, dtype=int)
+        self.source_label = QLabel("")
         axis_tools_layout.addWidget(self.source_label, 0, 3)
 
         self.graphicsView.scene().sigMouseMoved.connect(self.updateLabelFromMouseMove)
@@ -179,15 +182,15 @@ class DataViewer(pg.QtGui.QWidget):
         # lut widgets
         self.luts = [LUT(image=i, color=c) for i, c in zip(self.image_items, self.__get_colors(default_lut))]
 
-        lut_layout = pg.QtGui.QGridLayout()
+        lut_layout = QtWidgets.QGridLayout()
 
         lut_layout.setContentsMargins(0, 0, 0, 0)
         for d, lut in enumerate(self.luts):
             lut_layout.addWidget(lut, 0, d)
-        lut_widget = pg.QtGui.QWidget()
+        lut_widget = QWidget()
         lut_widget.setLayout(lut_layout)
         lut_widget.setContentsMargins(0, 0, 0, 0)
-        lut_widget.setSizePolicy(pg.QtGui.QSizePolicy.Preferred, pg.QtGui.QSizePolicy.Expanding)  # TODO: add option for sizepolicy
+        lut_widget.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)  # TODO: add option for sizepolicy
         splitter.addWidget(lut_widget)
 
         splitter.setStretchFactor(0, 1)
@@ -251,15 +254,15 @@ class DataViewer(pg.QtGui.QWidget):
         self.updateSourceSlice()
 
     def __setup_axes_controls(self):
-        axis_tools_layout = pg.QtGui.QGridLayout()
+        axis_tools_layout = QtWidgets.QGridLayout()
         for d, ax in enumerate('xyz'):
-            button = pg.QtGui.QRadioButton(ax)
+            button = QRadioButton(ax)
             button.setMaximumWidth(50)
             axis_tools_layout.addWidget(button, 0, d)
             button.clicked.connect(ft.partial(self.setSliceAxis, d))
             self.axis_buttons.append(button)
         self.axis_buttons[self.space_axes.index(self.scroll_axis)].setChecked(True)
-        axis_tools_widget = pg.QtGui.QWidget()
+        axis_tools_widget = QWidget()
         axis_tools_widget.setLayout(axis_tools_layout)
         return axis_tools_layout, axis_tools_widget
 
@@ -444,7 +447,7 @@ class DataViewer(pg.QtGui.QWidget):
                 img_itm.updateImage(self.color_last(layer))
             else:
                 img_itm.updateImage(src[slc])
-            img_itm.setRect(pg.QtCore.QRect(0, 0, self.source_range_x, self.source_range_y))
+            img_itm.setRect(QRect(0, 0, self.source_range_x, self.source_range_y))
         self.view.setXRange(0, self.source_range_x)
         self.view.setYRange(0, self.source_range_y)
 
@@ -532,7 +535,7 @@ def _test():
         pg.mkQApp()
     DataViewer(img1)
     if not runs_on_spyder():
-        instance = pg.QtGui.QApplication.instance()
+        instance = QApplication.instance()
         instance.exec_()
 
 
