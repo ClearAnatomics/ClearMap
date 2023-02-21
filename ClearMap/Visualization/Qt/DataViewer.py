@@ -164,8 +164,8 @@ class DataViewer(pg.QtGui.QWidget):
         axis_tools_layout, axis_tools_widget = self.__setup_axes_controls()
 
         # coordinate label
-        self.source_pointer = np.zeros(self.sources[0].ndim, dtype=np.int_)
         self.source_label = pg.QtGui.QLabel("")
+        self.source_pointer = np.zeros(self.sources[0].ndim, dtype=int)
         axis_tools_layout.addWidget(self.source_label, 0, 3)
 
         self.graphicsView.scene().sigMouseMoved.connect(self.updateLabelFromMouseMove)
@@ -241,7 +241,7 @@ class DataViewer(pg.QtGui.QWidget):
         if 3 in self.sources[0].shape:  # Color image
             shape.pop(self.sources[0].shape.index(3))
         self.scroll_axis = axis if axis is not None else shape[-1]  # Default to last axis
-        self.source_index = (np.array(self.source_shape, dtype=float) / 2).astype(np.int)
+        self.source_index = (np.array(self.source_shape, dtype=float) / 2).astype(int)
 
         # scaling
         scale = np.array(scale) if scale is not None else np.array([])
@@ -332,8 +332,8 @@ class DataViewer(pg.QtGui.QWidget):
 
     def updateSourceRange(self):
         x, y = self.getXYAxes()
-        self.source_range_x = self.source_scale[x] * self.source_shape[x]
-        self.source_range_y = self.source_scale[y] * self.source_shape[y]
+        self.source_range_x = round(self.source_scale[x] * self.source_shape[x])
+        self.source_range_y = round(self.source_scale[y] * self.source_shape[y])
 
     def updateSourceSlice(self):
         """Set the current slice of the source"""

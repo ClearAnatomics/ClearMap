@@ -334,7 +334,7 @@ class Scatter3D:
         self.axis = 2
         if smarties and colors is None:
             n_samples = self.coordinates.shape[0]
-            self.colours = (pseudo_random_rgb_array(n_samples) * 255).astype(np.int)
+            self.colours = (pseudo_random_rgb_array(n_samples) * 255).astype(int)
             self.colours = np.array([QColor(*col) for col in self.colours])
         else:
             self.colours = colors
@@ -887,7 +887,7 @@ class StructurePickerWidget(QTreeWidget):
     def parse_json():
         with open(annotation.label_file, 'r') as json_handle:
             aba = json.load(json_handle)
-            root = aba['msg'][0]
+        root = aba['msg'][0]
         return root
 
     @staticmethod

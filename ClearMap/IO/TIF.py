@@ -100,7 +100,7 @@ class Source(src.Source):
       slicing = slc.unpack_slicing(slicing, ndim)
 
       slicing_z = slicing[-1]
-      if isinstance(slicing_z, (np.int, np.int64)):
+      if isinstance(slicing_z, (int, np.int64)):
         slicing_z = int(slicing_z)
       array = self._tif.asarray(key=slicing_z, maxworkers=processes)
       array = array_from_tif(array)

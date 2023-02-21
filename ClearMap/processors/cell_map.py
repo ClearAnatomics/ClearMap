@@ -410,13 +410,13 @@ class CellDetector(TabProcessor):
         df = self.get_cells_df()
 
         if raw:
-            coordinates = df[['x', 'y', 'z']].values.astype(np.int)  # required to match integer z
+            coordinates = df[['x', 'y', 'z']].values.astype(int)  # required to match integer z
         else:
-            coordinates = df[['xt', 'yt', 'zt']].values.astype(np.int)  # required to match integer z
+            coordinates = df[['xt', 'yt', 'zt']].values.astype(int)  # required to match integer z
             dv.atlas = clearmap_io.read(self.preprocessor.annotation_file_path)
             dv.structure_names = annotation.get_names_map()
         colors = df['color'].values * 255
-        colors = np.array([QColor(*cols.astype(np.int)) for cols in colors])
+        colors = np.array([QColor(*cols.astype(int)) for cols in colors])
         if 'hemisphere' in df.columns:
             hemispheres = df['hemisphere']
         else:

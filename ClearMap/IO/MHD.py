@@ -264,9 +264,9 @@ def mhd_read(f_name, fall_back_mode=False):
             import vtk  # Seems not exist currently for Python 3 (Jan 2017)
             from vtk.util.numpy_support import vtk_to_numpy
         except ImportError:
-            print('Optional library VTK was not detected. Falling back to built in (but slower) MHD reader'
-                  'If you experience issues loading MHD files, please consider installing VTK.'
-                  '(try "conda install -c conda-forge vtk")')
+            print('Optional library VTK was not detected. Falling back to built in (but slower) MHD reader. \n'
+                  'If you experience issues loading MHD files, please consider installing VTK. \n'
+                  '(Try "conda install -c conda-forge vtk")')
             fall_back_mode = True
 
     if fall_back_mode:

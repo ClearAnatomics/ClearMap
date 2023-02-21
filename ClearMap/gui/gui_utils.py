@@ -10,6 +10,8 @@ import inspect
 import os
 from math import sqrt, ceil
 
+import warnings
+
 import matplotlib
 import numpy as np
 import skimage.io
@@ -109,7 +111,9 @@ def surface_project(img):
     mask = ~np.isnan(proj).T  # TODO: check .T
     proj *= 255.0 / np.nanmax(proj)
     proj = 255 - proj  # invert
+    warnings.filterwarnings("ignore")
     proj = proj.astype(np.uint8).T
+    warnings.resetwarnings()
     return mask, proj
 
 
