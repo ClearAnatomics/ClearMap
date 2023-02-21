@@ -30,7 +30,7 @@
         </font>
        </property>
        <property name="currentIndex">
-        <number>3</number>
+        <number>0</number>
        </property>
        <widget class="QWidget" name="page">
         <property name="geometry">
@@ -350,7 +350,7 @@
             </font>
            </property>
            <property name="toolTip">
-            <string>The main channel color of your sample</string>
+            <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The file extension of the individual tiles.&lt;/p&gt;&lt;p&gt;This is used by the helper wizzard to search for the images.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
            </property>
            <property name="whatsThis">
             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The main channel color of your sample.&lt;/p&gt;&lt;p&gt;This is usually the channel with &lt;span style=&quot; font-weight:700;&quot;&gt;cells or vessels&lt;/span&gt;.&lt;/p&gt;&lt;p&gt;This is a relative path (from the sample directory) and the channel digits are witten as follows&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-style:italic;&quot;&gt;&amp;lt;AXIS,n_digits&amp;gt;&lt;/span&gt;&lt;/p&gt;&lt;p&gt;with axis begin one of XYZ in caps. The number of digits includes the number of 0.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
@@ -969,7 +969,7 @@
             <string>Resolution of the autolfuorescence dataset. Uncheck to read from the metadata.</string>
            </property>
            <property name="text">
-            <string>Autofluorescence</string>
+            <string>Ref channel</string>
            </property>
           </widget>
          </item>
@@ -1040,7 +1040,7 @@
             <string>Resolution of the secondary (e.g. arteries) dataset. Uncheck to read from the metadata.</string>
            </property>
            <property name="text">
-            <string>Secondary channel</string>
+            <string>Second channel</string>
            </property>
           </widget>
          </item>
