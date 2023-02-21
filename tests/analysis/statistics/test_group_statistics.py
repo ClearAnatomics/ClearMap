@@ -203,7 +203,7 @@ def test_p_values_whole_region(fake_stats_table):
             region_mask = np.logical_and(atlas == row.s_id, hemispheres_atlas == row.hem_id)
             p_vals = color_p_vals[region_mask]
             unique_vals = np.unique(p_vals, axis=0)
-            unique_vals = unique_vals.astype(bool).astype(np.int_) * 255
+            unique_vals = unique_vals.astype(bool).astype(int) * 255
             assert len(unique_vals) == 1
             region_p_val = unique_vals[0]
             if shift <= -25:  # yellow

@@ -690,7 +690,7 @@ def _apply_code(function, function_mask, source, selem = None,
   else:
     shape_remove = [];
   
-  if source.dtype not in (np.uint8, np.uint16, np.int, np.int16, np.int32, np.int64, np.uint32, np.uint64, np.bool):
+  if source.dtype not in (np.uint8, np.uint16, int, np.int16, np.int32, np.int64, np.uint32, np.uint64, bool):
     raise ValueError('The rank filter requires a source of integer type, found %r!' % source.dtype);
   
   if mask is not None:

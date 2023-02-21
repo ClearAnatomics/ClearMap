@@ -417,12 +417,12 @@ def generate_summary_table(cells_dfs, p_cutoff=None):
 
     total_df, grouped_counts = sanitize_df(gp_names, grouped_counts, total_df)
 
-    gp1 = grouped_counts[0].values.astype(np.int)
-    gp2 = grouped_counts[1].values.astype(np.int)
+    gp1 = grouped_counts[0].values.astype(int)
+    gp2 = grouped_counts[1].values.astype(int)
     p_vals, p_signs = t_test_region_counts(gp1, gp2, p_cutoff=p_cutoff, signed=True)
     total_df['p_value'] = p_vals
     total_df['q_value'] = clearmap_FDR.estimate_q_values(p_vals)
-    total_df['p_sign'] = p_signs.astype(np.int_)
+    total_df['p_sign'] = p_signs.astype(int)
     return total_df
 
 
