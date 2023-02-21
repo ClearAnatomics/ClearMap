@@ -16,7 +16,7 @@ import numpy as np
 import pyqtgraph as pg
 from qdarkstyle import DarkPalette
 
-from skimage import transform as sk_transform  # Slowish
+from skimage import transform as sk_transform  # WARNING: Slowish import, should be replaced
 
 from PyQt5 import QtGui, QtCore, QtWidgets
 from PyQt5.QtGui import QColor
@@ -675,14 +675,14 @@ class PatternDialog(WizardDialog):
     def get_patterns(self):
         splash, progress_bar = make_splash(bar_max=100)
         splash.show()
-        pool = ThreadPool(processes=1)
-        result = pool.apply_async(pattern_finders_from_base_dir,
-                                  [self.src_folder, None, self.min_file_number, self.tile_extension])
-        while not result.ready():
-            result.wait(0.25)
-            update_pbar(self.app, progress_bar, 1)  # TODO: real update
-            self.app.processEvents()
-        pattern_finders = result.get()
+        with ThreadPool(processes=1) as pool:
+            result = pool.apply_async(pattern_finders_from_base_dir,
+                                      [self.src_folder, None, self.min_file_number, self.tile_extension])
+            while not result.ready():
+                result.wait(0.25)
+                update_pbar(self.app, progress_bar, 1)  # TODO: real update
+                self.app.processEvents()
+            pattern_finders = result.get()
         update_pbar(self.app, progress_bar, 100)
         splash.finish(self.dlg)
         return pattern_finders
