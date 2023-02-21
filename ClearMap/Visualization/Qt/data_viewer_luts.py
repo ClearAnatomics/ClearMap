@@ -2,13 +2,16 @@ import functools as ft
 
 import numpy as np
 import pyqtgraph as pg
+from PyQt5.QtCore import QSize
+from PyQt5.QtGui import QColor
+from PyQt5.QtWidgets import QGridLayout, QPushButton, QSizePolicy, QWidget
 
 
 class LUTItem(pg.HistogramLUTItem):
     """Lookup table item for the DataViewer"""
 
-    def __init__(self, *args, **kargs):
-        pg.HistogramLUTItem.__init__(self, *args, **kargs)
+    def __init__(self, *args, **kwargs):
+        pg.HistogramLUTItem.__init__(self, *args, **kwargs)
         self.vb.setMaximumWidth(15)
         self.vb.setMinimumWidth(10)
 
@@ -33,40 +36,41 @@ class LUTItem(pg.HistogramLUTItem):
 class LUTWidget(pg.GraphicsView):
     """Lookup table widget for the DataViewer"""
 
-    def __init__(self, parent=None, *args, **kargs):
-        background = kargs.get('background', 'default')
+    def __init__(self, parent=None, *args, **kwargs):
+        background = kwargs.get('background', 'default')
         pg.GraphicsView.__init__(self, parent=parent, useOpenGL=True, background=background)
-        self.item = LUTItem(*args, **kargs)
+        self.item = LUTItem(*args, **kwargs)
         self.setCentralItem(self.item)
-        self.setSizePolicy(pg.QtGui.QSizePolicy.Preferred, pg.QtGui.QSizePolicy.Expanding)  # TODO: add option for sizepolicy
+        self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)  # TODO: add option for size_policy
         self.setMinimumWidth(120)
 
     def sizeHint(self):
-        return pg.QtCore.QSize(120, 200)
+        return QSize(120, 200)
 
     def __getattr__(self, attr):
         return getattr(self.item, attr)
 
 
-class LUT(pg.QtGui.QWidget):
+class LUT(QWidget):
     def __init__(self, image=None, color='red', percentiles=[[-100, 0, 50], [50, 75, 100]],
                  parent=None, *args):
-        pg.QtGui.QWidget.__init__(self, parent, *args)
+        QWidget.__init__(self, parent, *args)
 
-        self.layout = pg.QtGui.QGridLayout(self)
+        self.layout = QGridLayout(self)
         self.layout.setSpacing(0)
-        self.layout.setMargin(0)
+        # self.layout.setMargin(0)
+        self.layout.setContentsMargins(0, 0, 0, 0)
 
         self.lut = LUTWidget(parent=parent, image=image)
         self.layout.addWidget(self.lut, 0, 0, 1, 1)
 
-        self.range_layout = pg.QtGui.QGridLayout()
+        self.range_layout = QGridLayout()
         self.range_buttons = []
         pre = ['%d', '%d']
         for r in range(2):
             range_buttons_m = []
             for i, p in enumerate(percentiles[r]):
-                button = pg.QtGui.QPushButton(pre[r] % (p))
+                button = QPushButton(pre[r] % (p))
                 button.setMaximumWidth(30)
                 font = button.font()
                 font.setPointSize(6)
@@ -88,8 +92,8 @@ class LUT(pg.QtGui.QWidget):
         if color in pg.graphicsItems.GradientEditorItem.Gradients.keys():
             self.lut.gradient.loadPreset(color)
         else:
-            self.lut.gradient.getTick(0).color = pg.QtGui.QColor(0, 0, 0, 0)
-            self.lut.gradient.getTick(1).color = pg.QtGui.QColor(color)
+            self.lut.gradient.getTick(0).color = QColor(0, 0, 0, 0)
+            self.lut.gradient.getTick(1).color = QColor(color)
             self.lut.gradient.updateGradient()
 
     def updateRegionRange(self, m, p):
@@ -116,8 +120,8 @@ class LUT(pg.QtGui.QWidget):
             r = [float(pmin)/pmin1, float(pmax)/pmax1] * self.quickPercentile(iitem.image, [pmin1, pmax1])
             self.lut.region.setRegion(r)
 
-    def quickPercentile(self, data, percentiles, targetSize=1e3):
-        while data.size > targetSize:
+    def quickPercentile(self, data, percentiles, target_size=1e3):
+        while data.size > target_size:
             ax = np.argmax(data.shape)
             sl = [slice(None)] * data.ndim
             sl[ax] = slice(None, None, 2)
