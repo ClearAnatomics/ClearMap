@@ -283,7 +283,9 @@ class SampleTab(GenericTab):
         self.connect_whats_this(self.ui.sampleCropZLblInfoToolButton, self.ui.sampleCropZLbl)
         self.ui.plotMiniBrainPushButton.clicked.connect(self.plot_mini_brain)
 
-        self.ui.applyBox.connectApply(self.main_window.alignment_tab_mgr.setup_workers)
+        self.ui.sampleViewAtlasPushButton.clicked.connect(self.display_atlas)
+
+        self.ui.applyBox.connectApply(self.main_window.alignment_tab_mgr.setup_workers)  # FIXME: check if risks overwrite if still same sample
         self.ui.applyBox.connectSave(self.save_cfg)
 
         self.ui.advancedCheckBox.stateChanged.connect(self.swap_tab_advanced)
@@ -359,6 +361,11 @@ class SampleTab(GenericTab):
         z_min, z_max = range_or_default(self.params.slice_z, z_scale)
         img = img[x_min:x_max, y_min:y_max:, z_min:z_max]
         return img
+
+    def display_atlas(self):
+        self.main_window.alignment_tab_mgr.setup_workers()
+        dvs = self.main_window.alignment_tab_mgr.preprocessor.plot_atlas()   # REFACTOR:
+        self.main_window.setup_plots(dvs)
 
 
 class AlignmentTab(GenericTab):
@@ -745,7 +752,7 @@ class CellCounterTab(PostProcessingTab):
         required_paths.append(self.cell_detector.df_path)
         if not self.step_exists('cell count', required_paths):
             return
-        dvs = self.cell_detector.plot_cells_3d_scatter_w_atlas_colors(parent=self.main_window)
+        dvs = self.cell_detector.plot_cells_3d_scatter_w_atlas_colors(parent=self.main_window)  # FIXME: add progress
         self.main_window.setup_plots(dvs)
 
     def plot_cells_scatter_w_atlas_colors_raw(self):
