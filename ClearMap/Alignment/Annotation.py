@@ -687,11 +687,13 @@ def prepare_annotation_files(slicing=None, orientation=None, directory=None, pos
                 print('Preparing: %r' % fn)
 
             if not overwrite and clearmap_io.is_file(fn):
+                if verbose:
+                    print('Atlas file exists, skipping')
                 results.append(fn)
                 continue
 
             if not clearmap_io.is_file(f_path):
-                raise ValueError('Cannot find annotation file: %s' % f_path)
+                raise ValueError(f'Cannot find annotation file: {f_path}')
 
             s = clearmap_io.as_source(f_path)
             if verbose:

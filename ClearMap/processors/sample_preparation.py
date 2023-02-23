@@ -42,6 +42,8 @@ import ClearMap.Alignment.Stitching.StitchingWobbly as stitching_wobbly
 from ClearMap.IO.metadata import define_auto_stitching_params, define_auto_resolution, pattern_finders_from_base_dir
 from ClearMap.IO.elastix_config import ElastixParser
 from ClearMap.config.config_loader import get_configs, ConfigLoader
+import ClearMap.Visualization.Plot3d as q_plot_3d
+
 
 
 __author__ = 'Christoph Kirst <christoph.kirst.ck@gmail.com>, Charly Rousseau <charly.rousseau@icm-institute.org>'
@@ -280,6 +282,9 @@ class PreProcessor(TabProcessor):
         self.align_channels_affine_file = os.path.join(align_dir, atlas_cfg['align_channels_affine_file'])
         self.align_reference_affine_file = os.path.join(align_dir, atlas_cfg['align_reference_affine_file'])
         self.align_reference_bspline_file = os.path.join(align_dir, atlas_cfg['align_reference_bspline_file'])
+
+    def plot_atlas(self):
+        return q_plot_3d.plot(self.reference_file_path, lut=self.machine_config['default_lut'])
 
     def run(self):
         self.stitch()
