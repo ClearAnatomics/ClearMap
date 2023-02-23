@@ -21,6 +21,7 @@ from matplotlib.colors import hsv_to_rgb
 
 from ClearMap.gui.pyuic_utils import loadUiType
 
+warnings.filterwarnings('ignore', category=RuntimeWarning, module='ClearMap.gui.gui_utils')  # For surface_project
 
 __author__ = 'Charly Rousseau <charly.rousseau@icm-institute.org>'
 __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
@@ -105,15 +106,13 @@ def project(img, axis, invalid_val=np.nan):
 
 
 def surface_project(img):
-    proj = project(img, 2, invalid_val=0.0)  # FIXME: check axis=0
+    proj = project(img, 2, invalid_val=0.0)
     proj -= np.min(proj[np.nonzero(proj)])
     proj[proj < 0] = np.nan  # or -np.inf
-    mask = ~np.isnan(proj).T  # TODO: check .T
+    mask = ~np.isnan(proj).T
     proj *= 255.0 / np.nanmax(proj)
     proj = 255 - proj  # invert
-    warnings.filterwarnings("ignore")
     proj = proj.astype(np.uint8).T
-    warnings.resetwarnings()
     return mask, proj
 
 
