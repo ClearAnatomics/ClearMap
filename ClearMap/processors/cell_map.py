@@ -415,13 +415,12 @@ class CellDetector(TabProcessor):
             coordinates = df[['xt', 'yt', 'zt']].values.astype(int)  # required to match integer z
             dv.atlas = clearmap_io.read(self.preprocessor.annotation_file_path)
             dv.structure_names = annotation.get_names_map()
-        colors = df['color'].values * 255
-        colors = np.array([QColor(*cols.astype(int)) for cols in colors])
         if 'hemisphere' in df.columns:
             hemispheres = df['hemisphere']
         else:
             hemispheres = None
-        dv.scatter_coords = Scatter3D(coordinates, colors=colors, hemispheres=hemispheres, half_slice_thickness=0)
+        dv.scatter_coords = Scatter3D(coordinates, colors=df['color'].values,
+                                      hemispheres=hemispheres, half_slice_thickness=0)
         dv.refresh()
         return [dv]
 
