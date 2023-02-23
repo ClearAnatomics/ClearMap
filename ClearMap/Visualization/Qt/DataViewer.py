@@ -471,18 +471,15 @@ class DataViewer(QWidget):
     def plot_scatter_markers(self, ax, index):
         self.scatter.clear()
         self.scatter_coords.axis = ax
-        scatter_params = DataViewer.DEFAULT_SCATTER_PARAMS.copy()  # TODO: check if copy required
         pos = self.scatter_coords.get_pos(index)
         if all(pos.shape):
-            if self.scatter_coords.colours is not None:
-                colours = self.scatter_coords.get_colours(index)
-                symbols = self.scatter_coords.get_symbols(index)
+            if self.scatter_coords.has_colours:
                 self.scatter.setData(pos=pos,
-                                     pen=[pg.mkPen(c) for c in colours],
-                                     brush=[pg.mkBrush(c) for c in colours],
-                                     symbol=symbols, size=10)  # FIXME: scale size as function of zoom
+                                     symbol=(self.scatter_coords.get_symbols(index)),
+                                     size=10,  # FIXME: scale size as function of zoom
+                                     **self.scatter_coords.get_draw_params(index))
             else:
-                self.scatter.setData(pos=pos, **scatter_params)
+                self.scatter.setData(pos=pos, **DataViewer.DEFAULT_SCATTER_PARAMS.copy())  # TODO: check if copy required
         try:  # FIXME: check why some markers trigger errors
             if self.scatter_coords.half_slice_thickness is not None:
                 marker_params = self.scatter_coords.get_all_data(index)
@@ -490,7 +487,7 @@ class DataViewer(QWidget):
                     self.scatter.addPoints(symbol='o', brush=pg.mkBrush((0, 0, 0, 0)),
                                            **marker_params)  # FIXME: scale size as function of zoom
         except KeyError as err:
-            print(err)
+            print(f'DataViewer error: {err}')
 
     def enable_mouse_clicks(self):
         self.graphicsView.scene().sigMouseClicked.connect(self.handleMouseClick)
