@@ -34,6 +34,8 @@ def main():
 
     if args.clear_atlas_cache:
         clear_atlas_caches(args.verbose)
+    else:  # No options given
+        parser.print_usage()
 
 
 if __name__ == '__main__':
