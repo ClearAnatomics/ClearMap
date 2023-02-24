@@ -96,7 +96,7 @@ setup(
         ],
         'console_scripts': [
             'cell_map = ClearMap.Scripts.cell_map_new_api:main',
-            'clearmap-utils = ClearMap.Scripts.clearmap-utils:main'
+            'clearmap-utils = ClearMap.Scripts.clearmap_utils:main'
         ],
     },
     url='',
