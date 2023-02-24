@@ -95,7 +95,8 @@ setup(
             'clear_map_ui = ClearMap.gui.run_gui:entry_point'
         ],
         'console_scripts': [
-             'cell_map = ClearMap.Scripts.cell_map_new_api:main',
+            'cell_map = ClearMap.Scripts.cell_map_new_api:main',
+            'clearmap-utils = ClearMap.Scripts.clearmap-utils:main'
         ],
     },
     url='',
