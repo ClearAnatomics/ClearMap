@@ -55,8 +55,7 @@ import ClearMap.Alignment.Annotation as annotation
 from ClearMap.processors.sample_preparation import PreProcessor
 from ClearMap.processors.generic_tab_processor import TabProcessor
 from ClearMap.Utils.utilities import runs_on_ui
-from ClearMap.gui.widgets import Scatter3D
-
+from ClearMap.Visualization.Qt.widgets import Scatter3D
 
 __author__ = 'Christoph Kirst <christoph.kirst.ck@gmail.com>, Charly Rousseau <charly.rousseau@icm-institute.org>'
 __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE)'

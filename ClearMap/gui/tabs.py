@@ -31,8 +31,8 @@ from ClearMap.gui.dialogs import prompt_dialog
 from ClearMap.gui.gui_utils import format_long_nb_to_str, surface_project, np_to_qpixmap, create_clearmap_widget
 from ClearMap.gui.params import ParamsOrientationError, VesselParams, PreferencesParams, SampleParameters, \
     AlignmentParams, CellMapParams, BatchParams
-from ClearMap.gui.widgets import PatternDialog, SamplePickerDialog, DataFrameWidget, LandmarksSelectorDialog, \
-    Scatter3D
+from ClearMap.gui.widgets import PatternDialog, SamplePickerDialog, DataFrameWidget, LandmarksSelectorDialog
+from ClearMap.Visualization.Qt.widgets import Scatter3D
 
 from ClearMap.Visualization.Qt.utils import link_dataviewers_cursors
 from ClearMap.Visualization.Qt import Plot3d as plot_3d
@@ -494,7 +494,8 @@ class AlignmentTab(GenericTab):
             dvs[i].view.addItem(scatter)
             dvs[i].scatter = scatter
             coords = [landmark_selector.fixed_coords(), landmark_selector.moving_coords()][i]  # FIXME: check order (A to B)
-            dvs[i].scatter_coords = Scatter3D(coords, colors=np.array(landmark_selector.colors), half_slice_thickness=5)
+            dvs[i].scatter_coords = Scatter3D(coords, colors=np.array(landmark_selector.colors),
+                                              half_slice_thickness=0) # TODO: check if should change thickness
             callback = [landmark_selector.set_fixed_coords, landmark_selector.set_moving_coords][i]
             dvs[i].mouse_clicked.connect(callback)
         callbacks = {
