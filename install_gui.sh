@@ -87,6 +87,7 @@ if [ -z "$tmp_dir" ]; then
 fi
 if [ ! -d "$tmp_dir" ]; then
     yellow "Folder missing $tmp_dir, it will be created"
+    mkdir -p $tmp_dir || exit 1
 fi
 green "Using temp folder: $tmp_dir"
 
