@@ -555,20 +555,19 @@ def label_points(points, annotation_file=None, invalid=0, key='order', level=Non
 
     n_points, n_spatial_dim = points.shape
 
-    annotation_file = __get_module_annotation_file(annotation_file)
-    atlas = clearmap_io.read(annotation_file)
+    atlas = clearmap_io.read(__get_module_annotation_file(annotation_file))
     if atlas.dtype.kind == 'f':
         atlas = np.array(atlas, dtype=int)
 
-    label = np.full(n_points, invalid, dtype=int)
-
+    # Filter out of atlas coordinates
     points_int = np.asarray(points, dtype=int)
     valid = np.ones(n_points)
     for d in range(n_spatial_dim):
         in_dim_range = np.logical_and(points_int[:, d] >= 0, points_int[:, d] < atlas.shape[d])
         valid = np.logical_and(valid, in_dim_range)
 
-    indices = [points_int[valid, d] for d in range(n_spatial_dim)]
+    indices = tuple([points_int[valid, d] for d in range(n_spatial_dim)])
+    label = np.full(n_points, invalid, dtype=int)
     label[valid] = atlas[indices]
 
     if key != 'id' or level is not None:
