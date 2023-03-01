@@ -795,9 +795,6 @@ class VesselGraphProcessor(TabProcessor):
     def plot_voxelization(self, parent):
         return q_p3d.plot(self.branch_density, arrange=False, parent=parent)
 
-    def get_graph_steps(self):
-        return {step: getattr(self, f'graph_{step}') for step in self.steps.existing_steps}
-
     def get_structure_sub_graph(self, structure_id):
         vertex_labels = self.graph_annotated.vertex_annotation()
 
@@ -833,14 +830,12 @@ class VesselGraphProcessor(TabProcessor):
         return [scene.canvas.native]
 
     def visualize_graph_annotations(self, chunk_range, plot_type='mesh', graph_step='reduced', show=True):
-        graph_steps = self.get_graph_steps()
-        try:
-            graph_chunk = graph_steps[graph_step].sub_slice(chunk_range)
-        except KeyError:
-            raise ValueError(f'graph step {graph_step} not recognised, available steps are {graph_steps.keys()}')
-
-        # region_label = self.graph_reduced.vertex_properties('annotation')
-        # region_color = np.array([[1, 0, 0, 1], [0, 0, 1, 1]])[region_label]
+        if graph_step in self.steps.existing_steps:
+            graph = getattr(self, f'graph_{graph_step}')
+        else:
+            raise ValueError(f'graph step {graph_step} not recognised, '
+                             f'available steps are {self.steps.existing_steps}')
+        graph_chunk = graph.sub_slice(chunk_range)
         title = f'{graph_step.title()} Graph'
         if graph_step == 'annotated':
             region_color = annotation_module.convert_label(graph_chunk.vertex_annotation(), key='id', value='rgba')
