@@ -623,6 +623,7 @@ class VesselGraphParams(UiParameter):
     reduce: bool
     transform: bool
     annotate: bool
+    use_arteries: bool
     vein_intensity_range_on_arteries_channel: List[int]
     restrictive_min_vein_radius: float
     permissive_min_vein_radius: float
@@ -642,6 +643,7 @@ class VesselGraphParams(UiParameter):
             'reduce': ParamLink(['graph_construction', 'reduce'], self.tab.buildGraphReduceCheckBox),
             'transform': ParamLink(['graph_construction', 'transform'], self.tab.buildGraphTransformCheckBox),
             'annotate':  ParamLink(['graph_construction', 'annotate'], self.tab.buildGraphRegisterCheckBox),
+            'use_arteries': ParamLink(['graph_construction', 'use_arteries'], self.tab.buildGraphUseArteriesCheckBox),
             'vein_intensity_range_on_arteries_channel': ParamLink(['vessel_type_postprocessing', 'pre_filtering', 'vein_intensity_range_on_arteries_ch'],
                                                                   self.tab.veinIntensityRangeOnArteriesChannelDoublet),
             'restrictive_min_vein_radius': ParamLink(['vessel_type_postprocessing', 'pre_filtering', 'restrictive_vein_radius'],
