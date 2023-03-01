@@ -1369,15 +1369,15 @@ class Graph(grp.AnnotatedGraph):
         
     as_list = self.edge_geometry_type != 'graph';
     for p in edge_geometry_properties.keys():
-      if p in self.edge_geometry_properties:
-        if verbose:
-          print('Transforming edge geometry: %s -> %s' % (p, edge_geometry_properties[p]));
-        values = self.edge_geometry(p, as_list=as_list);
-        if as_list:
-          values = [transformation(v) for v in values];
-        else:
-          values = transformation(values);
-        self.set_edge_geometry(edge_geometry_properties[p], values=values);
+      # if p in self.edge_geometry_properties:
+      if verbose:
+        print('Transforming edge geometry: %s -> %s' % (p, edge_geometry_properties[p]));
+      values = self.edge_geometry(p, as_list=as_list);
+      if as_list:
+        values = [transformation(v) for v in values];
+      else:
+        values = transformation(values);
+      self.set_edge_geometry(edge_geometry_properties[p], values=values);
 
   
   
