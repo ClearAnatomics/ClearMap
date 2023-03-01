@@ -718,10 +718,13 @@ class ClearMapGui(ClearMapGuiBase):
         self.sample_tab_mgr.src_folder = src_folder
 
 
-def create_main_window(app):
+def create_main_window(app, centered=True):
     clearmap_main_win = ClearMapGui()
     if clearmap_main_win.preference_editor.params.start_full_screen:
         clearmap_main_win.showMaximized()  # TODO: check if redundant with show
+    if centered:
+        clearmap_main_win.move(app.desktop().screenGeometry(0).center() / 2)
+    clearmap_main_win.setWindowState(Qt.WindowActive)
     return clearmap_main_win
 
 
