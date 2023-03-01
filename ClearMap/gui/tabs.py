@@ -181,6 +181,7 @@ class PostProcessingTab(GenericTab):
         self.preprocessor = pre_processor
 
     def plot_slicer(self, slicer_prefix, tab, params):
+        self.main_window.clear_plots()
         # if self.preprocessor.was_registered:
         #     img = mhd_read(self.preprocessor.annotation_file_path)  # FIXME: does not work (probably compressed format)
         # else:
@@ -401,7 +402,7 @@ class AlignmentTab(GenericTab):
 
         self.ui.runStitchingButtonBox.connectApply(self.run_stitching)
         self.ui.displayStitchingButtonBox.connectApply(self.plot_stitching_results)
-        self.ui.displayStitchingButtonBox.connectClose(self.main_window.remove_old_plots)
+        self.ui.displayStitchingButtonBox.connectClose(self.main_window.clear_plots)
         self.ui.convertOutputButtonBox.connectApply(self.convert_output)
         self.ui.registerButtonBox.connectApply(self.run_registration)
         self.ui.plotRegistrationResultsSideBySidePushButton.clicked.connect(self.plot_registration_results_side_by_side)
@@ -565,6 +566,7 @@ class AlignmentTab(GenericTab):
         return image_sources, titles
 
     def plot_registration_results_side_by_side_raw(self):
+        self.main_window.clear_plots()
         image_sources, titles = self.prepare_registration_results_graph('auto_to_raw')
         dvs = plot_3d.plot(image_sources, title=titles, arrange=False, sync=True,
                            lut=self.main_window.preference_editor.params.lut,
@@ -573,6 +575,7 @@ class AlignmentTab(GenericTab):
         self.main_window.setup_plots(dvs, ['autofluo', 'aligned'])
 
     def plot_registration_results_side_by_side(self):
+        self.main_window.clear_plots()
         image_sources, titles = self.prepare_registration_results_graph()
         dvs = plot_3d.plot(image_sources, title=titles, arrange=False, sync=True,
                            lut=self.main_window.preference_editor.params.lut,
@@ -581,6 +584,7 @@ class AlignmentTab(GenericTab):
         self.main_window.setup_plots(dvs, ['autofluo', 'aligned'])
 
     def plot_registration_results_composite_raw(self):
+        self.main_window.clear_plots()
         image_sources, titles = self.prepare_registration_results_graph('auto_to_raw')
         dvs = plot_3d.plot([image_sources, ], title=' '.join(titles), arrange=False, sync=True,
                            lut=self.main_window.preference_editor.params.lut,
@@ -588,6 +592,7 @@ class AlignmentTab(GenericTab):
         self.main_window.setup_plots(dvs)
 
     def plot_registration_results_composite(self):
+        self.main_window.clear_plots()
         image_sources, titles = self.prepare_registration_results_graph()
         dvs = plot_3d.plot([image_sources, ], title=' '.join(titles), arrange=False, sync=True,
                            lut=self.main_window.preference_editor.params.lut,
@@ -727,6 +732,7 @@ class CellCounterTab(PostProcessingTab):
     #     self.cell_detector.detected = False
 
     def plot_detection_results(self):
+        self.main_window.clear_plots()
         if not self.step_exists('cell detection', [self.preprocessor.filename('stitched')]):
             return
         dvs = self.cell_detector.preview_cell_detection(parent=self.main_window.centralWidget(),
@@ -739,6 +745,7 @@ class CellCounterTab(PostProcessingTab):
         self.main_window.setup_plots(dvs)
 
     def plot_cell_filter_results(self):
+        self.main_window.clear_plots()
         if not self.step_exists('cell filtering', [self.preprocessor.filename('stitched'),
                                                    self.preprocessor.filename('cells', postfix='filtered')]):
             return
@@ -746,6 +753,7 @@ class CellCounterTab(PostProcessingTab):
         self.main_window.setup_plots(dvs)
 
     def plot_cells_scatter_w_atlas_colors(self):
+        self.main_window.clear_plots()
         if self.preprocessor.was_registered:
             required_paths = [self.preprocessor.reference_file_path]
         else:
@@ -757,6 +765,7 @@ class CellCounterTab(PostProcessingTab):
         self.main_window.setup_plots(dvs)
 
     def plot_cells_scatter_w_atlas_colors_raw(self):
+        self.main_window.clear_plots()
         if not self.step_exists('cell count', [self.preprocessor.filename('stitched'),
                                                self.cell_detector.df_path]):
             return
@@ -794,6 +803,7 @@ class CellCounterTab(PostProcessingTab):
         # WARNING: some plots in .post_process_cells() without UI params
 
     def plot_cell_map_results(self):
+        self.main_window.clear_plots()
         if not self.step_exists('voxelization', [self.preprocessor.filename('density', postfix='counts')]):
             return
         dvs = self.cell_detector.plot_voxelized_counts(arrange=False)
@@ -874,7 +884,7 @@ class VasculatureTab(PostProcessingTab):
 
         self.ui.plotGraphPickRegionPushButton.clicked.connect(self.pick_region)
         self.ui.plotGraphChunkPushButton.clicked.connect(self.display_graph_chunk_from_cfg)
-        self.ui.plotGraphClearPlotPushButton.clicked.connect(self.main_window.remove_old_plots)
+        self.ui.plotGraphClearPlotPushButton.clicked.connect(self.main_window.clear_plots)
 
         self.ui.voxelizeGraphPushButton.clicked.connect(self.voxelize)
         self.ui.plotGraphVoxelizationPushButton.clicked.connect(self.plot_voxelization)
@@ -905,6 +915,7 @@ class VasculatureTab(PostProcessingTab):
 
     # FIXME: channel
     def plot_binarization_results(self, plot_side_by_side=True):
+        self.main_window.clear_plots()
         binarization_params = self.params.binarization_params
         steps = (binarization_params.plot_step_1,
                  binarization_params.plot_step_2)
@@ -946,10 +957,12 @@ class VasculatureTab(PostProcessingTab):
         return self.params.visualization_params.slicing
 
     def display_graph_chunk(self, graph_step):
+        self.main_window.clear_plots()
         slicing = self.__get_tube_map_slicing()
         dvs = self.vessel_graph_processor.visualize_graph_annotations(slicing, plot_type='mesh', graph_step=graph_step,
                                                                       show=False)
         self.main_window.setup_plots(dvs)
+        self.main_window.stop_timers()
 
     def display_graph_chunk_from_cfg(self):  # REFACTOR: split ?
         self.display_graph_chunk(self.params.visualization_params.graph_step)
@@ -974,12 +987,11 @@ class VasculatureTab(PostProcessingTab):
         self.main_window.structure_selector.show()
 
     def _plot_graph_structure(self, structure_id, structure_color):
+        self.main_window.clear_plots()
         dvs = self.vessel_graph_processor._plot_graph_structure(structure_id,
                                                                 self.params.visualization_params.plot_type,
                                                                 structure_color)
-        print('Integrating graph')
         self.main_window.setup_plots(dvs)
-        print('Graph integrated')
 
     def voxelize(self):
         voxelization_params = {
@@ -1042,6 +1054,7 @@ class BatchTab(GenericTab):
 
     def make_group_stats_tables(self):
         self.main_window.print_status_msg('Computing stats table')
+        self.main_window.clear_plots()
         dvs = []
         groups = self.params.groups
         # TODO: set abort callback
@@ -1074,6 +1087,7 @@ class BatchTab(GenericTab):
         self.main_window.signal_process_finished()
 
     def plot_p_vals(self):
+        self.main_window.clear_plots()
         self.main_window.print_status_msg('Plotting p_val maps')
         p_vals_imgs = []
         for pair in self.params.selected_comparisons:  # TODO: Move to processor object to be wrapped
@@ -1114,6 +1128,7 @@ class BatchTab(GenericTab):
         self.main_window.setup_plots(dvs)
 
     def run_plots(self, plot_function, plot_kw_args):
+        self.main_window.clear_plots()
         dvs = []
         for pair in self.params.selected_comparisons:
             gp1_name, gp2_name = pair
