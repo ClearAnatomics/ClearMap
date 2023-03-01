@@ -191,12 +191,13 @@ class ArbitraryRotationCamera(TurntableCamera):
             if event.press_event is None:
                 return
 
-        modifiers = event.mouse_event.modifiers
+        if event.mouse_event.press_event is None:  # TODO: find why might be for functions below
+            return
 
+        modifiers = event.mouse_event.modifiers
         if 1 in event.buttons:
             if not modifiers:  # Rotate
-                if event.mouse_event.press_event is not None:
-                    self._update_rotation(event)
+                self._update_rotation(event)
             elif keys.CONTROL in modifiers:  # roll only
                 self._update_roll(event)
             elif keys.META in modifiers:  # elevation only
