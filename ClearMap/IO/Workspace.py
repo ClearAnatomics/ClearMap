@@ -292,16 +292,25 @@ class Workspace(object):
                extension=None, debug=None, **kwargs):
         files = self.file_list(ftype, file_type_to_name=file_type_to_name, directory=directory, expression=expression,
                                values=values, prefix=prefix, extension=extension, debug=debug, **kwargs)
-        exp = Expression(self.filename(ftype, extension=extension))
-        tile_axes_ = exp.tag_names()
-        positions = [exp.values(f) for f in files]
-        indices = [tuple(tv[n] for n in tile_axes_) for tv in positions]
-        shape = np.array(indices).max(axis=0)
-        shape += 1  # Because 0 indexing
-        return len(files) == shape.prod()
+        return len(files) == self.mosaic_shape(ftype).prod()
 
     def expression(self, *args, **kwargs):
         return Expression(self.filename(*args, **kwargs))
+
+    def mosaic_shape(self, ftype):
+        exp = Expression(self.filename(ftype))
+        positions = self.get_positions(ftype)
+        tile_axes_ = exp.tag_names()
+        indices = [tuple(tv[n] for n in tile_axes_) for tv in positions]
+        # noinspection PyArgumentList
+        mosaic_shape = np.array(indices).max(axis=0) + 1  # Because 0 indexing
+        return mosaic_shape
+
+    def get_positions(self, ftype):
+        exp = Expression(self.filename(ftype))
+        files = self.file_list(ftype)
+        positions = [exp.values(f) for f in files]
+        return positions
 
     def extension(self, ftype, file_type_to_name=None, directory=None, expression=None, values=None, prefix=None,
                   extension=None, debug=None, **kwargs):
