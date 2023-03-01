@@ -43,7 +43,7 @@
             </font>
            </property>
            <property name="currentIndex">
-            <number>0</number>
+            <number>3</number>
            </property>
            <widget class="QWidget" name="binarization">
             <property name="geometry">
@@ -598,27 +598,6 @@
              <string>Graph Construction</string>
             </attribute>
             <layout class="QGridLayout" name="gridLayout_4">
-             <item row="5" column="0">
-              <widget class="QCheckBox" name="buildGraphRegisterCheckBox">
-               <property name="text">
-                <string>Assign regions to vertices</string>
-               </property>
-              </widget>
-             </item>
-             <item row="2" column="0">
-              <widget class="QCheckBox" name="buildGraphCleanCheckBox">
-               <property name="text">
-                <string>Remove cliques</string>
-               </property>
-              </widget>
-             </item>
-             <item row="8" column="0">
-              <widget class="QPushButton" name="buildGraphPushButton">
-               <property name="text">
-                <string>Build</string>
-               </property>
-              </widget>
-             </item>
              <item row="1" column="0">
               <widget class="QCheckBox" name="buildGraphBuildCheckBox">
                <property name="text">
@@ -626,18 +605,10 @@
                </property>
               </widget>
              </item>
-             <item row="8" column="1">
-              <widget class="QToolButton" name="buildGraphPushButtonInfoToolButton">
-               <property name="icon">
-                <iconset resource="icons.qrc">
-                 <normaloff>:/icons/icons/info.svg</normaloff>:/icons/icons/info.svg</iconset>
-               </property>
-              </widget>
-             </item>
-             <item row="0" column="0">
-              <widget class="QCheckBox" name="buildGraphSkeletonizeCheckBox">
+             <item row="3" column="0">
+              <widget class="QCheckBox" name="buildGraphReduceCheckBox">
                <property name="text">
-                <string>Skeletonize binary</string>
+                <string>Reduce to branching vertices</string>
                </property>
               </widget>
              </item>
@@ -653,12 +624,54 @@
                </property>
               </widget>
              </item>
-             <item row="3" column="0">
-              <widget class="QCheckBox" name="buildGraphReduceCheckBox">
+             <item row="10" column="0">
+              <widget class="QPushButton" name="buildGraphPushButton">
                <property name="text">
-                <string>Reduce to branching vertices</string>
+                <string>Build</string>
                </property>
               </widget>
+             </item>
+             <item row="2" column="0">
+              <widget class="QCheckBox" name="buildGraphCleanCheckBox">
+               <property name="text">
+                <string>Remove cliques</string>
+               </property>
+              </widget>
+             </item>
+             <item row="10" column="1">
+              <widget class="QToolButton" name="buildGraphPushButtonInfoToolButton">
+               <property name="icon">
+                <iconset resource="icons.qrc">
+                 <normaloff>:/icons/icons/info.svg</normaloff>:/icons/icons/info.svg</iconset>
+               </property>
+              </widget>
+             </item>
+             <item row="5" column="0">
+              <widget class="QCheckBox" name="buildGraphRegisterCheckBox">
+               <property name="text">
+                <string>Assign regions to vertices</string>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="0">
+              <widget class="QCheckBox" name="buildGraphSkeletonizeCheckBox">
+               <property name="text">
+                <string>Skeletonize binary</string>
+               </property>
+              </widget>
+             </item>
+             <item row="9" column="0">
+              <spacer name="verticalSpacer_2">
+               <property name="orientation">
+                <enum>Qt::Vertical</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>20</width>
+                 <height>40</height>
+                </size>
+               </property>
+              </spacer>
              </item>
              <item row="4" column="0">
               <widget class="QCheckBox" name="buildGraphTransformCheckBox">
@@ -667,8 +680,20 @@
                </property>
               </widget>
              </item>
+             <item row="8" column="0">
+              <widget class="QCheckBox" name="buildGraphUseArteriesCheckBox">
+               <property name="font">
+                <font>
+                 <bold>true</bold>
+                </font>
+               </property>
+               <property name="text">
+                <string>Use arteries</string>
+               </property>
+              </widget>
+             </item>
              <item row="7" column="0">
-              <spacer name="verticalSpacer_2">
+              <spacer name="verticalSpacer_7">
                <property name="orientation">
                 <enum>Qt::Vertical</enum>
                </property>
@@ -1061,15 +1086,15 @@
              <item>
               <widget class="QToolBox" name="toolBox_2">
                <property name="currentIndex">
-                <number>1</number>
+                <number>0</number>
                </property>
                <widget class="QWidget" name="graphVisulization">
                 <property name="geometry">
                  <rect>
                   <x>0</x>
                   <y>0</y>
-                  <width>395</width>
-                  <height>329</height>
+                  <width>550</width>
+                  <height>762</height>
                  </rect>
                 </property>
                 <attribute name="label">
@@ -1293,14 +1318,12 @@
                  </item>
                  <item row="2" column="0">
                   <widget class="QComboBox" name="graphSlicerStepComboBox">
+                   <property name="currentText">
+                    <string>annotated</string>
+                   </property>
                    <item>
                     <property name="text">
-                     <string>raw</string>
-                    </property>
-                   </item>
-                   <item>
-                    <property name="text">
-                     <string>cleaned</string>
+                     <string>annotated</string>
                     </property>
                    </item>
                    <item>
@@ -1310,7 +1333,12 @@
                    </item>
                    <item>
                     <property name="text">
-                     <string>annotated</string>
+                     <string>cleaned</string>
+                    </property>
+                   </item>
+                   <item>
+                    <property name="text">
+                     <string>raw</string>
                     </property>
                    </item>
                   </widget>

@@ -394,8 +394,8 @@ class VesselGraphProcessor(TabProcessor):
         self.post_process()
 
     @property
-    def run_arteries(self):  # FIXME: check if better using cfg or files on drive
-        return self.processing_config['binarization']['arteries']['binarization']['run']
+    def use_arteries_for_graph(self):
+        return self.processing_config['graph_construction']['use_arteries']
 
     def pre_process(self):
         self.processing_config.reload()
@@ -453,7 +453,7 @@ class VesselGraphProcessor(TabProcessor):
             self.graph_raw = graph_processing.graph_from_skeleton(skeleton, verbose=True)
             # p3d.plot_graph_line(graph_raw)
             self._measure_radii()
-            if self.run_arteries:
+            if self.use_arteries_for_graph:
                 self._set_artery_binary()
                 self._set_arteriness()
             self.save_graph('raw')
@@ -471,7 +471,7 @@ class VesselGraphProcessor(TabProcessor):
             'coordinates': graph_processing.mean_vertex_coordinates,
             'radii': np.max
         }
-        if self.run_arteries:
+        if self.use_arteries_for_graph:
             vertex_mappings.update({
                 'artery_binary': np.max,
                 'artery_raw': np.max
@@ -493,7 +493,7 @@ class VesselGraphProcessor(TabProcessor):
 
         vertex_edge_mappings = {'radii': np.max}
         edge_geometry_vertex_properties = ['coordinates', 'radii']
-        if self.run_arteries:
+        if self.use_arteries_for_graph:
             vertex_edge_mappings.update({
                 'artery_binary': vote,
                 'artery_raw': np.max})
@@ -738,7 +738,8 @@ class VesselGraphProcessor(TabProcessor):
         -------
 
         """
-        if self.run_arteries:
+        self.processing_config.reload()
+        if self.use_arteries_for_graph:
             cfg = self.processing_config['vessel_type_postprocessing']
             # Definitely a vein because too big
             restrictive_veins = self._pre_filter_veins(cfg['pre_filtering']['vein_intensity_range_on_arteries_ch'],
