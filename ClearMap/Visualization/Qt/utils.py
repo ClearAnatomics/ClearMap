@@ -42,7 +42,7 @@ def screen_geometry(screen=None):
 
 
 def tiled_layout(n_windows, origin=None, shape=None, percent=None, screen=None):
-    """Generate tiled geometry for windoes on a screen.
+    """Generate tiled geometry for windows on a screen.
 
     Arguments
     ---------
@@ -99,34 +99,7 @@ def tiled_layout(n_windows, origin=None, shape=None, percent=None, screen=None):
     return geo
 
 
-def link_dataviewers_cursors(dvs):
-    for i, dv in enumerate(dvs):
-        cursor = RedCross()
-        dv.view.addItem(cursor)
-        dv.cross = cursor
-        pals = dvs.copy()
-        pals.pop(i)
-        dv.pals = pals
-
-  
-############################################################################################################
-# ##  Tests
-############################################################################################################
-
-
-def _test():
-    import ClearMap.Visualization.Qt.utils as guiu
-    from importlib import reload
-    reload(guiu)
-
-    print(guiu.screen_geometry())
-
-    w, h = guiu.screen_geometry()
-
-    print(guiu.tiled_layout(3))
-
-
-class RedCross(pg.GraphicsObject):
+class RedCross(pg.GraphicsObject):  # Here to avoid circular imports
     def __init__(self, coords=None, size=[10, 10], parent=None):
         super().__init__(parent)
         self.color = "#FF00007d"
@@ -160,3 +133,30 @@ class RedCross(pg.GraphicsObject):
 
     def boundingRect(self):  # TODO: check if we need this method
         return QRectF(self.picture.boundingRect())
+
+
+def link_dataviewers_cursors(dvs):
+    for i, dv in enumerate(dvs):
+        cursor = RedCross()
+        dv.view.addItem(cursor)
+        dv.cross = cursor
+        pals = dvs.copy()
+        pals.pop(i)
+        dv.pals = pals
+
+  
+############################################################################################################
+# ##  Tests
+############################################################################################################
+
+
+def _test():
+    import ClearMap.Visualization.Qt.utils as guiu
+    from importlib import reload
+    reload(guiu)
+
+    print(guiu.screen_geometry())
+
+    w, h = guiu.screen_geometry()
+
+    print(guiu.tiled_layout(3))
