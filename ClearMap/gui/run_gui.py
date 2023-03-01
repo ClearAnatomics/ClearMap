@@ -138,6 +138,14 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         self.slow_timer.setInterval(3000)
         self.slow_timer.timeout.connect(self.update_gpu_bars)
 
+    def stop_timers(self):
+        self.timer.stop()
+        self.slow_timer.stop()
+
+    def start_timers(self):
+        self.timer.start()
+        self.slow_timer.start()
+
     def find_child_by_name(self, child_name, child_type, parent=None):
         if parent is None:
             parent = self
@@ -257,7 +265,7 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
     def graph_by_name(self, name):
         return [g for g in self.graphs if g.objectName() == name][0]
 
-    def remove_old_plots(self):
+    def clear_plots(self):
         for i in range(self.graphLayout.count(), -1, -1):
             graph = self.graphLayout.takeAt(i)
             if graph is not None:
@@ -265,12 +273,13 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
                 widg.setParent(None)
                 widg.deleteLater()
         self.graphs = []
+        self.start_timers()
 
     def setup_plots(self, dvs, graph_names=None):
         if graph_names is None:
             graph_names = [f'graph_{i}' for i in range(len(dvs))]
 
-        self.remove_old_plots()
+        self.clear_plots()
 
         n_rows, n_cols = compute_grid(len(dvs))
         n_spacers = (n_rows * n_cols) - len(dvs)
@@ -735,8 +744,7 @@ def main(app, splash):
 
     clearmap_main_win.show()
     clearmap_main_win.fix_styles()
-    clearmap_main_win.timer.start()
-    clearmap_main_win.slow_timer.start()
+    clearmap_main_win.start_timers()
     splash.finish(clearmap_main_win)
     if clearmap_main_win.preference_editor.params.verbosity != 'trace':  # WARNING: will disable progress bars
         clearmap_main_win.patch_stdout()
