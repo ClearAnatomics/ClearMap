@@ -532,6 +532,7 @@ class VesselGraphProcessor(TabProcessor):
                                                 vertex_properties={'coordinates': 'coordinates_atlas'},
                                                 edge_geometry_properties={'coordinates': 'coordinates_atlas'},
                                                 verbose=True)
+        self.save_graph('reduced')
 
     def _scale(self):
         """Apply transform to graph properties"""
@@ -551,7 +552,9 @@ class VesselGraphProcessor(TabProcessor):
         annotation_module.set_annotation_file(self.preprocessor.annotation_file_path)
 
         def annotation(coordinates):
-            label = annotation_module.label_points(coordinates, key='id')
+            label = annotation_module.label_points(coordinates,
+                                                   annotation_file=self.preprocessor.annotation_file_path,
+                                                   key='id')
             return label
 
         def annotation_hemisphere(coordinates):
@@ -583,13 +586,15 @@ class VesselGraphProcessor(TabProcessor):
             d = distance_atlas[x, y, z]
             return d
 
-        self.graph_reduced.transform_properties(distance,
-                                                vertex_properties={'coordinates_atlas': 'distance_to_surface'},
-                                                edge_geometry_properties={'coordinates_atlas': 'distance_to_surface'})
+        graph = self.graph_reduced
+        graph.transform_properties(distance,
+                                   vertex_properties={'coordinates_atlas': 'distance_to_surface'},
+                                   edge_geometry_properties={'coordinates_atlas': 'distance_to_surface'})
 
-        distance_to_surface = self.graph_reduced.edge_geometry('distance_to_surface', as_list=True)
+        distance_to_surface = graph.edge_geometry('distance_to_surface', as_list=True)
         distance_to_surface_edge = np.array([np.min(d) for d in distance_to_surface])
-        self.graph_reduced.define_edge_property('distance_to_surface', distance_to_surface_edge)
+        graph.define_edge_property('distance_to_surface', distance_to_surface_edge)
+        self.save_graph('reduced')
 
     @requires_files([FilePath('graph', postfix='reduced')])
     def register(self):
