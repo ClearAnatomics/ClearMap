@@ -67,7 +67,7 @@ green "OK"
 # Amend environment file (notably for compatibility with installed CUDA version)
 echo "Updating CUDA dependencies for ClearMap"
 echo "  Creating temporary environment"
-conda create -y -n clearmap_tmp_env python pyyaml "$solver_string" || exit 1
+conda create -n clearmap_tmp_env -c conda-forge python pyyaml "$solver_string" || exit 1
 conda activate clearmap_tmp_env || exit 1
 green "Done"
 
