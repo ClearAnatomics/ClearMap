@@ -1015,7 +1015,9 @@ class VasculatureTab(PostProcessingTab):
                        step_kw_args=voxelization_params)
 
     def plot_voxelization(self):
-        self.vessel_graph_processor.plot_voxelization(self.main_window.centralWidget())
+        self.main_window.clear_plots()
+        dvs = self.vessel_graph_processor.plot_voxelization(self.main_window.centralWidget())
+        self.main_window.setup_plots(dvs)
 
 
 ################################################################################################

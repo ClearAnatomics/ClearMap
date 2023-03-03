@@ -791,11 +791,12 @@ class VesselGraphProcessor(TabProcessor):
             self._remove_small_vessel_components('vein', min_vessel_size=cfg['capillaries_removal']['min_vein_size'])
 
             self.graph_annotated.save(self.workspace.filename('graph'))  # WARNING: no postfix
+            self.graph_traced = self.graph_annotated
 
     def __get_branch_voxelization_params(self):
         voxelize_branch_parameter = {
             'method': 'sphere',
-            'radius': self.processing_config['visualization']['voxelization']['size'],
+            'radius': tuple(self.processing_config['visualization']['voxelization']['size']),
             'weights': None,
             'shape': clearmap_io.shape(self.preprocessor.reference_file_path),
             'verbose': True
@@ -803,26 +804,28 @@ class VesselGraphProcessor(TabProcessor):
         return voxelize_branch_parameter
 
     def __voxelize(self, vertices, voxelize_branch_parameter):
+        clearmap_io.delete_file(self.workspace.filename('density', postfix='branches'))
         self.branch_density = voxelization.voxelize(vertices,
                                                     sink=self.workspace.filename('density', postfix='branches'),
                                                     dtype='float32',
                                                     **voxelize_branch_parameter)
 
     def voxelize(self, weight_by_radius=False, vertex_degrees=None):
-        vertices = self.graph_annotated.vertex_coordinates()
+        vertices = self.graph_traced.vertex_property('coordinates_atlas')
         voxelize_branch_parameter = self.__get_branch_voxelization_params()
 
         if vertex_degrees and vertex_degrees >= 1:
-            degrees = self.graph_annotated.vertex_degrees() == vertex_degrees
+            degrees = self.graph_traced.vertex_degrees() == vertex_degrees
             vertices = vertices[degrees]
 
         if weight_by_radius:
-            voxelize_branch_parameter.update(weights=self.graph_annotated.vertex_radii())
+            voxelize_branch_parameter.update(weights=self.graph_traced.vertex_radii())
 
         self.__voxelize(vertices, voxelize_branch_parameter)
 
     def plot_voxelization(self, parent):
-        return q_p3d.plot(self.branch_density, arrange=False, parent=parent)
+        return q_p3d.plot(self.workspace.filename('density', postfix='branches'),
+                          arrange=False, parent=parent, lut=self.machine_config['default_lut'])  # FIXME: fire
 
     def get_structure_sub_graph(self, structure_id):
         vertex_labels = self.graph_traced.vertex_annotation()
