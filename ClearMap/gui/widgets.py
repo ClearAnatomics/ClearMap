@@ -819,7 +819,8 @@ class StructureSelector(WizardDialog):
     def __init__(self, src_folder, params=None, app=None):
         super().__init__(src_folder, 'structure_selector', 'Structure selector', None, params, app)
         self.structure_selected = self.picker_widget.itemClicked
-        # self.dlg.show()
+        self.onAccepted = self.dlg.buttonBox.accepted.connect
+        self.onRejected = self.dlg.buttonBox.rejected.connect
 
     def show(self):
         self.dlg.show()

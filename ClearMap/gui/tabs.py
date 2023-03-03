@@ -23,7 +23,7 @@ import ClearMap.IO.IO as clearmap_io
 from ClearMap.IO.MHD import mhd_read
 from ClearMap.Alignment import Annotation as annotation
 from ClearMap.Analysis.Statistics.group_statistics import make_summary, density_files_are_comparable, compare_groups
-from ClearMap.Utils.exceptions import MissingRequirementException
+from ClearMap.Utils.exceptions import MissingRequirementException, PlotGraphError
 from ClearMap.Visualization.Matplotlib.PlotUtils import plot_sample_stats_histogram, plot_volcano
 from ClearMap.Visualization.atlas import create_color_annotation
 
@@ -865,6 +865,7 @@ class VasculatureTab(PostProcessingTab):
         # ######################################## GRAPH ##############################
         self.ui.buildGraphSelectAllCheckBox.stateChanged.connect(self.__select_all_graph_steps)
         self.ui.buildGraphPushButton.clicked.connect(self.build_graph)
+        self.ui.unloadGraphsPushButton.clicked.connect(self.unload_temporary_graphs)
         self.connect_whats_this(self.ui.buildGraphPushButtonInfoToolButton, self.ui.buildGraphPushButton)
 
         self.connect_whats_this(self.ui.maxArteriesTracingIterationsInfoToolButton, self.ui.maxArteriesTracingIterationsLbl)  # FIXME: try to automatise
@@ -889,6 +890,9 @@ class VasculatureTab(PostProcessingTab):
         self.ui.voxelizeGraphPushButton.clicked.connect(self.voxelize)
         self.ui.plotGraphVoxelizationPushButton.clicked.connect(self.plot_voxelization)
         self.ui.runAllVasculaturePushButton.clicked.connect(self.run_all)
+
+    def unload_temporary_graphs(self):
+        self.vessel_graph_processor.unload_temporary_graphs()
 
     def set_progress_watcher(self, watcher):
         if self.binary_vessel_processor is not None and self.binary_vessel_processor.preprocessor is not None:
@@ -959,8 +963,12 @@ class VasculatureTab(PostProcessingTab):
     def display_graph_chunk(self, graph_step):
         self.main_window.clear_plots()
         slicing = self.__get_tube_map_slicing()
-        dvs = self.vessel_graph_processor.visualize_graph_annotations(slicing, plot_type='mesh', graph_step=graph_step,
-                                                                      show=False)
+        try:
+            dvs = self.vessel_graph_processor.visualize_graph_annotations(slicing, plot_type='mesh',
+                                                                          graph_step=graph_step, show=False)
+        except PlotGraphError as err:
+            self.main_window.popup(str(err), base_msg='PlotGraphError')
+            return
         self.main_window.setup_plots(dvs)
         self.main_window.stop_timers()
 
@@ -982,16 +990,21 @@ class VasculatureTab(PostProcessingTab):
     def pick_region(self):
         self.main_window.structure_selector.structure_selected.connect(
             self.params.visualization_params.set_structure_id)
-        self.main_window.structure_selector.dlg.accepted.connect(self.plot_graph_structure)
-        # FIXME: connect cancel
+        self.main_window.structure_selector.onAccepted(self.plot_graph_structure)
+        self.main_window.structure_selector.onRejected(self.main_window.structure_selector.close)
         self.main_window.structure_selector.show()
 
     def _plot_graph_structure(self, structure_id, structure_color):
         self.main_window.clear_plots()
-        dvs = self.vessel_graph_processor._plot_graph_structure(structure_id,
-                                                                self.params.visualization_params.plot_type,
-                                                                structure_color)
-        self.main_window.setup_plots(dvs)
+        try:
+            dvs = self.vessel_graph_processor.plot_graph_structure(structure_id,
+                                                                   self.params.visualization_params.plot_type)
+        except PlotGraphError as err:
+            self.main_window.popup(str(err), base_msg='PlotGraphError')
+            return
+        if dvs:
+            self.main_window.setup_plots(dvs)
+            self.main_window.stop_timers()
 
     def voxelize(self):
         voxelization_params = {

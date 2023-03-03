@@ -176,7 +176,7 @@ def process(function, source, sink = None,
     If True, return the results of the proceessing functions.
   return_blocks : bool
     If True, return the block information used to distribute the processing.
-  processes : int
+  processes : int, None
     The number of parallel processes, if 'serial', use serial processing.
   verbose : bool
     Print information on sub-stack generation.
