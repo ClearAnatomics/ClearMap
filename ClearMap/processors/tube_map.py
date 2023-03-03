@@ -13,8 +13,8 @@ import copy
 import re
 
 import numpy as np
-from PyQt5.QtWidgets import QDialogButtonBox
 
+from ClearMap.Utils.exceptions import PlotGraphError
 from ClearMap.Visualization.Qt.utils import link_dataviewers_cursors
 from ClearMap.processors.generic_tab_processor import TabProcessor, ProcessorSteps
 
@@ -328,6 +328,7 @@ class VesselGraphProcessor(TabProcessor):
         self.__graph_cleaned = None
         self.__graph_reduced = None
         self.__graph_annotated = None
+        self.__graph_traced = None
         self.branch_density = None
         self.sample_config = None
         self.processing_config = None
@@ -376,6 +377,28 @@ class VesselGraphProcessor(TabProcessor):
     @graph_annotated.setter
     def graph_annotated(self, graph):
         self.__graph_annotated = graph
+
+    @property
+    def graph_traced(self):
+        if self.__graph_traced is None:
+            self.__graph_traced = clearmap_io.read(self.workspace.filename('graph'))
+        return self.__graph_traced
+
+    @graph_traced.setter
+    def graph_traced(self, graph):
+        self.__graph_traced = graph
+
+    def unload_temporary_graphs(self):
+        """
+        To free up memory
+        
+        Returns
+        -------
+
+        """
+        self.graph_raw = None
+        self.graph_cleaned = None
+        self.graph_reduced = None
 
     def setup(self, preprocessor):
         self.preprocessor = preprocessor
@@ -802,30 +825,42 @@ class VesselGraphProcessor(TabProcessor):
         return q_p3d.plot(self.branch_density, arrange=False, parent=parent)
 
     def get_structure_sub_graph(self, structure_id):
-        vertex_labels = self.graph_annotated.vertex_annotation()
+        vertex_labels = self.graph_traced.vertex_annotation()
 
-        # Assign label of rquested structure to all its children
+        # Assign label of requested structure to all its children
         level = annotation_module.find(structure_id)['level']
         label_leveled = annotation_module.convert_label(vertex_labels, value='id', level=level)
 
         vertex_filter = label_leveled == structure_id
         # if get_neighbours:
         #     vertex_filter = graph.expand_vertex_filter(vertex_filter, steps=2)
-        return self.graph_annotated.sub_graph(vertex_filter=vertex_filter)
+        if vertex_filter is None:
+            return
+        return self.graph_traced.sub_graph(vertex_filter=vertex_filter)
 
-    def plot_graph_structure(self, structure_id, plot_type, region_color):
-        # FIXME: translate structure ID to name
-        return self.plot_graph_chunk(self.get_structure_sub_graph(structure_id),
-                                     title=f'Structure {structure_id} graph',
+    def plot_graph_structure(self, structure_id, plot_type):
+        structure_name = annotation_module.get_names_map()[structure_id]
+        graph_chunk = self.get_structure_sub_graph(structure_id)
+        if not graph_chunk:
+            return
+        region_color = annotation_module.convert_label(graph_chunk.vertex_annotation(), key='id', value='rgba')
+        return self.plot_graph_chunk(graph_chunk,
+                                     title=f'Structure {structure_name} graph',
                                      plot_type=plot_type, region_color=region_color)
 
-    def plot_graph_chunk(self, graph_chunk, plot_type='mesh', title='sub graph', region_color=None, show=True):
+    def plot_graph_chunk(self, graph_chunk, plot_type='mesh', title='sub graph', region_color=None, show=True, n_max_vertices=300000):
         if plot_type == 'line':
             scene = plot_graph_3d.plot_graph_line(graph_chunk, vertex_colors=region_color, title=title,
                                                   show=show, bg_color=self.machine_config['three_d_plot_bg'])
         elif plot_type == 'mesh':
-            scene = plot_graph_3d.plot_graph_mesh(graph_chunk, vertex_colors=region_color, title=title,
-                                                  show=show, bg_color=self.machine_config['three_d_plot_bg'])
+            if graph_chunk.n_vertices > n_max_vertices:
+                raise PlotGraphError(f'Cannot plot graph with more than {n_max_vertices},'
+                                     f'got {graph_chunk.n_vertices}')
+            if region_color is not None and region_color.ndim == 1:
+                region_color = np.broadcast_to(region_color, (graph_chunk.n_vertices, 3))
+            scene = plot_graph_3d.plot_graph_mesh(graph_chunk, vertex_colors=region_color,
+                                                  title=title, show=show,
+                                                  bg_color=self.machine_config['three_d_plot_bg'])
         elif plot_type == 'edge_property':
             scene = plot_graph_3d.plot_graph_edge_property(graph_chunk, edge_property='artery_raw', title=title,
                                                            percentiles=[2, 98], normalize=True, mesh=True,
