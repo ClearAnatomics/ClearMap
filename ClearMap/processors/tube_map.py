@@ -205,24 +205,29 @@ class BinaryVesselProcessor(TabProcessor):
 
     def _smooth_and_fill(self, channel):
         postfix = channel if channel == 'arteries' else None
+        run_smoothing = self.processing_config['binarization'][channel]['smoothing']['run']
+        run_filling = self.processing_config['binarization'][channel]['binary_filling']['run']
 
         self.steps[channel].remove_next_steps_files(self.steps[channel].postprocessed)
 
-        source = self.workspace.filename('binary', postfix=postfix)
         sink_postfix = f'{postfix}_postprocessed' if postfix else 'postprocessed'
         sink = self.workspace.filename('binary', postfix=sink_postfix)
+        if run_filling and not run_smoothing and os.path.exists(sink):
+            source = sink  # We assume the smoothing ran previously, hence source is postprocessed
+        else:
+            source = self.workspace.filename('binary', postfix=postfix)
+
+        params = copy.deepcopy(vasculature.default_postprocessing_processing_parameter)
+        params.update(size_max=50)
 
         postprocessing_parameter = copy.deepcopy(vasculature.default_postprocessing_parameter)
-        postprocessing_parameter.update(fill=self.processing_config['binarization'][channel]['binary_filling']['run'])
+        if not run_smoothing:
+            postprocessing_parameter.update(smooth=False)
+        postprocessing_parameter.update(fill=run_filling)
 
-        postprocessing_processing_parameter = copy.deepcopy(vasculature.default_postprocessing_processing_parameter)
-        postprocessing_processing_parameter.update(size_max=50)
-
-        vasculature.postprocess(source, sink, postprocessing_parameter=postprocessing_parameter,
-                                processing_parameter=postprocessing_processing_parameter,
+        vasculature.postprocess(source, sink, processing_parameter=params,
+                                postprocessing_parameter=postprocessing_parameter,
                                 processes=None, verbose=True)
-
-        # q_p3d.plot([[source, sink]])  FIXME:
 
     def plot_vessel_filling_results(self, parent=None, postfix_base='', arrange=False):
         if postfix_base:
