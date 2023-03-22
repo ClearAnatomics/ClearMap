@@ -6,11 +6,18 @@ batch_process
 The processor for batch processing a group of samples.
 This can be used from the GUI, from the CLI or interactively from the python interpreter
 """
+import functools
+import math
 import multiprocessing
 import os
 import sys
+from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
+import tifffile
+from skimage import img_as_ubyte
+from skimage.exposure import exposure
+
 from ClearMap import Settings
 from skimage.transform import rescale
 from tqdm import tqdm
@@ -108,7 +115,7 @@ def voxelize_folders(folders, align=False, cells=True, vasc=False):
         voxelize_sample(configs, align=align, cells=cells, vasc=vasc)
 
 
-def init_preprocessor(folder, atlas_base_name=None):
+def init_preprocessor(folder, atlas_base_name=None, convert_tiles=False):
     cfg_loader = ConfigLoader(folder)
     configs = get_configs(cfg_loader.get_cfg_path('sample'), cfg_loader.get_cfg_path('processing'))
     pre_proc = PreProcessor()
@@ -117,7 +124,7 @@ def init_preprocessor(folder, atlas_base_name=None):
         atlas_base_name = ATLAS_NAMES_MAP[atlas_id]['base_name']
     json_file = os.path.join(Settings.atlas_folder, STRUCTURE_TREE_NAMES_MAP[configs[2]['registration']['atlas']['structure_tree_id']])
     pre_proc.unpack_atlas(atlas_base_name)
-    pre_proc.setup(configs)
+    pre_proc.setup(configs, convert_tiles=convert_tiles)
     pre_proc.setup_atlases()
     annotation.initialize(annotation_file=pre_proc.annotation_file_path, label_file=json_file)
     return pre_proc
@@ -134,6 +141,7 @@ def realign(folder, atlas_base_name='ABA_25um'):
     pre_proc = init_preprocessor(folder, atlas_base_name)
     pre_proc.setup_atlases()
     cell_detector = CellDetector(pre_proc)
+    cell_detector.filter_cells()
     cell_detector.atlas_align()
 
 
@@ -144,14 +152,15 @@ def rescale_img(f_path, scaling_factor):
     clearmap_io.write(f_path, rescaled_img)
 
 
-def rescale_raw(folder, atlas_base_name='ABA_25um', dest_resolution=(3, 3, 6)):
+def rescale_channel(folder, atlas_base_name=None, dest_resolution=(3, 3, 6), n_cpus=None, channel='raw', ext='.tif',
+                    chunk_size=1):
     """
     Used to rescale to create e.g. test samples that can be ran quickly
 
     Parameters
     ----------
     folder str:
-        The experiment folder with the
+        The experiment folder with the tiles
     atlas_base_name str:
         The base name of the atlas that serves as a file prefix for the atlas files
     dest_resolution tuple:
@@ -161,19 +170,24 @@ def rescale_raw(folder, atlas_base_name='ABA_25um', dest_resolution=(3, 3, 6)):
     -------
 
     """
+    n_cpus = multiprocessing.cpu_count() - 2 if n_cpus is None else n_cpus
+
     pre_proc = init_preprocessor(folder, atlas_base_name)
-    print(f'Processing {pre_proc.workspace.file_list("raw")}')
+    file_list = pre_proc.workspace.file_list(channel, prefix=pre_proc.prefix, extension=ext)
+    print(f'Processing {file_list}')
 
-    scaling_factor = tuple(np.array(pre_proc.sample_config['resolutions']['raw']) / np.array(dest_resolution))
+    scaling_factors = np.array(pre_proc.sample_config['resolutions'][channel]) / np.array(dest_resolution)
+    print(scaling_factors)
+    rescale_f = functools.partial(rescale_img, scaling_factor=tuple(scaling_factors))
 
-    p = multiprocessing.Pool()
-    for f_path in pre_proc.workspace.file_list('raw'):
-        p.apply_async(rescale_img, [f_path, scaling_factor])
+    if n_cpus*chunk_size == 1:
+        for f_path in file_list:
+            rescale_f(f_path)
+    else:
+        with ThreadPoolExecutor(n_cpus) as executor:
+            executor.map(rescale_f, file_list, chunksize=chunk_size)
 
-    p.close()
-    p.join()
-
-    pre_proc.sample_config['resolutions']['raw'] = list(dest_resolution)
+    pre_proc.sample_config['resolutions'][channel] = list(dest_resolution)
     pre_proc.sample_config.write()
     print('DONE')
 
