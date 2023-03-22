@@ -97,7 +97,7 @@ def multi_plot(sources, axis=None, scale=None, title=None, invert_y=True, min_ma
     invert_y : bool
         If True invert the y axis (as typically done for images).
     min_max : tuple or None
-        The minal and maximal values for each source. If None, determine them from
+        The minimal and maximal values for each source. If None, determine them from
         the source.
     screen : int or None
         Specify on which screen to open the window.
