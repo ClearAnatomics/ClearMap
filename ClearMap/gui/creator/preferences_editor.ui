@@ -370,6 +370,11 @@
               <string>white</string>
              </property>
             </item>
+            <item>
+             <property name="text">
+              <string>black</string>
+             </property>
+            </item>
            </widget>
           </item>
          </layout>
