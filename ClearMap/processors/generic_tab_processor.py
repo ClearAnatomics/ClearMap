@@ -94,6 +94,7 @@ class TabProcessor:
         self.stopped = True
         if hasattr(self.workspace, 'executor') and self.workspace.executor is not None:
             if sys.version_info[:2] >= (3, 9):
+                print('Canceling process')
                 self.workspace.executor.shutdown(cancel_futures=True)  # The new clean version
             else:
                 self.workspace.executor.immediate_shutdown()  # Dirty but we have no choice in python < 3.9

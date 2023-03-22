@@ -265,7 +265,6 @@ class CellDetector(TabProcessor):
 
         df.to_feather(self.workspace.filename('cells', extension='.feather'))
 
-
     def transform_coordinates(self, coords):
         coords = resampling.resample_points(
             coords, sink=None,
@@ -447,7 +446,7 @@ class CellDetector(TabProcessor):
         dv.view.addItem(scatter)
         dv.scatter = scatter
 
-        dv.scatter_coords = Scatter3D(coordinates, smarties=smarties, half_slice_thickness=3)  # FIXME: circles
+        dv.scatter_coords = Scatter3D(coordinates, smarties=smarties, half_slice_thickness=3)
         dv.refresh()
         return [dv]
 

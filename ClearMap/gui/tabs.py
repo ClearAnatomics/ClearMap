@@ -496,7 +496,7 @@ class AlignmentTab(GenericTab):
             dvs[i].scatter = scatter
             coords = [landmark_selector.fixed_coords(), landmark_selector.moving_coords()][i]  # FIXME: check order (A to B)
             dvs[i].scatter_coords = Scatter3D(coords, colors=np.array(landmark_selector.colors),
-                                              half_slice_thickness=0) # TODO: check if should change thickness
+                                              half_slice_thickness=3)
             callback = [landmark_selector.set_fixed_coords, landmark_selector.set_moving_coords][i]
             dvs[i].mouse_clicked.connect(callback)
         callbacks = {
