@@ -708,6 +708,38 @@ class PreProcessor(TabProcessor):
             cfg['Metric'] = ["AdvancedMattesMutualInformation"]
             cfg.write()
 
+    def stitch_overlay(self, channel, color=True):
+        positions = self.workspace.get_positions(channel)
+        mosaic_shape = {ax: max([p[ax] for p in positions]) + 1 for ax in 'XY'}  # +1 because 0 indexing
+        files = self.workspace.file_list(channel)
+        tile_shape = {k: v for k, v in zip('XYZ', clearmap_io.shape(files[0]))}
+        middle_z = int(tile_shape['Z'] / 2)
+        overlaps = {k: self.processing_config['stitching']['rigid'][f'overlap_{k.lower()}'] for k in 'XY'}
+        output_shape = [tile_shape[ax] * mosaic_shape[ax] - overlaps[ax] * (mosaic_shape[ax] - 1) for ax in 'XY']
+        cyan_image = np.zeros(output_shape, dtype=int)
+        magenta_image = np.zeros(output_shape, dtype=int)
+        for tile_path, pos in zip(files, positions):
+            starts = {ax: pos[ax] * tile_shape[ax] - pos[ax] * overlaps[ax] for ax in 'XY'}
+            ends = {ax: starts[ax] + tile_shape[ax] for ax in starts.keys()}
+            if (pos['Y'] + pos['X']) % 2:  # Alternate colors
+                layer = cyan_image
+            else:
+                layer = magenta_image
+            tile = clearmap_io.read(tile_path)[:, :, middle_z]  # TODO: see if can seek
+            layer[starts['X']: ends['X'], starts['Y']: ends['Y']] = tile
+        blank = np.zeros(output_shape, dtype=cyan_image.dtype)
+        if color:
+            high_intensity = (cyan_image.mean() + 4 * cyan_image.std())
+            cyan_image = cyan_image / high_intensity * 128
+            cyan_image = np.dstack((blank, cyan_image, cyan_image))  # To Cyan RGB
+            high_intensity = (magenta_image.mean() + 4 * magenta_image.std())
+            magenta_image = magenta_image / high_intensity * 128
+            magenta_image = np.dstack((magenta_image, blank, magenta_image))  # To Magenta RGB
+        output_image = cyan_image + magenta_image  # TODO: normalise
+        if color:
+            output_image = output_image.clip(0, 255).astype(np.uint8)
+        return output_image
+
 
 def main():
     preprocessor = PreProcessor()

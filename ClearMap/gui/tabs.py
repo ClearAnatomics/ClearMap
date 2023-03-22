@@ -398,7 +398,9 @@ class AlignmentTab(GenericTab):
     def setup(self):
         self.init_ui()
 
+        self.ui.previewStitchingPushButton.clicked.connect(functools.partial(self.preview_stitching, color=True))
         self.connect_whats_this(self.ui.rigidProjectionThicknessLblInfoToolButton, self.ui.rigidProjectionThicknessLbl)
+        self.ui.stitchingPreviewLevelsPushButton.clicked.connect(functools.partial(self.preview_stitching, color=False))
 
         self.ui.runStitchingButtonBox.connectApply(self.run_stitching)
         self.ui.displayStitchingButtonBox.connectApply(self.plot_stitching_results)
@@ -430,6 +432,13 @@ class AlignmentTab(GenericTab):
         self.sample_params.ui_to_cfg()  # To make sure we have the slicing up to date
         self.params.registration.ui_to_cfg()
         self.preprocessor.setup_atlases()
+
+    def preview_stitching(self, color):
+        if color:
+            overlay = [pg.image(self.preprocessor.stitch_overlay('raw', color))]
+        else:  # TODO: make DataViewer work with 2D color
+            overlay = plot_3d.plot(self.preprocessor.stitch_overlay('raw', color), lut='flame', min_max=(100, 5000))
+        self.main_window.setup_plots(overlay)
 
     def run_stitching(self):
         if not self.preprocessor.is_tiled:  # BYPASS stitching, just copy or stack
