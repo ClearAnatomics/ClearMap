@@ -247,16 +247,16 @@ def process(function, source, sink = None,
     #with BoundedProcessPoolExecutor(max_workers=processes) as executor:
     #   executor.map(function, source_blocks, sink_blocks)
     with CancelableProcessPoolExecutor(max_workers=processes) as executor:
-      futures = [executor.submit(func, *args) for args in zip(source_blocks, sink_blocks)];
-      # results = executor.map(func, source_blocks, sink_blocks)
       if workspace is not None:
         workspace.executor = executor
-      result = [f.result() for f in futures];  # To prevent keeping references to futures to avoid mem leaks
-    # result = list(results)
-    if workspace is not None:
-      workspace.executor = None
+      futures = [executor.submit(func, *args) for args in zip(source_blocks, sink_blocks)]
+      # res = executor.map(func, source_blocks, sink_blocks)
+      result = [f.result() for f in futures]  # To prevent keeping references to futures to avoid mem leaks
+      # result = list(res)
+      if workspace is not None:
+        workspace.executor = None
   else:
-    result = [func(*args) for args in zip(source_blocks, sink_blocks)]; #analysis:ignore
+    result = [func(*args) for args in zip(source_blocks, sink_blocks)]  #analysis:ignore
 
   if verbose:
     timer.print_elapsed_time("Processed %d blocks with function %r" % (n_blocks, function.__name__))
