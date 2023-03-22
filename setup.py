@@ -52,7 +52,8 @@ for ext_path in extension_paths:
         libraries=['m'],
         language='c++',  # WARNING: should be in file header
         include_dirs=[np.get_include(), os.path.dirname(os.path.abspath(ext_path))],
-        extra_compile_args=['-w']
+        extra_compile_args=['-w', '-O3', '-march=native', '-fopenmp'],
+        extra_link_args=['-fopenmp'],
     )
     extensions.append(extension)
 # ext_modules = cythonize(extensions, nthreads=n_procs, quiet=True, language_level="3")
