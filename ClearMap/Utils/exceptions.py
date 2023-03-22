@@ -12,3 +12,11 @@ class ConfigNotFoundError(ClearMapException):
 
 class PlotGraphError(ClearMapException):
     pass
+
+
+class ClearMapVRamException(ClearMapException):
+    pass
+
+
+class SmiError(ClearMapException):
+    pass
