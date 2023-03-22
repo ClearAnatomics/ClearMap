@@ -13,8 +13,9 @@ import copy
 import re
 
 import numpy as np
+from PyQt5.QtWidgets import QDialogButtonBox
 
-from ClearMap.Utils.exceptions import PlotGraphError
+from ClearMap.Utils.exceptions import PlotGraphError, ClearMapVRamException
 from ClearMap.Visualization.Qt.utils import link_dataviewers_cursors
 from ClearMap.processors.generic_tab_processor import TabProcessor, ProcessorSteps
 
@@ -233,16 +234,16 @@ class BinaryVesselProcessor(TabProcessor):
                           lut=self.machine_config['default_lut'], parent=parent)
 
     def _fill_vessels(self, size_max, overlap, channel, resample_factor=1):
-        if not get_free_v_ram() > 22000:
-            btn = warning_popup(f'Insufficient VRAM',  # FIXME: raise ClearMapVRamException
+        REQUIRED_V_RAM = 22000
+        if not get_free_v_ram() > REQUIRED_V_RAM:
+            btn = warning_popup(f'Insufficient VRAM',
                                 f'You do not have enough free memory on your graphics card to '
                                 f'run this operation. This step needs 22GB VRAM, {get_free_v_ram()/1000} were found. '
                                 f'Please free some or upgrade your hardware.')
-            return
-            # if btn == QDialogButtonBox.Abort:
-            #     return
-            # elif btn == QDialogButtonBox.Retry:
-            #     self._fill_vessels(size_max, overlap, channel, resample_factor)
+            if btn == QDialogButtonBox.Abort:
+                raise ClearMapVRamException(f'Insufficient VRAM, found only {get_free_v_ram()} < {REQUIRED_V_RAM}')
+            elif btn == QDialogButtonBox.Retry:
+                self._fill_vessels(size_max, overlap, channel, resample_factor)
 
         self.steps[channel].remove_next_steps_files(self.steps[channel].filled)
 
