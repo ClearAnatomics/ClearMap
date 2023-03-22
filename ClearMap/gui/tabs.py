@@ -970,7 +970,7 @@ class VasculatureTab(PostProcessingTab):
             self.main_window.popup(str(err), base_msg='PlotGraphError')
             return
         self.main_window.setup_plots(dvs)
-        self.main_window.stop_timers()
+        self.main_window.perf_monitor.stop()
 
     def display_graph_chunk_from_cfg(self):  # REFACTOR: split ?
         self.display_graph_chunk(self.params.visualization_params.graph_step)
@@ -1004,7 +1004,7 @@ class VasculatureTab(PostProcessingTab):
             return
         if dvs:
             self.main_window.setup_plots(dvs)
-            self.main_window.stop_timers()
+            self.main_window.perf_monitor.stop()
 
     def voxelize(self):
         voxelization_params = {

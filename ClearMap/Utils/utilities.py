@@ -5,7 +5,6 @@ utilities
 
 Various utilities that do not have a specific category
 """
-
 import os
 import re
 import shutil
@@ -24,7 +23,7 @@ __webpage__ = 'https://idisco.info'
 __download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
 
 from ClearMap.Utils.TagExpression import Expression
-from ClearMap.Utils.exceptions import MissingRequirementException
+from ClearMap.Utils.exceptions import MissingRequirementException, SmiError
 
 colors = {
     "WHITE": '\033[1;37m',
@@ -55,12 +54,14 @@ def runs_on_ui():
     return 'CLEARMAP_GUI_HOSTED' in os.environ
 
 
-# FIXME: raise specific exception if "Failed to initialize NVML: Driver/library version mismatch" in stdout
 def smi_query(var_name, units=False):
     cmd = f'nvidia-smi --query-gpu={var_name} --format=noheader,csv'
     if not units:
         cmd += ',nounits'
-    return subprocess.check_output(cmd, shell=True)
+    output = subprocess.check_output(cmd, shell=True)
+    if "Failed to initialize NVML: Driver/library version mismatch" in output.decode('ascii'):
+        raise SmiError(output)
+    return output
 
 
 def get_free_v_ram():
@@ -77,11 +78,10 @@ def gpu_util():
     return int(gpu_percent)
 
 
-def gpu_params():  # Uses 1 query instead of 3 because too time-consuming
-    res = smi_query('memory.used,memory.total,utilization.gpu').decode('ascii')
-    mem_used, mem_total, gpu_percent = [s.strip() for s in res.split(',')]
-    percent_mem = int((float(mem_used) / float(mem_total)) * 100)
-    return percent_mem, int(gpu_percent)
+def gpu_params(dest_file_path):  # Uses 1 query instead of 3 because too time-consuming
+    cmd = 'nvidia-smi --query-gpu=memory.used,memory.total,utilization.gpu --format=noheader,csv,nounits'
+    cmd += f' > {dest_file_path}'
+    subprocess.Popen(cmd, shell=True)
 
 
 class CancelableProcessPoolExecutor(ProcessPoolExecutor):

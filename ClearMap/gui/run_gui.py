@@ -23,11 +23,10 @@ from shutil import copyfile
 import traceback
 import types
 
-import psutil
 from PyQt5 import QtGui
-from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPalette, QColor
-from PyQt5.QtWebEngineWidgets import QWebEngineView  # WARNING: import required before app creation
+from PyQt5.QtWebEngineWidgets import QWebEngineView  # WARNING: must be imported before app creation
 from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QSpinBox, QDoubleSpinBox, QFrame, \
     QDialogButtonBox, QComboBox, QLineEdit, QStyle, QWidget, QMessageBox, QToolBox, QProgressBar, QLabel
 from qdarkstyle import DarkPalette
@@ -69,7 +68,7 @@ import qdarkstyle
 import pyqtgraph as pg
 
 update_pbar(app, progress_bar, 20)
-from ClearMap.Utils.utilities import title_to_snake, gpu_params
+from ClearMap.Utils.utilities import title_to_snake
 from ClearMap.gui.gui_logging import Printer
 from ClearMap.config.config_loader import ConfigLoader
 from ClearMap.Utils.exceptions import ConfigNotFoundError
@@ -84,7 +83,8 @@ from ClearMap.gui.gui_utils import html_to_ansi, html_to_plain_text, compute_gri
 from ClearMap.gui.style import DARK_BACKGROUND, PLOT_3D_BG, \
     BTN_STYLE_SHEET, TOOLTIP_STYLE_SHEET, COMBOBOX_STYLE_SHEET, WARNING_YELLOW
 
-from ClearMap.gui.widgets import OrthoViewer, ProgressWatcher, setup_mini_brain, StructureSelector  # needs plot_3d
+from ClearMap.gui.widgets import OrthoViewer, ProgressWatcher, setup_mini_brain, StructureSelector, \
+    PerfMonitor  # needs plot_3d
 update_pbar(app, progress_bar, 60)
 from ClearMap.gui.tabs import SampleTab, AlignmentTab, CellCounterTab, VasculatureTab, PreferenceUi, BatchTab
 
@@ -131,20 +131,10 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         self.gpu_bar = QProgressBar()
         self.vram_bar = QProgressBar()
 
-        self.timer = QTimer()
-        self.timer.setInterval(500)
-        self.timer.timeout.connect(self.update_cpu_bars)
-        self.slow_timer = QTimer()
-        self.slow_timer.setInterval(3000)
-        self.slow_timer.timeout.connect(self.update_gpu_bars)
-
-    def stop_timers(self):
-        self.timer.stop()
-        self.slow_timer.stop()
-
-    def start_timers(self):
-        self.timer.start()
-        self.slow_timer.start()
+        self.perf_monitor = PerfMonitor(self, 500, 500)
+        self.perf_monitor.cpu_vals_changed.connect(self.update_cpu_bars)
+        self.perf_monitor.gpu_vals_changed.connect(self.update_gpu_bars)
+        self.perf_monitor.start()
 
     def find_child_by_name(self, child_name, child_type, parent=None):
         if parent is None:
@@ -273,7 +263,7 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
                 widg.setParent(None)
                 widg.deleteLater()
         self.graphs = []
-        self.start_timers()
+        self.perf_monitor.start()
 
     def setup_plots(self, dvs, graph_names=None):
         if graph_names is None:
@@ -461,14 +451,13 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
             self.statusbar.addPermanentWidget(bar)
             # cpu_bar.setValue(20)
 
-    def update_cpu_bars(self):
-        self.cpu_bar.setValue(round(psutil.cpu_percent()))
-        self.ram_bar.setValue(round(psutil.virtual_memory().percent))
+    def update_cpu_bars(self, cpu_percent, ram_percent):
+        self.cpu_bar.setValue(cpu_percent)
+        self.ram_bar.setValue(ram_percent)
 
-    def update_gpu_bars(self):  # WARNING: these commands are much slower
-        percent_vram, percent_gpu = gpu_params()
-        self.gpu_bar.setValue(percent_gpu)
-        self.vram_bar.setValue(percent_vram)
+    def update_gpu_bars(self, gpu_percent, v_ram_percent):
+        self.gpu_bar.setValue(gpu_percent)
+        self.vram_bar.setValue(v_ram_percent)
 
 
 class ClearMapGui(ClearMapGuiBase):
@@ -747,7 +736,6 @@ def main(app, splash):
 
     clearmap_main_win.show()
     clearmap_main_win.fix_styles()
-    clearmap_main_win.start_timers()
     splash.finish(clearmap_main_win)
     if clearmap_main_win.preference_editor.params.verbosity != 'trace':  # WARNING: will disable progress bars
         clearmap_main_win.patch_stdout()

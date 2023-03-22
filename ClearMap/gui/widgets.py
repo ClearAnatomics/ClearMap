@@ -9,10 +9,13 @@ import functools
 import json
 import os
 import re
+import tempfile
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from multiprocessing.pool import ThreadPool
 
 
 import numpy as np
+import psutil
 import pyqtgraph as pg
 from qdarkstyle import DarkPalette
 
@@ -20,7 +23,7 @@ from skimage import transform as sk_transform  # WARNING: Slowish import, should
 
 from PyQt5 import QtGui, QtCore, QtWidgets
 from PyQt5.QtGui import QColor
-from PyQt5.QtCore import QRectF
+from PyQt5.QtCore import QRectF, QTimer
 from PyQt5.QtWidgets import QWidget, QDialogButtonBox, QListWidget, QHBoxLayout, QPushButton, QVBoxLayout, QTableWidget, \
     QTableWidgetItem, QToolBox, QRadioButton, QTreeWidget, QTreeWidgetItem
 
@@ -28,6 +31,7 @@ from ClearMap.Alignment.Annotation import annotation
 from ClearMap.IO import TIF
 from ClearMap.IO.metadata import pattern_finders_from_base_dir
 from ClearMap.Settings import atlas_folder
+from ClearMap.Utils.utilities import gpu_params
 from ClearMap.Visualization import Plot3d as plot_3d
 from ClearMap.config.config_loader import ConfigLoader
 from ClearMap.gui.dialogs import make_splash, get_directory_dlg, update_pbar
@@ -834,3 +838,83 @@ class StructureSelector(WizardDialog):
 
     def connect_buttons(self):
         pass
+
+
+class PerfMonitor(QWidget):
+    cpu_vals_changed = QtCore.pyqtSignal(int, int)
+    gpu_vals_changed = QtCore.pyqtSignal(int, int)
+
+    def __init__(self, parent, fast_period, slow_period, *args, **kwargs):
+        super().__init__(parent, *args, **kwargs)
+        if fast_period < 100 or slow_period < 100:
+            raise ValueError('Periods cannot be below 100ms')
+        self.percent_cpu = 0
+        self.percent_ram = 0
+        self.percent_v_ram = 0
+        self.percent_gpu = 0
+        self.fast_period = fast_period
+        self.slow_period = slow_period
+        self.fast_timer = QTimer()
+        self.fast_timer.setInterval(self.fast_period)
+        self.fast_timer.timeout.connect(self.update_cpu_values)
+        self.slow_timer = QTimer()
+        self.slow_timer.setInterval(self.slow_period)
+        self.slow_timer.timeout.connect(self.update_gpu_values)
+
+        self.gpu_proc_file_path = tempfile.mkstemp(suffix='_clearmap_gpu.proc')[-1]
+        self.cpu_proc_file_path = tempfile.mkstemp(suffix='_clearmap_cpu.proc')[-1]
+        self.file_watcher = QtCore.QFileSystemWatcher([self.gpu_proc_file_path, self.cpu_proc_file_path])
+        self.file_watcher.fileChanged.connect(self.handle_proc_changed)
+        self.pool = ProcessPoolExecutor(max_workers=1)
+
+    def start(self):
+        self.fast_timer.start()
+        self.slow_timer.start()
+
+    def stop(self):
+        self.fast_timer.stop()
+        self.slow_timer.stop()
+
+    def get_cpu_percent(self):
+        return round(psutil.cpu_percent())
+
+    def get_ram_percent(self):
+        return round(psutil.virtual_memory().percent)
+
+    def _get_cpu_vals(self):
+        with ThreadPoolExecutor(max_workers=1) as pool:  # TODO: check if should use self.pool instead
+            futures = [pool.submit(f) for f in (self.get_cpu_percent, self.get_ram_percent)]
+            percent_cpu, percent_ram = [f.result() for f in futures]
+        return percent_cpu, percent_ram
+
+    def update_cpu_values(self):
+        percent_cpu, percent_ram = self._get_cpu_vals()
+        if percent_ram != self.percent_ram or percent_cpu != self.percent_cpu:
+            self.percent_cpu = percent_cpu
+            self.percent_ram = percent_ram
+            self.cpu_vals_changed.emit(self.percent_cpu, self.percent_ram)
+
+    def update_gpu_values(self):
+        self.pool.submit(gpu_params, self.gpu_proc_file_path)
+
+    def handle_proc_changed(self, file_path):
+        if file_path == self.gpu_proc_file_path:
+            self.handle_gpu_vals_updated()
+        elif file_path == self.cpu_proc_file_path:
+            self.handle_cpu_vals_updated()
+
+    def handle_gpu_vals_updated(self):
+        with open(self.gpu_proc_file_path, 'r') as proc_file:
+            line = proc_file.read()
+            if not line:
+                return
+            elems = line.split(',')
+            if len(elems) < 3:
+                return
+            mem_used, mem_total, gpu_percent = [s.strip() for s in elems]
+            percent_v_ram = int((float(mem_used) / float(mem_total)) * 100)
+            percent_gpu = int(gpu_percent)
+        if percent_gpu != self.percent_gpu or percent_v_ram != self.percent_v_ram:
+            self.percent_gpu = percent_gpu
+            self.percent_v_ram = percent_v_ram
+            self.gpu_vals_changed.emit(self.percent_gpu, self.percent_v_ram)
