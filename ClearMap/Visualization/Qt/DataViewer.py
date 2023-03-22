@@ -219,14 +219,21 @@ class DataViewer(QWidget):
             self.sliceLine.setValue(self.sliceLine.value() + steps)
         return super().eventFilter(source, event)
 
-    def initializeSources(self, source, scale=None, axis=None, update=True):
-        # initialize sources and axis settings
+    def __cast_source(self, source):
         if isinstance(source, tuple):
             source = list(source)
         if not isinstance(source, list):
             source = [source]
+        return source
+
+    def initializeSources(self, source, scale=None, axis=None, update=True):
+        # initialize sources and axis settings
+        source = self.__cast_source(source)
         self.n_sources = len(source)
         self.sources = [as_source(s) for s in source]
+        for s in self.sources:
+            if s.ndim == 2:
+                s.shape = s.shape + (1,)  # Add empty z dimension # FIXME: see if works or need to expand_dims
 
         # self.__cast_bools()
         # self.__ensure_3d()
@@ -252,6 +259,37 @@ class DataViewer(QWidget):
 
         self.updateSourceRange()
         self.updateSourceSlice()
+
+    def setSource(self, source, index='all'):  # TODO: see if could factor with __init__
+        if index == 'all':
+            source = self.__cast_source(source)
+            if self.n_sources != len(source):
+                raise RuntimeError(f'Number of sources does not match! got {len(source)}, expected {self.n_sources}')
+            source = [as_source(s) for s in source]
+            index = range(self.n_sources)
+        else:
+            s = self.sources
+            s[index] = as_source(source)
+            source = s
+            index = [index]
+
+        # self.__cast_bools()
+        for i in index:
+            s = source[i]
+
+            if s.shape != self.source_shape:
+                raise RuntimeError('Shape of sources does not match!')
+            elif s.ndim < 2 or s.ndim > 4:  # FIXME: handle RGB
+                raise RuntimeError(f'Sources dont have dimensions 2, 3 or 4 but {s.ndim} in source {i}!')
+
+            if s.ndim == 4:
+                layer = self.color_last(s.array[self.source_slice[:s.ndim]])
+                self.image_items[i].updateImage(layer)
+            else:
+                if s.ndim == 2:
+                    s.shape = s.shape + (1,)
+                self.image_items[i].updateImage(s[self.source_slice[:s.ndim]])
+        self.sources = source
 
     def __setup_axes_controls(self):
         axis_tools_layout = QtWidgets.QGridLayout()
@@ -296,40 +334,6 @@ class DataViewer(QWidget):
     def all_colour(self):
         return all([self.is_color(s) for s in self.sources])
 
-    def setSource(self, source, index='all'):  # TODO: see if could factor with __init__
-        """initialize sources and axis settings"""
-
-        if index == 'all':
-            if isinstance(source, tuple):
-                source = list(source)
-            if not isinstance(source, list):
-                source = [source]
-            if self.n_sources != len(source):
-                raise RuntimeError('Number of sources does not match!')
-            source = [as_source(s) for s in source]
-            index = range(self.n_sources)
-        else:
-            s = self.sources
-            s[index] = as_source(source)
-            source = s
-            index = [index]
-
-        # self.__cast_bools()
-        for i in index:
-            s = source[i]
-            if s.shape != self.source_shape:
-                raise RuntimeError('Shape of sources does not match!')
-            if s.ndim == 2:
-                s.shape = s.shape + (1,)
-            if s.ndim != 4:  # FIXME: handle RGB
-                raise RuntimeError(f'Sources dont have dimensions 2, 3 or 4 but {s.ndim} in source {i}!')
-            if s.ndim == 4:
-                layer = self.color_last(s.array[self.source_slice[:s.ndim]])
-                self.image_items[i].updateImage(layer)
-            else:
-                self.image_items[i].updateImage(s[self.source_slice[:s.ndim]])
-        self.sources = source
-
     def getXYAxes(self):  # FIXME: properties
         return [ax for ax in range(self.sources[0].ndim) if ax not in (self.scroll_axis, self.color_axis)]
 
@@ -344,7 +348,8 @@ class DataViewer(QWidget):
             self.source_slice = [slice(None)] * 4  # TODO: check if could use self.sources[0].ndim
         else:
             self.source_slice = [slice(None)] * 3
-        self.source_slice[self.scroll_axis] = self.source_index[self.scroll_axis]
+        if self.scroll_axis:
+            self.source_slice[self.scroll_axis] = self.source_index[self.scroll_axis]
         self.source_slice = tuple(self.source_slice)
 
     def updateSlicer(self):
