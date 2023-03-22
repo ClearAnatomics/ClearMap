@@ -40,6 +40,11 @@ class EnvFileManager:
         lines = [ln for ln in self.cfg['dependencies'] if isinstance(ln, str) and ln.startswith(package_name)]
         return lines[0].split('=')[-1]
 
+    def write(self):
+        dest_path = self.dest_path if self.dest_path else self.cfg_path
+        with open(dest_path, 'w', encoding='utf8') as out_file:
+            yaml.dump(self.cfg, out_file, default_flow_style=False, allow_unicode=True, sort_keys=False)
+
     def patch_environment_package_line(self, package_name, pkg_version):
         """
         Patch the yaml environment file
@@ -61,18 +66,26 @@ class EnvFileManager:
                 patched_dependencies.append(dep)
 
         self.cfg['dependencies'] = patched_dependencies
-        dest_path = self.dest_path if self.dest_path else self.cfg_path
-        with open(dest_path, 'w', encoding='utf8') as out_file:
-            yaml.dump(self.cfg, out_file, default_flow_style=False, allow_unicode=True, sort_keys=False)
+        self.write()
+
+    def remove_dependency(self, package_name):
+        patched_dependencies = []
+        for dep in self.cfg['dependencies']:
+            if isinstance(dep, str):
+                if not dep.startswith(package_name):
+                    patched_dependencies.append(dep)
+            else:
+                patched_dependencies.append(dep)
+
+        self.cfg['dependencies'] = patched_dependencies
+        self.write()
 
     def patch_env_var(self, var_name, var_val):
         if 'variables' in self.cfg.keys():
             self.cfg['variables'][var_name] = var_val
         else:
             self.cfg['variables'] = {var_name: var_val}
-        dest_path = self.dest_path if self.dest_path else self.cfg_path
-        with open(dest_path, 'w', encoding='utf8') as out_file:
-            yaml.dump(self.cfg, out_file, default_flow_style=False, allow_unicode=True, sort_keys=False)
+        self.write()
 
 
 class CondaParser:
@@ -189,19 +202,22 @@ class CudaVersionManager:  # TODO: inherit from condaparser ??
         return [e.replace('cuda', '') for e in build.split('_') if 'cuda' in e][0]
 
 
-def patch_env(cfg_path, dest_path, tmp_dir=None):
+def patch_env(cfg_path, dest_path, use_torch=True, tmp_dir=None):
     env_mgr = EnvFileManager(cfg_path, dest_path)
 
-    cuda_mgr = CudaVersionManager(cfg_path, env_mgr.python_version, env_mgr.get_package_version('pytorch'))
+    if use_torch:
+        cuda_mgr = CudaVersionManager(cfg_path, env_mgr.python_version, env_mgr.get_package_version('pytorch'))
 
-    torch_pkg = cuda_mgr.match_pytorch_to_toolkit()
-    toolkit_v_tuple = cuda_mgr.toolkit_version_from_torch_pkg(torch_pkg)
-    toolkit_v_string = f"{toolkit_v_tuple[0]}.{toolkit_v_tuple[1]}"
-    env_mgr.patch_environment_package_line('cudatoolkit', toolkit_v_string)
-    torch_v_string = f"{torch_pkg['version']}={torch_pkg['build']}"
-    env_mgr.patch_environment_package_line('pytorch', torch_v_string)
+        torch_pkg = cuda_mgr.match_pytorch_to_toolkit()
+        toolkit_v_tuple = cuda_mgr.toolkit_version_from_torch_pkg(torch_pkg)
+        toolkit_v_string = f"{toolkit_v_tuple[0]}.{toolkit_v_tuple[1]}"
+        env_mgr.patch_environment_package_line('cudatoolkit', toolkit_v_string)
+        torch_v_string = f"{torch_pkg['version']}={torch_pkg['build']}"
+        env_mgr.patch_environment_package_line('pytorch', torch_v_string)
+    else:
+        env_mgr.remove_dependency('pytorch')
+        env_mgr.remove_dependency('cudatoolkit')
 
-    print(tmp_dir)
     if tmp_dir not in ('/tmp', '/tmp/'):
         print(f'Patching tmp_dir to {tmp_dir}')
         env_mgr.patch_env_var('TMP', tmp_dir)
