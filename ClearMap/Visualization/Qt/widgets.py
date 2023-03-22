@@ -116,21 +116,15 @@ class Scatter3D:
             if not all(pos.shape):  # empty
                 continue
             current_z_data[['x', 'y']] = pos
-            current_z_data['colour'] = self.get_colours(current_slice)
+            current_z_data['colour'] = self.get_colours(current_slice).values  # Otherwise uses index from source
             current_z_data['size'] = self.get_symbol_sizes(main_slice_idx, current_slice, half_size=half_slice_thickness)
             rows.append(current_z_data)
 
-        data = pd.concat(rows)
-        output = {'pos': data[['x', 'y']].values,  # WARNING: this is x/y of the view, not the 3D image
-                  'size': data['size'].values}
+        data_df = pd.concat(rows)
+        output = {'pos': data_df[['x', 'y']].values,  # WARNING: this is x/y of the view, not the 3D image
+                  'size': data_df['size'].values}
         if self.has_colours:
-            output['pen'] = data['colour'].map(dict(self.point_map[['colour', 'pen']].values)).values
-        print(f'{"-" * 25}'
-              f'Get all data: \n'
-              f'{self.data["colour"]}\n'
-              f'{self.point_map}\n'
-              f'{output}\n'
-              f'{"-" * 25}')
+            output['pen'] = data_df['colour'].map(dict(self.point_map[['colour', 'pen']].values)).values
         return output
 
     def get_draw_params(self, current_slice):
