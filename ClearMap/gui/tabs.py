@@ -693,19 +693,30 @@ class CellCounterTab(PostProcessingTab):
 
                 self.cell_size_histogram = self.setup_cell_param_histogram(cells_df, self.cell_size_histogram, 'size')
                 self.cell_intensity_histogram = self.setup_cell_param_histogram(cells_df, self.cell_intensity_histogram, 'source')
-                if self.ui.cellDetectionThresholdsLayout.count() <= 4:
-                    label = self.ui.cellDetectionThresholdsLayout.takeAt(2).widget()
-                    controls = self.ui.cellDetectionThresholdsLayout.takeAt(2).widget()
+                layout = self.ui.cellDetectionThresholdsLayout
+                if layout.count() <= 4:
+                    label = layout.takeAt(2).widget()
+                    controls = layout.takeAt(2).widget()
                     graph_width = label.width() + controls.width()
                     graph_height = 50
                     self.cell_size_histogram.resize(graph_width, graph_height)
                     self.cell_size_histogram.setMaximumSize(graph_width, graph_height)
-                    self.ui.cellDetectionThresholdsLayout.addWidget(self.cell_size_histogram, 1, 0, 1, 2)
-                    self.ui.cellDetectionThresholdsLayout.addWidget(label, 2, 0, 1, 1)
-                    self.ui.cellDetectionThresholdsLayout.addWidget(controls, 2, 1, 1, 1)
+                    layout.addWidget(self.cell_size_histogram, 1, 0, 1, 2)
+                    layout.addWidget(label, 2, 0, 1, 1)
+                    layout.addWidget(controls, 2, 1, 1, 1)
                     self.cell_intensity_histogram.resize(graph_width, graph_height)
                     self.cell_intensity_histogram.setMaximumSize(graph_width, graph_height)
-                    self.ui.cellDetectionThresholdsLayout.addWidget(self.cell_intensity_histogram, 4, 0, 1, 2)
+                    layout.addWidget(self.cell_intensity_histogram, 4, 0, 1, 2)
+
+                    lyt = self.ui.cellDetectionThresholdsLayout
+                    group_box = lyt.parent()
+                    # widgets = [lyt.itemAt(i).widget() for i in range(lyt.count())]
+                    page = group_box.parent()
+                    # heights = [lyt.itemAt(i).widget().height() for i in range(lyt.count())]
+                    container = page.parent().parent()
+                    container.setMinimumHeight(container.parent().height() - container.height()
+                                               + group_box.height())  # + 10 + self.ui.previewCellFiltersButtonBox.height())
+
             except FileNotFoundError:
                 print('Could not find cells dataframe file, skipping')
         elif tab_idx == 3:
