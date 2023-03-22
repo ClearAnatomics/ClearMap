@@ -58,11 +58,29 @@ case "$answer" in
 esac
 
 
-# Verify CUDA is functional
-green "Checking nVIDIA drivers and system CUDA installation"
-python -c "$prep_python \
-from ClearMap.Utils.install_utils import CudaVersionManager; CudaVersionManager.assert_cuda()" || exit 1
-green "OK"
+if  [[ "$OSTYPE" == "linux-gnu"* ]]; then
+    green "ClearMap uses neural networks to perform vasculature analysis.
+      The implementation of these networks relies on proprietary technology
+      from nVIDIA called CUDA. To perform vasculature analysis, you will
+      need a compatible graphics card and drivers."
+    read -r -p "Do you wish to use this feature ([y]/n)?" answer
+    case "$answer" in
+        [nN][oO]|[nN])
+            yellow "Skipping";
+            USE_TORCH="False";
+            ;;
+        *)
+            # Verify CUDA is functional
+            green "Checking nVIDIA drivers and system CUDA installation";
+            python -c "$prep_python \
+            from ClearMap.Utils.install_utils import CudaVersionManager; CudaVersionManager.assert_cuda()" || exit 1
+            green "OK";
+            USE_TORCH="True";
+            ;;
+    esac
+else
+    USE_TORCH="False";
+fi
 
 # Amend environment file (notably for compatibility with installed CUDA version)
 echo "Updating CUDA dependencies for ClearMap"
@@ -93,7 +111,7 @@ green "Using temp folder: $tmp_dir"
 
 python -c "$prep_python \
 from ClearMap.Utils.install_utils import patch_env; \
-patch_env(os.path.join(os.getcwd(), '$ENV_FILE_PATH'), 'tmp_env_file.yml', '$tmp_dir')" || exit 1
+patch_env(os.path.join(os.getcwd(), '$ENV_FILE_PATH'), 'tmp_env_file.yml', use_torch='$USE_TORCH', tmp_dir='$tmp_dir')" || exit 1
 conda deactivate
 conda env remove -n clearmap_tmp_env
 green "Done"
@@ -110,10 +128,12 @@ else
     conda env update --name "$ENV_NAME" --file "$BASEDIR/tmp_env_file.yml" $solver_string || exit 1
 fi
 conda activate "$ENV_NAME" || exit 1
-echo "Checking pytorch installation"
-python -c "$prep_python \
-from ClearMap.Utils.install_utils import CudaVersionManager; \
-CudaVersionManager.check_pytorch()" && green "Pytorch installed and functional with CUDA support" || { red "Pytorch installation failed"; exit 1; }
+if [[ "$USE_TORCH" == "True" ]]; then
+    echo "Checking pytorch installation"
+    python -c "$prep_python \
+    from ClearMap.Utils.install_utils import CudaVersionManager; \
+    CudaVersionManager.check_pytorch()" && green "Pytorch installed and functional with CUDA support" || { red "Pytorch installation failed"; exit 1; }
+fi
 
 # Install ClearMap
 echo "Installing"
@@ -141,6 +161,16 @@ fi
 echo "ClearMap installed at \"$clearmap_install_path\""
 
 # Create Linux desktop menus
+echo "Do you want to create a desktop menu entry.
+Skip this if you are not running on linux or
+running headless"
+read -r -p "Create menu entry ([y]/n)?" answer
+case "$answer" in  # FIXME:
+    [nN][oO]|[nN])
+        yellow "Skipping";
+        ;;
+    *)
+        green "Creating entry";
 menu_entry="[Desktop Entry]
 Version=1.1
 Type=Application
@@ -152,15 +182,20 @@ Actions=
 Categories=Biology;Education;X-XFCE;X-Xfce-Toplevel;
 StartupNotify=true"
 
-desktop_file="$HOME/.local/share/applications/menulibre-clearmap2.desktop"  # TODO: check if folder exists
-echo "$menu_entry" > "$desktop_file" && echo "wrote $desktop_file"
+          desktop_file="$HOME/.local/share/applications/menulibre-clearmap2.desktop"  # TODO: check if folder exists
+          echo "$menu_entry" > "$desktop_file" && echo "wrote $desktop_file"
 
-desktop_file="$HOME/.gnome/apps/menulibre-clearmap2.desktop"  # TODO: check if folder exists
-echo "$menu_entry" > "$desktop_file" && echo "wrote $desktop_file"
+          desktop_file="$HOME/.gnome/apps/menulibre-clearmap2.desktop"  # TODO: check if folder exists
+          echo "$menu_entry" > "$desktop_file" && echo "wrote $desktop_file"
 
-conda shell.bash hook >> "$clearmap_install_path/conda_init.sh" || exit 1
-chmod u+x "$clearmap_install_path/conda_init.sh" || exit 1
-chmod u+x "$clearmap_install_path/start_gui.sh" || exit 1
+          conda shell.bash hook >> "$clearmap_install_path/conda_init.sh" || exit 1
+          chmod u+x "$clearmap_install_path/conda_init.sh" || exit 1
+          chmod u+x "$clearmap_install_path/start_gui.sh" || exit 1
+        ;;
+    *)
+        green "Skipping menu entry";
+        ;;
+esac
 
 chmod u+x "$clearmap_install_path/ClearMap/External/elastix/build/bin/"* || exit 1
 
