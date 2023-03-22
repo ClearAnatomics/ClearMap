@@ -43,7 +43,7 @@
             </font>
            </property>
            <property name="currentIndex">
-            <number>0</number>
+            <number>3</number>
            </property>
            <widget class="QWidget" name="binarization">
             <property name="geometry">
@@ -119,7 +119,7 @@
                           <item>
                            <widget class="QSpinBox" name="spinBox_255">
                             <property name="suffix">
-                             <string>px</string>
+                             <string/>
                             </property>
                             <property name="minimum">
                              <number>0</number>
@@ -132,7 +132,7 @@
                           <item>
                            <widget class="QSpinBox" name="spinBox_256">
                             <property name="suffix">
-                             <string>px</string>
+                             <string/>
                             </property>
                             <property name="minimum">
                              <number>0</number>
@@ -283,7 +283,7 @@
                           <item>
                            <widget class="QSpinBox" name="spinBox_259">
                             <property name="suffix">
-                             <string>px</string>
+                             <string/>
                             </property>
                             <property name="minimum">
                              <number>0</number>
@@ -296,7 +296,7 @@
                           <item>
                            <widget class="QSpinBox" name="spinBox_260">
                             <property name="suffix">
-                             <string>px</string>
+                             <string/>
                             </property>
                             <property name="minimum">
                              <number>0</number>
@@ -1096,7 +1096,7 @@
              <item>
               <widget class="QToolBox" name="toolBox_2">
                <property name="currentIndex">
-                <number>0</number>
+                <number>1</number>
                </property>
                <widget class="QWidget" name="graphVisulization">
                 <property name="geometry">
@@ -1407,8 +1407,8 @@
                  <rect>
                   <x>0</x>
                   <y>0</y>
-                  <width>447</width>
-                  <height>168</height>
+                  <width>550</width>
+                  <height>762</height>
                  </rect>
                 </property>
                 <attribute name="label">
@@ -1446,11 +1446,55 @@
                        <number>0</number>
                       </property>
                       <property name="maximum">
-                       <number>1024</number>
+                       <number>99</number>
                       </property>
                      </widget>
                     </item>
                    </layout>
+                  </widget>
+                 </item>
+                 <item row="4" column="1">
+                  <widget class="QPushButton" name="voxelizeGraphPushButton">
+                   <property name="text">
+                    <string>Voxelize</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="0" column="0">
+                  <widget class="QLabel" name="label_14">
+                   <property name="text">
+                    <string>voxel size</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="3" column="1">
+                  <spacer name="verticalSpacer_6">
+                   <property name="orientation">
+                    <enum>Qt::Vertical</enum>
+                   </property>
+                   <property name="sizeHint" stdset="0">
+                    <size>
+                     <width>20</width>
+                     <height>40</height>
+                    </size>
+                   </property>
+                  </spacer>
+                 </item>
+                 <item row="4" column="2">
+                  <widget class="QPushButton" name="plotGraphVoxelizationPushButton">
+                   <property name="text">
+                    <string>Plot voxelization</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="2" column="0">
+                  <widget class="QLabel" name="label_24">
+                   <property name="text">
+                    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Filter by&lt;/p&gt;&lt;p&gt;vertex degree&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                   </property>
+                   <property name="textFormat">
+                    <enum>Qt::RichText</enum>
+                   </property>
                   </widget>
                  </item>
                  <item row="0" column="1" colspan="2">
@@ -1471,7 +1515,7 @@
                        <number>0</number>
                       </property>
                       <property name="maximum">
-                       <number>1024</number>
+                       <number>512</number>
                       </property>
                      </widget>
                     </item>
@@ -1484,7 +1528,7 @@
                        <number>0</number>
                       </property>
                       <property name="maximum">
-                       <number>1024</number>
+                       <number>512</number>
                       </property>
                      </widget>
                     </item>
@@ -1497,17 +1541,20 @@
                        <number>0</number>
                       </property>
                       <property name="maximum">
-                       <number>1024</number>
+                       <number>512</number>
                       </property>
                      </widget>
                     </item>
                    </layout>
                   </widget>
                  </item>
-                 <item row="4" column="2">
-                  <widget class="QPushButton" name="plotGraphVoxelizationPushButton">
+                 <item row="1" column="0">
+                  <widget class="QLabel" name="label_25">
                    <property name="text">
-                    <string>Plot voxelization</string>
+                    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Weight by &lt;/p&gt;&lt;p&gt;vertex radius&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                   </property>
+                   <property name="textFormat">
+                    <enum>Qt::RichText</enum>
                    </property>
                   </widget>
                  </item>
@@ -1515,47 +1562,6 @@
                   <widget class="QCheckBox" name="voxelizationWeightByRadiusCheckBox">
                    <property name="text">
                     <string/>
-                   </property>
-                  </widget>
-                 </item>
-                 <item row="4" column="1">
-                  <widget class="QPushButton" name="voxelizeGraphPushButton">
-                   <property name="text">
-                    <string>Voxelize</string>
-                   </property>
-                  </widget>
-                 </item>
-                 <item row="3" column="1">
-                  <spacer name="verticalSpacer_6">
-                   <property name="orientation">
-                    <enum>Qt::Vertical</enum>
-                   </property>
-                   <property name="sizeHint" stdset="0">
-                    <size>
-                     <width>20</width>
-                     <height>40</height>
-                    </size>
-                   </property>
-                  </spacer>
-                 </item>
-                 <item row="0" column="0">
-                  <widget class="QLabel" name="label_14">
-                   <property name="text">
-                    <string>voxel size</string>
-                   </property>
-                  </widget>
-                 </item>
-                 <item row="2" column="0">
-                  <widget class="QLabel" name="label_24">
-                   <property name="text">
-                    <string>Filter by vertex degree</string>
-                   </property>
-                  </widget>
-                 </item>
-                 <item row="1" column="0">
-                  <widget class="QLabel" name="label_25">
-                   <property name="text">
-                    <string>Weight by vertex radius</string>
                    </property>
                   </widget>
                  </item>
