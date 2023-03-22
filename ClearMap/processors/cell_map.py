@@ -134,8 +134,9 @@ class CellDetector(TabProcessor):
         #     self.plot_voxelized_intensities()
 
     def plot_voxelized_counts(self, arrange=True, parent=None):
+        scale = self.preprocessor.processing_config['registration']['resampling']['raw_sink_resolution']
         return plot_3d.plot(self.workspace.filename('density', postfix='counts'),
-                            title='Cell density (voxelized)',
+                            scale=scale, title='Cell density (voxelized)', lut='flame',
                             arrange=arrange, parent=parent)
 
     def create_test_dataset(self, slicing):
@@ -390,6 +391,7 @@ class CellDetector(TabProcessor):
     def plot_cells_3d_scatter_w_atlas_colors(self, raw=False, parent=None):
         if raw:
             dv = qplot_3d.plot(self.workspace.filename('stitched'), title='Stitched and cells',
+                               # scale=self.preprocessor.sample_config['resolutions']['raw'],# FIXME: correct scaling for anisotropic
                                arrange=False, lut='white', parent=parent)[0]
         else:
             if self.preprocessor.was_registered:  # REFACTORING: could extract
@@ -408,7 +410,9 @@ class CellDetector(TabProcessor):
         df = self.get_cells_df()
 
         if raw:
-            coordinates = df[['x', 'y', 'z']].values.astype(int)  # required to match integer z
+            coordinates = df[['x', 'y', 'z']].values.astype(int)
+            # coordinates = coordinates * np.array(self.preprocessor.sample_config['resolutions']['raw'])
+            # coordinates = coordinates.astype(int)  # required to match integer z  # FIXME: correct scaling for anisotropic
         else:
             coordinates = df[['xt', 'yt', 'zt']].values.astype(int)  # required to match integer z
             dv.atlas = clearmap_io.read(self.preprocessor.annotation_file_path)
