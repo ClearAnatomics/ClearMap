@@ -89,9 +89,9 @@ class Timer(object):
     beep : bool
       If True, beep in addition to print the time.
     """    
-    print(self.elapsed_time(head = head));
+    print(self.elapsed_time(head=head), flush=True)
     if beep:
-      snd.beep();
+      snd.beep()
   
   def format_time(self, t):
     """Format time to string.
