@@ -197,7 +197,7 @@ class CellDetector(TabProcessor):
         counts_file_path = self.workspace.filename('density', postfix='counts')  # TODO: improve var name
         clearmap_io.delete_file(counts_file_path)
         self.set_watcher_step('Unweighted voxelisation')
-        voxelization.voxelize(coordinates, sink=counts_file_path, **voxelization_parameter)
+        voxelization.voxelize(coordinates, sink=counts_file_path, **voxelization_parameter)  # WARNING: prange
         self.update_watcher_main_progress()
         # self.remove_crust(coordinates, voxelization_parameter)  # WARNING: currently causing issues
         return coordinates, counts_file_path
@@ -221,7 +221,7 @@ class CellDetector(TabProcessor):
         """
         intensities_file_path = self.workspace.filename('density', postfix='intensities')
         intensities = source['source']
-        voxelization.voxelize(coordinates, sink=intensities_file_path, weights=intensities, **voxelization_parameter)
+        voxelization.voxelize(coordinates, sink=intensities_file_path, weights=intensities, **voxelization_parameter)   # WARNING: prange
         return intensities_file_path
 
     def atlas_align(self):
@@ -301,7 +301,7 @@ class CellDetector(TabProcessor):
         self.processing_config.reload()
         self.workspace.debug = tuning  # TODO: use context manager
         cell_detection_param = copy.deepcopy(cell_detection.default_cell_detection_parameter)
-        cell_detection_param['illumination'] = None  # WARNING: illumination or illumination_correction
+        cell_detection_param['illumination_correction'] = None  # WARNING: illumination or illumination_correction
         cell_detection_param['background_correction']['shape'] = self.processing_config['detection']['background_correction']['diameter']
         cell_detection_param['maxima_detection']['shape'] = self.processing_config['detection']['maxima_detection']['shape']
         cell_detection_param['intensity_detection']['measure'] = ['source']
@@ -331,7 +331,7 @@ class CellDetector(TabProcessor):
                                         self.workspace.filename('cells', postfix='raw'),
                                         cell_detection_parameter=cell_detection_param,
                                         processing_parameter=processing_parameter,
-                                        workspace=self.workspace)
+                                        workspace=self.workspace)  # WARNING: prange inside multiprocess (including arrayprocessing and devolvepoints for vox)
         except BrokenProcessPool as err:
             print('Cell detection canceled')
             return
@@ -473,7 +473,7 @@ class CellDetector(TabProcessor):
              range(coordinates.shape[0])]).nonzero()[0]]
 
         voxelization.voxelize(coordinates_wcrust, sink=self.workspace.filename('density', postfix='counts_wcrust'),
-                              **voxelization_parameter)
+                              **voxelization_parameter)   # WARNING: prange
 
     def preview_cell_detection(self, parent=None, arrange=True, sync=True):
         sources = [self.workspace.filename('stitched'),
