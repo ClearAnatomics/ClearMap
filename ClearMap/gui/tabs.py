@@ -138,7 +138,7 @@ class GenericTab(GenericUi):
         info_btn.clicked.connect(lambda: self.display_whats_this(whats_this_ctrl))
 
     def wrap_step(self, task_name, func, step_args=None, step_kw_args=None, n_steps=1, abort_func=None, save_cfg=True,
-                  nested=True, close_when_done=True):  # FIXME: saving config should be default
+                  nested=True, close_when_done=True, main_thread=False):  # FIXME: saving config should be default
         if step_args is None:
             step_args = []
         if step_kw_args is None:
@@ -152,7 +152,10 @@ class GenericTab(GenericUi):
             self.main_window.make_progress_dialog(task_name, n_steps=n_steps, abort=abort_func)
 
         try:
-            self.main_window.wrap_in_thread(func, *step_args, **step_kw_args)
+            if main_thread:
+                func(*step_args, **step_kw_args)
+            else:
+                self.main_window.wrap_in_thread(func, *step_args, **step_kw_args)
         except MissingRequirementException as ex:
             self.main_window.print_error_msg(ex)
             self.main_window.popup(str(ex), base_msg=f'Could not run operation {func.__name__}', print_warning=False)
@@ -674,7 +677,7 @@ class CellCounterTab(PostProcessingTab):
     def voxelize(self):
         if os.path.exists(self.preprocessor.filename('cells', postfix='filtered')):
             self.wrap_step('Voxelization', self.cell_detector.voxelize,
-                           abort_func=self.cell_detector.stop_process, nested=False)
+                           abort_func=self.cell_detector.stop_process, nested=False, main_thread=True)
         else:
             self.main_window.popup('Could not run voxelization, missing filtered cells table. '
                                    'Please ensure that cell filtering has been run.', base_msg='Missing file')
@@ -798,7 +801,7 @@ class CellCounterTab(PostProcessingTab):
             self.wrap_step('Filtering cells', self.cell_detector.filter_cells, n_steps=2+(1 - is_last_step),
                            abort_func=self.cell_detector.stop_process, close_when_done=False)
             self.wrap_step('Voxelizing', self.cell_detector.voxelize, step_args=['filtered'], save_cfg=False,
-                           close_when_done=is_last_step)
+                           close_when_done=is_last_step, main_thread=True)
         self.plot_cell_filter_results()
 
     def preview_cell_filter(self):

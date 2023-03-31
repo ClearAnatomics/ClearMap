@@ -140,7 +140,7 @@ def voxelize(folder):
     coordinates = np.array([cells[axis] for axis in ['xt', 'yt', 'zt']]).T
     counts_file_path = os.path.join(folder, 'density_counts.tif')
     clearmap_io.delete_file(counts_file_path)
-    voxelization.voxelize(coordinates, sink=counts_file_path, **voxelization_parameter)
+    voxelization.voxelize(coordinates, sink=counts_file_path, **voxelization_parameter)   # WARNING: prange
     return coordinates, counts_file_path
 
 
