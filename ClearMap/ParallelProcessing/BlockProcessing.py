@@ -50,7 +50,7 @@ Block-Numpy-Source(50, 100, 38)[float64]|F|
 True
   
 >>> bp.process(process_image, source, sink,
->>>            processes = None, size_max = 10, size_min = 6, overlap = 3, axes = all,
+>>>            processes = None, size_max = 10, size_min = 6, overlap = 3, axes = 'all',
 >>>            optimization = True, verbose = True);
 
 """
@@ -62,6 +62,8 @@ __copyright__ = 'Copyright 2020 by Christoph Kirst'
 import functools as ft
 import multiprocessing as mp
 import concurrent.futures as cf
+import warnings
+
 import numpy as np
 import gc
 
@@ -557,35 +559,47 @@ def block_sizes(size, processes = None,
   return n_blocks, block_ranges, valid_ranges;
 
 
-def block_axes(source, axes = None):
-  """Determine the axes for block processing from source order.
+def block_axes(source, axes=None):
+  """
+  Determine the axes for block processing from source order.
   
   Arguments
   ---------
   source : array or Source
     The source on which the block processing is used.
-  axes : list or None
+  axes : list, 'all' or None
     The axes over which to split the block processing.
+    .. deprecated:: 2.1
+      Value *all* (the built-in Python keyword) is now
+       deprecated for parameter axes.
+     You should replace it with
+      *"all"* (the string literal) instead
+
   
   Returns
   -------
    axes : list or None
     The axes over which to split the block processing.
   """
-  if axes is all:
-    axes = [d for d in range(source.ndim)];
+  if axes == 'all' or axes is all:  # FIXME: remove is all
+    if axes is all:
+      warnings.warn("Parameter axes could take all (the built-in Python keyword). "
+                    "This will be replaced by the string 'all' in future versions",
+                    DeprecationWarning,
+                    stacklevel=2)
+    axes = [d for d in range(source.ndim)]
   if axes is not None:
     if np.max(axes) >= source.ndim or np.min(axes) < 0:
-      raise ValueError('Axes specification %r for source with dimnesion %d not valid!' % (axes, source.ndim));
-    return axes;
+      raise ValueError(f'Axes specification {axes} for source with dimension {source.ndim} not valid!')
+    return axes
   
-  source = io.as_source(source);
+  source = io.as_source(source)
   if source.order == 'F':
-    axes = [source.ndim-1];
+    axes = [source.ndim-1]
   else:
-    axes = [0];
+    axes = [0]
     
-  return axes;
+  return axes
 
 
 def split_into_blocks(source, processes = None, axes = None, 
@@ -751,7 +765,7 @@ def _test():
   print(np.all(sink[:] == process_image(source)))
   
   bp.process(process_image, source, sink,
-             processes = None, size_max = 10, size_min = 6, overlap = 3, axes = all,
+             processes = None, size_max = 10, size_min = 6, overlap = 3, axes = 'all',
              optimization = True, verbose = True);
                         
   assert(np.all(sink[:] == process_image(source))) 
