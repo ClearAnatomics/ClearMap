@@ -352,7 +352,7 @@ class CellDetector(TabProcessor):
         csv_file_path = self.workspace.filename('cells', extension='.csv')
         self.get_cells_df().to_csv(csv_file_path)
 
-    def export_collapsed_stats(self):
+    def export_collapsed_stats(self, all_regions=True):
         df = self.get_cells_df()
 
         collapsed = pd.DataFrame()
@@ -370,6 +370,22 @@ class CellDetector(TabProcessor):
             tmp['Average cell size'] = grouped.mean()['size']
 
             collapsed = pd.concat((collapsed, tmp))
+
+        if all_regions:  # Add regions even if they are empty
+            uniq_ids = np.unique(annotation.annotation.atlas)
+            tmp = pd.DataFrame({'Structure ID': uniq_ids, 'mock': ''})
+            tmp['Structure name'] = annotation.convert_label(uniq_ids, key='id', value='name')
+            df_mock = pd.DataFrame({'Hemisphere': [0, 255], 'mock': ''})
+            tmp = tmp.merge(df_mock, on='mock').drop(columns='mock')
+            vol_map = annotation.annotation.get_lateralised_volume_map(
+                self.preprocessor.processing_config['registration']['resampling']['autofluo_sink_resolution'],
+                self.preprocessor.hemispheres_file_path
+            )
+            tmp['Structure volume'] = tmp.set_index(['Structure ID', 'Hemisphere']).index.map(vol_map.get)
+            order_map = {id_: annotation.find(id_, key='id')['order'] for id_ in uniq_ids}
+            tmp['Structure order'] = tmp['Structure ID'].map(order_map)
+            collapsed = tmp.merge(collapsed[['Structure ID', 'Hemisphere', 'Cell counts', 'Average cell size']],
+                                  how='left', on=['Structure ID', 'Hemisphere'])
 
         collapsed = collapsed.sort_values(by='Structure ID')
 
