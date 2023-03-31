@@ -34,8 +34,7 @@ import ClearMap.ImageProcessing.Binary.Filling as bf
 import ClearMap.ImageProcessing.Binary.Smoothing as bs
 
 import ClearMap.Utils.Timer as tmr
-import ClearMap.Utils.HierarchicalDict as hdict
-
+from ClearMap.ImageProcessing.Experts.utils import initialize_sinks, equalize, wrap_step, print_params
 
 ###############################################################################
 # ## Generic parameter
@@ -479,12 +478,7 @@ def binarize(source, sink=None, binarization_parameter=default_binarization_para
     if binary_status:
         ap.initialize_sink(binary_status, source=sink, shape=shape, order=order, dtype='uint16')
 
-    for key in binarization_parameter.keys():
-        par = binarization_parameter[key]
-        if isinstance(par, dict):
-            filename = par.get('save')
-            if filename:
-                ap.initialize_sink(filename, shape=shape, order=order, dtype='float')
+    initialize_sinks(binarization_parameter, shape, order)
 
     binarization_parameter.update(verbose=processing_parameter.get('verbose', False))
 
@@ -502,6 +496,8 @@ def binarize_block(source, sink, parameter=default_binarization_parameter):
     if verbose:
         prefix = 'Block %s: ' % (source.info(),)
         total_time = tmr.Timer(prefix)
+    else:
+        prefix = ''
 
     max_bin = parameter.get('max_bin', MAX_BIN)
 
@@ -514,13 +510,14 @@ def binarize_block(source, sink, parameter=default_binarization_parameter):
         binary_status = io.as_source(binary_status)
         binary_status = binary_status[base_slicing]
 
+    default_step_params = {'parameter': parameter, 'steps_to_measure': None, 'prefix': prefix,  # FIXME: handle steps_to_measure is None
+                           'base_slicing': base_slicing, 'valid_slicing': valid_slicing}
+
     # clipping
     parameter_clip = parameter.get('clip')
     if parameter_clip:
-        parameter_clip = parameter_clip.copy()
-        if verbose:
-            timer = tmr.Timer(prefix)
-            hdict.pprint(parameter_clip, head=f'{prefix}Clipping:')
+        parameter_clip, timer = print_params(parameter_clip, 'clip', prefix, verbose)
+
         parameter_clip.update(norm=max_bin, dtype=DTYPE)
         save = parameter_clip.pop('save', None)
 
@@ -543,67 +540,23 @@ def binarize_block(source, sink, parameter=default_binarization_parameter):
     else:
         clipped = source
         mask = not_low = np.ones(source.shape, dtype=bool)
-        # high = low = np.zeros(source.shape, dtype=bool)
-        # low = np.zeros(source.shape, dtype=bool)
-        # not_low = np.logical_not(low)
-
     # active arrays: clipped, mask, not_low
 
     # lightsheet correction
-    parameter_lightsheet = parameter.get('lightsheet')
-    if parameter_lightsheet:
-        parameter_lightsheet = parameter_lightsheet.copy()
-        if verbose:
-            timer = tmr.Timer(prefix)
-            hdict.pprint(parameter_lightsheet, head=prefix + 'Lightsheet:')
-
-        # parameter_lightsheet.update(max_bin=max_bin);
-        save = parameter_lightsheet.pop('save', None)
-
-        corrected = lc.correct_lightsheet(clipped, mask=mask, max_bin=max_bin, **parameter_lightsheet)
-
-        if save:
-            save = io.as_source(save)
-            save[base_slicing] = corrected[valid_slicing]
-
-        if verbose:
-            timer.print_elapsed_time('Lightsheet')
-    else:
-        corrected = clipped
-
-    del clipped
+    corrected = wrap_step('lightsheet', clipped, lc.correct_lightsheet, remove_previous_result=True,
+                          extra_kwargs={'mask': mask, 'max_bin': max_bin}, **default_step_params)
     # active arrays: corrected, mask, not_low
 
     # median filter
-    parameter_median = parameter.get('median')
-    if parameter_median:
-        parameter_median = parameter_median.copy()
-        if verbose:
-            timer = tmr.Timer(prefix)
-            hdict.pprint(parameter_median, head=f'{prefix}Median:')
-
-        save = parameter_median.pop('save', None)
-        median = rnk.median(corrected, max_bin=max_bin, mask=not_low, **parameter_median)
-
-        if save:
-            save = io.as_source(save)
-            save[base_slicing] = median[valid_slicing]
-
-        if verbose:
-            timer.print_elapsed_time('Median')
-    else:
-        median = corrected
-
-    del corrected, not_low
+    median = wrap_step('median', corrected, rnk.median, remove_previous_result=True,
+                       extra_kwargs={'max_bin': max_bin, 'mask': not_low}, **default_step_params)
+    del not_low
     # active arrays: median, mask
 
     # pseudo deconvolution
     parameter_deconvolution = parameter.get('deconvolve')
     if parameter_deconvolution:
-        parameter_deconvolution = parameter_deconvolution.copy()
-        if verbose:
-            timer = tmr.Timer(prefix)
-            hdict.pprint(parameter_deconvolution, head=f'{prefix}Deconvolution:')
+        parameter_deconvolution, timer = print_params(parameter_deconvolution, 'deconvolve', prefix, verbose)
 
         save = parameter_deconvolution.pop('save', None)
         threshold = parameter_deconvolution.pop('threshold', None)
@@ -641,20 +594,9 @@ def binarize_block(source, sink, parameter=default_binarization_parameter):
 
     # adaptive
     parameter_adaptive = parameter.get('adaptive')
+    adaptive = wrap_step('adaptive', deconvolved, threshold_adaptive, remove_previous_result=False,
+                         **default_step_params)
     if parameter_adaptive:
-        parameter_adaptive = parameter_adaptive.copy()
-        if verbose:
-            timer = tmr.Timer(prefix)
-            hdict.pprint(parameter_adaptive, head=f'{prefix}Adaptive:')
-
-        save = parameter_adaptive.pop('save', None)
-
-        adaptive = threshold_adaptive(deconvolved, **parameter_adaptive)
-
-        if save:
-            save = io.as_source(save)
-            save[base_slicing] = adaptive[valid_slicing]
-
         binary_adaptive = deconvolved > adaptive
 
         if binary_status is not None:
@@ -664,8 +606,8 @@ def binarize_block(source, sink, parameter=default_binarization_parameter):
 
         del binary_adaptive, adaptive
 
-        if verbose:
-            timer.print_elapsed_time('Adaptive')
+        # if verbose:
+        #     timer.print_elapsed_time('Adaptive')
 
     del deconvolved
     # active arrays: median, mask
@@ -673,10 +615,7 @@ def binarize_block(source, sink, parameter=default_binarization_parameter):
     # equalize
     parameter_equalize = parameter.get('equalize')
     if parameter_equalize:
-        parameter_equalize = parameter_equalize.copy()
-        if verbose:
-            timer = tmr.Timer(prefix)
-            hdict.pprint(parameter_equalize, head=f'{prefix}Equalization:')
+        parameter_equalize, timer = print_params(parameter_equalize, 'equalize', prefix, verbose)
 
         save = parameter_equalize.pop('save', None)
         threshold = parameter_equalize.pop('threshold', None)
@@ -717,10 +656,7 @@ def binarize_block(source, sink, parameter=default_binarization_parameter):
     # smaller vessels /capillaries
     parameter_vesselization = parameter.get('vesselize')
     if parameter_vesselization:
-        parameter_vesselization = parameter_vesselization.copy()
-        if verbose:
-            timer = tmr.Timer(prefix)
-            hdict.pprint(parameter_vesselization, head=f'{prefix}Vesselization:')
+        parameter_vesselization, timer = print_params(parameter_vesselization, 'vesselize', prefix, verbose)
 
         parameter_background = parameter_vesselization.get('background')
         parameter_background = parameter_background.copy()
@@ -772,10 +708,7 @@ def binarize_block(source, sink, parameter=default_binarization_parameter):
     # fill holes
     parameter_fill = parameter.get('fill')
     if parameter_fill:
-        parameter_fill = parameter_fill.copy()
-        if verbose:
-            timer = tmr.Timer(prefix)
-            # hdict.pprint(parameter_fill, head='Filling:')
+        step_param, timer = print_params(parameter_fill, 'fill', prefix, verbose)
 
         if binary_status is not None:
             foreground = binary_status > 0
@@ -794,19 +727,12 @@ def binarize_block(source, sink, parameter=default_binarization_parameter):
         sink[valid_slicing] = binary_status[valid_slicing] > 0
 
     # smooth binary
-    parameter_smooth = parameter.get('smooth')
-    if parameter_smooth:
-        parameter_smooth = parameter_smooth.copy()
-        if verbose:
-            timer = tmr.Timer(prefix)
-            hdict.pprint(parameter_smooth, head=f'{prefix}Smoothing:')
-
-        smoothed = bs.smooth_by_configuration(sink, sink=None, processes=1, **parameter_smooth)
+    if parameter.get('smooth'):  # WARNING: otherwise removes sink if no smoothing
+        parameter['smooth']['save'] = False
+        smoothed = wrap_step('smooth', sink, bs.smooth_by_configuration, remove_previous_result=False,
+                             extra_kwargs={'sink': None, 'processes': 1}, **default_step_params)
         sink[valid_slicing] = smoothed[valid_slicing]
         del smoothed
-
-        if verbose:
-            timer.print_elapsed_time('Smoothing')
 
     if verbose:
         total_time.print_elapsed_time('Binarization')
@@ -876,42 +802,46 @@ def postprocess(source, sink=None, postprocessing_parameter=default_postprocessi
         print('Binary post processing: initialized.')
 
     postprocessing_parameter = postprocessing_parameter.copy()
-    parameter_smooth = postprocessing_parameter.pop('smooth', None)
-    parameter_fill = postprocessing_parameter.pop('fill', None)
+    run_binary_filling = postprocessing_parameter.pop('fill', False)
+    parameter_smooth = postprocessing_parameter.get('smooth')
 
     # smoothing
-    save = None
     if parameter_smooth:
-        # initialize temporary files if needed
-        if parameter_fill:
-            save = parameter_smooth.pop('save', None)
-            temporary_filename = save
-            if temporary_filename is None:
-                temporary_filename = postprocessing_parameter['temporary_filename']
-            if temporary_filename is None:
-                temporary_filename = tmpf.mktemp(prefix='TubeMap_Vasculature_postprocessing', suffix='.npy')
-            sink_smooth = ap.initialize_sink(temporary_filename, shape=source.shape, dtype=source.dtype, order=source.order, return_buffer=False)
-        else:
-            sink_smooth = sink
-
-        # run smoothing
-        source_fill = bs.smooth_by_configuration(source, sink=sink_smooth, processing_parameter=processing_parameter,
-                                                 processes=processes, verbose=verbose, **parameter_smooth)
-
+        fill_source, tmp_f_path, save = apply_smoothing(source, sink, processing_parameter, postprocessing_parameter,
+                                                        processes, verbose)
     else:
-        source_fill = source
+        fill_source = source
+        save = False
 
-    if parameter_fill:
-        bf.fill(source_fill, sink=sink, processes=processes, verbose=verbose)
-        if parameter_smooth and save is None:
-            io.delete_file(temporary_filename)
-    # else:
-    #   source_fill
+    if run_binary_filling:
+        bf.fill(fill_source, sink=sink, processes=processes, verbose=verbose)
+        if parameter_smooth and not save:
+            io.delete_file(tmp_f_path)
 
     if verbose:
         timer.print_elapsed_time('Binary post processing')
 
     gc.collect()
+
+
+def apply_smoothing(source, sink, processing_parameter, postprocessing_parameter, processes=None, verbose=True):
+    parameter_smooth = postprocessing_parameter.pop('smooth', None)
+    if postprocessing_parameter.get('fill'):
+        save = parameter_smooth.pop('save', False)
+        # initialize temporary files if needed
+        tmp_f_path = save if save else postprocessing_parameter['temporary_filename']
+        tmp_f_path = tmp_f_path if tmp_f_path else tmpf.mktemp(prefix='TubeMap_Vasculature_postprocessing',
+                                                               suffix='.npy')
+        sink_smooth = ap.initialize_sink(tmp_f_path, shape=source.shape, dtype=source.dtype,
+                                         order=source.order, return_buffer=False)
+    else:
+        sink_smooth = sink
+        save = False
+        tmp_f_path = ''
+    # run smoothing
+    fill_source = bs.smooth_by_configuration(source, sink=sink_smooth, processing_parameter=processing_parameter,
+                                             processes=processes, verbose=verbose, **parameter_smooth)
+    return fill_source, tmp_f_path, save
 
 
 ###############################################################################
@@ -965,17 +895,6 @@ def threshold_adaptive(source, function=threshold_isodata, selem=(100, 100, 3), 
     threshold = ls.apply_local_function(source, function=function, mask=mask, dtype=float,
                                         selem=selem, spacing=spacing, interpolate=interpolate, step=step)
     return threshold
-
-
-def equalize(source, percentile=(0.5, 0.95), max_value=1.5, selem=(200, 200, 5), spacing=(50, 50, 5), interpolate=1, mask=None):
-    equalized = ls.local_percentile(source, percentile=percentile, mask=mask, dtype=float,
-                                    selem=selem, spacing=spacing, interpolate=interpolate)
-    normalize = 1/np.maximum(equalized[..., 0], 1)
-    maxima = equalized[..., 1]
-    ids = maxima * normalize > max_value
-    normalize[ids] = max_value / maxima[ids]
-    equalized = np.array(source, dtype=float) * normalize
-    return equalized
 
 
 def tubify(source, sigma=1.0, gamma12=1.0, gamma23=1.0, alpha=0.25):
