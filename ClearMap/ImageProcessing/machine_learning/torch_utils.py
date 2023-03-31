@@ -15,6 +15,16 @@ __download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
 import torch
 
 
+def set_type(torch_obj, dtype, cuda):
+    if cuda:
+        torch_obj = torch_obj.cuda()
+        if dtype is not None:
+            torch_obj = to(torch_obj, dtype)
+    else:
+        torch_obj = torch_obj.float()
+    return torch_obj
+
+
 def to(t, dtype=float):
     """
     Convert torch object to a specified data type.
