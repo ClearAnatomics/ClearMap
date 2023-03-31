@@ -23,7 +23,7 @@ import ClearMap.IO.IO as clearmap_io
 from ClearMap.IO.MHD import mhd_read
 from ClearMap.Alignment import Annotation as annotation
 from ClearMap.Analysis.Statistics.group_statistics import make_summary, density_files_are_comparable, compare_groups
-from ClearMap.Utils.exceptions import MissingRequirementException, PlotGraphError
+from ClearMap.Utils.exceptions import MissingRequirementException, PlotGraphError, ClearMapVRamException
 from ClearMap.Visualization.Matplotlib.PlotUtils import plot_sample_stats_histogram, plot_volcano
 from ClearMap.Visualization.atlas import create_color_annotation
 
@@ -931,10 +931,21 @@ class VasculatureTab(PostProcessingTab):
 
     # ####################### BINARY  #######################
 
-    def binarize_channel(self, channel):
+    def binarize_channel(self, channel, stop_on_error=False):
         # FIXME: n_steps = self.params.binarization_params.n_steps
-        self.wrap_step('Vessel binarization', self.binary_vessel_processor.binarize_channel, step_args=[channel],
-                       abort_func=self.binary_vessel_processor.stop_process)
+        try:
+            self.wrap_step('Vessel binarization', self.binary_vessel_processor.binarize_channel,
+                           step_args=[channel], abort_func=self.binary_vessel_processor.stop_process)
+            self.wrap_step('Vessel binarization', self.binary_vessel_processor.smooth_channel,
+                           step_args=[channel], abort_func=self.binary_vessel_processor.stop_process)
+            self.wrap_step('Vessel binarization', self.binary_vessel_processor.fill_channel,
+                           step_args=[channel], abort_func=self.binary_vessel_processor.stop_process,
+                           main_thread=True)  # WARNING: The parallel cython loops inside cannot run from child thread
+            self.wrap_step('Vessel binarization', self.binary_vessel_processor.deep_fill_channel,
+                           step_args=[channel], abort_func=self.binary_vessel_processor.stop_process)
+        except ClearMapVRamException as err:
+            if stop_on_error:
+                raise err
 
     def combine(self):
         self.wrap_step('Combining channels', self.binary_vessel_processor.combine_binary,
@@ -965,16 +976,26 @@ class VasculatureTab(PostProcessingTab):
     # ###########################  GRAPH  #############################
 
     def run_all(self):
-        self.binarize_channel('raw')
-        self.binarize_channel('arteries')
+        try:
+            self.binarize_channel('raw', stop_on_error=True)
+            self.binarize_channel('arteries', stop_on_error=True)
+        except ClearMapVRamException:
+            return
         self.combine()
         self.build_graph()
         self.post_process_graph()
         self.voxelize()
 
     def build_graph(self):
-        self.wrap_step('Building vessel graph', self.vessel_graph_processor.pre_process,
-                       abort_func=self.vessel_graph_processor.stop_process)  # FIXME: n_steps = 4
+        # FIXME: n_steps = 4
+        self.wrap_step('Building vessel graph', self.vessel_graph_processor.build_graph,
+                       abort_func=self.vessel_graph_processor.stop_process, main_thread=True)
+        self.wrap_step('Building vessel graph', self.vessel_graph_processor.clean_graph,
+                       abort_func=self.vessel_graph_processor.stop_process)
+        self.wrap_step('Building vessel graph', self.vessel_graph_processor.reduce_graph,
+                       abort_func=self.vessel_graph_processor.stop_process)
+        self.wrap_step('Building vessel graph', self.vessel_graph_processor.register,
+                       abort_func=self.vessel_graph_processor.stop_process)
 
     def plot_graph_type_processing_chunk_slicer(self):
         self.plot_slicer('graphConstructionSlicer', self.ui, self.params.visualization_params)
@@ -1035,7 +1056,7 @@ class VasculatureTab(PostProcessingTab):
             'vertex_degrees': self.params.visualization_params.vertex_degrees
         }
         self.wrap_step('Running voxelization', self.vessel_graph_processor.voxelize,
-                       step_kw_args=voxelization_params)
+                       step_kw_args=voxelization_params, main_thread=True)
 
     def plot_voxelization(self):
         self.main_window.clear_plots()
