@@ -97,4 +97,3 @@ cpdef void fill(source_t[:] source, temp_t[:] temp, sink_t[:] sink, int processe
         sink[i] = 1
       else:
         sink[i] = 0
-  

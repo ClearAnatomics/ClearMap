@@ -760,7 +760,7 @@ def _test():
 
   cre.is_expression(expression, groups=all, n_patterns=3, verbose=True)
   
-  cre.is_expression(expression, groups = all, n_patterns=3, verbose = True,  ignore = ['.'])
+  cre.is_expression(expression, groups=all, n_patterns=3, verbose = True,  ignore = ['.'])
   
   
   #reload(cre)  
