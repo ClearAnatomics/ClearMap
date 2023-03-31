@@ -34,8 +34,8 @@ import ClearMap.ImageProcessing.Filter.StructureElement as se
 import ClearMap.ImageProcessing.Filter.FilterKernel as fk
 import ClearMap.ImageProcessing.LocalStatistics as ls
 
-import ClearMap.Analysis.Measurements.MaximaDetection as md
-import ClearMap.Analysis.Measurements.ShapeDetection as sd
+import ClearMap.Analysis.Measurements.maxima_detection as md
+import ClearMap.Analysis.Measurements.shape_detection as sd
 import ClearMap.Analysis.Measurements.MeasureExpression as me
 
 import ClearMap.Utils.Timer as tmr
