@@ -613,7 +613,6 @@ class PreProcessor(TabProcessor):
             "affine_parameter_file": self.align_channels_affine_file,
             "bspline_parameter_file": None,
 
-            # directory of the alignment result '/home/nicolas.renier/Documents/ClearMap_Resources/Par0000affine.txt'
             "result_directory": self.filename('resampled_to_auto'),
             'workspace': self.workspace
         }
