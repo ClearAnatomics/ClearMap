@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-VesselFilling Module
+vessel_filling Module
 ====================
 
 This module fills hollow tubes in a binary image use a deep convolutional 
