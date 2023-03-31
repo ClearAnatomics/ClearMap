@@ -27,7 +27,9 @@ def main():
 
     parser.add_argument('-V', '--version', action='version', version=f'%(prog)s {0.1}')
 
-    parser.add_argument('-x', '--clear-atlas-cache', dest='clear_atlas_cache', action='store_true', help='')
+    parser.add_argument('-x', '--clear-atlas-cache', dest='clear_atlas_cache', action='store_true',
+                        help='Removes the atlases that are not default to save some space on disk.'
+                             'These will be recomputed as required')
     parser.add_argument('-v', '--verbose', action='store_true', help='Turns on verbose mode.')
 
     args = parser.parse_args()
