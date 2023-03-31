@@ -420,7 +420,7 @@ def smooth_by_configuration(source, sink = None, iterations = 1,
                                     verbose=verbose);
   if processing_parameter is not None:
     block_processing_parameter.update(processing_parameter);
-  if not 'overlap' in block_processing_parameter or block_processing_parameter['overlap'] is None:
+  if not 'overlap' in block_processing_parameter or block_processing_parameter['overlap'] is None:  # FIXME: use .get
     block_processing_parameter['overlap'] = 2 + 2 * iterations;
   if not 'size_min' in block_processing_parameter or block_processing_parameter['size_min'] is None:
     block_processing_parameter['size_min'] = 2 + 2 * iterations + 1;
