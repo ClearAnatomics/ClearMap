@@ -24,36 +24,23 @@ To install the GUI you need to follow these steps:
     $ git clone https://github.com/ChristophKirst/ClearMap2.git
     $ cd ClearMap2
 
-2. Select the **gui** branch
+2. Select the **dev** branch
 
   .. code-block:: bash
 
-    $ git checkout gui
+    $ git checkout dev
 
-3. Create a conda environment using the *ClearMapUi.yml* environment file.
-
-  .. code-block:: bash
-
-   $ conda env create -f ClearMapUi.yml
-
-  This will create an environment called *ClearMapUi*. Should you wish to change 
-  this name, please check the conda documentation and amend the name in the 
-  instructions below accordingly.
-  To limit dependencies, *spyder* (which is particularly dependency hungry) 
-  is not part of the environment.
-  Please use *pip* after activating the environment should you wish to install it
+3. Make the install script executable
 
   .. code-block:: bash
 
-    $ conda activate ClearMapUi
-    $ pip install 'spyder<5'
+    $ chmod u+x install_gui.sh
 
-4. Copy the configuration files to the proper location:
+4. Start the install and answer the prompts
 
   .. code-block:: bash
 
-   $ mkdir ~/.clearmap
-   $ cp ClearMap/config/*.cfg ~/.clearmap/
+    $ ./install_gui.sh
 
 
 Using the interface
@@ -90,13 +77,8 @@ To use the interface, simply run:
 
   .. code-block:: bash
 
-    $ env PYTHONPATH=`pwd`:$PYTHONPATH python ClearMap/gui/run_gui.py
-
-In the future, this will be simplified to simply
-
-  .. code-block:: bash
-
-    $ clearmap_gui
+    $ conda activate ClearMapUi
+    $ clearmap-gui
 
 Structure
 =========
