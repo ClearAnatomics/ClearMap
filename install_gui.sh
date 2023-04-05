@@ -111,7 +111,7 @@ green "Using temp folder: $tmp_dir"
 
 python -c "$prep_python \
 from ClearMap.Utils.install_utils import patch_env; \
-patch_env(os.path.join(os.getcwd(), '$ENV_FILE_PATH'), 'tmp_env_file.yml', use_torch='$USE_TORCH', tmp_dir='$tmp_dir')" || exit 1
+patch_env(os.path.join(os.getcwd(), '$ENV_FILE_PATH'), 'tmp_env_file.yml', use_torch=$USE_TORCH, tmp_dir='$tmp_dir')" || exit 1
 conda deactivate
 conda env remove -n clearmap_tmp_env
 green "Done"
