@@ -27,6 +27,22 @@ function green_n(){  # FIXME: parametrise above instead
     fi
 }
 
+if [[ "$OSTYPE" == "darwin"* ]]; then
+  green "MacOS was detected as your operating system.
+   If you want to make full use of the parallel code in this program,
+   we suggest you install the GCC compiler using homebrew."
+  read -r -p "Do you wish to continue the installation process ([y]/n)?" answer
+  case "$answer" in
+    [nN][oO]|[nN])
+        yellow "Aborting install";
+        exit 0;
+        ;;
+    *)
+        green "Continue install";
+        ;;
+esac
+fi
+
 
 BASEDIR=$(dirname "$0")
 if [ "$1" == "" ]; then
@@ -135,6 +151,21 @@ if [[ "$USE_TORCH" == "True" ]]; then
     CudaVersionManager.check_pytorch()" && green "Pytorch installed and functional with CUDA support" || { red "Pytorch installation failed"; exit 1; }
 fi
 
+# Setup GCC for MaxOS
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    read -r -p "If GCC is installed on your system,
+     type here the main version number.
+      Otherwise, leave empty" answer
+
+     re='^[0-9]+$'
+    if ! [[ $answer =~ $re ]] ; then  # not a number
+        yellow "No version number given, skipping GCC"
+    else
+        conda env config vars set "CC=gcc-$answer"
+        conda env config vars set "CXX=g++-$answer"
+        green "Using gcc and g++ v-$answer"
+    fi
+fi
 # Install ClearMap
 echo "Installing"
 python "setup.py" install || exit 1
@@ -200,7 +231,14 @@ esac
 chmod u+x "$clearmap_install_path/ClearMap/External/elastix/build/bin/"* || exit 1
 
 # Configure environment to amend LD_LIBRARY_PATH to point to custom Elastix binary shipped with ClearMap
-conda env config vars set "LD_LIBRARY_PATH=$clearmap_install_path/ClearMap/External/elastix/build/bin/:$LD_LIBRARY_PATH" || exit 1
+if  [[ "$OSTYPE" == "linux-gnu"* ]]; then
+    lib_path_name="LD_LIBRARY_PATH"
+elif [[ "$OSTYPE" == "darwin"* ]]; then
+    lib_path_name="DYLD_LIBRARY_PATH"
+fi
+conda env config vars set "$lib_path_name=$clearmap_install_path/ClearMap/External/elastix/build/bin/:$LD_LIBRARY_PATH" || exit 1
+
+# FIXME: not for MaxOS
 
 green "
 $ENV_NAME installed
