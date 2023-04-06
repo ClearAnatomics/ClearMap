@@ -1,63 +1,51 @@
 import os
+import platform
+import subprocess
+import sys
+
 from multiprocessing import cpu_count
+from pathlib import Path
+
+from setuptools import setup, find_packages, Extension
 
 import numpy as np
-from setuptools import setup, find_packages, Extension
 
 from Cython.Build import cythonize
 
 # from https://stackoverflow.com/a/3042436
 # To modify the data install dir to match the source install dir...
-# Pull the install dir info from distutils with:
+# Pull the installation dir info from distutils with:
 from distutils.command.install import INSTALL_SCHEMES
 # Modify the data install dir to match the source install dir:
 for scheme in INSTALL_SCHEMES.values():
     scheme['data'] = scheme['purelib']
 
-n_procs = cpu_count() - 2
-
-requirements = [
+requirements = [  # pip
     'lxml'
 ]
-extension_paths = [
-    'ClearMap/ParallelProcessing/DataProcessing/ArrayProcessingCode.pyx',
-    'ClearMap/ParallelProcessing/DataProcessing/ConvolvePointListCode.pyx',
-    'ClearMap/ParallelProcessing/DataProcessing/DevolvePointListCode.pyx',
-    'ClearMap/ParallelProcessing/DataProcessing/MeasurePointListCode.pyx',
-    'ClearMap/ParallelProcessing/DataProcessing/StatisticsPointListCode.pyx',
 
-    'ClearMap/ImageProcessing/Binary/FillingCode.pyx',
-    'ClearMap/ImageProcessing/Clipping/ClippingCode.pyx',
-    'ClearMap/ImageProcessing/Differentiation/HessianCode.pyx',
-    'ClearMap/ImageProcessing/Filter/Rank/RankCode.pyx',
-    'ClearMap/ImageProcessing/Filter/Rank/RankCoreCode.pyx',
-    'ClearMap/ImageProcessing/Thresholding/ThresholdingCode.pyx',
-    'ClearMap/ImageProcessing/Tracing/TraceCode.pyx',
+OPTIMISE_COMPILATION_FOR_TARGET = True  # Cython code will run on the machine where is was compiled
+N_PROCS = cpu_count() - 2
+if len(sys.argv) > 1:
+    USE_OPENMP = sys.argv[1].lower() in ('use_openmp', 'true')
+else:
+    os_name = platform.system().lower()
+    if os_name.startswith('linux'):
+        USE_OPENMP = True
+    elif os_name.startswith('darwin'):
+        cpp_compiler_version = subprocess.check_output(['c++', '--version']).decode('ascii').split('\n')[0]
+        USE_OPENMP = 'g++' in cpp_compiler_version
+    else:
+        raise ValueError(f'Unknown OS {os_name}')
 
-    'ClearMap/ImageProcessing/Filter/Rank/PercentileCode.pyx',
-    'ClearMap/ImageProcessing/Filter/Rank/BilateralCode.pyx',
-    'ClearMap/ImageProcessing/Filter/Rank/ParametricCode.pyx',
-]
-extensions = []
+DEFAULT_COMPILE_ARGS = ['-w', '-O3']
+if OPTIMISE_COMPILATION_FOR_TARGET:
+    DEFAULT_COMPILE_ARGS += ['-march=native', '-mtune=native']
+DEFAULT_LINK_ARGS = []
 
 
 def module_path_to_doted(ext_path):
     return os.path.splitext(ext_path)[0].replace(os.sep, '.')
-
-
-for ext_path in extension_paths:
-    extension = Extension(
-        name=module_path_to_doted(ext_path),
-        sources=[ext_path],
-        libraries=['m'],
-        language='c++',  # WARNING: should be in file header
-        include_dirs=[np.get_include(), os.path.dirname(os.path.abspath(ext_path))],
-        extra_compile_args=['-w', '-O3', '-march=native', '-fopenmp'],
-        extra_link_args=['-fopenmp'],
-    )
-    extensions.append(extension)
-# ext_modules = cythonize(extensions, nthreads=n_procs, quiet=True, language_level="3")
-ext_modules = cythonize(extensions, nthreads=n_procs, quiet=True)
 
 
 def find_data_files(src_dir):
@@ -71,16 +59,37 @@ def find_data_files(src_dir):
     return out
 
 
+excluded_pyx = ['_Old', '_Todo', 'StatisticsPointListCode']
+extension_paths = [str(p) for p in Path('ClearMap').rglob('*.pyx') if not any([excl in str(p) for excl in excluded_pyx])]
+
+extra_args = ['-fopenmp'] if USE_OPENMP else []
+extensions = []
+for ext_path in extension_paths:
+    extension = Extension(
+        name=module_path_to_doted(ext_path),
+        sources=[ext_path],
+        libraries=['m'],
+        language='c++',  # WARNING: should be in file header
+        include_dirs=[np.get_include(), os.path.dirname(os.path.abspath(ext_path))],
+        extra_compile_args=DEFAULT_COMPILE_ARGS+extra_args,
+        extra_link_args=DEFAULT_LINK_ARGS+extra_args,
+    )
+    extensions.append(extension)
+
+# ext_modules = cythonize(extensions, nthreads=n_procs, quiet=True, language_level="3")
+ext_modules = cythonize(extensions, nthreads=N_PROCS, quiet=True)
+
+data_dirs = [
+    'ClearMap/External/elastix',
+    'ClearMap/External/geodesic_distance',
+    'ClearMap/Resources',
+    'ClearMap/ImageProcessing/Skeletonization',   # .npy and .npy.zip
+    'ClearMap/ImageProcessing/Binary',  # .npy and .npy.zip
+    'ClearMap/ImageProcessing/machine_learning/vessel_filling/resources'  # .pth
+]
 data_files = [('licenses', ['LICENSE.txt', 'LICENSE'])]
-
-data_files.extend([(k, v) for k, v in find_data_files('ClearMap/External/elastix').items()])
-data_files.extend([(k, v) for k, v in find_data_files('ClearMap/External/geodesic_distance').items()])
-data_files.extend([(k, v) for k, v in find_data_files('ClearMap/Resources').items()])
-data_files.extend([(k, v) for k, v in find_data_files('ClearMap/ImageProcessing/Skeletonization').items()])  # .npy and .npy.zip
-data_files.extend([(k, v) for k, v in find_data_files('ClearMap/ImageProcessing/Binary').items()])  # .npy and .npy.zip
-data_files.extend([(k, v) for k, v in find_data_files(
-    'ClearMap/ImageProcessing/MachineLearning/VesselFilling/Resources').items()])  # .pth
-
+for p in data_dirs:
+    data_files.extend([(k, v) for k, v in find_data_files(p).items()])
 data_files.extend([('', ['start_gui.sh'])])
 
 packages = find_packages(exclude=('doc', 'tests*', 'pickle_python_2'))
