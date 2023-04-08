@@ -11,6 +11,9 @@ from vispy.scene import TurntableCamera
 
 from vispy.util import keys
 
+MOUSE_LEFT = 1
+MOUSE_RIGHT = 2
+
 
 class ArbitraryRotationCamera(TurntableCamera):
     """ 3D camera class that orbits around a center point while
@@ -87,53 +90,50 @@ class ArbitraryRotationCamera(TurntableCamera):
         self.view_changed()
 
     def _update_roll(self, event):
-        """Update roll parmeter based on mouse movement"""
-        p1 = event.mouse_event.press_event.pos
-        p2 = event.mouse_event.pos
-        if self._event_value is None:
-            self._event_value = self.roll
-        self.roll = self._event_value + (p2-p1)[0]
+        """Update roll parameter based on mouse movement"""
+        _, _, d = self._get_mouse_points(event)
+        self._event_value = self.roll if self._event_value is None else self._event_value
+        self.roll = self._event_value + d[0]
 
     def _update_elevation(self, event):
-        """Update elevation parmeter based on mouse movement"""
-        p1 = event.mouse_event.press_event.pos
-        p2 = event.mouse_event.pos
-        if self._event_value is None:
-            self._event_value = self.elevation
-        self.elevation = self._event_value + (p2-p1)[0]
+        """Update elevation parameter based on mouse movement"""
+        _, _, d = self._get_mouse_points(event)
+        self._event_value = self.elevation if self._event_value is None else self._event_value
+        self.elevation = self._event_value + d[0]
         
     def _update_azimuth(self, event):
-        """Update azimuth parmeter based on mouse movement"""
-        p1 = event.mouse_event.press_event.pos
-        p2 = event.mouse_event.pos
-        if self._event_value is None:
-            self._event_value = self.azimuth
-        self.azimuth = self._event_value + (p2-p1)[0]
+        """Update azimuth parameter based on mouse movement"""
+        _, _, d = self._get_mouse_points(event)
+        self._event_value = self.azimuth if self._event_value is None else self._event_value
+        self.azimuth = self._event_value + d[0]
     
     def _update_zoom(self, event):
-        """Update azimuth parmeter based on mouse movement"""
+        """Update zoom based on mouse movement"""
+        _, _, d = self._get_mouse_points(event)
+        if self._event_value is None:
+            self._event_value = (self._scale_factor, self._distance)
+        zoom_y = (1 + self.zoom_factor) ** d[1]
+        
+        self.scale_factor = self._event_value[0] * zoom_y
+        # Modify distance if given
+        if self._distance is not None:
+            self._distance = self._event_value[1] * zoom_y
+        self.view_changed()
+
+    def _get_mouse_points(self, event):
         p1 = event.mouse_event.press_event.pos
         p2 = event.mouse_event.pos
         d = p2 - p1
-        if self._event_value is None:
-            self._event_value = (self._scale_factor, self._distance)
-        zoomy = (1 + self.zoom_factor) ** d[1]
-        
-        self.scale_factor = self._event_value[0] * zoomy
-        # Modify distance if given
-        if self._distance is not None:
-            self._distance = self._event_value[1] * zoomy
-        self.view_changed()
-    
+        return p1,  p2, d
+
     def _update_translate(self, event):
         """Update translate parameter based on mouse movement"""
-        p1 = event.mouse_event.press_event.pos
-        p2 = event.mouse_event.pos
+        p1, p2, _ = self._get_mouse_points(event)
         
         norm = np.mean(self._viewbox.size)
         if self._event_value is None or len(self._event_value) == 2:
             self._event_value = self.center
-        dist = (p1 - p2) / norm * self._scale_factor
+        dist = (p1 - p2) / norm * self._scale_factor  # FIXME: why invert d
         dist[1] *= -1
         # Black magic part 1: turn 2D into 3D translations
         dx, dy, dz = self._dist_to_trans(dist)
@@ -146,22 +146,17 @@ class ArbitraryRotationCamera(TurntableCamera):
         self.center = c[0] + dx, c[1] + dy, c[2] + dz
     
     def _update_fov(self, event):
-        """Update fov parmeter based on mouse movement"""  
-        p1 = event.mouse_event.press_event.pos
-        p2 = event.mouse_event.pos
-        d = p2 - p1
-        
-        if self._event_value is None:
-            self._event_value = self._fov
+        """Update fov parameter based on mouse movement"""
+        p1, p2, d = self._get_mouse_points(event)
+        self._event_value = self._fov if self._event_value is None else self._event_value
         fov = self._event_value - d[1] / 5.0
         self.fov = min(180.0, max(0.0, fov))
     
-    # def _rotate_tr(self):
-    #     """Rotate the transformation matrix based on camera parameters"""
-    #     up, forward, right = self._get_dim_vectors()
-    #     self.transform.rotate(self.azimuth, up)
-    #     self.transform.rotate(self.elevation, -right)
-    #     self.transform.rotate(self.roll, forward)
+    def _rotate_tr(self):
+        """Rotate the transformation matrix based on camera parameters"""
+        up, forward, right = self._get_dim_vectors()
+        super()._rotate_tr()
+        self.transform.rotate(self.roll, forward)
 
     def viewbox_mouse_event(self, event):
         """
@@ -191,23 +186,20 @@ class ArbitraryRotationCamera(TurntableCamera):
             if event.press_event is None:
                 return
 
-        if event.mouse_event.press_event is None:  # TODO: find why might be for functions below
-            return
-
-        modifiers = event.mouse_event.modifiers
-        if 1 in event.buttons:
-            if not modifiers:  # Rotate
-                self._update_rotation(event)
-            elif keys.CONTROL in modifiers:  # roll only
-                self._update_roll(event)
-            elif keys.META in modifiers:  # elevation only
-                self._update_elevation(event)
-            elif keys.SHIFT in modifiers:  # azimuth only
-                self._update_azimuth(event)
-        elif 2 in event.buttons:
-            if not modifiers:  # zoom
-                self._update_zoom(event)
-            elif keys.SHIFT in modifiers:  # Translate
-                self._update_translate(event)
-            elif keys.META in modifiers:  # Change fov
-                self._update_fov(event)
+            modifiers = event.mouse_event.modifiers
+            if MOUSE_LEFT in event.buttons:
+                if not modifiers:  # Rotate
+                    self._update_rotation(event)
+                elif keys.CONTROL in modifiers:  # roll only
+                    self._update_roll(event)
+                elif keys.META in modifiers:  # elevation only
+                    self._update_elevation(event)
+                elif keys.SHIFT in modifiers:  # azimuth only
+                    self._update_azimuth(event)
+            elif MOUSE_RIGHT in event.buttons:
+                if not modifiers:  # zoom
+                    self._update_zoom(event)
+                elif keys.SHIFT in modifiers:  # Translate
+                    self._update_translate(event)
+                elif keys.META in modifiers:  # Change fov
+                    self._update_fov(event)
