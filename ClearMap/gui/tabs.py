@@ -52,6 +52,10 @@ __download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
 # ############################################ INTERFACES ##########################################
 
 class GenericUi:
+    """
+    The first layer of interface. This is not implemented directly but is the base class
+    of GenericTab and GenericDialog, themselves interfaces
+    """
     def __init__(self, main_window, name, ui_file_name, widget_class_name):
         """
 
@@ -74,7 +78,7 @@ class GenericUi:
         self.ui = create_clearmap_widget(f'{self.ui_file_name}.ui', patch_parent_class=self.widget_class_name)
         self.patch_button_boxes()
 
-    def initial_cfg_load(self):
+    def load_config_to_gui(self):
         self.params.cfg_to_ui()
 
     def set_progress_watcher(self, watcher):
@@ -91,6 +95,12 @@ class GenericUi:
 
 
 class GenericTab(GenericUi):
+    """
+    The interface to all tab managers.
+    A tab manager includes a tab widget,
+     the associated parameters and potentially a processor object
+     which handles the computations.
+    """
     def __init__(self, main_window, name, tab_idx, ui_file_name):
         """
 
@@ -117,6 +127,15 @@ class GenericTab(GenericUi):
 
     def set_params(self, *args):
         raise NotImplementedError()
+
+    def read_configs(self, cfg_path):  # FIXME: REFACTOR: parse_configs
+        self.params.read_configs(cfg_path)
+
+    def fix_config(self):  # TODO: check if could make part of self.params may not be possible since not set
+        self.params.fix_cfg_file(self.params.config_path)
+
+    def disable(self):
+        self.ui.setEnabled(False)
 
     def step_exists(self, step_name, file_list):
         if isinstance(file_list, str):
@@ -239,7 +258,7 @@ class PreferenceUi(GenericDialog):
         self.set_params()
         machine_cfg_path = self.main_window.config_loader.get_default_path('machine')
         if self.main_window.file_exists(machine_cfg_path):
-            self.params.get_config(machine_cfg_path)
+            self.params.read_configs(machine_cfg_path)
             self.params.cfg_to_ui()
         else:
             msg = 'Missing machine config file. Please ensure a machine_params.cfg file ' \
@@ -268,9 +287,9 @@ class SampleTab(GenericTab):
     def setup(self):
         self.init_ui()
 
-        self.ui.srcFolderBtn.clicked.connect(self.main_window.set_src_folder)
+        self.ui.srcFolderBtn.clicked.connect(self.main_window.prompt_experiment_folder)
         self.connect_whats_this(self.ui.srcFolderInfoToolButton, self.ui.srcFolderBtn)
-        self.ui.sampleIdButtonBox.connectApply(self.main_window.parse_cfg)
+        self.ui.sampleIdButtonBox.connectApply(self.main_window.load_config_and_setup_ui)
         self.connect_whats_this(self.ui.sampleIdInfoToolButton, self.ui.sampleIdLabel)
 
         self.ui.launchPatternWizzardPushButton.clicked.connect(self.launch_pattern_wizard)
@@ -301,7 +320,7 @@ class SampleTab(GenericTab):
         self.params.ui_to_cfg()
         self.main_window.print_status_msg('Sample config saved')
 
-    def initial_cfg_load(self):
+    def load_config_to_gui(self):
         try:
             self.params.cfg_to_ui()
         except ParamsOrientationError as err:
