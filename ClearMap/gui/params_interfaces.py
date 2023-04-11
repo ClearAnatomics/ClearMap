@@ -139,12 +139,16 @@ class UiParameter(QObject):
     def path(self):
         return self._config.filename
 
-    def get_config(self, cfg_path):
+    def read_configs(self, cfg_path):
         self._config = ConfigLoader.get_cfg_from_path(cfg_path)
         if not self._config:
             raise ConfigNotFoundError
         cfg_name = os.path.splitext(os.path.basename(cfg_path))[0]
         self._default_config = ConfigLoader.get_cfg_from_path(ConfigLoader.get_default_path(cfg_name))
+
+    @property
+    def config_path(self):
+        return self._config.filename
 
     @property
     def config(self):
@@ -240,7 +244,7 @@ class UiParameterCollection:
     def params(self):
         raise NotImplementedError('Please subclass UiParameterCollection and implement params property')
 
-    def get_config(self, cfg_path):
+    def read_configs(self, cfg_path):
         self.config = ConfigLoader.get_cfg_from_path(cfg_path)
         if not self.config:
             raise ConfigNotFoundError
@@ -250,6 +254,10 @@ class UiParameterCollection:
         for param in self.params:
             param._config = self.config
             param._default_config = self._default_config
+
+    @property
+    def config_path(self):
+        return self.config.filename
 
     def write_config(self):
         self.config.write()
