@@ -127,7 +127,7 @@ green "Using temp folder: $tmp_dir"
 
 python -c "$prep_python \
 from ClearMap.Utils.install_utils import patch_env; \
-patch_env(os.path.join(os.getcwd(), '$ENV_FILE_PATH'), 'tmp_env_file.yml', use_torch=$USE_TORCH, tmp_dir='$tmp_dir')" || exit 1
+patch_env(os.path.join(os.getcwd(), '$ENV_FILE_PATH'), 'tmp_env_file.yml', use_cuda_torch=$USE_TORCH, tmp_dir='$tmp_dir')" || exit 1
 conda deactivate
 conda env remove -n clearmap_tmp_env
 green "Done"
@@ -244,7 +244,7 @@ green "
 $ENV_NAME installed
 To use it, open a terminal and run:
     conda activate $ENV_NAME
-    clear_map_ui
+    clearmap-ui
 Alternatively, use the ClearMap entry in the start menu
 "
 
