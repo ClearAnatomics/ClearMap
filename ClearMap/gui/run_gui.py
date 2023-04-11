@@ -67,6 +67,8 @@ import qdarkstyle
 
 import pyqtgraph as pg
 
+import torch
+
 update_pbar(app, progress_bar, 20)
 from ClearMap.Utils.utilities import title_to_snake
 from ClearMap.gui.gui_logging import Printer
@@ -131,9 +133,14 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         self.gpu_bar = QProgressBar()
         self.vram_bar = QProgressBar()
 
-        self.perf_monitor = PerfMonitor(self, 500, 500)
+        if torch.cuda.is_available():
+            gpu_period = None
+        else:
+            gpu_period = 500
+        self.perf_monitor = PerfMonitor(self, 500, gpu_period)
         self.perf_monitor.cpu_vals_changed.connect(self.update_cpu_bars)
-        self.perf_monitor.gpu_vals_changed.connect(self.update_gpu_bars)
+        if torch.cuda.is_available():
+            self.perf_monitor.gpu_vals_changed.connect(self.update_gpu_bars)
         self.perf_monitor.start()
 
     def find_child_by_name(self, child_name, child_type, parent=None):

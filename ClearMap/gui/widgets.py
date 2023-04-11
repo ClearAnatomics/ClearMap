@@ -859,7 +859,8 @@ class PerfMonitor(QWidget):
         self.fast_timer.timeout.connect(self.update_cpu_values)
         self.slow_timer = QTimer()
         self.slow_timer.setInterval(self.slow_period)
-        self.slow_timer.timeout.connect(self.update_gpu_values)
+        if slow_period is not None:
+            self.slow_timer.timeout.connect(self.update_gpu_values)
 
         self.gpu_proc_file_path = tempfile.mkstemp(suffix='_clearmap_gpu.proc')[-1]
         self.cpu_proc_file_path = tempfile.mkstemp(suffix='_clearmap_cpu.proc')[-1]
