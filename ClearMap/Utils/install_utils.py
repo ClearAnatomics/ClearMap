@@ -46,7 +46,7 @@ class EnvFileManager:
         with open(dest_path, 'w', encoding='utf8') as out_file:
             yaml.dump(self.cfg, out_file, default_flow_style=False, allow_unicode=True, sort_keys=False)
 
-    def patch_environment_package_line(self, package_name, pkg_version):
+    def patch_environment_package_line(self, package_name, pkg_version=''):
         """
         Patch the yaml environment file
 
@@ -87,6 +87,11 @@ class EnvFileManager:
             self.cfg['variables'][var_name] = var_val
         else:
             self.cfg['variables'] = {var_name: var_val}
+        self.write()
+
+    def add_dependency(self, package_name, pkg_version=''):
+        version_str = f"={pkg_version}" if pkg_version else ""
+        self.cfg['dependencies'].append(f'{package_name}{version_str}')
         self.write()
 
 
@@ -231,6 +236,8 @@ def patch_env(cfg_path, dest_path, use_cuda_torch=True, tmp_dir=None):
         torch_v_string = f"{torch_pkg['version']}={torch_pkg['build']}"
         env_mgr.patch_environment_package_line('pytorch', torch_v_string)
 
+        if platform.system().lower().startswith('darwin') and platform.processor().lower().startswith('x86'):
+            env_mgr.add_dependency('nomkl')  # MacOS includes "accelerate" and does not need Intel MKL on Intel CPU
         env_mgr.remove_dependency('cudatoolkit')
 
     if tmp_dir not in ('/tmp', '/tmp/'):
