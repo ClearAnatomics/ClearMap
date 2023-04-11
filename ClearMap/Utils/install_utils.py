@@ -4,9 +4,10 @@ install_utils
 
 Utilities module with minimal dependencies (standard library only) for installation
 """
-import json
 import sys
+import platform
 import subprocess
+import json
 try:
     import yaml  # WARNING: Only guaranteed to be here in the tmp env
 except ImportError:
@@ -188,7 +189,13 @@ class PytorchVersionManager:  # TODO: inherit from condaparser ??
         return CondaParser.get_conda_pkg_info('pytorch', ['pytorch'], version_pattern)
 
     def get_pytorch_cpu_info(self):
-        version_pattern = f'{self.pytorch_version}=py{self.python_version}_cpu*'
+        os_name = platform.system().lower()
+        if os_name.startswith('linux'):
+            version_pattern = f'{self.pytorch_version}=py{self.python_version}_cpu*'
+        elif os_name.startswith('darwin'):
+            version_pattern = f'{"*"}=cpu_py{"".join(self.python_version.split("."))}*'
+        else:
+            raise ValueError(f'Unknown platform {os_name}')
         return CondaParser.get_conda_pkg_info('pytorch', ['pytorch'], version_pattern)
 
     def get_toolkit_info(self):
