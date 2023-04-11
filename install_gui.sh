@@ -89,7 +89,7 @@ if  [[ "$OSTYPE" == "linux-gnu"* ]]; then
             # Verify CUDA is functional
             green "Checking nVIDIA drivers and system CUDA installation";
             python -c "$prep_python \
-            from ClearMap.Utils.install_utils import CudaVersionManager; CudaVersionManager.assert_cuda()" || exit 1
+            from ClearMap.Utils.install_utils import PytorchVersionManager; PytorchVersionManager.assert_cuda()" || exit 1
             green "OK";
             USE_TORCH="True";
             ;;
@@ -147,8 +147,8 @@ conda activate "$ENV_NAME" || exit 1
 if [[ "$USE_TORCH" == "True" ]]; then
     echo "Checking pytorch installation"
     python -c "$prep_python \
-    from ClearMap.Utils.install_utils import CudaVersionManager; \
-    CudaVersionManager.check_pytorch()" && green "Pytorch installed and functional with CUDA support" || { red "Pytorch installation failed"; exit 1; }
+    from ClearMap.Utils.install_utils import PytorchVersionManager; \
+    PytorchVersionManager.check_pytorch()" && green "Pytorch installed and functional with CUDA support" || { red "Pytorch installation failed"; exit 1; }
 fi
 
 # Setup GCC for MaxOS
