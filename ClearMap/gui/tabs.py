@@ -696,7 +696,7 @@ class CellCounterTab(PostProcessingTab):
     def voxelize(self):
         if os.path.exists(self.preprocessor.filename('cells', postfix='filtered')):
             self.wrap_step('Voxelization', self.cell_detector.voxelize,
-                           abort_func=self.cell_detector.stop_process, nested=False, main_thread=True)
+                           abort_func=self.cell_detector.stop_process, nested=False)#, main_thread=True)
         else:
             self.main_window.popup('Could not run voxelization, missing filtered cells table. '
                                    'Please ensure that cell filtering has been run.', base_msg='Missing file')
@@ -820,7 +820,7 @@ class CellCounterTab(PostProcessingTab):
             self.wrap_step('Filtering cells', self.cell_detector.filter_cells, n_steps=2+(1 - is_last_step),
                            abort_func=self.cell_detector.stop_process, close_when_done=False)
             self.wrap_step('Voxelizing', self.cell_detector.voxelize, step_args=['filtered'], save_cfg=False,
-                           close_when_done=is_last_step, main_thread=True)
+                           close_when_done=is_last_step)#, main_thread=True)
         self.plot_cell_filter_results()
 
     def preview_cell_filter(self):
@@ -1075,7 +1075,7 @@ class VasculatureTab(PostProcessingTab):
             'vertex_degrees': self.params.visualization_params.vertex_degrees
         }
         self.wrap_step('Running voxelization', self.vessel_graph_processor.voxelize,
-                       step_kw_args=voxelization_params, main_thread=True)
+                       step_kw_args=voxelization_params)#, main_thread=True)
 
     def plot_voxelization(self):
         self.main_window.clear_plots()
