@@ -1,7 +1,9 @@
+import functools
 import os
 import platform
 import subprocess
 import sys
+from concurrent.futures import ProcessPoolExecutor
 
 from multiprocessing import cpu_count
 from pathlib import Path
@@ -26,8 +28,11 @@ requirements = [  # pip
 
 OPTIMISE_COMPILATION_FOR_TARGET = True  # Cython code will run on the machine where is was compiled
 N_PROCS = cpu_count() - 2
-if len(sys.argv) > 1:
-    USE_OPENMP = sys.argv[1].lower() in ('use_openmp', 'true')
+DEFAULT_COMPILE_ARGS = ['-w', '-O3']
+DEFAULT_LINK_ARGS = []
+
+if len(sys.argv) > 2:
+    USE_OPENMP = sys.argv[2].lower() in ('use_openmp', 'true')
 else:
     os_name = platform.system().lower()
     if os_name.startswith('linux'):
@@ -38,10 +43,8 @@ else:
     else:
         raise ValueError(f'Unknown OS {os_name}')
 
-DEFAULT_COMPILE_ARGS = ['-w', '-O3']
 if OPTIMISE_COMPILATION_FOR_TARGET:
     DEFAULT_COMPILE_ARGS += ['-march=native', '-mtune=native']
-DEFAULT_LINK_ARGS = []
 
 
 def module_path_to_doted(ext_path):
@@ -59,7 +62,7 @@ def find_data_files(src_dir):
     return out
 
 
-excluded_pyx = ['_Old', '_Todo', 'StatisticsPointListCode']
+excluded_pyx = ['_Old', '_Todo', 'StatisticsPointListCode', 'flow']
 extension_paths = [str(p) for p in Path('ClearMap').rglob('*.pyx') if not any([excl in str(p) for excl in excluded_pyx])]
 
 extra_args = ['-fopenmp'] if USE_OPENMP else []
@@ -76,8 +79,11 @@ for ext_path in extension_paths:
     )
     extensions.append(extension)
 
-# ext_modules = cythonize(extensions, nthreads=n_procs, quiet=True, language_level="3")
-ext_modules = cythonize(extensions, nthreads=N_PROCS, quiet=True)
+# ext_modules = cythonize(extensions, nthreads=N_PROCS, quiet=True)
+with ProcessPoolExecutor(max_workers=N_PROCS) as executor:
+    parametrized_cythonize = functools.partial(cythonize, force=True, quiet=True)
+    ext_modules = executor.map(parametrized_cythonize, extensions)
+    ext_modules = [item for sublist in ext_modules for item in sublist]
 
 data_dirs = [
     'ClearMap/External/elastix',
