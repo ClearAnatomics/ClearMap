@@ -81,7 +81,7 @@ for ext_path in extension_paths:
 
 # ext_modules = cythonize(extensions, nthreads=N_PROCS, quiet=True)
 with ProcessPoolExecutor(max_workers=N_PROCS) as executor:
-    parametrized_cythonize = functools.partial(cythonize, force=True, quiet=True)
+    parametrized_cythonize = functools.partial(cythonize, quiet=True)
     ext_modules = executor.map(parametrized_cythonize, extensions)
     ext_modules = [item for sublist in ext_modules for item in sublist]
 
