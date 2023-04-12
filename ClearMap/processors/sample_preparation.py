@@ -407,18 +407,30 @@ class PreProcessor(TabProcessor):
         return int(not self.processing_config['stitching']['wobbly']['skip']) * 3
 
     def __align_layout_wobbly(self, layout):
-        stitching_cfg = self.processing_config['stitching']
-        max_shifts = [stitching_cfg['wobbly'][f'max_shifts_{ax}'] for ax in 'xyz']
+        wobbly_cfg = self.processing_config['stitching']['wobbly']
+        max_shifts = [
+            wobbly_cfg['max_shifts_x'],
+            wobbly_cfg['max_shifts_y'],
+            wobbly_cfg['max_shifts_z'],
+        ]
+        stack_validation_params = dict(
+            method='foreground',
+            valid_range = wobbly_cfg["valid_range"],
+            size=wobbly_cfg["pixel_size"]
+        )
+        slice_validation_params = dict(
+            method='foreground',
+            valid_range = wobbly_cfg["slice_valid_range"],
+            size=wobbly_cfg["slice_pixel_size"]
+        )
 
         n_pairs = len(layout.alignments)
         self.prepare_watcher_for_substep(n_pairs, self.__wobbly_stitching_algin_lyt_re, 'Align layout wobbly')
         try:
             stitching_wobbly.align_layout(layout, axis_range=(None, None, 3), max_shifts=max_shifts, axis_mip=None,
-                                          validate=dict(method='foreground', valid_range=(200, None), size=None),
-                                          # FIXME: replace valid_range
+                                          stack_validation_params=stack_validation_params,
                                           prepare=dict(method='normalization', clip=None, normalize=True),
-                                          validate_slice=dict(method='foreground', valid_range=(200, 20000), size=1500),
-                                          # FIXME: replace valid_range
+                                          slice_validation_params=slice_validation_params,
                                           prepare_slice=None,
                                           find_shifts=dict(method='tracing', cutoff=3 * np.sqrt(2)),
                                           processes=self.machine_config['n_processes_stitching'],
