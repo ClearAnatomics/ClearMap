@@ -79,11 +79,11 @@ for ext_path in extension_paths:
     )
     extensions.append(extension)
 
-# ext_modules = cythonize(extensions, nthreads=N_PROCS, quiet=True)
-with ProcessPoolExecutor(max_workers=N_PROCS) as executor:
-    parametrized_cythonize = functools.partial(cythonize, quiet=True)
-    ext_modules = executor.map(parametrized_cythonize, extensions)
-    ext_modules = [item for sublist in ext_modules for item in sublist]
+ext_modules = cythonize(extensions, nthreads=N_PROCS, quiet=True)
+# with ProcessPoolExecutor(max_workers=N_PROCS) as executor:
+#    parametrized_cythonize = functools.partial(cythonize, quiet=True)
+#    ext_modules = executor.map(parametrized_cythonize, extensions)
+#    ext_modules = [item for sublist in ext_modules for item in sublist]
 
 data_dirs = [
     'ClearMap/External/elastix',
