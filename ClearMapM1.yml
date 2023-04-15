@@ -8,8 +8,10 @@
 #
 # ClearMap anaconda environment
 #
-# install: conda env create -f ClearMapM1.yml
-# update:  conda env update -f ClearMapM1.yml
+# install:  conda env create -f ClearMapM1.yml
+# update:   conda env update -f ClearMapM1.yml
+# remove:   conda env remove --name ClearMapM1
+
 name: ClearMapM1
 channels:
   - nvidia
@@ -22,7 +24,7 @@ dependencies:
   - ipython
   - vispy
   - pyopengl
-  - pyqt
+  - pyqt<6
   - pyqtwebengine
   - pyqtgraph=0.12  # Problem with pyqtgraph import of QWidgets with 0.13
   - opencv

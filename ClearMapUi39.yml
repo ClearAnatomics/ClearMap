@@ -10,6 +10,8 @@
 #
 # install: conda env create -f ClearMapUi39.yml
 # update:  conda env update -f ClearMapUi39.yml
+# remove:   conda env remove --name ClearMapUi39
+
 name: ClearMapUi39
 channels:
   - nvidia
