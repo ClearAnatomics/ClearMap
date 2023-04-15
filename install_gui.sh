@@ -151,21 +151,28 @@ if [[ "$USE_TORCH" == "True" ]]; then
     PytorchVersionManager.check_pytorch()" && green "Pytorch installed and functional with CUDA support" || { red "Pytorch installation failed"; exit 1; }
 fi
 
-# Setup GCC for MaxOS
-if [[ "$OSTYPE" == "darwin"* ]]; then
-    read -r -p "If GCC is installed on your system,
-     type here the main version number.
-      Otherwise, leave empty" answer
+# FIXME revert comment and assess if m1 chip
+# # Setup GCC for MaxOS
+# if [[ "$OSTYPE" == "darwin"* ]]; then
+#     read -r -p "If GCC is installed on your system,
+#      type here the main version number.
+#       Otherwise, leave empty" answer
 
-     re='^[0-9]+$'
-    if ! [[ $answer =~ $re ]] ; then  # not a number
-        yellow "No version number given, skipping GCC"
-    else
-        conda env config vars set "CC=gcc-$answer"
-        conda env config vars set "CXX=g++-$answer"
-        green "Using gcc and g++ v-$answer"
-    fi
-fi
+#      re='^[0-9]+$'
+#     if ! [[ $answer =~ $re ]] ; then  # not a number
+#         yellow "No version number given, skipping GCC"
+#     else
+#         conda env config vars set "CC=gcc-$answer"
+#         conda env config vars set "CXX=g++-$answer"
+#         green "Using gcc and g++ v-$answer"
+#     fi
+# fi
+
+
+# FIXME assess if m1 chip
+conda env config vars set "CC=gcc"
+conda env config vars set "CXX=g++"
+
 # Install ClearMap
 echo "Installing"
 python "setup.py" install || exit 1
