@@ -79,11 +79,20 @@ for ext_path in extension_paths:
     )
     extensions.append(extension)
 
-ext_modules = cythonize(extensions, nthreads=N_PROCS, quiet=True)
-# with ProcessPoolExecutor(max_workers=N_PROCS) as executor:
+if platform.processor() != "arm":
+    ext_modules = cythonize(extensions, nthreads=1, quiet=False)
+# with ProcessPoolExecutor(max_workers=1) as executor:
 #    parametrized_cythonize = functools.partial(cythonize, quiet=True)
 #    ext_modules = executor.map(parametrized_cythonize, extensions)
 #    ext_modules = [item for sublist in ext_modules for item in sublist]
+
+
+### For M1 Chip
+else:
+    ext_modules = []
+    for extension in extensions:
+        cythonize(extension, quiet=False)
+    # FIXME ext_modules.append(...)
 
 data_dirs = [
     'ClearMap/External/elastix',

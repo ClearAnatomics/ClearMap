@@ -1,4 +1,4 @@
-# ClearMapUi39.yml
+# ClearMapM1.yml
 #
 # ClearMap2.0 Toolbox
 # © Christoph Kirst
@@ -8,22 +8,21 @@
 #
 # ClearMap anaconda environment
 #
-# install: conda env create -f ClearMapUi39.yml
-# update:  conda env update -f ClearMapUi39.yml
-name: ClearMapUi39
+# install: conda env create -f ClearMapM1.yml
+# update:  conda env update -f ClearMapM1.yml
+name: ClearMapM1
 channels:
   - nvidia
   - pytorch
   - conda-forge
   - defaults
-
 dependencies:
   - python=3.9  # constraining seems to speed up resolution
   - pip
   - ipython
   - vispy
   - pyopengl
-  - pyqt<6
+  - pyqt
   - pyqtwebengine
   - pyqtgraph=0.12  # Problem with pyqtgraph import of QWidgets with 0.13
   - opencv
@@ -37,7 +36,7 @@ dependencies:
   - scikit-learn
   - graph-tool
   - pytorch<=1.11  # could probably upgrade
-  - cudatoolkit=11.6
+  # - cudatoolkit=11.6
   - configobj
   - natsort
   - tifffile<2020.9.22  # Adds "Use DimensionOrder to determine axes order in OmeXml." which breaks ClearMap.IO
