@@ -49,8 +49,8 @@ dependencies:
   - psutil  # required for python < 3.9 for cancelable ProcessPoolExecutors
   - tqdm
   - mpld3  # WARNING Maybe pip
-#  - pip:
-#    - lxml
+  - pip:
+    - lxml
 variables:
   PYTHONNOUSERSITE: 1
 #  TMPDIR: /data/tmp  # FIXME: add option to script
