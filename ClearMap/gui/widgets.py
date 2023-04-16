@@ -846,7 +846,7 @@ class PerfMonitor(QWidget):
 
     def __init__(self, parent, fast_period, slow_period, *args, **kwargs):
         super().__init__(parent, *args, **kwargs)
-        if fast_period < 100 or slow_period < 100:
+        if fast_period < 100 or slow_period and slow_period < 100:
             raise ValueError('Periods cannot be below 100ms')
         self.percent_cpu = 0
         self.percent_ram = 0
