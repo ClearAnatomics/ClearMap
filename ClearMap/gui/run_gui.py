@@ -141,9 +141,9 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         self.vram_bar = QProgressBar()
 
         if torch.cuda.is_available():
-            gpu_period = None
-        else:
             gpu_period = 500
+        else:
+            gpu_period = None
         self.perf_monitor = PerfMonitor(self, 500, gpu_period)
         self.perf_monitor.cpu_vals_changed.connect(self.update_cpu_bars)
         if torch.cuda.is_available():
