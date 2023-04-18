@@ -518,7 +518,10 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
     def patch_font_size_name(self):
         font_names = {
             9: 'small',
+            10: 'small',
+            11: 'regular',
             12: 'regular',
+            13: 'regular',
             14: 'big',
             22: 'huge'
         }
