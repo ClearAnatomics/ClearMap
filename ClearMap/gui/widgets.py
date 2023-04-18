@@ -858,8 +858,8 @@ class PerfMonitor(QWidget):
         self.fast_timer.setInterval(self.fast_period)
         self.fast_timer.timeout.connect(self.update_cpu_values)
         self.slow_timer = QTimer()
-        self.slow_timer.setInterval(self.slow_period)
         if slow_period is not None:
+            self.slow_timer.setInterval(self.slow_period)
             self.slow_timer.timeout.connect(self.update_gpu_values)
 
         self.gpu_proc_file_path = tempfile.mkstemp(suffix='_clearmap_gpu.proc')[-1]
@@ -870,11 +870,13 @@ class PerfMonitor(QWidget):
 
     def start(self):
         self.fast_timer.start()
-        self.slow_timer.start()
+        if self.slow_period is not None:
+            self.slow_timer.start()
 
     def stop(self):
         self.fast_timer.stop()
-        self.slow_timer.stop()
+        if self.slow_period is not None:
+            self.slow_timer.stop()
 
     def get_cpu_percent(self):
         return round(psutil.cpu_percent())
