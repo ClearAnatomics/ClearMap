@@ -79,7 +79,10 @@ for ext_path in extension_paths:
     )
     extensions.append(extension)
 
-ext_modules = cythonize(extensions, nthreads=N_PROCS, quiet=True)
+if patform.system().lower().startswith('darwin'):
+    ext_modules = cythonize(extensions, quiet=True)
+else:
+    ext_modules = cythonize(extensions, nthreads=N_PROCS, quiet=True)
 # with ProcessPoolExecutor(max_workers=N_PROCS) as executor:
 #    parametrized_cythonize = functools.partial(cythonize, quiet=True)
 #    ext_modules = executor.map(parametrized_cythonize, extensions)
