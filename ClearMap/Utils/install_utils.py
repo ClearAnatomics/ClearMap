@@ -225,7 +225,8 @@ def patch_env(cfg_path, dest_path, use_cuda_torch=True, tmp_dir=None):
     if platform.system().lower().startswith('darwin'):
         if platform.processor().lower().startswith('x86'):
             env_mgr.add_dependency('nomkl')  # MacOS includes "accelerate" and does not need Intel MKL on Intel CPU
-        env_mgr.patch_environment_package_line('pyqt', '5.13', comparison_operator='<=')  # FIXME: get from other env file instead
+            env_mgr.patch_env_var('KMP_DUPLICATE_LIB_OK', 'TRUE')  # FIXME: find cleaner fix
+        env_mgr.patch_environment_package_line('pyqt', '5.13', comparison_operator='<=')  # REFACTOR: get from other env file instead
 
     pytorch_v_mgr = PytorchVersionManager(cfg_path, env_mgr.python_version, env_mgr.get_package_version('pytorch'))
     if use_cuda_torch:
