@@ -415,12 +415,12 @@ class PreProcessor(TabProcessor):
         ]
         stack_validation_params = dict(
             method='foreground',
-            valid_range = wobbly_cfg["valid_range"],
-            size=wobbly_cfg["pixel_size"]
+            valid_range=wobbly_cfg["stack_valid_range"],
+            size=wobbly_cfg["stack_pixel_size"]
         )
         slice_validation_params = dict(
             method='foreground',
-            valid_range = wobbly_cfg["slice_valid_range"],
+            valid_range=wobbly_cfg["slice_valid_range"],
             size=wobbly_cfg["slice_pixel_size"]
         )
 

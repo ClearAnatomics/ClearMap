@@ -264,7 +264,7 @@ class WobblyStitchingParams(UiParameter):
     max_shifts_x: List[int]
     max_shifts_y: List[int]
     max_shifts_z: List[int]
-    valid_range: list
+    valid_range: list  # FIXME: missing pixel size
     slice_range: List[int]
     slice_pixel_size: int
 
@@ -275,8 +275,8 @@ class WobblyStitchingParams(UiParameter):
             'max_shifts_x': ParamLink(['max_shifts_x'], self.tab.wobblyMaxShiftsXDoublet),
             'max_shifts_y': ParamLink(['max_shifts_y'], self.tab.wobblyMaxShiftsYDoublet),
             'max_shifts_z': ParamLink(['max_shifts_z'], self.tab.wobblyMaxShiftsZDoublet),
-            'valid_range': ParamLink(['valid_range'], self.tab.wobblyValidRangeDoublet),
-            'slice_range': ParamLink(['slice_range'], self.tab.wobblySliceRangeDoublet),
+            'valid_range': ParamLink(['stack_valid_range'], self.tab.wobblyValidRangeDoublet),
+            'slice_range': ParamLink(['slice_valid_range'], self.tab.wobblySliceRangeDoublet),
             'slice_pixel_size': ParamLink(['slice_pixel_size'], self.tab.wobblySlicePixelSizeSinglet)
         }
         self.cfg_subtree = ['stitching', 'wobbly']
