@@ -1,8 +1,8 @@
-import functools
 import os
-import platform
-import subprocess
 import sys
+import subprocess
+import platform
+import functools
 from concurrent.futures import ProcessPoolExecutor
 
 from multiprocessing import cpu_count
@@ -79,7 +79,7 @@ for ext_path in extension_paths:
     )
     extensions.append(extension)
 
-if patform.system().lower().startswith('darwin'):
+if platform.system().lower().startswith('darwin'):
     ext_modules = cythonize(extensions, quiet=True)
 else:
     ext_modules = cythonize(extensions, nthreads=N_PROCS, quiet=True)
