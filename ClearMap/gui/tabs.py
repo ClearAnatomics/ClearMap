@@ -37,10 +37,10 @@ from ClearMap.Visualization.Qt.widgets import Scatter3D
 from ClearMap.Visualization.Qt.utils import link_dataviewers_cursors
 from ClearMap.Visualization.Qt import Plot3d as plot_3d
 
-from ClearMap.processors.sample_preparation import PreProcessor
+from ClearMap.processors.sample_preparation import PreProcessor, init_preprocessor
 from ClearMap.processors.cell_map import CellDetector
 from ClearMap.processors.tube_map import BinaryVesselProcessor, VesselGraphProcessor
-from ClearMap.processors.batch_process import process_folders, init_preprocessor
+from ClearMap.processors.batch_process import process_folders
 
 __author__ = 'Charly Rousseau <charly.rousseau@icm-institute.org>'
 __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
