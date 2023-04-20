@@ -254,7 +254,7 @@ class WobblySource(strg.Source):
     Returns
     -------
     position : tuple of int.
-      The non-local position of the specified coordainte slice.
+      The non-local position of the specified coordinate slice.
     """ 
     local_coordinate = self.coordinate_to_local(coordinate);                                          
     wobble = self._wobble[local_coordinate];
@@ -272,7 +272,7 @@ class WobblySource(strg.Source):
     Returns
     -------
     position : tuple of int.
-      The non-local position of the specified coordainte slice.
+      The non-local position of the specified coordinate slice.
     """ 
     local_coordinate = self.coordinate_to_local(coordinate);   
     return self._wobble[local_coordinate];
@@ -355,13 +355,13 @@ class WobblySource(strg.Source):
   ### Helper
   
   def _wobble_to_position(self, wobble, coordinate):
-    """Transform a wobble and axis coordainte to the full position.
+    """Transform a wobble and axis coordinate to the full position.
     
     Arguments
     ---------
     wobble : tuple
       The wobble to add.
-    coordainte : int
+    coordinate : int
       The coordinate along the axis
     
     Returns
@@ -1190,12 +1190,12 @@ def align_wobbly_axis(source1, source2, axis=2, axis_range=None, max_shifts=10, 
       i1rawa = i1raw[slice1_a];
       valid = _validate(i1rawa, **slice_validation_params);
       if verbose and not valid:
-        print('Alignment: Slice %d with coordainte %d in source %r is not valid!' % (a - a_start, a, source1.identifier)); 
+        print('Alignment: Slice %d with coordinate %d in source %r is not valid!' % (a - a_start, a, source1.identifier));
       if valid:
         i2rawa = i2raw[slice2_a];
         valid = _validate(i2rawa, **slice_validation_params);
         if verbose and not valid:
-          print('Alignment: Slice %d with coordainte %d in source %r is not valid!' % (a - a_start, a, source2.identifier)); 
+          print('Alignment: Slice %d with coordinate %d in source %r is not valid!' % (a - a_start, a, source2.identifier));
       if not valid:
         status[i] = WobblyAlignment.NOSIGNAL;
         continue;                        
@@ -1501,7 +1501,7 @@ def inspect_align_layout(alignment, verbose):
   minima : array
    Coordinates of the detected minima  
   trajectories : list
-    List of coordaintes of the detected trajectories.
+    List of coordinates of the detected trajectories.
   trajectories_optimal : list
     List of the optimal trajectories.
   """
