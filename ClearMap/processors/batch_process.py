@@ -7,27 +7,18 @@ The processor for batch processing a group of samples.
 This can be used from the GUI, from the CLI or interactively from the python interpreter
 """
 import functools
-import math
 import multiprocessing
-import os
 import sys
 from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
-import tifffile
-from skimage import img_as_ubyte
-from skimage.exposure import exposure
 
-from ClearMap import Settings
 from skimage.transform import rescale
 from tqdm import tqdm
 
-from ClearMap.Alignment import Annotation as annotation
-from ClearMap.config.atlas import ATLAS_NAMES_MAP, STRUCTURE_TREE_NAMES_MAP
 from ClearMap.processors.tube_map import BinaryVesselProcessor, VesselGraphProcessor
-from ClearMap.Utils.utilities import backup_file
 from ClearMap.processors.cell_map import CellDetector
-from ClearMap.processors.sample_preparation import PreProcessor
+from ClearMap.processors.sample_preparation import PreProcessor, init_preprocessor
 from ClearMap.config.config_loader import get_configs, ConfigLoader
 from ClearMap.IO import IO as clearmap_io
 
@@ -113,21 +104,6 @@ def voxelize_folders(folders, align=False, cells=True, vasc=False):
         cfg_loader = ConfigLoader(folder)
         configs = get_configs(cfg_loader.get_cfg_path('sample'), cfg_loader.get_cfg_path('processing'))
         voxelize_sample(configs, align=align, cells=cells, vasc=vasc)
-
-
-def init_preprocessor(folder, atlas_base_name=None, convert_tiles=False):
-    cfg_loader = ConfigLoader(folder)
-    configs = get_configs(cfg_loader.get_cfg_path('sample'), cfg_loader.get_cfg_path('processing'))
-    pre_proc = PreProcessor()
-    if atlas_base_name is None:
-        atlas_id = configs[2]['registration']['atlas']['id']
-        atlas_base_name = ATLAS_NAMES_MAP[atlas_id]['base_name']
-    json_file = os.path.join(Settings.atlas_folder, STRUCTURE_TREE_NAMES_MAP[configs[2]['registration']['atlas']['structure_tree_id']])
-    pre_proc.unpack_atlas(atlas_base_name)
-    pre_proc.setup(configs, convert_tiles=convert_tiles)
-    pre_proc.setup_atlases()
-    annotation.initialize(annotation_file=pre_proc.annotation_file_path, label_file=json_file)
-    return pre_proc
 
 
 def convert_to_cm_2_1(folder, atlas_base_name='ABA_25um'):
