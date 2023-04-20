@@ -26,7 +26,7 @@ from ClearMap.Analysis.Statistics import MultipleComparisonCorrection as clearma
 from ClearMap.IO import IO as clearmap_io
 from ClearMap.Utils.path_utils import is_density_file, find_density_file, find_cells_df, dir_to_sample_id
 from ClearMap.Utils.utilities import make_abs
-from ClearMap.processors.batch_process import init_preprocessor
+from ClearMap.processors.sample_preparation import init_preprocessor
 
 colors = {
     'red': [255, 0, 0],
