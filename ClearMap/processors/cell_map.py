@@ -367,13 +367,13 @@ class CellDetector(TabProcessor):
             grouped = df[df['hemisphere'] == i][relevant_columns].groupby(['id'], as_index=False)
 
             tmp = pd.DataFrame()
-            tmp['Structure ID'] = grouped.first()['id']
-            tmp['Structure order'] = grouped.first()['order']
-            tmp['Structure name'] = grouped.first()['name']
-            tmp['Hemisphere'] = grouped.first()['hemisphere']
-            tmp['Structure volume'] = grouped.first()['volume']
-            tmp['Cell counts'] = grouped.count()['name']
-            tmp['Average cell size'] = grouped.mean()['size']
+            tmp['Structure ID'] = grouped['id'].first()
+            tmp['Structure order'] = grouped['order'].first()
+            tmp['Structure name'] = grouped['name'].first()
+            tmp['Hemisphere'] = grouped['hemisphere'].first()
+            tmp['Structure volume'] = grouped['volume'].first()
+            tmp['Cell counts'] = grouped['name'].count()
+            tmp['Average cell size'] = grouped['size'].mean()
 
             collapsed = pd.concat((collapsed, tmp))
 
