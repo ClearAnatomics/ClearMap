@@ -27,6 +27,7 @@ References
 import copy
 import importlib
 import os
+import platform
 import re
 import warnings
 from concurrent.futures.process import BrokenProcessPool
@@ -62,6 +63,11 @@ __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
+
+if platform.system().lower().startswith('darwin'):
+    USE_BINARY_POINTS_FILE = False
+else:
+    USE_BINARY_POINTS_FILE = True
 
 
 class CellDetector(TabProcessor):
@@ -276,12 +282,12 @@ class CellDetector(TabProcessor):
             coords = elastix.transform_points(
                 coords, sink=None,
                 transform_directory=self.workspace.filename('resampled_to_auto'),
-                binary=True, indices=False)
+                binary=USE_BINARY_POINTS_FILE, indices=False)
 
             coords = elastix.transform_points(
                 coords, sink=None,
                 transform_directory=self.workspace.filename('auto_to_reference'),
-                binary=True, indices=False)
+                binary=USE_BINARY_POINTS_FILE, indices=False)
 
         return coords
 
