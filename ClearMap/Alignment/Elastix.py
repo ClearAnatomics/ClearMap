@@ -564,7 +564,7 @@ def align(fixed_image, moving_image, affine_parameter_file, bspline_parameter_fi
     with subprocess.Popen(cmd, stdout=sys.stdout, stderr=sys.stdout) as proc:  # FIXME: check if we need an "if not sys.stdout.fileno"
       if workspace is not None:
         workspace.process = proc
-  except subprocess.SubprocessError as err:
+  except (subprocess.SubprocessError, OSError) as err:
     raise ClearMapException(f'Align: failed executing: {" ".join(cmd)}') from err
   finally:
     if workspace is not None:
