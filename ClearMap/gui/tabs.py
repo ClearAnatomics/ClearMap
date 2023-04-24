@@ -588,7 +588,7 @@ class AlignmentTab(GenericTab):
         else:
             raise ValueError(f'Unrecognised step option {step}, should be one of ["ref_to_auto", "auto_to_raw"]')
         if not self.step_exists('registration', img_paths):
-            return
+            raise ValueError(f'Missing requirements {img_paths}')
         image_sources = copy.deepcopy(list(img_paths))
         for i, im_path in enumerate(image_sources):
             if im_path.endswith('.mhd'):
