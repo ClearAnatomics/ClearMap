@@ -64,6 +64,8 @@ import numpy as np
 
 import multiprocessing as mp
 
+from ClearMap.Utils.exceptions import ClearMapException
+
 import ClearMap.IO.IO as io
 import ClearMap.Settings as settings
 
@@ -563,8 +565,7 @@ def align(fixed_image, moving_image, affine_parameter_file, bspline_parameter_fi
       if workspace is not None:
         workspace.process = proc
   except subprocess.SubprocessError as err:
-    print('Align: failed executing: ' + ' '.join(cmd))
-    raise err
+    raise ClearMapException(f'Align: failed executing: {" ".join(cmd)}') from err
   finally:
     if workspace is not None:
       workspace.process = None
