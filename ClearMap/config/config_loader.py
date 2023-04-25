@@ -195,3 +195,9 @@ def get_configs(cfg_path, processing_params_path, machine_cfg_path=None):  # FIX
     machine_config = ConfigLoader.get_patched_cfg_from_path(machine_cfg_path)
 
     return machine_config, sample_config, processing_config
+
+
+def get_cfg_reader_function(cfg_path):
+    ext = os.path.splitext(cfg_path)[-1]
+    read_cfg = ConfigLoader.loader_functions[ext]
+    return read_cfg

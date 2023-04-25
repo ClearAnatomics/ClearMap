@@ -1,9 +1,10 @@
+import copy
 import os.path
 
 import inspect
 import shutil
 
-from ClearMap.config.config_loader import ConfigLoader, get_alternatives, CONFIG_NAMES
+from ClearMap.config.config_loader import ConfigLoader, get_alternatives, CONFIG_NAMES, get_cfg_reader_function
 
 CFG_DIR = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 CLEARMAP_DIR = os.path.dirname(os.path.dirname(CFG_DIR))  # used by shell script
@@ -21,24 +22,47 @@ def update_default_config():
             shutil.copy(default_cfg_path, cfg_paths[0])
         else:  # if present merge
             cfg_path = cfg_paths[existing_paths.index(True)]
-            merge_config(loader, cfg_name, cfg_path, default_cfg_path)
+
+            read_cfg = get_cfg_reader_function(cfg_path)
+            cfg = read_cfg(cfg_path)
+            default_cfg = read_cfg(default_cfg_path)
+            print(f'Merging {cfg_name}')
+            merge_config(default_cfg, cfg)
 
 
-def merge_config(loader, cfg_name, cfg_path, default_cfg_path):
-    ext = os.path.splitext(cfg_path)[-1]
-    read_cfg = loader.loader_functions[ext]
-    cfg = read_cfg(cfg_path)
-    default_cfg = read_cfg(default_cfg_path)
-    was_modified = False
-    for k in default_cfg.keys():
-        if k not in cfg.keys():
-            cfg[k] = default_cfg[k]
-            was_modified = True
+def merge_config(source_cfg, dest_cfg):
+    dest_copy = copy.deepcopy(dest_cfg)
+    dest_cfg = deep_merge_dicts(dest_cfg, source_cfg)
+    dest_cfg = remove_extra_keys(dest_cfg, source_cfg)
+    # FIXME: add step to swap brackets and parenthesis
+    if dest_copy != dest_cfg:
+        dest_cfg.write()
+
+
+def remove_extra_keys(a, b):
+    """remove keys from a if not in b"""
+    for key in a:
+        if key in b:
+            if isinstance(a[key], dict) and isinstance(b[key], dict):
+                a[key] = remove_extra_keys(a[key], b[key])
         else:
-            if cfg[k] != default_cfg[k]:
-                print(f'Value "{k}" in {cfg_name}_params has been modified, skipping.')
-    if was_modified:
-        cfg.write()
+            del a[key]
+    return a
+
+
+def deep_merge_dicts(a, b, path=None):  # modified from https://stackoverflow.com/a/7205107
+    if path is None:
+        path = []
+    for key in b:
+        if key in a:
+            if isinstance(a[key], dict) and isinstance(b[key], dict):
+                deep_merge_dicts(a[key], b[key], path + [str(key)])
+            elif a[key] != b[key]:
+                print(f'Config value "{key}" has been modified by user, skipping.')
+        else:
+            a[key] = b[key]
+
+    return a
 
 
 if __name__ == '__main__':
