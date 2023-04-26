@@ -140,11 +140,15 @@ def set_elastix_library_path(elastix_lib_path = None):
   else:
     raise ValueError(f'Unknown OS {os_name}')
 
+  print(f'OS: {os_name}, library variable name: {lib_var_name}')
+
   if lib_var_name in os.environ:
     lib_path = os.environ[lib_var_name]
+    print(f'Variable {lib_var_name} exists, patching with {lib_path}')
     if elastix_lib_path not in lib_path.split(':'):
-      os.environ[lib_var_name] = f'{lib_path}:{elastix_lib_path}'
+      os.environ[lib_var_name] = f'{elastix_lib_path}:{lib_path}'
   else:
+    print(f'Variable {lib_var_name} not found, adding elastix lib folder: {elastix_lib}')
     os.environ[lib_var_name] = elastix_lib_path
 
 
@@ -163,50 +167,37 @@ def initialize_elastix(path = None):
   """
   global elastix_binary, elastix_lib, transformix_binary, initialized
   
-  if path is None:
+  if path is None and settings.elastix_path is not None:
     path = settings.elastix_path
-
-  if path is None:
+  else:
     raise RuntimeError('Cannot find elastix path!')
 
-  # search for elastix binary
-  elastixbin = os.path.join(path, 'bin', 'elastix')
-  if os.path.exists(elastixbin):
-    elastix_binary = elastixbin
-  else:
-    raise RuntimeError(f'Cannot find elastix binary {elastixbin}, set path in Settings.py accordingly!')
+  elastix_binary = search_elx_bin(path, 'elastix')
+  transformix_binary = search_elx_bin(path, 'transformix')
 
-  # search for transformix binarx
-  transformixbin = os.path.join(path, 'bin', 'transformix')
-  if os.path.exists(transformixbin):
-    transformix_binary = transformixbin
-  else:
-    raise RuntimeError(f'Cannot find transformix binary {transformixbin} set path in Settings.py accordingly!')
-
-  # search for elastix libs
-  elastix_lib = os.path.join(path, 'lib')
-  if os.path.exists(elastix_lib):
-    elastix_lib = elastix_lib
-  else:
-    elastix_lib = os.path.join(path, 'bin')
-    if os.path.exists(elastix_lib):
-      elastix_lib = elastix_lib
-    else:
-      raise RuntimeError(f'Cannot find elastix libs in {elastix_lib}  set path in Settings.py accordingly!')
-
-  # set path
-  set_elastix_library_path(elastix_lib)
+  elastix_lib = search_elx_lib(path)
+  set_elastix_library_path(elastix_lib)  # FIXME: check if needs global elastx_lib ??
 
   initialized = True
-
-  print(f'Elastix sucessfully initialized from path: {path}')
-
-  os_name = platform.system().lower()
-  if os_name.startswith('darwin'):
-    elastix_binary = f'DYLD_LIBRARY_PATH={elastix_lib} {elastix_binary}'  # FIXME: does not seem correct
-    transformix_binary = f'DYLD_LIBRARY_PATH={elastix_lib} {transformix_binary}'
-
+  print(f'Elastix successfully initialized from path: {path}')
   return path
+
+
+def search_elx_lib(path):
+  for sub_dir in ('lib', 'bin'):
+    lib_path = os.path.join(path, sub_dir)
+    if os.path.exists(lib_path):
+      return lib_path
+  else:
+    raise ClearMapException(f'Cannot find elastix libs in {lib_path} set path in Settings.py accordingly!')
+
+
+def search_elx_bin(path, bin_type):
+  elx = os.path.join(path, 'bin', bin_type)
+  if os.path.exists(elx):
+    return elx
+  else:
+    raise RuntimeError(f'Cannot find elastix binary {elx}, set path in Settings.py accordingly!')
 
 
 initialize_elastix()
