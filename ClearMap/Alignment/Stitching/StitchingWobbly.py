@@ -1977,7 +1977,7 @@ def _optimize_slice_positions(positions, components, processes = None, workspace
     #print M
     #print np.linalg.pinv(-M)
     
-    if isinstance(processes, int):
+    if isinstance(processes, int) and processes > 1:
       M = [io.sma.smm.insert(m) for m in M];
       X = [io.sma.smm.insert(x) for x in X];           
       with CancelableProcessPoolExecutor(min(processes, ndim)) as executor:

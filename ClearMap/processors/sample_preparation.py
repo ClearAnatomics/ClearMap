@@ -6,6 +6,7 @@ This is the part that is common to both pipelines to process the raw images.
 It includes file conversion, stitching and registration
 """
 import os
+import platform
 import re
 import sys
 from concurrent.futures.process import BrokenProcessPool
@@ -447,6 +448,9 @@ class PreProcessor(TabProcessor):
         self.prepare_watcher_for_substep(len(layout.alignments) / 2,  # WARNING: bad estimation
                                          self.__wobbly_stitching_place_re, 'Place layout wobbly')
         try:
+            n_processes = self.machine_config['n_processes_stitching']
+            if platform.system().lower().startswith('darwin'):
+                n_processes = 1
             stitching_wobbly.place_layout(layout, min_quality=-np.inf,
                                           method='optimization',
                                           smooth=dict(method='window', window='bartlett', window_length=100,
@@ -454,7 +458,7 @@ class PreProcessor(TabProcessor):
                                           smooth_optimized=dict(method='window', window='bartlett',
                                                                 window_length=20, binary=10),
                                           fix_isolated=False, lower_to_origin=True,
-                                          processes=self.machine_config['n_processes_stitching'],
+                                          processes=n_processes,
                                           workspace=self.workspace, verbose=True)
         except BrokenProcessPool:
             print('Wobbly stitching canceled')
