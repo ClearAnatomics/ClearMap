@@ -63,7 +63,7 @@ class EnvFileManager:
         patched_dependencies = []
         for dep in self.cfg['dependencies']:
             if isinstance(dep, str) and dep.startswith(package_name):
-                version_str = f"{comparison_operator}{pkg_version}" if pkg_version else ""
+                version_str = (f'{comparison_operator}{pkg_version}') if pkg_version else ''
                 patched_dependencies.append(f'{package_name}{version_str}')
             else:
                 patched_dependencies.append(dep)
