@@ -35,7 +35,7 @@ dependencies:
   - matplotlib
   - scikit-image
   - scikit-learn
-  - graph-tool
+  - graph-tool<=2.45  # Cannot remove self loops with later versions
   - pytorch<=1.11  # could probably upgrade
   - cudatoolkit=11.6
   - configobj
