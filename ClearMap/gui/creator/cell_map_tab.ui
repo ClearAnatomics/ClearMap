@@ -39,6 +39,7 @@
      </property>
      <property name="font">
       <font>
+       <weight>75</weight>
        <bold>true</bold>
       </font>
      </property>
@@ -51,7 +52,7 @@
         <x>0</x>
         <y>0</y>
         <width>503</width>
-        <height>333</height>
+        <height>228</height>
        </rect>
       </property>
       <attribute name="label">
@@ -67,9 +68,9 @@
           <property name="geometry">
            <rect>
             <x>0</x>
-            <y>0</y>
-            <width>485</width>
-            <height>225</height>
+            <y>-147</y>
+            <width>471</width>
+            <height>255</height>
            </rect>
           </property>
           <attribute name="label">
@@ -94,6 +95,9 @@
               </item>
               <item>
                <widget class="QSpinBox" name="backgroundCorrectionDiameter">
+                <property name="suffix">
+                 <string>px</string>
+                </property>
                 <property name="maximum">
                  <number>65535</number>
                 </property>
@@ -120,6 +124,9 @@
               </item>
               <item>
                <widget class="QSpinBox" name="maximaShape">
+                <property name="suffix">
+                 <string>px</string>
+                </property>
                 <property name="maximum">
                  <number>65535</number>
                 </property>
@@ -165,7 +172,7 @@
             <x>0</x>
             <y>0</y>
             <width>471</width>
-            <height>293</height>
+            <height>325</height>
            </rect>
           </property>
           <attribute name="label">
@@ -391,7 +398,7 @@
             <x>0</x>
             <y>0</y>
             <width>485</width>
-            <height>225</height>
+            <height>108</height>
            </rect>
           </property>
           <attribute name="label">
@@ -448,7 +455,7 @@
         <x>0</x>
         <y>0</y>
         <width>503</width>
-        <height>228</height>
+        <height>247</height>
        </rect>
       </property>
       <attribute name="label">
@@ -479,7 +486,7 @@
           <item row="0" column="0">
            <widget class="QLabel" name="label_7">
             <property name="text">
-             <string>Size</string>
+             <string>Size (voxels)</string>
             </property>
            </widget>
           </item>
@@ -647,7 +654,7 @@
         <x>0</x>
         <y>0</y>
         <width>503</width>
-        <height>137</height>
+        <height>115</height>
        </rect>
       </property>
       <attribute name="label">
@@ -724,7 +731,7 @@
         <x>0</x>
         <y>0</y>
         <width>503</width>
-        <height>150</height>
+        <height>160</height>
        </rect>
       </property>
       <attribute name="label">
@@ -763,6 +770,7 @@
          <property name="font">
           <font>
            <pointsize>22</pointsize>
+           <weight>75</weight>
            <bold>true</bold>
           </font>
          </property>
@@ -786,6 +794,7 @@
          <property name="font">
           <font>
            <pointsize>22</pointsize>
+           <weight>75</weight>
            <bold>true</bold>
           </font>
          </property>
@@ -805,7 +814,7 @@
         <x>0</x>
         <y>0</y>
         <width>503</width>
-        <height>137</height>
+        <height>115</height>
        </rect>
       </property>
       <attribute name="label">
