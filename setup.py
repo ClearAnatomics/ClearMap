@@ -26,7 +26,7 @@ requirements = [  # pip
     'lxml'
 ]
 
-OPTIMISE_COMPILATION_FOR_TARGET = True  # Cython code will run on the machine where is was compiled
+OPTIMISE_COMPILATION_FOR_TARGET = os.environ.get('OPTIMISE_CLEARMAP_COMPILATION_FOR_TARGET', True) != 'False' # Cython code will run on the machine where is was compiled
 N_PROCS = cpu_count() - 2
 DEFAULT_COMPILE_ARGS = ['-w', '-O3']
 DEFAULT_LINK_ARGS = []
