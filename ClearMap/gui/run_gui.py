@@ -88,7 +88,8 @@ from ClearMap.gui.style import DARK_BACKGROUND, PLOT_3D_BG, \
 from ClearMap.gui.widgets import OrthoViewer, ProgressWatcher, setup_mini_brain, StructureSelector, \
     PerfMonitor  # needs plot_3d
 update_pbar(app, progress_bar, 60)
-from ClearMap.gui.tabs import SampleTab, AlignmentTab, CellCounterTab, VasculatureTab, PreferenceUi, BatchTab
+from ClearMap.gui.tabs import SampleTab, AlignmentTab, CellCounterTab, VasculatureTab, BatchTab
+from ClearMap.gui.preferences import PreferenceUi
 
 update_pbar(app, progress_bar, 80)
 

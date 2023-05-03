@@ -16,20 +16,21 @@ import mpld3
 
 import pyqtgraph as pg
 from PyQt5.QtWebEngineWidgets import QWebEngineView
-from PyQt5.QtWidgets import QDialogButtonBox, QWhatsThis
+from PyQt5.QtWidgets import QDialogButtonBox
 from qdarkstyle import DarkPalette
 
 import ClearMap.IO.IO as clearmap_io
 from ClearMap.IO.MHD import mhd_read
 from ClearMap.Alignment import Annotation as annotation
 from ClearMap.Analysis.Statistics.group_statistics import make_summary, density_files_are_comparable, compare_groups
-from ClearMap.Utils.exceptions import MissingRequirementException, PlotGraphError, ClearMapVRamException
+from ClearMap.Utils.exceptions import PlotGraphError, ClearMapVRamException
 from ClearMap.Visualization.Matplotlib.PlotUtils import plot_sample_stats_histogram, plot_volcano
 from ClearMap.Visualization.atlas import create_color_annotation
 
 from ClearMap.gui.dialogs import prompt_dialog
-from ClearMap.gui.gui_utils import format_long_nb_to_str, surface_project, np_to_qpixmap, create_clearmap_widget
-from ClearMap.gui.params import ParamsOrientationError, VesselParams, PreferencesParams, SampleParameters, \
+from ClearMap.gui.gui_utils import format_long_nb_to_str, surface_project, np_to_qpixmap
+from ClearMap.gui.interfaces import GenericTab, PostProcessingTab
+from ClearMap.gui.params import ParamsOrientationError, VesselParams, SampleParameters, \
     AlignmentParams, CellMapParams, BatchParams
 from ClearMap.gui.widgets import PatternDialog, SamplePickerDialog, DataFrameWidget, LandmarksSelectorDialog
 from ClearMap.Visualization.Qt.widgets import Scatter3D
@@ -49,233 +50,10 @@ __webpage__ = 'https://idisco.info'
 __download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
 
 
-# ############################################ INTERFACES ##########################################
-
-class GenericUi:
-    """
-    The first layer of interface. This is not implemented directly but is the base class
-    of GenericTab and GenericDialog, themselves interfaces
-    """
-    def __init__(self, main_window, name, ui_file_name, widget_class_name):
-        """
-
-        Parameters
-        ----------
-        main_window: ClearMapGui
-        name: str
-        ui_file_name: str
-        widget_class_name: str
-        """
-        self.main_window = main_window
-        self.name = name
-        self.ui_file_name = ui_file_name
-        self.widget_class_name = widget_class_name
-        self.ui = None
-        self.params = None
-        self.progress_watcher = self.main_window.progress_watcher
-
-    def init_ui(self):
-        self.ui = create_clearmap_widget(f'{self.ui_file_name}.ui', patch_parent_class=self.widget_class_name)
-        self.patch_button_boxes()
-
-    def load_config_to_gui(self):
-        self.params.cfg_to_ui()
-
-    def set_progress_watcher(self, watcher):
-        pass
-
-    def patch_button_boxes(self):
-        self.main_window.patch_button_boxes(self.ui)
-
-    def set_params(self, *args):
-        raise NotImplementedError()
-
-    def load_params(self):
-        self.params.cfg_to_ui()
-
-
-class GenericTab(GenericUi):
-    """
-    The interface to all tab managers.
-    A tab manager includes a tab widget,
-     the associated parameters and potentially a processor object
-     which handles the computations.
-    """
-    def __init__(self, main_window, name, tab_idx, ui_file_name):
-        """
-
-        Parameters
-        ----------
-        main_window: ClearMapGui
-        name: str
-        tab_idx: int
-        ui_file_name: str
-        """
-        
-        super().__init__(main_window, name, ui_file_name, 'QTabWidget')
-
-        self.processing_type = None
-        self.tab_idx = tab_idx
-
-        self.minimum_width = 200  # REFACTOR:
-
-    def init_ui(self):
-        super().init_ui()
-        self.ui.setMinimumWidth(self.minimum_width)
-        self.main_window.tabWidget.removeTab(self.tab_idx)
-        self.main_window.tabWidget.insertTab(self.tab_idx, self.ui, self.name.title())
-
-    def set_params(self, *args):
-        raise NotImplementedError()
-
-    def read_configs(self, cfg_path):  # FIXME: REFACTOR: parse_configs
-        self.params.read_configs(cfg_path)
-
-    def fix_config(self):  # TODO: check if could make part of self.params may not be possible since not set
-        self.params.fix_cfg_file(self.params.config_path)
-
-    def disable(self):
-        self.ui.setEnabled(False)
-
-    def step_exists(self, step_name, file_list):
-        if isinstance(file_list, str):
-            file_list = [file_list]
-        for f_path in file_list:
-            if not os.path.exists(f_path):
-                self.main_window.print_error_msg(f'Missing {step_name} file {f_path}. '
-                                                 f'Please ensure {step_name} is run first.')
-                return False
-        return True
-
-    def setup_workers(self):
-        pass
-
-    def display_whats_this(self, widget):
-        QWhatsThis.showText(widget.pos(), widget.whatsThis(), widget)
-
-    def connect_whats_this(self, info_btn, whats_this_ctrl):
-        info_btn.clicked.connect(lambda: self.display_whats_this(whats_this_ctrl))
-
-    def wrap_step(self, task_name, func, step_args=None, step_kw_args=None, n_steps=1, abort_func=None, save_cfg=True,
-                  nested=True, close_when_done=True, main_thread=False):  # FIXME: saving config should be default
-        if step_args is None:
-            step_args = []
-        if step_kw_args is None:
-            step_kw_args = {}
-
-        if save_cfg:
-            self.params.ui_to_cfg()
-        if task_name:
-            if not nested:
-                n_steps = 0
-            self.main_window.make_progress_dialog(task_name, n_steps=n_steps, abort=abort_func)
-
-        try:
-            if main_thread:
-                func(*step_args, **step_kw_args)
-            else:
-                self.main_window.wrap_in_thread(func, *step_args, **step_kw_args)
-        except MissingRequirementException as ex:
-            self.main_window.print_error_msg(ex)
-            self.main_window.popup(str(ex), base_msg=f'Could not run operation {func.__name__}', print_warning=False)
-        finally:
-            if self.preprocessor is not None and self.preprocessor.workspace is not None:  # WARNING: hacky
-                self.preprocessor.workspace.executor = None
-            if close_when_done:
-                self.progress_watcher.finish()
-            else:
-                msg = f'{self.progress_watcher.main_step_name} finished'
-                self.main_window.print_status_msg(msg)
-                self.main_window.log_progress(f'    : {msg}')
-
-
-class PostProcessingTab(GenericTab):
-    def __init__(self, main_window, name, tab_idx, ui_file_name):
-        super().__init__(main_window, name, tab_idx, ui_file_name)
-
-        self.preprocessor = None
-        self.processing_type = 'post'
-
-    def set_params(self, sample_params, alignment_params):
-        raise NotImplementedError()
-
-    def setup_preproc(self, pre_processor):
-        self.preprocessor = pre_processor
-
-    def plot_slicer(self, slicer_prefix, tab, params):
-        self.main_window.clear_plots()
-        # if self.preprocessor.was_registered:
-        #     img = mhd_read(self.preprocessor.annotation_file_path)  # FIXME: does not work (probably compressed format)
-        # else:
-        img = self.preprocessor.workspace.source('resampled')
-        self.main_window.ortho_viewer.setup(img, params, parent=self.main_window)
-        dvs = self.main_window.ortho_viewer.plot_orthogonal_views()
-        ranges = [[params.reverse_scale_axis(v, ax) for v in vals] for ax, vals in zip('xyz', params.slice_tuples)]
-        self.main_window.ortho_viewer.update_ranges(ranges)
-        self.main_window.setup_plots(dvs, ['x', 'y', 'z'])
-
-        # WARNING: needs to be done after setup
-        for axis, ax_max in zip('XYZ', self.preprocessor.raw_stitched_shape):  # FIXME: not always raw stitched
-            getattr(tab, f'{slicer_prefix}{axis}RangeMax').setMaximum(ax_max)
-
-
-class GenericDialog(GenericUi):
-    def __init__(self, main_window, name, file_name):
-        super().__init__(main_window, name, file_name, 'QDialog')
-
-    def init_ui(self):
-        super().init_ui()
-        self.ui.setWindowTitle(self.name.title())
-
-    def set_params(self, *args):
-        raise NotImplementedError()
-
-# ############################################ IMPLEMENTATIONS #######################################
-
-
-class PreferenceUi(GenericDialog):
-    def __init__(self, main_window):
-        super().__init__(main_window, 'Preferences', 'preferences_editor')
-
-    def setup(self, font_size):
-        self.init_ui()
-        self.ui.setMinimumHeight(700)  # FIXME: adapt to screen resolution
-
-        self.setup_preferences()
-
-        self.ui.buttonBox.connectApply(self.params.ui_to_cfg)
-        self.ui.buttonBox.connectOk(self.apply_prefs_and_close)
-        self.ui.buttonBox.connectCancel(self.ui.close)
-
-        self.params.font_size = font_size
-
-        self.ui.fontComboBox.currentFontChanged.connect(self.main_window.set_font)
-
-    def set_params(self, *args):
-        self.params = PreferencesParams(self.ui, self.main_window.src_folder)
-
-    def setup_preferences(self):
-        self.set_params()
-        machine_cfg_path = self.main_window.config_loader.get_default_path('machine')
-        if self.main_window.file_exists(machine_cfg_path):
-            self.params.read_configs(machine_cfg_path)
-            self.params.cfg_to_ui()
-        else:
-            msg = 'Missing machine config file. Please ensure a machine_params.cfg file ' \
-                  'is available at {}. This should be done at installation'.format(machine_cfg_path)
-            self.main_window.print_error_msg(msg)
-            raise FileNotFoundError(msg)
-
-    def open(self):
-        return self.ui.exec()
-
-    def apply_prefs_and_close(self):
-        self.params.ui_to_cfg()
-        self.ui.close()
-        self.main_window.reload_prefs()
-
-
 class SampleTab(GenericTab):
+    """
+    The tab manager to define the parameters of the sample
+    """
     def __init__(self, main_window, tab_idx=0):
         super().__init__(main_window, 'Sample', tab_idx, 'sample_tab')
         self.mini_brain_scaling = None
