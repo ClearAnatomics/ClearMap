@@ -17,6 +17,7 @@ import numpy as np
 import matplotlib
 import tifffile
 
+from ClearMap.Alignment.Stitching.plot_utils import overlay_layout_plane
 
 matplotlib.use('Qt5Agg')
 
@@ -727,6 +728,18 @@ class PreProcessor(TabProcessor):
             cfg.write()
 
     def stitch_overlay(self, channel, color=True):
+        """
+        This creates a *dumb* overlay of the tiles
+        i.e. only using the fixed guess overlap
+        Parameters
+        ----------
+        channel
+        color
+
+        Returns
+        -------
+
+        """
         positions = self.workspace.get_positions(channel)
         mosaic_shape = {ax: max([p[ax] for p in positions]) + 1 for ax in 'XY'}  # +1 because 0 indexing
         files = self.workspace.file_list(channel)
@@ -757,6 +770,13 @@ class PreProcessor(TabProcessor):
         if color:
             output_image = output_image.clip(0, 255).astype(np.uint8)
         return output_image
+
+    def plot_layout(self, postfix='aligned_axis'):
+        if postfix not in ('aligned_axis', 'aligned', 'placed'):
+            raise ValueError(f'Expected on of ("aligned_axis", "aligned", "placed") for postfix, got "{postfix}"')
+        layout = stitching_rigid.load_layout(self.filename('layout', postfix=postfix))
+        overlay = overlay_layout_plane(layout)
+        return overlay
 
 
 def main():

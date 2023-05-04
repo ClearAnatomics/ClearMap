@@ -198,9 +198,10 @@ class AlignmentTab(GenericTab):
     def setup(self):
         self.init_ui()
 
-        self.ui.previewStitchingPushButton.clicked.connect(functools.partial(self.preview_stitching, color=True))
+        self.ui.previewStitchingPushButton.clicked.connect(functools.partial(self.preview_stitching_dumb, color=True))
         self.connect_whats_this(self.ui.rigidProjectionThicknessLblInfoToolButton, self.ui.rigidProjectionThicknessLbl)
-        self.ui.stitchingPreviewLevelsPushButton.clicked.connect(functools.partial(self.preview_stitching, color=False))
+        self.ui.stitchingPreviewLevelsPushButton.clicked.connect(functools.partial(self.preview_stitching_dumb, color=False))
+        self.ui.stitchingPreviewRigidPushButton.clicked.connect(self.preview_stitching_smart)
 
         self.ui.runStitchingButtonBox.connectApply(self.run_stitching)
         self.ui.displayStitchingButtonBox.connectApply(self.plot_stitching_results)
@@ -233,11 +234,18 @@ class AlignmentTab(GenericTab):
         self.params.registration.ui_to_cfg()
         self.preprocessor.setup_atlases()
 
-    def preview_stitching(self, color):
+    def preview_stitching_dumb(self, color):
         if color:
             overlay = [pg.image(self.preprocessor.stitch_overlay('raw', color))]
         else:  # TODO: make DataViewer work with 2D color
             overlay = plot_3d.plot(self.preprocessor.stitch_overlay('raw', color), lut='flame', min_max=(100, 5000))
+        self.main_window.setup_plots(overlay)
+
+    def preview_stitching_smart(self, postfix='aligned_axis'):
+        n_steps = self.preprocessor.n_rigid_steps_to_run
+        self.wrap_step('Stitching', self.preprocessor.stitch_rigid, step_kw_args={'force': True},
+                       n_steps=n_steps, abort_func=self.preprocessor.stop_process)
+        overlay = [pg.image(self.preprocessor.plot_layout(postfix=postfix))]
         self.main_window.setup_plots(overlay)
 
     def run_stitching(self):
