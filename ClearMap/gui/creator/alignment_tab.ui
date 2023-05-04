@@ -29,6 +29,7 @@
        </property>
        <property name="font">
         <font>
+         <weight>75</weight>
          <bold>true</bold>
         </font>
        </property>
@@ -41,7 +42,7 @@
           <x>0</x>
           <y>0</y>
           <width>478</width>
-          <height>631</height>
+          <height>619</height>
          </rect>
         </property>
         <attribute name="label">
@@ -57,9 +58,9 @@
             <property name="geometry">
              <rect>
               <x>0</x>
-              <y>0</y>
-              <width>460</width>
-              <height>463</height>
+              <y>-107</y>
+              <width>446</width>
+              <height>538</height>
              </rect>
             </property>
             <attribute name="label">
@@ -73,6 +74,40 @@
                </property>
               </widget>
              </item>
+             <item row="6" column="0">
+              <widget class="QLabel" name="label_4">
+               <property name="toolTip">
+                <string>Maximum number of pixels to shift in either direction along that axis to compute the alignment (correlograms).</string>
+               </property>
+               <property name="text">
+                <string>Max shifts X</string>
+               </property>
+              </widget>
+             </item>
+             <item row="2" column="0">
+              <widget class="QLabel" name="label_2">
+               <property name="toolTip">
+                <string>Expected overlap between tiles along Y dimension (in pixels)</string>
+               </property>
+               <property name="text">
+                <string>Y overlap</string>
+               </property>
+              </widget>
+             </item>
+             <item row="11" column="1">
+              <widget class="QSpinBox" name="rigidBackgroundPixels">
+               <property name="maximum">
+                <number>1000000</number>
+               </property>
+              </widget>
+             </item>
+             <item row="10" column="1">
+              <widget class="QSpinBox" name="rigidBackgroundLevel">
+               <property name="maximum">
+                <number>65535</number>
+               </property>
+              </widget>
+             </item>
              <item row="8" column="0">
               <widget class="QLabel" name="label_6">
                <property name="toolTip">
@@ -80,6 +115,17 @@
                </property>
                <property name="text">
                 <string>Max shifts Z</string>
+               </property>
+              </widget>
+             </item>
+             <item row="4" column="2">
+              <widget class="QToolButton" name="rigidProjectionThicknessLblInfoToolButton">
+               <property name="text">
+                <string/>
+               </property>
+               <property name="icon">
+                <iconset resource="icons.qrc">
+                 <normaloff>:/icons/icons/info.svg</normaloff>:/icons/icons/info.svg</iconset>
                </property>
               </widget>
              </item>
@@ -127,115 +173,6 @@
                 <string>X overlap</string>
                </property>
               </widget>
-             </item>
-             <item row="8" column="1">
-              <widget class="QFrame" name="rigidMaxShiftsZDoublet">
-               <property name="frameShape">
-                <enum>QFrame::StyledPanel</enum>
-               </property>
-               <property name="frameShadow">
-                <enum>QFrame::Raised</enum>
-               </property>
-               <layout class="QHBoxLayout" name="horizontalLayout_8">
-                <item>
-                 <widget class="QSpinBox" name="spinBox_12">
-                  <property name="suffix">
-                   <string>px</string>
-                  </property>
-                  <property name="minimum">
-                   <number>-1024</number>
-                  </property>
-                  <property name="maximum">
-                   <number>1024</number>
-                  </property>
-                 </widget>
-                </item>
-                <item>
-                 <widget class="QSpinBox" name="spinBox_13">
-                  <property name="suffix">
-                   <string>px</string>
-                  </property>
-                  <property name="minimum">
-                   <number>-1024</number>
-                  </property>
-                  <property name="maximum">
-                   <number>1024</number>
-                  </property>
-                 </widget>
-                </item>
-               </layout>
-              </widget>
-             </item>
-             <item row="10" column="1">
-              <widget class="QSpinBox" name="rigidBackgroundLevel">
-               <property name="maximum">
-                <number>65535</number>
-               </property>
-              </widget>
-             </item>
-             <item row="4" column="0">
-              <widget class="QLabel" name="rigidProjectionThicknessLbl">
-               <property name="toolTip">
-                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Number of planes to average to compute&lt;/p&gt;&lt;p&gt;the optimum overlap along X and Y dimensions&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-               </property>
-               <property name="whatsThis">
-                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;h1 style=&quot; margin-top:18px; margin-bottom:12px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;&lt;span style=&quot; font-size:xx-large; font-weight:700;&quot;&gt;Rigid stitcher&lt;/span&gt;&lt;/h1&gt;&lt;p&gt;The &lt;span style=&quot; font-weight:700; font-style:italic;&quot;&gt;projection thickness&lt;/span&gt; is the width (short dimension) of the &lt;span style=&quot; font-weight:700;&quot;&gt;white area&lt;/span&gt; in the image below.&lt;/p&gt;&lt;p&gt;&lt;img src=&quot;:/ClearMap/gui/creator/graphics_resources/graphics_resources/wobbly_stitcher_rigid.jpg&quot;/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-               </property>
-               <property name="text">
-                <string>Projection thickness</string>
-               </property>
-              </widget>
-             </item>
-             <item row="3" column="1">
-              <widget class="QPushButton" name="previewStitchingPushButton">
-               <property name="text">
-                <string>Preview overlap</string>
-               </property>
-              </widget>
-             </item>
-             <item row="2" column="0">
-              <widget class="QLabel" name="label_2">
-               <property name="toolTip">
-                <string>Expected overlap between tiles along Y dimension (in pixels)</string>
-               </property>
-               <property name="text">
-                <string>Y overlap</string>
-               </property>
-              </widget>
-             </item>
-             <item row="4" column="2">
-              <widget class="QToolButton" name="rigidProjectionThicknessLblInfoToolButton">
-               <property name="text">
-                <string/>
-               </property>
-               <property name="icon">
-                <iconset resource="icons.qrc">
-                 <normaloff>:/icons/icons/info.svg</normaloff>:/icons/icons/info.svg</iconset>
-               </property>
-              </widget>
-             </item>
-             <item row="7" column="0">
-              <widget class="QLabel" name="label_5">
-               <property name="toolTip">
-                <string>Maximum number of pixels to shift in either direction along that axis to compute the alignment (correlograms).</string>
-               </property>
-               <property name="text">
-                <string>Max shifts Y</string>
-               </property>
-              </widget>
-             </item>
-             <item row="0" column="1" colspan="2">
-              <spacer name="verticalSpacer">
-               <property name="orientation">
-                <enum>Qt::Vertical</enum>
-               </property>
-               <property name="sizeHint" stdset="0">
-                <size>
-                 <width>20</width>
-                 <height>40</height>
-                </size>
-               </property>
-              </spacer>
              </item>
              <item row="6" column="1">
               <widget class="QFrame" name="rigidMaxShiftsXDoublet">
@@ -329,32 +266,62 @@
                </layout>
               </widget>
              </item>
-             <item row="1" column="1">
-              <widget class="QFrame" name="xOverlapSinglet">
+             <item row="3" column="1">
+              <widget class="QPushButton" name="previewStitchingPushButton">
+               <property name="text">
+                <string>Preview overlap</string>
+               </property>
+              </widget>
+             </item>
+             <item row="9" column="1">
+              <widget class="QPushButton" name="stitchingPreviewLevelsPushButton">
+               <property name="text">
+                <string>Preview levels</string>
+               </property>
+              </widget>
+             </item>
+             <item row="4" column="0">
+              <widget class="QLabel" name="rigidProjectionThicknessLbl">
+               <property name="toolTip">
+                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Number of planes to average to compute&lt;/p&gt;&lt;p&gt;the optimum overlap along X and Y dimensions&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+               </property>
+               <property name="whatsThis">
+                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;h1 style=&quot; margin-top:18px; margin-bottom:12px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;&lt;span style=&quot; font-size:xx-large; font-weight:700;&quot;&gt;Rigid stitcher&lt;/span&gt;&lt;/h1&gt;&lt;p&gt;The &lt;span style=&quot; font-weight:700; font-style:italic;&quot;&gt;projection thickness&lt;/span&gt; is the width (short dimension) of the &lt;span style=&quot; font-weight:700;&quot;&gt;white area&lt;/span&gt; in the image below.&lt;/p&gt;&lt;p&gt;&lt;img src=&quot;:/ClearMap/gui/creator/graphics_resources/graphics_resources/wobbly_stitcher_rigid.jpg&quot;/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+               </property>
+               <property name="text">
+                <string>Projection thickness</string>
+               </property>
+              </widget>
+             </item>
+             <item row="8" column="1">
+              <widget class="QFrame" name="rigidMaxShiftsZDoublet">
                <property name="frameShape">
                 <enum>QFrame::StyledPanel</enum>
                </property>
                <property name="frameShadow">
                 <enum>QFrame::Raised</enum>
                </property>
-               <property name="disabledValue" stdset="0">
-                <string>'auto'</string>
-               </property>
-               <layout class="QHBoxLayout" name="horizontalLayout_2">
+               <layout class="QHBoxLayout" name="horizontalLayout_8">
                 <item>
-                 <widget class="QCheckBox" name="checkBox_8">
-                  <property name="text">
-                   <string/>
+                 <widget class="QSpinBox" name="spinBox_12">
+                  <property name="suffix">
+                   <string>px</string>
+                  </property>
+                  <property name="minimum">
+                   <number>-1024</number>
+                  </property>
+                  <property name="maximum">
+                   <number>1024</number>
                   </property>
                  </widget>
                 </item>
                 <item>
-                 <widget class="QSpinBox" name="spinBox_23">
-                  <property name="enabled">
-                   <bool>false</bool>
-                  </property>
+                 <widget class="QSpinBox" name="spinBox_13">
                   <property name="suffix">
                    <string>px</string>
+                  </property>
+                  <property name="minimum">
+                   <number>-1024</number>
                   </property>
                   <property name="maximum">
                    <number>1024</number>
@@ -362,16 +329,6 @@
                  </widget>
                 </item>
                </layout>
-              </widget>
-             </item>
-             <item row="6" column="0">
-              <widget class="QLabel" name="label_4">
-               <property name="toolTip">
-                <string>Maximum number of pixels to shift in either direction along that axis to compute the alignment (correlograms).</string>
-               </property>
-               <property name="text">
-                <string>Max shifts X</string>
-               </property>
               </widget>
              </item>
              <item row="7" column="1">
@@ -412,6 +369,51 @@
                </layout>
               </widget>
              </item>
+             <item row="7" column="0">
+              <widget class="QLabel" name="label_5">
+               <property name="toolTip">
+                <string>Maximum number of pixels to shift in either direction along that axis to compute the alignment (correlograms).</string>
+               </property>
+               <property name="text">
+                <string>Max shifts Y</string>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="1">
+              <widget class="QFrame" name="xOverlapSinglet">
+               <property name="frameShape">
+                <enum>QFrame::StyledPanel</enum>
+               </property>
+               <property name="frameShadow">
+                <enum>QFrame::Raised</enum>
+               </property>
+               <property name="disabledValue" stdset="0">
+                <string>'auto'</string>
+               </property>
+               <layout class="QHBoxLayout" name="horizontalLayout_2">
+                <item>
+                 <widget class="QCheckBox" name="checkBox_8">
+                  <property name="text">
+                   <string/>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QSpinBox" name="spinBox_23">
+                  <property name="enabled">
+                   <bool>false</bool>
+                  </property>
+                  <property name="suffix">
+                   <string>px</string>
+                  </property>
+                  <property name="maximum">
+                   <number>1024</number>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </widget>
+             </item>
              <item row="11" column="0">
               <widget class="QLabel" name="label_8">
                <property name="toolTip">
@@ -419,13 +421,6 @@
                </property>
                <property name="text">
                 <string>Background pixels</string>
-               </property>
-              </widget>
-             </item>
-             <item row="11" column="1">
-              <widget class="QSpinBox" name="rigidBackgroundPixels">
-               <property name="maximum">
-                <number>1000000</number>
                </property>
               </widget>
              </item>
@@ -439,10 +434,23 @@
                </property>
               </widget>
              </item>
-             <item row="9" column="1">
-              <widget class="QPushButton" name="stitchingPreviewLevelsPushButton">
+             <item row="0" column="1" colspan="2">
+              <spacer name="verticalSpacer">
+               <property name="orientation">
+                <enum>Qt::Vertical</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>20</width>
+                 <height>40</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+             <item row="12" column="1">
+              <widget class="QPushButton" name="stitchingPreviewRigidPushButton">
                <property name="text">
-                <string>Preview levels</string>
+                <string>Preview rigid stitching</string>
                </property>
               </widget>
              </item>
@@ -454,7 +462,7 @@
               <x>0</x>
               <y>0</y>
               <width>460</width>
-              <height>463</height>
+              <height>431</height>
              </rect>
             </property>
             <attribute name="label">
@@ -762,7 +770,7 @@
               <x>0</x>
               <y>0</y>
               <width>460</width>
-              <height>463</height>
+              <height>431</height>
              </rect>
             </property>
             <attribute name="label">
@@ -825,7 +833,7 @@
               <x>0</x>
               <y>0</y>
               <width>460</width>
-              <height>463</height>
+              <height>431</height>
              </rect>
             </property>
             <attribute name="label">
@@ -881,7 +889,7 @@
               <x>0</x>
               <y>0</y>
               <width>460</width>
-              <height>463</height>
+              <height>431</height>
              </rect>
             </property>
             <attribute name="label">
@@ -966,7 +974,7 @@
           <x>0</x>
           <y>0</y>
           <width>478</width>
-          <height>631</height>
+          <height>619</height>
          </rect>
         </property>
         <attribute name="label">
@@ -984,7 +992,7 @@
               <x>0</x>
               <y>0</y>
               <width>460</width>
-              <height>523</height>
+              <height>499</height>
              </rect>
             </property>
             <attribute name="label">
@@ -1179,8 +1187,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>228</width>
-              <height>138</height>
+              <width>256</width>
+              <height>154</height>
              </rect>
             </property>
             <attribute name="label">
@@ -1270,8 +1278,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>268</width>
-              <height>162</height>
+              <width>306</width>
+              <height>180</height>
              </rect>
             </property>
             <attribute name="label">
