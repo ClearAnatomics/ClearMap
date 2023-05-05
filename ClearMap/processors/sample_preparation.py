@@ -43,7 +43,8 @@ import ClearMap.Alignment.Stitching.StitchingRigid as stitching_rigid
 import ClearMap.Alignment.Stitching.StitchingWobbly as stitching_wobbly
 from ClearMap.IO.metadata import define_auto_stitching_params, define_auto_resolution, pattern_finders_from_base_dir
 from ClearMap.IO.elastix_config import ElastixParser
-from ClearMap.config.config_loader import get_configs, ConfigLoader
+from ClearMap.config.config_loader import get_configs, ConfigLoader, CLEARMAP_CFG_DIR
+from ClearMap.config.update_config import update_default_config
 import ClearMap.Visualization.Plot3d as q_plot_3d
 
 
@@ -90,6 +91,8 @@ class PreProcessor(TabProcessor):
                                                       r" quality = -\d+\.\d+e\+\d+!"))
         # if not runs_on_spyder():
         #     pyqtgraph.mkQApp()
+        if not os.path.exists(CLEARMAP_CFG_DIR):
+            update_default_config()
 
     @property
     def prefix(self):

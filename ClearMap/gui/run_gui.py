@@ -23,6 +23,7 @@ from shutil import copyfile
 import traceback
 import types
 
+from ClearMap.config.update_config import update_default_config
 from PyQt5 import QtGui
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPalette, QColor
@@ -72,7 +73,7 @@ import torch
 update_pbar(app, progress_bar, 20)
 from ClearMap.Utils.utilities import title_to_snake
 from ClearMap.gui.gui_logging import Printer
-from ClearMap.config.config_loader import ConfigLoader
+from ClearMap.config.config_loader import ConfigLoader, CLEARMAP_CFG_DIR
 from ClearMap.Utils.exceptions import ConfigNotFoundError
 from ClearMap.gui.params_interfaces import UiParameter, UiParameterCollection
 from ClearMap.gui.widget_monkeypatch_callbacks import get_value, set_value, controls_enabled, get_check_box, \
@@ -809,6 +810,9 @@ class ClearMapGui(ClearMapGuiBase):
         # self.actionPreferences.triggered.connect(self.raise_warning)
 
         self.app = QApplication.instance()
+
+        if not os.path.exists(CLEARMAP_CFG_DIR):
+            update_default_config()
 
     def __len__(self):
         return len(self.tab_mgrs)
