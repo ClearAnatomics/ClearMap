@@ -201,7 +201,7 @@ class AlignmentTab(GenericTab):
         self.ui.previewStitchingPushButton.clicked.connect(functools.partial(self.preview_stitching_dumb, color=True))
         self.connect_whats_this(self.ui.rigidProjectionThicknessLblInfoToolButton, self.ui.rigidProjectionThicknessLbl)
         self.ui.stitchingPreviewLevelsPushButton.clicked.connect(functools.partial(self.preview_stitching_dumb, color=False))
-        self.ui.stitchingPreviewRigidPushButton.clicked.connect(self.preview_stitching_smart)
+        self.ui.stitchingPreviewRigidPushButton.clicked.connect(functools.partial(self.preview_stitching_smart, postfix='aligned_axis'))
 
         self.ui.runStitchingButtonBox.connectApply(self.run_stitching)
         self.ui.displayStitchingButtonBox.connectApply(self.plot_stitching_results)
