@@ -17,17 +17,14 @@ import numpy as np
 import matplotlib
 import tifffile
 
-from ClearMap.Alignment.Stitching.plot_utils import overlay_layout_plane
-
 matplotlib.use('Qt5Agg')
 
 
-from ClearMap import Settings
+import ClearMap.Settings as settings
 from ClearMap.Utils.utilities import runs_on_ui, requires_files, FilePath
 from ClearMap.config.atlas import ATLAS_NAMES_MAP, STRUCTURE_TREE_NAMES_MAP
 from ClearMap.gui.gui_utils import TmpDebug  # REFACTOR: move to workspace object
 from ClearMap.processors.generic_tab_processor import TabProcessor, CanceledProcessing
-import ClearMap.Settings as settings
 # noinspection PyPep8Naming
 import ClearMap.Alignment.Elastix as elastix
 # noinspection PyPep8Naming
@@ -771,11 +768,62 @@ class PreProcessor(TabProcessor):
             output_image = output_image.clip(0, 255).astype(np.uint8)
         return output_image
 
+    def overlay_layout_plane(self, layout):
+        """Overlays the sources to check their placement.
+
+        Arguments
+        ---------
+        layout : Layout class
+          The layout with the sources to overlay.
+
+        Returns
+        -------
+        image : array
+          A color image.
+        """
+        sources = layout.sources
+
+        dest_shape = tuple(layout.extent[:-1])
+        full_lower = layout.lower
+        middle_z = round(dest_shape[-1] / 2)
+
+        cyan_image = np.zeros(dest_shape, dtype=int)
+        magenta_image = np.zeros(dest_shape, dtype=int)
+        # construct full image
+        for s in sources:
+            l = s.lower
+            u = s.upper
+            tile = clearmap_io.read(s.location)[:, :,
+                   middle_z]  # So as not to load the data into the list for memory efficiency
+            current_slicing = tuple(slice(ll - fl, uu - fl) for ll, uu, fl in zip(l, u, full_lower))[:2]
+
+            is_odd = sum(s.tile_position) % 2
+            if is_odd:  # Alternate colors
+                layer = cyan_image
+            else:
+                layer = magenta_image
+
+            layer[current_slicing] = tile
+        blank = np.zeros(dest_shape, dtype=cyan_image.dtype)
+
+        high_intensity = (cyan_image.mean() + 4 * cyan_image.std())
+        cyan_image = cyan_image / high_intensity * 128
+        cyan_image = np.dstack((blank, cyan_image, cyan_image))  # To Cyan RGB
+
+        high_intensity = (magenta_image.mean() + 4 * magenta_image.std())
+        magenta_image = magenta_image / high_intensity * 128
+        magenta_image = np.dstack((magenta_image, blank, magenta_image))  # To Magenta RGB
+
+        output_image = cyan_image + magenta_image  # TODO: normalise
+        output_image = output_image.clip(0, 255).astype(np.uint8)
+
+        return output_image
+
     def plot_layout(self, postfix='aligned_axis'):
         if postfix not in ('aligned_axis', 'aligned', 'placed'):
             raise ValueError(f'Expected on of ("aligned_axis", "aligned", "placed") for postfix, got "{postfix}"')
         layout = stitching_rigid.load_layout(self.filename('layout', postfix=postfix))
-        overlay = overlay_layout_plane(layout)
+        overlay = self.overlay_layout_plane(layout)
         return overlay
 
 
@@ -797,7 +845,7 @@ def init_preprocessor(folder, atlas_base_name=None, convert_tiles=False):
     if atlas_base_name is None:
         atlas_id = configs[2]['registration']['atlas']['id']
         atlas_base_name = ATLAS_NAMES_MAP[atlas_id]['base_name']
-    json_file = os.path.join(Settings.atlas_folder, STRUCTURE_TREE_NAMES_MAP[configs[2]['registration']['atlas']['structure_tree_id']])
+    json_file = os.path.join(settings.atlas_folder, STRUCTURE_TREE_NAMES_MAP[configs[2]['registration']['atlas']['structure_tree_id']])
     pre_proc.unpack_atlas(atlas_base_name)
     pre_proc.setup(configs, convert_tiles=convert_tiles)
     pre_proc.setup_atlases()
