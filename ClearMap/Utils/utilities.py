@@ -9,6 +9,7 @@ import os
 import re
 import shutil
 import subprocess
+import tempfile
 from concurrent.futures import ProcessPoolExecutor
 from functools import reduce
 from operator import getitem
@@ -170,6 +171,16 @@ def requires_files(file_paths):
             return func(*args, **kwargs)
         return wraps
     return decorator
+
+
+def check_enough_temp_space(min_temp_space=200):
+    free = get_free_temp_space()
+    return free // (2**30) > min_temp_space  # GB
+
+
+def get_free_temp_space():
+    _, _, free = shutil.disk_usage(tempfile.gettempdir())
+    return free
 
 
 # FIXME: move to io

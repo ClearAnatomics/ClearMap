@@ -22,6 +22,7 @@ import scipy.ndimage as ndi
 import skimage.filters as skif
 
 import ClearMap.IO.IO as io
+from ClearMap.Utils.exceptions import MissingRequirementException
 
 import ClearMap.ParallelProcessing.BlockProcessing as bp
 import ClearMap.ParallelProcessing.DataProcessing.ArrayProcessing as ap
@@ -35,6 +36,7 @@ import ClearMap.ImageProcessing.Binary.Smoothing as bs
 
 import ClearMap.Utils.Timer as tmr
 from ClearMap.ImageProcessing.Experts.utils import initialize_sinks, equalize, wrap_step, print_params
+from ClearMap.Utils.utilities import check_enough_temp_space, get_free_temp_space
 
 ###############################################################################
 # ## Generic parameter
@@ -829,6 +831,11 @@ def apply_smoothing(source, sink, processing_parameter, postprocessing_parameter
     if postprocessing_parameter.get('fill'):
         save = parameter_smooth.pop('save', False)
         # initialize temporary files if needed
+        if not check_enough_temp_space():
+            raise MissingRequirementException(f'Free space in temporary directory is insufficient, required 200 GB, '
+                                              f'got {get_free_temp_space() // (2**30)} GB'
+                                              f'Please free some space or use a different temporary directory.'
+                                              f'You can set the "TMP" environment variable to a directory of your choice')
         tmp_f_path = save if save else postprocessing_parameter['temporary_filename']
         tmp_f_path = tmp_f_path if tmp_f_path else tmpf.mktemp(prefix='TubeMap_Vasculature_postprocessing',
                                                                suffix='.npy')
