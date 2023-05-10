@@ -1,3 +1,5 @@
+import os
+
 from PyQt5.QtWidgets import QWhatsThis
 
 from ClearMap.Utils.exceptions import MissingRequirementException
