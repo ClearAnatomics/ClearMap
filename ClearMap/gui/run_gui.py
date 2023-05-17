@@ -49,7 +49,7 @@ palette.setColor(QPalette.ColorRole.ToolTipText, QColor(DarkPalette.COLOR_TEXT_2
 app.setPalette(palette)
 
 
-from ClearMap.gui.gui_utils import get_current_res, UI_FOLDER
+from ClearMap.gui.gui_utils import get_current_res, UI_FOLDER, clear_layout
 
 CURRENT_RES = get_current_res(app)
 
@@ -385,12 +385,7 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         -------
 
         """
-        for i in range(self.graphLayout.count(), -1, -1):
-            graph = self.graphLayout.takeAt(i)
-            if graph is not None:
-                widg = graph.widget()
-                widg.setParent(None)
-                widg.deleteLater()
+        clear_layout(self.graphLayout)
         self.graphs = []
         self.perf_monitor.start()
 

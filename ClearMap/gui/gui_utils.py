@@ -206,3 +206,23 @@ def is_dark(color):
 
     """
     return color.getHsl()[2] < 128
+
+
+def clear_layout(layout):
+    """
+    Clears all widgets in the layout
+
+    Parameters
+    ----------
+    layout
+
+    Returns
+    -------
+
+    """
+    for i in range(layout.count(), -1, -1):
+        item = layout.takeAt(i)
+        if item is not None:
+            widg = item.widget()
+            widg.setParent(None)
+            widg.deleteLater()

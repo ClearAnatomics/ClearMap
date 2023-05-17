@@ -13,7 +13,7 @@ from typing import List
 import numpy as np
 
 from ClearMap.config.atlas import ATLAS_NAMES_MAP
-from ClearMap.gui.gui_utils import create_clearmap_widget
+from ClearMap.gui.gui_utils import create_clearmap_widget, clear_layout
 
 from ClearMap.gui.dialogs import get_directory_dlg
 from PyQt5.QtCore import Qt, pyqtSignal
@@ -950,13 +950,8 @@ class BatchParams(UiParameter):
         return [box.text().split(self.group_concatenator) for box in self.comparison_checkboxes if box.isChecked()]
 
     def update_comparisons(self):
+        clear_layout(self.tab.comparisonsVerticalLayout)
         self.comparison_checkboxes = []
-        for i in range(self.tab.comparisonsVerticalLayout.count(), -1, -1):  # Clear
-            item = self.tab.comparisonsVerticalLayout.takeAt(i)
-            if item is not None:
-                widg = item.widget()
-                widg.setParent(None)
-                widg.deleteLater()
         for pair in self.comparisons:
             chk = QCheckBox(self.group_concatenator.join(pair))
             chk.setChecked(False)
