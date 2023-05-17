@@ -788,7 +788,7 @@ class PreProcessor(TabProcessor):
 
         dest_shape = tuple(layout.extent[:-1])
         full_lower = layout.lower
-        middle_z = round(dest_shape[-1] / 2)
+        middle_z = round(sources[0].shape[-1] / 2)
 
         cyan_image = np.zeros(dest_shape, dtype=int)
         magenta_image = np.zeros(dest_shape, dtype=int)
@@ -796,8 +796,7 @@ class PreProcessor(TabProcessor):
         for s in sources:
             l = s.lower
             u = s.upper
-            tile = clearmap_io.read(s.location)[:, :,
-                   middle_z]  # So as not to load the data into the list for memory efficiency
+            tile = clearmap_io.read(s.location)[:, :, middle_z]  # So as not to load the data into the list for memory efficiency
             current_slicing = tuple(slice(ll - fl, uu - fl) for ll, uu, fl in zip(l, u, full_lower))[:2]
 
             is_odd = sum(s.tile_position) % 2
