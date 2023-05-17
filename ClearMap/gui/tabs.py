@@ -25,7 +25,7 @@ import ClearMap.IO.IO as clearmap_io
 from ClearMap.IO.MHD import mhd_read
 from ClearMap.Alignment import Annotation as annotation
 from ClearMap.Analysis.Statistics.group_statistics import make_summary, density_files_are_comparable, compare_groups
-from ClearMap.Utils.exceptions import PlotGraphError, ClearMapVRamException
+from ClearMap.Utils.exceptions import PlotGraphError, ClearMapVRamException, GroupStatsError
 from ClearMap.Visualization.Matplotlib.PlotUtils import plot_sample_stats_histogram, plot_volcano
 from ClearMap.Visualization.atlas import create_color_annotation
 
@@ -1467,18 +1467,85 @@ class VasculatureTab(PostProcessingTab):
 
 ################################################################################################
 
+class BatchProcessor:
+    def __init__(self, progress_watcher, results_folder=None):
+        self.results_folder = results_folder
+        self.progress_watcher = progress_watcher
+
+    def plot_p_vals(self, selected_comparisons, groups, parent=None):
+        p_vals_imgs = []
+        for pair in selected_comparisons:  # TODO: Move to processor object to be wrapped
+            gp1_name, gp2_name = pair
+            # Reread because of cm_io orientation
+            p_val_path = os.path.join(self.results_folder, f'p_val_colors_{gp1_name}_{gp2_name}.tif')
+
+            p_vals_imgs.append(clearmap_io.read(p_val_path))
+        pre_proc = init_preprocessor(os.path.join(self.results_folder, groups[selected_comparisons[0][0]][0]))
+        atlas = clearmap_io.read(pre_proc.annotation_file_path)
+        if len(p_vals_imgs) == 1:
+            gp1_name, gp2_name = selected_comparisons[0]
+            gp1_img = clearmap_io.read(os.path.join(self.results_folder, f'avg_density_{gp1_name}.tif'))
+            gp2_img = clearmap_io.read(os.path.join(self.results_folder, f'avg_density_{gp2_name}.tif'))
+            colored_atlas = create_color_annotation(pre_proc.annotation_file_path)
+            images = [gp1_img, gp2_img, p_vals_imgs[0], colored_atlas]
+            titles = [gp1_name, gp2_name, 'P values', 'colored_atlas']
+            luts = ['flame', 'flame', None, None]
+            min_maxes = [None, None, None, (0, 255)]
+        else:
+            images = p_vals_imgs
+            titles = [f'{gp1_name} vs {gp2_name} p values' for gp1_name, gp2_name in selected_comparisons]
+            luts = None
+            min_maxes = None
+        dvs = plot_3d.plot(images, title=titles, arrange=False, sync=True,
+                           lut=luts, min_max=min_maxes,
+                           parent=parent)
+        names_map = annotation.get_names_map()
+        for dv in dvs:
+            dv.atlas = atlas
+            dv.structure_names = names_map
+        link_dataviewers_cursors(dvs)
+        return dvs
+
+    def compute_p_vals(self, selected_comparisons, groups):
+        for pair in selected_comparisons:  # TODO: Move to processor object to be wrapped
+            gp1_name, gp2_name = pair
+            gp1, gp2 = [groups[gp_name] for gp_name in pair]
+            if not density_files_are_comparable(self.results_folder, gp1, gp2):
+                raise GroupStatsError('Could not compare files, sizes differ')
+            ids = []
+            for gp_dir in gp1 + gp2:
+                loader = ConfigLoader(gp_dir)
+                ids.append(loader.get_cfg('sample')['sample_id'])
+            if len(ids) != len(set(ids)):
+                raise GroupStatsError('Analysis impossible, some IDs are not unique. please check and start again')
+            main_window.wrap_in_thread(compare_groups, self.results_folder,
+                                            gp1_name, gp2_name, gp1, gp2)
+            self.progress_watcher.increment_main_progress()
+
+    def run_plots(self, plot_function, selected_comparisons, plot_kw_args):
+        dvs = []
+        for pair in selected_comparisons:
+            gp1_name, gp2_name = pair
+            if 'group_names' in plot_kw_args.keys() and plot_kw_args['group_names'] is None:
+                plot_kw_args['group_names'] = pair
+            stats_df_path = os.path.join(self.results_folder, f'statistics_{gp1_name}_{gp2_name}.csv')
+            fig = plot_function(pd.read_csv(stats_df_path), **plot_kw_args)
+            browser = QWebEngineView()
+            browser.setHtml(mpld3.fig_to_html(fig))  # WARNING: won't work if external objects. Then
+            #   saving the html to URl (file///) and then
+            #   .load(Url) would be required
+            dvs.append(browser)
+        return dvs
+
 
 class BatchTab(GenericTab):
     def __init__(self, main_window, tab_idx=4):  # REFACTOR: offload computations to BatchProcessor object
         super().__init__(main_window, 'Group analysis', tab_idx, 'batch_tab')
 
         self.params = None
+        self.processor = BatchProcessor(self.main_window.progress_watcher)
 
         self.processing_type = 'batch'
-    #     self.batch_processor = None
-    #
-    # def setup_workers(self):
-    #     self.batch_processor = BatchProcessor(self.params.config)
 
     @property
     def initialised(self):
@@ -1486,7 +1553,6 @@ class BatchTab(GenericTab):
 
     def set_params(self):
         self.params = BatchParams(self.ui, src_folder='', preferences=self.main_window.preference_editor.params)
-        # self.params = BatchParams(self.ui, src_folder=self.main_window.src_folder)
 
     def setup(self):
         """
@@ -1505,8 +1571,7 @@ class BatchTab(GenericTab):
         self.connect_whats_this(self.ui.folderPickerHelperInfoToolButton, self.ui.folderPickerHelperPushButton)
         self.ui.runPValsPushButton.clicked.connect(self.run_p_vals)
         self.ui.plotPValsPushButton.clicked.connect(self.plot_p_vals)
-        self.ui.batchRunButtonBox.connectApply(self.run_batch_process)
-        self.ui.batchStatsButtonBox.connectApply(self.make_group_stats_tables)
+        self.ui.batchStatsPushButton.clicked.connect(self.make_group_stats_tables)
 
         self.ui.batchToolBox.setCurrentIndex(0)
 
@@ -1530,14 +1595,17 @@ class BatchTab(GenericTab):
 
         self.params.read_configs(cfg_path)
 
-    def run_batch_process(self):
+        self.load_config_to_gui()
+        self.params.results_folder = results_folder
         self.params.ui_to_cfg()
-        paths = [p for ps in self.params.get_all_paths() for p in ps]  # flatten list
-        self.main_window.make_progress_dialog('Analysing samples', n_steps=0, maximum=0)  # TODO: see abort callback
-        # FIXME: use BatchProcessor object to increment progress watcher from within
-        self.main_window.wrap_in_thread(process_folders, paths,
-                                        self.params.align, self.params.count_cells, self.params.run_vaculature)
-        self.progress_watcher.finish()
+        self.setup_workers()
+
+    def setup_workers(self):
+        self.processor.results_folder = self.params.results_folder
+        self.processor.progress_watcher = self.main_window.progress_watcher
+
+    # def setup_workers(self):
+    #     self.processor = BatchProcessor(self.params.config)
 
     def create_wizard(self):
         return SamplePickerDialog(self.params.src_folder, params=self.params)
@@ -1545,14 +1613,13 @@ class BatchTab(GenericTab):
     def make_group_stats_tables(self):
         self.main_window.print_status_msg('Computing stats table')
         self.main_window.clear_plots()
-        dvs = []
-        groups = self.params.groups
         # TODO: set abort callback
         self.main_window.make_progress_dialog('Group stats', n_steps=len(self.params.selected_comparisons))
-        for pair in self.params.selected_comparisons:
-            gp1_name, gp2_name = pair
+        dvs = []
+        for gp1_name, gp2_name in self.params.selected_comparisons:
             df = self.main_window.wrap_in_thread(make_summary, self.params.results_folder,
-                                                 gp1_name, gp2_name, groups[gp1_name], groups[gp2_name],
+                                                 gp1_name, gp2_name,
+                                                 self.params.groups[gp1_name], self.params.groups[gp2_name],
                                                  output_path=None, save=True)
             self.main_window.progress_watcher.increment_main_progress()
             dvs.append(DataFrameWidget(df).table)
@@ -1565,72 +1632,22 @@ class BatchTab(GenericTab):
         self.main_window.print_status_msg('Computing p_val maps')
         # TODO: set abort callback
         self.main_window.make_progress_dialog('P value maps', n_steps=len(self.params.selected_comparisons))
-        for pair in self.params.selected_comparisons:  # TODO: Move to processor object to be wrapped
-            gp1_name, gp2_name = pair
-            gp1, gp2 = [self.params.groups[gp_name] for gp_name in pair]
-            if not density_files_are_comparable(self.params.results_folder, gp1, gp2):
-                self.main_window.popup('Could not compare files, sizes differ',
-                                       base_msg='Cannot compare files')
-            self.main_window.wrap_in_thread(compare_groups, self.params.results_folder,
-                                                  gp1_name, gp2_name, gp1, gp2)
-            self.main_window.progress_watcher.increment_main_progress()
+        try:
+            self.processor.compute_p_vals(self.params.selected_comparisons, self.params.groups)
+        except GroupStatsError as err:
+            self.main_window.popup(str(err), base_msg='Cannot proceed with analysis')
         self.main_window.signal_process_finished()
 
     def plot_p_vals(self):
         self.main_window.clear_plots()
         self.main_window.print_status_msg('Plotting p_val maps')
-        p_vals_imgs = []
-        for pair in self.params.selected_comparisons:  # TODO: Move to processor object to be wrapped
-            gp1_name, gp2_name = pair
-            # Reread because of cm_io orientation
-            p_val_path = os.path.join(self.params.results_folder, f'p_val_colors_{gp1_name}_{gp2_name}.tif')
-
-            p_vals_imgs.append(clearmap_io.read(p_val_path))
-
-        pre_proc = init_preprocessor(os.path.join(self.params.results_folder,
-                                                  self.params.groups[self.params.selected_comparisons[0][0]][0]))
-        atlas = clearmap_io.read(pre_proc.annotation_file_path)
-
-        if len(p_vals_imgs) == 1:
-            gp1_name, gp2_name = self.params.selected_comparisons[0]
-            gp1_img = clearmap_io.read(os.path.join(self.params.results_folder, f'avg_density_{gp1_name}.tif'))
-            gp2_img = clearmap_io.read(os.path.join(self.params.results_folder, f'avg_density_{gp2_name}.tif'))
-            colored_atlas = create_color_annotation(pre_proc.annotation_file_path)
-            images = [gp1_img, gp2_img, p_vals_imgs[0], colored_atlas]
-            titles = [gp1_name, gp2_name, 'P values', 'colored_atlas']
-            luts = ['flame', 'flame', None, None]
-            min_maxes = [None, None, None, (0, 255)]
-        else:
-            images = p_vals_imgs
-            titles = [f'{gp1_name} vs {gp2_name} p values' for gp1_name, gp2_name in self.params.selected_comparisons]
-            luts = None
-            min_maxes = None
-        dvs = plot_3d.plot(images, title=titles, arrange=False, sync=True,
-                           lut=luts, min_max=min_maxes,
-                           parent=self.main_window.centralWidget())
-
-        names_map = annotation.get_names_map()
-        for dv in dvs:
-            # dv.atlas = atlas.copy()  #
-            dv.atlas = atlas
-            dv.structure_names = names_map
-        link_dataviewers_cursors(dvs)
+        dvs = self.processor.plot_p_vals(self.params.selected_comparisons, self.params.groups,
+                                         parent=self.main_window.centralWidget())
         self.main_window.setup_plots(dvs)
 
     def run_plots(self, plot_function, plot_kw_args):
         self.main_window.clear_plots()
-        dvs = []
-        for pair in self.params.selected_comparisons:
-            gp1_name, gp2_name = pair
-            if 'group_names' in plot_kw_args.keys() and plot_kw_args['group_names'] is None:
-                plot_kw_args['group_names'] = pair
-            stats_df_path = os.path.join(self.params.results_folder, f'statistics_{gp1_name}_{gp2_name}.csv')
-            fig = plot_function(pd.read_csv(stats_df_path), **plot_kw_args)
-            browser = QWebEngineView()
-            browser.setHtml(mpld3.fig_to_html(fig))  # WARNING: won't work if external objects. Then
-                                                     #   saving the html to URl (file///) and then
-                                                     #   .load(Url) would be required
-            dvs.append(browser)
+        dvs = self.processor.run_plots(plot_function, self.params.selected_comparisons, plot_kw_args)
         self.main_window.setup_plots(dvs)
 
     def plot_volcanoes(self):
@@ -1642,3 +1659,13 @@ class BatchTab(GenericTab):
                                                      'sort_by_order': True, 'value_cutoff': 0,
                                                      'fold_threshold': fold_threshold, 'fold_regions': True,
                                                      'show': False})
+
+# class BatchProcessingTab(GenericTab):
+    # def run_batch_process(self):
+    #     self.params.ui_to_cfg()
+    #     paths = [p for ps in self.params.get_all_paths() for p in ps]  # flatten list
+    #     self.main_window.make_progress_dialog('Analysing samples', n_steps=0, maximum=0)  # TODO: see abort callback
+    #     # FIXME: use BatchProcessor object to increment progress watcher from within
+    #     self.main_window.wrap_in_thread(process_folders, paths,
+    #                                     self.params.align, self.params.count_cells, self.params.run_vaculature)
+    #     self.progress_watcher.finish()

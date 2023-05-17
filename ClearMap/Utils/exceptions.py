@@ -20,3 +20,7 @@ class ClearMapVRamException(ClearMapException):
 
 class SmiError(ClearMapException):
     pass
+
+
+class GroupStatsError(ClearMapException):
+    pass
