@@ -44,7 +44,7 @@
       </font>
      </property>
      <property name="currentIndex">
-      <number>1</number>
+      <number>0</number>
      </property>
      <widget class="QWidget" name="page">
       <property name="geometry">
@@ -62,13 +62,13 @@
        <item>
         <widget class="QToolBox" name="toolBox_2">
          <property name="currentIndex">
-          <number>2</number>
+          <number>0</number>
          </property>
          <widget class="QWidget" name="page_3">
           <property name="geometry">
            <rect>
             <x>0</x>
-            <y>-147</y>
+            <y>-113</y>
             <width>471</width>
             <height>255</height>
            </rect>
@@ -392,59 +392,6 @@
            </item>
           </layout>
          </widget>
-         <widget class="QWidget" name="page_6">
-          <property name="geometry">
-           <rect>
-            <x>0</x>
-            <y>0</y>
-            <width>485</width>
-            <height>108</height>
-           </rect>
-          </property>
-          <attribute name="label">
-           <string>Run detection</string>
-          </attribute>
-          <layout class="QVBoxLayout" name="verticalLayout_5">
-           <item>
-            <layout class="QFormLayout" name="formLayout_6">
-             <item row="0" column="0">
-              <widget class="QLabel" name="label_16">
-               <property name="text">
-                <string>Plot cells</string>
-               </property>
-              </widget>
-             </item>
-             <item row="0" column="1">
-              <widget class="QCheckBox" name="cellDetectionPlotCheckBox">
-               <property name="text">
-                <string/>
-               </property>
-              </widget>
-             </item>
-            </layout>
-           </item>
-           <item>
-            <widget class="QDialogButtonBox" name="runCellDetectionButtonBox">
-             <property name="standardButtons">
-              <set>QDialogButtonBox::Apply</set>
-             </property>
-             <property name="applyText" stdset="0">
-              <string>Run</string>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <widget class="QDialogButtonBox" name="runCellDetectionPlotButtonBox">
-             <property name="standardButtons">
-              <set>QDialogButtonBox::Apply</set>
-             </property>
-             <property name="applyText" stdset="0">
-              <string>Plot</string>
-             </property>
-            </widget>
-           </item>
-          </layout>
-         </widget>
         </widget>
        </item>
       </layout>
@@ -631,18 +578,9 @@
         </spacer>
        </item>
        <item>
-        <widget class="QDialogButtonBox" name="previewCellFiltersButtonBox">
-         <property name="toolTip">
-          <string>Display results on the small data chunk detected</string>
-         </property>
-         <property name="standardButtons">
-          <set>QDialogButtonBox::Apply|QDialogButtonBox::Ok</set>
-         </property>
-         <property name="applyText" stdset="0">
-          <string>Preview</string>
-         </property>
-         <property name="okText" stdset="0">
-          <string>Run</string>
+        <widget class="QPushButton" name="previewCellFiltersPushButton">
+         <property name="text">
+          <string>Preview filter</string>
          </property>
         </widget>
        </item>
@@ -713,16 +651,6 @@
          </layout>
         </widget>
        </item>
-       <item row="1" column="1">
-        <widget class="QDialogButtonBox" name="cellMapVoxelizeButtonBox">
-         <property name="standardButtons">
-          <set>QDialogButtonBox::Apply</set>
-         </property>
-         <property name="applyText" stdset="0">
-          <string>Run</string>
-         </property>
-        </widget>
-       </item>
       </layout>
      </widget>
      <widget class="QWidget" name="page_7">
@@ -730,15 +658,15 @@
        <rect>
         <x>0</x>
         <y>0</y>
-        <width>503</width>
-        <height>160</height>
+        <width>489</width>
+        <height>256</height>
        </rect>
       </property>
       <attribute name="label">
        <string>Run CellMap</string>
       </attribute>
       <layout class="QGridLayout" name="gridLayout">
-       <item row="0" column="0">
+       <item row="4" column="0">
         <widget class="QDialogButtonBox" name="runCellMapButtonBox">
          <property name="standardButtons">
           <set>QDialogButtonBox::Apply</set>
@@ -748,24 +676,24 @@
          </property>
         </widget>
        </item>
-       <item row="1" column="0" colspan="2">
-        <widget class="QCheckBox" name="runCellMapPlotCheckBox">
+       <item row="7" column="2">
+        <widget class="QLabel" name="nDetectedCellsAfterFilterLabel">
+         <property name="font">
+          <font>
+           <pointsize>22</pointsize>
+           <weight>75</weight>
+           <bold>true</bold>
+          </font>
+         </property>
          <property name="text">
-          <string>Plot when finished</string>
+          <string>0</string>
+         </property>
+         <property name="alignment">
+          <set>Qt::AlignCenter</set>
          </property>
         </widget>
        </item>
-       <item row="2" column="0">
-        <widget class="QLabel" name="label_17">
-         <property name="toolTip">
-          <string/>
-         </property>
-         <property name="text">
-          <string>N cells</string>
-         </property>
-        </widget>
-       </item>
-       <item row="2" column="2">
+       <item row="6" column="2">
         <widget class="QLabel" name="nDetectedCellsLabel">
          <property name="font">
           <font>
@@ -782,27 +710,57 @@
          </property>
         </widget>
        </item>
-       <item row="3" column="0">
+       <item row="7" column="0">
         <widget class="QLabel" name="label_18">
          <property name="text">
           <string>After filter</string>
          </property>
         </widget>
        </item>
-       <item row="3" column="2">
-        <widget class="QLabel" name="nDetectedCellsAfterFilterLabel">
-         <property name="font">
-          <font>
-           <pointsize>22</pointsize>
-           <weight>75</weight>
-           <bold>true</bold>
-          </font>
+       <item row="3" column="0">
+        <widget class="QCheckBox" name="runCellMapPlotCheckBox">
+         <property name="text">
+          <string>Plot when finished</string>
+         </property>
+        </widget>
+       </item>
+       <item row="6" column="0">
+        <widget class="QLabel" name="label_17">
+         <property name="toolTip">
+          <string/>
          </property>
          <property name="text">
-          <string>0</string>
+          <string>N cells</string>
          </property>
-         <property name="alignment">
-          <set>Qt::AlignCenter</set>
+        </widget>
+       </item>
+       <item row="2" column="0">
+        <widget class="QCheckBox" name="runCellMapVoxelizeCheckBox">
+         <property name="text">
+          <string>Create cell density map (voxelization)</string>
+         </property>
+         <property name="checked">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="0">
+        <widget class="QCheckBox" name="runCellMapFilterCellsCheckBox">
+         <property name="text">
+          <string>Filter cells</string>
+         </property>
+         <property name="checked">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="0">
+        <widget class="QCheckBox" name="runCellMapDetectCellsCheckBox">
+         <property name="text">
+          <string>Detect cells</string>
+         </property>
+         <property name="checked">
+          <bool>true</bool>
          </property>
         </widget>
        </item>

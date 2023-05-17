@@ -19,9 +19,6 @@ from ClearMap.gui.dialogs import get_directory_dlg
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtWidgets import QInputDialog, QToolBox, QCheckBox
 
-from ClearMap.config.config_loader import ConfigLoader
-
-
 __author__ = 'Charly Rousseau <charly.rousseau@icm-institute.org>'
 __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
 __copyright__ = 'Copyright © 2022 by Charly Rousseau'
@@ -415,6 +412,9 @@ class CellMapParams(UiParameter):
     cell_filter_size: List[int]
     cell_filter_intensity: int
     voxelization_radii: List[int]
+    detect_cells: bool
+    filter_cells: bool
+    voxelize: bool
     plot_when_finished: bool
     plot_detected_cells: bool
     crop_x_min: int
@@ -433,8 +433,10 @@ class CellMapParams(UiParameter):
             'cell_filter_size': ParamLink(['cell_filtration', 'thresholds', 'size'], self.tab.cellFilterThresholdSizeDoublet),
             'cell_filter_intensity': ParamLink(['cell_filtration', 'thresholds', 'intensity'], self.tab.voxelizationRadiusTriplet),
             'voxelization_radii': ParamLink(['voxelization', 'radii'], self.tab.voxelizationRadiusTriplet),
+            'detect_cells': ParamLink(None, self.tab.runCellMapDetectCellsCheckBox),
+            'filter_cells': ParamLink(None, self.tab.runCellMapFilterCellsCheckBox),
+            'voxelize': ParamLink(None, self.tab.runCellMapVoxelizeCheckBox),
             'plot_when_finished': ParamLink(['run', 'plot_when_finished'], self.tab.runCellMapPlotCheckBox),
-            'plot_detected_cells': ParamLink(['detection', 'plot_cells'], self.tab.cellDetectionPlotCheckBox),
             'crop_x_min': ParamLink(['detection', 'test_set_slicing', 'dim_0', 0], self.tab.detectionSubsetXRangeMin),
             'crop_x_max': ParamLink(['detection', 'test_set_slicing', 'dim_0', 1], self.tab.detectionSubsetXRangeMax),
             'crop_y_min': ParamLink(['detection', 'test_set_slicing', 'dim_1', 0], self.tab.detectionSubsetYRangeMin),
