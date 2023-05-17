@@ -29,20 +29,14 @@
       <enum>QFrame::Raised</enum>
      </property>
      <layout class="QHBoxLayout" name="horizontalLayout_4">
-      <property name="leftMargin">
-       <number>2</number>
-      </property>
       <property name="topMargin">
-       <number>0</number>
-      </property>
-      <property name="rightMargin">
        <number>0</number>
       </property>
       <property name="bottomMargin">
        <number>0</number>
       </property>
       <item>
-       <widget class="QPushButton" name="resultsFolderPushButton">
+       <widget class="QPushButton" name="pushButton_2">
         <property name="toolTip">
          <string>Where will the results be saved</string>
         </property>
@@ -80,7 +74,7 @@
       <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Compute the summary stats table for all the pairs of groups selected in the &lt;span style=&quot; font-style:italic;&quot;&gt;comparisons&lt;/span&gt; tab&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
      </property>
      <property name="currentIndex">
-      <number>3</number>
+      <number>0</number>
      </property>
      <widget class="QWidget" name="sampleFoldersPage">
       <property name="geometry">
@@ -88,7 +82,7 @@
         <x>0</x>
         <y>0</y>
         <width>438</width>
-        <height>566</height>
+        <height>634</height>
        </rect>
       </property>
       <attribute name="label">
@@ -139,7 +133,8 @@
             <string>Remove group</string>
            </property>
            <property name="icon">
-            <iconset theme="remove"/>
+            <iconset theme="add">
+             <normaloff>.</normaloff>.</iconset>
            </property>
           </widget>
          </item>
@@ -147,89 +142,50 @@
        </item>
       </layout>
      </widget>
-     <widget class="QWidget" name="comparisonsPage">
+     <widget class="QWidget" name="page">
       <property name="geometry">
        <rect>
         <x>0</x>
         <y>0</y>
         <width>438</width>
-        <height>566</height>
+        <height>634</height>
        </rect>
       </property>
       <attribute name="label">
-       <string>Comparisons</string>
+       <string>Process</string>
       </attribute>
-      <layout class="QVBoxLayout" name="verticalLayout_3">
+      <layout class="QVBoxLayout" name="verticalLayout_5">
        <item>
-        <layout class="QVBoxLayout" name="comparisonsVerticalLayout"/>
+        <widget class="QCheckBox" name="batchAlignCheckBox">
+         <property name="text">
+          <string>Align</string>
+         </property>
+        </widget>
        </item>
-      </layout>
-     </widget>
-     <widget class="QWidget" name="page_8">
-      <property name="geometry">
-       <rect>
-        <x>0</x>
-        <y>0</y>
-        <width>438</width>
-        <height>566</height>
-       </rect>
-      </property>
-      <attribute name="label">
-       <string>P Values</string>
-      </attribute>
-      <layout class="QVBoxLayout" name="verticalLayout">
        <item>
-        <widget class="QPushButton" name="runPValsPushButton">
+        <widget class="QCheckBox" name="batchCountCellsCheckBox">
+         <property name="text">
+          <string>Count cells</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QCheckBox" name="batchVasculatureCheckBox">
+         <property name="text">
+          <string>Vasculature</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QDialogButtonBox" name="batchRunButtonBox">
          <property name="toolTip">
-          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Compute the p value maps for all the pairs of groups selected in the &lt;span style=&quot; font-style:italic;&quot;&gt;comparisons&lt;/span&gt; tab&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+          <string>Run these steps on all the samples selected previously</string>
          </property>
-         <property name="text">
+         <property name="standardButtons">
+          <set>QDialogButtonBox::Apply</set>
+         </property>
+         <property name="applyText" stdset="0">
           <string>Run</string>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QPushButton" name="plotPValsPushButton">
-         <property name="text">
-          <string>Display</string>
-         </property>
-        </widget>
-       </item>
-      </layout>
-     </widget>
-     <widget class="QWidget" name="page_2">
-      <property name="geometry">
-       <rect>
-        <x>0</x>
-        <y>0</y>
-        <width>438</width>
-        <height>566</height>
-       </rect>
-      </property>
-      <attribute name="label">
-       <string>Stats</string>
-      </attribute>
-      <layout class="QFormLayout" name="formLayout">
-       <item row="0" column="0">
-        <spacer name="horizontalSpacer">
-         <property name="orientation">
-          <enum>Qt::Horizontal</enum>
-         </property>
-         <property name="sizeType">
-          <enum>QSizePolicy::MinimumExpanding</enum>
-         </property>
-         <property name="sizeHint" stdset="0">
-          <size>
-           <width>200</width>
-           <height>20</height>
-          </size>
-         </property>
-        </spacer>
-       </item>
-       <item row="0" column="1">
-        <widget class="QPushButton" name="batchStatsPushButton">
-         <property name="text">
-          <string>Compute</string>
          </property>
         </widget>
        </item>
