@@ -609,6 +609,7 @@ class PatternDialog(WizardDialog):
 class SamplePickerDialog(WizardDialog):
     def __init__(self, src_folder, params=None, app=None):
         super().__init__(src_folder, 'sample_picker', 'File paths wizard', [None, 600], params, app)
+        self.list_selection.addAvailableItems(self.parse_sample_folders())
         self.exec()
 
     def setup(self):
@@ -620,7 +621,6 @@ class SamplePickerDialog(WizardDialog):
         self.dlg.listPickerLayout.addWidget(self.list_selection)
 
     def connect_buttons(self):
-        self.dlg.mainFolderPushButton.clicked.connect(self.handle_main_folder_clicked)
         self.dlg.addGroupPushButton.clicked.connect(functools.partial(self.handle_add_group, add_to_params=True))
         self.dlg.groupsComboBox.currentIndexChanged.connect(self.handle_group_changed)
         self.dlg.buttonBox.accepted.connect(self.apply_changes)
@@ -652,13 +652,6 @@ class SamplePickerDialog(WizardDialog):
         if add_to_params:
             self.params.add_group()
         self.group_paths.append([])
-
-    def handle_main_folder_clicked(self):
-        self.src_folder = get_directory_dlg('~/')
-        if self.src_folder:
-            # self.dlg.groupsComboBox.clear()
-            # self.dlg.groupsComboBox.addItems(self.parse_sample_folders())
-            self.list_selection.addAvailableItems(self.parse_sample_folders())
 
     def parse_sample_folders(self):
         sample_folders = []
