@@ -5,7 +5,7 @@ dialogs
 
 All the independent popup dialogs used by the GUI
 """
-
+import operator
 import os
 
 from PyQt5 import QtCore
@@ -41,6 +41,26 @@ def prompt_dialog(title, msg):
     pressed_btn = QMessageBox.question(None, title, msg)
     return pressed_btn == QMessageBox.Yes
 
+
+def option_dialog(base_msg, msg, options):
+    dlg = QMessageBox()
+    dlg.setIcon(QMessageBox.Question)
+    dlg.setWindowTitle('User input required')
+    dlg.setText(f'<b>{base_msg}</b>')
+    dlg.setInformativeText(msg)
+    btns = 0
+    option_button_ids = (QMessageBox.Ok, QMessageBox.Open, QMessageBox.Save, QMessageBox.Appy)
+    for _, btn_id in zip(options, option_button_ids):
+        operator.or_(btns, btn_id)
+    btns |= QMessageBox.Close
+    dlg.setStandardButtons(btns)
+    for option, btn_id in zip(options, option_button_ids):
+        btn = dlg.button(btn_id)
+        btn.setText(option)
+    dlg.setDefaultButton(QMessageBox.Ok)
+    dlg.exec()
+    option_index = option_button_ids.index(dlg.clickedButton())
+    return option_index
 
 # REFACTOR: make class
 def warning_popup(base_msg, msg):
