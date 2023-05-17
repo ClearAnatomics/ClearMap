@@ -91,6 +91,9 @@ class LUT(QWidget):
         # default gradient
         if color in pg.graphicsItems.GradientEditorItem.Gradients.keys():
             self.lut.gradient.loadPreset(color)
+        elif color in pg.colormap.listMaps('matplotlib'):
+            colormap = pg.colormap.get(color, source='matplotlib')
+            self.lut.gradient.setColorMap(colormap)
         else:
             self.lut.gradient.getTick(0).color = QColor(0, 0, 0, 0)
             self.lut.gradient.getTick(1).color = QColor(color)
