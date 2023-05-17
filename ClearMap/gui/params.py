@@ -566,10 +566,10 @@ class VesselBinarizationParams(UiParameter):
             'fill_secondary_channel': ParamLink(['arteries', 'deep_filling', 'run'],
                                                 self.tab.binarizationArteriesDeepFillingCheckBox),
             'fill_combined': ParamLink(['combined', 'binary_fill'], self.tab.binarizationConbineBinaryFillingCheckBox),
-            'plot_step_1': ParamLink(None, self.tab.binarizationPlotStep1ComboBox, connect=False),
-            'plot_step_2': ParamLink(None, self.tab.binarizationPlotStep2ComboBox, connect=False),
-            'plot_channel_1': ParamLink(None, self.tab.binarizationPlotChannel1ComboBox, connect=False),
-            'plot_channel_2': ParamLink(None, self.tab.binarizationPlotChannel2ComboBox, connect=False),
+            'plot_step_1': ParamLink(None, self.tab.binarizationPlotStep1ComboBox),
+            'plot_step_2': ParamLink(None, self.tab.binarizationPlotStep2ComboBox),
+            'plot_channel_1': ParamLink(None, self.tab.binarizationPlotChannel1ComboBox),
+            'plot_channel_2': ParamLink(None, self.tab.binarizationPlotChannel2ComboBox),
 
         }
         self.cfg_subtree = ['binarization']
