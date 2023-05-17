@@ -27,6 +27,21 @@ function green_n(){  # FIXME: parametrise above instead
     fi
 }
 
+green "Checking dependencies"
+if [[ $(dpkg-query --show --showformat='${db:Status-Status}\n' 'build-essential') == "installed"]]; then
+    green "Compilation tools available"
+else
+    red "Package \"build-essential\" was not found. It is required for compilation.
+         Please install it using
+         sudo apt install build-essential
+         and try the installation process again"
+         exit 1
+fi
+
+conda -V || { echo "Conda missing exiting"; exit 1; }
+green "Conda installed and functional"
+
+
 if [[ "$OSTYPE" == "darwin"* ]]; then
   green "MacOS was detected as your operating system.
    If you want to make full use of the parallel code in this program,
