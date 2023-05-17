@@ -11,6 +11,8 @@ from ClearMap.Utils.exceptions import ConfigNotFoundError
 
 class ParamLink:
     def __init__(self, keys, widget, attr_name=None, default=None, connect=True):
+        if keys is None:
+            connect = False
         self.keys = keys
         self.widget = widget
         self.attr_name = attr_name
