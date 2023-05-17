@@ -772,15 +772,7 @@ class CellCounterTab(PostProcessingTab):
         self.ui.detectionPreviewTuningSampleButtonBox.connectApply(self.create_cell_detection_tuning_sample)
         self.ui.detectionPreviewButtonBox.connectApply(self.run_tuning_cell_detection)
 
-        # for ctrl in (self.cell_map_tab.backgroundCorrectionDiameter, self.cell_map_tab.detectionThreshold):
-        #     ctrl.valueChanged.connect(self.reset_detected)  FIXME: find better way
-
-        self.ui.runCellDetectionButtonBox.connectApply(self.detect_cells)
-        self.ui.runCellDetectionPlotButtonBox.connectApply(self.plot_detection_results)
-        self.ui.previewCellFiltersButtonBox.connectApply(self.preview_cell_filter)
-        self.ui.previewCellFiltersButtonBox.connectOk(self.filter_cells)
-
-        self.ui.cellMapVoxelizeButtonBox.connectApply(self.voxelize)
+        self.ui.previewCellFiltersPushButton.clicked.connect(self.preview_cell_filter)
 
         self.ui.runCellMapButtonBox.connectApply(self.run_cell_map)
 
@@ -1057,11 +1049,15 @@ class CellCounterTab(PostProcessingTab):
 
         """
         self.params.ui_to_cfg()
-        if not self.cell_detector.detected:
+        self.update_cell_number()
+        if self.params.detect_cells:
             self.detect_cells()
-        self.update_cell_number()
-        self.cell_detector.post_process_cells()  # FIXME: save cfg and use progress
-        self.update_cell_number()
+            self.update_cell_number()
+        if self.params.filter_cells:
+            self.cell_detector.post_process_cells()  # FIXME: save cfg and use progress
+            self.update_cell_number()
+        if self.params.voxelize:
+            self.voxelize()
         if self.params.plot_when_finished:
             self.plot_cell_map_results()
         # WARNING: some plots in .post_process_cells() without UI params

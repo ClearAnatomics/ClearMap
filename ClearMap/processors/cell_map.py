@@ -123,7 +123,6 @@ class CellDetector(TabProcessor):
             self.plot_filtered_cells()
         self.atlas_align()
         self.export_collapsed_stats()
-        self.voxelize()
 
     def voxelize(self, postfix=''):
         self.processing_config.reload()
