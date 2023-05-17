@@ -1470,7 +1470,7 @@ class VasculatureTab(PostProcessingTab):
 
 class BatchTab(GenericTab):
     def __init__(self, main_window, tab_idx=4):  # REFACTOR: offload computations to BatchProcessor object
-        super().__init__(main_window, 'Batch', tab_idx, 'batch_tab')
+        super().__init__(main_window, 'Group analysis', tab_idx, 'batch_tab')
 
         self.params = None
 
@@ -1489,7 +1489,17 @@ class BatchTab(GenericTab):
         # self.params = BatchParams(self.ui, src_folder=self.main_window.src_folder)
 
     def setup(self):
+        """
+        Setup the UI elements, notably the signal/slot connections which are not
+        automatically set through the params object attribute
+
+        Returns
+        -------
+
+        """
         self.init_ui()
+
+        self.ui.resultsFolderPushButton.clicked.connect(self.setup_results_folder)
 
         self.ui.folderPickerHelperPushButton.clicked.connect(self.create_wizard)
         self.connect_whats_this(self.ui.folderPickerHelperInfoToolButton, self.ui.folderPickerHelperPushButton)
@@ -1500,8 +1510,25 @@ class BatchTab(GenericTab):
 
         self.ui.batchToolBox.setCurrentIndex(0)
 
-    def create_wizard(self):
-        return SamplePickerDialog('', params=self.params)
+    def setup_results_folder(self):
+        results_folder = get_directory_dlg(self.main_window.preference_editor.params.start_folder,
+                                           'Select the folder where results will be written')
+        self.config_loader = ConfigLoader(results_folder)
+        cfg_path = self.config_loader.get_cfg_path('batch', must_exist=False)
+        if not os.path.exists(cfg_path):
+            try:
+                default_cfg_file_path = self.config_loader.get_default_path('batch')
+                copyfile(default_cfg_file_path, cfg_path)
+                self.params.fix_cfg_file(cfg_path)
+            except FileNotFoundError as err:
+                self.main_window.print_error_msg(f'Could not locate file for "batch"')
+                raise err
+
+        self.main_window.logger.set_file(os.path.join(results_folder, 'info.log'))  # WARNING: set logs to global results folder
+        self.main_window.error_logger.set_file(os.path.join(results_folder, 'errors.html'))
+        self.main_window.progress_watcher.log_path = self.main_window.logger.file.name
+
+        self.params.read_configs(cfg_path)
 
     def run_batch_process(self):
         self.params.ui_to_cfg()
@@ -1511,6 +1538,9 @@ class BatchTab(GenericTab):
         self.main_window.wrap_in_thread(process_folders, paths,
                                         self.params.align, self.params.count_cells, self.params.run_vaculature)
         self.progress_watcher.finish()
+
+    def create_wizard(self):
+        return SamplePickerDialog(self.params.src_folder, params=self.params)
 
     def make_group_stats_tables(self):
         self.main_window.print_status_msg('Computing stats table')

@@ -949,20 +949,6 @@ class ClearMapGui(ClearMapGuiBase):
             try:
                 self.batch_tab_mgr.setup()
                 self.batch_tab_mgr.set_params()
-                results_folder = get_directory_dlg(self.preference_editor.params.start_folder,
-                                                   'Select the folder where results will be written')
-                was_copied, cfg_path = self.__get_cfg_path(cfg_name, ConfigLoader(results_folder))
-                if was_copied:
-                    self.batch_tab_mgr.params.fix_cfg_file(cfg_path)
-                self.logger.set_file(os.path.join(results_folder, 'info.log'))  # WARNING: set logs to global results folder
-                self.progress_watcher.log_path = self.logger.file.name
-                self.error_logger.set_file(os.path.join(results_folder, 'errors.html'))
-                self.progress_watcher.log_path = self.logger.file.name
-                self.batch_tab_mgr.params.read_configs(cfg_path)  # FIXME: try to put with other tabs init (difference with config_loader)
-                self.batch_tab_mgr.load_config_to_gui()
-                self.batch_tab_mgr.params.results_folder = results_folder
-                self.batch_tab_mgr.params.ui_to_cfg()
-                self.batch_tab_mgr.setup_workers()
             except ConfigNotFoundError:
                 self.conf_load_error_msg(cfg_name)
             except FileNotFoundError:  # message already printed, just stop
