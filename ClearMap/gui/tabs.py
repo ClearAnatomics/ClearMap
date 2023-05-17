@@ -8,6 +8,7 @@ The different tabs that correspond to different functionalities of the GUI
 import functools
 import os.path
 import copy
+from shutil import copyfile
 
 import numpy as np
 import pandas as pd
@@ -15,6 +16,7 @@ import pandas as pd
 import mpld3
 
 import pyqtgraph as pg
+from ClearMap.config.config_loader import ConfigLoader
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 from PyQt5.QtWidgets import QDialogButtonBox
 from qdarkstyle import DarkPalette
@@ -27,7 +29,7 @@ from ClearMap.Utils.exceptions import PlotGraphError, ClearMapVRamException
 from ClearMap.Visualization.Matplotlib.PlotUtils import plot_sample_stats_histogram, plot_volcano
 from ClearMap.Visualization.atlas import create_color_annotation
 
-from ClearMap.gui.dialogs import prompt_dialog
+from ClearMap.gui.dialogs import prompt_dialog, get_directory_dlg
 from ClearMap.gui.gui_utils import format_long_nb_to_str, surface_project, np_to_qpixmap
 from ClearMap.gui.interfaces import GenericTab, PostProcessingTab
 from ClearMap.gui.params import ParamsOrientationError, VesselParams, SampleParameters, \
@@ -53,6 +55,8 @@ __download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
 class SampleTab(GenericTab):
     """
     The tab manager to define the parameters of the sample
+    This refers to values that are intrinsic to the sample and the acquisition
+    like resolution, orientation ...
     """
     def __init__(self, main_window, tab_idx=0):
         super().__init__(main_window, 'Sample', tab_idx, 'sample_tab')
@@ -60,9 +64,27 @@ class SampleTab(GenericTab):
         self.mini_brain = None
 
     def set_params(self, *args):
+        """
+        Set the params object which links the UI and the configuration file
+        Parameters
+        ----------
+        args
+
+        Returns
+        -------
+
+        """
         self.params = SampleParameters(self.ui, self.main_window.src_folder)
 
     def setup(self):
+        """
+        Setup the UI elements, notably the signal/slot connections which are not
+        automatically set through the params object attribute
+
+        Returns
+        -------
+
+        """
         self.init_ui()
 
         self.ui.srcFolderBtn.clicked.connect(self.main_window.prompt_experiment_folder)
@@ -95,10 +117,23 @@ class SampleTab(GenericTab):
         # self.ui.sampleIdButtonBox.button(QDialogButtonBox.Apply).clicked.connect(self.plot_mini_brain)
 
     def save_cfg(self):  # REFACTOR: use this instead of direct calls to ui_to_cfg
+        """
+        Save the config to file
+
+        Returns
+        -------
+
+        """
         self.params.ui_to_cfg()
         self.main_window.print_status_msg('Sample config saved')
 
     def load_config_to_gui(self):
+        """
+        Set every control on the UI to the value in the params
+        Returns
+        -------
+
+        """
         try:
             self.params.cfg_to_ui()
         except ParamsOrientationError as err:
@@ -114,30 +149,91 @@ class SampleTab(GenericTab):
         self.ui.srcFolderTxt.setText(folder)
 
     def display_sample_id(self, sample_id):
+        """
+        Display the sample ID to the corresponding UI widget
+        Parameters
+        ----------
+        sample_id : str
+            The unique ID for that sample
+
+        Returns
+        -------
+
+        """
         self.ui.sampleIdTxt.setText(sample_id)
 
     def display_use_id_as_prefix(self, use_id):
+        """
+        Displays whether to use the ID as prefix in the corresponding
+        widget of the UI
+
+        Parameters
+        ----------
+        use_id : bool
+            Whether to se the sample ID as prefix in the file names
+
+        Returns
+        -------
+
+        """
         self.ui.useIdAsPrefixCheckBox.setChecked(use_id)
 
     def get_sample_id(self):
+        """
+        Get the sample ID from the GUI widget
+        Returns
+        -------
+
+        """
         return self.ui.sampleIdTxt.text()
 
     def swap_tab_advanced(self):  # TODO: implement
+        """
+        Activate the *advanced* mode which will display more controls
+        Returns
+        -------
+
+        """
         checked = self.ui.advancedCheckBox.isChecked()
 
     def launch_pattern_wizard(self):
+        """
+        Start the pattern selection wizard. This wizard helps create the
+        pattern strings for the individual tiles, with specific characters
+        representing the digits for the different axes.
+
+        Returns
+        -------
+
+        """
         dlg = PatternDialog(self.src_folder, self.params,
                             min_file_number=self.main_window.preference_editor.params.pattern_finder_min_n_files,
                             tile_extension=self.params.tile_extension)
         dlg.exec()
 
     def plot_mini_brain(self):
+        """
+        Plot the brain icon which represents the acquisition sample orientation graphically
+        to help users pick the right orientation.
+
+        Returns
+        -------
+
+        """
         img = self.__transform_mini_brain()
         mask, proj = surface_project(img)
         img = np_to_qpixmap(proj, mask)
         self.ui.miniBrainLabel.setPixmap(img)
 
     def __transform_mini_brain(self):  # REFACTOR: extract
+        """
+        Apply the set of transforms to the mini brain as defined by the crop and
+        orientation parameters input by the user.
+
+        Returns
+        -------
+
+        """
         def scale_range(rng, scale):
             for i in range(len(rng)):
                 if rng[i] is not None:
@@ -164,12 +260,22 @@ class SampleTab(GenericTab):
         return img
 
     def display_atlas(self):
+        """
+        Plot the atlas as a FIXME:
+        Returns
+        -------
+
+        """
         self.main_window.alignment_tab_mgr.setup_workers()
         dvs = self.main_window.alignment_tab_mgr.preprocessor.plot_atlas()   # REFACTOR:
         self.main_window.setup_plots(dvs)
 
 
 class AlignmentTab(GenericTab):
+    """
+    The tab responsible for all the alignments, including the stitching and
+    aligning to the atlas.
+    """
     def __init__(self, main_window, tab_idx=1):
         super().__init__(main_window, 'Alignment', tab_idx, 'alignment_tab')
 
@@ -178,12 +284,29 @@ class AlignmentTab(GenericTab):
         self.preprocessor = PreProcessor()
 
     def set_params(self, sample_params):
+        """
+        Set the params object which links the UI and the configuration file
+        Parameters
+        ----------
+        sample_params : SampleParameters
+            The params object that links the UI to the config for all the properties intrinsic to the sample
+
+        Returns
+        -------
+
+        """
         self.sample_params = sample_params
         self.params = AlignmentParams(self.ui)
         self.params.registration.atlas_id_changed.connect(self.preprocessor.setup_atlases)
         self.params.registration.atlas_structure_tree_id_changed.connect(self.preprocessor.setup_atlases)
 
     def setup_workers(self):
+        """
+        Setup the worker (PreProcessor) which handle the computations associated with this tab
+        Returns
+        -------
+
+        """
         self.sample_params.ui_to_cfg()
         self.preprocessor.setup((self.main_window.preference_editor.params.config,
                                  self.sample_params.config, self.params.config),
@@ -196,6 +319,14 @@ class AlignmentTab(GenericTab):
         self.wrap_step('Setting up atlas', self.setup_atlas, n_steps=1, save_cfg=False, nested=False)  # TODO: abort_func=self.preprocessor.stop_process
 
     def setup(self):
+        """
+        Setup the UI elements, notably the signal/slot connections which are not
+        automatically set through the params object attribute
+
+        Returns
+        -------
+
+        """
         self.init_ui()
 
         self.ui.previewStitchingPushButton.clicked.connect(functools.partial(self.preview_stitching_dumb, color=True))
@@ -223,18 +354,56 @@ class AlignmentTab(GenericTab):
         self.connect_whats_this(self.ui.referenceLandmarksInfoToolButton, self.ui.useAutoToRefLandmarksPushButton)
 
     def set_progress_watcher(self, watcher):
+        """
+        Setup the watcher object that will handle the progress in the computation for this tab
+
+        Parameters
+        ----------
+        watcher : ProgressWatcher
+            The object that tracks the progress
+
+        Returns
+        -------
+
+        """
         self.preprocessor.set_progress_watcher(watcher)
 
     def swap_tab_advanced(self):
+        """
+        Activate the *advanced* mode which will display more controls
+        Returns
+        -------
+
+        """
         checked = self.ui.advancedCheckBox.isChecked()
         self.ui.advancedAtlasSettingsGroupBox.setVisible(checked)
 
     def setup_atlas(self):
+        """
+        Setup the atlas that corresponds to the orientation and crop
+
+        Returns
+        -------
+
+        """
         self.sample_params.ui_to_cfg()  # To make sure we have the slicing up to date
         self.params.registration.ui_to_cfg()
         self.preprocessor.setup_atlases()
 
     def preview_stitching_dumb(self, color):
+        """
+        Preview the stitching based only on a *dumb* overlay of the tiles
+        i.e. only using the fixed guess overlap
+
+        Parameters
+        ----------
+        color : bool
+            Whether to stitch in chessboard or continuous grayscale
+
+        Returns
+        -------
+
+        """
         if color:
             overlay = [pg.image(self.preprocessor.stitch_overlay('raw', color))]
         else:  # TODO: make DataViewer work with 2D color
@@ -242,6 +411,18 @@ class AlignmentTab(GenericTab):
         self.main_window.setup_plots(overlay)
 
     def preview_stitching_smart(self, postfix='aligned_axis'):
+        """
+        Preview the stitching based on the actual stitching variable, rigid by default.
+
+        Parameters
+        ----------
+        postfix : str
+            One of ('aligned_axis', 'aligned', 'placed')
+
+        Returns
+        -------
+
+        """
         n_steps = self.preprocessor.n_rigid_steps_to_run
         self.wrap_step('Stitching', self.preprocessor.stitch_rigid, step_kw_args={'force': True},
                        n_steps=n_steps, abort_func=self.preprocessor.stop_process)
@@ -249,6 +430,12 @@ class AlignmentTab(GenericTab):
         self.main_window.setup_plots(overlay)
 
     def run_stitching(self):
+        """
+        Run the actual stitching steps based on the values in the config file (set from the UI).
+        Returns
+        -------
+
+        """
         if not self.preprocessor.is_tiled:  # BYPASS stitching, just copy or stack
             self.wrap_step('Stitching', clearmap_io.convert,
                            step_args=[self.preprocessor.filename('raw'), self.preprocessor.filename('stitched')])
@@ -272,6 +459,13 @@ class AlignmentTab(GenericTab):
         self.progress_watcher.finish()
 
     def plot_stitching_results(self):
+        """
+        Plot the stitched image in 3D in the viewer
+
+        Returns
+        -------
+
+        """
         self.params.stitching_general.ui_to_cfg()
         if not self.step_exists('stitching', (self.preprocessor.filename('stitched'))):  # TODO: add arteries option
             return
@@ -279,6 +473,14 @@ class AlignmentTab(GenericTab):
         self.main_window.setup_plots(dvs)
 
     def convert_output(self):
+        """
+        Convert the stitched output to the file type specified by the drop down
+        menu in the UI
+
+        Returns
+        -------
+
+        """
         fmt = self.params.stitching_general.conversion_fmt
         if not self.step_exists('stitching', (self.preprocessor.filename('stitched'))):  # TODO: add arteries option
             return
@@ -288,11 +490,27 @@ class AlignmentTab(GenericTab):
                        save_cfg=False, nested=False)
 
     def display_auto_to_ref_landmarks_dialog(self):
+        """
+        Display the dialog to use landmarks for optimising the registration
+        of the autofluorescence to the reference
+
+        Returns
+        -------
+
+        """
         images = [self.preprocessor.filename('resampled', postfix='autofluorescence'),
                   self.preprocessor.reference_file_path]
         self.__display_landmarks_dialog(images, 'auto_to_reference')
 
     def display_resampled_to_auto_landmarks_dialog(self):
+        """
+        Display the dialog to use landmarks for optimising the registration
+        of the resampled main channel to autofluorescence
+
+        Returns
+        -------
+
+        """
         images = [self.preprocessor.filename('resampled', postfix='autofluorescence'),
                   self.preprocessor.filename('resampled')]
         self.__display_landmarks_dialog(images, 'resampled_to_auto')
@@ -325,9 +543,23 @@ class AlignmentTab(GenericTab):
         # return landmark_selector
 
     def write_auto_to_ref_registration_landmark_coords(self):
+        """
+        Write the corresponding landmarks to file for use in landmark optimised registration
+
+        Returns
+        -------
+
+        """
         self.__write_registration_landmark_coords('auto_to_reference')
 
     def write_resampled_to_auto_registration_landmark_coords(self):
+        """
+        Write the corresponding landmarks to file for use in landmark optimised registration
+
+        Returns
+        -------
+
+        """
         self.__write_registration_landmark_coords('resampled_to_auto')
 
     def __write_registration_landmark_coords(self, direction):
@@ -351,6 +583,13 @@ class AlignmentTab(GenericTab):
         self.landmark_selector = None
 
     def run_registration(self):
+        """
+        Run the actual registration between the sample and the reference atlas.
+
+        Returns
+        -------
+
+        """
         self.main_window.make_progress_dialog('Registering', n_steps=4, abort=self.preprocessor.stop_process,
                                               parent=self.main_window)  # FIXME: compute n_steps (par of processor)
         self.setup_atlas()
@@ -364,7 +603,7 @@ class AlignmentTab(GenericTab):
             # self.main_window.print_status_msg('Resampled')
         self.main_window.wrap_in_thread(self.preprocessor.align)
 
-    def prepare_registration_results_graph(self, step='ref_to_auto'):
+    def __prepare_registration_results_graph(self, step='ref_to_auto'):
         if step == 'ref_to_auto':
             img_paths = (self.preprocessor.filename('resampled', postfix='autofluorescence'),
                          self.preprocessor.aligned_autofluo_path)
@@ -383,8 +622,16 @@ class AlignmentTab(GenericTab):
         return image_sources, titles
 
     def plot_registration_results_side_by_side_raw(self):
+        """
+        Plot the result of the registration between raw and autofluorescence
+        side-by-side in synchronised plots
+
+        Returns
+        -------
+
+        """
         self.main_window.clear_plots()
-        image_sources, titles = self.prepare_registration_results_graph('auto_to_raw')
+        image_sources, titles = self.__prepare_registration_results_graph('auto_to_raw')
         dvs = plot_3d.plot(image_sources, title=titles, arrange=False, sync=True,
                            lut=self.main_window.preference_editor.params.lut,
                            parent=self.main_window.centralWidget())
@@ -392,8 +639,16 @@ class AlignmentTab(GenericTab):
         self.main_window.setup_plots(dvs, ['autofluo', 'aligned'])
 
     def plot_registration_results_side_by_side(self):
+        """
+        Plot the result of the registration between autofluorescence and reference atlas
+        side-by-side in synchronised plots
+
+        Returns
+        -------
+
+        """
         self.main_window.clear_plots()
-        image_sources, titles = self.prepare_registration_results_graph()
+        image_sources, titles = self.__prepare_registration_results_graph()
         dvs = plot_3d.plot(image_sources, title=titles, arrange=False, sync=True,
                            lut=self.main_window.preference_editor.params.lut,
                            parent=self.main_window.centralWidget())
@@ -401,16 +656,32 @@ class AlignmentTab(GenericTab):
         self.main_window.setup_plots(dvs, ['autofluo', 'aligned'])
 
     def plot_registration_results_composite_raw(self):
+        """
+        Plot the result of the registration between raw and autofluorescence
+        as an overlay plot
+
+        Returns
+        -------
+
+        """
         self.main_window.clear_plots()
-        image_sources, titles = self.prepare_registration_results_graph('auto_to_raw')
+        image_sources, titles = self.__prepare_registration_results_graph('auto_to_raw')
         dvs = plot_3d.plot([image_sources, ], title=' '.join(titles), arrange=False, sync=True,
                            lut=self.main_window.preference_editor.params.lut,
                            parent=self.main_window.centralWidget())
         self.main_window.setup_plots(dvs)
 
     def plot_registration_results_composite(self):
+        """
+        Plot the result of the registration between autofluorescence and reference atlas
+        as an overlay plot
+
+        Returns
+        -------
+
+        """
         self.main_window.clear_plots()
-        image_sources, titles = self.prepare_registration_results_graph()
+        image_sources, titles = self.__prepare_registration_results_graph()
         dvs = plot_3d.plot([image_sources, ], title=' '.join(titles), arrange=False, sync=True,
                            lut=self.main_window.preference_editor.params.lut,
                            parent=self.main_window.centralWidget())
@@ -418,6 +689,9 @@ class AlignmentTab(GenericTab):
 
 
 class CellCounterTab(PostProcessingTab):
+    """
+    The tab responsible for the cell detection and cell coordinates alignment
+    """
     def __init__(self, main_window, tab_idx=2):
         super().__init__(main_window, 'CellMap', tab_idx, 'cell_map_tab')
 
@@ -427,9 +701,28 @@ class CellCounterTab(PostProcessingTab):
         self.cell_detector = None
 
     def set_params(self, sample_params, alignment_params):
+        """
+        Set the params object which links the UI and the configuration file
+        Parameters
+        ----------
+        sample_params : SampleParameters
+            The params object that links the UI to the config for all the properties intrinsic to the sample
+        alignment_params: AlignmentParams
+            The params object that links the UI to the config for things related to sample alignment
+
+        Returns
+        -------
+        """
         self.params = CellMapParams(self.ui, sample_params, alignment_params, self.main_window.src_folder)
 
     def setup_workers(self):
+        """
+         Setup the cell detection worker, which handle the computations associated with this tab
+
+         Returns
+         -------
+
+         """
         if self.preprocessor.workspace is not None:
             self.params.ui_to_cfg()
             self.cell_detector = CellDetector(self.preprocessor)
@@ -437,12 +730,27 @@ class CellCounterTab(PostProcessingTab):
             self.main_window.print_warning_msg('Workspace not initialised')
 
     def setup_cell_detector(self):
+        """
+        Post configuration of the CellDetector object  # FIXME: check redundancy with above
+
+        Returns
+        -------
+
+        """
         if self.cell_detector.preprocessor is None and self.preprocessor.workspace is not None:  # preproc initialised
             self.params.ui_to_cfg()
             self.cell_detector.setup(self.preprocessor)
             self.update_cell_number()
 
     def setup(self):
+        """
+        Setup the UI elements, notably the signal/slot connections which are not
+        automatically set through the params object attribute
+
+        Returns
+        -------
+
+        """
         self.init_ui()
 
         self.ui.toolBox.currentChanged.connect(self.handle_tool_tab_changed)
@@ -468,6 +776,26 @@ class CellCounterTab(PostProcessingTab):
         self.ui.cellMap3dScatterOnStitchedPushButton.clicked.connect(self.plot_cells_scatter_w_atlas_colors_raw)
 
     def setup_cell_param_histogram(self, cells, plot_item, key='size', x_log=False):
+        """
+        Plots the histogram of the cell parameter defined by key. This is used to display the
+        distribution of cell sizes or intensities
+
+        Parameters
+        ----------
+        cells : pd.DataFrame
+            The Cells dataframe containing one row per detected cell
+        plot_item : QWidget or None
+            The Plot element to plot into. If None, creates a new one
+        key : str
+            The key (cell attribute) in the dataframe to plot.
+             One of 'size' or 'source'
+        x_log : bool
+            X axis is log
+
+        Returns
+        -------
+
+        """
         values = cells[key].values
         hist, bin_edges = np.histogram(values, bins=20)
         if plot_item is None:
@@ -480,6 +808,12 @@ class CellCounterTab(PostProcessingTab):
         return widget
 
     def voxelize(self):
+        """
+        Creates the cell density plot
+        Returns
+        -------
+
+        """
         if os.path.exists(self.preprocessor.filename('cells', postfix='filtered')):
             self.wrap_step('Voxelization', self.cell_detector.voxelize,
                            abort_func=self.cell_detector.stop_process, nested=False)#, main_thread=True)
@@ -488,13 +822,45 @@ class CellCounterTab(PostProcessingTab):
                                    'Please ensure that cell filtering has been run.', base_msg='Missing file')
 
     def set_progress_watcher(self, watcher):
+        """
+        Setup the watcher object that will handle the progress in the computation for this tab
+
+        Parameters
+        ----------
+        watcher : ProgressWatcher
+            The object that tracks the progress
+
+        Returns
+        -------
+
+        """
         if self.cell_detector is not None and self.cell_detector.preprocessor is not None:  # If initialised
             self.cell_detector.set_progress_watcher(watcher)
 
     def plot_debug_cropping_interface(self):
+        """
+        Plot the orthoslicer to select a subset of the sample to perform cell detections
+        tests on
+
+        Returns
+        -------
+
+        """
         self.plot_slicer('detectionSubset', self.ui, self.params)
 
     def handle_tool_tab_changed(self, tab_idx):
+        """
+        Triggered when a new sub tab (tooltab) of the cell detection tab is selected.
+        It will either plot the cell parameter distributions or update the cell count display.
+
+        Parameters
+        ----------
+        tab_idx
+
+        Returns
+        -------
+
+        """
         if tab_idx == 1:
             try:
                 cells_df = self.cell_detector.get_cells_df()  # FIXME: debug or not
@@ -523,7 +889,7 @@ class CellCounterTab(PostProcessingTab):
                     # heights = [lyt.itemAt(i).widget().height() for i in range(lyt.count())]
                     container = page.parent().parent()
                     container.setMinimumHeight(container.parent().height() - container.height()
-                                               + group_box.height())  # + 10 + self.ui.previewCellFiltersButtonBox.height())
+                                               + group_box.height())
 
             except FileNotFoundError:
                 print('Could not find cells dataframe file, skipping')
@@ -531,10 +897,23 @@ class CellCounterTab(PostProcessingTab):
             self.update_cell_number()
 
     def create_cell_detection_tuning_sample(self):
+        """
+        Create an array from a subset of the sample to perform tests on
+        Returns
+        -------
+
+        """
         self.wrap_step('Creating tuning sample', self.cell_detector.create_test_dataset,
                        step_kw_args={'slicing': self.params.slicing}, nested=False)
 
     def run_tuning_cell_detection(self):
+        """
+        Run the cell detection on a subset of the sample which was previously selected
+
+        Returns
+        -------
+
+        """
         self.wrap_step('Cell detection preview', self.cell_detector.run_cell_detection, step_kw_args={'tuning': True})
         if self.cell_detector.stopped:
             return
@@ -542,6 +921,13 @@ class CellCounterTab(PostProcessingTab):
             self.plot_detection_results()
 
     def detect_cells(self):  # TODO: merge w/ above w/ tuning option
+        """
+        Run the cell detection on the whole sample
+
+        Returns
+        -------
+
+        """
         self.wrap_step('Detecting cells', self.cell_detector.run_cell_detection, step_kw_args={'tuning': False},
                        abort_func=self.cell_detector.stop_process)
         if self.cell_detector.stopped:
@@ -551,6 +937,12 @@ class CellCounterTab(PostProcessingTab):
         self.update_cell_number()
 
     def update_cell_number(self):  # FIXME: try except or check that cells and cells filtered exist
+        """
+        Update the cell count number displayed based on the size of the raw and filtered cell detection files
+        Returns
+        -------
+
+        """
         self.ui.nDetectedCellsLabel.setText(
             format_long_nb_to_str(self.cell_detector.get_n_detected_cells()))
         self.ui.nDetectedCellsAfterFilterLabel.setText(
@@ -559,7 +951,14 @@ class CellCounterTab(PostProcessingTab):
     # def reset_detected(self):
     #     self.cell_detector.detected = False
 
-    def plot_detection_results(self):
+    def plot_detection_results(self):  # FIXME: check only steps
+        """
+        Display the different steps of the cell detection in a grid to evaluate the filters
+
+        Returns
+        -------
+
+        """
         self.main_window.clear_plots()
         if not self.step_exists('cell detection', [self.preprocessor.filename('stitched')]):
             return
@@ -573,6 +972,12 @@ class CellCounterTab(PostProcessingTab):
         self.main_window.setup_plots(dvs)
 
     def plot_cell_filter_results(self):
+        """
+        Plot the cells as colored dots on top of the raw image fraction used for tests
+        Returns
+        -------
+
+        """
         self.main_window.clear_plots()
         if not self.step_exists('cell filtering', [self.preprocessor.filename('stitched'),
                                                    self.preprocessor.filename('cells', postfix='filtered')]):
@@ -581,6 +986,12 @@ class CellCounterTab(PostProcessingTab):
         self.main_window.setup_plots(dvs)
 
     def plot_cells_scatter_w_atlas_colors(self):
+        """
+        Plot the cells as colored symbols on top of the resampled (aligned) image
+        Returns
+        -------
+
+        """
         self.main_window.clear_plots()
         if self.preprocessor.was_registered:
             required_paths = [self.preprocessor.reference_file_path]
@@ -593,6 +1004,12 @@ class CellCounterTab(PostProcessingTab):
         self.main_window.setup_plots(dvs)
 
     def plot_cells_scatter_w_atlas_colors_raw(self):
+        """
+        Plot the cells as colored symbols on top of the raw stitched (not aligned) image
+        Returns
+        -------
+
+        """
         self.main_window.clear_plots()
         if not self.step_exists('cell count', [self.preprocessor.filename('stitched'),
                                                self.cell_detector.df_path]):
@@ -609,7 +1026,7 @@ class CellCounterTab(PostProcessingTab):
                            close_when_done=is_last_step)#, main_thread=True)
         self.plot_cell_filter_results()
 
-    def preview_cell_filter(self):
+    def preview_cell_filter(self):  # FIXME: circular calls TEST
         with self.cell_detector.workspace.tmp_debug:
             self.__filter_cells()
 
@@ -620,6 +1037,12 @@ class CellCounterTab(PostProcessingTab):
         self.cell_detector.export_collapsed_stats()
 
     def run_cell_map(self):
+        """
+        Run the whole pipeline at once
+        Returns
+        -------
+
+        """
         self.params.ui_to_cfg()
         if not self.cell_detector.detected:
             self.detect_cells()
@@ -631,6 +1054,12 @@ class CellCounterTab(PostProcessingTab):
         # WARNING: some plots in .post_process_cells() without UI params
 
     def plot_cell_map_results(self):
+        """
+        Plot the voxelisation (density map) result
+        Returns
+        -------
+
+        """
         self.main_window.clear_plots()
         if not self.step_exists('voxelization', [self.preprocessor.filename('density', postfix='counts')]):
             return
@@ -639,6 +1068,9 @@ class CellCounterTab(PostProcessingTab):
 
 
 class VasculatureTab(PostProcessingTab):
+    """
+    The tab responsible for the vasculature tracts detection, graph extraction and analysis
+    """
     def __init__(self, main_window, tab_idx=3):
         super().__init__(main_window, 'Vasculature', tab_idx, 'vasculature_tab')
 
@@ -649,12 +1081,43 @@ class VasculatureTab(PostProcessingTab):
         self.vessel_graph_processor = None
 
     def set_params(self, sample_params, alignment_params):
+        """
+        Set the params object which links the UI and the configuration file
+        Parameters
+        ----------
+        sample_params : SampleParameters
+            The params object that links the UI to the config for all the properties intrinsic to the sample
+        alignment_params: AlignmentParams
+            The params object that links the UI to the config for things related to sample alignment
+
+        Returns
+        -------
+        """
         self.params = VesselParams(self.ui, sample_params, alignment_params, self.main_window.src_folder)
 
     def setup_preproc(self, pre_processor):
+        """
+        Associate the preprocessor to the current tab
+
+        Parameters
+        ----------
+        pre_processor : PreProcessor
+
+        Returns
+        -------
+
+        """
         self.preprocessor = pre_processor
 
     def setup_workers(self):
+        """
+         Setup the BinaryVesselProcessor and VesselGraphProcessor workers,
+          which handle the computations associated with this tab
+
+         Returns
+         -------
+
+         """
         if self.preprocessor.workspace is not None:
             self.params.ui_to_cfg()
             self.binary_vessel_processor = BinaryVesselProcessor(self.preprocessor)
@@ -663,6 +1126,13 @@ class VasculatureTab(PostProcessingTab):
             self.main_window.print_warning_msg('Workspace not initialised')
 
     def setup_vessel_processors(self):
+        """
+        Post configuration of the BinaryVesselProcessor and VesselGraphProcessor objects  # FIXME: check redundancy with above
+
+        Returns
+        -------
+
+        """
         if self.preprocessor.workspace is not None:  # Inited
             if self.binary_vessel_processor.preprocessor is None:
                 self.params.ui_to_cfg()
@@ -672,6 +1142,14 @@ class VasculatureTab(PostProcessingTab):
                 self.vessel_graph_processor.setup(self.preprocessor)
 
     def setup(self):
+        """
+        Setup the UI elements, notably the signal/slot connections which are not
+        automatically set through the params object attribute
+
+        Returns
+        -------
+
+        """
         self.init_ui()
 
         # ######################################## BINARIZATION ##############################
@@ -720,9 +1198,24 @@ class VasculatureTab(PostProcessingTab):
         self.ui.runAllVasculaturePushButton.clicked.connect(self.run_all)
 
     def unload_temporary_graphs(self):
+        """
+        Unload the temporary vasculature graph objects to free up RAM
+        """
         self.vessel_graph_processor.unload_temporary_graphs()
 
     def set_progress_watcher(self, watcher):
+        """
+        Setup the watcher object that will handle the progress in the computation for this tab
+
+        Parameters
+        ----------
+        watcher : ProgressWatcher
+            The object that tracks the progress
+
+        Returns
+        -------
+
+        """
         if self.binary_vessel_processor is not None and self.binary_vessel_processor.preprocessor is not None:
             self.binary_vessel_processor.set_progress_watcher(watcher)
         if self.vessel_graph_processor is not None and self.vessel_graph_processor.preprocessor is not None:
@@ -737,6 +1230,18 @@ class VasculatureTab(PostProcessingTab):
     # ####################### BINARY  #######################
 
     def binarize_channel(self, channel, stop_on_error=False):
+        """
+        Perform all the selected binarization steps on the given channel
+
+        Parameters
+        ----------
+        channel
+        stop_on_error
+
+        Returns
+        -------
+
+        """
         # FIXME: n_steps = self.params.binarization_params.n_steps
         try:
             self.wrap_step('Vessel binarization', self.binary_vessel_processor.binarize_channel,
@@ -753,11 +1258,29 @@ class VasculatureTab(PostProcessingTab):
                 raise err
 
     def combine(self):
+        """
+        Combine the binarized (thresholded) version of the different channels.
+        Returns
+        -------
+
+        """
         self.wrap_step('Combining channels', self.binary_vessel_processor.combine_binary,
                        abort_func=self.binary_vessel_processor.stop_process)
 
     # FIXME: channel
     def plot_binarization_results(self, plot_side_by_side=True):
+        """
+        Plot the thresholded images resulting from the binarization at the steps specified
+        by the comboboxes in the UI.
+
+        Parameters
+        ----------
+        plot_side_by_side
+
+        Returns
+        -------
+
+        """
         self.main_window.clear_plots()
         binarization_params = self.params.binarization_params
         steps = (binarization_params.plot_step_1,
@@ -781,6 +1304,13 @@ class VasculatureTab(PostProcessingTab):
     # ###########################  GRAPH  #############################
 
     def run_all(self):
+        """
+        Run the whole vasculature pipeline at once
+
+        Returns
+        -------
+
+        """
         try:
             self.binarize_channel('raw', stop_on_error=True)
             self.binarize_channel('arteries', stop_on_error=True)
@@ -792,6 +1322,12 @@ class VasculatureTab(PostProcessingTab):
         self.voxelize()
 
     def build_graph(self):
+        """
+        Run the pipeline to build the vasculature graph
+        Returns
+        -------
+
+        """
         # FIXME: n_steps = 4
         self.wrap_step('Building vessel graph', self.vessel_graph_processor.build_graph,
                        abort_func=self.vessel_graph_processor.stop_process, main_thread=True)
@@ -802,7 +1338,15 @@ class VasculatureTab(PostProcessingTab):
         self.wrap_step('Building vessel graph', self.vessel_graph_processor.register,
                        abort_func=self.vessel_graph_processor.stop_process)
 
-    def plot_graph_type_processing_chunk_slicer(self):
+    def plot_graph_type_processing_chunk_slicer(self):  # Refactor: rename
+        """
+        Plot the orthoslicer to pick a sub part of the graph to display because
+        depending on the display options, the whole graph may not fit in memory
+
+        Returns
+        -------
+
+        """
         self.plot_slicer('graphConstructionSlicer', self.ui, self.params.visualization_params)
 
     def __get_tube_map_slicing(self):
@@ -810,6 +1354,18 @@ class VasculatureTab(PostProcessingTab):
         return self.params.visualization_params.slicing
 
     def display_graph_chunk(self, graph_step):
+        """
+        Display a chunk of the graph selected with the slicer
+
+        Parameters
+        ----------
+        graph_step : str
+            The name of the step to display (from 'raw', 'cleaned', 'reduced', 'annotated')
+
+        Returns
+        -------
+
+        """
         self.main_window.clear_plots()
         slicing = self.__get_tube_map_slicing()
         try:
@@ -825,6 +1381,13 @@ class VasculatureTab(PostProcessingTab):
         self.display_graph_chunk(self.params.visualization_params.graph_step)
 
     def plot_graph_structure(self):
+        """
+        Plot a subregion of the vasculature graph corresponding to a structure
+        using the atlas registration results
+        Returns
+        -------
+
+        """
         structure_id = self.params.visualization_params.structure_id
         if structure_id is not None:
             self._plot_graph_structure(structure_id, annotation.find(structure_id, key='id')['rgb'])
@@ -833,10 +1396,22 @@ class VasculatureTab(PostProcessingTab):
         self.main_window.structure_selector.close()
 
     def post_process_graph(self):
+        """
+        Post process the graph by filtering, tracing and removing capillaries
+        Returns
+        -------
+
+        """
         self.wrap_step('Post processing vasculature graph', self.vessel_graph_processor.post_process,
                        abort_func=self.vessel_graph_processor.stop_process)  # FIXME: n_steps = 8
 
     def pick_region(self):
+        """
+        Open a dialog to select a brain region and plot it
+        Returns
+        -------
+
+        """
         self.main_window.structure_selector.structure_selected.connect(
             self.params.visualization_params.set_structure_id)
         self.main_window.structure_selector.onAccepted(self.plot_graph_structure)
@@ -856,6 +1431,12 @@ class VasculatureTab(PostProcessingTab):
             self.main_window.perf_monitor.stop()
 
     def voxelize(self):
+        """
+        Run the voxelisation (density map) on the vasculature graph
+        Returns
+        -------
+
+        """
         voxelization_params = {
             'weight_by_radius': self.params.visualization_params.weight_by_radius,
             'vertex_degrees': self.params.visualization_params.vertex_degrees
@@ -864,6 +1445,12 @@ class VasculatureTab(PostProcessingTab):
                        step_kw_args=voxelization_params)#, main_thread=True)
 
     def plot_voxelization(self):
+        """
+        Plot the density map
+        Returns
+        -------
+
+        """
         self.main_window.clear_plots()
         dvs = self.vessel_graph_processor.plot_voxelization(self.main_window.centralWidget())
         self.main_window.setup_plots(dvs)

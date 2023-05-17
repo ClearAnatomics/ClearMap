@@ -34,7 +34,7 @@ from qdarkstyle import DarkPalette
 
 os.environ['CLEARMAP_GUI_HOSTED'] = "1"
 # ########################################### SPLASH SCREEN ###########################################################
-from ClearMap.gui.dialogs import make_splash, update_pbar, make_simple_progress_dialog
+from ClearMap.gui.dialogs import make_splash, update_pbar, make_simple_progress_dialog, option_dialog
 
 # To show splash before slow imports
 ICONS_FOLDER = 'ClearMap/gui/creator/icons/'   # REFACTOR: use qrc
@@ -1039,6 +1039,29 @@ class ClearMapGui(ClearMapGuiBase):
                 raise FileNotFoundError(html_to_ansi(base_msg))
         return was_copied, cfg_path
 
+    def clone(self):
+        folder = get_directory_dlg(self.preference_editor.params.start_folder,
+                                   title="Choose the experiment you would like to clone")
+        src_config_loader = ConfigLoader(folder)
+        for tab in self.tab_mgrs:
+            cfg_name = title_to_snake(tab.name)
+            try:
+                src_cfg_path = src_config_loader.get_cfg_path(cfg_name, must_exist=True)
+            except FileNotFoundError:
+                pass #FIXME: deal with this
+            cfg_path = self.config_loader.get_cfg_path(cfg_name, must_exist=False)
+            copyfile(src_cfg_path, cfg_path)
+
+    def load_default_cfg(self):
+        for tab in self.tab_mgrs:
+            cfg_name = title_to_snake(tab.name)
+            try:
+                src_cfg_path = self.config_loader.get_default_path(cfg_name)
+            except FileNotFoundError:
+                pass #FIXME: deal with this
+            cfg_path = self.config_loader.get_cfg_path(cfg_name, must_exist=False)
+            copyfile(src_cfg_path, cfg_path)
+
     def load_config_and_setup_ui(self):
         """
         Read (potentially from defaults), fix and load the config for each tab manager
@@ -1050,6 +1073,15 @@ class ClearMapGui(ClearMapGuiBase):
         """
         self.print_status_msg('Parsing configuration')
         self.assert_src_folder_set()
+
+        cfg_path = self.config_loader.get_cfg_path('sample', must_exist=False)
+        if not os.path.exists(cfg_path):
+            option_idx = option_dialog('New experiment', 'This seems to be a new experiment. Do you want to: ',
+                                       ['Clone existing config', 'Load default config'])
+            if option_idx == 0:
+                self.clone()
+            elif option_idx == 1:
+                self.load_default_cfg()
 
         error = False
         for tab in self.tab_mgrs:
