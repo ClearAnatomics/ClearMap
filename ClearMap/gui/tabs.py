@@ -187,6 +187,17 @@ class SampleTab(GenericTab):
         """
         return self.ui.sampleIdTxt.text()
 
+    def go_to_orientation(self):
+        """
+        Jump to the sample orientation (space info) tab
+
+        Returns
+        -------
+
+        """
+        self.ui.toolBox.setCurrentIndex(2)
+        self.main_window.tabWidget.setCurrentIndex(0)
+
     def swap_tab_advanced(self):  # TODO: implement
         """
         Activate the *advanced* mode which will display more controls
@@ -338,6 +349,8 @@ class AlignmentTab(GenericTab):
         self.ui.displayStitchingButtonBox.connectApply(self.plot_stitching_results)
         self.ui.displayStitchingButtonBox.connectClose(self.main_window.clear_plots)
         self.ui.convertOutputButtonBox.connectApply(self.convert_output)
+
+        self.ui.registrationGoToSampleOrientationPushButton.clicked.connect(self.main_window.sample_tab_mgr.go_to_orientation)
         self.ui.registerButtonBox.connectApply(self.run_registration)
         self.ui.plotRegistrationResultsSideBySidePushButton.clicked.connect(self.plot_registration_results_side_by_side)
         self.ui.plotRegistrationResultsCompositePushButton.clicked.connect(self.plot_registration_results_composite)

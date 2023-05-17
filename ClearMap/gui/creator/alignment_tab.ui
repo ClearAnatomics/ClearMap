@@ -34,7 +34,7 @@
         </font>
        </property>
        <property name="currentIndex">
-        <number>0</number>
+        <number>1</number>
        </property>
        <widget class="QWidget" name="page">
         <property name="geometry">
@@ -58,7 +58,7 @@
             <property name="geometry">
              <rect>
               <x>0</x>
-              <y>-107</y>
+              <y>0</y>
               <width>446</width>
               <height>538</height>
              </rect>
@@ -461,8 +461,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>460</width>
-              <height>431</height>
+              <width>339</width>
+              <height>368</height>
              </rect>
             </property>
             <attribute name="label">
@@ -769,8 +769,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>460</width>
-              <height>431</height>
+              <width>196</width>
+              <height>150</height>
              </rect>
             </property>
             <attribute name="label">
@@ -832,8 +832,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>460</width>
-              <height>431</height>
+              <width>196</width>
+              <height>118</height>
              </rect>
             </property>
             <attribute name="label">
@@ -888,8 +888,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>460</width>
-              <height>431</height>
+              <width>274</width>
+              <height>182</height>
              </rect>
             </property>
             <attribute name="label">
@@ -1059,7 +1059,7 @@
                </layout>
               </widget>
              </item>
-             <item row="3" column="0" colspan="2">
+             <item row="4" column="0" colspan="2">
               <widget class="QGroupBox" name="advancedAtlasSettingsGroupBox">
                <property name="title">
                 <string>Advanced atlas settings</string>
@@ -1178,6 +1178,13 @@
                  <string>ABA json 2022</string>
                 </property>
                </item>
+              </widget>
+             </item>
+             <item row="3" column="0" colspan="2">
+              <widget class="QPushButton" name="registrationGoToSampleOrientationPushButton">
+               <property name="text">
+                <string>Go to sample orientation</string>
+               </property>
               </widget>
              </item>
             </layout>
