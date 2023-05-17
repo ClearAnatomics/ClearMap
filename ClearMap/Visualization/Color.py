@@ -17,6 +17,7 @@ __download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 
 
 import numpy as np
+import colorsys
 
 import vispy as vp
 import vispy.color as vpc
@@ -1124,6 +1125,50 @@ def write_PAL(filename, colors):
     
   return filename;  
 
+
+def rand_cmap(n_labels, map_type='bright', first_color_black=True, last_color_black=False):  # Inspired from https://stackoverflow.com/a/32520273
+    """
+    Creates a random colormap to be used together with matplotlib. Useful for segmentation tasks
+
+    Arguments
+    ---------
+    n_labels : int
+        Number of labels (size of colormap)
+    map_type : str
+        'bright' for strong colors, 'soft' for pastel colors
+    first_color_black : bool
+        Option to use first color as black, True or False
+    last_color_black : bool
+        Option to use last color as black, True or False
+    Returns
+    -------
+    random_colormap : list of RGB colors
+        colormap for matplotlib
+    """
+
+    if map_type == 'bright':  # Generate color map for bright colors, based on hsv
+        lows = [0, 0.2, 0.9]
+        high = 1
+    elif map_type == 'soft':  # Generate soft pastel colors, by limiting the RGB spectrum
+        lows = [0.6] * 3
+        high = 0.95
+    else:
+        raise ValueError(f'Expected "bright" or "soft" for map_type, got "{map_type}"')
+
+    rand_colors = [(np.random.uniform(low=lows[0], high=high),
+                    np.random.uniform(low=lows[1], high=high),
+                    np.random.uniform(low=lows[2], high=high)) for i in range(n_labels)]  # FIXME: use np notation instead
+
+    if map_type == 'bright':
+        # Convert HSV list to RGB
+        rand_colors = [colorsys.hsv_to_rgb(hsv_color[0], hsv_color[1], hsv_color[2]) for hsv_color in rand_colors]
+
+    if first_color_black:
+        rand_colors[0] = [0, 0, 0]
+    if last_color_black:
+        rand_colors[-1] = [0, 0, 0]
+
+    return rand_colors
 
 ###############################################################################
 ### Tests

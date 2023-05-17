@@ -122,9 +122,7 @@ class CellDetector(TabProcessor):
         if self.processing_config['cell_filtration']['preview'] and not runs_on_ui():
             self.plot_filtered_cells()
         self.atlas_align()
-        # self.export_as_csv()
         self.export_collapsed_stats()
-        # self.export_to_clearmap1_fmt()
         self.voxelize()
 
     def voxelize(self, postfix=''):
@@ -504,7 +502,8 @@ class CellDetector(TabProcessor):
                    ]
         sources = [s for s in sources if os.path.exists(s)]  # Remove missing files (if not tuning)
         titles = [os.path.basename(s) for s in sources]
-        return plot_3d.plot(sources, title=titles, arrange=arrange, sync=sync, lut='white', parent=parent)
+        luts = ['white', 'white', 'random']
+        return plot_3d.plot(sources, title=titles, arrange=arrange, sync=sync, lut=luts, parent=parent)
 
     def get_n_detected_cells(self):
         if os.path.exists(self.workspace.filename('cells', postfix='raw')):
