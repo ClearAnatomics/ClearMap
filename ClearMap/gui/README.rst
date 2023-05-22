@@ -34,13 +34,13 @@ To install the GUI you need to follow these steps:
 
   .. code-block:: bash
 
-    $ chmod u+x install_gui.sh <environment_file.yml>  # If the environment file is not supplied it will use python 3.7
+    $ chmod u+x install_gui.sh
 
 4. Start the install and answer the prompts
 
   .. code-block:: bash
 
-    $ ./install_gui.sh
+    $ ./install_gui.sh <environment_file.yml>  # If the environment file is not supplied it will use python 3.7
 
 
 Using the interface
