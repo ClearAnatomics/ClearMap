@@ -1073,15 +1073,6 @@ class ClearMapGui(ClearMapGuiBase):
         self.print_status_msg('Parsing configuration')
         self.assert_src_folder_set()
 
-        cfg_path = self.config_loader.get_cfg_path('sample', must_exist=False)
-        if not os.path.exists(cfg_path):
-            option_idx = option_dialog('New experiment', 'This seems to be a new experiment. Do you want to: ',
-                                       ['Clone existing config', 'Load default config'])
-            if option_idx == 0:
-                self.clone()
-            elif option_idx == 1:
-                self.load_default_cfg()
-
         error = False
         for tab in self.tab_mgrs:
             cfg_name = title_to_snake(tab.name)
@@ -1158,15 +1149,18 @@ class ClearMapGui(ClearMapGuiBase):
 
         """
         sample_cfg_path = self.config_loader.get_cfg_path('sample', must_exist=False)
-        if self.file_exists(sample_cfg_path):
-            cfg = self.config_loader.get_cfg_from_path(sample_cfg_path)
-            sample_id = cfg['sample_id']
-            use_id_as_prefix = cfg['use_id_as_prefix']
-            if sample_id == 'undefined':
-                sample_id = ''
-        else:
+        if not self.file_exists(sample_cfg_path):
+            option_idx = option_dialog('New experiment', 'This seems to be a new experiment. Do you want to: ',
+                                       ['Clone existing config', 'Load default config'])
+            if option_idx == 0:
+                self.clone()
+            elif option_idx == 1:
+                self.load_default_cfg()
+        cfg = self.config_loader.get_cfg_from_path(sample_cfg_path)
+        sample_id = cfg['sample_id']
+        use_id_as_prefix = cfg['use_id_as_prefix']
+        if sample_id == 'undefined':
             sample_id = ''
-            use_id_as_prefix = False
         self.sample_tab_mgr.display_sample_id(sample_id)
         self.sample_tab_mgr.display_use_id_as_prefix(use_id_as_prefix)
 
