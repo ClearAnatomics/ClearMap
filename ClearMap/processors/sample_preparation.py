@@ -795,7 +795,7 @@ class PreProcessor(TabProcessor):
 
         dest_shape = tuple(layout.extent[:-1])
         full_lower = layout.lower
-        middle_z = round(dest_shape[-1] / 2)
+        middle_z = round(sources[0].shape[-1] / 2)
 
         cyan_image = np.zeros(dest_shape, dtype=int)
         magenta_image = np.zeros(dest_shape, dtype=int)
