@@ -28,7 +28,7 @@ function green_n(){  # FIXME: parametrise above instead
 }
 
 green "Checking dependencies"
-if [[ $(dpkg-query --show --showformat='${db:Status-Status}\n' 'build-essential') == "installed"]]; then
+if [[ $(dpkg-query --show --showformat='${db:Status-Status}\n' 'build-essential') == "installed" ]]; then
     green "Compilation tools available"
 else
     red "Package \"build-essential\" was not found. It is required for compilation.
