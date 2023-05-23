@@ -144,6 +144,13 @@ class PreProcessor(TabProcessor):
         elastix_folder = self.filename(direction)
         return os.path.join(elastix_folder, 'autolfuorescence_landmarks.pts')  # TODO: use workspace
 
+    def clear_landmarks(self):
+        for f_path in (self.ref_pts_path, self.resampled_pts_path,
+                       self.get_autofluo_pts_path('resampled_to_auto'),
+                       self.get_autofluo_pts_path('auto_to_reference')):
+            if os.path.exists(f_path):
+                os.remove(f_path)
+
     @property
     def resampled_pts_path(self):
         return os.path.join(self.filename('resampled_to_auto'), 'resampled_landmarks.pts')
