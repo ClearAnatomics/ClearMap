@@ -52,7 +52,7 @@
         <x>0</x>
         <y>0</y>
         <width>503</width>
-        <height>228</height>
+        <height>341</height>
        </rect>
       </property>
       <attribute name="label">
@@ -68,8 +68,8 @@
           <property name="geometry">
            <rect>
             <x>0</x>
-            <y>-113</y>
-            <width>471</width>
+            <y>0</y>
+            <width>485</width>
             <height>255</height>
            </rect>
           </property>
@@ -107,7 +107,7 @@
             </widget>
            </item>
            <item>
-            <widget class="QGroupBox" name="groupBox_5">
+            <widget class="QGroupBox" name="detectionShapeGroupBox">
              <property name="toolTip">
               <string/>
              </property>
@@ -658,7 +658,7 @@
        <rect>
         <x>0</x>
         <y>0</y>
-        <width>489</width>
+        <width>503</width>
         <height>256</height>
        </rect>
       </property>
@@ -847,12 +847,12 @@
    <slot>setEnabled(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>183</x>
-     <y>186</y>
+     <x>117</x>
+     <y>47</y>
     </hint>
     <hint type="destinationlabel">
-     <x>318</x>
-     <y>190</y>
+     <x>117</x>
+     <y>47</y>
     </hint>
    </hints>
   </connection>
@@ -863,12 +863,12 @@
    <slot>setEnabled(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>204</x>
-     <y>183</y>
+     <x>117</x>
+     <y>47</y>
     </hint>
     <hint type="destinationlabel">
-     <x>433</x>
-     <y>184</y>
+     <x>117</x>
+     <y>47</y>
     </hint>
    </hints>
   </connection>

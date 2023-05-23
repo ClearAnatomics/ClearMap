@@ -784,6 +784,18 @@ class CellCounterTab(PostProcessingTab):
         self.ui.cellMap3dScatterOnRefPushButton.clicked.connect(self.plot_cells_scatter_w_atlas_colors)
         self.ui.cellMap3dScatterOnStitchedPushButton.clicked.connect(self.plot_cells_scatter_w_atlas_colors_raw)
 
+        self.ui.advancedCheckBox.stateChanged.connect(self.swap_tab_advanced)
+
+    def swap_tab_advanced(self):  # TODO: implement
+        """
+        Activate the *advanced* mode which will display more controls
+        Returns
+        -------
+
+        """
+        checked = self.ui.advancedCheckBox.isChecked()
+        self.ui.detectionShapeGroupBox.setVisible(checked)
+
     def setup_cell_param_histogram(self, cells, plot_item, key='size', x_log=False):
         """
         Plots the histogram of the cell parameter defined by key. This is used to display the
