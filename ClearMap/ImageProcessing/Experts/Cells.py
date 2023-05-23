@@ -526,14 +526,14 @@ def filter_cells(source, sink, thresholds):
     source = clearmap_io.as_source(source)
 
     ids = np.ones(source.shape[0], dtype=bool)
-    for k, t in thresholds.items():
-        if t:
-            if not isinstance(t, (tuple, list)):
-                t = (t, None)
-            if t[0] is not None:
-                ids = np.logical_and(ids, t[0] <= source[k])
-            if t[1] is not None:
-                ids = np.logical_and(ids, t[1] > source[k])
+    for filter_name, thrsh in thresholds.items():
+        if thrsh:
+            if not isinstance(thrsh, (tuple, list)):
+                thrsh = (thrsh, None)
+            if thrsh[0] is not None:
+                ids = np.logical_and(ids, thrsh[0] <= source[filter_name])
+            if thrsh[1] is not None:
+                ids = np.logical_and(ids, thrsh[1] > source[filter_name])
     cells_filtered = source[ids]
 
     return clearmap_io.write(sink, cells_filtered)
