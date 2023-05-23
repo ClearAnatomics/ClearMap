@@ -89,7 +89,8 @@ from ClearMap.gui.style import DARK_BACKGROUND, PLOT_3D_BG, \
 from ClearMap.gui.widgets import OrthoViewer, ProgressWatcher, setup_mini_brain, StructureSelector, \
     PerfMonitor  # needs plot_3d
 update_pbar(app, progress_bar, 60)
-from ClearMap.gui.tabs import SampleTab, AlignmentTab, CellCounterTab, VasculatureTab, BatchTab
+from ClearMap.gui.tabs import SampleTab, AlignmentTab, CellCounterTab, VasculatureTab, GroupAnalysisTab, \
+    BatchProcessingTab
 from ClearMap.gui.preferences import PreferenceUi
 
 update_pbar(app, progress_bar, 80)
@@ -787,7 +788,8 @@ class ClearMapGui(ClearMapGuiBase):
         self.alignment_tab_mgr = AlignmentTab(self, tab_idx=1)
         self.cells_tab_mgr = CellCounterTab(self, tab_idx=2)
         self.vasculature_tab_mgr = VasculatureTab(self, tab_idx=3)
-        self.batch_tab_mgr = BatchTab(self, tab_idx=4)
+        self.group_analysis_tab_mgr = GroupAnalysisTab(self, tab_idx=4)
+        self.batch_tab_mgr = BatchProcessingTab(self, tab_idx=5)
 
         self.preference_editor = PreferenceUi(self)
         self.structure_selector = StructureSelector('', app=self)
@@ -822,7 +824,7 @@ class ClearMapGui(ClearMapGuiBase):
             tabs.append(self.cells_tab_mgr)
         if self.vasculature_tab_mgr.ui is None or self.vasculature_tab_mgr.ui.isEnabled():
             tabs.append(self.vasculature_tab_mgr)
-        # #self.batch_tab_mgr
+        # #self.group_analysis_tab_mgr
         return tabs
 
     @property
@@ -925,7 +927,8 @@ class ClearMapGui(ClearMapGuiBase):
         -------
 
         """
-        all_tabs = [self.sample_tab_mgr, self.alignment_tab_mgr, self.cells_tab_mgr, self.vasculature_tab_mgr, self.batch_tab_mgr]
+        all_tabs = [self.sample_tab_mgr, self.alignment_tab_mgr, self.cells_tab_mgr, self.vasculature_tab_mgr,
+                    self.group_analysis_tab_mgr, self.batch_tab_mgr]
         if 0 < tab_index < 4 and self.alignment_tab_mgr.preprocessor.workspace is None:
             self.popup('WARNING', 'Workspace not initialised, '
                                   'cannot proceed to alignment')
@@ -943,8 +946,16 @@ class ClearMapGui(ClearMapGuiBase):
                 # TODO: use result
                 self.popup('WARNING', 'Alignment not performed, please run first') == QMessageBox.Ok
                 self.tabWidget.setCurrentIndex(1)  # WARNING: does not work
-
-        elif tab_index == 4 and not self.batch_tab_mgr.initialised:
+        elif tab_index == 4 and not self.group_analysis_tab_mgr.initialised:
+            cfg_name = title_to_snake(self.group_analysis_tab_mgr.name)
+            try:
+                self.group_analysis_tab_mgr.setup()
+                self.group_analysis_tab_mgr.set_params()
+            except ConfigNotFoundError:
+                self.conf_load_error_msg(cfg_name)
+            except FileNotFoundError:  # message already printed, just stop
+                return
+        elif tab_index == 5 and not self.batch_tab_mgr.initialised:
             cfg_name = title_to_snake(self.batch_tab_mgr.name)
             try:
                 self.batch_tab_mgr.setup()
@@ -1028,6 +1039,8 @@ class ClearMapGui(ClearMapGuiBase):
     def clone(self):
         folder = get_directory_dlg(self.preference_editor.params.start_folder,
                                    title="Choose the experiment you would like to clone")
+        if not folder:
+            return
         src_config_loader = ConfigLoader(folder)
         for tab in self.tab_mgrs:
             cfg_name = title_to_snake(tab.name)
