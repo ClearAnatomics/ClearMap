@@ -33,7 +33,7 @@ from ClearMap.gui.dialogs import prompt_dialog, get_directory_dlg
 from ClearMap.gui.gui_utils import format_long_nb_to_str, surface_project, np_to_qpixmap
 from ClearMap.gui.interfaces import GenericTab, PostProcessingTab
 from ClearMap.gui.params import ParamsOrientationError, VesselParams, SampleParameters, \
-    AlignmentParams, CellMapParams, BatchParams
+    AlignmentParams, CellMapParams, GroupAnalysisParams, BatchProcessingParams
 from ClearMap.gui.widgets import PatternDialog, SamplePickerDialog, DataFrameWidget, LandmarksSelectorDialog
 from ClearMap.Visualization.Qt.widgets import Scatter3D
 
@@ -43,7 +43,7 @@ from ClearMap.Visualization.Qt import Plot3d as plot_3d
 from ClearMap.processors.sample_preparation import PreProcessor, init_preprocessor
 from ClearMap.processors.cell_map import CellDetector
 from ClearMap.processors.tube_map import BinaryVesselProcessor, VesselGraphProcessor
-from ClearMap.processors.batch_process import process_folders
+from ClearMap.processors.batch_process import BatchProcessor
 
 __author__ = 'Charly Rousseau <charly.rousseau@icm-institute.org>'
 __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
@@ -1467,7 +1467,7 @@ class VasculatureTab(PostProcessingTab):
 
 ################################################################################################
 
-class BatchProcessor:
+class GroupAnalysisProcessor:
     def __init__(self, progress_watcher, results_folder=None):
         self.results_folder = results_folder
         self.progress_watcher = progress_watcher
@@ -1506,7 +1506,7 @@ class BatchProcessor:
         link_dataviewers_cursors(dvs)
         return dvs
 
-    def compute_p_vals(self, selected_comparisons, groups):
+    def compute_p_vals(self, selected_comparisons, groups, wraping_func):
         for pair in selected_comparisons:  # TODO: Move to processor object to be wrapped
             gp1_name, gp2_name = pair
             gp1, gp2 = [groups[gp_name] for gp_name in pair]
@@ -1518,8 +1518,7 @@ class BatchProcessor:
                 ids.append(loader.get_cfg('sample')['sample_id'])
             if len(ids) != len(set(ids)):
                 raise GroupStatsError('Analysis impossible, some IDs are not unique. please check and start again')
-            main_window.wrap_in_thread(compare_groups, self.results_folder,
-                                            gp1_name, gp2_name, gp1, gp2)
+            wraping_func(compare_groups, self.results_folder, gp1_name, gp2_name, gp1, gp2)
             self.progress_watcher.increment_main_progress()
 
     def run_plots(self, plot_function, selected_comparisons, plot_kw_args):
@@ -1539,40 +1538,17 @@ class BatchProcessor:
 
 
 class BatchTab(GenericTab):
-    def __init__(self, main_window, tab_idx=4):  # REFACTOR: offload computations to BatchProcessor object
-        super().__init__(main_window, 'Group analysis', tab_idx, 'batch_tab')
-
-        self.params = None
-        self.processor = BatchProcessor(self.main_window.progress_watcher)
-
-        self.processing_type = 'batch'
-
     @property
     def initialised(self):
         return self.params is not None
 
-    def set_params(self):
-        self.params = BatchParams(self.ui, src_folder='', preferences=self.main_window.preference_editor.params)
-
     def setup(self):
-        """
-        Setup the UI elements, notably the signal/slot connections which are not
-        automatically set through the params object attribute
-
-        Returns
-        -------
-
-        """
         self.init_ui()
 
         self.ui.resultsFolderPushButton.clicked.connect(self.setup_results_folder)
 
         self.ui.folderPickerHelperPushButton.clicked.connect(self.create_wizard)
         self.connect_whats_this(self.ui.folderPickerHelperInfoToolButton, self.ui.folderPickerHelperPushButton)
-        self.ui.runPValsPushButton.clicked.connect(self.run_p_vals)
-        self.ui.plotPValsPushButton.clicked.connect(self.plot_p_vals)
-        self.ui.batchStatsPushButton.clicked.connect(self.make_group_stats_tables)
-
         self.ui.batchToolBox.setCurrentIndex(0)
 
     def setup_results_folder(self):
@@ -1600,15 +1576,42 @@ class BatchTab(GenericTab):
         self.params.ui_to_cfg()
         self.setup_workers()
 
+    def create_wizard(self):
+        return SamplePickerDialog(self.params.src_folder, params=self.params)
+
+
+class GroupAnalysisTab(BatchTab):
+    def __init__(self, main_window, tab_idx=4):  # REFACTOR: offload computations to BatchProcessor object
+        super().__init__(main_window, 'Group analysis', tab_idx, 'group_analysis_tab')
+
+        self.params = None
+        self.processor = GroupAnalysisProcessor(self.main_window.progress_watcher)
+
+        self.processing_type = 'batch'
+
+    def set_params(self):
+        self.params = GroupAnalysisParams(self.ui, src_folder='', preferences=self.main_window.preference_editor.params)
+
+    def setup(self):
+        """
+        Setup the UI elements, notably the signal/slot connections which are not
+        automatically set through the params object attribute
+
+        Returns
+        -------
+
+        """
+        super().setup()
+        self.ui.runPValsPushButton.clicked.connect(self.run_p_vals)
+        self.ui.plotPValsPushButton.clicked.connect(self.plot_p_vals)
+        self.ui.batchStatsPushButton.clicked.connect(self.make_group_stats_tables)
+
     def setup_workers(self):
         self.processor.results_folder = self.params.results_folder
         self.processor.progress_watcher = self.main_window.progress_watcher
 
     # def setup_workers(self):
     #     self.processor = BatchProcessor(self.params.config)
-
-    def create_wizard(self):
-        return SamplePickerDialog(self.params.src_folder, params=self.params)
 
     def make_group_stats_tables(self):
         self.main_window.print_status_msg('Computing stats table')
@@ -1633,7 +1636,8 @@ class BatchTab(GenericTab):
         # TODO: set abort callback
         self.main_window.make_progress_dialog('P value maps', n_steps=len(self.params.selected_comparisons))
         try:
-            self.processor.compute_p_vals(self.params.selected_comparisons, self.params.groups)
+            self.processor.compute_p_vals(self.params.selected_comparisons, self.params.groups,
+                                          self.main_window.wrap_in_thread)
         except GroupStatsError as err:
             self.main_window.popup(str(err), base_msg='Cannot proceed with analysis')
         self.main_window.signal_process_finished()
@@ -1660,12 +1664,33 @@ class BatchTab(GenericTab):
                                                      'fold_threshold': fold_threshold, 'fold_regions': True,
                                                      'show': False})
 
-# class BatchProcessingTab(GenericTab):
-    # def run_batch_process(self):
-    #     self.params.ui_to_cfg()
-    #     paths = [p for ps in self.params.get_all_paths() for p in ps]  # flatten list
-    #     self.main_window.make_progress_dialog('Analysing samples', n_steps=0, maximum=0)  # TODO: see abort callback
-    #     # FIXME: use BatchProcessor object to increment progress watcher from within
-    #     self.main_window.wrap_in_thread(process_folders, paths,
-    #                                     self.params.align, self.params.count_cells, self.params.run_vaculature)
-    #     self.progress_watcher.finish()
+
+class BatchProcessingTab(BatchTab):
+    def __init__(self, main_window, tab_idx=4):
+        super().__init__(main_window, 'Batch', tab_idx, 'batch_processing_tab')
+
+        self.params = None
+        self.processor = BatchProcessor(self.main_window.progress_watcher)
+
+        self.processing_type = 'batch'
+
+    def set_params(self):
+        self.params = BatchProcessingParams(self.ui, src_folder='', preferences=self.main_window.preference_editor.params)
+        self.processor.params = self.params
+
+    def setup(self):
+        """
+        Setup the UI elements, notably the signal/slot connections which are not
+        automatically set through the params object attribute
+
+        Returns
+        -------
+
+        """
+        super().setup()
+        self.ui.batchRunPushButton.clicked.connect(self.run_batch_process)
+
+    def run_batch_process(self):
+        self.params.ui_to_cfg()
+        self.main_window.make_progress_dialog('Analysing samples', n_steps=0, maximum=0)  # TODO: see abort callback
+        self.main_window.wrap_in_thread(self.processor.process_folders)

@@ -293,6 +293,7 @@ class GeneralStitchingParams(UiParameter):
     convert_raw: bool
     convert_arteries: bool
     conversion_fmt: str
+    # stitching_preview_step: str
 
     def __init__(self, tab, src_folder=None):
         super().__init__(tab, src_folder)
@@ -305,7 +306,8 @@ class GeneralStitchingParams(UiParameter):
             'convert_output': ['stitching', 'output_conversion', 'skip'],
             'convert_raw': ParamLink(['stitching', 'output_conversion', 'raw'], self.tab.stitchingConvertRawCheckBox),
             'convert_arteries': ParamLink(['stitching', 'output_conversion', 'arteries'], self.tab.stitchingConvertArteriesCheckBox),
-            'conversion_fmt': ParamLink(['stitching', 'output_conversion', 'format'], self.tab.outputConversionFormat)
+            'conversion_fmt': ParamLink(['stitching', 'output_conversion', 'format'], self.tab.outputConversionFormat),
+            # 'stitching_preview_step': ParamLink([], self.tab.stitchingPreviewStep, connect=False)
         }
         self.attrs_to_invert = ['convert_output']  # FIXME: check
         self.connect()
@@ -872,8 +874,7 @@ class PreferencesParams(UiParameter):
     #     self.tab.fontComboBox.setCurrentFont(font)
 
 
-class BatchParams(UiParameter):
-
+class BatchParameters(UiParameter):
     def __init__(self, tab, src_folder=None, preferences=None):
         super().__init__(tab, src_folder)
         self.group_concatenator = ' vs '
@@ -881,13 +882,9 @@ class BatchParams(UiParameter):
         self.tab.sampleFoldersToolBox = QToolBox(parent=self.tab)
         self.tab.sampleFoldersPageLayout.addWidget(self.tab.sampleFoldersToolBox, 3, 0)
 
-        self.comparison_checkboxes = []
-
     def _ui_to_cfg(self):
         self.config['paths']['results_folder'] = self.results_folder
         self.config['groups'] = self.groups
-        self.config['comparisons'] = {letter: pair for letter, pair in zip(string.ascii_lowercase,
-                                                                           self.selected_comparisons)}
 
     def cfg_to_ui(self):
         self.reload()
@@ -897,24 +894,6 @@ class BatchParams(UiParameter):
         self.group_names = self.config['groups'].keys()  # FIXME: check that ordered
         for i, paths in enumerate(self.config['groups'].values()):
             self.set_paths(i+1, paths)
-        self.update_comparisons()
-        for chk_bx in self.comparison_checkboxes:
-            if chk_bx.text().split(self.group_concatenator) in self.config['comparisons'].values():
-                self.set_check_state(chk_bx, True)
-
-    def connect(self):
-        self.tab.addGroupPushButton.clicked.connect(self.add_group)
-        self.tab.removeGroupPushButton.clicked.connect(self.remove_group)
-        self.tab.resultsFolderLineEdit.textChanged.connect(self.handle_results_folder_changed)
-        # self.connect_simple_widgets()
-
-    def connect_groups(self):
-        for btn in self.gp_add_folder_buttons:
-            self.__connect_btn(btn, self.handle_add_src_folder_clicked)
-        for btn in self.gp_remove_folder_buttons:
-            self.__connect_btn(btn, self.handle_remove_src_folder_clicked)
-        for ctrl in self.gp_group_name_ctrls:
-            self.__connect_line_edit(ctrl, self.update_comparisons)
 
     def __connect_btn(self, btn, callback):
         try:
@@ -936,29 +915,17 @@ class BatchParams(UiParameter):
             else:
                 raise err
 
-    @property
-    def comparisons(self):
-        """
+    def connect(self):
+        self.tab.addGroupPushButton.clicked.connect(self.add_group)
+        self.tab.removeGroupPushButton.clicked.connect(self.remove_group)
+        self.tab.resultsFolderLineEdit.textChanged.connect(self.handle_results_folder_changed)
+        # self.connect_simple_widgets()
 
-        Returns
-        -------
-            The list of all possible pairs of groups
-        """
-        # return list(combinations(self.group_names, 2))
-        return list(permutations(self.group_names, 2))
-
-    @property
-    def selected_comparisons(self):
-        return [box.text().split(self.group_concatenator) for box in self.comparison_checkboxes if box.isChecked()]
-
-    def update_comparisons(self):
-        clear_layout(self.tab.comparisonsVerticalLayout)
-        self.comparison_checkboxes = []
-        for pair in self.comparisons:
-            chk = QCheckBox(self.group_concatenator.join(pair))
-            chk.setChecked(False)
-            self.tab.comparisonsVerticalLayout.addWidget(chk)
-            self.comparison_checkboxes.append(chk)
+    def connect_groups(self):
+        for btn in self.gp_add_folder_buttons:
+            self.__connect_btn(btn, self.handle_add_src_folder_clicked)
+        for btn in self.gp_remove_folder_buttons:
+            self.__connect_btn(btn, self.handle_remove_src_folder_clicked)
 
     def add_group(self):  # REFACTOR: better in tab object
         new_gp_id = self.n_groups + 1
@@ -994,7 +961,7 @@ class BatchParams(UiParameter):
     @property
     def gp_add_folder_buttons(self):
         return self.get_gp_ctrls('AddSrcFolderBtn')
-    
+
     @property
     def gp_remove_folder_buttons(self):
         return self.get_gp_ctrls('RemoveSrcFolderBtn')
@@ -1007,16 +974,16 @@ class BatchParams(UiParameter):
         return [getattr(self.tab.sampleFoldersToolBox.widget(i), f'gp{ctrl_name}') for i in range(self.n_groups)]
 
     def set_paths(self, gp, paths):
-        list_widget = self.gp_list_widget[gp-1]
+        list_widget = self.gp_list_widget[gp - 1]
         list_widget.clear()
         list_widget.addItems(paths)
 
     def get_paths(self, gp):  # TODO: should exist from group name
-        list_widget = self.gp_list_widget[gp-1]
+        list_widget = self.gp_list_widget[gp - 1]
         return [list_widget.item(i).text() for i in range(list_widget.count())]
 
     def get_all_paths(self):
-        return [self.get_paths(gp+1) for gp in range(self.n_groups)]
+        return [self.get_paths(gp + 1) for gp in range(self.n_groups)]
 
     @property
     def groups(self):
@@ -1045,6 +1012,67 @@ class BatchParams(UiParameter):
 
     def handle_results_folder_changed(self):
         self.config['paths']['results_folder'] = self.results_folder
+
+
+class GroupAnalysisParams(BatchParameters):
+    """
+    Essentially batch parameters with comparisons
+    """
+
+    def __init__(self, tab, src_folder=None, preferences=None):
+        super().__init__(tab, src_folder, preferences)
+
+        self.comparison_checkboxes = []
+
+    def _ui_to_cfg(self):
+        super()._ui_to_cfg()
+        self.config['comparisons'] = {letter: pair for letter, pair in zip(string.ascii_lowercase,
+                                                                           self.selected_comparisons)}
+
+    def cfg_to_ui(self):
+        super().cfg_to_ui()
+        self.update_comparisons()
+        for chk_bx in self.comparison_checkboxes:
+            if chk_bx.text().split(self.group_concatenator) in self.config['comparisons'].values():
+                self.set_check_state(chk_bx, True)
+
+    def connect_groups(self):
+        super().connect_groups()
+        for ctrl in self.gp_group_name_ctrls:
+            self.__connect_line_edit(ctrl, self.update_comparisons)
+
+    @property
+    def comparisons(self):
+        """
+
+        Returns
+        -------
+            The list of all possible pairs of groups
+        """
+        # return list(combinations(self.group_names, 2))
+        return list(permutations(self.group_names, 2))
+
+    @property
+    def selected_comparisons(self):
+        return [box.text().split(self.group_concatenator) for box in self.comparison_checkboxes if box.isChecked()]
+
+    def update_comparisons(self):
+        clear_layout(self.tab.comparisonsVerticalLayout)
+        self.comparison_checkboxes = []
+        for pair in self.comparisons:
+            chk = QCheckBox(self.group_concatenator.join(pair))
+            chk.setChecked(False)
+            self.tab.comparisonsVerticalLayout.addWidget(chk)
+            self.comparison_checkboxes.append(chk)
+
+
+class BatchProcessingParams(BatchParameters):
+    """
+    Essentially BatchParameters with processing steps
+    """
+
+    def __init__(self, tab, src_folder=None, preferences=None):
+        super().__init__(tab, src_folder, preferences)
 
     @property
     def align(self):
