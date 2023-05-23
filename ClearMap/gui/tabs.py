@@ -352,6 +352,7 @@ class AlignmentTab(GenericTab):
 
         self.ui.registrationGoToSampleOrientationPushButton.clicked.connect(self.main_window.sample_tab_mgr.go_to_orientation)
         self.ui.registerButtonBox.connectApply(self.run_registration)
+        self.ui.clearLandmarksFilesPushButton.clicked.connect(self.clear_landmarks)
         self.ui.plotRegistrationResultsSideBySidePushButton.clicked.connect(self.plot_registration_results_side_by_side)
         self.ui.plotRegistrationResultsCompositePushButton.clicked.connect(self.plot_registration_results_composite)
         self.ui.plotRegistrationResultsRawSideBySidePushButton.clicked.connect(self.plot_registration_results_side_by_side_raw)
@@ -501,6 +502,9 @@ class AlignmentTab(GenericTab):
         self.wrap_step(f'Converting stitched image to {fmt}', self.preprocessor.convert_to_image_format,
                        n_steps=self.preprocessor.n_channels_convert, abort_func=self.preprocessor.stop_process,
                        save_cfg=False, nested=False)
+
+    def clear_landmarks(self):
+        self.preprocessor.clear_landmarks()
 
     def display_auto_to_ref_landmarks_dialog(self):
         """

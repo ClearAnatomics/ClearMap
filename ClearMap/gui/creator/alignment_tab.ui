@@ -984,7 +984,7 @@
          <item>
           <widget class="QToolBox" name="toolBox_3">
            <property name="currentIndex">
-            <number>0</number>
+            <number>1</number>
            </property>
            <widget class="QWidget" name="atlasSettingsPage">
             <property name="geometry">
@@ -1194,8 +1194,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>256</width>
-              <height>154</height>
+              <width>460</width>
+              <height>499</height>
              </rect>
             </property>
             <attribute name="label">
@@ -1204,13 +1204,6 @@
             <layout class="QVBoxLayout" name="verticalLayout">
              <item>
               <layout class="QGridLayout" name="gridLayout">
-               <item row="2" column="0">
-                <widget class="QCheckBox" name="skipRegistrationResamplingCheckBox">
-                 <property name="text">
-                  <string>Skip resampling</string>
-                 </property>
-                </widget>
-               </item>
                <item row="0" column="0">
                 <widget class="QPushButton" name="useResampledToAutoLandmarksPushButton">
                  <property name="toolTip">
@@ -1224,16 +1217,10 @@
                  </property>
                 </widget>
                </item>
-               <item row="1" column="0">
-                <widget class="QPushButton" name="useAutoToRefLandmarksPushButton">
-                 <property name="toolTip">
-                  <string>Select matching pixels between autofluorescence and reference channels</string>
-                 </property>
-                 <property name="whatsThis">
-                  <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;When you click this button a new window will appear with a list of markers and colors.&lt;/p&gt;&lt;p&gt;Select a landmark in the left image and &lt;span style=&quot; font-weight:700;&quot;&gt;left click&lt;/span&gt; to put the marker in this location.&lt;/p&gt;&lt;p&gt;Select the matching voxel of the right image and &lt;span style=&quot; font-weight:700;&quot;&gt;left click&lt;/span&gt; to label it too.&lt;/p&gt;&lt;p&gt;Once done, click &lt;span style=&quot; font-weight:700;&quot;&gt;Add Marker&lt;/span&gt; and reapeat the operation for each pair of markers.&lt;/p&gt;&lt;p&gt;When all markers are selected, click &lt;span style=&quot; font-weight:700;&quot;&gt;OK&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-                 </property>
+               <item row="3" column="0">
+                <widget class="QCheckBox" name="skipRegistrationResamplingCheckBox">
                  <property name="text">
-                  <string>Use reference landmarks</string>
+                  <string>Skip resampling</string>
                  </property>
                 </widget>
                </item>
@@ -1250,6 +1237,35 @@
                  <property name="icon">
                   <iconset resource="icons.qrc">
                    <normaloff>:/icons/icons/info.svg</normaloff>:/icons/icons/info.svg</iconset>
+                 </property>
+                </widget>
+               </item>
+               <item row="1" column="0">
+                <widget class="QPushButton" name="useAutoToRefLandmarksPushButton">
+                 <property name="toolTip">
+                  <string>Select matching pixels between autofluorescence and reference channels</string>
+                 </property>
+                 <property name="whatsThis">
+                  <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;When you click this button a new window will appear with a list of markers and colors.&lt;/p&gt;&lt;p&gt;Select a landmark in the left image and &lt;span style=&quot; font-weight:700;&quot;&gt;left click&lt;/span&gt; to put the marker in this location.&lt;/p&gt;&lt;p&gt;Select the matching voxel of the right image and &lt;span style=&quot; font-weight:700;&quot;&gt;left click&lt;/span&gt; to label it too.&lt;/p&gt;&lt;p&gt;Once done, click &lt;span style=&quot; font-weight:700;&quot;&gt;Add Marker&lt;/span&gt; and reapeat the operation for each pair of markers.&lt;/p&gt;&lt;p&gt;When all markers are selected, click &lt;span style=&quot; font-weight:700;&quot;&gt;OK&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                 </property>
+                 <property name="text">
+                  <string>Use reference landmarks</string>
+                 </property>
+                </widget>
+               </item>
+               <item row="2" column="0">
+                <widget class="QPushButton" name="clearLandmarksFilesPushButton">
+                 <property name="toolTip">
+                  <string>Remove landmarks files and revert to automated alignment</string>
+                 </property>
+                 <property name="whatsThis">
+                  <string/>
+                 </property>
+                 <property name="text">
+                  <string> Clear landmarks files</string>
+                 </property>
+                 <property name="icon">
+                  <iconset theme="remove"/>
                  </property>
                 </widget>
                </item>
