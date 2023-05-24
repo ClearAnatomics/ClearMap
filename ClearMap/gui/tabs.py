@@ -962,8 +962,6 @@ class CellCounterTab(PostProcessingTab):
                        abort_func=self.cell_detector.stop_process)
         if self.cell_detector.stopped:
             return
-        if self.params.plot_detected_cells:
-            self.cell_detector.plot_cells()  # TODO: integrate into UI
         self.update_cell_number()
 
     def update_cell_number(self):  # FIXME: try except or check that cells and cells filtered exist

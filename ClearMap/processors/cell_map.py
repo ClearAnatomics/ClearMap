@@ -395,7 +395,7 @@ class CellDetector(TabProcessor):
         csv_file_path = self.workspace.filename('cells', postfix='stats', extension='.csv')
         collapsed.to_csv(csv_file_path, index=False)
 
-    def plot_cells(self):
+    def plot_cells(self):  # For non GUI
         source = self.workspace.source('cells', postfix='raw')
         plt.figure(1)
         plt.clf()
