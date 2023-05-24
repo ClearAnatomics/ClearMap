@@ -886,16 +886,17 @@ class CellCounterTab(PostProcessingTab):
         if tab_idx == 1:
             for sample_type in ('normal', 'debug'):
                 try:
-                    if sample_type == 'debug':
-                        with self.preprocessor.workspace.debug:
-                            cells_df = self.cell_detector.get_cells_df()
-                    else:
-                        cells_df = self.cell_detector.get_cells_df()
+                    self.preprocessor.workspace.debug = sample_type == 'debug'
+                    cells_df = pd.DataFrame(np.load(self.preprocessor.workspace.filename('cells', postfix='raw')))
                     self.__plot_histograms(cells_df)
                     break
                 except FileNotFoundError:
                     end = 'skipping' if sample_type == 'debug' else 'trying debug'
                     print(f'Could not find {sample_type} cells dataframe file, {end}')
+                finally:
+                    self.preprocessor.workspace.debug = False
+            else:
+                self.main_window.popup('No cells file found, cannot display histograms yet')
         elif tab_idx == 3:
             self.update_cell_number()
 
