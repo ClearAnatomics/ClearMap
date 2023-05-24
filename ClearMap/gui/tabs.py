@@ -785,6 +785,7 @@ class CellCounterTab(PostProcessingTab):
         self.ui.cellMap3dScatterOnStitchedPushButton.clicked.connect(self.plot_cells_scatter_w_atlas_colors_raw)
 
         self.ui.advancedCheckBox.stateChanged.connect(self.swap_tab_advanced)
+        self.ui.detectionShapeGroupBox.setVisible(False)
 
     def swap_tab_advanced(self):  # TODO: implement
         """
