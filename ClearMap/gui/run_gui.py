@@ -791,10 +791,10 @@ class ClearMapGui(ClearMapGuiBase):
         self.group_analysis_tab_mgr = GroupAnalysisTab(self, tab_idx=4)
         self.batch_tab_mgr = BatchProcessingTab(self, tab_idx=5)
 
+        self.sample_tab_mgr.mini_brain_scaling, self.sample_tab_mgr.mini_brain = setup_mini_brain()
+
         self.preference_editor = PreferenceUi(self)
         self.structure_selector = StructureSelector('', app=self)
-
-        self.sample_tab_mgr.mini_brain_scaling, self.sample_tab_mgr.mini_brain = setup_mini_brain()
 
         self.setWindowIcon(QtGui.QIcon(os.path.join(ICONS_FOLDER, 'logo_cyber.png')))
 
@@ -816,6 +816,25 @@ class ClearMapGui(ClearMapGuiBase):
 
     def __getitem__(self, item):
         return self.tab_mgrs[item]
+
+    def reset(self):
+        self.config_loader = ConfigLoader('')
+        self.ortho_viewer = OrthoViewer()
+
+        self.sample_tab_mgr = SampleTab(self, tab_idx=0)
+        self.alignment_tab_mgr = AlignmentTab(self, tab_idx=1)
+        self.cells_tab_mgr = CellCounterTab(self, tab_idx=2)
+        self.vasculature_tab_mgr = VasculatureTab(self, tab_idx=3)
+        self.group_analysis_tab_mgr = GroupAnalysisTab(self, tab_idx=4)
+        self.batch_tab_mgr = BatchProcessingTab(self, tab_idx=5)
+
+        self.sample_tab_mgr.mini_brain_scaling, self.sample_tab_mgr.mini_brain = setup_mini_brain()
+
+        self.setup_loggers()
+        for tab in self.tab_mgrs:
+            tab.params = None
+
+        self.amend_ui()
 
     @property
     def tab_mgrs(self):
@@ -853,10 +872,7 @@ class ClearMapGui(ClearMapGuiBase):
         -------
 
         """
-        self.logger = Printer()
-        self.logger.text_updated.connect(self.textBrowser.append)
-        self.error_logger = Printer(color='red', logger_type='error')
-        self.error_logger.text_updated.connect(self.textBrowser.append)
+        self.setup_loggers()
 
         self.setup_icons()
         self.setup_tabs()
@@ -869,6 +885,12 @@ class ClearMapGui(ClearMapGuiBase):
         self.graphLayout.removeWidget(self.frame)
 
         self.print_status_msg('Idle, waiting for input')
+
+    def setup_loggers(self):
+        self.logger = Printer()
+        self.logger.text_updated.connect(self.textBrowser.append)
+        self.error_logger = Printer(color='red', logger_type='error')
+        self.error_logger.text_updated.connect(self.textBrowser.append)
 
     def patch_stdout(self):
         """
@@ -1133,6 +1155,8 @@ class ClearMapGui(ClearMapGuiBase):
 
         """
         folder = get_directory_dlg(self.preference_editor.params.start_folder)
+        if folder and folder != self.src_folder:
+            self.reset()
         self._set_src_folder(folder)
 
     def _set_src_folder(self, src_folder):
