@@ -80,7 +80,7 @@
       <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Apply all the selected processing steps to the samples selcted &lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
      </property>
      <property name="currentIndex">
-      <number>0</number>
+      <number>1</number>
      </property>
      <widget class="QWidget" name="sampleFoldersPage">
       <property name="geometry">
@@ -200,7 +200,7 @@
          <item>
           <widget class="QPushButton" name="batchRunPushButton">
            <property name="text">
-            <string>PushButton</string>
+            <string>Process all samples</string>
            </property>
           </widget>
          </item>
