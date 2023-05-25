@@ -19,6 +19,7 @@ __download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 
 import importlib
 import functools
+import math
 
 import numpy as np
 
@@ -716,7 +717,8 @@ def convert(source, sink, processes = None, verbose = False, **kwargs):
 
 
 
-def convert_files(filenames, extension = None, path = None, processes = None, verbose = False, workspace=None):
+def convert_files(filenames, extension = None, path = None, processes = None, verbose = False, workspace=None,
+                  verify=False):
   """Transforms list of files to their sink format in parallel.
   
   Arguments
@@ -755,7 +757,7 @@ def convert_files(filenames, extension = None, path = None, processes = None, ve
     processes = mp.cpu_count();
   
   #print(n_files, extension, filenames, sinks)
-  _convert = functools.partial(_convert_files, n_files=n_files, extension=extension, verbose=verbose);
+  _convert = functools.partial(_convert_files, n_files=n_files, extension=extension, verbose=verbose, verify=verify);
   
   if processes == 'serial':
     [_convert(source,sink,i) for i,source,sink in zip(range(n_files), filenames, sinks)];
@@ -774,7 +776,7 @@ def convert_files(filenames, extension = None, path = None, processes = None, ve
 
 
 @ptb.parallel_traceback
-def _convert_files(source, sink, fid, n_files, extension, verbose):
+def _convert_files(source, sink, fid, n_files, extension, verbose, verify=False):
   source = as_source(source);              
   if verbose:
     print('Converting file %d/%d %s -> %s' % (fid,n_files,source,sink))
@@ -782,7 +784,11 @@ def _convert_files(source, sink, fid, n_files, extension, verbose):
   if mod is None:
     raise ValueError("Cannot determine module for extension %s!" % extension);
   mod.write(sink,source);
-
+  if verify:
+    src_mean = source.mean()
+    sink_mean = mod.read(sink).mean()
+    if not math.isclose(src_mean, sink_mean, rel_tol=1e-5):
+      raise RuntimeError(f"Conversion of {source} to {sink} failed, means differ")
 
 
 ###############################################################################
