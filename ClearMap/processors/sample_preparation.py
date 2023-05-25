@@ -240,7 +240,7 @@ class PreProcessor(TabProcessor):
                 try:
                     clearmap_io.convert_files(self.workspace.file_list('raw', extension='tif'), extension='npy',
                                               processes=self.machine_config['n_processes_file_conv'],
-                                              workspace=self.workspace, verbose=self.verbose)
+                                              workspace=self.workspace, verbose=self.verbose, verify=True)
                 except BrokenProcessPool:
                     print('File conversion canceled')
                     return
@@ -249,7 +249,7 @@ class PreProcessor(TabProcessor):
                         clearmap_io.convert_files(self.workspace.file_list('arteries', extension='tif'),
                                                   extension='npy',
                                                   processes=self.machine_config['n_processes_file_conv'],
-                                                  workspace=self.workspace, verbose=self.verbose)
+                                                  workspace=self.workspace, verbose=self.verbose, verify=True)
                     except BrokenProcessPool:
                         print('File conversion canceled')
                         return
@@ -339,7 +339,7 @@ class PreProcessor(TabProcessor):
             try:
                 clearmap_io.convert_files(self.workspace.file_list('stitched', extension='npy', prefix=self.prefix),
                                           extension=fmt, processes=self.machine_config['n_processes_file_conv'],
-                                          workspace=self.workspace, verbose=True)
+                                          workspace=self.workspace, verbose=True, verify=True)
                 self.update_watcher_main_progress()
             except BrokenProcessPool:
                 print('File conversion canceled')
@@ -349,7 +349,7 @@ class PreProcessor(TabProcessor):
                 clearmap_io.convert_files(self.workspace.file_list('stitched', postfix='arteries',
                                                                    prefix=self.prefix, extension='npy'),
                                           extension=fmt, processes=self.machine_config['n_processes_file_conv'],
-                                          workspace=self.workspace, verbose=True)
+                                          workspace=self.workspace, verbose=True, verify=True)
                 self.update_watcher_main_progress()
             except BrokenProcessPool:
                 print('File conversion canceled')
