@@ -905,7 +905,7 @@ class BatchParameters(UiParameter):
             else:
                 raise err
 
-    def __connect_line_edit(self, ctrl, callback):
+    def _connect_line_edit(self, ctrl, callback):
         try:
             ctrl.editingFinished.connect(callback, type=Qt.UniqueConnection)
         except TypeError as err:
@@ -1039,7 +1039,7 @@ class GroupAnalysisParams(BatchParameters):
     def connect_groups(self):
         super().connect_groups()
         for ctrl in self.gp_group_name_ctrls:
-            self.__connect_line_edit(ctrl, self.update_comparisons)
+            self._connect_line_edit(ctrl, self.update_comparisons)
 
     @property
     def comparisons(self):
