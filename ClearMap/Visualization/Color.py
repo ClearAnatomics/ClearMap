@@ -1126,7 +1126,7 @@ def write_PAL(filename, colors):
   return filename;  
 
 
-def rand_cmap(n_labels, map_type='bright', first_color_black=True, last_color_black=False):  # Inspired from https://stackoverflow.com/a/32520273
+def rand_cmap(n_labels, map_type='bright', first_color_black=True, last_color_black=False, cmap_name='Paired'):
     """
     Creates a random colormap to be used together with matplotlib. Useful for segmentation tasks
 
@@ -1146,29 +1146,27 @@ def rand_cmap(n_labels, map_type='bright', first_color_black=True, last_color_bl
         colormap for matplotlib
     """
 
-    if map_type == 'bright':  # Generate color map for bright colors, based on hsv
-        lows = [0, 0.2, 0.9]
-        high = 1
-    elif map_type == 'soft':  # Generate soft pastel colors, by limiting the RGB spectrum
-        lows = [0.6] * 3
-        high = 0.95
-    else:
-        raise ValueError(f'Expected "bright" or "soft" for map_type, got "{map_type}"')
+    label_cmap_names = ('Pastel1', 'Pastel2', 'Accent', 'Paired', 'Dark2', 'Set1', 'Set2', 'Set3', 'Tab10')
+    pastel_cmap_names = ('Pastel1', 'Pastel2', 'Set3')
+    bright_cmap_names = list(set(label_cmap_names) - set(pastel_cmap_names))
+    black = [0, 0, 0]
 
-    rand_colors = [(np.random.uniform(low=lows[0], high=high),
-                    np.random.uniform(low=lows[1], high=high),
-                    np.random.uniform(low=lows[2], high=high)) for i in range(n_labels)]  # FIXME: use np notation instead
+    assert cmap_name in label_cmap_names
 
-    if map_type == 'bright':
-        # Convert HSV list to RGB
-        rand_colors = [colorsys.hsv_to_rgb(hsv_color[0], hsv_color[1], hsv_color[2]) for hsv_color in rand_colors]
+    if map_type == 'pastel' and cmap_name not in pastel_cmap_names:
+        cmap_name = 'Set3'
+    elif map_type == 'bright' and cmap_name not in bright_cmap_names:
+        cmap_name = 'Accent'
 
+    cmap_colors = np.array(mpl.cm.get_cmap(cmap_name).colors)
+    n_repeats = n_labels // cmap_colors.shape[0] + 1  # Overshoot
+    colors = np.tile(cmap_colors, (n_repeats, 1))[:n_labels, :]  # Trim
     if first_color_black:
-        rand_colors[0] = [0, 0, 0]
+        colors[0, :] = black
     if last_color_black:
-        rand_colors[-1] = [0, 0, 0]
+        colors[-1, :] = black
+    return colors
 
-    return rand_colors
 
 ###############################################################################
 ### Tests
