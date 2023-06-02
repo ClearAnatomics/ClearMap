@@ -412,7 +412,7 @@ class CellMapParams(UiParameter):
     maxima_shape: int
     detection_threshold: int
     cell_filter_size: List[int]
-    cell_filter_intensity: int
+    cell_filter_intensity: List[int]
     voxelization_radii: List[int]
     detect_cells: bool
     filter_cells: bool
@@ -433,7 +433,7 @@ class CellMapParams(UiParameter):
             'maxima_shape': ParamLink(['detection', 'maxima_detection', 'shape'], self.tab.maximaShape),
             'detection_threshold': ParamLink(['detection', 'shape_detection', 'threshold'], self.tab.detectionThreshold),
             'cell_filter_size': ParamLink(['cell_filtration', 'thresholds', 'size'], self.tab.cellFilterThresholdSizeDoublet),
-            'cell_filter_intensity': ParamLink(['cell_filtration', 'thresholds', 'intensity'], self.tab.voxelizationRadiusTriplet),
+            # Properties below 'cell_filter_intensity': ParamLink(['cell_filtration', 'thresholds', 'intensity'], self.tab.cellFilterThresholdIntensityDoublet),
             'voxelization_radii': ParamLink(['voxelization', 'radii'], self.tab.voxelizationRadiusTriplet),
             'detect_cells': ParamLink(None, self.tab.runCellMapDetectCellsCheckBox),
             'filter_cells': ParamLink(None, self.tab.runCellMapFilterCellsCheckBox),
