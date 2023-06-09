@@ -14,6 +14,8 @@ __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__   = 'http://idisco.info'
 __download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 
+import warnings
+
 import numpy as np
 import functools as ft
 import multiprocessing as mp
@@ -998,11 +1000,23 @@ def verbose_has_flag(verbose, flag):
     
 #TODO: use global plane wise coordinates if subsampling !
 def align_layout(layout, axis_range=None, max_shifts=10, axis_mip=None,
-                 stack_validation_params=None, prepare='normalization',
-                 slice_validation_params=None, prepare_slice=None,
+                 stack_validation_params=None, validate=None, prepare='normalization',
+                 slice_validation_params=None, validate_slice=None, prepare_slice=None,
                  find_shifts='minimization',
                  verbose=False, processes=None, workspace= None):
-  
+
+  if validate is not None:
+    if not stack_validation_params:
+      stack_validation_params = validate
+    warnings.warn('Parameter validate is deprecated, please use stack_validation_params instead',
+                  DeprecationWarning, stacklevel=2)
+
+  if validate_slice is not None:
+    if not slice_validation_params:
+      slice_validation_params = validate_slice
+    warnings.warn('Parameter validate_slice is deprecated, please use slice_validation_params instead',
+                  DeprecationWarning, stacklevel=2)
+
   axis = layout.axis;
   alignments = layout.alignments;
   
