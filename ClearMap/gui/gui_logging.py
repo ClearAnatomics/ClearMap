@@ -5,7 +5,7 @@ gui_logging
 
 Defines the Printer class used to log to file and to the GUI widgets from simple prints
 """
-
+import sys
 from datetime import datetime
 from io import UnsupportedOperation
 
@@ -25,16 +25,16 @@ __download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
 class Printer(QWidget):
     text_updated = QtCore.pyqtSignal(str)
 
-    def __init__(self, log_path=None, color=None, logger_type='info', app=None, open_mode='a', parent=None):
+    def __init__(self, log_path=None, color=None, logger_type='info', app=None, open_mode='a', redirects=None, parent=None):
         super().__init__(parent)
-        # self.widget = text_widget
         self.file = None
-        if log_path is not None:
-            self.file = open(log_path, open_mode)  # self.set_file
         self.n_lines = 0
         self.color = color
         self.type = logger_type
-        # self.win = self.widget.window()
+        self.redirects = redirects
+
+        self.set_file(log_path, open_mode)
+
         if app is None:
             self.app = QApplication.instance()
         else:
@@ -53,6 +53,10 @@ class Printer(QWidget):
         self.close_file()
         self.file = open(log_path, open_mode)
         self.n_lines = 0
+        if self.redirects == 'stdout':
+            sys.stdout = self.file
+        elif self.redirects == 'stderr':
+            sys.stderr = self.file
 
     def write(self, msg):
         if self.file is not None:

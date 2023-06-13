@@ -886,21 +886,10 @@ class ClearMapGui(ClearMapGuiBase):
         self.print_status_msg('Idle, waiting for input')
 
     def setup_loggers(self):
-        self.logger = Printer()
+        self.logger = Printer(redirects='stdout')
         self.logger.text_updated.connect(self.textBrowser.append)
-        self.error_logger = Printer(color='red', logger_type='error')
+        self.error_logger = Printer(color='red', logger_type='error', redirects='stderr')
         self.error_logger.text_updated.connect(self.textBrowser.append)
-
-    def patch_stdout(self):
-        """
-        To deal with the historical lack of logger in ClearMap, we redirect sys.stdout and
-        sys.stderr to custom objects to capture prints and errors
-        Returns
-        -------
-
-        """
-        sys.stdout = self.logger
-        sys.stderr = self.error_logger
 
     def setup_tabs(self):
         """
@@ -1219,7 +1208,6 @@ def main(app, splash):
     clearmap_main_win.fix_styles()
     splash.finish(clearmap_main_win)
     if clearmap_main_win.preference_editor.params.verbosity != 'trace':  # WARNING: will disable progress bars
-        clearmap_main_win.patch_stdout()
         sys.excepthook = except_hook
     sys.exit(app.exec())
 
