@@ -24,6 +24,8 @@ __download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
 
 class Printer(QWidget):
     text_updated = QtCore.pyqtSignal(str)
+    original_std_out = sys.stdout
+    original_std_err = sys.stderr
 
     def __init__(self, log_path=None, color=None, logger_type='info', app=None, open_mode='a', redirects=None, parent=None):
         super().__init__(parent)
@@ -48,15 +50,26 @@ class Printer(QWidget):
             self.file.close()
         except AttributeError:
             pass
+        self.__unset_redirects()
 
     def set_file(self, log_path, open_mode='a'):
         self.close_file()
-        self.file = open(log_path, open_mode)
-        self.n_lines = 0
+        if log_path:
+            self.file = open(log_path, open_mode)
+            self.n_lines = 0
+            self.__set_redirects()
+
+    def __set_redirects(self):
         if self.redirects == 'stdout':
-            sys.stdout = self.file
+            sys.stdout = self
         elif self.redirects == 'stderr':
-            sys.stderr = self.file
+            sys.stderr = self
+
+    def __unset_redirects(self):
+        if self.redirects == 'stdout':
+            sys.stdout = self.original_std_out
+        elif self.redirects == 'stderr':
+            sys.stderr = self.original_std_err
 
     def write(self, msg):
         if self.file is not None:
