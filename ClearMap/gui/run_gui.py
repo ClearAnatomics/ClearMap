@@ -830,7 +830,6 @@ class ClearMapGui(ClearMapGuiBase):
 
         self.sample_tab_mgr.mini_brain_scaling, self.sample_tab_mgr.mini_brain = setup_mini_brain()
 
-        self.setup_loggers()
         for tab in self.tab_mgrs:
             tab.params = None
 
