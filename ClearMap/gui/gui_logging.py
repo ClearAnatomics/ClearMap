@@ -30,21 +30,27 @@ class Printer(QWidget):
         # self.widget = text_widget
         self.file = None
         if log_path is not None:
-            self.file = open(log_path, open_mode)
+            self.file = open(log_path, open_mode)  # self.set_file
+        self.n_lines = 0
         self.color = color
         self.type = logger_type
         # self.win = self.widget.window()
         if app is None:
             self.app = QApplication.instance()
-        self.n_lines = 0
+        else:
+            self.app = app
 
     def __del__(self):
-        if self.file is not None:
+        self.close_file()
+
+    def close_file(self):
+        try:
             self.file.close()
+        except AttributeError:
+            pass
 
     def set_file(self, log_path, open_mode='a'):
-        if self.file is not None:
-            self.file.close()
+        self.close_file()
         self.file = open(log_path, open_mode)
         self.n_lines = 0
 
@@ -57,8 +63,10 @@ class Printer(QWidget):
         self.text_updated.emit(self.colourise(msg))
 
     def flush(self):
-        if self.file is not None:
+        try:
             self.file.flush()
+        except AttributeError:
+            pass
 
     def fileno(self):
         if self.file is not None:
