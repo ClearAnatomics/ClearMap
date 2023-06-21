@@ -89,7 +89,7 @@ class SampleTab(GenericTab):
 
         self.ui.srcFolderBtn.clicked.connect(self.main_window.prompt_experiment_folder)
         self.connect_whats_this(self.ui.srcFolderInfoToolButton, self.ui.srcFolderBtn)
-        self.ui.sampleIdButtonBox.connectApply(self.main_window.load_config_and_setup_ui)
+        self.ui.sampleIdPushButton.clicked.connect(self.main_window.load_config_and_setup_ui)
         self.connect_whats_this(self.ui.sampleIdInfoToolButton, self.ui.sampleIdLabel)
 
         self.ui.launchPatternWizzardPushButton.clicked.connect(self.launch_pattern_wizard)
@@ -113,8 +113,7 @@ class SampleTab(GenericTab):
 
         self.ui.advancedCheckBox.stateChanged.connect(self.swap_tab_advanced)
 
-        self.ui.sampleIdButtonBox.button(QDialogButtonBox.Apply).setIcon(self.main_window._reload_icon)  # REFACTOR: put inside style that overrides ?
-        # self.ui.sampleIdButtonBox.button(QDialogButtonBox.Apply).clicked.connect(self.plot_mini_brain)
+        self.ui.sampleIdPushButton.setIcon(self.main_window._reload_icon)
 
     def save_cfg(self):  # REFACTOR: use this instead of direct calls to ui_to_cfg
         """
@@ -345,13 +344,13 @@ class AlignmentTab(GenericTab):
         self.ui.stitchingPreviewLevelsPushButton.clicked.connect(functools.partial(self.preview_stitching_dumb, color=False))
         self.ui.stitchingPreviewRigidPushButton.clicked.connect(functools.partial(self.preview_stitching_smart, postfix='aligned_axis'))
 
-        self.ui.runStitchingButtonBox.connectApply(self.run_stitching)
-        self.ui.displayStitchingButtonBox.connectApply(self.plot_stitching_results)
-        self.ui.displayStitchingButtonBox.connectClose(self.main_window.clear_plots)
-        self.ui.convertOutputButtonBox.connectApply(self.convert_output)
+        self.ui.runStitchingPushButton.clicked.connect(self.run_stitching)
+        self.ui.displayStitchingPushButton.clicked.connect(self.plot_stitching_results)
+        self.ui.displayStitchingClearPlots.clicked.connect(self.main_window.clear_plots)
+        self.ui.convertOutputPushButton.clicked.connect(self.convert_output)
 
         self.ui.registrationGoToSampleOrientationPushButton.clicked.connect(self.main_window.sample_tab_mgr.go_to_orientation)
-        self.ui.registerButtonBox.connectApply(self.run_registration)
+        self.ui.registerPushButton.clicked.connect(self.run_registration)
         self.ui.clearLandmarksFilesPushButton.clicked.connect(self.clear_landmarks)
         self.ui.plotRegistrationResultsSideBySidePushButton.clicked.connect(self.plot_registration_results_side_by_side)
         self.ui.plotRegistrationResultsCompositePushButton.clicked.connect(self.plot_registration_results_composite)
@@ -772,13 +771,14 @@ class CellCounterTab(PostProcessingTab):
 
         self.ui.toolBox.currentChanged.connect(self.handle_tool_tab_changed)
 
-        self.ui.detectionPreviewTuningButtonBox.connectOpen(self.plot_debug_cropping_interface)
-        self.ui.detectionPreviewTuningSampleButtonBox.connectApply(self.create_cell_detection_tuning_sample)
-        self.ui.detectionPreviewButtonBox.connectApply(self.run_tuning_cell_detection)
+        self.ui.detectionPreviewTuningOpenPushButton.clicked.connect(self.plot_debug_cropping_interface)
+        # FIXME: add load icon
+        self.ui.detectionPreviewTuningCropPushButton.clicked.connect(self.create_cell_detection_tuning_sample)
+        self.ui.detectionPreviewPushButton.clicked.connect(self.run_tuning_cell_detection)
 
         self.ui.previewCellFiltersPushButton.clicked.connect(self.preview_cell_filter)
 
-        self.ui.runCellMapButtonBox.connectApply(self.run_cell_map)
+        self.ui.runCellMapPushButton.clicked.connect(self.run_cell_map)
 
         self.ui.cellMapPlotVoxelizationPushButton.clicked.connect(self.plot_cell_map_results)
         self.ui.cellMap3dScatterOnRefPushButton.clicked.connect(self.plot_cells_scatter_w_atlas_colors)
