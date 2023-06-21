@@ -110,11 +110,30 @@ class GenericTab(GenericUi):
 
         self.minimum_width = 200  # REFACTOR:
 
+        self.advanced_control_names = []
+
     def init_ui(self):
         super().init_ui()
         self.ui.setMinimumWidth(self.minimum_width)
         self.main_window.tabWidget.removeTab(self.tab_idx)
         self.main_window.tabWidget.insertTab(self.tab_idx, self.ui, self.name.title())
+        if hasattr(self.ui, 'advancedCheckBox'):
+            for ctrl_name in self.advanced_control_names:
+                ctrl = getattr(self.ui, ctrl_name)
+                ctrl.setVisible(False)
+            self.ui.advancedCheckBox.stateChanged.connect(self.handle_advanced_checked)
+
+    def handle_advanced_checked(self):
+        """
+        Activate the *advanced* mode which will display more controls
+        Returns
+        -------
+
+        """
+        checked = self.ui.advancedCheckBox.isChecked()
+        for ctrl_name in self.advanced_control_names:
+            ctrl = getattr(self.ui, ctrl_name)
+            ctrl.setVisible(checked)
 
     def set_params(self, *args):
         """
