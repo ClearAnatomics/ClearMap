@@ -111,8 +111,6 @@ class SampleTab(GenericTab):
         self.ui.applyBox.connectApply(self.main_window.alignment_tab_mgr.setup_workers)  # FIXME: check if risks overwrite if still same sample
         self.ui.applyBox.connectSave(self.save_cfg)
 
-        self.ui.advancedCheckBox.stateChanged.connect(self.swap_tab_advanced)
-
         self.ui.sampleIdPushButton.setIcon(self.main_window._reload_icon)
 
     def save_cfg(self):  # REFACTOR: use this instead of direct calls to ui_to_cfg
@@ -196,15 +194,6 @@ class SampleTab(GenericTab):
         """
         self.ui.toolBox.setCurrentIndex(2)
         self.main_window.tabWidget.setCurrentIndex(0)
-
-    def swap_tab_advanced(self):  # TODO: implement
-        """
-        Activate the *advanced* mode which will display more controls
-        Returns
-        -------
-
-        """
-        checked = self.ui.advancedCheckBox.isChecked()
 
     def launch_pattern_wizard(self):
         """
@@ -293,6 +282,8 @@ class AlignmentTab(GenericTab):
         self.sample_params = None
         self.preprocessor = PreProcessor()
 
+        self.advanced_control_names = ['advancedAtlasSettingsGroupBox']
+
     def set_params(self, sample_params):
         """
         Set the params object which links the UI and the configuration file
@@ -359,8 +350,6 @@ class AlignmentTab(GenericTab):
 
         # TODO: ?? connect alignment folder button
 
-        self.ui.advancedAtlasSettingsGroupBox.setVisible(False)
-        self.ui.advancedCheckBox.stateChanged.connect(self.swap_tab_advanced)
         self.ui.useAutoToRefLandmarksPushButton.clicked.connect(self.display_auto_to_ref_landmarks_dialog)
         self.ui.useResampledToAutoLandmarksPushButton.clicked.connect(self.display_resampled_to_auto_landmarks_dialog)
         self.connect_whats_this(self.ui.resampledLandmarksInfoToolButton, self.ui.useResampledToAutoLandmarksPushButton)
@@ -380,16 +369,6 @@ class AlignmentTab(GenericTab):
 
         """
         self.preprocessor.set_progress_watcher(watcher)
-
-    def swap_tab_advanced(self):
-        """
-        Activate the *advanced* mode which will display more controls
-        Returns
-        -------
-
-        """
-        checked = self.ui.advancedCheckBox.isChecked()
-        self.ui.advancedAtlasSettingsGroupBox.setVisible(checked)
 
     def setup_atlas(self):
         """
@@ -716,6 +695,8 @@ class CellCounterTab(PostProcessingTab):
         self.preprocessor = None
         self.cell_detector = None
 
+        self.advanced_control_names = ['detectionShapeGroupBox']
+
     def set_params(self, sample_params, alignment_params):
         """
         Set the params object which links the UI and the configuration file
@@ -783,19 +764,6 @@ class CellCounterTab(PostProcessingTab):
         self.ui.cellMapPlotVoxelizationPushButton.clicked.connect(self.plot_cell_map_results)
         self.ui.cellMap3dScatterOnRefPushButton.clicked.connect(self.plot_cells_scatter_w_atlas_colors)
         self.ui.cellMap3dScatterOnStitchedPushButton.clicked.connect(self.plot_cells_scatter_w_atlas_colors_raw)
-
-        self.ui.advancedCheckBox.stateChanged.connect(self.swap_tab_advanced)
-        self.ui.detectionShapeGroupBox.setVisible(False)
-
-    def swap_tab_advanced(self):  # TODO: implement
-        """
-        Activate the *advanced* mode which will display more controls
-        Returns
-        -------
-
-        """
-        checked = self.ui.advancedCheckBox.isChecked()
-        self.ui.detectionShapeGroupBox.setVisible(checked)
 
     def setup_cell_param_histogram(self, cells, plot_item, key='size', x_log=False):
         """
