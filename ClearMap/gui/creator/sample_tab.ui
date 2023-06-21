@@ -26,12 +26,11 @@
       <widget class="QToolBox" name="toolBox">
        <property name="font">
         <font>
-         <weight>75</weight>
          <bold>true</bold>
         </font>
        </property>
        <property name="currentIndex">
-        <number>2</number>
+        <number>0</number>
        </property>
        <widget class="QWidget" name="page">
         <property name="geometry">
@@ -39,7 +38,7 @@
           <x>0</x>
           <y>0</y>
           <width>428</width>
-          <height>420</height>
+          <height>444</height>
          </rect>
         </property>
         <attribute name="label">
@@ -50,7 +49,6 @@
           <widget class="QPushButton" name="srcFolderBtn">
            <property name="font">
             <font>
-             <weight>75</weight>
              <bold>true</bold>
             </font>
            </property>
@@ -107,7 +105,6 @@
           <widget class="QLabel" name="sampleIdLabel">
            <property name="font">
             <font>
-             <weight>75</weight>
              <bold>true</bold>
             </font>
            </property>
@@ -151,7 +148,6 @@
           <widget class="QLabel" name="sampleIdLabel_2">
            <property name="font">
             <font>
-             <weight>75</weight>
              <bold>true</bold>
             </font>
            </property>
@@ -166,20 +162,17 @@
            </property>
           </widget>
          </item>
-         <item row="4" column="1">
-          <widget class="QDialogButtonBox" name="sampleIdButtonBox">
-           <property name="standardButtons">
-            <set>QDialogButtonBox::Apply</set>
-           </property>
-           <property name="applyText" stdset="0">
-            <string>Update</string>
-           </property>
-          </widget>
-         </item>
          <item row="2" column="1">
           <widget class="QCheckBox" name="useIdAsPrefixCheckBox">
            <property name="text">
             <string/>
+           </property>
+          </widget>
+         </item>
+         <item row="3" column="1">
+          <widget class="QPushButton" name="sampleIdPushButton">
+           <property name="text">
+            <string>Update</string>
            </property>
           </widget>
          </item>
@@ -191,7 +184,7 @@
           <x>0</x>
           <y>0</y>
           <width>428</width>
-          <height>420</height>
+          <height>444</height>
          </rect>
         </property>
         <attribute name="label">
@@ -297,7 +290,6 @@
           <widget class="QLabel" name="mainChannelPathLbl">
            <property name="font">
             <font>
-             <weight>75</weight>
              <bold>true</bold>
             </font>
            </property>
@@ -351,7 +343,6 @@
           <widget class="QLabel" name="mainChannelPathLbl_2">
            <property name="font">
             <font>
-             <weight>75</weight>
              <bold>true</bold>
             </font>
            </property>
@@ -403,7 +394,7 @@
           <x>0</x>
           <y>0</y>
           <width>428</width>
-          <height>420</height>
+          <height>444</height>
          </rect>
         </property>
         <attribute name="label">
@@ -894,8 +885,8 @@
          <rect>
           <x>0</x>
           <y>0</y>
-          <width>436</width>
-          <height>406</height>
+          <width>428</width>
+          <height>444</height>
          </rect>
         </property>
         <attribute name="label">
