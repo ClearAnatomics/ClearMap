@@ -5,7 +5,7 @@ gui_logging
 
 Defines the Printer class used to log to file and to the GUI widgets from simple prints
 """
-
+import sys
 from datetime import datetime
 from io import UnsupportedOperation
 
@@ -24,29 +24,52 @@ __download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
 
 class Printer(QWidget):
     text_updated = QtCore.pyqtSignal(str)
+    original_std_out = sys.stdout
+    original_std_err = sys.stderr
 
-    def __init__(self, log_path=None, color=None, logger_type='info', app=None, open_mode='a', parent=None):
+    def __init__(self, log_path=None, color=None, logger_type='info', app=None, open_mode='a', redirects=None, parent=None):
         super().__init__(parent)
-        # self.widget = text_widget
         self.file = None
-        if log_path is not None:
-            self.file = open(log_path, open_mode)
+        self.n_lines = 0
         self.color = color
         self.type = logger_type
-        # self.win = self.widget.window()
+        self.redirects = redirects
+
+        self.set_file(log_path, open_mode)
+
         if app is None:
             self.app = QApplication.instance()
-        self.n_lines = 0
+        else:
+            self.app = app
 
     def __del__(self):
-        if self.file is not None:
+        self.close_file()
+
+    def close_file(self):
+        try:
             self.file.close()
+        except AttributeError:
+            pass
+        self.__unset_redirects()
 
     def set_file(self, log_path, open_mode='a'):
-        if self.file is not None:
-            self.file.close()
-        self.file = open(log_path, open_mode)
-        self.n_lines = 0
+        self.close_file()
+        if log_path:
+            self.file = open(log_path, open_mode)
+            self.n_lines = 0
+            self.__set_redirects()
+
+    def __set_redirects(self):
+        if self.redirects == 'stdout':
+            sys.stdout = self
+        elif self.redirects == 'stderr':
+            sys.stderr = self
+
+    def __unset_redirects(self):
+        if self.redirects == 'stdout':
+            sys.stdout = self.original_std_out
+        elif self.redirects == 'stderr':
+            sys.stderr = self.original_std_err
 
     def write(self, msg):
         if self.file is not None:
@@ -57,8 +80,10 @@ class Printer(QWidget):
         self.text_updated.emit(self.colourise(msg))
 
     def flush(self):
-        if self.file is not None:
+        try:
             self.file.flush()
+        except AttributeError:
+            pass
 
     def fileno(self):
         if self.file is not None:

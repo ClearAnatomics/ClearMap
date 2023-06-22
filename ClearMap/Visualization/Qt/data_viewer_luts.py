@@ -6,6 +6,8 @@ from PyQt5.QtCore import QSize
 from PyQt5.QtGui import QColor
 from PyQt5.QtWidgets import QGridLayout, QPushButton, QSizePolicy, QWidget
 
+from ClearMap.Visualization.Color import rand_cmap
+
 
 class LUTItem(pg.HistogramLUTItem):
     """Lookup table item for the DataViewer"""
@@ -91,6 +93,14 @@ class LUT(QWidget):
         # default gradient
         if color in pg.graphicsItems.GradientEditorItem.Gradients.keys():
             self.lut.gradient.loadPreset(color)
+        elif color in pg.colormap.listMaps('matplotlib'):
+            colormap = pg.colormap.get(color, source='matplotlib')
+            self.lut.gradient.setColorMap(colormap)
+        elif color == 'random':
+            colormap_values = rand_cmap(int(image.image.max() - image.image.min()), map_type='bright', first_color_black=True, last_color_black=False)
+            colormap_values = [pg.mkColor(*[int(c*255) for c in col]) for col in colormap_values]
+            colormap = pg.ColorMap(None, colormap_values, mapping=pg.ColorMap.CLIP)
+            self.lut.gradient.setColorMap(colormap)
         else:
             self.lut.gradient.getTick(0).color = QColor(0, 0, 0, 0)
             self.lut.gradient.getTick(1).color = QColor(color)

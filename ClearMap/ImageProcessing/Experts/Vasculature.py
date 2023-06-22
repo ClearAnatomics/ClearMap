@@ -512,7 +512,7 @@ def binarize_block(source, sink, parameter=default_binarization_parameter):
         binary_status = io.as_source(binary_status)
         binary_status = binary_status[base_slicing]
 
-    default_step_params = {'parameter': parameter, 'steps_to_measure': None, 'prefix': prefix,  # FIXME: handle steps_to_measure is None
+    default_step_params = {'parameter': parameter, 'steps_to_measure': {}, 'prefix': prefix,
                            'base_slicing': base_slicing, 'valid_slicing': valid_slicing}
 
     # clipping

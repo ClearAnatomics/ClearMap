@@ -13,14 +13,11 @@ from typing import List
 import numpy as np
 
 from ClearMap.config.atlas import ATLAS_NAMES_MAP
-from ClearMap.gui.gui_utils import create_clearmap_widget
+from ClearMap.gui.gui_utils import create_clearmap_widget, clear_layout
 
 from ClearMap.gui.dialogs import get_directory_dlg
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtWidgets import QInputDialog, QToolBox, QCheckBox
-
-from ClearMap.config.config_loader import ConfigLoader
-
 
 __author__ = 'Charly Rousseau <charly.rousseau@icm-institute.org>'
 __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
@@ -296,6 +293,7 @@ class GeneralStitchingParams(UiParameter):
     convert_raw: bool
     convert_arteries: bool
     conversion_fmt: str
+    # stitching_preview_step: str
 
     def __init__(self, tab, src_folder=None):
         super().__init__(tab, src_folder)
@@ -308,7 +306,8 @@ class GeneralStitchingParams(UiParameter):
             'convert_output': ['stitching', 'output_conversion', 'skip'],
             'convert_raw': ParamLink(['stitching', 'output_conversion', 'raw'], self.tab.stitchingConvertRawCheckBox),
             'convert_arteries': ParamLink(['stitching', 'output_conversion', 'arteries'], self.tab.stitchingConvertArteriesCheckBox),
-            'conversion_fmt': ParamLink(['stitching', 'output_conversion', 'format'], self.tab.outputConversionFormat)
+            'conversion_fmt': ParamLink(['stitching', 'output_conversion', 'format'], self.tab.outputConversionFormat),
+            # 'stitching_preview_step': ParamLink([], self.tab.stitchingPreviewStep, connect=False)
         }
         self.attrs_to_invert = ['convert_output']  # FIXME: check
         self.connect()
@@ -413,8 +412,11 @@ class CellMapParams(UiParameter):
     maxima_shape: int
     detection_threshold: int
     cell_filter_size: List[int]
-    cell_filter_intensity: int
+    cell_filter_intensity: List[int]
     voxelization_radii: List[int]
+    detect_cells: bool
+    filter_cells: bool
+    voxelize: bool
     plot_when_finished: bool
     plot_detected_cells: bool
     crop_x_min: int
@@ -431,10 +433,12 @@ class CellMapParams(UiParameter):
             'maxima_shape': ParamLink(['detection', 'maxima_detection', 'shape'], self.tab.maximaShape),
             'detection_threshold': ParamLink(['detection', 'shape_detection', 'threshold'], self.tab.detectionThreshold),
             'cell_filter_size': ParamLink(['cell_filtration', 'thresholds', 'size'], self.tab.cellFilterThresholdSizeDoublet),
-            'cell_filter_intensity': ParamLink(['cell_filtration', 'thresholds', 'intensity'], self.tab.voxelizationRadiusTriplet),
+            # Properties below 'cell_filter_intensity': ParamLink(['cell_filtration', 'thresholds', 'intensity'], self.tab.cellFilterThresholdIntensityDoublet),
             'voxelization_radii': ParamLink(['voxelization', 'radii'], self.tab.voxelizationRadiusTriplet),
+            'detect_cells': ParamLink(None, self.tab.runCellMapDetectCellsCheckBox),
+            'filter_cells': ParamLink(None, self.tab.runCellMapFilterCellsCheckBox),
+            'voxelize': ParamLink(None, self.tab.runCellMapVoxelizeCheckBox),
             'plot_when_finished': ParamLink(['run', 'plot_when_finished'], self.tab.runCellMapPlotCheckBox),
-            'plot_detected_cells': ParamLink(['detection', 'plot_cells'], self.tab.cellDetectionPlotCheckBox),
             'crop_x_min': ParamLink(['detection', 'test_set_slicing', 'dim_0', 0], self.tab.detectionSubsetXRangeMin),
             'crop_x_max': ParamLink(['detection', 'test_set_slicing', 'dim_0', 1], self.tab.detectionSubsetXRangeMax),
             'crop_y_min': ParamLink(['detection', 'test_set_slicing', 'dim_1', 0], self.tab.detectionSubsetYRangeMin),
@@ -566,10 +570,10 @@ class VesselBinarizationParams(UiParameter):
             'fill_secondary_channel': ParamLink(['arteries', 'deep_filling', 'run'],
                                                 self.tab.binarizationArteriesDeepFillingCheckBox),
             'fill_combined': ParamLink(['combined', 'binary_fill'], self.tab.binarizationConbineBinaryFillingCheckBox),
-            'plot_step_1': ParamLink(None, self.tab.binarizationPlotStep1ComboBox, connect=False),
-            'plot_step_2': ParamLink(None, self.tab.binarizationPlotStep2ComboBox, connect=False),
-            'plot_channel_1': ParamLink(None, self.tab.binarizationPlotChannel1ComboBox, connect=False),
-            'plot_channel_2': ParamLink(None, self.tab.binarizationPlotChannel2ComboBox, connect=False),
+            'plot_step_1': ParamLink(None, self.tab.binarizationPlotStep1ComboBox),
+            'plot_step_2': ParamLink(None, self.tab.binarizationPlotStep2ComboBox),
+            'plot_channel_1': ParamLink(None, self.tab.binarizationPlotChannel1ComboBox),
+            'plot_channel_2': ParamLink(None, self.tab.binarizationPlotChannel2ComboBox),
 
         }
         self.cfg_subtree = ['binarization']
@@ -870,8 +874,7 @@ class PreferencesParams(UiParameter):
     #     self.tab.fontComboBox.setCurrentFont(font)
 
 
-class BatchParams(UiParameter):
-
+class BatchParameters(UiParameter):
     def __init__(self, tab, src_folder=None, preferences=None):
         super().__init__(tab, src_folder)
         self.group_concatenator = ' vs '
@@ -879,13 +882,9 @@ class BatchParams(UiParameter):
         self.tab.sampleFoldersToolBox = QToolBox(parent=self.tab)
         self.tab.sampleFoldersPageLayout.addWidget(self.tab.sampleFoldersToolBox, 3, 0)
 
-        self.comparison_checkboxes = []
-
     def _ui_to_cfg(self):
         self.config['paths']['results_folder'] = self.results_folder
         self.config['groups'] = self.groups
-        self.config['comparisons'] = {letter: pair for letter, pair in zip(string.ascii_lowercase,
-                                                                           self.selected_comparisons)}
 
     def cfg_to_ui(self):
         self.reload()
@@ -895,10 +894,26 @@ class BatchParams(UiParameter):
         self.group_names = self.config['groups'].keys()  # FIXME: check that ordered
         for i, paths in enumerate(self.config['groups'].values()):
             self.set_paths(i+1, paths)
-        self.update_comparisons()
-        for chk_bx in self.comparison_checkboxes:
-            if chk_bx.text().split(self.group_concatenator) in self.config['comparisons'].values():
-                self.set_check_state(chk_bx, True)
+
+    def __connect_btn(self, btn, callback):
+        try:
+            btn.clicked.connect(callback, type=Qt.UniqueConnection)
+        except TypeError as err:
+            if err.args[0] == 'connection is not unique':
+                btn.clicked.disconnect()
+                btn.clicked.connect(callback, type=Qt.UniqueConnection)
+            else:
+                raise err
+
+    def _connect_line_edit(self, ctrl, callback):
+        try:
+            ctrl.editingFinished.connect(callback, type=Qt.UniqueConnection)
+        except TypeError as err:
+            if err.args[0] == 'connection is not unique':
+                ctrl.editingFinished.disconnect()
+                ctrl.editingFinished.connect(callback, type=Qt.UniqueConnection)
+            else:
+                raise err
 
     def connect(self):
         self.tab.addGroupPushButton.clicked.connect(self.add_group)
@@ -911,57 +926,6 @@ class BatchParams(UiParameter):
             self.__connect_btn(btn, self.handle_add_src_folder_clicked)
         for btn in self.gp_remove_folder_buttons:
             self.__connect_btn(btn, self.handle_remove_src_folder_clicked)
-        for ctrl in self.gp_group_name_ctrls:
-            self.__connect_line_edit(ctrl, self.update_comparisons)
-
-    def __connect_btn(self, btn, callback):
-        try:
-            btn.clicked.connect(callback, type=Qt.UniqueConnection)
-        except TypeError as err:
-            if err.args[0] == 'connection is not unique':
-                btn.clicked.disconnect()
-                btn.clicked.connect(callback, type=Qt.UniqueConnection)
-            else:
-                raise err
-
-    def __connect_line_edit(self, ctrl, callback):
-        try:
-            ctrl.editingFinished.connect(callback, type=Qt.UniqueConnection)
-        except TypeError as err:
-            if err.args[0] == 'connection is not unique':
-                ctrl.editingFinished.disconnect()
-                ctrl.editingFinished.connect(callback, type=Qt.UniqueConnection)
-            else:
-                raise err
-
-    @property
-    def comparisons(self):
-        """
-
-        Returns
-        -------
-            The list of all possible pairs of groups
-        """
-        # return list(combinations(self.group_names, 2))
-        return list(permutations(self.group_names, 2))
-
-    @property
-    def selected_comparisons(self):
-        return [box.text().split(self.group_concatenator) for box in self.comparison_checkboxes if box.isChecked()]
-
-    def update_comparisons(self):
-        self.comparison_checkboxes = []
-        for i in range(self.tab.comparisonsVerticalLayout.count(), -1, -1):  # Clear
-            item = self.tab.comparisonsVerticalLayout.takeAt(i)
-            if item is not None:
-                widg = item.widget()
-                widg.setParent(None)
-                widg.deleteLater()
-        for pair in self.comparisons:
-            chk = QCheckBox(self.group_concatenator.join(pair))
-            chk.setChecked(False)
-            self.tab.comparisonsVerticalLayout.addWidget(chk)
-            self.comparison_checkboxes.append(chk)
 
     def add_group(self):  # REFACTOR: better in tab object
         new_gp_id = self.n_groups + 1
@@ -997,7 +961,7 @@ class BatchParams(UiParameter):
     @property
     def gp_add_folder_buttons(self):
         return self.get_gp_ctrls('AddSrcFolderBtn')
-    
+
     @property
     def gp_remove_folder_buttons(self):
         return self.get_gp_ctrls('RemoveSrcFolderBtn')
@@ -1010,16 +974,16 @@ class BatchParams(UiParameter):
         return [getattr(self.tab.sampleFoldersToolBox.widget(i), f'gp{ctrl_name}') for i in range(self.n_groups)]
 
     def set_paths(self, gp, paths):
-        list_widget = self.gp_list_widget[gp-1]
+        list_widget = self.gp_list_widget[gp - 1]
         list_widget.clear()
         list_widget.addItems(paths)
 
     def get_paths(self, gp):  # TODO: should exist from group name
-        list_widget = self.gp_list_widget[gp-1]
+        list_widget = self.gp_list_widget[gp - 1]
         return [list_widget.item(i).text() for i in range(list_widget.count())]
 
     def get_all_paths(self):
-        return [self.get_paths(gp+1) for gp in range(self.n_groups)]
+        return [self.get_paths(gp + 1) for gp in range(self.n_groups)]
 
     @property
     def groups(self):
@@ -1048,6 +1012,67 @@ class BatchParams(UiParameter):
 
     def handle_results_folder_changed(self):
         self.config['paths']['results_folder'] = self.results_folder
+
+
+class GroupAnalysisParams(BatchParameters):
+    """
+    Essentially batch parameters with comparisons
+    """
+
+    def __init__(self, tab, src_folder=None, preferences=None):
+        super().__init__(tab, src_folder, preferences)
+
+        self.comparison_checkboxes = []
+
+    def _ui_to_cfg(self):
+        super()._ui_to_cfg()
+        self.config['comparisons'] = {letter: pair for letter, pair in zip(string.ascii_lowercase,
+                                                                           self.selected_comparisons)}
+
+    def cfg_to_ui(self):
+        super().cfg_to_ui()
+        self.update_comparisons()
+        for chk_bx in self.comparison_checkboxes:
+            if chk_bx.text().split(self.group_concatenator) in self.config['comparisons'].values():
+                self.set_check_state(chk_bx, True)
+
+    def connect_groups(self):
+        super().connect_groups()
+        for ctrl in self.gp_group_name_ctrls:
+            self._connect_line_edit(ctrl, self.update_comparisons)
+
+    @property
+    def comparisons(self):
+        """
+
+        Returns
+        -------
+            The list of all possible pairs of groups
+        """
+        # return list(combinations(self.group_names, 2))
+        return list(permutations(self.group_names, 2))
+
+    @property
+    def selected_comparisons(self):
+        return [box.text().split(self.group_concatenator) for box in self.comparison_checkboxes if box.isChecked()]
+
+    def update_comparisons(self):
+        clear_layout(self.tab.comparisonsVerticalLayout)
+        self.comparison_checkboxes = []
+        for pair in self.comparisons:
+            chk = QCheckBox(self.group_concatenator.join(pair))
+            chk.setChecked(False)
+            self.tab.comparisonsVerticalLayout.addWidget(chk)
+            self.comparison_checkboxes.append(chk)
+
+
+class BatchProcessingParams(BatchParameters):
+    """
+    Essentially BatchParameters with processing steps
+    """
+
+    def __init__(self, tab, src_folder=None, preferences=None):
+        super().__init__(tab, src_folder, preferences)
 
     @property
     def align(self):

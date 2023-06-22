@@ -30,7 +30,7 @@ dependencies:
   - cython
   - numpy
   - scipy
-  - pandas
+  - pandas<2  # Groupby syntax changes
   - pyarrow
   - matplotlib
   - scikit-image

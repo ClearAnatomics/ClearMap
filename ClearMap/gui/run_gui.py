@@ -34,7 +34,7 @@ from qdarkstyle import DarkPalette
 
 os.environ['CLEARMAP_GUI_HOSTED'] = "1"
 # ########################################### SPLASH SCREEN ###########################################################
-from ClearMap.gui.dialogs import make_splash, update_pbar, make_simple_progress_dialog
+from ClearMap.gui.dialogs import make_splash, update_pbar, make_simple_progress_dialog, option_dialog
 
 # To show splash before slow imports
 ICONS_FOLDER = 'ClearMap/gui/creator/icons/'   # REFACTOR: use qrc
@@ -49,7 +49,7 @@ palette.setColor(QPalette.ColorRole.ToolTipText, QColor(DarkPalette.COLOR_TEXT_2
 app.setPalette(palette)
 
 
-from ClearMap.gui.gui_utils import get_current_res, UI_FOLDER
+from ClearMap.gui.gui_utils import get_current_res, UI_FOLDER, clear_layout
 
 CURRENT_RES = get_current_res(app)
 
@@ -89,7 +89,8 @@ from ClearMap.gui.style import DARK_BACKGROUND, PLOT_3D_BG, \
 from ClearMap.gui.widgets import OrthoViewer, ProgressWatcher, setup_mini_brain, StructureSelector, \
     PerfMonitor  # needs plot_3d
 update_pbar(app, progress_bar, 60)
-from ClearMap.gui.tabs import SampleTab, AlignmentTab, CellCounterTab, VasculatureTab, BatchTab
+from ClearMap.gui.tabs import SampleTab, AlignmentTab, CellCounterTab, VasculatureTab, GroupAnalysisTab, \
+    BatchProcessingTab
 from ClearMap.gui.preferences import PreferenceUi
 
 update_pbar(app, progress_bar, 80)
@@ -385,12 +386,7 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         -------
 
         """
-        for i in range(self.graphLayout.count(), -1, -1):
-            graph = self.graphLayout.takeAt(i)
-            if graph is not None:
-                widg = graph.widget()
-                widg.setParent(None)
-                widg.deleteLater()
+        clear_layout(self.graphLayout)
         self.graphs = []
         self.perf_monitor.start()
 
@@ -792,12 +788,13 @@ class ClearMapGui(ClearMapGuiBase):
         self.alignment_tab_mgr = AlignmentTab(self, tab_idx=1)
         self.cells_tab_mgr = CellCounterTab(self, tab_idx=2)
         self.vasculature_tab_mgr = VasculatureTab(self, tab_idx=3)
-        self.batch_tab_mgr = BatchTab(self, tab_idx=4)
+        self.group_analysis_tab_mgr = GroupAnalysisTab(self, tab_idx=4)
+        self.batch_tab_mgr = BatchProcessingTab(self, tab_idx=5)
+
+        self.sample_tab_mgr.mini_brain_scaling, self.sample_tab_mgr.mini_brain = setup_mini_brain()
 
         self.preference_editor = PreferenceUi(self)
         self.structure_selector = StructureSelector('', app=self)
-
-        self.sample_tab_mgr.mini_brain_scaling, self.sample_tab_mgr.mini_brain = setup_mini_brain()
 
         self.setWindowIcon(QtGui.QIcon(os.path.join(ICONS_FOLDER, 'logo_cyber.png')))
 
@@ -820,6 +817,24 @@ class ClearMapGui(ClearMapGuiBase):
     def __getitem__(self, item):
         return self.tab_mgrs[item]
 
+    def reset(self):
+        self.config_loader = ConfigLoader('')
+        self.ortho_viewer = OrthoViewer()
+
+        self.sample_tab_mgr = SampleTab(self, tab_idx=0)
+        self.alignment_tab_mgr = AlignmentTab(self, tab_idx=1)
+        self.cells_tab_mgr = CellCounterTab(self, tab_idx=2)
+        self.vasculature_tab_mgr = VasculatureTab(self, tab_idx=3)
+        self.group_analysis_tab_mgr = GroupAnalysisTab(self, tab_idx=4)
+        self.batch_tab_mgr = BatchProcessingTab(self, tab_idx=5)
+
+        self.sample_tab_mgr.mini_brain_scaling, self.sample_tab_mgr.mini_brain = setup_mini_brain()
+
+        for tab in self.tab_mgrs:
+            tab.params = None
+
+        self.amend_ui()
+
     @property
     def tab_mgrs(self):
         tabs = [self.sample_tab_mgr, self.alignment_tab_mgr]
@@ -827,7 +842,7 @@ class ClearMapGui(ClearMapGuiBase):
             tabs.append(self.cells_tab_mgr)
         if self.vasculature_tab_mgr.ui is None or self.vasculature_tab_mgr.ui.isEnabled():
             tabs.append(self.vasculature_tab_mgr)
-        # #self.batch_tab_mgr
+        # #self.group_analysis_tab_mgr
         return tabs
 
     @property
@@ -856,10 +871,7 @@ class ClearMapGui(ClearMapGuiBase):
         -------
 
         """
-        self.logger = Printer()
-        self.logger.text_updated.connect(self.textBrowser.append)
-        self.error_logger = Printer(color='red', logger_type='error')
-        self.error_logger.text_updated.connect(self.textBrowser.append)
+        self.setup_loggers()
 
         self.setup_icons()
         self.setup_tabs()
@@ -873,16 +885,11 @@ class ClearMapGui(ClearMapGuiBase):
 
         self.print_status_msg('Idle, waiting for input')
 
-    def patch_stdout(self):
-        """
-        To deal with the historical lack of logger in ClearMap, we redirect sys.stdout and
-        sys.stderr to custom objects to capture prints and errors
-        Returns
-        -------
-
-        """
-        sys.stdout = self.logger
-        sys.stderr = self.error_logger
+    def setup_loggers(self):
+        self.logger = Printer(redirects='stdout')
+        self.logger.text_updated.connect(self.textBrowser.append)
+        self.error_logger = Printer(color='red', logger_type='error', redirects='stderr')
+        self.error_logger.text_updated.connect(self.textBrowser.append)
 
     def setup_tabs(self):
         """
@@ -930,7 +937,8 @@ class ClearMapGui(ClearMapGuiBase):
         -------
 
         """
-        all_tabs = [self.sample_tab_mgr, self.alignment_tab_mgr, self.cells_tab_mgr, self.vasculature_tab_mgr, self.batch_tab_mgr]
+        all_tabs = [self.sample_tab_mgr, self.alignment_tab_mgr, self.cells_tab_mgr, self.vasculature_tab_mgr,
+                    self.group_analysis_tab_mgr, self.batch_tab_mgr]
         if 0 < tab_index < 4 and self.alignment_tab_mgr.preprocessor.workspace is None:
             self.popup('WARNING', 'Workspace not initialised, '
                                   'cannot proceed to alignment')
@@ -948,26 +956,20 @@ class ClearMapGui(ClearMapGuiBase):
                 # TODO: use result
                 self.popup('WARNING', 'Alignment not performed, please run first') == QMessageBox.Ok
                 self.tabWidget.setCurrentIndex(1)  # WARNING: does not work
-
-        elif tab_index == 4 and not self.batch_tab_mgr.initialised:
+        elif tab_index == 4 and not self.group_analysis_tab_mgr.initialised:
+            cfg_name = title_to_snake(self.group_analysis_tab_mgr.name)
+            try:
+                self.group_analysis_tab_mgr.setup()
+                self.group_analysis_tab_mgr.set_params()
+            except ConfigNotFoundError:
+                self.conf_load_error_msg(cfg_name)
+            except FileNotFoundError:  # message already printed, just stop
+                return
+        elif tab_index == 5 and not self.batch_tab_mgr.initialised:
             cfg_name = title_to_snake(self.batch_tab_mgr.name)
             try:
                 self.batch_tab_mgr.setup()
                 self.batch_tab_mgr.set_params()
-                results_folder = get_directory_dlg(self.preference_editor.params.start_folder,
-                                                   'Select the folder where results will be written')
-                was_copied, cfg_path = self.__get_cfg_path(cfg_name, ConfigLoader(results_folder))
-                if was_copied:
-                    self.batch_tab_mgr.params.fix_cfg_file(cfg_path)
-                self.logger.set_file(os.path.join(results_folder, 'info.log'))  # WARNING: set logs to global results folder
-                self.progress_watcher.log_path = self.logger.file.name
-                self.error_logger.set_file(os.path.join(results_folder, 'errors.html'))
-                self.progress_watcher.log_path = self.logger.file.name
-                self.batch_tab_mgr.params.read_configs(cfg_path)  # FIXME: try to put with other tabs init (difference with config_loader)
-                self.batch_tab_mgr.load_config_to_gui()
-                self.batch_tab_mgr.params.results_folder = results_folder
-                self.batch_tab_mgr.params.ui_to_cfg()
-                self.batch_tab_mgr.setup_workers()
             except ConfigNotFoundError:
                 self.conf_load_error_msg(cfg_name)
             except FileNotFoundError:  # message already printed, just stop
@@ -1044,6 +1046,31 @@ class ClearMapGui(ClearMapGuiBase):
                 raise FileNotFoundError(html_to_ansi(base_msg))
         return was_copied, cfg_path
 
+    def clone(self):
+        folder = get_directory_dlg(self.preference_editor.params.start_folder,
+                                   title="Choose the experiment you would like to clone")
+        if not folder:
+            return
+        src_config_loader = ConfigLoader(folder)
+        for tab in self.tab_mgrs:
+            cfg_name = title_to_snake(tab.name)
+            try:
+                src_cfg_path = src_config_loader.get_cfg_path(cfg_name, must_exist=True)
+            except FileNotFoundError:
+                pass #FIXME: deal with this
+            cfg_path = self.config_loader.get_cfg_path(cfg_name, must_exist=False)
+            copyfile(src_cfg_path, cfg_path)
+
+    def load_default_cfg(self):
+        for tab in self.tab_mgrs:
+            cfg_name = title_to_snake(tab.name)
+            try:
+                src_cfg_path = self.config_loader.get_default_path(cfg_name)
+            except FileNotFoundError:
+                pass #FIXME: deal with this
+            cfg_path = self.config_loader.get_cfg_path(cfg_name, must_exist=False)
+            copyfile(src_cfg_path, cfg_path)
+
     def load_config_and_setup_ui(self):
         """
         Read (potentially from defaults), fix and load the config for each tab manager
@@ -1116,6 +1143,8 @@ class ClearMapGui(ClearMapGuiBase):
 
         """
         folder = get_directory_dlg(self.preference_editor.params.start_folder)
+        if folder and folder != self.src_folder:
+            self.reset()
         self._set_src_folder(folder)
 
     def _set_src_folder(self, src_folder):
@@ -1132,15 +1161,18 @@ class ClearMapGui(ClearMapGuiBase):
 
         """
         sample_cfg_path = self.config_loader.get_cfg_path('sample', must_exist=False)
-        if self.file_exists(sample_cfg_path):
-            cfg = self.config_loader.get_cfg_from_path(sample_cfg_path)
-            sample_id = cfg['sample_id']
-            use_id_as_prefix = cfg['use_id_as_prefix']
-            if sample_id == 'undefined':
-                sample_id = ''
-        else:
+        if not self.file_exists(sample_cfg_path):
+            option_idx = option_dialog('New experiment', 'This seems to be a new experiment. Do you want to: ',
+                                       ['Clone existing config', 'Load default config'])
+            if option_idx == 0:
+                self.clone()
+            elif option_idx == 1:
+                self.load_default_cfg()
+        cfg = self.config_loader.get_cfg_from_path(sample_cfg_path)
+        sample_id = cfg['sample_id']
+        use_id_as_prefix = cfg['use_id_as_prefix']
+        if sample_id == 'undefined':
             sample_id = ''
-            use_id_as_prefix = False
         self.sample_tab_mgr.display_sample_id(sample_id)
         self.sample_tab_mgr.display_use_id_as_prefix(use_id_as_prefix)
 
@@ -1176,7 +1208,6 @@ def main(app, splash):
     clearmap_main_win.fix_styles()
     splash.finish(clearmap_main_win)
     if clearmap_main_win.preference_editor.params.verbosity != 'trace':  # WARNING: will disable progress bars
-        clearmap_main_win.patch_stdout()
         sys.excepthook = except_hook
     sys.exit(app.exec())
 

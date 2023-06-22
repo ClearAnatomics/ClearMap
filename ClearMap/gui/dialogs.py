@@ -5,14 +5,13 @@ dialogs
 
 All the independent popup dialogs used by the GUI
 """
-
 import os
+import functools
 
-from PyQt5 import QtCore
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QSize
 from PyQt5.QtGui import QPixmap, QFont
-from PyQt5.QtWidgets import QFileDialog, QMessageBox, QProgressDialog, QLabel, QDialogButtonBox, QSplashScreen, \
-    QProgressBar
+from PyQt5.QtWidgets import QFileDialog, QMessageBox, QLabel, QDialogButtonBox, QSplashScreen, \
+    QProgressBar, QDialog, QHBoxLayout, QPushButton, QVBoxLayout, QStyle
 
 from ClearMap.config.config_loader import clean_path, ConfigLoader
 from ClearMap.gui.gui_utils import UI_FOLDER, create_clearmap_widget
@@ -41,6 +40,41 @@ def prompt_dialog(title, msg):
     pressed_btn = QMessageBox.question(None, title, msg)
     return pressed_btn == QMessageBox.Yes
 
+
+def option_dialog(base_msg, msg, options, parent=None):
+    index = [None]
+
+    def get_id(lst, id_):
+        lst[0] = id_
+        return id_
+
+    dlg = QDialog(parent)
+
+    dlg.setWindowTitle('User input required')
+    main_layout = QVBoxLayout()
+    dlg.setLayout(main_layout)
+    pixmapi = QStyle.SP_MessageBoxQuestion
+    icon = dlg.style().standardIcon(pixmapi)
+    icon_lbl = QLabel()
+    icon_lbl.setPixmap(icon.pixmap(icon.actualSize(QSize(32, 32))))
+    h1 = QHBoxLayout()
+    main_layout.addLayout(h1)
+    h1.addWidget(icon_lbl)
+    lbl = QLabel(f'<b>{base_msg}</b>')
+    h1.addWidget(lbl)
+    lbl2 = QLabel(msg)
+    main_layout.addWidget(lbl2)
+
+    layout = QHBoxLayout()
+    main_layout.addLayout(layout)
+
+    for i, option in enumerate(options):
+        btn = QPushButton(option, parent=dlg)
+        btn.clicked.connect(functools.partial(get_id, index, i))
+        btn.clicked.connect(dlg.accept)
+        layout.addWidget(btn)
+    dlg.exec()
+    return index[0]
 
 # REFACTOR: make class
 def warning_popup(base_msg, msg):

@@ -144,6 +144,13 @@ class PreProcessor(TabProcessor):
         elastix_folder = self.filename(direction)
         return os.path.join(elastix_folder, 'autolfuorescence_landmarks.pts')  # TODO: use workspace
 
+    def clear_landmarks(self):
+        for f_path in (self.ref_pts_path, self.resampled_pts_path,
+                       self.get_autofluo_pts_path('resampled_to_auto'),
+                       self.get_autofluo_pts_path('auto_to_reference')):
+            if os.path.exists(f_path):
+                os.remove(f_path)
+
     @property
     def resampled_pts_path(self):
         return os.path.join(self.filename('resampled_to_auto'), 'resampled_landmarks.pts')
@@ -233,7 +240,7 @@ class PreProcessor(TabProcessor):
                 try:
                     clearmap_io.convert_files(self.workspace.file_list('raw', extension='tif'), extension='npy',
                                               processes=self.machine_config['n_processes_file_conv'],
-                                              workspace=self.workspace, verbose=self.verbose)
+                                              workspace=self.workspace, verbose=self.verbose, verify=True)
                 except BrokenProcessPool:
                     print('File conversion canceled')
                     return
@@ -242,7 +249,7 @@ class PreProcessor(TabProcessor):
                         clearmap_io.convert_files(self.workspace.file_list('arteries', extension='tif'),
                                                   extension='npy',
                                                   processes=self.machine_config['n_processes_file_conv'],
-                                                  workspace=self.workspace, verbose=self.verbose)
+                                                  workspace=self.workspace, verbose=self.verbose, verify=True)
                     except BrokenProcessPool:
                         print('File conversion canceled')
                         return
@@ -332,7 +339,7 @@ class PreProcessor(TabProcessor):
             try:
                 clearmap_io.convert_files(self.workspace.file_list('stitched', extension='npy', prefix=self.prefix),
                                           extension=fmt, processes=self.machine_config['n_processes_file_conv'],
-                                          workspace=self.workspace, verbose=True)
+                                          workspace=self.workspace, verbose=True, verify=True)
                 self.update_watcher_main_progress()
             except BrokenProcessPool:
                 print('File conversion canceled')
@@ -342,7 +349,7 @@ class PreProcessor(TabProcessor):
                 clearmap_io.convert_files(self.workspace.file_list('stitched', postfix='arteries',
                                                                    prefix=self.prefix, extension='npy'),
                                           extension=fmt, processes=self.machine_config['n_processes_file_conv'],
-                                          workspace=self.workspace, verbose=True)
+                                          workspace=self.workspace, verbose=True, verify=True)
                 self.update_watcher_main_progress()
             except BrokenProcessPool:
                 print('File conversion canceled')
