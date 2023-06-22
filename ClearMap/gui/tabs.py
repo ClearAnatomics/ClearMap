@@ -315,9 +315,14 @@ class AlignmentTab(GenericTab):
 
         if self.preprocessor.has_tiles and not self.preprocessor.has_npy and\
                 prompt_dialog('Tile conversion', 'Convert individual tiles to npy for efficiency'):
-            self.wrap_step('Converting tiles', self.preprocessor.convert_tiles, step_kw_args={'force': True}, n_steps=0,
-                           abort_func=self.preprocessor.stop_process, save_cfg=False, nested=False)
+            self.convert_tiles()
         self.wrap_step('Setting up atlas', self.setup_atlas, n_steps=1, save_cfg=False, nested=False)  # TODO: abort_func=self.preprocessor.stop_process
+
+    def convert_tiles(self):
+        if not self.preprocessor.has_tiles:
+            return
+        self.wrap_step('Converting tiles', self.preprocessor.convert_tiles, step_kw_args={'force': True}, n_steps=0,
+                       abort_func=self.preprocessor.stop_process, save_cfg=False, nested=False)
 
     def setup(self):
         """
@@ -329,6 +334,8 @@ class AlignmentTab(GenericTab):
 
         """
         self.init_ui()
+
+        self.ui.convertTilesToNpyPushButton.clicked.connect(self.convert_tiles)
 
         self.ui.previewStitchingPushButton.clicked.connect(functools.partial(self.preview_stitching_dumb, color=True))
         self.connect_whats_this(self.ui.rigidProjectionThicknessLblInfoToolButton, self.ui.rigidProjectionThicknessLbl)
