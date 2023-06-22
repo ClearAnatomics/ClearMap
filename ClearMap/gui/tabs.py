@@ -1577,7 +1577,8 @@ class BatchTab(GenericTab):
         self.setup_workers()
 
     def create_wizard(self):
-        return SamplePickerDialog(self.params.src_folder, params=self.params)
+        self.params.ui_to_cfg()
+        return SamplePickerDialog(self.params.results_folder, params=self.params)  # FIXME: check if results_folder or make both equal with self.params.src_folder
 
 
 class GroupAnalysisTab(BatchTab):
