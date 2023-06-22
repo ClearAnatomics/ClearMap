@@ -29,12 +29,11 @@
        </property>
        <property name="font">
         <font>
-         <weight>75</weight>
          <bold>true</bold>
         </font>
        </property>
        <property name="currentIndex">
-        <number>0</number>
+        <number>1</number>
        </property>
        <widget class="QWidget" name="page">
         <property name="geometry">
@@ -42,7 +41,7 @@
           <x>0</x>
           <y>0</y>
           <width>478</width>
-          <height>619</height>
+          <height>631</height>
          </rect>
         </property>
         <attribute name="label">
@@ -54,13 +53,40 @@
            <property name="currentIndex">
             <number>0</number>
            </property>
+           <widget class="QWidget" name="page_8">
+            <attribute name="label">
+             <string>Input conversion</string>
+            </attribute>
+            <layout class="QGridLayout" name="gridLayout_6">
+             <item row="0" column="1">
+              <widget class="QPushButton" name="convertTilesToNpyPushButton">
+               <property name="text">
+                <string>Convert tiles to .npy format</string>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="0">
+              <spacer name="horizontalSpacer">
+               <property name="orientation">
+                <enum>Qt::Horizontal</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>40</width>
+                 <height>20</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+            </layout>
+           </widget>
            <widget class="QWidget" name="page_3">
             <property name="geometry">
              <rect>
               <x>0</x>
-              <y>-107</y>
+              <y>0</y>
               <width>446</width>
-              <height>538</height>
+              <height>482</height>
              </rect>
             </property>
             <attribute name="label">
@@ -462,7 +488,7 @@
               <x>0</x>
               <y>0</y>
               <width>460</width>
-              <height>431</height>
+              <height>433</height>
              </rect>
             </property>
             <attribute name="label">
@@ -770,14 +796,14 @@
               <x>0</x>
               <y>0</y>
               <width>460</width>
-              <height>431</height>
+              <height>433</height>
              </rect>
             </property>
             <attribute name="label">
              <string>Run stitching</string>
             </attribute>
-            <layout class="QVBoxLayout" name="verticalLayout_5">
-             <item>
+            <layout class="QGridLayout" name="gridLayout_3">
+             <item row="0" column="0">
               <layout class="QFormLayout" name="formLayout_7">
                <item row="1" column="0">
                 <widget class="QCheckBox" name="stitchingRunRawCheckBox">
@@ -802,7 +828,7 @@
                </item>
               </layout>
              </item>
-             <item>
+             <item row="1" column="0">
               <spacer name="verticalSpacer_5">
                <property name="orientation">
                 <enum>Qt::Vertical</enum>
@@ -815,12 +841,9 @@
                </property>
               </spacer>
              </item>
-             <item>
-              <widget class="QDialogButtonBox" name="runStitchingButtonBox">
-               <property name="standardButtons">
-                <set>QDialogButtonBox::Apply</set>
-               </property>
-               <property name="applyText" stdset="0">
+             <item row="2" column="1">
+              <widget class="QPushButton" name="runStitchingPushButton">
+               <property name="text">
                 <string>Run</string>
                </property>
               </widget>
@@ -833,14 +856,14 @@
               <x>0</x>
               <y>0</y>
               <width>460</width>
-              <height>431</height>
+              <height>433</height>
              </rect>
             </property>
             <attribute name="label">
              <string>Display results</string>
             </attribute>
-            <layout class="QVBoxLayout" name="verticalLayout_3">
-             <item>
+            <layout class="QGridLayout" name="gridLayout_4">
+             <item row="0" column="0">
               <layout class="QFormLayout" name="formLayout_4">
                <item row="0" column="0">
                 <widget class="QCheckBox" name="stitchingPreviewRawCheckBox">
@@ -858,7 +881,7 @@
                </item>
               </layout>
              </item>
-             <item>
+             <item row="1" column="0">
               <spacer name="verticalSpacer_10">
                <property name="orientation">
                 <enum>Qt::Vertical</enum>
@@ -871,12 +894,16 @@
                </property>
               </spacer>
              </item>
-             <item>
-              <widget class="QDialogButtonBox" name="displayStitchingButtonBox">
-               <property name="standardButtons">
-                <set>QDialogButtonBox::Apply|QDialogButtonBox::Close</set>
+             <item row="3" column="1">
+              <widget class="QPushButton" name="displayStitchingClearPlots">
+               <property name="text">
+                <string>Clear plots</string>
                </property>
-               <property name="applyText" stdset="0">
+              </widget>
+             </item>
+             <item row="2" column="1">
+              <widget class="QPushButton" name="displayStitchingPushButton">
+               <property name="text">
                 <string>Plot</string>
                </property>
               </widget>
@@ -889,7 +916,7 @@
               <x>0</x>
               <y>0</y>
               <width>460</width>
-              <height>431</height>
+              <height>433</height>
              </rect>
             </property>
             <attribute name="label">
@@ -936,19 +963,6 @@
                </item>
               </widget>
              </item>
-             <item row="5" column="1">
-              <widget class="QDialogButtonBox" name="convertOutputButtonBox">
-               <property name="toolTip">
-                <string>Convert the selected channels (stitched files) to the selected format for use outside ClearMap</string>
-               </property>
-               <property name="standardButtons">
-                <set>QDialogButtonBox::Apply</set>
-               </property>
-               <property name="applyText" stdset="0">
-                <string>Convert</string>
-               </property>
-              </widget>
-             </item>
              <item row="4" column="1">
               <spacer name="verticalSpacer_7">
                <property name="orientation">
@@ -962,6 +976,13 @@
                </property>
               </spacer>
              </item>
+             <item row="5" column="1">
+              <widget class="QPushButton" name="convertOutputPushButton">
+               <property name="text">
+                <string>Convert</string>
+               </property>
+              </widget>
+             </item>
             </layout>
            </widget>
           </widget>
@@ -974,7 +995,7 @@
           <x>0</x>
           <y>0</y>
           <width>478</width>
-          <height>619</height>
+          <height>631</height>
          </rect>
         </property>
         <attribute name="label">
@@ -992,7 +1013,7 @@
               <x>0</x>
               <y>0</y>
               <width>460</width>
-              <height>499</height>
+              <height>523</height>
              </rect>
             </property>
             <attribute name="label">
@@ -1059,7 +1080,7 @@
                </layout>
               </widget>
              </item>
-             <item row="3" column="0" colspan="2">
+             <item row="4" column="0" colspan="2">
               <widget class="QGroupBox" name="advancedAtlasSettingsGroupBox">
                <property name="title">
                 <string>Advanced atlas settings</string>
@@ -1089,7 +1110,7 @@
                     </widget>
                    </item>
                    <item>
-                    <widget class="QPushButton" name="pushButton">
+                    <widget class="QPushButton" name="selectAtlasFolderPushButton">
                      <property name="text">
                       <string> Select</string>
                      </property>
@@ -1180,6 +1201,13 @@
                </item>
               </widget>
              </item>
+             <item row="3" column="0" colspan="2">
+              <widget class="QPushButton" name="registrationGoToSampleOrientationPushButton">
+               <property name="text">
+                <string>Go to sample orientation</string>
+               </property>
+              </widget>
+             </item>
             </layout>
            </widget>
            <widget class="QWidget" name="page_10">
@@ -1187,23 +1215,36 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>256</width>
-              <height>154</height>
+              <width>460</width>
+              <height>523</height>
              </rect>
             </property>
             <attribute name="label">
              <string>Run registration</string>
             </attribute>
-            <layout class="QVBoxLayout" name="verticalLayout">
-             <item>
+            <layout class="QGridLayout" name="gridLayout_5">
+             <item row="1" column="0">
+              <spacer name="verticalSpacer_2">
+               <property name="orientation">
+                <enum>Qt::Vertical</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>20</width>
+                 <height>40</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+             <item row="2" column="1">
+              <widget class="QPushButton" name="registerPushButton">
+               <property name="text">
+                <string>Register</string>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="0" colspan="2">
               <layout class="QGridLayout" name="gridLayout">
-               <item row="2" column="0">
-                <widget class="QCheckBox" name="skipRegistrationResamplingCheckBox">
-                 <property name="text">
-                  <string>Skip resampling</string>
-                 </property>
-                </widget>
-               </item>
                <item row="0" column="0">
                 <widget class="QPushButton" name="useResampledToAutoLandmarksPushButton">
                  <property name="toolTip">
@@ -1217,16 +1258,10 @@
                  </property>
                 </widget>
                </item>
-               <item row="1" column="0">
-                <widget class="QPushButton" name="useAutoToRefLandmarksPushButton">
-                 <property name="toolTip">
-                  <string>Select matching pixels between autofluorescence and reference channels</string>
-                 </property>
-                 <property name="whatsThis">
-                  <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;When you click this button a new window will appear with a list of markers and colors.&lt;/p&gt;&lt;p&gt;Select a landmark in the left image and &lt;span style=&quot; font-weight:700;&quot;&gt;left click&lt;/span&gt; to put the marker in this location.&lt;/p&gt;&lt;p&gt;Select the matching voxel of the right image and &lt;span style=&quot; font-weight:700;&quot;&gt;left click&lt;/span&gt; to label it too.&lt;/p&gt;&lt;p&gt;Once done, click &lt;span style=&quot; font-weight:700;&quot;&gt;Add Marker&lt;/span&gt; and reapeat the operation for each pair of markers.&lt;/p&gt;&lt;p&gt;When all markers are selected, click &lt;span style=&quot; font-weight:700;&quot;&gt;OK&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-                 </property>
+               <item row="3" column="0">
+                <widget class="QCheckBox" name="skipRegistrationResamplingCheckBox">
                  <property name="text">
-                  <string>Use reference landmarks</string>
+                  <string>Skip resampling</string>
                  </property>
                 </widget>
                </item>
@@ -1246,30 +1281,37 @@
                  </property>
                 </widget>
                </item>
+               <item row="1" column="0">
+                <widget class="QPushButton" name="useAutoToRefLandmarksPushButton">
+                 <property name="toolTip">
+                  <string>Select matching pixels between autofluorescence and reference channels</string>
+                 </property>
+                 <property name="whatsThis">
+                  <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;When you click this button a new window will appear with a list of markers and colors.&lt;/p&gt;&lt;p&gt;Select a landmark in the left image and &lt;span style=&quot; font-weight:700;&quot;&gt;left click&lt;/span&gt; to put the marker in this location.&lt;/p&gt;&lt;p&gt;Select the matching voxel of the right image and &lt;span style=&quot; font-weight:700;&quot;&gt;left click&lt;/span&gt; to label it too.&lt;/p&gt;&lt;p&gt;Once done, click &lt;span style=&quot; font-weight:700;&quot;&gt;Add Marker&lt;/span&gt; and reapeat the operation for each pair of markers.&lt;/p&gt;&lt;p&gt;When all markers are selected, click &lt;span style=&quot; font-weight:700;&quot;&gt;OK&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                 </property>
+                 <property name="text">
+                  <string>Use reference landmarks</string>
+                 </property>
+                </widget>
+               </item>
+               <item row="2" column="0">
+                <widget class="QPushButton" name="clearLandmarksFilesPushButton">
+                 <property name="toolTip">
+                  <string>Remove landmarks files and revert to automated alignment</string>
+                 </property>
+                 <property name="whatsThis">
+                  <string/>
+                 </property>
+                 <property name="text">
+                  <string> Clear landmarks files</string>
+                 </property>
+                 <property name="icon">
+                  <iconset theme="remove">
+                   <normaloff>.</normaloff>.</iconset>
+                 </property>
+                </widget>
+               </item>
               </layout>
-             </item>
-             <item>
-              <spacer name="verticalSpacer_2">
-               <property name="orientation">
-                <enum>Qt::Vertical</enum>
-               </property>
-               <property name="sizeHint" stdset="0">
-                <size>
-                 <width>20</width>
-                 <height>40</height>
-                </size>
-               </property>
-              </spacer>
-             </item>
-             <item>
-              <widget class="QDialogButtonBox" name="registerButtonBox">
-               <property name="standardButtons">
-                <set>QDialogButtonBox::Apply</set>
-               </property>
-               <property name="applyText" stdset="0">
-                <string>Run</string>
-               </property>
-              </widget>
              </item>
             </layout>
            </widget>
@@ -1278,8 +1320,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>306</width>
-              <height>180</height>
+              <width>460</width>
+              <height>523</height>
              </rect>
             </property>
             <attribute name="label">

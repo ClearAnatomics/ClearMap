@@ -412,8 +412,8 @@ def generate_summary_table(cells_dfs, p_cutoff=None):
                 new_col_name = f'{gp_names[i]}_{col_name}'
                 total_df[new_col_name] = col
                 grouped_counts[i][new_col_name] = col
-        total_df[f'mean_{gp_name}'] = grouped_counts[i].mean(axis=1)
-        total_df[f'sd_{gp_name}'] = grouped_counts[i].std(axis=1)
+        total_df[f'mean_{gp_name}'] = grouped_counts[i].mean(axis=1).astype(float)  # To avoid "object" type
+        total_df[f'sd_{gp_name}'] = grouped_counts[i].std(axis=1).astype(float)  # To avoid "object" type
 
     total_df, grouped_counts = sanitize_df(gp_names, grouped_counts, total_df)
 

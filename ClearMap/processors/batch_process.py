@@ -39,17 +39,11 @@ def process_sample(configs, align=False, cells=False, vasc=False):
         pre_proc.run()
     if cells:
         cell_detector = CellDetector(pre_proc)
-
         cell_detector.processing_config.reload()
-        cell_detector.atlas_align()
-        cell_detector.export_collapsed_stats()
+
+        cell_detector.run_cell_detection()
+        cell_detector.post_process_cells()
         cell_detector.voxelize()
-        # cell_detector.run_cell_detection()
-        #cell_detector.post_process_cells()
-        # backup_file(cell_detector.workspace.filename('cells'))
-        # cell_detector.atlas_align()
-        # backup_file(cell_detector.workspace.filename('cells', extension='csv'))
-        # # cell_detector.export_as_csv()
     if vasc:
         binary_vessel_processor = BinaryVesselProcessor(pre_proc)
         binary_vessel_processor.binarize()
@@ -64,6 +58,23 @@ def patch_pipeline_name(configs, cells, vasc):
     configs[2]['pipeline_name'] = 'CellMap' if cells else 'TubeMap'
     if cells and vasc:
         configs[2]['pipeline_name'] = 'Both'
+
+
+class BatchProcessor:
+    def __init__(self, progress_watcher, results_folder=None, params=None):
+        self.results_folder = results_folder
+        self.progress_watcher = progress_watcher
+
+        self.params = params
+
+    def process_folders(self):
+        paths = [p for ps in self.params.get_all_paths() for p in ps]  # flatten list
+        for folder in tqdm(paths, desc='Processing sample ', unit='brain'):
+            cfg_loader = ConfigLoader(folder)
+            configs = get_configs(cfg_loader.get_cfg_path('sample'), cfg_loader.get_cfg_path('processing'))
+            process_sample(configs,  align=self.params.align, cells=self.params.count_cells,
+                           vasc=self.params.run_vaculature)
+        self.progress_watcher.finish()
 
 
 def process_folders(folders, align=False, cells=False, vasc=False):

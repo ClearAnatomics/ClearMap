@@ -61,7 +61,7 @@
       <item>
        <widget class="QTabWidget" name="tabWidget">
         <property name="currentIndex">
-         <number>0</number>
+         <number>5</number>
         </property>
         <widget class="QWidget" name="sample_tab">
          <attribute name="title">
@@ -78,12 +78,17 @@
           <string>CellMap</string>
          </attribute>
         </widget>
-        <widget class="QWidget" name="tab_2">
+        <widget class="QWidget" name="vasculature_tab">
          <attribute name="title">
           <string>Vasculature</string>
          </attribute>
         </widget>
-        <widget class="QWidget" name="tab">
+        <widget class="QWidget" name="group_analysis_tab">
+         <attribute name="title">
+          <string>Group analysis</string>
+         </attribute>
+        </widget>
+        <widget class="QWidget" name="batch_tab">
          <attribute name="title">
           <string>Batch</string>
          </attribute>
@@ -100,7 +105,7 @@
      <x>0</x>
      <y>0</y>
      <width>1950</width>
-     <height>21</height>
+     <height>25</height>
     </rect>
    </property>
    <widget class="QMenu" name="file_menu">
@@ -128,6 +133,7 @@
    <property name="font">
     <font>
      <pointsize>14</pointsize>
+     <weight>75</weight>
      <bold>true</bold>
     </font>
    </property>
@@ -135,8 +141,8 @@
   <widget class="QDockWidget" name="dockWidget">
    <property name="minimumSize">
     <size>
-     <width>108</width>
-     <height>127</height>
+     <width>109</width>
+     <height>131</height>
     </size>
    </property>
    <property name="baseSize">

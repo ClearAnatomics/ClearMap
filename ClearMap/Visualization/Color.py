@@ -17,6 +17,7 @@ __download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 
 
 import numpy as np
+import colorsys
 
 import vispy as vp
 import vispy.color as vpc
@@ -1123,6 +1124,48 @@ def write_PAL(filename, colors):
     f.close();
     
   return filename;  
+
+
+def rand_cmap(n_labels, map_type='bright', first_color_black=True, last_color_black=False, cmap_name='Paired'):
+    """
+    Creates a random colormap to be used together with matplotlib. Useful for segmentation tasks
+
+    Arguments
+    ---------
+    n_labels : int
+        Number of labels (size of colormap)
+    map_type : str
+        'bright' for strong colors, 'soft' for pastel colors
+    first_color_black : bool
+        Option to use first color as black, True or False
+    last_color_black : bool
+        Option to use last color as black, True or False
+    Returns
+    -------
+    random_colormap : list of RGB colors
+        colormap for matplotlib
+    """
+
+    label_cmap_names = ('Pastel1', 'Pastel2', 'Accent', 'Paired', 'Dark2', 'Set1', 'Set2', 'Set3', 'Tab10')
+    pastel_cmap_names = ('Pastel1', 'Pastel2', 'Set3')
+    bright_cmap_names = list(set(label_cmap_names) - set(pastel_cmap_names))
+    black = [0, 0, 0]
+
+    assert cmap_name in label_cmap_names
+
+    if map_type == 'pastel' and cmap_name not in pastel_cmap_names:
+        cmap_name = 'Set3'
+    elif map_type == 'bright' and cmap_name not in bright_cmap_names:
+        cmap_name = 'Accent'
+
+    cmap_colors = np.array(mpl.cm.get_cmap(cmap_name).colors)
+    n_repeats = n_labels // cmap_colors.shape[0] + 1  # Overshoot
+    colors = np.tile(cmap_colors, (n_repeats, 1))[:n_labels, :]  # Trim
+    if first_color_black:
+        colors[0, :] = black
+    if last_color_black:
+        colors[-1, :] = black
+    return colors
 
 
 ###############################################################################

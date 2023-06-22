@@ -122,10 +122,7 @@ class CellDetector(TabProcessor):
         if self.processing_config['cell_filtration']['preview'] and not runs_on_ui():
             self.plot_filtered_cells()
         self.atlas_align()
-        # self.export_as_csv()
         self.export_collapsed_stats()
-        # self.export_to_clearmap1_fmt()
-        self.voxelize()
 
     def voxelize(self, postfix=''):
         self.processing_config.reload()
@@ -367,13 +364,14 @@ class CellDetector(TabProcessor):
             grouped = df[df['hemisphere'] == i][relevant_columns].groupby(['id'], as_index=False)
 
             tmp = pd.DataFrame()
-            tmp['Structure ID'] = grouped['id'].first()
-            tmp['Structure order'] = grouped['order'].first()
-            tmp['Structure name'] = grouped['name'].first()
-            tmp['Hemisphere'] = grouped['hemisphere'].first()
-            tmp['Structure volume'] = grouped['volume'].first()
-            tmp['Cell counts'] = grouped['name'].count()
-            tmp['Average cell size'] = grouped['size'].mean()
+            first = grouped.first()
+            tmp['Structure ID'] = first['id']
+            tmp['Structure order'] = first['order']
+            tmp['Structure name'] = first['name']
+            tmp['Hemisphere'] = first['hemisphere']
+            tmp['Structure volume'] = first['volume']
+            tmp['Cell counts'] = grouped.count()['name']
+            tmp['Average cell size'] = grouped.mean()['size']
 
             collapsed = pd.concat((collapsed, tmp))
 
@@ -398,7 +396,7 @@ class CellDetector(TabProcessor):
         csv_file_path = self.workspace.filename('cells', postfix='stats', extension='.csv')
         collapsed.to_csv(csv_file_path, index=False)
 
-    def plot_cells(self):
+    def plot_cells(self):  # For non GUI
         source = self.workspace.source('cells', postfix='raw')
         plt.figure(1)
         plt.clf()
@@ -504,7 +502,8 @@ class CellDetector(TabProcessor):
                    ]
         sources = [s for s in sources if os.path.exists(s)]  # Remove missing files (if not tuning)
         titles = [os.path.basename(s) for s in sources]
-        return plot_3d.plot(sources, title=titles, arrange=arrange, sync=sync, lut='white', parent=parent)
+        luts = ['white', 'white', 'random']
+        return plot_3d.plot(sources, title=titles, arrange=arrange, sync=sync, lut=luts, parent=parent)
 
     def get_n_detected_cells(self):
         if os.path.exists(self.workspace.filename('cells', postfix='raw')):

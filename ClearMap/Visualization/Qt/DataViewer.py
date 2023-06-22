@@ -415,7 +415,7 @@ class DataViewer(QWidget):
                 id_ = np.asscalar(self.atlas[slc])  # Deprecated since np version 1.16
             except AttributeError:
                 id_ = self.atlas[slc].item()
-            label += f" <b style='color:#2d9cfc;'>{self.structure_names[id_]} ({id_})</b>"
+            label = f" <b style='color:#2d9cfc;'>{self.structure_names[id_]} ({id_})</b>" + label
         if self.parent() is None or not self.parent().objectName().lower().startswith('dataviewer'):
             label = f"<span style='font-size: 12pt; color: black'>{label}</span>"
         self.source_label.setText(label)
