@@ -1,0 +1,841 @@
+import igraph as ig
+import graph_tool as gt
+import networkx.algorithms.similarity as nxas
+import multiprocessing as mp
+import numpy as np
+# from multiprocessing import sharedctypes
+import graph_tool.topology as gtt
+import ClearMap.Analysis.Graphs.GraphGt as ggt
+import matplotlib.pyplot as plt
+from scipy import stats
+
+import os
+import pyximport
+pyximport.install()
+import pickle
+from ClearMap.Flow.linearSystem import LinearSystem
+from  ClearMap.Flow.assign_pBC import assign_pressureBC, fit_for_pressureBC
+# from ClearMap.KirschoffAnalysis import *
+import ClearMap.Analysis.Graphs.GraphGt_old as ggto
+import tifffile
+import ClearMap.Analysis.Measurements.Voxelization as vox
+import ClearMap.IO.IO as io
+
+import pandas as pd
+
+
+defaultUnits={'length': 'um', 'mass': 'ug', 'time': 'ms'}
+
+
+def get_lengthvessels(ggt):
+    edge_geom = ggt.edge_geometry()
+    Ls=[]
+
+    for i, edge in enumerate(edge_geom):
+        L = 0
+        for j, coord in enumerate(edge):
+            try:
+                diff = np.diff(edge[j:j+1], axis=0)
+                L = L + np.sum(np.linalg.norm(diff, axis=1))
+            except:
+                print('reached enf of array')
+        Ls.append(L * 25) #um
+    return Ls
+
+
+def get_lengthvessels_multiproc(args):
+    i,edge=args
+    # print(edge)
+    L = 0
+    for j, coord in enumerate(edge):
+        try:
+            diff = np.diff(edge, axis=0)
+            L = L + np.sum(np.linalg.norm(diff, axis=1))
+        except:
+            print('reached enf of array')
+
+    # print(i, L)
+    return L
+
+def gt2ig(gt_g):
+    G = ig.Graph()
+    G.add_vertices(gt_g.n_vertices)
+    connectivity=gt_g.edge_connectivity()
+    G.add_edges(connectivity)
+
+    edge_geom = gt_g.edge_geometry()
+    ids = [(i, edge_geom[i]) for i in range(len(edge_geom))]#enumerate(edge_geom)#np.ndenumerate(np.array(edge_geom))#.enumerated()
+    p = mp.Pool(15)
+    length_multiproc = [p.map(get_lengthvessels_multiproc, ids)]
+    length_multiproc=length_multiproc[0]
+
+    print(np.asarray(np.array(length_multiproc)<=1).nonzero()[0])
+    try:
+        length_multiproc[int(np.asarray(np.array(length_multiproc)<=1).nonzero()[0][0])]=1
+    except:
+        print('all length>=1')
+    # length=get_lengthvessels(gt_g)
+    radii=gt_g.edge_property('radii')
+    nkind=4*np.ones(gt_g.n_edges)
+
+
+    arteries=gt_g.edge_property('artery')
+    veins=gt_g.edge_property('vein')
+    nkind[arteries]=2
+    nkind[veins]=3
+    G.es["nkind"]=nkind
+
+    nkind = 4 * np.ones(gt_g.n_vertices)
+    arteries=np.asarray(from_e_prop2_vprop(gt_g, 'artery').astype(int)).nonzero()[0]
+    veins=np.asarray(from_e_prop2_vprop(gt_g, 'vein').astype(int)).nonzero()[0]
+    nkind[arteries]=2
+    nkind[veins]=3
+    G.vs["nkind"]=nkind
+
+    G.es["length"] = length_multiproc
+    G.es["radius"] = radii
+    G.es["diameter"] = 2 * radii
+    return G
+
+def computeFlowFranca(work_dir, g, cont):
+    # degrees = g.vertex_degrees()
+    # vf = np.logical_and(degrees > 1, degrees <= 4)
+    # g = g.sub_graph(vertex_filter=vf)
+
+    gt_g = g
+    G = gt2ig(gt_g)
+    G.write_graphml(work_dir + '/' + cont + '/data_graph_correcteduniverse.GraphML')
+
+    G = ig.read(work_dir + '/' + cont + '/data_graph_correcteduniverse.GraphML')
+
+    # Change capillary deadends adjacent to A or V to nkind = 2 and nkind=3
+    G.es['boundary_cap'] = [0] * G.ecount()
+    G['defaultUnits'] = defaultUnits
+    for v in G.vs(_degree_eq=1, nkind_eq=4):
+        G.es[G.incident(v)[0]]['boundary_cap'] = 1
+
+    for e in G.es(boundary_cap_eq=1, diameter_gt=10):
+        if 2 in G.vs[e.tuple]['nkind']:
+            e['nkind'] = 2
+            for v in e.tuple:
+                G.vs[v]['nkind'] = 2
+        if 3 in G.vs[e.tuple]['nkind']:
+            e['nkind'] = 3
+            for v in e.tuple:
+                G.vs[v]['nkind'] = 3
+
+    # pressure fit
+    p = np.array([2.59476905e-05, -8.91218311e-03, 1.06888397e+00, 2.04594862e+01])
+    G.vs['pBC'] = [None] * G.vcount()
+    G.vs(_degree_eq=1, nkind_eq=3)['pBC'] = [10] * len(G.vs(_degree_eq=1, nkind_eq=3))
+    for v in G.vs(_degree_eq=1, nkind_ne=3):
+        diameter = G.es[G.incident(v)[0]]['diameter']
+        v['pBC'] = np.polyval(p, diameter)
+
+    # p_a, p_v=fit_for_pressureBC()
+    #
+    # assign_pressureBC(G, p_a)
+
+    LS = LinearSystem(G)
+    LS.solve('iterative2')
+    with open('sampledict.pkl', 'rb') as fp:
+        sampledict= pickle.load(fp)
+
+    with open(work_dir+'/'+cont+'/sampledict'+cont+'.pkl', 'wb') as fp:
+        pickle.dump(sampledict, fp, protocol=pickle.HIGHEST_PROTOCOL)
+
+    ########  PLOT GRAPH WITH COLORMAP VELOCITIES /FLOW
+    flow=np.asarray(sampledict['flow'][0])
+    flow.shape
+
+    veloc=np.asarray(sampledict['v'][0])
+
+    return flow, veloc
+
+
+def computeFlowFranca_graph(workdir, g, cont, graph_name):
+    # degrees = g.vertex_degrees()
+    # vf = np.logical_and(degrees > 1, degrees <= 4)
+    # g = g.sub_graph(vertex_filter=vf)
+
+    gt_g = g
+    G = gt2ig(gt_g)
+    G.write_graphml(work_dir + '/' + cont + '/data_graph_'+graph_name+'.GraphML')
+
+    G = ig.read(work_dir + '/' + cont + '/data_graph_'+graph_name+'.GraphML')
+
+    # Change capillary deadends adjacent to A or V to nkind = 2 and nkind=3
+    G.es['boundary_cap'] = [0] * G.ecount()
+    G['defaultUnits'] = defaultUnits
+    for v in G.vs(_degree_eq=1, nkind_eq=4):
+        G.es[G.incident(v)[0]]['boundary_cap'] = 1
+
+    for e in G.es(boundary_cap_eq=1, diameter_gt=10):
+        if 2 in G.vs[e.tuple]['nkind']:
+            e['nkind'] = 2
+            for v in e.tuple:
+                G.vs[v]['nkind'] = 2
+        if 3 in G.vs[e.tuple]['nkind']:
+            e['nkind'] = 3
+            for v in e.tuple:
+                G.vs[v]['nkind'] = 3
+
+    # pressure fit
+    p = np.array([2.59476905e-05, -8.91218311e-03, 1.06888397e+00, 2.04594862e+01])
+    G.vs['pBC'] = [None] * G.vcount()
+    G.vs(_degree_eq=1, nkind_eq=3)['pBC'] = [10] * len(G.vs(_degree_eq=1, nkind_eq=3))
+    for v in G.vs(_degree_eq=1, nkind_ne=3):
+        diameter = G.es[G.incident(v)[0]]['diameter']
+        v['pBC'] = np.polyval(p, diameter)
+
+    # p_a, p_v=fit_for_pressureBC()
+    #
+    # assign_pressureBC(G, p_a)
+
+    LS = LinearSystem(G)
+    LS.solve('iterative2')
+    with open('sampledict.pkl', 'rb') as fp:
+        sampledict= pickle.load(fp)
+
+    with open(work_dir+'/'+cont+'/sampledict'+graph_name+'.pkl', 'wb') as fp:
+        pickle.dump(sampledict, fp, protocol=pickle.HIGHEST_PROTOCOL)
+
+    ########  PLOT GRAPH WITH COLORMAP VELOCITIES /FLOW
+    flow=np.asarray(sampledict['flow'][0])
+    flow.shape
+
+    veloc=np.asarray(sampledict['v'][0])
+
+    return flow, veloc
+
+if __name__ == "__main__":
+
+
+    work_dir='/data_SSD_2to/whiskers_graphs/new_graphs'
+    graph_nb = ['162L', '141L', '142L', '158L', '163L', '138L', '164L', '165L']
+    # cont=graph_nb[5]
+    work_dir = '/data_SSD_2to/191122Otof'  # '/data_SSD_2to/whiskers_graphs/new_graphs'#
+    graph_nb = ['2R', '3R', '5R', '8R', '1R', '7R', '6R', '4R']
+
+    work_dir = '/data_SSD_2to/whiskers_graphs/fluoxetine'
+    graph_nb = ['36', '22', '21', '23', '1', '2', '3', '4', '6', '18']
+
+    for cont in graph_nb:
+        g=ggto.load(work_dir+'/'+cont+'/data_graph_corrected_Isocortex.gt')#data_graph_correcteduniverse.gt')
+        degrees=g.vertex_degrees()
+        vf=np.logical_and(degrees>1, degrees<=4)
+        g=g.sub_graph(vertex_filter=vf)
+
+
+        gt_g=g
+        G=gt2ig(gt_g)
+        G.write_graphml(work_dir+'/'+cont+'/data_graph_correcteduniverse.GraphML')
+
+        G=ig.read(work_dir+'/'+cont+'/data_graph_correcteduniverse.GraphML')
+
+        # Change capillary deadends adjacent to A or V to nkind = 2 and nkind=3
+        G.es['boundary_cap'] = [0] * G.ecount()
+        G['defaultUnits'] = defaultUnits
+        for v in G.vs(_degree_eq=1, nkind_eq=4):
+            G.es[G.incident(v)[0]]['boundary_cap'] = 1
+
+        for e in G.es(boundary_cap_eq=1, diameter_gt=10):
+            if 2 in G.vs[e.tuple]['nkind']:
+                e['nkind'] = 2
+                for v in e.tuple:
+                    G.vs[v]['nkind'] = 2
+            if 3 in G.vs[e.tuple]['nkind']:
+                e['nkind'] = 3
+                for v in e.tuple:
+                    G.vs[v]['nkind'] = 3
+
+        # pressure fit
+        p = np.array([2.59476905e-05, -8.91218311e-03, 1.06888397e+00, 2.04594862e+01])
+        G.vs['pBC'] = [None] * G.vcount()
+        G.vs(_degree_eq=1, nkind_eq=3)['pBC'] = [10] * len(G.vs(_degree_eq=1, nkind_eq=3))
+        for v in G.vs(_degree_eq=1, nkind_ne=3):
+            diameter = G.es[G.incident(v)[0]]['diameter']
+            v['pBC'] = np.polyval(p, diameter)
+
+        # p_a, p_v=fit_for_pressureBC()
+        #
+        # assign_pressureBC(G, p_a)
+
+        LS=LinearSystem(G)
+        LS.solve('iterative2')
+
+        G_f=ig.Graph()
+        G_f=G_f.Read_Pickle( 'G_final.pkl')
+        with open('sampledict.pkl', 'rb') as fp:
+            sampledict= pickle.load(fp)
+
+        with open(work_dir+'/'+cont+'/sampledict'+cont+'.pkl', 'wb') as fp:
+            pickle.dump(sampledict, fp, protocol=pickle.HIGHEST_PROTOCOL)
+
+        ########  PLOT GRAPH WITH COLORMAP VELOCITIES /FLOW
+        # flow=np.asarray(sampledict['flow'][0])
+        # flow.shape
+        #
+        # veloc=np.asarray(sampledict['v'][0])
+        #
+        #
+        # plt.figure()
+        # plt.hist(np.clip(veloc, 0,4), bins=50)
+        # plt.yscale('linear')
+        #
+        #
+        # veloc_clipped=np.clip(veloc, 0,4)
+        # flow_clipped=np.clip(flow, 0,200)
+        #
+        # # g=ggto.load('/data_SSD_2to/whiskers_graphs/new_graphs/162L/data_graph_correcteduniverse.gt')
+        # edge_colors=getColorMap_from_vertex_prop(veloc_clipped)
+        # g.add_edge_property('color', edge_colors)
+        #
+        # label = g.vertex_annotation();
+        # level=9
+        # label_leveled = ano.convert_label(label, key='order', value='order', level=level)
+        # # region=[(142, 8), (149, 8), (128, 8), (156, 8)]#AUD
+        # # region
+        # # region=[(47, 9)]#NOSE
+        # region=[(54, 9), (47, 9)]#SNOUT
+        # vertex_filter=np.zeros(g.n_vertices)
+        # for reg in region:
+        #     order, level=reg
+        #     vertex_filter =np.logical_or(vertex_filter, label_leveled == order)
+        # #
+        # gs=g.sub_graph(vertex_filter=vertex_filter)
+        #
+        # gs = g.sub_slice((slice(1, 320), slice(270, 280), slice(1, 228)), coordinates='coordinates_atlas');
+        #
+        # col= gs.edge_property('color')
+        # q3 = p3d.plot_graph_mesh(gs, n_tube_points=3, edge_colors=col,fov=0);# vertex_colors=vertex_colors,
+
+
+
+
+        #Check if arterioles are inflows and venules are outflows
+        arterioleInflow = 0
+        G.es['arteriole_outflow']=[0]*G.ecount()
+        for v in G.vs(nkind_eq=2,_degree_eq=1).indices:
+            if G.vs[v]['pressure'] > G.vs[G.neighbors(v)[0]]['pressure']:
+                arterioleInflow += 1
+            else:
+                G.es[G.incident(v)[0]]['arteriole_outflow']=1
+
+        venuleOutflow = 0
+        G.es['venule_inflow']=[0]*G.ecount()
+        for v in G.vs(nkind_eq=3,_degree_eq=1).indices:
+            if G.vs[v]['pressure'] < G.vs[G.neighbors(v)[0]]['pressure']:
+                venuleOutflow += 1
+            else:
+                G.es[G.incident(v)[0]]['venule_inflow']=1
+
+        capillaryOutflow = 0
+        for v in G.vs(nkind_eq=4,_degree_eq=1).indices:
+            if G.vs[v]['pressure'] < G.vs[G.neighbors(v)[0]]['pressure']:
+                capillaryOutflow += 1
+
+        print('Ratio of Inflows to Outflows')
+        print(arterioleInflow/float(len(G.vs(nkind_eq=2,_degree_eq=1))))
+        print(venuleOutflow/float(len(G.vs(nkind_eq=3,_degree_eq=1))))
+        print(capillaryOutflow/float(len(G.vs(nkind_eq=4,_degree_eq=1))))
+
+        # vgm.write_pkl(G,'G_final.pkl')
+        # vgm.write_vtp(G,'G_final.vtp',False)
+
+        #Check for low velocity vessels
+        print('Low velocity vessels')
+        print(len(G.es(v_lt=0.0001))/float(G.ecount()))
+        print(len(G.es(v_lt=0.1))/float(G.ecount()))
+
+        #Average velocity per vessel type
+        print('Average velocities per vessel type')
+        print(np.median(G.es(nkind_eq=2)['v']),np.std(G.es(nkind_eq=2)['v']))
+        print(np.median(G.es(nkind_eq=3)['v']),np.std(G.es(nkind_eq=3)['v']))
+        print(np.median(G.es(nkind_eq=4)['v']),np.std(G.es(nkind_eq=4)['v']))
+
+        #Average pressure per vessel type
+        print('Average pressure per vessel type')
+        print(np.median(G.vs(nkind_eq=2)['pressure']),np.std(G.vs(nkind_eq=2)['pressure']))
+        print(np.median(G.vs(nkind_eq=3)['pressure']),np.std(G.vs(nkind_eq=3)['pressure']))
+        print(np.median(G.vs(nkind_eq=4)['pressure']),np.std(G.vs(nkind_eq=4)['pressure']))
+
+    # get extracted fraction
+
+    work_dir='/data_SSD_2to/whiskers_graphs/new_graphs'
+    controls=['142L','158L','162L', '164L']
+    mutants=['138L','141L', '163L', '165L']
+
+    work_dir = '/data_SSD_2to/191122Otof'
+    controls=['2R','3R','5R', '8R']#cpmntrol
+    mutants=['1R','7R', '6R', '4R']#mutant
+
+    work_dir='/data_SSD_2to/whiskers_graphs/fluoxetine'
+    mutants=['1','2','3', '4', '6', '18']
+    controls=['36', '21','22', '23']
+    ps=7.3
+    E_c=[]
+    E_m=[]
+    F_c=[]
+    F_m=[]
+    region=[(6, 6)]
+    region = [(54, 9), (47, 9)]  # NOSE
+    # region=[(142, 8), (149, 8), (128, 8), (156, 8)]
+    region=[(191,8)] # visual
+    for cont in controls:
+        print(cont)
+        graph = ggto.load(work_dir+'/'+cont+'/data_graph_corrected_Isocortex.gt')#/data_graph_correcteduniverse.gt')#/data_graph_corrected_Isocortex.gt')#/data_graph_correcteduniverse.gt')
+        degrees = graph.vertex_degrees()
+        vf = np.logical_and(degrees > 1, degrees <= 4)
+        graph = graph.sub_graph(vertex_filter=vf)
+        label = graph.vertex_annotation();
+
+
+
+        vertex_filter = np.zeros(graph.n_vertices)
+        for reg in region:
+            order, level = reg
+            label_leveled = ano.convert_label(label, key='order', value='order', level=level)
+            vertex_filter = np.logical_or(vertex_filter, label_leveled == order)
+        print(np.sum(vertex_filter))
+        with open(work_dir+'/'+cont+'/sampledict'+cont+'.pkl', 'rb') as fp:
+            sampledict = pickle.load(fp)
+
+        flow=np.asarray(sampledict['flow'][0])
+
+        flow_reg=flow[np.asarray(vertex_filter==1).nonzero()[0]]
+        e = 1 - np.exp(-(ps / abs(flow_reg)))
+        e = e[~np.isnan(e)]
+        E_c.append(e)
+        flow_reg = np.clip(flow_reg, 0, 200)
+        F_c.append(flow_reg)
+
+    for cont in mutants:
+        print(cont)
+        graph = ggto.load(work_dir + '/' + cont + '/data_graph_corrected_Isocortex.gt')#/data_graph_correcteduniverse.gt')#/data_graph_corrected_Isocortex.gt')#/data_graph_correcteduniverse.gt')
+        degrees = graph.vertex_degrees()
+        vf = np.logical_and(degrees > 1, degrees <= 4)
+        graph = graph.sub_graph(vertex_filter=vf)
+        label = graph.vertex_annotation();
+
+
+        vertex_filter = np.zeros(graph.n_vertices)
+        for reg in region:
+            order, level = reg
+            label_leveled = ano.convert_label(label, key='order', value='order', level=level)
+            vertex_filter = np.logical_or(vertex_filter, label_leveled == order)
+
+        print(np.sum(vertex_filter))
+        with open(work_dir + '/' + cont + '/sampledict' + cont + '.pkl', 'rb') as fp:
+            sampledict = pickle.load(fp)
+
+        flow = np.asarray(sampledict['flow'][0])
+        flow_reg = flow[np.asarray(vertex_filter==1).nonzero()[0]]
+        e = 1 - np.exp(-(ps / abs(flow_reg)))
+        e = e[~np.isnan(e)]
+        E_m.append(e)
+        flow_reg = np.clip(flow_reg, 0, 200)
+        F_m.append(flow_reg)
+
+
+
+    bin1=np.linspace(0,1,10)
+    bin3 = np.logspace(-3, 1, 100, endpoint=True)
+    bin2=np.linspace(0,200,50)
+
+    var_c=E_c
+    var_m=E_m
+    bin=bin1
+
+    for i, q in enumerate(var_c):
+        # plt.hist(abs(q), bins=np.linspace(0,1,100), alpha=0.3)
+        if i==0:
+            histc, bins_c = np.histogram(q, bins=bin, normed=False)
+            qc=histc.reshape((histc.size, 1))
+        else:
+            histc, bins_c = np.histogram(q, bins=bin, normed=False)
+            qc=np.concatenate((qc, histc.reshape((histc.size, 1))), axis=1)
+
+    for i, q in enumerate(var_m):
+        # plt.hist(abs(q), bins=np.linspace(0,1,100), alpha=0.3)
+        histm, bins_m = np.histogram(q, bins=bins_c, normed=False)
+        if i==0:
+            qm=histm.reshape((histc.size, 1))
+        else:
+            qm=np.concatenate((qm, histm.reshape((histm.size, 1))), axis=1)
+
+    plt.figure()
+    sns.set_style(style='white')
+    # histc, bins_c = np.histogram(qc, bins=10, normed=True)
+    # histm, bins_m = np.histogram(qm, bins=bins_c, normed=True)
+    # dfc = pd.DataFrame(np.array(histc.reshape((histc.size, 1))).transpose()).melt()
+    # dfm = pd.DataFrame(np.array(histm.reshape((histm.size, 1))).transpose()).melt()
+    dfc = pd.DataFrame(qc.transpose()).melt()#.transpose()
+    dfm = pd.DataFrame(qm.transpose()).melt()
+    sns.lineplot(x="variable", y="value", err_style="bars", ci='sd',data=dfc)
+    sns.lineplot(x="variable", y="value", err_style="bars", ci='sd',data=dfm)
+    plt.yscale('log')
+    sns.despine()
+    plt.xticks(np.linspace(0,bin.size, 10), np.around(bin, 1))
+    plt.ylabel('distribution')
+    plt.xlabel('flow')
+
+    # plt.xscale('log')
+
+    ## voxelization flow
+
+    work_dir='/data_SSD_2to/whiskers_graphs/new_graphs'
+    controls=['142L','158L','162L', '164L']
+    mutants=['138L','141L', '163L', '165L']
+
+
+    template_shape=(320,528,228)
+    vox_shape = (320, 528, 228, len(controls))
+    vox_ori_control_rad = np.zeros(vox_shape)
+    vox_ori_mutant_rad = np.zeros(vox_shape)
+
+
+    radius=5
+
+
+    for i, g in enumerate(controls):
+        print(g)
+        graph = ggto.load(work_dir + '/' + g + '/' + '/data_graph_corrected_Isocortex.gt')#data_graph_correcteduniverse.gt')
+        degrees = graph.vertex_degrees()
+        vf = np.logical_and(degrees > 1, degrees <= 4)
+        graph= graph.sub_graph(vertex_filter=vf)
+        label = graph.vertex_annotation();
+        # art_tree = graph.sub_graph(vertex_filter=vertex_filter)
+        with open(work_dir + '/' + g + '/sampledict' + g + '.pkl', 'rb') as fp:
+            sampledict = pickle.load(fp)
+
+        flow = np.asarray(sampledict['flow'][0])
+        flow_reg = np.clip(flow, 0, 200)
+
+        connectivity = graph.edge_connectivity()
+        coordinates = graph.vertex_property('coordinates_atlas')  # *1.625/25
+        edges_centers = np.array(
+            [(coordinates[connectivity[i, 0]] + coordinates[connectivity[i, 1]]) / 2 for i in range(connectivity.shape[0])])
+
+
+        # print('artBP')#artBP
+        # v = vox.voxelize(art_coordinates[:, :3], shape=template_shape, weights=None, radius=(radius, radius, radius), method='sphere');
+        # vox_art_control[:, :, :, i] = v
+        vox_data = np.concatenate((edges_centers, np.expand_dims(flow_reg, axis=1)), axis=1)
+        v = vox.voxelize(vox_data[:, :3], shape=template_shape, weights=vox_data[:,3], radius=(radius, radius, radius), method='sphere');
+        w = vox.voxelize(vox_data[:, :3], shape=template_shape, weights=None, radius=(radius, radius,radius), method='sphere');
+        vox_ori_control_rad[:, :, :, i] = v.array / w.array
+
+
+
+
+    for i, g in enumerate(mutants):
+        print(g)
+        graph = ggto.load(work_dir + '/' + g + '/' + '/data_graph_corrected_Isocortex.gt')#'data_graph_correcteduniverse.gt')
+        degrees = graph.vertex_degrees()
+        vf = np.logical_and(degrees > 1, degrees <= 4)
+        graph = graph.sub_graph(vertex_filter=vf)
+        label = graph.vertex_annotation();
+        # vertex_filter = from_e_prop2_vprop(graph, 'artery')
+        # art_tree = graph.sub_graph(vertex_filter=vertex_filter)
+        # art_tree = graph.sub_graph(vertex_filter=vertex_filter)
+        with open(work_dir + '/' + g + '/sampledict' + g + '.pkl', 'rb') as fp:
+            sampledict = pickle.load(fp)
+
+        flow = np.asarray(sampledict['flow'][0])
+        flow_reg = np.clip(flow, 0, 200)
+        connectivity = graph.edge_connectivity()
+        coordinates = graph.vertex_property('coordinates_atlas')  # *1.625/25
+        edges_centers = np.array(
+            [(coordinates[connectivity[i, 0]] + coordinates[connectivity[i, 1]]) / 2 for i in range(connectivity.shape[0])])
+
+
+        # print('artBP')  # artBP
+        # v = vox.voxelize(art_coordinates[:, :3], shape=template_shape, weights=None, radius=(radius, radius, radius), method='sphere');
+        # vox_art_mutant[:, :, :, i] = v
+
+        vox_data = np.concatenate((edges_centers, np.expand_dims(flow_reg, axis=1)), axis=1)
+        v = vox.voxelize(vox_data[:, :3], shape=template_shape, weights=vox_data[:, 3], radius=(radius, radius, radius),method='sphere');
+        w = vox.voxelize(vox_data[:, :3], shape=template_shape, weights=None, radius=(radius, radius, radius),method='sphere');
+        vox_ori_mutant_rad[:, :, :, i] =  v.array / w.array
+
+
+    io.write(work_dir + '/' +'vox_flow_sim_control'+str(radius)+'.tif', vox_ori_control_rad.astype('float32'))
+    io.write(work_dir + '/' +'vox_flow_sim_mutant'+str(radius)+'.tif', vox_ori_mutant_rad.astype('float32'))
+
+    vox_ori_control_rad_avg=np.mean(vox_ori_control_rad, axis=3)
+    vox_ori_mutant_rad_avg=np.mean(vox_ori_mutant_rad, axis=3)
+
+
+    io.write(work_dir + '/' +'vox_flow_sim_control_avg_'+str(radius)+'.tif', vox_ori_control_rad_avg.astype('float32'))
+    io.write(work_dir + '/' +'vox_flow_sim_mutant_avg_'+str(radius)+'.tif', vox_ori_mutant_rad_avg.astype('float32'))
+
+
+
+
+
+
+    for i in range(len(controls)):
+        # np.save(work_dir + '/' + controls[i] + '/' + 'vox_art_'+str(radius)+'.npy', vox_art_control[:, :, :, i])
+        io.write(work_dir + '/' + controls[i] + '/' + 'vvox_flow_sim_' + controls[i] + '.tif', vox_ori_control_rad[:, :, :, i].astype('float32'))
+
+
+    for i in range(len(mutants)):
+        # np.save(work_dir + '/' + controls[i] + '/' + 'vox_art_'+str(radius)+'.npy', vox_art_mutant[:, :, :, i])
+        io.write(work_dir + '/' + mutants[i] + '/' + 'vox_flow_sim_' + mutants[i] + '.tif', vox_ori_mutant_rad[:, :, :, i].astype('float32'))
+
+
+
+
+
+
+
+    pcutoff = 0.05
+
+    tvals, pvals = stats.ttest_ind(vox_ori_control_rad, vox_ori_mutant_rad, axis = 3, equal_var = True);
+
+    pi = np.isnan(pvals);
+    pvals[pi] = 1.0;
+    tvals[pi] = 0;
+
+    pvals2 = pvals.copy();
+    pvals2[pvals2 > pcutoff] = pcutoff;
+    psign=np.sign(tvals)
+
+
+    ## from sagital to coronal view
+    pvals2_f=np.swapaxes(np.swapaxes(pvals2, 0,2), 1,2)
+    psign_f=np.swapaxes(np.swapaxes(psign, 0,2), 1,2)
+    # pvals = self.cutoffPValues(pvals, pcutoff = pcutoff);
+
+    # pvals, psign = tTestVoxelization(vox_control_avg, vox_mutant_avg, pcutoff = None, signed = True);
+    pvalscol = colorPValues(pvals2_f, psign_f, positive = [255,0,0], negative = [0,255,0])
+
+    # io.write('/data_SSD_2to/191122Otof/pvalcolors.tif', np.moveaxis(pvalscol, -1, 0).astype('float32'))
+    # io.write('/data_SSD_2to/191122Otof/pvalcolors.tif', pvalscol.astype('uint8'), photometric='rgb')
+
+
+    tifffile.imsave(work_dir+'/pvalcolors_flowSim_'+str(radius)+'.tif', np.swapaxes(pvalscol, 2, 0).astype('uint8'), photometric='rgb',imagej=True)
+
+
+
+    work_dir='/data_SSD_2to/whiskers_graphs/new_graphs'
+    controls=['142L','158L','162L', '164L']
+    mutants=['138L','141L', '163L', '165L']
+
+    work_dir = '/data_SSD_2to/191122Otof'
+    controls=['2R','3R','5R', '8R']#cpmntrol
+    mutants=['1R','7R', '6R', '4R']#mutant
+
+    work_dir='/data_SSD_2to/whiskers_graphs/fluoxetine'
+    mutants=['1','2','3', '4', '6', '18']
+    controls=['36', '21','22', '23']
+
+
+
+
+
+    ######## PLOT FLOW VS ORIENTATION
+    work_dir='/data_SSD_2to/whiskers_graphs/new_graphs'
+    controls=['142L','158L','162L', '164L']
+    mutants=['138L','141L', '163L', '165L']
+
+    work_dir = '/data_SSD_2to/191122Otof'
+    controls = ['2R', '3R', '5R', '8R']  # cpmntrol
+    mutants = ['1R', '7R', '6R', '4R']  # mutant
+
+    cont='5R'
+    region = [(54, 9), (47, 9)]  # NOSE
+    region = [(142, 8), (149, 8), (128, 8), (156, 8)] #AUD
+    layer='2'
+    region=[(25,8)]
+    mode=True
+
+    print(cont)
+    graph = ggto.load(
+        work_dir + '/' + cont + '/data_graph_correcteduniverse.gt') # /data_graph_correcteduniverse.gt')#/data_graph_corrected_Isocortex.gt')#/data_graph_correcteduniverse.gt')
+    degrees = graph.vertex_degrees()
+    vf = np.logical_and(degrees > 1, degrees <= 4)
+    graph = graph.sub_graph(vertex_filter=vf)
+    label = graph.vertex_annotation();
+
+    vertex_filter = np.zeros(graph.n_vertices)
+    for reg in region:
+        order, level = reg
+        label_leveled = ano.convert_label(label, key='order', value='order', level=level)
+        for r in reg_list.keys():
+        n = ano.find_name(r, key='order')
+        if R in n:
+            for se in reg_list[r]:
+                if layer in ano.find(se, key='order')['name']:
+                    l = ano.find(se, key='order')['level']
+                    print(ano.find(se, key='order')['name'], se)
+                    label_leveled = ano.convert_label(label, key='order', value='order', level=l)
+                    vertex_filter[label_leveled == se] = 1
+        vertex_filter = np.logical_or(vertex_filter, label_leveled == order)
+
+    print(np.sum(vertex_filter))
+    with open(work_dir + '/' + cont + '/sampledict' + cont + '.pkl', 'rb') as fp:
+        sampledict = pickle.load(fp)
+
+    flow = np.asarray(sampledict['flow'][0])
+    # flow_reg = flow[np.asarray(vertex_filter == 1).nonzero()[0]]
+    e = 1 - np.exp(-(ps / abs(flow)))
+    e = e[~np.isnan(e)]
+
+    graph.add_edge_property('e', e)
+    gss4 = graph.sub_graph(vertex_filter=vertex_filter)
+    # flow_clipped=gss4.edge_property('flow_clipped')
+    extr_frac=gss4.edge_property('e')
+    r, p, l = getRadPlanOrienttaion(gss4, graph)
+    r = np.nan_to_num(r)#r[~np.isnan(r)]
+    if mode:
+        #"high extracted-fraction"
+        extr_frac_c=extr_frac[np.logical_and(extr_frac<0.99,extr_frac>0.8)]
+        r_c=r[np.logical_and(extr_frac<0.99,extr_frac>0.8)]
+        print(extr_frac_c.shape, r_c.shape)
+
+        r = r[extr_frac < 0.3]
+        extr_frac=extr_frac[extr_frac<0.3]
+        print(extr_frac.shape, r.shape)
+
+    # rc=r
+    # extr_frac_c=extr_frac
+
+    radial=np.concatenate((r_c, r), axis=0)
+    exctracted_fraction=np.concatenate((extr_frac_c,extr_frac), axis=0)
+    print(exctracted_fraction.shape, radial.shape)
+
+    c=['controls' for i in range(r_c.shape[0])]
+    m = ['deprived' for i in range(r.shape[0])]
+    condition=np.concatenate((c,m), axis=0)#(np.zeros(rc.shape[0]), np.ones(r.shape[0])
+    d = {'condition': condition, 'radiality': radial, 'extracted_fraction':exctracted_fraction}
+    df = pd.DataFrame(data=d)
+
+    control = df.loc[df.condition == 'controls']
+    mutant = df.loc[df.condition == 'deprived']
+
+    # sns.set_style(style='white')
+    # sns.despine()
+    g = sns.JointGrid('radiality', 'extracted_fraction', data=df)
+    # plt.figure()
+    sns.set_style(style='white')
+    sns.despine()
+    ax = sns.kdeplot(mutant.radiality, mutant.extracted_fraction, cmap="Reds",
+                     shade=False, shade_lowest=False, fill=False, ax=g.ax_joint)
+    sns.distplot(mutant.radiality, color="r", ax=g.ax_marg_x, bins=50)
+    ax = sns.distplot(mutant.extracted_fraction, kde=True, color="r", ax=g.ax_marg_y, vertical=True, bins=200)
+    ax.set_yscale('linear')
+    # sns.scatterplot(mutant.depth,mutant.path,size=0.1, alpha=0.001,color="r")
+    # sns.distplot(Dm, kde=True, hist=False, color="r", ax=g.ax_marg_x)
+    # sns.distplot(Pm, kde=True, hist=False, color="r", ax=g.ax_marg_y, vertical=True)
+
+    ax = sns.kdeplot(control.radiality, control.extracted_fraction, cmap="Blues",
+                     shade=False, shade_lowest=False, fill=False, ax=g.ax_joint)
+    sns.distplot(control.radiality, color="b", ax=g.ax_marg_x, bins=50)
+    ax = sns.distplot(control.extracted_fraction, kde=True, color="b", ax=g.ax_marg_y, vertical=True, bins=200)
+    g.ax_marg_y.set_xscale('log')
+    g.ax_marg_y.set_yscale('linear')
+    # sns.scatterplot(control.depth,control.path,size=0.1, alpha=0.0001,color="b")
+    # sns.distplot(Dc, kde=True, hist=False, color="b", ax=g.ax_marg_x)
+    # sns.distplot(Pc, kde=True, hist=False, color="b", ax=g.ax_marg_y, vertical=True)
+    sns.set_style(style='white')
+    sns.despine()
+    # sns.jointplot(
+    #     r, extr_frac,
+    #     kind="kde",
+    #     fill = False
+    # )
+    
+
+
+
+
+
+    ########  PLOT GRAPH WITH COLORMAP VELOCITIES /FLOW
+    region=[(6,6)]
+    g='7R'
+    region=[(142, 8), (149, 8), (128, 8), (156, 8)]#AUD
+    # region
+    # region=[(47, 9)]#NOSE
+
+    graph = ggto.load(work_dir + '/' + g + '/' + 'data_graph_correcteduniverse.gt')#'data_graph_corrected_Isocortex.gt')#
+    degrees = graph.vertex_degrees()
+    vf = np.logical_and(degrees > 1, degrees <= 4)
+    graph = graph.sub_graph(vertex_filter=vf)
+
+
+    label = graph.vertex_annotation();
+    art_filter = from_e_prop2_vprop(graph, 'artery')
+
+
+    vertex_filter = np.zeros(graph.n_vertices)
+    for reg in region:
+        order, level = reg
+        label_leveled = ano.convert_label(label, key='order', value='order', level=level)
+        vertex_filter = np.logical_or(vertex_filter, label_leveled == order)
+    vertex_filter=np.logical_and(np.logical_not(art_filter), vertex_filter)
+
+    with open(work_dir + '/' + g + '/sampledict' + g + '.pkl', 'rb') as fp:
+        sampledict = pickle.load(fp)
+
+
+    flow=np.asarray(sampledict['flow'][0])
+    veloc=np.asarray(sampledict['v'][0])
+
+
+    veloc_clipped=np.clip(veloc, 0,4)
+    flow_clipped=np.clip(flow, 0,70)
+
+    # g=ggto.load('/data_SSD_2to/whiskers_graphs/new_graphs/162L/data_graph_correcteduniverse.gt')
+    edge_colors=getColorMap_from_vertex_prop(flow_clipped)
+    graph.add_edge_property('color', edge_colors)
+
+    graph.add_edge_property('flow_clipped', flow_clipped)
+    gss4 = graph.sub_graph(vertex_filter=vertex_filter)
+    flow_clipped=gss4.edge_property('flow_clipped')
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    #########  RICCI FLOW TEST
+    from ClearMap.Gt2Nx import gt2nx
+    from ClearMap.GraphRicciCurvature.FormanRicci import FormanRicci
+    from ClearMap.GraphRicciCurvature.OllivierRicci import OllivierRicci
+    G=gt2nx(gss4, weight=flow_clipped)
+    orc_OTD = OllivierRicci(G, alpha=0.5)
+    orc_OTD.compute_ricci_flow(iterations=10)
+
+    connectivity=gss4.edge_connectivity()
+    RicciWeight=[]
+    for edge in connectivity:
+        try:
+            RicciWeight.append(orc_OTD.G[edge[0]][edge[1]]['weight'])
+        except:
+            RicciWeight.append(1000)
+    plt.figure()
+    plt.hist(np.clip(RicciWeight,0,10), bins=100)
+
+    edge_filter=RicciWeight<=1.7
+    gsRicciFlitered=gss4.sub_graph(edge_filter=edge_filter)
+    np.unique(gsRicciFlitered.label_components(), return_counts=True)
+
+
+    #####################################
+    # gs=graph.sub_graph(vertex_filter=vertex_filter)
+
+    gs = graph.sub_slice((slice(1, 320), slice(260, 280), slice(1, 228)), coordinates='coordinates_atlas');
+
+    col= gs.edge_property('color')
+    col[:, 3]=0.5
+    q3 = p3d.plot_graph_mesh(gs, edge_colors=col ,fov=0);# vertex_colors=vertex_colors,
