@@ -35,13 +35,19 @@ coordinates).
 
 import numpy as np
 
-from vispy.visuals.volume import Texture3D, TextureEmulated3D, VertexBuffer, IndexBuffer
+
+import vispy
+if vispy.__version__ < '0.12.1':
+    from vispy.visuals.volume import Texture3D, TextureEmulated3D, VertexBuffer, IndexBuffer
+else:
+    from vispy.gloo import Texture3D, TextureEmulated3D, VertexBuffer, IndexBuffer
+
 from vispy.visuals.volume import Visual, Function, get_colormap
 
-#from ..gloo import Texture3D, TextureEmulated3D, VertexBuffer, IndexBuffer
-#from . import Visual
-#from .shaders import Function
-#from ..color import get_colormap
+# from ..gloo import Texture3D, TextureEmulated3D, VertexBuffer, IndexBuffer
+# from . import Visual
+# from .shaders import Function
+# from ..color import get_colormap
 
 # todo: implement more render methods (port from visvis)
 # todo: allow anisotropic data

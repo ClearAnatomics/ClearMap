@@ -1,5 +1,11 @@
 # Temporary Files
 *~
+*.autosave
+*.swp
+
+# IDE files
+.idea
+*pyproject.user*
 
 # OS generated files
 .DS_Store
@@ -13,10 +19,22 @@ Thumbs.db
 *rtf
 .ipynb_checkpoints
 
+# Distutils files
+dist
+build
+ClearMap2.egg-info/
+conda_init.sh
+
 # pyc files
 *.pyc
 *.pyxc
 *.pyxbldc
+
+# cythonized files  # TODO: check if include
+*.c
+*.cpp
+# Custom compiled
+*cpython*.so
 
 
 # unzipped resources
@@ -27,6 +45,17 @@ ClearMap/ImageProcessing/Skeletonization/*.npy
 # test data
 ClearMap/Tests/Data/TubeMap_Example/*
 ClearMap/Tests/Data/CellMap_Example/*
+
+# Code spikes
+ClearMap/gui/spikes
+ClearMap/spikes
+
+# In progress
+todo
+wip_info
+
+# deprecated
+deprecated
 
 # documentation
 Documentation

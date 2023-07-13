@@ -12,8 +12,9 @@ __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__   = 'http://idisco.info'
 __download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 
-
+import sys
 import copy
+
 import numpy as np
 
 import graph_tool as gt
@@ -21,16 +22,12 @@ import graph_tool.util as gtu
 import graph_tool.topology as gtt
 import graph_tool.generation as gtg
 
-#fix graph tool saving / loading for very large arrays
-import sys
-if sys.version_info[0] < 3:
-  import ClearMap.External.pickle_python_2 as pickle
-else:
-  #import ClearMap.External.pickle_python_3 as pickle  
-  import ClearMap.External.pickle_python_3 as pickle
+# fix graph tool saving / loading for very large arrays
+import ClearMap.Analysis.Graphs.Graph as grp
+import ClearMap.External.pickle_python_3 as pickle
   
 
-gt.gt_io.clean_picklers();
+gt.gt_io.clean_picklers()
 
 def pickler(stream, obj):
   sstream = gt.gt_io.BytesIO()
@@ -48,10 +45,6 @@ def unpickler(stream):
 
 gt.gt_io.libgraph_tool_core.set_pickler(pickler)
 gt.gt_io.libgraph_tool_core.set_unpickler(unpickler)
-
-
-import ClearMap.Analysis.Graphs.Graph as grp
-
 
 
 ###############################################################################
@@ -1376,15 +1369,15 @@ class Graph(grp.AnnotatedGraph):
         
     as_list = self.edge_geometry_type != 'graph';
     for p in edge_geometry_properties.keys():
-      if p in self.edge_geometry_properties:
-        if verbose:
-          print('Transforming edge geometry: %s -> %s' % (p, edge_geometry_properties[p]));
-        values = self.edge_geometry(p, as_list=as_list);
-        if as_list:
-          values = [transformation(v) for v in values];
-        else:
-          values = transformation(values);
-        self.set_edge_geometry(edge_geometry_properties[p], values=values);
+      # if p in self.edge_geometry_properties:
+      if verbose:
+        print('Transforming edge geometry: %s -> %s' % (p, edge_geometry_properties[p]));
+      values = self.edge_geometry(p, as_list=as_list);
+      if as_list:
+        values = [transformation(v) for v in values];
+      else:
+        values = transformation(values);
+      self.set_edge_geometry(edge_geometry_properties[p], values=values);
 
   
   
