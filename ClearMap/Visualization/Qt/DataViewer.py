@@ -28,7 +28,7 @@ import pyqtgraph as pg
 from PyQt5 import QtWidgets
 from PyQt5.QtCore import QEvent, QRect, QSize, pyqtSignal, Qt
 from PyQt5.QtGui import QPainter
-from PyQt5.QtWidgets import QWidget, QRadioButton, QLabel, QSplitter, QApplication, QSizePolicy
+from PyQt5.QtWidgets import QWidget, QRadioButton, QLabel, QSplitter, QApplication, QSizePolicy, QPushButton, QCheckBox
 
 from ClearMap.Utils.utilities import runs_on_spyder
 from ClearMap.IO.IO import as_source
@@ -302,7 +302,20 @@ class DataViewer(QWidget):
         self.axis_buttons[self.space_axes.index(self.scroll_axis)].setChecked(True)
         axis_tools_widget = QWidget()
         axis_tools_widget.setLayout(axis_tools_layout)
+
+        for i in range(self.n_sources):
+            box = QCheckBox(f'{i}')
+
+            box.setMaximumWidth(50)
+            box.setChecked(True)
+            box.stateChanged.connect(ft.partial(self.toggle_layer, i))
+            axis_tools_layout.addWidget(box, 1, i)
+            self.axis_buttons.append(box)
+
         return axis_tools_layout, axis_tools_widget
+
+    def toggle_layer(self, i, state):
+        self.image_items[i].setVisible(state == Qt.Checked)
 
     def __get_colors(self, default_lut):
         if self.n_sources == 1:
