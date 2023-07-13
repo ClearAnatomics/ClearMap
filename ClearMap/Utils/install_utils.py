@@ -220,7 +220,7 @@ class PytorchVersionManager:  # TODO: inherit from condaparser ??
         return [e.replace('cuda', '') for e in build.split('_') if 'cuda' in e][0]
 
 
-def patch_env(cfg_path, dest_path, use_cuda_torch=True, tmp_dir=None):
+def patch_env(cfg_path, dest_path, use_cuda_torch=True, use_spyder=False, tmp_dir=None):
     env_mgr = EnvFileManager(cfg_path, dest_path)
 
     if platform.system().lower().startswith('darwin'):
@@ -244,6 +244,9 @@ def patch_env(cfg_path, dest_path, use_cuda_torch=True, tmp_dir=None):
         env_mgr.patch_environment_package_line('pytorch', torch_v_string)
 
         env_mgr.remove_dependency('cudatoolkit')
+
+    if use_spyder:
+        env_mgr.add_dependency('spyder-kernels', pkg_version='2.3.3')
 
     if tmp_dir not in ('/tmp', '/tmp/'):
         print(f'Patching tmp_dir to {tmp_dir}')
