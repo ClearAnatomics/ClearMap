@@ -1,5 +1,46 @@
 #!/usr/bin/env bash
 
+PROG_NAME=$0
+
+BASEDIR=$(dirname "$0")
+if [ "$1" == "" ]; then
+    ENV_FILE_PATH="ClearMapUi.yml"
+else
+    ENV_FILE_PATH=$1
+fi
+
+usage() {
+  cat << EOF >&2
+  Usage: $PROG_NAME [-v] [-d <dir>] [-f <file>]
+
+  --file, -f <env-file-path>: The environment file to use. Defaults to ClearMapUi.yml in the current folder
+  --spyder, -s : Whether to install the appropriate spyder kernel
+EOF
+  exit 1
+}
+
+USE_SPYDER="False"
+ENV_FILE_PATH=''
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -f|--file)
+      ENV_FILE_PATH="$2"
+      shift # past argument
+      shift # past value
+      ;;
+    -s|--spyder)
+      USE_SPYDER="True"
+      shift # past argument
+      ;;
+    -*|--*)
+      echo "Unknown option $1"
+      exit 1
+      ;;
+  esac
+done
+
+########################################################################################################################
+
 function red(){  #  From https://stackoverflow.com/a/57096493
     echo -e "\x1B[31m $1 \x1B[0m"
     if [ -n "${2}" ]; then
@@ -26,6 +67,10 @@ function green_n(){  # FIXME: parametrise above instead
         echo -n -e "\x1B[32m $($2) \x1B[0m"
     fi
 }
+
+########################################################################################################################
+
+green "Using env file $ENV_FILE_PATH"
 
 green "Checking dependencies"
 if [[ $(dpkg-query --show --showformat='${db:Status-Status}\n' 'build-essential') == "installed" ]]; then
@@ -58,15 +103,6 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
 esac
 fi
 
-
-BASEDIR=$(dirname "$0")
-if [ "$1" == "" ]; then
-    ENV_FILE_PATH="ClearMapUi.yml"
-else
-    ENV_FILE_PATH=$1
-fi
-
-green "Using env file $ENV_FILE_PATH"
 
 config_folder="$HOME/.clearmap"
 prep_python="import os, sys; sys.path.append(os.getcwd());"
@@ -142,7 +178,7 @@ green "Using temp folder: $tmp_dir"
 
 python -c "$prep_python \
 from ClearMap.Utils.install_utils import patch_env; \
-patch_env(os.path.join(os.getcwd(), '$ENV_FILE_PATH'), 'tmp_env_file.yml', use_cuda_torch=$USE_TORCH, tmp_dir='$tmp_dir')" || exit 1
+patch_env(os.path.join(os.getcwd(), '$ENV_FILE_PATH'), 'tmp_env_file.yml', use_cuda_torch=$USE_TORCH, use_spyder=$USE_SPYDER, tmp_dir='$tmp_dir')" || exit 1
 conda deactivate
 conda env remove -n clearmap_tmp_env
 green "Done"
