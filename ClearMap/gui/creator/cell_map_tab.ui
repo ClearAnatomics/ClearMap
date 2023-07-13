@@ -1,0 +1,867 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>Form</class>
+ <widget class="QWidget" name="Form">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>521</width>
+    <height>625</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Form</string>
+  </property>
+  <property name="styleSheet">
+   <string notr="true">background-color: rgb(46, 52, 54);</string>
+  </property>
+  <layout class="QVBoxLayout" name="verticalLayout_2">
+   <property name="leftMargin">
+    <number>9</number>
+   </property>
+   <property name="topMargin">
+    <number>9</number>
+   </property>
+   <property name="rightMargin">
+    <number>9</number>
+   </property>
+   <property name="bottomMargin">
+    <number>9</number>
+   </property>
+   <item>
+    <widget class="QToolBox" name="toolBox">
+     <property name="maximumSize">
+      <size>
+       <width>16777215</width>
+       <height>600</height>
+      </size>
+     </property>
+     <property name="font">
+      <font>
+       <bold>true</bold>
+      </font>
+     </property>
+     <property name="currentIndex">
+      <number>0</number>
+     </property>
+     <widget class="QWidget" name="page">
+      <property name="geometry">
+       <rect>
+        <x>0</x>
+        <y>0</y>
+        <width>503</width>
+        <height>303</height>
+       </rect>
+      </property>
+      <attribute name="label">
+       <string>Cell detection</string>
+      </attribute>
+      <layout class="QHBoxLayout" name="horizontalLayout_3">
+       <item>
+        <widget class="QToolBox" name="toolBox_2">
+         <property name="currentIndex">
+          <number>1</number>
+         </property>
+         <widget class="QWidget" name="page_3">
+          <property name="geometry">
+           <rect>
+            <x>0</x>
+            <y>0</y>
+            <width>485</width>
+            <height>225</height>
+           </rect>
+          </property>
+          <attribute name="label">
+           <string>Cell parameters</string>
+          </attribute>
+          <layout class="QVBoxLayout" name="verticalLayout">
+           <item>
+            <widget class="QGroupBox" name="groupBox_2">
+             <property name="toolTip">
+              <string>The diameter of the filter to estimate the background. This should be larger than the typical cell size.</string>
+             </property>
+             <property name="title">
+              <string>Background correction</string>
+             </property>
+             <layout class="QHBoxLayout" name="horizontalLayout_2">
+              <item>
+               <widget class="QLabel" name="label_6">
+                <property name="text">
+                 <string>Diameter</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QSpinBox" name="backgroundCorrectionDiameter">
+                <property name="suffix">
+                 <string>px</string>
+                </property>
+                <property name="maximum">
+                 <number>65535</number>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </widget>
+           </item>
+           <item>
+            <widget class="QGroupBox" name="detectionShapeGroupBox">
+             <property name="toolTip">
+              <string/>
+             </property>
+             <property name="title">
+              <string>Maxima</string>
+             </property>
+             <layout class="QHBoxLayout" name="horizontalLayout_10">
+              <item>
+               <widget class="QLabel" name="label_22">
+                <property name="text">
+                 <string>shape</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QSpinBox" name="maximaShape">
+                <property name="suffix">
+                 <string>px</string>
+                </property>
+                <property name="maximum">
+                 <number>65535</number>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </widget>
+           </item>
+           <item>
+            <widget class="QGroupBox" name="groupBox">
+             <property name="toolTip">
+              <string>The threshold for the maxima detection. Peaks below this value are ignored.</string>
+             </property>
+             <property name="title">
+              <string>Shape detection</string>
+             </property>
+             <layout class="QHBoxLayout" name="horizontalLayout_4">
+              <item>
+               <widget class="QLabel" name="label_2">
+                <property name="text">
+                 <string>Threshold</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QSpinBox" name="detectionThreshold">
+                <property name="maximum">
+                 <number>65535</number>
+                </property>
+                <property name="value">
+                 <number>500</number>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+         <widget class="QWidget" name="page_5">
+          <property name="geometry">
+           <rect>
+            <x>0</x>
+            <y>0</y>
+            <width>471</width>
+            <height>293</height>
+           </rect>
+          </property>
+          <attribute name="label">
+           <string>Preview</string>
+          </attribute>
+          <layout class="QGridLayout" name="gridLayout_2">
+           <item row="1" column="0" colspan="3">
+            <widget class="QGroupBox" name="groupBox_4">
+             <property name="title">
+              <string>Tuning subset</string>
+             </property>
+             <layout class="QVBoxLayout" name="verticalLayout_4">
+              <item>
+               <layout class="QFormLayout" name="formLayout_4">
+                <item row="0" column="0">
+                 <widget class="QLabel" name="label_9">
+                  <property name="text">
+                   <string>dim 0 range</string>
+                  </property>
+                 </widget>
+                </item>
+                <item row="0" column="1">
+                 <widget class="QFrame" name="detectionSubsetXRangeDoublet">
+                  <property name="frameShape">
+                   <enum>QFrame::StyledPanel</enum>
+                  </property>
+                  <property name="frameShadow">
+                   <enum>QFrame::Raised</enum>
+                  </property>
+                  <layout class="QHBoxLayout" name="horizontalLayout_5">
+                   <item>
+                    <widget class="QLabel" name="label_4">
+                     <property name="text">
+                      <string>min:</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item>
+                    <widget class="QSpinBox" name="detectionSubsetXRangeMin">
+                     <property name="suffix">
+                      <string/>
+                     </property>
+                     <property name="prefix">
+                      <string/>
+                     </property>
+                     <property name="maximum">
+                      <number>65535</number>
+                     </property>
+                    </widget>
+                   </item>
+                   <item>
+                    <widget class="QLabel" name="label_5">
+                     <property name="text">
+                      <string>max:</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item>
+                    <widget class="QSpinBox" name="detectionSubsetXRangeMax">
+                     <property name="suffix">
+                      <string/>
+                     </property>
+                     <property name="maximum">
+                      <number>65535</number>
+                     </property>
+                    </widget>
+                   </item>
+                  </layout>
+                 </widget>
+                </item>
+                <item row="1" column="0">
+                 <widget class="QLabel" name="label_12">
+                  <property name="text">
+                   <string>dim 1 range</string>
+                  </property>
+                 </widget>
+                </item>
+                <item row="1" column="1">
+                 <widget class="QFrame" name="detectionSubsetYRangeDoublet">
+                  <property name="frameShape">
+                   <enum>QFrame::StyledPanel</enum>
+                  </property>
+                  <property name="frameShadow">
+                   <enum>QFrame::Raised</enum>
+                  </property>
+                  <layout class="QHBoxLayout" name="horizontalLayout_6">
+                   <item>
+                    <widget class="QLabel" name="label_10">
+                     <property name="text">
+                      <string>min:</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item>
+                    <widget class="QSpinBox" name="detectionSubsetYRangeMin">
+                     <property name="suffix">
+                      <string/>
+                     </property>
+                     <property name="prefix">
+                      <string/>
+                     </property>
+                     <property name="maximum">
+                      <number>65535</number>
+                     </property>
+                    </widget>
+                   </item>
+                   <item>
+                    <widget class="QLabel" name="label_11">
+                     <property name="text">
+                      <string>max:</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item>
+                    <widget class="QSpinBox" name="detectionSubsetYRangeMax">
+                     <property name="suffix">
+                      <string/>
+                     </property>
+                     <property name="maximum">
+                      <number>65535</number>
+                     </property>
+                    </widget>
+                   </item>
+                  </layout>
+                 </widget>
+                </item>
+                <item row="2" column="0">
+                 <widget class="QLabel" name="label_15">
+                  <property name="text">
+                   <string>dim 2 range</string>
+                  </property>
+                 </widget>
+                </item>
+                <item row="2" column="1">
+                 <widget class="QFrame" name="detectionSubsetZRangeDoublet">
+                  <property name="frameShape">
+                   <enum>QFrame::StyledPanel</enum>
+                  </property>
+                  <property name="frameShadow">
+                   <enum>QFrame::Raised</enum>
+                  </property>
+                  <layout class="QHBoxLayout" name="horizontalLayout_8">
+                   <item>
+                    <widget class="QLabel" name="label_13">
+                     <property name="text">
+                      <string>min:</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item>
+                    <widget class="QSpinBox" name="detectionSubsetZRangeMin">
+                     <property name="suffix">
+                      <string/>
+                     </property>
+                     <property name="prefix">
+                      <string/>
+                     </property>
+                     <property name="maximum">
+                      <number>65535</number>
+                     </property>
+                    </widget>
+                   </item>
+                   <item>
+                    <widget class="QLabel" name="label_14">
+                     <property name="text">
+                      <string>max:</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item>
+                    <widget class="QSpinBox" name="detectionSubsetZRangeMax">
+                     <property name="suffix">
+                      <string/>
+                     </property>
+                     <property name="maximum">
+                      <number>65535</number>
+                     </property>
+                    </widget>
+                   </item>
+                  </layout>
+                 </widget>
+                </item>
+               </layout>
+              </item>
+             </layout>
+            </widget>
+           </item>
+           <item row="4" column="2">
+            <widget class="QPushButton" name="detectionPreviewTuningCropPushButton">
+             <property name="text">
+              <string>Crop</string>
+             </property>
+            </widget>
+           </item>
+           <item row="5" column="2">
+            <widget class="QPushButton" name="detectionPreviewPushButton">
+             <property name="text">
+              <string>Preview detection</string>
+             </property>
+            </widget>
+           </item>
+           <item row="0" column="2">
+            <widget class="QPushButton" name="detectionPreviewTuningOpenPushButton">
+             <property name="text">
+              <string>Load</string>
+             </property>
+             <property name="icon">
+              <iconset resource="icons.qrc">
+               <normaloff>:/icons/icons/folder_open.svg</normaloff>:/icons/icons/folder_open.svg</iconset>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="page_4">
+      <property name="geometry">
+       <rect>
+        <x>0</x>
+        <y>0</y>
+        <width>503</width>
+        <height>228</height>
+       </rect>
+      </property>
+      <attribute name="label">
+       <string>Cell filters</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="verticalLayout_6">
+       <property name="sizeConstraint">
+        <enum>QLayout::SetMaximumSize</enum>
+       </property>
+       <item>
+        <widget class="QGroupBox" name="groupBox_3">
+         <property name="toolTip">
+          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Filter out cells that are not within this size or intensity range&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+         </property>
+         <property name="title">
+          <string>Cell Thresholds</string>
+         </property>
+         <layout class="QGridLayout" name="cellDetectionThresholdsLayout">
+          <property name="sizeConstraint">
+           <enum>QLayout::SetMaximumSize</enum>
+          </property>
+          <property name="leftMargin">
+           <number>0</number>
+          </property>
+          <property name="rightMargin">
+           <number>0</number>
+          </property>
+          <item row="0" column="0">
+           <widget class="QLabel" name="label_7">
+            <property name="text">
+             <string>Size (voxels)</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <widget class="QFrame" name="cellFilterThresholdSizeDoublet">
+            <property name="frameShape">
+             <enum>QFrame::StyledPanel</enum>
+            </property>
+            <property name="frameShadow">
+             <enum>QFrame::Raised</enum>
+            </property>
+            <layout class="QHBoxLayout" name="horizontalLayout">
+             <item>
+              <widget class="QLabel" name="label">
+               <property name="text">
+                <string>min:</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QSpinBox" name="spinBox_7">
+               <property name="suffix">
+                <string/>
+               </property>
+               <property name="prefix">
+                <string/>
+               </property>
+               <property name="maximum">
+                <number>65535</number>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QLabel" name="label_3">
+               <property name="text">
+                <string>max:</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QSpinBox" name="spinBox_8">
+               <property name="suffix">
+                <string/>
+               </property>
+               <property name="maximum">
+                <number>65535</number>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+          </item>
+          <item row="1" column="0">
+           <widget class="QLabel" name="label_19">
+            <property name="text">
+             <string>Intensity</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1">
+           <widget class="QFrame" name="cellFilterThresholdIntensityDoublet">
+            <property name="frameShape">
+             <enum>QFrame::StyledPanel</enum>
+            </property>
+            <property name="frameShadow">
+             <enum>QFrame::Raised</enum>
+            </property>
+            <property name="disabledValue" stdset="0">
+             <string>None</string>
+            </property>
+            <layout class="QHBoxLayout" name="horizontalLayout_9">
+             <item>
+              <widget class="QCheckBox" name="checkBox">
+               <property name="text">
+                <string/>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QLabel" name="label_20">
+               <property name="text">
+                <string>min:</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QSpinBox" name="spinBox_12">
+               <property name="enabled">
+                <bool>false</bool>
+               </property>
+               <property name="suffix">
+                <string/>
+               </property>
+               <property name="prefix">
+                <string/>
+               </property>
+               <property name="maximum">
+                <number>99999999</number>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QLabel" name="label_21">
+               <property name="text">
+                <string>max:</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QSpinBox" name="spinBox_13">
+               <property name="enabled">
+                <bool>false</bool>
+               </property>
+               <property name="suffix">
+                <string/>
+               </property>
+               <property name="minimum">
+                <number>-1</number>
+               </property>
+               <property name="maximum">
+                <number>99999999</number>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <spacer name="verticalSpacer">
+         <property name="orientation">
+          <enum>Qt::Vertical</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>20</width>
+           <height>40</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+       <item>
+        <widget class="QPushButton" name="previewCellFiltersPushButton">
+         <property name="text">
+          <string>Preview filter</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="page_2">
+      <property name="geometry">
+       <rect>
+        <x>0</x>
+        <y>0</y>
+        <width>503</width>
+        <height>137</height>
+       </rect>
+      </property>
+      <attribute name="label">
+       <string>Voxelisation</string>
+      </attribute>
+      <layout class="QFormLayout" name="formLayout_2">
+       <item row="0" column="0">
+        <widget class="QLabel" name="label_8">
+         <property name="toolTip">
+          <string>The XYZ half width of the ellipsoid used to voxelize</string>
+         </property>
+         <property name="text">
+          <string>Sphere radius</string>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="1">
+        <widget class="QFrame" name="voxelizationRadiusTriplet">
+         <property name="frameShape">
+          <enum>QFrame::StyledPanel</enum>
+         </property>
+         <property name="frameShadow">
+          <enum>QFrame::Raised</enum>
+         </property>
+         <layout class="QHBoxLayout" name="horizontalLayout_7">
+          <item>
+           <widget class="QSpinBox" name="spinBox_9">
+            <property name="maximum">
+             <number>65535</number>
+            </property>
+            <property name="value">
+             <number>5</number>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QSpinBox" name="spinBox_10">
+            <property name="maximum">
+             <number>65535</number>
+            </property>
+            <property name="value">
+             <number>5</number>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QSpinBox" name="spinBox_11">
+            <property name="maximum">
+             <number>65535</number>
+            </property>
+            <property name="value">
+             <number>5</number>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="page_7">
+      <property name="geometry">
+       <rect>
+        <x>0</x>
+        <y>0</y>
+        <width>503</width>
+        <height>234</height>
+       </rect>
+      </property>
+      <attribute name="label">
+       <string>Run CellMap</string>
+      </attribute>
+      <layout class="QGridLayout" name="gridLayout">
+       <item row="5" column="2">
+        <widget class="QLabel" name="nDetectedCellsLabel">
+         <property name="font">
+          <font>
+           <pointsize>22</pointsize>
+           <bold>true</bold>
+          </font>
+         </property>
+         <property name="text">
+          <string>0</string>
+         </property>
+         <property name="alignment">
+          <set>Qt::AlignCenter</set>
+         </property>
+        </widget>
+       </item>
+       <item row="3" column="0">
+        <widget class="QCheckBox" name="runCellMapPlotCheckBox">
+         <property name="text">
+          <string>Plot when finished</string>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="0">
+        <widget class="QCheckBox" name="runCellMapVoxelizeCheckBox">
+         <property name="text">
+          <string>Create cell density map (voxelization)</string>
+         </property>
+         <property name="checked">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="0">
+        <widget class="QCheckBox" name="runCellMapFilterCellsCheckBox">
+         <property name="text">
+          <string>Filter cells</string>
+         </property>
+         <property name="checked">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item row="6" column="0">
+        <widget class="QLabel" name="label_18">
+         <property name="text">
+          <string>After filter</string>
+         </property>
+        </widget>
+       </item>
+       <item row="6" column="2">
+        <widget class="QLabel" name="nDetectedCellsAfterFilterLabel">
+         <property name="font">
+          <font>
+           <pointsize>22</pointsize>
+           <bold>true</bold>
+          </font>
+         </property>
+         <property name="text">
+          <string>0</string>
+         </property>
+         <property name="alignment">
+          <set>Qt::AlignCenter</set>
+         </property>
+        </widget>
+       </item>
+       <item row="5" column="0">
+        <widget class="QLabel" name="label_17">
+         <property name="toolTip">
+          <string/>
+         </property>
+         <property name="text">
+          <string>N cells</string>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="0">
+        <widget class="QCheckBox" name="runCellMapDetectCellsCheckBox">
+         <property name="text">
+          <string>Detect cells</string>
+         </property>
+         <property name="checked">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item row="4" column="2">
+        <widget class="QPushButton" name="runCellMapPushButton">
+         <property name="text">
+          <string>Run</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="page_8">
+      <property name="geometry">
+       <rect>
+        <x>0</x>
+        <y>0</y>
+        <width>503</width>
+        <height>137</height>
+       </rect>
+      </property>
+      <attribute name="label">
+       <string>Visualize</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="verticalLayout_7">
+       <item>
+        <widget class="QPushButton" name="cellMapPlotVoxelizationPushButton">
+         <property name="toolTip">
+          <string>Display the results of the voxelization</string>
+         </property>
+         <property name="text">
+          <string>Plot voxelization</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="cellMap3dScatterOnRefPushButton">
+         <property name="toolTip">
+          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Display a scatter of the cell coordinates &lt;/p&gt;&lt;p&gt;on top of the atlas reference (atlas coordinates)&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+         </property>
+         <property name="text">
+          <string> 3D scatter on reference</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="cellMap3dScatterOnStitchedPushButton">
+         <property name="toolTip">
+          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Display a scatter of the cell coordinates&lt;/p&gt;&lt;p&gt;on top of the stitched image (sample coordinates)&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+         </property>
+         <property name="text">
+          <string>3D scatter on stitched</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </widget>
+   </item>
+   <item>
+    <spacer name="verticalSpacer_2">
+     <property name="orientation">
+      <enum>Qt::Vertical</enum>
+     </property>
+     <property name="sizeType">
+      <enum>QSizePolicy::MinimumExpanding</enum>
+     </property>
+     <property name="sizeHint" stdset="0">
+      <size>
+       <width>20</width>
+       <height>40</height>
+      </size>
+     </property>
+    </spacer>
+   </item>
+   <item>
+    <widget class="QCheckBox" name="advancedCheckBox">
+     <property name="text">
+      <string>Advanced</string>
+     </property>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources>
+  <include location="icons.qrc"/>
+ </resources>
+ <connections>
+  <connection>
+   <sender>checkBox</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>spinBox_12</receiver>
+   <slot>setEnabled(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>117</x>
+     <y>47</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>117</x>
+     <y>47</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>checkBox</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>spinBox_13</receiver>
+   <slot>setEnabled(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>117</x>
+     <y>47</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>117</x>
+     <y>47</y>
+    </hint>
+   </hints>
+  </connection>
+ </connections>
+</ui>

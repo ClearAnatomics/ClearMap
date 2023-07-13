@@ -33,7 +33,7 @@
 
 (WriteTransformParametersEachIteration "false")
 (WriteResultImage "true")
-(CompressResultImage "true")
+(CompressResultImage "false")
 (WriteResultImageAfterEachResolution "false") 
 (ShowExactMetricValue "false")
 

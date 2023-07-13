@@ -342,24 +342,28 @@ def smooth_by_configuration_block(source, iterations = 1, verbose = False):
   smoothed : array
     Thre smoothed binary array.
   """
-  if isinstance(source, io.src.Source):
-    smoothed = source.array;
-  else:
-    smoothed = source;
-  smoothed = np.asarray(smoothed, dtype='uint32');
-  ndim = smoothed.ndim;
-  
-  lut = np.asarray(initialize_lookup_table(verbose=verbose), dtype='uint32');
-  
-  for i in range(iterations):   
-    #index 
-    for axis in range(ndim):
-      kernel = t3d.index_kernel(axis=axis);
-      smoothed = ndi.correlate1d(smoothed, kernel, axis=axis, output='uint32', mode='constant', cval=0);
-    smoothed = lut[smoothed];
-   
-    if verbose:
-      print('Binary Smoothing: itertion %d / %d done!' % (i+1, iterations));
+  try:
+    if isinstance(source, io.src.Source):
+      smoothed = source.array;
+    else:
+      smoothed = source;
+    smoothed = np.asarray(smoothed, dtype='uint32');
+    ndim = smoothed.ndim;
+
+    lut = np.asarray(initialize_lookup_table(verbose=verbose), dtype='uint32');
+
+    for i in range(iterations):
+      # index
+      for axis in range(ndim):
+        kernel = t3d.index_kernel(axis=axis);
+        smoothed = ndi.correlate1d(smoothed, kernel, axis=axis, output='uint32', mode='constant', cval=0);
+      smoothed = lut[smoothed];
+
+      if verbose:
+        print(f'Binary Smoothing: itertion {i+1} / {iterations} done!', flush=True)
+  except Exception as err:
+    print(err, flush=True)
+    raise
   
   return np.asarray(smoothed, dtype=bool);
 
@@ -416,7 +420,7 @@ def smooth_by_configuration(source, sink = None, iterations = 1,
                                     verbose=verbose);
   if processing_parameter is not None:
     block_processing_parameter.update(processing_parameter);
-  if not 'overlap' in block_processing_parameter or block_processing_parameter['overlap'] is None:
+  if not 'overlap' in block_processing_parameter or block_processing_parameter['overlap'] is None:  # FIXME: use .get
     block_processing_parameter['overlap'] = 2 + 2 * iterations;
   if not 'size_min' in block_processing_parameter or block_processing_parameter['size_min'] is None:
     block_processing_parameter['size_min'] = 2 + 2 * iterations + 1;

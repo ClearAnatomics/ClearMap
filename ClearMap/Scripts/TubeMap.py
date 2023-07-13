@@ -307,7 +307,7 @@ if __name__ == '__main__':
   processing_parameter = vf.default_fill_vessels_processing_parameter.copy();
   processing_parameter.update(size_max = 500, 
                               size_min = 'fixed',
-                              axes = all,
+                              axes = 'all',
                               overlap = 50);                 
                               
   vf.fill_vessels(source, sink, resample=1, threshold=0.5, cuda=None, processing_parameter=processing_parameter, verbose=True)
@@ -323,7 +323,7 @@ if __name__ == '__main__':
   processing_parameter = vf.default_fill_vessels_processing_parameter.copy();
   processing_parameter.update(size_max = 1000, 
                               size_min = 'fixed',
-                              axes = all,
+                              axes = 'all',
                               overlap = 100);                 
                               
   vf.fill_vessels(source, sink, resample=2, threshold=0.5, cuda=None, processing_parameter=processing_parameter, verbose=True)

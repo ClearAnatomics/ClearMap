@@ -45,8 +45,9 @@ import ClearMap.ParallelProcessing.DataProcessing.DevolvePointList as dpl
 print('ClearMap.ParallelProcessing.DataProcessing.MeasurePointList')
 import ClearMap.ParallelProcessing.DataProcessing.MeasurePointList as mpl
 print('ClearMap.ParallelProcessing.DataProcessing.StatisticsPointList')
-import ClearMap.ParallelProcessing.DataProcessing.StatisticsPointList as spl
+import ClearMap.ParallelProcessing.DataProcessing.statistics.StatisticsPointList as spl
 
 
 __all__ = ['fil', 'clp', 'hes', 'rnk', 'thr', 'trc',
            'ap', 'cpl', 'dpl', 'mpl', 'spl']
+

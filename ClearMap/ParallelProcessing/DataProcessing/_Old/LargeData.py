@@ -188,7 +188,7 @@ def where(data, out = None, blocks = None, cutoff = defaultCutoff, processes = d
       sums = code.blockSums1d(d, blocks = blocks, processes = processes);
     else:
       sums = code.blockSums3d(d, blocks = blocks, processes = processes);
-    out = np.squeeze(np.zeros((np.sum(sums), data.ndim), dtype = np.int));
+    out = np.squeeze(np.zeros((np.sum(sums), data.ndim), dtype=int));
   else:
     sums = None;
   

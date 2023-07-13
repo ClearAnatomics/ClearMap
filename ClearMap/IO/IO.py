@@ -19,6 +19,7 @@ __download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 
 import importlib
 import functools
+import math
 
 import numpy as np
 
@@ -56,11 +57,13 @@ from ClearMap.IO.FileUtils import (is_file, is_directory, file_extension,   #ana
 ###############################################################################
 ### Source associations 
 ###############################################################################
+from ClearMap.Utils.utilities import CancelableProcessPoolExecutor
 
-source_modules = [npy, tif, mmp, sma, fl, nrrd, csv, gt];
+source_modules = [npy, tif, mmp, sma, fl, nrrd, csv, gt]
 """The valid source modules."""
 
-file_extension_to_module = {"npy" : mmp, "tif" : tif, 'nrrd' : nrrd, 'nrdh' : nrrd, 'csv' : csv, 'gt' : gt};
+file_extension_to_module = {"npy": mmp, "tif": tif, "tiff": tif, 'nrrd': nrrd,
+                            'nrdh': nrrd, 'csv': csv, 'gt': gt}
 """Map between file extensions and modules that handle this file type."""        
 
 ###############################################################################
@@ -517,7 +520,7 @@ def initialize(source = None, shape = None, dtype = None, order = None, location
           mod = location_to_module(location);
           return mod.create(location=location, shape=shape, dtype=dtype, order=order, **kwargs);
         except Exception as error:
-          raise ValueError('Cannot initialize source for location %r - %r' % (location, error));
+          raise ValueError(f'Cannot initialize source for location {location} - {error}')
     
   if isinstance(source, np.ndarray):
     source = as_source(source);
@@ -714,7 +717,8 @@ def convert(source, sink, processes = None, verbose = False, **kwargs):
 
 
 
-def convert_files(filenames, extension = None, path = None, processes = None, verbose = False):
+def convert_files(filenames, extension = None, path = None, processes = None, verbose = False, workspace=None,
+                  verify=False):
   """Transforms list of files to their sink format in parallel.
   
   Arguments
@@ -753,13 +757,17 @@ def convert_files(filenames, extension = None, path = None, processes = None, ve
     processes = mp.cpu_count();
   
   #print(n_files, extension, filenames, sinks)
-  _convert = functools.partial(_convert_files, n_files=n_files, extension=extension, verbose=verbose);
+  _convert = functools.partial(_convert_files, n_files=n_files, extension=extension, verbose=verbose, verify=verify);
   
   if processes == 'serial':
     [_convert(source,sink,i) for i,source,sink in zip(range(n_files), filenames, sinks)];
   else:
-    with concurrent.futures.ProcessPoolExecutor(processes) as executor:
-      executor.map(_convert, filenames, sinks, range(n_files));
+    with CancelableProcessPoolExecutor(processes) as executor:
+      executor.map(_convert, filenames, sinks, range(n_files))
+      if workspace is not None:
+        workspace.executor = executor
+    if workspace is not None:
+      workspace.executor = None
                   
   if verbose:
     timer.print_elapsed_time('Converting %d files to %s' % (n_files, extension));
@@ -768,7 +776,7 @@ def convert_files(filenames, extension = None, path = None, processes = None, ve
 
 
 @ptb.parallel_traceback
-def _convert_files(source, sink, fid, n_files, extension, verbose):
+def _convert_files(source, sink, fid, n_files, extension, verbose, verify=False):
   source = as_source(source);              
   if verbose:
     print('Converting file %d/%d %s -> %s' % (fid,n_files,source,sink))
@@ -776,7 +784,11 @@ def _convert_files(source, sink, fid, n_files, extension, verbose):
   if mod is None:
     raise ValueError("Cannot determine module for extension %s!" % extension);
   mod.write(sink,source);
-
+  if verify:
+    src_mean = source.mean()
+    sink_mean = mod.read(sink).mean()
+    if not math.isclose(src_mean, sink_mean, rel_tol=1e-5):
+      raise RuntimeError(f"Conversion of {source} to {sink} failed, means differ")
 
 
 ###############################################################################

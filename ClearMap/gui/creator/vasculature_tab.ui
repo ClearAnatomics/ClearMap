@@ -1,0 +1,1612 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>Form</class>
+ <widget class="QWidget" name="Form">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>592</width>
+    <height>1014</height>
+   </rect>
+  </property>
+  <property name="minimumSize">
+   <size>
+    <width>400</width>
+    <height>720</height>
+   </size>
+  </property>
+  <property name="windowTitle">
+   <string>Form</string>
+  </property>
+  <property name="styleSheet">
+   <string notr="true">background-color: rgb(46, 52, 54);</string>
+  </property>
+  <layout class="QVBoxLayout" name="verticalLayout_2">
+   <item>
+    <layout class="QVBoxLayout" name="verticalLayout_61">
+     <item>
+      <layout class="QHBoxLayout" name="horizontalLayout_241">
+       <item>
+        <layout class="QVBoxLayout" name="verticalLayout_52">
+         <item>
+          <widget class="QToolBox" name="toolBox_3">
+           <property name="minimumSize">
+            <size>
+             <width>0</width>
+             <height>500</height>
+            </size>
+           </property>
+           <property name="font">
+            <font>
+             <bold>true</bold>
+            </font>
+           </property>
+           <property name="currentIndex">
+            <number>3</number>
+           </property>
+           <widget class="QWidget" name="binarization">
+            <property name="geometry">
+             <rect>
+              <x>0</x>
+              <y>0</y>
+              <width>568</width>
+              <height>840</height>
+             </rect>
+            </property>
+            <attribute name="label">
+             <string>Binarization</string>
+            </attribute>
+            <layout class="QHBoxLayout" name="horizontalLayout_362">
+             <item>
+              <widget class="QToolBox" name="toolBox_26">
+               <property name="currentIndex">
+                <number>0</number>
+               </property>
+               <widget class="QWidget" name="page_83">
+                <property name="geometry">
+                 <rect>
+                  <x>0</x>
+                  <y>0</y>
+                  <width>550</width>
+                  <height>762</height>
+                 </rect>
+                </property>
+                <attribute name="label">
+                 <string>Binarization</string>
+                </attribute>
+                <layout class="QVBoxLayout" name="verticalLayout_5">
+                 <item>
+                  <widget class="QGroupBox" name="groupBox_2">
+                   <property name="styleSheet">
+                    <string notr="true"/>
+                   </property>
+                   <property name="title">
+                    <string>All vessels channel</string>
+                   </property>
+                   <layout class="QGridLayout" name="gridLayout">
+                    <item row="1" column="0">
+                     <widget class="QFrame" name="frame">
+                      <property name="frameShape">
+                       <enum>QFrame::StyledPanel</enum>
+                      </property>
+                      <property name="frameShadow">
+                       <enum>QFrame::Raised</enum>
+                      </property>
+                      <layout class="QGridLayout" name="gridLayout_3">
+                       <item row="0" column="0">
+                        <widget class="QLabel" name="binarizationRawClippingRangeLbl">
+                         <property name="toolTip">
+                          <string>The range for the vessel detection</string>
+                         </property>
+                         <property name="whatsThis">
+                          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;For optimal values, open the stitched image and look at the pixel intensities inside the brain (ignore the pixels outside the brain).&lt;/p&gt;&lt;p&gt;Set the minimum based on the lowest intensities you see.&lt;/p&gt;&lt;p&gt;For the higher intensity, look at the large vessels at the surface. You should set to the limit to a value that still excludes the halo.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                         </property>
+                         <property name="text">
+                          <string>Clip range</string>
+                         </property>
+                        </widget>
+                       </item>
+                       <item row="0" column="1" colspan="2">
+                        <widget class="QFrame" name="rawBinarizationClipRangeDoublet">
+                         <property name="frameShape">
+                          <enum>QFrame::StyledPanel</enum>
+                         </property>
+                         <property name="frameShadow">
+                          <enum>QFrame::Raised</enum>
+                         </property>
+                         <layout class="QHBoxLayout" name="horizontalLayout_9">
+                          <item>
+                           <widget class="QSpinBox" name="spinBox_255">
+                            <property name="suffix">
+                             <string/>
+                            </property>
+                            <property name="minimum">
+                             <number>0</number>
+                            </property>
+                            <property name="maximum">
+                             <number>65535</number>
+                            </property>
+                           </widget>
+                          </item>
+                          <item>
+                           <widget class="QSpinBox" name="spinBox_256">
+                            <property name="suffix">
+                             <string/>
+                            </property>
+                            <property name="minimum">
+                             <number>0</number>
+                            </property>
+                            <property name="maximum">
+                             <number>65535</number>
+                            </property>
+                           </widget>
+                          </item>
+                         </layout>
+                        </widget>
+                       </item>
+                       <item row="0" column="3">
+                        <widget class="QToolButton" name="binarizationRawClippingRangeInfoToolButton">
+                         <property name="icon">
+                          <iconset resource="icons.qrc">
+                           <normaloff>:/icons/icons/info.svg</normaloff>:/icons/icons/info.svg</iconset>
+                         </property>
+                        </widget>
+                       </item>
+                       <item row="1" column="0">
+                        <widget class="QLabel" name="binarizationRawThresholdLbl">
+                         <property name="toolTip">
+                          <string>Pseudo deconvolution threshold.</string>
+                         </property>
+                         <property name="whatsThis">
+                          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Pseudo deconvolution threshold. &lt;/p&gt;&lt;p&gt;Voxels above this threshold will be added to the &lt;/p&gt;&lt;p&gt;binarization result in the multi-path biniarization.&lt;/p&gt;&lt;p&gt;Select slightly below the clip range min.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                         </property>
+                         <property name="text">
+                          <string>Threshold</string>
+                         </property>
+                        </widget>
+                       </item>
+                       <item row="1" column="1">
+                        <widget class="QSpinBox" name="rawBinarizationThresholdSpinBox">
+                         <property name="minimum">
+                          <number>0</number>
+                         </property>
+                         <property name="maximum">
+                          <number>65535</number>
+                         </property>
+                        </widget>
+                       </item>
+                       <item row="1" column="2">
+                        <widget class="QToolButton" name="binarizationRawThresholdInfoToolButton">
+                         <property name="icon">
+                          <iconset resource="icons.qrc">
+                           <normaloff>:/icons/icons/info.svg</normaloff>:/icons/icons/info.svg</iconset>
+                         </property>
+                        </widget>
+                       </item>
+                      </layout>
+                     </widget>
+                    </item>
+                    <item row="9" column="0">
+                     <widget class="QPushButton" name="binarizeVesselsPushButton">
+                      <property name="text">
+                       <string>Run</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="0" column="0">
+                     <widget class="QCheckBox" name="runRawBinarizationCheckBox">
+                      <property name="text">
+                       <string>Binarize</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="5" column="0">
+                     <layout class="QGridLayout" name="gridLayout_9">
+                      <item row="1" column="0">
+                       <widget class="QCheckBox" name="rawBinarizationBinaryFillingCheckBox">
+                        <property name="text">
+                         <string>Binary filling</string>
+                        </property>
+                       </widget>
+                      </item>
+                      <item row="2" column="0">
+                       <widget class="QCheckBox" name="binarizationRawDeepFillingCheckBox">
+                        <property name="whatsThis">
+                         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;In this step a trained convolutional deep network &lt;/p&gt;&lt;p&gt;is applied to fill the holes of hollow vessels in the &lt;/p&gt;&lt;p&gt;vasculature and arteries data.&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                        </property>
+                        <property name="text">
+                         <string>Deep filling</string>
+                        </property>
+                       </widget>
+                      </item>
+                      <item row="0" column="0">
+                       <widget class="QCheckBox" name="rawBinarizationSmoothingCheckBox">
+                        <property name="text">
+                         <string>Smooth</string>
+                        </property>
+                       </widget>
+                      </item>
+                      <item row="2" column="1">
+                       <widget class="QToolButton" name="binarizationRawDeepFillingInfoToolButton">
+                        <property name="icon">
+                         <iconset resource="icons.qrc">
+                          <normaloff>:/icons/icons/info.svg</normaloff>:/icons/icons/info.svg</iconset>
+                        </property>
+                       </widget>
+                      </item>
+                     </layout>
+                    </item>
+                   </layout>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QGroupBox" name="groupBox">
+                   <property name="enabled">
+                    <bool>true</bool>
+                   </property>
+                   <property name="title">
+                    <string>Arteries channel</string>
+                   </property>
+                   <layout class="QGridLayout" name="gridLayout_2">
+                    <item row="1" column="0">
+                     <widget class="QFrame" name="frame_2">
+                      <property name="frameShape">
+                       <enum>QFrame::StyledPanel</enum>
+                      </property>
+                      <property name="frameShadow">
+                       <enum>QFrame::Raised</enum>
+                      </property>
+                      <layout class="QGridLayout" name="gridLayout_13">
+                       <item row="0" column="0">
+                        <widget class="QLabel" name="binarizationArteriesClippingRangeLbl">
+                         <property name="toolTip">
+                          <string>The range for the arteries detection</string>
+                         </property>
+                         <property name="whatsThis">
+                          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;For optimal values, open the stitched image and look at the pixel intensities inside the brain (ignore the pixels outside the brain).&lt;/p&gt;&lt;p&gt;Set the minimum based on the lowest intensities you see.&lt;/p&gt;&lt;p&gt;For the higher intensity, look at the large vessels at the surface. You should set to the limit to a value that still excludes the halo.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                         </property>
+                         <property name="text">
+                          <string>Clip range</string>
+                         </property>
+                        </widget>
+                       </item>
+                       <item row="0" column="1" colspan="2">
+                        <widget class="QFrame" name="arteriesBinarizationClipRangeDoublet">
+                         <property name="frameShape">
+                          <enum>QFrame::StyledPanel</enum>
+                         </property>
+                         <property name="frameShadow">
+                          <enum>QFrame::Raised</enum>
+                         </property>
+                         <layout class="QHBoxLayout" name="horizontalLayout_10">
+                          <item>
+                           <widget class="QSpinBox" name="spinBox_259">
+                            <property name="suffix">
+                             <string/>
+                            </property>
+                            <property name="minimum">
+                             <number>0</number>
+                            </property>
+                            <property name="maximum">
+                             <number>65535</number>
+                            </property>
+                           </widget>
+                          </item>
+                          <item>
+                           <widget class="QSpinBox" name="spinBox_260">
+                            <property name="suffix">
+                             <string/>
+                            </property>
+                            <property name="minimum">
+                             <number>0</number>
+                            </property>
+                            <property name="maximum">
+                             <number>65535</number>
+                            </property>
+                           </widget>
+                          </item>
+                         </layout>
+                        </widget>
+                       </item>
+                       <item row="0" column="3">
+                        <widget class="QToolButton" name="binarizationArteriesClippingRangeInfoToolButton">
+                         <property name="icon">
+                          <iconset resource="icons.qrc">
+                           <normaloff>:/icons/icons/info.svg</normaloff>:/icons/icons/info.svg</iconset>
+                         </property>
+                        </widget>
+                       </item>
+                       <item row="1" column="0">
+                        <widget class="QLabel" name="binarizationArteriesThresholdLbl">
+                         <property name="toolTip">
+                          <string>Pseudo deconvolution threshold.</string>
+                         </property>
+                         <property name="whatsThis">
+                          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Pseudo deconvolution threshold. &lt;/p&gt;&lt;p&gt;Voxels above this threshold will be added to the &lt;/p&gt;&lt;p&gt;binarization result in the multi-path biniarization.&lt;/p&gt;&lt;p&gt;Select slightly below the clip range min.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                         </property>
+                         <property name="text">
+                          <string>Threshold</string>
+                         </property>
+                        </widget>
+                       </item>
+                       <item row="1" column="1">
+                        <widget class="QSpinBox" name="arteriesBinarizationThresholdSpinBox">
+                         <property name="minimum">
+                          <number>0</number>
+                         </property>
+                         <property name="maximum">
+                          <number>65535</number>
+                         </property>
+                        </widget>
+                       </item>
+                       <item row="1" column="2">
+                        <widget class="QToolButton" name="binarizationArteriesThresholdInfoToolButton">
+                         <property name="icon">
+                          <iconset resource="icons.qrc">
+                           <normaloff>:/icons/icons/info.svg</normaloff>:/icons/icons/info.svg</iconset>
+                         </property>
+                        </widget>
+                       </item>
+                      </layout>
+                     </widget>
+                    </item>
+                    <item row="0" column="0">
+                     <widget class="QCheckBox" name="runArteriesBinarizationCheckBox">
+                      <property name="text">
+                       <string>Binarize</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="8" column="0">
+                     <widget class="QPushButton" name="binarizeArteriesPushButton">
+                      <property name="text">
+                       <string>Run</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="4" column="0">
+                     <layout class="QGridLayout" name="gridLayout_10">
+                      <item row="0" column="0">
+                       <widget class="QCheckBox" name="arteriesBinarizationSmoothingCheckBox">
+                        <property name="text">
+                         <string>Smooth</string>
+                        </property>
+                       </widget>
+                      </item>
+                      <item row="1" column="0">
+                       <widget class="QCheckBox" name="arteriesBinarizationBinaryFillingCheckBox">
+                        <property name="text">
+                         <string>Binary filling</string>
+                        </property>
+                       </widget>
+                      </item>
+                      <item row="2" column="0">
+                       <widget class="QCheckBox" name="binarizationArteriesDeepFillingCheckBox">
+                        <property name="whatsThis">
+                         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;In this step a trained convolutional deep network &lt;/p&gt;&lt;p&gt;is applied to fill the holes of hollow vessels in the &lt;/p&gt;&lt;p&gt;vasculature and arteries data.&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                        </property>
+                        <property name="text">
+                         <string>Deep filling</string>
+                        </property>
+                       </widget>
+                      </item>
+                      <item row="2" column="1">
+                       <widget class="QToolButton" name="binarizationArteriesDeepFillingInfoToolButton">
+                        <property name="icon">
+                         <iconset resource="icons.qrc">
+                          <normaloff>:/icons/icons/info.svg</normaloff>:/icons/icons/info.svg</iconset>
+                        </property>
+                       </widget>
+                      </item>
+                     </layout>
+                    </item>
+                   </layout>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QCheckBox" name="binarizationConbineBinaryFillingCheckBox">
+                   <property name="text">
+                    <string>Binary fill</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QPushButton" name="binarizationCombinePushButton">
+                   <property name="toolTip">
+                    <string>Combine the binary images of the different vasculature channels</string>
+                   </property>
+                   <property name="text">
+                    <string>Combine channels</string>
+                   </property>
+                  </widget>
+                 </item>
+                </layout>
+               </widget>
+               <widget class="QWidget" name="page_3">
+                <property name="geometry">
+                 <rect>
+                  <x>0</x>
+                  <y>0</y>
+                  <width>390</width>
+                  <height>108</height>
+                 </rect>
+                </property>
+                <attribute name="label">
+                 <string>Display</string>
+                </attribute>
+                <layout class="QGridLayout" name="gridLayout_12">
+                 <item row="0" column="2">
+                  <widget class="QLabel" name="label_2">
+                   <property name="text">
+                    <string>Image B</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="0" column="3">
+                  <widget class="QComboBox" name="binarizationPlotStep2ComboBox">
+                   <property name="currentIndex">
+                    <number>1</number>
+                   </property>
+                   <item>
+                    <property name="text">
+                     <string>stitched</string>
+                    </property>
+                   </item>
+                   <item>
+                    <property name="text">
+                     <string>binary</string>
+                    </property>
+                   </item>
+                   <item>
+                    <property name="text">
+                     <string>postprocessed</string>
+                    </property>
+                   </item>
+                   <item>
+                    <property name="text">
+                     <string>filled</string>
+                    </property>
+                   </item>
+                   <item>
+                    <property name="text">
+                     <string>combined</string>
+                    </property>
+                   </item>
+                   <item>
+                    <property name="text">
+                     <string>final</string>
+                    </property>
+                   </item>
+                  </widget>
+                 </item>
+                 <item row="1" column="3">
+                  <widget class="QComboBox" name="binarizationPlotChannel2ComboBox">
+                   <property name="currentIndex">
+                    <number>0</number>
+                   </property>
+                   <item>
+                    <property name="text">
+                     <string>all vessels</string>
+                    </property>
+                   </item>
+                   <item>
+                    <property name="text">
+                     <string>arteries</string>
+                    </property>
+                   </item>
+                  </widget>
+                 </item>
+                 <item row="1" column="1">
+                  <widget class="QComboBox" name="binarizationPlotChannel1ComboBox">
+                   <item>
+                    <property name="text">
+                     <string>all vessels</string>
+                    </property>
+                   </item>
+                   <item>
+                    <property name="text">
+                     <string>arteries</string>
+                    </property>
+                   </item>
+                  </widget>
+                 </item>
+                 <item row="3" column="3">
+                  <widget class="QPushButton" name="binarizationPlotOverlayPushButton">
+                   <property name="text">
+                    <string>Plot overlay</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="0" column="0">
+                  <widget class="QLabel" name="label">
+                   <property name="text">
+                    <string>Image A</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="3" column="1" colspan="2">
+                  <widget class="QPushButton" name="binarizationPlotSideBySidePushButton">
+                   <property name="text">
+                    <string>Plot side by side</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="0" column="1">
+                  <widget class="QComboBox" name="binarizationPlotStep1ComboBox">
+                   <item>
+                    <property name="text">
+                     <string>stitched</string>
+                    </property>
+                   </item>
+                   <item>
+                    <property name="text">
+                     <string>binary</string>
+                    </property>
+                   </item>
+                   <item>
+                    <property name="text">
+                     <string>postprocessed</string>
+                    </property>
+                   </item>
+                   <item>
+                    <property name="text">
+                     <string>filled</string>
+                    </property>
+                   </item>
+                   <item>
+                    <property name="text">
+                     <string>combined</string>
+                    </property>
+                   </item>
+                   <item>
+                    <property name="text">
+                     <string>final</string>
+                    </property>
+                   </item>
+                  </widget>
+                 </item>
+                 <item row="2" column="1">
+                  <spacer name="verticalSpacer">
+                   <property name="orientation">
+                    <enum>Qt::Vertical</enum>
+                   </property>
+                   <property name="sizeHint" stdset="0">
+                    <size>
+                     <width>20</width>
+                     <height>40</height>
+                    </size>
+                   </property>
+                  </spacer>
+                 </item>
+                </layout>
+               </widget>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+           <widget class="QWidget" name="Graph_Construction">
+            <property name="geometry">
+             <rect>
+              <x>0</x>
+              <y>0</y>
+              <width>568</width>
+              <height>840</height>
+             </rect>
+            </property>
+            <attribute name="label">
+             <string>Graph Construction</string>
+            </attribute>
+            <layout class="QGridLayout" name="gridLayout_4">
+             <item row="1" column="0">
+              <widget class="QCheckBox" name="buildGraphBuildCheckBox">
+               <property name="text">
+                <string>Build initial graph</string>
+               </property>
+              </widget>
+             </item>
+             <item row="3" column="0">
+              <widget class="QCheckBox" name="buildGraphReduceCheckBox">
+               <property name="text">
+                <string>Reduce to branching vertices</string>
+               </property>
+              </widget>
+             </item>
+             <item row="4" column="0">
+              <widget class="QCheckBox" name="buildGraphTransformCheckBox">
+               <property name="text">
+                <string>Align to atlas</string>
+               </property>
+              </widget>
+             </item>
+             <item row="2" column="0">
+              <widget class="QCheckBox" name="buildGraphCleanCheckBox">
+               <property name="text">
+                <string>Remove cliques</string>
+               </property>
+              </widget>
+             </item>
+             <item row="8" column="0">
+              <widget class="QCheckBox" name="buildGraphUseArteriesCheckBox">
+               <property name="font">
+                <font>
+                 <bold>true</bold>
+                </font>
+               </property>
+               <property name="text">
+                <string>Use arteries</string>
+               </property>
+              </widget>
+             </item>
+             <item row="7" column="0">
+              <spacer name="verticalSpacer_7">
+               <property name="orientation">
+                <enum>Qt::Vertical</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>20</width>
+                 <height>40</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+             <item row="6" column="0">
+              <widget class="QCheckBox" name="buildGraphSelectAllCheckBox">
+               <property name="font">
+                <font>
+                 <bold>true</bold>
+                </font>
+               </property>
+               <property name="text">
+                <string>Select all</string>
+               </property>
+              </widget>
+             </item>
+             <item row="10" column="0">
+              <widget class="QPushButton" name="buildGraphPushButton">
+               <property name="text">
+                <string>Build</string>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="0">
+              <widget class="QCheckBox" name="buildGraphSkeletonizeCheckBox">
+               <property name="text">
+                <string>Skeletonize binary</string>
+               </property>
+              </widget>
+             </item>
+             <item row="9" column="0">
+              <spacer name="verticalSpacer_2">
+               <property name="orientation">
+                <enum>Qt::Vertical</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>20</width>
+                 <height>40</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+             <item row="10" column="2">
+              <widget class="QToolButton" name="buildGraphPushButtonInfoToolButton">
+               <property name="icon">
+                <iconset resource="icons.qrc">
+                 <normaloff>:/icons/icons/info.svg</normaloff>:/icons/icons/info.svg</iconset>
+               </property>
+              </widget>
+             </item>
+             <item row="5" column="0">
+              <widget class="QCheckBox" name="buildGraphRegisterCheckBox">
+               <property name="text">
+                <string>Assign regions to vertices</string>
+               </property>
+              </widget>
+             </item>
+             <item row="10" column="1">
+              <widget class="QPushButton" name="unloadGraphsPushButton">
+               <property name="statusTip">
+                <string>Unload the temporary (raw, cleaned, reduced) graphs from memory</string>
+               </property>
+               <property name="text">
+                <string>Unload temp graphs</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+           <widget class="QWidget" name="Vessel_Type_Processing">
+            <property name="geometry">
+             <rect>
+              <x>0</x>
+              <y>0</y>
+              <width>568</width>
+              <height>840</height>
+             </rect>
+            </property>
+            <attribute name="label">
+             <string>Arteries and veins tracing</string>
+            </attribute>
+            <layout class="QVBoxLayout" name="verticalLayout">
+             <item>
+              <widget class="QToolBox" name="toolBox">
+               <property name="currentIndex">
+                <number>0</number>
+               </property>
+               <widget class="QWidget" name="arteries">
+                <property name="geometry">
+                 <rect>
+                  <x>0</x>
+                  <y>0</y>
+                  <width>550</width>
+                  <height>732</height>
+                 </rect>
+                </property>
+                <attribute name="label">
+                 <string>Arteries</string>
+                </attribute>
+                <layout class="QGridLayout" name="gridLayout_5">
+                 <item row="2" column="1">
+                  <widget class="QSpinBox" name="minArterySizeSpinBox">
+                   <property name="maximum">
+                    <number>65535</number>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="1" column="1">
+                  <widget class="QSpinBox" name="maxArteriesTracingIterationsSpinBox">
+                   <property name="maximum">
+                    <number>65535</number>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="1" column="2">
+                  <widget class="QToolButton" name="maxArteriesTracingIterationsInfoToolButton">
+                   <property name="icon">
+                    <iconset resource="icons.qrc">
+                     <normaloff>:/icons/icons/info.svg</normaloff>:/icons/icons/info.svg</iconset>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="2" column="0">
+                  <widget class="QLabel" name="minArterySizeLbl">
+                   <property name="toolTip">
+                    <string>Minimum number of branches to qualify as artery</string>
+                   </property>
+                   <property name="whatsThis">
+                    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;To correct for errors due to isolated vessel branches or large veins that express low levels of Acta2, we require a minimum number of branches an artery must have.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                   </property>
+                   <property name="text">
+                    <string>Minimum Branch Number</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="2" column="2">
+                  <widget class="QToolButton" name="minArterySizeInfoToolButton">
+                   <property name="icon">
+                    <iconset resource="icons.qrc">
+                     <normaloff>:/icons/icons/info.svg</normaloff>:/icons/icons/info.svg</iconset>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="1" column="0">
+                  <widget class="QLabel" name="maxArteriesTracingIterationsLbl">
+                   <property name="toolTip">
+                    <string>Maximum number of nodes to extend to bridge arteries.</string>
+                   </property>
+                   <property name="whatsThis">
+                    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The arteries will be traced by hysteresis to try and bridge artery segments with few nodes between them that were not labelled as arteries due to the weakness of the artery marker. This defines the maximum number of unlabelled nodes between two segments to attempt bridging them.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                   </property>
+                   <property name="text">
+                    <string>Maximum Tracing Steps</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="0" column="0">
+                  <widget class="QLabel" name="label_6">
+                   <property name="toolTip">
+                    <string>Minimum artery radius</string>
+                   </property>
+                   <property name="text">
+                    <string>Minimum Radius</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="0" column="1">
+                  <widget class="QSpinBox" name="arteriesMinRadiusSpinBox">
+                   <property name="maximum">
+                    <number>65535</number>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="3" column="0">
+                  <spacer name="verticalSpacer_5">
+                   <property name="orientation">
+                    <enum>Qt::Vertical</enum>
+                   </property>
+                   <property name="sizeHint" stdset="0">
+                    <size>
+                     <width>20</width>
+                     <height>40</height>
+                    </size>
+                   </property>
+                  </spacer>
+                 </item>
+                </layout>
+               </widget>
+               <widget class="QWidget" name="veins">
+                <property name="geometry">
+                 <rect>
+                  <x>0</x>
+                  <y>0</y>
+                  <width>367</width>
+                  <height>212</height>
+                 </rect>
+                </property>
+                <attribute name="label">
+                 <string>Veins</string>
+                </attribute>
+                <layout class="QGridLayout" name="gridLayout_6">
+                 <item row="5" column="0">
+                  <widget class="QLabel" name="minVeinSizeLbl">
+                   <property name="toolTip">
+                    <string>Minimum radius to qualify as vein</string>
+                   </property>
+                   <property name="whatsThis">
+                    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Radius below which a vessel is a capillary,&lt;/p&gt;&lt;p&gt; not a vein anymore.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                   </property>
+                   <property name="text">
+                    <string>Min. Size Radius</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="1" column="0">
+                  <widget class="QLabel" name="restrictiveMinVeinRadiusLbl">
+                   <property name="toolTip">
+                    <string>Minimum radius of large veins</string>
+                   </property>
+                   <property name="whatsThis">
+                    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Large veins are identified as vessels with a high radius and a low maximal Acta2 expression.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                   </property>
+                   <property name="text">
+                    <string>Restrictive Min. Radius</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="3" column="0">
+                  <widget class="QLabel" name="finalMinVeinRadiusLbl">
+                   <property name="toolTip">
+                    <string>Final vein minimum radius</string>
+                   </property>
+                   <property name="whatsThis">
+                    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Now that arteries have been refined, we redefine the veins&lt;/p&gt;&lt;p&gt;by adding, vessels that are quite large &lt;/p&gt;&lt;p&gt;(superior to &lt;span style=&quot; font-style:italic;&quot;&gt;final min radius&lt;/span&gt;) but not identified as&lt;/p&gt;&lt;p&gt;arteries.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                   </property>
+                   <property name="text">
+                    <string>Final Min. Radius</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="0" column="3">
+                  <widget class="QToolButton" name="veinIntensityRangeOnArteriesChannelInfoToolButton">
+                   <property name="icon">
+                    <iconset resource="icons.qrc">
+                     <normaloff>:/icons/icons/info.svg</normaloff>:/icons/icons/info.svg</iconset>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="1" column="1">
+                  <widget class="QSpinBox" name="restrictiveMinVeinRadiusSpinBox">
+                   <property name="mouseTracking">
+                    <bool>false</bool>
+                   </property>
+                   <property name="suffix">
+                    <string/>
+                   </property>
+                   <property name="maximum">
+                    <number>65535</number>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="3" column="2">
+                  <widget class="QToolButton" name="finalMinVeinRadiusInfoToolButton">
+                   <property name="icon">
+                    <iconset resource="icons.qrc">
+                     <normaloff>:/icons/icons/info.svg</normaloff>:/icons/icons/info.svg</iconset>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="5" column="1">
+                  <widget class="QSpinBox" name="minVeinSizeSpinBox">
+                   <property name="maximum">
+                    <number>65535</number>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="4" column="2">
+                  <widget class="QToolButton" name="maxVeinsTracingIterationsInfoToolButton">
+                   <property name="icon">
+                    <iconset resource="icons.qrc">
+                     <normaloff>:/icons/icons/info.svg</normaloff>:/icons/icons/info.svg</iconset>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="3" column="1">
+                  <widget class="QSpinBox" name="finalMinVeinRadiusSpinBox">
+                   <property name="maximum">
+                    <number>65535</number>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="4" column="0">
+                  <widget class="QLabel" name="maxVeinsTracingIterationsLbl">
+                   <property name="toolTip">
+                    <string>Maximum number of nodes between veins to be bridged</string>
+                   </property>
+                   <property name="whatsThis">
+                    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The veins will be traced by hysteresis to try and bridge vein segments with few nodes between them that were not labelled as veins due to the previous criteria. This defines the maximum number of unlabelled nodes between two segments to attempt bridging them.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                   </property>
+                   <property name="text">
+                    <string>Max. Tracing steps</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="4" column="1">
+                  <widget class="QSpinBox" name="maxVeinsTracingIterationsSpinBox">
+                   <property name="maximum">
+                    <number>65535</number>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="5" column="2">
+                  <widget class="QToolButton" name="minVeinSizeInfoToolButton">
+                   <property name="icon">
+                    <iconset resource="icons.qrc">
+                     <normaloff>:/icons/icons/info.svg</normaloff>:/icons/icons/info.svg</iconset>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="2" column="2">
+                  <widget class="QToolButton" name="permissiveMinVeinRadiusInfoToolButton">
+                   <property name="icon">
+                    <iconset resource="icons.qrc">
+                     <normaloff>:/icons/icons/info.svg</normaloff>:/icons/icons/info.svg</iconset>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="2" column="1">
+                  <widget class="QSpinBox" name="permissiveMinVeinRadiusSpinBox">
+                   <property name="maximum">
+                    <number>65535</number>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="2" column="0">
+                  <widget class="QLabel" name="permissiveMinVeinRadiusLbl">
+                   <property name="toolTip">
+                    <string>Temporary vein minimum radius</string>
+                   </property>
+                   <property name="whatsThis">
+                    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;After predefining veins, vessels that are quite large &lt;/p&gt;&lt;p&gt;(superior to &lt;span style=&quot; font-style:italic;&quot;&gt;permissive min radius&lt;/span&gt;) but not identified as&lt;/p&gt;&lt;p&gt;arteries are also added. This is then used to refine the definition&lt;/p&gt;&lt;p&gt;of arteries.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                   </property>
+                   <property name="text">
+                    <string>Permissive Min. Radius</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="0" column="0">
+                  <widget class="QLabel" name="veinIntensityRangeOnArteriesChannelLbl">
+                   <property name="toolTip">
+                    <string>Range of artery marker (acta2) expression for veins</string>
+                   </property>
+                   <property name="whatsThis">
+                    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Large veins are identified as vessels with a high radius and a low maximal Acta2 expression.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                   </property>
+                   <property name="text">
+                    <string>Intensity range</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="1" column="2">
+                  <widget class="QToolButton" name="restrictiveMinVeinRadiusInfoToolButton">
+                   <property name="icon">
+                    <iconset resource="icons.qrc">
+                     <normaloff>:/icons/icons/info.svg</normaloff>:/icons/icons/info.svg</iconset>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="0" column="1" colspan="2">
+                  <widget class="QFrame" name="veinIntensityRangeOnArteriesChannelDoublet">
+                   <property name="frameShape">
+                    <enum>QFrame::StyledPanel</enum>
+                   </property>
+                   <property name="frameShadow">
+                    <enum>QFrame::Raised</enum>
+                   </property>
+                   <layout class="QHBoxLayout" name="horizontalLayout_2">
+                    <item>
+                     <widget class="QSpinBox" name="spinBox_264">
+                      <property name="suffix">
+                       <string/>
+                      </property>
+                      <property name="minimum">
+                       <number>0</number>
+                      </property>
+                      <property name="maximum">
+                       <number>65535</number>
+                      </property>
+                     </widget>
+                    </item>
+                    <item>
+                     <widget class="QSpinBox" name="spinBox_265">
+                      <property name="suffix">
+                       <string/>
+                      </property>
+                      <property name="minimum">
+                       <number>0</number>
+                      </property>
+                      <property name="maximum">
+                       <number>65535</number>
+                      </property>
+                     </widget>
+                    </item>
+                   </layout>
+                  </widget>
+                 </item>
+                 <item row="6" column="0">
+                  <spacer name="verticalSpacer_3">
+                   <property name="orientation">
+                    <enum>Qt::Vertical</enum>
+                   </property>
+                   <property name="sizeHint" stdset="0">
+                    <size>
+                     <width>20</width>
+                     <height>40</height>
+                    </size>
+                   </property>
+                  </spacer>
+                 </item>
+                </layout>
+               </widget>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="postProcessVesselTypesPushButton">
+               <property name="text">
+                <string>Run</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+           <widget class="QWidget" name="Vasculature_Analysis">
+            <property name="geometry">
+             <rect>
+              <x>0</x>
+              <y>0</y>
+              <width>568</width>
+              <height>840</height>
+             </rect>
+            </property>
+            <attribute name="label">
+             <string>Graph Display</string>
+            </attribute>
+            <layout class="QVBoxLayout" name="verticalLayout_7">
+             <item>
+              <widget class="QToolBox" name="toolBox_2">
+               <property name="currentIndex">
+                <number>1</number>
+               </property>
+               <widget class="QWidget" name="graphVisulization">
+                <property name="geometry">
+                 <rect>
+                  <x>0</x>
+                  <y>0</y>
+                  <width>550</width>
+                  <height>762</height>
+                 </rect>
+                </property>
+                <attribute name="label">
+                 <string>Graph Visualization</string>
+                </attribute>
+                <layout class="QGridLayout" name="gridLayout_8">
+                 <item row="0" column="1">
+                  <widget class="QToolButton" name="graphSlicerGroupBoxInfoToolButton">
+                   <property name="icon">
+                    <iconset resource="icons.qrc">
+                     <normaloff>:/icons/icons/info.svg</normaloff>:/icons/icons/info.svg</iconset>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="3" column="0">
+                  <widget class="QComboBox" name="graphPlotTypeComboBox">
+                   <item>
+                    <property name="text">
+                     <string>mesh</string>
+                    </property>
+                   </item>
+                   <item>
+                    <property name="text">
+                     <string>line</string>
+                    </property>
+                   </item>
+                  </widget>
+                 </item>
+                 <item row="0" column="0">
+                  <widget class="QGroupBox" name="graphSlicerGroupBox">
+                   <property name="toolTip">
+                    <string>Select which part of the graph to plot</string>
+                   </property>
+                   <property name="whatsThis">
+                    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;It is generaly impossible to plot the vasculature graph of a whole brain.&lt;/p&gt;&lt;p&gt;You can here select the region you wish to display by selecting the range of coordinates from the image of the brain. The shadowed regions will be excluded.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                   </property>
+                   <property name="title">
+                    <string>Slicer</string>
+                   </property>
+                   <layout class="QFormLayout" name="formLayout_4">
+                    <item row="0" column="1">
+                     <widget class="QDialogButtonBox" name="graphSlicerButtonBox">
+                      <property name="standardButtons">
+                       <set>QDialogButtonBox::Open</set>
+                      </property>
+                      <property name="openText" stdset="0">
+                       <string>Load</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="1" column="1">
+                     <widget class="QFrame" name="graphConstructionSlicerXRangeDoublet">
+                      <property name="frameShape">
+                       <enum>QFrame::StyledPanel</enum>
+                      </property>
+                      <property name="frameShadow">
+                       <enum>QFrame::Raised</enum>
+                      </property>
+                      <layout class="QHBoxLayout" name="horizontalLayout_6">
+                       <item>
+                        <widget class="QLabel" name="label_16">
+                         <property name="text">
+                          <string>min:</string>
+                         </property>
+                        </widget>
+                       </item>
+                       <item>
+                        <widget class="QSpinBox" name="graphConstructionSlicerXRangeMin">
+                         <property name="suffix">
+                          <string/>
+                         </property>
+                         <property name="prefix">
+                          <string/>
+                         </property>
+                         <property name="maximum">
+                          <number>65535</number>
+                         </property>
+                        </widget>
+                       </item>
+                       <item>
+                        <widget class="QLabel" name="label_17">
+                         <property name="text">
+                          <string>max:</string>
+                         </property>
+                        </widget>
+                       </item>
+                       <item>
+                        <widget class="QSpinBox" name="graphConstructionSlicerXRangeMax">
+                         <property name="suffix">
+                          <string/>
+                         </property>
+                         <property name="maximum">
+                          <number>65535</number>
+                         </property>
+                        </widget>
+                       </item>
+                      </layout>
+                     </widget>
+                    </item>
+                    <item row="1" column="0">
+                     <widget class="QLabel" name="label_15">
+                      <property name="text">
+                       <string>dim 0 range</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="2" column="1">
+                     <widget class="QFrame" name="graphConstructionSlicerYRangeDoublet">
+                      <property name="frameShape">
+                       <enum>QFrame::StyledPanel</enum>
+                      </property>
+                      <property name="frameShadow">
+                       <enum>QFrame::Raised</enum>
+                      </property>
+                      <layout class="QHBoxLayout" name="horizontalLayout_7">
+                       <item>
+                        <widget class="QLabel" name="label_19">
+                         <property name="text">
+                          <string>min:</string>
+                         </property>
+                        </widget>
+                       </item>
+                       <item>
+                        <widget class="QSpinBox" name="graphConstructionSlicerYRangeMin">
+                         <property name="suffix">
+                          <string/>
+                         </property>
+                         <property name="prefix">
+                          <string/>
+                         </property>
+                         <property name="maximum">
+                          <number>65535</number>
+                         </property>
+                        </widget>
+                       </item>
+                       <item>
+                        <widget class="QLabel" name="label_20">
+                         <property name="text">
+                          <string>max:</string>
+                         </property>
+                        </widget>
+                       </item>
+                       <item>
+                        <widget class="QSpinBox" name="graphConstructionSlicerYRangeMax">
+                         <property name="suffix">
+                          <string/>
+                         </property>
+                         <property name="maximum">
+                          <number>65535</number>
+                         </property>
+                        </widget>
+                       </item>
+                      </layout>
+                     </widget>
+                    </item>
+                    <item row="2" column="0">
+                     <widget class="QLabel" name="label_18">
+                      <property name="text">
+                       <string>dim 1 range</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="3" column="0">
+                     <widget class="QLabel" name="label_21">
+                      <property name="text">
+                       <string>dim 2 range</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="3" column="1">
+                     <widget class="QFrame" name="graphConstructionSlicerZRangeDoublet">
+                      <property name="frameShape">
+                       <enum>QFrame::StyledPanel</enum>
+                      </property>
+                      <property name="frameShadow">
+                       <enum>QFrame::Raised</enum>
+                      </property>
+                      <layout class="QHBoxLayout" name="horizontalLayout_8">
+                       <item>
+                        <widget class="QLabel" name="label_22">
+                         <property name="text">
+                          <string>min:</string>
+                         </property>
+                        </widget>
+                       </item>
+                       <item>
+                        <widget class="QSpinBox" name="graphConstructionSlicerZRangeMin">
+                         <property name="suffix">
+                          <string/>
+                         </property>
+                         <property name="prefix">
+                          <string/>
+                         </property>
+                         <property name="maximum">
+                          <number>65535</number>
+                         </property>
+                        </widget>
+                       </item>
+                       <item>
+                        <widget class="QLabel" name="label_23">
+                         <property name="text">
+                          <string>max:</string>
+                         </property>
+                        </widget>
+                       </item>
+                       <item>
+                        <widget class="QSpinBox" name="graphConstructionSlicerZRangeMax">
+                         <property name="suffix">
+                          <string/>
+                         </property>
+                         <property name="maximum">
+                          <number>65535</number>
+                         </property>
+                        </widget>
+                       </item>
+                      </layout>
+                     </widget>
+                    </item>
+                   </layout>
+                  </widget>
+                 </item>
+                 <item row="2" column="0">
+                  <widget class="QComboBox" name="graphSlicerStepComboBox">
+                   <property name="currentText">
+                    <string>annotated</string>
+                   </property>
+                   <item>
+                    <property name="text">
+                     <string>annotated</string>
+                    </property>
+                   </item>
+                   <item>
+                    <property name="text">
+                     <string>reduced</string>
+                    </property>
+                   </item>
+                   <item>
+                    <property name="text">
+                     <string>cleaned</string>
+                    </property>
+                   </item>
+                   <item>
+                    <property name="text">
+                     <string>raw</string>
+                    </property>
+                   </item>
+                  </widget>
+                 </item>
+                 <item row="7" column="0" rowspan="2">
+                  <layout class="QHBoxLayout" name="horizontalLayout_3">
+                   <item>
+                    <widget class="QPushButton" name="plotGraphPickRegionPushButton">
+                     <property name="toolTip">
+                      <string>Select a single region to plot from the structure tree</string>
+                     </property>
+                     <property name="text">
+                      <string>Plot region</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item>
+                    <widget class="QPushButton" name="plotGraphChunkPushButton">
+                     <property name="toolTip">
+                      <string>Select a single region to plot from the structure tree</string>
+                     </property>
+                     <property name="text">
+                      <string>Plot chunk</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item>
+                    <widget class="QPushButton" name="plotGraphClearPlotPushButton">
+                     <property name="toolTip">
+                      <string>Select a single region to plot from the structure tree</string>
+                     </property>
+                     <property name="text">
+                      <string>Clear plots</string>
+                     </property>
+                    </widget>
+                   </item>
+                  </layout>
+                 </item>
+                 <item row="4" column="0">
+                  <spacer name="verticalSpacer_4">
+                   <property name="orientation">
+                    <enum>Qt::Vertical</enum>
+                   </property>
+                   <property name="sizeHint" stdset="0">
+                    <size>
+                     <width>20</width>
+                     <height>40</height>
+                    </size>
+                   </property>
+                  </spacer>
+                 </item>
+                </layout>
+               </widget>
+               <widget class="QWidget" name="voxelization">
+                <property name="geometry">
+                 <rect>
+                  <x>0</x>
+                  <y>0</y>
+                  <width>550</width>
+                  <height>762</height>
+                 </rect>
+                </property>
+                <attribute name="label">
+                 <string>Voxelization</string>
+                </attribute>
+                <layout class="QGridLayout" name="gridLayout_7">
+                 <item row="2" column="1">
+                  <widget class="QFrame" name="vasculatureVoxelizationFilterDegreesSinglet">
+                   <property name="enabled">
+                    <bool>true</bool>
+                   </property>
+                   <property name="frameShape">
+                    <enum>QFrame::StyledPanel</enum>
+                   </property>
+                   <property name="frameShadow">
+                    <enum>QFrame::Raised</enum>
+                   </property>
+                   <layout class="QHBoxLayout" name="horizontalLayout_375">
+                    <item>
+                     <widget class="QCheckBox" name="checkBox">
+                      <property name="text">
+                       <string/>
+                      </property>
+                     </widget>
+                    </item>
+                    <item>
+                     <widget class="QSpinBox" name="spinBox_266">
+                      <property name="enabled">
+                       <bool>false</bool>
+                      </property>
+                      <property name="suffix">
+                       <string>degree</string>
+                      </property>
+                      <property name="minimum">
+                       <number>0</number>
+                      </property>
+                      <property name="maximum">
+                       <number>99</number>
+                      </property>
+                     </widget>
+                    </item>
+                   </layout>
+                  </widget>
+                 </item>
+                 <item row="4" column="1">
+                  <widget class="QPushButton" name="voxelizeGraphPushButton">
+                   <property name="text">
+                    <string>Voxelize</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="0" column="0">
+                  <widget class="QLabel" name="label_14">
+                   <property name="text">
+                    <string>voxel size</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="3" column="1">
+                  <spacer name="verticalSpacer_6">
+                   <property name="orientation">
+                    <enum>Qt::Vertical</enum>
+                   </property>
+                   <property name="sizeHint" stdset="0">
+                    <size>
+                     <width>20</width>
+                     <height>40</height>
+                    </size>
+                   </property>
+                  </spacer>
+                 </item>
+                 <item row="4" column="2">
+                  <widget class="QPushButton" name="plotGraphVoxelizationPushButton">
+                   <property name="text">
+                    <string>Plot voxelization</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="2" column="0">
+                  <widget class="QLabel" name="label_24">
+                   <property name="text">
+                    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Filter by&lt;/p&gt;&lt;p&gt;vertex degree&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                   </property>
+                   <property name="textFormat">
+                    <enum>Qt::RichText</enum>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="0" column="1" colspan="2">
+                  <widget class="QFrame" name="vasculatureVoxelizationRadiusTriplet">
+                   <property name="frameShape">
+                    <enum>QFrame::StyledPanel</enum>
+                   </property>
+                   <property name="frameShadow">
+                    <enum>QFrame::Raised</enum>
+                   </property>
+                   <layout class="QHBoxLayout" name="horizontalLayout_374">
+                    <item>
+                     <widget class="QSpinBox" name="spinBox_261">
+                      <property name="suffix">
+                       <string>px</string>
+                      </property>
+                      <property name="minimum">
+                       <number>0</number>
+                      </property>
+                      <property name="maximum">
+                       <number>512</number>
+                      </property>
+                     </widget>
+                    </item>
+                    <item>
+                     <widget class="QSpinBox" name="spinBox_262">
+                      <property name="suffix">
+                       <string>px</string>
+                      </property>
+                      <property name="minimum">
+                       <number>0</number>
+                      </property>
+                      <property name="maximum">
+                       <number>512</number>
+                      </property>
+                     </widget>
+                    </item>
+                    <item>
+                     <widget class="QSpinBox" name="spinBox_263">
+                      <property name="suffix">
+                       <string>px</string>
+                      </property>
+                      <property name="minimum">
+                       <number>0</number>
+                      </property>
+                      <property name="maximum">
+                       <number>512</number>
+                      </property>
+                     </widget>
+                    </item>
+                   </layout>
+                  </widget>
+                 </item>
+                 <item row="1" column="0">
+                  <widget class="QLabel" name="label_25">
+                   <property name="text">
+                    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Weight by &lt;/p&gt;&lt;p&gt;vertex radius&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                   </property>
+                   <property name="textFormat">
+                    <enum>Qt::RichText</enum>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="1" column="1">
+                  <widget class="QCheckBox" name="voxelizationWeightByRadiusCheckBox">
+                   <property name="text">
+                    <string/>
+                   </property>
+                  </widget>
+                 </item>
+                </layout>
+               </widget>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+          </widget>
+         </item>
+        </layout>
+       </item>
+      </layout>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <widget class="QPushButton" name="runAllVasculaturePushButton">
+     <property name="text">
+      <string>Run all</string>
+     </property>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources>
+  <include location="icons.qrc"/>
+ </resources>
+ <connections>
+  <connection>
+   <sender>checkBox</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>spinBox_266</receiver>
+   <slot>setEnabled(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>235</x>
+     <y>304</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>311</x>
+     <y>307</y>
+    </hint>
+   </hints>
+  </connection>
+ </connections>
+</ui>
