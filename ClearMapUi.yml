@@ -20,6 +20,7 @@ channels:
 dependencies:
   - python=3.7  # constraining seems to speed up resolution
   - pip
+  - ipython
   - vispy<=0.5.3
   - pyopengl
   - pyqt<6
@@ -29,17 +30,17 @@ dependencies:
   - cython
   - numpy
   - scipy
-  - pandas
+  - pandas<2  # Groupby syntax changes
   - pyarrow
   - matplotlib
   - scikit-image
   - scikit-learn
-  - graph-tool
+  - graph-tool<=2.45  # Cannot remove self loops with later versions
   - pytorch<=1.11
   - cudatoolkit=11.6
   - configobj
   - natsort
-  - tifffile==0.15.1  # Very important because the new tiffile breaks IO.TIF
+  - tifffile<2020.9.22  # Adds "Use DimensionOrder to determine axes order in OmeXml." which breaks ClearMap.IO
   - xmltodict  # to compensate for old tifffile
   - pygments
   - qdarkstyle
@@ -49,5 +50,7 @@ dependencies:
   - mpld3  # WARNING Maybe pip
   - pip:
     - lxml
+variables:
+  PYTHONNOUSERSITE: 1
 #variables:
 #  TMPDIR: /data/tmp  # FIXME:
