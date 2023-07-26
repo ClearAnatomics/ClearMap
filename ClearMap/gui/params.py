@@ -417,6 +417,7 @@ class CellMapParams(UiParameter):
     detect_cells: bool
     filter_cells: bool
     voxelize: bool
+    save_shape: bool
     plot_when_finished: bool
     plot_detected_cells: bool
     crop_x_min: int
@@ -438,6 +439,7 @@ class CellMapParams(UiParameter):
             'detect_cells': ParamLink(None, self.tab.runCellMapDetectCellsCheckBox),
             'filter_cells': ParamLink(None, self.tab.runCellMapFilterCellsCheckBox),
             'voxelize': ParamLink(None, self.tab.runCellMapVoxelizeCheckBox),
+            'save_shape': ParamLink(None, self.tab.runCellMapSaveShapeCheckBox),
             'plot_when_finished': ParamLink(['run', 'plot_when_finished'], self.tab.runCellMapPlotCheckBox),
             'crop_x_min': ParamLink(['detection', 'test_set_slicing', 'dim_0', 0], self.tab.detectionSubsetXRangeMin),
             'crop_x_max': ParamLink(['detection', 'test_set_slicing', 'dim_0', 1], self.tab.detectionSubsetXRangeMax),

@@ -671,7 +671,7 @@ class PreProcessor(TabProcessor):
         if use_landmarks:  # FIXME: add use_landmarks to config
             align_reference_parameter.update(moving_landmarks_path=self.ref_pts_path,
                                              fixed_landmarks_path=self.get_autofluo_pts_path('auto_to_reference'))
-            self.patch_elastix_parameter_files([self.align_reference_affine_file, self.align_reference_bspline_file])
+            self.patch_elastix_parameter_files([self.align_reference_bspline_file])
         for k, v in align_reference_parameter.items():
             if not v:
                 raise ValueError(f'Registration missing parameter "{k}"')

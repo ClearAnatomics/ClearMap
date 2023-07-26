@@ -43,7 +43,7 @@
       </font>
      </property>
      <property name="currentIndex">
-      <number>0</number>
+      <number>3</number>
      </property>
      <widget class="QWidget" name="page">
       <property name="geometry">
@@ -51,7 +51,7 @@
         <x>0</x>
         <y>0</y>
         <width>503</width>
-        <height>303</height>
+        <height>360</height>
        </rect>
       </property>
       <attribute name="label">
@@ -68,7 +68,7 @@
            <rect>
             <x>0</x>
             <y>0</y>
-            <width>485</width>
+            <width>195</width>
             <height>225</height>
            </rect>
           </property>
@@ -652,15 +652,32 @@
        <rect>
         <x>0</x>
         <y>0</y>
-        <width>503</width>
-        <height>234</height>
+        <width>489</width>
+        <height>262</height>
        </rect>
       </property>
       <attribute name="label">
        <string>Run CellMap</string>
       </attribute>
       <layout class="QGridLayout" name="gridLayout">
-       <item row="5" column="2">
+       <item row="1" column="0">
+        <widget class="QCheckBox" name="runCellMapFilterCellsCheckBox">
+         <property name="text">
+          <string>Filter cells</string>
+         </property>
+         <property name="checked">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item row="7" column="0">
+        <widget class="QLabel" name="label_18">
+         <property name="text">
+          <string>After filter</string>
+         </property>
+        </widget>
+       </item>
+       <item row="6" column="2">
         <widget class="QLabel" name="nDetectedCellsLabel">
          <property name="font">
           <font>
@@ -676,41 +693,7 @@
          </property>
         </widget>
        </item>
-       <item row="3" column="0">
-        <widget class="QCheckBox" name="runCellMapPlotCheckBox">
-         <property name="text">
-          <string>Plot when finished</string>
-         </property>
-        </widget>
-       </item>
-       <item row="2" column="0">
-        <widget class="QCheckBox" name="runCellMapVoxelizeCheckBox">
-         <property name="text">
-          <string>Create cell density map (voxelization)</string>
-         </property>
-         <property name="checked">
-          <bool>true</bool>
-         </property>
-        </widget>
-       </item>
-       <item row="1" column="0">
-        <widget class="QCheckBox" name="runCellMapFilterCellsCheckBox">
-         <property name="text">
-          <string>Filter cells</string>
-         </property>
-         <property name="checked">
-          <bool>true</bool>
-         </property>
-        </widget>
-       </item>
-       <item row="6" column="0">
-        <widget class="QLabel" name="label_18">
-         <property name="text">
-          <string>After filter</string>
-         </property>
-        </widget>
-       </item>
-       <item row="6" column="2">
+       <item row="7" column="2">
         <widget class="QLabel" name="nDetectedCellsAfterFilterLabel">
          <property name="font">
           <font>
@@ -726,13 +709,10 @@
          </property>
         </widget>
        </item>
-       <item row="5" column="0">
-        <widget class="QLabel" name="label_17">
-         <property name="toolTip">
-          <string/>
-         </property>
+       <item row="4" column="0">
+        <widget class="QCheckBox" name="runCellMapPlotCheckBox">
          <property name="text">
-          <string>N cells</string>
+          <string>Plot when finished</string>
          </property>
         </widget>
        </item>
@@ -746,10 +726,37 @@
          </property>
         </widget>
        </item>
-       <item row="4" column="2">
+       <item row="2" column="0">
+        <widget class="QCheckBox" name="runCellMapVoxelizeCheckBox">
+         <property name="text">
+          <string>Create cell density map (voxelization)</string>
+         </property>
+         <property name="checked">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item row="5" column="2">
         <widget class="QPushButton" name="runCellMapPushButton">
          <property name="text">
           <string>Run</string>
+         </property>
+        </widget>
+       </item>
+       <item row="6" column="0">
+        <widget class="QLabel" name="label_17">
+         <property name="toolTip">
+          <string/>
+         </property>
+         <property name="text">
+          <string>N cells</string>
+         </property>
+        </widget>
+       </item>
+       <item row="3" column="0">
+        <widget class="QCheckBox" name="runCellMapSaveShapeCheckBox">
+         <property name="text">
+          <string>Save shape</string>
          </property>
         </widget>
        </item>

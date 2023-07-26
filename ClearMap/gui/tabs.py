@@ -537,34 +537,26 @@ class AlignmentTab(GenericTab):
             callback = [landmark_selector.set_fixed_coords, landmark_selector.set_moving_coords][i]
             dvs[i].mouse_clicked.connect(callback)
         callbacks = {
-            'auto_to_reference': self.write_auto_to_ref_registration_landmark_coords,
-            'resampled_to_auto': self.write_resampled_to_auto_registration_landmark_coords
+            'auto_to_reference': functools.partial(self.write_registration_landmark_coords, 'auto_to_reference'),
+            'resampled_to_auto': functools.partial(self.write_registration_landmark_coords, 'resampled_to_auto')
         }
         landmark_selector.dlg.buttonBox.accepted.connect(callbacks[direction])
         self.landmark_selector = landmark_selector  # REFACTOR: find better way to keep in scope
-        # return landmark_selector
 
-    def write_auto_to_ref_registration_landmark_coords(self):
+    def write_registration_landmark_coords(self, direction):
         """
         Write the corresponding landmarks to file for use in landmark optimised registration
+
+
+        Parameters
+        ----------
+        direction : str
+            The direction of the transformation. One of ('auto_to_reference', 'resampled_to_auto')
 
         Returns
         -------
 
         """
-        self.__write_registration_landmark_coords('auto_to_reference')
-
-    def write_resampled_to_auto_registration_landmark_coords(self):
-        """
-        Write the corresponding landmarks to file for use in landmark optimised registration
-
-        Returns
-        -------
-
-        """
-        self.__write_registration_landmark_coords('resampled_to_auto')
-
-    def __write_registration_landmark_coords(self, direction):
         landmarks_file_paths = [self.preprocessor.get_autofluo_pts_path(direction)]
         if direction == 'auto_to_reference':
             landmarks_file_paths.append(self.preprocessor.ref_pts_path)
@@ -577,7 +569,7 @@ class AlignmentTab(GenericTab):
             if not os.path.exists(os.path.dirname(f_path)):
                 os.mkdir(os.path.dirname(f_path))
             with open(f_path, 'w') as landmarks_file:
-                landmarks_file.write(f'point\n{len(markers)}\n')
+                landmarks_file.write(f'point\n{len(markers)}\n')  # FIXME: use index ??
                 for marker in markers:
                     x, y, z = marker[i]
                     landmarks_file.write(f'{x} {y} {z}\n')
@@ -935,7 +927,8 @@ class CellCounterTab(PostProcessingTab):
         -------
 
         """
-        self.wrap_step('Detecting cells', self.cell_detector.run_cell_detection, step_kw_args={'tuning': False},
+        self.wrap_step('Detecting cells', self.cell_detector.run_cell_detection,
+                       step_kw_args={'tuning': False, 'save_shape': self.params.save_shape},
                        abort_func=self.cell_detector.stop_process)
         if self.cell_detector.stopped:
             return
