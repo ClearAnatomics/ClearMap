@@ -11,7 +11,7 @@ fi
 
 usage() {
   cat << EOF >&2
-  Usage: $PROG_NAME [-v] [-d <dir>] [-f <file>]
+  Usage: $PROG_NAME [-h] [-f <env-file-path>] [-s]
 
   --file, -f <env-file-path>: The environment file to use. Defaults to ClearMapUi.yml in the current folder
   --spyder, -s : Whether to install the appropriate spyder kernel
@@ -23,6 +23,10 @@ USE_SPYDER="False"
 ENV_FILE_PATH=''
 while [[ $# -gt 0 ]]; do
   case $1 in
+    -h|--help)
+      usage
+      exit 0
+      ;;
     -f|--file)
       ENV_FILE_PATH="$2"
       shift # past argument
