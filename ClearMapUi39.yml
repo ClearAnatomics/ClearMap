@@ -27,7 +27,7 @@ dependencies:
   - pyqtwebengine
   - pyqtgraph=0.12  # Problem with pyqtgraph import of QWidgets with 0.13
   - opencv
-  - cython
+  - cython<3  # get_distutils_extension has been removed from pyximport in >=3
   - numpy
   - scipy
   - pandas<2  # Groupby syntax changes
