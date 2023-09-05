@@ -12,6 +12,7 @@ Edit the :func:`setup` routine to point to set paths for specific hosts.
 See Also
 --------
     * :const:`clearmap_path`
+    * :const:`atlas_folder`
     * :const:`resources_path`
     * :const:`external_path`
     * :const:`ilastik_path`
@@ -43,22 +44,22 @@ def path():  # FIXME: use inspect and rename
     return f_name
 
 
-"""Absolute path to the ClearMap's root folder."""
 clearmap_path = path()
+"""Absolute path to the ClearMap's root folder."""
 
-"""Absolute path to the ClearMap's resources folder."""
 resources_path = os.path.join(clearmap_path, 'Resources')
+"""Absolute path to the ClearMap's resources folder."""
 
 atlas_folder = os.path.join(resources_path, 'Atlas')
 
-"""Absolute path to the ClearMap's external program folder."""
 external_path = os.path.join(clearmap_path, 'External')
+"""Absolute path to the ClearMap's external program folder."""
 
-"""Absolute path to the ClearMap's test folder."""
 test_path = os.path.join(clearmap_path, 'Tests')
+"""Absolute path to the ClearMap's test folder."""
 
-"""Absolute path to the ClearMap's test data folder."""
 test_data_path = os.path.join(test_path, 'Data')
+"""Absolute path to the ClearMap's test data folder."""
 
 
 ###############################################################################
