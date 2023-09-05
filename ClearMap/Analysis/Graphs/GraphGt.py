@@ -1352,7 +1352,7 @@ class Graph(grp.AnnotatedGraph):
       edge_geometry_properties = {n : n for n in edge_geometry_properties}
     
     for p in vertex_properties.keys():
-      if p in self.vertex_properties:
+      # if p in self.vertex_properties:
         if verbose:
           print('Transforming vertex property: %s -> %s' % (p, vertex_properties[p]));
         values = self.vertex_property(p);
@@ -1360,7 +1360,7 @@ class Graph(grp.AnnotatedGraph):
         self.define_vertex_property(vertex_properties[p], values);
         
     for p in edge_properties.keys():
-      if p in self.edge_properties:
+      # if p in self.edge_properties:
         if verbose:
           print('Transforming edge property: %s -> %s' % (p, edge_properties[p]));
         values = self.edge_property(p);
