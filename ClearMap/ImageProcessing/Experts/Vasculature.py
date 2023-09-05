@@ -74,7 +74,7 @@ BINARY_STATUS = {n: 2**k for k, n in enumerate(BINARY_NAMES)}
 default_binarization_parameter = dict(
     # initial clipping and mask generation
     clip=dict(clip_range=(400, 60000),
-              save=False),
+              save=None),
 
     # lightsheet correction
     lightsheet=dict(percentile=0.25,
@@ -84,16 +84,16 @@ default_binarization_parameter = dict(
                                     step=(2, 2, 1),
                                     interpolate=1),
                     lightsheet_vs_background=2,
-                    save=False),
+                    save=None),
 
     # median
     median=dict(selem=((3,)*3),
-                save=False),
+                save=None),
 
     # deconvolution
     deconvolve=dict(sigma=10,
                     threshold=750,
-                    save=False),
+                    save=None),
 
     # equalization
     equalize=dict(percentile=(0.4, 0.975),
@@ -101,13 +101,13 @@ default_binarization_parameter = dict(
                   spacing=(50, 50, 5),
                   interpolate=1,
                   threshold=1.1,
-                  save=False),
+                  save=None),
 
     # adaptive threshold
     adaptive=dict(selem=(250, 250, 3),
                   spacing=(50, 50, 3),
                   interpolate=1,
-                  save=False),
+                  save=None),
 
     # tubeness
     vesselize=dict(background=dict(selem=('disk', (30, 30, 1)),
@@ -115,7 +115,7 @@ default_binarization_parameter = dict(
                    tubeness=dict(sigma=1.0,
                                  gamma12=0.0),
                    threshold=120,
-                   save=False),
+                   save=None),
 
     # fill
     fill=None,
