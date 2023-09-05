@@ -672,14 +672,16 @@ def initialize_sink(sink=None, shape=None, dtype=None, order=None, memory=None, 
     The initialized sink.
   buffer (optional) : array
     Buffer of the sink.
-  shape : tuple of int
+  shape (optional) : tuple of int
     Shape of the source.
-  strides : tuple of int
+  strides (optional) : tuple of int
     Element strides of the source. 
   """
        
   sink = io.initialize(sink, shape=shape, dtype=dtype, order=order, memory=memory, location=location, mode=mode,
                        like=source, as_source=True)
+
+    result = (sink,)
   
   if return_buffer:
     buffer = sink.as_buffer()
@@ -690,9 +692,8 @@ def initialize_sink(sink=None, shape=None, dtype=None, order=None, memory=None, 
     if as_1d:
       buffer = buffer.reshape(-1, order = 'A')
   
-  result = (sink,)
-  if return_buffer:
-    result += (buffer,);
+    result += (buffer,)
+
   if return_shape:
     result += (np.array(sink.shape,dtype=int),)
 
@@ -766,8 +767,7 @@ def _test():
   # IO
   import ClearMap.ParallelProcessing.DataProcessing.ArrayProcessing as ap
   import numpy as np
-  reload(ap)
-  
+    # reload(ap)
   
   data = np.random.rand(10,200,10)
   
@@ -780,9 +780,9 @@ def _test():
   ap.io.delete_file('test.npy')
 
   # where
-  reload(ap)
-  data = np.random.rand(30,20,40) > 0.5;
-  
+    # reload(ap)
+  data = np.random.rand(30,20,40) > 0.5
+
   where_np = np.array(np.where(data)).T
   where = ap.where(data, cutoff = 2**0)
   
