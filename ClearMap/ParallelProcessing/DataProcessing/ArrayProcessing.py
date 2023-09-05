@@ -13,11 +13,11 @@ numpy routines that get very slow for data arrays above 100-500GB of size.
 
 The implementation builds on the buffer interface used by cython.
 """
-__author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
-__license__   = 'GPLv3 - GNU General Pulic License v3 (see LICENSE)'
+__author__ = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
+__license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
-__webpage__   = 'http://idisco.info'
-__download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
+__webpage__   = 'https://idisco.info'
+__download__  = 'https://www.github.com/ChristophKirst/ClearMap2'
 
 import os
 import numpy as np
@@ -28,32 +28,32 @@ import ClearMap.IO.Slice as slc
 
 import ClearMap.Utils.Timer as tmr
 
-import pyximport;
+import pyximport
 
 _old_get_distutils_extension = pyximport.pyximport.get_distutils_extension
 
+
 def _new_get_distutils_extension(modname, pyxfilename, language_level=None):
     extension_mod, setup_args = _old_get_distutils_extension(modname, pyxfilename, language_level)
-    extension_mod.language='c++'
-    return extension_mod,setup_args
+    extension_mod.language = 'c++'
+    return extension_mod, setup_args
+
 
 pyximport.pyximport.get_distutils_extension = _new_get_distutils_extension
 
-pyximport.install(setup_args = {"include_dirs" : [np.get_include(), os.path.dirname(os.path.abspath(__file__))]},
+pyximport.install(setup_args={"include_dirs": [np.get_include(), os.path.dirname(os.path.abspath(__file__))]},
                   reload_support=True)
 
 import ClearMap.ParallelProcessing.DataProcessing.ArrayProcessingCode as code
 
-
 ###############################################################################
-### Default Machine Settings
+# Default Machine Settings
 ###############################################################################
 
-default_processes = mp.cpu_count();
+default_processes = mp.cpu_count()
 """Default number of processes to use"""
 
-
-default_blocks_per_process = 10;
+default_blocks_per_process = 10
 """Default number of blocks per process to split the data.
 
 Note
@@ -61,8 +61,7 @@ Note
 10 blocks per process is a good choice.
 """
 
-
-default_cutoff = 20000000;
+default_cutoff = 20000000
 """Default size of array below which ordinary numpy is used.
 
 Note
@@ -72,46 +71,48 @@ Ideally test this on your machine for different array sizes.
 
 
 ###############################################################################
-### Lookup table transforms
+# Lookup table transforms
 ###############################################################################
 
-def apply_lut(source, lut, sink = None, blocks = None, processes = None, verbose = False):
-  """Transforms the source via a lookup table.
+def apply_lut(source, lut, sink=None, blocks=None, processes=None, verbose=False):
+    """Transforms the source via a lookup table.
   
-  Arguments
-  ---------
-  source : array 
-    The source array.
-  lut : array
-    The lookup table.
-  sink : array or None
-    The result array, if none an array is created.
-  processes : None or int
-    Number of processes to use, if None use number of cpus.
-  verbose : bool
-    If True, print progress information.
+    Arguments
+    ---------
+    source : array 
+      The source array.
+    lut : array
+      The lookup table.
+    sink : array or None
+      The result array, if none an array is created.
+    blocks : int or None:
+      Number of blocks to use, if None use `blocks=default_blocks_per_process * processes`
+    processes : None or int
+      Number of processes to use, if None use number of cpus.
+    verbose : bool
+      If True, print progress information.
   
-  Returns
-  -------
-  sink : array
-    The source transformed via the lookup table.
-  """
-  processes, timer, blocks = initialize_processing(processes=processes, function='apply_lut', verbose=verbose, blocks=blocks, return_blocks=True);
+    Returns
+    -------
+    sink : array
+      The source transformed via the lookup table.
+    """
+    processes, timer, blocks = initialize_processing(processes=processes, function='apply_lut', verbose=verbose, blocks=blocks, return_blocks=True)
 
-  source, source_buffer = initialize_source(source, as_1d=True);
-  lut, lut_buffer       = initialize_source(lut);
+    source, source_buffer = initialize_source(source, as_1d=True)
+    lut, lut_buffer = initialize_source(lut)
 
-  sink, sink_buffer = initialize_sink(sink=sink, source=source, as_1d=True, dtype=lut.dtype);
+    sink, sink_buffer = initialize_sink(sink=sink, source=source, as_1d=True, dtype=lut.dtype)
   
-  code.apply_lut(source_buffer, sink_buffer, lut_buffer, blocks=blocks, processes=processes)
+    code.apply_lut(source_buffer, sink_buffer, lut_buffer, blocks=blocks, processes=processes)
 
-  finalize_processing(verbose=verbose, function='apply_lut', timer=timer);
+    finalize_processing(verbose=verbose, function='apply_lut', timer=timer)
 
-  return sink;
+    return sink
 
 
-def apply_lut_to_index(source, kernel, lut, sink = None, processes = None, verbose = False):
-  """Correlates the source with an index kernel and returns the value of the the look-up table.
+def apply_lut_to_index(source, kernel, lut, sink=None, processes=None, verbose=False):
+  """Correlates the source with an index kernel and returns the value of the look-up table.
   
   Arguments
   ---------
@@ -131,28 +132,29 @@ def apply_lut_to_index(source, kernel, lut, sink = None, processes = None, verbo
   sink : array
     The source transformed via the lookup table.
   """
-  processes, timer =  initialize_processing(processes=processes, verbose=verbose, function='apply_lut_to_index');
+  processes, timer =  initialize_processing(processes=processes, verbose=verbose, function='apply_lut_to_index')
 
-  source, source_buffer, source_shape   = initialize_source(source, return_shape=True);
-  kernel, kernel_buffer, kernel_shape   = initialize_source(kernel, return_shape=True);
-  sink, sink_buffer, sink_shape = initialize_sink(sink=sink, dtype=lut.dtype, source=source, return_shape=True);
-  lut, lut_buffer = initialize_source(lut);
-  
+  source, source_buffer, source_shape   = initialize_source(source, return_shape=True)
+  kernel, kernel_buffer, kernel_shape   = initialize_source(kernel, return_shape=True)
+  sink, sink_buffer, sink_shape = initialize_sink(sink=sink, dtype=lut.dtype, source=source, return_shape=True)
+  lut, lut_buffer = initialize_source(lut)
+
   if len(source_shape) != 3 or len(kernel_shape) != 3 or len(sink_shape) != 3:
-    raise NotImplementedError('apply_lut_index not implemented for non 3d sources, found %d dimensions!'% len(source_shape));
-    
+    raise NotImplementedError(
+        'apply_lut_index not implemented for non 3d sources, found %d dimensions!' % len(source_shape))
+
   code.apply_lut_to_index_3d(source_buffer, kernel_buffer, lut_buffer, sink_buffer, processes=processes)
 
-  finalize_processing(verbose=verbose, function='apply_lut_to_index', timer=timer);
+  finalize_processing(verbose=verbose, function='apply_lut_to_index', timer=timer)
 
-  return sink;
+  return sink
 
 
 ###############################################################################
 ### Correlation
 ###############################################################################
 
-def correlate1d(source, kernel, sink = None, axis = 0, processes = None, verbose = False):
+def correlate1d(source, kernel, sink = None, axis=0, processes=None, verbose=False):
   """Correlates the source along the given axis wih ta 1d kernel.
   
   Arguments
@@ -175,30 +177,33 @@ def correlate1d(source, kernel, sink = None, axis = 0, processes = None, verbose
   """ 
   processes, timer =  initialize_processing(processes=processes, 
                                             verbose=verbose, 
-                                            function='correlate1d');
+                                            function='correlate1d')
 
-  source, source_buffer, source_shape, source_strides = initialize_source(source, as_1d=True, return_shape=True, return_strides=True);
-  kernel, kernel_buffer = initialize_source(kernel);
-  
-  dtype = np.result_type(source_buffer.dtype, kernel_buffer.dtype) if sink is None else None;
-  sink, sink_buffer, sink_shape, sink_strides = initialize_sink(sink=sink, as_1d=True, shape=tuple(source_shape), dtype=dtype, source=source, return_shape=True, return_strides=True);
-  
-  kernel_buffer = np.asarray(kernel_buffer, dtype=float);
-  
+  source, source_buffer, source_shape, source_strides = initialize_source(source, as_1d=True, return_shape=True, 
+                                                                          return_strides=True)
+  kernel, kernel_buffer = initialize_source(kernel)
+
+  dtype = np.result_type(source_buffer.dtype, kernel_buffer.dtype) if sink is None else None
+  sink, sink_buffer, sink_shape, sink_strides = initialize_sink(sink=sink, as_1d=True, shape=tuple(source_shape),
+                                                                dtype=dtype, source=source, return_shape=True,
+                                                                return_strides=True)
+
+  kernel_buffer = np.asarray(kernel_buffer, dtype=float)
+
   code.correlate_1d(source_buffer, source_shape, source_strides, 
                     sink_buffer, sink_shape, sink_strides, 
-                    kernel_buffer, axis, processes=processes);
+                    kernel_buffer, axis, processes=processes)
 
-  finalize_processing(verbose=verbose, function='correlate1d', timer=timer);
+  finalize_processing(verbose=verbose, function='correlate1d', timer=timer)
 
-  return sink;
+  return sink
 
 
 ###############################################################################
 ### Where
 ###############################################################################
 
-def where(source, sink = None, blocks = None, cutoff = None, processes = None, verbose = False):
+def where(source, sink=None, blocks=None, cutoff=None, processes=None, verbose=False):
   """Returns the indices of the non-zero entries of the array.
   
   Arguments
@@ -223,53 +228,54 @@ def where(source, sink = None, blocks = None, cutoff = None, processes = None, v
   ----
     Uses numpy.where if there is no match of dimension implemented!
   """  
-  source, source_buffer = initialize_source(source);
-  
-  ndim = source_buffer.ndim;
+  source, source_buffer = initialize_source(source)
+
+  ndim = source_buffer.ndim
   if not ndim in [1,2,3]:
     raise Warning('Using numpy.where for dimension %d!' % (ndim,))
-    return io.as_source(np.vstack(np.where(source_buffer)).T);
+    return io.as_source(np.vstack(np.where(source_buffer)).T)
 
-  processes, timer, blocks = initialize_processing(processes=processes, function='where', verbose=verbose, blocks=blocks, return_blocks=True)
+  processes, timer, blocks = initialize_processing(processes=processes, function='where', verbose=verbose,
+                                                   blocks=blocks, return_blocks=True)
     
   if cutoff is None:
-    cutoff = 1;
-  cutoff = min(1, cutoff);
-  
+    cutoff = 1
+  cutoff = min(1, cutoff)
+
   if source_buffer.size <= cutoff:
-    result = np.vstack(np.where(source_buffer)).T;
+    result = np.vstack(np.where(source_buffer)).T
     if sink is None:
-      sink = io.as_source(result);
+      sink = io.as_source(result)
     else:
       sink, sink_buffer = initialize_sink(sink=sink, shape=result.shape)
-      sink[:] = result;  
+      sink[:] = result
   else:
     if ndim == 1:
-      sums = code.block_sums_1d(source_buffer, blocks=blocks, processes=processes);
+      sums = code.block_sums_1d(source_buffer, blocks=blocks, processes=processes)
     elif ndim == 2:
-      sums = code.block_sums21d(source_buffer, blocks=blocks, processes=processes);
+      sums = code.block_sums21d(source_buffer, blocks=blocks, processes=processes)
     else:
-      sums = code.block_sums_3d(source_buffer, blocks=blocks, processes=processes);
-    
+      sums = code.block_sums_3d(source_buffer, blocks=blocks, processes=processes)
+
     if ndim == 1:
       sink_shape = (np.sum(sums),)
     else:
-      sink_shape = (np.sum(sums), ndim);
-    sink, sink_buffer = initialize_sink(sink=sink, shape=sink_shape, dtype=int);
-     
+      sink_shape = (np.sum(sums), ndim)
+    sink, sink_buffer = initialize_sink(sink=sink, shape=sink_shape, dtype=int)
+
     if ndim == 1:
-      code.where_1d(source_buffer, where=sink_buffer, sums=sums, blocks=blocks, processes=processes);
+      code.where_1d(source_buffer, where=sink_buffer, sums=sums, blocks=blocks, processes=processes)
     elif ndim == 2:
-      code.where_2d(source_buffer, where=sink_buffer, sums=sums, blocks=blocks, processes=processes);
+      code.where_2d(source_buffer, where=sink_buffer, sums=sums, blocks=blocks, processes=processes)
     else:
-      code.where_3d(source_buffer, where=sink_buffer, sums=sums, blocks=blocks, processes=processes);
-  
-  finalize_processing(verbose=verbose, function='where', timer=timer);
-    
-  return sink;
+      code.where_3d(source_buffer, where=sink_buffer, sums=sums, blocks=blocks, processes=processes)
+
+  finalize_processing(verbose=verbose, function='where', timer=timer)
+
+  return sink
 
 
-def neighbours(indices, offset, processes = None, verbose = False):
+def neighbours(indices, offset, processes=None, verbose=False):
   """Returns all pairs in a list of indices that are apart a specified offset.
   
   Arguments
@@ -292,19 +298,20 @@ def neighbours(indices, offset, processes = None, verbose = False):
   ----
   This function can be used to create graphs from binary images.
   """
-  processes, timer = initialize_processing(processes=processes, verbose=verbose, function='neighbours');
-  
-  neighbours =  code.neighbours(indices, offset=offset,  processes=processes);
-  
+  processes, timer = initialize_processing(processes=processes, verbose=verbose, function='neighbours')
+
+  neighbours =  code.neighbours(indices, offset=offset,  processes=processes)
+
   finalize_processing(verbose=verbose, timer=timer, function='neighbours')
   
-  return neighbours;
+  return neighbours
+
 
 ###############################################################################
 ### IO
 ###############################################################################
 
-def read(source, sink = None, slicing = None, memory = None, blocks = None, processes = None, verbose = False, **kwargs):
+def read(source, sink=None, slicing=None, memory=None, blocks=None, processes=None, verbose=False, **kwargs):
   """Read a large array into memory in parallel.
   
   Arguments
@@ -327,31 +334,32 @@ def read(source, sink = None, slicing = None, memory = None, blocks = None, proc
   sink : Source class
     The read source in memory.
   """
-  processes, timer, blocks = initialize_processing(processes=processes, verbose=verbose, function='read', blocks=blocks, return_blocks=True);
-  
+  processes, timer, blocks = initialize_processing(processes=processes, verbose=verbose, function='read',
+                                                   blocks=blocks, return_blocks=True)
+
   #source info
-  source = io.as_source(source);
+  source = io.as_source(source)
   if slicing is not None:
-    source = slc.Slice(source=source, slicing=slicing);
-  
-  shape, location, dtype, order, offset = source.shape, source.location, source.dtype, source.order, source.offset;
+    source = slc.Slice(source=source, slicing=slicing)
+
+  shape, location, dtype, order, offset = source.shape, source.location, source.dtype, source.order, source.offset
 
   if location is None:
-    raise ValueError('The source has not valid location to read from!');  
+    raise ValueError('The source has not valid location to read from!')
   if order not in ['C', 'F']:
-    raise NotImplementedError('Cannot read in parallel from non-contigous source!');
+    raise NotImplementedError('Cannot read in parallel from non-contigous source!')
     #TODO: implement parallel reader with strides !
   
-  sink, sink_buffer = initialize_sink(sink=sink, shape=shape, dtype=dtype, order=order, memory=memory, as_1d=True);
-  
-  code.read(sink_buffer, location.encode(), offset=offset, blocks=blocks, processes=processes);
-  
-  finalize_processing(verbose=verbose, function='read', timer=timer);
-           
-  return sink;
+  sink, sink_buffer = initialize_sink(sink=sink, shape=shape, dtype=dtype, order=order, memory=memory, as_1d=True)
+
+  code.read(sink_buffer, location.encode(), offset=offset, blocks=blocks, processes=processes)
+
+  finalize_processing(verbose=verbose, function='read', timer=timer)
+
+  return sink
 
 
-def write(sink, source, slicing = None, overwrite = True, blocks = None, processes = None, verbose = False):
+def write(sink, source, slicing=None, overwrite=True, blocks=None, processes=None, verbose=False):
   """Write a large array to disk in parallel.
   
   Arguments
@@ -376,65 +384,67 @@ def write(sink, source, slicing = None, overwrite = True, blocks = None, process
   sink : Source class
       The sink to which the source was written.
   """
-  processes, timer, blocks = initialize_processing(processes=processes, verbose=verbose, function='write', blocks=blocks, return_blocks=True);
+  processes, timer, blocks = initialize_processing(processes=processes, verbose=verbose, function='write', 
+                                                   blocks=blocks, return_blocks=True)
   
-  source, source_buffer, source_order = initialize_source(source, as_1d=True, return_order = True);  
+  source, source_buffer, source_order = initialize_source(source, as_1d=True, return_order = True)
   
   try:
-    sink = io.as_source(sink);
-    location = sink.location;
+    sink = io.as_source(sink)
+    location = sink.location
   except:
     if isinstance(sink, str):
-      location = sink;
-      sink = None;
+      location = sink
+      sink = None
     else:
       raise ValueError('Sink is not a valid writable sink specification!')
   if location is None:
-    raise ValueError('Sink is not a valid writable sink specification!');
+    raise ValueError('Sink is not a valid writable sink specification!')
 
   if slicing is not None:
     if not io.is_file(location):
-      raise ValueError('Cannot write a slice to a non-existent sink %s!' % location);
-    sink = slc.Slice(source=sink, slicing=slicing);
+      raise ValueError('Cannot write a slice to a non-existent sink %s!' % location)
+    sink = slc.Slice(source=sink, slicing=slicing)
   else:
     if io.is_file(location):
-      mode = None;
+      mode = None
       if (sink.shape != source.shape or sink.dtype != source.dtype or sink.order != source_order):
         if overwrite:
-          mode = 'w+';
+          mode = 'w+'
         else:
-          raise ValueError('Sink file %s exists but does not match source!');
-      sink_shape = source.shape;
-      sink_dtype = source.dtype;
-      sink_order = source.order;
-      sink = None;
+          raise ValueError('Sink file %s exists but does not match source!')
+      sink_shape = source.shape
+      sink_dtype = source.dtype
+      sink_order = source.order
+      sink = None
     else:
-      sink_shape = None;
-      sink_dtype = None;
-      sink_order = None;
-      mode = None;
-    
-    sink = initialize_sink(sink=sink, location=location, shape=sink_shape, dtype=sink_dtype, order=sink_order, mode=mode, source=source, return_buffer=False);
-  sink_order, sink_offset = sink.order, sink.offset;
-  
+      sink_shape = None
+      sink_dtype = None
+      sink_order = None
+      mode = None
+
+    sink = initialize_sink(sink=sink, location=location, shape=sink_shape, dtype=sink_dtype, order=sink_order, 
+                           mode=mode, source=source, return_buffer=False)
+  sink_order, sink_offset = sink.order, sink.offset
+
   if sink_order not in ['C', 'F']:
-    raise NotImplementedError('Cannot read in parallel from non-contigous source!');  
+    raise NotImplementedError('Cannot read in parallel from non-contigous source!')
   if (source_order != sink_order):
-    raise RuntimeError('Order of source %r and sink %r do not match!' % (source_order, sink_order));    
-  
-  #print(source_buffer.shape, location, sink_offset, blocks, processes)
-  code.write(source_buffer, location.encode(), offset=sink_offset, blocks=blocks, processes=processes);
-  
-  finalize_processing(verbose=verbose, function='write', timer=timer);
-           
-  return sink;
+    raise RuntimeError('Order of source %r and sink %r do not match!' % (source_order, sink_order))
+
+    #print(source_buffer.shape, location, sink_offset, blocks, processes)
+  code.write(source_buffer, location.encode(), offset=sink_offset, blocks=blocks, processes=processes)
+
+  finalize_processing(verbose=verbose, function='write', timer=timer)
+
+  return sink
 
 
 ###############################################################################
 ### Utility
 ###############################################################################
 
-def block_ranges(source, blocks = None, processes = None):
+def block_ranges(source, blocks=None, processes=None):
   """Ranges of evenly spaced blocks in array.
   
   Arguments
@@ -453,19 +463,19 @@ def block_ranges(source, blocks = None, processes = None):
   """
   processes, _ = initialize_processing(processes=processes, verbose=False)
   if blocks is None:
-    blocks = processes * default_blocks_per_process;
-  
-  size = io.size(source);
-  blocks = min(blocks, size);
-  return np.array(np.linspace(0, size, blocks + 1), dtype=int);
+    blocks = processes * default_blocks_per_process
+
+  size = io.size(source)
+  blocks = min(blocks, size)
+  return np.array(np.linspace(0, size, blocks + 1), dtype=int)
 
 
-def block_sums(source, blocks = None, processes = None):
+def block_sums(source, blocks=None, processes=None):
   """Sums of evenly spaced blocks in array.
   
   Arguments
   ---------
-  data : array
+  source : array
     Array to perform the block sums on.
   blocks : int or None
     Number of blocks to split array into.
@@ -479,14 +489,14 @@ def block_sums(source, blocks = None, processes = None):
   """
   processes, _ = initialize_processing(processes=processes, verbose=False)
   if blocks is None:
-    blocks = processes * default_blocks_per_process;
-  
-  source, source_buffer = initialize_source(source, as_1d=True);
-  
-  return code.block_sums_1d(source_buffer, blocks=blocks, processes=processes);
- 
-  
-def index_neighbours(indices, offset, processes = None):
+    blocks = processes * default_blocks_per_process
+
+  source, source_buffer = initialize_source(source, as_1d=True)
+
+  return code.block_sums_1d(source_buffer, blocks=blocks, processes=processes)
+
+
+def index_neighbours(indices, offset, processes=None):
   """Returns all pairs of indices that are a part of a specified offset.
   
   Arguments
@@ -499,25 +509,25 @@ def index_neighbours(indices, offset, processes = None):
     Number of processes, if None use number of cpus.
   """
   processes, _ = initialize_processing(processes=processes, verbose=False)
-  indices, indices_buffer = initialize_source(indices);
-  return code.index_neighbours(indices_buffer, offset=offset, processes=processes);
+  indices, indices_buffer = initialize_source(indices)
+  return code.index_neighbours(indices_buffer, offset=offset, processes=processes)
 
 
 ###############################################################################
 ### Initialization
 ###############################################################################
 
-def initialize_processing(processes = None, verbose = False, function = None, blocks = None, return_blocks = False):
+def initialize_processing(processes=None, verbose=False, function=None, blocks=None, return_blocks=False):
   """Initialize parallel array processing.
   
   Arguments
   ---------
-  processes : int, 'seial' or None
+  processes : int, 'serial' or None
     The number of processes to use. If None use number of cpus.
   verbose : bool
     If True, print progress information.
   function : str or None
-    The nae of the function.
+    The name of the function.
   
   Returns
   -------
@@ -527,28 +537,28 @@ def initialize_processing(processes = None, verbose = False, function = None, bl
     A timer for the processing.
   """
   if processes is None:
-    processes = default_processes;
+    processes = default_processes
   if processes == 'serial':
-    processes = 1;
+    processes = 1
   
   if verbose:
     if function:
-      print('%s: initialized!' % function);
-    timer = tmr.Timer();
+      print('%s: initialized!' % function)
+    timer = tmr.Timer()
   else:
-    timer = None;
+    timer = None
   
-  results = (processes, timer);
+  results = (processes, timer)
   
   if return_blocks:
     if blocks is None:
-      blocks = processes * default_blocks_per_process;
+      blocks = processes * default_blocks_per_process
     results += (blocks,)
   
-  return results;
+  return results
 
 
-def finalize_processing(verbose = False, function = None, timer = None):
+def finalize_processing(verbose=False, function=None, timer=None):
   """Finalize parallel array processing.
   
   Arguments
@@ -562,11 +572,11 @@ def finalize_processing(verbose = False, function = None, timer = None):
   """
   if verbose:
     if function and timer:
-      timer.print_elapsed_time(function);
+      timer.print_elapsed_time(function)
 
 
-def initialize_source(source, return_buffer = True, as_1d = False, 
-                      return_shape = False, return_strides = False, return_order = False):
+def initialize_source(source, return_buffer=True, as_1d=False,
+                      return_shape=False, return_strides=False, return_order=False):
   """Initialize a source buffer for parallel array processing.
   
   Arguments
@@ -585,7 +595,7 @@ def initialize_source(source, return_buffer = True, as_1d = False,
   Returns
   -------
   source : Source
-    The intialized source.
+    The initialized source.
   source_buffer
     The initialized source as buffer.
   shape : tuple of int
@@ -596,41 +606,41 @@ def initialize_source(source, return_buffer = True, as_1d = False,
   source = io.as_source(source)
 
   if return_shape:
-    shape = np.array(source.shape, dtype=int);
-  
+    shape = np.array(source.shape, dtype=int)
+
   if return_strides:
-    strides = np.array(source.element_strides, dtype=int);
-    
+    strides = np.array(source.element_strides, dtype=int)
+
   if return_order:
-    order = source.order;
-    
+    order = source.order
+
   if return_buffer:
-    source_buffer = source.as_buffer();
+    source_buffer = source.as_buffer()
 
     if source_buffer.dtype == bool:
-      source_buffer = source_buffer.view('uint8');  
-  
+      source_buffer = source_buffer.view('uint8')
+
     if as_1d:
-      source_buffer = source_buffer.reshape(-1, order = 'A');
-  
-  result = (source,);
+      source_buffer = source_buffer.reshape(-1, order = 'A')
+
+  result = (source,)
   if return_buffer:
     result += (source_buffer,)
   if return_shape:
-    result += (shape,);
+    result += (shape,)
   if return_strides:
-    result += (strides,);
+    result += (strides,)
   if return_order:
-    result += (order,);
-  
+    result += (order,)
+
   if len(result) == 1:
-    return result[0];
+    return result[0]
   else:
-    return result;
+    return result
 
 
-def initialize_sink(sink = None, shape = None, dtype = None, order = None, memory = None, location = None, mode = None, source = None, 
-                    return_buffer = True, as_1d = False, return_shape = False, return_strides = False):
+def initialize_sink(sink=None, shape=None, dtype=None, order=None, memory=None, location=None, mode=None, source=None,
+                    return_buffer=True, as_1d=False, return_shape=False, return_strides=False):
   """Initialze or create a sink.
   
   Arguments
@@ -639,18 +649,18 @@ def initialize_sink(sink = None, shape = None, dtype = None, order = None, memor
     The source to initialize.
   shape : tuple of int
     Optional shape of the sink. If None, inferred from the source.
-  dtype : dtype
+  dtype : str, type or None
     Optional dtype of the sink. If None, inferred from the source.
   order : 'C', 'F' or None
-    Optonal order of the sink. If None, inferred from the source.
+    Optional order of the sink. If None, inferred from the source.
   memory : 'shared' or None
     If 'shared' create a shared memory sink.
   location : str
     Optional location specification of the sink.
   source : Source or None
-    Optional source to infer sink specifictions from.
+    Optional source to infer sink specifications from.
   return_buffer : bool
-    If True, return alos a buffer compatible with cython memory views. 
+    If True, return also a buffer compatible with cython memory views.
   return_shape : bool
     If True, also return shape of the sink.
   return_strides : bool
@@ -659,8 +669,8 @@ def initialize_sink(sink = None, shape = None, dtype = None, order = None, memor
   Returns
   -------
   sink : Source
-    The intialized sink.
-  buffer : array
+    The initialized sink.
+  buffer (optional) : array
     Buffer of the sink.
   shape : tuple of int
     Shape of the source.
@@ -668,33 +678,31 @@ def initialize_sink(sink = None, shape = None, dtype = None, order = None, memor
     Element strides of the source. 
   """
        
-  sink = io.initialize(sink, shape=shape, dtype=dtype, order=order, memory=memory, location=location, mode=mode, like=source, as_source=True);
+  sink = io.initialize(sink, shape=shape, dtype=dtype, order=order, memory=memory, location=location, mode=mode,
+                       like=source, as_source=True)
   
   if return_buffer:
-    buffer = sink.as_buffer();
+    buffer = sink.as_buffer()
   
     if buffer.dtype == bool:
-      buffer = sink.view('uint8');
+      buffer = sink.view('uint8')
       
     if as_1d:
-      buffer = buffer.reshape(-1, order = 'A');  
+      buffer = buffer.reshape(-1, order = 'A')
   
   result = (sink,)
   if return_buffer:
     result += (buffer,);
   if return_shape:
-    result += (np.array(sink.shape,dtype=int),);
+    result += (np.array(sink.shape,dtype=int),)
+
   if return_strides:
-    result += (np.array(sink.element_strides, dtype=int),);
+    result += (np.array(sink.element_strides, dtype=int),)
   
   if len(result) == 1:
-    return result[0];
+    return result[0]
   else:
-    return result;
-
-
-
-
+    return result
 
 
 ###############################################################################
@@ -708,55 +716,52 @@ def _test():
   ## Lookup table processing
   
   #apply_lut  
-  x = np.random.randint(0, 100, size=(20,30));
-  lut = np.arange(100) + 1;
+  x = np.random.randint(0, 100, size=(20,30))
+  lut = np.arange(100) + 1
   y = ap.apply_lut(x, lut)
   assert np.all(y == x+1)
 
   #apply_lut_to_index
   import ClearMap.ImageProcessing.Topology.Topology3d as t3d
-  kernel = t3d.index_kernel(dtype=int);
-  
+  kernel = t3d.index_kernel(dtype=int)
+
   import ClearMap.ImageProcessing.Binary.Smoothing as sm
-  lut = sm.initialize_lookup_table();
-    
-  data = np.array(np.random.rand(150,30,40) > 0.75, order='F');
-  
+  lut = sm.initialize_lookup_table()
+
+  data = np.array(np.random.rand(150,30,40) > 0.75, order='F')
+
   result = ap.apply_lut_to_index(data, kernel, lut, sink=None, verbose=True)
 
   import ClearMap.Visualization.Plot3d as p3d
   p3d.plot([[data, result]])    
   
-  
   ### Correlation 
   
   #correlate1d
-  kernel = np.array(range(11), dtype='uint32');  
-  data = np.array(np.random.randint(0, 2**27, (300, 400, 1500), dtype='uint32'), order='F');
+  kernel = np.array(range(11), dtype='uint32')
+  data = np.array(np.random.randint(0, 2**27, (300, 400, 1500), dtype='uint32'), order='F')
   #data = np.array(np.random.rand(3,4,5), order='F');
   
-  data = np.empty((300,400,1500), order='F');
-  kernel = np.array([1,2,3,4,5], dtype='uint8');
-  
+  data = np.empty((300,400,1500), order='F')
+  kernel = np.array([1,2,3,4,5], dtype='uint8')
+
   sink = 'test.npy'
   
   import ClearMap.Utils.Timer as tmr
   import scipy.ndimage as ndi
-  timer = tmr.Timer();
-  for axis in range(3):
-    print(axis);
-    corr_ndi = ndi.correlate1d(data, axis=axis, mode='constant',cval=0);
-  timer.print_elapsed_time('ndi')  
-  
-  timer = tmr.Timer();
+  timer = tmr.Timer()
   for axis in range(3):
     print(axis)
-    corr = ap.correlate1d(data, sink=sink, kernel=kernel, axis=axis, verbose=False, processes=None);  
+    corr_ndi = ndi.correlate1d(data, axis=axis, mode='constant',cval=0)
+  timer.print_elapsed_time('ndi')  
+  
+  timer = tmr.Timer()
+  for axis in range(3):
+    print(axis)
+    corr = ap.correlate1d(data, sink=sink, kernel=kernel, axis=axis, verbose=False, processes=None)
   timer.print_elapsed_time('ap')
   
-
   assert np.allclose(corr.array, corr_ndi)
-  
   
   # IO
   import ClearMap.ParallelProcessing.DataProcessing.ArrayProcessing as ap
@@ -774,7 +779,6 @@ def _test():
   
   ap.io.delete_file('test.npy')
 
-
   # where
   reload(ap)
   data = np.random.rand(30,20,40) > 0.5;
@@ -782,15 +786,14 @@ def _test():
   where_np = np.array(np.where(data)).T
   where = ap.where(data, cutoff = 2**0)
   
-  check_np = np.zeros(data.shape, dtype=bool);
-  check = np.zeros(data.shape, dtype=bool);
-  check_np[tuple(where_np.T)] = True;
-  check[tuple(where.array.T)] = True;
+  check_np = np.zeros(data.shape, dtype=bool)
+  check = np.zeros(data.shape, dtype=bool)
+  check_np[tuple(where_np.T)] = True
+  check[tuple(where.array.T)] = True
   assert(np.all(check_np == check))
-  
 
 #
-#def setValue(data, indices, value, cutoff = defaultCutoff, processes = defaultProcesses):
+# def setValue(data, indices, value, cutoff=defaultCutoff, processes=defaultProcesses):
 #  """Set value at specified indices of an array
 #  
 #  Arguments:
@@ -835,7 +838,7 @@ def _test():
 #  return data;
 #
 #
-#def setArray(data, indices, values, cutoff = defaultCutoff, processes = defaultProcesses):
+# def setArray(data, indices, values, cutoff=defaultCutoff, processes=defaultProcesses):
 #  """Set value at specified indices of an array
 #  
 #  Arguments:
@@ -881,7 +884,7 @@ def _test():
 #
 #
 #
-#def take(data, indices, out = None, cutoff = defaultCutoff, processes = defaultProcesses):
+# def take(data, indices, out=None, cutoff=defaultCutoff, processes=defaultProcesses):
 #  """Extracts the values at specified indices
 #  
 #  Arguments:
@@ -931,7 +934,7 @@ def _test():
 #  return out;
 #
 #
-#def match(match, indices, out = None):
+# def match(match, indices, out=None):
 #  """Matches a sorted list of 1d indices to another larger one 
 #  
 #  Arguments:
@@ -963,12 +966,12 @@ def _test():
 # Find neighbours in an index list
 #
 #
-#def neighbours(indices, offset, processes = defaultProcesses):
+# def neighbours(indices, offset, processes=defaultProcesses):
 #  """Returns all pairs of indices that are apart a specified offset"""
 #  return code.neighbours(indices, offset = offset,  processes = processes);
 #
 #
-#def findNeighbours(indices, center, shape, strides, mask):
+# def findNeighbours(indices, center, shape, strides, mask):
 #  """Finds all indices within a specified kernel region centered at a point"""
 #  
 #  if len(strides) != 3 or len(shape) != 3 or (strides[0] != 1 and strides[2] != 1):
