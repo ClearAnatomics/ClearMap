@@ -11,8 +11,9 @@ __webpage__ = 'https://idisco.info'
 __download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
 
 import os
-import multiprocessing as mp
 import gc
+import multiprocessing as mp
+
 import pyximport
 
 import numpy as np
@@ -81,8 +82,11 @@ def fill(source, sink=None, seeds=None, processes=None, verbose=False):
 
     if processes is None:
         processes = mp.cpu_count()
-    elif isinstance(processes, str) and processes == 'serial':
-        processes = 1
+    elif isinstance(processes, str):
+        if processes == 'serial':
+            processes = 1
+        else:
+            processes = mp.cpu_count()
     if not isinstance(processes, int):
         raise ValueError(f'Processes must be one of None, int or "serial", got {processes}')
     if verbose:
@@ -113,7 +117,7 @@ def fill(source, sink=None, seeds=None, processes=None, verbose=False):
     if sink_flat.dtype == 'bool':
         sink_flat = sink_flat.view(dtype='uint8')
 
-    code.fill(source_flat, temp_flat, sink_flat, processes=processes, verbose=True)
+    code.fill(source_flat, temp_flat, sink_flat, processes=processes, verbose=verbose)
 
     if verbose:
         timer.print_elapsed_time('Binary filling')
