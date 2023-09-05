@@ -178,8 +178,8 @@ def sum_relaive_masked(source_t[:, :, :] source, char[:, :, :] selem,
 cdef inline void kernel_mean_scale(sink_t* sink, index_t* histo, index_t pop, source_t g, 
                                    index_t max_bin, index_t* p, double* q) nogil:
 
-    cdef index_t i, s = 0, e = 0, imax
-    cdef double bilat_pop = 0
+    cdef index_t i, s = 0, e = 0, imax = 0
+    # cdef double bilat_pop = 0
     cdef double mean = 0
 
     if pop:
@@ -195,9 +195,9 @@ cdef inline void kernel_mean_scale(sink_t* sink, index_t* histo, index_t pop, so
           imax = i;
         #bilat_pop += histo[i]
         #mean += histo[i] * i
-      if bilat_pop:
-        sink[0] = <sink_t>imax #(mean / bilat_pop)
-      else:
+      #if bilat_pop:
+      #  sink[0] = <sink_t>imax #(mean / bilat_pop)
+      #else:
         sink[0] = <sink_t>imax
     else:
         sink[0] = <sink_t>0
