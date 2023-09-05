@@ -334,7 +334,7 @@ def sum_above_percentile(source, selem=None, sink=None, mask=None, percentile = 
     The filtered array.
   """
   return rnk._apply_code(code.sum_above, code.sum_above_masked,
-                        source=source, selem=selem, sink=sink, mask=mask, parameter_float=[percentile], **kwargs);
+                        source=source, selem=selem, sink=sink, mask=mask, parameter_float=percentile, **kwargs);
 
 
 
@@ -370,7 +370,7 @@ def threshold_percentile(source, selem=None, sink=None, mask=None, percentile=0,
     The filtered array.
   """
   return rnk._apply_code(code.threshold, code.threshold_masked,
-                        source=source, selem=selem, sink=sink, mask=mask, parameter_float=[percentile], **kwargs);
+                        source=source, selem=selem, sink=sink, mask=mask, parameter_float=percentile, **kwargs);
 
 
     
