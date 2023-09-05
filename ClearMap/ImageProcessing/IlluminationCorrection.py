@@ -55,6 +55,7 @@ See Also:
 ### Illuminaton correction
 ###############################################################################
 
+
 def correct_illumination(source, flatfield = None, background = None, scaling = None, dtype = None, verbose = False):
   """Correct illumination and background.
  
@@ -67,14 +68,14 @@ def correct_illumination(source, flatfield = None, background = None, scaling = 
   flatfield : str, array, Source or None
     The flatfield estimate. If None, no flat field correction is done.
   background : str, array, Source or None
-    The background estimate. If None, backgorund is assumed to be zero.
+    The background estimate. If None, background is assumed to be zero.
   scaling : float, 'max', 'mean' or None
     Scale the corrected result by this factor. If 'max' or 'mean' scale the 
-    result to match the 'max' or 'mean'. If None, dont scale the result.
-  processes : int or None
-    Number of processes to use. If None use macimal available.
+    result to match the 'max' or 'mean'. If None, don't scale the result.
+  dtype : dtype
+    Data type for output.
   verbose : bool
-    If true, print progrss infomration.
+    If true, print progress information.
     
   Returns
   ------- 

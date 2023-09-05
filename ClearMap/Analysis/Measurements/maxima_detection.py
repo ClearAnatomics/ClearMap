@@ -201,3 +201,4 @@ def find_center_of_maxima(source, maxima=None, label=None, verbose=False):
         timer.print_elapsed_time(f'Center of Maxima: {centers.shape[0]} maxima detected')
 
     return centers
+

@@ -8,7 +8,7 @@ processing of very large arrays in
 :mod:`ClearMap.ParallelProcessing.BlockProcessing`.
 """
 __author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
-__license__   = 'GPLv3 - GNU General Pulic License v3 (see LICENSE)'
+__license__   = 'GPLv3 - GNU General Public License v3 (see LICENSE)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__   = 'http://idisco.info'
 __download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
@@ -75,7 +75,7 @@ class Block(slc.Slice):
   
   @property
   def valid(self):
-    """Return the Slice souce of the valid region of this block.
+    """Return the slice of the valid region of this block.
     
     Returns
     -------
@@ -110,7 +110,7 @@ class Block(slc.Slice):
   
   @property
   def iteration(self):
-    """Return the index of this block in the lost of all blocks to process.
+    """Return the index of this block in the list of all blocks to process.
     
     Returns
     -------

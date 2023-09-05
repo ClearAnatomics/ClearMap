@@ -44,10 +44,10 @@ def measure_radius(source, points, fraction = None, value = None,
     If None, value needs to be given.
   value : array or float or None:
     The value below which the inensity has to fall to measure the radius
-    from the center pixel. If array, it has to be the same size as the 
+    from the center pixel. For array, it has to be the same size as the
     points. If None, fraction has to be given.
   max_radius : int or tuple of ints
-    The maximal pixel radius to consider in each dimension. The larger the 
+    The maximal pixel radius to consider in each dimension. The larger, the
     slower the measurement.
   default : number or None
     Default value to use if no radius was detected.

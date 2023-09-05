@@ -741,7 +741,10 @@ def _apply_code(function, function_mask, source, selem = None,
     parameter_float = np.zeros(0, dtype = float);
   parameter_float = np.asarray([parameter_float], dtype = float).flatten();           
   
-  #print(source.__class__, source.dtype, s.__class__, s.dtype, selem.dtype, mask.dtype, max_bin)                           
+  #print(source.__class__, source.dtype, s.__class__, s.dtype, structural_element.dtype, max_bin);
+  #if mask is not None:
+  #  print(mask.dtype)  
+  #print(source.shape, s.shape, structural_element.shape);
                               
   if mask is None:
     function(source=source, selem=selem, sink=s, max_bin=max_bin, p=parameter_index, q=parameter_float);
