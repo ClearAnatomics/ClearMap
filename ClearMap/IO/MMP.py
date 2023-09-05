@@ -39,7 +39,7 @@ class Source(npy.Source):
     array : array
       The underlying data array of this source. 
     """
-    memmap = _memmap(location=location, shape=shape, dtype=dtype, order=order, mode=mode, array=array);
+    memmap = _memmap(location=location, shape=shape, dtype=dtype, order=order, mode=mode, array=array);  # FIXME: dangerous location
     super(Source, self).__init__(array=memmap, name=name);
   
   @property
@@ -110,7 +110,7 @@ class Source(npy.Source):
     return self._array.filename;
   
   @location.setter
-  def location(self, value):
+  def location(self, value):  # FIXME: should only accept path
     if value != self.location:
       memmap = _memmap(location=value, shape=self.shape, dtype=self.dtype, order=self.order);
       self.array = memmap;
@@ -292,7 +292,7 @@ def create(location = None, shape = None, dtype = None, order = None, mode = Non
   By default memmaps are initialized as fortran contiguous if order is None.
   """
   mode = 'w+' if mode is None else mode; 
-  memmap = _memmap(location=location, shape=shape, dtype=dtype, order=order, mode=mode, array=array);
+  memmap = _memmap(location=location, shape=shape, dtype=dtype, order=order, mode=mode, array=array);   #FIXME: dangerous call
   if as_source:
     return Source(memmap);
   else:
