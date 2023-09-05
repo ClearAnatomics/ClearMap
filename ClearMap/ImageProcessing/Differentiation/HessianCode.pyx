@@ -46,10 +46,9 @@ def hessian(source_t[:, :, :] source, sink_t[:, :, :, :, :] sink, index_t sink_s
   cdef index_t ny = source.shape[1]
   cdef index_t nz = source.shape[2]   
   
-  cdef index_t max_img = nx * ny * nz
-
   # local variable types
   cdef index_t x,y,z,xm,ym,zm,xp,yp,zp
+  cdef double s;
   
   with nogil:
     for x in range(nx):
@@ -65,11 +64,11 @@ def hessian(source_t[:, :, :] source, sink_t[:, :, :, :, :] sink, index_t sink_s
           zp = z + 1 if z < nz - 1 else nz - 1;
           
           # create hessian
-          i = 2.0 * <double>source[x,y,z];
+          s = 2.0 * (<double>source[x,y,z]);
           
-          sink[x,y,z,0,0] = <sink_t> (source[xm,y, z ] - i + source[xp,y, z ]);
-          sink[x,z,y,1,1] = <sink_t> (source[x, ym,z ] - i + source[x, yp,z ]);
-          sink[x,y,z,2,2] = <sink_t> (source[x, y, zm] - i + source[x, y ,zp]);
+          sink[x,y,z,0,0] = <sink_t> (source[xm,y, z ] - s + source[xp,y, z ]);
+          sink[x,y,z,1,1] = <sink_t> (source[x, ym,z ] - s + source[x, yp,z ]);
+          sink[x,y,z,2,2] = <sink_t> (source[x, y, zm] - s + source[x, y ,zp]);
 
           sink[x,y,z,0,1] = sink[x,y,z,1,0] = <sink_t> ((<double>source[xp,yp,z ] - source[xm,yp,z ] - source[xp,ym,z ] + source[xm,ym,z ]) / 4.0);
           sink[x,y,z,0,2] = sink[x,y,z,2,0] = <sink_t> ((<double>source[xp,y ,zp] - source[xm,y ,zp] - source[xp,y ,zm] + source[xm,y ,zm]) / 4.0);
