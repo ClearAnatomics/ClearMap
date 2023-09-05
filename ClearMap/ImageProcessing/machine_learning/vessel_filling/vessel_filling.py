@@ -275,3 +275,12 @@ def print_array_shape(step, array, verbose):
 
 def train(network, data):
     pass
+
+
+#%%############################################################################
+### Tests
+###############################################################################
+
+def _test():
+  import ClearMap.ImageProcessing.MachineLearning.VesselFilling.VesselFilling as vf
+
