@@ -35,7 +35,7 @@ import ClearMap.ImageProcessing.Binary.Filling as bf
 import ClearMap.ImageProcessing.Binary.Smoothing as bs
 
 import ClearMap.Utils.Timer as tmr
-from ClearMap.ImageProcessing.Experts.utils import initialize_sinks, equalize, wrap_step, print_params
+from ClearMap.ImageProcessing.Experts.utils import initialize_sinks, run_step, print_params
 from ClearMap.Utils.utilities import check_enough_temp_space, get_free_temp_space
 
 ###############################################################################
@@ -545,13 +545,13 @@ def binarize_block(source, sink, parameter=default_binarization_parameter):
     # active arrays: clipped, mask, not_low
 
     # lightsheet correction
-    corrected = wrap_step('lightsheet', clipped, lc.correct_lightsheet, remove_previous_result=True,
-                          extra_kwargs={'mask': mask, 'max_bin': max_bin}, **default_step_params)
+    corrected = run_step('lightsheet', clipped, lc.correct_lightsheet, remove_previous_result=True,
+                         extra_kwargs={'mask': mask, 'max_bin': max_bin}, **default_step_params)
     # active arrays: corrected, mask, not_low
 
     # median filter
-    median = wrap_step('median', corrected, rnk.median, remove_previous_result=True,
-                       extra_kwargs={'max_bin': max_bin, 'mask': not_low}, **default_step_params)
+    median = run_step('median', corrected, rnk.median, remove_previous_result=True,
+                      extra_kwargs={'max_bin': max_bin, 'mask': not_low}, **default_step_params)
     del not_low
     # active arrays: median, mask
 
@@ -596,8 +596,8 @@ def binarize_block(source, sink, parameter=default_binarization_parameter):
 
     # adaptive
     parameter_adaptive = parameter.get('adaptive')
-    adaptive = wrap_step('adaptive', deconvolved, threshold_adaptive, remove_previous_result=False,
-                         **default_step_params)
+    adaptive = run_step('adaptive', deconvolved, threshold_adaptive, remove_previous_result=False,
+                        **default_step_params)
     if parameter_adaptive:
         binary_adaptive = deconvolved > adaptive
 
@@ -731,8 +731,8 @@ def binarize_block(source, sink, parameter=default_binarization_parameter):
     # smooth binary
     if parameter.get('smooth'):  # WARNING: otherwise removes sink if no smoothing
         parameter['smooth']['save'] = False
-        smoothed = wrap_step('smooth', sink, bs.smooth_by_configuration, remove_previous_result=False,
-                             extra_kwargs={'sink': None, 'processes': 1}, **default_step_params)
+        smoothed = run_step('smooth', sink, bs.smooth_by_configuration, remove_previous_result=False,
+                            extra_kwargs={'sink': None, 'processes': 1}, **default_step_params)
         sink[valid_slicing] = smoothed[valid_slicing]
         del smoothed
 
@@ -902,6 +902,18 @@ def threshold_adaptive(source, function=threshold_isodata, selem=(100, 100, 3), 
     threshold = ls.apply_local_function(source, function=function, mask=mask, dtype=float,
                                         selem=selem, spacing=spacing, interpolate=interpolate, step=step)
     return threshold
+
+
+def equalize(source, percentile=(0.5, 0.95), max_value=1.5, selem=(200, 200, 5), spacing=(50, 50, 5),
+             interpolate=1, mask=None):
+    equalized = ls.local_percentile(source, percentile=percentile, mask=mask, dtype=float,
+                                    selem=selem, spacing=spacing, interpolate=interpolate)
+    normalize = 1/np.maximum(equalized[..., 0], 1)
+    maxima = equalized[..., 1]
+    ids = maxima * normalize > max_value
+    normalize[ids] = max_value / maxima[ids]
+    equalized = np.array(source, dtype=float) * normalize
+    return equalized
 
 
 def tubify(source, sigma=1.0, gamma12=1.0, gamma23=1.0, alpha=0.25):
