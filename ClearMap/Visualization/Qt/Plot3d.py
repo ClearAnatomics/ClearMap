@@ -23,10 +23,10 @@ import functools as ft
 from PyQt5.QtCore import QRect
 from PyQt5.QtWidgets import QApplication
 
-from ClearMap.Utils import utilities
-
 import ClearMap.Visualization.Qt.DataViewer as dv
 import ClearMap.Visualization.Qt.utils as qtu
+
+from ClearMap.Utils import utilities
 
 ############################################################################################################
 ###  Plotting
@@ -132,7 +132,23 @@ def multi_plot(sources, axis=None, scale=None, title=None, invert_y=True, min_ma
         for d1, d2 in itertools.combinations(dvs, 2):
             synchronize(d1, d2)
 
+    if to_front:
+        bring_to_front(dvs)
+
+    #for d in dvs:
+    #    d.update();
+    
     return dvs
+
+
+def arrange_plots(plots, screen = None, screen_percent = 90):
+    try:
+        geo = qtu.tiled_layout(len(plots), percent=screen_percent, screen=screen)
+
+        for d, g in zip(plots, geo):
+            d.setGeometry(pg.QtCore.QRect(*g))
+    except:
+        pass
   
 
 def synchronize(viewer1, viewer2):
@@ -182,6 +198,27 @@ def set_source(viewer, source):
     """
     viewer.setSource(source)
     return viewer
+
+
+def bring_to_front(plots):
+    if not isinstance(plots, list):
+        plots = [plots]
+    for plot in plots:
+        plot.setWindowFlag(pg.Qt.QtCore.Qt.WindowStaysOnTopHint)
+        plot.raise_()
+        plot.activateWindow()
+        plot.show()
+
+
+def close(plots='all'):
+    if plots == 'all':
+        pg.Qt.App.closeAllWindows()
+    else:
+        if not isinstance(plots, list):
+            plots = [plots]
+        for plot in plots:
+            plot.close()
+
 
 ############################################################################################################
 # ## Tests
