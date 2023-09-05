@@ -101,7 +101,7 @@ def reconstruct(seed, mask = None, method = 'dilation', selem = None, offset = N
         ValueError("Footprint dimensions must all be odd")
     offset = np.array([d // 2 for d in selem.shape])
   
-  # Cross out the center of the selem
+  # Cross out the center of the structural_element
   selem[tuple(slice(d, d + 1) for d in offset)] = False
 
   # Make padding for edges of reconstructed image so we can ignore boundaries

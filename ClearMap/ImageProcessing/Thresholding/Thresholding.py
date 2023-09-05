@@ -49,7 +49,7 @@ def threshold(source, sink = None, threshold = None, hysteresis_threshold = None
     sink : array or None
       If None, a new array is allocated.
     threshold : float
-      The threshold for the intial seeds.
+      The threshold for the initial seeds.
     hysteresis_threshold : float or None
       The hysteresis threshold to extend the initial seeds. 
       If None, no hysteresis thresholding is performed.

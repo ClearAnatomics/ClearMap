@@ -458,17 +458,17 @@ def lsac_masked(source_t[:, :, :] source, char[:, :, :] selem,
 #          
 #          
 #
-#def lsac(source_t[:, :, :] source, char[:, :, :] selem,
+#def lsac(source_t[:, :, :] source, char[:, :, :] structural_element,
 #         sink_t[:, :, :, :] sink, 
 #         index_t max_bin, index_t[:] p, double[:] q):
 #
-#  rank_core(kernel_lsac[sink_t, index_t, source_t], source, selem,
+#  rank_core(kernel_lsac[sink_t, index_t, source_t], source, structural_element,
 #            sink, max_bin, p, q)
 #
-#def lsac_masked(source_t[:, :, :] source, char[:, :, :] selem,
+#def lsac_masked(source_t[:, :, :] source, char[:, :, :] structural_element,
 #                char[:, :, :] mask, sink_t[:, :, :, :] sink,
 #                index_t max_bin, index_t[:] p, double[:] q):
 #
-#  rank_core_masked(kernel_lsac[sink_t, index_t, source_t], source, selem, 
+#  rank_core_masked(kernel_lsac[sink_t, index_t, source_t], source, structural_element,
 #                   mask, sink, max_bin, p, q)
 

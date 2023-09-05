@@ -37,7 +37,6 @@ cdef enum Status:
 
 
 cpdef void prepare_temp(source_t[:] source, temp_t[:] temp, int processes) nogil:
-    
   cdef index_t n = source.shape[0]
   cdef index_t i
   
@@ -50,7 +49,6 @@ cpdef void prepare_temp(source_t[:] source, temp_t[:] temp, int processes) nogil
 
 
 cpdef void label_temp(temp_t[:] temp, index_t[:] strides, index_t[:] seeds, int processes) nogil:
-   
   cdef index_t size = temp.shape[0]
   cdef index_t ndim = strides.shape[0]
   cdef index_t n_seeds = seeds.shape[0]
@@ -97,3 +95,4 @@ cpdef void fill(source_t[:] source, temp_t[:] temp, sink_t[:] sink, int processe
         sink[i] = 1
       else:
         sink[i] = 0
+

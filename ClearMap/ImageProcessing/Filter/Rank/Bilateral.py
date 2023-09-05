@@ -122,7 +122,7 @@ def sum_bilateral(source, selem=None, sink=None, mask=None, s0=10, s1=10, **kwar
   pixels based on their spatial closeness and radiometric similarity.
 
   Spatial closeness is measured by considering only the local pixel
-  neighborhood given by a structuring element (selem).
+  neighborhood given by a structuring element (structural_element).
 
   Radiometric similarity is defined by the greylevel interval [g-s0, g+s1]
   where g is the current pixel greylevel.
@@ -165,7 +165,7 @@ def sum_relative_bilateral(source, selem=None, sink=None, mask=None, s0=0.5, s1=
   pixels based on their spatial closeness and radiometric similarity.
 
   Spatial closeness is measured by considering only the local pixel
-  neighborhood given by a structuring element (selem).
+  neighborhood given by a structuring element (structural_element).
 
   Radiometric similarity is defined by the greylevel interval [g-s0, g+s1]
   where g is the current pixel greylevel.

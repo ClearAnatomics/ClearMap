@@ -340,7 +340,7 @@ def smooth_by_configuration_block(source, iterations = 1, verbose = False):
   Returns
   -------
   smoothed : array
-    Thre smoothed binary array.
+        The smoothed binary array.
   """
   try:
     if isinstance(source, io.src.Source):

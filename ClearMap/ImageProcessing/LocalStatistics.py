@@ -26,8 +26,9 @@ import scipy.ndimage as ndi
 ### Local image processing 
 ###############################################################################
     
-def apply_local_function(source, function, selem = (50,50), spacing = None, step = None, interpolate = 2, mask = None, fshape = None, dtype = None, return_centers = False):
-  """Calculate local histograms on a sub-grid, apply a scalar valued function and resmaple to original image shape.
+def apply_local_function(source, function, selem=(50,50), spacing=None, step=None, interpolate=2,
+                         mask=None, fshape=None, dtype=None, return_centers=False):
+  """Calculate local histograms on a sub-grid, apply a scalar valued function and resample to original image shape.
   
   Arguments
   ---------
@@ -41,10 +42,10 @@ def apply_local_function(source, function, selem = (50,50), spacing = None, step
     If tuple, use a rectangular region of this shape. If array, the array
     is assumed to be bool and acts as a local mask around the center point.
   spacing : tuple or None
-    The spacing between sample points. If None, use shape of selem.
+    The spacing between sample points. If None, use shape of structural_element.
   step : tuple of int or None
     If tuple, subsample the local region by these step. Note that the
-    selem is applied after this subsampling.
+    structural_element is applied after this subsampling.
   interpolate : int or None
     If int, resample the result back to the original source shape using this
     order of interpolation. If None, return the results on the sub-grid.
@@ -158,10 +159,10 @@ def local_histogram(source, max_bin = 2**12, selem = (50,50), spacing = None, st
     If tuple, use a rectangular region of this shape. If array, the array
     is assumed to be bool and acts as a local mask around the center point.
   spacing : tuple or None
-    The spacing between sample points. If None, use shape of selem.
+    The spacing between sample points. If None, use shape of structural_element.
   step : tuple of int or None
     If tuple, subsample the local region by these step. Note that the
-    selem is applied after this subsampling.
+    structural_element is applied after this subsampling.
   interpolate : int or None
     If int, resample the result back to the original source shape using this
     order of interpolation. If None, return the results on the sub-grid.
@@ -211,23 +212,23 @@ def local_percentile(source, percentile, selem = (50,50), spacing = None, step =
     If tuple, use a rectangular region of this shape. If array, the array
     is assumed to be bool and acts as a local mask around the center point.
   spacing : tuple or None
-    The spacing between sample points. If None, use shape of selem.
-  step : tuple of int or None
-    If tuple, subsample the local region by these step. Note that the
-    selem is applied after this subsampling.
+    The spacing between sample points. If None, use shape of structural_element.
+  step : tuple or int or None
+    If tuple, subsample the local region by these steps. Note that the
+    structural_element is applied after this subsampling.
   interpolate : int or None
     If int, resample the result back to the original source shape using this
     order of interpolation. If None, return the results on the sub-grid.
   mask : array or None
     Optional mask to use.
   return_centers : bool
-    If True, additionaly return the centers of the sampling.
+    If True, additionally return the centers of the sampling.
     
   Returns
   -------
   percentiles : array
     The local percentiles.
-  cetners : array
+  centers : array
     Optional centers of the sampling.
   """
   if isinstance(percentile, (tuple, list)):
