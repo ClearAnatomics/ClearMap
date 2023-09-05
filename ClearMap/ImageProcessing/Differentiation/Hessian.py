@@ -15,7 +15,6 @@ __download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 import numpy as np
 import scipy.ndimage as ndi    
 
-
 import ClearMap.IO.IO as io
 
 
@@ -66,7 +65,7 @@ def eigenvalues(source, sink = None, sigma = None):
   Returns
   -------
   sink : array
-    The three eigenvalues along the first axis for each source.
+    The three eigenvalues of the Hessian matrix of the source.
   """
   return _apply_code(code.eigenvalues, source, sink, sink_shape_per_pixel = (3,), parameter = None, sigma = sigma);
           
@@ -110,7 +109,7 @@ def lambda123(source, sink = None, gamma12 = 1.0, gamma23 = 1.0, alpha = 0.25, s
   sink : array
     Output, if None, a new array is allocated.
   gamma12, gamma23, alpha : float
-    Parameters for the tubness measure.
+    Parameters for the tubeness measure.
   sigma : float or None
     If not None, a Gaussian filter with std sigma is applied initialliy.
   
