@@ -1,9 +1,6 @@
-import numpy as np
-
 import ClearMap.IO.IO as clearmap_io
 
 from ClearMap.ParallelProcessing.DataProcessing import ArrayProcessing as ap
-import ClearMap.ImageProcessing.LocalStatistics as ls
 import ClearMap.Utils.Timer as tmr
 import ClearMap.Utils.HierarchicalDict as hdict
 
@@ -17,18 +14,6 @@ def initialize_sinks(cell_detection_parameter, shape, order):
                 ap.initialize_sink(filename, shape=shape, order=order, dtype='float')
 
 
-def equalize(source, percentile=(0.5, 0.95), max_value=1.5, selem=(200, 200, 5), spacing=(50, 50, 5),
-             interpolate=1, mask=None):
-    equalized = ls.local_percentile(source, percentile=percentile, mask=mask, dtype=float,
-                                    selem=selem, spacing=spacing, interpolate=interpolate)
-    normalize = 1/np.maximum(equalized[..., 0], 1)
-    maxima = equalized[..., 1]
-    ids = maxima * normalize > max_value
-    normalize[ids] = max_value / maxima[ids]
-    equalized = np.array(source, dtype=float) * normalize
-    return equalized
-
-
 def print_params(step_params, param_key, prefix, verbose):
     step_params = step_params.copy()
     if verbose:
@@ -39,9 +24,9 @@ def print_params(step_params, param_key, prefix, verbose):
     return step_params, None
 
 
-def wrap_step(param_key, previous_result, step_function, args=(), remove_previous_result=False,
-              extra_kwargs=None, parameter=None, steps_to_measure=None, prefix='',
-              base_slicing=None, valid_slicing=None):
+def run_step(param_key, previous_result, step_function, args=(), remove_previous_result=False,
+             extra_kwargs=None, parameter=None, steps_to_measure=None, prefix='',
+             base_slicing=None, valid_slicing=None):
     if extra_kwargs is None:
         extra_kwargs = {}
     step_param = parameter.get(param_key)

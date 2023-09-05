@@ -38,7 +38,8 @@ import ClearMap.Analysis.Measurements.shape_detection as sd
 import ClearMap.Analysis.Measurements.MeasureExpression as me
 
 import ClearMap.Utils.Timer as tmr
-from ClearMap.ImageProcessing.Experts.utils import initialize_sinks, equalize, wrap_step, print_params
+from ClearMap.ImageProcessing.Experts.utils import initialize_sinks, run_step, print_params
+from ClearMap.ImageProcessing.LocalStatistics import local_percentile
 
 ###############################################################################
 # ## Default parameter
@@ -362,17 +363,17 @@ def detect_cells_block(source, parameter=default_cell_detection_parameter, n_thr
                            'base_slicing': base_slicing, 'valid_slicing': valid_slicing}
 
     # WARNING: if param_illumination: previous_step = source, not np.array(source.array)
-    corrected = wrap_step('illumination_correction', np.array(source.array),
-                          ic.correct_illumination, **default_step_params)
+    corrected = run_step('illumination_correction', np.array(source.array),
+                         ic.correct_illumination, **default_step_params)
 
-    background = wrap_step('background_correction', corrected, remove_background,
-                           remove_previous_result=True, **default_step_params)
+    background = run_step('background_correction', corrected, remove_background,
+                          remove_previous_result=True, **default_step_params)
 
-    equalized = wrap_step('equalization', background, equalize, remove_previous_result=True,
-                          extra_kwargs={'mask': None}, **default_step_params)
+    equalized = run_step('equalization', background, equalize, remove_previous_result=True,
+                         extra_kwargs={'mask': None}, **default_step_params)
 
-    dog = wrap_step('dog_filter', equalized, dog_filter,  # TODO: DoG filter != .title()
-                    remove_previous_result=True, **default_step_params)
+    dog = run_step('dog_filter', equalized, dog_filter,  # TODO: DoG filter != .title()
+                   remove_previous_result=True, **default_step_params)
 
     # Maxima detection
     parameter_maxima = parameter.get('maxima_detection')
@@ -385,8 +386,8 @@ def detect_cells_block(source, parameter=default_cell_detection_parameter, n_thr
 
     if parameter_maxima:
         valid = parameter_maxima.pop('valid', None)
-        maxima = wrap_step('maxima_detection', dog, md.find_maxima, extra_kwargs={'verbose': parameter.get('verbose')},
-                           remove_previous_result=False, **default_step_params)
+        maxima = run_step('maxima_detection', dog, md.find_maxima, extra_kwargs={'verbose': parameter.get('verbose')},
+                          remove_previous_result=False, **default_step_params)
         # center of maxima
         if parameter_maxima['h_max']:  # FIXME: check if source or dog
             centers = md.find_center_of_maxima(source, maxima=maxima, verbose=parameter.get('verbose'))
@@ -407,8 +408,8 @@ def detect_cells_block(source, parameter=default_cell_detection_parameter, n_thr
 
     # WARNING: sd.detect_shape uses prange
     # cell shape detection  # FIXME: may use centers without assignment
-    shape = wrap_step('shape_detection', dog, sd.detect_shape, remove_previous_result=True, **default_step_params,
-                      args=[centers], extra_kwargs={'verbose': parameter.get('verbose'), 'processes': n_threads})
+    shape = run_step('shape_detection', dog, sd.detect_shape, remove_previous_result=True, **default_step_params,
+                     args=[centers], extra_kwargs={'verbose': parameter.get('verbose'), 'processes': n_threads})
     if parameter_shape:
         # size detection
         max_label = centers.shape[0]
@@ -495,6 +496,18 @@ def detect_maxima(source, h_max=None, shape=5, threshold=None, verbose=False):  
         centers = ap.where(maxima).array  # FIXME: prange
 
     return centers
+
+
+def equalize(source, percentile=(0.5, 0.95), max_value=1.5, selem=(200, 200, 5), spacing=(50, 50, 5),
+             interpolate=1, mask=None):
+    equalized = local_percentile(source, percentile=percentile, mask=mask, dtype=float,
+                                 selem=selem, spacing=spacing, interpolate=interpolate)
+    normalize = 1/np.maximum(equalized[..., 0], 1)
+    maxima = equalized[..., 1]
+    ids = maxima * normalize > max_value
+    normalize[ids] = max_value / maxima[ids]
+    equalized = np.array(source, dtype=float) * normalize
+    return equalized
 
 
 ###############################################################################
