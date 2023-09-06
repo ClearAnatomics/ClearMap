@@ -961,8 +961,8 @@ def transform_points(source, sink=None, transform_parameter_file=None, transform
     else:
         transformed_points = read_points(os.path.join(out_dirname, output_file), indices=indices, binary=binary)
 
-        if delete_result_directory:
-            shutil.rmtree(delete_result_directory)
+    if delete_result_directory:
+        shutil.rmtree(delete_result_directory)
 
     return io.write(sink, transformed_points)
 
