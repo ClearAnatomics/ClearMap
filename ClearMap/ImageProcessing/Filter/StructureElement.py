@@ -62,6 +62,8 @@ def structure_element(shape=(3, 3), form='Disk', ndim=None):
     if isinstance(shape, int) and ndim is not None:
         shape = (shape,) * ndim
 
+    form = form.lower()
+
     if isinstance(shape, (list, tuple)):  # FIXME: iterable
         shape = np.array([shape]).flatten()
 
@@ -70,11 +72,11 @@ def structure_element(shape=(3, 3), form='Disk', ndim=None):
         else:
             shape = np.pad(shape[:ndim], (0, max(0, ndim - len(shape))), 'wrap')
 
-        if form in ['Disk', 'disk', 'd']:
+        if form in ['disk', 'd']:
             return disk(shape=shape)
-        elif form in ['Sphere', 'shpere', 's']:
+        elif form in ['sphere', 's']:
             return sphere(shape=shape)
-        elif form in ['Cube', 'cube', 'c', 'Rectangle', 'rectangle', 'r']:
+        elif form in ['cube', 'c', 'rectangle', 'r']:
             return cube(shape=shape)
         else:
             ValueError(f'Form {form} for structuring element not valid!')
