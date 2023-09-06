@@ -480,7 +480,7 @@ def block_sizes(size, processes = None,
         if verbose:
           print("Optimized block size decreased to %d in %d blocks!" % (block_size, n_blocks));
                 
-      elif optimization_fix == 'decrease' and n_blocks > n_add:  # FIXME: should be increase
+      elif optimization_fix == 'increase' and n_blocks > n_add: 
         #try to increase chunk size and decrease chunk number to fit  processors
         n_blocks = n_blocks - n_add;
         block_size = float(size + (n_blocks-1) * overlap) / n_blocks;
