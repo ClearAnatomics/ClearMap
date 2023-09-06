@@ -68,7 +68,7 @@ def structure_element(shape=(3, 3), form='Disk', ndim=None):
         shape = np.array([shape]).flatten()
 
         if ndim is None:
-            ndim = len(shape)
+            ndim = len(shape)  # FIXME: this makes no sense
         else:
             shape = np.pad(shape[:ndim], (0, max(0, ndim - len(shape))), 'wrap')
 
