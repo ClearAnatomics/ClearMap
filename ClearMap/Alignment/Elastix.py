@@ -376,7 +376,7 @@ def set_metric_parameter_file(parameter_file, metric):
                 newfile.write(line)
 
     if not mset:
-        newfile.write("(Metric \"" + metric + "\")\n")
+        newfile.write(f'(Metric "{metric}")\n')
 
     os.close(fh)  # FIXME: try finally
     os.remove(parameter_file)
