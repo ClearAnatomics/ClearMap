@@ -9,11 +9,11 @@ The module provides base classes and routines for stitching images. The
 :mod:`~ClearMap.Alignment.Stitching.StichingWobbly` module builds on this 
 module.
 """
-__author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
-__license__   = 'GPLv3 - GNU General Pulic License v3 (see LICENSE)'
+__author__ = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
+__license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
-__webpage__   = 'http://idisco.info'
-__download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
+__webpage__ = 'https://idisco.info'
+__download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
 
 import copy
 import warnings
@@ -60,7 +60,7 @@ class Region(object):
   #__slots__ = ('_position', '_shape');  
   
   def __init__(self, position = None, shape = None, lower = None, upper = None):
-    """Region construtor.
+    """Region constructor.
     
     Arguments
     ---------
@@ -102,7 +102,7 @@ class Region(object):
       The shape of the layout.
     """
     return self._shape;
-    
+
   @shape.setter
   def shape(self, shape):
     self._shape = ensure(shape, tuple);
@@ -304,7 +304,7 @@ class Overlap(Region):
   """Class to handle overlapping regions of aligned sources."""
   
   def __init__(self, position = None, shape = None, lower = None, upper = None, sources = None):
-    """Overlap construtor.
+    """Overlap constructor.
     
     Arguments
     ---------
@@ -418,7 +418,7 @@ class Source(SourceRegion, src.AbstractSource):
   """Counter for the sources used to create unique ids.""" 
   
   def __init__(self, source = None, position = None, tile_position = None):
-    """Source class construtor.
+    """Source class constructor.
     
     Arguments
     ---------
@@ -606,7 +606,7 @@ class Slice(slc.Slice, SourceRegion):
   """Class to handle a slice of a stitchable source.""" 
   
   def __init__(self, source, position = None, tile_position = None, slicing = None):
-    """Slice class construtor.
+    """Slice class constructor.
     
     Arguments
     ---------
@@ -770,7 +770,7 @@ class AlignmentBase(object):
   #note: could make this a source like object with data and plot routines
   
   def __init__(self, pre = None, post = None):
-    """Alignment construtor.
+    """Alignment constructor.
     
     Arguments
     ---------
@@ -893,7 +893,7 @@ class Alignment(AlignmentBase):
   #note: could make this a source like object with data and plot routines
   
   def __init__(self, pre = None, post = None, shift = None, displacement = None, quality = None):
-    """Alignment construtor.
+    """Alignment constructor.
     
     Arguments
     ---------
@@ -2447,7 +2447,7 @@ def save_layout(filename, layout):
   
   Returns
   -------
-  str
+  file_name : str
     The file name in which the layout was saved.
   """  
   s = np.array([layout.as_virtual()], dtype=object);
@@ -3710,7 +3710,7 @@ def positions_from_tree(alignments, sources = None, min_quality = None, fixed_so
   ----
   The result will be a single consistent solution based on a minimal paths between the first and the other sources of the layout.
   """
-  #TODO: base on spanning tree with best quality measure
+  # TODO: base on spanning tree with best quality measure
   alignments = filter_alignments(alignments, min_quality = min_quality);
   
   if sources is None:
@@ -3755,7 +3755,7 @@ def positions_from_tree(alignments, sources = None, min_quality = None, fixed_so
     positions -= min_pos;  
   
   positions = [tuple(p for p in pos) for pos in positions];
-  return positions;  
+  return positions;
 
 
 def positions_from_optimization(alignments, sources = None, min_quality = None, fixed_source = None, lower_to_origin = False): # optimize positions !
