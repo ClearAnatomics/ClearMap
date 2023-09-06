@@ -535,6 +535,12 @@ def align(fixed_image, moving_image, affine_parameter_file, bspline_parameter_fi
       Elastic result directory.
     processes : int or None
       Number of threads to use.
+    workspace : Workspace
+        The workspace passed to the function to cath the executor to cancel the execution of the computation
+    moving_landmarks_path : str
+        Path to the moving landmarks file.
+    fixed_landmarks_path : str
+        Path to the fixed landmarks file.
 
     Returns
     -------
