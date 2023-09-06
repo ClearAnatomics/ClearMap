@@ -1030,7 +1030,7 @@ def inverse_transform(fixed_image, affine_parameter_file, bspline_parameter_file
         cmd += f'-p {affine_file} '
     if bspline_file is not None:
         cmd += f'-p {bspline_file} '
-    cmd += f' -out {result_directory}'
+    cmd += f'-out {result_directory}'
 
     res = os.system(cmd)
 
