@@ -449,6 +449,9 @@ def block_sizes(size, processes = None,
     n_blocks = 1;   
   if not fixed:
     block_size = float(size + (n_blocks-1) * overlap) / n_blocks;
+  if block_size < size_min:
+    block_size = size_min
+
   
   if verbose:
     print("Estimated block size %d in %d blocks!" % (block_size, n_blocks));
