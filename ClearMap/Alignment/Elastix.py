@@ -559,14 +559,14 @@ def align(fixed_image, moving_image, affine_parameter_file, bspline_parameter_fi
         os.mkdir(result_directory)
 
     # run elastix
-    cmd = [elastix_binary, '-threads', str(processes), '-m', f'"{moving_image}"', '-f', f'"{fixed_image}"']  # We quote all the paths for spaces
+    cmd = [elastix_binary, '-threads', str(processes), '-m', f'{moving_image}', '-f', f'{fixed_image}']
     if affine_parameter_file is not None:
-        cmd.extend(['-p', f'"{affine_parameter_file}"'])
+        cmd.extend(['-p', f'{affine_parameter_file}'])
     if bspline_parameter_file is not None:
-        cmd.extend(['-p', f'"{bspline_parameter_file}"'])
+        cmd.extend(['-p', f'{bspline_parameter_file}'])
     if moving_landmarks_path is not None or fixed_landmarks_path is not None:
-        cmd.extend(['-mp', f'"{moving_landmarks_path}"', '-fp', f'"{fixed_landmarks_path}"'])
-    cmd.extend(['-out', f'"{result_directory}"'])
+        cmd.extend(['-mp', f'{moving_landmarks_path}', '-fp', f'{fixed_landmarks_path}'])
+    cmd.extend(['-out', f'{result_directory}'])
 
     try:
         with subprocess.Popen(cmd, stdout=sys.stdout, stderr=sys.stdout) as proc:  # FIXME: check if we need an "if not sys.stdout.fileno"
