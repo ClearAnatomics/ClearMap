@@ -626,7 +626,7 @@ def transform(source, sink=[], transform_parameter_file=None, transform_director
         delete_image = None
     else:
         img_name = os.path.join(tempfile.gettempdir(), 'elastix_input.tif')
-        io.write(source, img_name)
+        io.write(img_name, source)
         delete_image = img_name
 
     # result directory
