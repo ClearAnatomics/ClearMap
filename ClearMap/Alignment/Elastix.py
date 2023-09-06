@@ -997,7 +997,7 @@ def inverse_transform(fixed_image, affine_parameter_file, bspline_parameter_file
 
     # result directory
     if result_directory is None:
-        result_directory = tempfile.getgettempdir()
+        result_directory = tempfile.gettempdir()
 
     if not os.path.exists(result_directory):
         os.mkdir(result_directory)
