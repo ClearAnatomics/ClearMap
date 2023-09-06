@@ -129,10 +129,10 @@ def graph_from_skeleton(skeleton, points = None, radii = None, vertex_coordinate
 def graph_to_skeleton(graph, sink = None, dtype = bool):
   """Create a binary skeleton from a graph."""
   if not graph.has_edge_geometry():
-    coordinates = graph.vertex_coordinates();
+    coordinates = np.asarray(graph.vertex_coordinates(), dtype=int);
   else:
     coordinates = graph.edge_geometry('coordinates');
-    coordinates = np.vstack(coordinates);
+    coordinates = np.asarray(np.vstack(coordinates), dtype=int);
 
   if sink is None:
     shape = graph.shape;
@@ -142,7 +142,7 @@ def graph_to_skeleton(graph, sink = None, dtype = bool):
   
   shape = io.shape(sink);
 
-  coordinates = list(coordinates.T);
+  coordinates = tuple(coordinates.T);
   sink[coordinates] = True;
       
   return sink;
