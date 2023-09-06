@@ -647,7 +647,7 @@ def transform(source, sink=[], transform_parameter_file=None, transform_director
     set_path_transform_files(transform_parameter_dir)
 
     # transformix -in inputImage.ext -out outputDirectory -tp TransformParameters.txx
-    cmd = '%s -in %s -out %s -tp %s' % (transformix_binary, img_name, result_dirname, transform_parameter_file)
+    cmd = f'{transformix_binary} -in {img_name} -out {result_dirname} -tp {transform_parameter_file}'
 
     res = os.system(cmd)
 
