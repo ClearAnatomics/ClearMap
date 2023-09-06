@@ -123,7 +123,7 @@ If this is None, a zero overlap will be used.
 ###############################################################################
 
 def process(function, source, sink = None,
-            axes = None, size_max = None, size_min = None, overlap = None,  
+            axes = None, size_max = None, size_min = None, size_multiple_of = None, overlap = None,
             optimization = True, optimization_fix = 'all', neighbours = False,
             function_type = None, as_memory = False, return_result = False,
             return_blocks = False,
@@ -214,7 +214,7 @@ def process(function, source, sink = None,
   axes = block_axes(sources[0], axes=axes);
 
   split = ft.partial(split_into_blocks, processes=processes, axes=axes,
-                     size_max=size_max, size_min=size_min,
+                     size_max=size_max, size_min=size_min, size_multiple_of=size_multiple_of,
                      overlap=overlap, optimization=optimization,
                      optimization_fix=optimization_fix, neighbours=neighbours,
                      verbose=False);
@@ -339,7 +339,6 @@ def process_block_block(sources, sinks, function, as_memory = False, return_resu
     print('Processing block %s' % (sources[0].info(),));
 
   if as_memory:
-    sinks = sinks;
     sinks_memory = [s.as_memory_block() for s in sinks]
     sources_and_sinks = [s.as_memory_block() for s in sources] + sinks_memory;
   else:
