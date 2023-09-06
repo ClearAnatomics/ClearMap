@@ -483,29 +483,32 @@ def set_transform_file_size_and_spacing(transform_file, size, spacing):
 
 
 def rescale_size_and_spacing(size, spacing, scale):
-  """Rescales the size and spacing
-  
-  Arguments
-  ---------
-  size : tuple
-    The image size.
-  spacing : tuple
-    The image spacing.
-  scale : tuple
-    The scale factor.
-  
-  Returns
-  -------
-  size : tuple
-    The scaled image size.
-  spacing : tuple
-    The scaled image spacing.
-  """   
+    """Rescales the size and spacing
 
-  si = [int(x * scale) for x in size]
-  sp = spacing / scale
+    Arguments
+    ---------
+    size : tuple
+      The image size.
+    spacing : tuple
+      The image spacing.
+    scale : tuple, number
+      The scale factor.
 
-  return si, sp
+    Returns
+    -------
+    size : tuple
+      The scaled image size.
+    spacing : tuple
+      The scaled image spacing.
+    """
+
+    if not isinstance(scale, (tuple, list)):
+      scale = (scale,) * len(size)
+
+    si = tuple(int(x * s) for x, s in zip(size, scale))
+    sp = tuple(sp / sc for sp, sc in zip(spacing, scale))
+
+    return si, sp
 
 
 ##############################################################################
