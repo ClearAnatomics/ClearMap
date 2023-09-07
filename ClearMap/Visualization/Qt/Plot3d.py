@@ -56,7 +56,7 @@ def plot(source, axis=None, scale=None, title=None, invert_y=True, min_max=None,
     invert_y : bool
         If True invert the y axis (as typically done for images).
     min_max : tuple or None
-        The minal and maximal values for each source. If None, determine them from
+        The minimal and maximal values for each source. If None, determine them from
         the source.
     screen : int or None
         Specify on which screen to open the window.
@@ -79,7 +79,7 @@ def plot(source, axis=None, scale=None, title=None, invert_y=True, min_max=None,
 
 
 def multi_plot(sources, axis=None, scale=None, title=None, invert_y=True, min_max=None,
-               arrange=True, screen=None, lut='flame', parent=None, sync=True):
+               arrange=True, screen=None, lut='flame', screen_percent=90, parent=None, sync=True):
     """
     Plot a source as 2d slices.
 
@@ -112,7 +112,7 @@ def multi_plot(sources, axis=None, scale=None, title=None, invert_y=True, min_ma
         title = [title] * len(sources)
     if not isinstance(lut, (list, tuple)):
         lut = [lut] * len(sources)
-    if min_max is None or np.isscalar(min_max[0]):
+    if min_max is None or np.isscalar(min_max[0]):  # Because it is a list of lists
         min_max = [min_max] * len(sources)
 
     dvs = [dv.DataViewer(source=src, axis=axis, scale=scale, title=title_,
@@ -121,7 +121,7 @@ def multi_plot(sources, axis=None, scale=None, title=None, invert_y=True, min_ma
 
     if arrange:
         try:
-            geo = qtu.tiled_layout(len(dvs), percent=80, screen=screen)
+            geo = qtu.tiled_layout(len(dvs), percent=screen_percent, screen=screen)
             for d, g in zip(dvs, geo):
                 # d.setFixedSize(int(0.95 * g[2]), int(0.9 * g[3]))
                 d.setGeometry(QRect(*g))
