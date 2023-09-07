@@ -188,7 +188,7 @@ def initialize_elastix(path=None):
     transformix_binary = search_elx_bin(path, 'transformix')
 
     elastix_lib = search_elx_lib(path)
-    set_elastix_library_path(elastix_lib)  # FIXME: check if needs global elastx_lib ??
+    set_elastix_library_path(elastix_lib)  # FIXME: check if needs global elastix_lib ??
 
     initialized = True
     print(f'Elastix successfully initialized from path: {path}')
@@ -524,17 +524,17 @@ def align(fixed_image, moving_image, affine_parameter_file, bspline_parameter_fi
     Arguments
     ---------
     fixed_image : str
-      Image source of the fixed image (typically the reference image).
+        Image source of the fixed image (typically the reference image).
     moving_image : str
-      Image source of the moving image (typically the image to be registered).
+        Image source of the moving image (typically the image to be registered).
     affine_parameter_file : str or None
-      Elastix parameter file for the primary affine transformation.
+        Elastix parameter file for the primary affine transformation.
     bspline_parameter_file : str or None
-      Elastix parameter file for the secondary non-linear transformation.
+        Elastix parameter file for the secondary non-linear transformation.
     result_directory : str or None
-      Elastic result directory.
+        Elastic result directory.
     processes : int or None
-      Number of threads to use.
+        Number of threads to use.
     workspace : Workspace
         The workspace passed to the function to cath the executor to cancel the execution of the computation
     moving_landmarks_path : str
@@ -574,7 +574,9 @@ def align(fixed_image, moving_image, affine_parameter_file, bspline_parameter_fi
                 workspace.process = proc
     except UnsupportedOperation:
         try:
-            subprocess.Popen(cmd)
+            with subprocess.Popen(cmd) as proc:
+                if workspace is not None:
+                    workspace.process = proc
         except (subprocess.SubprocessError, OSError) as err:
             raise ClearMapException(f'Align: failed executing: {" ".join(cmd)}') from err
     except (subprocess.SubprocessError, OSError) as err:
