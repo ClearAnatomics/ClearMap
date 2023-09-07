@@ -339,15 +339,22 @@ def orientation_to_boys(orientations, alpha = None, as_int = False):
     Include the alpha value in the color map.
   as_int : bool
     If True return color maps as integers in range 0 to 255.
+  normalize : bool 
+    Normalize vectors to unit length. set to False to avoid overhead 
+    when passing normalized vectors.
     
   Returns
   -------
   colors : array
-    RGB colors for the oreitnation vectors according to Boys coloring.
+    RGB colors for the orientation vectors according to Boys coloring.
     
   Note
   ----
   The Boys color map is a smooth way of coloring orientations.
+  
+  References
+  ----------
+  [1] https://ieeexplore.ieee.org/abstract/document/5290761
   """
   
   def _cc(na, nd):
@@ -475,7 +482,7 @@ def orientation_to_rgb(orientation, alpha = None, as_int = False):
   Arguments
   ---------   
   orientations : array
-    List of 3d vectors as nx3 array 
+    List of 3d vectors as nx3 array.
   alpha : None, bool, int or float
     Include the alpha value in the color map.
   as_int : bool
@@ -488,7 +495,7 @@ def orientation_to_rgb(orientation, alpha = None, as_int = False):
     
   Note
   ----
-  This color map is not continous.
+  This color map is not continuous.
   """
 
   rgb = np.asarray(orientation, dtype = float);
