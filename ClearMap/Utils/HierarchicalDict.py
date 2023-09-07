@@ -34,6 +34,7 @@ from collections import OrderedDict as odict
 
 
 DELIMITER = '_'
+HIDDEN_FLAG = '!'
 # TODO: Could be handled more professionally by Enum Flag to allow for multiple parameter flags if needed
 # TODO: use a HierarchicalDict class -> derive ParameterDict for ClearMap use in GUI
 
@@ -66,6 +67,8 @@ def get(parameter, key, default=None):
     for k in key.split(DELIMITER):
         if k in p.keys():
             p = p[k]
+        elif HIDDEN_FLAG + k in p.keys():
+            p = p[HIDDEN_FLAG + k]
         else:
             return default
 
@@ -91,7 +94,7 @@ def set(parameter, key=None, value=None, **kwargs):
     parameter : dict 
       Parameter dictionary.
     """
-    if key is None or value is None:
+    if key is None:
         keys = kwargs.keys()
         values = kwargs.values()
     else:
@@ -108,13 +111,21 @@ def set(parameter, key=None, value=None, **kwargs):
                 if isinstance(p, dict):
                     if l in p.keys():
                         p = p[l]
+                    elif HIDDEN_FLAG + l in p.keys():
+                        p = p[HIDDEN_FLAG + l]
                     else:
                         p[l] = {}
                         p = p[l]
                 else:
                     raise RuntimeError(f"set: {k} is not a dictionary!")
 
-            p[ks[-1]] = v
+            l = ks[-1]
+            if l in p.keys():
+                p[l] = v
+            elif HIDDEN_FLAG + l in p.keys():
+                p[HIDDEN_FLAG + l] = v
+            else:
+                p[l] = v
 
     return parameter
 
@@ -224,12 +235,91 @@ def prepend(parameter, key):
     """
     return {f'{key}{DELIMITER}{k}': v for k, v in parameter.items()}
     
-    keys   = parameter.keys() 
-    values = parameter.values();
-    keys = [key + '.' + k for k in keys];
-    
-    return {k : v for k,v in zip(keys, values)}
-        
+
+def flatten(parameter):
+    flattened = dict()
+    for k, v in parameter.items():
+        if isinstance(v, dict):
+            sub_parameter = flatten(v)
+            for ks, vs in sub_parameter.items():
+                flattened[k + DELIMITER + ks] = vs
+        else:
+            flattened[k] = v
+
+    return flattened
+
+
+def expand(parameter):
+    expanded = dict()
+    for key, value in parameter.items():
+        set(expanded, key=key, value=value)
+    return expanded
+
+
+# TODO:
+# class HierarchicalDict(dict):
+#
+#     def get(self, key, default=None):
+#         if not isinstance(key, str) or DELIMITER not in key:
+#             return super().get(key, default)
+#         else:
+#             keys = key.split(DELIMITER)
+#             value = super().__getitem__(keys[0])
+#             return value.get(DELIMITER.join(keys[1:]), default=default)
+#
+#     def set(self, key=None, value=None, **kwargs):
+#         if key is None or value is None:
+#             keys = kwargs.keys()
+#             values = kwargs.values()
+#         else:
+#             keys = [key]
+#             values = [value]
+#
+#         for k, v in zip(keys, values):
+#             if not isinstance(k, str):
+#                 self.__setitem__(k, v)
+#             else:
+#                 ks = k.split(DELIMITER)
+#                 vs = self.__getitem__(ks[0]) if ks[0] in self.keys() else HierarchicalDict()
+#                 if not isinstance(vs, dict):
+#                     raise RuntimeError("set: %s is not a dictionary!" % k)
+#                 vs.__setitem__(DELIMITER.join(keys[1:]), v)
+#
+#     def expand(self):
+#         return expand(self)
+#
+#     def flatten(self):
+#         return flatten(self)
+#
+#
+#     def to_dict(self):
+#         return to_dict(self)
+#
+#     @staticmethod
+#     def from_dict(parameter):
+#         return from_dict(prameter)
+#
+#     def update(self, ;
+#
+#     def __setitem__(self, key, value):
+#         self.set(key, value)
+#
+#     def __getitem__(self, key, default=None):
+#         self.get(key, default)
+#
+#     def __str__(self):
+#         return write(self)
+#
+#     def __repr__(self):
+#         return self.__str__()
+# def to_dict(hdict):
+#     d = dict()
+#     for k,v in hdict.items():
+#         if isinstance(v, HierarchicalDict):
+#             v = to_dict(v)
+#         d[k] = v
+#     return d
+
 
 ###############################################################################
 # Tests
