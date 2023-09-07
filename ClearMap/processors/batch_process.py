@@ -16,7 +16,11 @@ import numpy as np
 from skimage.transform import rescale
 from tqdm import tqdm
 
+try:
 from ClearMap.processors.tube_map import BinaryVesselProcessor, VesselGraphProcessor
+    graph_gt = True
+except ImportError:
+    graph_gt = False
 from ClearMap.processors.cell_map import CellDetector
 from ClearMap.processors.sample_preparation import PreProcessor, init_preprocessor
 from ClearMap.config.config_loader import get_configs, ConfigLoader

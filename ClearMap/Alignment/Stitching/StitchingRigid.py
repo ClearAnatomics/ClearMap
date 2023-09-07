@@ -25,9 +25,6 @@ import inspect as insp
 import numpy as np
 import multiprocessing as mp
 import concurrent.futures
- 
-import graph_tool as gt
-import graph_tool.topology as gtt
 
 import matplotlib.pyplot as plt
 
@@ -48,8 +45,12 @@ import ClearMap.Utils.Timer as tmr
 from ClearMap.Utils.Formatting import ensure
 
 
+from ClearMap.Alignment.Stitching.sitching_layout_graphs import (get_connected_components, connect_sources,
+                                                                 get_positions_from_tree, get_color_ids)
+
+
 ###############################################################################
-### Geometry
+# Geometry
 ###############################################################################
 from ClearMap.Utils.utilities import CancelableProcessPoolExecutor
 
@@ -2389,17 +2390,9 @@ def connected_components(alignments, sources = None, min_quality = None, with_so
   n_sources = len(sources);
   source_to_index = { s : i for i,s in enumerate(sources)};
   #print sources, alignments
-    
-  #determine connected compoenents
-  g = gt.Graph(directed = False);    
-  g.add_vertex(n_sources);
-  for a in alignments:
-    g.add_edge(source_to_index[a.pre], source_to_index[a.post]);
-  connected_components, hist = gtt.label_components(g);
-  connected_components = np.array(connected_components.a);                            
-  n_components = len(hist);
-  #print connected_components, hist, len(hist), np.max(hist)   
-  
+
+  connected_components, n_components = get_connected_components(alignments, n_sources, source_to_index)
+
   # create components
   components = [];
   for i in range(n_components):
@@ -3719,31 +3712,11 @@ def positions_from_tree(alignments, sources = None, min_quality = None, fixed_so
   
   ndim = alignments[0].ndim
   source_to_index = { s : i for i,s in enumerate(sources)};
-  
-  #construct minimal tree to connect sources
-  g = gt.Graph(directed = True);    
-  g.add_vertex(nsources);
-  p = g.new_edge_property('vector<int>');
-  for a in alignments:
-    ipre = source_to_index[a.pre];
-    ipost = source_to_index[a.post];
-    shift = a.displacement;
-    e  = g.add_edge(ipre, ipost);
-    p[e] = shift;
-    e = g.add_edge(ipost, ipre);
-    p[e] = tuple(-s for s in shift);
-  
-  #calculate positions from tree
-  start_id = 0;
-  if fixed_source is not None:
-    start_id = source_to_index[fixed_source];
-  
-  positions = np.zeros((nsources, ndim), dtype=int);
-  for i in range(nsources):
-    vlist, elist = gtt.shortest_path(g, g.vertex(start_id), g.vertex(i));
-    for e in elist:
-      positions[i] += p[e];
-  
+
+  g, p = connect_sources(alignments, nsources, source_to_index)
+
+  positions = get_positions_from_tree(g, fixed_source, source_to_index, nsources, ndim, p)
+
   #correct for origin and fixed source
   if fixed_source is not None:
     fixed_id = source_to_index[fixed_source];
@@ -4466,26 +4439,10 @@ def overlay_sources(sources, colors = None, percentile = 98, normalize = True):
 
 
 def layout_coloring(layout, colors = None, color_ids = None):
-  sources = layout.sources;
-  nsources = len(sources); 
-  
-  if color_ids is None:
-    #find sources that overlap
-    edges = [];
-    for i,s in enumerate(sources):
-      p1 = np.array(s.position, dtype=int);
-      s1 = s.shape;
-      for j in range(i+1,nsources):
-        p2 = np.array(sources[j].position, dtype=int);
-        s2 = sources[j].shape;
-        if np.all(np.max([p1,p2], axis = 0) < np.min([p1+s1, p2+s2], axis = 0)):
-          edges.append((i,j));
-    
-    # find graph coloring of overlap structure
-    g = gt.Graph(directed = False);
-    g.add_vertex(n = nsources);
-    g.add_edge_list(edges);  
-    color_ids = np.array(gtt.sequential_vertex_coloring(g).a);
+  sources = layout.sources
+  nsources = len(sources)
+
+  color_ids = get_color_ids(sources, nsources, color_ids)
   
   if colors == 'ids':
     return color_ids;
