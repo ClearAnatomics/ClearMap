@@ -196,7 +196,7 @@ class PytorchVersionManager:  # TODO: inherit from condaparser ??
 
     def get_pytorch_cpu_info(self):
         os_name = platform.system().lower()
-        if os_name.startswith('linux'):
+        if os_name.startswith('linux') or os_name.startswith('windows'):
             version_pattern = f'{self.pytorch_version}=py{self.python_version}_cpu*'
         elif os_name.startswith('darwin'):
             version_pattern = f'{"*"}=cpu_py{"".join(self.python_version.split("."))}*'
