@@ -19,10 +19,6 @@ import warnings
 import numpy as np
 import functools as ft
 import multiprocessing as mp
-import concurrent.futures
-
-import graph_tool as gt
-import graph_tool.topology as gtt
 
 
 import ClearMap.IO.IO as io
@@ -37,6 +33,9 @@ import ClearMap.Utils.Timer as tmr
 import ClearMap.Utils.TagExpression as te
 
 from ClearMap.Utils.utilities import CancelableProcessPoolExecutor
+
+
+from ClearMap.Alignment.Stitching.sitching_layout_graphs import cluster_from_graph
 
 ###############################################################################
 ###  Layout
@@ -1733,16 +1732,8 @@ def _place_slice(displacements, qualities, status, positions, alignment_pairs, m
 def _connected_components(positions, alignment_pairs, displacements):
   """Returns the connected components of the alignments."""
   n_sources = len(positions);
-    
-  #determine connected compoenents
-  g = gt.Graph(directed = False);    
-  g.add_vertex(n_sources);
-  for a in alignment_pairs:
-    g.add_edge(a[0], a[1]);
-  connected_components, hist = gtt.label_components(g);
-  connected_components = np.array(connected_components.a);                            
-  n_components = len(hist);
-  #print connected_components, hist, len(hist), np.max(hist)   
+
+  connected_components, n_components = strg.get_connected_components(alignment_pairs, n_sources)
   
   # create components
   component_pairs = [];
@@ -1842,21 +1833,8 @@ def _cluster_components(components):
     s = np.searchsorted(c_ids, c, side='right')-1;
     i = c - c_ids[s];
     return s,i
-  
-  g = gt.Graph(directed = False);    
-  g.add_vertex(n_components);
-  
-  for s in range(1, len(components)):  
-    for i,ci in enumerate(components[s-1]):
-      for j,cj in enumerate(components[s]):
-        for c in ci:
-          if c in cj:
-            g.add_edge(is_to_c(s-1,i),is_to_c(s,j));
-            break;
-  
-  connected_components, hist = gtt.label_components(g);
-  connected_components = np.array(connected_components.a);
-  n_components = len(hist);
+
+  connected_components, n_components = cluster_from_graph(components, n_components, is_to_c)
   components_full = [np.where(connected_components==i)[0] for i in range(n_components)];
   
   #remove isolated nodes
