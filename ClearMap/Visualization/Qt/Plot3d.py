@@ -26,10 +26,8 @@ from PyQt5.QtWidgets import QApplication
 import ClearMap.Visualization.Qt.DataViewer as dv
 import ClearMap.Visualization.Qt.utils as qtu
 
-from ClearMap.Utils import utilities
-
 ############################################################################################################
-###  Plotting
+#  Plotting
 ############################################################################################################
 
 # TODO: figure / windows handler to update data in existing windows
@@ -37,7 +35,7 @@ from ClearMap.Utils.utilities import runs_on_spyder
 
 
 def plot(source, axis=None, scale=None, title=None, invert_y=True, min_max=None, screen=None,
-         arrange=True, lut=None, to_front=True, parent=None, sync=True):
+         arrange=True, lut=None, max_projection=None, to_front=True, parent=None, sync=True):
     """
     Plot a source as 2d slices.
 
@@ -70,7 +68,7 @@ def plot(source, axis=None, scale=None, title=None, invert_y=True, min_max=None,
     if not isinstance(source, (list, tuple)):
         source = [source]
     m_plot = multi_plot(source, axis=axis, scale=scale, title=title, invert_y=invert_y,
-                        min_max=min_max, screen=screen, arrange=arrange, lut=lut, to_front=to_front,
+                        min_max=min_max, max_projection=max_projection, screen=screen, arrange=arrange, lut=lut, to_front=to_front,
                         parent=parent, sync=sync)
     if not runs_on_spyder():
         inst = QApplication.instance()
@@ -80,7 +78,7 @@ def plot(source, axis=None, scale=None, title=None, invert_y=True, min_max=None,
 
 
 def multi_plot(sources, axis=None, scale=None, title=None, invert_y=True, min_max=None,
-               arrange=True, screen=None, lut='flame', screen_percent=90, parent=None, sync=True, to_front=True):
+               max_projection=None, arrange=True, screen=None, lut='flame', screen_percent=90, parent=None, sync=True, to_front=True):
     """
     Plot a source as 2d slices.
 
@@ -115,10 +113,12 @@ def multi_plot(sources, axis=None, scale=None, title=None, invert_y=True, min_ma
         lut = [lut] * len(sources)
     if min_max is None or np.isscalar(min_max[0]):  # Because it is a list of lists
         min_max = [min_max] * len(sources)
+    if not isinstance(max_projection, list):
+        max_projection = [max_projection] * len(sources)
 
-    dvs = [dv.DataViewer(source=src, axis=axis, scale=scale, title=title_,
-                         invertY=invert_y, minMax=min_max_, default_lut=lut_, parent=parent)
-           for src, title_, lut_, min_max_ in zip(sources, title, lut, min_max)]
+    dvs = [dv.DataViewer(source=src, axis=axis, scale=scale, title=title_, invertY=invert_y,
+                         minMax=min_max_, max_projection=max_projection_, default_lut=lut_, parent=parent)
+           for src, title_, lut_, min_max_, max_projection_ in zip(sources, title, lut, min_max, max_projection)]
 
     if arrange:
         try:
