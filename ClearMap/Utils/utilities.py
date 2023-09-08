@@ -23,6 +23,8 @@ __copyright__ = 'Copyright © 2022 by Charly Rousseau'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
 
+import pyximport
+
 from ClearMap.Utils.TagExpression import Expression
 from ClearMap.Utils.exceptions import MissingRequirementException, SmiError
 
@@ -190,3 +192,15 @@ class FilePath:
         self.prefix = prefix
         self.postfix = postfix
         self.extension = extension
+
+
+def patch_distutils_get_extension():
+  global _old_get_distutils_extension
+  _old_get_distutils_extension = pyximport.pyximport.get_distutils_extension
+
+  def new_get_distutils_extension(modname, pyxfilename, language_level=None):
+    extension_mod, setup_args = _old_get_distutils_extension(modname, pyxfilename, language_level)
+    extension_mod.language = 'c++'
+    return extension_mod, setup_args
+
+  pyximport.pyximport.get_distutils_extension = new_get_distutils_extension

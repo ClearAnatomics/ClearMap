@@ -14,22 +14,13 @@ import os
 import gc
 import multiprocessing as mp
 
-import pyximport
-
 import numpy as np
 
+import pyximport
 
-old_get_distutils_extension = pyximport.pyximport.get_distutils_extension
+from ClearMap.Utils.utilities import patch_distutils_get_extension
 
-
-def new_get_distutils_extension(modname, pyxfilename, language_level=None):
-    extension_mod, setup_args = old_get_distutils_extension(modname, pyxfilename, language_level)
-    extension_mod.language = 'c++'
-    return extension_mod, setup_args
-
-
-pyximport.pyximport.get_distutils_extension = new_get_distutils_extension
-
+patch_distutils_get_extension()
 pyximport.install(setup_args={"include_dirs": [np.get_include(), os.path.dirname(os.path.abspath(__file__))]},
                   reload_support=True)
 

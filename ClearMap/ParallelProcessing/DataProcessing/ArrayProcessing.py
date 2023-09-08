@@ -23,24 +23,14 @@ import os
 import numpy as np
 import multiprocessing as mp
 
-import ClearMap.IO.IO as io
-import ClearMap.IO.Slice as slc
-
-import ClearMap.Utils.Timer as tmr
-
 import pyximport
 
-_old_get_distutils_extension = pyximport.pyximport.get_distutils_extension
+import ClearMap.IO.IO as io
+import ClearMap.IO.Slice as slc
+import ClearMap.Utils.Timer as tmr
+from ClearMap.Utils.utilities import patch_distutils_get_extension
 
-
-def _new_get_distutils_extension(modname, pyxfilename, language_level=None):
-    extension_mod, setup_args = _old_get_distutils_extension(modname, pyxfilename, language_level)
-    extension_mod.language = 'c++'
-    return extension_mod, setup_args
-
-
-pyximport.pyximport.get_distutils_extension = _new_get_distutils_extension
-
+patch_distutils_get_extension()
 pyximport.install(setup_args={"include_dirs": [np.get_include(), os.path.dirname(os.path.abspath(__file__))]},
                   reload_support=True)
 
