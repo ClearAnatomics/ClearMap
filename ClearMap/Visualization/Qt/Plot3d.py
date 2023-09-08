@@ -32,18 +32,18 @@ from ClearMap.Utils import utilities
 ###  Plotting
 ############################################################################################################
 
-#TODO: figure / windows handler to update data in existing windows
+# TODO: figure / windows handler to update data in existing windows
 from ClearMap.Utils.utilities import runs_on_spyder
 
 
 def plot(source, axis=None, scale=None, title=None, invert_y=True, min_max=None, screen=None,
-         arrange=True, lut=None, parent=None, sync=True):
+         arrange=True, lut=None, to_front=True, parent=None, sync=True):
     """
     Plot a source as 2d slices.
 
     Arguments
     ---------
-    source : list of sources
+    source : Source, list or dict
         The source to plot. If a list is given several synchronized windows are
         generated. If an element in the list is a list of sources those are
         overlayed in different colors in that window.
@@ -70,7 +70,8 @@ def plot(source, axis=None, scale=None, title=None, invert_y=True, min_max=None,
     if not isinstance(source, (list, tuple)):
         source = [source]
     m_plot = multi_plot(source, axis=axis, scale=scale, title=title, invert_y=invert_y,
-                        min_max=min_max, screen=screen, arrange=arrange, lut=lut, parent=parent, sync=sync)
+                        min_max=min_max, screen=screen, arrange=arrange, lut=lut, to_front=to_front,
+                        parent=parent, sync=sync)
     if not runs_on_spyder():
         inst = QApplication.instance()
         # if inst is not None:
@@ -79,7 +80,7 @@ def plot(source, axis=None, scale=None, title=None, invert_y=True, min_max=None,
 
 
 def multi_plot(sources, axis=None, scale=None, title=None, invert_y=True, min_max=None,
-               arrange=True, screen=None, lut='flame', screen_percent=90, parent=None, sync=True):
+               arrange=True, screen=None, lut='flame', screen_percent=90, parent=None, sync=True, to_front=True):
     """
     Plot a source as 2d slices.
 
