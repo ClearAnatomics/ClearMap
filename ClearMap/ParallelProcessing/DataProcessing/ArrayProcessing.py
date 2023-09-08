@@ -671,7 +671,7 @@ def initialize_sink(sink=None, shape=None, dtype=None, order=None, memory=None, 
   sink = io.initialize(sink, shape=shape, dtype=dtype, order=order, memory=memory, location=location, mode=mode,
                        like=source, as_source=True)
 
-    result = (sink,)
+  result = (sink,)
   
   if return_buffer:
     buffer = sink.as_buffer()
