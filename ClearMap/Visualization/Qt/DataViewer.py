@@ -28,7 +28,7 @@ import pyqtgraph as pg
 from PyQt5 import QtWidgets
 from PyQt5.QtCore import QEvent, QRect, QSize, pyqtSignal, Qt
 from PyQt5.QtGui import QPainter
-from PyQt5.QtWidgets import QWidget, QRadioButton, QLabel, QSplitter, QApplication, QSizePolicy, QPushButton, QCheckBox
+from PyQt5.QtWidgets import QWidget, QRadioButton, QLabel, QSplitter, QApplication, QSizePolicy, QCheckBox, QGridLayout
 
 from ClearMap.Utils.utilities import runs_on_spyder
 from ClearMap.IO.IO import as_source
@@ -52,12 +52,12 @@ class DataViewer(QWidget):
     }
 
     def __init__(self, source, axis=None, scale=None, title=None, invertY=False,
-                 minMax=None, screen=None, parent=None, default_lut='flame', original_orientation='zcxy', *args):
+                 minMax=None, screen=None, parent=None, default_lut='flame', original_orientation='zcxy', **kwargs):
 
-        QWidget.__init__(self, parent, *args)
+        QWidget.__init__(self, parent, **kwargs)
         # super().__init__(self, parent, *args)
 
-        # ## Images sources
+        # Images sources
         self.sources = []
         self.original_orientation = original_orientation
         self.n_sources = 0
@@ -162,7 +162,7 @@ class DataViewer(QWidget):
 
         self.sliceLine.sigPositionChanged.connect(self.updateSlice)
 
-        # Axis Tools
+        # Axis tools
         self.axis_buttons = []
         axis_tools_layout, axis_tools_widget = self.__setup_axes_controls()
 
@@ -177,7 +177,7 @@ class DataViewer(QWidget):
         image_splitter.addWidget(self.graphicsView)
         image_splitter.addWidget(self.slicePlot)
         image_splitter.addWidget(axis_tools_widget)
-        image_splitter.setSizes([self.height()-35-20, 35, 20])
+        image_splitter.setSizes([self.height() - 35 - 20, 35, 20])
 
         # lut widgets
         self.luts = [LUT(image=i, color=c) for i, c in zip(self.image_items, self.__get_colors(default_lut))]
@@ -292,7 +292,7 @@ class DataViewer(QWidget):
         self.sources = source
 
     def __setup_axes_controls(self):
-        axis_tools_layout = QtWidgets.QGridLayout()
+        axis_tools_layout = QGridLayout()
         for d, ax in enumerate('xyz'):
             button = QRadioButton(ax)
             button.setMaximumWidth(50)
@@ -486,6 +486,9 @@ class DataViewer(QWidget):
                 image = image.view('uint8')
             img_item.updateImage(image)
 
+    def setMinMax(self, min_max, source=0):
+        self.luts[source].lut.region.setRegion(min_max)
+
     def plot_scatter_markers(self, ax, index):
         self.scatter.clear()
         self.scatter_coords.axis = ax
@@ -520,9 +523,6 @@ class DataViewer(QWidget):
         x_axis, y_axis = self.getXYAxes()
         scaled_x, scaled_y = self.scale_coords(x, x_axis, y, y_axis)
         self.mouse_clicked.emit(scaled_x, scaled_y, self.source_index[self.scroll_axis])
-
-    def setMinMax(self, min_max, source=0):
-        self.luts[source].lut.region.setRegion(min_max)
 
     def padded_shape(self, shape):
         pad_size = max(3, len(shape))
