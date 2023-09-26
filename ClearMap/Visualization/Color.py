@@ -17,7 +17,6 @@ __download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 
 
 import numpy as np
-import colorsys
 
 import vispy as vp
 import vispy.color as vpc
@@ -328,7 +327,7 @@ color_map = colormap
 
 # special color maps
 
-def orientation_to_boys(orientations, alpha = None, as_int = False):
+def orientation_to_boys(orientations, alpha = None, as_int = False, normalize = True):
   """Colormap mapping 3d orientation vectors into rgb colors.
   
   Arguments
@@ -357,15 +356,21 @@ def orientation_to_boys(orientations, alpha = None, as_int = False):
   [1] https://ieeexplore.ieee.org/abstract/document/5290761
   """
   
-  def _cc(na, nd):
+  def cc(na, nd):
     return (na * np.cos(nd * np.pi / 180.0))
 
-  def _ss(na, nd):
+  def ss(na, nd):
     return na * np.sin(nd * np.pi / 180.0);
   
-  x = orientations[:,0]
-  y = orientations[:,1]
-  z = orientations[:,2]
+  x = orientations[...,0]
+  y = orientations[...,1]
+  z = orientations[...,2]
+  
+  if normalize:
+      norm = np.linalg.norm(orientations, axis=-1)
+      x = x / norm
+      y = y / norm
+      z = z / norm
 
   x2 = x ** 2
   y2 = y ** 2
@@ -399,14 +404,14 @@ def orientation_to_boys(orientations, alpha = None, as_int = False):
   s2 = 251.0
   s3 = 125.0
 
-  ss23 = _ss(2.71, s0)
-  cc23 = _cc(2.71, s0)
-  ss45 = _ss(2.12, s1)
-  cc45 = _cc(2.12, s1)
-  ss67 = _ss(.972, s2)
-  cc67 = _cc(.972, s2)
-  ss89 = _ss(.868, s3)
-  cc89 = _cc(.868, s3)
+  ss23 = ss(2.71, s0)
+  cc23 = cc(2.71, s0)
+  ss45 = ss(2.12, s1)
+  cc45 = cc(2.12, s1)
+  ss67 = ss(.972, s2)
+  cc67 = cc(.972, s2)
+  ss89 = ss(.868, s3)
+  cc89 = cc(.868, s3)
 
   X = 0.0
 
@@ -1193,9 +1198,9 @@ def _test():
   #import numpy as np
   import ClearMap.Visualization.Mesh.IcoSphere as ics
   
-  vertices, faces = ics.icosphere(n_refinements = 7);
+  vertices, faces = ics.icosphere(n_refinements = 7)
   
-  vertex_colors = col.boys_to_rgb(vertices, alpha=1.0);
+  vertex_colors = col.orientation_to_boys(vertices, alpha=1.0)
   
   import ClearMap.Visualization.Plot3d as p3d
   p = p3d.plot_mesh_3d(vertices, faces, vertex_colors=vertex_colors)
