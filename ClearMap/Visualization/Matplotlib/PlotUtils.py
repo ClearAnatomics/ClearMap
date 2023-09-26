@@ -23,7 +23,7 @@ import scipy.stats as st
 
 from matplotlib.colors import rgb_to_hsv, hsv_to_rgb
 import matplotlib.pyplot as plt
-
+from mpl_toolkits.mplot3d import Axes3D  # analysis:ignore
 
 from ClearMap.Alignment import Annotation as annotation
 from ClearMap.Analysis.Statistics.data_frame_operations import sanitize_df, normalise_df_column_names
