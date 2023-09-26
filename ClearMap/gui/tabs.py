@@ -932,7 +932,7 @@ class CellCounterTab(PostProcessingTab):
 
         """
         self.wrap_step('Detecting cells', self.cell_detector.run_cell_detection,
-                       step_kw_args={'tuning': False, 'save_shape': self.params.save_shape},
+                       step_kw_args={'tuning': False, 'save_shape': self.params.save_shape},  # FIXME: seems to crash
                        abort_func=self.cell_detector.stop_process)
         if self.cell_detector.stopped:
             return
@@ -1481,12 +1481,30 @@ class GroupAnalysisProcessor:
         atlas = clearmap_io.read(pre_proc.annotation_file_path)
         if len(p_vals_imgs) == 1:
             gp1_name, gp2_name = selected_comparisons[0]
-            gp1_img = clearmap_io.read(os.path.join(self.results_folder, f'avg_density_{gp1_name}.tif'))
-            gp2_img = clearmap_io.read(os.path.join(self.results_folder, f'avg_density_{gp2_name}.tif'))
+            gp1_avg = clearmap_io.read(os.path.join(self.results_folder, f'avg_density_{gp1_name}.tif'))
+            gp1_sd_path = os.path.join(self.results_folder, f'sd_density_{gp1_name}.tif')
+            gp2_avg = clearmap_io.read(os.path.join(self.results_folder, f'avg_density_{gp2_name}.tif'))
+            gp2_sd_path = os.path.join(self.results_folder, f'sd_density_{gp2_name}.tif')
             colored_atlas = create_color_annotation(pre_proc.annotation_file_path)
-            images = [gp1_img, gp2_img, p_vals_imgs[0], colored_atlas]
-            titles = [gp1_name, gp2_name, 'P values', 'colored_atlas']
-            luts = ['flame', 'flame', None, None]
+            gp1_imgs = gp1_avg
+            if os.path.exists(gp1_sd_path):
+                gp1_sd = clearmap_io.read(gp1_sd_path)
+                gp1_imgs = [gp1_avg, gp1_sd]
+            gp2_imgs = gp2_avg
+            if os.path.exists(gp2_sd_path):
+                gp2_sd = clearmap_io.read(gp2_sd_path)
+                gp2_imgs = [gp2_avg, gp2_sd]
+            stats_imgs = p_vals_imgs[0]
+            stats_title = 'P values'
+            stats_luts = None
+            effect_size_path = os.path.join(self.results_folder, f'effect_size_{gp1_name}_{gp2_name}.tif')
+            if os.path.exists(effect_size_path):
+                stats_imgs = [stats_imgs, clearmap_io.read(effect_size_path)]
+                stats_title += ' and effect size'
+                stats_luts = [None, 'flame']
+            images = [gp1_imgs, gp2_imgs, stats_imgs, colored_atlas]
+            titles = [gp1_name, gp2_name, stats_title, 'colored_atlas']
+            luts = ['flame', 'flame', stats_luts, None]
             min_maxes = [None, None, None, (0, 255)]
         else:
             images = p_vals_imgs
@@ -1503,19 +1521,18 @@ class GroupAnalysisProcessor:
         link_dataviewers_cursors(dvs)
         return dvs
 
-    def compute_p_vals(self, selected_comparisons, groups, wraping_func):
+    def compute_p_vals(self, selected_comparisons, groups, wrapping_func, advanced=False):
         for pair in selected_comparisons:  # TODO: Move to processor object to be wrapped
             gp1_name, gp2_name = pair
             gp1, gp2 = [groups[gp_name] for gp_name in pair]
-            if not density_files_are_comparable(self.results_folder, gp1, gp2):
-                raise GroupStatsError('Could not compare files, sizes differ')
+            _ = density_files_are_comparable(self.results_folder, gp1, gp2)
             ids = []
             for gp_dir in gp1 + gp2:
                 loader = ConfigLoader(gp_dir)
                 ids.append(loader.get_cfg('sample')['sample_id'])
             if len(ids) != len(set(ids)):
                 raise GroupStatsError('Analysis impossible, some IDs are not unique. please check and start again')
-            wraping_func(compare_groups, self.results_folder, gp1_name, gp2_name, gp1, gp2)
+            wrapping_func(compare_groups, self.results_folder, gp1_name, gp2_name, gp1, gp2, advanced=advanced)
             self.progress_watcher.increment_main_progress()
 
     def run_plots(self, plot_function, selected_comparisons, plot_kw_args):
@@ -1635,7 +1652,8 @@ class GroupAnalysisTab(BatchTab):
         self.main_window.make_progress_dialog('P value maps', n_steps=len(self.params.selected_comparisons))
         try:
             self.processor.compute_p_vals(self.params.selected_comparisons, self.params.groups,
-                                          self.main_window.wrap_in_thread)
+                                          self.main_window.wrap_in_thread,
+                                          advanced=self.ui.advancedCheckBox.isChecked())
         except GroupStatsError as err:
             self.main_window.popup(str(err), base_msg='Cannot proceed with analysis')
         self.main_window.signal_process_finished()
