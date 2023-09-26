@@ -43,7 +43,7 @@ from ClearMap.Visualization.Qt import Plot3d as plot_3d
 from ClearMap.processors.sample_preparation import PreProcessor, init_preprocessor
 from ClearMap.processors.cell_map import CellDetector
 try:
-from ClearMap.processors.tube_map import BinaryVesselProcessor, VesselGraphProcessor
+    from ClearMap.processors.tube_map import BinaryVesselProcessor, VesselGraphProcessor
     graph_gt = True
 except ImportError:
     graph_gt = False
