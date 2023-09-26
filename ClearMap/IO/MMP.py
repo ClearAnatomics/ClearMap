@@ -32,39 +32,38 @@ class Source(npy.Source):
   """Memory mapped array source."""
   
   def __init__(self, location = None, shape = None, dtype = None, order = None, array = None, mode = None, name = None):
-    """Memory map source construtor.
+    """Memory mapped source constructor.
     
     Arguments
     ---------
     array : array
       The underlying data array of this source. 
     """
-    memmap = _memmap(location=location, shape=shape, dtype=dtype, order=order, mode=mode, array=array);  # FIXME: dangerous location
-    super(Source, self).__init__(array=memmap, name=name);
-  
+    memmap = _memmap(location=location, shape=shape, dtype=dtype, order=order, mode=mode, array=array)  # FIXME: dangerous location
+    super(Source, self).__init__(array=memmap, name=name)
+
   @property
   def name(self):
-    return "Memmap-Source";  
-  
-  
+    return "Memmap-Source"
+
   @property
   def array(self):
     """The underlying data array.
     
     Returns
     -------
-    array : array
+    array : array or np.ndarray
       The underlying data array of this source.
     """
-    return self._array;
-  
+    return self._array
+
   @array.setter
   def array(self, value):
     if not isinstance(value, np.memmap):
-      array = np.asarray(value);    
-      value = _memmap(location=self.location, array=array);
-    self._array = value;
-  
+      array = np.asarray(value)
+      value = _memmap(location=self.location, array=array)
+    self._array = value
+
   @property 
   def dtype(self):
     """The data type of the source.
@@ -74,13 +73,13 @@ class Source(npy.Source):
     dtype : dtype
       The data type of the source.
     """
-    return self._array.dtype;
-  
+    return self._array.dtype
+
   @dtype.setter
   def dtype(self, value):
     if np.dtype(value) != self.dtype:
-      self.array = np.asarray(self.array, dtype=value);
-   
+      self.array = np.asarray(self.array, dtype=value)
+
   @property 
   def order(self):
     """The order of how the data is stored in the source.
@@ -90,8 +89,8 @@ class Source(npy.Source):
     order : str
       Returns 'C' for C contigous and 'F' for fortran contigous, None otherwise.
     """
-    return npy.order(self.array);
-  
+    return npy.order(self.array)
+
   @order.setter
   def order(self, value):
     if value != self.order:
@@ -107,14 +106,14 @@ class Source(npy.Source):
     location : str or None
       Returns the location of the data source or None if this source lives in memory only.
     """
-    return self._array.filename;
-  
+    return self._array.filename
+
   @location.setter
   def location(self, value):  # FIXME: should only accept path
     if value != self.location:
-      memmap = _memmap(location=value, shape=self.shape, dtype=self.dtype, order=self.order);
-      self.array = memmap;
-  
+      memmap = _memmap(location=value, shape=self.shape, dtype=self.dtype, order=self.order)
+      self.array = memmap
+
   @property
   def offset(self):
     """The offset of the memory map in the file.
@@ -124,12 +123,11 @@ class Source(npy.Source):
     offset : int
       Offset of the memeory map in the file.
     """
-    return self._array.offset;
-  
-  
+    return self._array.offset
+
   def as_virtual(self):
-    return VirtualSource(source=self);
-  
+    return VirtualSource(source=self)
+
   def as_buffer(self):
     return self._array
 
@@ -139,24 +137,24 @@ class VirtualSource(src.VirtualSource):
   """Virtual memory map source."""
   
   def __init__(self, source = None, shape = None, dtype = None, order = None, name = None):
-    super(VirtualSource, self).__init__(source=source, shape=shape, dtype=dtype, order=order, name=name);
-  
+    super(VirtualSource, self).__init__(source=source, shape=shape, dtype=dtype, order=order, name=name)
+
   @property 
   def name(self):
-    return 'Virtual-Memmap-Source';
-  
+    return 'Virtual-Memmap-Source'
+
   def as_virtual(self):
-    return self;
-  
+    return self
+
   def as_real(self):
-    return Source(location=self.location, shape=self.shape, dtype=self.dtype, order=self.order, name=self.name);
+    return Source(location=self.location, shape=self.shape, dtype=self.dtype, order=self.order, name=self.name)
 
   def as_buffer(self):
-    return self.as_real().as_buffer();
+    return self.as_real().as_buffer()
 
   @property
   def array(self):
-    return self.as_real().array;
+    return self.as_real().array
 
 
 ###############################################################################
@@ -165,20 +163,20 @@ class VirtualSource(src.VirtualSource):
 
 def is_memmap(source):
   if isinstance(source, (np.memmap, Source)):
-    return True;
+    return True
   elif isinstance(source, str):
     if fu.is_file(source):
       try:
-        memmap = np.memmap(source);  #analysis:ignore
+        memmap = np.memmap(source)  #analysis:ignore
       except:
-        return False;
-    return True;
+        return False
+    return True
   else:
-    return False;
+    return False
 
 
 def read(source, slicing=None, mode=None, **kwargs):
-  """Write data to a memory map.
+  """Read data from a memory mapped source.
   
   Arguments
   ---------
@@ -197,30 +195,30 @@ def read(source, slicing=None, mode=None, **kwargs):
   
   if isinstance(source, Source):
     if slicing is None:
-      return source;
+      return source
     else:
-      return source.__getitem__(slicing);
-  
+      return source.__getitem__(slicing)
+
   elif isinstance(source, np.memmap):
     if slicing is None:
-      memmap = source;
+      memmap = source
     else:
-      memmap = source.__getitem__(slicing);
-    return Source(array = memmap);
-  
+      memmap = source.__getitem__(slicing)
+    return Source(array = memmap)
+
   elif isinstance(source, str):
     try:
-      memmap = _memmap(location=source, mode=mode);
+      memmap = _memmap(location=source, mode=mode)
     except:
-      raise ValueError('Cannot read memmap from location %r!' % source);
-    
+      raise ValueError('Cannot read memmap from location %r!' % source)
+
     if slicing is not None:
-      memmap = memmap.__getitem__(slicing);
-    
-    return Source(array = memmap);
-  
+      memmap = memmap.__getitem__(slicing)
+
+    return Source(array = memmap)
+
   else:
-    raise ValueError('Cannot read memmap from source %r!' % source);
+    raise ValueError('Cannot read memmap from source %r!' % source)
 
 
 def write(sink, data, slicing=None, **kwargs):
@@ -241,25 +239,25 @@ def write(sink, data, slicing=None, **kwargs):
     The sink.
   """
   if slc.is_trivial(slicing):
-    slicing = (slice(None),);
-  
+    slicing = (slice(None),)
+
   if isinstance(sink, (Source, np.memmap)):
-    sink.__setitem__(slicing, data.array);
-  
+    sink.__setitem__(slicing, data.array)
+
   elif isinstance(sink, str):
     if slicing == (slice(None),):
-       memmap = _memmap(location=sink, array=data.array);
+       memmap = _memmap(location=sink, array=data.array)
     else:
       try:
-        memmap = _memmap(location=sink, mode='r+');
+        memmap = _memmap(location=sink, mode='r+')
       except:
-        raise ValueError('Cannot write slice into non-existent memmap at location %r!' % sink);
-      memmap.__setitem__(slicing, data.array);
-  
+        raise ValueError('Cannot write slice into non-existent memmap at location %r!' % sink)
+      memmap.__setitem__(slicing, data.array)
+
   else:
-    raise ValueError('Cannot write memmap to sink %r!' % sink);
-    
-  return sink;
+    raise ValueError('Cannot write memmap to sink %r!' % sink)
+
+  return sink
 
 
 def create(location = None, shape = None, dtype = None, order = None, mode = None, array = None, as_source = True, **kwargs):
@@ -291,12 +289,12 @@ def create(location = None, shape = None, dtype = None, order = None, mode = Non
   ----
   By default memmaps are initialized as fortran contiguous if order is None.
   """
-  mode = 'w+' if mode is None else mode; 
-  memmap = _memmap(location=location, shape=shape, dtype=dtype, order=order, mode=mode, array=array);   #FIXME: dangerous call
+  mode = 'w+' if mode is None else mode
+  memmap = _memmap(location=location, shape=shape, dtype=dtype, order=order, mode=mode, array=array)  #FIXME: dangerous call
   if as_source:
-    return Source(memmap);
+    return Source(memmap)
   else:
-    return memmap;
+    return memmap
 
 
 ###############################################################################
@@ -332,74 +330,74 @@ def _memmap(location = None, shape = None, dtype = None, order = None, mode = No
   """  
   #print location, shape, dtype, order, mode, array
   if isinstance(location, np.memmap):
-    array = location;
-    location = None;
-  
+    array = location
+    location = None
+
   if array is None:
     if not isinstance(location, str):
-      raise ValueError('Cannot create memmap without a location!');
-    
+      raise ValueError('Cannot create memmap without a location!')
+
     if mode != 'w+' and fu.is_file(location):
-      array = np.lib.format.open_memmap(location);                                      
-  
+      array = np.lib.format.open_memmap(location)
+
   if array is None:
     if shape is None:
-      raise ValueError('Cannot create memmap without shape at location %r!' % location);
+      raise ValueError('Cannot create memmap without shape at location %r!' % location)
+
+    mode = 'w+' if mode is None else mode
+    fortran = order in ['F', None]  #default is 'F' for memmaps
     
-    mode = 'w+' if mode is None else mode;
-    fortran = order in ['F', None]; #default is 'F' for memmaps
-    
-    memmap = np.lib.format.open_memmap(location, mode=mode, shape=shape, dtype=dtype, fortran_order=fortran);
-  
+    memmap = np.lib.format.open_memmap(location, mode=mode, shape=shape, dtype=dtype, fortran_order=fortran)
+
   elif isinstance(array, np.memmap):
-    location = location if location is not None else array.filename;
-    location = fu.abspath(location);
-    
-    shape = shape if shape is not None else array.shape;
-    dtype = dtype if dtype is not None else array.dtype;
-    order = order if order is not None else npy.order(array);
-    
+    location = location if location is not None else array.filename
+    location = fu.abspath(location)
+
+    shape = shape if shape is not None else array.shape
+    dtype = dtype if dtype is not None else array.dtype
+    order = order if order is not None else npy.order(array)
+
     #if shape != array.shape:
     #  raise ValueError('Shape %r and array shape %r mismatch!' % (shape, array.shape));
     
     if shape != array.shape or dtype != array.dtype or order != npy.order(array) or location != fu.abspath(array.filename):
-      fortran = order in ['F', None]; #default is 'F' for memmaps
-      memmap = np.lib.format.open_memmap(location, mode='w+', shape=shape, dtype=dtype, fortran_order=fortran);
+      fortran = order in ['F', None]  #default is 'F' for memmaps
+      memmap = np.lib.format.open_memmap(location, mode='w+', shape=shape, dtype=dtype, fortran_order=fortran)
       if shape == array.shape:
-        memmap[:] = array; 
+        memmap[:] = array
     else:
-      memmap = array;
-    
+      memmap = array
+
     if mode is None:
-      mode = 'r+';
+      mode = 'r+'
     if mode != memmap.mode:
-      memmap = np.lib.format.open_memmap(location, mode = mode);
-  
+      memmap = np.lib.format.open_memmap(location, mode = mode)
+
   elif isinstance(array, np.ndarray):
     if not isinstance(location, str):
-      raise ValueError('Cannot create memmap without a location!');
-    
-    shape = shape if shape is not None else array.shape;
-    dtype = dtype if dtype is not None else array.dtype;
-    order = order if order is not None else npy.order(array);
-    
+      raise ValueError('Cannot create memmap without a location!')
+
+    shape = shape if shape is not None else array.shape
+    dtype = dtype if dtype is not None else array.dtype
+    order = order if order is not None else npy.order(array)
+
     if shape != array.shape:
-      raise ValueError('Shape %r and array shape %r mismatch!' % (shape, array.shape));
-    
-    fortran = order in ['F', None]; #default is 'F' for memmaps
-    memmap = np.lib.format.open_memmap(location, mode='w+', shape=shape, dtype=dtype, fortran_order=fortran);
-    memmap[:] = array;
-   
+      raise ValueError('Shape %r and array shape %r mismatch!' % (shape, array.shape))
+
+    fortran = order in ['F', None]  #default is 'F' for memmaps
+    memmap = np.lib.format.open_memmap(location, mode='w+', shape=shape, dtype=dtype, fortran_order=fortran)
+    memmap[:] = array
+
     if mode is None:
-      mode = 'r+';
+      mode = 'r+'
     if mode != memmap.mode:
-      memmap = np.lib.format.open_memmap(location, mode=mode);
+      memmap = np.lib.format.open_memmap(location, mode=mode)
 
   else:
-    raise ValueError('Array is not a valid!');
-  
-  return memmap;
-  
+    raise ValueError('Array is not a valid!')
+
+  return memmap
+
 
 def header_size(filename):
   """Return the offset of a header in a memmaped file.
@@ -415,13 +413,13 @@ def header_size(filename):
     The offest due to the header.
   """
   with open(filename, 'rb') as f:
-    major, minor = np.lib.format.read_magic(f);
-    shape, fortran, dtype = np.lib.format.read_array_header_1_0(f);
+    major, minor = np.lib.format.read_magic(f)
+    shape, fortran, dtype = np.lib.format.read_array_header_1_0(f)
     offset = f.tell()
   
-  return offset;
+  return offset
 
-     
+
 ###############################################################################
 ### Tests
 ###############################################################################
@@ -433,15 +431,15 @@ def _test():
   m = mmp.Source(location = 'test.npy', shape = 4)
   print(m)
 
-  m[:] = 5;
+  m[:] = 5
   print(m)
   
   import ClearMap.IO.Slice as slc
   
-  s = slc.Slice(source = m, slicing = slice(1,3));
+  s = slc.Slice(source = m, slicing = slice(1,3))
   print(s)
 
-  s[:] = 3;
+  s[:] = 3
   print(s)
   print(m)  
   
