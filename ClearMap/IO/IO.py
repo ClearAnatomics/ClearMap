@@ -37,7 +37,7 @@ import ClearMap.IO.MMP as mmp
 import ClearMap.IO.SMA as sma
 import ClearMap.IO.MHD as mhd
 try:
-import ClearMap.IO.GT as gt
+  import ClearMap.IO.GT as gt
   gt_loaded = True
 except ImportError:
   gt_loaded = False
