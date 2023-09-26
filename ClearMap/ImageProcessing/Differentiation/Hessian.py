@@ -17,15 +17,14 @@ import scipy.ndimage as ndi
 
 import ClearMap.IO.IO as io
 
-
-import pyximport;
+import pyximport
 pyximport.install(setup_args={"include_dirs":np.get_include()}, reload_support=True)
 
 from . import HessianCode as code
 
 #import ClearMap.IO.IO as io
 
-__all__ = ['hessian', 'eigenvalues', 'lambda123', 'tubeness'];
+__all__ = ['hessian', 'hessian_eigenvalues', 'hessian_eigensystem', 'lambda123', 'tubeness'];
 
 
 ###############################################################################
@@ -47,11 +46,11 @@ def hessian(source, sink = None, sigma = None):
   hessian : array:
       5d array with the hessian matrix in the first two dimensions.
   """    
-  return _apply_code(code.hessian, source, sink, sink_shape_per_pixel = (2,2), parameter = None, sigma = sigma);
+  return _apply_code(code.hessian, source, sink, sink_shape_per_pixel = (3,3), parameter = None, sigma = sigma);
   
 
-def eigenvalues(source, sink = None, sigma = None):
-  """Hessiean eigenvalues of source data
+def hessian_eigenvalues(source, sink = None, sigma = None):
+  """Hessian eigenvalues of source data
 
   Arguments
   ---------
@@ -130,6 +129,67 @@ def lambda123(source, sink = None, gamma12 = 1.0, gamma23 = 1.0, alpha = 0.25, s
     return _apply_code(code.lambda123_threshold, source, sink, parameter=parameter, sigma=sigma, sink_dtype=bool);          
 
 
+def hessian_eigensystem(source, sink = None, sigma = None, eigenvectors = 3):
+  """Hessian eigensystem of source data
+
+  Arguments
+  ---------
+  source : array
+    Input array.
+  sink : array
+    Output, if None, a new array is allocated.
+  sigma : float or None
+    If not None, a Gaussian filter with std sigma is applied initialliy.
+
+  Returns
+  -------
+  sink : array
+    The three eigenvalues and up to 3 eigenvectors of the Hessian matrix of the source.
+  """
+  parameter = np.array([eigenvectors], dtype=float);
+  sink_shape_per_pixel = (3 + eigenvectors * 3,)
+  return _apply_code(code.eigensystem, source, sink, sink_shape_per_pixel=sink_shape_per_pixel, parameter=parameter, sigma = sigma).reshape(source.shape + (-1, 3));
+
+
+#Note: for testing only
+def hessian_test(source, sink = None, sigma = None):
+  """Returns the hessian matrix at each location calculatd via finite differences.
+  
+  Arguments
+  ---------
+  source : array
+    Input array.
+  sink : array
+    Output, if None, a new array is allocated.  
+
+  Returns
+  -------
+  hessian : array:
+      5d array with the hessian matrix in the first two dimensions.
+  """
+  return _apply_code(code.eigensystem_test, source, sink, sink_shape_per_pixel = (3 + 6,), parameter = None, sigma = sigma);
+
+# def eigenvalues_test(source, sink = None, sigma = None):
+#   """Hessian eigenvalues of source data
+
+#   Arguments
+#   ---------
+#   source : array
+#     Input array.
+#   sink : array
+#     Output, if None, a new array is allocated.
+#   sigma : float or None
+#     If not None, a Gaussian filter with std sigma is applied initialliy.
+  
+#   Returns
+#   -------
+#   sink : array
+#     The three eigenvalues along the first axis for each source.
+#   """
+#   return _apply_code(code.eigenvalues_test, source, sink, sink_shape_per_pixel = (3,), parameter = None, sigma = sigma);
+
+
+
 ###############################################################################
 ### Helpers
 ###############################################################################
@@ -188,7 +248,7 @@ def _apply_code(function, source, sink, sink_dtype = None, sink_shape_per_pixel 
 
 def _test():
   import numpy as np
-  import ClearMap.Test.Files as tst
+  import ClearMap.Tests.Files as tst
   import ClearMap.Visualization.Plot3d as p3d
   
   import ClearMap.ImageProcessing.Differentiation as dif
@@ -196,17 +256,78 @@ def _test():
   from importlib import reload
   reload(dif);
   
-  source = tst.init('v')[:20, :20, :20]; 
+  # test hessian 
+  import scipy.ndimage as ndi   
+  sigma = 2;
+  data = np.random.rand(20,20,1);
+  d1 = ndi.gaussian_filter(data[:,:,0], sigma=sigma, order=(1,1));
   
-  sink = dif.eigenvalues(source, sigma = 1.0);
-  p3d.plot([source] + list(sink.transpose([3,0,1,2])));
+  import ClearMap.ImageProcessing.Differentiation.Hessian as hes
+  d2 = hes.hessian(data, sigma=sigma)
+
+  clim = (np.min([d1, d2[:,:,0,0,1]]), np.max([d1, d2[:,:,0,0,1]]))
+
+  import matplotlib.pyplot as plt
+  plt.figure(1); plt.clf();
+  plt.subplot(1,3,1)
+  plt.imshow(d1, clim=clim)
+  plt.subplot(1,3,2)
+  plt.imshow(d2[:,:,0,0,1], clim=clim)
+  plt.subplot(1,3,3);
+  plt.imshow(d1 - d2[:,:,0,0,1], clim=clim)
+  
+  plt.plot(d1[:])
+  plt.plot(d2[:,0,0,0,0])
+      
+      
+  # test hessian eigenvalues
+  source = np.array(tst.source('v')[:7, :7, :7], dtype=float, order = 'F')
+  hessian = dif.hessian(source, sigma=None)
+  
+  # eigenvalues
+  evs_np = np.sort(np.linalg.eigvals(hessian), axis=-1)[...,::-1]
+  evs    = dif.hessian_eigenvalues(source, sigma=None)
+  print(np.allclose(evs, evs_np))
+
+  # eigenvectors
+  es = dif.hessian_eigensystem(source, sigma=None)
+  evs = es[...,0,:];
+  evecs = es[...,1:,:]
+  
+  axis = -1
+  index = list(np.ix_(*[np.arange(i) for i in evs.shape]))
+  index[axis] = evs.argsort(axis)
+  index = tuple(index)
+  
+  evs = evs[index];
+  evecs = evecs[index]
+  
+  
+  evs_np, evecs_np = np.linalg.eigh(hessian);  
+  evecs_np = evecs_np.transpose((0,1,2,4,3)) # numpy gives eigenvectros in the form evec[:,index]
+
+  axis = -1
+  index_np = list(np.ix_(*[np.arange(i) for i in evs_np.shape]))
+  index_np[axis] = evs_np.argsort(axis)
+  index_np = tuple(index_np)
+
+  evs_np = evs_np[index_np]
+  evecs_np = evecs_np[index_np]
+
+  print(np.allclose(evs, evs_np))
+  print(np.allclose(np.abs(evecs / evecs_np), 1))
+  
+  #wrong = np.array(np.where(np.logical_not(np.isclose(np.abs(evecs / evecs_np), 1)))).T
+  #wrong = wrong[::9][:,:3]
+
+
     
   sink = np.zeros(source.shape + (3,), order = 'C');
-  dif.eigenvalues(source, sink, sigma = 1.0);
+  dif.hessian_eigenvalues(source, sink, sigma = 1.0);
   p3d.plot([source] + list(sink.transpose([3,0,1,2])));
 
   sink = np.zeros(source.shape + (3,), order = 'F');
-  dif.eigenvalues(source, sink, sigma = 1.0);
+  dif.hessian_eigenvalues(source, sink, sigma = 1.0);
   p3d.plot([source] + list(sink.transpose([3,0,1,2])));
   
   sink = np.zeros(source.shape);
@@ -216,13 +337,18 @@ def _test():
   sink = dif.lambda123(source, sigma = 1.0, threshold = 0.2);
   p3d.plot([source, sink]);
   
-  #import ClearMap.ImageProcessing.Differentiation.Gradient as grd
-  #res2 = grd.eigenvalues(data, sigma = 1.0);
 
-  #import numpy as np
-  #np.max(np.abs(res[[2,1,0]] - res2))
+  #test = dif.hessian_test(source, sigma=None)
   
-  #print res[:,10,10,10], res2[:,10,10,10]
+  # Hessian:
+  #A B C
+  #B D E
+  #C E F
+  #hessian_test = np.array([[test[...,3], test[...,4], test[...,5]],[test[...,4], test[...,6], test[...,7]], [test[...,5], test[...,7], test[...,8]]])
+  #hessian_test = Hessian.transpose((2,3,4,0,1))
+  
+  #np.allclose(hessian_test, hessian)
+  
 
 
 
