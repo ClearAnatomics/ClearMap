@@ -35,7 +35,8 @@ import ClearMap.Utils.TagExpression as te
 from ClearMap.Utils.utilities import CancelableProcessPoolExecutor
 
 
-from ClearMap.Alignment.Stitching.sitching_layout_graphs import cluster_from_graph
+from ClearMap.Alignment.Stitching.layout_graph_utils import cluster_components
+
 
 ###############################################################################
 ###  Layout
@@ -1417,8 +1418,6 @@ def shifts_from_tracing(errors, status, cutoff=None, new_trajectory_cost=None, m
     trajectories = trk.track_positions(positions, new_trajectory_cost=new_trajectory_cost, cutoff=cutoff)
     
     if verbose.has_flag('figure'):
-      import matplotlib as mpl   #analysis:ignore
-      from mpl_toolkits.mplot3d import Axes3D #analysis:ignore
       import matplotlib.pyplot as plt
       fig = plt.figure(200); plt.clf();
       fig.gca(projection='3d') 
@@ -1569,9 +1568,6 @@ def inspect_align_layout(alignment, verbose):
       opt_paths.append(np.array([np.array(positions[p[0]][p[1]] +(z_positions[p[0]],)) for p in trajectory]));
   
   return error, minima, paths, opt_paths
-
-
-
 
 
 ###############################################################################
@@ -1816,31 +1812,6 @@ def _place_slice_component(positions, alignment_pairs, displacements, fixed = No
   
   #update positions
   positions[node_to_index] = positions_optimized;
-
-
-
-def _cluster_components(components):
-  """Find the connected components of the cluster components"""
-  c_lens = [len(c) for c in components];
-  c_ids = np.cumsum(c_lens);
-  c_ids = np.hstack([0, c_ids]);
-  n_components = np.sum(c_lens);
-  
-  def is_to_c(s, i):
-    return c_ids[s] + i
-    
-  def c_to_si(c):
-    s = np.searchsorted(c_ids, c, side='right')-1;
-    i = c - c_ids[s];
-    return s,i
-
-  connected_components, n_components = cluster_from_graph(components, n_components, is_to_c)
-  components_full = [np.where(connected_components==i)[0] for i in range(n_components)];
-  
-  #remove isolated nodes
-  components_full = [c for c in components_full if len(c) > 1] 
-                     
-  return components_full, is_to_c, c_to_si
 
 
 def _optimize_slice_positions(positions, components, processes = None, workspace=None, verbose = False):
@@ -2589,8 +2560,6 @@ def _test():
                    processes = '!serial', verbose = True)
 
   #plot the positions of the stacks
-  import matplotlib as mpl   #analysis:ignore
-  from mpl_toolkits.mplot3d import Axes3D #analysis:ignore
   import matplotlib.pyplot as plt
   fig = plt.figure(200); plt.clf();
   fig.gca(projection='3d') 
@@ -2618,10 +2587,10 @@ def _test():
   reload(stw)
   l = stw.WobblyLayout([data1, data2], overlaps = 20); l.sources[1].position = (100,0,sh);
   
-  stw.align_layout(l, max_shifts = 20, axis_range = (None, None, 1),
-                   stack_validation_params= None,
-                   prepare = 'normalization',
-                   slice_validation_params= dict(method='foreground', valid_range = (1, None), size = None),
+  stw.align_layout(l, max_shifts=20, axis_range=(None, None, 1),
+                   stack_validation_params=None,
+                   prepare='normalization',
+                   slice_validation_params=dict(method='foreground', valid_range=(1, None), size=None),
                    find_shifts = dict(method='tracing', cutoff=np.sqrt(2 * 3**2), debug = False),
                    verbose = True, processes = 'serial')
   stw.place_layout(l, method = '!optimization',  lower_to_origin=True, min_quality=-np.inf, 

@@ -45,8 +45,8 @@ import ClearMap.Utils.Timer as tmr
 from ClearMap.Utils.Formatting import ensure
 
 
-from ClearMap.Alignment.Stitching.sitching_layout_graphs import (get_connected_components, connect_sources,
-                                                                 get_positions_from_tree, get_color_ids)
+from ClearMap.Alignment.Stitching.layout_graph_utils import (get_connected_components, connect_sources,
+                                                             get_positions_from_tree, get_color_ids)
 
 
 ###############################################################################

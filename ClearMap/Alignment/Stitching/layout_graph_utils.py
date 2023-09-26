@@ -9,8 +9,14 @@ except ImportError:
     graph_lib = 'igraph'
 
 
+def get_graph(n_vertices, directed=False):
+    g = gt.Graph(directed=directed)
+    g.add_vertex(n_vertices)
+    return g
+
+
 def graph_to_connected_components(g):
-    if graph_lib == 'igraph':
+    if graph_lib == 'igraph':   # FIXME: check that swapped
         connected_components, hist = gtt.label_components(g)
         connected_components = np.array(connected_components.a)
         n_components = len(hist)
@@ -18,12 +24,6 @@ def graph_to_connected_components(g):
         connected_components = g.clusters()
         _, n_components = np.unique(connected_components, return_counts=True)
     return connected_components, n_components
-
-
-def get_graph(n_vertices, directed=False):
-    g = gt.Graph(directed=directed)
-    g.add_vertex(n_vertices)
-    return g
 
 
 def get_connected_components(alignments, n_sources, source_to_index=None):
@@ -38,22 +38,10 @@ def get_connected_components(alignments, n_sources, source_to_index=None):
     return graph_to_connected_components(g)
 
 
-def cluster_from_graph(components, n_components, is_to_c):  # REFACTOR: rename
-    g = get_graph(n_components)
-    for s in range(1, len(components)):
-        for i, ci in enumerate(components[s - 1]):
-            for j, cj in enumerate(components[s]):
-                for c in ci:
-                    if c in cj:
-                        g.add_edge(is_to_c(s - 1, i), is_to_c(s, j))
-                        break
-    return graph_to_connected_components(g)
-    
-    
 def connect_sources(alignments, n_sources, source_to_index):
     """construct minimal tree to connect sources"""
     graph = get_graph(n_sources, directed=True)
-    if graph_lib == '':
+    if graph_lib == '':   # FIXME: check name
         pos_tree = graph.new_edge_property('vector<int>')  # FIXME: missing
     else:
         pos_tree = {}  # An object indexable by edge should suffice for our purpose
@@ -108,3 +96,36 @@ def get_color_ids(sources, n_sources, color_ids):
             g.add_edges(edges)
             color_ids = np.array(g.vertex_coloring_greedy())
     return color_ids
+
+
+def cluster_components(components):
+    """Find the connected components of the cluster components"""
+    c_lens = [len(c) for c in components]
+    c_ids = np.cumsum(c_lens)
+    c_ids = np.hstack([0, c_ids])
+    n_components = np.sum(c_lens)
+
+    def is_to_c(s, i):
+       return c_ids[s] + i
+
+    def c_to_si(c):
+        s = np.searchsorted(c_ids, c, side='right') - 1
+        i = c - c_ids[s]
+        return s,i
+
+    g = get_graph(n_components)
+    for s in range(1, len(components)):
+        for i, ci in enumerate(components[s - 1]):
+            for j, cj in enumerate(components[s]):
+                for c in ci:
+                    if c in cj:
+                        g.add_edge(is_to_c(s - 1, i), is_to_c(s, j))
+                        break
+    connected_components, n_components = graph_to_connected_components(g)
+
+    components_full = [np.where(connected_components == i)[0] for i in range(n_components)]
+
+    # remove isolated nodes
+    components_full = [c for c in components_full if len(c) > 1]
+
+    return components_full, is_to_c, c_to_si
