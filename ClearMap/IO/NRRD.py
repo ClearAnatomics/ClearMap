@@ -28,36 +28,35 @@ import ClearMap.IO.Source as src
 
 
 ###############################################################################
-### Source classe
+### Source class
 ###############################################################################
 
 class Source(src.Source):
   """Nrrd array source."""
   
   def __init__(self, location):
-    """Nrrd source class construtor.
+    """Nrrd source class constructor.
     
     Arguments
     ---------
     location : str
       The file nameof the nrrd source.
     """
-    self._location = location;
+    self._location = location
 
   @property
   def name(self):
-    return "Nrrd-Source";  
-  
+    return "Nrrd-Source"
+
   @property
   def location(self):
-    return self._location;
-    
+    return self._location
+
   @location.setter
   def location(self, value):
     if value != self.location:
-      self._location = value;
+      self._location = value
 
-  
   @property
   def array(self):
     """The underlying data array.
@@ -67,14 +66,13 @@ class Source(src.Source):
     array : array
       The underlying data array of this source.
     """
-    return _array(self.location);
-  
+    return _array(self.location)
+
   @array.setter
   def array(self, value):
-    _write_data(self.location, value);
+    _write_data(self.location, value)
 
-  
-  @property 
+  @property
   def shape(self):
     """The shape of the source.
     
@@ -83,14 +81,13 @@ class Source(src.Source):
     shape : tuple
       The shape of the source.
     """
-    return _shape(self.location);
-  
+    return _shape(self.location)
+
   @shape.setter
   def shape(self, value):
     #TODO: fix
-    raise NotImplementedError('Cannot set shape of nrrd file');
-    
-  
+    raise NotImplementedError('Cannot set shape of nrrd file')
+
   @property 
   def dtype(self):
     """The data type of the source.
@@ -105,9 +102,8 @@ class Source(src.Source):
   @dtype.setter
   def dtype(self, value):
     #TODO: fix
-    raise NotImplementedError('Cannot set dtype of nrrd file');
-  
-    
+    raise NotImplementedError('Cannot set dtype of nrrd file')
+
   @property 
   def order(self):
     """The order of how the data is stored in the source.
@@ -117,14 +113,13 @@ class Source(src.Source):
     order : str
       Returns 'C' for C contigous and 'F' for fortran contigous, None otherwise.
     """
-    return _order(self.location);
-  
+    return _order(self.location)
+
   @order.setter
   def order(self, value):
     #TODO: fix
-    raise NotImplementedError('Cannot set order of nrrd file');
-    
-  
+    raise NotImplementedError('Cannot set order of nrrd file')
+
   @property
   def element_strides(self):
     """The strides of the array elements.
@@ -138,7 +133,7 @@ class Source(src.Source):
     ----
     The strides of the elements module itemsize instead of bytes.
     """
-    memmap = _memmap(self.location);
+    memmap = _memmap(self.location)
     return  tuple(s // memmap.itemsize for s in memmap.strides)
   
   
@@ -151,19 +146,17 @@ class Source(src.Source):
     offset : int
       Offset of the memeory map in the file.
     """
-    return _offset(self.location);
-  
-  
+    return _offset(self.location)
+
   ### Data
   def __getitem__(self, *args):
-    memmap = _memmap(self.location);
-    return memmap.__getitem__(*args);
+    memmap = _memmap(self.location)
+    return memmap.__getitem__(*args)
 
   def __setitem__(self, *args):
-    memmap = _memmap(self.location);
-    memmap.__setitem__(*args);
-  
-  
+    memmap = _memmap(self.location)
+    memmap.__setitem__(*args)
+
   def metadata(self, info = None):
     """Returns metadata from this nrrd file.
   
@@ -177,86 +170,83 @@ class Source(src.Source):
     metadata : dict
       Dictionary with the meta data.
     """
-    return _read_header(self.location);
+    return _read_header(self.location)
 
-  
   def as_memmap(self):
-     return _memmap(self.location);
-  
-  
+     return _memmap(self.location)
+
   def as_virtual(self):
-     return VirtualSource(source = self);
-     
+     return VirtualSource(source = self)
+
   def as_real(self):
-    return self;
-  
+    return self
+
   def as_buffer(self):
-    return self.as_memmap();
-  
-  
+    return self.as_memmap()
+
   ### Formatting
   def __str__(self):
     try:
-      name = self.name;
-      name = '%s' % name if name is not None else '';
+      name = self.name
+      name = '%s' % name if name is not None else ''
     except:
-      name ='';
-    
-    try:
-      shape = self.shape
-      shape ='%r' % ((shape,)) if shape is not None else '';
-    except:
-      shape = '';
+      name =''
 
     try:
-      dtype = self.dtype;
-      dtype = '[%s]' % dtype if dtype is not None else '';
+      shape = self.shape
+      shape ='%r' % ((shape,)) if shape is not None else ''
     except:
-      dtype = '';
-            
+      shape = ''
+
     try:
-      order = self.order;
-      order = '|%s|' % order if order is not None else '';
+      dtype = self.dtype
+      dtype = '[%s]' % dtype if dtype is not None else ''
     except:
-      order = '';
-    
-#    try:
+      dtype = ''
+
+    try:
+      order = self.order
+      order = '|%s|' % order if order is not None else ''
+    except:
+      order = ''
+
+    #    try:
 #      memory = self.memory;
 #      memory = '<%s>' % memory if memory is not None else '';
 #    except:
 #      memory = '';  
     
     try:
-      location = self.location;
-      location = '%s' % location if location is not None else '';
+      location = self.location
+      location = '%s' % location if location is not None else ''
       if len(location) > 100:
         location = location[:50] + '...' + location[-50:]
       if len(location) > 0:
-        location = '{%s}' % location;
+        location = '{%s}' % location
     except:
-      location = '';    
-    
+      location = ''
+
     return name + shape + dtype + order + location
 
 
 class VirtualSource(src.VirtualSource):
   def __init__(self, source = None, shape = None, dtype = None, order = None, location = None, name = None):
-    super(VirtualSource, self).__init__(source=source, shape=shape, dtype=dtype, order=order, location=location, name=name);
+    super(VirtualSource, self).__init__(source=source, shape=shape, dtype=dtype, order=order, location=location, name=name)
     if isinstance(source, Source):
-      self.location = source.location;
-  
+      self.location = source.location
+
   @property 
   def name(self):
-    return 'Virtual-Nrrd-Source';
-  
+    return 'Virtual-Nrrd-Source'
+
   def as_virtual(self):
-    return self;
-  
+    return self
+
   def as_real(self):
-    return Source(location=self.location);
-  
+    return Source(location=self.location)
+
   def as_buffer(self):
-    return self.as_real().as_buffer();
+    return self.as_real().as_buffer()
 
 
 ###############################################################################
@@ -266,14 +256,14 @@ class VirtualSource(src.VirtualSource):
 def is_nrrd(source):
   """Checks if this source is a NRRD source"""
   if isinstance(source, Source):
-    return True;
+    return True
   if isinstance(source, str) and len(source) >= 4 and source[-4:] == 'nrrd':
     try:
-      Source(source);
+      Source(source)
     except:
-      return False;
-    return True;
-  return False;
+      return False
+    return True
+  return False
 
 
 def read(source, slicing = None, **kwargs):
@@ -292,25 +282,25 @@ def read(source, slicing = None, **kwargs):
     The image data in the tif file as a buffer.
   """ 
   if not isinstance(source, Source):
-    source = Source(source);
+    source = Source(source)
   if slicing is None:
     return source.array
   else:
-    return source.__getitem__(slicing);
-  
+    return source.__getitem__(slicing)
+
 
 def write(sink, data, slicing = None, **kwargs):
   if isinstance(sink, Source):
-    sink = sink.location;
+    sink = sink.location
   if not isinstance(sink, str):
-    raise ValueError('Invalid sink specification %r' % sink);
-  
+    raise ValueError('Invalid sink specification %r' % sink)
+
   if slicing is not None:
-    memmap = _memmap(sink, mode='r+');
-    memmap[slicing]= data; 
-    return sink;
+    memmap = _memmap(sink, mode='r+')
+    memmap[slicing]= data
+    return sink
   else:
-    return _write(sink, data);
+    return _write(sink, data)
 
 
 def create(location = None, shape = None, dtype = None, order = None, mode = None, array = None, as_source = True, **kwargs):
@@ -535,10 +525,10 @@ def _read_header(filename):
     """
     
     if isinstance(filename, str):
-        nrrdfile = open(filename,'rb');
+        nrrdfile = open(filename,'rb')
     else:
-        nrrdfile = filename;
-    
+        nrrdfile = filename
+
     # Collect number of bytes in the file header (for seeking below)
     headerSize = 0
     it = iter(nrrdfile)
@@ -555,7 +545,7 @@ def _read_header(filename):
             continue
         # Single blank line separates the header from the data
         if line == '':
-            break;
+            break
         # Handle the <key>:=<value> lines first since <value> may contain a
         # ': ' which messes up the <field>: <desc> parsing
         key_value = line.split(':=', 1)
@@ -601,9 +591,9 @@ def _array(filename):
     fields = _read_header(filehandle)
     
     dtype = _dtype_from_header(fields)
-    shape = fields['sizes'];
-    order = 'F';
-    
+    shape = fields['sizes']
+    order = 'F'
+
     #offset
     numPixels=np.prod(shape)
     datafilehandle = filehandle
@@ -659,8 +649,8 @@ def _dtype(filename):
     
     # Determine the data type from the fields
     dtype = fields['sizes'](fields)
-    return dtype;
-  
+    return dtype
+
 
 def _shape(filename):
     """Determine shape from nrrd file."""
@@ -668,12 +658,12 @@ def _shape(filename):
     with open(filename,'rb') as filehandle:
        fields = _read_header(filehandle)
     
-    return tuple(fields['sizes']);
+    return tuple(fields['sizes'])
 
 
 def _order(filename):
   """Determine shape from nrrd file."""
-  return 'F';
+  return 'F'
 
 
 def _offset(filename):
@@ -705,7 +695,7 @@ def _offset(filename):
             datafilehandle.readline()
           datafilehandle.read(byteskip)
     
-    return datafilehandle.tell();
+    return datafilehandle.tell()
 
 
 def _memmap(filename, mode = None):
@@ -714,16 +704,16 @@ def _memmap(filename, mode = None):
     fields = _read_header(filehandle)
     
     if fields['encoding'] != 'raw':
-      raise NrrdError('Cannot memmap to compressed file %r!' % fields['encoding']);
-    
+      raise NrrdError('Cannot memmap to compressed file %r!' % fields['encoding'])
+
     dtype = _dtype_from_header(fields)
-    shape = tuple(fields['sizes']);
-    order = 'F';
-    
+    shape = tuple(fields['sizes'])
+    order = 'F'
+
     #datafile
-    datafilename = filename;
-    datafilehandle = filehandle;
-    datafile = fields.get("datafile", fields.get("data file", None));
+    datafilename = filename
+    datafilehandle = filehandle
+    datafile = fields.get("datafile", fields.get("data file", None))
     if datafile is not None:
         if os.path.isabs(datafile):
             datafilename = datafile
@@ -742,11 +732,11 @@ def _memmap(filename, mode = None):
       for _ in range(lineskip):
         datafilehandle.readline()
       datafilehandle.read(byteskip)
-    offset = datafilehandle.tell();
-    
+    offset = datafilehandle.tell()
+
     if mode is None:
-      mode = 'r+';
-    
+      mode = 'r+'
+
     #print datafilename, dtype,  mode, shape, order, offset
     return np.memmap(datafilename, dtype=dtype, mode=mode, offset=offset, shape=shape, order=order)
 
@@ -810,22 +800,22 @@ _NRRD_FIELD_FORMATTERS = {
 
 def _write_data(data, filehandle, options):
     # Now write data directly
-    #rawdata = data.transpose([2,0,1]).tostring(order = 'C')
-    #TODO: this is only working for numpy arrays!
-    rawdata = data.tostring(order='F');
-    
-    if options['encoding'] == 'raw':
-        filehandle.write(rawdata)
-    elif options['encoding'] == 'gzip':
-        gzfileobj = gzip.GzipFile(fileobj = filehandle)
-        gzfileobj.write(rawdata)
-        gzfileobj.close()
-    elif options['encoding'] == 'bz2':
-        bz2fileobj = bz2.BZ2File(fileobj = filehandle)
-        bz2fileobj.write(rawdata)
-        bz2fileobj.close()
+    # rawdata = data.transpose([2,0,1]).tostring(order = 'C')
+    # FIXME: this is only working for numpy arrays!
+
+    compressors = {
+        'gzip': gzip,
+        'bz2': bz2
+    }
+    encoding = options['encoding']
+
+    if encoding == 'raw':
+        data.tofile(filehandle)
+    elif encoding in compressors.keys():
+        with compressors[encoding].open(filename=filehandle, mode='wb') as compressor_file:
+            compressor_file.write(data.tostring(order='F'))
     else:
-        raise NrrdError('Unsupported encoding: "%s"' % options['encoding'])
+        raise NrrdError(f'Unsupported encoding: {encoding}')
 
 
 def _write(filename, data, options={}, separate_header=False):
@@ -843,8 +833,8 @@ def _write(filename, data, options={}, separate_header=False):
     To sample date use `options['spacings'] = [s1, s2, s3]` for
     3d data with sampling deltas `s1`, `s2`, and `s3` in each dimension.
     """
-    dtype = data.dtype;
-    
+    dtype = data.dtype
+
     options['type'] = _TYPEMAP_NUMPY2NRRD[dtype.str[1:]]
     if dtype.itemsize > 1:
         options['endian'] = _NUMPY2NRRD_ENDIAN_MAP[dtype.str[:1]]
@@ -853,8 +843,8 @@ def _write(filename, data, options={}, separate_header=False):
     if 'space' in options.keys() and 'space dimension' in options.keys():
         del options['space dimension']
     options['dimension'] = data.ndim
-    dsize = list(data.shape);
-    options['sizes'] = dsize;
+    dsize = list(data.shape)
+    options['sizes'] = dsize
 
     # The default encoding is 'raw'
     if 'encoding' not in options:
@@ -874,13 +864,13 @@ def _write(filename, data, options={}, separate_header=False):
         else:
             datafilename = options['data file']
     elif filename[-5:] == '.nrrd' and separate_header:
-        separate_header = True;
+        separate_header = True
         datafilename = filename
         filename = filename[:-4] + str('nhdr')
     else:
         # Write header & data as one file
         datafilename = filename
-        separate_header = False;
+        separate_header = False
 
     with open(filename,'wb') as filehandle:
         filehandle.write(b'NRRD0005\n')
@@ -888,8 +878,8 @@ def _write(filename, data, options={}, separate_header=False):
         filehandle.write(b'# on ' +
                          datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S').encode('ascii') +
                          b'(GMT).\n')
-        filehandle.write(b'# Complete NRRD file format specification at:\n');
-        filehandle.write(b'# http://teem.sourceforge.net/nrrd/format.html\n');
+        filehandle.write(b'# Complete NRRD file format specification at:\n')
+        filehandle.write(b'# http://teem.sourceforge.net/nrrd/format.html\n')
 
         # Write the fields in order, this ignores fields not in _NRRD_FIELD_ORDER
         for field in _NRRD_FIELD_ORDER:
@@ -915,11 +905,9 @@ def _write(filename, data, options={}, separate_header=False):
         with open(datafilename, 'wb') as datafilehandle:
             _write(data, datafilehandle, options)
     
-    return filename;
+    return filename
 
 
-
- 
 ###############################################################################
 ### Tests
 ###############################################################################
@@ -929,13 +917,13 @@ def _test():
     import numpy as np
     import ClearMap.IO.NRRD as NRRD
     
-    data = np.random.rand(20,50,10);
-    data[5:15, 20:45, 2:9] = 0;
- 
-    filename = 'test.nrrd';
-    
-    NRRD.write(filename, data);
-    
+    data = np.random.rand(20,50,10)
+    data[5:15, 20:45, 2:9] = 0
+
+    filename = 'test.nrrd'
+
+    NRRD.write(filename, data)
+
     check = NRRD.read(filename)
     
     print(np.all(data==check))
