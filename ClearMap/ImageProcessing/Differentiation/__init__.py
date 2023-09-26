@@ -14,7 +14,7 @@ __download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
                            
 from .Gradient import gradient, gradient_abs, gradient_square
 
-from .Hessian import hessian, eigenvalues, tubeness, lambda123
+from .Hessian import hessian, hessian_eigenvalues, hessian_eigensystem, tubeness, lambda123
 
 
-__all__ = ['gradient', 'gradient_abs', 'gradient_square', 'hessian', 'eigenvalues', 'tubeness', 'lambda123']
+__all__ = ['gradient', 'gradient_abs', 'gradient_square', 'hessian', 'hessian_eigenvalues', 'hessian_eigensystem', 'tubeness', 'lambda123']
