@@ -243,7 +243,7 @@ class DataViewer(QWidget):
         for s in self.sources:
             if s.ndim > 4:
                 raise RuntimeError(f'Source has {s.ndim} > 4 dimensions: {s}!')
-            if s.shape != self.source_shape:
+            if s.shape[:2] != self.source_shape[:2]:
                 raise RuntimeError(f'Sources shape {self.source_shape} vs {s.shape} in source {s}!')
 
         # slicing
