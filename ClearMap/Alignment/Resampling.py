@@ -6,1058 +6,1608 @@ Resampling
 This module provides methods to resample and reorient data. 
 
 Resampling the data is usually necessary as the first step to match the 
-resolution and orientation of the reference object. 
+resolution and orientation of the reference object.
 """
-__author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
-__license__   = 'GPLv3 - GNU General Pulic License v3 (see LICENSE)'
-__copyright__ = 'Copyright © 2020 by Christoph Kirst'
-__webpage__   = 'http://idisco.info'
-__download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
+__author__ = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
+__license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE)'
+__copyright__ = 'Copyright © 2023 by Christoph Kirst'
+__webpage__ = 'https://idisco.info'
+__download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
 
 
 import tempfile
 import itertools
 import functools as ft
-import concurrent.futures
 from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
 
 import cv2
-import psutil
 
 import ClearMap.IO.IO as io
 import ClearMap.IO.FileList as fl
-import ClearMap.IO.Slice as slc
 
 import ClearMap.ParallelProcessing.ProcessWriter as pw
-
 import ClearMap.ParallelProcessing.ParallelTraceback as ptb
 
 import ClearMap.Utils.Timer as tmr
 from ClearMap.Utils.utilities import CancelableProcessPoolExecutor
 
+from .Transformations.Transformation import TransformationBase
 ########################################################################################
-### Conversion
+# Orientation
 ########################################################################################
 
 
 def format_orientation(orientation, inverse=False, default=None):
-  """Convert orientation to standard format.
-  
-  Arguments
-  ---------
-  orientation : tuple or str
-    The orientation specification.
-  inverse : bool
-     If True, invert orientation.
-  default : object
-     The default value if orientation is None;
-      
-  Returns
-  -------
-  orientation : tuple of ints
-    The orientation sequence.
-  
-  See Also
-  --------
-  `Orientation`_
-  """
-  if orientation is None:
-      return default
-      
-  # fix named representations
-  if orientation == 'left':
-      #orientation = (1,2,3);
-      orientation = None
-  elif orientation == 'right':
-      orientation = (-1, 2, 3)
-      
-  if orientation is not None and len(orientation) != 3:
-    raise ValueError("orientation should be 'left', 'right' or a tuple of 3 (signed) "
-                     "integers from 1 to 3, found %r" % (orientation,))
-  
-  if inverse:
-    orientation = inverse_orientation(orientation)
-  
-  return orientation
+    """Convert orientation to standard format.
+
+    Arguments
+    ---------
+    orientation : tuple, str or None
+      The orientation specification.
+    inverse : bool
+       If True, invert orientation.
+    default : object
+       The default value if orientation is None;
+
+    Returns
+    -------
+    orientation : tuple of ints
+      The orientation sequence.
+
+    See Also
+    --------
+    `Orientation`_
+    """
+    if orientation is None:
+        return default
+
+    # convert named representations
+    if orientation == 'left':
+        # orientation = (1,2,3);
+        orientation = None
+    elif orientation == 'right':
+        orientation = (-1, 2, 3)
+
+    if orientation is not None and len(orientation) != 3:
+        raise ValueError(
+            "orientation should be 'left', 'right' or a tuple of 3 signed integers from 1 to 3, found %r" % (
+                orientation,))
+
+    if inverse:
+        orientation = invert_orientation(orientation)
+
+    return orientation
 
 
-def inverse_orientation(orientation):
-  """Returns the inverse orientation taking axis inversions into account.
+def invert_orientation(orientation):
+    """Returns the inverse orientation taking axis inversions into account.
+
+    Arguments
+    ---------
+    orientation : tuple, str or None
+      The orientation specification.
+
+    Returns
+    -------
+    orientation : tuple
+      The inverse orientation sequence.
+
+    See Also
+    --------
+    `Orientation`_
+    """
+    orientation = format_orientation(orientation)
+
+    if orientation is None:
+        return None
+
+    # orientation is defined as permuting the axes and then inverrting the axis
+    inverse = list(orientation)
+    for i, o in enumerate(orientation):
+        if o < 0:
+            inverse[int(abs(o) - 1)] = -(i + 1)
+        else:
+            inverse[int(abs(o) - 1)] = (i + 1)
+
+    return tuple(inverse)
+
+
+def orientation_to_transposition(orientation, inverse=False):
+    """Extracts the transposition permutation from an orientation.
   
-  Arguments
-  ---------
-  orientation : tuple or str
-    The orientation specification.
-      
-  Returns
-  -------
-  orientation : tuple
-    The inverse orientation sequence.
-      
-  See Also
-  --------
-  `Orientation`_
-  """
-  orientation = format_orientation(orientation);  
-  
-  if orientation is None:
-      return None;
-  
-  #orientation is defined as permuting the axes and then inverrting the axis
-  inv = list(orientation);
-  for i,o in enumerate(orientation):
-    if o < 0:
-      inv[int(abs(o)-1)] = -(i + 1);
+    Arguments
+    ---------
+    orientation : tuple or str
+      The orientation specification.
+    inverse : bool
+      If True, return inverse permutation.
+
+    Returns
+    -------
+    permutation : tuple of ints
+      The permutation sequence.
+
+    See Also
+    --------
+    `Orientation`_
+    """
+    orientation = format_orientation(orientation, inverse=inverse)
+    if orientation is None:
+        return 0, 1, 2
     else:
-      inv[int(abs(o)-1)] = (i + 1);
-
-  return tuple(inv)
+        return tuple(int(abs(i)) - 1 for i in orientation)
 
 
-def orientation_to_permuation(orientation, inverse = False):
-  """Extracts the permuation from an orientation.
+def orient_resolution(resolution, orientation, inverse=False):
+    """Permutes a resolution tuple according to the given orientation.
+
+    Arguments
+    ---------
+      resolution : tuple
+        The resolution specification.
+      orientation : tuple or str
+        The orientation specification.
+      inverse : bool
+        If True, invert the orientation.
+
+    Returns
+    -------
+      resolution : tuple
+        The re-oriented resolution sequence.
+
+    See Also
+    --------
+    `Orientation`_
+    """
+    if orientation is None:
+        return resolution
+
+    axes = orientation_to_transposition(orientation, inverse=inverse)
+    return tuple(resolution[a] for a in axes)
+
+
+def orient_shape(shape, orientation, inverse=False):
+    """Permutes a shape according to the given orientation.
   
-  Arguments
-  ---------
-  orientation : tuple or str
-    The orientation specification.
-  inverse : bool
-    If True, return inverse permutation.
-      
-  Returns
-  -------
-  permuation : tuple of ints
-    The premutation sequence.
-      
-  See Also
-  --------
-  `Orientation`_
-  """
-  orientation = format_orientation(orientation, inverse = inverse);
-  if orientation is None:
-    return (0,1,2);
-  else:
-    return tuple(int(abs(i))-1 for i in orientation);
-
-
-def orient_resolution(resolution, orientation, inverse = False):
-  """Permutes a resolution tuple according to the given orientation.
-  
-  Arguments
-  ---------
-    resolution : tuple
-      The resolution specification.
+    Arguments
+    ---------
+    shape : tuple
+      The shape specification.
     orientation : tuple or str
       The orientation specification.
     inverse : bool
       If True, invert the orientation.
-      
-  Returns
-  -------
-    resolution : tuple
-      The re-oriented resolution sequence.
-      
-  See Also
-  --------
-  `Orientation`_
-  """
-  if resolution is None:
-      return None;
-  
-  per = orientation_to_permuation(orientation, inverse = inverse);
-  
-  return tuple(resolution[i] for i in per);
-  
 
-def orient_shape(shape, orientation, inverse = False):
-  """Permutes a shape according to the given orientation.
-  
-  Arguments
-  ---------
-  shape : tuple
-    The shape specification.
-  orientation : tuple or str
-    The orientation specification.
-  inverse : bool
-    If True, invert the orientation.
-      
-  Returns
-  -------
-  shape : tuple
-    The oriented shape tuple.
-      
-  See Also
-  --------
-  `Orientation`_
-  """
-  return orient_resolution(shape, orientation, inverse = inverse);
- 
+    Returns
+    -------
+    shape : tuple
+      The oriented shape tuple.
 
-def resample_shape(source_shape, sink_shape = None, source_resolution = None, sink_resolution = None, orientation = None):
-  """Calculate scaling factors and data shapes for resampling.
-  
-  Arguments
-  ---------
-  source_shape : tuple
-    The shape the source.
-  sink_shape : tuple or None
-    The shape of the resmapled sink.
-  source_resolution : tuple or None
-    The resolution of the source.
-  sink_resolution : tuple or None
-    The resolution of the sink.
-  orientation : tuple or str
-    The re-orientation specification.
-      
-  Returns
-  -------
-  source_shape : tuple
-    The shape of the source.
-  sink_shape : tuple
-    The shape of the sink.
-  source_resolution : tuple or None
-    The resolution of the source.
-  sink_resolution : tuple or None
-    The resolution of the sink.
-  
-  See Also
-  --------
-  `Orientation`_
-  """
-  orientation = format_orientation(orientation);    
-  
-  #determine shapes if not specified
-  if sink_shape is None and source_shape is None:
-    raise RuntimeError('Source or sink shape must be defined!');
-    
-  if sink_shape is None and sink_resolution is None:
-    raise RuntimeError('Sink shape or resolution must be defined!');
-    
-  if sink_resolution is None and not isinstance(sink_shape, tuple):
-    sink_shape = io.shape(sink_shape);
-  
-  if source_shape is not None:
-    ndim = len(source_shape);
-  else:
-    ndim = len(sink_shape);
-  
-  if sink_shape is None:
-    if source_resolution is None:
-      source_resolution = (1.0,) * ndim;
-    if sink_resolution is None:
-      sink_resolution = (1.0,) * ndim;
-      
-    #orient resolution of source to resolution of sink to get sink shape
-    source_resolutionO = orient_resolution(source_resolution, orientation);
-    source_shapeO      = orient_shape(source_shape, orientation);
-    sink_shape = tuple([int(np.ceil(source_shapeO[i] *  float(source_resolutionO[i])/float(sink_resolution[i]))) for i in range(ndim)]);        
-  
-  if source_shape is None:
-    if source_resolution is None:
-      source_resolution = (1,) * ndim;
-    if sink_resolution is None:
-      sink_resolution = (1,) * ndim;
-    
-    #orient resolution of source to resolution of sink to get sink shape
-    source_resolutionO = orient_resolution(source_resolution, orientation);
-    source_shape = tuple([int(np.ceil(sink_shape[i] *  float(sink_resolution[i])/float(source_resolutionO[i]))) for i in range(ndim)]);  
-    source_shape = orient_shape(source_shape, orientation, inverse=True);
-     
-  #calculate effecive resolutions
-  if source_resolution is None:
-    if sink_resolution is None:
-      source_resolution = (1,1,1);
-    else:
-      source_shapeO = orient_shape(source_shape, orientation);
-      source_resolution = tuple(float(sink_shape[i]) / float(source_shapeO[i]) * sink_resolution[i] for i in range(ndim));
-      source_resolution = orient_resolution(source_resolution, orientation, inverse=True);
-  
-  source_shapeO = orient_shape(source_shape, orientation);
-  source_resolutionO = orient_resolution(source_resolution, orientation);
-  sink_resolution = tuple(float(source_shapeO[i]) / float(sink_shape[i]) * source_resolutionO[i] for i in range(ndim));
-  
-  return source_shape, sink_shape, source_resolution, sink_resolution  
+    See Also
+    --------
+    `Orientation`_
+    """
+    return orient_resolution(shape, orientation, inverse=inverse)
 
 
-def resample_factor(source_shape, sink_shape = None, source_resolution = None, sink_resolution = None, orientation = None):
-  """Calculate scaling factors for resampling.
-  
-  Arguments
-  ---------
-  source_shape : tuple
-    The shape the source.
-  sink_shape : tuple or None
-    The shape of the resmapled sink.
-  source_resolution : tuple or None
-    The resolution of the source.
-  sink_resolution : tuple or None
-    The resolution of the sink.
-  orientation : tuple or str
-    The re-orientation specification.
-      
-  Returns
-  -------
-  factor : tuple
-    The resampling factor along the axes of the source.
-  
-  See Also
-  --------
-  `Orientation`_
-  """
-  source_shape, sink_shape, source_resolution, sink_resolution = \
-    resample_shape(source_shape=source_shape, sink_shape=sink_shape,
-                   source_resolution=source_resolution, sink_resolution=sink_resolution, 
-                   orientation=orientation);
-  
-  sink_shape_in_source_orientation = orient_shape(sink_shape, orientation, inverse=True);
-  
-  resample_factor = [float(t) / float(s) for s,t in zip(source_shape, sink_shape_in_source_orientation)];
-  
-  return resample_factor;
+def orient(data, orientation, inverse=False):
+    """Orients a data array according to the given orientation.
+
+       Arguments
+       ---------
+       data : array or Source
+         The data to orient.
+       orientation : tuple or str
+         The orientation specification.
+       inverse : bool
+         If True, invert the orientation.
+
+       Returns
+       -------
+       oriented : array
+         The oriented data array.
+
+       See Also
+       --------
+       `Orientation`_
+       """
+    orientation = format_orientation(orientation)
+
+    oriented = data
+
+    if orientation is not None:
+        # reverse
+        reverse = np.any([o < 0 for o in orientation])
+
+        if inverse and reverse:
+            slicing = tuple(slice(None, None, -1) if o < 0 else slice(None) for o in orientation)
+            oriented = oriented[slicing]
+
+        # re-orient
+        oriented = oriented.transpose(orientation_to_transposition(orientation, inverse=inverse))
+
+        # reverse
+        if not inverse and reverse:
+            slicing = tuple(slice(None, None, -1) if o < 0 else slice(None) for o in orientation)
+            oriented = oriented[slicing]
+
+    return oriented
+
+
+def orient_points(points, orientation, shape=None, inverse=False):
+    """Orients an array of coordinates according to the given orientation.
+
+       Arguments
+       ---------
+       points : array or Source
+         The data points to orient, as nxd array where d is dimension.
+       orientation : tuple or str
+         The orientation specification.
+       shape : tuple
+         The shape of the data array before reorientation needed in case some axes are reversed.
+       inverse : bool
+         If True, invert the orientation.
+
+       Returns
+       -------
+       oriented : array
+         The oriented data array.
+
+       See Also
+       --------
+       `Orientation`_
+       """
+    # reorient points
+    orientation = format_orientation(orientation)
+
+    oriented = points
+
+    if orientation is not None:
+        # reverse
+        reverse = np.any([o < 0 for o in orientation])
+        if reverse and shape is None:
+            raise ValueError('Cannot invert orientation without data shape.')
+
+        if reverse and inverse:
+            shape_oriented = orient_shape(shape, orientation)
+            for d, o in enumerate(orientation):
+                if o < 0:
+                    oriented[..., d] = shape_oriented[d] - 1 - oriented[..., d]
+
+        # permute
+        oriented = oriented[..., orientation_to_transposition(orientation, inverse=inverse)]
+
+        if reverse and not inverse:
+            shape_oriented = orient_shape(shape, orientation)
+            for d, o in enumerate(orientation):
+                if o < 0:
+                    oriented[..., d] = shape_oriented[d] - 1 - oriented[..., d]
+
+    return oriented
 
 
 ########################################################################################
-### Resampling
+# Resampling
 ########################################################################################
 
-def resample(source, sink = None, orientation = None, 
-             sink_shape = None, source_resolution = None, sink_resolution = None, 
-             interpolation = 'linear', axes_order = None, method = 'shared',
-             processes = None, workspace=None, verbose = True):
-  """Resample data of source in new shape/resolution and orientation.
-  
-  Arguments
-  ---------
-  source : str or array
-    The source to be resampled.
-  sink : str or None
-    The sink for the resampled image.
-  orientation : tuple or None:
-    The orientation specified by permuation and change in sign of (1,2,3).
-  sink_shape : tuple or None
-    The target shape of the resampled sink.
-  source_resolution : tuple or None
-    The resolution of the source (in length per pixel).
-  sink_resolution : tuple or None
-    The resolution of the resampled source (in length per pixel).
-  interpolation : str 
-    The method to use for interpolating to the resmapled array.
-  axis_order : str, list of tuples of int or None
-    The axes pairs along which to resample the data at each step.
-    If None, this is detertmined automatically. For a FileList source, 
-    setting the first tuple should point to axis not indicating files.
-    If 'size' the axis order is determined automatically to maximally reduce 
-    the size of the array in each resmapling step.
-    If 'order' the axis order is chosed automatically to optimize io speed.
-  method : 'shared' or 'memmap'
-    Method to handle intermediate resampling results. If 'shared' use shared 
-    memory, otherwise use a memory map on disk.
-  processes : int, None or 'serial'
-    Number of processes to use for parallel resampling, if None use maximal 
-    processes avaialable, if 'serial' process in serial.
-  verbose : bool
-    If True, display progress information.
-  
-  Returns
-  -------
-  sink : array or str
-    The data or filename of resampled sink.
+def resample_shape_from_resolution(original_shape, original_resolution, resampled_resolution,
+                                   orientation=None, discretize=True):
+    """Calculate the resampled shape given resolution information.
 
-  Notes
-  -----
-  * Resolutions are assumed to be given for the axes of the intrinsic 
-    orientation of the data and reference (as when viewed by ImageJ).
-  * Orientation: permuation of 1,2,3 with potential sign, indicating which 
-    axes map onto the reference axes, a negative sign indicates reversal 
-    of that particular axes.
-  * Only a minimal set of information to determine the resampling parameter 
-    has to be given, e.g. source_shape and sink_shape.
-  * The resampling is done by iterating two dimensional resampling steps.
-  """
-  #TODO: write full nd resampling routine extending cv2 lib.
-  if verbose:
-    timer = tmr.Timer();
-  
-  source = io.as_source(source);
-  source_shape = source.shape;
-  ndim = len(source_shape);
-  dtype = source.dtype;
-  order = source.order;
-  
-  orientation = format_orientation(orientation);
-  
-  source_shape, sink_shape, source_resolution, sink_resolution = \
-    resample_shape(source_shape=source_shape, sink_shape=sink_shape,
-                   source_resolution=source_resolution, sink_resolution=sink_resolution,
-                    orientation=orientation);
-  
-  sink_shape_in_source_orientation = orient_shape(sink_shape, orientation, inverse=True);
-                                   
-  interpolation = _interpolation_to_cv2(interpolation)
+    Arguments
+    ---------
+    original_shape : tuple
+      Shape of the data array to be resampled.
+    original_resolution : tuple
+       Resolution of the data array to be resampled.
+    resampled_resolution : tuple
+       Resolution of the resampled data array.
+    orientation : tuple
+       Orientation specifications.
+    discretize : bool
+       If True, return next largest integer values.
 
-  if not isinstance(processes, int) and processes != 'serial':
-    processes = io.mp.cpu_count();
-  
-  #detemine order of resampling
-  axes_order, shape_order = _axes_order(axes_order, source, sink_shape_in_source_orientation, order=order);
-  #print(axes_order, shape_order) 
-  
-  if len(axes_order) == 0:
+    Returns
+    -------
+    resampled_shape : tuple or None
+      The shape of the resampled data array.
+    """
+
+    # orient onto resampled array
+    original_shape_oriented = orient_shape(original_shape, orientation)
+    original_resolution_oriented = orient_resolution(original_resolution, orientation)
+
+    # shape
+    resampled_shape = tuple(float(s) * float(r) / float(rr) for s, r, rr
+                            in zip(original_shape_oriented, original_resolution_oriented, resampled_resolution))
+
+    if discretize:
+        resampled_shape = tuple(int(np.ceil(s)) for s in resampled_shape)
+
+    return resampled_shape
+
+
+def original_shape_from_resolution(resampled_shape, original_resolution, resampled_resolution,
+                                   orientation=None, discretize=True):
+    """Calculate the original shape given resolution information.
+
+    Arguments
+    ---------
+    resampled_shape : tuple
+      Shape of the resampled data array.
+    original_resolution : tuple
+       Resolution of the data array to be resampled.
+    resampled_resolution : tuple
+       Resolution of the resampled data array.
+    orientation : tuple
+       Orientation specifications.
+    discretize : bool
+       If True, return next largest integer values.
+
+    Returns
+    -------
+    resampled_shape : tuple or None
+      The shape of the resampled data array.
+    """
+
+    # orient onto original array
+    resampled_shape_oriented = orient_shape(resampled_shape, orientation, inverse=True)
+    resampled_resolution_oriented = orient_resolution(resampled_resolution, orientation, inverse=True)
+
+    # shape
+    original_shape = tuple(float(rs) * float(rr) / float(r) for r, rs, rr
+                           in zip(original_resolution, resampled_shape_oriented, resampled_resolution_oriented))
+
+    if discretize:
+        original_shape = tuple(int(np.ceil(s)) for s in original_shape)
+
+    return original_shape
+
+
+def resample_resolution_from_shape(original_shape, resampled_shape, original_resolution, orientation=None):
+    """Calculate the resampled resolution given shape information.
+
+    Arguments
+    ---------
+    original_shape : tuple
+      Shape of the data array to be resampled.
+    resampled_shape : tuple
+       Resolution of the resampled data array.
+    original_resolution : tuple
+       Resolution of the data array to be resampled.
+    orientation : tuple
+       Orientation specifications.
+
+    Returns
+    -------
+    resampled_resolution : tuple or None
+      The resolution of the resampled data array.
+    """
+
+    # orient onto resampled array
+    original_shape_oriented = orient_shape(original_shape, orientation)
+    original_resolution_oriented = orient_resolution(original_resolution, orientation)
+
+    resampled_resolution = tuple(float(s) * float(r) / float(rs) for s, r, rs
+                                 in zip(original_shape_oriented, original_resolution_oriented, resampled_shape))
+
+    return resampled_resolution
+
+
+def original_resolution_from_shape(original_shape, resampled_shape, resampled_resolution, orientation=None):
+    """Calculate the original resolution given shape information.
+
+    Arguments
+    ---------
+    original_shape : tuple
+      Shape of the data array to be resampled.
+    resampled_shape : tuple
+       Resolution of the resampled data array.
+    resampled_resolution : tuple
+       Resolution of the resampled data array.
+    orientation : tuple
+       Orientation specifications.
+
+    Returns
+    -------
+    resampled_resolution : tuple or None
+      The resolution of the resampled data array.
+    """
+
+    # orient onto resampled array
+    resampled_shape_oriented = orient_shape(resampled_shape, orientation, inverse=True)
+    resampled_resolution_oriented = orient_resolution(resampled_resolution, orientation, inverse=True)
+
+    original_resolution = tuple(float(rs) * float(rr) / float(s) for s, rs, rr
+                                in zip(original_shape, resampled_shape_oriented, resampled_resolution_oriented))
+
+    return original_resolution
+
+
+def resample_information(original_shape=None, resampled_shape=None,
+                         original_resolution=None, resampled_resolution=None,
+                         original=None, resampled=None,
+                         orientation=None, discretize=True, consistent=True):
+    """Convert resampling information to standard form.
+
+    Arguments
+    ---------
+    original_shape : tuple or None
+      Optional value of the shape of the data array to be resampled.
+    resampled_shape : tuple or None
+      Optional value of the shape of the resampled data array.
+    original_resolution : tuple or None
+      Optional value of the resolution of the data array to be resampled.
+    resampled_resolution : tuple or None
+       Optional value of the resolution of the resampled data array.
+    original : str, array or None
+      Optional source to be resampled used to determine missing resampling information.
+    resampled: str, array or None
+       Optional source of the resampled data used to determine missing resampling information.
+    orientation : tuple
+      Orientation as specified.
+    discretize : bool
+      If True and sufficient shape information is given, discretize the shapes.
+    consistent:
+      If True, recalculate resolutions to match the discrete shapes.
+
+
+    Returns
+    -------
+    original_shape : tuple or None
+      Value of the shape of the data array to be resampled
+    resampled_shape : tuple or None
+      Value of the shape of the resampled data array.
+    original_resolution : tuple or None
+      Value of the resolution of the data array to be resampled.
+    resampled_resolution : tuple or None
+       Value of the resolution of the resampled data array.
+    orientation : tuple
+      Orientation in standard formatting.
+
+    See also
+    --------
+    See :func:`resample` for details.
+    """
+    orientation = format_orientation(orientation)
+
+    # conventions
+    if original_shape is not None and not isinstance(original_shape, tuple):
+        original = original_shape
+        original_shape = io.shape(original)
+
+    if resampled_shape is not None and not isinstance(resampled_shape, tuple):
+        resampled = resampled_shape
+        resampled_shape = io.shape(resampled)
+
+    # shapes form sources
+    if original_shape is None and original is not None:
+        original_shape = io.shape(original)
+
+    if resampled_shape is None and resampled is not None:
+        resampled_shape = io.shape(resampled)
+
+    # ndim
+    if original_shape is not None:
+        ndim = len(original_shape)
+    elif resampled_shape is not None:
+        ndim = len(resampled_shape)
+    elif original_resolution is not None:
+        ndim = len(original_resolution)
+    elif resampled_resolution is not None:
+        ndim = len(resampled_resolution)
+    else:
+        raise ValueError('The resampling information is not sufficient!')
+
+    # resolutions
+    if original_shape is None and original_resolution is None:
+        original_resolution = (1,) * ndim
+
+    if resampled_shape is None and resampled_resolution is None:
+        resampled_resolution = (1,) * ndim
+
+    if original_resolution is None and resampled_resolution is None:
+        original_resolution = (1,) * ndim
+
+    # auto complete (if one piece of information is missing)
+    if original_shape is not None and original_resolution is not None \
+            and resampled_shape is not None and resampled_resolution is None:
+        resampled_resolution = resample_resolution_from_shape(original_shape, resampled_shape,
+                                                              original_resolution, orientation)
+    if original_shape is not None and original_resolution is not None \
+            and resampled_shape is None and resampled_resolution is not None:
+        resampled_shape = resample_shape_from_resolution(original_shape,
+                                                         original_resolution, resampled_resolution,
+                                                         orientation, discretize)
+        if discretize and consistent:
+            resampled_resolution = resample_resolution_from_shape(original_shape, resampled_shape,
+                                                                  original_resolution, orientation)
+    if original_shape is not None and original_resolution is None \
+            and resampled_shape is not None and resampled_resolution is not None:
+        original_resolution = original_resolution_from_shape(original_shape, resampled_shape,
+                                                             resampled_resolution, orientation)
+    if original_shape is None and original_resolution is not None \
+            and resampled_shape is not None and resampled_resolution is not None:
+        original_shape = original_shape_from_resolution(resampled_shape,
+                                                        original_resolution, resampled_resolution,
+                                                        orientation, discretize)
+        if discretize and consistent:
+            original_resolution = original_resolution_from_shape(original_shape, resampled_shape,
+                                                                 resampled_resolution, orientation)
+
+    return original_shape, resampled_shape, original_resolution, resampled_resolution, orientation
+
+
+def resample_shape(original_shape=None, resampled_shape=None,
+                   original_resolution=None, resampled_resolution=None,
+                   original=None, resampled=None,
+                   orientation=None, consistent=True):
+    """Calculate the resampled shape.
+
+    Arguments
+    ---------
+    original_shape : tuple or None
+      Optional value of the shape of the data array to be resampled.
+    resampled_shape : tuple or None
+      Optional value of the shape of the resampled data array.
+    original_resolution : tuple or None
+      Optional value of the resolution of the data array to be resampled.
+    resampled_resolution : tuple or None
+       Optional value of the resolution of the resampled data array.
+    original : str, array or None
+      Optional source to be resampled used to determine missing resampling information.
+    resampled: str, array or None
+       Optional source of the resampled data used to determine missing resampling information.
+    orientation : tuple
+      Orientation as specified.
+    consistent:
+      If True, recalculate resolutions to match the discrete shapes.
+
+    Returns
+    -------
+    original_shape : tuple or None
+      Value of the shape of the data array to be resampled
+    resampled_shape : tuple or None
+      Value of the shape of the resampled data array.
+    original_resolution : tuple or None
+      Value of the resolution of the data array to be resampled.
+    resampled_resolution : tuple or None
+       Value of the resolution of the resampled data array.
+
+    See also
+    --------
+    See :func:`resample` for details.
+
+    See Also
+    --------
+    `Orientation`_
+    """
+    if original_shape is None and resampled_shape is None:
+        raise RuntimeError('Either the original or resampled shape must be defined to determine all shapes!')
+
+    original_shape, resampled_shape, original_resolution, resampled_resolution, orientation = \
+        resample_information(original_shape, resampled_shape,
+                             original_resolution, resampled_resolution,
+                             original, resampled,
+                             orientation, discretize=True, consistent=consistent)
+
+    return original_shape, resampled_shape, original_resolution, resampled_resolution
+
+
+def resample_resolution(original_shape=None, resampled_shape=None,
+                        original_resolution=None, resampled_resolution=None,
+                        original=None, resampled=None,
+                        orientation=None, discretize=True, consistent=True):
+    """Calculate resolutions for original and resampled data.
+
+    Arguments
+    ---------
+    original_shape : tuple or None
+      Optional value of the shape of the data array to be resampled.
+    resampled_shape : tuple or None
+      Optional value of the shape of the resampled data array.
+    original_resolution : tuple or None
+      Optional value of the resolution of the data array to be resampled.
+    resampled_resolution : tuple or None
+       Optional value of the resolution of the resampled data array.
+    original : str, array or None
+      Optional source to be resampled used to determine missing resampling information.
+    resampled: str, array or None
+       Optional source of the resampled data used to determine missing resampling information.
+    orientation : tuple
+      Orientation as specified.
+    discretize : bool
+      If True and sufficient shape information is given, discretize the shapes.
+    consistent:
+      If True, recalculate resolutions to match the discrete shapes.
+
+    Returns
+    -------
+    original_resolution : tuple or None
+      Value of the resolution of the data array to be resampled.
+    resampled_resolution : tuple or None
+       Value of the resolution of the resampled data array.
+
+    See also
+    --------
+    See :func:`resample` for details.
+
+    See Also
+    --------
+    `Orientation`_
+    """
+    original_shape, resampled_shape, original_resolution, resampled_resolution, orientation = \
+        resample_information(original_shape, resampled_shape,
+                             original_resolution, resampled_resolution,
+                             original, resampled,
+                             orientation, discretize=discretize, consistent=consistent)
+
+    if original_resolution is None or resampled_resolution is None:
+        raise ValueError('Cant determine original or resmapled resolutions from the resampling specifications.')
+
+    return original_resolution, resampled_resolution
+
+
+def resample_factor(original_shape=None, resampled_shape=None,
+                    original_resolution=None, resampled_resolution=None,
+                    original=None, resampled=None,
+                    orientation=None, discretize=True, consistent=True):
+    """Calculate scaling factors for the resampling.
+
+    Arguments
+    ---------
+    original_shape : tuple or None
+      Optional value of the shape of the data array to be resampled.
+    resampled_shape : tuple or None
+      Optional value of the shape of the resampled data array.
+    original_resolution : tuple or None
+      Optional value of the resolution of the data array to be resampled.
+    resampled_resolution : tuple or None
+       Optional value of the resolution of the resampled data array.
+    original : str, array or None
+      Optional source to be resampled used to determine missing resampling information.
+    resampled: str, array or None
+       Optional source of the resampled data used to determine missing resampling information.
+    orientation : tuple
+      Orientation as specified.
+    discretize : bool
+      If True and sufficient shape information is given, discretize the shapes.
+    consistent:
+      If True, recalculate resolutions to match the discrete shapes.
+
+    Returns
+    -------
+    original_resolution : tuple or None
+      Value of the resolution of the data array to be resampled.
+    resampled_resolution : tuple or None
+       Value of the resolution of the resampled data array.
+
+    See also
+    --------
+    See :func:`resample` for details.
+
+    See Also
+    --------
+    `Orientation`_
+    """
+    original_resolution, resampled_resolution = \
+        resample_resolution(original_shape, resampled_shape,
+                            original_resolution, resampled_resolution,
+                            original, resampled,
+                            orientation, discretize=discretize, consistent=consistent)
+
+    resampled_resolution_in_source_orientation = orient_resolution(resampled_resolution, orientation, inverse=True)
+
+    factor = tuple(float(r) / float(rr) for r, rr
+                   in zip(original_resolution, resampled_resolution_in_source_orientation))
+
+    return factor
+
+
+########################################################################################
+# Resample
+########################################################################################
+
+def resample(original, resampled=None,
+             original_shape=None, resampled_shape=None,
+             original_resolution=None, resampled_resolution=None, orientation=None,
+             interpolation='linear', axes_order=None, method='shared', processes=None, workspace=None, verbose=True):
+    """Resample data of source in new shape/resolution and orientation.
+
+    Arguments
+    ---------
+    original : str, array or None
+      Data array source to be resampled.
+    resampled: str, array or None
+       Optional sink for the resampled data.
+    original_shape : tuple or None
+      Optional value for the shape of the data array to be resampled.
+      Determined by the shape of the original source by default.
+    resampled_shape : tuple or None
+      Optional value of the shape of the resampled data array.
+    original_resolution : tuple or None
+      Optional value of the resolution of the data array to be resampled.
+    resampled_resolution : tuple or None
+       Optional value of the resolution of the resampled data array.
+    orientation : tuple or None
+      Orientation specification.
+    interpolation : str
+      Interpolation method to use. Available methods are 'linear', 'nearest', 'area'.
+    axes_order : list of tuples of int or None
+      The axes pairs along which to resample the data at each step.
+      If None, this is determined automatically. For a FileList source,
+      setting the first tuple should point to axis not indicating files.
+      If 'size' the axis order is determined automatically to maximally reduce
+      the size of the array in each resampling step.
+      If 'order' the axis order is chosen automatically to optimize io speed.
+    method : 'shared' or 'memmap'
+      Method to handle intermediate resampling results. If 'shared' use shared
+      memory, otherwise use a memory map on disk.
+    processes : int, None or 'serial'
+      Number of processes to use for parallel resampling, if None use maximal
+      processes available, if 'serial' process in serial.
+    verbose : bool
+      If True, display progress information.
+
+    Returns
+    -------
+    resampled : array or str
+      The data or filename of resampled sink.
+
+    Notes
+    -----
+    * Resolutions are assumed to be given for the axes of the intrinsic
+      orientation of the data and reference (as when viewed by ImageJ).
+    * Orientation: permutation of 1,2,3 with potential sign, indicating which
+      axes map onto the reference axes, a negative sign indicates reversal
+      of that particular axes.
+    * Only a minimal set of information to determine the resampling parameter
+      has to be given, e.g. original_shape or the original source and resampled_shape.
+    * The resampling is done by iterating two-dimensional resampling steps.
+    """
+    # TODO: write full nd resampling routine extending cv2 lib.
     if verbose:
-      print('resampling: no resampling necessary, source has same size as sink!');
-    if sink != source:
-      return io.write(sink, source);
-    else:
-      return source;
-  
-  #resample
-  n_steps = len(axes_order);
-  last_source = source;
-  delete_files = [];
-  for step, axes, shape in zip(range(n_steps), axes_order, shape_order):
-    if step == n_steps-1 and orientation is None:
-      resampled = io.initialize(source=sink, shape=sink_shape, dtype=dtype, as_source=True)
-    else:
-      if method == 'shared':
-        resampled = io.sma.create(shape, dtype=dtype, order=order, as_source=True);
-      else:
-        location = tempfile.mktemp() + '.npy';
-        resampled = io.mmp.create(location, shape=shape, dtype=dtype, order=order, as_source=True);
-        delete_files.append(location);
-    #print(resampled)
+        timer = tmr.Timer()
 
-    #indices for non-resampled axes
-    indices = tuple([range(s) for d,s in enumerate(shape) if d not in axes]);
-    indices = [i for i in itertools.product(*indices)];
-    n_indices = len(indices);
-    
-    #resample step
-    last_source_virtual = last_source.as_virtual();
-    resampled_virtual = resampled.as_virtual();
-    _resample = ft.partial(_resample_2d, source=last_source_virtual, sink=resampled_virtual, axes=axes, shape=shape,
-                           interpolation=interpolation, n_indices=n_indices, verbose=verbose)
-    
-    if processes == 'serial':
-      for index in indices:
-        _resample(index=index);
-    else:
-      with ThreadPoolExecutor(processes) as executor:
-        chunk_size = round(len(indices) / (processes * 3))
-        executor.map(_resample, indices, chunksize=chunk_size)
-        if workspace is not None:
-          workspace.executor = executor
-    last_source = resampled
-  
-  #fix orientation
-  if orientation is not None:
-    #permute
-    per = orientation_to_permuation(orientation);
-    resampled = resampled.transpose(per);
+    original = io.as_source(original)
+    dtype = original.dtype
+    order = original.order
 
-    #reverse axes
-    reslice = False;
-    slicing = [slice(None)] * ndim;
-    for d,o in enumerate(orientation):
-      if o < 0:
-        slicing[d] = slice(None, None, -1);
-        reslice = True;
-    if reslice:
-      resampled = resampled[slicing];
-      
+    if original_shape is not None and original_shape != original.shape:
+        original_resolution, resampled_resolution = resample_resolution(original_shape, resampled_shape,
+                                                                        original_resolution, resampled_resolution,
+                                                                        original, resampled,
+                                                                        orientation, consistent=True)
+        original_shape = io.shape(original)
+        resampled_shape = None
+    else:
+        original_shape = original.shape
+
+    original_shape, resampled_shape, original_resolution, resampled_resolution = \
+        resample_shape(original_shape, resampled_shape,
+                       original_resolution, resampled_resolution,
+                       original, resampled,
+                       orientation, consistent=True)
+
+    resampled_shape_in_original_orientation = orient_shape(resampled_shape, orientation, inverse=True)
+
+    interpolation = _interpolation_to_cv2(interpolation, dtype=dtype)
+
+    if not isinstance(processes, int) and processes != 'serial':
+        processes = io.mp.cpu_count()
+
+    # determine order of resampling
+    axes_order, shape_order = _axes_order(axes_order, original_shape, resampled_shape_in_original_orientation,
+                                          order=order, source=original, minimize_size=True)
     if verbose:
-      print("resample: re-oriented shape %r!" % (resampled.shape,))
-  
-    sink = io.write(sink, resampled);
-  else:
-    sink = resampled;
-  
-  for f in delete_files:
-      io.delete_file(f);
-  
-  if verbose:
-    timer.print_elapsed_time('Resampling')
-    
-  return sink;
+        print('Resampling: %r -> %r using axes:%r and intermediate shapes:%r' %
+              (original_shape, resampled_shape, axes_order, shape_order))
 
+    if len(axes_order) == 0:
+        if verbose:
+            print('Resampling: no resampling necessary, source has same size as sink!')
+        if original != resampled:  # TODO: this should be handled by Source functionality !
+            return io.write(resampled, original)
+        else:
+            return original
+
+    # resample
+    n_steps = len(axes_order)
+    resampled_data = last = original
+    delete_files = []
+    for step, axes, shape in zip(range(n_steps), axes_order, shape_order):
+        if step == n_steps - 1 and orientation is None:
+            resampled_data = io.initialize(source=resampled, shape=resampled_shape, dtype=dtype, as_source=True)
+        else:
+            if method == 'shared':
+                resampled_data = io.sma.create(shape, dtype=dtype, order=order, as_source=True)
+            else:
+                location = tempfile.mktemp() + '.npy'
+                resampled_data = io.mmp.create(location, shape=shape, dtype=dtype, order=order, as_source=True)
+                delete_files.append(location)
+
+        # indices for non-resampled axes
+        indices = tuple(range(s) for d, s in enumerate(shape) if d not in axes)
+        indices = tuple(i for i in itertools.product(*indices))
+        n_indices = len(indices)
+
+        # resample step
+        last_virtual = last.as_virtual()
+        resampled_data_virtual = resampled_data.as_virtual()
+        _resample = ft.partial(_resample_2d, source=last_virtual, sink=resampled_data_virtual, axes=axes, shape=shape,
+                               interpolation=interpolation, n_indices=n_indices, verbose=verbose)
+
+        if processes == 'serial':
+            for index in indices:
+                _resample(index=index)
+        else:
+            # with CancelableProcessPoolExecutor(processes) as executor:
+            # ThreadPool because of documented cv2 instability w/ multiprocessing. Is this still true ?
+            with ThreadPoolExecutor(processes) as executor:
+                chunk_size = round(len(indices) / (processes * 3))  # REFACTOR: explain calculation
+                executor.map(_resample, indices, chunksize=chunk_size)  # default chunk_size is 1 (too small)
+                if workspace is not None:
+                    workspace.executor = executor
+
+        last = resampled_data
+
+    resampled_data = orient(resampled_data, orientation)
+    resampled = io.write(resampled, resampled_data)
+
+    for f in delete_files:
+        io.delete_file(f)
+
+    if verbose:
+        timer.print_elapsed_time('Resampling')
+
+    return resampled
+
+
+def resample_inverse(resampled, original=None,
+                     original_shape=None, resampled_shape=None,
+                     original_resolution=None, resampled_resolution=None, orientation=None,
+                     axes_order=None, method='memmap', interpolation='linear',
+                     processes=None, verbose=True, workspace=None):
+    """Resample data inversely to :func:`resample` routine.
+
+    Arguments
+    ---------
+    resampled: str, array or None
+       Data array to be inversely resampled.
+    original : str, array or None
+      Optional sink for the inversely resampled array.
+    original_shape : tuple or None
+      Optional value for the shape of the original data array.
+    resampled_shape : tuple or None
+      Optional value of the shape of the resampled data array.
+      Determined by the shape of the resampled source by default.
+    original_resolution : tuple or None
+      Optional value of the resolution of the data array to be resampled.
+    resampled_resolution : tuple or None
+       Optional value of the resolution of the resampled data array.
+    orientation : tuple or None
+      Orientation specification.
+    interpolation : str
+      Interpolation method to use. Available methods are 'linear', 'nearest', 'area'.
+    axes_order : list of tuples of int or None
+      The axes pairs along which to resample the data at each step.
+      If None, this is determined automatically. For a FileList source,
+      setting the first tuple should point to axis not indicating files.
+      If 'size' the axis order is determined automatically to maximally reduce
+      the size of the array in each resampling step.
+      If 'order' the axis order is chosen automatically to optimize io speed.
+    method : 'shared' or 'memmap'
+      Method to handle intermediate resampling results. If 'shared' use shared
+      memory, otherwise use a memory map on disk.
+    processes : int, None or 'serial'
+      Number of processes to use for parallel resampling, if None use maximal
+      processes available, if 'serial' process in serial.
+    verbose : bool
+      If True, display progress information.
+
+    Returns
+    -------
+    resampled : array or str
+       Data or file name of inversely resampled image.
+
+    Notes
+    -----
+    * All arguments, except source and sink should be passed as :func:`resample`
+      to invert the resampling.
+    """
+    resampled = io.as_source(resampled)
+
+    # invert orientation
+    resampled = orient(resampled, orientation, inverse=True)
+
+    # resampled data in original orientation
+    resampled_shape = orient_shape(resampled_shape, orientation, inverse=True)
+    resampled_resolution = orient_resolution(resampled_resolution, orientation, inverse=True)
+    if axes_order is not None:
+        transposition = orientation_to_transposition(orientation, inverse=True)
+        axes_map = {i: t for i, t in enumerate(transposition)}
+        axes_order = [(axes_map[axes[0]], axes_map[axes[1]]) for axes in axes_order]
+
+    # inversely resample
+    return resample(resampled, original,
+                    resampled_shape, original_shape,
+                    resampled_resolution, original_resolution, orientation=None,
+                    interpolation=interpolation, axes_order=axes_order,
+                    method=method, processes=processes, workspace=workspace, verbose=verbose)
+
+
+########################################################################################
+# Resample Points
+########################################################################################
+
+def resample_points(original_points, resampled_points=None,
+                    original_shape=None, resampled_shape=None,
+                    original_resolution=None, resampled_resolution=None,
+                    original=None, resampled=None,
+                    orientation=None):
+    """Transform point coordinates according to resampling specifications.
+
+    Arguments
+    ---------
+    original_points : str, array or None
+      Data array source to be resampled.
+    resampled_points: str, array or None
+       Optional sink for the resampled points
+    original_shape : tuple or None
+      Optional value for the shape of the data array to be resampled.
+      Determined by the shape of the original source by default.
+    resampled_shape : tuple or None
+      Optional value of the shape of the resampled data array.
+    original_resolution : tuple or None
+      Optional value of the resolution of the data array to be resampled.
+    resampled_resolution : tuple or None
+       Optional value of the resolution of the resampled data array.
+    original : array or str
+       Optional original source data used to infer resampling specifications.
+    resampled : array or str
+       Optional resampled source data used to infer resampling specifications.
+    orientation : tuple or None
+      Orientation specification.
+
+    Returns
+    -------
+    resampled : array or str
+      The array or filename of resampled points.
+
+    Notes
+    -----
+    * The resampling of points here corresponds to he resampling of a data array in :func:`resample`.
+    * The arguments should be passed exactly as in :func:`resample` except for the additional original_points
+      and resampled_points.
+    """
+    factor = resample_factor(original_shape, resampled_shape,
+                             original_resolution, resampled_resolution,
+                             original, resampled,
+                             orientation, discretize=True, consistent=True)
+
+    original_shape, resampled_shape, original_resolution, resampled_resolution = \
+        resample_shape(original_shape, resampled_shape,
+                       original_resolution, resampled_resolution,
+                       original, resampled,
+                       orientation, consistent=True)
+
+    resampled = io.as_source(original_points)
+    resampled = resampled[:] * factor
+    resampled = orient_points(resampled, orientation, shape=orient_shape(resampled_shape, orientation, inverse=True))
+    return io.write(resampled_points, resampled)
+
+
+def resample_points_inverse(resampled_points, original_points=None,
+                            original_shape=None, resampled_shape=None,
+                            original_resolution=None, resampled_resolution=None,
+                            original=None, resampled=None,
+                            orientation=None):
+    """Transform point coordinates inversely according to resampling specifications.
+
+    Arguments
+    ---------
+    resampled_points: str, array or None
+       Optional source of the resampled points to be resampled inversely.
+    original_points : str, array or None
+      Data array sink for inversely resampled points.
+    original_shape : tuple or None
+      Optional value for the shape of the data array to be resampled.
+      Determined by the shape of the original source by default.
+    resampled_shape : tuple or None
+      Optional value of the shape of the resampled data array.
+    original_resolution : tuple or None
+      Optional value of the resolution of the data array to be resampled.
+    resampled_resolution : tuple or None
+       Optional value of the resolution of the resampled data array.
+    original : array or str
+       Optional original source data used to infer resampling specifications.
+    resampled : array or str
+       Optional resampled source data used to infer resampling specifications.
+    orientation : tuple or None
+      Orientation specification.
+
+    Returns
+    -------
+    resampled : array or str
+      The array or filename of resampled points.
+
+    Notes
+    -----
+    * The resampling of points here corresponds to he resampling of a data array in :func:`resample`.
+    * The arguments should be passed exactly as in :func:`resample` except for the additional original_points
+      and resampled_points.
+    """
+    factor = resample_factor(original_shape, resampled_shape,
+                             original_resolution, resampled_resolution,
+                             original, resampled,
+                             orientation, discretize=True, consistent=True)
+
+    original_shape, resampled_shape, original_resolution, resampled_resolution = \
+        resample_shape(original_shape, resampled_shape,
+                       original_resolution, resampled_resolution,
+                       original, resampled,
+                       orientation, consistent=True)
+
+    resampled_points = io.as_source(resampled_points)
+    original = orient_points(resampled_points, orientation, shape=resampled_shape, inverse=True)
+    original = original[:] / factor
+    return io.write(original_points, original)
+
+
+########################################################################################
+# Transformation interface
+########################################################################################
+
+class ResamplingTransformation(TransformationBase):
+    def __init__(self, ttype='Resampling', inverse=False,
+                 original_resolution=None, resampled_resolution=None,
+                 original_shape=None, resampled_shape=None,
+                 original=None, resampled=None,
+                 orientation=None):
+
+        super().__init__(ttype=ttype, inverse=inverse)
+
+        original_shape, resampled_shape, original_resolution, resampled_resolution, orientation = \
+            resample_information(original_shape, resampled_shape,
+                                 original_resolution, resampled_resolution,
+                                 original, resampled,
+                                 orientation, discretize=True, consistent=True)
+
+        self.original_shape = original_shape
+        self.resampled_shape = resampled_shape
+        self.original_resolution = original_resolution
+        self.resampled_resolution = resampled_resolution
+        self.orientation = orientation
+
+    def resample_kwargs(self):
+        return dict(original_shape=self.original_shape, resampled_shape=self.resampled_shape,
+                    resampled_resolution=self.resampled_resolution, original_resolution=self.original_resolution,
+                    orientation=self.orientation)
+
+    def resample_factor(self):
+        return resample_factor(**self.resample_kwargs())
+
+    def transform_data(self, source, sink=None, inverse=False, **kwargs):
+        inverse = self.get_inverse(inverse)
+        resample_kwargs = self.resample_kwargs()
+        resample_kwargs.update(kwargs)
+        if not inverse:
+            return resample(source, sink, **resample_kwargs)
+        else:
+            return resample_inverse(source, sink, **resample_kwargs)
+
+    def transform_points(self, source, sink=None, inverse=False, **kwargs):
+        inverse = self.get_inverse(inverse)
+        resample_kwargs = self.resample_kwargs()
+        resample_kwargs.update(kwargs)
+        if not inverse:
+            return resample_points(source, sink, **resample_kwargs)
+        else:
+            return resample_points_inverse(source, sink, **resample_kwargs)
+
+    def transform_shape(self, shape, inverse=False, **kwargs):
+        kwargs = self.resample_kwargs()
+        kwargs.update(**kwargs)
+        kwargs.update(original_shape=shape)
+        return resample_shape(shape, **kwargs)
+
+    def to_dict(self) -> dict:
+        dictionary = super().to_dict()
+        dictionary.update(self.resample_kwargs())
+        return dictionary
+
+    def __repr__(self):
+        orientation = '' if self.orientation is None else ('%r ' % (self.orientation,))
+        return '%s[%s%r->%r]' % (super().__repr__(), orientation, self.original_resolution, self.resampled_resolution)
+
+
+class OrientationTransformation(TransformationBase):
+
+    ttype = 'Orientation'
+
+    def __init__(self, orientation=None, shape=None,inverse=None):
+        super().__init__(inverse=inverse)
+        self.orientation = format_orientation(orientation)
+        self.shape = shape
+
+    def transform_data(self, source, sink=None, inverse=False):
+        inverse = self.get_inverse(inverse)
+        return io.write(sink, orient(source, orientation=self.orientation, inverse=inverse))
+
+    def transform_points(self, source, sink=None, inverse=False, **kwargs):
+        inverse = self.get_inverse(inverse)
+        return io.write(sink, orient_points(source, orientation=self.orientation, shape=self.shape, inverse=inverse))
+
+    def transform_shape(self, shape, inverse=False, **kwargs):
+        return orient_shape(self.orientation, shape, inverse=inverse)
+
+    def to_dict(self) -> dict:
+        dictionary = super().to_dict()
+        dictionary.update(orientation=self.orientation,
+                          shape=self.shape)
+        return dictionary
+
+    def __repr__(self):
+        orientation = '' if self.orientation is None else ('%r' % (self.orientation,))
+        shape = '' if self.shape is None else (' %r ' % (self.shape,))
+        return '%s[%s%s]' % (super().__repr__(), orientation, shape)
+
+
+########################################################################################
+# Helpers
+########################################################################################
 
 @ptb.parallel_traceback
 def _resample_2d(index, source, sink, axes, shape, interpolation, n_indices, verbose):
-  """Resampling helper function to use for parallel resampling of image slices"""
-  if verbose:
-    pw.ProcessWriter(index).write("Resampling: resampling axes %r, slice %r / %d" % (axes, index, n_indices))
-  
-  # slicing
-  ndim = len(shape)
-  slicing_ = ()
-  i = 0
-  for d in range(ndim):
-    if d in axes:
-      slicing_ += (slice(None),)
-    else:
-      slicing_ += (index[i],)
-      i += 1
-  
-  # resample planeresizeresizeresize
-  sink = sink.as_real()
-  source = source.as_real()
-  new_shape = (shape[axes[1]], shape[axes[0]])
-  sink[slicing_] = cv2.resize(source[slicing_], new_shape, interpolation=interpolation)
-  # WARNING: cv2 takes reverse shape order !
+    """Resampling helper function to use for parallel resampling of image slices"""
+    if verbose:
+        pw.ProcessWriter(index).write("Resampling: resampling axes %r, slice %r / %d" % (axes, index, n_indices))
+
+    # slicing
+    slicing_ = ()
+    i = 0
+    for d in range(len(shape)):
+        if d in axes:
+            slicing_ += (slice(None),)
+        else:
+            slicing_ += (index[i],)
+            i += 1
+
+    # resample
+    sink = sink.as_real()
+    source = source.as_real()
+    new_shape = (shape[axes[1]], shape[axes[0]])
+    sink[slicing_] = cv2.resize(source[slicing_], new_shape, interpolation=interpolation)
+    # note cv2 takes reverse shape order !
 
 
-def _axes_order(axes_order, source, sink_shape_in_source_orientation, order = None): 
-  """Helper to find axes order for subsequent 2d resampling steps."""
+def _order_axes(original_shape, resampled_shape, resample_axes, resample_factors,
+                sort_factors=None, minimize_size=True):
+    """Helper to order axes resampling according to minimize or maximize the change in data size at each step.
 
-  source_shape = source.shape;
-  ndim = source.ndim;
-  
-  if axes_order is not None and isinstance(axes_order, list):
-    axes_order = [(a[0],a[1]) if a[0] < a[1] else (a[1],a[0]) for a in axes_order];
-    shape_order = [];
-    last_shape = source_shape;
-    for axes in axes_order:
-      if not isinstance(axes, tuple) and len(axes) != 2:
-        raise ValueError('resampling; expected a tuple of len 2 for axes_order entry, got %r!' % axes);
-      last_shape = tuple([s if d not in axes else t for d,s,t in zip(range(ndim), last_shape, sink_shape_in_source_orientation)]);
-      shape_order.append(last_shape);
-    return axes_order, shape_order;
-  
-  else: #determine automatically
+    Note
+    ----
+    The change in data size at each step is given by the change in size between two intermediate 2d resampling steps.
+    Note that the resampled_shape is assumed to be given in the original orientation.
+
+    # (1000, 50, 10) -> (500, 10, 5) / factors (1/2, 1/5, 1/2)
+    # 0,1 (1000, 50, 10) -> (500,10,10) -> size:50000
+    # 0,2 (1000, 50, 10) -> (500,50,5)  -> size:125000
+    # 1,2 (1000, 50, 10) -> (1000,10,5) -> size:50000
+
+    # (1000, 100, 10) -> (500, 50, 5) / factors (1/2, 1/2, 1/2)
+    # 0,1 (1000, 100, 10) -> (500,50,10) -> size:250000
+    # 0,2 (1000, 100, 10) -> (500,100,5) -> size:250000
+    # 1,2 (1000, 100, 10) -> (1000,50,5) -> size:250000
+    """
+    resample_axes = np.array(resample_axes)
+    if sort_factors is None:
+        sort_factors = resample_factors
+
+    axes_order = []
+    shape_order = []
+    current_shape = original_shape
+
+    while len(resample_axes) > 0:
+        if len(resample_axes) >= 2:
+            # take the best two resampling factors
+            best = np.argsort(sort_factors)[:2] if minimize_size else np.argsort(sort_factors)[-2:]
+            current_axes = tuple(np.sort(resample_axes[best]))
+            resample_axes = np.array([s for a, s in enumerate(resample_axes) if a not in best])
+            resample_factors = np.array([s for a, s in enumerate(resample_factors) if a not in best])
+            sort_factors = np.array([s for a, s in enumerate(sort_factors) if a not in best])
+        else:
+            # take remaining axis and best resampled axis
+            axis = resample_axes[0]
+            best_axis = np.argsort(current_shape) if minimize_size else np.argsort(current_shape)[::-1]
+            best_axis = [a for a in best_axis if a != axis][0]
+            current_axes = (axis, best_axis) if axis < best_axis else (best_axis, axis)
+            resample_axes = []
+
+        current_shape = tuple(s if d not in current_axes else t
+                              for d, (s, t) in enumerate(zip(current_shape, resampled_shape)))
+        axes_order.append(current_axes)
+        shape_order.append(current_shape)
+
+    return axes_order, shape_order
+
+
+def _axes_order(axes_order, original_shape, resampled_shape, order=None, source=None, minimize_size=True):
+    """Helper to find axes order for subsequent 2d resampling steps."""
+
+    # specified axes_order
+    if axes_order is not None and isinstance(axes_order, list):
+        axes_order = [(a[0], a[1]) if a[0] < a[1] else (a[1], a[0]) for a in axes_order]
+        shape_order = []
+        last_shape = original_shape
+        for axes in axes_order:
+            if not isinstance(axes, tuple) and len(axes) != 2:
+                raise ValueError('resampling; expected a tuple of len 2 for axes_order entry, got %r!' % axes)
+            last_shape = tuple(s if d not in axes else t for d, (s, t) in enumerate(zip(last_shape, resampled_shape)))
+            shape_order.append(last_shape)
+        return axes_order, shape_order
+
+    # determine axes order automatically
     if axes_order is None:
-      axes_order = 'order';
+        axes_order = 'order'
     if axes_order == 'order' and order is None and not isinstance(source, fl.Source):
-      axes_order = 'size';
-    
-    if axes_order == 'size': #order to reduce size as much as possible in each sub-resampling step
-      resample_axes = np.array([d for d,s,t in zip(range(ndim), sink_shape_in_source_orientation, source_shape) if s !=t]);
-      resample_factors = np.array([float(t)/float(s) for s,t in zip(sink_shape_in_source_orientation, source_shape) if s!=t]);
-      
-      axes_order = [];
-      shape_order = [];
-      last_shape = source_shape;
-      
-      while len(resample_axes) > 0:
-        if len(resample_axes) >= 2: 
-          #take largest two resampling factors
-          ids = np.argsort(resample_factors)[-2:];
-          axes = tuple(np.sort(resample_axes[ids]))
-          last_shape = tuple([s if d not in axes else t for d,s,t in zip(range(ndim), last_shape, sink_shape_in_source_orientation)]);
-          
-          axes_order.append(axes);
-          shape_order.append(last_shape);
-          
-          resample_axes = np.array([s for a,s in enumerate(resample_axes) if a not in ids]);
-          resample_factors = np.array([s for a,s in enumerate(resample_factors) if a not in ids]);
-        
-        else:
-          axis = resample_axes[0];
-          small_axis = np.argsort(last_shape);
-          small_axis = [a for a in small_axis if a != axis][0] ;                              
-          if axis < small_axis:
-            axes = (axis, small_axis);
-          else:
-            axes = (small_axis, axis);
-          last_shape = tuple([s if d not in axes else t for d,s,t in zip(range(ndim), last_shape, sink_shape_in_source_orientation)]);
-          
-          axes_order.append(axes);
-          shape_order.append(last_shape);
-          
-          resample_axes = [];
-      
-      return axes_order, shape_order;
-    
-    elif axes_order == 'order': #order axes according to array order for faster io
-    
-      if isinstance(source, fl.Source):
-        # FileList determine order according to file structure
-        axes_list = source.axes_list;
-        #axes_file = source.axes_file;
+        axes_order = 'size'
 
-        resample_axes = np.array([d for d,s,t in zip(range(ndim), sink_shape_in_source_orientation, source_shape) if s !=t]);
-        resample_factors = np.array([float(t)/float(s) for s,t in zip(sink_shape_in_source_orientation, source_shape) if s!=t]);
-        
-        axes_order = [];
-        shape_order = [];
-        last_shape = source_shape;
-        
-        #modify factors to account for file structure
-        resample_factors_list = [f for a,f in zip(resample_axes, resample_factors) if a in axes_list];
-        if len(resample_factors_list) > 0:
-          max_resample_factor_list = np.max(resample_factors_list);    
-        else:
-          max_resample_factor_list = 0;
-        resample_factors_sort = np.array([f if a in axes_list else f + max_resample_factor_list for a,f in zip(resample_axes,resample_factors)])
-        #print(resample_factors_sort, resample_factors)
-        
-        while len(resample_axes) > 0:
-          if len(resample_axes) >= 2: 
-            ids = np.argsort(resample_factors_sort)[-2:];
-            
-            axes = tuple(np.sort(resample_axes[ids]))
-            last_shape = tuple([s if d not in axes else t for d,s,t in zip(range(ndim), last_shape, sink_shape_in_source_orientation)]);
-          
-            axes_order.append(axes);
-            shape_order.append(last_shape);
-            
-            resample_axes = np.array([s for a,s in enumerate(resample_axes) if a not in ids]);
-            resample_factors = np.array([s for a,s in enumerate(resample_factors) if a not in ids]);
-            resample_factors_sort = np.array([s for a,s in enumerate(resample_factors_sort) if a not in ids]);  
-          else:
-            axis = resample_axes[0];
-            small_axis = np.argsort(last_shape);
-            small_axis = [a for a in small_axis if a != axis][0] ;                              
-            if axis < small_axis:
-              axes = (axis, small_axis);
-            else:
-              axes = (small_axis, axis);
-            last_shape = tuple([s if d not in axes else t for d,s,t in zip(range(ndim), last_shape, sink_shape_in_source_orientation)]);
-            
-            axes_order.append(axes);
-            shape_order.append(last_shape);
-            
-            resample_axes = [];
-        
-        return axes_order, shape_order;
-      else:
-        #not a FileList
-        resample_axes = np.array([d for d,s,t in zip(range(ndim), sink_shape_in_source_orientation, source_shape) if s !=t]);
-        
-        axes_order = [];
-        shape_order = [];
-        last_shape = source_shape;
-        while len(resample_axes) > 0:
-          if len(resample_axes) >= 2:
-            if order == 'C':
-              slicing = slice(-2,None);
-            else:
-              slicing = slice(None,2);
-            axes = tuple(resample_axes[slicing]);
-          else:
-            if order == 'C':
-              axes = (resample_axes[0], axes_order[-1][0]); 
-            else:
-              axes = (axes_order[-1][1], resample_axes[0])
-          
-          axes_order.append(axes);
-          last_shape = tuple([s if d not in axes else t for d,s,t in zip(range(ndim), last_shape, sink_shape_in_source_orientation)]);
-          shape_order.append(last_shape);
-          resample_axes = np.array([a for a in resample_axes if a not in axes]);
-        
-        return axes_order, shape_order;
-    
+    # only select axes that need resampling
+    resample_axes = [d for d, (s, rs) in enumerate(zip(original_shape, resampled_shape)) if s != rs]
+    resample_factors = [float(rs) / float(s) for s, rs in zip(original_shape, resampled_shape) if s != rs]
+
+    # axes and shape order results
+    if axes_order == 'size':  # order to reduce size as much as possible in each sub-resampling step
+        return _order_axes(original_shape, resampled_shape, resample_axes, resample_factors, None, minimize_size)
+    elif axes_order == 'order':  # order axes according to file or array order for faster io
+        # determine order according to file structure (i.e. resample individual files first)
+        if isinstance(source, fl.Source):
+            axes_list = source.axes_list  # axes for individual files
+            shift = -(np.max(resample_factors) + 1)  # make file factors the smallest
+            if not minimize_size:
+                shift = -shift  # make file factors the biggest
+            sort_factors = [f + shift if a in axes_list else f for a, f in zip(resample_axes, resample_factors)]
+            return _order_axes(original_shape, resampled_shape, resample_axes,
+                               resample_factors, sort_factors, minimize_size)
+        else:  # follow 'C' or 'F' array order
+            axes_order = []
+            shape_order = []
+            current_shape = original_shape
+            while len(resample_axes) > 0:
+                if len(resample_axes) >= 2:
+                    slicing = slice(-2, None) if order == 'C' else slice(None, 2)
+                    current_axes = tuple(resample_axes[slicing])
+                else:
+                    current_axes = (resample_axes[0], axes_order[-1][0]) if order == 'C' \
+                        else (axes_order[-1][1], resample_axes[0])
+                current_shape = tuple(s if d not in current_axes else t
+                                      for d, (s, t) in enumerate(zip(current_shape, resampled_shape)))
+
+                axes_order.append(current_axes)
+                shape_order.append(current_shape)
+
+                resample_axes = np.array([a for a in resample_axes if a not in current_axes])
+
+            return axes_order, shape_order
     else:
-      raise ValueError("axes_order %r not 'size','order' or list but %r!" % axes_order);
+        raise ValueError("axes_order not 'size','order' or list but %r!" % axes_order)
 
 
-def _interpolation_to_cv2(interpolation):
-  """Helper to convert interpolation specification to CV2 format."""
-  
-  if interpolation in ['nearest', 'nn', None, cv2.INTER_NEAREST]:
-    interpolation = cv2.INTER_NEAREST
-  elif interpolation in ['area', 'a', cv2.INTER_AREA]:
-    interpolation = cv2.INTER_AREA
-  else:
-    interpolation = cv2.INTER_LINEAR
-      
-  return interpolation
+_interpolation_to_cv2_map = {
+    cv2.INTER_NEAREST: cv2.INTER_NEAREST,
+    'nearest': cv2.INTER_NEAREST,
+    None: cv2.INTER_NEAREST,
+
+    cv2.INTER_AREA: cv2.INTER_AREA,
+    'area': cv2.INTER_AREA,
+
+    cv2.INTER_LINEAR: cv2.INTER_LINEAR,
+    'linear': cv2.INTER_LINEAR,
+
+    cv2.INTER_CUBIC: cv2.INTER_CUBIC,
+    'cubic': cv2.INTER_CUBIC,
+
+    cv2.INTER_LANCZOS4: cv2.INTER_LANCZOS4,
+    'lanczos': cv2.INTER_LANCZOS4,
+
+    cv2.INTER_LINEAR_EXACT: cv2.INTER_LINEAR_EXACT,
+    'linear_exact': cv2.INTER_LINEAR_EXACT,
+
+    cv2.INTER_NEAREST_EXACT: cv2.INTER_NEAREST_EXACT,
+    'nearest_exact': cv2.INTER_NEAREST_EXACT
+}
+
+_interpolation_method_for_int_map = {
+    cv2.INTER_LINEAR: cv2.INTER_LINEAR_EXACT,
+    cv2.INTER_CUBIC: cv2.INTER_LINEAR_EXACT,
+    cv2.INTER_LANCZOS4: cv2.INTER_LINEAR_EXACT,
+    cv2.INTER_AREA: cv2.INTER_NEAREST,
+}
 
 
-def resample_inverse(source, sink = None,
-                     resample_source = None, resample_sink = None,
-                     orientation = None,
-                     source_shape = None, source_resolution = None,
-                     sink_shape = None, sink_resolution = None,
-                     axes_order = None, method = 'memmap',
-                     interpolation = 'linear',
-                     processes = None, verbose = True, workspace=None, **args):
-  """Resample data inversely to :func:`resample` routine.
-  
-  Arguments
-  ---------
-  source : str, array
-    Source to be inversly resampled (e.g. sink in :func:`resample`).
-  sink : str or None
-    Sink to write the inversly resampled image to.
-  resample_source : str, array or None
-    Optional source in :func:`resample`.
-  resmaple_sink: str, array or None
-    Optional sink used in :func:`resample`.
-  orientation : tuple
-    Orientation as specified as in :func:`resample`.
-  source_shape : tuple or None
-    Optional value of source_shape as in :func:`resample`.
-  source_resolution : tuple or None
-    Optional value of source_resolution as in :func:`resample`.
-  sink_resolution : tuple or None
-    Optional value of sink_resolution as in :func:`resample`.
-  processing_directory : str or None
-    Optional directory in which to perform resmapling in parallel.
-    If None, a temporary directry will be created.
-  axis_order : list of tuples of int or None
-    The axes pairs along which to resample the data as in :func:`resample`.
-  method : 'shared' or 'memmap'
-    Method to handle intermediate resampling results. If 'shared' use shared 
-    memory, otherwise use a memory map on disk.
-  interpolation : str
-    Method to use for interpolating to the resmapled image. 
-  processes int or None
-    Number of processes to use for parallel resampling.
-  verbose : bool
-    If True, print progress information.
-   
-  Returns
-  -------
-  resampled : array or str
-     Data or file name of inversly resampled image.
+def _interpolation_to_cv2(interpolation, default=cv2.INTER_LINEAR, dtype=None):
+    """Helper to convert interpolation specification to CV2 format."""
+    interpolation = _interpolation_to_cv2_map.get(interpolation, default)
 
-  Notes
-  -----
-  * All arguments, except source and sink should be passed as :func:`resample`
-    to invert the resmapling.
-  """   
-  source = io.as_source(source);
-  ndim = source.ndim;
-  dtype = source.dtype;
-  
-  #orientation
-  orientation = format_orientation(orientation);
-  orientation_inverse = inverse_orientation(orientation);
-  
-  #original source info
-  if source_shape is None:
-    if source_resolution is None and resample_source is None:
-      raise ValueError('Either source_shape, source_resolution or resample_source must to be given!')
-    if resample_source is not None:
-      source_shape = io.shape(resample_source);
-  
-  #original sink info
-  if sink_shape is None and sink_resolution is None: 
-    if resample_sink is None:
-      sink_shape = io.shape(source);
-    else:
-      sink_shape = io.shape(resample_sink);
-  
-  source_shape, sink_shape, source_resolution, sink_resolution = \
-      resample_shape(source_shape=source_shape, sink_shape=sink_shape, 
-                     source_resolution=source_resolution, sink_resolution=sink_resolution, 
-                     orientation=orientation);
-  
-  sink_shape_in_source_orientation = orient_shape(sink_shape, orientation, inverse=True);
-  
-  axes_order, shape_order = _axes_order(axes_order, source, source_shape, sink_shape_in_source_orientation);
- 
-  interpolation = _interpolation_to_cv2(interpolation);                                   
+    # check if consistent with data type
+    if dtype is not None and np.dtype(dtype) not in [float, np.dtype('float32')]:
+        correct_interpolation = _interpolation_method_for_int_map.get(interpolation, interpolation)
+        if correct_interpolation != interpolation:
+            print('Resampling: Warning: the interpolation method requires a float data type, '
+                  'using an exact method instead!')
+        interpolation = correct_interpolation
 
-  if processes is None or not processes == 'serial':
-      processes = io.mp.cpu_count();
-  
-  #reversed orientation
-  if not orientation is None:
-    #reverse axes
-    slicing = [slice(None)] * ndim;
-    reslice = False;
-    for d,o in enumerate(orientation):
-      if o < 0:
-        slicing[d] = slice(None, None, -1);
-        reslice = True;
-    if reslice:
-      source = source[slicing];   
-    
-    #re-orient
-    per = orientation_to_permuation(orientation_inverse);
-    source = io.read(source);
-    source = source.transpose(per);
-    source = io.sma.as_shared(source);
- 
-  #reverse resampling steps
-  axes_order = axes_order[::-1];
-  
-  shape_order = shape_order[:-1];
-  shape_order = shape_order[::-1];
-  shape_order = shape_order + [source_shape]
-  #print(axes_order, shape_order)
-  
-  #reverse resampling
-  n_steps = len(axes_order);
-  last_source = source;
-  delete_files = [];
-  #print(last_source)
-  for step, axes, shape in zip(range(n_steps), axes_order, shape_order):
-    if step == n_steps-1:
-      resampled = io.initialize(source=sink, shape=shape, dtype=dtype, memory='shared', as_source=True); 
-    else:
-      if method == 'shared':
-        resampled = io.sma.create(shape, dtype=dtype, order='C', as_source=True);
-      else:
-        location = tempfile.mktemp() + '.npy';
-        resampled = io.mmp.create(location, shape=shape, dtype=dtype, order='C', as_source=True);
-        delete_files.append(location);
-
-    #indices for non-resampled axes
-    indices = tuple([range(s) for d,s in enumerate(shape) if d not in axes]);
-    indices = [i for i in itertools.product(*indices)];
-    n_indices = len(indices);
-    
-    #resample step
-    last_source_virtual = last_source.as_virtual();
-    resampled_virtual = resampled.as_virtual();
-    _resample = ft.partial(_resample_2d, source=last_source_virtual, sink=resampled_virtual, axes=axes, shape=shape, 
-                                         interpolation=interpolation, n_indices=n_indices, verbose=verbose)                       
-    
-    if processes == 'serial': 
-      for index in indices:
-        _resample(index=index);
-    else:
-      with CancelableProcessPoolExecutor(processes) as executor:
-        executor.map(_resample, indices)
-        if workspace is not None:
-          workspace.executor = executor
-      # if workspace is not None:
-      #   workspace.executor = None
-        
-    last_source = resampled;
-  
-  for f in delete_files:
-      io.delete_file(f);  
-  
-  sink = resampled.as_real();
-      
-  return sink;
+    return interpolation
 
 
 ########################################################################################
-### Resample Points
-########################################################################################
-
-def resample_points(source, sink = None, resample_source = None, resample_sink = None, 
-                    orientation = None, source_shape = None, sink_shape = None,
-                    source_resolution = None, sink_resolution = None, **args):
-  """Resample points from original coordiantes to resampled ones.
-  
-  Arguments
-  ---------
-  source : str or array
-    Points to be resampled.
-  sink : str or None
-    Sink for the resampled point coordinates.
-  orientation : tuple
-    Orientation as specified in :func:`resample`.
-  resample_source : str, array or None
-    Optional source as in :func:`resample`.
-  resample_sink: str, array or None
-    Optional sink used in :func:`resample`.
-  source_shape : tuple or None
-    Optional value of source_shape as in :func:`resample`.
-  source_resolution : tuple or None
-    Optional value of source_resolution as in :func:`resample`.
-  sink_resolution : tuple or None
-    Optional value of sink_resolution as in :func:`resample`.
-      
-  Returns
-  -------
-  resmapled : array or str
-    Sink for the resampled point coordinates.
-
-  Notes
-  -----
-  * The resampling of points here corresponds to he resampling of an image 
-    in :func:`resample`.
-  * The arguments should be passed exactly as in :func:`resample` except soure
-    and sink that point to the point sources. 
-    Use resample_source and resmaple_sink to pass the source and sink values
-    used in :func:`resample`.
-  """
-  #orientation
-  orientation = format_orientation(orientation);
-  
-  #original source info
-  if source_shape is None:
-    if source_resolution is None and resample_source is None:
-      raise ValueError('Either source_shape, source_resolution or resample_source must to be given!')
-    if resample_source is not None:
-      source_shape = io.shape(resample_source);
-
-  #original sink info
-  if sink_shape is None and sink_resolution is None: 
-    if resample_sink is None:
-      sink_shape = io.shape(source);
-    else:
-      sink_shape = io.shape(resample_sink);
-  
-  source_shape, sink_shape, source_resolution, sink_resolution = \
-      resample_shape(source_shape=source_shape, sink_shape=sink_shape, 
-                     source_resolution=source_resolution, sink_resolution=sink_resolution, 
-                     orientation=orientation);
-  
-  sink_shape_in_source_orientation = orient_shape(sink_shape, orientation, inverse=True);
-  
-  resample_factor = [float(t)/float(s) for s,t in zip(source_shape, sink_shape_in_source_orientation)];
-  
-  points = io.as_source(source);
-  resampled = points[:] * resample_factor;
-  
-  # reorient points
-  if orientation is not None:
-    #permute
-    per = orientation_to_permuation(orientation);
-    resampled = resampled.transpose(per);
-
-    #reverse axes
-    reslice = False;
-    slicing = [slice(None)] * len(source_shape);
-    for d,o in enumerate(orientation):
-      if o < 0:
-        slicing[d] = slice(None, None, -1);
-        reslice = True;
-    if reslice:
-      resampled = resampled[slicing];
-  
-  return io.write(sink, resampled);
-
-
-def resample_points_inverse(source, sink = None, resample_source = None, resample_sink = None,
-                            orientation = None, source_shape = None, sink_shape = None, 
-                            source_resolution = None, sink_resolution = None, **args):
-  """Resample points from original coordiantes to resampled ones.
-  
-  Arguments
-  ---------
-  source : str or array
-    Points to be resampled inversely.
-  sink : str or None
-    Sink for the inversly resmapled points.
-  resample_source : str, array or None
-    Optional source as in :func:`resample`.
-  resample_sink: str, array or None
-    Optional sink used in :func:`resample`.
-  orientation : tuple
-    Orientation as specified in :func:`resample`.
-  source_shape : tuple or None
-    Optional value of source_shape as in :func:`resample`.
-  source_resolution : tuple or None
-    Optional value of source_resolution as in :func:`resample`.
-  sink_resolution : tuple or None
-    Optional value of sink_resolution as in :func:`resample`.
-      
-  Returns
-  -------
-  resmapled : array or str
-    Sink for the inversly resampled point coordinates.
-
-  Notes
-  -----
-  * The resampling of points here corresponds to the inverse resampling of 
-    an image in :func:`resample`, i.e. to func:`resample_inverse`
-  * The arguments should be passed exactly as in :func:`resample` except source
-    and sink that point to the point sources. 
-    Use resample_source and resmaple_sink to pass the source and sink values
-    used in :func:`resample`.
-  """
-  #orientation
-  orientation = format_orientation(orientation);
-  
-  #original source info
-  if source_shape is None:
-    if source_resolution is None and resample_source is None:
-      raise ValueError('Either source_shape, source_resolution or resample_source must to be given!')
-    if resample_source is not None:
-      source_shape = io.shape(resample_source);
-
-  #original sink info
-  if sink_shape is None and sink_resolution is None: 
-    if resample_sink is None:
-      sink_shape = io.shape(source);
-    else:
-      sink_shape = io.shape(resample_sink);
-  
-  source_shape, sink_shape, source_resolution, sink_resolution = \
-      resample_shape(source_shape=source_shape, sink_shape=sink_shape, 
-                     source_resolution=source_resolution, sink_resolution=sink_resolution, 
-                     orientation=orientation);
-  
-  sink_shape_in_source_orientation = orient_shape(sink_shape, orientation, inverse=True);
-  
-  resample_factor = [float(t)/float(s) for s,t in zip(source_shape, sink_shape_in_source_orientation)];
-  
-  points = io.read(source);
- 
-  # reorient points
-  if orientation is not None:
-    #reverse axes
-    reslice = False;
-    slicing = [slice(None)] * len(source_shape);
-    for d,o in enumerate(orientation):
-      if o < 0:
-        slicing[d] = slice(None, None, -1);
-        reslice = True;
-    if reslice:
-      points = points[slicing];
-
-    #permute
-    per = orientation_to_permuation(orientation);
-    points = points.transpose(per);
-  
-  points = points[:] / resample_factor;
-  
-  return io.write(sink, points);     
-
-
-########################################################################################
-### Test
+# Test
 ########################################################################################
 
 def _test():
-  """Tests"""
-  import ClearMap.Settings as settings 
-  import ClearMap.IO.IO as io
-  import ClearMap.Visualization.Plot3d as p3d;
-  
-  import ClearMap.Alignment.Resampling as res
-  from importlib import reload
-  reload(res)
-  
-  r = res.resample_shape(source_shape=(100,200,300), sink_shape=(50,50,30));
-  print('resampled source_shape=%r, sink_shape=%r, source_resolution=%r, sink_resolution=%r' % r)
- 
-  r = res.resample_shape(source_shape=(100,200,300), source_resolution=(2,2,2), sink_resolution=(10,2,1))
-  print('resampled source_shape=%r, sink_shape=%r, source_resolution=%r, sink_resolution=%r' % r)
-  
-  
-  source = io.join(settings.test_data_path, 'Resampling/test.tif')
-  sink   = io.join(settings.test_data_path, "Resampling/resampled.npy")
-  
-  source = io.join(settings.test_data_path, 'Tif/sequence/sequence<Z,4>.tif')
-  sink = io.join(settings.test_data_path, "Resampling/resampled_sequence.tif")  
-  
-  
-  source_shape, sink_shape, source_res, sink_res = res.resample_shape(source_shape=io.shape(source), source_resolution=(1.,1.,1.), sink_resolution=(1.6,1.6,2))
-  axes_order = res._axes_order(None, source_shape, sink_shape);
-  print(axes_order)
-  resampled = res.resample(source, sink, source_resolution=(1.,1.,1.), sink_resolution = (1.6,1.6,2), orientation=None, processes=None);
-  p3d.plot(resampled)
-  p3d.plot(source)
-  
-  inverse = res.resample_inverse(resampled, sink=None, resample_source=source, source_resolution=(1,1,1), sink_resolution = (10,10,2), orientation=None, processes='serial')
-  p3d.plot([source, inverse])
+    """Tests"""
+    import numpy as np
+    import ClearMap.Settings as settings
+    import ClearMap.IO.IO as io
+    import ClearMap.Visualization.Plot3d as p3d
 
-  
-  resampled = res.resample(source, sink, source_resolution=(1,1,1), sink_resolution = (10,10,2), orientation=(2,-1,3), processes=None);
-  p3d.plot(resampled)
-  
-  inverse = res.resample_inverse(resampled, sink=None, resample_source=source, source_resolution=(1,1,1), sink_resolution = (10,10,2), orientation=(2,-1,3), processes=None)
-  p3d.plot([source, inverse])
-  
-  resampled = res.resample(source, sink=None, source_resolution=(1.6,1.6,2), sink_shape=(10,20,30), orientation=None, processes=None)
-  p3d.plot(resampled)
-  
-  
-  # ponints
-  points = res.np.array([[0,0,0], [1,1,1], [1,2,3]], dtype=float);
-  resampled_points = res.resample_points(points, resample_source=source , resample_sink=sink, orientation=None)
-  print(resampled_points)
+    import ClearMap.Alignment.Resampling as res
+    from importlib import reload
+    reload(res)
 
-  inverse_points = res.resample_points_inverse(resampled_points, resample_source=source , resample_sink=sink, orientation=None)
-  print(inverse_points)
-  print(res.np.allclose(points, inverse_points))
+    # orientation
+    data = np.zeros((15, 16, 17))
+    data[5, 6, 7] = 1
+    orientation = (-3, 1, 2)
+
+    data_oriented = res.orient(data, orientation)
+    data_inverse = res.orient(data_oriented, orientation, inverse=True)
+    np.all(data == data_inverse)
+
+    points = np.array(np.where(data)).T
+    points_oriented = res.orient_points(points, orientation, shape=data.shape)
+    np.all(points_oriented == np.array(np.where(data_oriented)).T)
+
+    r = res.resample_information(original_shape=(100, 200, 300), resampled_shape=(50, 50, 30))
+    print('original_shape=%r, resampled_shape=%r, original_resolution=%r resampled_resolution=%r orientation=%r' % r)
+
+    r = res.resample_shape(original_shape=(100, 200, 300), resampled_shape=(50, 50, 30))
+    print('original_shape=%r, resampled_shape=%r, original_resolution=%r resampled_resolution=%r' % r)
+
+    r = res.resample_shape(original_shape=(100, 200, 300), original_resolution=(2, 2, 2),
+                           resampled_resolution=(10, 2, 1))
+    print('original_shape=%r, resampled_shape=%r, original_resolution=%r resampled_resolution=%r' % r)
+
+    # random sources
+    from importlib import reload
+    reload(res)
+
+    shape = (40, 30, 10)
+
+    original = np.random.rand(40, 30, 10)
+    x, y, z = np.meshgrid(*tuple(np.arange(s) for s in shape))
+    # original = x + y + z
+    original = np.array(x + y + z, dtype=float)
+
+    resampled = res.resample(original, original_resolution=(1, 1, 1), resampled_shape=(10, 10, 10), processes='serial')
+    print(resampled.shape)
+    upsampled = res.resample_inverse(resampled, original_resolution=(1, 1, 1), original_shape=original.shape,
+                                     processes='serial')
+    print(upsampled.shape)
+    import ClearMap.Visualization.Plot3d as p3d
+    p3d.plot([resampled])
+    p3d.plot([original, upsampled])
+
+    source = io.join(settings.test_data_path, 'Resampling/test.tif')
+    sink = io.join(settings.test_data_path, "Resampling/resampled.npy")
+
+    source = io.join(settings.test_data_path, 'Tif/sequence/sequence<Z,4>.tif')
+    sink = io.join(settings.test_data_path, "Resampling/resampled_sequence.tif")
+
+    source_shape, sink_shape, source_res, sink_res = res.resample_shape(source_shape=io.shape(source),
+                                                                        source_resolution=(1., 1., 1.),
+                                                                        sink_resolution=(1.6, 1.6, 2))
+    axes_order = res._axes_order(None, source_shape, sink_shape)
+    print(axes_order)
+    resampled = res.resample(source, sink, source_resolution=(1., 1., 1.), sink_resolution=(1.6, 1.6, 2),
+                             orientation=None, processes=None)
+    p3d.plot(resampled)
+    p3d.plot(source)
+
+    inverse = res.resample_inverse(resampled, sink=None, resample_source=source, source_resolution=(1, 1, 1),
+                                   sink_resolution=(10, 10, 2), orientation=None, processes='serial')
+    p3d.plot([source, inverse])
+
+    resampled = res.resample(source, sink, source_resolution=(1, 1, 1), sink_resolution=(10, 10, 2),
+                             orientation=(2, -1, 3), processes=None)
+    p3d.plot(resampled)
+
+    inverse = res.resample_inverse(resampled, sink=None, resample_source=source, source_resolution=(1, 1, 1),
+                                   sink_resolution=(10, 10, 2), orientation=(2, -1, 3), processes=None)
+    p3d.plot([source, inverse])
+
+    resampled = res.resample(source, sink=None, source_resolution=(1.6, 1.6, 2), sink_shape=(10, 20, 30),
+                             orientation=None, processes=None)
+    p3d.plot(resampled)
+
+    # ponints
+    points = res.np.array([[0, 0, 0], [1, 1, 1], [1, 2, 3]], dtype=float)
+    resampled_points = res.resample_points(points, resample_source=source, resample_sink=sink, orientation=None)
+    print(resampled_points)
+
+    inverse_points = res.resample_points_inverse(resampled_points, resample_source=source, resample_sink=sink,
+                                                 orientation=None)
+    print(inverse_points)
+    print(res.np.allclose(points, inverse_points))
+
+    # random sources
+    from importlib import reload
+    reload(res)
+
+    source = np.random.rand(20, 30, 40)
+    resampled = res.resample(source, source_resolution=(1, 1, 1), sink_shape=(10, 11, 12), processes='serial')
+    print(resampled.shape)
+    upsampled = res.resample_inverse(resampled, source_resolution=(1, 1, 1), resample_source=source, processes='serial')
+    print(upsampled.shape)
+    import ClearMap.Visualization.Plot3d as p3d
+    p3d.plot([resampled])
+    p3d.plot([source, upsampled])
+
+# def _axes_order(axes_order, source, sink_shape_in_source_orientation, order=None):
+#     """Helper to find axes order for subsequent 2d resampling steps."""
+#
+#     source_shape = source.shape
+#     ndim = source.ndim
+#
+#     if axes_order is not None and isinstance(axes_order, list):
+#         axes_order = [(a[0], a[1]) if a[0] < a[1] else (a[1], a[0]) for a in axes_order]
+#         shape_order = []
+#         last_shape = source_shape
+#         for axes in axes_order:
+#             if not isinstance(axes, tuple) and len(axes) != 2:
+#                 raise ValueError('resampling; expected a tuple of len 2 for axes_order entry, got %r!' % axes)
+#             last_shape = tuple([s if d not in axes else t for d, s, t in
+#                                 zip(range(ndim), last_shape, sink_shape_in_source_orientation)])
+#             shape_order.append(last_shape)
+#         return axes_order, shape_order
+#
+#     else:  # determine automatically
+#         if axes_order is None:
+#             axes_order = 'order'
+#         if axes_order == 'order' and order is None and not isinstance(source, fl.Source):
+#             axes_order = 'size'
+#
+#         if axes_order == 'size':  # order to reduce size as much as possible in each sub-resampling step
+#             resample_axes = np.array(
+#                 [d for d, s, t in zip(range(ndim), sink_shape_in_source_orientation, source_shape) if s != t])
+#             resample_factors = np.array(
+#                 [float(t) / float(s) for s, t in zip(sink_shape_in_source_orientation, source_shape) if s != t])
+#
+#             axes_order = []
+#             shape_order = []
+#             last_shape = source_shape
+#
+#             while len(resample_axes) > 0:
+#                 if len(resample_axes) >= 2:
+#                     # take the largest two resampling factors
+#                     ids = np.argsort(resample_factors)[-2:]
+#                     axes = tuple(np.sort(resample_axes[ids]))
+#                     last_shape = tuple([s if d not in axes else t for d, s, t in
+#                                         zip(range(ndim), last_shape, sink_shape_in_source_orientation)])
+#
+#                     axes_order.append(axes)
+#                     shape_order.append(last_shape)
+#
+#                     resample_axes = np.array([s for a, s in enumerate(resample_axes) if a not in ids])
+#                     resample_factors = np.array([s for a, s in enumerate(resample_factors) if a not in ids])
+#
+#                 else:
+#                     axis = resample_axes[0]
+#                     small_axis = np.argsort(last_shape)
+#                     small_axis = [a for a in small_axis if a != axis][0]
+#                     if axis < small_axis:
+#                         axes = (axis, small_axis)
+#                     else:
+#                         axes = (small_axis, axis)
+#                     last_shape = tuple([s if d not in axes else t for d, s, t in
+#                                         zip(range(ndim), last_shape, sink_shape_in_source_orientation)])
+#
+#                     axes_order.append(axes)
+#                     shape_order.append(last_shape)
+#
+#                     resample_axes = []
+#
+#             return axes_order, shape_order
+#
+#         elif axes_order == 'order':  # order axes according to array order for faster io
+#
+#             if isinstance(source, fl.Source):
+#                 # FileList determine order according to file structure
+#                 axes_list = source.axes_list
+#                 # axes_file = source.axes_file;
+#
+#                 resample_axes = np.array(
+#                     [d for d, s, t in zip(range(ndim), sink_shape_in_source_orientation, source_shape) if s != t])
+#                 resample_factors = np.array(
+#                     [float(t) / float(s) for s, t in zip(sink_shape_in_source_orientation, source_shape) if s != t])
+#
+#                 axes_order = []
+#                 shape_order = []
+#                 last_shape = source_shape
+#
+#                 # modify factors to account for file structure
+#                 resample_factors_list = [f for a, f in zip(resample_axes, resample_factors) if a in axes_list]
+#                 if len(resample_factors_list) > 0:
+#                     max_resample_factor_list = np.max(resample_factors_list)
+#                 else:
+#                     max_resample_factor_list = 0
+#                 resample_factors_sort = np.array([f if a in axes_list else f + max_resample_factor_list for a, f in
+#                                                   zip(resample_axes, resample_factors)])
+#                 # print(resample_factors_sort, resample_factors)
+#
+#                 while len(resample_axes) > 0:
+#                     if len(resample_axes) >= 2:
+#                         ids = np.argsort(resample_factors_sort)[-2:]
+#
+#                         axes = tuple(np.sort(resample_axes[ids]))
+#                         last_shape = tuple([s if d not in axes else t for d, s, t in
+#                                             zip(range(ndim), last_shape, sink_shape_in_source_orientation)])
+#
+#                         axes_order.append(axes)
+#                         shape_order.append(last_shape)
+#
+#                         resample_axes = np.array([s for a, s in enumerate(resample_axes) if a not in ids])
+#                         resample_factors = np.array([s for a, s in enumerate(resample_factors) if a not in ids])
+#                         resample_factors_sort = np.array(
+#                             [s for a, s in enumerate(resample_factors_sort) if a not in ids])
+#                     else:
+#                         axis = resample_axes[0]
+#                         small_axis = np.argsort(last_shape)
+#                         small_axis = [a for a in small_axis if a != axis][0]
+#                         if axis < small_axis:
+#                             axes = (axis, small_axis)
+#                         else:
+#                             axes = (small_axis, axis)
+#                         last_shape = tuple([s if d not in axes else t for d, s, t in
+#                                             zip(range(ndim), last_shape, sink_shape_in_source_orientation)])
+#
+#                         axes_order.append(axes)
+#                         shape_order.append(last_shape)
+#
+#                         resample_axes = []
+#
+#                 return axes_order, shape_order
+#             else:
+#                 # not a FileList
+#                 resample_axes = np.array(
+#                     [d for d, s, t in zip(range(ndim), sink_shape_in_source_orientation, source_shape) if s != t])
+#
+#                 axes_order = []
+#                 shape_order = []
+#                 last_shape = source_shape
+#                 while len(resample_axes) > 0:
+#                     if len(resample_axes) >= 2:
+#                         if order == 'C':
+#                             slicing = slice(-2, None)
+#                         else:
+#                             slicing = slice(None, 2)
+#                         axes = tuple(resample_axes[slicing])
+#                     else:
+#                         if order == 'C':
+#                             axes = (resample_axes[0], axes_order[-1][0])
+#                         else:
+#                             axes = (axes_order[-1][1], resample_axes[0])
+#
+#                     axes_order.append(axes)
+#                     last_shape = tuple([s if d not in axes else t for d, s, t in
+#                                         zip(range(ndim), last_shape, sink_shape_in_source_orientation)])
+#                     shape_order.append(last_shape)
+#                     resample_axes = np.array([a for a in resample_axes if a not in axes])
+#
+#                 return axes_order, shape_order
+#
+#         else:
+#             raise ValueError("axes_order not 'size','order' or list but %r!" % axes_order)
