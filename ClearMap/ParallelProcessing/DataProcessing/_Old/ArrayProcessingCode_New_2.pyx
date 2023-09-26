@@ -237,8 +237,6 @@ cpdef void apply_lut_to_index_3d(source_t[:,:,:] source, sink_t[:,:,:] sink, ind
   
   #  print('nx,ny,nz=%d,%d,%d, kx,y,z1=%d,%d,%d, kx,y,z2=%d,%d,%d' % (nx,ny,nz,kx1,ky1,kz1,kx2,ky2,kz2));
   
-  
-  for 
   with nogil, parallel(num_threads = processes):                 
     
     for x in prange(nx, schedule = 'guided'):
