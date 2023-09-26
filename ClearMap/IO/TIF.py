@@ -33,51 +33,51 @@ class Source(src.Source):
   Its assumed that the image data is stored in a serregionies of the tif file.
   """
   def __init__(self, location, series = 0, multi_file = False):
-    self._tif = tif.TiffFile(location, _multifile = multi_file);
-    self._series = series;
-    self.multi_file = multi_file;
-    
+    self._tif = tif.TiffFile(location, _multifile = multi_file)
+    self._series = series
+    self.multi_file = multi_file
+
   @property
   def name(self):
-    return "Tif-Source";
-      
+    return "Tif-Source"
+
   @lazyattr
   def series(self):
-    return self._tif.series[self._series];
-    
+    return self._tif.series[self._series]
+
   @property
   def shape(self):
-    return shape_from_tif(self.tif_shape);
-    
+    return shape_from_tif(self.tif_shape)
+
   @property
   def tif_shape(self):
     if self._tif._multifile:
-      return self._tif.series[self._series].shape;
+      return self._tif.series[self._series].shape
     else:
-      s =  self._tif.pages[0].shape;
-      l = len(self._tif.pages);
+      s =  self._tif.pages[0].shape
+      l = len(self._tif.pages)
       if l > 1:
-        s = (l,) + s;
-    return s;
-    
+        s = (l,) + s
+    return s
+
   @property
   def dtype(self):
-    return self._tif.pages[0].dtype;
-  
+    return self._tif.pages[0].dtype
+
   @property
   def location(self):
-    return self._tif._fh.path;
-    
+    return self._tif._fh.path
+
   @location.setter
   def location(self, value):
     if value != self.location:
-      self._tif = tif.TiffFile(value, multifile = False);
-  
+      self._tif = tif.TiffFile(value, multifile = False)
+
   @property
   def array(self, processes = None):
-     array = self._tif.asarray(maxworkers=processes);
-     return array_from_tif(array);
-   
+     array = self._tif.asarray(maxworkers=processes)
+     return array_from_tif(array)
+
   @property
   def element_strides(self):
     """The strides of the array elements.
@@ -135,144 +135,141 @@ class Source(src.Source):
     metadata : dict
       Dictionary with the meta data.
     """
-    md = None;
+    md = None
     for t in self._tif.flags:
       if hasattr(self._tif, t + '_metadata'):
-        md = getattr(self._tif, t + '_metadata');
+        md = getattr(self._tif, t + '_metadata')
         if md is not None:
-          break;
+          break
 
     if md is None:
-      md = {};
-      
+      md = {}
+
     if info is all:
-      return md;
+      return md
     elif info is None:
-      info = ['shape', 'resolution', 'overlap'];
+      info = ['shape', 'resolution', 'overlap']
     elif isinstance(info, str):
-      info = [info];
-    info = {k : None for k in info};
-        
+      info = [info]
+    info = {k : None for k in info}
+
     def update_info(info, name, keys, mdict, astype, include_keys=False):
-      value = [];      
+      value = []
       for k in keys:
         try:
-          v = mdict;
+          v = mdict
           for kk in k.split('.'):
-            v = v.get(kk, None);
+            v = v.get(kk, None)
             if v is None:
-              break;
+              break
           if include_keys and v is not None:
-            info[k] = v;
-          value.append(astype(v));
+            info[k] = v
+          value.append(astype(v))
         except Exception:
           pass
       if len(value) > 0:
-        info[name] = tuple(value);
-    
+        info[name] = tuple(value)
+
     #get info
-    mdp = md.get('Image', {}).get('Pixels', {});
-    keys = info.keys();    
-    
+    mdp = md.get('Image', {}).get('Pixels', {})
+    keys = info.keys()
+
     if 'shape' in keys:
       #info['shape'] = self.shape;
-      order = mdp.get('DimensionOrder', None);
+      order = mdp.get('DimensionOrder', None)
       if order is None:
-        order = ''.join([d for d in 'XYZTC' if 'Size' + d in mdp.keys()]);
-      info['order'] = order;
-      skeys = ['Size' + d for d in order];
-      update_info(info, 'shape', skeys, mdp, int);
-    
-    if 'description' in keys:
-      info['description'] = self._tif.pages[0].description;
-      
-    if 'resolution' in keys:
-      rkeys = ['PhysicalSizeX', 'PhysicalSizeY', 'PhysicalSizeZ'];
-      update_info(info, 'resolution', rkeys, mdp, float);
-    
-    if 'overlap' in keys:
-      mdc = md.get('CustomAttributes', {}).get('PropArray',{});
-      okeys = ['xyz-Table_X_Overlap.Value', 'xyz-Table_Y_Overlap.Value'];
-      update_info(info, 'overlap', okeys, mdc, float); 
-    
-    return info;
+        order = ''.join([d for d in 'XYZTC' if 'Size' + d in mdp.keys()])
+      info['order'] = order
+      skeys = ['Size' + d for d in order]
+      update_info(info, 'shape', skeys, mdp, int)
 
-  
+    if 'description' in keys:
+      info['description'] = self._tif.pages[0].description
+
+    if 'resolution' in keys:
+      rkeys = ['PhysicalSizeX', 'PhysicalSizeY', 'PhysicalSizeZ']
+      update_info(info, 'resolution', rkeys, mdp, float)
+
+    if 'overlap' in keys:
+      mdc = md.get('CustomAttributes', {}).get('PropArray',{})
+      okeys = ['xyz-Table_X_Overlap.Value', 'xyz-Table_Y_Overlap.Value']
+      update_info(info, 'overlap', okeys, mdc, float)
+
+    return info
+
   def as_memmap(self):
     try :
-      return array_from_tif(tif.memmap(self.location));
+      return array_from_tif(tif.memmap(self.location))
     except:
-      raise ValueError('The tif file %s cannot be memmaped!' % self.location);
-  
-  
+      raise ValueError('The tif file %s cannot be memmaped!' % self.location)
+
   def as_virtual(self):
-     return VirtualSource(source = self);
-     
+     return VirtualSource(source = self)
+
   def as_real(self):
-    return self;
-  
+    return self
+
   def as_buffer(self):
-    return self.as_memmap();
-  
-  
+    return self.as_memmap()
+
   ### Formatting
   def __str__(self):
     try:
-      name = self.name;
-      name = '%s' % name if name is not None else '';
+      name = self.name
+      name = '%s' % name if name is not None else ''
     except:
-      name ='';
-    
-    try:
-      shape = self.shape
-      shape ='%r' % ((shape,)) if shape is not None else '';
-    except:
-      shape = '';
+      name =''
 
     try:
-      dtype = self.dtype;
-      dtype = '[%s]' % dtype if dtype is not None else '';
+      shape = self.shape
+      shape ='%r' % ((shape,)) if shape is not None else ''
     except:
-      dtype = '';
-            
+      shape = ''
+
     try:
-      order = self.order;
-      order = '|%s|' % order if order is not None else '';
+      dtype = self.dtype
+      dtype = '[%s]' % dtype if dtype is not None else ''
     except:
-      order = '';
-    
+      dtype = ''
+
     try:
-      location = self.location;
-      location = '%s' % location if location is not None else '';
+      order = self.order
+      order = '|%s|' % order if order is not None else ''
+    except:
+      order = ''
+
+    try:
+      location = self.location
+      location = '%s' % location if location is not None else ''
       if len(location) > 100:
         location = location[:50] + '...' + location[-50:]
       if len(location) > 0:
-        location = '{%s}' % location;
+        location = '{%s}' % location
     except:
-      location = '';    
-    
+      location = ''
+
     return name + shape + dtype + order + location
 
 
 class VirtualSource(src.VirtualSource):
   def __init__(self, source = None, shape = None, dtype = None, order = None, location = None, name = None):
-    super(VirtualSource, self).__init__(source=source, shape=shape, dtype=dtype, order=order, location=location, name=name);
+    super(VirtualSource, self).__init__(source=source, shape=shape, dtype=dtype, order=order, location=location, name=name)
     if isinstance(source, Source):
-      self.multi_file = source.multi_file;
-      self.series = source._series;
-  
+      self.multi_file = source.multi_file
+      self.series = source._series
+
   @property 
   def name(self):
-    return 'Virtual-Tif-Source';
-  
+    return 'Virtual-Tif-Source'
+
   def as_virtual(self):
-    return self;
-  
+    return self
+
   def as_real(self):
-    return Source(location=self.location, series=self.series, multi_file=self.multi_file);
-  
+    return Source(location=self.location, series=self.series, multi_file=self.multi_file)
+
   def as_buffer(self):
-    return self.as_real().as_buffer();
+    return self.as_real().as_buffer()
 
 
 ###############################################################################
@@ -283,15 +280,15 @@ class VirtualSource(src.VirtualSource):
 def is_tif(source):
   """Checks if this source a TIF source"""
   if isinstance(source, Source):
-    return True;
+    return True
   if isinstance(source, str):
     try:
-      Source(source);
+      Source(source)
     except :
-      return False;
-    return True;
-  return False;
- 
+      return False
+    return True
+  return False
+
 
 def read(source, slicing = None, sink = None, **args):
   """Read data from a tif file.
@@ -309,11 +306,11 @@ def read(source, slicing = None, sink = None, **args):
     The image data in the tif file.
   """ 
   if not isinstance(source, Source):
-    source = Source(source);
+    source = Source(source)
   if slicing is None:
     return source.array
   else:
-    return source.__getitem__(slicing);
+    return source.__getitem__(slicing)
 
 
 def write(sink, data, **args):
@@ -330,7 +327,7 @@ def write(sink, data, **args):
     The name of the tif file.
   """ 
   tif.imsave(sink, array_to_tif(data), **args)
-  return sink;
+  return sink
 
 
 def create(location = None, shape = None, dtype = None, mode = None, as_source = True, **kwargs):
@@ -359,17 +356,16 @@ def create(location = None, shape = None, dtype = None, mode = None, as_source =
   By default memmaps are initialized as fortran contiguous if order is None.
   """
   if shape is None:
-    raise ValueError('Shape for new tif file must be given!');
-  shape = shape_to_tif(shape);
-  mode = 'r+' if mode == 'w+' or mode is None else mode;
-  dtype = 'float64' if dtype is None else dtype;
-  
-  memmap = tif.memmap(filename=location, shape=shape, dtype=dtype, mode=mode);
-  if as_source:
-    return Source(location);
-  else:
-    return memmap;
+    raise ValueError('Shape for new tif file must be given!')
+  shape = shape_to_tif(shape)
+  mode = 'r+' if mode == 'w+' or mode is None else mode
+  dtype = 'float64' if dtype is None else dtype
 
+  memmap = tif.memmap(filename=location, shape=shape, dtype=dtype, mode=mode)
+  if as_source:
+    return Source(location)
+  else:
+    return memmap
 
 
 ################################################################################
@@ -406,6 +402,7 @@ def array_from_tif(array):
 
 def array_to_tif(array):
   return array_from_tif(array)
+
 
 ################################################################################
 #### Meta data
@@ -456,17 +453,16 @@ def array_to_tif(array):
 def _test():
   import ClearMap.Tests.Files as tfs
   import ClearMap.IO.TIF as tif
-  reload(tif)
   
-  filename = tfs.filename('tif_2d');
-  t = tif.Source(location = filename);
+  filename = tfs.filename('tif_2d')
+  t = tif.Source(location = filename)
   print(t)
   
-  filename = tfs.filename('tif_2d_color');
-  t = tif.Source(location = filename);
+  filename = tfs.filename('tif_2d_color')
+  t = tif.Source(location = filename)
   print(t)
   
-  d = tif.read(filename);
+  d = tif.read(filename)
   print(d.shape)
   
   v = t.as_virtual()
@@ -475,8 +471,5 @@ def _test():
   q = v.as_real()
   print(q)
   
-  
-  #filename = '/home/ckirst/Science/Projects/WholeBrainClearing/Vasculature/Experiment/17-19-19_IgG_UltraII[02 x 06]_C00_UltraII Filter0000.ome.tif';
-  #t = tif.Source(location = filename);
-  #print(t)  
+
   
