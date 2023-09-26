@@ -28,7 +28,7 @@ from ClearMap.Visualization.Vispy.PlotGraph3d import *      #analysis:ignore
 ### Qt plotting
 ###############################################################################
 
-from ClearMap.Visualization.Qt.Plot3d import plot           #analysis:ignore
+from ClearMap.Visualization.Qt.Plot3d import plot, bring_to_front, close, arrange_plots  #analysis:ignore
 
 
 ###############################################################################
