@@ -63,11 +63,16 @@ from ClearMap.IO.FileUtils import (is_file, is_directory, file_extension,   #ana
 ###############################################################################
 from ClearMap.Utils.utilities import CancelableProcessPoolExecutor
 
-source_modules = [npy, tif, mmp, sma, fl, nrrd, csv]
+source_modules = [npy, tif, mmp, sma, fl, nrrd, mhd, csv]
 """The valid source modules."""
 
-file_extension_to_module = {"npy": mmp, "tif": tif, "tiff": tif, 'nrrd': nrrd,
-                            'nrdh': nrrd, 'csv': csv}
+file_extension_to_module = {'npy': mmp,
+                            'tif': tif,
+                            'tiff': tif,
+                            'nrrd': nrrd,
+                            'nrdh': nrrd,
+                            'csv': csv,
+                            'mhd': mhd}
 if gt_loaded:
   file_extension_to_module['gt'] = gt
   source_modules += [gt]
@@ -379,7 +384,7 @@ def element_strides(source):
 
 
 def buffer(source):
-  """Returns an io buffer of the data array of a source for use with e,g python.
+  """Returns an io buffer of the data array of a source for use with e.g. cython.
   
   Arguments
   ---------
@@ -514,7 +519,7 @@ def initialize(source = None, shape = None, dtype = None, order = None, location
   if source is None:
     if location is None:
       shape, dtype, order = _from_hint(hint, shape, dtype, order);
-      if memory == 'shared':
+      if memory in ['shared', 'automatic']:
         return sma.create(shape=shape, dtype=dtype, order=order, **kwargs);
       else:
         return npy.create(shape=shape, dtype=dtype, order=order);
