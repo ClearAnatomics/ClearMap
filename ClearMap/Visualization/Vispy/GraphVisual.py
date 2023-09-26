@@ -7,7 +7,7 @@ Module providing Graph visuals for rendering graphs.
 
 Note
 ----
-This module is porviding vispy visuals only. 
+This module is providing vispy visuals only.
 See :mod:`PlotGraph3d` module for plotting.
 """
 __author__ = 'Christoph Kirst <ckirst@rockefeller.edu>'

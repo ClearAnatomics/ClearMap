@@ -50,7 +50,8 @@ clearmap_path = path()
 resources_path = os.path.join(clearmap_path, 'Resources')
 """Absolute path to the ClearMap's resources folder."""
 
-atlas_folder = os.path.join(resources_path, 'Atlas')
+atlas_folder = os.path.join(resources_path, 'Atlas')  # FIXME: rename or rename others to be consistent
+"""Absolute path to the ClearMap's atlas folder."""
 
 external_path = os.path.join(clearmap_path, 'External')
 """Absolute path to the ClearMap's external program folder."""
@@ -66,30 +67,31 @@ test_data_path = os.path.join(test_path, 'Data')
 # ## Paths to external programs and resources
 ###############################################################################
 
+elastix_path = os.path.join(external_path, 'elastix', 'build')
 """Absolute path to the elastix installation
 
 Note
 ----
   `Elastix Webpage <https://elastix.lumc.nl/>`_
 """
-elastix_path = os.path.join(external_path, 'elastix', 'build')
 
+tera_stitcher_path = None
 """Absolute path to the TeraStitcher installation
 
 Note
 ----
   `TeraSticher Webpage <https://abria.github.io/TeraStitcher/>`_
 """
-tera_stitcher_path = None
 
+imagej_path = None  # '/usr/local/Fiji.app'
 """Absolute path to the ImageJ/Fiji installation
 
 Note
   `ImageJ/Fiji Webpage <https://fiji.sc/>`_
 ----
 """
-imagej_path = None  # '/usr/local/Fiji.app'
 
+ilastik_path = None  # '/usr/local/ilastik/ilastik-1.2.0-Linux'
 """Absolute path to the Ilastik installation
 
 Note
@@ -97,4 +99,3 @@ Note
   `Ilastik Webpage <https://ilastik.org/>`_ 
   `Ilastik Download <https://www.ilastik.org/download.html>`_
 """
-ilastik_path = None  # '/usr/local/ilastik/ilastik-1.2.0-Linux'
