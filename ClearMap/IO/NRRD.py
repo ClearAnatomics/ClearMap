@@ -100,8 +100,8 @@ class Source(src.Source):
     dtype : dtype
       The data type of the source.
     """
-    return self._dtype(self.location);
-  
+    return _dtype(self.location)
+
   @dtype.setter
   def dtype(self, value):
     #TODO: fix
