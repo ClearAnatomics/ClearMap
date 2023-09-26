@@ -148,7 +148,7 @@ class Source(src.Source):
   
   ### Parallel processing
   def as_virtual(self):
-    #TODO: convert to shared memory array ?
+    #TODO: convert to shared memory array ? -> needs to be implmented to make block processing work for in memory  numpay arrays !
     return self;
     
   def as_real(self):
@@ -294,7 +294,7 @@ def read(source, slicing = None, as_source = None, as_array = None, processes = 
     raise ValueError('The source is not a valid numpy source!')
     
 
-#TODO: add processes kewword for parallel writing
+#TODO: add processes keyword for parallel writing
 def write(sink, data, slicing = None, **kwargs):
   if slicing is None:
     slicing = ();

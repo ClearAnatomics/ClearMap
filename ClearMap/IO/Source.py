@@ -316,7 +316,7 @@ class AbstractSource(Source):
   #__slots__ = ('_shape', '_dtype', '_order', '_location')
   
   def __init__(self, source = None, shape = None, dtype = None, order = None, location = None, name = None):
-    """Source class construtor.
+    """Source class constructor.
     
     Arguments
     ---------
@@ -386,7 +386,7 @@ class AbstractSource(Source):
   
   @property 
   def order(self):
-    """The continguous order of the data array of the source.
+    """The contiguous order of the data array of the source.
     
     Returns
     -------
@@ -433,7 +433,7 @@ class VirtualSource(AbstractSource):
   
   Note
   ----
-  This class is fast to serialize and useful as a source pointer in paralle processing.  
+  This class is fast to serialize and useful as a source pointer in parallel processing.
   """
   def __init__(self, source = None, shape = None, dtype = None, order = None, location = None, name = None):
     AbstractSource.__init__(self, source=source, shape=shape, dtype=dtype, order=order, location=location, name=name)

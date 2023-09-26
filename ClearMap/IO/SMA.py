@@ -40,7 +40,7 @@ class Source(npy.Source):
   def __init__(self, array = None, shape = None, dtype = None, order = None, handle = None, name = None):
     """Shared memory source constructor."""
     shared = _shared(shape=shape, dtype=dtype, order=order, array=array, handle=handle);
-    super(Source,self).__init__(array=shared, name=name);
+    super().__init__(array=shared, name=name);
     
     self._handle = handle;
   
