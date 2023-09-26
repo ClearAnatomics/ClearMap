@@ -24,11 +24,12 @@ from ClearMap.Alignment import Annotation as annotation
 from ClearMap.Alignment.utils import get_all_structs
 from ClearMap.Analysis.Statistics import MultipleComparisonCorrection as clearmap_FDR
 from ClearMap.IO import IO as clearmap_io
+from ClearMap.Utils.exceptions import GroupStatsError
 from ClearMap.Utils.path_utils import is_density_file, find_density_file, find_cells_df, dir_to_sample_id
 from ClearMap.Utils.utilities import make_abs
 from ClearMap.processors.sample_preparation import init_preprocessor
 
-colors = {
+colors = {  # REFACTOR: move to visualisation module
     'red': [255, 0, 0],
     'green': [0, 255, 0],
     'blue': [0, 0, 255]
@@ -256,17 +257,23 @@ def stack_voxelizations(directory, f_list, suffix):
     return stacked_voxelizations
 
 
-def average_voxelization_groups(stacked_voxelizations, directory, suffix):
+def average_voxelization_groups(stacked_voxelizations, directory, suffix, compute_sd=False):
     avg_voxelization = np.mean(stacked_voxelizations, axis=3)
     clearmap_io.write(os.path.join(directory, f'avg_density_{suffix}.tif'), avg_voxelization)
 
+    if compute_sd:
+        sd_voxelization = np.std(stacked_voxelizations, axis=3)
+        clearmap_io.write(os.path.join(directory, f'sd_density_{suffix}.tif'), sd_voxelization)
 
+
+# REFACTOR: move to visualisation module
 def __validate_colors(positive_color, negative_color):
     if len(positive_color) != len(negative_color):
         raise ValueError(f'Length of positive and negative colors do not match, '
                          f'got {len(positive_color)} and {len(negative_color)}')
 
 
+  # REFACTOR: move to visualisation module
 def color_p_values(p_vals, p_sign, positive_color=[1, 0], negative_color=[0, 1], p_cutoff=None,
                    positive_trend=[0, 0, 1, 0], negative_trend=[0, 0, 0, 1], p_max=None):
     """
@@ -331,7 +338,7 @@ def color_p_values(p_vals, p_sign, positive_color=[1, 0], negative_color=[0, 1],
 
     return colored_p_vals
 
-
+# REFACTOR: move to visualisation module
 def get_colored_p_vals(p_vals, t_vals, significance, color_names):
     p_vals_f = np.clip(p_vals, None, significance)
     p_sign = np.sign(t_vals)
@@ -463,6 +470,7 @@ def get_volume_map(folder):
     )
 
 
+# REFACTOR: move to separate module
 def make_summary(directory, gp1_name, gp2_name, gp1_dirs, gp2_dirs, output_path=None, save=True):
     gp1_dfs = dirs_to_cells_dfs(directory, gp1_dirs)
     gp2_dfs = dirs_to_cells_dfs(directory, gp2_dirs)
@@ -491,17 +499,26 @@ def density_files_are_comparable(directory, gp1_dirs, gp2_dirs):
     gp2_f_list = dirs_to_density_files(directory, gp2_dirs)
     all_files = gp1_f_list + gp2_f_list
     sizes = [os.path.getsize(f) for f in all_files]
-    return all(s == sizes[0] for s in sizes)
+    comparable = all(s == sizes[0] for s in sizes)
+    if comparable:
+        return True
+    else:
+        raise GroupStatsError(f'Could not compare files, sizes differ\n\n'
+                              f'Group 1: {gp1_f_list}\n'
+                              f'Group 2: {gp2_f_list}\n'
+                              f'Sizes 1: {[os.path.getsize(f) for f in gp1_f_list]}\n'
+                              f'Sizes 2: {[os.path.getsize(f) for f in gp2_f_list]}\n')
 
 
-def compare_groups(directory, gp1_name, gp2_name, gp1_dirs, gp2_dirs, prefix='p_val_colors'):
+# REFACTOR: move to separate module
+def compare_groups(directory, gp1_name, gp2_name, gp1_dirs, gp2_dirs, prefix='p_val_colors', advanced=True):
     gp1_f_list = dirs_to_density_files(directory, gp1_dirs)
     gp2_f_list = dirs_to_density_files(directory, gp2_dirs)
 
     gp1_stacked_voxelizations = stack_voxelizations(directory, gp1_f_list, suffix=gp1_name)
-    average_voxelization_groups(gp1_stacked_voxelizations, directory, gp1_name)
+    average_voxelization_groups(gp1_stacked_voxelizations, directory, gp1_name, compute_sd=advanced)
     gp2_stacked_voxelizations = stack_voxelizations(directory, gp2_f_list, suffix=gp2_name)
-    average_voxelization_groups(gp2_stacked_voxelizations, directory, gp2_name)
+    average_voxelization_groups(gp2_stacked_voxelizations, directory, gp2_name, compute_sd=advanced)
 
     t_vals, p_vals = stats.ttest_ind(gp1_stacked_voxelizations, gp2_stacked_voxelizations, axis=3, equal_var=False)
     p_vals, t_vals = remove_p_val_nans(p_vals, t_vals)
@@ -513,6 +530,15 @@ def compare_groups(directory, gp1_name, gp2_name, gp1_dirs, gp2_dirs, prefix='p_
     output_f_name = f'{prefix}_{gp1_name}_{gp2_name}.tif'
     output_file_path = os.path.join(directory, output_f_name)
     clearmap_io.write(output_file_path, colored_p_vals, photometric='rgb', imagej=True)
+
+    if advanced:
+        effect_size = np.abs(np.mean(gp1_stacked_voxelizations, axis=3).astype(int) -
+                             np.mean(gp2_stacked_voxelizations, axis=3).astype(int))
+        effect_size = effect_size.astype(np.uint16)  # for imagej compatibility
+        output_f_name = f'effect_size_{gp1_name}_{gp2_name}.tif'
+        output_file_path = os.path.join(directory, output_f_name)
+        clearmap_io.write(output_file_path, effect_size, imagej=True)
+
     return colored_p_vals
 
 
