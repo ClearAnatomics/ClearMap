@@ -246,7 +246,8 @@ def patch_env(cfg_path, dest_path, use_cuda_torch=True, use_spyder=False, tmp_di
         env_mgr.remove_dependency('cudatoolkit')
 
     if use_spyder:
-        env_mgr.add_dependency('spyder-kernels', pkg_version='2.3.3')
+        # env_mgr.add_dependency('spyder-kernels', pkg_version='2.3.3')
+        env_mgr.add_dependency('spyder-kernels', pkg_version='2.4')
 
     if tmp_dir not in ('/tmp', '/tmp/'):
         print(f'Patching tmp_dir to {tmp_dir}')
