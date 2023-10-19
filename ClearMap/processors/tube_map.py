@@ -13,6 +13,7 @@ import copy
 import re
 
 import numpy as np
+import pandas as pd
 from PyQt5.QtWidgets import QDialogButtonBox
 
 from ClearMap.Utils.exceptions import PlotGraphError, ClearMapVRamException
@@ -898,6 +899,44 @@ class VesselGraphProcessor(TabProcessor):
     def plot_voxelization(self, parent):
         return q_p3d.plot(self.workspace.filename('density', postfix='branches'),
                           arrange=False, parent=parent, lut=self.machine_config['default_lut'])  # FIXME: fire
+
+    def write_vertex_table(self):
+        """
+        Write a table with vertex coordinates and properties
+        """
+        # FIXME: assert annotation_module is initialised
+        coordinates = self.graph_traced.vertex_property('coordinates')
+        df = pd.DataFrame({'x': coordinates[:, 0], 'y': coordinates[:, 1], 'z': coordinates[:, 2]})
+        df['radius'] = self.graph_traced.vertex_property('radii')
+        df['degree'] = self.graph_traced.vertex_degrees()
+
+        if self.preprocessor.was_registered:
+            coordinates_transformed = self.graph_traced.vertex_property('coordinates_atlas')
+            df['xt'] = coordinates_transformed[:, 0]
+            df['yt'] = coordinates_transformed[:, 1]
+            df['zt'] = coordinates_transformed[:, 2]
+
+            df['id'] = self.graph_traced.vertex_property('annotation')
+
+            hemisphere_labels = annotation_module.label_points(coordinates_transformed,
+                                                               annotation_file=self.preprocessor.hemispheres_file_path,
+                                                               key='id')  # FIXME: assert that exists
+            df['hemisphere'] = hemisphere_labels
+
+            df['name'] = annotation_module.convert_label(df['id'], key='id', value='name')
+
+            unique_ids = np.sort(df['id'].unique())
+
+            color_map = {id_: annotation_module.find(id_, key='id')['rgb'] for id_ in unique_ids}  # WARNING RGB upper case should give integer but does not work
+            df['color'] = df['id'].map(color_map)
+
+            volumes = annotation_module.annotation.get_lateralised_volume_map(
+                self.preprocessor.processing_config['registration']['resampling']['autofluo_sink_resolution'],
+                self.preprocessor.hemispheres_file_path
+            )
+            df['volume'] = df.set_index(['id', 'hemisphere']).index.map(volumes.get)
+
+        df.to_feather(self.workspace.filename('vertices', extension='.feather'))
 
     def get_structure_sub_graph(self, structure_id):
         vertex_labels = self.graph_traced.vertex_annotation()
