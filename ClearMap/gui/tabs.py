@@ -22,7 +22,7 @@ from PyQt5.QtWidgets import QDialogButtonBox
 from qdarkstyle import DarkPalette
 
 import ClearMap.IO.IO as clearmap_io
-from ClearMap.IO.MHD import mhd_read
+from ClearMap.IO.MHD import read as mhd_read
 from ClearMap.Alignment import Annotation as annotation
 from ClearMap.Analysis.Statistics.group_statistics import make_summary, density_files_are_comparable, compare_groups
 from ClearMap.Utils.exceptions import PlotGraphError, ClearMapVRamException, GroupStatsError
