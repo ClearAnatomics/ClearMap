@@ -365,6 +365,11 @@ class PreProcessor(TabProcessor):
         return os.path.exists(self.aligned_autofluo_path)
 
     @property
+    def n_channels(self):
+        return (int(self.processing_config['stitching']['run']['raw']) +
+                int(self.processing_config['stitching']['run']['arteries']))
+
+    @property
     def n_rigid_steps_to_run(self):
         return int(not self.processing_config['stitching']['rigid']['skip'])
 
@@ -416,7 +421,7 @@ class PreProcessor(TabProcessor):
 
     @property
     def n_wobbly_steps_to_run(self):
-        return int(not self.processing_config['stitching']['wobbly']['skip']) * 3
+        return int(not self.processing_config['stitching']['wobbly']['skip']) * 3 + (self.n_channels - 1)
 
     def __align_layout_wobbly(self, layout):
         wobbly_cfg = self.processing_config['stitching']['wobbly']
