@@ -61,7 +61,7 @@ function green(){
 function yellow(){
     echo -e "\x1B[33m $1 \x1B[0m"
     if [ ! -z "${2}" ]; then
-    echo -e "\x1B[33m $($2) \x1B[0m"
+      echo -e "\x1B[33m $($2) \x1B[0m"
     fi
 }
 
