@@ -1203,6 +1203,8 @@ class VasculatureTab(PostProcessingTab):
         self.ui.plotGraphVoxelizationPushButton.clicked.connect(self.plot_voxelization)
         self.ui.runAllVasculaturePushButton.clicked.connect(self.run_all)
 
+        self.ui.saveStatsPushButton.clicked.connect(self.save_stats)
+
     def unload_temporary_graphs(self):
         """
         Unload the temporary vasculature graph objects to free up RAM
@@ -1460,6 +1462,15 @@ class VasculatureTab(PostProcessingTab):
         self.main_window.clear_plots()
         dvs = self.vessel_graph_processor.plot_voxelization(self.main_window.centralWidget())
         self.main_window.setup_plots(dvs)
+
+    def save_stats(self):
+        """
+        Save the stats of the graph
+        Returns
+        -------
+
+        """
+        self.wrap_step('Saving stats', self.vessel_graph_processor.write_vertex_table)
 
 
 ################################################################################################
