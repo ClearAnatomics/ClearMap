@@ -702,7 +702,7 @@ def prepare_annotation_files(slicing=None, orientation=None, directory=None, pos
 
             if orientation is not None:
                 # permute
-                per = res.orientation_to_permuation(orientation)
+                per = res.orientation_to_transposition(orientation)
                 data = data.transpose(per)
 
                 # reverse axes
