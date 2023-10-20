@@ -558,6 +558,9 @@ def align(fixed_image, moving_image, affine_parameter_file, bspline_parameter_fi
     if not os.path.exists(result_directory):
         os.mkdir(result_directory)
 
+    check_spaces(affine_parameter_file, bspline_parameter_file, fixed_image, moving_image,
+                 moving_landmarks_path, fixed_landmarks_path, result_directory)
+
     # run elastix
     cmd = [elastix_binary, '-threads', str(processes), '-m', f'{moving_image}', '-f', f'{fixed_image}']
     if affine_parameter_file is not None:
@@ -587,6 +590,11 @@ def align(fixed_image, moving_image, affine_parameter_file, bspline_parameter_fi
 
     return result_directory
 
+
+def check_spaces(*paths):
+    for p in paths:
+        if p is not None and ' ' in p:
+            raise ValueError(f'Could not run elastix with path containing spaces: {p}')
 
 def transform(source, sink=[], transform_parameter_file=None, transform_directory=None,
               result_directory=None):
@@ -649,6 +657,7 @@ def transform(source, sink=[], transform_parameter_file=None, transform_director
     set_path_transform_files(transform_parameter_dir)
 
     # transformix -in inputImage.ext -out outputDirectory -tp TransformParameters.txx
+    check_spaces(img_name, result_dirname, transform_parameter_file)
     cmd = f'{transformix_binary} -in {img_name} -out {result_dirname} -tp {transform_parameter_file}'
 
     res = os.system(cmd)
@@ -723,6 +732,7 @@ def deformation_field(sink=[], transform_parameter_file=None, transform_director
     set_path_transform_files(transform_parameter_dir)
 
     # transformix -in inputImage.ext -out outputDirectory -tp TransformParameters.txt
+    check_spaces(result_dirname, transform_parameter_file)
     cmd = f'{transformix_binary} -def all -out {result_dirname} -tp {transform_parameter_file}'
 
     res = os.system(cmd)
@@ -943,6 +953,7 @@ def transform_points(source, sink=None, transform_parameter_file=None, transform
     set_path_transform_files(transform_parameter_dir)
 
     # run transformix
+    check_spaces(point_file, out_dirname, transform_parameter_file)
     cmd = f'{transformix_binary} -def {point_file} -out {out_dirname} -tp {transform_parameter_file}'
     print(cmd)
 
@@ -1027,6 +1038,7 @@ def inverse_transform(fixed_image, affine_parameter_file, bspline_parameter_file
         affine_file = None
 
     # run elastix
+    check_spaces(fixed_image, result_directory, transform_parameter_file, affine_file, bspline_file)
     cmd = f'{elastix_binary} -threads {processes} -m {fixed_image} -f {fixed_image} -t0 {transform_parameter_file} '  # FIXME: fixed_image is used twice
     if affine_file is not None:
         cmd += f'-p {affine_file} '
