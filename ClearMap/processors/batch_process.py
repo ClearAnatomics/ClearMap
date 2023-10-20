@@ -17,7 +17,7 @@ from skimage.transform import rescale
 from tqdm import tqdm
 
 try:
-from ClearMap.processors.tube_map import BinaryVesselProcessor, VesselGraphProcessor
+    from ClearMap.processors.tube_map import BinaryVesselProcessor, VesselGraphProcessor
     graph_gt = True
 except ImportError:
     graph_gt = False
