@@ -72,20 +72,25 @@ def decompress_atlases(atlas_base_name):
 
 
 atlas_base_name = 'ABA_25um'  # FIXME: change if different atlas
-"""
-Default volumetric annotated image file.
 
+
+default_annotation_file, default_hemispheres_file,\
+default_reference_file, default_distance_to_surface_file = decompress_atlases(atlas_base_name)
+"""
 Note
 ----
   This file is by default the Allen brain annotated mouse atlas with 25um 
   isotropic resolution.
+
+  Includes the
+    - Default volumetric annotated image file.
+    - Default hemispheres annotated image file
+    - Default reference (grayscale) image file
+    - Corresponding distance to surface file
+
 """
 
-default_annotation_file, default_hemispheres_file,\
-default_reference_file, default_distance_to_surface_file = decompress_atlases(atlas_base_name)
-
 default_label_file = os.path.join(settings.atlas_folder, 'ABA_annotation.json')
-
 """Default list of labels and region names in the annotated image.
 
 Note
