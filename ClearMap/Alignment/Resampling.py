@@ -847,8 +847,11 @@ def resample(original, resampled=None,
 
         last = resampled_data
 
-    resampled_data = orient(resampled_data, orientation)
-    resampled = io.write(resampled, resampled_data)
+    if orientation is not None:
+        resampled_data = orient(resampled_data, orientation)
+        resampled = io.write(resampled, resampled_data)
+    else:
+        resampled = resampled_data
 
     for f in delete_files:
         io.delete_file(f)
