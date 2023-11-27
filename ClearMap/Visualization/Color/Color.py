@@ -1162,8 +1162,8 @@ def rand_cmap(n_labels, map_type='bright', first_color_black=True, last_color_bl
     pastel_cmap_names = ('Pastel1', 'Pastel2', 'Set3')
     bright_cmap_names = list(set(label_cmap_names) - set(pastel_cmap_names))
     black = [0, 0, 0]
-    if n_labels:
-        return black
+    if n_labels == 0:
+        return [black]
 
     assert cmap_name in label_cmap_names
 
