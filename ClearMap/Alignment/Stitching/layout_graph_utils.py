@@ -16,7 +16,7 @@ def get_graph(n_vertices, directed=False):
 
 
 def graph_to_connected_components(g):
-    if graph_lib == 'igraph':   # FIXME: check that swapped
+    if graph_lib == 'graph_tool':
         connected_components, hist = gtt.label_components(g)
         connected_components = np.array(connected_components.a)
         n_components = len(hist)
@@ -32,9 +32,9 @@ def get_connected_components(alignments, n_sources, source_to_index=None):
     if source_to_index is not None:
         for a in alignments:
             g.add_edge(source_to_index[a.pre], source_to_index[a.post])
-        else:
-            for a in alignments:
-                g.add_edge(a[0], a[1])
+    else:
+        for a in alignments:
+            g.add_edge(a[0], a[1])
     return graph_to_connected_components(g)
 
 
