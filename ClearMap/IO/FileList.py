@@ -132,15 +132,15 @@ class Source(src.VirtualSource):
     axes_order : list of str
       The ordered axis names.
     """
-    tag_names = self.expression.tag_names();
-    axes_order = self._axes_order;
+    tag_names = self.expression.tag_names()
+    axes_order = self._axes_order
     if axes_order is None:
-      axes_order = [];
+      axes_order = []
     for a in axes_order:
       if a not in tag_names:
-        raise ValueError('Axes name %s is not in the tags %r!' % (a, tag_names));
-    axes_order = axes_order + [n for n in tag_names if n not in axes_order];
-    return axes_order;
+        raise ValueError(f'Axes name {a} is not in the tags {tag_names}!')
+    axes_order += [n for n in tag_names if n not in axes_order]
+    return axes_order
   
   @axes_order.setter
   def axes_order(self, value):
@@ -750,15 +750,15 @@ def shape_file(expression = None, file_list = None):
   shape : int or tuple of ints
     The shape of the array st  ored in a file list.
   """
-  expression, file_list = _expression_and_file_list(expression=expression, file_list=file_list);
+  expression, file_list = _expression_and_file_list(expression=expression, file_list=file_list)
   
   if len(file_list) == 0:
     raise ValueError('Cannot determine dimension of the file list %r without files.!' % expression);
   
   #determine dimensions in each file
-  shape_file = io.shape(file_list[0]);
+  shape_file = io.shape(file_list[-1])  # Take the last because the first has Z
   
-  return shape_file;
+  return shape_file
 
   
 def shape_list(expression = None, file_list = None, axes_order = None):
