@@ -1834,17 +1834,16 @@ def _optimize_slice_positions(positions, components, processes = None, workspace
   ndim = len(positions[0,0]);
   
   #compute connected components of the clusters
-  cluster_components, si_to_c, c_to_si = _cluster_components(components);                                                                                                               
-  #cluster_components is a list of lists of ints indicating the cluster ids
+  cluster_components_, si_to_c, c_to_si = cluster_components(components)
+  #cluster_components_ is a list of lists of ints indicating the cluster ids
   #that belong to the connected compoenents of the clusters
-  #cluster_components[0] = [c1, c2, ...] with cluster ids c1,c2,...
-  #print cluster_components   
-  n_components = len(cluster_components)
+  #cluster_components_[0] = [c1, c2, ...] with cluster ids c1,c2,...
+  n_components = len(cluster_components_)
   if verbose:
-    print('Placement: found %d components to optimize!' % n_components);
+    print(f'Placement: found {n_components} components to optimize!')
   
   #optimize positions for each cluster component
-  for cci, cluster_component in enumerate(cluster_components):
+  for cci, cluster_component in enumerate(cluster_components_):
     #Error functon:
     # E = \sum_s \sum_{i \in C_s} \sum_{j \in C_{s+1}} \sum_{k\in C_{s,i} \cup C_{s+1,j}} (x_{s,k} + s_{s,i} - (x_{s+1,k} + s_{s+1,j}))^2
     # x_{s,k} is the position of the k-th tile in the s-th slice
@@ -1863,7 +1862,7 @@ def _optimize_slice_positions(positions, components, processes = None, workspace
     # starting at the second cluster as the first cluster's shift is fixed
     # d_to_si, si_to_d convert between them.
     
-    n_clusters = len(cluster_component);
+    n_clusters = len(cluster_component)
     n_s = (n_clusters - 1); # first s == 0
     if verbose:
       print('Placement: optimizing component %d/%d with %d clusters!' % (cci, n_components, n_clusters));
@@ -1996,10 +1995,9 @@ def _straighten_slice_positions(positions, components, tile_positions):
   n_slices = len(components);
   
   #compute connected components of the clusters
-  cluster_components, si_to_c, c_to_si = _cluster_components(components);
+  cluster_components_, si_to_c, c_to_si = cluster_components(components)
 
-  for cluster_component in cluster_components:
-
+  for cluster_component in cluster_components_:
     slice_ids = [];    
     for c in cluster_component:
       s,i = c_to_si(c);
