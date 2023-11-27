@@ -55,6 +55,7 @@ import ClearMap.Utils.HierarchicalDict as hdict
 import ClearMap.Visualization.Color as col
 
 from ClearMap.Alignment.utils import create_label_table
+from ClearMap.Visualization.atlas import color_map
 
 
 ###############################################################################
@@ -353,18 +354,28 @@ class Annotation(object):
 
         return d
 
-    def get_dictionary(self, key, value, node=None, level=None, ordered=False):
+    def get_dictionary(self, key, value, node=None, level=None, ordered=False,
+                       with_parents=False, max_depth=None, min_level=None):
         if node is None:
             node = self.root
 
         keys = self.get_list(key=key, node=node, level=None)
-        vals = self.get_list(key=value, node=node, level=level)
+        values = self.get_list(key=value, node=node, level=level)
 
         if ordered:
-            d = collections.OrderedDict  # FIXME: never evecuted
-        d = {k: v for k, v in zip(keys, vals)}
+            dictionary = collections.OrderedDict()
+        else:
+            dictionary = dict()
+        for k, v in  zip(keys, values):
+            dictionary[k] = v
 
-        return d
+        if with_parents:
+            for k,v in dictionary.items():
+                node = self.find(k, key=key)
+                parent_list = node.parent_list(max_depth=max_depth, min_level=min_level)
+                dictionary[k] = tuple(node[value] for node in parent_list)
+
+        return dictionary
 
     def get_map(self, key, value, node=None, level=None):
         d = self.get_dictionary(key=key, value=value, node=node, level=level)
@@ -779,6 +790,21 @@ def annotation_to_distance_file(annotation_file_path):
     return distance_array
 
 
+def convert_array(array, key='id', value='order'):
+    if value =='color':
+        return colorize(array, key)
+    key_to_value = get_map(key=key, value=value)
+    array = np.asarray(array, dtype=int)
+    return key_to_value[array]
+
+
+def colorize(array, key='id'):
+    if key != 'order':
+        array = convert_array(array, key=key, value='order')
+    order_to_color = color_map()[...,:3]
+    return order_to_color[array]
+
+
 def get_names_map():
     return dict(zip(annotation.ids, annotation.names))
 
@@ -787,7 +813,41 @@ def get_names_map():
 # ## Tests
 ###############################################################################
 
-if __name__ == "__main__":
+def _test1():
+    import numpy as np
+    import ClearMap.Alignment.Annotation as ano
+    from importlib import reload
+    reload(ano)
+
+    points = np.array([[162, 200, 138], [246, 486, 138], [246, 486, 138]])
+
+    label = ano.label_points(points)
+    print(label)
+
+    cnts = ano.count_points(points)
+    print(cnts)
+
+    cnts = ano.count_points(points, hierarchical=False)
+    print(cnts)
+
+    import ClearMap.IO.IO as io
+    ano.write_color_annotation('test.tif')
+    io.delete_file('test.tif')
+
+    l = ano.find(247, key='id')
+    print(l)
+    l.info(with_children=True)
+    print(l.level)
+
+    ano.annotation.get_dictionary(key='id', value='acronym', with_parents=True, min_level=3, max_depth=3)
+
+
+def _test2():
+    import numpy as np
+    import ClearMap.Alignment.Annotation as ano
+    from importlib import reload
+    reload(ano)
+
     assert annotation.df.shape == (1319, 5)
     assert annotation.dict_id_to_acronym[1] == "TMv"
     assert annotation.dict_name_to_id['Interpeduncular nucleus'] == 100
