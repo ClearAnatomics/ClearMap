@@ -473,21 +473,15 @@ def resample_information(original_shape=None, resampled_shape=None,
     """
     orientation = format_orientation(orientation)
 
-    # conventions
-    if original_shape is not None and not isinstance(original_shape, tuple):
-        original = original_shape
-        original_shape = io.shape(original)
-
-    if resampled_shape is not None and not isinstance(resampled_shape, tuple):
-        resampled = resampled_shape
-        resampled_shape = io.shape(resampled)
-
     # shapes form sources
     if original_shape is None and original is not None:
         original_shape = io.shape(original)
 
-    if resampled_shape is None and resampled is not None:
-        resampled_shape = io.shape(resampled)
+    if resampled_shape is None:
+        try:
+            resampled_shape = io.shape(resampled)
+        except FileNotFoundError:
+            pass
 
     # ndim
     for var in [original_shape, resampled_shape, original_resolution, resampled_resolution]:
@@ -846,7 +840,7 @@ def resample(original, resampled=None,
             # with CancelableProcessPoolExecutor(processes) as executor:
             # ThreadPool because of documented cv2 instability w/ multiprocessing. Is this still true ?
             with ThreadPoolExecutor(processes) as executor:
-                chunk_size = round(len(indices) / (processes * 3))  # REFACTOR: explain calculation
+                chunk_size = len(indices) // (processes * 3)  # REFACTOR: explain calculation
                 executor.map(_resample, indices, chunksize=chunk_size)  # default chunk_size is 1 (too small)
                 if workspace is not None:
                     workspace.executor = executor
