@@ -552,9 +552,9 @@ class PreProcessor(TabProcessor):
         self.prepare_watcher_for_substep(n_planes, self.__resample_re, 'Resampling raw')
         try:
             result = resampling.resample(self.filename('stitched'),
-                                         source_resolution=src_res,
-                                         sink=self.filename('resampled'),
-                                         sink_resolution=resampling_cfg['raw_sink_resolution'],
+                                         original_resolution=src_res,
+                                         resampled=self.filename('resampled'),
+                                         resampled_resolution=resampling_cfg['raw_sink_resolution'],
                                          workspace=self.workspace,
                                          **default_resample_parameter)
         except BrokenProcessPool:
@@ -580,9 +580,9 @@ class PreProcessor(TabProcessor):
         self.prepare_watcher_for_substep(n_planes, self.__resample_re, 'Resampling autofluorescence', True)
         try:
             result = resampling.resample(self.filename('autofluorescence'),
-                                         source_resolution=auto_res,
-                                         sink=self.filename('resampled', postfix='autofluorescence'),
-                                         sink_resolution=resampling_cfg['autofluo_sink_resolution'],
+                                         original_resolution=auto_res,
+                                         resampled=self.filename('resampled', postfix='autofluorescence'),
+                                         resampled_resolution=resampling_cfg['autofluo_sink_resolution'],
                                          workspace=self.workspace,
                                          **default_resample_parameter)
         except BrokenProcessPool:

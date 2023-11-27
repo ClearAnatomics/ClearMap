@@ -490,14 +490,10 @@ def resample_information(original_shape=None, resampled_shape=None,
         resampled_shape = io.shape(resampled)
 
     # ndim
-    if original_shape is not None:
-        ndim = len(original_shape)
-    elif resampled_shape is not None:
-        ndim = len(resampled_shape)
-    elif original_resolution is not None:
-        ndim = len(original_resolution)
-    elif resampled_resolution is not None:
-        ndim = len(resampled_resolution)
+    for var in [original_shape, resampled_shape, original_resolution, resampled_resolution]:
+        if var is not None:
+            ndim = len(var)
+            break
     else:
         raise ValueError('The resampling information is not sufficient!')
 
@@ -512,12 +508,10 @@ def resample_information(original_shape=None, resampled_shape=None,
         original_resolution = (1,) * ndim
 
     # auto complete (if one piece of information is missing)
-    if original_shape is not None and original_resolution is not None \
-            and resampled_shape is not None and resampled_resolution is None:
+    if all_not_none([original_shape, original_resolution, resampled_shape]) and resampled_resolution is None:
         resampled_resolution = resample_resolution_from_shape(original_shape, resampled_shape,
                                                               original_resolution, orientation)
-    if original_shape is not None and original_resolution is not None \
-            and resampled_shape is None and resampled_resolution is not None:
+    if all_not_none([original_shape, original_resolution, resampled_shape, resampled_resolution]):
         resampled_shape = resample_shape_from_resolution(original_shape,
                                                          original_resolution, resampled_resolution,
                                                          orientation, discretize)
@@ -528,8 +522,7 @@ def resample_information(original_shape=None, resampled_shape=None,
             and resampled_shape is not None and resampled_resolution is not None:
         original_resolution = original_resolution_from_shape(original_shape, resampled_shape,
                                                              resampled_resolution, orientation)
-    if original_shape is None and original_resolution is not None \
-            and resampled_shape is not None and resampled_resolution is not None:
+    if original_shape is None and all_not_none([original_resolution, resampled_shape, resampled_resolution]):
         original_shape = original_shape_from_resolution(resampled_shape,
                                                         original_resolution, resampled_resolution,
                                                         orientation, discretize)
@@ -538,6 +531,10 @@ def resample_information(original_shape=None, resampled_shape=None,
                                                                  resampled_resolution, orientation)
 
     return original_shape, resampled_shape, original_resolution, resampled_resolution, orientation
+
+
+def all_not_none(*args):
+    return all([a is not None for a in args])
 
 
 def resample_shape(original_shape=None, resampled_shape=None,
@@ -784,6 +781,9 @@ def resample(original, resampled=None,
         resampled_shape = None
     else:
         original_shape = original.shape
+
+    if original.ndim ==4 and 3 not in original_shape:  # 4D but not color
+        raise ValueError(f'Unsupported shape for original: "{original_shape}"')
 
     original_shape, resampled_shape, original_resolution, resampled_resolution = \
         resample_shape(original_shape, resampled_shape,

@@ -271,9 +271,9 @@ class CellDetector(TabProcessor):
 
     def transform_coordinates(self, coords):
         coords = resampling.resample_points(
-            coords, sink=None,
-            source_shape=self.preprocessor.raw_stitched_shape,
-            sink_shape=self.preprocessor.resampled_shape)
+            coords, resampled=None,
+            original_shape=self.preprocessor.raw_stitched_shape,
+            resampled_shape=self.preprocessor.resampled_shape)
 
         if self.preprocessor.was_registered:
             coords = elastix.transform_points(
