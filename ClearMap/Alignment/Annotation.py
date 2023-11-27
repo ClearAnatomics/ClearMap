@@ -23,10 +23,14 @@ References
   - `Allen Brain Atlas <https://mouse.brain-map.org/static/atlas>`_
 """
 __author__ = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
-__license__ = 'GPLv3 - GNU General Pulic License v3 (see LICENSE)'
+__license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
+
+
+# TODO: inherit Label from dict
+# TODO: integrate with atlas meshes / plotting / transforming data / region selection
 
 
 import os
@@ -143,29 +147,38 @@ class Label(object):
     def __setitem__(self, key, value):
         self.data[key] = value
 
-    def write(self, with_children=True, ident=None):
-        return self.__str__(ident=ident, with_children=with_children)
+    def parent_list(self, max_depth=None, min_level=None):
+        if max_depth is None:
+            max_depth = self.level + 1
+        if min_level is None:
+            min_level = 1
+        if max_depth > 0 and self.level > min_level and self.parent is not None:
+            return [self] + self.parent.parent_list(max_depth=max_depth-1, min_level=min_level)
+        else:
+            return []
 
-    def info(self, with_children=True, ident=None):
-        print(self.write(ident=ident, with_children=with_children))
+    def write(self, with_children=True, indent=None):
+        return self.__str__(indent=indent, with_children=with_children)
 
-    def __str__(self, ident=None, with_children=False):
-        if ident is None:
-            ident = ''
+    def info(self, with_children=True, indent=None):
+        print(self.write(indent=indent, with_children=with_children))
+
+    def __str__(self, indent=None, with_children=False):
+        indent = indent or ''
 
         s = ''
         if with_children and isinstance(self.children, list):
             for c in self.children:
-                s += '\n' + c.__str__(ident=ident + '  ')
+                s += '\n' + c.__str__(indent=indent + '  ')
 
-        h = f'{ident}{self.name}\n{ident}{"=" * len(self.name)}\n'
+        h = f'{indent}{self.name}\n{indent}{"=" * len(self.name)}\n'
 
-        s = h + hdict.write(self.data, head=ident[:-1]) + '\n' + s
+        s = h + hdict.write(self.data, head=indent[:-1]) + '\n' + s
 
         return s
 
-    def __repr__(self, ident=None, with_children=False):
-        return self.__str__(ident=ident, with_children=False)
+    def __repr__(self, indent=None, with_children=False):
+        return self.__str__(indent=indent, with_children=False)
 
 
 class Annotation(object):
@@ -177,7 +190,7 @@ class Annotation(object):
         Arguments
         ---------
         label_file : str
-          File with label infomration in json format.
+          File with label information in json format.
         """
         self.root = None
         self.structures = None
