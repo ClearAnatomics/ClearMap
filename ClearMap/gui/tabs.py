@@ -16,6 +16,8 @@ import pandas as pd
 import mpld3
 
 import pyqtgraph as pg
+
+from ClearMap.config.atlas import ATLAS_NAMES_MAP, STRUCTURE_TREE_NAMES_MAP
 from ClearMap.config.config_loader import ConfigLoader
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 from PyQt5.QtWidgets import QDialogButtonBox
@@ -361,6 +363,14 @@ class AlignmentTab(GenericTab):
         self.ui.useResampledToAutoLandmarksPushButton.clicked.connect(self.display_resampled_to_auto_landmarks_dialog)
         self.connect_whats_this(self.ui.resampledLandmarksInfoToolButton, self.ui.useResampledToAutoLandmarksPushButton)
         self.connect_whats_this(self.ui.referenceLandmarksInfoToolButton, self.ui.useAutoToRefLandmarksPushButton)
+
+        for k in ATLAS_NAMES_MAP.keys():
+            if self.ui.atlasIdComboBox.findText(k) == -1:
+                self.ui.atlasIdComboBox.addItem(k)
+
+        for k in STRUCTURE_TREE_NAMES_MAP.keys():
+            if self.ui.structureTreeIdComboBox.findText(k) == -1:
+                self.ui.structureTreeIdComboBox.addItem(k)
 
     def set_progress_watcher(self, watcher):
         """
