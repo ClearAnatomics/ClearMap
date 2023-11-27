@@ -33,7 +33,10 @@ class Source(src.Source):
   Its assumed that the image data is stored in a serregionies of the tif file.
   """
   def __init__(self, location, series = 0, multi_file = False):
-    self._tif = tif.TiffFile(location)
+    try:
+      self._tif = tif.TiffFile(location, multi_file=multi_file)
+    except TypeError:  # TODO: filter with message
+      self._tif = tif.TiffFile(location)
     self._series = series
     self.multi_file = multi_file
 
@@ -284,7 +287,7 @@ def is_tif(source):
   if isinstance(source, str):
     try:
       Source(source)
-    except :
+    except:  # FIXME: too broad
       return False
     return True
   return False

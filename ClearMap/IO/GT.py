@@ -28,6 +28,7 @@ import ClearMap.IO.Source as src
 ### Source classe
 ###############################################################################
 
+
 class Source(src.Source):
   """GT graph source."""
   
