@@ -14,7 +14,7 @@ __copyright__ = 'Copyright © 2023 by Christoph Kirst'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
 
-
+import os
 import tempfile
 import itertools
 import functools as ft
@@ -32,8 +32,11 @@ import ClearMap.ParallelProcessing.ParallelTraceback as ptb
 
 import ClearMap.Utils.Timer as tmr
 from ClearMap.Utils.utilities import CancelableProcessPoolExecutor
+from ClearMap.Utils.TagExpression import Expression
 
 from .Transformations.Transformation import TransformationBase
+
+
 ########################################################################################
 # Orientation
 ########################################################################################
@@ -762,6 +765,16 @@ def resample(original, resampled=None,
     if verbose:
         timer = tmr.Timer()
 
+    if os.path.splitext(original)[1] == '.tif':   # Resampling is much faster from .npy files
+        exp = Expression(original)
+        for tag in exp.tags:
+            exp = Expression(exp.pattern[0].replace(str(tag), ''))
+        new_path = exp.pattern[0] + '.npy'
+        io.convert(original, new_path)
+        original = new_path
+    else:
+        new_path = None
+
     original = io.as_source(original)
     dtype = original.dtype
     order = original.order
@@ -811,6 +824,8 @@ def resample(original, resampled=None,
     n_steps = len(axes_order)
     resampled_data = last = original
     delete_files = []
+    if new_path is not None:
+        delete_files.append(new_path)
     for step, axes, shape in zip(range(n_steps), axes_order, shape_order):
         if step == n_steps - 1 and orientation is None:
             resampled_data = io.initialize(source=resampled, shape=resampled_shape, dtype=dtype, as_source=True)
