@@ -28,7 +28,8 @@ import pyqtgraph as pg
 from PyQt5 import QtWidgets
 from PyQt5.QtCore import QEvent, QRect, QSize, pyqtSignal, Qt
 from PyQt5.QtGui import QPainter
-from PyQt5.QtWidgets import QWidget, QRadioButton, QLabel, QSplitter, QApplication, QSizePolicy, QCheckBox, QGridLayout
+from PyQt5.QtWidgets import QWidget, QRadioButton, QLabel, QSplitter, QApplication, QSizePolicy, QPushButton, QCheckBox, \
+  QGraphicsPathItem, QGridLayout, QLineEdit, QScrollArea
 
 from ClearMap.Utils.utilities import runs_on_spyder
 from ClearMap.IO.IO import as_source
@@ -51,11 +52,14 @@ class DataViewer(QWidget):
         'size': 10
     }
 
-    def __init__(self, source, axis=None, scale=None, title=None, invertY=False,
-                 minMax=None, screen=None, parent=None, default_lut='flame', original_orientation='zcxy', **kwargs):
+    def __init__(self, source,
+                 points=None, vectors=None, orientations=None, annotation=None,
+                 axis=None, scale=None, title=None,
+                 invertY=False, minMax=None, screen=None, parent=None, default_lut='flame', max_projection=None,
+                 points_style=None, vectors_style=None, original_orientation='zcxy', orientations_style=None, **kwargs):
 
-        QWidget.__init__(self, parent, **kwargs)
-        # super().__init__(self, parent, *args)
+        # super().__init__(self, parent, **kwargs)
+        QWidget.__init__(self, parent, **kwargs)  # TODO: check why super() doesn't handle **kwargs properly
 
         # Images sources
         self.sources = []
@@ -73,10 +77,40 @@ class DataViewer(QWidget):
         self.pals = []  # linked DataViewers
         self.scatter = None
         self.scatter_coords = None
-        self.atlas = None
+        self.atlas = None  # WARNING: overlap w/ self.anotation ??
         self.structure_names = None
 
         self.z_cursor_width = 5
+
+        self.points = points
+        if self.points is not None:
+            self.points = as_source(points).array
+        self.points_item = None
+        self.points_style = dict(pen=None, brush='white')
+        if points_style is not None:
+            self.points_style.update(points_style)
+
+        self.vectors = vectors
+        if self.vectors is not None:
+            self.vectors = as_source(vectors).array
+        self.vectors_item = None
+        self.vectors_base_item = None
+        self.vectors_style = dict(pen=None, brush='lightblue')
+        if vectors_style is not None:
+            self.vectors_style.update(vectors_style)
+
+        self.orientations = orientations
+        if self.orientations is not None:
+            self.orientations = as_source(orientations).array
+        self.orientations_item = None
+        self.orientations_style = dict(pen='gray')
+        if orientations_style is not None:
+            self.orientations_style.update(orientations_style)
+
+        self.vectors = vectors
+        self.vectors_item = None
+
+        self.annotation = annotation
 
         self.initializeSources(source, axis=axis, scale=scale)
 
@@ -125,13 +159,13 @@ class DataViewer(QWidget):
         else:
             self.image_items = [pg.ImageItem(s[self.source_slice[:s.ndim]], **image_options) for s in self.sources]
         for itm in self.image_items:
-            itm.setRect(QRect(0, 0, self.source_range_x, self.source_range_y))
+            itm.setRect(QRect(0, 0, int(self.source_range_x), int(self.source_range_y)))
             itm.setCompositionMode(QPainter.CompositionMode_Plus)
             self.view.addItem(itm)
         self.view.setXRange(0, self.source_range_x)
         self.view.setYRange(0, self.source_range_y)
 
-        # Slice Selector
+        # slice selector
         if original_title:
             self.slicePlot = pg.PlotWidget(title=f"""
             <html><head/><body>
@@ -166,10 +200,67 @@ class DataViewer(QWidget):
         self.axis_buttons = []
         axis_tools_layout, axis_tools_widget = self.__setup_axes_controls()
 
+        # max projection depth
+        self.max_projection = max_projection
+        self.max_projection_edit = QLineEdit()
+        if self.max_projection is not None:
+            self.max_projection_edit.setText('%d' % self.max_projection)
+        # self.max_projection_edit.setValidator(pg.QtGui.QIntValidator())
+        self.max_projection_edit.setMaxLength(4)
+        self.max_projection_edit.setAlignment(Qt.AlignRight)
+        self.max_projection_edit.setMaximumWidth(60)
+        self.max_projection_edit.editingFinished.connect(self.change_max_projection)
+        axis_tools_layout.addWidget(self.max_projection_edit, 0, 3)
+
+        # points color
+        self.points_color_button = pg.ColorButton(color=self.points_style.get('brush'))
+        self.points_color_button.setMaximumWidth(30)
+        self.points_color_button.sigColorChanged.connect(self.change_points_color)
+        axis_tools_layout.addWidget(self.points_color_button, 0, 4)
+
+        # vectors color and threshold
+        self.vectors_color_button = pg.ColorButton(color=self.vectors_style.get('brush'))
+        self.vectors_color_button.setMaximumWidth(30)
+        self.vectors_color_button.sigColorChanged.connect(self.change_vectors_color)
+        axis_tools_layout.addWidget(self.vectors_color_button, 0, 5)
+
+        self.vectors_threshold_edit = QLineEdit()
+        vectors_threshold = self.vectors_style.get('threshold', None)
+        if vectors_threshold is not None:
+            self.vectors_threshold_edit.setText('%.4f' % vectors_threshold)
+        self.vectors_threshold_edit.setMaxLength(6)
+        self.vectors_threshold_edit.setAlignment(Qt.AlignRight)
+        self.vectors_threshold_edit.setMaximumWidth(60)
+        self.vectors_threshold_edit.editingFinished.connect(self.change_vectors_threshold)
+        axis_tools_layout.addWidget(self.vectors_threshold_edit, 0, 6)
+
+        # orientation threshold
+        self.orientations_color_button = pg.ColorButton(color=self.orientations_style.get('pen'))
+        self.orientations_color_button.setMaximumWidth(30)
+        self.orientations_color_button.sigColorChanged.connect(self.change_orientations_color)
+        axis_tools_layout.addWidget(self.orientations_color_button, 0, 7)
+
+        self.orientations_threshold_edit = QLineEdit()
+        orientations_threshold = self.orientations_style.get('threshold', None)
+        if orientations_threshold is not None:
+            self.orientations_threshold_edit.setText('%.4f' % orientations_threshold)
+        self.orientations_threshold_edit.setMaxLength(6)
+        self.orientations_threshold_edit.setAlignment(Qt.AlignRight)
+        self.orientations_threshold_edit.setMaximumWidth(60)
+        self.orientations_threshold_edit.editingFinished.connect(self.change_orientations_threshold)
+        axis_tools_layout.addWidget(self.orientations_threshold_edit, 0, 8)
+
         # coordinate label
         self.source_pointer = np.zeros(self.sources[0].ndim, dtype=int)
         self.source_label = QLabel("")
-        axis_tools_layout.addWidget(self.source_label, 0, 3)
+
+        self.source_label_scroll = QScrollArea()
+        self.source_label_scroll.setMaximumHeight(30)
+        self.source_label_scroll.setWidgetResizable(True)
+        self.source_label_scroll.horizontalScrollBar().setStyleSheet("QScrollBar {height:0px;}")
+        self.source_label_scroll.setWidget(self.source_label)
+
+        axis_tools_layout.addWidget(self.source_label_scroll, 0, 9)
 
         self.graphicsView.scene().sigMouseMoved.connect(self.updateLabelFromMouseMove)
 
@@ -201,6 +292,12 @@ class DataViewer(QWidget):
             lut.range_buttons[1][2].click()
         if minMax is not None:
             self.setMinMax(minMax)
+
+        self.initialize_points_item()
+        self.initialize_vectors_item()
+
+        self.change_max_projection()
+        # self.change_orientations_threshold()
 
         self.show()
 
@@ -254,7 +351,7 @@ class DataViewer(QWidget):
         self.source_index = (np.array(self.source_shape, dtype=float) / 2).astype(int)
 
         # scaling
-        scale = np.array(scale) if scale is not None else np.array([])
+        scale = np.array(scale) if scale is not None else np.array([])  # Test Not default np.ones(3) ??
         self.source_scale = np.pad(scale, (0, self.sources[0].ndim - len(scale)), 'constant', constant_values=1)
 
         self.updateSourceRange()
@@ -352,7 +449,7 @@ class DataViewer(QWidget):
 
     def updateSourceRange(self):
         x, y = self.getXYAxes()
-        self.source_range_x = round(self.source_scale[x] * self.source_shape[x])
+        self.source_range_x = round(self.source_scale[x] * self.source_shape[x])  # TODO: check if round
         self.source_range_y = round(self.source_scale[y] * self.source_shape[y])
 
     def updateSourceSlice(self):
@@ -423,7 +520,11 @@ class DataViewer(QWidget):
         else:  # FIXME: check why array does not work for ndim = 3 (i.e. why we need 2 versions)
             vals = ", ".join([str(s[slc]) for s in self.sources])
         label = f"({x}, {y}, {z}) {{{x*xs:.2f}, {y*ys:.2f}, {z*zs:.2f}}} [{vals}]"
-        if self.atlas is not None:
+        if self.annotation is not None:
+            struct_info = self.annotation.get(self.sources[0][x, y, z], None)
+            if struct_info:
+                label += f"[{struct_info}]"
+        elif self.atlas is not None:
             try:
                 id_ = np.asscalar(self.atlas[slc])  # Deprecated since np version 1.16
             except AttributeError:
@@ -433,15 +534,23 @@ class DataViewer(QWidget):
             label = f"<span style='font-size: 12pt; color: black'>{label}</span>"
         self.source_label.setText(label)
 
-    def updateSlice(self):
+    def updateSlice(self, force_update=False):
         ax = self.scroll_axis
         index = min(max(0, int(self.sliceLine.value())), self.source_shape[ax]-1)
-        if index != self.source_index[ax]:
+        if self.max_projection is not None:
+            slc_ax = (
+            slice(max(0, index - self.max_projection), min(self.source_shape[ax], index + self.max_projection)),);
+        else:
+            slc_ax = (index,)
+        if index != self.source_index[ax] or force_update:
             self.source_index[ax] = index
-            self.source_slice = self.source_slice[:ax] + (index,) + self.source_slice[ax+1:]
+            self.source_slice = self.source_slice[:ax] + slc_ax + self.source_slice[ax+1:]
             self.source_pointer[ax] = index
             self.updateLabel()
             self.updateImage()
+            self.update_points()
+            self.update_vectors()
+            self.update_orientations()
             if self.scatter is not None:
                 self.plot_scatter_markers(ax, index)
 
@@ -477,7 +586,9 @@ class DataViewer(QWidget):
     def updateImage(self):
         for img_item, src in zip(self.image_items, self.sources):
             slc = self.source_slice[:src.ndim]
-            if self.all_colour:
+            if self.max_projection is not None:
+                image = np.max(src[self.source_slice[:src.ndim]], axis=self.source_axis)
+            elif self.all_colour:
                 image = src.array[slc]
                 image = self.color_last(image)
             else:
@@ -486,8 +597,18 @@ class DataViewer(QWidget):
                 image = image.view('uint8')
             img_item.updateImage(image)
 
-    def setMinMax(self, min_max, source=0):
-        self.luts[source].lut.region.setRegion(min_max)
+    def setMinMax(self, min_max, source=None):
+        if source is None:
+            if not isinstance(min_max, list):
+                min_max = [min_max] * len(self.sources)
+                source = list(range(len(self.sources)))
+        else:
+            if not isinstance(source, list):
+                source = [source]
+            if not isinstance(min_max, list):
+                min_max = [min_max] * len(source)
+        for s, mM in enumerate(min_max):
+            self.luts[s].lut.region.setRegion(mM)
 
     def plot_scatter_markers(self, ax, index):
         self.scatter.clear()
@@ -509,6 +630,184 @@ class DataViewer(QWidget):
                                            **marker_params)  # FIXME: scale size as function of zoom
         except KeyError as err:
             print(f'DataViewer error: {err}')
+
+    def change_max_projection(self, value=None):
+        if value is not None:
+            self.max_projection_edit.setText('%d' % value)
+
+        text = self.max_projection_edit.text()
+        try:
+            text = int(text)
+            if text <= 0:
+                text = None
+        except ValueError:
+            text = None
+        self.max_projection = text
+        self.updateSlice(force_update=True)
+
+    def initialize_points_item(self):
+        if self.points_item is not None:
+            self.view.removeItem(self.points_item)
+        self.points_item = pg.ScatterPlotItem(**self.points_style)
+        self.view.addItem(self.points_item)
+
+    def set_points(self, points):
+        self.points = points
+        if self.points is not None:
+            self.points = as_source(points)
+        self.initialize_points_item()
+        self.update_points()
+
+    def update_points(self):
+        if self.points is not None:
+            points = self.points
+
+            axis = self.source_axis
+            axes = [d for d in range(3) if d != axis]
+            index = self.source_index[axis]
+
+            # select points in slice
+            valid_min, valid_max = index - 0.5, index + 0.5
+            if self.max_projection is not None:
+                valid_min, valid_max = valid_min - self.max_projection, valid_max + self.max_projection
+            valid = np.logical_and(valid_min < points[..., axis], points[..., axis] <= valid_max)
+
+            points = points[valid]
+            x, y = [points[:, a] + 0.5 for a in axes]
+
+            self.points_item.setData(x=x, y=y)
+
+    def change_points_color(self):
+        color = self.points_color_button.color()
+        self.points_style['brush'] = color
+        self.points_item.setBrush(self.points_style['brush'])
+
+    def initialize_vectors_item(self):
+        if self.vectors_base_item is not None:
+            self.view.removeItem(self.vectors_base_item)
+        self.vectors_base_item = pg.ScatterPlotItem(**self.vectors_style)
+        self.view.addItem(self.vectors_base_item)
+
+    def set_vectors(self, vectors):
+        self.vectors = vectors
+        self.update_vectors()
+
+    def update_vectors(self):
+        if self.vectors is not None:
+            vectors = self.vectors
+
+            axis = self.source_axis
+            index = self.source_index[axis]
+            slicing = tuple(slice(None) if a != axis else index for a in range(3))
+            axes = [d for d in range(3) if d != axis]
+            vx, vy = [vectors[slicing + (a,)] for a in axes]
+            x, y = np.meshgrid(np.arange(vectors.shape[axes[0]], dtype=float),
+                               np.arange(vectors.shape[axes[1]], dtype=float),
+                               indexing='ij')
+
+            if self.vectors_style.get('threshold', None) is not None:
+                select = self.sources[0][self.sourceSlice()] > self.vectors_style.get('threshold')
+                vx, vy = vx[select], vy[select]
+                x, y = x[select], y[select]
+            else:
+                vx, vy = vx.flatten(), vy.flatten()
+                x, y = x.flatten(), y.flatten()
+
+            x += 0.5
+            y += 0.5
+
+            px, py = np.zeros(x.shape[0] * 2), np.zeros(y.shape[0] * 2)
+            px[0::2] = x
+            px[1::2] = x + vx
+            py[0::2] = y
+            py[1::2] = y + vy
+            path = pg.arrayToQPath(px, py, 'pairs')
+
+            if self.vectors_item is not None:
+                self.view.removeItem(self.vectors_item)
+            self.vectors_item = QGraphicsPathItem(path)
+            self.vectors_item.setPen(pg.mkPen(self.vectors_style.get('brush')))
+            self.view.addItem(self.vectors_item)
+            self.vectors_base_item.setData(x=x, y=y)
+
+    def change_vectors_threshold(self, value=None):
+        if value is not None:
+            self.vectors_threshold_edit.setText('%d' % value)
+        text = self.vectors_threshold_edit.text()
+        # print('text=',text)
+        try:
+            value = float(text)
+        except ValueError:
+            value = None
+        self.vectors_style['threshold'] = value
+        self.updateSlice(force_update=True)
+
+    def change_vectors_color(self):
+        color = self.vectors_color_button.color()
+        self.vectors_style['brush'] = color
+        self.vectors_item.setPen(pg.mkPen(self.vectors_style['brush']))
+        self.vectors_base_item.setBrush(self.vectors_style['brush'])
+
+    def set_orientations(self, orientations):
+        self.orientations = orientations
+        self.update_orientations()
+
+    def update_orientations(self):
+        if self.orientations is not None:
+            orientations = self.orientations
+
+            axis = self.source_axis
+            index = self.source_index[axis]
+            slicing = tuple(slice(None) if a != axis else index for a in range(3))
+            axes = [d for d in range(3) if d != axis]
+            vx, vy = [orientations[slicing + (a,)] for a in axes]
+            x, y = np.meshgrid(np.arange(orientations.shape[axes[0]], dtype=float),
+                               np.arange(orientations.shape[axes[1]], dtype=float), indexing='ij')
+
+            if self.orientations_style.get('threshold', None) is not None:
+                select = self.sources[0][self.sourceSlice()] > self.orientations_style.get('threshold')
+                vx, vy = vx[select], vy[select]
+                x, y = x[select], y[select]
+            else:
+                vx, vy = vx.flatten(), vy.flatten()
+                x, y = x.flatten(), y.flatten()
+
+            x += 0.5
+            y += 0.5
+
+            px, py = np.zeros(x.shape[0] * 2), np.zeros(y.shape[0] * 2)
+            l = 0.45
+            px[0::2] = x - l * vx;
+            px[1::2] = x + l * vx
+            py[0::2] = y - l * vy;
+            py[1::2] = y + l * vy
+            path = pg.arrayToQPath(px, py, 'pairs')
+
+            if self.orientations_item is not None:
+                self.view.removeItem(self.orientations_item)
+            self.orientations_item = QGraphicsPathItem(path)
+            self.orientations_item.setPen(pg.mkPen(self.orientations_style.get('pen')))
+            self.view.addItem(self.orientations_item)
+
+    def change_orientations_threshold(self, value=None):
+        if value is not None:
+            self.orientations_threshold_edit.setText('%d' % value)
+        text = self.orientations_threshold_edit.text()
+        # print('text=',text)
+        try:
+            value = float(text)
+        except ValueError:
+            value = None
+        self.orientations_style['threshold'] = value
+        self.updateSlice(force_update=True)
+
+    def change_orientations_color(self):
+        color = self.orientations_color_button.color()
+        self.orientations_style['pen'] = color
+        self.orientations_item.setPen(self.orientations_style['pen'])
+
+    def set_color_scheme(self, type_, lut=0):
+        self.luts[lut].lut.item.gradient.loadPreset(type_)
 
     def enable_mouse_clicks(self):
         self.graphicsView.scene().sigMouseClicked.connect(self.handleMouseClick)
@@ -548,6 +847,12 @@ class DataViewer(QWidget):
 
 
 def _test():
+    import numpy as np
+    import ClearMap.Visualization.Qt.DataViewerAxon as dv
+
+    from importlib import reload
+    reload(dv)
+
     img1 = np.random.rand(*(100, 80, 30))
     if not runs_on_spyder():
         pg.mkQApp()
@@ -555,7 +860,14 @@ def _test():
     if not runs_on_spyder():
         instance = QApplication.instance()
         instance.exec_()
+    points = np.array(np.where(img1 > 0.99)).T
+    points.shape
 
+    vectors = np.random.rand(*(img1.shape + (3,)))
+
+    # %gui qt
+    reload(dv)
+    dv.DataViewer(img1, points=points, vectors=vectors)
 
 if __name__ == '__main__':
     print('testing')
