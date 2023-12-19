@@ -183,5 +183,17 @@ def rescale_channel(folder, atlas_base_name=None, dest_resolution=(3, 3, 6), n_c
     print('DONE')
 
 
+def batch_crop(folder, crop_x=0, crop_y=0, suffix='_cropped'):
+    from ClearMap.processors.sample_preparation import init_preprocessor
+    preproc = init_preprocessor(folder)
+
+    shape = clearmap_io.shape(preproc.workspace.file_list('raw')[-1])
+    for f_path in preproc.workspace.file_list('raw'):
+        img = clearmap_io.read(f_path)
+        cropped_img = img[crop_x:shape[0] - crop_x, crop_y:shape[1] - crop_y, :]
+        cropped_path = f_path.replace('.ome.tif', f'{suffix}.ome.tif')
+        clearmap_io.write(cropped_path, cropped_img)
+
+
 if __name__ == '__main__':
     main(sys.argv[1])
