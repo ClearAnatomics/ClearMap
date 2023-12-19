@@ -52,10 +52,8 @@ import ClearMap.Alignment.Resampling as res
 
 import ClearMap.Utils.HierarchicalDict as hdict
 
-import ClearMap.Visualization.Color as col
-
 from ClearMap.Alignment.utils import create_label_table
-from ClearMap.Visualization.atlas import color_map
+from ClearMap.Visualization import Color as col
 
 
 ###############################################################################
@@ -112,6 +110,11 @@ default_extra_label = [
 ]
 """Additional label not in the Allen Brain Atlas label but in the atlas image.
 
+Warning
+-------
+    This is required for the older version of the Allen Brain Atlas. There
+    are no more labels missing in the current version (2017+ with 2022+ json file).
+    
 Note
 ----
   The form is a list of tuples, each tuple has the form 
@@ -805,6 +808,24 @@ def colorize(array, key='id'):
     return order_to_color[array]
 
 
+def color_map(alpha=True, as_int=False, int_type='uint8'):  # FIXME: this is bordeline circular (atlas module and annotation)
+    """
+    Generates a color map from color ids to rgb
+
+    Arguments
+    ---------
+    alpha : bool
+        If True return a color map with alpha values.
+
+    Returns
+    -------
+    color_map : array
+        An array of rgb colors for each label.
+    """
+    cm = annotation.colors_rgb
+    return col.color(cm, alpha=alpha, as_int=as_int, int_type=int_type)
+
+
 def get_names_map():
     return dict(zip(annotation.ids, annotation.names))
 
@@ -812,6 +833,7 @@ def get_names_map():
 ###############################################################################
 # ## Tests
 ###############################################################################
+
 
 def _test1():
     import numpy as np
