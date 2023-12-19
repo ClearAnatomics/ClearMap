@@ -42,8 +42,13 @@ def print_params(step_params, param_key, prefix, verbose):
 def wrap_step(param_key, previous_result, step_function, args=(), remove_previous_result=False,
               extra_kwargs=None, parameter=None, steps_to_measure=None, prefix='',
               base_slicing=None, valid_slicing=None):
+    if steps_to_measure is None:
+        steps_to_measure = {}
+    if parameter is None:
+        parameter = {}
     if extra_kwargs is None:
         extra_kwargs = {}
+
     step_param = parameter.get(param_key)
     if step_param:
         step_param, timer = print_params(step_param, param_key, prefix, parameter.get('verbose'))
