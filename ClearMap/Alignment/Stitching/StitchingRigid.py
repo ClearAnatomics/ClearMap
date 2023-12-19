@@ -51,6 +51,7 @@ from ClearMap.Utils.Formatting import ensure
 ###############################################################################
 ### Geometry
 ###############################################################################
+from ClearMap.Utils.utilities import CancelableProcessPoolExecutor
 
 
 class Region(object):
@@ -1586,9 +1587,9 @@ class Layout(SourceRegion, src.AbstractSource):
     align_layout(self, max_shifts = max_shifts, clip = clip, background = background, processes = processes, verbose = verbose);
   
   
-  def place(self, method = 'optimization', lower_to_origin = False, processes = None, verbose = False):
+  def place(self, method = 'optimization', lower_to_origin = False, processes = None, verbose = False, min_quality=None):
     """Optimizes positions of the sources in this layout."""
-    place_layout(self, method = method, lower_to_origin = lower_to_origin, verbose = verbose);
+    place_layout(self, method = method,  min_quality=min_quality, lower_to_origin = lower_to_origin, verbose = verbose);
   
   
   def stitch(self, sink = None, method = 'interpolation', processes = None, verbose = False):
@@ -2446,7 +2447,7 @@ def save_layout(filename, layout):
   
   Returns
   -------
-  file_name : str
+  str
     The file name in which the layout was saved.
   """  
   s = np.array([layout.as_virtual()], dtype=object);
@@ -3312,7 +3313,8 @@ def _align_layout_axis(src1, src2, aid, n_alignments, axis, axis_range, depth, m
 
 
 
-def align_layout_rigid_mip(layout, depth = 10, max_shifts = 10, ranges = None, clip = None, background = None, processes = None, verbose = False):
+def align_layout_rigid_mip(layout, depth = 10, max_shifts = 10, ranges = None, clip = None, background = None,
+                           processes = None, workspace=None, verbose = False):
   """Aligns sources in a layout in a single axis direction only.
   
   Arguments
@@ -3373,9 +3375,13 @@ def align_layout_rigid_mip(layout, depth = 10, max_shifts = 10, ranges = None, c
     layout.sources_as_virtual();                        
     alignments = layout.alignments;
     #print('align_axis')
-    with concurrent.futures.ProcessPoolExecutor(processes) as executor:
+    with CancelableProcessPoolExecutor(processes) as executor:
       results = executor.map(_align, [a.pre for a in alignments], [a.post for a in alignments], range(n_alignments));
-    results = list(results);                       
+      if workspace is not None:
+        workspace.executor = executor
+    if workspace is not None:
+      workspace.executor = None
+    results = list(results);
   
     #layout.sources_as_real();
   

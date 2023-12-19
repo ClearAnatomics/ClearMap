@@ -1,5 +1,5 @@
-ClearMap
-========
+ClearMap 2.1
+============
 
 [![DOI](https://zenodo.org/badge/256322811.svg)](https://zenodo.org/badge/latestdoi/256322811)
 [![GitHub stars](https://img.shields.io/github/stars/ChristophKirst/ClearMap2.svg?style=social&label=Star)](https://github.com/ChristophKirst/ClearMap2) 
@@ -24,6 +24,24 @@ ClearMap
 *ClearMap* is a toolbox for the analysis and registration of volumetric
 data from cleared tissues.
 
+> :new: This is the new 2.1 version of ClearMap which includes a Graphical User Interface.
+> To use it, make sure that the *install_gui.sh* script is executable and run it by 
+> opening a terminal in the ClearMap2 folder and typing ./run_gui.sh. 
+
+## 2.1.0 what's new
+  * [x] Graphical user interface with many helper widgets
+  * [x] Redesigned code with config based parameters to replace the scripts
+  * [x] Atlas alignment improvements:
+    * [x] Updated Allen atlas files (no more "No Label")
+    * [x] Support for more atlases
+    * [x] Support for hemispheres information
+    * [x] Landmarks based registration
+  * [x] Batch mode for processing or analysis
+  * [x] New plots to visualise detected cells
+  * [x] Various bug fixes
+
+\
+\
 *ClearMap's* tool box includes 
 
 ## [Wobbly-Stitcher](https://christophkirst.github.io/ClearMap2Documentation/html/wobblystitcher.html) <a href="https://christophkirst.github.io/ClearMap2Documentation/html/TubeMap.html#Stitching"> <img src="https://christophkirst.github.io/ClearMap2Documentation/images/WobblyStitcher.jpg" alt="WobblyStitcher" width="150" align="right" vspace = "5"/></a>
@@ -162,7 +180,10 @@ ClearMap was originally designed and developed by
 Scripts and specific applications were developed by [Nicolas Renier](https://www.renier-lab.com/nicolasrenier)
 and [Christoph Kirst](https://profiles.ucsf.edu/christoph.kirst).
 
-The deep vessel filling network was designed and created by Sophie Skriabine 
+Version 2.1 and GUI by [Charly Rousseau](https://github.com/crousseau) and [Etienne Doumazane](https://github.com/doumazane)
+with group analysis scripts contributed by [Sophie Skriabine](https://github.com/skriabineSop).
+
+The deep vessel filling network was designed and created by [Sophie Skriabine](https://github.com/skriabineSop) 
 and integrated to ClearMap by [Christoph Kirst](https://profiles.ucsf.edu/christoph.kirst).
 
 The documentation was written by [Christoph Kirst](https://profiles.ucsf.edu/christoph.kirst).
@@ -183,6 +204,12 @@ Copyright © 2020 by Christoph Kirst
 
 Versions
 ========
+
+VERSION 2.1
+-----------
+  * Rewrite of the upper layers of software based on configuration files.
+  * Graphical user interface.
+
 
 VERSION 2.0
 -----------

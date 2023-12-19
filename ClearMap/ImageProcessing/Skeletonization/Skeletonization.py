@@ -68,16 +68,16 @@ def skeletonize(source, sink = None, points = None, method = 'PK12i', steps = No
     timer = tmr.Timer();
   
   if not in_place and io.is_file(source):
-    binary_buffer = ap.read(source).as_buffer();
+    binary_buffer = ap.read(source).as_buffer();  # prange
   else:
     binary, binary_buffer = ap.initialize_source(source);
     if not in_place:
       binary_buffer = np.array(binary_buffer);
   
   if method == 'PK12':
-    result = PK12.skeletonize(binary_buffer, points=points, steps=steps, verbose=verbose, **kwargs)
+    result = PK12.skeletonize(binary_buffer, points=points, steps=steps, verbose=verbose, **kwargs)  # prange
   elif method == 'PK12i':
-    result = PK12.skeletonize_index(binary_buffer, points=points, steps=steps, verbose=verbose, **kwargs)
+    result = PK12.skeletonize_index(binary_buffer, points=points, steps=steps, verbose=verbose, **kwargs)  # prange
   else:
     raise RuntimeError('Skeletonizaton method %r is not valid!' % method);
                       
@@ -87,7 +87,7 @@ def skeletonize(source, sink = None, points = None, method = 'PK12i', steps = No
   if sink is None:
     sink = ap.io.as_source(result);
   elif isinstance(sink, str):
-    sink = ap.write(sink, result);
+    sink = ap.write(sink, result);  # prange
   else:
     sink = io.write(sink, result);
   return sink

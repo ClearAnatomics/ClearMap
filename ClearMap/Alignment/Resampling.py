@@ -19,10 +19,12 @@ import tempfile
 import itertools
 import functools as ft
 import concurrent.futures
+from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
 
 import cv2
+import psutil
 
 import ClearMap.IO.IO as io
 import ClearMap.IO.FileList as fl
@@ -33,12 +35,14 @@ import ClearMap.ParallelProcessing.ProcessWriter as pw
 import ClearMap.ParallelProcessing.ParallelTraceback as ptb
 
 import ClearMap.Utils.Timer as tmr
+from ClearMap.Utils.utilities import CancelableProcessPoolExecutor
 
 ########################################################################################
 ### Conversion
 ########################################################################################
 
-def format_orientation(orientation, inverse = False, default = None):
+
+def format_orientation(orientation, inverse=False, default=None):
   """Convert orientation to standard format.
   
   Arguments
@@ -60,22 +64,23 @@ def format_orientation(orientation, inverse = False, default = None):
   `Orientation`_
   """
   if orientation is None:
-      return default;
+      return default
       
-  #fix named representations
+  # fix named representations
   if orientation == 'left':
       #orientation = (1,2,3);
-      orientation = None;
+      orientation = None
   elif orientation == 'right':
-      orientation = (-1,2,3);
+      orientation = (-1, 2, 3)
       
   if orientation is not None and len(orientation) != 3:
-    raise ValueError("orientation should be 'left', 'right' or a tuple of 3 intergers from 1 to 3, signed, found %r" % (orientation,))
+    raise ValueError("orientation should be 'left', 'right' or a tuple of 3 (signed) "
+                     "integers from 1 to 3, found %r" % (orientation,))
   
   if inverse:
-    orientation = inverse_orientation(orientation);
+    orientation = inverse_orientation(orientation)
   
-  return orientation;
+  return orientation
 
 
 def inverse_orientation(orientation):
@@ -320,7 +325,7 @@ def resample_factor(source_shape, sink_shape = None, source_resolution = None, s
 def resample(source, sink = None, orientation = None, 
              sink_shape = None, source_resolution = None, sink_resolution = None, 
              interpolation = 'linear', axes_order = None, method = 'shared',
-             processes = None, verbose = True):
+             processes = None, workspace=None, verbose = True):
   """Resample data of source in new shape/resolution and orientation.
   
   Arguments
@@ -384,13 +389,13 @@ def resample(source, sink = None, orientation = None,
   orientation = format_orientation(orientation);
   
   source_shape, sink_shape, source_resolution, sink_resolution = \
-     resample_shape(source_shape=source_shape, sink_shape=sink_shape, 
-                    source_resolution=source_resolution, sink_resolution=sink_resolution, 
+    resample_shape(source_shape=source_shape, sink_shape=sink_shape,
+                   source_resolution=source_resolution, sink_resolution=sink_resolution,
                     orientation=orientation);
   
   sink_shape_in_source_orientation = orient_shape(sink_shape, orientation, inverse=True);
                                    
-  interpolation = _interpolation_to_cv2(interpolation);                                   
+  interpolation = _interpolation_to_cv2(interpolation)
 
   if not isinstance(processes, int) and processes != 'serial':
     processes = io.mp.cpu_count();
@@ -413,7 +418,7 @@ def resample(source, sink = None, orientation = None,
   delete_files = [];
   for step, axes, shape in zip(range(n_steps), axes_order, shape_order):
     if step == n_steps-1 and orientation is None:
-      resampled = io.initialize(source=sink, shape=sink_shape, dtype=dtype, as_source=True); 
+      resampled = io.initialize(source=sink, shape=sink_shape, dtype=dtype, as_source=True)
     else:
       if method == 'shared':
         resampled = io.sma.create(shape, dtype=dtype, order=order, as_source=True);
@@ -431,21 +436,22 @@ def resample(source, sink = None, orientation = None,
     #resample step
     last_source_virtual = last_source.as_virtual();
     resampled_virtual = resampled.as_virtual();
-    _resample = ft.partial(_resample_2d, source=last_source_virtual, sink=resampled_virtual, axes=axes, shape=shape, 
-                                         interpolation=interpolation, n_indices=n_indices, verbose=verbose)                       
+    _resample = ft.partial(_resample_2d, source=last_source_virtual, sink=resampled_virtual, axes=axes, shape=shape,
+                           interpolation=interpolation, n_indices=n_indices, verbose=verbose)
     
-    if processes == 'serial': 
+    if processes == 'serial':
       for index in indices:
         _resample(index=index);
     else:
-      #print(processes);
-      with concurrent.futures.ProcessPoolExecutor(processes) as executor:
-        executor.map(_resample, indices);
-        
-    last_source = resampled;
+      with ThreadPoolExecutor(processes) as executor:
+        chunk_size = round(len(indices) / (processes * 3))
+        executor.map(_resample, indices, chunksize=chunk_size)
+        if workspace is not None:
+          workspace.executor = executor
+    last_source = resampled
   
   #fix orientation
-  if not orientation is None:
+  if orientation is not None:
     #permute
     per = orientation_to_permuation(orientation);
     resampled = resampled.transpose(per);
@@ -464,7 +470,7 @@ def resample(source, sink = None, orientation = None,
       print("resample: re-oriented shape %r!" % (resampled.shape,))
   
     sink = io.write(sink, resampled);
-  else: 
+  else:
     sink = resampled;
   
   for f in delete_files:
@@ -482,24 +488,23 @@ def _resample_2d(index, source, sink, axes, shape, interpolation, n_indices, ver
   if verbose:
     pw.ProcessWriter(index).write("Resampling: resampling axes %r, slice %r / %d" % (axes, index, n_indices))
   
-  #slicing
-  ndim = len(shape);   
-  slicing = ();
-  i = 0;
+  # slicing
+  ndim = len(shape)
+  slicing_ = ()
+  i = 0
   for d in range(ndim):
     if d in axes:
-      slicing += (slice(None),);
+      slicing_ += (slice(None),)
     else:
-      slicing += (index[i],);
-      i += 1;
+      slicing_ += (index[i],)
+      i += 1
   
-  #resample planeresizeresizeresize
+  # resample planeresizeresizeresize
   sink = sink.as_real()
-  source = source.as_real();
-  #print(source.shape, sink.shape, source[slicing].shape, sink[slicing].shape)
-  #print(shape, axes)
-  sink[slicing] = cv2.resize(source[slicing], (shape[axes[1]], shape[axes[0]]), interpolation=interpolation);
-  #note cv2 takes reverse shape order !
+  source = source.as_real()
+  new_shape = (shape[axes[1]], shape[axes[0]])
+  sink[slicing_] = cv2.resize(source[slicing_], new_shape, interpolation=interpolation)
+  # WARNING: cv2 takes reverse shape order !
 
 
 def _axes_order(axes_order, source, sink_shape_in_source_orientation, order = None): 
@@ -644,32 +649,29 @@ def _axes_order(axes_order, source, sink_shape_in_source_orientation, order = No
     
     else:
       raise ValueError("axes_order %r not 'size','order' or list but %r!" % axes_order);
-      
 
 
 def _interpolation_to_cv2(interpolation):
   """Helper to convert interpolation specification to CV2 format."""
   
   if interpolation in ['nearest', 'nn', None, cv2.INTER_NEAREST]:
-    interpolation = cv2.INTER_NEAREST;
+    interpolation = cv2.INTER_NEAREST
   elif interpolation in ['area', 'a', cv2.INTER_AREA]:
-    interpolation = cv2.INTER_AREA;
+    interpolation = cv2.INTER_AREA
   else:
-    interpolation = cv2.INTER_LINEAR;
+    interpolation = cv2.INTER_LINEAR
       
-  return interpolation;
+  return interpolation
 
 
-
-
-def resample_inverse(source, sink = None, 
+def resample_inverse(source, sink = None,
                      resample_source = None, resample_sink = None,
-                     orientation = None, 
-                     source_shape = None, source_resolution = None, 
-                     sink_shape = None, sink_resolution = None, 
+                     orientation = None,
+                     source_shape = None, source_resolution = None,
+                     sink_shape = None, sink_resolution = None,
                      axes_order = None, method = 'memmap',
-                     interpolation = 'linear', 
-                     processes = None, verbose = True, **args):
+                     interpolation = 'linear',
+                     processes = None, verbose = True, workspace=None, **args):
   """Resample data inversely to :func:`resample` routine.
   
   Arguments
@@ -808,8 +810,12 @@ def resample_inverse(source, sink = None,
       for index in indices:
         _resample(index=index);
     else:
-      with concurrent.futures.ProcessPoolExecutor(processes) as executor:
-        executor.map(_resample, indices);
+      with CancelableProcessPoolExecutor(processes) as executor:
+        executor.map(_resample, indices)
+        if workspace is not None:
+          workspace.executor = executor
+      # if workspace is not None:
+      #   workspace.executor = None
         
     last_source = resampled;
   
@@ -835,7 +841,7 @@ def resample_points(source, sink = None, resample_source = None, resample_sink =
   source : str or array
     Points to be resampled.
   sink : str or None
-    Sink for the resmapled point coordinates.
+    Sink for the resampled point coordinates.
   orientation : tuple
     Orientation as specified in :func:`resample`.
   resample_source : str, array or None

@@ -12,7 +12,7 @@ __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__   = 'http://idisco.info'
 __download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 
-
+import numpy as np
 import tifffile as tif
 
 import ClearMap.IO.Source as src
@@ -91,31 +91,33 @@ class Source(src.Source):
     ----
     The strides of the elements module itemsize instead of bytes.
     """
-    memmap = self.as_memmap();
-    return tuple(s // memmap.itemsize for s in memmap.strides);
+    memmap = self.as_memmap()
+    return tuple(s // memmap.itemsize for s in memmap.strides)
   
-  def __getitem__(self, slicing, processes = None):
-    ndim = self.ndim;
+  def __getitem__(self, slicing, processes=None):
+    ndim = self.ndim
     if ndim >= 3:
-      slicing = slc.unpack_slicing(slicing, ndim);
+      slicing = slc.unpack_slicing(slicing, ndim)
 
-      slicing_z  = slicing[-1];
-      array = self._tif.asarray(key = slicing_z, maxworkers=processes);
-      array = array_from_tif(array);    
+      slicing_z = slicing[-1]
+      if isinstance(slicing_z, (int, np.int64)):
+        slicing_z = int(slicing_z)
+      array = self._tif.asarray(key=slicing_z, maxworkers=processes)
+      array = array_from_tif(array)
       
-      slicing_xy = (Ellipsis,) + slicing[-3:-1];
+      slicing_xy = (Ellipsis,) + slicing[-3:-1]
       if len(array.shape) > len(self._tif.pages[0].shape):
-        slicing_xy = slicing_xy + (slice(None),);
-      return array[slicing_xy];
+        slicing_xy = slicing_xy + (slice(None),)
+      return array[slicing_xy]
     
     else:
-      array = self._tif.asarray(maxworkers=processes);
+      array = self._tif.asarray(maxworkers=processes)
       array = array_from_tif(array)
-      return array.__getitem__(slicing);
+      return array.__getitem__(slicing)
       
   def __setitem__(self, *args):
-    memmap = self.as_memmap();
-    memmap.__setitem__(*args);
+    memmap = self.as_memmap()
+    memmap.__setitem__(*args)
    
   
   def metadata(self, info = None):
@@ -327,7 +329,7 @@ def write(sink, data, **args):
   sink : str
     The name of the tif file.
   """ 
-  tif.imsave(sink, array_to_tif(data))
+  tif.imsave(sink, array_to_tif(data), **args)
   return sink;
 
 
@@ -375,25 +377,35 @@ def create(location = None, shape = None, dtype = None, mode = None, as_source =
 ################################################################################
  
 def shape_from_tif(shape):
-  ndim = len(shape);
-  shape = shape[:max(0,ndim-3)] + shape[-3:][::-1];
-  return shape;
+  ndim = len(shape)
+  shape = shape[:max(0, ndim-3)] + shape[-3:][::-1]  # FIXME: rewrite for color and use in array_from_tiff too
+  return shape
 
   
 def shape_to_tif(shape):
-  return shape_from_tif(shape);
+  return shape_from_tif(shape)
 
 
 def array_from_tif(array):
-  ndim = array.ndim;
-  axes = [d for d in range(ndim)];
-  axes = axes[:max(0,ndim-3)] + axes[-3:][::-1];
-  array = array.transpose(axes);
-  return array;
+  ndim = array.ndim
+  n_colors = min(array.shape)  # valid if rgb
+  if ndim == 4 and n_colors in (3, 4):  # Put color last for RGB images
+    col_idx = array.shape.index(n_colors)
+
+    new_axes = list(range(ndim))
+    new_axes.pop(col_idx)
+    new_axes = new_axes[::-1]
+    new_axes.append(col_idx)
+    array = np.transpose(array, new_axes)
+  else:
+    axes = list(range(ndim))
+    axes = axes[:max(0, ndim-3)] + axes[-3:][::-1]
+    array = array.transpose(axes)
+  return array
 
 
 def array_to_tif(array):
-  return array_from_tif(array);
+  return array_from_tif(array)
 
 ################################################################################
 #### Meta data

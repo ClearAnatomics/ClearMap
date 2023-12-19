@@ -14,6 +14,8 @@ __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__   = 'http://idisco.info'
 __download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 
+import warnings
+
 import numpy as np
 import functools as ft
 import multiprocessing as mp
@@ -33,6 +35,8 @@ import ClearMap.ParallelProcessing.ParallelTraceback as ptb
 
 import ClearMap.Utils.Timer as tmr
 import ClearMap.Utils.TagExpression as te
+
+from ClearMap.Utils.utilities import CancelableProcessPoolExecutor
 
 ###############################################################################
 ###  Layout
@@ -252,7 +256,7 @@ class WobblySource(strg.Source):
     Returns
     -------
     position : tuple of int.
-      The non-local position of the specified coordainte slice.
+      The non-local position of the specified coordinate slice.
     """ 
     local_coordinate = self.coordinate_to_local(coordinate);                                          
     wobble = self._wobble[local_coordinate];
@@ -270,7 +274,7 @@ class WobblySource(strg.Source):
     Returns
     -------
     position : tuple of int.
-      The non-local position of the specified coordainte slice.
+      The non-local position of the specified coordinate slice.
     """ 
     local_coordinate = self.coordinate_to_local(coordinate);   
     return self._wobble[local_coordinate];
@@ -353,13 +357,13 @@ class WobblySource(strg.Source):
   ### Helper
   
   def _wobble_to_position(self, wobble, coordinate):
-    """Transform a wobble and axis coordainte to the full position.
+    """Transform a wobble and axis coordinate to the full position.
     
     Arguments
     ---------
     wobble : tuple
       The wobble to add.
-    coordainte : int
+    coordinate : int
       The coordinate along the axis
     
     Returns
@@ -515,7 +519,7 @@ class WobblyAlignment(strg.Alignment):
   
                    
   def align_wobbly_axis(self, **kwargs):
-    shifts, qualities = align_wobbly_axis(self.pre, self.post, axis = self.axis, **kwargs);
+    shifts, qualities = align_wobbly_axis(self.pre, self.post, axis=self.axis, **kwargs);
     self.shifts = shifts;
     self.qualities = qualities;                                        
   
@@ -995,12 +999,24 @@ def verbose_has_flag(verbose, flag):
 
     
 #TODO: use global plane wise coordinates if subsampling !
-def align_layout(layout, axis_range = None, max_shifts = 10, axis_mip = None,
-                 validate = None, prepare = 'normalization',
-                 validate_slice = None, prepare_slice = None,
-                 find_shifts = 'minimization',
-                 verbose = False, processes = None):
-  
+def align_layout(layout, axis_range=None, max_shifts=10, axis_mip=None,
+                 stack_validation_params=None, validate=None, prepare='normalization',
+                 slice_validation_params=None, validate_slice=None, prepare_slice=None,
+                 find_shifts='minimization',
+                 verbose=False, processes=None, workspace= None):
+
+  if validate is not None:
+    if not stack_validation_params:
+      stack_validation_params = validate
+    warnings.warn('Parameter validate is deprecated, please use stack_validation_params instead',
+                  DeprecationWarning, stacklevel=2)
+
+  if validate_slice is not None:
+    if not slice_validation_params:
+      slice_validation_params = validate_slice
+    warnings.warn('Parameter validate_slice is deprecated, please use slice_validation_params instead',
+                  DeprecationWarning, stacklevel=2)
+
   axis = layout.axis;
   alignments = layout.alignments;
   
@@ -1009,13 +1025,13 @@ def align_layout(layout, axis_range = None, max_shifts = 10, axis_mip = None,
     print('Alignment: aligning %d pairs of wobbly sources.' % (len(alignments)));
     verbose = Verbose(verbose);
     if verbose.has_flag('save'):
-       verbose.create_directory(prefix='WobblyAlginment');
+       verbose.create_directory(prefix='WobblyAlignment');
   
   _align = ft.partial(align_wobbly_axis, axis=axis, axis_range=axis_range, axis_mip=axis_mip, max_shifts=max_shifts,
-                                         prepare=prepare, validate=validate, 
-                                         prepare_slice=prepare_slice, validate_slice=validate_slice, 
-                                         find_shifts=find_shifts,
-                                         verbose=verbose);
+                      prepare=prepare, stack_validation_params=stack_validation_params,
+                      prepare_slice=prepare_slice, slice_validation_params=slice_validation_params,
+                      find_shifts=find_shifts,
+                      verbose=verbose);
   
   if not isinstance(processes, int) and processes != 'serial':
     processes = mp.cpu_count();
@@ -1024,8 +1040,12 @@ def align_layout(layout, axis_range = None, max_shifts = 10, axis_mip = None,
     results = [_align(a.pre, a.post) for a in alignments];
   else:
     layout.sources_as_virtual();
-    with concurrent.futures.ProcessPoolExecutor(processes) as executor:
+    with CancelableProcessPoolExecutor(processes) as executor:
       results = executor.map(_align, [a.pre for a in alignments], [a.post for a in alignments]);
+      if workspace is not None:
+        workspace.executor = executor
+    if workspace is not None:
+      workspace.executor = None
     results = list(results);                 
   
   for a,r in zip(layout.alignments, results):
@@ -1038,11 +1058,10 @@ def align_layout(layout, axis_range = None, max_shifts = 10, axis_mip = None,
 
 
 @ptb.parallel_traceback
-def align_wobbly_axis(source1, source2, axis = 2, axis_range = None, max_shifts = 10, axis_mip = None,
-                      validate = None, prepare = 'normalization',
-                      validate_slice = None, prepare_slice = None,
-                      find_shifts = 'minimization',
-                      with_errors = False, with_overlaps = False, verbose = True):
+def align_wobbly_axis(source1, source2, axis=2, axis_range=None, max_shifts=10, axis_mip=None,
+                      stack_validation_params=None, prepare='normalization', slice_validation_params=None,
+                      prepare_slice=None, find_shifts='minimization', with_errors=False, with_overlaps=False,
+                      verbose=True):
   """Create shifts along the wobble axis, estimate smooth shifts and mark invalid slices, accounts for jumps in minima using multiple minima."""                      
   
   if verbose:
@@ -1050,8 +1069,8 @@ def align_wobbly_axis(source1, source2, axis = 2, axis_range = None, max_shifts 
     print('Alignment: wobbly alignment %r->%r along axis %d' % (source1.identifier, source2.identifier, axis));
   
   #prepare methods dicts
-  validate, prepare, validate_slice, prepare_slice, find_shifts = \
-    [dict(method=m) if isinstance(m, str) else m for m in (validate, prepare, validate_slice, prepare_slice, find_shifts)];
+  stack_validation_params, prepare, slice_validation_params, prepare_slice, find_shifts = \
+    [dict(method=m) if isinstance(m, str) else m for m in (stack_validation_params, prepare, slice_validation_params, prepare_slice, find_shifts)];
   
   if axis_mip:
     if not isinstance(axis_mip, tuple):
@@ -1115,12 +1134,12 @@ def align_wobbly_axis(source1, source2, axis = 2, axis_range = None, max_shifts 
   errors = np.zeros(error_shape);                
                    
   #validate entire stacks 
-  if validate:
-    valid = _validate(i1, **validate);             
+  if stack_validation_params:
+    valid = _validate(i1, **stack_validation_params);
     if verbose and not valid:
       print('Alignment: Source %r is not valid!' % (source1.identifier,)); 
     if valid:
-      valid = _validate(i2, **validate);
+      valid = _validate(i2, **stack_validation_params);
       if verbose and not valid:
         print('Alignment: Source %r is not valid!' % (source1.identifier,));
     if not valid:
@@ -1133,7 +1152,7 @@ def align_wobbly_axis(source1, source2, axis = 2, axis_range = None, max_shifts 
       return results;                            
 
   #keep original copy for validation               
-  if validate_slice:
+  if slice_validation_params:
     i1raw = i1.copy();
     i2raw = i2.copy();
 
@@ -1148,7 +1167,7 @@ def align_wobbly_axis(source1, source2, axis = 2, axis_range = None, max_shifts 
   w1[slice_no_pad1] = 1;
   w1fft = np.fft.fftn(w1);
   
-  w2 = np.pad(np.zeros(shape1), pad1, 'constant');             
+  w2 = np.pad(np.zeros(shape1), pad1, 'constant');     # FIXME: check pad1
   w2[slice_no_pad2] = 1;
   w2fft = np.fft.fftn(w2);
    
@@ -1181,16 +1200,16 @@ def align_wobbly_axis(source1, source2, axis = 2, axis_range = None, max_shifts 
       i1a = i1[slice1_a];
       i2a = i2[slice2_a];
     
-    if validate_slice:
+    if slice_validation_params:
       i1rawa = i1raw[slice1_a];
-      valid = _validate(i1rawa, **validate_slice);
+      valid = _validate(i1rawa, **slice_validation_params);
       if verbose and not valid:
-        print('Alignment: Slice %d with coordainte %d in source %r is not valid!' % (a - a_start, a, source1.identifier)); 
+        print('Alignment: Slice %d with coordinate %d in source %r is not valid!' % (a - a_start, a, source1.identifier));
       if valid:
         i2rawa = i2raw[slice2_a];
-        valid = _validate(i2rawa, **validate_slice);
+        valid = _validate(i2rawa, **slice_validation_params);
         if verbose and not valid:
-          print('Alignment: Slice %d with coordainte %d in source %r is not valid!' % (a - a_start, a, source2.identifier)); 
+          print('Alignment: Slice %d with coordinate %d in source %r is not valid!' % (a - a_start, a, source2.identifier));
       if not valid:
         status[i] = WobblyAlignment.NOSIGNAL;
         continue;                        
@@ -1496,7 +1515,7 @@ def inspect_align_layout(alignment, verbose):
   minima : array
    Coordinates of the detected minima  
   trajectories : list
-    List of coordaintes of the detected trajectories.
+    List of coordinates of the detected trajectories.
   trajectories_optimal : list
     List of the optimal trajectories.
   """
@@ -1561,9 +1580,9 @@ def inspect_align_layout(alignment, verbose):
 ###############################################################################
 
 
-def place_layout(layout, min_quality = None, method = 'optimization', 
-                 smooth = None, smooth_optimized = None, fix_isolated = True,                       
-                 lower_to_origin = True, processes = None, verbose = False):
+def place_layout(layout, min_quality = None, method = 'optimization',
+                 smooth = None, smooth_optimized = None, fix_isolated = True,
+                 lower_to_origin = True, processes = None, verbose = False, workspace=None):
   """Place a layout with the WobblyAlignments."""
   
   #prepare methods dicts
@@ -1622,8 +1641,12 @@ def place_layout(layout, min_quality = None, method = 'optimization',
   if processes == 'serial':
     results = [_place(d,q,s) for d,q,s in zip(displacements, qualities, status)];
   else:
-    with concurrent.futures.ProcessPoolExecutor(processes) as executor:
-      results = executor.map(_place, displacements, qualities, status);
+    with CancelableProcessPoolExecutor(processes) as executor:
+      results = executor.map(_place, displacements, qualities, status)
+      if workspace is not None:
+        workspace.executor = executor
+    if workspace is not None:
+      workspace.executor = None
     results = list(results);                 
   
   positions_new = np.array([r[0] for r in results]);             
@@ -1647,7 +1670,8 @@ def place_layout(layout, min_quality = None, method = 'optimization',
   if method == 'optimization':
     if verbose:
       print('Placement: optimizing wobbly positions!')
-    positions_optimized = _optimize_slice_positions(positions_new, components, processes=processes, verbose=verbose);
+    positions_optimized = _optimize_slice_positions(positions_new, components, processes=processes,
+                                                    workspace=workspace, verbose=verbose)
   else:
     if verbose:
       print('Placement: combining wobbly positions!')      
@@ -1841,7 +1865,7 @@ def _cluster_components(components):
   return components_full, is_to_c, c_to_si
 
 
-def _optimize_slice_positions(positions, components, processes = None, verbose = False):
+def _optimize_slice_positions(positions, components, processes = None, workspace=None, verbose = False):
   """Helper to optimize the positions of the slices on top of each other"""
   
   #Setting:
@@ -1967,11 +1991,15 @@ def _optimize_slice_positions(positions, components, processes = None, verbose =
     #print M
     #print np.linalg.pinv(-M)
     
-    if isinstance(processes, int):
+    if isinstance(processes, int) and processes > 1:
       M = [io.sma.smm.insert(m) for m in M];
       X = [io.sma.smm.insert(x) for x in X];           
-      with concurrent.futures.ProcessPoolExecutor(min(processes, ndim)) as executer:
-        shifts = executer.map(_optimize_shifts, M, X);
+      with CancelableProcessPoolExecutor(min(processes, ndim)) as executor:
+        shifts = executor.map(_optimize_shifts, M, X)
+        if workspace is not None:
+          workspace.executor = executor
+      if workspace is not None:
+        workspace.executor = None
       shifts = list(shifts);
       shifts = np.array(shifts).T;
     else:
@@ -2243,7 +2271,7 @@ def fix_isolated(self, exclude_borders=False):
 ###############################################################################
 
 
-def stitch_layout(layout, sink, method = 'interpolation', processes = None, verbose = True):
+def stitch_layout(layout, sink, method = 'interpolation', processes = None, verbose = True, workspace=None):
   """Stitches the wobbly sources in a wobbly layout.
   
   Arguments
@@ -2305,8 +2333,12 @@ def stitch_layout(layout, sink, method = 'interpolation', processes = None, verb
   else:
     #for l in layout_slices:
     #  l.sources_as_virtual();
-    with concurrent.futures.ProcessPoolExecutor(processes) as executor:
-      executor.map(_stitch, layout_slices, range(n_slices));
+    with CancelableProcessPoolExecutor(processes) as executor:
+      executor.map(_stitch, layout_slices, range(n_slices))
+      if workspace is not None:
+        workspace.executor = executor
+    if workspace is not None:
+      workspace.executor = None
     
   
   if verbose:
@@ -2375,7 +2407,7 @@ def _test():
   plt.plot(wobble[:,0])
   
   l = stw.WobblyLayout([data1, data2], overlaps = 20);
-  stw.align_layout(l, max_shifts = 20, verbose = True, processes = 'serial', validate = True, find_shifts = 'tracing')
+  stw.align_layout(l, max_shifts = 20, verbose = True, processes = 'serial', stack_validation_params= True, find_shifts ='tracing')
   
   a = l.alignments[0];
   a.plot_overlay_wobbly()                  
@@ -2423,7 +2455,7 @@ def _test():
   reload(stw.strg)
   reload(stw)
   l = stw.WobblyLayout([data1, data2], overlaps = 20);
-  stw.align_layout(l, max_shifts = 20, verbose = True, processes = 'serial', validate = False)
+  stw.align_layout(l, max_shifts = 20, verbose = True, processes = 'serial', stack_validation_params= False)
   
   stw.place_layout(l, method='!optimization',  lower_to_origin=True, smooth = None, verbose = True, processes = 'serial')
 
@@ -2474,7 +2506,7 @@ def _test():
   stw.strg.place_layout_axis(l, axis = 2, method = 'optimization', min_quality = -np.inf, lower_to_origin = True, verbose = True)
   l.sources
 
-  stw.align_layout(l, max_shifts = 20, verbose = True, processes = '!serial', validate = False, axis_range = (None, None, 3))
+  stw.align_layout(l, max_shifts = 20, verbose = True, processes = '!serial', stack_validation_params= False, axis_range = (None, None, 3))
   a = l.alignments[0];
   a.plot_overlay_wobbly()                  
   
@@ -2549,10 +2581,10 @@ def _test():
   reload(stw)
   l = stw.WobblyLayout([data1, data2], overlaps = 20); l.sources[1].position = (100,0,sh);
   
-  stw.align_layout(l, max_shifts = 15,  axis_range = (None, None, 1), axis_mip = 1,
-                   validate = None,
+  stw.align_layout(l, max_shifts = 15, axis_range = (None, None, 1), axis_mip = 1,
+                   stack_validation_params= None,
                    prepare = 'normalization',
-                   validate_slice = dict(method='foreground', valid_range = (1, None), size = None),
+                   slice_validation_params= dict(method='foreground', valid_range = (1, None), size = None),
                    find_shifts = dict(method='tracing', cutoff=np.sqrt(2 * 3**2), debug = True),
                    verbose = True, processes = 'serial')
 
@@ -2564,12 +2596,10 @@ def _test():
 
   
   a = l.alignments[0];     
-  results = stw.align_wobbly_axis(a.pre, a.post, max_shifts = 20,  axis_range = (None, None, 1), axis_mip = None,
-                                  validate = None,
-                                  prepare = 'normalization',
-                                  validate_slice = dict(method='foreground', valid_range = (1, None), size = None),
-                                  find_shifts = 'minimization',
-                                  with_errors = True, with_overlaps = True, verbose = True)
+  results = stw.align_wobbly_axis(a.pre, a.post, axis_range=(None, None, 1), max_shifts=20, axis_mip=None,
+                                  stack_validation_params=None, prepare='normalization',
+                                  slice_validation_params=dict(method='foreground', valid_range=(1, None), size=None),
+                                  find_shifts='minimization', with_errors=True, with_overlaps=True, verbose=True)
   shifts, qualities, status, errors, ovlps = results;
   stw.strg.dv.plot((errors.transpose([1,2,0]),) + ovlps)
            
@@ -2610,10 +2640,10 @@ def _test():
   reload(stw)
   l = stw.WobblyLayout([data1, data2], overlaps = 20); l.sources[1].position = (100,0,sh);
   
-  stw.align_layout(l, max_shifts = 20,  axis_range = (None, None, 1),
-                   validate = None,
+  stw.align_layout(l, max_shifts = 20, axis_range = (None, None, 1),
+                   stack_validation_params= None,
                    prepare = 'normalization',
-                   validate_slice = dict(method='foreground', valid_range = (1, None), size = None),
+                   slice_validation_params= dict(method='foreground', valid_range = (1, None), size = None),
                    find_shifts = dict(method='tracing', cutoff=np.sqrt(2 * 3**2), debug = False),
                    verbose = True, processes = 'serial')
   stw.place_layout(l, method = '!optimization',  lower_to_origin=True, min_quality=-np.inf, 
