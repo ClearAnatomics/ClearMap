@@ -44,8 +44,8 @@ def test_geodesic_distance3d():
     D2 = geodesic_distance_3d(I,S, 1.0, 4)
     dt1 = t1 - t0
     dt2 = time.time() - t1
-    print "runtime(s) fast marching {0:}".format(dt1)
-    print "runtime(s) raster scan   {0:}".format(dt2)
+    print("runtime(s) fast marching {0:}".format(dt1))
+    print("runtime(s) raster scan   {0:}".format(dt2))
 
     D1 = D1*255/D1.max()
     D1 = np.asarray(D1, np.uint8)
