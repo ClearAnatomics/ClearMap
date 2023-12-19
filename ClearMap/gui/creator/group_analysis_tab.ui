@@ -238,7 +238,7 @@
     </widget>
    </item>
    <item>
-    <widget class="QCheckBox" name="advancedCheckBox_2">
+    <widget class="QCheckBox" name="advancedCheckBox">
      <property name="text">
       <string>Advanced</string>
      </property>
