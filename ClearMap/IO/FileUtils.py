@@ -250,7 +250,10 @@ def copy_file(source, sink):
 
 def uncompress(file_path, extension='zip', check=True, verbose=False):
     """
-    Unzips a file only if 1) the file does not exist (check), 2) the compressed file exists.
+    Unzips a file only if:
+        1) the file does not exist (check)
+        2) the compressed file exists.
+
 
     Arguments
     ---------
@@ -305,6 +308,90 @@ def uncompress(file_path, extension='zip', check=True, verbose=False):
         else:
             print(f'Cannot find compressed source: {compressed_path}')
     return file_path
+
+
+def compress(file_path, extension='zip', check=True, verbose=False):
+    """
+    Compresses a file only if:
+        1) the file exists (check)
+        2) the compressed file does not exist.
+
+    Arguments
+    ---------
+    file_path : str
+        The file path to search for.
+    extension : str
+        The extension for the compressed file.
+    check : bool
+        If True, check if the compressed file already exists.
+    verbose : bool
+        Print progress info.
+
+    Returns
+    -------
+    filename : str or None
+        The compressed filename or None if failed.
+    """
+
+    if os.path.exists(file_path) and check:
+        if extension == 'auto':
+            extension = 'zip'
+        compressed_path = f'{file_path}.{extension}'  # FIXME: replace existing extension
+        if not os.path.exists(compressed_path):
+            if verbose:
+                print(f'Compressing source: {file_path}')
+            if extension == 'zip':
+                import zipfile
+                with zipfile.ZipFile(compressed_path, 'w', compression=zipfile.ZIP_DEFLATED) as zipf:
+                    if os.path.splitext(file_path)[-1] in ('.tif', '.nrrd'):
+                        zipf.write(file_path, arcname=os.path.basename(file_path))
+                    else:
+                        for root, dirs, files in os.walk(file_path):
+                            for file in files:
+                                zipf.write(os.path.join(root, file), arcname=os.path.join(root, file))
+                if not os.path.exists(compressed_path):
+                    raise FileNotFoundError
+            elif extension in ('bz2', 'gzip', 'lzma'):
+                mod = importlib.import_module(extension)
+                with open(file_path, 'rb') as in_file, open(compressed_path, 'wb') as compressed_file:
+                    compressed_file.write(mod.compress(in_file.read()))
+            else:
+                raise NotImplementedError(f'Unrecognized compression extension {extension}')
+        else:
+            print(f'Compressed file {compressed_path} exists. Skipping compression.')
+    return compressed_path
+
+
+def checksum(file_path, algorithm='md5', verbose=False):
+    """
+    Calculates the checksum of a file.
+
+    Arguments
+    ---------
+    file_path : str
+        The file path to search for.
+    algorithm : str
+        The algorithm to use for the checksum.
+    verbose : bool
+        Print progress info.
+
+    Returns
+    -------
+    checksum : str or None
+        The checksum or None if failed.
+    """
+    if os.path.exists(file_path):
+        if verbose:
+            print(f'Calculating checksum for {file_path}')
+        import hashlib
+        hash = hashlib.new(algorithm)  # TODO: check because could be faster to call the function directly
+        with open(file_path, 'rb') as f:
+            for chunk in iter(lambda: f.read(4096), b""):
+                hash.update(chunk)
+        file_checksum = hash.hexdigest()
+    else:
+        raise FileNotFoundError(f'Cannot find file {file_path}')
+    return file_checksum
     
 
 ###############################################################################
