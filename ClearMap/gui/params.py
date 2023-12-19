@@ -434,7 +434,8 @@ class CellMapParams(UiParameter):
             'maxima_shape': ParamLink(['detection', 'maxima_detection', 'shape'], self.tab.maximaShape),
             'detection_threshold': ParamLink(['detection', 'shape_detection', 'threshold'], self.tab.detectionThreshold),
             'cell_filter_size': ParamLink(['cell_filtration', 'thresholds', 'size'], self.tab.cellFilterThresholdSizeDoublet),
-            # Properties below 'cell_filter_intensity': ParamLink(['cell_filtration', 'thresholds', 'intensity'], self.tab.cellFilterThresholdIntensityDoublet),
+            'cell_filter_intensity': ParamLink(['cell_filtration', 'thresholds', 'intensity'],
+                                               self.tab.cellFilterThresholdIntensityDoublet),
             'voxelization_radii': ParamLink(['voxelization', 'radii'], self.tab.voxelizationRadiusTriplet),
             'detect_cells': ParamLink(None, self.tab.runCellMapDetectCellsCheckBox),
             'filter_cells': ParamLink(None, self.tab.runCellMapFilterCellsCheckBox),
@@ -454,6 +455,7 @@ class CellMapParams(UiParameter):
 
     def connect(self):
         self.tab.backgroundCorrectionDiameter.valueChanged.connect(self.handle_background_correction_diameter_changed)
+        self.tab.cellFilterThresholdIntensityDoublet.valueChangedConnect(self.handle_filter_intensity_changed)
         self.connect_simple_widgets()  # |TODO: automatise in parent class
 
     def cfg_to_ui(self):
