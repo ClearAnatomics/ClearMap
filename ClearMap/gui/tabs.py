@@ -927,7 +927,8 @@ class CellCounterTab(PostProcessingTab):
         -------
 
         """
-        self.wrap_step('Cell detection preview', self.cell_detector.run_cell_detection, step_kw_args={'tuning': True})
+        self.wrap_step('Cell detection preview', self.cell_detector.run_cell_detection,
+                       step_kw_args={'tuning': True})
         if self.cell_detector.stopped:
             return
         with self.cell_detector.workspace.tmp_debug:
