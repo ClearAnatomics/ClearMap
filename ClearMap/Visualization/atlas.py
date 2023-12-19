@@ -1,26 +1,8 @@
 import numpy as np
 
-from ClearMap.Alignment.Annotation import annotation, __get_module_annotation_file, convert_label
+from ClearMap.Alignment.Annotation import annotation, __get_module_annotation_file, convert_label, color_map
 from ClearMap.IO import IO as clearmap_io
 from ClearMap.Visualization import Color as col
-
-
-def color_map(alpha=True, as_int=False, int_type='uint8'):
-    """
-    Generates a color map from color ids to rgb
-
-    Arguments
-    ---------
-    alpha : bool
-        If True return a color map with alpha values.
-
-    Returns
-    -------
-    color_map : array
-        An array of rgb colors for each label.
-    """
-    cm = annotation.colors_rgb
-    return col.color(cm, alpha=alpha, as_int=as_int, int_type=int_type)
 
 
 def write_color_palette(filename=None):
