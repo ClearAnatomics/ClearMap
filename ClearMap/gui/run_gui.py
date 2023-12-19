@@ -29,7 +29,7 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPalette, QColor
 from PyQt5.QtWebEngineWidgets import QWebEngineView  # WARNING: must be imported before app creation
 from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QSpinBox, QDoubleSpinBox, QFrame, \
-    QDialogButtonBox, QComboBox, QLineEdit, QStyle, QWidget, QMessageBox, QToolBox, QProgressBar, QLabel
+    QDialogButtonBox, QComboBox, QLineEdit, QStyle, QWidget, QMessageBox, QToolBox, QProgressBar, QLabel, QAction
 from qdarkstyle import DarkPalette
 
 os.environ['CLEARMAP_GUI_HOSTED'] = "1"
@@ -96,6 +96,8 @@ from ClearMap.gui.preferences import PreferenceUi
 update_pbar(app, progress_bar, 80)
 
 pg.setConfigOption('background', PLOT_3D_BG)
+
+CLEARMAP_VERSION = '2.1.1'
 
 # TODO
 """
@@ -863,6 +865,10 @@ class ClearMapGui(ClearMapGuiBase):
         self.progress_logger.set_file(os.path.join(src_folder, 'progress.log'))
         self.sample_tab_mgr.src_folder = src_folder
 
+    def display_about(self):
+        about_msg = f'You are running ClearMap version {CLEARMAP_VERSION}'
+        self.popup(about_msg, 'About ClearMap GUI', print_warning=False)
+
     def amend_ui(self):
         """
         Setup the loggers and all the post instantiation fixes to the UI
@@ -872,6 +878,11 @@ class ClearMapGui(ClearMapGuiBase):
 
         """
         self.setup_loggers()
+
+        helpMenu = self.menuBar().addMenu("&Help")
+        self.aboutAction = QAction("&About", self)
+        self.aboutAction.triggered.connect(self.display_about)
+        helpMenu.addAction(self.aboutAction)
 
         self.setup_icons()
         self.setup_tabs()
