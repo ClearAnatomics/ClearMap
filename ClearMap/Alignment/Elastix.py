@@ -53,7 +53,7 @@ Main routines are: :func:`align`, :func:`transform`.
     
 See Also
 --------
-    `Elastix documentation <http://elastix.isi.uu.nl/>`_
+    `Elastix documentation <https://elastix.lumc.nl/doxygen/index.html>`_
     :mod:`~ClearMap.Alignment.Resampling`
 """
 __author__ = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
