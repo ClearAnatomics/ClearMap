@@ -64,7 +64,7 @@ import ClearMap.ImageProcessing.Filter.StructureElement as se
 import ClearMap.ImageProcessing.Differentiation as dif
 import ClearMap.ImageProcessing.Skeletonization.Skeletonization as skl
 import ClearMap.ImageProcessing.Skeletonization.SkeletonProcessing as skp
-import ClearMap.ImageProcessing.MachineLearning.VesselFilling.VesselFilling as vf
+import ClearMap.ImageProcessing.machine_learning.vessel_filling.vessel_filling as vf
 
 #analysis
 import ClearMap.Analysis.Graphs.GraphGt as grp

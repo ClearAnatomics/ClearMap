@@ -50,7 +50,7 @@ Block-Numpy-Source(50, 100, 38)[float64]|F|
 True
   
 >>> bp.process(process_image, source, sink,
->>>            processes = None, size_max = 10, size_min = 6, overlap = 3, axes = all,
+>>>            processes = None, size_max = 10, size_min = 6, overlap = 3, axes = 'all',
 >>>            optimization = True, verbose = True);
 
 """
@@ -62,6 +62,8 @@ __copyright__ = 'Copyright 2020 by Christoph Kirst'
 import functools as ft
 import multiprocessing as mp
 import concurrent.futures as cf
+import warnings
+
 import numpy as np
 import gc
 
@@ -80,6 +82,7 @@ import ClearMap.Utils.Timer as tmr;
 ###############################################################################
 ### Default parameter
 ###############################################################################
+from ClearMap.Utils.utilities import CancelableProcessPoolExecutor
 
 default_size_max = None
 """Default maximal size of a block.
@@ -124,7 +127,7 @@ def process(function, source, sink = None,
             optimization = True, optimization_fix = 'all', neighbours = False,
             function_type = None, as_memory = False, return_result = False,
             return_blocks = False,
-            processes = None, verbose = False, 
+            processes = None, verbose = False, workspace=None,
             **kwargs):
   """Create blocks and process a function on them in parallel.
   
@@ -175,7 +178,7 @@ def process(function, source, sink = None,
     If True, return the results of the proceessing functions.
   return_blocks : bool
     If True, return the block information used to distribute the processing.
-  processes : int
+  processes : int, None
     The number of parallel processes, if 'serial', use serial processing.
   verbose : bool
     Print information on sub-stack generation.
@@ -188,14 +191,14 @@ def process(function, source, sink = None,
   Note
   ----
   This implementation only supports processing into sinks with the same shape as the source.
-  """     
+  """
   #sources and sinks
   if isinstance(source, list):
     sources = source;
   else:
     sources = [source];
   sources = [io.as_source(s).as_virtual() for s in sources];
-  
+
   #if sink is None:
   #  sink = sma.Source(shape=sources[0].shape, dtype=sources[0].dtype, order=sources[0].order);
   if isinstance(sink, list):
@@ -204,25 +207,25 @@ def process(function, source, sink = None,
     sinks = [];
   else:
     sinks = [sink];
-  
+
   sinks = [io.initialize(s, hint=sources[0]) for s in sinks];
   sinks = [io.as_source(s).as_virtual() for s in sinks];
 
   axes = block_axes(sources[0], axes=axes);
 
-  split = ft.partial(split_into_blocks, processes=processes, axes=axes, 
-                     size_max=size_max, size_min=size_min, 
-                     overlap=overlap, optimization=optimization, 
+  split = ft.partial(split_into_blocks, processes=processes, axes=axes,
+                     size_max=size_max, size_min=size_min,
+                     overlap=overlap, optimization=optimization,
                      optimization_fix=optimization_fix, neighbours=neighbours,
-                     verbose=False); 
+                     verbose=False);
 
   source_blocks = [split(s) for s in sources];
   sink_blocks = [split(s) for s in sinks];
   n_blocks = len(source_blocks[0]);
-  
-  source_blocks = [[blocks[i] for blocks in source_blocks] for i in range(n_blocks)];  
-  sink_blocks =  [[blocks[i] for blocks in sink_blocks] for i in range(n_blocks)];  
-  
+
+  source_blocks = [[blocks[i] for blocks in source_blocks] for i in range(n_blocks)];
+  sink_blocks =  [[blocks[i] for blocks in sink_blocks] for i in range(n_blocks)];
+
   if function_type is None:
     function_type = 'array';
   if function_type == 'block':
@@ -233,27 +236,33 @@ def process(function, source, sink = None,
     func = ft.partial(process_block_source, function=function, as_memory=as_memory, as_array=True, verbose=verbose, **kwargs);
   else:
     raise ValueError("function type %r not 'array', 'source', 'block' or None!");
-  
+
   if not isinstance(processes, int) and processes != "serial":
     processes = mp.cpu_count();
-  
+
   if verbose:
     timer = tmr.Timer();
     print("Processing %d blocks with function %r." % (n_blocks, function.__name__))
-  
+
   if isinstance(processes, int):
     #from bounded_pool_executor import BoundedProcessPoolExecutor
-    with cf.ProcessPoolExecutor(max_workers=processes) as executor:
     #with BoundedProcessPoolExecutor(max_workers=processes) as executor:
-      futures = [executor.submit(func, *args) for args in zip(source_blocks, sink_blocks)];
-      result  = [f.result() for f in futures];
-      #executor.map(function, source_blocks, sink_blocks)
+    #   executor.map(function, source_blocks, sink_blocks)
+    with CancelableProcessPoolExecutor(max_workers=processes) as executor:
+      if workspace is not None:
+        workspace.executor = executor
+      futures = [executor.submit(func, *args) for args in zip(source_blocks, sink_blocks)]
+      # res = executor.map(func, source_blocks, sink_blocks)
+      result = [f.result() for f in futures]  # To prevent keeping references to futures to avoid mem leaks
+      # result = list(res)
+      if workspace is not None:
+        workspace.executor = None
   else:
-    result = [func(*args) for args in zip(source_blocks, sink_blocks)]; #analysis:ignore
-  
+    result = [func(*args) for args in zip(source_blocks, sink_blocks)]  #analysis:ignore
+
   if verbose:
     timer.print_elapsed_time("Processed %d blocks with function %r" % (n_blocks, function.__name__))
-  
+
   #gc.collect();
 
   if return_result:
@@ -469,7 +478,7 @@ def block_sizes(size, processes = None,
         if verbose:
           print("Optimized block size decreased to %d in %d blocks!" % (block_size, n_blocks));
                 
-      elif optimization_fix == 'decrease' and n_blocks > n_add:
+      elif optimization_fix == 'decrease' and n_blocks > n_add:  # FIXME: should be increase
         #try to increase chunk size and decrease chunk number to fit  processors
         n_blocks = n_blocks - n_add;
         block_size = float(size + (n_blocks-1) * overlap) / n_blocks;
@@ -550,35 +559,47 @@ def block_sizes(size, processes = None,
   return n_blocks, block_ranges, valid_ranges;
 
 
-def block_axes(source, axes = None):
-  """Determine the axes for block processing from source order.
+def block_axes(source, axes=None):
+  """
+  Determine the axes for block processing from source order.
   
   Arguments
   ---------
   source : array or Source
     The source on which the block processing is used.
-  axes : list or None
+  axes : list, 'all' or None
     The axes over which to split the block processing.
+    .. deprecated:: 2.1
+      Value *all* (the built-in Python keyword) is now
+       deprecated for parameter axes.
+     You should replace it with
+      *"all"* (the string literal) instead
+
   
   Returns
   -------
    axes : list or None
     The axes over which to split the block processing.
   """
-  if axes is all:
-    axes = [d for d in range(source.ndim)];
+  if axes == 'all' or axes is all:  # FIXME: remove is all
+    if axes is all:
+      warnings.warn("Parameter axes could take all (the built-in Python keyword). "
+                    "This will be replaced by the string 'all' in future versions",
+                    DeprecationWarning,
+                    stacklevel=2)
+    axes = [d for d in range(source.ndim)]
   if axes is not None:
     if np.max(axes) >= source.ndim or np.min(axes) < 0:
-      raise ValueError('Axes specification %r for source with dimnesion %d not valid!' % (axes, source.ndim));
-    return axes;
+      raise ValueError(f'Axes specification {axes} for source with dimension {source.ndim} not valid!')
+    return axes
   
-  source = io.as_source(source);
+  source = io.as_source(source)
   if source.order == 'F':
-    axes = [source.ndim-1];
+    axes = [source.ndim-1]
   else:
-    axes = [0];
+    axes = [0]
     
-  return axes;
+  return axes
 
 
 def split_into_blocks(source, processes = None, axes = None, 
@@ -744,7 +765,7 @@ def _test():
   print(np.all(sink[:] == process_image(source)))
   
   bp.process(process_image, source, sink,
-             processes = None, size_max = 10, size_min = 6, overlap = 3, axes = all,
+             processes = None, size_max = 10, size_min = 6, overlap = 3, axes = 'all',
              optimization = True, verbose = True);
                         
   assert(np.all(sink[:] == process_image(source))) 

@@ -645,7 +645,7 @@ def _array(filename):
         raise NrrdError('Unsupported encoding: "%s"' % fields['encoding'])
 
     if numPixels != data.size:
-       raise NrrdError('ERROR: {0}-{1}={2}'.format(numPixels,data.size,numPixels-data.size))
+       raise NrrdError(f'ERROR: {numPixels}-{data.size}={numPixels - data.size}')
     
     data = np.reshape(data, shape, order=order)
     return data
@@ -653,7 +653,7 @@ def _array(filename):
 
 def _dtype(filename):
     """Determine data type from nrrd file."""
-    #read header
+    # read header
     with open(filename,'rb') as filehandle:
        fields = _read_header(filehandle)
     
