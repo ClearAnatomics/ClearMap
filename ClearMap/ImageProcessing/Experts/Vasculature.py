@@ -804,7 +804,7 @@ def postprocess(source, sink=None, postprocessing_parameter=default_postprocessi
         print('Binary post processing: initialized.')
 
     postprocessing_parameter = postprocessing_parameter.copy()
-    run_binary_filling = postprocessing_parameter.pop('fill', False)
+    run_binary_filling = postprocessing_parameter.get('fill', False)
     parameter_smooth = postprocessing_parameter.get('smooth')
 
     # smoothing
