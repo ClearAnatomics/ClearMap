@@ -291,11 +291,9 @@ class CellDetector(TabProcessor):
     def filter_cells(self):
         self.processing_config.reload()
         thresholds = {
-            'source': None,
+            'source': self.processing_config['cell_filtration']['thresholds']['intensity'],
             'size': self.processing_config['cell_filtration']['thresholds']['size']
         }
-        if self.processing_config['cell_filtration']['thresholds']['intensity'] is not None:
-            thresholds['source'] = self.processing_config['cell_filtration']['thresholds']['intensity']
         cell_detection.filter_cells(source=self.workspace.filename('cells', postfix='raw'),
                                     sink=self.workspace.filename('cells', postfix='filtered'),
                                     thresholds=thresholds)
