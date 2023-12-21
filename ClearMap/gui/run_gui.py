@@ -141,6 +141,7 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         self.progress_watcher = ProgressWatcher()
 
         self.cpu_bar = QProgressBar()
+        self.single_thread_bar = QProgressBar()
         self.ram_bar = QProgressBar()
         self.gpu_bar = QProgressBar()
         self.vram_bar = QProgressBar()
@@ -729,14 +730,20 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         -------
 
         """
-        for label, bar in zip(('CPU', 'RAM', 'GPU', 'VRAM'), (self.cpu_bar, self.ram_bar, self.gpu_bar, self.vram_bar)):
-            self.statusbar.addPermanentWidget(QLabel(label))
+        for label, bar in zip(('CPU', None, 'RAM', 'GPU', 'VRAM'),
+                              (self.cpu_bar, self.single_thread_bar, self.ram_bar, self.gpu_bar, self.vram_bar)):
+            if label is not None:
+                self.statusbar.addPermanentWidget(QLabel(label))
+            else:
+                bar.setMaximumWidth(5)
+                bar.setStyleSheet('QProgressBar::chunk{background-color: yellow;}')
+                bar.setTextVisible(False)
+                bar.setContentsMargins(0, 0, 0, 0)
             bar.setOrientation(Qt.Vertical)
             bar.setMaximumHeight(40)
             self.statusbar.addPermanentWidget(bar)
-            # cpu_bar.setValue(20)
 
-    def update_cpu_bars(self, cpu_percent, ram_percent):
+    def update_cpu_bars(self, cpu_percent, thread_percent, ram_percent):
         """
         Update the performance monitoring bars in the status bar
 
@@ -752,6 +759,7 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
 
         """
         self.cpu_bar.setValue(cpu_percent)
+        self.single_thread_bar.setValue(thread_percent)
         self.ram_bar.setValue(ram_percent)
 
     def update_gpu_bars(self, gpu_percent, v_ram_percent):
