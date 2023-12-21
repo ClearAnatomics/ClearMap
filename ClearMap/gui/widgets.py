@@ -834,7 +834,7 @@ class StructureSelector(WizardDialog):
 
 
 class PerfMonitor(QWidget):
-    cpu_vals_changed = QtCore.pyqtSignal(int, int)
+    cpu_vals_changed = QtCore.pyqtSignal(int, int, int)
     gpu_vals_changed = QtCore.pyqtSignal(int, int)
 
     def __init__(self, parent, fast_period, slow_period, *args, **kwargs):
@@ -842,6 +842,8 @@ class PerfMonitor(QWidget):
         if fast_period < 100 or slow_period and slow_period < 100:
             raise ValueError('Periods cannot be below 100ms')
         self.percent_cpu = 0
+        self.percent_thread = 0
+        """The percentage of the CPU used by the most active process of ClearMap"""
         self.percent_ram = 0
         self.percent_v_ram = 0
         self.percent_gpu = 0
@@ -874,21 +876,28 @@ class PerfMonitor(QWidget):
     def get_cpu_percent(self):
         return round(psutil.cpu_percent())
 
+    def get_thread_percent(self):
+        clear_map_proc_cpu = [proc.cpu_percent() for proc in psutil.process_iter()
+                              if 'python' in proc.name().lower() and 'clearmap' in proc.exe().lower()]
+        # The name filter is not sufficient but necessary because the exe is not always allowed
+        return max(clear_map_proc_cpu) if clear_map_proc_cpu else 0
+
     def get_ram_percent(self):
         return round(psutil.virtual_memory().percent)
 
     def _get_cpu_vals(self):
         with ThreadPoolExecutor(max_workers=1) as pool:  # TODO: check if should use self.pool instead
-            futures = [pool.submit(f) for f in (self.get_cpu_percent, self.get_ram_percent)]
-            percent_cpu, percent_ram = [f.result() for f in futures]
-        return percent_cpu, percent_ram
+            futures = [pool.submit(f) for f in (self.get_cpu_percent, self.get_thread_percent, self.get_ram_percent)]
+            percents = [f.result() for f in futures]
+        return percents
 
     def update_cpu_values(self):
-        percent_cpu, percent_ram = self._get_cpu_vals()
-        if percent_ram != self.percent_ram or percent_cpu != self.percent_cpu:
+        percent_cpu, percent_thread, percent_ram = self._get_cpu_vals()
+        if percent_ram != self.percent_ram or percent_cpu != self.percent_cpu or percent_thread != self.percent_thread:
             self.percent_cpu = percent_cpu
+            self.percent_thread = percent_thread
             self.percent_ram = percent_ram
-            self.cpu_vals_changed.emit(self.percent_cpu, self.percent_ram)
+            self.cpu_vals_changed.emit(self.percent_cpu, self.percent_thread, self.percent_ram)
 
     def update_gpu_values(self):
         self.pool.submit(gpu_params, self.gpu_proc_file_path)
