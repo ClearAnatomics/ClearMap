@@ -48,8 +48,7 @@ import ClearMap.Settings as settings
 import ClearMap.IO.IO as clearmap_io
 import ClearMap.IO.FileUtils as fu
 
-import ClearMap.Alignment.Resampling as res
-
+from ClearMap.Alignment.Resampling import orientation_to_transposition, format_orientation
 import ClearMap.Utils.HierarchicalDict as hdict
 
 from ClearMap.Alignment.utils import create_label_table
@@ -734,7 +733,7 @@ def prepare_annotation_files(slicing=None, orientation=None, directory=None, pos
 
             if orientation is not None:
                 # permute
-                per = res.orientation_to_transposition(orientation)
+                per = orientation_to_transposition(orientation)
                 data = data.transpose(per)
 
                 # reverse axes
@@ -771,7 +770,7 @@ def __format_annotation_filename(filename, orientation=None, slicing=None, postf
     """Formats the annotation filename given orientation and slicing."""
 
     if postfix is None:
-        orientation = res.format_orientation(orientation, default=(1, 2, 3))
+        orientation = format_orientation(orientation, default=(1, 2, 3))
         x, y, z = orientation
         postfix = f'{x}_{y}_{z}_{slicing}'
         postfix = __substitute_chars(postfix)

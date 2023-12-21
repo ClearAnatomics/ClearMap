@@ -2,7 +2,7 @@
 from .Transformation import TransformationBase
 from ClearMap.Alignment.Resampling import resample_information, resample_factor, resample, resample_inverse, resample_points, \
     resample_points_inverse, resample_shape
-from ClearMap.Alignment.Resampling import format_orientation, orient, orient_points, orient_shape
+from ClearMap.Alignment.orientation import format_orientation, orient_shape, orient, orient_points
 
 import ClearMap.IO.IO as io
 
