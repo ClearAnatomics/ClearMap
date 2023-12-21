@@ -17,7 +17,7 @@ from ClearMap.gui.gui_utils import create_clearmap_widget, clear_layout
 
 from ClearMap.gui.dialogs import get_directory_dlg
 from PyQt5.QtCore import Qt, pyqtSignal
-from PyQt5.QtWidgets import QInputDialog, QToolBox, QCheckBox
+from PyQt5.QtWidgets import QInputDialog, QToolBox, QCheckBox, QPushButton
 
 __author__ = 'Charly Rousseau <charly.rousseau@icm-institute.org>'
 __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
@@ -1069,6 +1069,12 @@ class GroupAnalysisParams(BatchParameters):
             chk.setChecked(False)
             self.tab.comparisonsVerticalLayout.addWidget(chk)
             self.comparison_checkboxes.append(chk)
+        self.tab.comparisonsVerticalLayout.addStretch()
+        self.plot_density_maps_buttons = []
+        for gp in self.group_names:
+            btn = QPushButton(f'Plot {gp} group density maps')
+            self.tab.comparisonsVerticalLayout.addWidget(btn)
+            self.plot_density_maps_buttons.append(btn)
 
 
 class BatchProcessingParams(BatchParameters):
