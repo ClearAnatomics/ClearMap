@@ -164,6 +164,8 @@ def create_clearmap_widget(ui_name, patch_parent_class, window_title=None):
 
 
 def pseudo_random_rgb_array(n_samples):
+    if n_samples == 0:
+        return None
     hues = np.random.rand(n_samples)
     saturations = np.random.rand(n_samples) / 2 + 0.5
     values = np.random.rand(n_samples) / 2 + 0.5
