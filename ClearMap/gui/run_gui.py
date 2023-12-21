@@ -310,10 +310,9 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         # self.fix_btns_stylesheet()
         self.fix_widgets_backgrounds()
         self.fix_sizes()
-        self.fix_tootips_stylesheet()
-        self.setup_monitoring_bars()  # FIXME: find better location
+        self.fix_tooltips_stylesheet()
 
-    def fix_tootips_stylesheet(self):
+    def fix_tooltips_stylesheet(self):
         for widg in self.findChildren(QWidget):
             if hasattr(widg, 'toolTip') and widg.toolTip():
                 widg.setStyleSheet(TOOLTIP_STYLE_SHEET)
@@ -803,6 +802,8 @@ class ClearMapGui(ClearMapGuiBase):
         self.setupUi(self)
         self.amend_ui()
 
+        self.setup_monitoring_bars()
+
         self.actionPreferences.triggered.connect(self.preference_editor.open)
         self.actionStructureSelector.triggered.connect(self.structure_selector.show)
 
@@ -893,6 +894,8 @@ class ClearMapGui(ClearMapGuiBase):
         self.logoLabel.setPixmap(QtGui.QPixmap(os.path.join(ICONS_FOLDER, 'logo_cyber.png')))
 
         self.graphLayout.removeWidget(self.frame)
+
+        self.fix_styles()
 
         self.print_status_msg('Idle, waiting for input')
 
