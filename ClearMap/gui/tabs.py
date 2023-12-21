@@ -1572,6 +1572,19 @@ class GroupAnalysisProcessor:
             dvs.append(browser)
         return dvs
 
+    def plot_density_maps(self, group_folders, parent=None):
+        density_map_paths = []
+        titles = []
+        for folder in group_folders:
+            preproc = init_preprocessor(folder)
+            map_path = preproc.workspace.filename('density', postfix='counts')
+            density_map_paths.append(map_path)  # TODO: make work for tubemap too
+            titles.append(preproc.sample_config['sample_id'])
+        luts = ['flame'] * len(density_map_paths)
+        dvs = plot_3d.plot(density_map_paths, title=titles, arrange=False, sync=True, lut=luts, parent=parent)
+        link_dataviewers_cursors(dvs)
+        return dvs
+
 
 class BatchTab(GenericTab):
     @property
@@ -1642,6 +1655,7 @@ class GroupAnalysisTab(BatchTab):
         self.ui.runPValsPushButton.clicked.connect(self.run_p_vals)
         self.ui.plotPValsPushButton.clicked.connect(self.plot_p_vals)
         self.ui.batchStatsPushButton.clicked.connect(self.make_group_stats_tables)
+        self.ui.batchToolBox.currentChanged.connect(self.handle_tool_changed)
 
     def setup_workers(self):
         self.processor.results_folder = self.params.results_folder
@@ -1649,6 +1663,20 @@ class GroupAnalysisTab(BatchTab):
 
     # def setup_workers(self):
     #     self.processor = BatchProcessor(self.params.config)
+
+    def handle_tool_changed(self, idx):
+        if idx == 1:
+            for i, gp in enumerate(self.params.group_names):
+                self.params.plot_density_maps_buttons[i].clicked.connect(
+                    functools.partial(self.plot_density_maps, gp))
+
+    def plot_density_maps(self, group_name):
+        self.params.ui_to_cfg()
+
+        self.main_window.clear_plots()
+        self.main_window.print_status_msg('Plotting density maps')
+        dvs = self.processor.plot_density_maps(self.params.groups[group_name], parent=self.main_window.centralWidget())
+        self.main_window.setup_plots(dvs)
 
     def make_group_stats_tables(self):
         self.main_window.print_status_msg('Computing stats table')
