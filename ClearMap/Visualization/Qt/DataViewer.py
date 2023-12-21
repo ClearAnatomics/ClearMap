@@ -582,6 +582,7 @@ class DataViewer(QWidget):
         self.view.setYRange(0, self.source_range_y)
 
         self.updateSlicer()
+        self.refresh()
 
     def updateImage(self):
         for img_item, src in zip(self.image_items, self.sources):
