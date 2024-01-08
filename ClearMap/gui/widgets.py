@@ -877,8 +877,11 @@ class PerfMonitor(QWidget):
         return round(psutil.cpu_percent())
 
     def get_thread_percent(self):
-        clear_map_proc_cpu = [proc.cpu_percent() for proc in psutil.process_iter()
-                              if 'python' in proc.name().lower() and 'clearmap' in proc.exe().lower()]
+        try:
+            clear_map_proc_cpu = [proc.cpu_percent() for proc in psutil.process_iter()
+                                  if proc and 'python' in proc.name().lower() and 'clearmap' in proc.exe().lower()]
+        except psutil.NoSuchProcess:
+            clear_map_proc_cpu = []
         # The name filter is not sufficient but necessary because the exe is not always allowed
         return max(clear_map_proc_cpu) if clear_map_proc_cpu else 0
 
