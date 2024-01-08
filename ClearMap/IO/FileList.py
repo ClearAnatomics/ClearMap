@@ -750,15 +750,15 @@ def shape_file(expression = None, file_list = None):
   shape : int or tuple of ints
     The shape of the array st  ored in a file list.
   """
-  expression, file_list = _expression_and_file_list(expression=expression, file_list=file_list);
+  expression, file_list = _expression_and_file_list(expression=expression, file_list=file_list)
   
   if len(file_list) == 0:
     raise ValueError('Cannot determine dimension of the file list %r without files.!' % expression);
   
   #determine dimensions in each file
-  shape_file = io.shape(file_list[0]);
+  shape_file = io.shape(file_list[-1])  # Take the last because the first has Z
   
-  return shape_file;
+  return shape_file
 
   
 def shape_list(expression = None, file_list = None, axes_order = None):
