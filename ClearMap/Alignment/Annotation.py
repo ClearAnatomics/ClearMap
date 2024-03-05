@@ -239,8 +239,8 @@ class Annotation(object):
     def ids_to_acronyms(self, ids):
         return [self.dict_id_to_acronym[id_] for id_ in ids]
 
-    def ids_to_names(self, names):
-        return [self.dict_id_to_acronym[name] for name in names]
+    def ids_to_names(self, ids):
+        return [self.dict_id_to_name[id_] for id_ in ids]
 
     def get_colors_rgba(self, alpha=1):
         return self.df["colors_hex"].map(lambda x: col.hex_to_rgb(x, alpha=alpha))
