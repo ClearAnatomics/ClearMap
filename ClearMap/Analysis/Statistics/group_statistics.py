@@ -12,6 +12,7 @@ __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
 
+import math
 import os
 
 import numpy as np
@@ -499,7 +500,8 @@ def density_files_are_comparable(directory, gp1_dirs, gp2_dirs):
     gp2_f_list = dirs_to_density_files(directory, gp2_dirs)
     all_files = gp1_f_list + gp2_f_list
     sizes = [os.path.getsize(f) for f in all_files]
-    comparable = all(s == sizes[0] for s in sizes)
+    tolerance = 1024  # 1 KB
+    comparable = all(math.isclose(s, sizes[0], abs_tol=tolerance) for s in sizes)
     if comparable:
         return True
     else:
