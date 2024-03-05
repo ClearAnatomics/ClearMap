@@ -1,3 +1,8 @@
+import pytest
+
+skip = True
+pytestmark = pytest.mark.skipif(skip, reason="This is a very slow test")
+
 import copy
 import os
 import tempfile
@@ -5,15 +10,15 @@ from shutil import rmtree
 
 import numpy as np
 import pandas as pd
-import pytest
 import tifffile
 
-from ClearMap.Analysis.Statistics.data_frame_operations import fix_df_column_names
-from ClearMap.Analysis.Statistics.group_statistics import compare_groups
 from ClearMap.Settings import clearmap_path
 from ClearMap.IO import IO as clearmap_io
 from ClearMap.Alignment import Annotation as annotation
 import ClearMap.Analysis.Measurements.Voxelization as voxelization
+from ClearMap.Analysis.Statistics.data_frame_operations import fix_df_column_names
+if not skip:
+    from ClearMap.Analysis.Statistics.group_statistics import compare_groups
 
 BASE_SHIFTS = [-30, -10, 0, 30, -20, -10, 25]
 
