@@ -394,12 +394,14 @@ class Annotation(object):
             n.data[name] = d
 
     def convert_label(self, label, key='order', value='graph_order', node=None, level=None, method='map'):
+        if key in ('acronym', 'name', 'color_hex_triplet'):  # string keys
+            method = 'dictionary'
         if method in ['map']:
             m = self.get_map(key=key, value=value, node=node, level=level)
             return m[label]
         else:
             d = self.get_dictionary(key=key, value=value, node=node, level=level)
-            return np.vectorize(d.__getitem__, otypes=[type(d[list(d.keys())[0]])])(label)
+            return np.vectorize(d.__getitem__, otypes=[type(list(d.values())[0])])(label)
 
     def label_to_color(self, label, key='order', level=None, alpha=True, as_int=False, int_type='uint8'):
         cm = self.colors_rgb
