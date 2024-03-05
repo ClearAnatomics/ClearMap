@@ -480,18 +480,27 @@ class CellDetector(TabProcessor):
         p = plot_3d.list_plot_3d(coordinates)
         return plot_3d.plot_3d(self.workspace.filename('stitched'), view=p, cmap=plot_3d.grays_alpha(alpha=1))
 
-    def remove_crust(self, coordinates,voxelization_parameter):
+    def remove_crust(self, coordinates, voxelization_parameter):
         dist2surf = clearmap_io.read(self.preprocessor.distance_file_path)
         threshold = 3
-        shape = dist2surf.shape
+        # Convert coordinates to integer
+        int_coordinates = np.floor(coordinates).astype(int)
 
-        good_coordinates = np.logical_and(np.logical_and(coordinates[:, 0] < shape[0],
-                                                         coordinates[:, 1] < shape[1]),
-                                          coordinates[:, 2] < shape[2]).nonzero()[0]
-        coordinates = coordinates[good_coordinates]
-        coordinates_wcrust = coordinates[np.asarray(
-            [dist2surf[tuple(np.floor(coordinates[i]).astype(int))] > threshold for i in
-             range(coordinates.shape[0])]).nonzero()[0]]
+        # Ensure all coordinates are within the dist2surf array bounds
+        valid_indices = (int_coordinates[:, 0] < dist2surf.shape[0]) & \
+                        (int_coordinates[:, 1] < dist2surf.shape[1]) & \
+                        (int_coordinates[:, 2] < dist2surf.shape[2])
+
+        # Apply the mask to get valid coordinates
+        valid_coordinates = int_coordinates[valid_indices]
+
+        # Get the dist2surf values at the valid coordinates
+        dist_values = dist2surf[valid_coordinates[:, 0],
+                                valid_coordinates[:, 1],
+                                valid_coordinates[:, 2]]
+
+        # Apply the threshold
+        coordinates_wcrust = valid_coordinates[dist_values > threshold]
 
         voxelization.voxelize(coordinates_wcrust, sink=self.workspace.filename('density', postfix='counts_wcrust'),
                               **voxelization_parameter)   # WARNING: prange
