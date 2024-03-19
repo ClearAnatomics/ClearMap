@@ -124,7 +124,11 @@ case "$answer" in
     *)
         green "Using libmamba";
         conda install -y -n base conda-libmamba-solver;
-        solver_string="--experimental-solver=libmamba";
+        if conda install -h | grep -q "experimental-solver"; then
+            solver_string="--experimental-solver=libmamba";  # Old conda
+        else
+            solver_string="--solver=libmamba";
+        fi
         ;;
 esac
 
@@ -306,4 +310,4 @@ Alternatively, use the ClearMap entry in the start menu
 # Cleanup
 conda deactivate
 cd "$srcdir" || exit 1
-rm tmp_env_file.yml
+mv tmp_env_file.yml "${ENV_NAME}Real".yml
