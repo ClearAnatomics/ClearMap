@@ -61,7 +61,7 @@ class VesselGraphProcessorSteps(ProcessorSteps):
 
     @property
     def steps(self):
-        return self.graph_raw, self.graph_cleaned, self.graph_reduced, self.graph_annotated
+        return self.graph_raw, self.graph_cleaned, self.graph_reduced, self.graph_annotated  # FIXME: add traced
 
     def path_from_step_name(self, step):
         f_path = self.workspace.filename('graph', postfix=step)
@@ -132,6 +132,10 @@ class BinaryVesselProcessor(TabProcessor):
             self.processing_config = self.preprocessor.config_loader.get_cfg('vasculature')
 
             self.set_progress_watcher(self.preprocessor.progress_watcher)
+
+    def run(self):
+        self.binarize()
+        self.combine_binary()
 
     def get_n_blocks(self, dim_size):
         blk_size = vasculature.default_binarization_processing_parameter['size_max']
@@ -474,16 +478,17 @@ class VesselGraphProcessor(TabProcessor):
         return self.processing_config['graph_construction']['use_arteries']
 
     def pre_process(self):
-        self.build_graph()
+        self.skeletonize_and_build_graph()
         self.clean_graph()
         self.reduce_graph()
         self.register()
 
-    def build_graph(self):
+    def skeletonize_and_build_graph(self):
         self.processing_config.reload()
         graph_cfg = self.processing_config['graph_construction']
+        self.skeletonize(self.workspace.filename('skeleton'))# WARNING: main thread (prange)
         if graph_cfg['build'] or graph_cfg['skeletonize']:
-            self.__build_graph()  # WARNING: main thread (prange)
+            self._build_graph_from_skeleton()  # WARNING: main thread (prange)
 
     def clean_graph(self):
         self.processing_config.reload()
@@ -491,11 +496,11 @@ class VesselGraphProcessor(TabProcessor):
         if graph_cfg['clean']:
             self.__clean_graph()
 
-    def reduce_graph(self):
+    def reduce_graph(self, vertex_to_edge_mapping=None, edge_to_edge_mappings=None):
         self.processing_config.reload()
         graph_cfg = self.processing_config['graph_construction']
         if graph_cfg['reduce']:
-            self.__reduce_graph()
+            self.__reduce_graph(vertex_to_edge_mappings=vertex_to_edge_mapping, edge_to_edge_mappings=edge_to_edge_mappings)
 
     def register(self):
         self.processing_config.reload()
@@ -539,14 +544,13 @@ class VesselGraphProcessor(TabProcessor):
                                                            radii_measure, method='max')   # WARNING: prange
         self.graph_raw.define_vertex_property('artery_raw', np.asarray(expression.array, dtype=float))
 
-    def __build_graph(self):  # TODO: split for requirements
-        skeleton = self.workspace.filename('skeleton')
-        self.skeletonize(skeleton)# WARNING: main thread (prange)
+    def _build_graph_from_skeleton(self):  # TODO: split for requirements
         if self.processing_config['graph_construction']['build']:
             n_blocks = 100  # TBD:
             self.prepare_watcher_for_substep(n_blocks, self.build_graph_re, f'Building graph', True)
             self.steps.remove_next_steps_files(self.steps.graph_raw)
-            self.graph_raw = graph_processing.graph_from_skeleton(skeleton, verbose=True)  # WARNING: main thread (prange)
+            self.graph_raw = graph_processing.graph_from_skeleton(self.workspace.filename('skeleton'),
+                                                                  verbose=True)  # WARNING: main thread (prange)
             # p3d.plot_graph_line(graph_raw)
             self._measure_radii()  # WARNING: main thread (prange)
             if self.use_arteries_for_graph:
@@ -577,7 +581,7 @@ class VesselGraphProcessor(TabProcessor):
         self.save_graph('cleaned')
 
     @requires_files([FilePath('graph', postfix='cleaned')])
-    def __reduce_graph(self):
+    def __reduce_graph(self, vertex_to_edge_mappings=None, edge_to_edge_mappings=None):
         """
         Simplify straight segments between branches
         Returns
@@ -587,7 +591,10 @@ class VesselGraphProcessor(TabProcessor):
         def vote(expression):
             return np.sum(expression) >= len(expression) / 1.5
 
-        vertex_edge_mappings = {'radii': np.max}
+        if vertex_to_edge_mappings is None:
+            vertex_edge_mappings = {'radii': np.max}
+        if edge_to_edge_mappings is None:
+            edge_to_edge_mappings = {'length': np.sum}
         edge_geometry_vertex_properties = ['coordinates', 'radii']
         if self.use_arteries_for_graph:
             vertex_edge_mappings.update({
@@ -596,7 +603,7 @@ class VesselGraphProcessor(TabProcessor):
             edge_geometry_vertex_properties.extend(['artery_binary', 'artery_raw'])
         self.steps.remove_next_steps_files(self.steps.graph_reduced)
         self.graph_reduced = graph_processing.reduce_graph(self.graph_cleaned, edge_length=True,
-                                                           edge_to_edge_mappings={'length': np.sum},
+                                                           edge_to_edge_mappings=edge_to_edge_mappings,
                                                            vertex_to_edge_mappings=vertex_edge_mappings,
                                                            edge_geometry_vertex_properties=edge_geometry_vertex_properties,
                                                            edge_geometry_edge_properties=None,
@@ -674,7 +681,7 @@ class VesselGraphProcessor(TabProcessor):
         distance_atlas_shape = distance_atlas.shape
 
         def distance(coordinates):
-            c = (np.asarray(np.round(coordinates), dtype=int)).clip(0, None)
+            c = np.round(coordinates).astype(int).clip(0, None)
             x, y, z = [c[:, i] for i in range(3)]
             x[x >= distance_atlas_shape[0]] = distance_atlas_shape[0] - 1
             y[y >= distance_atlas_shape[1]] = distance_atlas_shape[1] - 1
@@ -701,7 +708,9 @@ class VesselGraphProcessor(TabProcessor):
             self._annotate()
             self._compute_distance_to_surface()
         self.steps.remove_next_steps_files(self.steps.graph_annotated)
-        self.graph_annotated = self.graph_reduced.largest_component()  # TODO: explanation
+
+        # discard non connected graph components
+        self.graph_annotated = self.graph_reduced.largest_component()
         self.save_graph('annotated')
 
     # POST PROCESS
