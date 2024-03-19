@@ -25,7 +25,8 @@ import graph_tool.generation as gtg
 # fix graph tool saving / loading for very large arrays
 import ClearMap.Analysis.Graphs.Graph as grp
 import ClearMap.External.pickle_python_3 as pickle
-  
+
+from ClearMap.Utils.array_utils import remap_array_ranges
 
 gt.gt_io.clean_picklers()
 
@@ -774,14 +775,13 @@ class Graph(grp.AnnotatedGraph):
   
   @property
   def edge_geometry_property_names(self):
-    prefix = self.edge_geometry_property_name(name = '');
-    n_prefix = len(prefix);
+    prefix = self.edge_geometry_property_name(name='')
     if self.edge_geometry_type == 'graph':
-      properties = self.graph_properties;
+      properties = self.graph_properties
     else:
-      properties = self.edge_properties;
-    properties = [p for p in properties if len(p) >= n_prefix and p[:n_prefix] == prefix and p != 'edge_geometry_type'];
-    return properties;
+      properties = self.edge_properties
+    properties = [p for p in properties if p.startswith(prefix) and p != 'edge_geometry_type']
+    return properties  # Essentially all the properties that are arrays with n_pixels elements
   
   def edge_geometry_property(self, name):
     name = self.edge_geometry_property_name(name);
@@ -918,33 +918,52 @@ class Graph(grp.AnnotatedGraph):
   
   def resize_edge_geometry(self):
     if not self.has_edge_geometry() or self.edge_geometry_type != 'graph':
-      return;
+      return
     
-    #adjust indices
-    indices = self._edge_geometry_indices_graph();
+    # adjust indices
+    indices = self._edge_geometry_indices_graph()
     
-    indices_new = np.diff(indices, axis=1)[:,0];
-    indices_new = np.cumsum(indices_new);
-    indices_new = np.array([np.hstack([0, indices_new[:-1]]), indices_new]).T;
-    self._set_edge_geometry_indices_graph(indices_new);
-    
-    #reduce arrays
-    n = indices_new[-1,-1];
+    indices_new = np.diff(indices, axis=1)[:, 0]
+    indices_new = np.cumsum(indices_new)
+    indices_new = np.array([np.hstack([0, indices_new[:-1]]), indices_new]).T
+    self._set_edge_geometry_indices_graph(indices_new)
+
+    self._reduce_edge_geometry_properties(indices, indices_new)
+
+  def _reduce_edge_geometry_properties(self, indices, indices_new):
+    """
+    Remap all properties in self.edge_geometry_properties to the new indices
+
+    For example, if for the edge_geometry_coordinates, which has a shape of
+    (n_voxels, 3), the indices would be (n_edges, 2) and the indices_new would be
+    (n_edges_new, 2). The function would then remap the coordinates from the old
+    indices to the new indices like this:
+    for i in range(indices.shape[0]):
+      prop_new[indices_new[i, 0]:indices_new[i, 1]] = prop[indices[i, 0]:indices[i, 1]]
+
+
+    Parameters
+    ----------
+    indices
+    indices_new
+
+    Returns
+    -------
+
+    """
+    n = indices_new[-1, -1]
     for prop_name in self.edge_geometry_property_names:
-      prop = self.graph_property(prop_name);
-      shape_new = (n,) + prop.shape[1:];
-      prop_new = np.zeros(shape_new, prop.dtype);
-      for i,j in zip(indices, indices_new):
-        si,ei = i;  sj,ej=j;
-        prop_new[sj:ej] = prop[si:ei];
+      prop = self.graph_property(prop_name)
+      shape_new = (n,) + prop.shape[1:]
+      prop_new = np.zeros(shape_new, prop.dtype)
+      prop_new = remap_array_ranges(prop, prop_new, indices, indices_new)
       self.set_graph_property(prop_name, prop_new)
-  
-  
+
   def edge_geometry(self, name = 'coordinates', edge = None, as_list = True, return_indices = False, reshape = True, ndim = None):
     if self.edge_geometry_type == 'graph':
       return self._edge_geometry_graph(name=name, edge=edge, return_indices=return_indices, as_list=as_list);
-    else: # edge geometry type
-      return self._edge_geometry_edge(name=name, edge=edge, as_list=as_list, return_indices=return_indices, reshape=reshape, ndim=ndim);
+    else:  # edge geometry type
+      return self._edge_geometry_edge(name=name, edge=edge, return_indices=return_indices, as_list=as_list, reshape=reshape, ndim=ndim);
   
   
   def set_edge_geometry(self, name, values, indices = None, edge = None):
@@ -1123,10 +1142,9 @@ class Graph(grp.AnnotatedGraph):
       g = Graph(base=g);
       g.resize_edge_geometry();
       return g;
-  
+
   def view(self, vertex_filter = None, edge_filter = None):
     return gt.GraphView(self.base, vfilt=vertex_filter, efilt=edge_filter);
-  
   
   def remove_self_loops(self):
     gt.stats.remove_self_loops(self.base);
@@ -1135,7 +1153,6 @@ class Graph(grp.AnnotatedGraph):
     non_isolated = self.vertex_degrees() > 0;
     new_graph = self.sub_graph(vertex_filter=non_isolated);
     self._base = new_graph._base;
-  
   
   def label_components(self, return_vertex_counts = False):
     components, vertex_counts = gtt.label_components(self.base);
