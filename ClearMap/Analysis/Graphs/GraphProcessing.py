@@ -17,6 +17,7 @@ __download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 
 import numpy as np
 
+import ClearMap.Analysis.Graphs.type_conversions
 import ClearMap.IO.IO as io
 
 import ClearMap.Analysis.Graphs.GraphGt as ggt;
@@ -884,7 +885,7 @@ def _test():
   e, m = gp.expand_graph_length(graph, 'length', True)
   
   import graph_tool.draw as gd
-  pos = gp.ggt.vertex_property_map_to_python(gd.sfdp_layout(e.base))
+  pos = ClearMap.Analysis.Graphs.type_conversions.vertex_property_map_to_python(gd.sfdp_layout(e.base))
   import matplotlib.pyplot as plt
   plt.figure(1); plt.clf();
   import matplotlib.collections  as mc
