@@ -1,0 +1,1329 @@
+﻿acronym;name;structure_ids_path;structure_acronyms_path;id;MRI_regions_id;metaregion_id;lambada_id
+root;root;997;root;997;997;997;997
+fiber tracts;fiber tracts;997/1009;root > fiber tracts;1009;997;997;1009
+cbf;cerebellum related fiber tracts;997/1009/960;root > fiber tracts > cbf;960;997;997;1009
+arb;arbor vitae;997/1009/960/728;root > fiber tracts > cbf > arb;728;997;997;1009
+cbc;cerebellar commissure;997/1009/960/744;root > fiber tracts > cbf > cbc;744;997;997;1009
+cbp;cerebellar peduncles;997/1009/960/752;root > fiber tracts > cbf > cbp;752;997;997;1009
+icp;inferior cerebellar peduncle;997/1009/960/752/1123;root > fiber tracts > cbf > cbp > icp;1123;997;997;1009
+bct;bulbocerebellar tract;997/1009/960/752/1123/490;root > fiber tracts > cbf > cbp > icp > bct;490;997;997;1009
+oct;olivocerebellar tract;997/1009/960/752/1123/490/404;root > fiber tracts > cbf > cbp > icp > bct > oct;404;997;997;1009
+rct;reticulocerebellar tract;997/1009/960/752/1123/490/410;root > fiber tracts > cbf > cbp > icp > bct > rct;410;997;997;1009
+cct;cuneocerebellar tract;997/1009/960/752/1123/499;root > fiber tracts > cbf > cbp > icp > cct;499;997;997;1009
+jrb;juxtarestiform body;997/1009/960/752/1123/650;root > fiber tracts > cbf > cbp > icp > jrb;650;997;997;1009
+sctd;dorsal spinocerebellar tract;997/1009/960/752/1123/553;root > fiber tracts > cbf > cbp > icp > sctd;553;997;997;1009
+mcp;middle cerebellar peduncle;997/1009/960/752/78;root > fiber tracts > cbf > cbp > mcp;78;997;997;1009
+scp;superior cerebelar peduncles;997/1009/960/752/326;root > fiber tracts > cbf > cbp > scp;326;997;997;1009
+dscp;superior cerebellar peduncle decussation;997/1009/960/752/326/812;root > fiber tracts > cbf > cbp > scp > dscp;812;997;997;1009
+sct;spinocerebellar tract;997/1009/960/752/326/812/85;root > fiber tracts > cbf > cbp > scp > dscp > sct;85;997;997;1009
+sctv;ventral spinocerebellar tract;997/1009/960/752/326/866;root > fiber tracts > cbf > cbp > scp > sctv;866;997;997;1009
+uf;uncinate fascicle;997/1009/960/752/326/850;root > fiber tracts > cbf > cbp > scp > uf;850;997;997;1009
+tct;trigeminocerebellar tract;997/1009/960/752/373;root > fiber tracts > cbf > cbp > tct;373;997;997;1009
+cm;cranial nerves;997/1009/967;root > fiber tracts > cm;967;997;997;1009
+drt;dorsal roots;997/1009/967/792;root > fiber tracts > cm > drt;792;997;997;1009
+cett;cervicothalamic tract;997/1009/967/792/932;root > fiber tracts > cm > drt > cett;932;997;997;1009
+dc;dorsal column;997/1009/967/792/932/514;root > fiber tracts > cm > drt > cett > dc;514;997;997;1009
+cuf;cuneate fascicle;997/1009/967/792/932/514/380;root > fiber tracts > cm > drt > cett > dc > cuf;380;997;997;1009
+grf;gracile fascicle;997/1009/967/792/932/514/388;root > fiber tracts > cm > drt > cett > dc > grf;388;997;997;1009
+iaf;internal arcuate fibers;997/1009/967/792/932/514/396;root > fiber tracts > cm > drt > cett > dc > iaf;396;997;997;1009
+dcm;dorsal commissure of the spinal cord;997/1009/967/792/932/522;root > fiber tracts > cm > drt > cett > dcm;522;997;997;1009
+dl;dorsolateral fascicle;997/1009/967/792/932/570;root > fiber tracts > cm > drt > cett > dl;570;997;997;1009
+fpr;fasciculus proprius;997/1009/967/792/932/586;root > fiber tracts > cm > drt > cett > fpr;586;997;997;1009
+ml;medial lemniscus;997/1009/967/792/932/697;root > fiber tracts > cm > drt > cett > ml;697;997;997;1009
+vc;ventral commissure of the spinal cord;997/1009/967/792/932/858;root > fiber tracts > cm > drt > cett > vc;858;997;997;1009
+IIIn;oculomotor nerve;997/1009/967/832;root > fiber tracts > cm > IIIn;832;997;997;1009
+mlf;medial longitudinal fascicle;997/1009/967/832/62;root > fiber tracts > cm > IIIn > mlf;62;997;997;1009
+pc;posterior commissure;997/1009/967/832/158;root > fiber tracts > cm > IIIn > pc;158;997;997;1009
+IIn;optic nerve;997/1009/967/848;root > fiber tracts > cm > IIn;848;997;997;1009
+aot;accessory optic tract;997/1009/967/848/876;root > fiber tracts > cm > IIn > aot;876;997;997;1009
+bsc;brachium of the superior colliculus;997/1009/967/848/916;root > fiber tracts > cm > IIn > bsc;916;997;997;1009
+csc;superior colliculus commissure;997/1009/967/848/336;root > fiber tracts > cm > IIn > csc;336;997;997;1009
+och;optic chiasm;997/1009/967/848/117;root > fiber tracts > cm > IIn > och;117;997;997;1009
+opt;optic tract;997/1009/967/848/125;root > fiber tracts > cm > IIn > opt;125;997;997;1009
+ttp;tectothalamic pathway;997/1009/967/848/357;root > fiber tracts > cm > IIn > ttp;357;997;997;1009
+In;olfactory nerve;997/1009/967/840;root > fiber tracts > cm > In;840;997;997;1009
+aco;anterior commissure, olfactory limb;997/1009/967/840/900;root > fiber tracts > cm > In > aco;900;997;997;1009
+lotg;lateral olfactory tract, general;997/1009/967/840/21;root > fiber tracts > cm > In > lotg;21;997;997;1009
+aolt;accessory olfactory tract;997/1009/967/840/21/459;root > fiber tracts > cm > In > lotg > aolt;459;997;997;1009
+lot;lateral olfactory tract, body;997/1009/967/840/21/665;root > fiber tracts > cm > In > lotg > lot;665;997;997;1009
+lotd;dorsal limb;997/1009/967/840/21/538;root > fiber tracts > cm > In > lotg > lotd;538;997;997;1009
+onl;olfactory nerve layer of main olfactory bulb;997/1009/967/840/1016;root > fiber tracts > cm > In > onl;1016;997;997;1009
+IVn;trochlear nerve;997/1009/967/911;root > fiber tracts > cm > IVn;911;997;997;1009
+IVd;trochlear nerve decussation;997/1009/967/911/384;root > fiber tracts > cm > IVn > IVd;384;997;997;1009
+IXn;glossopharyngeal nerve;997/1009/967/808;root > fiber tracts > cm > IXn;808;997;997;1009
+sst;spinothalamic tract;997/1009/967/871;root > fiber tracts > cm > sst;871;997;997;1009
+scrt;spinocervical tract;997/1009/967/871/245;root > fiber tracts > cm > sst > scrt;245;997;997;1009
+shp;spinohypothalamic pathway;997/1009/967/871/253;root > fiber tracts > cm > sst > shp;253;997;997;1009
+sop;spino-olivary pathway;997/1009/967/871/261;root > fiber tracts > cm > sst > sop;261;997;997;1009
+srp;spinoreticular pathway;997/1009/967/871/270;root > fiber tracts > cm > sst > srp;270;997;997;1009
+step;spinotelenchephalic pathway;997/1009/967/871/285;root > fiber tracts > cm > sst > step;285;997;997;1009
+hht;hypothalamohypophysial tract;997/1009/967/871/285/627;root > fiber tracts > cm > sst > step > hht;627;997;997;1009
+stp;spinotectal pathway;997/1009/967/871/277;root > fiber tracts > cm > sst > stp;277;997;997;1009
+sttl;lateral spinothalamic tract;997/1009/967/871/29;root > fiber tracts > cm > sst > sttl;29;997;997;1009
+sttv;ventral spinothalamic tract;997/1009/967/871/389;root > fiber tracts > cm > sst > sttv;389;997;997;1009
+svp;spinovestibular pathway;997/1009/967/871/293;root > fiber tracts > cm > sst > svp;293;997;997;1009
+tn;terminal nerve;997/1009/967/885;root > fiber tracts > cm > tn;885;997;997;1009
+VIIIn;vestibulocochlear nerve;997/1009/967/933;root > fiber tracts > cm > VIIIn;933;997;997;1009
+cvb;efferent cochleovestibular bundle;997/1009/967/933/1076;root > fiber tracts > cm > VIIIn > cvb;1076;997;997;1009
+cVIIIn;cochlear nerve;997/1009/967/933/948;root > fiber tracts > cm > VIIIn > cVIIIn;948;997;997;1009
+bic;brachium of the inferior colliculus;997/1009/967/933/948/482;root > fiber tracts > cm > VIIIn > cVIIIn > bic;482;997;997;1009
+cic;inferior colliculus commissure;997/1009/967/933/948/633;root > fiber tracts > cm > VIIIn > cVIIIn > cic;633;997;997;1009
+das;dorsal acoustic stria;997/1009/967/933/948/506;root > fiber tracts > cm > VIIIn > cVIIIn > das;506;997;997;1009
+ias;intermediate acoustic stria;997/1009/967/933/948/641;root > fiber tracts > cm > VIIIn > cVIIIn > ias;641;997;997;1009
+ll;lateral lemniscus;997/1009/967/933/948/658;root > fiber tracts > cm > VIIIn > cVIIIn > ll;658;997;997;1009
+tb;trapezoid body;997/1009/967/933/948/841;root > fiber tracts > cm > VIIIn > cVIIIn > tb;841;997;997;1009
+vVIIIn;vestibular nerve;997/1009/967/933/413;root > fiber tracts > cm > VIIIn > vVIIIn;413;997;997;1009
+VIIn;facial nerve;997/1009/967/798;root > fiber tracts > cm > VIIn;798;997;997;1009
+gVIIn;genu of the facial nerve;997/1009/967/798/1116;root > fiber tracts > cm > VIIn > gVIIn;1116;997;997;1009
+iVIIn;intermediate nerve;997/1009/967/798/1131;root > fiber tracts > cm > VIIn > iVIIn;1131;997;997;1009
+VIn;abducens nerve;997/1009/967/710;root > fiber tracts > cm > VIn;710;997;997;1009
+Vn;trigeminal nerve;997/1009/967/901;root > fiber tracts > cm > Vn;901;997;997;1009
+moV;motor root of the trigeminal nerve;997/1009/967/901/93;root > fiber tracts > cm > Vn > moV;93;997;997;1009
+sV;sensory root of the trigeminal nerve;997/1009/967/901/229;root > fiber tracts > cm > Vn > sV;229;997;997;1009
+mtV;midbrain tract of the trigeminal nerve;997/1009/967/901/229/705;root > fiber tracts > cm > Vn > sV > mtV;705;997;997;1009
+sptV;spinal tract of the trigeminal nerve;997/1009/967/901/229/794;root > fiber tracts > cm > Vn > sV > sptV;794;997;997;1009
+von;vomeronasal nerve;997/1009/967/949;root > fiber tracts > cm > von;949;997;997;1009
+vrt;ventral roots;997/1009/967/925;root > fiber tracts > cm > vrt;925;997;997;1009
+XIIn;hypoglossal nerve;997/1009/967/813;root > fiber tracts > cm > XIIn;813;997;997;1009
+XIn;accessory spinal nerve;997/1009/967/717;root > fiber tracts > cm > XIn;717;997;997;1009
+Xn;vagus nerve;997/1009/967/917;root > fiber tracts > cm > Xn;917;997;997;1009
+ts;solitary tract;997/1009/967/917/237;root > fiber tracts > cm > Xn > ts;237;997;997;1009
+eps;extrapyramidal fiber systems;997/1009/1000;root > fiber tracts > eps;1000;997;997;1009
+ctb;central tegmental bundle;997/1009/1000/736;root > fiber tracts > eps > ctb;736;997;997;1009
+epsc;cerebral nuclei related;997/1009/1000/760;root > fiber tracts > eps > epsc;760;997;997;1009
+nst;nigrostriatal tract;997/1009/1000/760/102;root > fiber tracts > eps > epsc > nst;102;997;997;1009
+ntt;nigrothalamic fibers;997/1009/1000/760/109;root > fiber tracts > eps > epsc > ntt;109;997;997;1009
+pap;pallidothalamic pathway;997/1009/1000/760/142;root > fiber tracts > eps > epsc > pap;142;997;997;1009
+ptf;pallidotegmental fascicle;997/1009/1000/760/134;root > fiber tracts > eps > epsc > ptf;134;997;997;1009
+snp;striatonigral pathway;997/1009/1000/760/309;root > fiber tracts > eps > epsc > snp;309;997;997;1009
+stf;subthalamic fascicle;997/1009/1000/760/317;root > fiber tracts > eps > epsc > stf;317;997;997;1009
+rst;retriculospinal tract;997/1009/1000/855;root > fiber tracts > eps > rst;855;997;997;1009
+rstl;retriculospinal tract, lateral part;997/1009/1000/855/205;root > fiber tracts > eps > rst > rstl;205;997;997;1009
+rstm;retriculospinal tract, medial part;997/1009/1000/855/213;root > fiber tracts > eps > rst > rstm;213;997;997;1009
+rust;rubrospinal tract;997/1009/1000/863;root > fiber tracts > eps > rust;863;997;997;1009
+rrt;rubroreticular tract;997/1009/1000/863/221;root > fiber tracts > eps > rust > rrt;221;997;997;1009
+vtd;ventral tegmental decussation;997/1009/1000/863/397;root > fiber tracts > eps > rust > vtd;397;997;997;1009
+tsp;tectospinal pathway;997/1009/1000/877;root > fiber tracts > eps > tsp;877;997;997;1009
+dtd;doral tegmental decussation;997/1009/1000/877/1060;root > fiber tracts > eps > tsp > dtd;1060;997;997;1009
+tspc;crossed tectospinal pathway;997/1009/1000/877/1043;root > fiber tracts > eps > tsp > tspc;1043;997;997;1009
+tspd;direct tectospinal pathway;997/1009/1000/877/1051;root > fiber tracts > eps > tsp > tspd;1051;997;997;1009
+vsp;vestibulospinal pathway;997/1009/1000/941;root > fiber tracts > eps > vsp;941;997;997;1009
+lfbs;lateral forebrain bundle system;997/1009/983;root > fiber tracts > lfbs;983;997;997;1009
+cc;corpus callosum;997/1009/983/776;root > fiber tracts > lfbs > cc;776;997;997;1009
+ccb;corpus callosum, body;997/1009/983/776/484682516;root > fiber tracts > lfbs > cc > ccb;484682516;997;997;1009
+ccg;genu of corpus callosum;997/1009/983/776/1108;root > fiber tracts > lfbs > cc > ccg;1108;997;997;1009
+ccr;corpus callosum, rostrum;997/1009/983/776/979;root > fiber tracts > lfbs > cc > ccr;979;997;997;1009
+ccs;corpus callosum, splenium;997/1009/983/776/986;root > fiber tracts > lfbs > cc > ccs;986;997;997;1009
+ee;corpus callosum, extreme capsule;997/1009/983/776/964;root > fiber tracts > lfbs > cc > ee;964;997;997;1009
+fa;corpus callosum, anterior forceps;997/1009/983/776/956;root > fiber tracts > lfbs > cc > fa;956;997;997;1009
+ec;external capsule;997/1009/983/776/956/579;root > fiber tracts > lfbs > cc > fa > ec;579;997;997;1009
+fp;corpus callosum, posterior forceps;997/1009/983/776/971;root > fiber tracts > lfbs > cc > fp;971;997;997;1009
+cst;corticospinal tract;997/1009/983/784;root > fiber tracts > lfbs > cst;784;997;997;1009
+cbt;corticobulbar tract;997/1009/983/784/994;root > fiber tracts > lfbs > cst > cbt;994;997;997;1009
+cpd;cerebal peduncle;997/1009/983/784/924;root > fiber tracts > lfbs > cst > cpd;924;997;997;1009
+cpt;corticopontine tract;997/1009/983/784/1003;root > fiber tracts > lfbs > cst > cpt;1003;997;997;1009
+crt;corticorubral tract;997/1009/983/784/1012;root > fiber tracts > lfbs > cst > crt;1012;997;997;1009
+cstc;corticospinal tract, crossed;997/1009/983/784/1019;root > fiber tracts > lfbs > cst > cstc;1019;997;997;1009
+cstu;corticospinal tract, uncrossed;997/1009/983/784/1028;root > fiber tracts > lfbs > cst > cstu;1028;997;997;1009
+cte;corticotectal tract;997/1009/983/784/1036;root > fiber tracts > lfbs > cst > cte;1036;997;997;1009
+int;internal capsule;997/1009/983/784/6;root > fiber tracts > lfbs > cst > int;6;997;997;1009
+py;pyramid;997/1009/983/784/190;root > fiber tracts > lfbs > cst > py;190;997;997;1009
+pyd;pyramidal decussation;997/1009/983/784/198;root > fiber tracts > lfbs > cst > pyd;198;997;997;1009
+lfbst;thalamus related;997/1009/983/896;root > fiber tracts > lfbs > lfbst;896;997;997;1009
+ar;auditory radiation;997/1009/983/896/484682524;root > fiber tracts > lfbs > lfbst > ar;484682524;997;997;1009
+em;external medullary lamina of the thalamus;997/1009/983/896/1092;root > fiber tracts > lfbs > lfbst > em;1092;997;997;1009
+im;internal medullary lamina of the thalamus;997/1009/983/896/14;root > fiber tracts > lfbs > lfbst > im;14;997;997;1009
+mtc;middle thalamic commissure;997/1009/983/896/86;root > fiber tracts > lfbs > lfbst > mtc;86;997;997;1009
+or;optic radiation;997/1009/983/896/484682520;root > fiber tracts > lfbs > lfbst > or;484682520;997;997;1009
+tp;thalamic peduncles;997/1009/983/896/365;root > fiber tracts > lfbs > lfbst > tp;365;997;997;1009
+mfbs;medial forebrain bundle system;997/1009/991;root > fiber tracts > mfbs;991;997;997;1009
+mfbc;cerebrum related;997/1009/991/768;root > fiber tracts > mfbs > mfbc;768;997;997;1009
+act;anterior commissure, temporal limb;997/1009/991/768/908;root > fiber tracts > mfbs > mfbc > act;908;997;997;1009
+amc;amygdalar capsule;997/1009/991/768/884;root > fiber tracts > mfbs > mfbc > amc;884;997;997;1009
+apd;ansa peduncularis;997/1009/991/768/892;root > fiber tracts > mfbs > mfbc > apd;892;997;997;1009
+cing;cingulum bundle;997/1009/991/768/940;root > fiber tracts > mfbs > mfbc > cing;940;997;997;1009
+fxs;fornix system;997/1009/991/768/1099;root > fiber tracts > mfbs > mfbc > fxs;1099;997;997;1009
+ab;angular path;997/1009/991/768/1099/474;root > fiber tracts > mfbs > mfbc > fxs > ab;474;997;997;1009
+alv;alveus;997/1009/991/768/1099/466;root > fiber tracts > mfbs > mfbc > fxs > alv;466;997;997;1009
+df;dorsal fornix;997/1009/991/768/1099/530;root > fiber tracts > mfbs > mfbc > fxs > df;530;997;997;1009
+fi;fimbria;997/1009/991/768/1099/603;root > fiber tracts > mfbs > mfbc > fxs > fi;603;997;997;1009
+fxpo;postcommissural fornix;997/1009/991/768/1099/737;root > fiber tracts > mfbs > mfbc > fxs > fxpo;737;997;997;1009
+fx;columns of the fornix;997/1009/991/768/1099/737/436;root > fiber tracts > mfbs > mfbc > fxs > fxpo > fx;436;997;997;1009
+mct;medial corticohypothalamic tract;997/1009/991/768/1099/737/428;root > fiber tracts > mfbs > mfbc > fxs > fxpo > mct;428;997;997;1009
+fxprg;precommissural fornix, general;997/1009/991/768/1099/745;root > fiber tracts > mfbs > mfbc > fxs > fxprg;745;997;997;1009
+db;precommissural fornix diagonal band;997/1009/991/768/1099/745/420;root > fiber tracts > mfbs > mfbc > fxs > fxprg > db;420;997;997;1009
+hc;hippocampal commissures;997/1009/991/768/1099/618;root > fiber tracts > mfbs > mfbc > fxs > hc;618;997;997;1009
+dhc;dorsal hippocampal commissure;997/1009/991/768/1099/618/443;root > fiber tracts > mfbs > mfbc > fxs > hc > dhc;443;997;997;1009
+vhc;ventral hippocampal commissure;997/1009/991/768/1099/618/449;root > fiber tracts > mfbs > mfbc > fxs > hc > vhc;449;997;997;1009
+per;perforant path;997/1009/991/768/1099/713;root > fiber tracts > mfbs > mfbc > fxs > per;713;997;997;1009
+lab;longitudinal association bundle;997/1009/991/768/37;root > fiber tracts > mfbs > mfbc > lab;37;997;997;1009
+st;stria terminalis;997/1009/991/768/301;root > fiber tracts > mfbs > mfbc > st;301;997;997;1009
+stc;commissural branch of stria terminalis;997/1009/991/768/301/484682528;root > fiber tracts > mfbs > mfbc > st > stc;484682528;997;997;1009
+mfsbshy;hypothalamus related;997/1009/991/824;root > fiber tracts > mfbs > mfsbshy;824;997;997;1009
+mfb;medial forebrain bundle;997/1009/991/824/54;root > fiber tracts > mfbs > mfsbshy > mfb;54;997;997;1009
+mfbse;epithalamus related;997/1009/991/824/1083;root > fiber tracts > mfbs > mfsbshy > mfbse;1083;997;997;1009
+fr;fasciculus retroflexus;997/1009/991/824/1083/595;root > fiber tracts > mfbs > mfsbshy > mfbse > fr;595;997;997;1009
+hbc;habenular commissure;997/1009/991/824/1083/611;root > fiber tracts > mfbs > mfsbshy > mfbse > hbc;611;997;997;1009
+PIS;pineal stalk;997/1009/991/824/1083/730;root > fiber tracts > mfbs > mfsbshy > mfbse > PIS;730;997;997;1009
+sm;stria medullaris;997/1009/991/824/1083/802;root > fiber tracts > mfbs > mfsbshy > mfbse > sm;802;997;997;1009
+mfbsm;midbrain related;997/1009/991/824/70;root > fiber tracts > mfbs > mfsbshy > mfbsm;70;997;997;1009
+dlf;dorsal longitudinal fascicle;997/1009/991/824/70/547;root > fiber tracts > mfbs > mfsbshy > mfbsm > dlf;547;997;997;1009
+dtt;dorsal tegmental tract;997/1009/991/824/70/563;root > fiber tracts > mfbs > mfsbshy > mfbsm > dtt;563;997;997;1009
+mfbsma;mammillary related;997/1009/991/824/46;root > fiber tracts > mfbs > mfsbshy > mfbsma;46;997;997;1009
+mp;mammillary peduncle;997/1009/991/824/46/673;root > fiber tracts > mfbs > mfsbshy > mfbsma > mp;673;997;997;1009
+mtg;mammillotegmental tract;997/1009/991/824/46/681;root > fiber tracts > mfbs > mfsbshy > mfbsma > mtg;681;997;997;1009
+mtt;mammillothalamic tract;997/1009/991/824/46/690;root > fiber tracts > mfbs > mfsbshy > mfbsma > mtt;690;997;997;1009
+pm;principal mammillary tract;997/1009/991/824/46/753;root > fiber tracts > mfbs > mfsbshy > mfbsma > pm;753;997;997;1009
+mfbst;dorsal thalamus related;997/1009/991/824/1068;root > fiber tracts > mfbs > mfsbshy > mfbst;1068;997;997;1009
+pvbt;periventricular bundle of the thalamus;997/1009/991/824/1068/722;root > fiber tracts > mfbs > mfsbshy > mfbst > pvbt;722;997;997;1009
+php;propriohypothalamic pathways;997/1009/991/824/182;root > fiber tracts > mfbs > mfsbshy > php;182;997;997;1009
+phpd;propriohypothalamic pathways, dorsal;997/1009/991/824/182/762;root > fiber tracts > mfbs > mfsbshy > php > phpd;762;997;997;1009
+phpl;propriohypothalamic pathways, lateral;997/1009/991/824/182/770;root > fiber tracts > mfbs > mfsbshy > php > phpl;770;997;997;1009
+phpm;propriohypothalamic pathways, medial;997/1009/991/824/182/779;root > fiber tracts > mfbs > mfsbshy > php > phpm;779;997;997;1009
+phpv;propriohypothalamic pathways, ventral;997/1009/991/824/182/787;root > fiber tracts > mfbs > mfsbshy > php > phpv;787;997;997;1009
+pmx;premammillary commissure;997/1009/991/824/166;root > fiber tracts > mfbs > mfsbshy > pmx;166;997;997;1009
+poc;preoptic commissure;997/1009/991/824/174;root > fiber tracts > mfbs > mfsbshy > poc;174;997;997;1009
+pvbh;periventricular bundle of the hypothalamus;997/1009/991/824/150;root > fiber tracts > mfbs > mfsbshy > pvbh;150;997;997;1009
+smd;supramammillary decussation;997/1009/991/824/341;root > fiber tracts > mfbs > mfsbshy > smd;341;997;997;1009
+sup;supraoptic commissures;997/1009/991/824/349;root > fiber tracts > mfbs > mfsbshy > sup;349;997;997;1009
+supa;supraoptic commissures, anterior;997/1009/991/824/349/817;root > fiber tracts > mfbs > mfsbshy > sup > supa;817;997;997;1009
+supd;supraoptic commissures, dorsal;997/1009/991/824/349/825;root > fiber tracts > mfbs > mfsbshy > sup > supd;825;997;997;1009
+supv;supraoptic commissures, ventral;997/1009/991/824/349/833;root > fiber tracts > mfbs > mfsbshy > sup > supv;833;997;997;1009
+vlt;ventrolateral hypothalamic tract;997/1009/991/824/405;root > fiber tracts > mfbs > mfsbshy > vlt;405;997;997;1009
+scwm;supra-callosal cerebral white matter;997/1009/484682512;root > fiber tracts > scwm;484682512;997;997;1009
+grey;Basic cell groups and regions;997/8;root > grey;8;997;997;997
+BS;Brain stem;997/8/343;root > grey > BS;343;997;997;997
+HB;Hindbrain;997/8/343/1065;root > grey > BS > HB;1065;1065;1065;1065
+MY;Medulla;997/8/343/1065/354;root > grey > BS > HB > MY;354;1065;1065;1065
+MY-mot;Medulla, motor related;997/8/343/1065/354/370;root > grey > BS > HB > MY > MY-mot;370;1065;1065;1065
+ACVI;Accessory abducens nucleus;997/8/343/1065/354/370/568;root > grey > BS > HB > MY > MY-mot > ACVI;568;1065;1065;1065
+ACVII;Accessory facial motor nucleus;997/8/343/1065/354/370/576;root > grey > BS > HB > MY > MY-mot > ACVII;576;1065;1065;1065
+AMB;Nucleus ambiguus;997/8/343/1065/354/370/135;root > grey > BS > HB > MY > MY-mot > AMB;135;1065;1065;1065
+AMBd;Nucleus ambiguus, dorsal division;997/8/343/1065/354/370/135/939;root > grey > BS > HB > MY > MY-mot > AMB > AMBd;939;1065;1065;1065
+AMBv;Nucleus ambiguus, ventral division;997/8/343/1065/354/370/135/143;root > grey > BS > HB > MY > MY-mot > AMB > AMBv;143;1065;1065;1065
+DMX;Dorsal motor nucleus of the vagus nerve;997/8/343/1065/354/370/839;root > grey > BS > HB > MY > MY-mot > DMX;839;1065;1065;1065
+ECO;Efferent cochlear group;997/8/343/1065/354/370/887;root > grey > BS > HB > MY > MY-mot > ECO;887;1065;1065;1065
+EV;Efferent vestibular nucleus;997/8/343/1065/354/370/640;root > grey > BS > HB > MY > MY-mot > EV;640;1065;1065;1065
+GRN;Gigantocellular reticular nucleus;997/8/343/1065/354/370/1048;root > grey > BS > HB > MY > MY-mot > GRN;1048;1065;1065;1065
+ICB;Infracerebellar nucleus;997/8/343/1065/354/370/372;root > grey > BS > HB > MY > MY-mot > ICB;372;1065;1065;1065
+INV;Interstitial nucleus of the vestibular nerve;997/8/343/1065/354/370/76;root > grey > BS > HB > MY > MY-mot > INV;76;1065;1065;1065
+IO;Inferior olivary complex;997/8/343/1065/354/370/83;root > grey > BS > HB > MY > MY-mot > IO;83;1065;1065;83
+IRN;Intermediate reticular nucleus;997/8/343/1065/354/370/136;root > grey > BS > HB > MY > MY-mot > IRN;136;1065;1065;1065
+ISN;Inferior salivatory nucleus;997/8/343/1065/354/370/106;root > grey > BS > HB > MY > MY-mot > ISN;106;1065;1065;1065
+LIN;Linear nucleus of the medulla;997/8/343/1065/354/370/203;root > grey > BS > HB > MY > MY-mot > LIN;203;1065;1065;1065
+LRN;Lateral reticular nucleus;997/8/343/1065/354/370/235;root > grey > BS > HB > MY > MY-mot > LRN;235;1065;1065;1065
+LRNm;Lateral reticular nucleus, magnocellular part;997/8/343/1065/354/370/235/955;root > grey > BS > HB > MY > MY-mot > LRN > LRNm;955;1065;1065;1065
+LRNp;Lateral reticular nucleus, parvicellular part;997/8/343/1065/354/370/235/963;root > grey > BS > HB > MY > MY-mot > LRN > LRNp;963;1065;1065;1065
+MARN;Magnocellular reticular nucleus;997/8/343/1065/354/370/307;root > grey > BS > HB > MY > MY-mot > MARN;307;1065;1065;1065
+MDRN;Medullary reticular nucleus;997/8/343/1065/354/370/395;root > grey > BS > HB > MY > MY-mot > MDRN;395;1065;1065;1065
+MDRNd;Medullary reticular nucleus, dorsal part;997/8/343/1065/354/370/395/1098;root > grey > BS > HB > MY > MY-mot > MDRN > MDRNd;1098;1065;1065;1065
+MDRNv;Medullary reticular nucleus, ventral part;997/8/343/1065/354/370/395/1107;root > grey > BS > HB > MY > MY-mot > MDRN > MDRNv;1107;1065;1065;1065
+PARN;Parvicellular reticular nucleus;997/8/343/1065/354/370/852;root > grey > BS > HB > MY > MY-mot > PARN;852;1065;1065;1065
+PAS;Parasolitary nucleus;997/8/343/1065/354/370/859;root > grey > BS > HB > MY > MY-mot > PAS;859;1065;1065;1065
+PGRN;Paragigantocellular reticular nucleus;997/8/343/1065/354/370/938;root > grey > BS > HB > MY > MY-mot > PGRN;938;1065;1065;1065
+PGRNd;Paragigantocellular reticular nucleus, dorsal part;997/8/343/1065/354/370/938/970;root > grey > BS > HB > MY > MY-mot > PGRN > PGRNd;970;1065;1065;1065
+PGRNl;Paragigantocellular reticular nucleus, lateral part;997/8/343/1065/354/370/938/978;root > grey > BS > HB > MY > MY-mot > PGRN > PGRNl;978;1065;1065;1065
+PHY;Perihypoglossal nuclei;997/8/343/1065/354/370/154;root > grey > BS > HB > MY > MY-mot > PHY;154;1065;1065;1065
+NIS;Nucleus intercalatus;997/8/343/1065/354/370/154/161;root > grey > BS > HB > MY > MY-mot > PHY > NIS;161;1065;1065;1065
+NR;Nucleus of Roller;997/8/343/1065/354/370/154/177;root > grey > BS > HB > MY > MY-mot > PHY > NR;177;1065;1065;1065
+PRP;Nucleus prepositus;997/8/343/1065/354/370/154/169;root > grey > BS > HB > MY > MY-mot > PHY > PRP;169;1065;1065;1065
+PMR;Paramedian reticular nucleus;997/8/343/1065/354/370/995;root > grey > BS > HB > MY > MY-mot > PMR;995;1065;1065;1065
+PPY;Parapyramidal nucleus;997/8/343/1065/354/370/1069;root > grey > BS > HB > MY > MY-mot > PPY;1069;1065;1065;1065
+PPYd;Parapyramidal nucleus, deep part;997/8/343/1065/354/370/1069/185;root > grey > BS > HB > MY > MY-mot > PPY > PPYd;185;1065;1065;1065
+PPYs;Parapyramidal nucleus, superficial part;997/8/343/1065/354/370/1069/193;root > grey > BS > HB > MY > MY-mot > PPY > PPYs;193;1065;1065;1065
+VI;Abducens nucleus;997/8/343/1065/354/370/653;root > grey > BS > HB > MY > MY-mot > VI;653;1065;1065;1065
+VII;Facial motor nucleus;997/8/343/1065/354/370/661;root > grey > BS > HB > MY > MY-mot > VII;661;1065;1065;661
+VNC;Vestibular nuclei;997/8/343/1065/354/370/701;root > grey > BS > HB > MY > MY-mot > VNC;701;1065;1065;1065
+LAV;Lateral vestibular nucleus;997/8/343/1065/354/370/701/209;root > grey > BS > HB > MY > MY-mot > VNC > LAV;209;1065;1065;1065
+MV;Medial vestibular nucleus;997/8/343/1065/354/370/701/202;root > grey > BS > HB > MY > MY-mot > VNC > MV;202;1065;1065;1065
+SPIV;Spinal vestibular nucleus;997/8/343/1065/354/370/701/225;root > grey > BS > HB > MY > MY-mot > VNC > SPIV;225;1065;1065;1065
+SUV;Superior vestibular nucleus;997/8/343/1065/354/370/701/217;root > grey > BS > HB > MY > MY-mot > VNC > SUV;217;1065;1065;1065
+x;Nucleus x;997/8/343/1065/354/370/765;root > grey > BS > HB > MY > MY-mot > x;765;1065;1065;1065
+XII;Hypoglossal nucleus;997/8/343/1065/354/370/773;root > grey > BS > HB > MY > MY-mot > XII;773;1065;1065;1065
+y;Nucleus y;997/8/343/1065/354/370/781;root > grey > BS > HB > MY > MY-mot > y;781;1065;1065;1065
+MY-sat;Medulla, behavioral state related;997/8/343/1065/354/379;root > grey > BS > HB > MY > MY-sat;379;1065;1065;1065
+RM;Nucleus raphe magnus;997/8/343/1065/354/379/206;root > grey > BS > HB > MY > MY-sat > RM;206;1065;1065;1065
+RO;Nucleus raphe obscurus;997/8/343/1065/354/379/222;root > grey > BS > HB > MY > MY-sat > RO;222;1065;1065;1065
+RPA;Nucleus raphe pallidus;997/8/343/1065/354/379/230;root > grey > BS > HB > MY > MY-sat > RPA;230;1065;1065;1065
+MY-sen;Medulla, sensory related;997/8/343/1065/354/386;root > grey > BS > HB > MY > MY-sen;386;1065;1065;1065
+AP;Area postrema;997/8/343/1065/354/386/207;root > grey > BS > HB > MY > MY-sen > AP;207;1065;1065;1065
+CN;Cochlear nuclei;997/8/343/1065/354/386/607;root > grey > BS > HB > MY > MY-sen > CN;607;1065;1065;1065
+CNlam;Granular lamina of the cochlear nuclei;997/8/343/1065/354/386/607/112;root > grey > BS > HB > MY > MY-sen > CN > CNlam;112;1065;1065;1065
+CNspg;Cochlear nucleus, subpedunclular granular region;997/8/343/1065/354/386/607/560;root > grey > BS > HB > MY > MY-sen > CN > CNspg;560;1065;1065;1065
+DCO;Dorsal cochlear nucleus;997/8/343/1065/354/386/607/96;root > grey > BS > HB > MY > MY-sen > CN > DCO;96;1065;1065;1065
+VCO;Ventral cochlear nucleus;997/8/343/1065/354/386/607/101;root > grey > BS > HB > MY > MY-sen > CN > VCO;101;1065;1065;1065
+DCN;Dorsal column nuclei;997/8/343/1065/354/386/720;root > grey > BS > HB > MY > MY-sen > DCN;720;1065;1065;1065
+CU;Cuneate nucleus;997/8/343/1065/354/386/720/711;root > grey > BS > HB > MY > MY-sen > DCN > CU;711;1065;1065;1065
+GR;Gracile nucleus;997/8/343/1065/354/386/720/1039;root > grey > BS > HB > MY > MY-sen > DCN > GR;1039;1065;1065;1065
+ECU;External cuneate nucleus;997/8/343/1065/354/386/903;root > grey > BS > HB > MY > MY-sen > ECU;903;1065;1065;1065
+NTB;Nucleus of the trapezoid body;997/8/343/1065/354/386/642;root > grey > BS > HB > MY > MY-sen > NTB;642;1065;1065;642
+NTS;Nucleus of the solitary tract;997/8/343/1065/354/386/651;root > grey > BS > HB > MY > MY-sen > NTS;651;1065;1065;1065
+NTSce;Nucleus of the solitary tract, central part;997/8/343/1065/354/386/651/659;root > grey > BS > HB > MY > MY-sen > NTS > NTSce;659;1065;1065;1065
+NTSco;Nucleus of the solitary tract, commissural part;997/8/343/1065/354/386/651/666;root > grey > BS > HB > MY > MY-sen > NTS > NTSco;666;1065;1065;1065
+NTSge;Nucleus of the solitary tract, gelatinous part;997/8/343/1065/354/386/651/674;root > grey > BS > HB > MY > MY-sen > NTS > NTSge;674;1065;1065;1065
+NTSl;Nucleus of the solitary tract, lateral part;997/8/343/1065/354/386/651/682;root > grey > BS > HB > MY > MY-sen > NTS > NTSl;682;1065;1065;1065
+NTSm;Nucleus of the solitary tract, medial part;997/8/343/1065/354/386/651/691;root > grey > BS > HB > MY > MY-sen > NTS > NTSm;691;1065;1065;1065
+Pa5;Paratrigeminal nucleus;997/8/343/1065/354/386/589508451;root > grey > BS > HB > MY > MY-sen > Pa5;589508451;1065;1065;1065
+SPVC;Spinal nucleus of the trigeminal, caudal part;997/8/343/1065/354/386/429;root > grey > BS > HB > MY > MY-sen > SPVC;429;1065;1065;1065
+SPVI;Spinal nucleus of the trigeminal, interpolar part;997/8/343/1065/354/386/437;root > grey > BS > HB > MY > MY-sen > SPVI;437;1065;1065;437
+SPVO;Spinal nucleus of the trigeminal, oral part;997/8/343/1065/354/386/445;root > grey > BS > HB > MY > MY-sen > SPVO;445;1065;1065;1065
+SPVOcdm;Spinal nucleus of the trigeminal, oral part, caudal dorsomedial part;997/8/343/1065/354/386/445/77;root > grey > BS > HB > MY > MY-sen > SPVO > SPVOcdm;77;1065;1065;1065
+SPVOmdmd;Spinal nucleus of the trigeminal, oral part, middle dorsomedial part, dorsal zone;997/8/343/1065/354/386/445/53;root > grey > BS > HB > MY > MY-sen > SPVO > SPVOmdmd;53;1065;1065;1065
+SPVOmdmv;Spinal nucleus of the trigeminal, oral part, middle dorsomedial part, ventral zone;997/8/343/1065/354/386/445/61;root > grey > BS > HB > MY > MY-sen > SPVO > SPVOmdmv;61;1065;1065;1065
+SPVOrdm;Spinal nucleus of the trigeminal, oral part, rostral dorsomedial part;997/8/343/1065/354/386/445/45;root > grey > BS > HB > MY > MY-sen > SPVO > SPVOrdm;45;1065;1065;1065
+SPVOvl;Spinal nucleus of the trigeminal, oral part, ventrolateral part;997/8/343/1065/354/386/445/69;root > grey > BS > HB > MY > MY-sen > SPVO > SPVOvl;69;1065;1065;1065
+z;Nucleus z;997/8/343/1065/354/386/789;root > grey > BS > HB > MY > MY-sen > z;789;1065;1065;1065
+P;Pons;997/8/343/1065/771;root > grey > BS > HB > P;771;1065;1065;1065
+P-mot;Pons, motor related;997/8/343/1065/771/987;root > grey > BS > HB > P > P-mot;987;1065;1065;1065
+Acs5;Accessory trigeminal nucleus;997/8/343/1065/771/987/549009219;root > grey > BS > HB > P > P-mot > Acs5;549009219;1065;1065;1065
+B;Barrington's nucleus;997/8/343/1065/771/987/280;root > grey > BS > HB > P > P-mot > B;280;1065;1065;1065
+DTN;Dorsal tegmental nucleus;997/8/343/1065/771/987/880;root > grey > BS > HB > P > P-mot > DTN;880;1065;1065;1065
+I5;Intertrigeminal nucleus;997/8/343/1065/771/987/549009227;root > grey > BS > HB > P > P-mot > I5;549009227;1065;1065;1065
+LTN;Lateral tegmental nucleus;997/8/343/1065/771/987/283;root > grey > BS > HB > P > P-mot > LTN;283;1065;1065;1065
+P5;Peritrigeminal zone;997/8/343/1065/771/987/549009215;root > grey > BS > HB > P > P-mot > P5;549009215;1065;1065;1065
+PC5;Parvicellular motor 5 nucleus;997/8/343/1065/771/987/549009223;root > grey > BS > HB > P > P-mot > PC5;549009223;1065;1065;1065
+PCG;Pontine central gray;997/8/343/1065/771/987/898;root > grey > BS > HB > P > P-mot > PCG;898;1065;1065;1065
+PDTg;Posterodorsal tegmental nucleus;997/8/343/1065/771/987/599626927;root > grey > BS > HB > P > P-mot > PDTg;599626927;1065;1065;1065
+PG;Pontine gray;997/8/343/1065/771/987/931;root > grey > BS > HB > P > P-mot > PG;931;1065;1065;1065
+PRNc;Pontine reticular nucleus, caudal part;997/8/343/1065/771/987/1093;root > grey > BS > HB > P > P-mot > PRNc;1093;1065;1065;1065
+PRNv;Pontine reticular nucleus, ventral part;997/8/343/1065/771/987/552;root > grey > BS > HB > P > P-mot > PRNv;552;1065;1065;1065
+SG;Supragenual nucleus;997/8/343/1065/771/987/318;root > grey > BS > HB > P > P-mot > SG;318;1065;1065;1065
+SSN;Superior salivatory nucleus;997/8/343/1065/771/987/462;root > grey > BS > HB > P > P-mot > SSN;462;1065;1065;1065
+SUT;Supratrigeminal nucleus;997/8/343/1065/771/987/534;root > grey > BS > HB > P > P-mot > SUT;534;1065;1065;1065
+TRN;Tegmental reticular nucleus;997/8/343/1065/771/987/574;root > grey > BS > HB > P > P-mot > TRN;574;1065;1065;1065
+V;Motor nucleus of trigeminal;997/8/343/1065/771/987/621;root > grey > BS > HB > P > P-mot > V;621;1065;1065;621
+P-sat;Pons, behavioral state related;997/8/343/1065/771/1117;root > grey > BS > HB > P > P-sat;1117;1065;1065;1065
+CS;Superior central nucleus raphe;997/8/343/1065/771/1117/679;root > grey > BS > HB > P > P-sat > CS;679;1065;1065;1065
+CSl;Superior central nucleus raphe, lateral part;997/8/343/1065/771/1117/679/137;root > grey > BS > HB > P > P-sat > CS > CSl;137;1065;1065;1065
+CSm;Superior central nucleus raphe, medial part;997/8/343/1065/771/1117/679/130;root > grey > BS > HB > P > P-sat > CS > CSm;130;1065;1065;1065
+LC;Locus ceruleus;997/8/343/1065/771/1117/147;root > grey > BS > HB > P > P-sat > LC;147;1065;1065;1065
+LDT;Laterodorsal tegmental nucleus;997/8/343/1065/771/1117/162;root > grey > BS > HB > P > P-sat > LDT;162;1065;1065;1065
+NI;Nucleus incertus;997/8/343/1065/771/1117/604;root > grey > BS > HB > P > P-sat > NI;604;1065;1065;1065
+PRNr;Pontine reticular nucleus;997/8/343/1065/771/1117/146;root > grey > BS > HB > P > P-sat > PRNr;146;1065;1065;1065
+RPO;Nucleus raphe pontis;997/8/343/1065/771/1117/238;root > grey > BS > HB > P > P-sat > RPO;238;1065;1065;1065
+SLC;Subceruleus nucleus;997/8/343/1065/771/1117/350;root > grey > BS > HB > P > P-sat > SLC;350;1065;1065;1065
+SLD;Sublaterodorsal nucleus;997/8/343/1065/771/1117/358;root > grey > BS > HB > P > P-sat > SLD;358;1065;1065;1065
+P-sen;Pons, sensory related;997/8/343/1065/771/1132;root > grey > BS > HB > P > P-sen;1132;1065;1065;1065
+NLL;Nucleus of the lateral lemniscus;997/8/343/1065/771/1132/612;root > grey > BS > HB > P > P-sen > NLL;612;1065;1065;612
+NLLd;Nucleus of the lateral lemniscus, dorsal part;997/8/343/1065/771/1132/612/82;root > grey > BS > HB > P > P-sen > NLL > NLLd;82;1065;1065;612
+NLLh;Nucleus of the lateral lemniscus, horizontal part;997/8/343/1065/771/1132/612/90;root > grey > BS > HB > P > P-sen > NLL > NLLh;90;1065;1065;612
+NLLv;Nucleus of the lateral lemniscus, ventral part;997/8/343/1065/771/1132/612/99;root > grey > BS > HB > P > P-sen > NLL > NLLv;99;1065;1065;612
+PB;Parabrachial nucleus;997/8/343/1065/771/1132/867;root > grey > BS > HB > P > P-sen > PB;867;1065;1065;1065
+KF;Koelliker-Fuse subnucleus;997/8/343/1065/771/1132/867/123;root > grey > BS > HB > P > P-sen > PB > KF;123;1065;1065;1065
+PBl;Parabrachial nucleus, lateral division;997/8/343/1065/771/1132/867/881;root > grey > BS > HB > P > P-sen > PB > PBl;881;1065;1065;1065
+PBlc;Parabrachial nucleus, lateral division, central lateral part;997/8/343/1065/771/1132/867/881/860;root > grey > BS > HB > P > P-sen > PB > PBl > PBlc;860;1065;1065;1065
+PBld;Parabrachial nucleus, lateral division, dorsal lateral part;997/8/343/1065/771/1132/867/881/868;root > grey > BS > HB > P > P-sen > PB > PBl > PBld;868;1065;1065;1065
+PBle;Parabrachial nucleus, lateral division, external lateral part;997/8/343/1065/771/1132/867/881/875;root > grey > BS > HB > P > P-sen > PB > PBl > PBle;875;1065;1065;1065
+PBls;Parabrachial nucleus, lateral division, superior lateral part;997/8/343/1065/771/1132/867/881/883;root > grey > BS > HB > P > P-sen > PB > PBl > PBls;883;1065;1065;1065
+PBlv;Parabrachial nucleus, lateral division, ventral lateral part;997/8/343/1065/771/1132/867/881/891;root > grey > BS > HB > P > P-sen > PB > PBl > PBlv;891;1065;1065;1065
+PBm;Parabrachial nucleus, medial division;997/8/343/1065/771/1132/867/890;root > grey > BS > HB > P > P-sen > PB > PBm;890;1065;1065;1065
+PBme;Parabrachial nucleus, medial division, external medial part;997/8/343/1065/771/1132/867/890/899;root > grey > BS > HB > P > P-sen > PB > PBm > PBme;899;1065;1065;1065
+PBmm;Parabrachial nucleus, medial division, medial medial part;997/8/343/1065/771/1132/867/890/915;root > grey > BS > HB > P > P-sen > PB > PBm > PBmm;915;1065;1065;1065
+PBmv;Parabrachial nucleus, medial division, ventral medial part;997/8/343/1065/771/1132/867/890/923;root > grey > BS > HB > P > P-sen > PB > PBm > PBmv;923;1065;1065;1065
+PSV;Principal sensory nucleus of the trigeminal;997/8/343/1065/771/1132/7;root > grey > BS > HB > P > P-sen > PSV;7;1065;1065;7
+SOC;Superior olivary complex;997/8/343/1065/771/1132/398;root > grey > BS > HB > P > P-sen > SOC;398;1065;1065;398
+POR;Superior olivary complex, periolivary region;997/8/343/1065/771/1132/398/122;root > grey > BS > HB > P > P-sen > SOC > POR;122;1065;1065;398
+SOCl;Superior olivary complex, lateral part;997/8/343/1065/771/1132/398/114;root > grey > BS > HB > P > P-sen > SOC > SOCl;114;1065;1065;398
+SOCm;Superior olivary complex, medial part;997/8/343/1065/771/1132/398/105;root > grey > BS > HB > P > P-sen > SOC > SOCm;105;1065;1065;398
+IB;Interbrain;997/8/343/1129;root > grey > BS > IB;1129;343;997;997
+HY;Hypothalamus;997/8/343/1129/1097;root > grey > BS > IB > HY;1097;343;1097;1097
+LZ;Hypothalamic lateral zone;997/8/343/1129/1097/290;root > grey > BS > IB > HY > LZ;290;343;1097;1097
+LHA;Lateral hypothalamic area;997/8/343/1129/1097/290/194;root > grey > BS > IB > HY > LZ > LHA;194;343;1097;1097
+LPO;Lateral preoptic area;997/8/343/1129/1097/290/226;root > grey > BS > IB > HY > LZ > LPO;226;343;1097;1097
+PeF;Perifornical nucleus;997/8/343/1129/1097/290/576073704;root > grey > BS > IB > HY > LZ > PeF;576073704;343;1097;1097
+PST;Preparasubthalamic nucleus;997/8/343/1129/1097/290/356;root > grey > BS > IB > HY > LZ > PST;356;343;1097;1097
+PSTN;Parasubthalamic nucleus;997/8/343/1129/1097/290/364;root > grey > BS > IB > HY > LZ > PSTN;364;343;1097;1097
+RCH;Retrochiasmatic area;997/8/343/1129/1097/290/173;root > grey > BS > IB > HY > LZ > RCH;173;343;1097;1097
+STN;Subthalamic nucleus;997/8/343/1129/1097/290/470;root > grey > BS > IB > HY > LZ > STN;470;343;1097;1097
+TU;Tuberal nucleus;997/8/343/1129/1097/290/614;root > grey > BS > IB > HY > LZ > TU;614;343;1097;1097
+ZI;Zona incerta;997/8/343/1129/1097/290/797;root > grey > BS > IB > HY > LZ > ZI;797;343;1097;1097
+A13;Dopaminergic A13 group;997/8/343/1129/1097/290/797/796;root > grey > BS > IB > HY > LZ > ZI > A13;796;343;1097;1097
+FF;Fields of Forel;997/8/343/1129/1097/290/797/804;root > grey > BS > IB > HY > LZ > ZI > FF;804;343;1097;1097
+ME;Median eminence;997/8/343/1129/1097/10671;root > grey > BS > IB > HY > ME;10671;343;1097;1097
+MEZ;Hypothalamic medial zone;997/8/343/1129/1097/467;root > grey > BS > IB > HY > MEZ;467;343;1097;1097
+AHN;Anterior hypothalamic nucleus;997/8/343/1129/1097/467/88;root > grey > BS > IB > HY > MEZ > AHN;88;343;1097;1097
+AHNa;Anterior hypothalamic nucleus, anterior part;997/8/343/1129/1097/467/88/700;root > grey > BS > IB > HY > MEZ > AHN > AHNa;700;343;1097;1097
+AHNc;Anterior hypothalamic nucleus, central part;997/8/343/1129/1097/467/88/708;root > grey > BS > IB > HY > MEZ > AHN > AHNc;708;343;1097;1097
+AHNd;Anterior hypothalamic nucleus, dorsal part;997/8/343/1129/1097/467/88/716;root > grey > BS > IB > HY > MEZ > AHN > AHNd;716;343;1097;1097
+AHNp;Anterior hypothalamic nucleus, posterior part;997/8/343/1129/1097/467/88/724;root > grey > BS > IB > HY > MEZ > AHN > AHNp;724;343;1097;1097
+MBO;Mammillary body;997/8/343/1129/1097/467/331;root > grey > BS > IB > HY > MEZ > MBO;331;343;1097;1097
+LM;Lateral mammillary nucleus;997/8/343/1129/1097/467/331/210;root > grey > BS > IB > HY > MEZ > MBO > LM;210;343;1097;1097
+MM;Medial mammillary nucleus;997/8/343/1129/1097/467/331/491;root > grey > BS > IB > HY > MEZ > MBO > MM;491;343;1097;1097
+MMd;Medial mammillary nucleus, dorsal part;997/8/343/1129/1097/467/331/491/606826659;root > grey > BS > IB > HY > MEZ > MBO > MM > MMd;606826659;343;1097;1097
+MMl;Medial mammillary nucleus, lateral part;997/8/343/1129/1097/467/331/491/606826647;root > grey > BS > IB > HY > MEZ > MBO > MM > MMl;606826647;343;1097;1097
+MMm;Medial mammillary nucleus, medial part;997/8/343/1129/1097/467/331/491/606826651;root > grey > BS > IB > HY > MEZ > MBO > MM > MMm;606826651;343;1097;1097
+MMme;Medial mammillary nucleus, median part;997/8/343/1129/1097/467/331/491/732;root > grey > BS > IB > HY > MEZ > MBO > MM > MMme;732;343;1097;1097
+MMp;Medial mammillary nucleus, posterior part;997/8/343/1129/1097/467/331/491/606826655;root > grey > BS > IB > HY > MEZ > MBO > MM > MMp;606826655;343;1097;1097
+SUM;Supramammillary nucleus;997/8/343/1129/1097/467/331/525;root > grey > BS > IB > HY > MEZ > MBO > SUM;525;343;1097;1097
+SUMl;Supramammillary nucleus, lateral part;997/8/343/1129/1097/467/331/525/1110;root > grey > BS > IB > HY > MEZ > MBO > SUM > SUMl;1110;343;1097;1097
+SUMm;Supramammillary nucleus, medial part;997/8/343/1129/1097/467/331/525/1118;root > grey > BS > IB > HY > MEZ > MBO > SUM > SUMm;1118;343;1097;1097
+TM;Tuberomammillary nucleus;997/8/343/1129/1097/467/331/557;root > grey > BS > IB > HY > MEZ > MBO > TM;557;343;1097;1097
+TMd;Tuberomammillary nucleus, dorsal part;997/8/343/1129/1097/467/331/557/1126;root > grey > BS > IB > HY > MEZ > MBO > TM > TMd;1126;343;1097;1097
+TMv;Tuberomammillary nucleus, ventral part;997/8/343/1129/1097/467/331/557/1;root > grey > BS > IB > HY > MEZ > MBO > TM > TMv;1;343;1097;1097
+MPN;Medial preoptic nucleus;997/8/343/1129/1097/467/515;root > grey > BS > IB > HY > MEZ > MPN;515;343;1097;1097
+MPNc;Medial preoptic nucleus, central part;997/8/343/1129/1097/467/515/740;root > grey > BS > IB > HY > MEZ > MPN > MPNc;740;343;1097;1097
+MPNl;Medial preoptic nucleus, lateral part;997/8/343/1129/1097/467/515/748;root > grey > BS > IB > HY > MEZ > MPN > MPNl;748;343;1097;1097
+MPNm;Medial preoptic nucleus, medial part;997/8/343/1129/1097/467/515/756;root > grey > BS > IB > HY > MEZ > MPN > MPNm;756;343;1097;1097
+PH;Posterior hypothalamic nucleus;997/8/343/1129/1097/467/946;root > grey > BS > IB > HY > MEZ > PH;946;343;1097;1097
+PMd;Dorsal premammillary nucleus;997/8/343/1129/1097/467/980;root > grey > BS > IB > HY > MEZ > PMd;980;343;1097;1097
+PMv;Ventral premammillary nucleus;997/8/343/1129/1097/467/1004;root > grey > BS > IB > HY > MEZ > PMv;1004;343;1097;1097
+PVHd;Paraventricular hypothalamic nucleus, descending division;997/8/343/1129/1097/467/63;root > grey > BS > IB > HY > MEZ > PVHd;63;343;1097;1097
+PVHdp;Paraventricular hypothalamic nucleus, descending division, dorsal parvicellular part;997/8/343/1129/1097/467/63/439;root > grey > BS > IB > HY > MEZ > PVHd > PVHdp;439;343;1097;1097
+PVHf;Paraventricular hypothalamic nucleus, descending division, forniceal part;997/8/343/1129/1097/467/63/447;root > grey > BS > IB > HY > MEZ > PVHd > PVHf;447;343;1097;1097
+PVHlp;Paraventricular hypothalamic nucleus, descending division, lateral parvicellular part;997/8/343/1129/1097/467/63/455;root > grey > BS > IB > HY > MEZ > PVHd > PVHlp;455;343;1097;1097
+PVHmpv;Paraventricular hypothalamic nucleus, descending division, medial parvicellular part, ventral zone;997/8/343/1129/1097/467/63/464;root > grey > BS > IB > HY > MEZ > PVHd > PVHmpv;464;343;1097;1097
+VMH;Ventromedial hypothalamic nucleus;997/8/343/1129/1097/467/693;root > grey > BS > IB > HY > MEZ > VMH;693;343;1097;1097
+VMHa;Ventromedial hypothalamic nucleus, anterior part;997/8/343/1129/1097/467/693/761;root > grey > BS > IB > HY > MEZ > VMH > VMHa;761;343;1097;1097
+VMHc;Ventromedial hypothalamic nucleus, central part;997/8/343/1129/1097/467/693/769;root > grey > BS > IB > HY > MEZ > VMH > VMHc;769;343;1097;1097
+VMHdm;Ventromedial hypothalamic nucleus, dorsomedial part;997/8/343/1129/1097/467/693/777;root > grey > BS > IB > HY > MEZ > VMH > VMHdm;777;343;1097;1097
+VMHvl;Ventromedial hypothalamic nucleus, ventrolateral part;997/8/343/1129/1097/467/693/785;root > grey > BS > IB > HY > MEZ > VMH > VMHvl;785;343;1097;1097
+PVR;Periventricular region;997/8/343/1129/1097/141;root > grey > BS > IB > HY > PVR;141;343;1097;1097
+ADP;Anterodorsal preoptic nucleus;997/8/343/1129/1097/141/72;root > grey > BS > IB > HY > PVR > ADP;72;343;1097;1097
+AHA;Anterior hypothalamic area;997/8/343/1129/1097/141/80;root > grey > BS > IB > HY > PVR > AHA;80;343;1097;1097
+AVP;Anteroventral preoptic nucleus;997/8/343/1129/1097/141/263;root > grey > BS > IB > HY > PVR > AVP;263;343;1097;1097
+AVPV;Anteroventral periventricular nucleus;997/8/343/1129/1097/141/272;root > grey > BS > IB > HY > PVR > AVPV;272;343;1097;1097
+DMH;Dorsomedial nucleus of the hypothalamus;997/8/343/1129/1097/141/830;root > grey > BS > IB > HY > PVR > DMH;830;343;1097;1097
+DMHa;Dorsomedial nucleus of the hypothalamus, anterior part;997/8/343/1129/1097/141/830/668;root > grey > BS > IB > HY > PVR > DMH > DMHa;668;343;1097;1097
+DMHp;Dorsomedial nucleus of the hypothalamus, posterior part;997/8/343/1129/1097/141/830/676;root > grey > BS > IB > HY > PVR > DMH > DMHp;676;343;1097;1097
+DMHv;Dorsomedial nucleus of the hypothalamus, ventral part;997/8/343/1129/1097/141/830/684;root > grey > BS > IB > HY > PVR > DMH > DMHv;684;343;1097;1097
+MEPO;Median preoptic nucleus;997/8/343/1129/1097/141/452;root > grey > BS > IB > HY > PVR > MEPO;452;343;1097;1097
+MPO;Medial preoptic area;997/8/343/1129/1097/141/523;root > grey > BS > IB > HY > PVR > MPO;523;343;1097;1097
+OV;Vascular organ of the lamina terminalis;997/8/343/1129/1097/141/763;root > grey > BS > IB > HY > PVR > OV;763;343;1097;1097
+PD;Posterodorsal preoptic nucleus;997/8/343/1129/1097/141/914;root > grey > BS > IB > HY > PVR > PD;914;343;1097;1097
+PS;Parastrial nucleus;997/8/343/1129/1097/141/1109;root > grey > BS > IB > HY > PVR > PS;1109;343;1097;1097
+PSCH;Suprachiasmatic preoptic nucleus;997/8/343/1129/1097/141/1124;root > grey > BS > IB > HY > PVR > PSCH;1124;343;1097;1097
+PVp;Periventricular hypothalamic nucleus, posterior part;997/8/343/1129/1097/141/126;root > grey > BS > IB > HY > PVR > PVp;126;343;1097;1097
+PVpo;Periventricular hypothalamic nucleus, preoptic part;997/8/343/1129/1097/141/133;root > grey > BS > IB > HY > PVR > PVpo;133;343;1097;1097
+SBPV;Subparaventricular zone;997/8/343/1129/1097/141/347;root > grey > BS > IB > HY > PVR > SBPV;347;343;1097;1097
+SCH;Suprachiasmatic nucleus;997/8/343/1129/1097/141/286;root > grey > BS > IB > HY > PVR > SCH;286;343;1097;1097
+SFO;Subfornical organ;997/8/343/1129/1097/141/338;root > grey > BS > IB > HY > PVR > SFO;338;343;1097;1097
+VLPO;Ventrolateral preoptic nucleus;997/8/343/1129/1097/141/689;root > grey > BS > IB > HY > PVR > VLPO;689;343;1097;1097
+VMPO;Ventromedial preoptic nucleus;997/8/343/1129/1097/141/576073699;root > grey > BS > IB > HY > PVR > VMPO;576073699;343;1097;1097
+PVZ;Periventricular zone;997/8/343/1129/1097/157;root > grey > BS > IB > HY > PVZ;157;343;1097;1097
+ARH;Arcuate hypothalamic nucleus;997/8/343/1129/1097/157/223;root > grey > BS > IB > HY > PVZ > ARH;223;343;1097;1097
+ASO;Accessory supraoptic group;997/8/343/1129/1097/157/332;root > grey > BS > IB > HY > PVZ > ASO;332;343;1097;1097
+NC;Nucleus circularis;997/8/343/1129/1097/157/332/432;root > grey > BS > IB > HY > PVZ > ASO > NC;432;343;1097;1097
+PVa;Periventricular hypothalamic nucleus, anterior part;997/8/343/1129/1097/157/30;root > grey > BS > IB > HY > PVZ > PVa;30;343;1097;1097
+PVH;Paraventricular hypothalamic nucleus;997/8/343/1129/1097/157/38;root > grey > BS > IB > HY > PVZ > PVH;38;343;1097;1097
+PVHm;Paraventricular hypothalamic nucleus, magnocellular division;997/8/343/1129/1097/157/38/71;root > grey > BS > IB > HY > PVZ > PVH > PVHm;71;343;1097;1097
+PVHam;Paraventricular hypothalamic nucleus, magnocellular division, anterior magnocellular part;997/8/343/1129/1097/157/38/71/47;root > grey > BS > IB > HY > PVZ > PVH > PVHm > PVHam;47;343;1097;1097
+PVHmm;Paraventricular hypothalamic nucleus, magnocellular division, medial magnocellular part;997/8/343/1129/1097/157/38/71/79;root > grey > BS > IB > HY > PVZ > PVH > PVHm > PVHmm;79;343;1097;1097
+PVHpm;Paraventricular hypothalamic nucleus, magnocellular division, posterior magnocellular part;997/8/343/1129/1097/157/38/71/103;root > grey > BS > IB > HY > PVZ > PVH > PVHm > PVHpm;103;343;1097;1097
+PVHpml;Paraventricular hypothalamic nucleus, magnocellular division, posterior magnocellular part, lateral zone;997/8/343/1129/1097/157/38/71/103/652;root > grey > BS > IB > HY > PVZ > PVH > PVHm > PVHpm > PVHpml;652;343;1097;1097
+PVHpmm;Paraventricular hypothalamic nucleus, magnocellular division, posterior magnocellular part, medial zone;997/8/343/1129/1097/157/38/71/103/660;root > grey > BS > IB > HY > PVZ > PVH > PVHm > PVHpm > PVHpmm;660;343;1097;1097
+PVHp;Paraventricular hypothalamic nucleus, parvicellular division;997/8/343/1129/1097/157/38/94;root > grey > BS > IB > HY > PVZ > PVH > PVHp;94;343;1097;1097
+PVHap;Paraventricular hypothalamic nucleus, parvicellular division, anterior parvicellular part;997/8/343/1129/1097/157/38/94/55;root > grey > BS > IB > HY > PVZ > PVH > PVHp > PVHap;55;343;1097;1097
+PVHmpd;Paraventricular hypothalamic nucleus, parvicellular division, medial parvicellular part, dorsal zone;997/8/343/1129/1097/157/38/94/87;root > grey > BS > IB > HY > PVZ > PVH > PVHp > PVHmpd;87;343;1097;1097
+PVHpv;Paraventricular hypothalamic nucleus, parvicellular division, periventricular part;997/8/343/1129/1097/157/38/94/110;root > grey > BS > IB > HY > PVZ > PVH > PVHp > PVHpv;110;343;1097;1097
+PVi;Periventricular hypothalamic nucleus, intermediate part;997/8/343/1129/1097/157/118;root > grey > BS > IB > HY > PVZ > PVi;118;343;1097;1097
+SO;Supraoptic nucleus;997/8/343/1129/1097/157/390;root > grey > BS > IB > HY > PVZ > SO;390;343;1097;1097
+TH;Thalamus;997/8/343/1129/549;root > grey > BS > IB > TH;549;343;549;549
+DORpm;Thalamus, polymodal association cortex related;997/8/343/1129/549/856;root > grey > BS > IB > TH > DORpm;856;343;549;549
+ATN;Anterior group of the dorsal thalamus;997/8/343/1129/549/856/239;root > grey > BS > IB > TH > DORpm > ATN;239;343;549;549
+AD;Anterodorsal nucleus;997/8/343/1129/549/856/239/64;root > grey > BS > IB > TH > DORpm > ATN > AD;64;343;549;64
+AM;Anteromedial nucleus;997/8/343/1129/549/856/239/127;root > grey > BS > IB > TH > DORpm > ATN > AM;127;343;549;127
+AMd;Anteromedial nucleus, dorsal part;997/8/343/1129/549/856/239/127/1096;root > grey > BS > IB > TH > DORpm > ATN > AM > AMd;1096;343;549;127
+AMv;Anteromedial nucleus, ventral part;997/8/343/1129/549/856/239/127/1104;root > grey > BS > IB > TH > DORpm > ATN > AM > AMv;1104;343;549;127
+AV;Anteroventral nucleus of thalamus;997/8/343/1129/549/856/239/255;root > grey > BS > IB > TH > DORpm > ATN > AV;255;343;549;255
+IAD;Interanterodorsal nucleus of the thalamus;997/8/343/1129/549/856/239/1113;root > grey > BS > IB > TH > DORpm > ATN > IAD;1113;343;549;549
+IAM;Interanteromedial nucleus of the thalamus;997/8/343/1129/549/856/239/1120;root > grey > BS > IB > TH > DORpm > ATN > IAM;1120;343;549;549
+LD;Lateral dorsal nucleus of thalamus;997/8/343/1129/549/856/239/155;root > grey > BS > IB > TH > DORpm > ATN > LD;155;343;549;155
+EPI;Epithalamus;997/8/343/1129/549/856/958;root > grey > BS > IB > TH > DORpm > EPI;958;343;549;549
+LH;Lateral habenula;997/8/343/1129/549/856/958/186;root > grey > BS > IB > TH > DORpm > EPI > LH;186;343;549;186
+MH;Medial habenula;997/8/343/1129/549/856/958/483;root > grey > BS > IB > TH > DORpm > EPI > MH;483;343;549;483
+PIN;Pineal body;997/8/343/1129/549/856/958/953;root > grey > BS > IB > TH > DORpm > EPI > PIN;953;343;549;549
+GENv;Geniculate group, ventral thalamus;997/8/343/1129/549/856/1014;root > grey > BS > IB > TH > DORpm > GENv;1014;343;549;549
+IGL;Intergeniculate leaflet of the lateral geniculate complex;997/8/343/1129/549/856/1014/27;root > grey > BS > IB > TH > DORpm > GENv > IGL;27;343;549;549
+IntG;Intermediate geniculate nucleus;997/8/343/1129/549/856/1014/563807439;root > grey > BS > IB > TH > DORpm > GENv > IntG;563807439;343;549;549
+LGv;Ventral part of the lateral geniculate complex;997/8/343/1129/549/856/1014/178;root > grey > BS > IB > TH > DORpm > GENv > LGv;178;343;549;178
+LGvl;Ventral part of the lateral geniculate complex, lateral zone;997/8/343/1129/549/856/1014/178/300;root > grey > BS > IB > TH > DORpm > GENv > LGv > LGvl;300;343;549;178
+LGvm;Ventral part of the lateral geniculate complex, medial zone;997/8/343/1129/549/856/1014/178/316;root > grey > BS > IB > TH > DORpm > GENv > LGv > LGvm;316;343;549;178
+SubG;Subgeniculate nucleus;997/8/343/1129/549/856/1014/321;root > grey > BS > IB > TH > DORpm > GENv > SubG;321;343;549;549
+ILM;Intralaminar nuclei of the dorsal thalamus;997/8/343/1129/549/856/51;root > grey > BS > IB > TH > DORpm > ILM;51;343;549;549
+CL;Central lateral nucleus of the thalamus;997/8/343/1129/549/856/51/575;root > grey > BS > IB > TH > DORpm > ILM > CL;575;343;549;549
+CM;Central medial nucleus of the thalamus;997/8/343/1129/549/856/51/599;root > grey > BS > IB > TH > DORpm > ILM > CM;599;343;549;549
+PCN;Paracentral nucleus;997/8/343/1129/549/856/51/907;root > grey > BS > IB > TH > DORpm > ILM > PCN;907;343;549;549
+PF;Parafascicular nucleus;997/8/343/1129/549/856/51/930;root > grey > BS > IB > TH > DORpm > ILM > PF;930;343;549;930
+PIL;Posterior intralaminar thalamic nucleus;997/8/343/1129/549/856/51/560581563;root > grey > BS > IB > TH > DORpm > ILM > PIL;560581563;343;549;549
+RH;Rhomboid nucleus;997/8/343/1129/549/856/51/189;root > grey > BS > IB > TH > DORpm > ILM > RH;189;343;549;549
+LAT;Lateral group of the dorsal thalamus;997/8/343/1129/549/856/138;root > grey > BS > IB > TH > DORpm > LAT;138;343;549;549
+Eth;Ethmoid nucleus of the thalamus;997/8/343/1129/549/856/138/560581551;root > grey > BS > IB > TH > DORpm > LAT > Eth;560581551;343;549;549
+LP;Lateral posterior nucleus of the thalamus;997/8/343/1129/549/856/138/218;root > grey > BS > IB > TH > DORpm > LAT > LP;218;343;549;549
+PO;Posterior complex of the thalamus;997/8/343/1129/549/856/138/1020;root > grey > BS > IB > TH > DORpm > LAT > PO;1020;343;549;549
+POL;Posterior limiting nucleus of the thalamus;997/8/343/1129/549/856/138/1029;root > grey > BS > IB > TH > DORpm > LAT > POL;1029;343;549;549
+REth;Retroethmoid nucleus;997/8/343/1129/549/856/138/560581555;root > grey > BS > IB > TH > DORpm > LAT > REth;560581555;343;549;549
+SGN;Suprageniculate nucleus;997/8/343/1129/549/856/138/325;root > grey > BS > IB > TH > DORpm > LAT > SGN;325;343;549;549
+MED;Medial group of the dorsal thalamus;997/8/343/1129/549/856/444;root > grey > BS > IB > TH > DORpm > MED;444;343;549;549
+IMD;Intermediodorsal nucleus of the thalamus;997/8/343/1129/549/856/444/59;root > grey > BS > IB > TH > DORpm > MED > IMD;59;343;549;549
+MD;Mediodorsal nucleus of thalamus;997/8/343/1129/549/856/444/362;root > grey > BS > IB > TH > DORpm > MED > MD;362;343;549;549
+MDc;Mediodorsal nucleus of the thalamus, central part;997/8/343/1129/549/856/444/362/617;root > grey > BS > IB > TH > DORpm > MED > MD > MDc;617;343;549;549
+MDl;Mediodorsal nucleus of the thalamus, lateral part;997/8/343/1129/549/856/444/362/626;root > grey > BS > IB > TH > DORpm > MED > MD > MDl;626;343;549;549
+MDm;Mediodorsal nucleus of the thalamus, medial part;997/8/343/1129/549/856/444/362/636;root > grey > BS > IB > TH > DORpm > MED > MD > MDm;636;343;549;549
+PR;Perireunensis nucleus;997/8/343/1129/549/856/444/1077;root > grey > BS > IB > TH > DORpm > MED > PR;1077;343;549;549
+SMT;Submedial nucleus of the thalamus;997/8/343/1129/549/856/444/366;root > grey > BS > IB > TH > DORpm > MED > SMT;366;343;549;549
+MTN;Midline group of the dorsal thalamus;997/8/343/1129/549/856/571;root > grey > BS > IB > TH > DORpm > MTN;571;343;549;549
+PT;Parataenial nucleus;997/8/343/1129/549/856/571/15;root > grey > BS > IB > TH > DORpm > MTN > PT;15;343;549;549
+PVT;Paraventricular nucleus of the thalamus;997/8/343/1129/549/856/571/149;root > grey > BS > IB > TH > DORpm > MTN > PVT;149;343;549;549
+RE;Nucleus of reuniens;997/8/343/1129/549/856/571/181;root > grey > BS > IB > TH > DORpm > MTN > RE;181;343;549;549
+Xi;Xiphoid thalamic nucleus;997/8/343/1129/549/856/571/560581559;root > grey > BS > IB > TH > DORpm > MTN > Xi;560581559;343;549;549
+RT;Reticular nucleus of the thalamus;997/8/343/1129/549/856/262;root > grey > BS > IB > TH > DORpm > RT;262;343;549;262
+DORsm;Thalamus, sensory-motor cortex related;997/8/343/1129/549/864;root > grey > BS > IB > TH > DORsm;864;343;549;549
+GENd;Geniculate group, dorsal thalamus;997/8/343/1129/549/864/1008;root > grey > BS > IB > TH > DORsm > GENd;1008;343;549;549
+LGd;Dorsal part of the lateral geniculate complex;997/8/343/1129/549/864/1008/170;root > grey > BS > IB > TH > DORsm > GENd > LGd;170;343;549;170
+LGd-co;Dorsal part of the lateral geniculate complex, core;997/8/343/1129/549/864/1008/170/496345668;root > grey > BS > IB > TH > DORsm > GENd > LGd > LGd-co;496345668;343;549;170
+LGd-ip;Dorsal part of the lateral geniculate complex, ipsilateral zone;997/8/343/1129/549/864/1008/170/496345672;root > grey > BS > IB > TH > DORsm > GENd > LGd > LGd-ip;496345672;343;549;170
+LGd-sh;Dorsal part of the lateral geniculate complex, shell;997/8/343/1129/549/864/1008/170/496345664;root > grey > BS > IB > TH > DORsm > GENd > LGd > LGd-sh;496345664;343;549;170
+MG;Medial geniculate complex;997/8/343/1129/549/864/1008/475;root > grey > BS > IB > TH > DORsm > GENd > MG;475;343;549;475
+MGd;Medial geniculate complex, dorsal part;997/8/343/1129/549/864/1008/475/1072;root > grey > BS > IB > TH > DORsm > GENd > MG > MGd;1072;343;549;475
+MGm;Medial geniculate complex, medial part;997/8/343/1129/549/864/1008/475/1088;root > grey > BS > IB > TH > DORsm > GENd > MG > MGm;1088;343;549;475
+MGv;Medial geniculate complex, ventral part;997/8/343/1129/549/864/1008/475/1079;root > grey > BS > IB > TH > DORsm > GENd > MG > MGv;1079;343;549;475
+PP;Peripeduncular nucleus;997/8/343/1129/549/864/1044;root > grey > BS > IB > TH > DORsm > PP;1044;343;549;549
+SPA;Subparafascicular area;997/8/343/1129/549/864/609;root > grey > BS > IB > TH > DORsm > SPA;609;343;549;549
+SPF;Subparafascicular nucleus;997/8/343/1129/549/864/406;root > grey > BS > IB > TH > DORsm > SPF;406;343;549;549
+SPFm;Subparafascicular nucleus, magnocellular part;997/8/343/1129/549/864/406/414;root > grey > BS > IB > TH > DORsm > SPF > SPFm;414;343;549;549
+SPFp;Subparafascicular nucleus, parvicellular part;997/8/343/1129/549/864/406/422;root > grey > BS > IB > TH > DORsm > SPF > SPFp;422;343;549;549
+VENT;Ventral group of the dorsal thalamus;997/8/343/1129/549/864/637;root > grey > BS > IB > TH > DORsm > VENT;637;343;549;549
+PoT;Posterior triangular thalamic nucleus;997/8/343/1129/549/864/637/563807435;root > grey > BS > IB > TH > DORsm > VENT > PoT;563807435;343;549;549
+VAL;Ventral anterior-lateral complex of the thalamus;997/8/343/1129/549/864/637/629;root > grey > BS > IB > TH > DORsm > VENT > VAL;629;343;549;549
+VM;Ventral medial nucleus of the thalamus;997/8/343/1129/549/864/637/685;root > grey > BS > IB > TH > DORsm > VENT > VM;685;343;549;549
+VP;Ventral posterior complex of the thalamus;997/8/343/1129/549/864/637/709;root > grey > BS > IB > TH > DORsm > VENT > VP;709;343;549;549
+VPL;Ventral posterolateral nucleus of the thalamus;997/8/343/1129/549/864/637/709/718;root > grey > BS > IB > TH > DORsm > VENT > VP > VPL;718;343;549;718
+VPLpc;Ventral posterolateral nucleus of the thalamus, parvicellular part;997/8/343/1129/549/864/637/709/725;root > grey > BS > IB > TH > DORsm > VENT > VP > VPLpc;725;343;549;549
+VPM;Ventral posteromedial nucleus of the thalamus;997/8/343/1129/549/864/637/709/733;root > grey > BS > IB > TH > DORsm > VENT > VP > VPM;733;343;549;733
+VPMpc;Ventral posteromedial nucleus of the thalamus, parvicellular part;997/8/343/1129/549/864/637/709/741;root > grey > BS > IB > TH > DORsm > VENT > VP > VPMpc;741;343;549;549
+MB;Midbrain;997/8/343/313;root > grey > BS > MB;313;343;313;313
+MBmot;Midbrain, motor related;997/8/343/313/323;root > grey > BS > MB > MBmot;323;343;313;313
+AT;Anterior tegmental nucleus;997/8/343/313/323/231;root > grey > BS > MB > MBmot > AT;231;343;313;313
+CUN;Cuneiform nucleus;997/8/343/313/323/616;root > grey > BS > MB > MBmot > CUN;616;343;313;313
+DT;Dorsal terminal nucleus of the accessory optic tract;997/8/343/313/323/75;root > grey > BS > MB > MBmot > DT;75;343;313;313
+EW;Edinger-Westphal nucleus;997/8/343/313/323/975;root > grey > BS > MB > MBmot > EW;975;343;313;313
+III;Oculomotor nucleus;997/8/343/313/323/35;root > grey > BS > MB > MBmot > III;35;343;313;35
+InCo;Intercollicular nucleus;997/8/343/313/323/549009207;root > grey > BS > MB > MBmot > InCo;549009207;343;313;313
+IV;Trochlear nucleus;997/8/343/313/323/115;root > grey > BS > MB > MBmot > IV;115;343;313;115
+LT;Lateral terminal nucleus of the accessory optic tract;997/8/343/313/323/66;root > grey > BS > MB > MBmot > LT;66;343;313;313
+MA3;Medial accesory oculomotor nucleus;997/8/343/313/323/549009211;root > grey > BS > MB > MBmot > MA3;549009211;343;313;313
+MRN;Midbrain reticular nucleus;997/8/343/313/323/128;root > grey > BS > MB > MBmot > MRN;128;343;313;313
+MRNm;Midbrain reticular nucleus, magnocellular part;997/8/343/313/323/128/539;root > grey > BS > MB > MBmot > MRN > MRNm;539;343;313;313
+MRNmg;Midbrain reticular nucleus, magnocellular part, general;997/8/343/313/323/128/548;root > grey > BS > MB > MBmot > MRN > MRNmg;548;343;313;313
+MRNp;Midbrain reticular nucleus, parvicellular part;997/8/343/313/323/128/555;root > grey > BS > MB > MBmot > MRN > MRNp;555;343;313;313
+MT;Medial terminal nucleus of the accessory optic tract;997/8/343/313/323/58;root > grey > BS > MB > MBmot > MT;58;343;313;313
+Pa4;Paratrochlear nucleus;997/8/343/313/323/606826663;root > grey > BS > MB > MBmot > Pa4;606826663;343;313;313
+PAG;Periaqueductal gray;997/8/343/313/323/795;root > grey > BS > MB > MBmot > PAG;795;343;313;795
+INC;Interstitial nucleus of Cajal;997/8/343/313/323/795/67;root > grey > BS > MB > MBmot > PAG > INC;67;343;313;795
+ND;Nucleus of Darkschewitsch;997/8/343/313/323/795/587;root > grey > BS > MB > MBmot > PAG > ND;587;343;313;795
+PRC;Precommissural nucleus;997/8/343/313/323/795/50;root > grey > BS > MB > MBmot > PAG > PRC;50;343;313;795
+Su3;Supraoculomotor periaqueductal gray;997/8/343/313/323/795/614454277;root > grey > BS > MB > MBmot > PAG > Su3;614454277;343;313;795
+PN;Paranigral nucleus;997/8/343/313/323/607344830;root > grey > BS > MB > MBmot > PN;607344830;343;313;313
+PRT;Pretectal region;997/8/343/313/323/1100;root > grey > BS > MB > MBmot > PRT;1100;343;313;313
+APN;Anterior pretectal nucleus;997/8/343/313/323/1100/215;root > grey > BS > MB > MBmot > PRT > APN;215;343;313;215
+MPT;Medial pretectal area;997/8/343/313/323/1100/531;root > grey > BS > MB > MBmot > PRT > MPT;531;343;313;313
+NOT;Nucleus of the optic tract;997/8/343/313/323/1100/628;root > grey > BS > MB > MBmot > PRT > NOT;628;343;313;313
+NPC;Nucleus of the posterior commissure;997/8/343/313/323/1100/634;root > grey > BS > MB > MBmot > PRT > NPC;634;343;313;313
+OP;Olivary pretectal nucleus;997/8/343/313/323/1100/706;root > grey > BS > MB > MBmot > PRT > OP;706;343;313;313
+PPT;Posterior pretectal nucleus;997/8/343/313/323/1100/1061;root > grey > BS > MB > MBmot > PRT > PPT;1061;343;313;313
+RPF;Retroparafascicular nucleus;997/8/343/313/323/1100/549009203;root > grey > BS > MB > MBmot > PRT > RPF;549009203;343;313;313
+RN;Red nucleus;997/8/343/313/323/214;root > grey > BS > MB > MBmot > RN;214;343;313;214
+RR;Midbrain reticular nucleus, retrorubral area;997/8/343/313/323/246;root > grey > BS > MB > MBmot > RR;246;343;313;313
+SCm;Superior colliculus, motor related;997/8/343/313/323/294;root > grey > BS > MB > MBmot > SCm;294;343;313;294
+SCdg;Superior colliculus, motor related, deep gray layer;997/8/343/313/323/294/26;root > grey > BS > MB > MBmot > SCm > SCdg;26;343;313;294
+SCdw;Superior colliculus, motor related, deep white layer;997/8/343/313/323/294/42;root > grey > BS > MB > MBmot > SCm > SCdw;42;343;313;294
+SCig;Superior colliculus, motor related, intermediate gray layer;997/8/343/313/323/294/10;root > grey > BS > MB > MBmot > SCm > SCig;10;343;313;294
+SCig-a;Superior colliculus, motor related, intermediate gray layer, sublayer a;997/8/343/313/323/294/10/494;root > grey > BS > MB > MBmot > SCm > SCig > SCig-a;494;343;313;294
+SCig-b;Superior colliculus, motor related, intermediate gray layer, sublayer b;997/8/343/313/323/294/10/503;root > grey > BS > MB > MBmot > SCm > SCig > SCig-b;503;343;313;294
+SCig-c;Superior colliculus, motor related, intermediate gray layer, sublayer c;997/8/343/313/323/294/10/511;root > grey > BS > MB > MBmot > SCm > SCig > SCig-c;511;343;313;294
+SCiw;Superior colliculus, motor related, intermediate white layer;997/8/343/313/323/294/17;root > grey > BS > MB > MBmot > SCm > SCiw;17;343;313;294
+SNl;Substantia nigra, lateral part;997/8/343/313/323/615;root > grey > BS > MB > MBmot > SNl;615;343;313;313
+SNr;Substantia nigra, reticular part;997/8/343/313/323/381;root > grey > BS > MB > MBmot > SNr;381;343;313;381
+VTA;Ventral tegmental area;997/8/343/313/323/749;root > grey > BS > MB > MBmot > VTA;749;343;313;313
+VTN;Ventral tegmental nucleus;997/8/343/313/323/757;root > grey > BS > MB > MBmot > VTN;757;343;313;313
+MBsen;Midbrain, sensory related;997/8/343/313/339;root > grey > BS > MB > MBsen;339;343;313;313
+IC;Inferior colliculus;997/8/343/313/339/4;root > grey > BS > MB > MBsen > IC;4;343;313;4
+ICc;Inferior colliculus, central nucleus;997/8/343/313/339/4/811;root > grey > BS > MB > MBsen > IC > ICc;811;343;313;4
+ICd;Inferior colliculus, dorsal nucleus;997/8/343/313/339/4/820;root > grey > BS > MB > MBsen > IC > ICd;820;343;313;4
+ICe;Inferior colliculus, external nucleus;997/8/343/313/339/4/828;root > grey > BS > MB > MBsen > IC > ICe;828;343;313;4
+MEV;Midbrain trigeminal nucleus;997/8/343/313/339/460;root > grey > BS > MB > MBsen > MEV;460;343;313;313
+NB;Nucleus of the brachium of the inferior colliculus;997/8/343/313/339/580;root > grey > BS > MB > MBsen > NB;580;343;313;313
+PBG;Parabigeminal nucleus;997/8/343/313/339/874;root > grey > BS > MB > MBsen > PBG;874;343;313;313
+SAG;Nucleus sagulum;997/8/343/313/339/271;root > grey > BS > MB > MBsen > SAG;271;343;313;313
+SCO;Subcommissural organ;997/8/343/313/339/599626923;root > grey > BS > MB > MBsen > SCO;599626923;343;313;313
+SCs;Superior colliculus, sensory related;997/8/343/313/339/302;root > grey > BS > MB > MBsen > SCs;302;343;313;302
+SCop;Superior colliculus, optic layer;997/8/343/313/339/302/851;root > grey > BS > MB > MBsen > SCs > SCop;851;343;313;302
+SCsg;Superior colliculus, superficial gray layer;997/8/343/313/339/302/842;root > grey > BS > MB > MBsen > SCs > SCsg;842;343;313;302
+SCzo;Superior colliculus, zonal layer;997/8/343/313/339/302/834;root > grey > BS > MB > MBsen > SCs > SCzo;834;343;313;302
+MBsta;Midbrain, behavioral state related;997/8/343/313/348;root > grey > BS > MB > MBsta;348;343;313;313
+PPN;Pedunculopontine nucleus;997/8/343/313/348/1052;root > grey > BS > MB > MBsta > PPN;1052;343;313;313
+RAmb;Midbrain raphe nuclei;997/8/343/313/348/165;root > grey > BS > MB > MBsta > RAmb;165;343;313;313
+CLI;Central linear nucleus raphe;997/8/343/313/348/165/591;root > grey > BS > MB > MBsta > RAmb > CLI;591;343;313;313
+DR;Dorsal nucleus raphe;997/8/343/313/348/165/872;root > grey > BS > MB > MBsta > RAmb > DR;872;343;313;313
+IF;Interfascicular nucleus raphe;997/8/343/313/348/165/12;root > grey > BS > MB > MBsta > RAmb > IF;12;343;313;313
+IPN;Interpeduncular nucleus;997/8/343/313/348/165/100;root > grey > BS > MB > MBsta > RAmb > IPN;100;343;313;100
+IPA;Interpeduncular nucleus, apical;997/8/343/313/348/165/100/607344842;root > grey > BS > MB > MBsta > RAmb > IPN > IPA;607344842;343;313;100
+IPC;Interpeduncular nucleus, caudal;997/8/343/313/348/165/100/607344838;root > grey > BS > MB > MBsta > RAmb > IPN > IPC;607344838;343;313;100
+IPDL;Interpeduncular nucleus, dorsolateral;997/8/343/313/348/165/100/607344858;root > grey > BS > MB > MBsta > RAmb > IPN > IPDL;607344858;343;313;100
+IPDM;Interpeduncular nucleus, dorsomedial;997/8/343/313/348/165/100/607344854;root > grey > BS > MB > MBsta > RAmb > IPN > IPDM;607344854;343;313;100
+IPI;Interpeduncular nucleus, intermediate;997/8/343/313/348/165/100/607344850;root > grey > BS > MB > MBsta > RAmb > IPN > IPI;607344850;343;313;100
+IPL;Interpeduncular nucleus, lateral;997/8/343/313/348/165/100/607344846;root > grey > BS > MB > MBsta > RAmb > IPN > IPL;607344846;343;313;100
+IPR;Interpeduncular nucleus, rostral;997/8/343/313/348/165/100/607344834;root > grey > BS > MB > MBsta > RAmb > IPN > IPR;607344834;343;313;100
+IPRL;Interpeduncular nucleus, rostrolateral;997/8/343/313/348/165/100/607344862;root > grey > BS > MB > MBsta > RAmb > IPN > IPRL;607344862;343;313;100
+RL;Rostral linear nucleus raphe;997/8/343/313/348/165/197;root > grey > BS > MB > MBsta > RAmb > RL;197;343;313;313
+SNc;Substantia nigra, compact part;997/8/343/313/348/374;root > grey > BS > MB > MBsta > SNc;374;343;313;313
+CB;Cerebellum;997/8/512;root > grey > CB;512;512;512;512
+CBN;Cerebellar nuclei;997/8/512/519;root > grey > CB > CBN;519;512;512;512
+DN;Dentate nucleus;997/8/512/519/846;root > grey > CB > CBN > DN;846;512;512;512
+FN;Fastigial nucleus;997/8/512/519/989;root > grey > CB > CBN > FN;989;512;512;512
+IP;Interposed nucleus;997/8/512/519/91;root > grey > CB > CBN > IP;91;512;512;512
+VeCB;Vestibulocerebellar nucleus;997/8/512/519/589508455;root > grey > CB > CBN > VeCB;589508455;512;512;512
+CBX;Cerebellar cortex;997/8/512/528;root > grey > CB > CBX;528;512;512;512
+CBXgr;Cerebellar cortex, granular layer;997/8/512/528/1143;root > grey > CB > CBX > CBXgr;1143;512;512;512
+CBXmo;Cerebellar cortex, molecular layer;997/8/512/528/1144;root > grey > CB > CBX > CBXmo;1144;512;512;512
+CBXpu;Cerebellar cortex, Purkinje layer;997/8/512/528/1145;root > grey > CB > CBX > CBXpu;1145;512;512;512
+HEM;Hemispheric regions;997/8/512/528/1073;root > grey > CB > CBX > HEM;1073;512;512;512
+AN;Ansiform lobule;997/8/512/528/1073/1017;root > grey > CB > CBX > HEM > AN;1017;512;512;512
+ANcr1;Crus 1;997/8/512/528/1073/1017/1056;root > grey > CB > CBX > HEM > AN > ANcr1;1056;512;512;512
+ANcr1gr;Crus 1, granular layer;997/8/512/528/1073/1017/1056/10675;root > grey > CB > CBX > HEM > AN > ANcr1 > ANcr1gr;10675;512;512;512
+ANcr1mo;Crus 1, molecular layer;997/8/512/528/1073/1017/1056/10677;root > grey > CB > CBX > HEM > AN > ANcr1 > ANcr1mo;10677;512;512;512
+ANcr1pu;Crus 1, Purkinje layer;997/8/512/528/1073/1017/1056/10676;root > grey > CB > CBX > HEM > AN > ANcr1 > ANcr1pu;10676;512;512;512
+ANcr2;Crus 2;997/8/512/528/1073/1017/1064;root > grey > CB > CBX > HEM > AN > ANcr2;1064;512;512;512
+ANcr2gr;Crus 2, granular layer;997/8/512/528/1073/1017/1064/10678;root > grey > CB > CBX > HEM > AN > ANcr2 > ANcr2gr;10678;512;512;512
+ANcr2mo;Crus 2, molecular layer;997/8/512/528/1073/1017/1064/10680;root > grey > CB > CBX > HEM > AN > ANcr2 > ANcr2mo;10680;512;512;512
+ANcr2pu;Crus 2, Purkinje layer;997/8/512/528/1073/1017/1064/10679;root > grey > CB > CBX > HEM > AN > ANcr2 > ANcr2pu;10679;512;512;512
+COPY;Copula pyramidis;997/8/512/528/1073/1033;root > grey > CB > CBX > HEM > COPY;1033;512;512;512
+COPYgr;Copula pyramidis, granular layer;997/8/512/528/1073/1033/10684;root > grey > CB > CBX > HEM > COPY > COPYgr;10684;512;512;512
+COPYmo;Copula pyramidis, molecular layer;997/8/512/528/1073/1033/10686;root > grey > CB > CBX > HEM > COPY > COPYmo;10686;512;512;512
+COPYpu;Copula pyramidis, Purkinje layer;997/8/512/528/1073/1033/10685;root > grey > CB > CBX > HEM > COPY > COPYpu;10685;512;512;512
+FL;Flocculus;997/8/512/528/1073/1049;root > grey > CB > CBX > HEM > FL;1049;0;0;0
+FLgr;Flocculus, granular layer;997/8/512/528/1073/1049/10690;root > grey > CB > CBX > HEM > FL > FLgr;10690;0;0;0
+FLmo;Flocculus, molecular layer;997/8/512/528/1073/1049/10692;root > grey > CB > CBX > HEM > FL > FLmo;10692;0;0;0
+FLpu;Flocculus, Purkinje layer;997/8/512/528/1073/1049/10691;root > grey > CB > CBX > HEM > FL > FLpu;10691;0;0;0
+PFL;Paraflocculus;997/8/512/528/1073/1041;root > grey > CB > CBX > HEM > PFL;1041;0;0;0
+PFLgr;Paraflocculus, granular layer;997/8/512/528/1073/1041/10687;root > grey > CB > CBX > HEM > PFL > PFLgr;10687;0;0;0
+PFLmo;Paraflocculus, molecular layer;997/8/512/528/1073/1041/10689;root > grey > CB > CBX > HEM > PFL > PFLmo;10689;0;0;0
+PFLpu;Paraflocculus, Purkinje layer;997/8/512/528/1073/1041/10688;root > grey > CB > CBX > HEM > PFL > PFLpu;10688;0;0;0
+PRM;Paramedian lobule;997/8/512/528/1073/1025;root > grey > CB > CBX > HEM > PRM;1025;512;512;512
+PRMgr;Paramedian lobule, granular layer;997/8/512/528/1073/1025/10681;root > grey > CB > CBX > HEM > PRM > PRMgr;10681;512;512;512
+PRMmo;Paramedian lobule, molecular layer;997/8/512/528/1073/1025/10683;root > grey > CB > CBX > HEM > PRM > PRMmo;10683;512;512;512
+PRMpu;Paramedian lobule, Purkinje layer;997/8/512/528/1073/1025/10682;root > grey > CB > CBX > HEM > PRM > PRMpu;10682;512;512;512
+SIM;Simple lobule;997/8/512/528/1073/1007;root > grey > CB > CBX > HEM > SIM;1007;512;512;512
+SIMgr;Simple lobule, granular layer;997/8/512/528/1073/1007/10672;root > grey > CB > CBX > HEM > SIM > SIMgr;10672;512;512;512
+SIMmo;Simple lobule, molecular layer;997/8/512/528/1073/1007/10674;root > grey > CB > CBX > HEM > SIM > SIMmo;10674;512;512;512
+SIMpu;Simple lobule, Purkinje layer;997/8/512/528/1073/1007/10673;root > grey > CB > CBX > HEM > SIM > SIMpu;10673;512;512;512
+VERM;Vermal regions;997/8/512/528/645;root > grey > CB > CBX > VERM;645;512;512;512
+CENT;Central lobule;997/8/512/528/645/920;root > grey > CB > CBX > VERM > CENT;920;512;512;512
+CENT2;Lobule II;997/8/512/528/645/920/976;root > grey > CB > CBX > VERM > CENT > CENT2;976;512;512;512
+CENT2gr;Lobule II, granular layer;997/8/512/528/645/920/976/10708;root > grey > CB > CBX > VERM > CENT > CENT2 > CENT2gr;10708;512;512;512
+CENT2mo;Lobule II, molecular layer;997/8/512/528/645/920/976/10710;root > grey > CB > CBX > VERM > CENT > CENT2 > CENT2mo;10710;512;512;512
+CENT2pu;Lobule II, Purkinje layer;997/8/512/528/645/920/976/10709;root > grey > CB > CBX > VERM > CENT > CENT2 > CENT2pu;10709;512;512;512
+CENT3;Lobule III;997/8/512/528/645/920/984;root > grey > CB > CBX > VERM > CENT > CENT3;984;512;512;512
+CENT3gr;Lobule III, granular layer;997/8/512/528/645/920/984/10711;root > grey > CB > CBX > VERM > CENT > CENT3 > CENT3gr;10711;512;512;512
+CENT3mo;Lobule III, molecular layer;997/8/512/528/645/920/984/10713;root > grey > CB > CBX > VERM > CENT > CENT3 > CENT3mo;10713;512;512;512
+CENT3pu;Lobule III, Purkinje layer;997/8/512/528/645/920/984/10712;root > grey > CB > CBX > VERM > CENT > CENT3 > CENT3pu;10712;512;512;512
+CUL;Culmen;997/8/512/528/645/928;root > grey > CB > CBX > VERM > CUL;928;512;512;512
+CUL4;Lobule IV;997/8/512/528/645/928/992;root > grey > CB > CBX > VERM > CUL > CUL4;992;512;512;512
+CUL4gr;Lobule IV, granular layer;997/8/512/528/645/928/992/10714;root > grey > CB > CBX > VERM > CUL > CUL4 > CUL4gr;10714;512;512;512
+CUL4mo;Lobule IV, molecular layer;997/8/512/528/645/928/992/10716;root > grey > CB > CBX > VERM > CUL > CUL4 > CUL4mo;10716;512;512;512
+CUL4pu;Lobule IV, Purkinje layer;997/8/512/528/645/928/992/10715;root > grey > CB > CBX > VERM > CUL > CUL4 > CUL4pu;10715;512;512;512
+CUL4, 5;Lobules IV-V;997/8/512/528/645/928/1091;root > grey > CB > CBX > VERM > CUL > CUL4, 5;1091;512;512;512
+CUL4, 5gr;Lobules IV-V, granular layer;997/8/512/528/645/928/1091/10720;root > grey > CB > CBX > VERM > CUL > CUL4, 5 > CUL4, 5gr;10720;512;512;512
+CUL4, 5mo;Lobules IV-V, molecular layer;997/8/512/528/645/928/1091/10722;root > grey > CB > CBX > VERM > CUL > CUL4, 5 > CUL4, 5mo;10722;512;512;512
+CUL4, 5pu;Lobules IV-V, Purkinje layer;997/8/512/528/645/928/1091/10721;root > grey > CB > CBX > VERM > CUL > CUL4, 5 > CUL4, 5pu;10721;512;512;512
+CUL5;Lobule V;997/8/512/528/645/928/1001;root > grey > CB > CBX > VERM > CUL > CUL5;1001;512;512;512
+CUL5gr;Lobule V, granular layer;997/8/512/528/645/928/1001/10717;root > grey > CB > CBX > VERM > CUL > CUL5 > CUL5gr;10717;512;512;512
+CUL5mo;Lobule V, molecular layer;997/8/512/528/645/928/1001/10719;root > grey > CB > CBX > VERM > CUL > CUL5 > CUL5mo;10719;512;512;512
+CUL5pu;Lobule V, Purkinje layer;997/8/512/528/645/928/1001/10718;root > grey > CB > CBX > VERM > CUL > CUL5 > CUL5pu;10718;512;512;512
+DEC;Declive (VI);997/8/512/528/645/936;root > grey > CB > CBX > VERM > DEC;936;512;512;512
+DECgr;Declive (VI), granular layer;997/8/512/528/645/936/10723;root > grey > CB > CBX > VERM > DEC > DECgr;10723;512;512;512
+DECmo;Declive (VI), molecular layer;997/8/512/528/645/936/10725;root > grey > CB > CBX > VERM > DEC > DECmo;10725;512;512;512
+DECpu;Declive (VI), Purkinje layer;997/8/512/528/645/936/10724;root > grey > CB > CBX > VERM > DEC > DECpu;10724;512;512;512
+FOTU;Folium-tuber vermis (VII);997/8/512/528/645/944;root > grey > CB > CBX > VERM > FOTU;944;512;512;512
+FOTUgr;Folium-tuber vermis (VII), granular layer;997/8/512/528/645/944/10726;root > grey > CB > CBX > VERM > FOTU > FOTUgr;10726;512;512;512
+FOTUmo;Folium-tuber vermis (VII), molecular layer;997/8/512/528/645/944/10728;root > grey > CB > CBX > VERM > FOTU > FOTUmo;10728;512;512;512
+FOTUpu;Folium-tuber vermis (VII), Purkinje layer;997/8/512/528/645/944/10727;root > grey > CB > CBX > VERM > FOTU > FOTUpu;10727;512;512;512
+LING;Lingula (I);997/8/512/528/645/912;root > grey > CB > CBX > VERM > LING;912;512;512;512
+LINGgr;Lingula (I), granular layer;997/8/512/528/645/912/10705;root > grey > CB > CBX > VERM > LING > LINGgr;10705;512;512;512
+LINGmo;Lingula (I), molecular layer;997/8/512/528/645/912/10707;root > grey > CB > CBX > VERM > LING > LINGmo;10707;512;512;512
+LINGpu;Lingula (I), Purkinje layer;997/8/512/528/645/912/10706;root > grey > CB > CBX > VERM > LING > LINGpu;10706;512;512;512
+NOD;Nodulus (X);997/8/512/528/645/968;root > grey > CB > CBX > VERM > NOD;968;512;512;512
+NODgr;Nodulus (X), granular layer;997/8/512/528/645/968/10735;root > grey > CB > CBX > VERM > NOD > NODgr;10735;512;512;512
+NODmo;Nodulus (X), molecular layer;997/8/512/528/645/968/10737;root > grey > CB > CBX > VERM > NOD > NODmo;10737;512;512;512
+NODpu;Nodulus (X), Purkinje layer;997/8/512/528/645/968/10736;root > grey > CB > CBX > VERM > NOD > NODpu;10736;512;512;512
+PYR;Pyramus (VIII);997/8/512/528/645/951;root > grey > CB > CBX > VERM > PYR;951;512;512;512
+PYRgr;Pyramus (VIII), granular layer;997/8/512/528/645/951/10729;root > grey > CB > CBX > VERM > PYR > PYRgr;10729;512;512;512
+PYRmo;Pyramus (VIII), molecular layer;997/8/512/528/645/951/10731;root > grey > CB > CBX > VERM > PYR > PYRmo;10731;512;512;512
+PYRpu;Pyramus (VIII), Purkinje layer;997/8/512/528/645/951/10730;root > grey > CB > CBX > VERM > PYR > PYRpu;10730;512;512;512
+UVU;Uvula (IX);997/8/512/528/645/957;root > grey > CB > CBX > VERM > UVU;957;512;512;512
+UVUgr;Uvula (IX), granular layer;997/8/512/528/645/957/10732;root > grey > CB > CBX > VERM > UVU > UVUgr;10732;512;512;512
+UVUmo;Uvula (IX), molecular layer;997/8/512/528/645/957/10734;root > grey > CB > CBX > VERM > UVU > UVUmo;10734;512;512;512
+UVUpu;Uvula (IX), Purkinje layer;997/8/512/528/645/957/10733;root > grey > CB > CBX > VERM > UVU > UVUpu;10733;512;512;512
+CH;Cerebrum;997/8/567;root > grey > CH;567;567;997;997
+CNU;Cerebral nuclei;997/8/567/623;root > grey > CH > CNU;623;567;997;997
+PAL;Pallidum;997/8/567/623/803;root > grey > CH > CNU > PAL;803;567;803;803
+PALc;Pallidum, caudal region;997/8/567/623/803/809;root > grey > CH > CNU > PAL > PALc;809;567;803;803
+BAC;Bed nucleus of the anterior commissure;997/8/567/623/803/809/287;root > grey > CH > CNU > PAL > PALc > BAC;287;567;803;803
+BST;Bed nuclei of the stria terminalis;997/8/567/623/803/809/351;root > grey > CH > CNU > PAL > PALc > BST;351;567;803;351
+BSTa;Bed nuclei of the stria terminalis, anterior division;997/8/567/623/803/809/351/359;root > grey > CH > CNU > PAL > PALc > BST > BSTa;359;567;803;351
+BSTal;Bed nuclei of the stria terminalis, anterior division, anterolateral area;997/8/567/623/803/809/351/359/537;root > grey > CH > CNU > PAL > PALc > BST > BSTa > BSTal;537;567;803;351
+BSTam;Bed nuclei of the stria terminalis, anterior division, anteromedial area;997/8/567/623/803/809/351/359/498;root > grey > CH > CNU > PAL > PALc > BST > BSTa > BSTam;498;567;803;351
+BSTdm;Bed nuclei of the stria terminalis, anterior division, dorsomedial nucleus;997/8/567/623/803/809/351/359/505;root > grey > CH > CNU > PAL > PALc > BST > BSTa > BSTdm;505;567;803;351
+BSTfu;Bed nuclei of the stria terminalis, anterior division, fusiform nucleus;997/8/567/623/803/809/351/359/513;root > grey > CH > CNU > PAL > PALc > BST > BSTa > BSTfu;513;567;803;351
+BSTju;Bed nuclei of the stria terminalis, anterior division, juxtacapsular nucleus;997/8/567/623/803/809/351/359/546;root > grey > CH > CNU > PAL > PALc > BST > BSTa > BSTju;546;567;803;351
+BSTmg;Bed nuclei of the stria terminalis, anterior division, magnocellular nucleus;997/8/567/623/803/809/351/359/521;root > grey > CH > CNU > PAL > PALc > BST > BSTa > BSTmg;521;567;803;351
+BSTov;Bed nuclei of the stria terminalis, anterior division, oval nucleus;997/8/567/623/803/809/351/359/554;root > grey > CH > CNU > PAL > PALc > BST > BSTa > BSTov;554;567;803;351
+BSTrh;Bed nuclei of the stria terminalis, anterior division, rhomboid nucleus;997/8/567/623/803/809/351/359/562;root > grey > CH > CNU > PAL > PALc > BST > BSTa > BSTrh;562;567;803;351
+BSTv;Bed nuclei of the stria terminalis, anterior division, ventral nucleus;997/8/567/623/803/809/351/359/529;root > grey > CH > CNU > PAL > PALc > BST > BSTa > BSTv;529;567;803;351
+BSTp;Bed nuclei of the stria terminalis, posterior division;997/8/567/623/803/809/351/367;root > grey > CH > CNU > PAL > PALc > BST > BSTp;367;567;803;351
+BSTd;Bed nuclei of the stria terminalis, posterior division, dorsal nucleus;997/8/567/623/803/809/351/367/569;root > grey > CH > CNU > PAL > PALc > BST > BSTp > BSTd;569;567;803;351
+BSTif;Bed nuclei of the stria terminalis, posterior division, interfascicular nucleus;997/8/567/623/803/809/351/367/585;root > grey > CH > CNU > PAL > PALc > BST > BSTp > BSTif;585;567;803;351
+BSTpr;Bed nuclei of the stria terminalis, posterior division, principal nucleus;997/8/567/623/803/809/351/367/578;root > grey > CH > CNU > PAL > PALc > BST > BSTp > BSTpr;578;567;803;351
+BSTse;Bed nuclei of the stria terminalis, posterior division, strial extension;997/8/567/623/803/809/351/367/602;root > grey > CH > CNU > PAL > PALc > BST > BSTp > BSTse;602;567;803;351
+BSTtr;Bed nuclei of the stria terminalis, posterior division, transverse nucleus;997/8/567/623/803/809/351/367/594;root > grey > CH > CNU > PAL > PALc > BST > BSTp > BSTtr;594;567;803;351
+PALd;Pallidum, dorsal region;997/8/567/623/803/818;root > grey > CH > CNU > PAL > PALd;818;567;803;803
+GPe;Globus pallidus, external segment;997/8/567/623/803/818/1022;root > grey > CH > CNU > PAL > PALd > GPe;1022;567;803;1022
+GPi;Globus pallidus, internal segment;997/8/567/623/803/818/1031;root > grey > CH > CNU > PAL > PALd > GPi;1031;567;803;1031
+PALm;Pallidum, medial region;997/8/567/623/803/826;root > grey > CH > CNU > PAL > PALm;826;567;803;803
+MSC;Medial septal complex;997/8/567/623/803/826/904;root > grey > CH > CNU > PAL > PALm > MSC;904;567;803;803
+MS;Medial septal nucleus;997/8/567/623/803/826/904/564;root > grey > CH > CNU > PAL > PALm > MSC > MS;564;567;803;803
+NDB;Diagonal band nucleus;997/8/567/623/803/826/904/596;root > grey > CH > CNU > PAL > PALm > MSC > NDB;596;567;803;803
+TRS;Triangular nucleus of septum;997/8/567/623/803/826/581;root > grey > CH > CNU > PAL > PALm > TRS;581;567;803;803
+PALv;Pallidum, ventral region;997/8/567/623/803/835;root > grey > CH > CNU > PAL > PALv;835;567;803;803
+MA;Magnocellular nucleus;997/8/567/623/803/835/298;root > grey > CH > CNU > PAL > PALv > MA;298;567;803;803
+SI;Substantia innominata;997/8/567/623/803/835/342;root > grey > CH > CNU > PAL > PALv > SI;342;567;803;803
+STR;Striatum;997/8/567/623/477;root > grey > CH > CNU > STR;477;567;477;477
+LSX;Lateral septal complex;997/8/567/623/477/275;root > grey > CH > CNU > STR > LSX;275;567;477;275
+LS;Lateral septal nucleus;997/8/567/623/477/275/242;root > grey > CH > CNU > STR > LSX > LS;242;567;477;275
+LSc;Lateral septal nucleus, caudal (caudodorsal) part;997/8/567/623/477/275/242/250;root > grey > CH > CNU > STR > LSX > LS > LSc;250;567;477;275
+LSr;Lateral septal nucleus, rostral (rostroventral) part;997/8/567/623/477/275/242/258;root > grey > CH > CNU > STR > LSX > LS > LSr;258;567;477;275
+LSv;Lateral septal nucleus, ventral part;997/8/567/623/477/275/242/266;root > grey > CH > CNU > STR > LSX > LS > LSv;266;567;477;275
+SF;Septofimbrial nucleus;997/8/567/623/477/275/310;root > grey > CH > CNU > STR > LSX > SF;310;567;477;275
+SH;Septohippocampal nucleus;997/8/567/623/477/275/333;root > grey > CH > CNU > STR > LSX > SH;333;567;477;275
+sAMY;Striatum-like amygdalar nuclei;997/8/567/623/477/278;root > grey > CH > CNU > STR > sAMY;278;567;477;278
+AAA;Anterior amygdalar area;997/8/567/623/477/278/23;root > grey > CH > CNU > STR > sAMY > AAA;23;567;477;278
+BA;Bed nucleus of the accessory olfactory tract;997/8/567/623/477/278/292;root > grey > CH > CNU > STR > sAMY > BA;292;567;477;278
+CEA;Central amygdalar nucleus;997/8/567/623/477/278/536;root > grey > CH > CNU > STR > sAMY > CEA;536;567;477;278
+CEAc;Central amygdalar nucleus, capsular part;997/8/567/623/477/278/536/544;root > grey > CH > CNU > STR > sAMY > CEA > CEAc;544;567;477;278
+CEAl;Central amygdalar nucleus, lateral part;997/8/567/623/477/278/536/551;root > grey > CH > CNU > STR > sAMY > CEA > CEAl;551;567;477;278
+CEAm;Central amygdalar nucleus, medial part;997/8/567/623/477/278/536/559;root > grey > CH > CNU > STR > sAMY > CEA > CEAm;559;567;477;278
+IA;Intercalated amygdalar nucleus;997/8/567/623/477/278/1105;root > grey > CH > CNU > STR > sAMY > IA;1105;567;477;278
+MEA;Medial amygdalar nucleus;997/8/567/623/477/278/403;root > grey > CH > CNU > STR > sAMY > MEA;403;567;477;278
+MEAad;Medial amygdalar nucleus, anterodorsal part;997/8/567/623/477/278/403/411;root > grey > CH > CNU > STR > sAMY > MEA > MEAad;411;567;477;278
+MEAav;Medial amygdalar nucleus, anteroventral part;997/8/567/623/477/278/403/418;root > grey > CH > CNU > STR > sAMY > MEA > MEAav;418;567;477;278
+MEApd;Medial amygdalar nucleus, posterodorsal part;997/8/567/623/477/278/403/426;root > grey > CH > CNU > STR > sAMY > MEA > MEApd;426;567;477;278
+MEApd-a;Medial amygdalar nucleus, posterodorsal part, sublayer a;997/8/567/623/477/278/403/426/472;root > grey > CH > CNU > STR > sAMY > MEA > MEApd > MEApd-a;472;567;477;278
+MEApd-b;Medial amygdalar nucleus, posterodorsal part, sublayer b;997/8/567/623/477/278/403/426/480;root > grey > CH > CNU > STR > sAMY > MEA > MEApd > MEApd-b;480;567;477;278
+MEApd-c;Medial amygdalar nucleus, posterodorsal part, sublayer c;997/8/567/623/477/278/403/426/487;root > grey > CH > CNU > STR > sAMY > MEA > MEApd > MEApd-c;487;567;477;278
+MEApv;Medial amygdalar nucleus, posteroventral part;997/8/567/623/477/278/403/435;root > grey > CH > CNU > STR > sAMY > MEA > MEApv;435;567;477;278
+STRd;Striatum dorsal region;997/8/567/623/477/485;root > grey > CH > CNU > STR > STRd;485;567;477;477
+CP;Caudoputamen;997/8/567/623/477/485/672;root > grey > CH > CNU > STR > STRd > CP;672;567;477;672
+STRv;Striatum ventral region;997/8/567/623/477/493;root > grey > CH > CNU > STR > STRv;493;567;477;477
+ACB;Nucleus accumbens;997/8/567/623/477/493/56;root > grey > CH > CNU > STR > STRv > ACB;56;567;477;56
+FS;Fundus of striatum;997/8/567/623/477/493/998;root > grey > CH > CNU > STR > STRv > FS;998;567;477;998
+LSS;Lateral strip of striatum;997/8/567/623/477/493/549009199;root > grey > CH > CNU > STR > STRv > LSS;549009199;567;477;997
+OT;Olfactory tubercle;997/8/567/623/477/493/754;root > grey > CH > CNU > STR > STRv > OT;754;567;477;754
+isl;Islands of Calleja;997/8/567/623/477/493/754/481;root > grey > CH > CNU > STR > STRv > OT > isl;481;567;477;754
+islm;Major island of Calleja;997/8/567/623/477/493/754/489;root > grey > CH > CNU > STR > STRv > OT > islm;489;567;477;754
+OT1;Olfactory tubercle, molecular layer;997/8/567/623/477/493/754/458;root > grey > CH > CNU > STR > STRv > OT > OT1;458;567;477;754
+OT1-3;Olfactory tubercle, layers 1-3;997/8/567/623/477/493/754/144;root > grey > CH > CNU > STR > STRv > OT > OT1-3;144;567;477;754
+OT2;Olfactory tubercle, pyramidal layer;997/8/567/623/477/493/754/465;root > grey > CH > CNU > STR > STRv > OT > OT2;465;567;477;754
+OT3;Olfactory tubercle, polymorph layer;997/8/567/623/477/493/754/473;root > grey > CH > CNU > STR > STRv > OT > OT3;473;567;477;754
+CTX;Cerebral cortex;997/8/567/688;root > grey > CH > CTX;688;688;688;688
+CTXpl;Cortical plate;997/8/567/688/695;root > grey > CH > CTX > CTXpl;695;688;688;688
+HPF;Hippocampal formation;997/8/567/688/695/1089;root > grey > CH > CTX > CTXpl > HPF;1089;688;688;688
+HIP;Hippocampal region;997/8/567/688/695/1089/1080;root > grey > CH > CTX > CTXpl > HPF > HIP;1080;688;1080;1080
+CA;Ammon's horn;997/8/567/688/695/1089/1080/375;root > grey > CH > CTX > CTXpl > HPF > HIP > CA;375;688;1080;1080
+CA1;Field CA1;997/8/567/688/695/1089/1080/375/382;root > grey > CH > CTX > CTXpl > HPF > HIP > CA > CA1;382;688;1080;1080
+CA1slm;Field CA1, stratum lacunosum-moleculare;997/8/567/688/695/1089/1080/375/382/391;root > grey > CH > CTX > CTXpl > HPF > HIP > CA > CA1 > CA1slm;391;688;1080;1080
+CA1so;Field CA1, stratum oriens;997/8/567/688/695/1089/1080/375/382/399;root > grey > CH > CTX > CTXpl > HPF > HIP > CA > CA1 > CA1so;399;688;1080;1080
+CA1sp;Field CA1, pyramidal layer;997/8/567/688/695/1089/1080/375/382/407;root > grey > CH > CTX > CTXpl > HPF > HIP > CA > CA1 > CA1sp;407;688;1080;1080
+CA1sr;Field CA1, stratum radiatum;997/8/567/688/695/1089/1080/375/382/415;root > grey > CH > CTX > CTXpl > HPF > HIP > CA > CA1 > CA1sr;415;688;1080;1080
+CA2;Field CA2;997/8/567/688/695/1089/1080/375/423;root > grey > CH > CTX > CTXpl > HPF > HIP > CA > CA2;423;688;1080;1080
+CA2slm;Field CA2, stratum lacunosum-moleculare;997/8/567/688/695/1089/1080/375/423/431;root > grey > CH > CTX > CTXpl > HPF > HIP > CA > CA2 > CA2slm;431;688;1080;1080
+CA2so;Field CA2, stratum oriens;997/8/567/688/695/1089/1080/375/423/438;root > grey > CH > CTX > CTXpl > HPF > HIP > CA > CA2 > CA2so;438;688;1080;1080
+CA2sp;Field CA2, pyramidal layer;997/8/567/688/695/1089/1080/375/423/446;root > grey > CH > CTX > CTXpl > HPF > HIP > CA > CA2 > CA2sp;446;688;1080;1080
+CA2sr;Field CA2, stratum radiatum;997/8/567/688/695/1089/1080/375/423/454;root > grey > CH > CTX > CTXpl > HPF > HIP > CA > CA2 > CA2sr;454;688;1080;1080
+CA3;Field CA3;997/8/567/688/695/1089/1080/375/463;root > grey > CH > CTX > CTXpl > HPF > HIP > CA > CA3;463;688;1080;1080
+CA3slm;Field CA3, stratum lacunosum-moleculare;997/8/567/688/695/1089/1080/375/463/471;root > grey > CH > CTX > CTXpl > HPF > HIP > CA > CA3 > CA3slm;471;688;1080;1080
+CA3slu;Field CA3, stratum lucidum;997/8/567/688/695/1089/1080/375/463/479;root > grey > CH > CTX > CTXpl > HPF > HIP > CA > CA3 > CA3slu;479;688;1080;1080
+CA3so;Field CA3, stratum oriens;997/8/567/688/695/1089/1080/375/463/486;root > grey > CH > CTX > CTXpl > HPF > HIP > CA > CA3 > CA3so;486;688;1080;1080
+CA3sp;Field CA3, pyramidal layer;997/8/567/688/695/1089/1080/375/463/495;root > grey > CH > CTX > CTXpl > HPF > HIP > CA > CA3 > CA3sp;495;688;1080;1080
+CA3sr;Field CA3, stratum radiatum;997/8/567/688/695/1089/1080/375/463/504;root > grey > CH > CTX > CTXpl > HPF > HIP > CA > CA3 > CA3sr;504;688;1080;1080
+DG;Dentate gyrus;997/8/567/688/695/1089/1080/726;root > grey > CH > CTX > CTXpl > HPF > HIP > DG;726;688;1080;1080
+DG-mo;Dentate gyrus, molecular layer;997/8/567/688/695/1089/1080/726/10703;root > grey > CH > CTX > CTXpl > HPF > HIP > DG > DG-mo;10703;688;1080;1080
+DG-po;Dentate gyrus, polymorph layer;997/8/567/688/695/1089/1080/726/10704;root > grey > CH > CTX > CTXpl > HPF > HIP > DG > DG-po;10704;688;1080;1080
+DG-sg;Dentate gyrus, granule cell layer;997/8/567/688/695/1089/1080/726/632;root > grey > CH > CTX > CTXpl > HPF > HIP > DG > DG-sg;632;688;1080;1080
+DG-sgz;Dentate gyrus, subgranular zone;997/8/567/688/695/1089/1080/726/10702;root > grey > CH > CTX > CTXpl > HPF > HIP > DG > DG-sgz;10702;688;1080;1080
+DGcr;Dentate gyrus crest;997/8/567/688/695/1089/1080/726/734;root > grey > CH > CTX > CTXpl > HPF > HIP > DG > DGcr;734;688;1080;1080
+DGcr-mo;Dentate gyrus crest, molecular layer;997/8/567/688/695/1089/1080/726/734/742;root > grey > CH > CTX > CTXpl > HPF > HIP > DG > DGcr > DGcr-mo;742;688;1080;1080
+DGcr-po;Dentate gyrus crest, polymorph layer;997/8/567/688/695/1089/1080/726/734/751;root > grey > CH > CTX > CTXpl > HPF > HIP > DG > DGcr > DGcr-po;751;688;1080;1080
+DGcr-sg;Dentate gyrus crest, granule cell layer;997/8/567/688/695/1089/1080/726/734/758;root > grey > CH > CTX > CTXpl > HPF > HIP > DG > DGcr > DGcr-sg;758;688;1080;1080
+DGlb;Dentate gyrus lateral blade;997/8/567/688/695/1089/1080/726/766;root > grey > CH > CTX > CTXpl > HPF > HIP > DG > DGlb;766;688;1080;1080
+DGlb-mo;Dentate gyrus lateral blade, molecular layer;997/8/567/688/695/1089/1080/726/766/775;root > grey > CH > CTX > CTXpl > HPF > HIP > DG > DGlb > DGlb-mo;775;688;1080;1080
+DGlb-po;Dentate gyrus lateral blade, polymorph layer;997/8/567/688/695/1089/1080/726/766/782;root > grey > CH > CTX > CTXpl > HPF > HIP > DG > DGlb > DGlb-po;782;688;1080;1080
+DGlb-sg;Dentate gyrus lateral blade, granule cell layer;997/8/567/688/695/1089/1080/726/766/790;root > grey > CH > CTX > CTXpl > HPF > HIP > DG > DGlb > DGlb-sg;790;688;1080;1080
+DGmb;Dentate gyrus medial blade;997/8/567/688/695/1089/1080/726/799;root > grey > CH > CTX > CTXpl > HPF > HIP > DG > DGmb;799;688;1080;1080
+DGmb-mo;Dentate gyrus medial blade, molecular layer;997/8/567/688/695/1089/1080/726/799/807;root > grey > CH > CTX > CTXpl > HPF > HIP > DG > DGmb > DGmb-mo;807;688;1080;1080
+DGmb-po;Dentate gyrus medial blade, polymorph layer;997/8/567/688/695/1089/1080/726/799/815;root > grey > CH > CTX > CTXpl > HPF > HIP > DG > DGmb > DGmb-po;815;688;1080;1080
+DGmb-sg;Dentate gyrus medial blade, granule cell layer;997/8/567/688/695/1089/1080/726/799/823;root > grey > CH > CTX > CTXpl > HPF > HIP > DG > DGmb > DGmb-sg;823;688;1080;1080
+FC;Fasciola cinerea;997/8/567/688/695/1089/1080/982;root > grey > CH > CTX > CTXpl > HPF > HIP > FC;982;688;1080;1080
+IG;Induseum griseum;997/8/567/688/695/1089/1080/19;root > grey > CH > CTX > CTXpl > HPF > HIP > IG;19;688;1080;1080
+RHP;Retrohippocampal region;997/8/567/688/695/1089/822;root > grey > CH > CTX > CTXpl > HPF > RHP;822;688;822;822
+APr;Area prostriata;997/8/567/688/695/1089/822/484682508;root > grey > CH > CTX > CTXpl > HPF > RHP > APr;484682508;688;822;822
+ENT;Entorhinal area;997/8/567/688/695/1089/822/909;root > grey > CH > CTX > CTXpl > HPF > RHP > ENT;909;688;822;822
+ENTl;Entorhinal area, lateral part;997/8/567/688/695/1089/822/909/918;root > grey > CH > CTX > CTXpl > HPF > RHP > ENT > ENTl;918;688;822;822
+ENTl1;Entorhinal area, lateral part, layer 1;997/8/567/688/695/1089/822/909/918/1121;root > grey > CH > CTX > CTXpl > HPF > RHP > ENT > ENTl > ENTl1;1121;688;822;822
+ENTl2;Entorhinal area, lateral part, layer 2;997/8/567/688/695/1089/822/909/918/20;root > grey > CH > CTX > CTXpl > HPF > RHP > ENT > ENTl > ENTl2;20;688;822;822
+ENTl2/3;Entorhinal area, lateral part, layer 2/3;997/8/567/688/695/1089/822/909/918/999;root > grey > CH > CTX > CTXpl > HPF > RHP > ENT > ENTl > ENTl2/3;999;688;822;822
+ENTl2a;Entorhinal area, lateral part, layer 2a;997/8/567/688/695/1089/822/909/918/715;root > grey > CH > CTX > CTXpl > HPF > RHP > ENT > ENTl > ENTl2a;715;688;822;822
+ENTl2b;Entorhinal area, lateral part, layer 2b;997/8/567/688/695/1089/822/909/918/764;root > grey > CH > CTX > CTXpl > HPF > RHP > ENT > ENTl > ENTl2b;764;688;822;822
+ENTl3;Entorhinal area, lateral part, layer 3;997/8/567/688/695/1089/822/909/918/52;root > grey > CH > CTX > CTXpl > HPF > RHP > ENT > ENTl > ENTl3;52;688;822;822
+ENTl4;Entorhinal area, lateral part, layer 4;997/8/567/688/695/1089/822/909/918/92;root > grey > CH > CTX > CTXpl > HPF > RHP > ENT > ENTl > ENTl4;92;688;822;822
+ENTl4/5;Entorhinal area, lateral part, layer 4/5;997/8/567/688/695/1089/822/909/918/312;root > grey > CH > CTX > CTXpl > HPF > RHP > ENT > ENTl > ENTl4/5;312;688;822;822
+ENTl5;Entorhinal area, lateral part, layer 5;997/8/567/688/695/1089/822/909/918/139;root > grey > CH > CTX > CTXpl > HPF > RHP > ENT > ENTl > ENTl5;139;688;822;822
+ENTl5/6;Entorhinal area, lateral part, layer 5/6;997/8/567/688/695/1089/822/909/918/387;root > grey > CH > CTX > CTXpl > HPF > RHP > ENT > ENTl > ENTl5/6;387;688;822;822
+ENTl6a;Entorhinal area, lateral part, layer 6a;997/8/567/688/695/1089/822/909/918/28;root > grey > CH > CTX > CTXpl > HPF > RHP > ENT > ENTl > ENTl6a;28;688;822;822
+ENTl6b;Entorhinal area, lateral part, layer 6b;997/8/567/688/695/1089/822/909/918/60;root > grey > CH > CTX > CTXpl > HPF > RHP > ENT > ENTl > ENTl6b;60;688;822;822
+ENTm;Entorhinal area, medial part, dorsal zone;997/8/567/688/695/1089/822/909/926;root > grey > CH > CTX > CTXpl > HPF > RHP > ENT > ENTm;926;688;822;822
+ENTm1;Entorhinal area, medial part, dorsal zone, layer 1;997/8/567/688/695/1089/822/909/926/526;root > grey > CH > CTX > CTXpl > HPF > RHP > ENT > ENTm > ENTm1;526;688;822;822
+ENTm2;Entorhinal area, medial part, dorsal zone, layer 2;997/8/567/688/695/1089/822/909/926/543;root > grey > CH > CTX > CTXpl > HPF > RHP > ENT > ENTm > ENTm2;543;688;822;822
+ENTm2a;Entorhinal area, medial part, dorsal zone, layer 2a;997/8/567/688/695/1089/822/909/926/468;root > grey > CH > CTX > CTXpl > HPF > RHP > ENT > ENTm > ENTm2a;468;688;822;822
+ENTm2b;Entorhinal area, medial part, dorsal zone, layer 2b;997/8/567/688/695/1089/822/909/926/508;root > grey > CH > CTX > CTXpl > HPF > RHP > ENT > ENTm > ENTm2b;508;688;822;822
+ENTm3;Entorhinal area, medial part, dorsal zone, layer 3;997/8/567/688/695/1089/822/909/926/664;root > grey > CH > CTX > CTXpl > HPF > RHP > ENT > ENTm > ENTm3;664;688;822;822
+ENTm4;Entorhinal area, medial part, dorsal zone, layer 4;997/8/567/688/695/1089/822/909/926/712;root > grey > CH > CTX > CTXpl > HPF > RHP > ENT > ENTm > ENTm4;712;688;822;822
+ENTm5;Entorhinal area, medial part, dorsal zone, layer 5;997/8/567/688/695/1089/822/909/926/727;root > grey > CH > CTX > CTXpl > HPF > RHP > ENT > ENTm > ENTm5;727;688;822;822
+ENTm5/6;Entorhinal area, medial part, dorsal zone, layer 5/6;997/8/567/688/695/1089/822/909/926/550;root > grey > CH > CTX > CTXpl > HPF > RHP > ENT > ENTm > ENTm5/6;550;688;822;822
+ENTm6;Entorhinal area, medial part, dorsal zone, layer 6;997/8/567/688/695/1089/822/909/926/743;root > grey > CH > CTX > CTXpl > HPF > RHP > ENT > ENTm > ENTm6;743;688;822;822
+ENTmv;Entorhinal area, medial part, ventral zone;997/8/567/688/695/1089/822/909/934;root > grey > CH > CTX > CTXpl > HPF > RHP > ENT > ENTmv;934;688;822;822
+ENTmv1;Entorhinal area, medial part, ventral zone, layer 1;997/8/567/688/695/1089/822/909/934/259;root > grey > CH > CTX > CTXpl > HPF > RHP > ENT > ENTmv > ENTmv1;259;688;822;822
+ENTmv2;Entorhinal area, medial part, ventral zone, layer 2;997/8/567/688/695/1089/822/909/934/324;root > grey > CH > CTX > CTXpl > HPF > RHP > ENT > ENTmv > ENTmv2;324;688;822;822
+ENTmv3;Entorhinal area, medial part, ventral zone, layer 3;997/8/567/688/695/1089/822/909/934/371;root > grey > CH > CTX > CTXpl > HPF > RHP > ENT > ENTmv > ENTmv3;371;688;822;822
+ENTmv4;Entorhinal area, medial part, ventral zone, layer 4;997/8/567/688/695/1089/822/909/934/419;root > grey > CH > CTX > CTXpl > HPF > RHP > ENT > ENTmv > ENTmv4;419;688;822;822
+ENTmv5/6;Entorhinal area, medial part, ventral zone, layer 5/6;997/8/567/688/695/1089/822/909/934/1133;root > grey > CH > CTX > CTXpl > HPF > RHP > ENT > ENTmv > ENTmv5/6;1133;688;822;822
+HATA;Hippocampo-amygdalar transition area;997/8/567/688/695/1089/822/589508447;root > grey > CH > CTX > CTXpl > HPF > RHP > HATA;589508447;688;822;822
+PAR;Parasubiculum;997/8/567/688/695/1089/822/843;root > grey > CH > CTX > CTXpl > HPF > RHP > PAR;843;688;822;822
+PAR1;Parasubiculum, layer 1;997/8/567/688/695/1089/822/843/10693;root > grey > CH > CTX > CTXpl > HPF > RHP > PAR > PAR1;10693;688;822;822
+PAR2;Parasubiculum, layer 2;997/8/567/688/695/1089/822/843/10694;root > grey > CH > CTX > CTXpl > HPF > RHP > PAR > PAR2;10694;688;822;822
+PAR3;Parasubiculum, layer 3;997/8/567/688/695/1089/822/843/10695;root > grey > CH > CTX > CTXpl > HPF > RHP > PAR > PAR3;10695;688;822;822
+POST;Postsubiculum;997/8/567/688/695/1089/822/1037;root > grey > CH > CTX > CTXpl > HPF > RHP > POST;1037;688;822;822
+POST1;Postsubiculum, layer 1;997/8/567/688/695/1089/822/1037/10696;root > grey > CH > CTX > CTXpl > HPF > RHP > POST > POST1;10696;688;822;822
+POST2;Postsubiculum, layer 2;997/8/567/688/695/1089/822/1037/10697;root > grey > CH > CTX > CTXpl > HPF > RHP > POST > POST2;10697;688;822;822
+POST3;Postsubiculum, layer 3;997/8/567/688/695/1089/822/1037/10698;root > grey > CH > CTX > CTXpl > HPF > RHP > POST > POST3;10698;688;822;822
+PRE;Presubiculum;997/8/567/688/695/1089/822/1084;root > grey > CH > CTX > CTXpl > HPF > RHP > PRE;1084;688;822;822
+PRE1;Presubiculum, layer 1;997/8/567/688/695/1089/822/1084/10699;root > grey > CH > CTX > CTXpl > HPF > RHP > PRE > PRE1;10699;688;822;822
+PRE2;Presubiculum, layer 2;997/8/567/688/695/1089/822/1084/10700;root > grey > CH > CTX > CTXpl > HPF > RHP > PRE > PRE2;10700;688;822;822
+PRE3;Presubiculum, layer 3;997/8/567/688/695/1089/822/1084/10701;root > grey > CH > CTX > CTXpl > HPF > RHP > PRE > PRE3;10701;688;822;822
+ProS;Prosubiculum;997/8/567/688/695/1089/822/484682470;root > grey > CH > CTX > CTXpl > HPF > RHP > ProS;484682470;688;822;822
+ProSd;Prosubiculum, dorsal part;997/8/567/688/695/1089/822/484682470/484682475;root > grey > CH > CTX > CTXpl > HPF > RHP > ProS > ProSd;484682475;688;822;822
+ProSd-m;Prosubiculum, dorsal part, molecular layer;997/8/567/688/695/1089/822/484682470/484682475/484682479;root > grey > CH > CTX > CTXpl > HPF > RHP > ProS > ProSd > ProSd-m;484682479;688;822;822
+ProSd-sp;Prosubiculum, dorsal part, pyramidal layer;997/8/567/688/695/1089/822/484682470/484682475/484682483;root > grey > CH > CTX > CTXpl > HPF > RHP > ProS > ProSd > ProSd-sp;484682483;688;822;822
+ProSd-sr;Prosubiculum, dorsal part, stratum radiatum;997/8/567/688/695/1089/822/484682470/484682475/484682487;root > grey > CH > CTX > CTXpl > HPF > RHP > ProS > ProSd > ProSd-sr;484682487;688;822;822
+ProSv;Prosubiculum, ventral part;997/8/567/688/695/1089/822/484682470/484682492;root > grey > CH > CTX > CTXpl > HPF > RHP > ProS > ProSv;484682492;688;822;822
+ProSv-m;Prosubiculum, ventral part, molecular layer;997/8/567/688/695/1089/822/484682470/484682492/484682496;root > grey > CH > CTX > CTXpl > HPF > RHP > ProS > ProSv > ProSv-m;484682496;688;822;822
+ProSv-sp;Prosubiculum, ventral part, pyramidal layer;997/8/567/688/695/1089/822/484682470/484682492/484682500;root > grey > CH > CTX > CTXpl > HPF > RHP > ProS > ProSv > ProSv-sp;484682500;688;822;822
+Prosv-sr;Prosubiculum, ventral part, stratum radiatum;997/8/567/688/695/1089/822/484682470/484682492/484682504;root > grey > CH > CTX > CTXpl > HPF > RHP > ProS > ProSv > Prosv-sr;484682504;688;822;822
+SUB;Subiculum;997/8/567/688/695/1089/822/502;root > grey > CH > CTX > CTXpl > HPF > RHP > SUB;502;688;822;822
+SUBd;Subiculum, dorsal part;997/8/567/688/695/1089/822/502/509;root > grey > CH > CTX > CTXpl > HPF > RHP > SUB > SUBd;509;688;822;822
+SUBd-m;Subiculum, dorsal part, molecular layer;997/8/567/688/695/1089/822/502/509/829;root > grey > CH > CTX > CTXpl > HPF > RHP > SUB > SUBd > SUBd-m;829;688;822;822
+SUBd-sp;Subiculum, dorsal part, pyramidal layer;997/8/567/688/695/1089/822/502/509/845;root > grey > CH > CTX > CTXpl > HPF > RHP > SUB > SUBd > SUBd-sp;845;688;822;822
+SUBd-sr;Subiculum, dorsal part, stratum radiatum;997/8/567/688/695/1089/822/502/509/837;root > grey > CH > CTX > CTXpl > HPF > RHP > SUB > SUBd > SUBd-sr;837;688;822;822
+SUBv;Subiculum, ventral part;997/8/567/688/695/1089/822/502/518;root > grey > CH > CTX > CTXpl > HPF > RHP > SUB > SUBv;518;688;822;822
+SUBv-m;Subiculum, ventral part, molecular layer;997/8/567/688/695/1089/822/502/518/853;root > grey > CH > CTX > CTXpl > HPF > RHP > SUB > SUBv > SUBv-m;853;688;822;822
+SUBv-sp;Subiculum, ventral part, pyramidal layer;997/8/567/688/695/1089/822/502/518/870;root > grey > CH > CTX > CTXpl > HPF > RHP > SUB > SUBv > SUBv-sp;870;688;822;822
+SUBv-sr;Subiculum, ventral part, stratum radiatum;997/8/567/688/695/1089/822/502/518/861;root > grey > CH > CTX > CTXpl > HPF > RHP > SUB > SUBv > SUBv-sr;861;688;822;822
+Isocortex;Isocortex;997/8/567/688/695/315;root > grey > CH > CTX > CTXpl > Isocortex;315;688;315;315
+ACA;Anterior cingulate area;997/8/567/688/695/315/31;root > grey > CH > CTX > CTXpl > Isocortex > ACA;31;688;315;315
+ACA1;Anterior cingulate area, layer 1;997/8/567/688/695/315/31/572;root > grey > CH > CTX > CTXpl > Isocortex > ACA > ACA1;572;688;315;315
+ACA2/3;Anterior cingulate area, layer 2/3;997/8/567/688/695/315/31/1053;root > grey > CH > CTX > CTXpl > Isocortex > ACA > ACA2/3;1053;688;315;315
+ACA5;Anterior cingulate area, layer 5;997/8/567/688/695/315/31/739;root > grey > CH > CTX > CTXpl > Isocortex > ACA > ACA5;739;688;315;315
+ACA6a;Anterior cingulate area, layer 6a;997/8/567/688/695/315/31/179;root > grey > CH > CTX > CTXpl > Isocortex > ACA > ACA6a;179;688;315;315
+ACA6b;Anterior cingulate area, layer 6b;997/8/567/688/695/315/31/227;root > grey > CH > CTX > CTXpl > Isocortex > ACA > ACA6b;227;688;315;315
+ACAd;Anterior cingulate area, dorsal part;997/8/567/688/695/315/31/39;root > grey > CH > CTX > CTXpl > Isocortex > ACA > ACAd;39;688;315;315
+ACAd1;Anterior cingulate area, dorsal part, layer 1;997/8/567/688/695/315/31/39/935;root > grey > CH > CTX > CTXpl > Isocortex > ACA > ACAd > ACAd1;935;688;315;315
+ACAd2/3;Anterior cingulate area, dorsal part, layer 2/3;997/8/567/688/695/315/31/39/211;root > grey > CH > CTX > CTXpl > Isocortex > ACA > ACAd > ACAd2/3;211;688;315;315
+ACAd5;Anterior cingulate area, dorsal part, layer 5;997/8/567/688/695/315/31/39/1015;root > grey > CH > CTX > CTXpl > Isocortex > ACA > ACAd > ACAd5;1015;688;315;315
+ACAd6a;Anterior cingulate area, dorsal part, layer 6a;997/8/567/688/695/315/31/39/919;root > grey > CH > CTX > CTXpl > Isocortex > ACA > ACAd > ACAd6a;919;688;315;315
+ACAd6b;Anterior cingulate area, dorsal part, layer 6b;997/8/567/688/695/315/31/39/927;root > grey > CH > CTX > CTXpl > Isocortex > ACA > ACAd > ACAd6b;927;688;315;315
+ACAv;Anterior cingulate area, ventral part;997/8/567/688/695/315/31/48;root > grey > CH > CTX > CTXpl > Isocortex > ACA > ACAv;48;688;315;315
+ACAv1;Anterior cingulate area, ventral part, layer 1;997/8/567/688/695/315/31/48/588;root > grey > CH > CTX > CTXpl > Isocortex > ACA > ACAv > ACAv1;588;688;315;315
+ACAv2/3;Anterior cingulate area, ventral part, layer 2/3;997/8/567/688/695/315/31/48/296;root > grey > CH > CTX > CTXpl > Isocortex > ACA > ACAv > ACAv2/3;296;688;315;315
+ACAv5;Anterior cingulate area, ventral part, layer 5;997/8/567/688/695/315/31/48/772;root > grey > CH > CTX > CTXpl > Isocortex > ACA > ACAv > ACAv5;772;688;315;315
+ACAv6a;Anterior cingulate area, ventral part, 6a;997/8/567/688/695/315/31/48/810;root > grey > CH > CTX > CTXpl > Isocortex > ACA > ACAv > ACAv6a;810;688;315;315
+ACAv6b;Anterior cingulate area, ventral part, 6b;997/8/567/688/695/315/31/48/819;root > grey > CH > CTX > CTXpl > Isocortex > ACA > ACAv > ACAv6b;819;688;315;315
+AI;Agranular insular area;997/8/567/688/695/315/95;root > grey > CH > CTX > CTXpl > Isocortex > AI;95;688;315;315
+AId;Agranular insular area, dorsal part;997/8/567/688/695/315/95/104;root > grey > CH > CTX > CTXpl > Isocortex > AI > AId;104;688;315;315
+AId1;Agranular insular area, dorsal part, layer 1;997/8/567/688/695/315/95/104/996;root > grey > CH > CTX > CTXpl > Isocortex > AI > AId > AId1;996;688;315;315
+AId2/3;Agranular insular area, dorsal part, layer 2/3;997/8/567/688/695/315/95/104/328;root > grey > CH > CTX > CTXpl > Isocortex > AI > AId > AId2/3;328;688;315;315
+AId5;Agranular insular area, dorsal part, layer 5;997/8/567/688/695/315/95/104/1101;root > grey > CH > CTX > CTXpl > Isocortex > AI > AId > AId5;1101;688;315;315
+AId6a;Agranular insular area, dorsal part, layer 6a;997/8/567/688/695/315/95/104/783;root > grey > CH > CTX > CTXpl > Isocortex > AI > AId > AId6a;783;688;315;315
+AId6b;Agranular insular area, dorsal part, layer 6b;997/8/567/688/695/315/95/104/831;root > grey > CH > CTX > CTXpl > Isocortex > AI > AId > AId6b;831;688;315;315
+AIp;Agranular insular area, posterior part;997/8/567/688/695/315/95/111;root > grey > CH > CTX > CTXpl > Isocortex > AI > AIp;111;688;315;315
+AIp1;Agranular insular area, posterior part, layer 1;997/8/567/688/695/315/95/111/120;root > grey > CH > CTX > CTXpl > Isocortex > AI > AIp > AIp1;120;688;315;315
+AIp2/3;Agranular insular area, posterior part, layer 2/3;997/8/567/688/695/315/95/111/163;root > grey > CH > CTX > CTXpl > Isocortex > AI > AIp > AIp2/3;163;688;315;315
+AIp5;Agranular insular area, posterior part, layer 5;997/8/567/688/695/315/95/111/344;root > grey > CH > CTX > CTXpl > Isocortex > AI > AIp > AIp5;344;688;315;315
+AIp6a;Agranular insular area, posterior part, layer 6a;997/8/567/688/695/315/95/111/314;root > grey > CH > CTX > CTXpl > Isocortex > AI > AIp > AIp6a;314;688;315;315
+AIp6b;Agranular insular area, posterior part, layer 6b;997/8/567/688/695/315/95/111/355;root > grey > CH > CTX > CTXpl > Isocortex > AI > AIp > AIp6b;355;688;315;315
+AIv;Agranular insular area, ventral part;997/8/567/688/695/315/95/119;root > grey > CH > CTX > CTXpl > Isocortex > AI > AIv;119;688;315;315
+AIv1;Agranular insular area, ventral part, layer 1;997/8/567/688/695/315/95/119/704;root > grey > CH > CTX > CTXpl > Isocortex > AI > AIv > AIv1;704;688;315;315
+AIv2/3;Agranular insular area, ventral part, layer 2/3;997/8/567/688/695/315/95/119/694;root > grey > CH > CTX > CTXpl > Isocortex > AI > AIv > AIv2/3;694;688;315;315
+AIv5;Agranular insular area, ventral part, layer 5;997/8/567/688/695/315/95/119/800;root > grey > CH > CTX > CTXpl > Isocortex > AI > AIv > AIv5;800;688;315;315
+AIv6a;Agranular insular area, ventral part, layer 6a;997/8/567/688/695/315/95/119/675;root > grey > CH > CTX > CTXpl > Isocortex > AI > AIv > AIv6a;675;688;315;315
+AIv6b;Agranular insular area, ventral part, layer 6b;997/8/567/688/695/315/95/119/699;root > grey > CH > CTX > CTXpl > Isocortex > AI > AIv > AIv6b;699;688;315;315
+AUD;Auditory areas;997/8/567/688/695/315/247;root > grey > CH > CTX > CTXpl > Isocortex > AUD;247;688;315;247
+AUDd;Dorsal auditory area;997/8/567/688/695/315/247/1011;root > grey > CH > CTX > CTXpl > Isocortex > AUD > AUDd;1011;688;315;247
+AUDd1;Dorsal auditory area, layer 1;997/8/567/688/695/315/247/1011/527;root > grey > CH > CTX > CTXpl > Isocortex > AUD > AUDd > AUDd1;527;688;315;247
+AUDd2/3;Dorsal auditory area, layer 2/3;997/8/567/688/695/315/247/1011/600;root > grey > CH > CTX > CTXpl > Isocortex > AUD > AUDd > AUDd2/3;600;688;315;247
+AUDd4;Dorsal auditory area, layer 4;997/8/567/688/695/315/247/1011/678;root > grey > CH > CTX > CTXpl > Isocortex > AUD > AUDd > AUDd4;678;688;315;247
+AUDd5;Dorsal auditory area, layer 5;997/8/567/688/695/315/247/1011/252;root > grey > CH > CTX > CTXpl > Isocortex > AUD > AUDd > AUDd5;252;688;315;247
+AUDd6a;Dorsal auditory area, layer 6a;997/8/567/688/695/315/247/1011/156;root > grey > CH > CTX > CTXpl > Isocortex > AUD > AUDd > AUDd6a;156;688;315;247
+AUDd6b;Dorsal auditory area, layer 6b;997/8/567/688/695/315/247/1011/243;root > grey > CH > CTX > CTXpl > Isocortex > AUD > AUDd > AUDd6b;243;688;315;247
+VISlla;Laterolateral anterior visual area;997/8/567/688/695/315/247/1011/480149230;root > grey > CH > CTX > CTXpl > Isocortex > AUD > AUDd > VISlla;480149230;688;315;247
+VISlla1;Laterolateral anterior visual area, layer 1;997/8/567/688/695/315/247/1011/480149230/480149234;root > grey > CH > CTX > CTXpl > Isocortex > AUD > AUDd > VISlla > VISlla1;480149234;688;315;247
+VISlla2/3;Laterolateral anterior visual area, layer 2/3;997/8/567/688/695/315/247/1011/480149230/480149238;root > grey > CH > CTX > CTXpl > Isocortex > AUD > AUDd > VISlla > VISlla2/3;480149238;688;315;247
+VISlla4;Laterolateral anterior visual area, layer 4;997/8/567/688/695/315/247/1011/480149230/480149242;root > grey > CH > CTX > CTXpl > Isocortex > AUD > AUDd > VISlla > VISlla4;480149242;688;315;247
+VISlla5;Laterolateral anterior visual area,layer 5;997/8/567/688/695/315/247/1011/480149230/480149246;root > grey > CH > CTX > CTXpl > Isocortex > AUD > AUDd > VISlla > VISlla5;480149246;688;315;247
+VISlla6a;Laterolateral anterior visual area, layer 6a;997/8/567/688/695/315/247/1011/480149230/480149250;root > grey > CH > CTX > CTXpl > Isocortex > AUD > AUDd > VISlla > VISlla6a;480149250;688;315;247
+VISlla6b;Laterolateral anterior visual area, layer 6b;997/8/567/688/695/315/247/1011/480149230/480149254;root > grey > CH > CTX > CTXpl > Isocortex > AUD > AUDd > VISlla > VISlla6b;480149254;688;315;247
+AUDp;Primary auditory area;997/8/567/688/695/315/247/1002;root > grey > CH > CTX > CTXpl > Isocortex > AUD > AUDp;1002;688;315;247
+AUDp1;Primary auditory area, layer 1;997/8/567/688/695/315/247/1002/735;root > grey > CH > CTX > CTXpl > Isocortex > AUD > AUDp > AUDp1;735;688;315;247
+AUDp2/3;Primary auditory area, layer 2/3;997/8/567/688/695/315/247/1002/251;root > grey > CH > CTX > CTXpl > Isocortex > AUD > AUDp > AUDp2/3;251;688;315;247
+AUDp4;Primary auditory area, layer 4;997/8/567/688/695/315/247/1002/816;root > grey > CH > CTX > CTXpl > Isocortex > AUD > AUDp > AUDp4;816;688;315;247
+AUDp5;Primary auditory area, layer 5;997/8/567/688/695/315/247/1002/847;root > grey > CH > CTX > CTXpl > Isocortex > AUD > AUDp > AUDp5;847;688;315;247
+AUDp6a;Primary auditory area, layer 6a;997/8/567/688/695/315/247/1002/954;root > grey > CH > CTX > CTXpl > Isocortex > AUD > AUDp > AUDp6a;954;688;315;247
+AUDp6b;Primary auditory area, layer 6b;997/8/567/688/695/315/247/1002/1005;root > grey > CH > CTX > CTXpl > Isocortex > AUD > AUDp > AUDp6b;1005;688;315;247
+AUDpo;Posterior auditory area;997/8/567/688/695/315/247/1027;root > grey > CH > CTX > CTXpl > Isocortex > AUD > AUDpo;1027;688;315;247
+AUDpo1;Posterior auditory area, layer 1;997/8/567/688/695/315/247/1027/696;root > grey > CH > CTX > CTXpl > Isocortex > AUD > AUDpo > AUDpo1;696;688;315;247
+AUDpo2/3;Posterior auditory area, layer 2/3;997/8/567/688/695/315/247/1027/643;root > grey > CH > CTX > CTXpl > Isocortex > AUD > AUDpo > AUDpo2/3;643;688;315;247
+AUDpo4;Posterior auditory area, layer 4;997/8/567/688/695/315/247/1027/759;root > grey > CH > CTX > CTXpl > Isocortex > AUD > AUDpo > AUDpo4;759;688;315;247
+AUDpo5;Posterior auditory area, layer 5;997/8/567/688/695/315/247/1027/791;root > grey > CH > CTX > CTXpl > Isocortex > AUD > AUDpo > AUDpo5;791;688;315;247
+AUDpo6a;Posterior auditory area, layer 6a;997/8/567/688/695/315/247/1027/249;root > grey > CH > CTX > CTXpl > Isocortex > AUD > AUDpo > AUDpo6a;249;688;315;247
+AUDpo6b;Posterior auditory area, layer 6b;997/8/567/688/695/315/247/1027/456;root > grey > CH > CTX > CTXpl > Isocortex > AUD > AUDpo > AUDpo6b;456;688;315;247
+AUDv;Ventral auditory area;997/8/567/688/695/315/247/1018;root > grey > CH > CTX > CTXpl > Isocortex > AUD > AUDv;1018;688;315;315
+AUDv1;Ventral auditory area, layer 1;997/8/567/688/695/315/247/1018/959;root > grey > CH > CTX > CTXpl > Isocortex > AUD > AUDv > AUDv1;959;688;315;315
+AUDv2/3;Ventral auditory area, layer 2/3;997/8/567/688/695/315/247/1018/755;root > grey > CH > CTX > CTXpl > Isocortex > AUD > AUDv > AUDv2/3;755;688;315;315
+AUDv4;Ventral auditory area, layer 4;997/8/567/688/695/315/247/1018/990;root > grey > CH > CTX > CTXpl > Isocortex > AUD > AUDv > AUDv4;990;688;315;315
+AUDv5;Ventral auditory area, layer 5;997/8/567/688/695/315/247/1018/1023;root > grey > CH > CTX > CTXpl > Isocortex > AUD > AUDv > AUDv5;1023;688;315;315
+AUDv6a;Ventral auditory area, layer 6a;997/8/567/688/695/315/247/1018/520;root > grey > CH > CTX > CTXpl > Isocortex > AUD > AUDv > AUDv6a;520;688;315;315
+AUDv6b;Ventral auditory area, layer 6b;997/8/567/688/695/315/247/1018/598;root > grey > CH > CTX > CTXpl > Isocortex > AUD > AUDv > AUDv6b;598;688;315;315
+ECT;Ectorhinal area;997/8/567/688/695/315/895;root > grey > CH > CTX > CTXpl > Isocortex > ECT;895;688;315;315
+ECT1;Ectorhinal area/Layer 1;997/8/567/688/695/315/895/836;root > grey > CH > CTX > CTXpl > Isocortex > ECT > ECT1;836;688;315;315
+ECT2/3;Ectorhinal area/Layer 2/3;997/8/567/688/695/315/895/427;root > grey > CH > CTX > CTXpl > Isocortex > ECT > ECT2/3;427;688;315;315
+ECT5;Ectorhinal area/Layer 5;997/8/567/688/695/315/895/988;root > grey > CH > CTX > CTXpl > Isocortex > ECT > ECT5;988;688;315;315
+ECT6a;Ectorhinal area/Layer 6a;997/8/567/688/695/315/895/977;root > grey > CH > CTX > CTXpl > Isocortex > ECT > ECT6a;977;688;315;315
+ECT6b;Ectorhinal area/Layer 6b;997/8/567/688/695/315/895/1045;root > grey > CH > CTX > CTXpl > Isocortex > ECT > ECT6b;1045;688;315;315
+FRP;Frontal pole, cerebral cortex;997/8/567/688/695/315/184;root > grey > CH > CTX > CTXpl > Isocortex > FRP;184;688;315;315
+FRP1;Frontal pole, layer 1;997/8/567/688/695/315/184/68;root > grey > CH > CTX > CTXpl > Isocortex > FRP > FRP1;68;688;315;315
+FRP2/3;Frontal pole, layer 2/3;997/8/567/688/695/315/184/667;root > grey > CH > CTX > CTXpl > Isocortex > FRP > FRP2/3;667;688;315;315
+FRP5;Frontal pole, layer 5;997/8/567/688/695/315/184/526157192;root > grey > CH > CTX > CTXpl > Isocortex > FRP > FRP5;526157192;688;315;315
+FRP6a;Frontal pole, layer 6a;997/8/567/688/695/315/184/526157196;root > grey > CH > CTX > CTXpl > Isocortex > FRP > FRP6a;526157196;688;315;315
+FRP6b;Frontal pole, layer 6b;997/8/567/688/695/315/184/526322264;root > grey > CH > CTX > CTXpl > Isocortex > FRP > FRP6b;526322264;688;315;315
+GU;Gustatory areas;997/8/567/688/695/315/1057;root > grey > CH > CTX > CTXpl > Isocortex > GU;1057;688;315;315
+GU1;Gustatory areas, layer 1;997/8/567/688/695/315/1057/36;root > grey > CH > CTX > CTXpl > Isocortex > GU > GU1;36;688;315;315
+GU2/3;Gustatory areas, layer 2/3;997/8/567/688/695/315/1057/180;root > grey > CH > CTX > CTXpl > Isocortex > GU > GU2/3;180;688;315;315
+GU4;Gustatory areas, layer 4;997/8/567/688/695/315/1057/148;root > grey > CH > CTX > CTXpl > Isocortex > GU > GU4;148;688;315;315
+GU5;Gustatory areas, layer 5;997/8/567/688/695/315/1057/187;root > grey > CH > CTX > CTXpl > Isocortex > GU > GU5;187;688;315;315
+GU6a;Gustatory areas, layer 6a;997/8/567/688/695/315/1057/638;root > grey > CH > CTX > CTXpl > Isocortex > GU > GU6a;638;688;315;315
+GU6b;Gustatory areas, layer 6b;997/8/567/688/695/315/1057/662;root > grey > CH > CTX > CTXpl > Isocortex > GU > GU6b;662;688;315;315
+ILA;Infralimbic area;997/8/567/688/695/315/44;root > grey > CH > CTX > CTXpl > Isocortex > ILA;44;688;315;315
+ILA1;Infralimbic area, layer 1;997/8/567/688/695/315/44/707;root > grey > CH > CTX > CTXpl > Isocortex > ILA > ILA1;707;688;315;315
+ILA2;Infralimbic area, layer 2;997/8/567/688/695/315/44/747;root > grey > CH > CTX > CTXpl > Isocortex > ILA > ILA2;747;688;315;315
+ILA2/3;Infralimbic area, layer 2/3;997/8/567/688/695/315/44/556;root > grey > CH > CTX > CTXpl > Isocortex > ILA > ILA2/3;556;688;315;315
+ILA5;Infralimbic area, layer 5;997/8/567/688/695/315/44/827;root > grey > CH > CTX > CTXpl > Isocortex > ILA > ILA5;827;688;315;315
+ILA6a;Infralimbic area, layer 6a;997/8/567/688/695/315/44/1054;root > grey > CH > CTX > CTXpl > Isocortex > ILA > ILA6a;1054;688;315;315
+ILA6b;Infralimbic area, layer 6b;997/8/567/688/695/315/44/1081;root > grey > CH > CTX > CTXpl > Isocortex > ILA > ILA6b;1081;688;315;315
+MO;Somatomotor areas;997/8/567/688/695/315/500;root > grey > CH > CTX > CTXpl > Isocortex > MO;500;688;315;500
+MO1;Somatomotor areas, Layer 1;997/8/567/688/695/315/500/107;root > grey > CH > CTX > CTXpl > Isocortex > MO > MO1;107;688;315;500
+MO2/3;Somatomotor areas, Layer 2/3;997/8/567/688/695/315/500/219;root > grey > CH > CTX > CTXpl > Isocortex > MO > MO2/3;219;688;315;500
+MO5;Somatomotor areas, Layer 5;997/8/567/688/695/315/500/299;root > grey > CH > CTX > CTXpl > Isocortex > MO > MO5;299;688;315;500
+MO6a;Somatomotor areas, Layer 6a;997/8/567/688/695/315/500/644;root > grey > CH > CTX > CTXpl > Isocortex > MO > MO6a;644;688;315;500
+MO6b;Somatomotor areas, Layer 6b;997/8/567/688/695/315/500/947;root > grey > CH > CTX > CTXpl > Isocortex > MO > MO6b;947;688;315;500
+MOp;Primary motor area;997/8/567/688/695/315/500/985;root > grey > CH > CTX > CTXpl > Isocortex > MO > MOp;985;688;315;500
+MOp1;Primary motor area, Layer 1;997/8/567/688/695/315/500/985/320;root > grey > CH > CTX > CTXpl > Isocortex > MO > MOp > MOp1;320;688;315;500
+MOp2/3;Primary motor area, Layer 2/3;997/8/567/688/695/315/500/985/943;root > grey > CH > CTX > CTXpl > Isocortex > MO > MOp > MOp2/3;943;688;315;500
+MOp5;Primary motor area, Layer 5;997/8/567/688/695/315/500/985/648;root > grey > CH > CTX > CTXpl > Isocortex > MO > MOp > MOp5;648;688;315;500
+MOp6a;Primary motor area, Layer 6a;997/8/567/688/695/315/500/985/844;root > grey > CH > CTX > CTXpl > Isocortex > MO > MOp > MOp6a;844;688;315;500
+MOp6b;Primary motor area, Layer 6b;997/8/567/688/695/315/500/985/882;root > grey > CH > CTX > CTXpl > Isocortex > MO > MOp > MOp6b;882;688;315;500
+MOs;Secondary motor area;997/8/567/688/695/315/500/993;root > grey > CH > CTX > CTXpl > Isocortex > MO > MOs;993;688;315;500
+MOs1;Secondary motor area, layer 1;997/8/567/688/695/315/500/993/656;root > grey > CH > CTX > CTXpl > Isocortex > MO > MOs > MOs1;656;688;315;500
+MOs2/3;Secondary motor area, layer 2/3;997/8/567/688/695/315/500/993/962;root > grey > CH > CTX > CTXpl > Isocortex > MO > MOs > MOs2/3;962;688;315;500
+MOs5;Secondary motor area, layer 5;997/8/567/688/695/315/500/993/767;root > grey > CH > CTX > CTXpl > Isocortex > MO > MOs > MOs5;767;688;315;500
+MOs6a;Secondary motor area, layer 6a;997/8/567/688/695/315/500/993/1021;root > grey > CH > CTX > CTXpl > Isocortex > MO > MOs > MOs6a;1021;688;315;500
+MOs6b;Secondary motor area, layer 6b;997/8/567/688/695/315/500/993/1085;root > grey > CH > CTX > CTXpl > Isocortex > MO > MOs > MOs6b;1085;688;315;500
+ORB;Orbital area;997/8/567/688/695/315/714;root > grey > CH > CTX > CTXpl > Isocortex > ORB;714;688;315;315
+ORB1;Orbital area, layer 1;997/8/567/688/695/315/714/264;root > grey > CH > CTX > CTXpl > Isocortex > ORB > ORB1;264;688;315;315
+ORB2/3;Orbital area, layer 2/3;997/8/567/688/695/315/714/492;root > grey > CH > CTX > CTXpl > Isocortex > ORB > ORB2/3;492;688;315;315
+ORB5;Orbital area, layer 5;997/8/567/688/695/315/714/352;root > grey > CH > CTX > CTXpl > Isocortex > ORB > ORB5;352;688;315;315
+ORB6a;Orbital area, layer 6a;997/8/567/688/695/315/714/476;root > grey > CH > CTX > CTXpl > Isocortex > ORB > ORB6a;476;688;315;315
+ORB6b;Orbital area, layer 6b;997/8/567/688/695/315/714/516;root > grey > CH > CTX > CTXpl > Isocortex > ORB > ORB6b;516;688;315;315
+ORBl;Orbital area, lateral part;997/8/567/688/695/315/714/723;root > grey > CH > CTX > CTXpl > Isocortex > ORB > ORBl;723;688;315;315
+ORBl1;Orbital area, lateral part, layer 1;997/8/567/688/695/315/714/723/448;root > grey > CH > CTX > CTXpl > Isocortex > ORB > ORBl > ORBl1;448;688;315;315
+ORBl2/3;Orbital area, lateral part, layer 2/3;997/8/567/688/695/315/714/723/412;root > grey > CH > CTX > CTXpl > Isocortex > ORB > ORBl > ORBl2/3;412;688;315;315
+ORBl5;Orbital area, lateral part, layer 5;997/8/567/688/695/315/714/723/630;root > grey > CH > CTX > CTXpl > Isocortex > ORB > ORBl > ORBl5;630;688;315;315
+ORBl6a;Orbital area, lateral part, layer 6a;997/8/567/688/695/315/714/723/440;root > grey > CH > CTX > CTXpl > Isocortex > ORB > ORBl > ORBl6a;440;688;315;315
+ORBl6b;Orbital area, lateral part, layer 6b;997/8/567/688/695/315/714/723/488;root > grey > CH > CTX > CTXpl > Isocortex > ORB > ORBl > ORBl6b;488;688;315;315
+ORBm;Orbital area, medial part;997/8/567/688/695/315/714/731;root > grey > CH > CTX > CTXpl > Isocortex > ORB > ORBm;731;688;315;315
+ORBm1;Orbital area, medial part, layer 1;997/8/567/688/695/315/714/731/484;root > grey > CH > CTX > CTXpl > Isocortex > ORB > ORBm > ORBm1;484;688;315;315
+ORBm2;Orbital area, medial part, layer 2;997/8/567/688/695/315/714/731/524;root > grey > CH > CTX > CTXpl > Isocortex > ORB > ORBm > ORBm2;524;688;315;315
+ORBm2/3;Orbital area, medial part, layer 2/3;997/8/567/688/695/315/714/731/582;root > grey > CH > CTX > CTXpl > Isocortex > ORB > ORBm > ORBm2/3;582;688;315;315
+ORBm5;Orbital area, medial part, layer 5;997/8/567/688/695/315/714/731/620;root > grey > CH > CTX > CTXpl > Isocortex > ORB > ORBm > ORBm5;620;688;315;315
+ORBm6a;Orbital area, medial part, layer 6a;997/8/567/688/695/315/714/731/910;root > grey > CH > CTX > CTXpl > Isocortex > ORB > ORBm > ORBm6a;910;688;315;315
+ORBm6b;Orbital area, medial part, layer 6b;997/8/567/688/695/315/714/731/527696977;root > grey > CH > CTX > CTXpl > Isocortex > ORB > ORBm > ORBm6b;527696977;688;315;315
+ORBv;Orbital area, ventral part;997/8/567/688/695/315/714/738;root > grey > CH > CTX > CTXpl > Isocortex > ORB > ORBv;738;688;315;315
+ORBvl;Orbital area, ventrolateral part;997/8/567/688/695/315/714/746;root > grey > CH > CTX > CTXpl > Isocortex > ORB > ORBvl;746;688;315;315
+ORBvl1;Orbital area, ventrolateral part, layer 1;997/8/567/688/695/315/714/746/969;root > grey > CH > CTX > CTXpl > Isocortex > ORB > ORBvl > ORBvl1;969;688;315;315
+ORBvl2/3;Orbital area, ventrolateral part, layer 2/3;997/8/567/688/695/315/714/746/288;root > grey > CH > CTX > CTXpl > Isocortex > ORB > ORBvl > ORBvl2/3;288;688;315;315
+ORBvl5;Orbital area, ventrolateral part, layer 5;997/8/567/688/695/315/714/746/1125;root > grey > CH > CTX > CTXpl > Isocortex > ORB > ORBvl > ORBvl5;1125;688;315;315
+ORBvl6a;Orbital area, ventrolateral part, layer 6a;997/8/567/688/695/315/714/746/608;root > grey > CH > CTX > CTXpl > Isocortex > ORB > ORBvl > ORBvl6a;608;688;315;315
+ORBvl6b;Orbital area, ventrolateral part, layer 6b;997/8/567/688/695/315/714/746/680;root > grey > CH > CTX > CTXpl > Isocortex > ORB > ORBvl > ORBvl6b;680;688;315;315
+PERI;Perirhinal area;997/8/567/688/695/315/922;root > grey > CH > CTX > CTXpl > Isocortex > PERI;922;688;315;315
+PERI1;Perirhinal area, layer 1;997/8/567/688/695/315/922/540;root > grey > CH > CTX > CTXpl > Isocortex > PERI > PERI1;540;688;315;315
+PERI2/3;Perirhinal area, layer 2/3;997/8/567/688/695/315/922/888;root > grey > CH > CTX > CTXpl > Isocortex > PERI > PERI2/3;888;688;315;315
+PERI5;Perirhinal area, layer 5;997/8/567/688/695/315/922/692;root > grey > CH > CTX > CTXpl > Isocortex > PERI > PERI5;692;688;315;315
+PERI6a;Perirhinal area, layer 6a;997/8/567/688/695/315/922/335;root > grey > CH > CTX > CTXpl > Isocortex > PERI > PERI6a;335;688;315;315
+PERI6b;Perirhinal area, layer 6b;997/8/567/688/695/315/922/368;root > grey > CH > CTX > CTXpl > Isocortex > PERI > PERI6b;368;688;315;315
+PL;Prelimbic area;997/8/567/688/695/315/972;root > grey > CH > CTX > CTXpl > Isocortex > PL;972;688;315;315
+PL1;Prelimbic area, layer 1;997/8/567/688/695/315/972/171;root > grey > CH > CTX > CTXpl > Isocortex > PL > PL1;171;688;315;315
+PL2;Prelimbic area, layer 2;997/8/567/688/695/315/972/195;root > grey > CH > CTX > CTXpl > Isocortex > PL > PL2;195;688;315;315
+PL2/3;Prelimbic area, layer 2/3;997/8/567/688/695/315/972/304;root > grey > CH > CTX > CTXpl > Isocortex > PL > PL2/3;304;688;315;315
+PL5;Prelimbic area, layer 5;997/8/567/688/695/315/972/363;root > grey > CH > CTX > CTXpl > Isocortex > PL > PL5;363;688;315;315
+PL6a;Prelimbic area, layer 6a;997/8/567/688/695/315/972/84;root > grey > CH > CTX > CTXpl > Isocortex > PL > PL6a;84;688;315;315
+PL6b;Prelimbic area, layer 6b;997/8/567/688/695/315/972/132;root > grey > CH > CTX > CTXpl > Isocortex > PL > PL6b;132;688;315;315
+PTLp;Posterior parietal association areas;997/8/567/688/695/315/22;root > grey > CH > CTX > CTXpl > Isocortex > PTLp;22;688;315;315
+PTLp1;Posterior parietal association areas, layer 1;997/8/567/688/695/315/22/532;root > grey > CH > CTX > CTXpl > Isocortex > PTLp > PTLp1;532;688;315;315
+PTLp2/3;Posterior parietal association areas, layer 2/3;997/8/567/688/695/315/22/241;root > grey > CH > CTX > CTXpl > Isocortex > PTLp > PTLp2/3;241;688;315;315
+PTLp4;Posterior parietal association areas, layer 4;997/8/567/688/695/315/22/635;root > grey > CH > CTX > CTXpl > Isocortex > PTLp > PTLp4;635;688;315;315
+PTLp5;Posterior parietal association areas, layer 5;997/8/567/688/695/315/22/683;root > grey > CH > CTX > CTXpl > Isocortex > PTLp > PTLp5;683;688;315;315
+PTLp6a;Posterior parietal association areas, layer 6a;997/8/567/688/695/315/22/308;root > grey > CH > CTX > CTXpl > Isocortex > PTLp > PTLp6a;308;688;315;315
+PTLp6b;Posterior parietal association areas, layer 6b;997/8/567/688/695/315/22/340;root > grey > CH > CTX > CTXpl > Isocortex > PTLp > PTLp6b;340;688;315;315
+VISa;Anterior area;997/8/567/688/695/315/22/312782546;root > grey > CH > CTX > CTXpl > Isocortex > PTLp > VISa;312782546;688;315;315
+VISa1;Anterior area, layer 1;997/8/567/688/695/315/22/312782546/312782550;root > grey > CH > CTX > CTXpl > Isocortex > PTLp > VISa > VISa1;312782550;688;315;315
+VISa2/3;Anterior area, layer 2/3;997/8/567/688/695/315/22/312782546/312782554;root > grey > CH > CTX > CTXpl > Isocortex > PTLp > VISa > VISa2/3;312782554;688;315;315
+VISa4;Anterior area, layer 4;997/8/567/688/695/315/22/312782546/312782558;root > grey > CH > CTX > CTXpl > Isocortex > PTLp > VISa > VISa4;312782558;688;315;315
+VISa5;Anterior area, layer 5;997/8/567/688/695/315/22/312782546/312782562;root > grey > CH > CTX > CTXpl > Isocortex > PTLp > VISa > VISa5;312782562;688;315;315
+VISa6a;Anterior area, layer 6a;997/8/567/688/695/315/22/312782546/312782566;root > grey > CH > CTX > CTXpl > Isocortex > PTLp > VISa > VISa6a;312782566;688;315;315
+VISa6b;Anterior area, layer 6b;997/8/567/688/695/315/22/312782546/312782570;root > grey > CH > CTX > CTXpl > Isocortex > PTLp > VISa > VISa6b;312782570;688;315;315
+VISrl;Rostrolateral visual area;997/8/567/688/695/315/22/417;root > grey > CH > CTX > CTXpl > Isocortex > PTLp > VISrl;417;688;315;315
+VISrl1;Rostrolateral area, layer 1;997/8/567/688/695/315/22/417/312782604;root > grey > CH > CTX > CTXpl > Isocortex > PTLp > VISrl > VISrl1;312782604;688;315;315
+VISrl2/3;Rostrolateral area, layer 2/3;997/8/567/688/695/315/22/417/312782608;root > grey > CH > CTX > CTXpl > Isocortex > PTLp > VISrl > VISrl2/3;312782608;688;315;315
+VISrl4;Rostrolateral area, layer 4;997/8/567/688/695/315/22/417/312782612;root > grey > CH > CTX > CTXpl > Isocortex > PTLp > VISrl > VISrl4;312782612;688;315;315
+VISrl5;Rostrolateral area, layer 5;997/8/567/688/695/315/22/417/312782616;root > grey > CH > CTX > CTXpl > Isocortex > PTLp > VISrl > VISrl5;312782616;688;315;315
+VISrl6a;Rostrolateral area, layer 6a;997/8/567/688/695/315/22/417/312782620;root > grey > CH > CTX > CTXpl > Isocortex > PTLp > VISrl > VISrl6a;312782620;688;315;315
+VISrl6b;Rostrolateral area, layer 6b;997/8/567/688/695/315/22/417/312782624;root > grey > CH > CTX > CTXpl > Isocortex > PTLp > VISrl > VISrl6b;312782624;688;315;315
+RSP;Retrosplenial area;997/8/567/688/695/315/254;root > grey > CH > CTX > CTXpl > Isocortex > RSP;254;688;315;315
+RSPagl;Retrosplenial area, lateral agranular part;997/8/567/688/695/315/254/894;root > grey > CH > CTX > CTXpl > Isocortex > RSP > RSPagl;894;688;315;315
+RSPagl1;Retrosplenial area, lateral agranular part, layer 1;997/8/567/688/695/315/254/894/671;root > grey > CH > CTX > CTXpl > Isocortex > RSP > RSPagl > RSPagl1;671;688;315;315
+RSPagl2/3;Retrosplenial area, lateral agranular part, layer 2/3;997/8/567/688/695/315/254/894/965;root > grey > CH > CTX > CTXpl > Isocortex > RSP > RSPagl > RSPagl2/3;965;688;315;315
+RSPagl5;Retrosplenial area, lateral agranular part, layer 5;997/8/567/688/695/315/254/894/774;root > grey > CH > CTX > CTXpl > Isocortex > RSP > RSPagl > RSPagl5;774;688;315;315
+RSPagl6a;Retrosplenial area, lateral agranular part, layer 6a;997/8/567/688/695/315/254/894/906;root > grey > CH > CTX > CTXpl > Isocortex > RSP > RSPagl > RSPagl6a;906;688;315;315
+RSPagl6b;Retrosplenial area, lateral agranular part, layer 6b;997/8/567/688/695/315/254/894/279;root > grey > CH > CTX > CTXpl > Isocortex > RSP > RSPagl > RSPagl6b;279;688;315;315
+VISm;Medial visual area;997/8/567/688/695/315/254/894/480149314;root > grey > CH > CTX > CTXpl > Isocortex > RSP > RSPagl > VISm;480149314;688;315;315
+VISm1;Medial visual area, layer 1;997/8/567/688/695/315/254/894/480149314/480149318;root > grey > CH > CTX > CTXpl > Isocortex > RSP > RSPagl > VISm > VISm1;480149318;688;315;315
+VISm2/3;Medial visual area, layer 2/3;997/8/567/688/695/315/254/894/480149314/480149322;root > grey > CH > CTX > CTXpl > Isocortex > RSP > RSPagl > VISm > VISm2/3;480149322;688;315;315
+VISm4;Medial visual area, layer 4;997/8/567/688/695/315/254/894/480149314/480149326;root > grey > CH > CTX > CTXpl > Isocortex > RSP > RSPagl > VISm > VISm4;480149326;688;315;315
+VISm5;Medial visual area,layer 5;997/8/567/688/695/315/254/894/480149314/480149330;root > grey > CH > CTX > CTXpl > Isocortex > RSP > RSPagl > VISm > VISm5;480149330;688;315;315
+VISm6a;Medial visual area, layer 6a;997/8/567/688/695/315/254/894/480149314/480149334;root > grey > CH > CTX > CTXpl > Isocortex > RSP > RSPagl > VISm > VISm6a;480149334;688;315;315
+VISm6b;Medial visual area, layer 6b;997/8/567/688/695/315/254/894/480149314/480149338;root > grey > CH > CTX > CTXpl > Isocortex > RSP > RSPagl > VISm > VISm6b;480149338;688;315;315
+VISmma;Mediomedial anterior visual area;997/8/567/688/695/315/254/894/480149258;root > grey > CH > CTX > CTXpl > Isocortex > RSP > RSPagl > VISmma;480149258;688;315;315
+VISmma1;Mediomedial anterior visual area, layer 1;997/8/567/688/695/315/254/894/480149258/480149262;root > grey > CH > CTX > CTXpl > Isocortex > RSP > RSPagl > VISmma > VISmma1;480149262;688;315;315
+VISmma2/3;Mediomedial anterior visual area, layer 2/3;997/8/567/688/695/315/254/894/480149258/480149266;root > grey > CH > CTX > CTXpl > Isocortex > RSP > RSPagl > VISmma > VISmma2/3;480149266;688;315;315
+VISmma4;Mediomedial anterior visual area, layer 4;997/8/567/688/695/315/254/894/480149258/480149270;root > grey > CH > CTX > CTXpl > Isocortex > RSP > RSPagl > VISmma > VISmma4;480149270;688;315;315
+VISmma5;Mediomedial anterior visual area,layer 5;997/8/567/688/695/315/254/894/480149258/480149274;root > grey > CH > CTX > CTXpl > Isocortex > RSP > RSPagl > VISmma > VISmma5;480149274;688;315;315
+VISmma6a;Mediomedial anterior visual area, layer 6a;997/8/567/688/695/315/254/894/480149258/480149278;root > grey > CH > CTX > CTXpl > Isocortex > RSP > RSPagl > VISmma > VISmma6a;480149278;688;315;315
+VISmma6b;Mediomedial anterior visual area, layer 6b;997/8/567/688/695/315/254/894/480149258/480149282;root > grey > CH > CTX > CTXpl > Isocortex > RSP > RSPagl > VISmma > VISmma6b;480149282;688;315;315
+VISmmp;Mediomedial posterior visual area;997/8/567/688/695/315/254/894/480149286;root > grey > CH > CTX > CTXpl > Isocortex > RSP > RSPagl > VISmmp;480149286;688;315;315
+VISmmp1;Mediomedial posterior visual area, layer 1;997/8/567/688/695/315/254/894/480149286/480149290;root > grey > CH > CTX > CTXpl > Isocortex > RSP > RSPagl > VISmmp > VISmmp1;480149290;688;315;315
+VISmmp2/3;Mediomedial posterior visual area, layer 2/3;997/8/567/688/695/315/254/894/480149286/480149294;root > grey > CH > CTX > CTXpl > Isocortex > RSP > RSPagl > VISmmp > VISmmp2/3;480149294;688;315;315
+VISmmp4;Mediomedial posterior visual area, layer 4;997/8/567/688/695/315/254/894/480149286/480149298;root > grey > CH > CTX > CTXpl > Isocortex > RSP > RSPagl > VISmmp > VISmmp4;480149298;688;315;315
+VISmmp5;Mediomedial posterior visual area,layer 5;997/8/567/688/695/315/254/894/480149286/480149302;root > grey > CH > CTX > CTXpl > Isocortex > RSP > RSPagl > VISmmp > VISmmp5;480149302;688;315;315
+VISmmp6a;Mediomedial posterior visual area, layer 6a;997/8/567/688/695/315/254/894/480149286/480149306;root > grey > CH > CTX > CTXpl > Isocortex > RSP > RSPagl > VISmmp > VISmmp6a;480149306;688;315;315
+VISmmp6b;Mediomedial posterior visual area, layer 6b;997/8/567/688/695/315/254/894/480149286/480149310;root > grey > CH > CTX > CTXpl > Isocortex > RSP > RSPagl > VISmmp > VISmmp6b;480149310;688;315;315
+RSPd;Retrosplenial area, dorsal part;997/8/567/688/695/315/254/879;root > grey > CH > CTX > CTXpl > Isocortex > RSP > RSPd;879;688;315;315
+RSPd1;Retrosplenial area, dorsal part, layer 1;997/8/567/688/695/315/254/879/442;root > grey > CH > CTX > CTXpl > Isocortex > RSP > RSPd > RSPd1;442;688;315;315
+RSPd2/3;Retrosplenial area, dorsal part, layer 2/3;997/8/567/688/695/315/254/879/434;root > grey > CH > CTX > CTXpl > Isocortex > RSP > RSPd > RSPd2/3;434;688;315;315
+RSPd4;Retrosplenial area, dorsal part, layer 4;997/8/567/688/695/315/254/879/545;root > grey > CH > CTX > CTXpl > Isocortex > RSP > RSPd > RSPd4;545;688;315;315
+RSPd5;Retrosplenial area, dorsal part, layer 5;997/8/567/688/695/315/254/879/610;root > grey > CH > CTX > CTXpl > Isocortex > RSP > RSPd > RSPd5;610;688;315;315
+RSPd6a;Retrosplenial area, dorsal part, layer 6a;997/8/567/688/695/315/254/879/274;root > grey > CH > CTX > CTXpl > Isocortex > RSP > RSPd > RSPd6a;274;688;315;315
+RSPd6b;Retrosplenial area, dorsal part, layer 6b;997/8/567/688/695/315/254/879/330;root > grey > CH > CTX > CTXpl > Isocortex > RSP > RSPd > RSPd6b;330;688;315;315
+RSPv;Retrosplenial area, ventral part;997/8/567/688/695/315/254/886;root > grey > CH > CTX > CTXpl > Isocortex > RSP > RSPv;886;688;315;315
+RSPv1;Retrosplenial area, ventral part, layer 1;997/8/567/688/695/315/254/886/542;root > grey > CH > CTX > CTXpl > Isocortex > RSP > RSPv > RSPv1;542;688;315;315
+RSPv2;Retrosplenial area, ventral part, layer 2;997/8/567/688/695/315/254/886/606;root > grey > CH > CTX > CTXpl > Isocortex > RSP > RSPv > RSPv2;606;688;315;315
+RSPv2/3;Retrosplenial area, ventral part, layer 2/3;997/8/567/688/695/315/254/886/430;root > grey > CH > CTX > CTXpl > Isocortex > RSP > RSPv > RSPv2/3;430;688;315;315
+RSPv5;Retrosplenial area, ventral part, layer 5;997/8/567/688/695/315/254/886/687;root > grey > CH > CTX > CTXpl > Isocortex > RSP > RSPv > RSPv5;687;688;315;315
+RSPv6a;Retrosplenial area, ventral part, layer 6a;997/8/567/688/695/315/254/886/590;root > grey > CH > CTX > CTXpl > Isocortex > RSP > RSPv > RSPv6a;590;688;315;315
+RSPv6b;Retrosplenial area, ventral part, layer 6b;997/8/567/688/695/315/254/886/622;root > grey > CH > CTX > CTXpl > Isocortex > RSP > RSPv > RSPv6b;622;688;315;315
+SS;Somatosensory areas;997/8/567/688/695/315/453;root > grey > CH > CTX > CTXpl > Isocortex > SS;453;688;315;315
+SS1;Somatosensory areas, layer 1;997/8/567/688/695/315/453/12993;root > grey > CH > CTX > CTXpl > Isocortex > SS > SS1;12993;688;315;315
+SS2/3;Somatosensory areas, layer 2/3;997/8/567/688/695/315/453/12994;root > grey > CH > CTX > CTXpl > Isocortex > SS > SS2/3;12994;688;315;315
+SS4;Somatosensory areas, layer 4;997/8/567/688/695/315/453/12995;root > grey > CH > CTX > CTXpl > Isocortex > SS > SS4;12995;688;315;315
+SS5;Somatosensory areas, layer 5;997/8/567/688/695/315/453/12996;root > grey > CH > CTX > CTXpl > Isocortex > SS > SS5;12996;688;315;315
+SS6a;Somatosensory areas, layer 6a;997/8/567/688/695/315/453/12997;root > grey > CH > CTX > CTXpl > Isocortex > SS > SS6a;12997;688;315;315
+SS6b;Somatosensory areas, layer 6b;997/8/567/688/695/315/453/12998;root > grey > CH > CTX > CTXpl > Isocortex > SS > SS6b;12998;688;315;315
+SSp;Primary somatosensory area;997/8/567/688/695/315/453/322;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSp;322;688;315;322
+SSp-bfd;Primary somatosensory area, barrel field;997/8/567/688/695/315/453/322/329;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSp > SSp-bfd;329;688;315;329
+SSp-bfd1;Primary somatosensory area, barrel field, layer 1;997/8/567/688/695/315/453/322/329/981;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSp > SSp-bfd > SSp-bfd1;981;688;315;329
+SSp-bfd2/3;Primary somatosensory area, barrel field, layer 2/3;997/8/567/688/695/315/453/322/329/201;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSp > SSp-bfd > SSp-bfd2/3;201;688;315;329
+SSp-bfd4;Primary somatosensory area, barrel field, layer 4;997/8/567/688/695/315/453/322/329/1047;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSp > SSp-bfd > SSp-bfd4;1047;688;315;329
+SSp-bfd5;Primary somatosensory area, barrel field, layer 5;997/8/567/688/695/315/453/322/329/1070;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSp > SSp-bfd > SSp-bfd5;1070;688;315;329
+SSp-bfd6a;Primary somatosensory area, barrel field, layer 6a;997/8/567/688/695/315/453/322/329/1038;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSp > SSp-bfd > SSp-bfd6a;1038;688;315;329
+SSp-bfd6b;Primary somatosensory area, barrel field, layer 6b;997/8/567/688/695/315/453/322/329/1062;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSp > SSp-bfd > SSp-bfd6b;1062;688;315;329
+VISrll;Rostrolateral lateral visual area;997/8/567/688/695/315/453/322/329/480149202;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSp > SSp-bfd > VISrll;480149202;688;315;329
+VISrll1;Rostrolateral lateral visual area, layer 1;997/8/567/688/695/315/453/322/329/480149202/480149206;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSp > SSp-bfd > VISrll > VISrll1;480149206;688;315;329
+VISrll2/3;Rostrolateral lateral visual area, layer 2/3;997/8/567/688/695/315/453/322/329/480149202/480149210;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSp > SSp-bfd > VISrll > VISrll2/3;480149210;688;315;329
+VISrll4;Rostrolateral lateral visual area, layer 4;997/8/567/688/695/315/453/322/329/480149202/480149214;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSp > SSp-bfd > VISrll > VISrll4;480149214;688;315;329
+VISrll5;Rostrolateral lateral visual area,layer 5;997/8/567/688/695/315/453/322/329/480149202/480149218;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSp > SSp-bfd > VISrll > VISrll5;480149218;688;315;329
+VISrll6a;Rostrolateral lateral visual area, layer 6a;997/8/567/688/695/315/453/322/329/480149202/480149222;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSp > SSp-bfd > VISrll > VISrll6a;480149222;688;315;329
+VISrll6b;Rostrolateral lateral visual area, layer 6b;997/8/567/688/695/315/453/322/329/480149202/480149226;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSp > SSp-bfd > VISrll > VISrll6b;480149226;688;315;329
+SSp-ll;Primary somatosensory area, lower limb;997/8/567/688/695/315/453/322/337;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSp > SSp-ll;337;688;315;322
+SSp-ll1;Primary somatosensory area, lower limb, layer 1;997/8/567/688/695/315/453/322/337/1030;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSp > SSp-ll > SSp-ll1;1030;688;315;322
+SSp-ll2/3;Primary somatosensory area, lower limb, layer 2/3;997/8/567/688/695/315/453/322/337/113;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSp > SSp-ll > SSp-ll2/3;113;688;315;322
+SSp-ll4;Primary somatosensory area, lower limb, layer 4;997/8/567/688/695/315/453/322/337/1094;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSp > SSp-ll > SSp-ll4;1094;688;315;322
+SSp-ll5;Primary somatosensory area, lower limb, layer 5;997/8/567/688/695/315/453/322/337/1128;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSp > SSp-ll > SSp-ll5;1128;688;315;322
+SSp-ll6a;Primary somatosensory area, lower limb, layer 6a;997/8/567/688/695/315/453/322/337/478;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSp > SSp-ll > SSp-ll6a;478;688;315;322
+SSp-ll6b;Primary somatosensory area, lower limb, layer 6b;997/8/567/688/695/315/453/322/337/510;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSp > SSp-ll > SSp-ll6b;510;688;315;322
+SSp-m;Primary somatosensory area, mouth;997/8/567/688/695/315/453/322/345;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSp > SSp-m;345;688;315;322
+SSp-m1;Primary somatosensory area, mouth, layer 1;997/8/567/688/695/315/453/322/345/878;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSp > SSp-m > SSp-m1;878;688;315;322
+SSp-m2/3;Primary somatosensory area, mouth, layer 2/3;997/8/567/688/695/315/453/322/345/657;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSp > SSp-m > SSp-m2/3;657;688;315;322
+SSp-m4;Primary somatosensory area, mouth, layer 4;997/8/567/688/695/315/453/322/345/950;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSp > SSp-m > SSp-m4;950;688;315;322
+SSp-m5;Primary somatosensory area, mouth, layer 5;997/8/567/688/695/315/453/322/345/974;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSp > SSp-m > SSp-m5;974;688;315;322
+SSp-m6a;Primary somatosensory area, mouth, layer 6a;997/8/567/688/695/315/453/322/345/1102;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSp > SSp-m > SSp-m6a;1102;688;315;322
+SSp-m6b;Primary somatosensory area, mouth, layer 6b;997/8/567/688/695/315/453/322/345/2;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSp > SSp-m > SSp-m6b;2;688;315;322
+SSp-n;Primary somatosensory area, nose;997/8/567/688/695/315/453/322/353;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSp > SSp-n;353;688;315;329
+SSp-n1;Primary somatosensory area, nose, layer 1;997/8/567/688/695/315/453/322/353/558;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSp > SSp-n > SSp-n1;558;688;315;329
+SSp-n2/3;Primary somatosensory area, nose, layer 2/3;997/8/567/688/695/315/453/322/353/838;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSp > SSp-n > SSp-n2/3;838;688;315;329
+SSp-n4;Primary somatosensory area, nose, layer 4;997/8/567/688/695/315/453/322/353/654;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSp > SSp-n > SSp-n4;654;688;315;329
+SSp-n5;Primary somatosensory area, nose, layer 5;997/8/567/688/695/315/453/322/353/702;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSp > SSp-n > SSp-n5;702;688;315;329
+SSp-n6a;Primary somatosensory area, nose, layer 6a;997/8/567/688/695/315/453/322/353/889;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSp > SSp-n > SSp-n6a;889;688;315;329
+SSp-n6b;Primary somatosensory area, nose, layer 6b;997/8/567/688/695/315/453/322/353/929;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSp > SSp-n > SSp-n6b;929;688;315;329
+SSp-tr;Primary somatosensory area, trunk;997/8/567/688/695/315/453/322/361;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSp > SSp-tr;361;688;315;322
+SSp-tr1;Primary somatosensory area, trunk, layer 1;997/8/567/688/695/315/453/322/361/1006;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSp > SSp-tr > SSp-tr1;1006;688;315;322
+SSp-tr2/3;Primary somatosensory area, trunk, layer 2/3;997/8/567/688/695/315/453/322/361/670;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSp > SSp-tr > SSp-tr2/3;670;688;315;322
+SSp-tr4;Primary somatosensory area, trunk, layer 4;997/8/567/688/695/315/453/322/361/1086;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSp > SSp-tr > SSp-tr4;1086;688;315;322
+SSp-tr5;Primary somatosensory area, trunk, layer 5;997/8/567/688/695/315/453/322/361/1111;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSp > SSp-tr > SSp-tr5;1111;688;315;322
+SSp-tr6a;Primary somatosensory area, trunk, layer 6a;997/8/567/688/695/315/453/322/361/9;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSp > SSp-tr > SSp-tr6a;9;688;315;322
+SSp-tr6b;Primary somatosensory area, trunk, layer 6b;997/8/567/688/695/315/453/322/361/461;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSp > SSp-tr > SSp-tr6b;461;688;315;322
+SSp-ul;Primary somatosensory area, upper limb;997/8/567/688/695/315/453/322/369;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSp > SSp-ul;369;688;315;322
+SSp-ul1;Primary somatosensory area, upper limb, layer 1;997/8/567/688/695/315/453/322/369/450;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSp > SSp-ul > SSp-ul1;450;688;315;322
+SSp-ul2/3;Primary somatosensory area, upper limb, layer 2/3;997/8/567/688/695/315/453/322/369/854;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSp > SSp-ul > SSp-ul2/3;854;688;315;322
+SSp-ul4;Primary somatosensory area, upper limb, layer 4;997/8/567/688/695/315/453/322/369/577;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSp > SSp-ul > SSp-ul4;577;688;315;322
+SSp-ul5;Primary somatosensory area, upper limb, layer 5;997/8/567/688/695/315/453/322/369/625;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSp > SSp-ul > SSp-ul5;625;688;315;322
+SSp-ul6a;Primary somatosensory area, upper limb, layer 6a;997/8/567/688/695/315/453/322/369/945;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSp > SSp-ul > SSp-ul6a;945;688;315;322
+SSp-ul6b;Primary somatosensory area, upper limb, layer 6b;997/8/567/688/695/315/453/322/369/1026;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSp > SSp-ul > SSp-ul6b;1026;688;315;322
+SSp-un;Primary somatosensory area, unassigned;997/8/567/688/695/315/453/322/182305689;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSp > SSp-un;182305689;688;315;322
+SSp-un1;Primary somatosensory area, unassigned, layer 1;997/8/567/688/695/315/453/322/182305689/182305693;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSp > SSp-un > SSp-un1;182305693;688;315;322
+SSp-un2/3;Primary somatosensory area, unassigned, layer 2/3;997/8/567/688/695/315/453/322/182305689/182305697;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSp > SSp-un > SSp-un2/3;182305697;688;315;322
+SSp-un4;Primary somatosensory area, unassigned, layer 4;997/8/567/688/695/315/453/322/182305689/182305701;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSp > SSp-un > SSp-un4;182305701;688;315;322
+SSp-un5;Primary somatosensory area, unassigned, layer 5;997/8/567/688/695/315/453/322/182305689/182305705;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSp > SSp-un > SSp-un5;182305705;688;315;322
+SSp-un6a;Primary somatosensory area, unassigned, layer 6a;997/8/567/688/695/315/453/322/182305689/182305709;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSp > SSp-un > SSp-un6a;182305709;688;315;322
+SSp-un6b;Primary somatosensory area, unassigned, layer 6b;997/8/567/688/695/315/453/322/182305689/182305713;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSp > SSp-un > SSp-un6b;182305713;688;315;322
+SSp1;Primary somatosensory area, layer 1;997/8/567/688/695/315/453/322/793;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSp > SSp1;793;688;315;322
+SSp2/3;Primary somatosensory area, layer 2/3;997/8/567/688/695/315/453/322/346;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSp > SSp2/3;346;688;315;322
+SSp4;Primary somatosensory area, layer 4;997/8/567/688/695/315/453/322/865;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSp > SSp4;865;688;315;322
+SSp5;Primary somatosensory area, layer 5;997/8/567/688/695/315/453/322/921;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSp > SSp5;921;688;315;322
+SSp6a;Primary somatosensory area, layer 6a;997/8/567/688/695/315/453/322/686;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSp > SSp6a;686;688;315;322
+SSp6b;Primary somatosensory area, layer 6b;997/8/567/688/695/315/453/322/719;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSp > SSp6b;719;688;315;322
+SSs;Supplemental somatosensory area;997/8/567/688/695/315/453/378;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSs;378;688;315;378
+SSs1;Supplemental somatosensory area, layer 1;997/8/567/688/695/315/453/378/873;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSs > SSs1;873;688;315;378
+SSs2/3;Supplemental somatosensory area, layer 2/3;997/8/567/688/695/315/453/378/806;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSs > SSs2/3;806;688;315;378
+SSs4;Supplemental somatosensory area, layer 4;997/8/567/688/695/315/453/378/1035;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSs > SSs4;1035;688;315;378
+SSs5;Supplemental somatosensory area, layer 5;997/8/567/688/695/315/453/378/1090;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSs > SSs5;1090;688;315;378
+SSs6a;Supplemental somatosensory area, layer 6a;997/8/567/688/695/315/453/378/862;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSs > SSs6a;862;688;315;378
+SSs6b;Supplemental somatosensory area, layer 6b;997/8/567/688/695/315/453/378/893;root > grey > CH > CTX > CTXpl > Isocortex > SS > SSs > SSs6b;893;688;315;378
+TEa;Temporal association areas;997/8/567/688/695/315/541;root > grey > CH > CTX > CTXpl > Isocortex > TEa;541;688;315;315
+TEa1;Temporal association areas, layer 1;997/8/567/688/695/315/541/97;root > grey > CH > CTX > CTXpl > Isocortex > TEa > TEa1;97;688;315;315
+TEa2/3;Temporal association areas, layer 2/3;997/8/567/688/695/315/541/1127;root > grey > CH > CTX > CTXpl > Isocortex > TEa > TEa2/3;1127;688;315;315
+TEa4;Temporal association areas, layer 4;997/8/567/688/695/315/541/234;root > grey > CH > CTX > CTXpl > Isocortex > TEa > TEa4;234;688;315;315
+TEa5;Temporal association areas, layer 5;997/8/567/688/695/315/541/289;root > grey > CH > CTX > CTXpl > Isocortex > TEa > TEa5;289;688;315;315
+TEa6a;Temporal association areas, layer 6a;997/8/567/688/695/315/541/729;root > grey > CH > CTX > CTXpl > Isocortex > TEa > TEa6a;729;688;315;315
+TEa6b;Temporal association areas, layer 6b;997/8/567/688/695/315/541/786;root > grey > CH > CTX > CTXpl > Isocortex > TEa > TEa6b;786;688;315;315
+VIS;Visual areas;997/8/567/688/695/315/669;root > grey > CH > CTX > CTXpl > Isocortex > VIS;669;688;315;669
+VIS1;Visual areas, layer 1;997/8/567/688/695/315/669/801;root > grey > CH > CTX > CTXpl > Isocortex > VIS > VIS1;801;688;315;669
+VIS2/3;Visual areas, layer 2/3;997/8/567/688/695/315/669/561;root > grey > CH > CTX > CTXpl > Isocortex > VIS > VIS2/3;561;688;315;669
+VIS4;Visual areas, layer 4;997/8/567/688/695/315/669/913;root > grey > CH > CTX > CTXpl > Isocortex > VIS > VIS4;913;688;315;669
+VIS5;Visual areas, layer 5;997/8/567/688/695/315/669/937;root > grey > CH > CTX > CTXpl > Isocortex > VIS > VIS5;937;688;315;669
+VIS6a;Visual areas, layer 6a;997/8/567/688/695/315/669/457;root > grey > CH > CTX > CTXpl > Isocortex > VIS > VIS6a;457;688;315;669
+VIS6b;Visual areas, layer 6b;997/8/567/688/695/315/669/497;root > grey > CH > CTX > CTXpl > Isocortex > VIS > VIS6b;497;688;315;669
+VISal;Anterolateral visual area;997/8/567/688/695/315/669/402;root > grey > CH > CTX > CTXpl > Isocortex > VIS > VISal;402;688;315;315
+VISal1;Anterolateral visual area, layer 1;997/8/567/688/695/315/669/402/1074;root > grey > CH > CTX > CTXpl > Isocortex > VIS > VISal > VISal1;1074;688;315;315
+VISal2/3;Anterolateral visual area, layer 2/3;997/8/567/688/695/315/669/402/905;root > grey > CH > CTX > CTXpl > Isocortex > VIS > VISal > VISal2/3;905;688;315;315
+VISal4;Anterolateral visual area, layer 4;997/8/567/688/695/315/669/402/1114;root > grey > CH > CTX > CTXpl > Isocortex > VIS > VISal > VISal4;1114;688;315;315
+VISal5;Anterolateral visual area, layer 5;997/8/567/688/695/315/669/402/233;root > grey > CH > CTX > CTXpl > Isocortex > VIS > VISal > VISal5;233;688;315;315
+VISal6a;Anterolateral visual area, layer 6a;997/8/567/688/695/315/669/402/601;root > grey > CH > CTX > CTXpl > Isocortex > VIS > VISal > VISal6a;601;688;315;315
+VISal6b;Anterolateral visual area, layer 6b;997/8/567/688/695/315/669/402/649;root > grey > CH > CTX > CTXpl > Isocortex > VIS > VISal > VISal6b;649;688;315;315
+VISam;Anteromedial visual area;997/8/567/688/695/315/669/394;root > grey > CH > CTX > CTXpl > Isocortex > VIS > VISam;394;688;315;315
+VISam1;Anteromedial visual area, layer 1;997/8/567/688/695/315/669/394/281;root > grey > CH > CTX > CTXpl > Isocortex > VIS > VISam > VISam1;281;688;315;315
+VISam2/3;Anteromedial visual area, layer 2/3;997/8/567/688/695/315/669/394/1066;root > grey > CH > CTX > CTXpl > Isocortex > VIS > VISam > VISam2/3;1066;688;315;315
+VISam4;Anteromedial visual area, layer 4;997/8/567/688/695/315/669/394/401;root > grey > CH > CTX > CTXpl > Isocortex > VIS > VISam > VISam4;401;688;315;315
+VISam5;Anteromedial visual area, layer 5;997/8/567/688/695/315/669/394/433;root > grey > CH > CTX > CTXpl > Isocortex > VIS > VISam > VISam5;433;688;315;315
+VISam6a;Anteromedial visual area, layer 6a;997/8/567/688/695/315/669/394/1046;root > grey > CH > CTX > CTXpl > Isocortex > VIS > VISam > VISam6a;1046;688;315;315
+VISam6b;Anteromedial visual area, layer 6b;997/8/567/688/695/315/669/394/441;root > grey > CH > CTX > CTXpl > Isocortex > VIS > VISam > VISam6b;441;688;315;315
+VISl;Lateral visual area;997/8/567/688/695/315/669/409;root > grey > CH > CTX > CTXpl > Isocortex > VIS > VISl;409;688;315;669
+VISl1;Lateral visual area, layer 1;997/8/567/688/695/315/669/409/421;root > grey > CH > CTX > CTXpl > Isocortex > VIS > VISl > VISl1;421;688;315;669
+VISl2/3;Lateral visual area, layer 2/3;997/8/567/688/695/315/669/409/973;root > grey > CH > CTX > CTXpl > Isocortex > VIS > VISl > VISl2/3;973;688;315;669
+VISl4;Lateral visual area, layer 4;997/8/567/688/695/315/669/409/573;root > grey > CH > CTX > CTXpl > Isocortex > VIS > VISl > VISl4;573;688;315;669
+VISl5;Lateral visual area, layer 5;997/8/567/688/695/315/669/409/613;root > grey > CH > CTX > CTXpl > Isocortex > VIS > VISl > VISl5;613;688;315;669
+VISl6a;Lateral visual area, layer 6a;997/8/567/688/695/315/669/409/74;root > grey > CH > CTX > CTXpl > Isocortex > VIS > VISl > VISl6a;74;688;315;669
+VISl6b;Lateral visual area, layer 6b;997/8/567/688/695/315/669/409/121;root > grey > CH > CTX > CTXpl > Isocortex > VIS > VISl > VISl6b;121;688;315;669
+VISli;Laterointermediate area;997/8/567/688/695/315/669/312782574;root > grey > CH > CTX > CTXpl > Isocortex > VIS > VISli;312782574;688;315;669
+VISli1;Laterointermediate area, layer 1;997/8/567/688/695/315/669/312782574/312782578;root > grey > CH > CTX > CTXpl > Isocortex > VIS > VISli > VISli1;312782578;688;315;669
+VISli2/3;Laterointermediate area, layer 2/3;997/8/567/688/695/315/669/312782574/312782582;root > grey > CH > CTX > CTXpl > Isocortex > VIS > VISli > VISli2/3;312782582;688;315;669
+VISli4;Laterointermediate area, layer 4;997/8/567/688/695/315/669/312782574/312782586;root > grey > CH > CTX > CTXpl > Isocortex > VIS > VISli > VISli4;312782586;688;315;669
+VISli5;Laterointermediate area, layer 5;997/8/567/688/695/315/669/312782574/312782590;root > grey > CH > CTX > CTXpl > Isocortex > VIS > VISli > VISli5;312782590;688;315;669
+VISli6a;Laterointermediate area, layer 6a;997/8/567/688/695/315/669/312782574/312782594;root > grey > CH > CTX > CTXpl > Isocortex > VIS > VISli > VISli6a;312782594;688;315;669
+VISli6b;Laterointermediate area, layer 6b;997/8/567/688/695/315/669/312782574/312782598;root > grey > CH > CTX > CTXpl > Isocortex > VIS > VISli > VISli6b;312782598;688;315;669
+VISp;Primary visual area;997/8/567/688/695/315/669/385;root > grey > CH > CTX > CTXpl > Isocortex > VIS > VISp;385;688;315;669
+VISp1;Primary visual area, layer 1;997/8/567/688/695/315/669/385/593;root > grey > CH > CTX > CTXpl > Isocortex > VIS > VISp > VISp1;593;688;315;669
+VISp2/3;Primary visual area, layer 2/3;997/8/567/688/695/315/669/385/821;root > grey > CH > CTX > CTXpl > Isocortex > VIS > VISp > VISp2/3;821;688;315;669
+VISp4;Primary visual area, layer 4;997/8/567/688/695/315/669/385/721;root > grey > CH > CTX > CTXpl > Isocortex > VIS > VISp > VISp4;721;688;315;669
+VISp5;Primary visual area, layer 5;997/8/567/688/695/315/669/385/778;root > grey > CH > CTX > CTXpl > Isocortex > VIS > VISp > VISp5;778;688;315;669
+VISp6a;Primary visual area, layer 6a;997/8/567/688/695/315/669/385/33;root > grey > CH > CTX > CTXpl > Isocortex > VIS > VISp > VISp6a;33;688;315;669
+VISp6b;Primary visual area, layer 6b;997/8/567/688/695/315/669/385/305;root > grey > CH > CTX > CTXpl > Isocortex > VIS > VISp > VISp6b;305;688;315;669
+VISpl;Posterolateral visual area;997/8/567/688/695/315/669/425;root > grey > CH > CTX > CTXpl > Isocortex > VIS > VISpl;425;688;315;669
+VISpl1;Posterolateral visual area, layer 1;997/8/567/688/695/315/669/425/750;root > grey > CH > CTX > CTXpl > Isocortex > VIS > VISpl > VISpl1;750;688;315;669
+VISpl2/3;Posterolateral visual area, layer 2/3;997/8/567/688/695/315/669/425/269;root > grey > CH > CTX > CTXpl > Isocortex > VIS > VISpl > VISpl2/3;269;688;315;669
+VISpl4;Posterolateral visual area, layer 4;997/8/567/688/695/315/669/425/869;root > grey > CH > CTX > CTXpl > Isocortex > VIS > VISpl > VISpl4;869;688;315;669
+VISpl5;Posterolateral visual area, layer 5;997/8/567/688/695/315/669/425/902;root > grey > CH > CTX > CTXpl > Isocortex > VIS > VISpl > VISpl5;902;688;315;669
+VISpl6a;Posterolateral visual area, layer 6a;997/8/567/688/695/315/669/425/377;root > grey > CH > CTX > CTXpl > Isocortex > VIS > VISpl > VISpl6a;377;688;315;669
+VISpl6b;Posterolateral visual area, layer 6b;997/8/567/688/695/315/669/425/393;root > grey > CH > CTX > CTXpl > Isocortex > VIS > VISpl > VISpl6b;393;688;315;669
+VISpm;posteromedial visual area;997/8/567/688/695/315/669/533;root > grey > CH > CTX > CTXpl > Isocortex > VIS > VISpm;533;688;315;669
+VISpm1;posteromedial visual area, layer 1;997/8/567/688/695/315/669/533/805;root > grey > CH > CTX > CTXpl > Isocortex > VIS > VISpm > VISpm1;805;688;315;669
+VISpm2/3;posteromedial visual area, layer 2/3;997/8/567/688/695/315/669/533/41;root > grey > CH > CTX > CTXpl > Isocortex > VIS > VISpm > VISpm2/3;41;688;315;669
+VISpm4;posteromedial visual area, layer 4;997/8/567/688/695/315/669/533/501;root > grey > CH > CTX > CTXpl > Isocortex > VIS > VISpm > VISpm4;501;688;315;669
+VISpm5;posteromedial visual area, layer 5;997/8/567/688/695/315/669/533/565;root > grey > CH > CTX > CTXpl > Isocortex > VIS > VISpm > VISpm5;565;688;315;669
+VISpm6a;posteromedial visual area, layer 6a;997/8/567/688/695/315/669/533/257;root > grey > CH > CTX > CTXpl > Isocortex > VIS > VISpm > VISpm6a;257;688;315;669
+VISpm6b;posteromedial visual area, layer 6b;997/8/567/688/695/315/669/533/469;root > grey > CH > CTX > CTXpl > Isocortex > VIS > VISpm > VISpm6b;469;688;315;669
+VISpor;Postrhinal area;997/8/567/688/695/315/669/312782628;root > grey > CH > CTX > CTXpl > Isocortex > VIS > VISpor;312782628;688;315;669
+VISpor1;Postrhinal area, layer 1;997/8/567/688/695/315/669/312782628/312782632;root > grey > CH > CTX > CTXpl > Isocortex > VIS > VISpor > VISpor1;312782632;688;315;669
+VISpor2/3;Postrhinal area, layer 2/3;997/8/567/688/695/315/669/312782628/312782636;root > grey > CH > CTX > CTXpl > Isocortex > VIS > VISpor > VISpor2/3;312782636;688;315;669
+VISpor4;Postrhinal area, layer 4;997/8/567/688/695/315/669/312782628/312782640;root > grey > CH > CTX > CTXpl > Isocortex > VIS > VISpor > VISpor4;312782640;688;315;669
+VISpor5;Postrhinal area, layer 5;997/8/567/688/695/315/669/312782628/312782644;root > grey > CH > CTX > CTXpl > Isocortex > VIS > VISpor > VISpor5;312782644;688;315;669
+VISpor6a;Postrhinal area, layer 6a;997/8/567/688/695/315/669/312782628/312782648;root > grey > CH > CTX > CTXpl > Isocortex > VIS > VISpor > VISpor6a;312782648;688;315;669
+VISpor6b;Postrhinal area, layer 6b;997/8/567/688/695/315/669/312782628/312782652;root > grey > CH > CTX > CTXpl > Isocortex > VIS > VISpor > VISpor6b;312782652;688;315;669
+VISC;Visceral area;997/8/567/688/695/315/677;root > grey > CH > CTX > CTXpl > Isocortex > VISC;677;688;315;315
+VISC1;Visceral area, layer 1;997/8/567/688/695/315/677/897;root > grey > CH > CTX > CTXpl > Isocortex > VISC > VISC1;897;688;315;315
+VISC2/3;Visceral area, layer 2/3;997/8/567/688/695/315/677/1106;root > grey > CH > CTX > CTXpl > Isocortex > VISC > VISC2/3;1106;688;315;315
+VISC4;Visceral area, layer 4;997/8/567/688/695/315/677/1010;root > grey > CH > CTX > CTXpl > Isocortex > VISC > VISC4;1010;688;315;315
+VISC5;Visceral area, layer 5;997/8/567/688/695/315/677/1058;root > grey > CH > CTX > CTXpl > Isocortex > VISC > VISC5;1058;688;315;315
+VISC6a;Visceral area, layer 6a;997/8/567/688/695/315/677/857;root > grey > CH > CTX > CTXpl > Isocortex > VISC > VISC6a;857;688;315;315
+VISC6b;Visceral area, layer 6b;997/8/567/688/695/315/677/849;root > grey > CH > CTX > CTXpl > Isocortex > VISC > VISC6b;849;688;315;315
+OLF;Olfactory areas;997/8/567/688/695/698;root > grey > CH > CTX > CTXpl > OLF;698;688;698;698
+AOB;Accessory olfactory bulb;997/8/567/688/695/698/151;root > grey > CH > CTX > CTXpl > OLF > AOB;151;688;698;698
+AOBgl;Accessory olfactory bulb, glomerular layer;997/8/567/688/695/698/151/188;root > grey > CH > CTX > CTXpl > OLF > AOB > AOBgl;188;688;698;698
+AOBgr;Accessory olfactory bulb, granular layer;997/8/567/688/695/698/151/196;root > grey > CH > CTX > CTXpl > OLF > AOB > AOBgr;196;688;698;698
+AOBmi;Accessory olfactory bulb, mitral layer;997/8/567/688/695/698/151/204;root > grey > CH > CTX > CTXpl > OLF > AOB > AOBmi;204;688;698;698
+AON;Anterior olfactory nucleus;997/8/567/688/695/698/159;root > grey > CH > CTX > CTXpl > OLF > AON;159;688;698;698
+AON1;Anterior olfactory nucleus, layer 1;997/8/567/688/695/698/159/160;root > grey > CH > CTX > CTXpl > OLF > AON > AON1;160;688;698;698
+AON2;Anterior olfactory nucleus, layer 2;997/8/567/688/695/698/159/168;root > grey > CH > CTX > CTXpl > OLF > AON > AON2;168;688;698;698
+AONd;Anterior olfactory nucleus, dorsal part;997/8/567/688/695/698/159/167;root > grey > CH > CTX > CTXpl > OLF > AON > AONd;167;688;698;698
+AONe;Anterior olfactory nucleus, external part;997/8/567/688/695/698/159/175;root > grey > CH > CTX > CTXpl > OLF > AON > AONe;175;688;698;698
+AONl;Anterior olfactory nucleus, lateral part;997/8/567/688/695/698/159/183;root > grey > CH > CTX > CTXpl > OLF > AON > AONl;183;688;698;698
+AONm;Anterior olfactory nucleus, medial part;997/8/567/688/695/698/159/191;root > grey > CH > CTX > CTXpl > OLF > AON > AONm;191;688;698;698
+AONpv;Anterior olfactory nucleus, posteroventral part;997/8/567/688/695/698/159/199;root > grey > CH > CTX > CTXpl > OLF > AON > AONpv;199;688;698;698
+COA;Cortical amygdalar area;997/8/567/688/695/698/631;root > grey > CH > CTX > CTXpl > OLF > COA;631;688;698;631
+COAa;Cortical amygdalar area, anterior part;997/8/567/688/695/698/631/639;root > grey > CH > CTX > CTXpl > OLF > COA > COAa;639;688;698;631
+COAa1;Cortical amygdalar area, anterior part, layer 1;997/8/567/688/695/698/631/639/192;root > grey > CH > CTX > CTXpl > OLF > COA > COAa > COAa1;192;688;698;631
+COAa2;Cortical amygdalar area, anterior part, layer 2;997/8/567/688/695/698/631/639/200;root > grey > CH > CTX > CTXpl > OLF > COA > COAa > COAa2;200;688;698;631
+COAa3;Cortical amygdalar area, anterior part, layer 3;997/8/567/688/695/698/631/639/208;root > grey > CH > CTX > CTXpl > OLF > COA > COAa > COAa3;208;688;698;631
+COAp;Cortical amygdalar area, posterior part;997/8/567/688/695/698/631/647;root > grey > CH > CTX > CTXpl > OLF > COA > COAp;647;688;698;631
+COApl;Cortical amygdalar area, posterior part, lateral zone;997/8/567/688/695/698/631/647/655;root > grey > CH > CTX > CTXpl > OLF > COA > COAp > COApl;655;688;698;631
+COApl1;Cortical amygdalar area, posterior part, lateral zone, layer 1;997/8/567/688/695/698/631/647/655/216;root > grey > CH > CTX > CTXpl > OLF > COA > COAp > COApl > COApl1;216;688;698;631
+COApl1-2;Cortical amygdalar area, posterior part, lateral zone, layers 1-2;997/8/567/688/695/698/631/647/655/584;root > grey > CH > CTX > CTXpl > OLF > COA > COAp > COApl > COApl1-2;584;688;698;631
+COApl1-3;Cortical amygdalar area, posterior part, lateral zone, layers 1-3;997/8/567/688/695/698/631/647/655/376;root > grey > CH > CTX > CTXpl > OLF > COA > COAp > COApl > COApl1-3;376;688;698;631
+COApl2;Cortical amygdalar area, posterior part, lateral zone, layer 2;997/8/567/688/695/698/631/647/655/224;root > grey > CH > CTX > CTXpl > OLF > COA > COAp > COApl > COApl2;224;688;698;631
+COApl3;Cortical amygdalar area, posterior part, lateral zone, layer 3;997/8/567/688/695/698/631/647/655/232;root > grey > CH > CTX > CTXpl > OLF > COA > COAp > COApl > COApl3;232;688;698;631
+COApm;Cortical amygdalar area, posterior part, medial zone;997/8/567/688/695/698/631/647/663;root > grey > CH > CTX > CTXpl > OLF > COA > COAp > COApm;663;688;698;631
+COApm1;Cortical amygdalar area, posterior part, medial zone, layer 1;997/8/567/688/695/698/631/647/663/240;root > grey > CH > CTX > CTXpl > OLF > COA > COAp > COApm > COApm1;240;688;698;631
+COApm1-2;Cortical amygdalar area, posterior part, medial zone, layers 1-2;997/8/567/688/695/698/631/647/663/592;root > grey > CH > CTX > CTXpl > OLF > COA > COAp > COApm > COApm1-2;592;688;698;631
+COApm1-3;Cortical amygdalar area, posterior part, medial zone, layers 1-3;997/8/567/688/695/698/631/647/663/383;root > grey > CH > CTX > CTXpl > OLF > COA > COAp > COApm > COApm1-3;383;688;698;631
+COApm2;Cortical amygdalar area, posterior part, medial zone, layer 2;997/8/567/688/695/698/631/647/663/248;root > grey > CH > CTX > CTXpl > OLF > COA > COAp > COApm > COApm2;248;688;698;631
+COApm3;Cortical amygdalar area, posterior part, medial zone, layer 3;997/8/567/688/695/698/631/647/663/256;root > grey > CH > CTX > CTXpl > OLF > COA > COAp > COApm > COApm3;256;688;698;631
+DP;Dorsal peduncular area;997/8/567/688/695/698/814;root > grey > CH > CTX > CTXpl > OLF > DP;814;688;698;698
+DP1;Dorsal peduncular area, layer 1;997/8/567/688/695/698/814/496;root > grey > CH > CTX > CTXpl > OLF > DP > DP1;496;688;698;698
+DP2;Dorsal peduncular area, layer 2;997/8/567/688/695/698/814/535;root > grey > CH > CTX > CTXpl > OLF > DP > DP2;535;688;698;698
+DP2/3;Dorsal peduncular area, layer 2/3;997/8/567/688/695/698/814/360;root > grey > CH > CTX > CTXpl > OLF > DP > DP2/3;360;688;698;698
+DP5;Dorsal peduncular area, layer 5;997/8/567/688/695/698/814/646;root > grey > CH > CTX > CTXpl > OLF > DP > DP5;646;688;698;698
+DP6a;Dorsal peduncular area, layer 6a;997/8/567/688/695/698/814/267;root > grey > CH > CTX > CTXpl > OLF > DP > DP6a;267;688;698;698
+MOB;Main olfactory bulb;997/8/567/688/695/698/507;root > grey > CH > CTX > CTXpl > OLF > MOB;507;688;698;698
+MOBgl;Main olfactory bulb, glomerular layer;997/8/567/688/695/698/507/212;root > grey > CH > CTX > CTXpl > OLF > MOB > MOBgl;212;688;698;698
+MOBgr;Main olfactory bulb, granule layer;997/8/567/688/695/698/507/220;root > grey > CH > CTX > CTXpl > OLF > MOB > MOBgr;220;688;698;698
+MOBipl;Main olfactory bulb, inner plexiform layer;997/8/567/688/695/698/507/228;root > grey > CH > CTX > CTXpl > OLF > MOB > MOBipl;228;688;698;698
+MOBmi;Main olfactory bulb, mitral layer;997/8/567/688/695/698/507/236;root > grey > CH > CTX > CTXpl > OLF > MOB > MOBmi;236;688;698;698
+MOBopl;Main olfactory bulb, outer plexiform layer;997/8/567/688/695/698/507/244;root > grey > CH > CTX > CTXpl > OLF > MOB > MOBopl;244;688;698;698
+NLOT;Nucleus of the lateral olfactory tract;997/8/567/688/695/698/619;root > grey > CH > CTX > CTXpl > OLF > NLOT;619;688;698;619
+NLOT1;Nucleus of the lateral olfactory tract, molecular layer;997/8/567/688/695/698/619/260;root > grey > CH > CTX > CTXpl > OLF > NLOT > NLOT1;260;688;698;619
+NLOT1-3;Nucleus of the lateral olfactory tract, layers 1-3;997/8/567/688/695/698/619/392;root > grey > CH > CTX > CTXpl > OLF > NLOT > NLOT1-3;392;688;698;619
+NLOT2;Nucleus of the lateral olfactory tract, pyramidal layer;997/8/567/688/695/698/619/268;root > grey > CH > CTX > CTXpl > OLF > NLOT > NLOT2;268;688;698;619
+NLOT3;Nucleus of the lateral olfactory tract, layer 3;997/8/567/688/695/698/619/1139;root > grey > CH > CTX > CTXpl > OLF > NLOT > NLOT3;1139;688;698;619
+PAA;Piriform-amygdalar area;997/8/567/688/695/698/788;root > grey > CH > CTX > CTXpl > OLF > PAA;788;688;698;631
+PAA1;Piriform-amygdalar area, molecular layer;997/8/567/688/695/698/788/408;root > grey > CH > CTX > CTXpl > OLF > PAA > PAA1;408;688;698;631
+PAA1-3;Piriform-amygdalar area, layers 1-3;997/8/567/688/695/698/788/400;root > grey > CH > CTX > CTXpl > OLF > PAA > PAA1-3;400;688;698;631
+PAA2;Piriform-amygdalar area, pyramidal layer;997/8/567/688/695/698/788/416;root > grey > CH > CTX > CTXpl > OLF > PAA > PAA2;416;688;698;631
+PAA3;Piriform-amygdalar area, polymorph layer;997/8/567/688/695/698/788/424;root > grey > CH > CTX > CTXpl > OLF > PAA > PAA3;424;688;698;631
+PIR;Piriform area;997/8/567/688/695/698/961;root > grey > CH > CTX > CTXpl > OLF > PIR;961;688;698;698
+PIR1;Piriform area, molecular layer;997/8/567/688/695/698/961/276;root > grey > CH > CTX > CTXpl > OLF > PIR > PIR1;276;688;698;698
+PIR1-3;Piriform area, layers 1-3;997/8/567/688/695/698/961/152;root > grey > CH > CTX > CTXpl > OLF > PIR > PIR1-3;152;688;698;698
+PIR2;Piriform area, pyramidal layer;997/8/567/688/695/698/961/284;root > grey > CH > CTX > CTXpl > OLF > PIR > PIR2;284;688;698;698
+PIR3;Piriform area, polymorph layer;997/8/567/688/695/698/961/291;root > grey > CH > CTX > CTXpl > OLF > PIR > PIR3;291;688;698;698
+TR;Postpiriform transition area;997/8/567/688/695/698/566;root > grey > CH > CTX > CTXpl > OLF > TR;566;688;698;698
+TR1;Postpiriform transition area, layers 1;997/8/567/688/695/698/566/1140;root > grey > CH > CTX > CTXpl > OLF > TR > TR1;1140;688;698;698
+TR1-3;Postpiriform transition area, layers 1-3;997/8/567/688/695/698/566/517;root > grey > CH > CTX > CTXpl > OLF > TR > TR1-3;517;688;698;698
+TR2;Postpiriform transition area, layers 2;997/8/567/688/695/698/566/1141;root > grey > CH > CTX > CTXpl > OLF > TR > TR2;1141;688;698;698
+TR3;Postpiriform transition area, layers 3;997/8/567/688/695/698/566/1142;root > grey > CH > CTX > CTXpl > OLF > TR > TR3;1142;688;698;698
+TT;Taenia tecta;997/8/567/688/695/698/589;root > grey > CH > CTX > CTXpl > OLF > TT;589;688;698;698
+TTd;Taenia tecta, dorsal part;997/8/567/688/695/698/589/597;root > grey > CH > CTX > CTXpl > OLF > TT > TTd;597;688;698;698
+TTd1;Taenia tecta, dorsal part, layer 1;997/8/567/688/695/698/589/597/1034;root > grey > CH > CTX > CTXpl > OLF > TT > TTd > TTd1;1034;688;698;698
+TTd1-4;Taenia tecta, dorsal part, layers 1-4;997/8/567/688/695/698/589/597/297;root > grey > CH > CTX > CTXpl > OLF > TT > TTd > TTd1-4;297;688;698;698
+TTd2;Taenia tecta, dorsal part, layer 2;997/8/567/688/695/698/589/597/1042;root > grey > CH > CTX > CTXpl > OLF > TT > TTd > TTd2;1042;688;698;698
+TTd3;Taenia tecta, dorsal part, layer 3;997/8/567/688/695/698/589/597/1050;root > grey > CH > CTX > CTXpl > OLF > TT > TTd > TTd3;1050;688;698;698
+TTd4;Taenia tecta, dorsal part, layer 4;997/8/567/688/695/698/589/597/1059;root > grey > CH > CTX > CTXpl > OLF > TT > TTd > TTd4;1059;688;698;698
+TTv;Taenia tecta, ventral part;997/8/567/688/695/698/589/605;root > grey > CH > CTX > CTXpl > OLF > TT > TTv;605;688;698;698
+TTv1;Taenia tecta, ventral part, layer 1;997/8/567/688/695/698/589/605/1067;root > grey > CH > CTX > CTXpl > OLF > TT > TTv > TTv1;1067;688;698;698
+TTv1-3;Taenia tecta, ventral part, layers 1-3;997/8/567/688/695/698/589/605/306;root > grey > CH > CTX > CTXpl > OLF > TT > TTv > TTv1-3;306;688;698;698
+TTv2;Taenia tecta, ventral part, layer 2;997/8/567/688/695/698/589/605/1075;root > grey > CH > CTX > CTXpl > OLF > TT > TTv > TTv2;1075;688;698;698
+TTv3;Taenia tecta, ventral part, layer 3;997/8/567/688/695/698/589/605/1082;root > grey > CH > CTX > CTXpl > OLF > TT > TTv > TTv3;1082;688;698;698
+CTXsp;Cortical subplate;997/8/567/688/703;root > grey > CH > CTX > CTXsp;703;688;703;703
+6b;Layer 6b, isocortex;997/8/567/688/703/16;root > grey > CH > CTX > CTXsp > 6b;16;688;703;703
+BLA;Basolateral amygdalar nucleus;997/8/567/688/703/295;root > grey > CH > CTX > CTXsp > BLA;295;688;703;703
+BLAa;Basolateral amygdalar nucleus, anterior part;997/8/567/688/703/295/303;root > grey > CH > CTX > CTXsp > BLA > BLAa;303;688;703;703
+BLAp;Basolateral amygdalar nucleus, posterior part;997/8/567/688/703/295/311;root > grey > CH > CTX > CTXsp > BLA > BLAp;311;688;703;703
+BLAv;Basolateral amygdalar nucleus, ventral part;997/8/567/688/703/295/451;root > grey > CH > CTX > CTXsp > BLA > BLAv;451;688;703;703
+BMA;Basomedial amygdalar nucleus;997/8/567/688/703/319;root > grey > CH > CTX > CTXsp > BMA;319;688;703;703
+BMAa;Basomedial amygdalar nucleus, anterior part;997/8/567/688/703/319/327;root > grey > CH > CTX > CTXsp > BMA > BMAa;327;688;703;703
+BMAp;Basomedial amygdalar nucleus, posterior part;997/8/567/688/703/319/334;root > grey > CH > CTX > CTXsp > BMA > BMAp;334;688;703;703
+CLA;Claustrum;997/8/567/688/703/583;root > grey > CH > CTX > CTXsp > CLA;583;688;703;703
+EP;Endopiriform nucleus;997/8/567/688/703/942;root > grey > CH > CTX > CTXsp > EP;942;688;703;703
+EPd;Endopiriform nucleus, dorsal part;997/8/567/688/703/942/952;root > grey > CH > CTX > CTXsp > EP > EPd;952;688;703;703
+EPv;Endopiriform nucleus, ventral part;997/8/567/688/703/942/966;root > grey > CH > CTX > CTXsp > EP > EPv;966;688;703;703
+LA;Lateral amygdalar nucleus;997/8/567/688/703/131;root > grey > CH > CTX > CTXsp > LA;131;688;703;703
+PA;Posterior amygdalar nucleus;997/8/567/688/703/780;root > grey > CH > CTX > CTXsp > PA;780;688;703;703
+grv;grooves;997/1024;root > grv;1024;997;997;997
+grv of CBX;grooves of the cerebellar cortex;997/1024/1040;root > grv > grv of CBX;1040;997;997;997
+apf;ansoparamedian fissure;997/1024/1040/43;root > grv > grv of CBX > apf;43;997;997;997
+icf;intercrural fissure;997/1024/1040/34;root > grv > grv of CBX > icf;34;997;997;997
+ipf;intraparafloccular fissure;997/1024/1040/49;root > grv > grv of CBX > ipf;49;997;997;997
+nf;nodular fissure;997/1024/1040/18;root > grv > grv of CBX > nf;18;997;997;997
+pce;precentral fissure;997/1024/1040/1087;root > grv > grv of CBX > pce;1087;997;997;997
+pcf;preculminate fissure;997/1024/1040/1095;root > grv > grv of CBX > pcf;1095;997;997;997
+pfs;parafloccular sulcus;997/1024/1040/65;root > grv > grv of CBX > pfs;65;997;997;997
+plf;posterolateral fissure;997/1024/1040/11;root > grv > grv of CBX > plf;11;997;997;997
+pms;paramedian sulcus;997/1024/1040/57;root > grv > grv of CBX > pms;57;997;997;997
+ppf;prepyramidal fissure;997/1024/1040/1119;root > grv > grv of CBX > ppf;1119;997;997;997
+pri;primary fissure;997/1024/1040/1103;root > grv > grv of CBX > pri;1103;997;997;997
+psf;posterior superior fissure;997/1024/1040/1112;root > grv > grv of CBX > psf;1112;997;997;997
+sec;secondary fissure;997/1024/1040/3;root > grv > grv of CBX > sec;3;997;997;997
+sif;simple fissure;997/1024/1040/25;root > grv > grv of CBX > sif;25;997;997;997
+grv of CTX;grooves of the cerebral cortex;997/1024/1032;root > grv > grv of CTX;1032;997;997;997
+eg;endorhinal groove;997/1024/1032/1055;root > grv > grv of CTX > eg;1055;997;997;997
+hf;hippocampal fissure;997/1024/1032/1063;root > grv > grv of CTX > hf;1063;997;997;997
+rf;rhinal fissure;997/1024/1032/1071;root > grv > grv of CTX > rf;1071;997;997;997
+ri;rhinal incisure;997/1024/1032/1078;root > grv > grv of CTX > ri;1078;997;997;997
+IPF;Interpeduncular fossa;997/1024/624;root > grv > IPF;624;997;997;997
+retina;retina;997/304325711;root > retina;304325711;997;997;997
+VS;ventricular systems;997/73;root > VS;73;997;997;73
+AQ;cerebral aqueduct;997/73/140;root > VS > AQ;140;997;997;73
+c;central canal, spinal cord/medulla;997/73/164;root > VS > c;164;997;997;73
+IVF;interventricular foramen;997/73/124;root > VS > IVF;124;997;997;73
+V3;third ventricle;997/73/129;root > VS > V3;129;997;997;73
+V4;fourth ventricle;997/73/145;root > VS > V4;145;997;997;73
+V4r;lateral recess;997/73/145/153;root > VS > V4 > V4r;153;997;997;73
+VL;lateral ventricle;997/73/81;root > VS > VL;81;997;997;73
+chfl;choroid fissure;997/73/81/116;root > VS > VL > chfl;116;997;997;73
+chpl;choroid plexus;997/73/81/108;root > VS > VL > chpl;108;997;997;73
+RC;rhinocele;997/73/81/89;root > VS > VL > RC;89;997;997;73
+SEZ;subependymal zone;997/73/81/98;root > VS > VL > SEZ;98;997;997;73
+universe;universe;0;universe;0;0;0;0

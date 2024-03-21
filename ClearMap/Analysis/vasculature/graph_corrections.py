@@ -1,387 +1,264 @@
+import multiprocessing
+import os.path
+import sys
+
 import numpy as np
+import pandas as pd
+from sklearn.neighbors import NearestNeighbors
 
-import ClearMap.Settings as settings
+from ClearMap.Alignment import Annotation as annotation
+from ClearMap.Analysis.vasculature.vasc_graph_utils import remove_surface, vertex_filter_to_edge_filter
 
-import ClearMap.Alignment.Annotation as ano
-
-
-import ClearMap.Visualization.Plot3d as p3d
-import graph_tool.inference as gti
-
-print('TEST')
-import math
-import matplotlib.pyplot as plt
+print('Loading ClearMap modules, please wait ...')
 import ClearMap.Analysis.Graphs.GraphGt as ggt
-import graph_tool.centrality as gtc
-print('loading...')
-import numpy as np
-import numexpr as ne
-import graph_tool.topology as gtt
-from sklearn import preprocessing
 
-import math
-pi=math.pi
+CPU_COUNT = multiprocessing.cpu_count()
 
 
+def join_neighbouring_degrees_1(graph, min_radius=5, dest_path=''):
+    """
+    Join degrees one (empty ended branches) that are very close and likely
+    interrupted by a thresholding issue. The distance criterion is defined
+    by min_radius.
 
-def extract_AnnotatedRegion(graph, region):
-    order, level = region
-    print(level, order, ano.find_name(order, key='order'))
+    .. warning::
+        This is meant to be used on the GRAPH BEFORE REDUCTION
 
-    label = graph.vertex_annotation();
-    label_leveled = ano.convert_label(label, key='order', value='order', level=level)
-    vertex_filter = label_leveled == order;
+    graph : GraphGt.Graph
+        the graph to fix
+    dest_path : str
+        The optional path to save the modified graph
+    min_radius : float
+        The radius around a degree 1 vertex to search for neighbouring vertices
 
-    gss4 = graph.sub_graph(vertex_filter=vertex_filter)
-    return gss4, vertex_filter
+    returns : GraphGt.Graph
+        The modified graph
+    """
+    df = pd.DataFrame()
+    degrees_1_mask = graph.vertex_degrees() == 1
+    df[["x", "y", "z"]] = graph.vertex_coordinates()[degrees_1_mask]
+    degree_1_indices = np.where(degrees_1_mask)[0]
+    df['vertex_id'] = degree_1_indices
+    # find the nearest degree 1 for each degree 1 vertex
+    knn = NearestNeighbors(n_neighbors=2, radius=min_radius + 1,
+                           n_jobs=CPU_COUNT - 2)  # we take the two nearest "neighbors" : itself and the nearest degree1
+    knn.fit(df[["x", "y", "z"]])
+    dist, indices = knn.kneighbors(df[["x", "y", "z"]], return_distance=True)
+    dist = dist[:, 1]  # throw away the vertex itself
+    indices = indices[:, 1]  # throw away the vertex itself
+    df["neighbor_id"] = -1
+    close_neighbors_mask = dist < min_radius
+    df.loc[close_neighbors_mask, "neighbor_id"] = degree_1_indices[indices[close_neighbors_mask]]
+    df = df[df["neighbor_id"] != -1]
+    edges_array = df[['vertex_id', 'neighbor_id']].values
+    edges_array.sort(axis=1)
+    # remove double edges
+    edges = list(set([tuple(e) for e in edges_array]))
 
-
-def removeAutoLoops(graph):
-    connectivity=graph.edge_connectivity()
-    autoloops=np.asarray((connectivity[:, 0]-connectivity[:,1])==0).nonzero()[0]
-    print(autoloops)
-    ef=np.ones(graph.n_edges)
-    for edge in autoloops:
-        ef[edge]=0
-    g=graph.sub_graph(edge_filter=ef)
-    return g
-
-def f_min(X,p):
-    plane_xyz = p[0:3]
-    distance = (plane_xyz*X.T).sum(axis=1) + p[3]
-    return distance / np.linalg.norm(plane_xyz)
-
-def residuals(params, signal, X):
-    return f_min(X, params)
-
-from scipy.optimize import leastsq
-
-
-def get_edges_from_vertex_filter(prev_graph,vertex_filter):
-  connectivity=prev_graph.edge_connectivity()
-  edges=np.logical_and(vertex_filter[connectivity[:,0]], vertex_filter[connectivity[:,1]])
-  return(edges)
-
-def cleandeg4nodes(graph):
-    degrees_m=graph.vertex_degrees()
-    deg4=np.asarray(degrees_m==4).nonzero()[0]
-    graph_cleaned=graph
-    conn = graph.edge_connectivity()
-    e_g = np.array(graph.edge_geometry())
-    for j, d in enumerate(deg4):
-        ns=graph.vertex_neighbours(d)
-        vf=np.zeros(graph.n_vertices)
-
-        vf[ns]=1
-        vf[d]=1
-        ef = get_edges_from_vertex_filter(graph, vf)
-        conn_f=conn[ef]
-
-        gs=graph.sub_graph(vertex_filter=vf)
-
-        es=np.array(gs.edge_geometry())
-        cs=gs.edge_connectivity()
-        ds = gs.vertex_degrees()
-
-        d4 = np.asarray(ds == 4).nonzero()[0]
-        if isinstance(d4, (list, tuple, np.ndarray)):
-            d4=d4[0]
-        pts=[]
-        pts_index=[]
-        for i,c in enumerate(cs):
-            # id=np.asarray(c==d4).nonzero()[0][0]
-            if c[0]==d4:
-                pts.append(np.array(es[i])[1])
-                pts_index.append(i)
-                if i==0:
-                    pts.append(np.array(es[i])[0])
-                    pts_index.append(100)
-            elif c[1]==d4:
-                pts.append(np.array(es[i])[-2])
-                pts_index.append(i)
-                if i==0:
-                    pts.append(np.array(es[i])[-1])
-                    pts_index.append(100)
-            else:
-                print('...')
-
-        XYZ=np.array(pts).transpose()
-        p0=[0,0,1,np.mean(XYZ[2])]
-        sol = leastsq(residuals, p0, args=(None, XYZ))[0]
-        x=sol[0:3]
-        new_error=(f_min(XYZ, sol) ** 2).sum()
-        old_error=(f_min(XYZ, p0) ** 2).sum()
-
-        if new_error<1:
-            z=np.array([0, 0, 1])
-            costheta=np.dot(x,z)/(np.linalg.norm(x)*np.linalg.norm(z))
-            # print(np.dot(x,z), (np.linalg.norm(x)*np.linalg.norm(z)))
-            if abs(np.arccos(costheta))<0.3:
-                print(j)
-                print("Solution: ", x / np.linalg.norm(x), sol[3])
-                print("Old Error: ", old_error)
-                print("New Error: ", new_error)
-
-                dn4 = np.asarray(ds != 4).nonzero()[0]
-                coord=gs.vertex_coordinates()
-
-                pos=[]
-                neg=[]
-                pos_e=[]
-                neg_e = []
-                e_i = np.asarray(ef == 1).nonzero()[0]
-                v_i=np.asarray(vf == 1).nonzero()[0]
-                for i, co in enumerate(np.array(pts)):
-                    if i != d4:
-                        res=sol[0]*co[0]+sol[1]*co[1]+sol[2]*co[2]+sol[3]
-                        if res<0:
-                            # neg.append((v_i[i], d))
-                            neg.append((i, d4))
-                        if res>=0:
-                            # pos.append((v_i[i], d))
-                            pos.append((i, d4))
+    # we reconnect vertices of degree 1 to the nearest degree 1
+    graph.add_edge(edges)
+    if dest_path:
+        graph.save(dest_path)
+    return graph
 
 
-                for p in pos:
-                    for i,cf in enumerate(conn_f):
-                        if p[0] in cf:
-                            print(i)
-                            pos_e.append(e_i[i])
-                            break
+def remove_spurious_branches(graph, r_min=None, min_length=1.0, view=False):
+    """
+    Removes spurious branches from the graph.
+    Spurious branches are defined as small degree 1 branches (with a radius smaller than r_min).
 
-                for n in neg:
-                    for i,cf in enumerate(conn_f):
-                        if n[0] in cf:
-                            print(i)
-                            neg_e.append(e_i[i])
-                            break
+    Parameters
+    ----------
+    graph : Graph object
+        The graph to consider
+    r_min : float
+        The minimum radius to consider
+    min_length : float
+        The minimum length of the branch
 
-                graph_cleaned.remove_vertex(d)
-                newpos_edge=[]
-                new_conn=[]
-                for i, p in enumerate(pos_e):
-                    newpos_edge.append(e_g[p])
-                    new_conn.append(pos[i][0])
-                newpos_edge=np.array(newpos_edge).ravel()
+    Returns
+    -------
+        The graph with the spurious branches removed
+    """
+    degrees_filter = graph.vertex_degrees() == 1
+    degrees_filter = vertex_filter_to_edge_filter(graph, degrees_filter, operator=np.logical_or)
+    if r_min is not None:
+        # radii_filter = graph.edge_radii() < r_min
+        raise NotImplementedError('Radii are not implemented yet because we need to decide how they combine '
+                                  '("or" or "and") with the length')
+    length_filter = graph.edge_property('length') < min_length
 
+    edge_filter = np.logical_not(degrees_filter & length_filter)
 
-                graph_cleaned.add_edge((new_conn[0],new_conn[1]))
-
-                newpos_edge = []
-                new_conn = []
-                for i, p in enumerate(neg_e):
-                    newpos_edge.append(e_g[p])
-                    new_conn.append(neg[i][0])
-                newpos_edge = np.array(newpos_edge).ravel()
-
-                graph_cleaned.add_edge((new_conn[0], new_conn[1]))
+    return graph.sub_graph(edge_filter=edge_filter, view=view)
 
 
+def remove_auto_loops(graph, min_length=None):
+    """
+    Removes auto loops from the graph.
+    Auto loops are defined as edges with the same source and destination.
 
-def removeSpuriousBranches(graph ,rmin=1, length=5):
-    radii = graph.vertex_radii()
-    conn=graph.edge_connectivity()
-    degrees_m = graph.vertex_degrees()
-    deg1 = np.asarray(degrees_m <= 1).nonzero()[0]
-    rad1 = np.asarray(radii <= rmin).nonzero()[0]
+    Parameters
+    ----------
+    graph : Graph object
+        The graph to consider
+    min_length : float
+        The minimum length to consider
+
+    Returns
+    -------
+        The graph with the auto loops removed
+    """
+    connectivity = graph.edge_connectivity()
+    auto_loops_mask = ((connectivity[:, 0] - connectivity[:, 1]) == 0)
+    if min_length is None:
+        bad_length_mask = np.zeros(graph.n_edges, dtype=bool)
+    else:
+        lengths = graph.edge_property('length')
+        bad_length_mask = lengths < min_length
+
+    auto_loops_filter = np.logical_not(auto_loops_mask & bad_length_mask)
+
+    return graph.sub_graph(edge_filter=auto_loops_filter)
+
+
+def remove_mutual_loops_gt(graph, min_radius, min_length):  # TODO: what are the defaults 5  & 3 ?
+    """
+    Removes mutual loops from the graph.
+    Mutual loops are defined as edges with the same source and destination. In other words, two edges that
+        connect the same pair of vertices in the graph form a mutual loop.
+    This function uses a parallelized version of mutual_loop_detection.
+
+    .. warning::
+        There is a substantial difference between this function and a
+        standard parallel edge filter. Contrary to a standard parallel edge filter,
+        this function takes into account the length, i.e. the distance between
+        the two vertices along the tract of the vessel, and the radius, i.e. the size of the vessel.
+        For each pair of vertices where these two conditions are met,
+        only the edge with the smallest radius will be removed.
+
+    Parameters
+    ----------
+    graph : Graph object
+        The graph to consider
+    min_radius : float
+        The minimum radius to consider
+    min_length : float
+        The minimum length to consider
+
+    Returns
+    -------
+        The graph with the mutual loops removed
+    """
+    # mutual_loops = graph_tool.generation.label_parallel_edges(graph, mark_only=True)
+
+    radii = graph.edge_radii()
     lengths = graph.edge_geometry_lengths()
 
-    vertex2rm=[]
-    for i in rad1:
-        if i in deg1:
-            # if lengths[i]<=length:
-            vertex2rm.append(i)
+    edge_group_ids = np.sort(graph.edge_connectivity(), axis=1)
+    # return the indices of unique values. This labels edges belonging to the same group with the same id
+    _, edge_group_ids = np.unique(edge_group_ids, axis=0, return_inverse=True)
+
+    df = pd.DataFrame({
+        'edge_id': np.arange(graph.n_edges),
+        'edge_group_id': edge_group_ids,
+        'radius': radii,
+        'length': lengths
+    })
+    good_edges_indices = (df
+                          .sort_values("radius", ascending=False)
+                          .groupby('edge_group_id')  # This will only give one element for single edges hence kept
+                          .first())["edge_id"].values
+
+    single_edges = df.groupby('edge_group_id').count() == 1
+    single_edges = single_edges['edge_id'].values
+
+    parallel_edges = (df.groupby('edge_group_id').count() != 1)['edge_id'].values
+    assert single_edges.sum() + parallel_edges.sum() == graph.n_edges   #FIXME: not True
+
+    # Go back to mask with same size as the original graph from indices of the edges to remove
+    good_edges = np.zeros(graph.n_edges, dtype=bool)
+    good_edges[good_edges_indices] = 1
+
+    large_edges = (radii >= min_radius) | (lengths >= min_length)
+    edge_filter = large_edges | good_edges #| (mutual_loops == 0)
+    # edge_filter = np.ones(graph.n_edges)
+    # edge_filter[bad_edges] = 0
+    return graph.sub_graph(edge_filter=edge_filter)
 
 
-    vertex2rm=np.array(vertex2rm)
-    print(vertex2rm.shape)
-    ef=np.ones(graph.n_vertices)
-    ef[vertex2rm]=0
-    graph=graph.sub_graph(vertex_filter=ef)
-    return graph
+def correct_graph(graph, min_radius=2.9, min_length=13):  # FIXME: reinstate min_length
+    """
+    This is the main function to correct the graph.
+    Corrects the graph by removing
+        * spurious branches (small degree 1 branches)
+        * surface branches (branches that are too close to the surface)
+        * auto loops (edges where edge.source == edge.target)
+        * mutual loops (edges share the same source and target and are small(in radius and length))
+
+    Parameters
+    ----------
+    graph
+    min_radius
+    min_length
+
+    Returns
+    -------
+        The corrected graph
+
+    """
+    corrected_graph = graph.largest_component()
+
+    print_percent_degree(corrected_graph, 5)  # @Sophie: why 5 ??
+
+    corrected_graph = remove_spurious_branches(corrected_graph, r_min=min_radius)
+    corrected_graph = remove_surface(corrected_graph, 2)
+    corrected_graph = corrected_graph.largest_component()
+
+    corrected_graph = remove_auto_loops(corrected_graph)
+    corrected_graph = remove_mutual_loops_gt(corrected_graph, min_radius, 5)
+
+    print_percent_degree(corrected_graph, 5)  # @Sophie: why 5 ??
+
+    return corrected_graph
 
 
+def print_percent_degree(graph, degree=4):
+    """
+    Print the number of nodes with a degree greater or equal to degree.
+
+    Parameters
+    ----------
+    graph : Graph object
+        The graph to consider
+    degree : int
+        The degree to consider
+
+    Returns
+    -------
+
+    """
+    percent_greater_degrees = np.sum(graph.vertex_degrees() >= degree) / graph.n_vertices * 100
+    print(f'Percent of degree {degree}+ nodes: {percent_greater_degrees:.2f}%')
 
 
-def mutualLoopDetection(args):
-    res=0
-    ind, i, rmin, length, conn, radii, lengths = args
-    co = conn[i]
-    # print(ind)
-    similaredges = np.logical_or(np.logical_and(conn[:, 0] == co[0], conn[:, 1] == co[1]),
-                                 np.logical_and(conn[:, 1] == co[0], conn[:, 0] == co[1]))
-    # print(similaredges.shape)
-    similaredges = np.asarray(similaredges == True).nonzero()[0]
-
-    if similaredges.shape[0] >= 2:
-        rs = radii[similaredges]
-        # print(rs)
-        imin = np.argmin(rs)
-        if rs[imin] <= rmin:
-            if lengths[imin] <= length:
-                print('adding edge to remove ', similaredges[imin])
-                # e2rm.append(similaredges[imin])
-                res=similaredges[imin]
-    return res
+def test():
+    region_list = [(0, 0)]
+    mutants = ['7o', '8c']
+    save = False
+    if len(sys.argv) > 1:
+        work_dir = sys.argv[1]
+    else:
+        work_dir = '/media/sophie.skriabine/sophie/HFD_VASC'
+    for sample_id in mutants:
+        sample_dir = os.path.join(work_dir, f'{sample_id}')
+        print(f'Processing {sample_dir} ...')
+        sample_graph = ggt.load(os.path.join(sample_dir, f'{sample_id}_graph.gt'))
+        corrected_graph = correct_graph(sample_graph)
+        if save:
+            file_name = f'data_graph_corrected{annotation.find_name(region_list[0][0], key="id")}.gt'
+            corrected_graph.save(os.path.join(sample_dir, file_name))
 
 
-def removeMutualLoop(graph, rmin=3, length=5):
-    radii = graph.edge_radii()
-    conn = graph.edge_connectivity()
-    rad1 = np.asarray(radii <= rmin).nonzero()[0]
-    print(rad1.shape)
-    edge2rm = []
-    lengths=graph.edge_geometry_lengths()
-
-    n=0
-    for i in rad1:
-       
-        co=conn[i]
-        
-
-        similaredges=np.logical_or(np.logical_and(conn[:,0]==co[0], conn[:, 1]==co[1]), np.logical_and(conn[:,1]==co[0], conn[:, 0]==co[1]))
-        # print(similaredges.shape)
-        similaredges=np.asarray(similaredges ==True).nonzero()[0]
-
-
-        if similaredges.shape[0]>=2:
-            rs=radii[similaredges]
-            # print(rs)
-            imin=np.argmin(rs)
-            if rs[imin]<=rmin:
-                if lengths[imin]<=length:
-                    # print('adding edge to remove ', imin)
-                    edge2rm.append(similaredges[imin])
-                    # n = True
-
-       
-
-    edge2rm=np.array(edge2rm)
-    print(edge2rm.shape)
-    ef = np.ones(graph.n_edges)
-    if edge2rm.shape[0] !=0:
-        ef[edge2rm] = 0
-        graph = graph.sub_graph(edge_filter=ef)
-    return graph
-
-
-def createHighLevelGraph(gss4):
-   
-    diff=np.load('/data_SSD_2to/' + brainnb + '/sbm/diffusion_penetrating_vessel_overlap_end_point_cluster_per_region_iteration_' + ano.find_name(order, key='order') +'_graph_corrected'+ '.npy')
-    # diff=np.load('/mnt/data_SSD_2to/' + brainnb + '/sbm/diffusion_penetrating_art_end_point_cluster_per_region_'+ ano.find_name(order,key='order') + '.npy')
-    gss4.add_vertex_property('diff_val', diff)
-    diff=gss4.vertex_property('diff_val')
-    coordinates=gss4.vertex_coordinates()
-    u, c = np.unique(diff, return_counts=True)#diffusion_through_penetrating_arteries_vector
-    high_lev_coord=np.zeros((u.shape[0], 3))
-    conn = gss4.edge_connectivity()
-    edges_all=[[diff[conn[i, 0]], diff[conn[i,1]]] for i in range(conn.shape[0])]
-    edges_all=np.array(edges_all)
-    g = ggt.Graph(n_vertices=u.shape[0], directed=False)
-    # radii = np.zeros((0, 1), dtype=int)
-    cluster_size = np.zeros(g.n_vertices)
-    print(g)
-    for i, uc in enumerate(u):
-        vf=diff==uc
-        high_lev_coord[i]=np.sum(coordinates[vf], axis=0)/c[i]
-        cluster_size[uc] = c[i]
-
-    intra_edges=np.asarray([edges_all[i, 0]==edges_all[i, 1] for i in range(edges_all.shape[0])]).nonzero()
-    intra_edges=edges_all[intra_edges]
-
-    inter_edges = np.asarray([edges_all[i, 0]!=edges_all[i, 1] for i in range(edges_all.shape[0])]).nonzero()
-    inter_edges = edges_all[inter_edges]
-
-    eu, ec=np.unique(inter_edges, return_counts=True, axis=0)
-    g.add_edge(eu)
-    # radii=np.ones(edges_all.shape[0])
-    print(g)
-    g.set_edge_geometry(name='radii', values=ec)
-    g.set_vertex_coordinates(high_lev_coord)
-
-
-    eu, ec=np.unique(intra_edges, return_counts=True, axis=0)
-
-    inter_connectivity=np.zeros(g.n_vertices)
-
-    for i, u in enumerate(eu):
-        inter_connectivity[u]=ec[i]
-
-
-    g.add_vertex_property('inter_connectivity', inter_connectivity)
-    g.add_vertex_property('cluster_size', cluster_size)
-    return g
-
-
-
-def graphCorrection(graph, graph_dir, region, save=True):
-
-
-    gss = graph.largest_component()
-
-    degrees_m = gss.vertex_degrees()
-    deg4 = np.asarray(degrees_m >= 5).nonzero()[0]
-    print('deg4 init ', deg4.shape[0] / gss.n_vertices)
-
-    gss = removeSpuriousBranches(gss, rmin=2.9, length=7)
-    gss = remove_surface(gss, 2)
-    gss = gss.largest_component()
-
-    gss = removeAutoLoops(gss)
-    
-
-    rmin = 2.9
-    length = 13
-    radii = gss.edge_radii()
-    lengths = gss.edge_geometry_lengths()
-
-    conn = gss.edge_connectivity()
-    rad1 = np.asarray(radii <= rmin)  # .nonzero()[0]
-    len1 = np.asarray(lengths <= length)  # .nonzero()[0]
-    l = np.logical_and(len1, rad1).nonzero()[0]
-
-    print(l.shape)
-  
-    from multiprocessing import Pool
-    p = Pool(20)
-    import time
-    start = time.time()
-
-    e2rm = np.array(
-        [p.map(mutualLoopDetection, [(ind, i, rmin, length, conn, radii, lengths) for ind, i in enumerate(l)])])
-
-    end = time.time()
-    print(end - start)
-
-    print(gss)
-    degrees_m = gss.vertex_degrees()
-    deg4 = np.asarray(degrees_m >= 4).nonzero()[0]
-    print('deg4 exit ', deg4.shape)
-
-    u = np.unique(e2rm[0].nonzero())
-    ef = np.ones(gss.n_edges)
-    ef[u] = 0
-    g = gss.sub_graph(edge_filter=ef)
-   
-
-    degrees_m = g.vertex_degrees()
-    deg4 = np.asarray(degrees_m >= 5).nonzero()[0]
-    print('deg4 exit ', deg4.shape[0] / g.n_vertices)
-
-   
-    if save:
-        g.save(graph_dir+'/data_graph_corrected'+ano.find_name(region[0], key='id')+'.gt')
-    return g
-    
-    
-    
 if __name__ == "__main__":
-	
-	region_list = [(0, 0)]
-	mutants=[ '7o', '8c']
-	work_dir='/media/sophie.skriabine/sophie/HFD_VASC'
-	for c in mutants:
-	    graph = ggt.load(work_dir + '/' + str(c) + '/' + str(c)+'_graph.gt')
-	    giso=graphCorrection(graph, work_dir+'/'+c, region_list[0])
-    
-
+    test()
