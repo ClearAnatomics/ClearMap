@@ -7,9 +7,9 @@ cdef extern from "math.h":
     double sqrt(double)
     double M_PI
 
-# import g_math
-import units
-import numpy
+# import ClearMap.Analysis.vasculature.flow.units as units
+from . import units
+
 
 __all__ = ['Physiology']
 
@@ -23,8 +23,7 @@ cdef class Physiology(object):
 
     cdef public dict _sf
     
-    def __init__(self, defaultUnits={'length': 'um', 'mass': 'ug', 
-                                     'time': 'ms'}):
+    def __init__(self, default_units={'length': 'um', 'mass': 'ug', 'time': 'ms'}):
         """Initializes the Physiology object.
         INPUT: defaultUnits: The default units to be used for input and output
                              as a dictionary, e.g.: {'length': 'm', 
@@ -32,12 +31,12 @@ cdef class Physiology(object):
         OUTPUT: None
         """
         
-        self.tune_to_default_units(defaultUnits)
+        self.tune_to_default_units(default_units)
         
     # -------------------------------------------------------------------------
     # -------------------------------------------------------------------------
     
-    def tune_to_default_units(self, defaultUnits):
+    def tune_to_default_units(self, default_units):
         """Tunes the Physiology object to a set of default units. This results
         in faster execution time and less calling parameters.
         INPUT: defaultUnits: The default units to be used for input and output
@@ -47,12 +46,12 @@ cdef class Physiology(object):
         """
         self._sf = {}
         sf = self._sf
-        sf['um -> du'] = units.scaling_factor_du('um', defaultUnits)
-        sf['mm/s -> du'] = units.scaling_factor_du('mm/s', defaultUnits)
-        sf['kg/m^3 -> du'] = units.scaling_factor_du('kg/m^3', defaultUnits)
-        sf['mmHg -> du'] = units.scaling_factor_du('mmHg', defaultUnits)
-        sf['Pa*s -> du'] = units.scaling_factor_du('Pa*s', defaultUnits)
-        sf['fL -> du'] = units.scaling_factor_du('fL', defaultUnits)
+        sf['um -> du'] = units.scaling_factor_du('um', default_units)
+        sf['mm/s -> du'] = units.scaling_factor_du('mm/s', default_units)
+        sf['kg/m^3 -> du'] = units.scaling_factor_du('kg/m^3', default_units)
+        sf['mmHg -> du'] = units.scaling_factor_du('mmHg', default_units)
+        sf['Pa*s -> du'] = units.scaling_factor_du('Pa*s', default_units)
+        sf['fL -> du'] = units.scaling_factor_du('fL', default_units)
         
     # -------------------------------------------------------------------------
     # -------------------------------------------------------------------------
@@ -194,9 +193,9 @@ cdef class Physiology(object):
     # -------------------------------------------------------------------------
     # -------------------------------------------------------------------------
 
-    cpdef dynamic_plasma_viscosity(self,str plasmaType='default'):
+    cpdef dynamic_plasma_viscosity(self, str plasma_type='default'):
         """Returns the dynamic viscosity of human plasma at 37 degrees 
-        centigrate, as reported in 'Plasma viscosity: A forgotten variable' by 
+        centigrade, as reported in 'Plasma viscosity: A forgotten variable' by 
         Kesmarky et al, 2008.
         INPUT: None
         OUTPUT: Dynamic viscosity of human plasma.
@@ -204,10 +203,12 @@ cdef class Physiology(object):
         
         # The value reported by Kesmarky is scaled from [Pa s] to default 
         # units:
-        if plasmaType == 'default':
+        if plasma_type == 'default':
             return 0.0012 * self._sf['Pa*s -> du']
-        elif plasmaType == 'human':
+        elif plasma_type == 'human':
             return 0.001339 * self._sf['Pa*s -> du']
+        else:  # TODO: check
+            raise NotImplementedError(f'Unknown plasma type {plasma_type}, expected one of "default", "human"')
         
     # -------------------------------------------------------------------------
     # -------------------------------------------------------------------------
@@ -231,6 +232,9 @@ cdef class Physiology(object):
             return 49.0 * self._sf['fL -> du']
         elif species == 'human2':
             return 92.0 * self._sf['fL -> du']
+        else:  # TODO: check
+            raise NotImplementedError(f'Unknown species {species}, Expected one of:'
+                                      f'("rat", "human", "mouse", "human2")')
 
     # -------------------------------------------------------------------------
     # -------------------------------------------------------------------------

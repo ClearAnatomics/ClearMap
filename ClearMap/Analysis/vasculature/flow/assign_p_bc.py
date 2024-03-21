@@ -1,5 +1,5 @@
 import numpy as np
-import matplotlib.pyplot as plt
+
 
 def fit_for_pressureBC():
     #Available Data --> see Schmid et al. 2017 for references: https://doi.org/10.1371/journal.pcbi.1005392
@@ -44,6 +44,7 @@ def fit_for_pressureBC():
     polynomial_v = np.poly1d(z2) #NOTE I don't use the venule fit but assign a constant value of 10 mmHg
     
     return polynomial_a, polynomial_v
+
 
 def assign_pressureBC(G,polynomial_a):
     G.vs['degree'] = G.degree()
