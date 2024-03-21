@@ -7,7 +7,7 @@ Module provides basic Graph interface to the
 `graph_tool <https://graph-tool.skewed.de>`_ library.
 """
 __author__ = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
-__license__ = 'GPLv3 - GNU General Pulic License v3 (see LICENSE)'
+__license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
@@ -46,10 +46,10 @@ class Graph(grp.AnnotatedGraph):
     DEFAULT_N_DIMS = 3
 
     def __init__(self, name=None, n_vertices=None, edges=None, directed=None,
-                       vertex_coordinates=None, vertex_radii=None,
-                       edge_coordinates=None, edge_radii=None, edge_geometries=None, shape=None,
-                       vertex_labels=None, edge_labels=None, annotation=None,
-                       base=None, edge_geometry_type='graph'):
+                 vertex_coordinates=None, vertex_radii=None,
+                 edge_coordinates=None, edge_radii=None, edge_geometries=None, shape=None,
+                 vertex_labels=None, edge_labels=None, annotation=None,
+                 base=None, edge_geometry_type='graph'):
 
         if base is None:
             base = gt.Graph(directed=directed)
@@ -91,7 +91,6 @@ class Graph(grp.AnnotatedGraph):
         return isinstance(self.base, gt.GraphView)
 
     # ## Vertices
-
     @property
     def n_vertices(self):
         return self._base.num_vertices()
@@ -399,7 +398,6 @@ class Graph(grp.AnnotatedGraph):
             else:
                 return coordinates.T
 
-
     # FIXME: not very useful
     def set_vertex_coordinates(self, coordinates, vertex=None, dtype=float):
         self.define_vertex_property('coordinates', coordinates, vertex=vertex, dtype=dtype)
@@ -427,7 +425,7 @@ class Graph(grp.AnnotatedGraph):
     def edge_coordinates(self, edge=None):
         return self.edge_property('coordinates', edge=edge)
 
-    def set_edge_coordaintes(self, coordinates, edge=None):
+    def set_edge_coordinates(self, coordinates, edge=None):
         self.define_edge_property('coordinates', coordinates, edge=edge)
 
     @property
@@ -448,7 +446,7 @@ class Graph(grp.AnnotatedGraph):
         Returns
         -------
         type : 'graph' or 'edge'
-          'graph' : Stores edge coordinates in an graph property array and
+          'graph' : Stores edge coordinates in a graph property array and
                     start end indices in edges.
 
           'edge'  : Stores the edge coordinates in variable length vectors in
@@ -703,7 +701,7 @@ class Graph(grp.AnnotatedGraph):
 
     def set_edge_geometry_type(self, edge_geometry_type):
         if edge_geometry_type not in ['graph', 'edge']:
-            raise ValueError(f"Edge geometry can only be 'graph' or 'edge', got '{edge_geometry_type}'!")
+            raise ValueError(f"Edge geometry must be 'graph' or 'edge', got '{edge_geometry_type}'!")
 
         if self.edge_geometry_type == edge_geometry_type:
             return
@@ -875,7 +873,7 @@ class Graph(grp.AnnotatedGraph):
         else:
             return line_graph
 
-    # ## Binary morpological graph operations
+    # ## Binary morphological graph operations
 
     def vertex_propagate(self, label, value, steps=1):
         if value is not None and not hasattr(value, '__len__'):
@@ -968,66 +966,53 @@ class Graph(grp.AnnotatedGraph):
         valid = self.sub_slice_vertex_filter(slicing, coordinates=coordinates)
         return self.sub_graph(vertex_filter=valid, view=view)
 
-    def sub_slice_vertex_filter(self, slicing, coordinates=None):
+    def _slice_coordinates(self, coordinates, slicing, size):
         import ClearMap.IO.IO as io
         slicing = io.slc.unpack_slicing(slicing, self.ndim)
-        valid = np.ones(self.n_vertices, dtype=bool)
+        valid = np.ones(size, dtype=bool)
+        for d, s in enumerate(slicing):
+            if isinstance(s, slice):
+                if s.start is not None:
+                    valid = np.logical_and(valid, s.start <= coordinates[:, d])
+                if s.stop is not None:
+                    valid = np.logical_and(valid, coordinates[:, d] < s.stop)
+            elif isinstance(s, int):
+                valid = np.logical_and(valid, coordinates[:, d] == s)
+            else:
+                raise ValueError(f'Invalid slicing {s} in dimension {d} for sub slicing the graph')
+        return valid
+
+    def sub_slice_vertex_filter(self, slicing, coordinates=None):
         if coordinates is None:
             coordinates = self.vertex_coordinates()
         elif isinstance(coordinates, str):
             coordinates = self.vertex_property(coordinates)
-        for d, s in enumerate(slicing):
-            if isinstance(s, slice):
-                if s.start is not None:
-                    valid = np.logical_and(valid, s.start <= coordinates[:, d])
-                if s.stop is not None:
-                    valid = np.logical_and(valid, coordinates[:, d] < s.stop)
-            elif isinstance(s, int):
-                valid = np.logical_and(valid, coordinates[:, d] == s)
-            else:
-                raise ValueError(f'Invalid slicing {s} in dimension {d} for sub slicing the graph')
+        valid = self._slice_coordinates(coordinates, slicing, size=self.n_vertices)
         return valid
 
     def sub_slice_edge_filter(self, slicing, coordinates=None):
-        import ClearMap.IO.IO as io
-        slicing = io.slc.unpack_slicing(slicing, self.ndim)
-        valid = np.ones(self.n_edges, dtype=bool)
         if coordinates is None:
             coordinates = self.edge_coordinates()
         elif isinstance(coordinates, str):
             coordinates = self.edge_property(coordinates)
-        for d, s in enumerate(slicing):
-            if isinstance(s, slice):
-                if s.start is not None:
-                    valid = np.logical_and(valid, s.start <= coordinates[:, d])
-                if s.stop is not None:
-                    valid = np.logical_and(valid, coordinates[:, d] < s.stop)
-            elif isinstance(s, int):
-                valid = np.logical_and(valid, coordinates[:, d] == s)
-            else:
-                raise ValueError(f'Invalid slicing {s} in dimension {d} for sub slicing the graph')
+        valid = self._slice_coordinates(coordinates, slicing, size=self.n_edges)
         return valid
 
     def transform_properties(self, transformation,
-                                   vertex_properties=None,
-                                   edge_properties=None,
-                                   edge_geometry_properties=None,
-                                   verbose=False):
+                             vertex_properties=None,
+                             edge_properties=None,
+                             edge_geometry_properties=None,
+                             verbose=False):
+        def properties_to_dict(properties):
+            if properties is None:
+                properties = {}
+            if isinstance(properties, list):
+                properties = {n: n for n in properties}
+            return properties
 
-        if vertex_properties is None:
-            vertex_properties = {}
-        if isinstance(vertex_properties, list):
-            vertex_properties = {n: n for n in vertex_properties}
-
-        if edge_properties is None:
-            edge_properties = {}
-        if isinstance(edge_properties, list):
-            edge_properties = {n: n for n in edge_properties}
-
-        if edge_geometry_properties is None:
-            edge_geometry_properties = {}
-        if isinstance(edge_geometry_properties, list):
-            edge_geometry_properties = {n: n for n in edge_geometry_properties}
+        vertex_properties = properties_to_dict(vertex_properties)
+        edge_properties = properties_to_dict(edge_properties)
+        edge_geometry_properties = properties_to_dict(edge_geometry_properties)
 
         for p in vertex_properties.keys():
             # if p in self.vertex_properties:
@@ -1128,7 +1113,7 @@ def _test():
 
     g.vertex_coordinates()
 
-    #edge geometry
+    # edge geometry
     elen = [3, 4, 5, 6]
     geometry = [np.random.rand(l, 3) for l in elen]
 
@@ -1173,13 +1158,13 @@ def _test():
     # edge properties
     x = 10 * np.arange(g.n_edges)
     g.add_edge_property('test', x)
-    g.edge_property('test') == x
+    assert g.edge_property('test') == x
 
     g.info()
 
-    # filtering / subgraphs
-    vfilter = [True] * 5 + [False] * 5
-    s = g.sub_graph(vertex_filter=vfilter)
+    # filtering / sub-graphs
+    v_filter = [True] * 5 + [False] * 5
+    s = g.sub_graph(vertex_filter=v_filter)
 
     p = s.vertex_property_map('test')
     print(p.a)
@@ -1190,8 +1175,8 @@ def _test():
     print(s.vertex_property('list', as_array=False))
 
     # views
-    vfilter = [False] * 5 + [True] * 5
-    v = g.sub_graph(vertex_filter=vfilter, view=True)
+    v_filter = [False] * 5 + [True] * 5
+    v = g.sub_graph(vertex_filter=v_filter, view=True)
     print(v.edge_property('test'))
     print(v.vertex_property('list', as_array=False))
 
