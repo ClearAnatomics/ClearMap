@@ -48,7 +48,7 @@ def mesh_tube(graph=None,
               processes=None, verbose=False):
     """Construct mesh from edge geometry of a graph."""
     if graph is not None:
-        if graph.has_edge_geometry():
+        if graph.has_edge_geometry():  # FIXME: split into two functions
             if isinstance(coordinates, str):
                 coordinates, indices = graph.edge_geometry(name=coordinates, return_indices=True, as_list=False)
             else:
@@ -89,15 +89,12 @@ def mesh_tube(graph=None,
     return vertices, faces, colors
 
 
-def mesh_tube_from_coordinates_and_radii(coordinates, radii, indices, n_tube_points=None, edge_colors=None,
+def mesh_tube_from_coordinates_and_radii(coordinates, radii, indices, n_tube_points=8, edge_colors=None,
                                          processes=None, verbose=False):
     """Construct a mesh from the edge geometry of a graph."""
     coordinates_hdl = smm.insert(coordinates)
     radii_hdl = smm.insert(radii)
     indices_hdl = smm.insert(indices)
-
-    if n_tube_points is None:
-        n_tube_points = 8
 
     func = ft.partial(_parallel_mesh, coordinates_hdl=coordinates_hdl, radii_hdl=radii_hdl, indices_hdl=indices_hdl, n_tube_points=n_tube_points, verbose=verbose)
     argdata = np.arange(len(indices))
