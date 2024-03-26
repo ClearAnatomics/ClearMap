@@ -49,10 +49,8 @@ def mesh_tube(graph=None,
     """Construct mesh from edge geometry of a graph."""
     if graph is not None:
         if graph.has_edge_geometry():
-            if coordinates is None:
-                name = 'coordinates'
-            if isinstance(coordinates, str):  # FIXME: might use name not set
-                coordinates, indices = graph.edge_geometry(name=name, return_indices=True, as_list=False)
+            if isinstance(coordinates, str):
+                coordinates, indices = graph.edge_geometry(name=coordinates, return_indices=True, as_list=False)
             else:
                 raise ValueError(f'Expected coordinates to by None or str, found {coordinates}!')
 
@@ -63,7 +61,10 @@ def mesh_tube(graph=None,
                 print(f'No radii found in the graph, using uniform radii = {default_radius}!')
                 radii = default_radius * np.ones(coordinates.shape[0])  # FIXME: dtype=float
         else:
-            coordinates = graph.vertex_coordinates()
+            if isinstance(coordinates, str) and coordinates != 'coordinates':
+                coordinates = graph.vertex_property(name=coordinates)
+            else:
+                coordinates = graph.vertex_coordinates()
             indices = graph.edge_connectivity().flatten()
             coordinates = np.vstack(coordinates[indices])
             try:
