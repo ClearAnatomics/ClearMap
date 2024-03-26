@@ -62,7 +62,7 @@ def join_neighbouring_degrees_1(graph, min_radius=5, dest_path=''):
     return graph
 
 
-def remove_spurious_branches(graph, r_min=None, min_length=1.0, view=False):
+def remove_spurious_branches(graph, r_min=None, min_length=1.0, view=False):  #  WARNING: isolated vertices are not removed
     """
     Removes spurious branches from the graph.
     Spurious branches are defined as small degree 1 branches (with a radius smaller than r_min).
