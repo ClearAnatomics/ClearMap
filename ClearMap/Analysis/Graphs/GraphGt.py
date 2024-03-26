@@ -23,6 +23,7 @@ import graph_tool.generation as gtg
 
 # fix graph tool saving / loading for very large arrays
 import ClearMap.Analysis.Graphs.Graph as grp
+from ClearMap.Analysis.Graphs.GraphRendering import mesh_tube
 from ClearMap.Analysis.Graphs.type_conversions import dtype_to_gtype, gtype_from_source, vertex_property_map_to_python, \
   edge_property_map_to_python, vertex_property_map_from_python, set_vertex_property_map, edge_property_map_from_python, \
   set_edge_property_map
@@ -67,6 +68,12 @@ class Graph(grp.AnnotatedGraph):
         else:
             self.base = base
             super(Graph, self).__init__(name=name)
+        self.__mesh_vertices = None
+        self.__mesh_faces = None
+
+    def invalidate_caches(self):
+        self.__mesh_vertices = None
+        self.__mesh_faces = None
 
     @property
     def base(self):
@@ -77,6 +84,7 @@ class Graph(grp.AnnotatedGraph):
         if not isinstance(value, gt.Graph):
             raise ValueError('Base graph not a graph_tool Graph')
         self._base = value
+        self.invalidate_caches()
 
     @property
     def directed(self):
@@ -127,9 +135,11 @@ class Graph(grp.AnnotatedGraph):
         #     v = vertex  #analysis:ignore
         else:
             raise ValueError('Cannot add vertices.')
+        self.invalidate_caches()
 
     def remove_vertex(self, vertex):
         self._base.remove_vertex(vertex)
+        self.invalidate_caches()
 
     def vertex_property(self, name, vertex=None, as_array=True):
         v_prop = self._base.vertex_properties[name]
@@ -148,6 +158,7 @@ class Graph(grp.AnnotatedGraph):
     def add_vertex_property(self, name, source=None, dtype=None):
         v_prop = vertex_property_map_from_python(source, self, dtype=dtype)
         self._base.vertex_properties[name] = v_prop
+        # self.invalidate_caches()  # TODO: check if this is necessary
 
     def set_vertex_property(self, name, source, vertex=None):
         if name not in self._base.vertex_properties:
@@ -157,6 +168,7 @@ class Graph(grp.AnnotatedGraph):
             v_prop[vertex] = source
         else:
             set_vertex_property_map(v_prop, source)
+        # self.invalidate_caches()  # TODO: check if this is necessary
 
     def define_vertex_property(self, name, source, vertex=None, dtype=None):
         if name in self.vertex_properties:
@@ -173,6 +185,7 @@ class Graph(grp.AnnotatedGraph):
         if name not in self._base.vertex_properties:
             raise ValueError(f'Graph has no vertex property with name {name}!')
         del self._base.vertex_properties[name]
+        self.invalidate_caches()
 
     def vertex_degrees(self):
         return self._base.get_out_degrees(self._base.get_vertices())
@@ -231,10 +244,12 @@ class Graph(grp.AnnotatedGraph):
             self._base.add_edge(*edge)
         else:
             self._base.add_edge_list(edge)
+        self.invalidate_caches()
 
     def remove_edge(self, edge):
         edge = self.edge(edge)
         self._base.remove_edge(edge)
+        self.invalidate_caches()
 
     @property
     def edges(self):
@@ -263,6 +278,7 @@ class Graph(grp.AnnotatedGraph):
     def add_edge_property(self, name, source=None, dtype=None):
         p = edge_property_map_from_python(source, self)
         self._base.edge_properties[name] = p
+        self.invalidate_caches()
 
     def set_edge_property(self, name, source, edge=None):
         if name not in self._base.edge_properties:
@@ -272,6 +288,7 @@ class Graph(grp.AnnotatedGraph):
             p[self.edge(edge)] = source
         else:
             set_edge_property_map(p, source)
+        self.invalidate_caches()
 
     def define_edge_property(self, name, source, edge=None, dtype=None):
         if name in self.edge_properties:
@@ -288,6 +305,7 @@ class Graph(grp.AnnotatedGraph):
         if name not in self.edge_properties:
             raise ValueError(f'Graph does not have edge property with name {name}!')
         del self._base.edge_properties[name]
+        self.invalidate_caches()
 
     def vertex_edges(self, vertex):
         return edges_to_vertices(self.vertex_edges_iterator(vertex))
@@ -325,12 +343,14 @@ class Graph(grp.AnnotatedGraph):
         g_prop = self._base.new_graph_property(gtype)
         g_prop.set_value(source)
         self._base.graph_properties[name] = g_prop
+        self.invalidate_caches()
 
     def set_graph_property(self, name, source):
         if name not in self.graph_properties:
             raise ValueError(f'Graph has no property named {name}!')
         if source is not None:
             self._base.graph_properties[name] = source
+        self.invalidate_caches()
 
     def define_graph_property(self, name, source, dtype=None):
         if name in self.graph_properties:
@@ -342,6 +362,7 @@ class Graph(grp.AnnotatedGraph):
         if name not in self.graph_properties:
             raise ValueError(f'Graph does not have graph property named {name}!')
         del self._base.graph_properties[name]
+        self.invalidate_caches()
 
     # ## Geometry
     @property
@@ -719,6 +740,7 @@ class Graph(grp.AnnotatedGraph):
                     self._remove_edge_geometry_edge(name)
                     self._set_edge_geometry_graph(name, values)
             self.set_graph_property('edge_geometry_type', edge_geometry_type)
+        self.invalidate_caches()
 
     def is_edge_geometry_consistent(self, verbose=False):
         eg, ei = self.edge_geometry(as_list=False, return_indices=True)
@@ -758,16 +780,18 @@ class Graph(grp.AnnotatedGraph):
 
         self.set_edge_geometry(name=edge_geometry_name, values=edge_geometry, indices=indices)
 
-    # def edge_meshes(self, edge=None):
-    #     """Returns a mesh triangulation for the geometry of each edge.
-    #
-    #     Note
-    #     ----
-    #     This functionality can be used to store geometric information of edges as
-    #     meshes, e.g. useful for graph rendering.
-    #     """
-    #
-    #     pass
+    @property
+    def edge_meshes(self, coordinates='coordinates'):
+        """
+        Returns a mesh triangulation for the geometry of each edge.
+        For efficiency purposes, the result is cached.
+        """
+
+        # TODO: check if vertex_colors and edge_colors are needed
+        if self.__mesh_vertices is None or self.__mesh_faces is None:
+            self.__mesh_vertices, self.__mesh_faces, _ = mesh_tube(graph=self, coordinates=coordinates,
+                                                                   vertex_colors=None, edge_colors=None)
+        return self.__mesh_vertices, self.__mesh_faces
 
     # ## Label
 
@@ -811,7 +835,7 @@ class Graph(grp.AnnotatedGraph):
     def view(self, vertex_filter=None, edge_filter=None):
         return gt.GraphView(self.base, vfilt=vertex_filter, efilt=edge_filter)
 
-    def remove_self_loops(self):
+    def remove_self_loops(self):  # FIXME: substitute custom function
         gt.stats.remove_self_loops(self.base)
 
     def remove_isolated_vertices(self):
