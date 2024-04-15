@@ -954,6 +954,52 @@ class Graph(grp.AnnotatedGraph):
 
     ################# MAPPING FUNCTIONS #################
 
+    def vertex_ids_to_connectivity(self, vertex_indices):
+        """
+        Get the edge connectivity for a set of vertices.
+        This will return any edge that has at least one vertex in the set of vertex_indices.
+
+        Parameters
+        ----------
+        vertex_indices : list of int
+            The vertex indices to consider.
+
+        Returns
+        -------
+        connectivity : np.ndarray
+        """
+        start_mask, end_mask, connectivity = self.vertex_ids_to_vertex_masks(vertex_indices)
+        return connectivity[np.logical_or(start_mask, end_mask)]
+
+    def vertex_ids_to_vertex_masks(self, vertex_indices):
+        connectivity = self.edge_connectivity()
+        start_mask = np.isin(connectivity[:, 0], vertex_indices)
+        end_mask = np.isin(connectivity[:, 1], vertex_indices)
+        return start_mask, end_mask, connectivity
+
+    def vertex_indices_to_vectors(self, vertex_indices, coordinates_name='coordinates'):
+        """
+        Get the edge vectors for a set of vertices.
+
+        Parameters
+        ----------
+        vertex_indices : list of int
+            The vertex indices to consider.
+        coordinates_name : str
+            The name of the vertex property that contains the coordinates.
+            Typically 'coordinates', 'coordinates_atlas', 'coordinates_um'...
+
+        Returns
+        -------
+        vectors : np.ndarray
+        """
+        connectivity = self.vertex_ids_to_connectivity(vertex_indices)
+        if coordinates_name == 'coordinates':
+            coordinates = self.vertex_coordinates()
+        else:
+            coordinates = self.vertex_property(coordinates_name)
+        return np.hstack([coordinates[connectivity[:, 0]], coordinates[connectivity[:, 1]]])
+
     # FIXME: check if these are ordered as expected
     def vertex_to_edge_property(self, vertex_property, mapping=np.logical_and, vertices=None):
         """
