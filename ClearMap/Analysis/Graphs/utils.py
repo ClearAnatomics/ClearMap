@@ -23,4 +23,7 @@ def unpickler(stream):
 
 def edges_to_connectivity(edges):
     return np.array([[int(e.source()), int(e.target())] for e in edges])
-    # return np.array([[e.source(), e.target()] for e in edges], dtype=int)  # TODO: see which is better cpu/RAM wise
+    # indices = self.edge_indices()[edges]
+    # connectivity = self.connectivity()
+    # return connectivity[indices]
+    # return np.array([[e.source(), e.target()] for e in edges], dtype=int)  # TODO: see best of 3 cpu/RAM wise
