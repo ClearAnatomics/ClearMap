@@ -68,52 +68,52 @@ def edge_to_vertex_property(graph, edge_property, dtype=None):
     return vertex_property_data
 
 
-def vertex_to_edge_property(graph, graph_property):
-    """
-    Converts graph_property from vertex to edge property
+# def vertex_to_edge_property(graph, vertex_property):
+#     """
+#     Converts graph_property from vertex to edge property
+#
+#     .. warning:: This function only works for binary properties
+#
+#     Parameters
+#     ----------
+#     graph : Graph
+#         The graph to convert the property from
+#     vertex_property : str or np.array
+#         The name of the vertex property to convert or the vertex property itself
+#
+#     Returns
+#     -------
+#     The edge property (as a numpy array)
+#     """
+#     vertex_prop = graph.vertex_property(vertex_property) if isinstance(vertex_property, str) else vertex_property
+#     connectivity = graph.edge_connectivity()
+#     edge_prop = np.logical_and(vertex_prop[connectivity[:, 0]], vertex_prop[connectivity[:, 1]])
+#     return edge_prop
 
-    .. warning:: This function only works for binary properties
 
-    Parameters
-    ----------
-    graph : Graph
-        The graph to convert the property from
-    graph_property : str or np.array
-        The name of the vertex property to convert or the vertex property itself
-
-    Returns
-    -------
-    The edge property (as a numpy array)
-    """
-    vertex_prop = graph.vertex_property(graph_property) if isinstance(graph_property, str) else graph_property
-    connectivity = graph.edge_connectivity()
-    edge_prop = np.logical_and(vertex_prop[connectivity[:, 0]], vertex_prop[connectivity[:, 1]])
-    return edge_prop
-
-
-def vertex_filter_to_edge_filter(graph, vertex_filter, operator=np.logical_and):
-    """
-    Converts a vertex filter to an edge filter
-
-    .. warning::
-      The operator is essential. Should both vertices follow the filter or either one.
-
-    Parameters
-    ----------
-    graph : Graph
-        The graph to convert the filter for
-    vertex_filter : np.array
-        The vertex filter to convert
-
-    Returns
-    -------
-    The edge filter (as a numpy array)
-    """
-    connectivity = graph.edge_connectivity()
-    start_vertex_follows_filter = vertex_filter[connectivity[:, 0]]
-    end_vertex_follows_filter = vertex_filter[connectivity[:, 1]]
-    edge_filter = operator(start_vertex_follows_filter, end_vertex_follows_filter)
-    return edge_filter
+# def vertex_filter_to_edge_filter(graph, vertex_filter, operator=np.logical_and):
+#     """
+#     Converts a vertex filter to an edge filter
+#
+#     .. warning::
+#       The operator is essential. Should both vertices follow the filter or either one.
+#
+#     Parameters
+#     ----------
+#     graph : Graph
+#         The graph to convert the filter for
+#     vertex_filter : np.array
+#         The vertex filter to convert
+#
+#     Returns
+#     -------
+#     The edge filter (as a numpy array)
+#     """
+#     connectivity = graph.edge_connectivity()
+#     start_vertex_follows_filter = vertex_filter[connectivity[:, 0]]
+#     end_vertex_follows_filter = vertex_filter[connectivity[:, 1]]
+#     edge_filter = operator(start_vertex_follows_filter, end_vertex_follows_filter)
+#     return edge_filter
 
 
 def remove_surface(graph, depth):
@@ -181,8 +181,8 @@ def set_artery_vein_if_missing(graph, artery_min_radius=4, vein_min_radius=8):  
         vein = graph.vertex_radii() >= vein_min_radius
         graph.add_vertex_property('artery', artery)
         graph.add_vertex_property('vein', vein)
-        graph.add_edge_property('artery', vertex_to_edge_property(graph, artery))
-        graph.add_edge_property('vein', vertex_to_edge_property(graph, vein))
+        graph.add_edge_property('artery', graph.vertex_to_edge_property(artery))
+        graph.add_edge_property('vein', graph.vertex_to_edge_property(vein))
 
 
 def combine_arteries_and_veins(graph, artery=None, vein=None, mode='arteryvein', min_radius=None):

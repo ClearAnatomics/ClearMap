@@ -7,8 +7,8 @@ from tqdm import tqdm
 from ClearMap.Analysis.vasculature.geometry_utils import cartesian_to_polar, angle_between_vectors, compute_grid, \
     interpolate_vectors
 from ClearMap.Analysis.vasculature.vasc_graph_utils import set_artery_vein_if_missing, combine_arteries_and_veins, \
-    vertex_to_edge_property, edge_to_vertex_property, filter_graph_degrees, \
-    parallel_get_vessels_lengths, graph_gt_to_igraph, n_kinds, get_vertex_coordinates, vertex_filter_to_edge_filter
+    edge_to_vertex_property, filter_graph_degrees, \
+    parallel_get_vessels_lengths, graph_gt_to_igraph, n_kinds, get_vertex_coordinates
 
 CORRECTED_GRAPH_BASE_NAME = 'data_graph_correcteduniverse'
 
@@ -114,7 +114,7 @@ def get_artery_vein_edge_coords_and_vectors(graph, mode, artery, vein, min_radiu
     out = graph_to_edge_coords_and_vectors(sub_graph, coordinates_name=coordinates_name,
                                                orientation_criterion=orientation_criterion)
     if return_filter:
-        out = list(out) + [vertex_filter_to_edge_filter(graph, vertex_filter)]
+        out = list(out) + [graph.vertex_filter_to_edge_filter(vertex_filter)]
     return out
 
 
@@ -507,8 +507,8 @@ def get_orientation_from_normal_to_surface_local(graph, region_ids, normal_vecto
         r, p = get_orientation_from_normal_to_surface_global(sub_graph, sub_graph,  # FIXME: check if sub_graph is correct
                                                              normal_vector_method=normal_vector_method,
                                                              coordinates_name=coordinates_name)
-        edge_filter = vertex_to_edge_property(graph, vertex_filter)
-        radial_orientations[edge_filter] = r
+        edge_filter = graph.vertex_filter_to_edge_filter(vertex_filter)
+        radial_orientations[edge_filter] = r  # FIXME: unordered edges
         planar_orientations[edge_filter] = p
     return abs(radial_orientations), abs(planar_orientations)
 

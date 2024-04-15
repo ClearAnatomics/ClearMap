@@ -7,7 +7,7 @@ import pandas as pd
 from sklearn.neighbors import NearestNeighbors
 
 from ClearMap.Alignment import Annotation as annotation
-from ClearMap.Analysis.vasculature.vasc_graph_utils import remove_surface, vertex_filter_to_edge_filter
+from ClearMap.Analysis.vasculature.vasc_graph_utils import remove_surface
 
 print('Loading ClearMap modules, please wait ...')
 import ClearMap.Analysis.Graphs.GraphGt as ggt
@@ -81,7 +81,7 @@ def remove_spurious_branches(graph, r_min=None, min_length=1.0, view=False):
         The graph with the spurious branches removed
     """
     degrees_filter = graph.vertex_degrees() == 1
-    degrees_filter = vertex_filter_to_edge_filter(graph, degrees_filter, operator=np.logical_or)
+    degrees_filter = graph.vertex_filter_to_edge_filter(degrees_filter, mode='either')
     if r_min is not None:
         # radii_filter = graph.edge_radii() < r_min
         raise NotImplementedError('Radii are not implemented yet because we need to decide how they combine '

@@ -952,6 +952,74 @@ class Graph(grp.AnnotatedGraph):
         label = self.edge_dilate_binary(label, steps=steps)
         return self.edge_erode_binary(label, steps=steps)
 
+    ################# MAPPING FUNCTIONS #################
+
+    # FIXME: check if these are ordered as expected
+    def vertex_to_edge_property(self, vertex_property, mapping=np.logical_and, vertices=None):
+        """
+        Converts vertex_property from vertex to edge property
+
+        Parameters
+        ----------
+        vertex_property : str or np.array
+            The name of the vertex property to convert or the vertex property itself
+        mapping : function
+            The mapping function to apply to the vertex property.
+            Typically np.logical_and, np.logical_or, np.mean, np.max, np.sum, ...
+        vertices : list of int
+            The vertices to consider. If None, all vertices are considered.
+
+        .. warning:: The mapping function should be able to handle numpy arrays of
+            the type of the vertex property.
+
+        Returns
+        -------
+        The edge property (as a numpy array)
+        """
+        vertex_prop = self.vertex_property(vertex_property) if isinstance(vertex_property, str) else vertex_property
+        if vertices is None:
+            connectivity = self.edge_connectivity()
+        else:
+            connectivity = self.vertex_ids_to_connectivity(vertices)
+        edge_prop = np.array(mapping(vertex_prop[connectivity[:, 0]], vertex_prop[connectivity[:, 1]]),
+                             dtype=vertex_property.dtype)
+        return edge_prop
+
+    def vertex_filter_to_edge_filter(self, vertex_filter, mode='both'):
+        """
+        Converts a vertex filter to an edge filter
+
+        Parameters
+        ----------
+        vertex_filter : np.array
+            The vertex filter to convert
+        mode : str
+            The mode to apply to map from vertex to edge filter.
+            It can be:
+                'both': both vertices have to follow the filter
+                'either': either vertex has to follow the filter
+                 (or the boolean equivalents 'and', 'or')
+
+        Returns
+        -------
+        The edge filter (as a numpy array)
+        """
+        mappings = {
+            'both': np.logical_and,
+            'either': np.logical_or,
+            'and': np.logical_and,
+            'or': np.logical_or
+        }
+        connectivity = self.edge_connectivity()
+        start_vertex_follows_filter = vertex_filter[connectivity[:, 0]]
+        end_vertex_follows_filter = vertex_filter[connectivity[:, 1]]
+        try:
+            operator = mappings[mode]
+        except KeyError:
+            raise ValueError(f'Unknown mode {mode}! Choose from {mappings.keys()}')
+        edge_filter = operator(start_vertex_follows_filter, end_vertex_follows_filter)
+        return edge_filter
+
     def edge_to_vertex_label(self, edge_label, method='max', as_array=True):
         # TODO: compare implementation with
         #  edge_connectivity = graph.edge_connectivity()
