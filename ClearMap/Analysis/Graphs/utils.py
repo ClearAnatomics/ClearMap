@@ -21,6 +21,6 @@ def unpickler(stream):
     return pickle.load(sstream, encoding="bytes")
 
 
-def edges_to_vertices(edges):
+def edges_to_connectivity(edges):
     return np.array([[int(e.source()), int(e.target())] for e in edges])
     # return np.array([[e.source(), e.target()] for e in edges], dtype=int)  # TODO: see which is better cpu/RAM wise

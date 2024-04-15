@@ -27,7 +27,7 @@ from ClearMap.Analysis.Graphs.GraphRendering import mesh_tube
 from ClearMap.Analysis.Graphs.type_conversions import dtype_to_gtype, gtype_from_source, vertex_property_map_to_python, \
   edge_property_map_to_python, vertex_property_map_from_python, set_vertex_property_map, edge_property_map_from_python, \
   set_edge_property_map
-from ClearMap.Analysis.Graphs.utils import pickler, unpickler, edges_to_vertices
+from ClearMap.Analysis.Graphs.utils import pickler, unpickler, edges_to_connectivity
 
 from ClearMap.Utils.array_utils import remap_array_ranges
 
@@ -308,13 +308,13 @@ class Graph(grp.AnnotatedGraph):
         self.invalidate_caches()
 
     def vertex_edges(self, vertex):
-        return edges_to_vertices(self.vertex_edges_iterator(vertex))
+        return edges_to_connectivity(self.vertex_edges_iterator(vertex))
 
     def vertex_out_edges(self, vertex):
-        return edges_to_vertices(self.vertex_out_edges_iterator(vertex))
+        return edges_to_connectivity(self.vertex_out_edges_iterator(vertex))
 
     def vertex_in_edges(self, vertex):
-        return edges_to_vertices(self.vertex_in_edges_iterator(vertex))
+        return edges_to_connectivity(self.vertex_in_edges_iterator(vertex))
 
     def vertex_edges_iterator(self, vertex):
         return self._base.vertex(vertex).out_edges()
@@ -419,7 +419,6 @@ class Graph(grp.AnnotatedGraph):
             else:
                 return coordinates.T
 
-    # FIXME: not very useful
     def set_vertex_coordinates(self, coordinates, vertex=None, dtype=float):
         self.define_vertex_property('coordinates', coordinates, vertex=vertex, dtype=dtype)
 
@@ -790,7 +789,7 @@ class Graph(grp.AnnotatedGraph):
         # TODO: check if vertex_colors and edge_colors are needed
         if self.__mesh_vertices is None or self.__mesh_faces is None:
             self.__mesh_vertices, self.__mesh_faces, _ = mesh_tube(graph=self, coordinates=coordinates,
-                                                                   vertex_colors=None, edge_colors=None)
+                                                                   vertex_colors=None, edge_colors=None)  # FIXME: color by edge, vertex or edge_geometry
         return self.__mesh_vertices, self.__mesh_faces
 
     # ## Label
