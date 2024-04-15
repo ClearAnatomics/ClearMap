@@ -826,8 +826,7 @@ class Graph(grp.AnnotatedGraph):
         if view:
             return Graph(base=gv)
         else:
-            g = gt.Graph(gv, prune=True)
-            g = Graph(base=g)
+            g = Graph(base=gt.Graph(gv, prune=True))  # create a new pruned graphtool instance to ensure vertices are coninuous
             g.resize_edge_geometry()
             return g
 
@@ -954,6 +953,14 @@ class Graph(grp.AnnotatedGraph):
         return self.edge_erode_binary(label, steps=steps)
 
     def edge_to_vertex_label(self, edge_label, method='max', as_array=True):
+        # TODO: compare implementation with
+        #  edge_connectivity = graph.edge_connectivity()
+        #  vertex_property_data = np.zeros(graph.n_vertices)
+        #  for i in range(edge_connectivity.shape[1]):
+        #      vertex_property_data[edge_connectivity[edge_property_data == 1, i]] = 1
+        #  if dtype is not None:
+        #      vertex_property_data = vertex_property_data.astype(dtype)
+
         if isinstance(edge_label, str):
             edge_label = self.edge_property(edge_label)
         if not isinstance(edge_label, gt.PropertyMap):
@@ -970,8 +977,7 @@ class Graph(grp.AnnotatedGraph):
         label[ids] = True
         return label
 
-    def vertex_to_edge_label(self, vertex_label, method=None):
-        label = np.zeros(self.n_edges, dtype=vertex_label.dtype)
+    def vertex_to_edge_label(self, vertex_label, method=None):  # FIXME: use vertex_to_con
         ec = self.edge_connectivity()
 
         if method is None:
