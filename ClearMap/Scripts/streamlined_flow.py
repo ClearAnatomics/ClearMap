@@ -51,17 +51,17 @@ def set_vertex_properties(graph):
     Sets the vertex properties for artery and vein.
     """
     try:
-        artery = from_e_prop2_vprop(graph, 'artery')
-        vein = from_e_prop2_vprop(graph, 'vein')
+        artery = from_e_prop_to_v_prop(graph, 'artery')
+        vein = from_e_prop_to_v_prop(graph, 'vein')
     except:
         print('no artery vertex properties')
         artery=graph.vertex_radii()>=4
         vein=graph.vertex_radii()>=8
         graph.add_vertex_property('artery', artery)
         graph.add_vertex_property('vein', vein)
-        artery=from_v_prop2_eprop(graph, artery)
+        artery=from_v_prop_to_e_prop(graph, artery)
         graph.add_edge_property('artery', artery)
-        vein=from_v_prop2_eprop(graph, vein)
+        vein=from_v_prop_to_e_prop(graph, vein)
         graph.add_edge_property('vein', vein)
 
 
