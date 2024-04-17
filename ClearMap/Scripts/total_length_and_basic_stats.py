@@ -1,4 +1,4 @@
-from general_fonction import *
+from ClearMap.Analysis.vasculature.general_fonction import *
 
 work_dir='/data_SSD_2to/211019_otof_10m'
 mutants=['1k', '2k','3k', '6k']#456 not annotated ?
@@ -23,141 +23,141 @@ feature='vessels'#'vessels'#art_raw_signal
 
 
 if condition == 'Aud_p':
-    region_list = [(142, 8)]  # auditory
-    regions = []
-    R = ano.find(region_list[0][0], key='order')['name']
-    main_reg = region_list
-    sub_region = True
-    for r in reg_list.keys():
-        n = ano.find_name(r, key='order')
-        if R in n:
-            for se in reg_list[r]:
-                n = ano.find_name(se, key='order')
-                print(n)
-                regions.append(n)
+	region_list = [(142, 8)]  # auditory
+	regions = []
+	R = ano.find(region_list[0][0], key='order')['name']
+	main_reg = region_list
+	sub_region = True
+	for r in reg_list.keys():
+		n = ano.find_name(r, key='order')
+		if R in n:
+			for se in reg_list[r]:
+				n = ano.find_name(se, key='order')
+				print(n)
+				regions.append(n)
 elif condition == 'Aud':
-    region_list = [(127, 7)]  # barrels
-    regions = []
-    R = ano.find(region_list[0][0], key='order')['name']
-    main_reg = region_list
-    sub_region = True
-    for r in reg_list.keys():
-        n = ano.find_name(r, key='order')
-        if R in n:
-            for se in reg_list[r]:
-                n = ano.find_name(se, key='order')
-                print(n)
-                regions.append(n)
+	region_list = [(127, 7)]  # barrels
+	regions = []
+	R = ano.find(region_list[0][0], key='order')['name']
+	main_reg = region_list
+	sub_region = True
+	for r in reg_list.keys():
+		n = ano.find_name(r, key='order')
+		if R in n:
+			for se in reg_list[r]:
+				n = ano.find_name(se, key='order')
+				print(n)
+				regions.append(n)
 if condition == 'Aud_po':
-    region_list = [(149, 8)]  # auditory
-    regions = []
-    R = ano.find(region_list[0][0], key='order')['name']
-    main_reg = region_list
-    sub_region = True
-    for r in reg_list.keys():
-        n = ano.find_name(r, key='order')
-        if R in n:
-            for se in reg_list[r]:
-                n = ano.find_name(se, key='order')
-                print(n)
-                regions.append(n)
+	region_list = [(149, 8)]  # auditory
+	regions = []
+	R = ano.find(region_list[0][0], key='order')['name']
+	main_reg = region_list
+	sub_region = True
+	for r in reg_list.keys():
+		n = ano.find_name(r, key='order')
+		if R in n:
+			for se in reg_list[r]:
+				n = ano.find_name(se, key='order')
+				print(n)
+				regions.append(n)
 if condition == 'Aud_d':
-    region_list = [(128, 8)]  # auditory
-    regions = []
-    R = ano.find(region_list[0][0], key='order')['name']
-    main_reg = region_list
-    sub_region = True
-    for r in reg_list.keys():
-        n = ano.find_name(r, key='order')
-        if R in n:
-            for se in reg_list[r]:
-                n = ano.find_name(se, key='order')
-                print(n)
-                regions.append(n)
+	region_list = [(128, 8)]  # auditory
+	regions = []
+	R = ano.find(region_list[0][0], key='order')['name']
+	main_reg = region_list
+	sub_region = True
+	for r in reg_list.keys():
+		n = ano.find_name(r, key='order')
+		if R in n:
+			for se in reg_list[r]:
+				n = ano.find_name(se, key='order')
+				print(n)
+				regions.append(n)
 if condition == 'Aud_v':
-    region_list = [(156, 8)]  # auditory
-    regions = []
-    R = ano.find(region_list[0][0], key='order')['name']
-    main_reg = region_list
-    sub_region = True
-    for r in reg_list.keys():
-        n = ano.find_name(r, key='order')
-        if R in n:
-            for se in reg_list[r]:
-                n = ano.find_name(se, key='order')
-                print(n)
-                regions.append(n)
+	region_list = [(156, 8)]  # auditory
+	regions = []
+	R = ano.find(region_list[0][0], key='order')['name']
+	main_reg = region_list
+	sub_region = True
+	for r in reg_list.keys():
+		n = ano.find_name(r, key='order')
+		if R in n:
+			for se in reg_list[r]:
+				n = ano.find_name(se, key='order')
+				print(n)
+				regions.append(n)
 elif condition == 'Ssp':
-    region_list = [(40, 8)]  # barrels
-    regions = []
-    R = ano.find(region_list[0][0], key='order')['name']
-    main_reg = region_list
-    sub_region = True
-    for r in reg_list.keys():
-        n = ano.find_name(r, key='order')
-        if R in n:
-            for se in reg_list[r]:
-                n = ano.find_name(se, key='order')
-                print(n)
-                regions.append(n)
+	region_list = [(40, 8)]  # barrels
+	regions = []
+	R = ano.find(region_list[0][0], key='order')['name']
+	main_reg = region_list
+	sub_region = True
+	for r in reg_list.keys():
+		n = ano.find_name(r, key='order')
+		if R in n:
+			for se in reg_list[r]:
+				n = ano.find_name(se, key='order')
+				print(n)
+				regions.append(n)
 elif condition == 'barrels':
-    region_list = [(54, 9)]  # barrels
-    regions = []
-    R = ano.find(region_list[0][0], key='order')['name']
-    main_reg = region_list
-    sub_region = True
-    for r in reg_list.keys():
-        n = ano.find_name(r, key='order')
-        if R in n:
-            for se in reg_list[r]:
-                n = ano.find_name(se, key='order')
-                print(n)
-                regions.append(n)
+	region_list = [(54, 9)]  # barrels
+	regions = []
+	R = ano.find(region_list[0][0], key='order')['name']
+	main_reg = region_list
+	sub_region = True
+	for r in reg_list.keys():
+		n = ano.find_name(r, key='order')
+		if R in n:
+			for se in reg_list[r]:
+				n = ano.find_name(se, key='order')
+				print(n)
+				regions.append(n)
 elif condition == 'nose':
-    region_list = [(47, 9)]  # barrels
-    regions = []
-    R = ano.find(region_list[0][0], key='order')['name']
-    main_reg = region_list
-    sub_region = True
-    for r in reg_list.keys():
-        n = ano.find_name(r, key='order')
-        if R in n:
-            for se in reg_list[r]:
-                n = ano.find_name(se, key='order')
-                print(n)
-                regions.append(n)
+	region_list = [(47, 9)]  # barrels
+	regions = []
+	R = ano.find(region_list[0][0], key='order')['name']
+	main_reg = region_list
+	sub_region = True
+	for r in reg_list.keys():
+		n = ano.find_name(r, key='order')
+		if R in n:
+			for se in reg_list[r]:
+				n = ano.find_name(se, key='order')
+				print(n)
+				regions.append(n)
 elif condition == 'mouth':
-    region_list = [(75, 9)]  # barrels
-    regions = []
-    R = ano.find(region_list[0][0], key='order')['name']
-    main_reg = region_list
-    sub_region = True
-    for r in reg_list.keys():
-        n = ano.find_name(r, key='order')
-        if R in n:
-            for se in reg_list[r]:
-                n = ano.find_name(se, key='order')
-                print(n)
-                regions.append(n)
+	region_list = [(75, 9)]  # barrels
+	regions = []
+	R = ano.find(region_list[0][0], key='order')['name']
+	main_reg = region_list
+	sub_region = True
+	for r in reg_list.keys():
+		n = ano.find_name(r, key='order')
+		if R in n:
+			for se in reg_list[r]:
+				n = ano.find_name(se, key='order')
+				print(n)
+				regions.append(n)
 elif condition == 'Auditory_regions':
-    region_list = [[(142, 8), (149, 8), (128, 8), (156, 8)]]
-    sub_region = True
+	region_list = [[(142, 8), (149, 8), (128, 8), (156, 8)]]
+	sub_region = True
 elif condition == 'barrel_region':
-    regions = [[(54, 9), (47, 9)]]  # , (75, 9)]  # barrels
-    sub_region = True
+	regions = [[(54, 9), (47, 9)]]  # , (75, 9)]  # barrels
+	sub_region = True
 elif condition == 'l2 barrels':
-    regions = [(56, 10), (49, 10), (77, 10)]  # barrels
+	regions = [(56, 10), (49, 10), (77, 10)]  # barrels
 elif condition == 'l4 barrels':
-    regions = [(58, 10), (51, 10), (79, 10)]  # barrels
+	regions = [(58, 10), (51, 10), (79, 10)]  # barrels
 elif condition == 'isocortex':
-    region_list = [(6, 6)]  # isocortex
-    regions = []
-    R = ano.find(region_list[0][0], key='order')['name']
-    main_reg = region_list
-    sub_region = True
-    for r in reg_list.keys():
-        l = ano.find(r, key='order')['level']
-        regions.append([(r, l)])
+	region_list = [(6, 6)]  # isocortex
+	regions = []
+	R = ano.find(region_list[0][0], key='order')['name']
+	main_reg = region_list
+	sub_region = True
+	for r in reg_list.keys():
+		l = ano.find(r, key='order')['level']
+		regions.append([(r, l)])
 
 
 
@@ -720,17 +720,15 @@ f=2
 feat=['BP','PROP_ORI_PLAN', 'PROP_ORI_RAD', 'ORI_RAD']#['ART EP', 'VE EP', 'BP', 'ORI']#'SP len', 'SP step',
 import pandas as pd
 for r in range(features.shape[1]):
-    l = ano.find(regis[r][0][0], key='order')['acronym']
-    print(l)
-    # print(l)
-    if l in ROI:
-        print(l)
-        plt.figure()
-        sns.set_style(style='white')
+	l = ano.find(regis[r][0][0], key='order')['acronym']
+	print(l)
+	# print(l)
+	if l in ROI:
+		print(l)
+		plt.figure()
+		sns.set_style(style='white')
 
-        # for b in range(features.shape[0]):
-
-		
+		# for b in range(features.shape[0]):
 	norm = False
 	f = 8#3 ORI
 	if norm:
