@@ -1,4 +1,5 @@
-from ClearMap.Analysis.vasculature.general_fonction import *
+from ClearMap.Analysis.vasculature.general_functions import *
+
 
 work_dir='/data_SSD_2to/211019_otof_10m'
 mutants=['1k', '2k','3k', '6k']#456 not annotated ?
@@ -238,21 +239,21 @@ for state in states:
 		try:
 			artery=graph.vertex_property('artery')
 			vein=graph.vertex_property('vein')
-			# artery=from_e_prop2_vprop(graph, 'artery')
-			# vein=from_e_prop2_vprop(graph, 'vein')
+			# artery=from_e_prop_to_v_prop(graph, 'artery')
+			# vein=from_e_prop_to_v_prop(graph, 'vein')
 		except:
 			try:
-				artery=from_e_prop2_vprop(graph , 'artery')
-				vein=from_e_prop2_vprop(graph , 'vein')
+				artery=from_e_prop_to_v_prop(graph , 'artery')
+				vein=from_e_prop_to_v_prop(graph , 'vein')
 			except:
 				print('no artery vertex properties')
 				artery=np.logical_and(graph.vertex_radii()>=4.8,graph.vertex_radii()<=8)#4
 				vein=graph.vertex_radii()>=8
 				graph.add_vertex_property('artery', artery)
 				graph.add_vertex_property('vein', vein)
-				artery=from_v_prop2_eprop(graph, artery)
+				artery=from_v_prop_to_e_prop(graph, artery)
 				graph.add_edge_property('artery', artery)
-				vein=from_v_prop2_eprop(graph, vein)
+				vein=from_v_prop_to_e_prop(graph, vein)
 				graph.add_edge_property('vein', vein)
 
 		if compute_flow:
@@ -382,7 +383,7 @@ for state in states:
 
 			ori.append(rad)
 			print('done')
-			artery = from_e_prop2_vprop(gss4_t, 'artery')
+			artery = from_e_prop_to_v_prop(gss4_t, 'artery')
 			# vertex_filter=np.logical_and(artery,gss4_t.vertex_property('artery_binary')>0)#np.logical_and()
 			# art_g = gss4_t.sub_graph(vertex_filter=vertex_filter)
 			# dist_art = art_g.vertex_property('distance_to_surface')
