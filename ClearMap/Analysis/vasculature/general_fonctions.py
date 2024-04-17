@@ -2,7 +2,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 import ClearMap.Settings as settings
 import os
-import ClearMap.Alignment.Annotation as ano
+try:
+    import ClearMap.Alignment.Annotation as ano
+except:
+    print("Warning: module `ClearMap.Alignment.Annotation` not loaded")
 import graph_tool.inference as gti
 import pandas as pd
 import graph_tool.topology as gtt
@@ -33,11 +36,12 @@ try:
 except ImportError:  # python 3.x
     import pickle
 
-
-with open('/home/sophie.skriabine/Projects/clearVessel_New/ClearMap/ClearMap/Resources/Atlas/annotation.json') as json_data:
-    data_dict = json.load(json_data)['msg']
-    print(data_dict)
-
+try:
+    with open('/home/sophie.skriabine/Projects/clearVessel_New/ClearMap/ClearMap/Resources/Atlas/annotation.json') as json_data:
+        data_dict = json.load(json_data)['msg']
+        print(data_dict)
+except:
+    pass
 
 
 def get_volume_region(region_leaves, atlas):
@@ -47,7 +51,7 @@ def get_volume_region(region_leaves, atlas):
     return val
 
 
-def from_v_prop2_eprop(graph, property):
+def from_v_prop_to_e_prop(graph, property):
     if isinstance(property, ''.__class__):
         vprop = graph.vertex_property(property)#vprop = property#graph.vertex_property(property)
     else:
@@ -57,7 +61,7 @@ def from_v_prop2_eprop(graph, property):
     e_prop = np.logical_and(vprop[connectivity[:, 0]], vprop[connectivity[:, 1]])
     return e_prop
 
-def from_e_prop2_vprop(graph, property):
+def from_e_prop_to_v_prop(graph, property):
     if isinstance(property, ''.__class__):
         e_prop=graph.edge_property(property)#e_prop = property#else:
     else:
@@ -98,7 +102,7 @@ def getRadPlanOrienttaion(graph, ref_graph, local_normal=False, calc_art=False, 
 
             label_leveled = ano.convert_label(label, key='order', value='order', level=l)
             vf = label_leveled == o  # 54;
-            ef=from_v_prop2_eprop(graph, vf)
+            ef=from_v_prop_to_e_prop(graph, vf)
             try:
                 # sub_graph=graph.sub_graph(edge_filter=ef)
                 sub_graph = graph.sub_graph(vertex_filter=vf)
@@ -363,8 +367,8 @@ def takeAvgStreamlines2(graph, controls, workdir, mode='bigvessels'):
 
 
 
-        artery = from_e_prop2_vprop(graph, 'artery')
-        vein = from_e_prop2_vprop(graph, 'vein')
+        artery = from_e_prop_to_v_prop(graph, 'artery')
+        vein = from_e_prop_to_v_prop(graph, 'vein')
         radii = graph.vertex_property('radii')
         d2s = graph.vertex_property('distance_to_surface')
 
@@ -376,13 +380,13 @@ def takeAvgStreamlines2(graph, controls, workdir, mode='bigvessels'):
             artery_vein = np.asarray(np.logical_or(artery, vein))
         elif mode=='bigvessels':
             artery_vein = np.asarray(np.logical_or(artery, vein))
-            artery_vein = np.logical_or(artery_vein,from_e_prop2_vprop(graph, graph.edge_property('radii')>4))
+            artery_vein = np.logical_or(artery_vein,from_e_prop_to_v_prop(graph, graph.edge_property('radii')>4))
 
         order, level = 1006, 3
         label_leveled = ano.convert_label(label, key='order', value='order', level=level)
         cerebellum = label_leveled == order;
         # radii = graph.edge_property('radii')
-        # cerebellum_art=from_e_prop2_vprop(graph, np.logical_and(radii <=3, np.logical_and(from_v_prop2_eprop(graph, cerebellum),from_v_prop2_eprop(graph,artery_vein))))
+        # cerebellum_art=from_e_prop_to_v_prop(graph, np.logical_and(radii <=3, np.logical_and(from_v_prop_to_e_prop(graph, cerebellum),from_v_prop_to_e_prop(graph,artery_vein))))
         cerebellum_art = np.logical_and(radii <= 6, np.logical_and(cerebellum, artery_vein))
         # cg=graph.sub_graph(vertex_property=cerebellum_art)
 
@@ -390,7 +394,7 @@ def takeAvgStreamlines2(graph, controls, workdir, mode='bigvessels'):
         label_leveled = ano.convert_label(label, key='order', value='order', level=level)
         hippocampus = label_leveled == order;
         # radii = graph.edge_property('radii')
-        # hippocampus_art=from_e_prop2_vprop(graph, np.logical_and(radii <=3, np.logical_and(from_v_prop2_eprop(graph, hippocampus),from_v_prop2_eprop(graph,artery_vein))))
+        # hippocampus_art=from_e_prop_to_v_prop(graph, np.logical_and(radii <=3, np.logical_and(from_v_prop_to_e_prop(graph, hippocampus),from_v_prop_to_e_prop(graph,artery_vein))))
         hippocampus_art = np.logical_and(radii <= 6, np.logical_and(hippocampus, artery_vein))
         # hg = graph.sub_graph(vertex_filter=hippocampus_art)
         # p3d.plot_graph_mesh(hg)
@@ -469,13 +473,13 @@ def takeAvgStreamlines(controls, work_dir, mode='bigvessels'):
             vein=graph.vertex_radii()>=8
             graph.add_vertex_property('artery', artery)
             graph.add_vertex_property('vein', vein)
-            artery=from_v_prop2_eprop(graph, artery)
+            artery=from_v_prop_to_e_prop(graph, artery)
             graph.add_edge_property('artery', artery)
-            vein=from_v_prop2_eprop(graph, vein)
+            vein=from_v_prop_to_e_prop(graph, vein)
             graph.add_edge_property('vein', vein)
 
-        artery = from_e_prop2_vprop(graph, 'artery')
-        vein = from_e_prop2_vprop(graph, 'vein')
+        artery = from_e_prop_to_v_prop(graph, 'artery')
+        vein = from_e_prop_to_v_prop(graph, 'vein')
         radii = graph.vertex_property('radii')
         d2s = graph.vertex_property('distance_to_surface')
 
@@ -487,13 +491,13 @@ def takeAvgStreamlines(controls, work_dir, mode='bigvessels'):
             artery_vein = np.asarray(np.logical_or(artery, vein))
         elif mode=='bigvessels':
             artery_vein = np.asarray(np.logical_or(artery, vein))
-            artery_vein = np.logical_or(artery_vein,from_e_prop2_vprop(graph, graph.edge_property('radii')>4))
+            artery_vein = np.logical_or(artery_vein,from_e_prop_to_v_prop(graph, graph.edge_property('radii')>4))
 
         order, level = 1006, 3
         label_leveled = ano.convert_label(label, key='order', value='order', level=level)
         cerebellum = label_leveled == order;
         # radii = graph.edge_property('radii')
-        # cerebellum_art=from_e_prop2_vprop(graph, np.logical_and(radii <=3, np.logical_and(from_v_prop2_eprop(graph, cerebellum),from_v_prop2_eprop(graph,artery_vein))))
+        # cerebellum_art=from_e_prop_to_v_prop(graph, np.logical_and(radii <=3, np.logical_and(from_v_prop_to_e_prop(graph, cerebellum),from_v_prop_to_e_prop(graph,artery_vein))))
         cerebellum_art = np.logical_and(radii <= 6, np.logical_and(cerebellum, artery_vein))
         # cg=graph.sub_graph(vertex_property=cerebellum_art)
 
@@ -501,7 +505,7 @@ def takeAvgStreamlines(controls, work_dir, mode='bigvessels'):
         label_leveled = ano.convert_label(label, key='order', value='order', level=level)
         hippocampus = label_leveled == order;
         # radii = graph.edge_property('radii')
-        # hippocampus_art=from_e_prop2_vprop(graph, np.logical_and(radii <=3, np.logical_and(from_v_prop2_eprop(graph, hippocampus),from_v_prop2_eprop(graph,artery_vein))))
+        # hippocampus_art=from_e_prop_to_v_prop(graph, np.logical_and(radii <=3, np.logical_and(from_v_prop_to_e_prop(graph, hippocampus),from_v_prop_to_e_prop(graph,artery_vein))))
         hippocampus_art = np.logical_and(radii <= 6, np.logical_and(hippocampus, artery_vein))
         # hg = graph.sub_graph(vertex_filter=hippocampus_art)
         # p3d.plot_graph_mesh(hg)
@@ -543,8 +547,8 @@ def takeAvgStreamlines(controls, work_dir, mode='bigvessels'):
 def GeneralizedRadPlanorientation(graph, cont, rad, controls, corrected=True, d2s=True, mode='arteryvein', average=False, dvlpmt=True):
     print(mode, average)
     pi = math.pi
-    artery=from_e_prop2_vprop(graph, 'artery')
-    vein=from_e_prop2_vprop(graph, 'vein')
+    artery=from_e_prop_to_v_prop(graph, 'artery')
+    vein=from_e_prop_to_v_prop(graph, 'vein')
     radii=graph.vertex_property('radii')
     d2s = graph.vertex_property('distance_to_surface')
     print(np.sum(artery), np.sum(vein))
@@ -577,8 +581,8 @@ def GeneralizedRadPlanorientation(graph, cont, rad, controls, corrected=True, d2
                 artery_vein = np.asarray(np.logical_or(artery, vein))
             elif mode=='bigvessels':
                 artery_vein = np.asarray(np.logical_or(artery, vein))
-                artery_vein = np.logical_or(artery_vein,from_e_prop2_vprop(graph, graph.edge_property('radii')>rad))#6
-                # artery_vein = np.logical_or(artery_vein,np.logical_and(from_e_prop2_vprop(graph, graph.edge_property('radii')<8),from_e_prop2_vprop(graph, graph.edge_property('radii')>5.5)))
+                artery_vein = np.logical_or(artery_vein,from_e_prop_to_v_prop(graph, graph.edge_property('radii')>rad))#6
+                # artery_vein = np.logical_or(artery_vein,np.logical_and(from_e_prop_to_v_prop(graph, graph.edge_property('radii')<8),from_e_prop_to_v_prop(graph, graph.edge_property('radii')>5.5)))
 
             # artery_vein=np.asarray(np.logical_and(artery_vein, radii>=rad))#.nonzero()[0]
             artery_vein = np.asarray(np.logical_or(artery_vein, radii >= rad))  # .nonzero()[0]
@@ -600,8 +604,8 @@ def GeneralizedRadPlanorientation(graph, cont, rad, controls, corrected=True, d2
                 artery_vein = np.asarray(np.logical_or(artery, vein))
             elif mode=='bigvessels':
                 artery_vein = np.asarray(np.logical_or(artery, vein))
-                artery_vein = np.logical_or(artery_vein,from_e_prop2_vprop(graph, graph.edge_property('radii')>rad))
-                # artery_vein = np.logical_or(artery_vein,np.logical_and(from_e_prop2_vprop(graph, graph.edge_property('radii')<8),from_e_prop2_vprop(graph, graph.edge_property('radii')>5.5)))
+                artery_vein = np.logical_or(artery_vein,from_e_prop_to_v_prop(graph, graph.edge_property('radii')>rad))
+                # artery_vein = np.logical_or(artery_vein,np.logical_and(from_e_prop_to_v_prop(graph, graph.edge_property('radii')<8),from_e_prop_to_v_prop(graph, graph.edge_property('radii')>5.5)))
 
             try:
                 if not dvlpmt:
@@ -609,7 +613,7 @@ def GeneralizedRadPlanorientation(graph, cont, rad, controls, corrected=True, d2
                     label_leveled = ano.convert_label(label, key='order', value='order', level=level)
                     cerebellum = label_leveled == order;
                     # radii = graph.edge_property('radii')
-                    # cerebellum_art=from_e_prop2_vprop(graph, np.logical_and(radii <=3, np.logical_and(from_v_prop2_eprop(graph, cerebellum),from_v_prop2_eprop(graph,artery_vein))))
+                    # cerebellum_art=from_e_prop_to_v_prop(graph, np.logical_and(radii <=3, np.logical_and(from_v_prop_to_e_prop(graph, cerebellum),from_v_prop_to_e_prop(graph,artery_vein))))
                     cerebellum_art = np.logical_and(radii <= 6, np.logical_and(cerebellum, artery_vein))
                     # cg=graph.sub_graph(vertex_property=cerebellum_art)
 
@@ -617,7 +621,7 @@ def GeneralizedRadPlanorientation(graph, cont, rad, controls, corrected=True, d2
                     label_leveled = ano.convert_label(label, key='order', value='order', level=level)
                     hippocampus = label_leveled == order;
                     # radii = graph.edge_property('radii')
-                    # hippocampus_art=from_e_prop2_vprop(graph, np.logical_and(radii <=3, np.logical_and(from_v_prop2_eprop(graph, hippocampus),from_v_prop2_eprop(graph,artery_vein))))
+                    # hippocampus_art=from_e_prop_to_v_prop(graph, np.logical_and(radii <=3, np.logical_and(from_v_prop_to_e_prop(graph, hippocampus),from_v_prop_to_e_prop(graph,artery_vein))))
                     hippocampus_art = np.logical_and(radii <= 6, np.logical_and(hippocampus, artery_vein))
                     # hg = graph.sub_graph(vertex_filter=hippocampus_art)
                     # p3d.plot_graph_mesh(hg)
@@ -665,15 +669,15 @@ def GeneralizedRadPlanorientation(graph, cont, rad, controls, corrected=True, d2
             artery_vein = np.asarray(np.logical_or(artery, vein))
         elif mode=='bigvessels':
             artery_vein = np.asarray(np.logical_or(artery, vein))
-            artery_vein = np.logical_or(artery_vein,from_e_prop2_vprop(graph, graph.edge_property('radii')>rad))
-            # artery_vein = np.logical_or(artery_vein,from_e_prop2_vprop(graph, graph.edge_property('radii')<8))
+            artery_vein = np.logical_or(artery_vein,from_e_prop_to_v_prop(graph, graph.edge_property('radii')>rad))
+            # artery_vein = np.logical_or(artery_vein,from_e_prop_to_v_prop(graph, graph.edge_property('radii')<8))
 
         try:
             order, level = 1006, 3
             label_leveled = ano.convert_label(label, key='order', value='order', level=level)
             cerebellum = label_leveled == order;
             # radii = graph.edge_property('radii')
-            # cerebellum_art=from_e_prop2_vprop(graph, np.logical_and(radii <=3, np.logical_and(from_v_prop2_eprop(graph, cerebellum),from_v_prop2_eprop(graph,artery_vein))))
+            # cerebellum_art=from_e_prop_to_v_prop(graph, np.logical_and(radii <=3, np.logical_and(from_v_prop_to_e_prop(graph, cerebellum),from_v_prop_to_e_prop(graph,artery_vein))))
             cerebellum_art = np.logical_and(radii <= 6, np.logical_and(cerebellum, artery_vein))
             # cg=graph.sub_graph(vertex_property=cerebellum_art)
 

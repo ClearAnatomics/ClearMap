@@ -14,7 +14,7 @@ import graph_tool.inference as gti
 
 import ClearMap.Analysis.Graphs.GraphGt as ggt
 import ClearMap.Alignment.Annotation as ano
-from ClearMap.Scripts.vasculature_stats_general_fonctions import from_e_prop_to_v_prop, from_v_prop_to_e_prop, \
+from ClearMap.Analysis.vasculature.general_fonctions import from_e_prop_to_v_prop, from_v_prop_to_e_prop, \
     generalized_radial_planar_orientation, get_radial_planar_orientation, \
     computeFlowFranca, ps, modularity_measure, load_sample_dict
 
