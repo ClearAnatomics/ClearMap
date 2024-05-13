@@ -54,6 +54,14 @@
             <number>0</number>
            </property>
            <widget class="QWidget" name="page_8">
+            <property name="geometry">
+             <rect>
+              <x>0</x>
+              <y>0</y>
+              <width>460</width>
+              <height>433</height>
+             </rect>
+            </property>
             <attribute name="label">
              <string>Input conversion</string>
             </attribute>
@@ -85,7 +93,7 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>446</width>
+              <width>384</width>
               <height>482</height>
              </rect>
             </property>
@@ -487,8 +495,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>460</width>
-              <height>433</height>
+              <width>309</width>
+              <height>334</height>
              </rect>
             </property>
             <attribute name="label">
@@ -795,8 +803,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>460</width>
-              <height>433</height>
+              <width>262</width>
+              <height>134</height>
              </rect>
             </property>
             <attribute name="label">
@@ -855,8 +863,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>460</width>
-              <height>433</height>
+              <width>262</width>
+              <height>136</height>
              </rect>
             </property>
             <attribute name="label">
@@ -915,8 +923,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>460</width>
-              <height>433</height>
+              <width>254</width>
+              <height>162</height>
              </rect>
             </property>
             <attribute name="label">
@@ -1034,17 +1042,12 @@
               <widget class="QComboBox" name="atlasIdComboBox">
                <item>
                 <property name="text">
-                 <string>ABA - adult mouse - 25µm</string>
-                </property>
-               </item>
-               <item>
-                <property name="text">
                  <string>ABA 2017 - adult mouse - 25µm</string>
                 </property>
                </item>
                <item>
                 <property name="text">
-                 <string>CDMBA - P10 - 25µm</string>
+                 <string>ABA - adult mouse - 25µm</string>
                 </property>
                </item>
               </widget>
@@ -1191,12 +1194,12 @@
               <widget class="QComboBox" name="structureTreeIdComboBox">
                <item>
                 <property name="text">
-                 <string>ABA json clearmap</string>
+                 <string>ABA json 2022</string>
                 </property>
                </item>
                <item>
                 <property name="text">
-                 <string>ABA json 2022</string>
+                 <string>ABA json clearmap</string>
                 </property>
                </item>
               </widget>
@@ -1320,8 +1323,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>460</width>
-              <height>523</height>
+              <width>268</width>
+              <height>162</height>
              </rect>
             </property>
             <attribute name="label">
