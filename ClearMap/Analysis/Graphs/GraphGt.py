@@ -823,7 +823,16 @@ class Graph(grp.AnnotatedGraph):
     #     self.add_vertex_property(value, g_order)
 
     # ## Functionality
-    def sub_graph(self, vertex_filter=None, edge_filter=None, view=False):
+    def sub_graph(self, vertex_filter=None, edge_filter=None, view=False, with_neighbors=False):
+        if with_neighbors:
+            vertex_indices = self.vertex_indices()
+            vertex_indices = vertex_indices[vertex_filter]
+            neighbors = set()
+            for v_idx in vertex_indices:
+                vertex = self.vertex(v_idx)
+                neighbors.update(vertex.all_neighbors())
+            vertex_filter[sorted(list(neighbors))] = 1
+
         gv = gt.GraphView(self.base, vfilt=vertex_filter, efilt=edge_filter)
         if view:
             return Graph(base=gv)
