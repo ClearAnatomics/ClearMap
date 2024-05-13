@@ -13,6 +13,7 @@ __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
 
+import multiprocessing
 
 import numpy as np
 
@@ -106,14 +107,14 @@ def mesh_tube_from_coordinates_and_radii(coordinates, radii, indices, n_tube_poi
     radii_hdl = smm.insert(radii)
     indices_hdl = smm.insert(indices)
 
-    func = ft.partial(_parallel_mesh, coordinates_hdl=coordinates_hdl, radii_hdl=radii_hdl, indices_hdl=indices_hdl, n_tube_points=n_tube_points, verbose=verbose)
-    argdata = np.arange(len(indices))
-
     # process in parallel
-    pool = smm.mp.Pool(processes=processes)
-    results = pool.map(func, argdata)
-    pool.close()
-    pool.join()
+    func = ft.partial(_parallel_mesh, coordinates_hdl=coordinates_hdl, radii_hdl=radii_hdl, indices_hdl=indices_hdl,
+                      n_tube_points=n_tube_points, verbose=verbose)
+    argdata = np.arange(len(indices))
+    chunksize = max(1, len(indices) // (2 * processes))
+    with smm.mp.Pool(processes=processes) as pool:
+        results = pool.map(func, argdata, chunksize=chunksize)
+    results = list(results)
 
     smm.free(coordinates_hdl)
     smm.free(radii_hdl)
