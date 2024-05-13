@@ -33,7 +33,7 @@ def mesh(graph=None, method='tubes', **kwargs):
     if method == 'tubes':
         return mesh_tube(graph, **kwargs)
     else:
-        ValueError(f'Method n{method} not valid!')
+        ValueError(f'Method {method} not valid!')
 
 
 ###############################################################################
@@ -44,42 +44,20 @@ def mesh_tube(graph=None,
               coordinates=None, radii=None, indices=None,
               vertex_colors=None, edge_colors=None,
               n_tube_points=None, default_radius=1,
-              color=None, default_color=(0.8, 0.1, 0.1, 1.0),
-              processes=None, verbose=False):
-    """Construct mesh from edge geometry of a graph."""
+              **kwargs):
+    """
+    Construct mesh from edge geometry of a graph or
+    from vertex coordinates and radii if the edge geometry is not available.
+    """
     if graph is not None:
-        if graph.has_edge_geometry():  # FIXME: split into two functions
-            if isinstance(coordinates, str):
-                coordinates, indices = graph.edge_geometry(name=coordinates, return_indices=True, as_list=False)
-            else:
-                raise ValueError(f'Expected coordinates to by None or str, found {coordinates}!')
-
-            try:
-                name = radii if radii is not None else 'radii'
-                radii = graph.edge_geometry(name=name, return_indices=False, as_list=False)
-            except KeyError:
-                print(f'No radii found in the graph, using uniform radii = {default_radius}!')
-                radii = default_radius * np.ones(coordinates.shape[0])  # FIXME: dtype=float
+        if graph.has_edge_geometry():
+            coordinates, indices, radii = edge_geometry_coordinates_and_radii(graph, coordinates, radii, default_radius)
         else:
-            if isinstance(coordinates, str) and coordinates != 'coordinates':
-                coordinates = graph.vertex_property(name=coordinates)
-            else:
-                coordinates = graph.vertex_coordinates()
-            indices = graph.edge_connectivity().flatten()
-            coordinates = np.vstack(coordinates[indices])
-            try:
-                radii = graph.vertex_radii()
-                radii = radii[indices]
-            except KeyError:
-                print(f'No radii found in the graph, using uniform radii = {default_radius}!')
-                radii = default_radius * np.ones(coordinates.shape[0])  # FIXME: dtype=float
-
-            n_edges = graph.n_edges
-            indices = np.array([2 * np.arange(0, n_edges), 2 * np.arange(1, n_edges+1)]).T
+            coordinates, indices, radii = vertex_coordinates_and_radii(graph, coordinates, default_radius)
 
     if vertex_colors is not None:
         connectivity = graph.edge_connectivity()
-        edge_colors = (vertex_colors[connectivity[:, 0]] + vertex_colors[connectivity[:, 1]]) / 2.0
+        edge_colors = np.mean(vertex_colors[connectivity], axis=1)
 
     vertices, faces, colors = mesh_tube_from_coordinates_and_radii(coordinates, radii, indices,
                                                                    n_tube_points=n_tube_points,
@@ -87,6 +65,38 @@ def mesh_tube(graph=None,
                                                                    processes=None)
 
     return vertices, faces, colors
+
+
+def vertex_coordinates_and_radii(graph, coordinates, default_radius):
+    if isinstance(coordinates, str) and coordinates != 'coordinates':
+        coordinates = graph.vertex_property(name=coordinates)
+    else:
+        coordinates = graph.vertex_coordinates()
+    indices = graph.edge_connectivity().flatten()
+    coordinates = np.vstack(coordinates[indices])
+    try:
+        radii = graph.vertex_radii()
+        radii = radii[indices]
+    except KeyError:
+        print(f'No radii found in the graph, using uniform radii = {default_radius}!')
+        radii = default_radius * np.ones(coordinates.shape[0])  # FIXME: dtype=float
+    n_edges = graph.n_edges
+    indices = np.array([2 * np.arange(0, n_edges), 2 * np.arange(1, n_edges + 1)]).T
+    return coordinates, indices, radii
+
+
+def edge_geometry_coordinates_and_radii(graph, coordinates, radii, default_radius):
+    if isinstance(coordinates, str):
+        coordinates, indices = graph.edge_geometry(name=coordinates, return_indices=True, as_list=False)
+    else:
+        raise ValueError(f'Expected coordinates to by None or str, found {coordinates}!')
+    try:
+        name = radii if radii is not None else 'radii'
+        radii = graph.edge_geometry(name=name, return_indices=False, as_list=False)
+    except KeyError:
+        print(f'No radii found in the graph, using uniform radii = {default_radius}!')
+        radii = default_radius * np.ones(coordinates.shape[0])  # FIXME: dtype=float
+    return coordinates, indices, radii
 
 
 def mesh_tube_from_coordinates_and_radii(coordinates, radii, indices, n_tube_points=8, edge_colors=None,

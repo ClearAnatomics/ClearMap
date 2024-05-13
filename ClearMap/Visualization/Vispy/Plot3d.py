@@ -200,7 +200,7 @@ def plot_mesh_3d(coordinates, faces, view=None, shading='smooth', color=None, fa
     MeshVisual = vispy.scene.visuals.create_visual_node(vispy.visuals.mesh.MeshVisual)
 
     # view
-    title = title if title is not None else 'plot_mesh_3d'
+    title = title or 'plot_mesh_3d'
     view = initialize_view(view, title=title)
 
     # print view

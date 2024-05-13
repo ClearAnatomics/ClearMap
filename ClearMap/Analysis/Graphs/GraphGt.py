@@ -70,10 +70,12 @@ class Graph(grp.AnnotatedGraph):
             super(Graph, self).__init__(name=name)
         self.__mesh_vertices = None
         self.__mesh_faces = None
+        self.__faces_edge_ids = None
 
     def invalidate_caches(self):
         self.__mesh_vertices = None
         self.__mesh_faces = None
+        self.__faces_edge_ids = None
 
     @property
     def base(self):
@@ -786,11 +788,11 @@ class Graph(grp.AnnotatedGraph):
         For efficiency purposes, the result is cached.
         """
 
-        # TODO: check if vertex_colors and edge_colors are needed
         if self.__mesh_vertices is None or self.__mesh_faces is None:
-            self.__mesh_vertices, self.__mesh_faces, _ = mesh_tube(graph=self, coordinates=coordinates,
-                                                                   vertex_colors=None, edge_colors=None)  # FIXME: color by edge, vertex or edge_geometry
-        return self.__mesh_vertices, self.__mesh_faces
+            edge_ids = np.arange(self.n_edges)
+            self.__mesh_vertices, self.__mesh_faces, self.__faces_edge_ids = (
+                mesh_tube(graph=self, coordinates=coordinates, edge_colors=edge_ids))
+        return self.__mesh_vertices, self.__mesh_faces, self.__faces_edge_ids
 
     # ## Label
 
