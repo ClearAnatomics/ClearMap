@@ -4,7 +4,7 @@ PROG_NAME=$0
 
 BASEDIR=$(dirname "$0")
 if [ "$1" == "" ]; then
-    ENV_FILE_PATH="ClearMapUi.yml"
+    ENV_FILE_PATH="ClearMapUi39.yml"
 else
     ENV_FILE_PATH=$1
 fi

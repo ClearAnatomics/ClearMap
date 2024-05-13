@@ -2,6 +2,7 @@
 *~
 *.autosave
 *.swp
+ClearMap*Real.yml
 
 # IDE files
 .idea
