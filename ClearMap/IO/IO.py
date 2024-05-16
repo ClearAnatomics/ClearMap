@@ -20,6 +20,7 @@ __download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 import importlib
 import functools
 import math
+import pathlib
 
 import numpy as np
 
@@ -420,6 +421,8 @@ def read(source, *args, **kwargs):
   data : array
     The data of the source.
   """
+  if isinstance(source, pathlib.Path):
+    source = str(source)
   mod = source_to_module(source);
   return mod.read(source, *args, **kwargs);
 
@@ -441,8 +444,10 @@ def write(sink, data, *args, **kwargs):
   sink : str, array or Source class
     The sink to which the data was written.
   """
-  mod = source_to_module(sink);
-  return mod.write(sink, as_source(data), *args, **kwargs);
+  if isinstance(sink, pathlib.Path):
+    sink = str(sink)
+  mod = source_to_module(sink)
+  return mod.write(sink, as_source(data), *args, **kwargs)
 
 
 def create(source, *args, **kwargs):
@@ -458,6 +463,8 @@ def create(source, *args, **kwargs):
   sink : str, array or Source class
     The sink to which the data was written.
   """
+  if isinstance(source, pathlib.Path):
+    source = str(source)
   mod = source_to_module(source);
   return mod.create(source, *args, **kwargs);
 
@@ -503,6 +510,8 @@ def initialize(source = None, shape = None, dtype = None, order = None, location
   The source is created on disk or in memory if it does not exists so processes
   can start writing into it.
   """
+  if isinstance(source, pathlib.Path):
+    source = str(source)
   if isinstance(source, (str, te.Expression)):
     location = source;
     source = None;
