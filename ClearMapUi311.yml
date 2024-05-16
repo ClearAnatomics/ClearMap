@@ -1,0 +1,59 @@
+# ClearMap.yml 
+#
+# ClearMap2.0 Toolbox
+# © Christoph Kirst, Charly Rousseau
+# https://github.com/ChristophKirst/ClearMap2
+#
+# Licensed under GNU General Public License v3.0
+#
+# ClearMap anaconda environment
+#
+# install: conda env create -f ClearMap.yml 
+# update:  conda env update -f ClearMap.yml 
+name: ClearMapUi311
+channels:
+  - nvidia
+  - pytorch
+  - conda-forge
+  - defaults
+
+dependencies:
+  - python=3.11  # constraining seems to speed up resolution
+  - cython<3  # get_distutils_extension has been removed from pyximport in >=3
+  - pip
+  - ipython
+  - numpy
+  - scipy
+  - pandas<2  # Groupby syntax changes
+  - pyarrow
+  - scikit-image
+  - scikit-learn
+  - opencv
+  - configobj
+  - natsort
+  - tqdm
+  - matplotlib
+  - seaborn
+  - tifffile<2020.9.22  # Adds "Use DimensionOrder to determine axes order in OmeXml." which breaks ClearMap.IO
+  - pyqt<6
+  - pyqtwebengine
+  - qtpy  # for qdarkstyle
+  - pyqtgraph=0.12  # Problem with pyqtgraph import of QWidgets with 0.13
+  - pygments
+  - qdarkstyle
+  - vispy
+  - pyvista
+  - pyopengl
+  - napari
+  - graph-tool<=2.45  # Cannot remove self loops with later versions
+  - python-igraph
+  - pytorch<=2.2
+  - pytorch-cuda
+  - cudatoolkit=11.8
+  - xmltodict  # to compensate for old tifffile
+  - psutil
+  - mpld3
+  - lxml < 5.2
+variables:
+  PYTHONNOUSERSITE: 1
+#  TMPDIR: /data/tmp

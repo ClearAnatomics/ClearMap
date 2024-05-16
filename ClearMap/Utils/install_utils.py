@@ -9,6 +9,11 @@ import sys
 import platform
 import subprocess
 import json
+from packaging.version import Version
+from pathlib import Path
+
+from ClearMap import Settings as clearmap_settings
+
 try:
     import yaml  # WARNING: Only guaranteed to be here in the tmp env
 except ImportError:
@@ -137,8 +142,12 @@ class PytorchVersionManager:  # TODO: inherit from condaparser ??
             lines = subprocess.check_output(cmd, shell=True).splitlines()
             lines = [ln.decode('ASCII') for ln in lines]
             cuda_line = [ln for ln in lines if ln.lower().startswith('cuda version')][0]
-            self.__cuda_version = [int(e) for e in cuda_line.split(':')[-1].strip().split('.')]
+            self.__cuda_version = Version(cuda_line.split(':')[-1].strip())
         return self.__cuda_version
+
+    @property
+    def cuda_major(self):
+        return self.used_cuda_major or self.cuda_version.major
 
     @staticmethod
     def check_pytorch():
@@ -153,22 +162,13 @@ class PytorchVersionManager:  # TODO: inherit from condaparser ??
         return self._pytorch_info
 
     def get_best_match_cuda_version(self, versions):
-        major, minor = self.cuda_version
+        print(f'CUDA version: {self.cuda_version}')
         for v in versions[::-1]:
-            print(f'CUDA version: {self.cuda_version}, candidate version: {v}')
-            v_major, v_minor = v
-            if v_major > major:
-                raise ValueError(f'Version not supported: {v}')
-            else:
-                if v_major < major or v_minor <= minor:
-                    return v
+            print(f'\tcandidate version: {v}')
+            if self.cuda_version >= Version(v):
+                return v
         else:
             raise ValueError(f'No match found between installed CUDA {self.cuda_version} and candidates {versions}')
-
-    def cuda_matches(self, version):
-        major, minor = self.cuda_version
-        v_major, v_minor = version
-        return v_major < major or v_minor <= minor
 
     def toolkit_dep_to_version(self, dep_str):
         version_str = dep_str.split(' ')[-1].split(',')[0].split('=')[-1]
@@ -178,19 +178,29 @@ class PytorchVersionManager:  # TODO: inherit from condaparser ??
         for dep in pkg['depends']:
             if 'cudatoolkit' in dep:
                 return self.toolkit_dep_to_version(dep)
-        raise ValueError('Dependency not found')
+        raise ValueError(f'Dependency "cudatoolkit" not found in {pkg=}')
 
     def match_pytorch_to_toolkit(self):
         available_cudatoolkit_versions = self.get_toolkit_versions()
         for i, pkg in enumerate(self.pytorch_info[::-1]):
+            # print(i, pkg)
             pytorch_toolkit_version = self.toolkit_version_from_torch_pkg(pkg)
             if pytorch_toolkit_version in available_cudatoolkit_versions:
                 return pkg
         else:
             raise ValueError('No matching versions found')
 
+    def match_pytorch_to_cuda(self):
+        available_pytorch_cuda_versions = [self.torch_build_to_cuda_version(pkg['build']) for pkg in self.pytorch_info]
+        best_match_cuda_version = self.get_best_match_cuda_version(available_pytorch_cuda_versions)
+        for i, pkg in enumerate(self.pytorch_info[::-1]):
+            if self.torch_build_to_cuda_version(pkg['build']) == best_match_cuda_version:
+                return pkg
+        else:
+            raise ValueError('No matching versions found')
+
     def get_pytorch_gpu_info(self):
-        cuda_major = self.cuda_version[0] if self.used_cuda_major is None else self.used_cuda_major
+        cuda_major = self.cuda_major
         version_pattern = f'{self.pytorch_version}=py{self.python_version}_cuda{cuda_major}*'
         return CondaParser.get_conda_pkg_info('pytorch', ['pytorch'], version_pattern)
 
@@ -205,7 +215,7 @@ class PytorchVersionManager:  # TODO: inherit from condaparser ??
         return CondaParser.get_conda_pkg_info('pytorch', ['pytorch'], version_pattern)
 
     def get_toolkit_info(self):
-        cuda_major = self.cuda_version[0] if self.used_cuda_major is None else self.used_cuda_major
+        cuda_major = self.cuda_major
         while cuda_major > 9:
             try:
                 return CondaParser.get_conda_pkg_info('cudatoolkit', ['nvidia'], cuda_major)
@@ -231,13 +241,17 @@ def patch_env(cfg_path, dest_path, use_cuda_torch=True, use_spyder=False, tmp_di
 
     pytorch_v_mgr = PytorchVersionManager(cfg_path, env_mgr.python_version, env_mgr.get_package_version('pytorch'))
     if use_cuda_torch:
-        torch_pkg = pytorch_v_mgr.match_pytorch_to_toolkit()
-        torch_v_string = f"{torch_pkg['version']}={torch_pkg['build']}"
-        env_mgr.patch_environment_package_line('pytorch', torch_v_string)
+        if Version(pytorch_v_mgr.pytorch_version) >= Version('2.0'):
+            pytorch_cuda_version = pytorch_v_mgr.match_pytorch_to_cuda()['version']
+            env_mgr.add_dependency('pytorch-cuda', pkg_version=pytorch_cuda_version)
+        else:
+            torch_pkg = pytorch_v_mgr.match_pytorch_to_toolkit()
+            torch_v_string = f"{torch_pkg['version']}={torch_pkg['build']}"
+            env_mgr.patch_environment_package_line('pytorch', torch_v_string)
 
-        toolkit_v_tuple = pytorch_v_mgr.toolkit_version_from_torch_pkg(torch_pkg)
-        toolkit_v_string = f"{toolkit_v_tuple[0]}.{toolkit_v_tuple[1]}"
-        env_mgr.patch_environment_package_line('cudatoolkit', toolkit_v_string)
+            toolkit_v_tuple = pytorch_v_mgr.toolkit_version_from_torch_pkg(torch_pkg)
+            toolkit_v_string = f"{toolkit_v_tuple[0]}.{toolkit_v_tuple[1]}"
+            env_mgr.patch_environment_package_line('cudatoolkit', toolkit_v_string)
     else:
         torch_pkg = pytorch_v_mgr.get_pytorch_cpu_info()[-1]
         torch_v_string = f"{torch_pkg['version']}={torch_pkg['build']}"
@@ -251,3 +265,10 @@ def patch_env(cfg_path, dest_path, use_cuda_torch=True, use_spyder=False, tmp_di
     if tmp_dir not in ('/tmp', '/tmp/'):
         print(f'Patching tmp_dir to {tmp_dir}')
         env_mgr.patch_env_var('TMP', tmp_dir)
+
+
+if __name__ == '__main__':
+    if sys.argv[1] == 'test_patch':
+        clearmap_folder = Path(clearmap_settings.clearmap_path)
+        patch_env(clearmap_folder.parent / sys.argv[2], clearmap_folder.parent / sys.argv[3],
+                  use_cuda_torch=True, use_spyder=False, tmp_dir='/tmp/tmp')
