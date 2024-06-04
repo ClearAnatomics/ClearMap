@@ -243,6 +243,7 @@ class BinaryVesselProcessor(TabProcessor):
         self.steps[channel].remove_next_steps_files(self.steps[channel].postprocessed)
 
         source = self.workspace.filename('binary', postfix=postfix)
+        source = clearmap_io.as_source(source)
         sink_postfix = f'{postfix}_postprocessed' if postfix else 'postprocessed'
         sink = self.workspace.filename('binary', postfix=sink_postfix)
 
@@ -275,6 +276,8 @@ class BinaryVesselProcessor(TabProcessor):
                 source = self.postprocessing_tmp_params['fill_source']
             else:
                 source = self.workspace.filename('binary', postfix=postfix)
+
+        source = clearmap_io.as_source(source)
 
         binary_filling.fill(source, sink=sink, processes=None, verbose=True)  # WARNING: prange if filling
         if run_smoothing and not self.postprocessing_tmp_params['save']:
