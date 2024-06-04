@@ -34,6 +34,9 @@ class EnvFileManager:
         with open(self.cfg_path, 'r') as in_file:
             self.cfg = yaml.safe_load(in_file)
 
+    def __str__(self):
+        return f'{self.dest_path} {self.cfg}'
+
     @property
     def python_version(self):
         if self.__python_version is None:
@@ -193,9 +196,10 @@ class PytorchVersionManager:  # TODO: inherit from condaparser ??
     def match_pytorch_to_cuda(self):
         available_pytorch_cuda_versions = [self.torch_build_to_cuda_version(pkg['build']) for pkg in self.pytorch_info]
         best_match_cuda_version = self.get_best_match_cuda_version(available_pytorch_cuda_versions)
+        print(f'{best_match_cuda_version=}')
         for i, pkg in enumerate(self.pytorch_info[::-1]):
             if self.torch_build_to_cuda_version(pkg['build']) == best_match_cuda_version:
-                return pkg
+                return best_match_cuda_version
         else:
             raise ValueError('No matching versions found')
 
@@ -242,8 +246,9 @@ def patch_env(cfg_path, dest_path, use_cuda_torch=True, use_spyder=False, tmp_di
     pytorch_v_mgr = PytorchVersionManager(cfg_path, env_mgr.python_version, env_mgr.get_package_version('pytorch'))
     if use_cuda_torch:
         if Version(pytorch_v_mgr.pytorch_version) >= Version('2.0'):
-            pytorch_cuda_version = pytorch_v_mgr.match_pytorch_to_cuda()['version']
+            pytorch_cuda_version = pytorch_v_mgr.match_pytorch_to_cuda()
             env_mgr.add_dependency('pytorch-cuda', pkg_version=pytorch_cuda_version)
+            env_mgr.remove_dependency('cudatoolkit')
         else:
             torch_pkg = pytorch_v_mgr.match_pytorch_to_toolkit()
             torch_v_string = f"{torch_pkg['version']}={torch_pkg['build']}"
