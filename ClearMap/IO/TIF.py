@@ -34,9 +34,9 @@ class Source(src.Source):
   """
   def __init__(self, location, series = 0, multi_file = False):
     try:
-      self._tif = tif.TiffFile(location, multi_file=multi_file)
+      self._tif = tif.TiffFile(location, multifile=multi_file)
     except TypeError:  # TODO: filter with message
-      self._tif = tif.TiffFile(location)
+      self._tif = tif.TiffFile(location, _multifile=multi_file)  # Versions >= 2020.9.30
     self._series = series
     self.multi_file = multi_file
 
