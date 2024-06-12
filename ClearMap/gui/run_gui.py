@@ -23,6 +23,8 @@ from shutil import copyfile
 import traceback
 import types
 
+from importlib_metadata import version
+
 from ClearMap.config.update_config import update_default_config
 from PyQt5 import QtGui
 from PyQt5.QtCore import Qt
@@ -97,7 +99,8 @@ update_pbar(app, progress_bar, 80)
 
 pg.setConfigOption('background', PLOT_3D_BG)
 
-CLEARMAP_VERSION = '2.1.1'
+
+CLEARMAP_VERSION = version('ClearMap2')
 
 # TODO
 """
