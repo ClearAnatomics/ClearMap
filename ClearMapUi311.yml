@@ -33,7 +33,7 @@ dependencies:
   - natsort
   - tqdm
   - matplotlib
-  - seaborn
+  - seaborn  #=0.12.2
   - tifffile<2020.9.22  # Adds "Use DimensionOrder to determine axes order in OmeXml." which breaks ClearMap.IO
   - pyqt<6
   - pyqtwebengine
@@ -52,8 +52,8 @@ dependencies:
   - cudatoolkit=11.8
   - xmltodict  # to compensate for old tifffile
   - psutil
-  - mpld3
-  - lxml < 5.2
+  - mpld3  # WARNING Maybe pip
+  - lxml < 5.2  # lxml 5.2 breaks napari
 variables:
   PYTHONNOUSERSITE: 1
 #  TMPDIR: /data/tmp
