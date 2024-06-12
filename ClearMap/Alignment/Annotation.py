@@ -34,7 +34,8 @@ __download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
 
 
 import os
-import collections 
+import sys
+import collections
 
 import json
 
@@ -52,6 +53,7 @@ from ClearMap.Alignment.Resampling import orientation_to_transposition, format_o
 import ClearMap.Utils.HierarchicalDict as hdict
 
 from ClearMap.Alignment.utils import create_label_table
+
 from ClearMap.Visualization import Color as col
 
 
@@ -525,16 +527,23 @@ class Annotation(object):
 # Handle singleton
 ##########################################################################################
 
+def create_singleton():
+    global annotation, n_structures, get_dictionary, get_list, get_map, find, initialized
+    annotation = Annotation()
+    """Information on the annotated regions"""
+    n_structures = annotation.n_structures  # remove
+    get_dictionary = annotation.get_dictionary  # remove
+    get_list = annotation.get_list  # remove
+    get_map = annotation.get_map  # remove
+    find = annotation.find  # Find and replace
+    initialized = False
 
-annotation = Annotation()
-"""Information on the annotated regions"""
 
-n_structures = annotation.n_structures  # remove
-get_dictionary = annotation.get_dictionary  # remove
-get_list = annotation.get_list  # remove
-get_map = annotation.get_map  # remove
-find = annotation.find  # Find and replace
-initialized = False
+if 'sphinx' in sys.modules.keys():
+    print('Imported for documentation, skipping annotation singleton creation')
+    annotation = None
+else:
+    create_singleton()
 
 
 def initialize(label_file=None, extra_label=None, annotation_file=None):
@@ -576,7 +585,8 @@ def label_points(points, annotation_file=None, invalid=0, key='order', level=Non
         Label for invalid points.
     key : str
         The key of the label, by default the order of the labels.
-    level
+    level : int
+        The level of the hierarchy to use.
 
     Returns
     -------
