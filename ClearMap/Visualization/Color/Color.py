@@ -1182,6 +1182,55 @@ def rand_cmap(n_labels, map_type='bright', first_color_black=True, last_color_bl
     return colors
 
 
+def gray_image_to_rgb(image, color_name, pseudo_z_score=False, normalize=False, range_max=None):
+    """
+    Convert a grayscale image to a colored RGB image.
+
+    Parameters:
+    image (numpy.ndarray): The grayscale image to convert.
+    color (str): The color to convert to. Must be one of 'cyan', 'magenta', 'yellow', 'red', 'green', 'blue'.
+
+    Returns:
+    numpy.ndarray: The converted RGB image.
+    """
+    if pseudo_z_score and normalize:
+        raise ValueError('Cannot normalize and pseudo z-score at the same time.')
+
+    output_shape = image.shape
+    blank = np.zeros(output_shape, dtype=image.dtype)
+
+    if pseudo_z_score:
+        n_sds = 4
+        high_intensity = (image.mean() + n_sds * image.std())
+        if range_max is None:
+            max_val = np.iinfo(image.dtype).max
+        else:
+            max_val = range_max
+        image = image / high_intensity * (max_val / 2)
+
+    if normalize:
+        image = (image - np.min(image)) / (np.max(image) - np.min(image))
+
+    color_dict = {
+        'cyan': (0, 1, 1),
+        'magenta': (1, 0, 1),
+        'yellow': (1, 1, 0),
+        'red': (1, 0, 0),
+        'green': (0, 1, 0),
+        'blue': (0, 0, 1)
+    }
+    try:
+        color_order = color_dict[color_name]
+    except KeyError:
+        raise ValueError(f'Invalid color name: {color_name}, should be one of {color_dict.keys()}')
+
+    image = np.dstack((color_order[0]*image + (1-color_order[0])*blank,
+                       color_order[1]*image + (1-color_order[1])*blank,
+                       color_order[2]*image + (1-color_order[2])*blank))
+
+    return image
+
+
 ###############################################################################
 ### Tests
 ###############################################################################

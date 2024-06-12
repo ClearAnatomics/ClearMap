@@ -17,6 +17,8 @@ import numpy as np
 import matplotlib
 import tifffile
 
+from ClearMap.Visualization.Color.Color import gray_image_to_rgb
+
 matplotlib.use('Qt5Agg')
 
 
@@ -824,9 +826,9 @@ class PreProcessor(TabProcessor):
             Path to the elastix configuration file
         """
         cfg = ElastixParser(elastix_cfg_path)
-            cfg['Registration'] = ['MultiMetricMultiResolutionRegistration']
-            cfg['Metric'] = ["AdvancedMattesMutualInformation", "CorrespondingPointsEuclideanDistanceMetric"]
-            cfg.write()
+        cfg['Registration'] = ['MultiMetricMultiResolutionRegistration']
+        cfg['Metric'] = ["AdvancedMattesMutualInformation", "CorrespondingPointsEuclideanDistanceMetric"]
+        cfg.write()
 
     @staticmethod
     def restore_elastix_cfg_no_landmarks(elastix_cfg_path):
@@ -842,9 +844,9 @@ class PreProcessor(TabProcessor):
         elastix_cfg_path
         """
         cfg = ElastixParser(elastix_cfg_path)
-            cfg['Registration'] = ['MultiResolutionRegistration']
-            cfg['Metric'] = ["AdvancedMattesMutualInformation"]
-            cfg.write()
+        cfg['Registration'] = ['MultiResolutionRegistration']
+        cfg['Metric'] = ["AdvancedMattesMutualInformation"]
+        cfg.write()
 
     def stitch_overlay(self, channel, color=True):
         """
@@ -861,31 +863,28 @@ class PreProcessor(TabProcessor):
         """
         positions = self.workspace.get_positions(channel)
         mosaic_shape = {ax: max([p[ax] for p in positions]) + 1 for ax in 'XY'}  # +1 because 0 indexing
-        files = self.workspace.file_list(channel)
+        if self.has_npy:
+            files = self.workspace.file_list(channel, extension='npy')
+        else:
+            files = self.workspace.file_list(channel)
         tile_shape = {k: v for k, v in zip('XYZ', clearmap_io.shape(files[0]))}
         middle_z = int(tile_shape['Z'] / 2)
         overlaps = {k: self.processing_config['stitching']['rigid'][f'overlap_{k.lower()}'] for k in 'XY'}
         output_shape = [tile_shape[ax] * mosaic_shape[ax] - overlaps[ax] * (mosaic_shape[ax] - 1) for ax in 'XY']
-        cyan_image = np.zeros(output_shape, dtype=int)
-        magenta_image = np.zeros(output_shape, dtype=int)
+        layers = [np.zeros(output_shape, dtype=int), np.zeros(output_shape, dtype=int)]
         for tile_path, pos in zip(files, positions):
             starts = {ax: pos[ax] * tile_shape[ax] - pos[ax] * overlaps[ax] for ax in 'XY'}
             ends = {ax: starts[ax] + tile_shape[ax] for ax in starts.keys()}
-            if (pos['Y'] + pos['X']) % 2:  # Alternate colors
-                layer = cyan_image
+            if self.has_npy:
+                tile = clearmap_io.buffer(tile_path)[:, :, middle_z]
             else:
-                layer = magenta_image
-            tile = clearmap_io.read(tile_path)[:, :, middle_z]  # TODO: see if can seek
+                tile = clearmap_io.read(tile_path)[:, :, middle_z]
+            layer = layers[(pos['Y'] + pos['X']) % 2]  # Alternate colors
             layer[starts['X']: ends['X'], starts['Y']: ends['Y']] = tile
-        blank = np.zeros(output_shape, dtype=cyan_image.dtype)
         if color:
-            high_intensity = (cyan_image.mean() + 4 * cyan_image.std())
-            cyan_image = cyan_image / high_intensity * 128
-            cyan_image = np.dstack((blank, cyan_image, cyan_image))  # To Cyan RGB
-            high_intensity = (magenta_image.mean() + 4 * magenta_image.std())
-            magenta_image = magenta_image / high_intensity * 128
-            magenta_image = np.dstack((magenta_image, blank, magenta_image))  # To Magenta RGB
-        output_image = cyan_image + magenta_image  # TODO: normalise
+            layers[0] = gray_image_to_rgb(layers[0], 'cyan', pseudo_z_score=True, range_max=255)
+            layers[1] = gray_image_to_rgb(layers[1], 'magenta', pseudo_z_score=True, range_max=255)
+        output_image = layers[0] + layers[1]
         if color:
             output_image = output_image.clip(0, 255).astype(np.uint8)
         return output_image
@@ -909,8 +908,7 @@ class PreProcessor(TabProcessor):
         full_lower = layout.lower
         middle_z = round(sources[0].shape[-1] / 2)
 
-        cyan_image = np.zeros(dest_shape, dtype=int)
-        magenta_image = np.zeros(dest_shape, dtype=int)
+        color_layers = [np.zeros(dest_shape, dtype=int), np.zeros(dest_shape, dtype=int)]
         # construct full image
         for s in sources:
             l = s.lower
@@ -919,21 +917,11 @@ class PreProcessor(TabProcessor):
             current_slicing = tuple(slice(ll - fl, uu - fl) for ll, uu, fl in zip(l, u, full_lower))[:2]
 
             is_odd = sum(s.tile_position) % 2
-            if is_odd:  # Alternate colors
-                layer = cyan_image
-            else:
-                layer = magenta_image
-
+            layer = color_layers[is_odd]  # Alternate colors
             layer[current_slicing] = tile
-        blank = np.zeros(dest_shape, dtype=cyan_image.dtype)
 
-        high_intensity = (cyan_image.mean() + 4 * cyan_image.std())
-        cyan_image = cyan_image / high_intensity * 128
-        cyan_image = np.dstack((blank, cyan_image, cyan_image))  # To Cyan RGB
-
-        high_intensity = (magenta_image.mean() + 4 * magenta_image.std())
-        magenta_image = magenta_image / high_intensity * 128
-        magenta_image = np.dstack((magenta_image, blank, magenta_image))  # To Magenta RGB
+        cyan_image = gray_image_to_rgb(color_layers[0], 'cyan', pseudo_z_score=True, range_max=255)
+        magenta_image = gray_image_to_rgb(color_layers[1], 'magenta', pseudo_z_score=True, range_max=255)
 
         output_image = cyan_image + magenta_image  # TODO: normalise
         output_image = output_image.clip(0, 255).astype(np.uint8)
