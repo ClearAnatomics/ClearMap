@@ -1,39 +1,19 @@
-import ClearMap.Alignment.Annotation as ano
+import math
+pi = math.pi
+import pickle
 
-import ClearMap.IO.IO as io
-import ClearMap.Visualization.Plot3d as p3d
-import graph_tool.inference as gti
-import os
-print('TEST')
-import math
+import numpy as np
 import matplotlib.pyplot as plt
-import ClearMap.Analysis.Graphs.GraphGt as ggt
-import graph_tool.centrality as gtc
-import graph_tool.generation as gtg
-print('loading...')
-import numpy as np
-import numexpr as ne
-import graph_tool.topology as gtt
 from sklearn import preprocessing
-import seaborn as sns
-from scipy.stats import ttest_ind
-import math
-pi=math.pi
-import pickle
-from sklearn.decomposition import KernelPCA
-from sklearn.decomposition import PCA
-from mpl_toolkits.mplot3d import Axes3D
-from scipy.interpolate import RegularGridInterpolator
-from scipy.interpolate import NearestNDInterpolator
-from scipy.interpolate import Rbf
-from sklearn.linear_model import LinearRegression
-import math
-import pickle
-import numpy as np
-import graph_tool.all as ggt
-from sklearn.preprocessing import normalize
-from scipy.interpolate import griddata
+from scipy.interpolate import LinearNDInterpolator, griddata
 from skimage import feature
+
+import graph_tool.all as ggt
+
+import ClearMap.Alignment.Annotation as ano
+import ClearMap.IO.IO as io
+import ClearMap.Analysis.Graphs.GraphGt as ggt
+
 
 def load_graph(work_dir, control):
     """
@@ -51,6 +31,7 @@ def load_graph(work_dir, control):
 
     return graph
 
+
 def load_sampledict(work_dir, control):
     """
     Loads the sampledict for the given work directory and control.
@@ -63,6 +44,7 @@ def load_sampledict(work_dir, control):
         graph.add_vertex_property('pressure', pressure)
     except:
         print('no sample dict found for pressure and flow modelisation')
+
 
 def set_vertex_properties(graph):
     """
@@ -122,7 +104,7 @@ def get_edge_vector(graph, control, normed=False, oriented=True, criteria='dista
         try:
             pressure=graph.vertex_property('pressure')
         except:
-            f, v = computeFlowFranca(work_dir, graph,cont)
+            f, v = computeFlowFranca(work_dir, graph, cont)
             graph.add_edge_property('flow', f)
             graph.add_edge_property('veloc', v)
 
@@ -252,94 +234,73 @@ def plot_vector_field(grid, grid_vector, sl, sxe='sagital'):
     return X, Y, U, V, ui, vi
 
 
-
-if __name__ == '__main__':
-    
-    work_dir=''
-    control=''
-    slice_no=205
-    zmin=2500
-    zmax=2600
-    dim=[0,2]
-    sampling=50
-    function=LinearNDInterpolator
-    mode='arteryvein'
-
+def main():
+    global work_dir, mode, pi, graph, label
+    work_dir = ''
+    control = ''
+    slice_no = 205
+    zmin = 2500
+    zmax = 2600
+    dim = [0, 2]
+    sampling = 50
+    function = LinearNDInterpolator
+    mode = 'arteryvein'
     pi = math.pi
-    G=[]
-    mode='bigvessels'
-    average=True
-
+    G = []
+    mode = 'bigvessels'
+    average = True
     # Load the graph
     graph = load_graph(work_dir, control)
-
     # Load the sampledict
     load_sampledict(work_dir, control)
-
     # Set the vertex properties for artery and vein
     set_vertex_properties(graph)
-
     # Get the radii and distance_to_surface vertex properties
     radii = graph.vertex_property('radii')
     d2s = graph.vertex_property('distance_to_surface')
-    
     # Get graph labels
-    label =  graph.vertex_annotation()
-    
+    label = graph.vertex_annotation()
     # Get artery graph
     grid, grid_vector = get_interpolated_vector(control, graph, mode='arteryvein', average=True, work_dir=None)
-    
-    
-    
-    
-    slices = [400, 600, 800, 1000, 1200, 1400, 1600, 1800, 2000, 2200, 2400, 2600, 2800, 3000, 3200, 3400, 3600, 3800, 4000, 4500]
-    slices = [329] # [210, 165]
-
-    sxe = 'coronal' # 'coronal' # 'sagital'
-
+    slices = [400, 600, 800, 1000, 1200, 1400, 1600, 1800, 2000, 2200, 2400, 2600, 2800, 3000, 3200, 3400, 3600, 3800,
+              4000, 4500]
+    slices = [329]  # [210, 165]
+    sxe = 'coronal'  # 'coronal' # 'sagital'
     for sl in slices:
         if sxe == 'sagital':
-	    annotation = io.read('/home/sophie.skriabine/Documents/ClearMap_Ressources/annotation_25_HeadLightOrientation_sagital_rotated.tif')
-	 elif sxe=='coronal':
-	    import tifffile
-            annotation=tifffile.imread( '/home/sophie.skriabine/Pictures/Reslice_of_annotation_25_HeadLightOrientation_coronal.tif')
-            annotation=np.swapaxes(annotation, 0, 2)
-            annotation=np.flip(annotation, 2)
-            
+            annotation = io.read(
+                '/home/sophie.skriabine/Documents/ClearMap_Ressources/annotation_25_HeadLightOrientation_sagital_rotated.tif')
+        elif sxe == 'coronal':
+            import tifffile
+            annotation = tifffile.imread(
+                '/home/sophie.skriabine/Pictures/Reslice_of_annotation_25_HeadLightOrientation_coronal.tif')
+            annotation = np.swapaxes(annotation, 0, 2)
+            annotation = np.flip(annotation, 2)
+
         X, Y, U, V, ui, vi = plot_vector_field(grid, grid_vector, sl, sxe=sxe)
-   
-   
+
         # Plot streamline on specfy slice
         plt.figure()
         with plt.style.context('seaborn-white'):
-             
-             edges2 = feature.canny(annotation[:228, :, 528-sl].T, sigma=0.1).astype(int)  
-             mask = np.ma.masked_where(annotation[:228, :, 528-sl].T > 0, annotation[:228, :, 528-sl].T)
-             xi = xi - np.min(xi)
-             yi = yi - np.min(yi)
-             plt.streamplot(xi, yi, -ui, -vi, density=15, arrowstyle='-', color='k', zorder=2)  # color=ui+vi#color=colors_rgb,
-             
 
-             plt.gca().invert_yaxis()
-             plt.gca().invert_xaxis()
-             plt.imshow(mask, cmap='Greys', zorder=10)
-             plt.imshow(edges2, cmap='Greys', zorder=1)  # jet#copper#
-             edges2 = np.logical_not(edges2)
-            
-             masked_data = np.ma.masked_where(edges2 > 0, edges2)
-             plt.imshow(masked_data, cmap='cool_r', zorder=11)  # jet#copper#
-             
-             plt.title(str(sl))
+            edges2 = feature.canny(annotation[:228, :, 528 - sl].T, sigma=0.1).astype(int)
+            mask = np.ma.masked_where(annotation[:228, :, 528 - sl].T > 0, annotation[:228, :, 528 - sl].T)
+            xi = xi - np.min(xi)
+            yi = yi - np.min(yi)
+            plt.streamplot(xi, yi, -ui, -vi, density=15, arrowstyle='-', color='k',
+                           zorder=2)  # color=ui+vi#color=colors_rgb,
 
+            plt.gca().invert_yaxis()
+            plt.gca().invert_xaxis()
+            plt.imshow(mask, cmap='Greys', zorder=10)
+            plt.imshow(edges2, cmap='Greys', zorder=1)  # jet#copper#
+            edges2 = np.logical_not(edges2)
 
+            masked_data = np.ma.masked_where(edges2 > 0, edges2)
+            plt.imshow(masked_data, cmap='cool_r', zorder=11)  # jet#copper#
+
+            plt.title(str(sl))
 
 
-
-
-
-
-
-
-
-
-
+if __name__ == '__main__':
+    main()
