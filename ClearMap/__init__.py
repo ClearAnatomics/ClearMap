@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 ``ClearMap`` is a toolbox for the analysis and registration of volumetric data.
-It has been designed to analyze O(TB) 3d datasets obtained
+It has been designed to analyze O(TB) 3D datasets obtained
 via light sheet microscopy from iDISCO+ cleared tissue samples 
 immunolabeled for proteins. 
 
