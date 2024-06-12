@@ -2,7 +2,7 @@ import copy
 import os
 
 from ClearMap.IO import IO as clearmap_io
-from ClearMap.IO.MHD import mhd_read
+from ClearMap.IO.MHD import read as mhd_read
 from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
 
 
