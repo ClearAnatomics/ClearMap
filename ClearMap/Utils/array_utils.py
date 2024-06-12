@@ -1,3 +1,11 @@
+"""
+This module provides functions to remap the values of an array from one range to another.
+It is essentially a fronted to optimized ``Cython`` functions.
+
+The function remap_array_ranges is the main function of this module.
+It takes as input the source array, the new array, the source ranges, and the new ranges and
+returns the remapped array.
+"""
 import os
 
 import numpy as np

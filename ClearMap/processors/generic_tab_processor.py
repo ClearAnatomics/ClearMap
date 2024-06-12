@@ -1,3 +1,7 @@
+"""
+This module contains the generic processor classes that are used to define the processing steps and run the processing
+This is inherited by all processors in ClearMap
+"""
 import os
 import sys
 from concurrent.futures.process import BrokenProcessPool

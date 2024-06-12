@@ -1,3 +1,6 @@
+"""
+Utility functions for working with paths
+"""
 import os
 
 from ClearMap.config.config_loader import ConfigLoader

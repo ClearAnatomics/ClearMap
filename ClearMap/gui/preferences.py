@@ -1,3 +1,9 @@
+"""
+This module handles the preferences of the graphical interface.
+The values are persisted in a file
+located in the home folder of the user. The preferences are used to store values related to
+ClearMap performance as well as values that affect the appearance of the software.
+"""
 from ClearMap.gui.interfaces import GenericDialog
 from ClearMap.gui.params import PreferencesParams
 

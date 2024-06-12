@@ -3,7 +3,7 @@
 batch_process
 =============
 
-The processor for batch processing a group of samples.
+The processor set of scripts to batch process a group of samples.
 This can be used from the GUI, from the CLI or interactively from the python interpreter
 """
 import functools

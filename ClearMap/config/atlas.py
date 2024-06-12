@@ -1,4 +1,7 @@
-
+"""
+A simple configuration module for the atlases. This is parsed by the ClearMap GUI to
+display the available atlases.
+"""
 
 ATLAS_NAMES_MAP = {
     'ABA 2017 - adult mouse - 25µm': {'resolution': 25, 'base_name': 'ABA_25um_2017'},

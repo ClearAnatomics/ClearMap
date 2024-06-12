@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 vessel_filling
-=============
+==============
 
 This module uses a convolutional neuronal network to fill empty tubes
 and vessels.

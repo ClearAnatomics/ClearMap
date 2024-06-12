@@ -1,3 +1,11 @@
+"""
+This script is used to update the default config files in the ClearMap package.
+
+It will detect if a default config file is missing and create it, or merge it with the existing one.
+If a parameter was altered by the user, it will not be overwritten.
+
+This module will be extended to support conversion from one ClearMap configuration version to another.
+"""
 import copy
 import os.path
 

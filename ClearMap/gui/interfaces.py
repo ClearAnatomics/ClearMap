@@ -1,3 +1,6 @@
+"""
+This module contains the interfaces to the different tabs and dialogs in the ClearMap GUI.
+"""
 import os
 
 from PyQt5.QtWidgets import QWhatsThis
