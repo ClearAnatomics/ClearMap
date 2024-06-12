@@ -2,19 +2,17 @@
 Utility functions for working with paths
 """
 import os
+from pathlib import Path
 
 from ClearMap.config.config_loader import ConfigLoader
 
 
 def is_feather(f):
-<<<<<<< HEAD
-    return f.endswith('cells.feather')
-=======
     """
     Check if a file is a feather file
 
     .. warning::
-        Currently, this function only checks if the file ends with 'cells.feather'
+    Currently, this function only checks if the file ends with 'cells.feather'
 
     Parameters
     ----------
@@ -28,7 +26,6 @@ def is_feather(f):
     if isinstance(f, Path):
         f = str(f)
     return f.endswith('cells.feather')  # FIXME: check does not match name
->>>>>>> 9002859 (DOC: Fixes many docstrings, mostly indentation errors)
 
 
 def is_density_file(f_name):
@@ -44,10 +41,37 @@ def find_density_file(target_dir):
 
 
 def find_cells_df(target_dir):
+    """
+    Find the first feather file in ``target_dir``
+
+    Parameters
+    ----------
+    target_dir
+
+    Returns
+    -------
+
+    """
     return find_file(target_dir, is_feather, 'feather')
 
 
 def find_file(target_dir, check_func, file_type_name):
+    """
+    Find the first file corresponding to ``check_func`` in ``target_dir``
+
+    Parameters
+    ----------
+    target_dir : str
+        The directory to search
+    check_func : callable
+        A function that takes a file name and returns a boolean
+    file_type_name : str
+        The name of the file type to search for. This is used for error messages
+
+    Returns
+    -------
+
+    """
     files = [os.path.join(target_dir, f) for f in os.listdir(target_dir) if check_func(f)]
     try:
         return files[0]
@@ -56,5 +80,17 @@ def find_file(target_dir, check_func, file_type_name):
 
 
 def dir_to_sample_id(folder):
+    """
+    Get the sample ID from a directory
+
+    Parameters
+    ----------
+    folder : str
+        The directory to check
+
+    Returns
+    -------
+
+    """
     cfg_loader = ConfigLoader(folder)
     return cfg_loader.get_cfg('sample')['sample_id']
