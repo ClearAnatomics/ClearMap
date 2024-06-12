@@ -15,7 +15,7 @@ import ClearMap.Analysis.Graphs.GraphGt as ggt
 CPU_COUNT = multiprocessing.cpu_count()
 
 
-def join_neighbouring_degrees_1(graph, min_radius=5, dest_path=''):
+def join_neighbouring_degrees_1(graph, min_radius=5, dest_path='', reduction_compatible=True):
     """
     Join degrees one (empty ended branches) that are very close and likely
     interrupted by a thresholding issue. The distance criterion is defined
@@ -59,6 +59,13 @@ def join_neighbouring_degrees_1(graph, min_radius=5, dest_path=''):
     graph.add_edge(edges)
     if dest_path:
         graph.save(dest_path)
+
+    if not reduction_compatible:
+        # Label the reconnected vertices by their partner (-1 if not reconnected)
+        partners = np.full(graph.n_vertices, -1, dtype=int)
+        partners[df['vertex_id']] = df['neighbor_id']
+        graph.add_vertex_property('reconnection_partner', partners)
+
     return graph
 
 
