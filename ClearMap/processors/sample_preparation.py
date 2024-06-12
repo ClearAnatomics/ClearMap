@@ -738,9 +738,9 @@ class PreProcessor(TabProcessor):
         if use_landmarks:  # FIXME: add use_landmarks to config
             align_channels_parameter.update(moving_landmarks_path=self.resampled_pts_path,
                                             fixed_landmarks_path=self.get_autofluo_pts_path('resampled_to_auto'))
-            self.patch_elastix_parameter_files([self.align_channels_affine_file])
+            self.patch_elastix_cfg_landmarks(self.align_channels_affine_file)
         elastix.align(**align_channels_parameter)
-        self.restore_elastix_parameter_files([self.align_channels_affine_file])  # FIXME: do in try except
+        self.restore_elastix_cfg_no_landmarks(self.align_channels_affine_file)  # FIXME: do in try except
         self.__check_elastix_success('resampled_to_auto')
 
     def __align_auto_to_ref(self):
@@ -761,12 +761,13 @@ class PreProcessor(TabProcessor):
         if use_landmarks:  # FIXME: add use_landmarks to config
             align_reference_parameter.update(moving_landmarks_path=self.ref_pts_path,
                                              fixed_landmarks_path=self.get_autofluo_pts_path('auto_to_reference'))
-            self.patch_elastix_parameter_files([self.align_reference_bspline_file])
+            self.patch_elastix_cfg_landmarks(self.align_reference_bspline_file)
         for k, v in align_reference_parameter.items():
             if not v:
                 raise ValueError(f'Registration missing parameter "{k}"')
         elastix.align(**align_reference_parameter)
-        self.restore_elastix_parameter_files([self.align_reference_affine_file, self.align_reference_bspline_file])  # FIXME: do in try except
+        for cfg_path in [self.align_reference_affine_file, self.align_reference_bspline_file]:
+            self.restore_elastix_cfg_no_landmarks(cfg_path)  # FIXME: do in try except
         self.__check_elastix_success('auto_to_reference')
 
     def __check_elastix_success(self, results_dir_name):
@@ -809,29 +810,13 @@ class PreProcessor(TabProcessor):
         return dvs
 
     @staticmethod
-<<<<<<< HEAD
-    def patch_elastix_parameter_files(elastix_files):
-        for f_path in elastix_files:
-            cfg = ElastixParser(f_path)
-            cfg['Registration'] = ['MultiMetricMultiResolutionRegistration']
-            cfg['Metric'] = ["AdvancedMattesMutualInformation", "CorrespondingPointsEuclideanDistanceMetric"]
-            cfg.write()
-
-    @staticmethod
-    def restore_elastix_parameter_files(elastix_files):
-        for f_path in elastix_files:
-            cfg = ElastixParser(f_path)
-            cfg['Registration'] = ['MultiResolutionRegistration']
-            cfg['Metric'] = ["AdvancedMattesMutualInformation"]
-            cfg.write()
-=======
     def patch_elastix_cfg_landmarks(elastix_cfg_path):
         """
         Patches the elastix configuration file to use landmarks (CorrespondingPointsEuclideanDistanceMetric),
         in addition to AdvancedMattesMutualInformation
 
         .. warning:: This method modifies the file in place and assumes that the existing
-            metric is AdvancedMattesMutualInformation
+        metric is AdvancedMattesMutualInformation
 
         Parameters
         ----------
@@ -839,9 +824,9 @@ class PreProcessor(TabProcessor):
             Path to the elastix configuration file
         """
         cfg = ElastixParser(elastix_cfg_path)
-        cfg['Registration'] = ['MultiMetricMultiResolutionRegistration']
-        cfg['Metric'] = ["AdvancedMattesMutualInformation", "CorrespondingPointsEuclideanDistanceMetric"]
-        cfg.write()
+            cfg['Registration'] = ['MultiMetricMultiResolutionRegistration']
+            cfg['Metric'] = ["AdvancedMattesMutualInformation", "CorrespondingPointsEuclideanDistanceMetric"]
+            cfg.write()
 
     @staticmethod
     def restore_elastix_cfg_no_landmarks(elastix_cfg_path):
@@ -850,17 +835,16 @@ class PreProcessor(TabProcessor):
         only AdvancedMattesMutualInformation
 
         .. warning:: This method modifies the file in place and assumes that the existing metric is
-            AdvancedMattesMutualInformation
+        AdvancedMattesMutualInformation
 
         Parameters
         ----------
         elastix_cfg_path
         """
         cfg = ElastixParser(elastix_cfg_path)
-        cfg['Registration'] = ['MultiResolutionRegistration']
-        cfg['Metric'] = ["AdvancedMattesMutualInformation"]
-        cfg.write()
->>>>>>> 9002859 (DOC: Fixes many docstrings, mostly indentation errors)
+            cfg['Registration'] = ['MultiResolutionRegistration']
+            cfg['Metric'] = ["AdvancedMattesMutualInformation"]
+            cfg.write()
 
     def stitch_overlay(self, channel, color=True):
         """
