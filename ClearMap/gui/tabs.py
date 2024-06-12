@@ -19,8 +19,10 @@ import pyqtgraph as pg
 
 from ClearMap.config.atlas import ATLAS_NAMES_MAP, STRUCTURE_TREE_NAMES_MAP
 from ClearMap.config.config_loader import ConfigLoader
-from PyQt5.QtWebEngineWidgets import QWebEngineView
-from PyQt5.QtWidgets import QDialogButtonBox
+from PyQt5.QtWidgets import QApplication
+app = QApplication.instance()
+if app is not None and app.applicationName() == 'ClearMap':
+    from PyQt5.QtWebEngineWidgets import QWebEngineView
 from qdarkstyle import DarkPalette
 
 import ClearMap.IO.IO as clearmap_io
