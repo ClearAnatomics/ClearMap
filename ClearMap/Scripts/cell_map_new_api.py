@@ -14,7 +14,7 @@ from ClearMap.processors.cell_map import CellDetector
 from ClearMap.processors.sample_preparation import PreProcessor
 
 
-def main(src_directory, atlas_base_name='ABA_25um'):
+def main(src_directory, atlas_base_name='ABA_25um_2017'):
     cfg_loader = ConfigLoader(src_directory)
     configs = get_configs(cfg_loader.get_cfg_path('sample'), cfg_loader.get_cfg_path('processing'))
     pre_proc = PreProcessor()
