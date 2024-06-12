@@ -40,6 +40,9 @@ if not os_name.startswith('windows'):
     DEFAULT_COMPILE_ARGS += ['-w', '-O3']
     DEFAULT_LIBRARIES += ['m']
 
+if os_name.startswith('linux'):
+    DEFAULT_COMPILE_ARGS += ['-flarge-source-files']
+
 if len(sys.argv) > 2:
     USE_OPENMP = sys.argv[2].lower() in ('use_openmp', 'true')
 else:
