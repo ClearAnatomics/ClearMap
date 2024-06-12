@@ -10,6 +10,7 @@ visualization of detected cells or brain structures.
 
 
 Key modules are:
+
 ====================================== ==================================================
 Module                                 Description
 ====================================== ==================================================
@@ -17,9 +18,11 @@ Module                                 Description
 :mod:`~ClearMap.Analysis.Graphs`       Graph construction and analysis for large graphs.
 :mod:`~ClearMap.Analysis.Statistics`   Statistical tools.
 ====================================== ==================================================
+
+See below for a detailed description of each module.
 """
-__author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
-__license__   = 'GPLv3 - GNU General Pulic License v3 (see LICENSE)'
+__author__ = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
+__license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
-__webpage__   = 'http://idisco.info'
-__download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
+__webpage__ = 'https://idisco.info'
+__download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
