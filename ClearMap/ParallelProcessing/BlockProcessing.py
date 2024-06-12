@@ -569,11 +569,11 @@ def block_axes(source, axes=None):
     The source on which the block processing is used.
   axes : list, 'all' or None
     The axes over which to split the block processing.
+
     .. deprecated:: 2.1
       Value *all* (the built-in Python keyword) is now
-       deprecated for parameter axes.
-     You should replace it with
-      *"all"* (the string literal) instead
+      deprecated for parameter axes.
+      You should replace it with *"all"* (the string literal) instead
 
   
   Returns

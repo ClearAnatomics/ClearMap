@@ -7,7 +7,7 @@ Data viewer showing 3d data as 2d slices.
 Usage
 -----
 
-.. image:: ../Static/DataViewer.jpg
+.. image:: ../static/DataViewer.jpg
 
 Note
 ----

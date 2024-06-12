@@ -133,17 +133,17 @@ def detect_cells(source, sink=None, cell_detection_parameter=default_cell_detect
         * difference of Gaussians (DoG) filter
         * maxima detection via :func:`~ClearMap.Analysis.Measurements.MaximaDetection.find_extended_maxima`
         * cell shape detection via :func:`~ClearMap.Analysis.Measurements.ShapeDetection.detect_shape`
-        * cell intensity and size measurements via: :func:`~ClearMap.ImageProcessing.Measurements.ShapeDetection.find_intensity`,
-          :func:`~ClearMap.ImageProcessing.Measurements.ShapeDetection.find_size`.
+        * cell intensity and size measurements via:
+            :func:`~ClearMap.ImageProcessing.Measurements.ShapeDetection.find_intensity`,
+            :func:`~ClearMap.ImageProcessing.Measurements.ShapeDetection.find_size`.
 
 
     The parameters for each step are passed as sub-dictionaries to the
     cell_detection_parameter dictionary.
 
     * If None is passed for one of the steps this step is skipped.
-
-    * Each step also has an additional parameter 'save' that enables saving of
-    the result of that step to a file to inspect the pipeline.
+    * Each step also has an additional parameter 'save' that enables saving
+        of the result of that step to a file to inspect the pipeline.
 
 
     Illumination correction
@@ -187,7 +187,7 @@ def detect_cells(source, sink=None, cell_detection_parameter=default_cell_detect
         Equalization step parameter.
         See also :func:`ClearMap.ImageProcessing.LocalStatistics.local_percentile`
 
-        precentile : tuple
+        percentile : tuple
             The lower and upper percentiles used to estimate the equalization.
             The lower percentile is used for normalization, the upper to limit the
             maximal boost to a maximal intensity above this percentile.

@@ -17,12 +17,18 @@ fL = pq.UnitQuantity('femtoliter', pq.liter/1e15, symbol='fL')
 def scaling_factor(Q_rescale, Q_compare):
     """Computes the scaling factor to multiply a quantity with, if it is to be
     expressed in units of another quantity.
-    INPUT: Q_rescale: The quantity instance or unit-string that is to be
-           rescaled.
-           Q_compare: The quantity instance or unit-string whose units are
-           desired.
-    OUTPUT: Factor by which Q_rescale is to be multiplied with, if expressed in
-            units of Q_compare
+
+    Arguments
+    ---------
+
+    Q_rescale:
+        The quantity instance or unit-string that is to be rescaled.
+    Q_compare:
+        The quantity instance or unit-string whose units are desired.
+
+    Returns
+    -------
+    Factor by which Q_rescale is to be multiplied with, if expressed in units of Q_compare
     """
     if not isinstance(Q_rescale, pq.Quantity):
         Q_rescale = pq.Quantity(1.0, Q_rescale)
@@ -32,12 +38,17 @@ def scaling_factor(Q_rescale, Q_compare):
 def scaling_factor_du(Q_rescale, default_units):
     """Computes the scaling factor to multiply a quantity with, if it is to be
     expressed in the default units provided.
-    INPUT: Q_rescale: The quantity instance or unit-string that is to be
-           rescaled.
-           default_units: The default units as dictionary, e.g.: {'length': 'm',
-                         'mass': 'kg', 'time': 's'}
-    OUTPUT: Factor by which Q_rescale is to be multiplied with, if expressed in
-            the default units.
+
+    Arguments
+    ---------
+    Q_rescale:
+        The quantity instance or unit-string that is to be rescaled.
+    default_units:
+        The default units as dictionary, e.g.: {'length': 'm', 'mass': 'kg', 'time': 's'}
+
+    Returns
+    -------
+    Factor by which Q_rescale is to be multiplied with, if expressed in the default units.
     """
     pq.set_default_units(**default_units)
     if not isinstance(Q_rescale, pq.Quantity):

@@ -43,7 +43,9 @@ def fill(source, sink=None, seeds=None, processes=None, verbose=False):
         Input source.
     sink : array or None
         If None, a new array is allocated.
-    seeds
+    seeds : array or None
+        An array of seed points for the fill operation.
+        If None, the border indices of the source are used as seeds.
     processes: int or None
         How many CPU cores to use, None defaults to max
     verbose: bool

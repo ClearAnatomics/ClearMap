@@ -20,7 +20,7 @@ def format_orientation(orientation, inverse=False, default=None):
 
     See Also
     --------
-    `Orientation`_
+    :mod:`~ClearMap.Alignment.orientation`
     """
     if orientation is None:
         return default
@@ -58,7 +58,7 @@ def invert_orientation(orientation):
 
     See Also
     --------
-    `Orientation`_
+    :mod:`~ClearMap.Alignment.orientation`
     """
     orientation = format_orientation(orientation)
 
@@ -93,7 +93,7 @@ def orientation_to_transposition(orientation, inverse=False):
 
     See Also
     --------
-    `Orientation`_
+    :mod:`~ClearMap.Alignment.orientation`
     """
     orientation = format_orientation(orientation, inverse=inverse)
     if orientation is None:
@@ -121,7 +121,7 @@ def orient_resolution(resolution, orientation, inverse=False):
 
     See Also
     --------
-    `Orientation`_
+    :mod:`~ClearMap.Alignment.orientation`
     """
     if orientation is None:
         return resolution
@@ -149,32 +149,33 @@ def orient_shape(shape, orientation, inverse=False):
 
     See Also
     --------
-    `Orientation`_
+    :mod:`~ClearMap.Alignment.orientation`
     """
     return orient_resolution(shape, orientation, inverse=inverse)
 
 
 def orient(data, orientation, inverse=False):
-    """Orients a data array according to the given orientation.
+    """
+    Orients a data array according to the given orientation.
 
-       Arguments
-       ---------
-       data : array or Source
-         The data to orient.
-       orientation : tuple or str
-         The orientation specification.
-       inverse : bool
-         If True, invert the orientation.
+    Arguments
+    ---------
+    data : array or Source
+     The data to orient.
+    orientation : tuple or str
+     The orientation specification.
+    inverse : bool
+     If True, invert the orientation.
 
-       Returns
-       -------
-       oriented : array
-         The oriented data array.
+    Returns
+    -------
+    oriented : array
+     The oriented data array.
 
-       See Also
-       --------
-       `Orientation`_
-       """
+    See Also
+    --------
+    :mod:`~ClearMap.Alignment.orientation`
+    """
     orientation = format_orientation(orientation)
 
     oriented = data
@@ -219,7 +220,7 @@ def orient_points(points, orientation, shape=None, inverse=False):
 
        See Also
        --------
-       `Orientation`_
+       :mod:`ClearMap.Alignment.orientation`
        """
     # reorient points
     orientation = format_orientation(orientation)

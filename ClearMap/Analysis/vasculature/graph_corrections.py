@@ -126,7 +126,7 @@ def remove_mutual_loops_gt(graph, min_radius, min_length):  # TODO: what are the
     """
     Removes mutual loops from the graph.
     Mutual loops are defined as edges with the same source and destination. In other words, two edges that
-        connect the same pair of vertices in the graph form a mutual loop.
+    connect the same pair of vertices in the graph form a mutual loop.
     This function uses a parallelized version of mutual_loop_detection.
 
     .. warning::
@@ -181,7 +181,7 @@ def remove_mutual_loops_gt(graph, min_radius, min_length):  # TODO: what are the
     good_edges[good_edges_indices] = 1
 
     large_edges = (radii >= min_radius) | (lengths >= min_length)
-    edge_filter = large_edges | good_edges #| (mutual_loops == 0)
+    edge_filter = large_edges | good_edges  #| (mutual_loops == 0)
     # edge_filter = np.ones(graph.n_edges)
     # edge_filter[bad_edges] = 0
     return graph.sub_graph(edge_filter=edge_filter)
@@ -191,10 +191,10 @@ def correct_graph(graph, min_radius=2.9, min_length=13):  # FIXME: reinstate min
     """
     This is the main function to correct the graph.
     Corrects the graph by removing
-        * spurious branches (small degree 1 branches)
-        * surface branches (branches that are too close to the surface)
-        * auto loops (edges where edge.source == edge.target)
-        * mutual loops (edges share the same source and target and are small(in radius and length))
+    * spurious branches (small degree 1 branches)
+    * surface branches (branches that are too close to the surface)
+    * auto loops (edges where edge.source == edge.target)
+    * mutual loops (edges share the same source and target and are small(in radius and length))
 
     Parameters
     ----------

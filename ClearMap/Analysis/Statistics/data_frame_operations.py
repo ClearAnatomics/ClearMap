@@ -1,7 +1,23 @@
 import numpy as np
 import pandas as pd
 
+
 def sanitize_df(df, id_col_name='Structure ID'):
+    """
+    Remove the rows corresponding to the "brain" structure and the rows with invalid ids
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        The dataframe to sanitize
+    id_col_name : str
+        The name of the column containing the ids
+
+    Returns
+    -------
+    pd.DataFrame
+        The sanitized dataframe
+    """
     valid_idx = np.logical_and(df[id_col_name] > 0, df[id_col_name] < 2 ** 16)
     df = df[valid_idx]
     df = df[df[id_col_name] != 997]  # Not "brain"
@@ -9,6 +25,20 @@ def sanitize_df(df, id_col_name='Structure ID'):
 
 
 def _sanitize_df_column_names(df):
+    """
+    Sanitize the column names of a dataframe by lowercasing them and
+    replacing spaces with underscores
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        The dataframe to sanitize
+
+    Returns
+    -------
+    pd.DataFrame
+        The sanitized dataframe
+    """
     columns = {c: c.lower().replace(' ', '_') for c in df.columns}
     return df.rename(columns=columns)
 
@@ -47,7 +77,8 @@ def normalise_df_column_names(df):
     }
     return df.rename(columns=columns, errors='ignore')
 
-### utils for dataframe counting, grouping, collapsing, filtering and normalizing
+# ## utils for dataframe counting, grouping, collapsing, filtering and normalizing
+
 
 def count_cells(path: str) -> pd.DataFrame:
     """
@@ -62,6 +93,7 @@ def count_cells(path: str) -> pd.DataFrame:
     counts = counts.reset_index(drop=True)
     return counts
 
+
 def group_counts(counts_s, sample_names) -> pd.DataFrame:
     """
     groups several cell_counts together; sample_names are the names of the samples
@@ -72,6 +104,7 @@ def group_counts(counts_s, sample_names) -> pd.DataFrame:
     df.columns = sample_names
     df = df.reset_index()
     return df
+
 
 def collapse_structures(df: pd.DataFrame, map_collapse, collapse_hemispheres=False) -> pd.DataFrame:
     """
@@ -88,6 +121,7 @@ def collapse_structures(df: pd.DataFrame, map_collapse, collapse_hemispheres=Fal
                   .sum()
                   )
     return counts
+
 
 def filter_df(df: pd.DataFrame, structure_ids,
               hemispheres=['RH', 'LH'], exclude: bool=False) -> pd.DataFrame:
@@ -106,6 +140,7 @@ def filter_df(df: pd.DataFrame, structure_ids,
             mask = ~df["id"].isin(structure_ids)
     df = df.loc[mask].reset_index(drop=True)
     return df.copy()
+
 
 def normalize_df(df: pd.DataFrame, df_normalize: pd.DataFrame) -> pd.DataFrame:
     df = df.set_index(['id', 'hemisphere']).copy()

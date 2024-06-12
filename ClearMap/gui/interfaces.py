@@ -91,9 +91,8 @@ class GenericDialog(GenericUi):
 class GenericTab(GenericUi):
     """
     The interface to all tab managers.
-    A tab manager includes a tab widget,
-     the associated parameters and potentially a processor object
-     which handles the computations.
+    A tab manager includes a tab widget, the associated parameters and
+    potentially a processor object which handles the computations.
     """
     def __init__(self, main_window, name, tab_idx, ui_file_name):
         """
@@ -316,9 +315,8 @@ class PostProcessingTab(GenericTab):
     """
     Interface to all the tab managers in charge of post processing the data (e.e. typically detecting relevant info in the data).
     One particularity of a post processing tab manager is that it includes the corresponding pre processor.
-    A tab manager includes a tab widget,
-     the associated parameters and potentially a processor object
-     which handles the computations.
+    A tab manager includes a tab widget, the associated parameters
+    and potentially a processor object which handles the computations.
     """
     def __init__(self, main_window, name, tab_idx, ui_file_name):
         super().__init__(main_window, name, tab_idx, ui_file_name)
