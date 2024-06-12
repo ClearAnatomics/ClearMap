@@ -45,6 +45,18 @@ __download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
 
 
 def setup_mini_brain(mini_brain_scaling=(5, 5, 5)):  # TODO: scaling in prefs
+    """
+    Create a downsampled version of the Allen Brain Atlas for the mini brain widget
+
+    Parameters
+    ----------
+    mini_brain_scaling : tuple(int, int, int)
+        The scaling factors for the mini brain. Default is (5, 5, 5)
+
+    Returns
+    -------
+    tuple(scale, downsampled_array)
+    """
     atlas_path = os.path.join(atlas_folder, 'ABA_25um_annotation.tif')
     arr = TIF.Source(atlas_path).array
     return mini_brain_scaling, sk_transform.downscale_local_mean(arr, mini_brain_scaling)
@@ -82,7 +94,21 @@ class RectItem(pg.GraphicsObject):  # Derived from https://stackoverflow.com/a/6
 
 
 class OrthoViewer(object):
+    """
+    Orthogonal viewer for 3D images
+
+    This is a class that allows to visualize 3D images in 3 orthogonal views.
+    """
     def __init__(self, img=None, parent=None):
+        """
+        Initialize the viewer
+        Parameters
+        ----------
+        img : np.ndarray
+            The 3D image to visualize
+        parent : QWidget
+            The parent widget
+        """
         self.img = img
         self.parent = parent
         self.params = None
@@ -90,6 +116,22 @@ class OrthoViewer(object):
         self.dvs = []
 
     def setup(self, img, params, parent=None):
+        """
+        Initialize the viewer after the object has been created
+
+        Parameters
+        ----------
+        img : np.ndarray
+            The 3D image to visualize
+        params : UiParameter
+            The parameters object
+        parent : QWidget
+            The parent widget
+
+        Returns
+        -------
+
+        """
         self.img = img
         self.params = params
         self.parent = parent
@@ -97,21 +139,56 @@ class OrthoViewer(object):
 
     @property
     def shape(self):
+        """
+        Get the shape of the image
+        Returns
+        -------
+
+        """
         return self.img.shape if self.img is not None else None
 
     @property
     def width(self):
+        """
+        Get the width of the image
+        Returns
+        -------
+
+        """
         return self.shape[0]
 
     @property
     def height(self):
+        """
+        Get the height of the image
+        Returns
+        -------
+
+        """
         return self.shape[1]
 
     @property
     def depth(self):
+        """
+        Get the depth of the image
+        Returns
+        -------
+
+        """
         return self.shape[2]
 
     def update_ranges(self, ranges):
+        """
+        Update the ranges (min, max) for each axis of the viewer
+
+        Parameters
+        ----------
+        ranges : list(tuple(float, float))
+
+        Returns
+        -------
+
+        """
         for i, rng in enumerate(ranges):
             region_item = self.linear_regions[i]
             region_item.setRegion(rng)
@@ -124,7 +201,13 @@ class OrthoViewer(object):
             setattr(self.params, f'crop_{"xyz"[axis]}_min', rng[0])
             setattr(self.params, f'crop_{"xyz"[axis]}_max', rng[1])
 
-    def add_regions(self):
+    def add_regions(self):  # FIXME: improve documenation
+        """
+        Add the regions to the viewer
+        Returns
+        -------
+
+        """
         # y_axis_idx = (1, 2, 0)
         for i, dv in enumerate(self.dvs):
             transparency = '4B'
@@ -134,6 +217,20 @@ class OrthoViewer(object):
             dv.view.addItem(linear_region)
 
     def plot_orthogonal_views(self, img=None, parent=None):
+        """
+        Plot the orthogonal views of the image
+
+        Parameters
+        ----------
+        img : np.ndarray
+            The image to plot. If None, the image set at initialization will be used
+        parent : QWidget
+            The parent widget to plot into. If None, the parent set at initialization will be used
+
+        Returns
+        -------
+
+        """
         if img is None:
             img = self.img.array
         if parent is None:
@@ -153,6 +250,12 @@ class OrthoViewer(object):
 
 
 class ProgressWatcher(QWidget):  # Inspired from https://stackoverflow.com/a/66266068
+    """
+    A QWidget that watches the progress of a process. It uses signals to update the progress bar and the text
+    The main setup methods are `setup` and `prepare_for_substep`
+    It is meant to be used in conjunction with a ProgressWatcherDialog to which it is connected
+    through its signals
+    """
     main_step_name_changed = QtCore.pyqtSignal(str)
     sub_step_name_changed = QtCore.pyqtSignal(str)
 
@@ -166,6 +269,21 @@ class ProgressWatcher(QWidget):  # Inspired from https://stackoverflow.com/a/662
     aborted = QtCore.pyqtSignal(bool)  # FIXME: use
 
     def __init__(self, max_progress=100, main_max_progress=1, parent=None):
+        """
+        Create a ProgressWatcher
+
+        Parameters
+        ----------
+        max_progress : int
+            The maximum progress value, when the progress reaches this value, the (sub-)operation is considered finished.
+            default is 100
+        main_max_progress : int
+            The maximum progress value for the main operation. When the progress reaches this value, the main operation
+            is considered finished. If all sub-operations are also finished, this is usually linked to the end of the
+            whole process. Default is 1
+        parent : QWidget
+            The parent widget
+        """
         super().__init__(parent)
         self._main_step_name = 'Processing'
         self._sub_step_name = None
@@ -187,6 +305,13 @@ class ProgressWatcher(QWidget):  # Inspired from https://stackoverflow.com/a/662
             self.parentWidget().app.processEvents()
 
     def reset(self):
+        """
+        Reset all the values to their initial state
+
+        Returns
+        -------
+
+        """
         self.main_step_name = 'Processing'
         self.__main_progress = 1
         self.__main_max_progress = 1
@@ -200,6 +325,20 @@ class ProgressWatcher(QWidget):  # Inspired from https://stackoverflow.com/a/662
         self.pattern = None
 
     def setup(self, main_step_name, main_step_length, sub_step_length=0, pattern=None):
+        """
+        Post initialisation of the
+
+        Parameters
+        ----------
+        main_step_name
+        main_step_length
+        sub_step_length
+        pattern
+
+        Returns
+        -------
+
+        """
         self.main_step_name = main_step_name
         self.main_max_progress = main_step_length
         # self.sub_step_name = sub_step_name

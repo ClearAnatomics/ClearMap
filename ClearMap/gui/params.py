@@ -33,6 +33,10 @@ class ParamsOrientationError(ValueError):
 
 
 class AlignmentParams(UiParameterCollection):
+    """
+    Class that groups all the parameters related to the alignment of the sample
+    This includes stitching and registration
+    """
     def __init__(self, tab, src_folder=None):
         super().__init__(tab, src_folder)
         self.stitching_general = GeneralStitchingParams(tab, src_folder)
@@ -82,6 +86,39 @@ class AlignmentParams(UiParameterCollection):
 
 
 class SampleParameters(UiParameter):
+    """
+    Class that links the sample params file to the UI
+
+    Attributes
+    ----------
+    sample_id : str
+        The ID of the sample. This must be unique
+    use_id_as_prefix : bool
+        Whether to use the sample ID as a prefix for the output files
+    tile_extension : str
+        The extension of the tile files
+    raw_path : str
+        The path to the raw data. This is typically an *expression* that will be expanded by ClearMap
+    autofluo_path : str
+        The path to the autofluorescence data. This is typically an *expression* that will be expanded by ClearMap
+    arteries_path : str
+        The path to the arteries data. This is typically an *expression* that will be expanded by ClearMap
+    raw_resolution : List[float]
+        The resolution (sampling) of the raw data
+    arteries_resolution : List[float]
+        The resolution (sampling) of the arteries data
+    autofluorescence_resolution : List[float]
+        The resolution (sampling) of the autofluorescence data
+    slice_x : List[int]
+        The slice in the x dimension
+    slice_y : List[int]
+        The slice in the y dimension
+    slice_z : List[int]
+        The slice in the z dimension
+    orientation : List[int]
+        The orientation of the data (x, y, z) as a tuple of integers (1, 2, 3), (3, 1, 2) ...
+        Negative values are allowed to indicate a flip of the axis
+    """
     sample_id: str
     use_id_as_prefix: bool
     tile_extension: str
