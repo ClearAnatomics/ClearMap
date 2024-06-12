@@ -39,8 +39,6 @@ import ClearMap.Settings as settings
 import ClearMap.IO.IO as io
 import ClearMap.IO.Workspace as wsp
 
-import ClearMap.Tests.Files as tfs 
-
 import ClearMap.Visualization.Plot3d as p3d
 import ClearMap.Visualization.Color as col
 
@@ -83,9 +81,9 @@ import ClearMap.ImageProcessing.Experts.Cells as cells
 ###############################################################################
 
 __all__ = ['sys', 'os', 'glob', 'np', 'plt', 'reload',
-           'settings', 'io', 'wsp', 'tfs', 
+           'settings', 'io', 'wsp',
            'p3d', 'col', 'te', 'tmr',  'bp', 'ap',
            'ano', 'res', 'elx', 'st', 'stw',
            'clp', 'rnk', 'se', 'dif', 'skl', 'skp', 'vf',
            'grp', 'gp', 'me', 'mr', 'vox',
-           'vasc', 'cells'];
+           'vasc', 'cells']
