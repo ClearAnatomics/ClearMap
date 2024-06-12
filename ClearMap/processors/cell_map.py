@@ -8,19 +8,14 @@ This module contains the class to analyze (detect) individual cells,
 e.g. to analyze immediate early gene expression data from iDISCO+ cleared tissue [Renier2016]_.
 
 
-.. image:: ../Static/cell_abstract_2016.jpg
+.. image:: ../static/cell_abstract_2016.jpg
    :target: https://doi.org/10.1016/j.cell.2020.01.028
    :width: 300
 
-.. figure:: ../Static/CellMap_pipeline.png
+.. figure:: ../static/CellMap_pipeline.png
 
   iDISCO+ and ClearMap: A Pipeline for Cell Detection, Registration, and 
   Mapping in Intact Samples Using Light Sheet Microscopy.
-
-
-References
-----------
-.. [Renier2016] `Mapping of brain activity by automated volume analysis of immediate early genes. Renier* N, Adams* EL, Kirst* C, Wu* Z, et al. Cell. 2016 165(7):1789-802 <https://doi.org/10.1016/j.cell.2016.05.007>`_
 """
 
 
@@ -546,7 +541,7 @@ class CellDetector(TabProcessor):
         In order to align the coordinates when we have right and left hemispheres,
         if the orientation of the brain is left, will calculate the new coordinates for the Y axes,
         this change will not affect the orientation of the heatmaps, since these are generated from
-         the ClearMap2 file 'cells'
+        the ClearMap2 file 'cells'
 
         .. deprecated:: 2.1
             Use :func:`atlas_align` and `export_collapsed_stats` instead.

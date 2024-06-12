@@ -48,7 +48,6 @@ from ClearMap.config.update_config import update_default_config
 import ClearMap.Visualization.Plot3d as q_plot_3d
 
 
-
 __author__ = 'Christoph Kirst <christoph.kirst.ck@gmail.com>, Charly Rousseau <charly.rousseau@icm-institute.org>'
 __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
@@ -57,6 +56,9 @@ __download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
 
 
 class PreProcessor(TabProcessor):
+    """
+    Handle the stitching and alignment of the raw images
+    """
     def __init__(self):
         super().__init__()
         self.config_loader = None
@@ -96,18 +98,60 @@ class PreProcessor(TabProcessor):
 
     @property
     def prefix(self):
+        """
+        Get the prefix to use for the files
+
+        Returns
+        -------
+        str
+            The prefix to use, None to not use any
+        """
         return self.sample_config['sample_id'] if self.sample_config['use_id_as_prefix'] else None
 
     def filename(self, *args, **kwargs):
+        """
+        A shortcut to get the filename from the workspace
+
+        Parameters
+        ----------
+        args
+        kwargs
+
+        Returns
+        -------
+        str
+            The filename
+        """
         return self.workspace.filename(*args, **kwargs)
 
     def z_only(self, channel='raw'):
+        """
+        Check if the channel is z only (no x or y tiles)
+
+        Parameters
+        ----------
+        channel : str
+            The channel to check
+
+        Returns
+        -------
+        bool
+            True if the channel is z only
+        """
         tags = self.workspace.expression(channel, prefix=self.prefix).tags
         axes = [tag.name for tag in tags]
         return axes == ['Z']
 
     @property
     def is_tiled(self):
+        """
+        Check if the raw channel is tiled (has x and y tiles)
+
+        Returns
+        -------
+        bool
+            True if the raw channel is tiled
+        """
         return self.__is_tiled('raw')
 
     def __is_tiled(self, channel):
@@ -119,6 +163,13 @@ class PreProcessor(TabProcessor):
 
     @property
     def autofluorescence_is_tiled(self):
+        """
+        Check if the autofluorescence channel is tiled (has x and y tiles)
+        Returns
+        -------
+        bool
+            True if the autofluorescence channel is tiled
+        """
         return self.__is_tiled('autofluorescence')
 
     def __has_tiles(self, channel):
@@ -132,19 +183,55 @@ class PreProcessor(TabProcessor):
         return self.__has_tiles('raw')
 
     def check_has_all_tiles(self, channel):
+        """
+        Check whether all the tiles of the channel exist on disk
+
+        Parameters
+        ----------
+        channel : str
+            The channel to check
+
+        Returns
+        -------
+        bool
+            True if all the tiles exist
+        """
         extension = 'npy' if self.use_npy() else None
         return self.workspace.all_tiles_exist(channel, extension=extension)
 
     @property
     def has_npy(self):
+        """
+        Check if the raw channel is in npy format
+
+        Returns
+        -------
+        bool
+            True if the raw channel is in npy format
+        """
         # noinspection PyTypeChecker
         return len(clearmap_io.file_list(self.filename('raw', prefix=self.prefix, extension='.npy')))
 
     def get_autofluo_pts_path(self, direction='resampled_to_auto'):
+        """
+        Get the path to the autofluorescence landmarks file
+
+        Parameters
+        ----------
+        direction
+
+        Returns
+        -------
+        str
+            The path to the autofluorescence landmarks file
+        """
         elastix_folder = self.filename(direction)
         return os.path.join(elastix_folder, 'autolfuorescence_landmarks.pts')  # TODO: use workspace
 
     def clear_landmarks(self):
+        """
+        Clear (remove) the landmarks files
+        """
         for f_path in (self.ref_pts_path, self.resampled_pts_path,
                        self.get_autofluo_pts_path('resampled_to_auto'),
                        self.get_autofluo_pts_path('auto_to_reference')):
@@ -329,8 +416,6 @@ class PreProcessor(TabProcessor):
     def convert_to_image_format(self):  # TODO: support progress
         """
         Convert (optionally) to image formats readable by e.g. Fiji
-        -------
-
         """
         if self.stopped:
             return
@@ -724,6 +809,7 @@ class PreProcessor(TabProcessor):
         return dvs
 
     @staticmethod
+<<<<<<< HEAD
     def patch_elastix_parameter_files(elastix_files):
         for f_path in elastix_files:
             cfg = ElastixParser(f_path)
@@ -738,6 +824,43 @@ class PreProcessor(TabProcessor):
             cfg['Registration'] = ['MultiResolutionRegistration']
             cfg['Metric'] = ["AdvancedMattesMutualInformation"]
             cfg.write()
+=======
+    def patch_elastix_cfg_landmarks(elastix_cfg_path):
+        """
+        Patches the elastix configuration file to use landmarks (CorrespondingPointsEuclideanDistanceMetric),
+        in addition to AdvancedMattesMutualInformation
+
+        .. warning:: This method modifies the file in place and assumes that the existing
+            metric is AdvancedMattesMutualInformation
+
+        Parameters
+        ----------
+        elastix_cfg_path : str
+            Path to the elastix configuration file
+        """
+        cfg = ElastixParser(elastix_cfg_path)
+        cfg['Registration'] = ['MultiMetricMultiResolutionRegistration']
+        cfg['Metric'] = ["AdvancedMattesMutualInformation", "CorrespondingPointsEuclideanDistanceMetric"]
+        cfg.write()
+
+    @staticmethod
+    def restore_elastix_cfg_no_landmarks(elastix_cfg_path):
+        """
+        Restores the elastix configuration file to not use landmarks (CorrespondingPointsEuclideanDistanceMetric),
+        only AdvancedMattesMutualInformation
+
+        .. warning:: This method modifies the file in place and assumes that the existing metric is
+            AdvancedMattesMutualInformation
+
+        Parameters
+        ----------
+        elastix_cfg_path
+        """
+        cfg = ElastixParser(elastix_cfg_path)
+        cfg['Registration'] = ['MultiResolutionRegistration']
+        cfg['Metric'] = ["AdvancedMattesMutualInformation"]
+        cfg.write()
+>>>>>>> 9002859 (DOC: Fixes many docstrings, mostly indentation errors)
 
     def stitch_overlay(self, channel, color=True):
         """

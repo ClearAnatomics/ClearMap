@@ -4,9 +4,9 @@ This module provides a class to load configuration files from the ClearMap confi
 The configuration files are used to store the parameters for the ClearMap processing steps.
 Currently, they are stored as configobj files, but other formats like json or yaml
 could be supported in the future through a simple plugin function to this module
- (see the not_implemented functions). All that is required is that the object returned by these
- plugin functions implements read, write, and reload methods, a filename attribute and behaves as
- a python dictionary.
+(see the not_implemented functions). All that is required is that the object returned by these
+plugin functions implements read, write, and reload methods, a filename attribute and behaves as
+a python dictionary.
 """
 import inspect
 import os

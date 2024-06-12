@@ -7,7 +7,28 @@ from ClearMap.config.config_loader import ConfigLoader
 
 
 def is_feather(f):
+<<<<<<< HEAD
     return f.endswith('cells.feather')
+=======
+    """
+    Check if a file is a feather file
+
+    .. warning::
+        Currently, this function only checks if the file ends with 'cells.feather'
+
+    Parameters
+    ----------
+    f : str or Path
+        The file to check
+
+    Returns
+    -------
+
+    """
+    if isinstance(f, Path):
+        f = str(f)
+    return f.endswith('cells.feather')  # FIXME: check does not match name
+>>>>>>> 9002859 (DOC: Fixes many docstrings, mostly indentation errors)
 
 
 def is_density_file(f_name):

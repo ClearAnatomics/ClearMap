@@ -67,8 +67,8 @@ def cartesian_to_polar(x, y, ceval=numexpr.evaluate):
     x:  ndarray coordinates
     y:  ndarray coordinates
     ceval: backend to use:
-        - eval :  pure Numpy
-        - numexpr.evaluate:  Numexpr
+    - eval :  pure Numpy
+    - numexpr.evaluate:  Numexpr
 
     Returns
     """

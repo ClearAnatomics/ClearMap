@@ -4,18 +4,14 @@
 TubeMap
 =======
 
-This script is the main pipeline to generate annotated graphs from vascualture 
+This script is the main pipeline to generate annotated graphs from vasculature
 lightsheet data [Kirst2020]_.
 
-See the :ref:`TubeMap tutorial </TubeMap.ipynb>` for a tutorial and usage.
+See the :ref:`TubeMap tutorial <../../ClearMap/Scripts/TubeMap.ipynb>` for a tutorial and usage.
 
-.. image:: ../Static/cell_abstract_2020.jpg
+.. image:: ../static/cell_abstract_2020.jpg
    :target: https://doi.org/10.1016/j.cell.2016.05.007 
-   :width: 300  
-
-References
-----------
-.. [Kirst2020] `Mapping the Fine-Scale Organization and Plasticity of the Brain Vasculature. Kirst, C., Skriabine, S., Vieites-Prado, A., Topilko, T., Bertin, P., Gerschenfeld, G., Verny, F., Topilko, P., Michalski, N., Tessier-Lavigne, M. and Renier, N., Cell, 180(4):780-795 <https://doi.org/10.1016/j.cell.2020.01.028>`_
+   :width: 300
 """
 __author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
 __license__   = 'GPLv3 - GNU General Pulic License v3 (see LICENSE.txt)'

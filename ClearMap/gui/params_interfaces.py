@@ -21,6 +21,26 @@ class ParamLink:
 
 
 class UiParameter(QObject):
+    """
+    This is a class to link the GUI widgets to the config file.
+    This is done automatically from parsing the ``params_dict`` attribute.
+    The ``params_dict`` attribute is a dictionary of the form::
+
+        {'attr_name': ParamLink(keys, widget, attr_name=, default=, connect=)}
+        or
+        {'attr_name': keys,}
+
+    where:
+
+    - ``attr_name`` is the name of the attribute in the class
+    - ``keys`` is a list of keys (chain) to access the value in the config file.
+
+    If ``None``, the attribute is not connected widget is the GUI widget
+    ``connect`` is a boolean to indicate whether the widget should be connected
+    to the config file. Set to ``False`` to not connect or connect manually.
+    If the value is not a ``ParamLink``, it is assumed that the keys point to the value and
+    the widget connection is done through accessors and mutators.
+    """
     def __init__(self, tab, src_folder=None, params_dict=None):
         super().__init__()
         params_dict = params_dict if params_dict is not None else {}
