@@ -125,11 +125,11 @@ def compute_flow_f_schmid(work_dir, graph, cont, graph_name='correcteduniverse',
 
     First, make an igraph version of the graph with the necassary properties
     Then add:
-        - length (computed from the geometry of the edges)
-        - boundary_cap (True if edge is a boundary capillary)
-        - nkind (node kind, i.e. integer representing the type of node from
-        (0, 1, 2, 3) for (capillaries, arteries, veins, universe)
-        - pBC (pressure boundary conditions)
+    - length (computed from the geometry of the edges)
+    - boundary_cap (True if edge is a boundary capillary)
+    - nkind (node kind, i.e. integer representing the type of node from
+    (0, 1, 2, 3) for (capillaries, arteries, veins, universe)
+    - pBC (pressure boundary conditions)
 
     Parameters
     ----------
@@ -200,6 +200,7 @@ def compute_blood_flow(graph, work_dir, sample_name):
     Parameters
     ----------
     graph : GraphGt.Graph
+        The graph to compute the flow, velocity and pressure from
     work_dir : str
         The path to the work directory
     sample_name : str
@@ -548,6 +549,7 @@ def get_top_to_bottom_dist(graph, normal_vector_method='svd', coordinates_name='
     """
     Get the top to bottom distance of the graph.
     This can be computed using the minimum distance method or by taking the mean of the top and bottom vertices.
+
     Parameters
     ----------
     graph : GraphGt.Graph
@@ -567,10 +569,10 @@ def get_top_to_bottom_dist(graph, normal_vector_method='svd', coordinates_name='
         and the bottom vertices are those with a distance to the surface greater than or equal
         to the maximum distance minus 1.
         The top-to-bottom direction is then the normalized vector from the mean of the top vertices
-         to the mean of the bottom vertices.
+        to the mean of the bottom vertices.
     coordinates_name : str
         The coordinates space to use. Typically, 'coordinates', 'coordinates_atlas',
-         'coordinates_scaled' or 'coordinates_MRI'
+        'coordinates_scaled' or 'coordinates_MRI'
 
     Returns
     -------
