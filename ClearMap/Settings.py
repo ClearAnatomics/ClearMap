@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Settings
-=======
+========
 
 Module to set *ClearMap's* internal parameter and paths to external programs.
 
@@ -87,8 +87,8 @@ imagej_path = None  # '/usr/local/Fiji.app'
 """Absolute path to the ImageJ/Fiji installation
 
 Note
-  `ImageJ/Fiji Webpage <https://fiji.sc/>`_
 ----
+  `ImageJ/Fiji Webpage <https://fiji.sc/>`_
 """
 
 ilastik_path = None  # '/usr/local/ilastik/ilastik-1.2.0-Linux'
