@@ -62,37 +62,6 @@ def setup_mini_brain(mini_brain_scaling=(5, 5, 5)):  # TODO: scaling in prefs
     return mini_brain_scaling, sk_transform.downscale_local_mean(arr, mini_brain_scaling)
 
 
-class RectItem(pg.GraphicsObject):  # Derived from https://stackoverflow.com/a/60012800
-    def __init__(self, rect, parent=None):
-        super().__init__(parent)
-        self._rect = rect
-        self.picture = QtGui.QPicture()
-        self._generate_picture()
-        self.name = 'rect'
-
-    def __str__(self):
-        return f'Rect {self.name}, coordinates: {self.rect.getCoords()}'
-
-    @property
-    def rect(self):
-        return self._rect
-
-    # TODO: setWidth, setLeft ... that call self.rect.setWidth + self._generate_picture
-
-    def _generate_picture(self):
-        painter = QtGui.QPainter(self.picture)
-        painter.setPen(pg.mkPen("#FFFF007d"))
-        painter.setBrush(pg.mkBrush("#2e34367d"))
-        painter.drawRect(self.rect)
-        painter.end()
-
-    def paint(self, painter, option, widget=None):
-        painter.drawPicture(0, 0, self.picture)
-
-    def boundingRect(self):
-        return QRectF(self.picture.boundingRect())
-
-
 class OrthoViewer(object):
     """
     Orthogonal viewer for 3D images
