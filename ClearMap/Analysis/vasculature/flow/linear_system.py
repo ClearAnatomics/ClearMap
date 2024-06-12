@@ -32,17 +32,28 @@ class LinearSystem(object):
         distribution.
         The pressure boundary conditions (pBC) should be given in mmHg and pressure will be output in mmHg
 
-        INPUT: G: Vascular graph in iGraph format.
-               invivo: boolean if the invivo or invitro empirical functions are used (default = 0, i.e. in vitro)
-               withRBC: = 0: no RBCs, pure plasma Flow (default)
-                        0 < withRBC < 1 & 'htt' not in edgeAttributes: the given value is assigned as htt to all edges.
-                        0 < withRBC < 1 & 'htt' in edgeAttributes: the given value is assigned as htt to all edges where htt = None.
-                dMin_empiricial: lower limit for the diameter that is used to compute nurel (effective viscosity). The aim of the limit
-                        is to avoid using the empirical equations in a range where no experimental data is available (default = 3.5).
-                htdMax_empirical: upper limit for htd that is used to compute nurel (effective viscosity). The aim of the limit
-                        is to avoid using the empirical equations in a range where no experimental data is available (default = 0.6). Maximum has to be 1.
-                verbose: Bool if WARNINGS and setup information is printed
-        OUTPUT: None, the edge properties htt is assgined and the function update is executed (see description for more details)
+        Parameters
+        ----------
+        G: igraph.Graph
+            Vascular graph in iGraph format.
+        withRBC: int
+            0: no RBCs, pure plasma Flow (default)
+            0 < withRBC < 1 & 'htt' not in edgeAttributes: the given value is assigned as htt to all edges.
+            0 < withRBC < 1 & 'htt' in edgeAttributes: the given value is assigned as htt to all edges where htt = None.
+        invivo: boolean
+            whether the invivo or invitro empirical functions are used (default = 0, i.e. in vitro)
+        dMin_empiricial: float
+            lower limit for the diameter that is used to compute nurel (effective viscosity). The aim of the limit
+            is to avoid using the empirical equations in a range where no experimental data is available (default = 3.5).
+        htdMax_empirical: float
+            upper limit for htd that is used to compute nurel (effective viscosity). The aim of the limit
+            is to avoid using the empirical equations in a range where no experimental data is available (default = 0.6). Maximum has to be 1.
+        verbose: bool
+            if WARNINGS and setup information is printed
+
+        Returns
+        -------
+        None, the edge properties htt is assigned and the function update is executed (see description for more details)
         """
         self._G = G
         self._eps = np.finfo(float).eps
@@ -87,12 +98,15 @@ class LinearSystem(object):
     # --------------------------------------------------------------------------
 
     def update(self):
-        """Constructs the linear system A x = b where the matrix A contains the 
-        conductance information of the vascular graph, the vector b specifies 
-        the boundary conditions and the vector x holds the pressures at the 
-        vertices (for which the system needs to be solved). 
-    
-        OUTPUT: matrix A and vector b
+        """
+        Constructs the linear system A x = b where the matrix A contains the
+        conductance information of the vascular graph, the vector b specifies
+        the boundary conditions and the vector x holds the pressures at the
+        vertices (for which the system needs to be solved).
+
+        Returns
+        -------
+        matrix A and vector b
         """
         htt2htd = self._P.tube_to_discharge_hematocrit
         nurel = self._P.relative_apparent_blood_viscosity
@@ -164,13 +178,23 @@ class LinearSystem(object):
     # --------------------------------------------------------------------------
 
     def solve(self, method, dest_file_path='sampledict.pkl', **kwargs):
-        """Solves the linear system A x = b for the vector of unknown pressures
+        """
+        Solves the linear system A x = b for the vector of unknown pressures
         x, either using a direct solver (obsolete) or an iterative GMRES solver. From the
         pressures, the flow field is computed.
-        INPUT: method: This can be either 'direct' or 'iterative2'
-        OUTPUT: None - G is modified in place.
-                G_final.pkl & G_final.vtp: are save as output
-                sampledict.pkl: is saved as output
+
+        Parameters
+        ----------
+        method: str
+            This can be either 'direct' or 'iterative2'
+        dest_file_path: str
+            The path to save the output file
+
+        Returns
+        -------
+        None - G is modified in place.
+        G_final.pkl & G_final.vtp: are save as output
+        sampledict.pkl: is saved as output
         """
         # htt2htd = self._P.tube_to_discharge_hematocrit
 
@@ -240,12 +264,17 @@ class LinearSystem(object):
 
     # --------------------------------------------------------------------------
     def _update_nominal_and_specific_resistance(self, esequence=None):
-        """Updates the nominal and specific resistance of a given edge 
+        """Updates the nominal and specific resistance of a given edge
         sequence.
-        INPUT: es: Sequence of edge indices as tuple. If not provided, all 
-                   edges are updated.
-        OUTPUT: None, the edge properties 'resistance' and 'specificResistance'
-                are updated (or created).
+        Arguments
+        ---------
+        esequence:
+            Sequence of edge indices as tuple. If not provided, all
+            edges are updated.
+        Returns
+        -------
+        None, the edge properties 'resistance' and 'specificResistance'
+        are updated (or created).
         """
         G = self._G
 
