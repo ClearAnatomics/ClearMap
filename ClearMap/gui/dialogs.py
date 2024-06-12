@@ -124,7 +124,9 @@ def make_simple_progress_dialog(title='Processing', overall_maximum=100, sub_pro
     return dlg
 
 
-def make_splash(img_source=os.path.join(UI_FOLDER, 'creator', 'graphics_resources', 'splash.png'), bar_max=100, res='hd'):
+def make_splash(img_source=None, bar_max=100, res='hd'):
+    if img_source is None:
+        img_source = os.path.join(UI_FOLDER, 'creator', 'graphics_resources', 'splash.png')
     splash_pix = QPixmap(img_source)  # .scaled(848, 480)
     splash = QSplashScreen(splash_pix, Qt.WindowStaysOnTopHint)
     splash.setMask(splash_pix.mask())
