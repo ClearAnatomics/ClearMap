@@ -28,9 +28,7 @@ import pyximport
 import ClearMap.IO.IO as io
 import ClearMap.IO.Slice as slc
 import ClearMap.Utils.Timer as tmr
-from ClearMap.Utils.utilities import patch_distutils_get_extension
 
-patch_distutils_get_extension()
 pyximport.install(setup_args={"include_dirs": [np.get_include(), os.path.dirname(os.path.abspath(__file__))]},
                   reload_support=True)
 

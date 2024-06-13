@@ -13,9 +13,6 @@ import numpy as np
 
 import pyximport
 
-from ClearMap.Utils.utilities import patch_distutils_get_extension
-
-patch_distutils_get_extension()
 pyximport.install(setup_args={"include_dirs": [np.get_include(), os.path.dirname(os.path.abspath(__file__))]},
                   reload_support=True)
 

@@ -193,14 +193,3 @@ class FilePath:
         self.postfix = postfix
         self.extension = extension
 
-
-def patch_distutils_get_extension():
-    global _old_get_distutils_extension
-    _old_get_distutils_extension = pyximport.pyximport.get_distutils_extension
-
-    def new_get_distutils_extension(modname, pyxfilename, language_level=None):
-        extension_mod, setup_args = _old_get_distutils_extension(modname, pyxfilename, language_level)
-        extension_mod.language = 'c++'
-        return extension_mod, setup_args
-
-    pyximport.pyximport.get_distutils_extension = new_get_distutils_extension

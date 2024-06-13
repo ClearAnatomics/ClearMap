@@ -19,7 +19,7 @@ channels:
 
 dependencies:
   - python=3.11  # constraining seems to speed up resolution
-  - cython<3  # get_distutils_extension has been removed from pyximport in >=3
+  - cython
   - pip
   - ipython
   - numpy
