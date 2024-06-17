@@ -22,6 +22,7 @@ dependencies:
   - cython
   - pip
   - ipython
+  - jupyter
   - numpy
   - scipy
   - pandas<2  # Groupby syntax changes
