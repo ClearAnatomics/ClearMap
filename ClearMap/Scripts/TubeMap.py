@@ -7,7 +7,7 @@ TubeMap
 This script is the main pipeline to generate annotated graphs from vasculature
 lightsheet data [Kirst2020]_.
 
-See the :ref:`TubeMap tutorial <../../ClearMap/Scripts/TubeMap.ipynb>` for a tutorial and usage.
+See the :ref:`TubeMap tutorial <../../ClearMap/Scripts/tube_map_tutorial.ipynb>` for a tutorial and usage.
 
 .. image:: ../static/cell_abstract_2020.jpg
    :target: https://doi.org/10.1016/j.cell.2016.05.007 
