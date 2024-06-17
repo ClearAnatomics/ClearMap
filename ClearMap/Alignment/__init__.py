@@ -7,7 +7,7 @@ This sub-package handles stitching and alignment of volumetric data.
 
 .. include:: /../../ClearMap/Alignment/README.rst
 
-All steps are demonstrated in the :ref:`TubeMap tutorial </TubeMap.ipynb>`.
+All steps are demonstrated in the :ref:`TubeMap tutorial </tube_map_tutorial.ipynb>`.
 
 The main routines for resampling are
 :func:`~ClearMap.Alignment.Resampling.resample`.
