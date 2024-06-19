@@ -10,6 +10,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+import warnings
 from concurrent.futures import ProcessPoolExecutor
 from functools import reduce
 from operator import getitem
@@ -23,7 +24,7 @@ __copyright__ = 'Copyright © 2022 by Charly Rousseau'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
 
-import pyximport
+import functools
 
 from ClearMap.Utils.TagExpression import Expression
 from ClearMap.Utils.exceptions import MissingRequirementException, SmiError
@@ -193,3 +194,29 @@ class FilePath:
         self.postfix = postfix
         self.extension = extension
 
+
+def handle_deprecated_args(deprecated_args_map):
+    """
+    Decorator to handle deprecated arguments by renaming them.
+    It takes a dictionary and renames old arguments to new ones.
+
+    Parameters
+    ----------
+    deprecated_args_map : dict
+        Dictionary mapping old argument names to new ones.
+
+    Returns
+    -------
+
+    """
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            for old_arg, new_arg in deprecated_args_map.items():
+                if old_arg in kwargs:
+                    warnings.warn(f"The '{old_arg}' argument is deprecated, use '{new_arg}' instead.",
+                                  DeprecationWarning)
+                    kwargs[new_arg] = kwargs.pop(old_arg)
+            return func(*args, **kwargs)
+        return wrapper
+    return decorator

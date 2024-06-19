@@ -36,6 +36,7 @@ from ClearMap.Utils.TagExpression import Expression
 from .Transformations.Transformation import TransformationBase
 from ClearMap.Alignment.orientation import (format_orientation, orientation_to_transposition, orient_resolution,
                                             orient_shape, orient, orient_points)
+from ClearMap.Utils.utilities import handle_deprecated_args
 
 
 def resample_shape_from_resolution(original_shape, original_resolution, resampled_resolution,
@@ -178,6 +179,10 @@ def resample_information(original_shape=None, resampled_shape=None,
                          orientation=None, discretize=True, consistent=True):
     """Convert resampling information to standard form.
 
+    This function takes in various optional parameters related to the original and resampled data,
+    and returns a tuple containing the original shape, resampled shape, original resolution,
+    resampled resolution, and orientation in a standard format.
+
     Arguments
     ---------
     original_shape : tuple or None
@@ -215,7 +220,7 @@ def resample_information(original_shape=None, resampled_shape=None,
 
     See also
     --------
-    See :func:`resample` for details.
+    resample : Function that performs the actual resampling based on the information provided.
     """
     orientation = format_orientation(orientation)
 
@@ -315,11 +320,9 @@ def resample_shape(original_shape=None, resampled_shape=None,
 
     See also
     --------
-    See :func:`resample` for details.
+    resample: For more details.
 
-    See Also
-    --------
-    `Orientation`_
+    :mod:`ClearMap.Alignment.orientation`
     """
     if original_shape is None and resampled_shape is None:
         raise RuntimeError('Either the original or resampled shape must be defined to determine all shapes!')
@@ -369,11 +372,8 @@ def resample_resolution(original_shape=None, resampled_shape=None,
 
     See also
     --------
-    See :func:`resample` for details.
-
-    See Also
-    --------
-    `Orientation`_
+    resample : For more details.
+    :mod:`ClearMap.Alignment.orientation`
     """
     original_shape, resampled_shape, original_resolution, resampled_resolution, orientation = \
         resample_information(original_shape, resampled_shape,
@@ -387,6 +387,15 @@ def resample_resolution(original_shape=None, resampled_shape=None,
     return original_resolution, resampled_resolution
 
 
+# Usage
+@handle_deprecated_args({
+    'source': 'original',
+    'sink': 'resampled',
+    'source_shape': 'original_shape',
+    'sink_shape': 'resampled_shape',
+    'source_resolution': 'original_resolution',
+    'sink_resolution': 'resampled_resolution'
+})
 def resample_factor(original_shape=None, resampled_shape=None,
                     original_resolution=None, resampled_resolution=None,
                     original=None, resampled=None,
@@ -414,6 +423,16 @@ def resample_factor(original_shape=None, resampled_shape=None,
     consistent:
       If True, recalculate resolutions to match the discrete shapes.
 
+    .. deprecated:: 2.1.0
+        The following arguments are deprecated and will be removed in version 3.0.0:
+
+        - source (now original)
+        - sink (now resampled)
+        - source_shape (now original_shape)
+        - sink_shape (now resampled_shape)
+        - source_resolution (now original_resolution)
+        - sink_resolution (now resampled_resolution)
+
     Returns
     -------
     original_resolution : tuple or None
@@ -423,12 +442,10 @@ def resample_factor(original_shape=None, resampled_shape=None,
 
     See also
     --------
-    See :func:`resample` for details.
-
-    See Also
-    --------
-    `Orientation`_
+    resample : For more details.
+    :mod:`ClearMap.Alignment.orientation`
     """
+
     original_resolution, resampled_resolution = \
         resample_resolution(original_shape, resampled_shape,
                             original_resolution, resampled_resolution,
@@ -447,6 +464,14 @@ def resample_factor(original_shape=None, resampled_shape=None,
 # Resample
 ########################################################################################
 
+@handle_deprecated_args({
+    'source': 'original',
+    'sink': 'resampled',
+    'source_shape': 'original_shape',
+    'sink_shape': 'resampled_shape',
+    'source_resolution': 'original_resolution',
+    'sink_resolution': 'resampled_resolution'
+})
 def resample(original, resampled=None,
              original_shape=None, resampled_shape=None,
              original_resolution=None, resampled_resolution=None, orientation=None,
@@ -488,6 +513,17 @@ def resample(original, resampled=None,
     verbose : bool
       If True, display progress information.
 
+    .. deprecated:: 2.1.0
+        The following arguments are deprecated and will be removed in version 3.0.0:
+
+        - source (now original)
+        - sink (now resampled)
+        - source_shape (now original_shape)
+        - sink_shape (now resampled_shape)
+        - source_resolution (now original_resolution)
+        - sink_resolution (now resampled_resolution)
+
+
     Returns
     -------
     resampled : array or str
@@ -508,7 +544,7 @@ def resample(original, resampled=None,
     if verbose:
         timer = tmr.Timer()
 
-    if os.path.splitext(original)[1] == '.tif':   # Resampling is much faster from .npy files
+    if os.path.splitext(original)[1] == '.tif':  # Resampling is much faster from .npy files
         exp = Expression(original)
         for tag in exp.tags:
             exp = Expression(exp.pattern[0].replace(str(tag), ''))
@@ -532,7 +568,7 @@ def resample(original, resampled=None,
     else:
         original_shape = original.shape
 
-    if original.ndim ==4 and 3 not in original_shape:  # 4D but not color
+    if original.ndim == 4 and 3 not in original_shape:  # 4D but not color
         raise ValueError(f'Unsupported shape for original: "{original_shape}"')
 
     original_shape, resampled_shape, original_resolution, resampled_resolution = \
@@ -696,7 +732,14 @@ def resample_inverse(resampled, original=None,
 ########################################################################################
 # Resample Points
 ########################################################################################
-
+@handle_deprecated_args({
+    'source': 'resampled_points',
+    'sink': 'original_points',
+    'source_shape': 'original_shape',
+    'sink_shape': 'resampled_shape',
+    'source_resolution': 'original_resolution',
+    'sink_resolution': 'resampled_resolution'
+})
 def resample_points(original_points, resampled_points=None,
                     original_shape=None, resampled_shape=None,
                     original_resolution=None, resampled_resolution=None,
@@ -725,6 +768,16 @@ def resample_points(original_points, resampled_points=None,
        Optional resampled source data used to infer resampling specifications.
     orientation : tuple or None
       Orientation specification.
+
+    .. deprecated:: 2.1.0
+        The following arguments are deprecated and will be removed in version 3.0.0:
+
+        - source (now original_points)
+        - sink (now resampled_points)
+        - source_shape (now original_shape)
+        - sink_shape (now resampled_shape)
+        - source_resolution (now original_resolution)
+        - sink_resolution (now resampled_resolution)
 
     Returns
     -------
