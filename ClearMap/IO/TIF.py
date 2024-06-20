@@ -4,7 +4,7 @@ TIF module provides interface to read and write tif image files.
 
 Note
 ----
-This modules relies onf the tifffile library.
+This modules relies on the tifffile library.
 """
 __author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
 __license__   = 'GPLv3 - GNU General Pulic License v3 (see LICENSE.txt)'
@@ -30,7 +30,7 @@ class Source(src.Source):
   
   Note
   ----
-  Its assumed that the image data is stored in a serregionies of the tif file.
+  Its assumed that the image data is stored in a series of the tif file.
   """
   def __init__(self, location, series = 0, multi_file = False):
     try:
