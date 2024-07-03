@@ -618,6 +618,8 @@ class PreProcessor(TabProcessor):
             return
 
     def __resample_raw(self):
+        if os.path.exists(self.filename('resampled')):
+            raise FileExistsError(f'Resampled raw ({self.filename("resampled")}) already exists')
         resampling_cfg = self.processing_config['registration']['resampling']
         default_resample_parameter = {
             'processes': self.machine_config['n_processes_resampling'],
@@ -650,6 +652,9 @@ class PreProcessor(TabProcessor):
         assert result.array.max() != 0, 'Resampled raw has no data'
 
     def __resample_autofluorescence(self):
+        if os.path.exists(self.filename('resampled', postfix='autofluorescence')):
+            raise FileExistsError(f'Resampled autofluorescence '
+                                  f'({self.filename("resampled", postfix="autofluorescence")}) already exists')
         resampling_cfg = self.processing_config['registration']['resampling']
         default_resample_parameter = {
             'processes': self.machine_config['n_processes_resampling'],

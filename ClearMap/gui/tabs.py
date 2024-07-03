@@ -609,7 +609,11 @@ class AlignmentTab(GenericTab):
                 self.main_window.progress_watcher.finish()
                 self.main_window.print_status_msg('Registration skipped because of missing tiles')
                 return
-            self.main_window.wrap_in_thread(self.preprocessor.resample_for_registration, force=True)
+            try:
+                self.main_window.wrap_in_thread(self.preprocessor.resample_for_registration, force=True)
+            except FileExistsError as err:
+                self.main_window.popup(str(err), 'Files already exist, '
+                                                 'please delete or skip resampling')
             # self.main_window.print_status_msg('Resampled')
         self.main_window.wrap_in_thread(self.preprocessor.align)
 
