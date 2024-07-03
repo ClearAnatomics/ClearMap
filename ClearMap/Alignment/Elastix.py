@@ -231,9 +231,9 @@ def get_elastix_version():
 
 
 if 'sphinx' in sys.modules.keys():
-    initialize_elastix()
-else:
     print('Import for documentation: elastix not initialized!')
+else:
+    initialize_elastix()
 
 
 def check_elastix_initialized():
