@@ -528,7 +528,7 @@ def filter_cells(source, sink, thresholds):
     thresholds : dict
         Dictionary of the form {name : threshold} where name refers to the
         column in the cell data and threshold can be None, a float
-        indicating a minimal threshold or a tuple (min,max) where min,max can be
+        indicating a minimal threshold or a tuple (min, max) where min, max can be
         None or a minimal and maximal threshold value.
 
     Returns
@@ -541,11 +541,11 @@ def filter_cells(source, sink, thresholds):
     ids = np.ones(source.shape[0], dtype=bool)
     for filter_name, thrsh in thresholds.items():
         if thrsh:
-            if not isinstance(thrsh, (tuple, list)):
+            if not isinstance(thrsh, (tuple, list)) and isinstance(thrsh, (int, float)):
                 thrsh = (thrsh, None)
-            if thrsh[0] is not None:
+            if thrsh[0] is not None:  # high pass
                 ids = np.logical_and(ids, thrsh[0] <= source[filter_name])
-            if thrsh[1] is not None:
+            if thrsh[1] is not None:  # low pass
                 ids = np.logical_and(ids, thrsh[1] > source[filter_name])
     cells_filtered = source[ids]
 
