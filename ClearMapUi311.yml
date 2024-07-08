@@ -49,6 +49,7 @@ dependencies:
   - graph-tool<=2.45  # Cannot remove self loops with later versions
   - python-igraph
   - pytorch<=2.2
+  - mkl<2024.1  # Breaks pytorch (https://github.com/pytorch/pytorch/issues/123097)
   - pytorch-cuda
   - cudatoolkit=11.8
   - xmltodict  # to compensate for old tifffile
