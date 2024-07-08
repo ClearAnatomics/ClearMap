@@ -134,6 +134,17 @@ case "$answer" in
         ;;
 esac
 
+# Amend environment file (notably for compatibility with installed CUDA version)
+echo "Updating CUDA dependencies for ClearMap"
+echo "  Creating temporary environment"
+if  [[ "$OSTYPE" == "msys"* ]]; then
+    conda create -y -n clearmap_tmp_env -c conda-forge python packaging pyyaml "$solver_string"
+else
+    conda create -n clearmap_tmp_env -c conda-forge python packaging pyyaml "$solver_string" || exit 1
+fi
+conda activate clearmap_tmp_env || exit 1
+green "Done"
+
 
 if  [[ "$OSTYPE" == "linux-gnu"* ]]; then  # FIXME: or "$OSTYPE" == "msys"
     green "ClearMap uses neural networks to perform vasculature analysis.
@@ -149,8 +160,9 @@ if  [[ "$OSTYPE" == "linux-gnu"* ]]; then  # FIXME: or "$OSTYPE" == "msys"
         *)
             # Verify CUDA is functional
             green "Checking nVIDIA drivers and system CUDA installation";
-            python -c "$prep_python \
-            from ClearMap.Utils.install_utils import PytorchVersionManager; PytorchVersionManager.assert_cuda()" || exit 1
+            python -c "$prep_python import ClearMap; \
+                       from ClearMap.Utils.install_utils import PytorchVersionManager; \
+                       PytorchVersionManager.assert_cuda()" || exit 1
             green "OK";
             USE_TORCH="True";
             ;;
@@ -158,17 +170,6 @@ if  [[ "$OSTYPE" == "linux-gnu"* ]]; then  # FIXME: or "$OSTYPE" == "msys"
 else
     USE_TORCH="False";
 fi
-
-# Amend environment file (notably for compatibility with installed CUDA version)
-echo "Updating CUDA dependencies for ClearMap"
-echo "  Creating temporary environment"
-if  [[ "$OSTYPE" == "msys"* ]]; then
-    conda create -y -n clearmap_tmp_env -c conda-forge python packaging pyyaml "$solver_string"
-else
-    conda create -n clearmap_tmp_env -c conda-forge python packaging pyyaml "$solver_string" || exit 1
-fi
-conda activate clearmap_tmp_env || exit 1
-green "Done"
 
 echo "  Getting env name"
 ENV_NAME=$(python -c "import os; from ClearMap.Utils.install_utils import EnvFileManager; \
