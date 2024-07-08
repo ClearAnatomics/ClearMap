@@ -538,7 +538,7 @@ def get_orientation_from_normal_to_surface_global(graph, ref_graph, normal_vecto
     vertex_coordinates = get_vertex_coordinates(graph, coordinates_name=coordinates_name)
     normed_edge_vect = coordinates_to_edge_vectors(vertex_coordinates, graph.edge_connectivity(), normalized=True)
     top_to_bottom_dist = get_top_to_bottom_dist(ref_graph, normal_vector_method=normal_vector_method)
-    radial_orientations = np.dot(top_to_bottom_dist, normed_edge_vect)
+    radial_orientations = np.dot(normed_edge_vect, top_to_bottom_dist)
     planar_orientations = np.sqrt(1 - radial_orientations ** 2)
     # edge_vect = coordinates_to_edge_vectors(vertex_coordinates, connectivity, normalized=False)
     # reference_norms = np.linalg.norm(edge_vect[edge_vect.shape[0] - 1])
