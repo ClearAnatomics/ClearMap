@@ -134,65 +134,6 @@ def compute_orientation(work_dir, graph, sub_graph, region_ids, controls, sample
     return graph, angles, dist, planar_proportion
 
 
-# class GraphProps:  # TODO: could this be a DF ?
-#     def __init__(self, work_dir, steps):
-#         self.work_dir = work_dir
-#         self.compute_steps = steps
-#         self.edges = []  # FIXME: Edges or edges dist to surface ?
-#         # self.branch_points = []  #  branch_poitns or branch_points_distance_to_surface ?
-#         self.branch_point_distance_to_surface = []
-#         self.arteries_branch_points = []  # FIXME: branch_poitns or branch_points_distance_to_surface ?
-#         self.blood_flow = []
-#         self.radial_orientation = []  # in flow
-#         self.planar_orientation = []  # cross flow
-#         self.proportion_radially_oriented = []
-#         self.modularity = []
-#         self.n_modules = []
-#
-#     def __get_path(self, base_name):
-#         return os.path.join(self.work_dir, f'{base_name}_{self.postfix}')
-#
-#     def save_array(self, name, attr):
-#         np.save(self.__get_path(name), attr)
-#
-#     def save(self, condition, sample_name, orientation_method):  # FIXME: the names should be saved in one place in the init
-#         self.postfix = f'{condition}_{sample_name}.npy'
-#         method_short = 'ln' if orientation_method == 'local_normal' else 'fi_bv'
-#         self.save_array(f'ORI_{method_short}', self.radial_orientation)
-#         self.save_array('ORI_plan', self.planar_orientation)
-#         self.save_array(f'PROP_ORI_{method_short}', self.proportion_radially_oriented)
-#         if self.compute_steps['arteries_branch_points']:
-#             self.save_array('ARTBP', self.arteries_branch_points)
-#         if self.compute_steps['sbm']:
-#             self.save_array('SBMQ', self.modularity)
-#             self.save_array('SBMNB', self.n_modules)
-#         if self.compute_steps['flow']:
-#             self.save_array('FLOW', self.blood_flow)
-#         # self.save_array('BP', self.branch_points)
-#         self.save_array('BP_dist', self.branch_point_distance_to_surface)
-#         self.save_array('EP', self.edges)
-#
-#     def load_array(self, name):
-#         return np.load(self.__get_path(name), allow_pickle=True)
-#
-#     def load(self, condition, sample_name, orientation_method):
-#         self.postfix = f'{condition}_{sample_name}.npy'
-#         method_short = 'ln' if orientation_method == 'local_normal' else 'fi_bv'
-#         self.radial_orientation = self.load_array(f'ORI_{method_short}')  # FIXME: ori rad ??
-#         self.planar_orientation = self.load_array('ORI_plan')
-#         self.proportion_radially_oriented = self.load_array(f'PROP_ORI_{method_short}')
-#         if self.compute_steps['arteries_branch_points']:
-#             self.arteries_branch_points = self.load_array('ARTBP')
-#         if self.compute_steps['sbm']:
-#             self.modularity = self.load_array('SBMQ')
-#             self.n_modules = self.load_array('SBMNB')
-#         if self.compute_steps['flow']:
-#             self.blood_flow = self.load_array('FLOW')
-#         # self.branch_points = self.load_array('BP')
-#         self.branch_point_distance_to_surface = self.load_array('BP_dist')
-#         self.edges = self.load_array('EP')
-
-
 def compute_brain_params_per_region(work_dir, sample_name, regions, artery_min_radius, compute_steps, controls,
                                     average, mode, orientation_method, limit_angle, sample_graph_suffix, vein_min_radius):
     """
