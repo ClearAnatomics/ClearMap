@@ -38,6 +38,7 @@ dependencies:
   - graph-tool<=2.45  # Cannot remove self loops with later versions
   - python-igraph
   - pytorch<=1.11  # could probably upgrade
+  - mkl<2024.1  # Breaks pytorch (https://github.com/pytorch/pytorch/issues/123097)
   - cudatoolkit=11.6
   - configobj
   - natsort
