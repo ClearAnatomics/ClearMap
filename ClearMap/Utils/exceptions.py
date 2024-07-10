@@ -10,6 +10,33 @@ class ClearMapException(Exception):
     pass
 
 
+class ClearMapIoException(ClearMapException):
+    """
+    Base exception for all exceptions related to input/output operations
+    """
+    pass
+
+
+class SourceModuleNotFoundError(ClearMapIoException):
+    """
+    Exception raised when a source module is not found
+    """
+    pass
+
+
+class IncompatibleSource(ClearMapIoException):
+    def __init__(self, source, variable_name, current_vars):
+        self.source = source
+        self.variable_name = variable_name
+        self.current_value = current_vars.get(variable_name)
+        self.source_value = getattr(source, variable_name, None)
+        super().__init__(self._generate_message())
+
+    def _generate_message(self):
+        return (f'Incompatible {self.variable_name} {self.current_value} != '
+                f'{self.source_value} for the source {self.source}!')
+
+
 class MissingRequirementException(ClearMapException):
     """
     Exception raised when a processing step is missing a required condition (i.e. an other step has not been run yet)
