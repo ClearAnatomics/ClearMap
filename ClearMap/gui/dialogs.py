@@ -76,6 +76,7 @@ def option_dialog(base_msg, msg, options, parent=None):
     dlg.exec()
     return index[0]
 
+
 # REFACTOR: make class
 def warning_popup(base_msg, msg):
     dlg = QMessageBox()
