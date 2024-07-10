@@ -1188,11 +1188,15 @@ class ClearMapGui(ClearMapGuiBase):
         sample_cfg_path = self.config_loader.get_cfg_path('sample', must_exist=False)
         if not self.file_exists(sample_cfg_path):
             option_idx = option_dialog('New experiment', 'This seems to be a new experiment. Do you want to: ',
-                                       ['Clone existing config', 'Load default config'])
+                                       ['Clone existing config', 'Load default config', 'Cancel'])
             if option_idx == 0:
                 self.clone()
             elif option_idx == 1:
                 self.load_default_cfg()
+            elif option_idx == 2:
+                self.src_folder = ''
+                self.config_loader.src_dir = ''
+                return
         cfg = self.config_loader.get_cfg_from_path(sample_cfg_path)
         sample_id = cfg['sample_id']
         use_id_as_prefix = cfg['use_id_as_prefix']
