@@ -33,7 +33,7 @@ from ClearMap.Utils.exceptions import PlotGraphError, ClearMapVRamException, Gro
 from ClearMap.Visualization.Matplotlib.PlotUtils import plot_sample_stats_histogram, plot_volcano
 from ClearMap.Visualization.atlas import create_color_annotation
 
-from ClearMap.gui.dialogs import prompt_dialog, get_directory_dlg
+from ClearMap.gui.dialogs import prompt_dialog, get_directory_dlg, option_dialog
 from ClearMap.gui.gui_utils import format_long_nb_to_str, surface_project, np_to_qpixmap
 from ClearMap.gui.interfaces import GenericTab, PostProcessingTab
 from ClearMap.gui.params import ParamsOrientationError, VesselParams, SampleParameters, \
@@ -612,8 +612,14 @@ class AlignmentTab(GenericTab):
             try:
                 self.main_window.wrap_in_thread(self.preprocessor.resample_for_registration, force=True)
             except FileExistsError as err:
-                self.main_window.popup(str(err), 'Files already exist, '
-                                                 'please delete or skip resampling')
+                option_idx = option_dialog('Files exist',
+                                           'Resampled files exist, do you want to: ',
+                                           ['Delete and retry', 'Cancel and skip resampling'])
+                if option_idx == 0:
+                    self.preprocessor.delete_resampled_files()
+                    # self.run_registration()  # retry w/ recursion
+                self.main_window.progress_watcher.finish()
+                return
             # self.main_window.print_status_msg('Resampled')
         self.main_window.wrap_in_thread(self.preprocessor.align)
 

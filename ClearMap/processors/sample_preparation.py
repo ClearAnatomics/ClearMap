@@ -940,6 +940,12 @@ class PreProcessor(TabProcessor):
         overlay = self.overlay_layout_plane(layout)
         return overlay
 
+    def delete_resampled_files(self):
+        for postfix in ('autofluorescence', ''):
+            path = self.filename('resampled', postfix=postfix)
+            if os.path.exists(path):
+                os.remove(path)
+
 
 def main():
     preprocessor = PreProcessor()
