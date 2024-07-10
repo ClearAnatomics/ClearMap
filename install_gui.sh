@@ -111,7 +111,7 @@ fi
 
 
 config_folder="$HOME/.clearmap"
-prep_python="import os, sys; sys.path.append(os.getcwd());"
+prep_python="import os, sys; sys.path.append(os.getcwd()); sys.path.append(os.path.join(os.getcwd(), 'ClearMap'));"
 
 eval "$(conda shell.bash hook)"  # Required to activate conda envs
 
@@ -140,7 +140,7 @@ echo "  Creating temporary environment"
 if  [[ "$OSTYPE" == "msys"* ]]; then
     conda create -y -n clearmap_tmp_env -c conda-forge python packaging pyyaml "$solver_string"
 else
-    conda create -n clearmap_tmp_env -c conda-forge python packaging pyyaml "$solver_string" || exit 1
+    conda create -y -n clearmap_tmp_env -c conda-forge python packaging pyyaml "$solver_string" || exit 1
 fi
 conda activate clearmap_tmp_env || exit 1
 green "Done"
@@ -199,7 +199,7 @@ python -c "$prep_python \
 from ClearMap.Utils.install_utils import patch_env; \
 patch_env(os.path.join(os.getcwd(), '$ENV_FILE_PATH'), 'tmp_env_file.yml', use_cuda_torch=$USE_TORCH, use_spyder=$USE_SPYDER, tmp_dir='$tmp_dir')" || exit 1
 conda deactivate
-conda env remove -n clearmap_tmp_env
+conda env remove -y -n clearmap_tmp_env
 green "Done"
 
 # Create environment if not present, otherwise update the packages and activate
