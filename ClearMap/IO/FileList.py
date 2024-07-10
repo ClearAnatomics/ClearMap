@@ -16,6 +16,9 @@ __download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 import os
 import re
 import glob
+import traceback
+from concurrent.futures import as_completed
+
 import natsort
 import warnings
 import itertools
@@ -963,7 +966,8 @@ def _expression_or_file_list(expression = None, file_list = None):
 ###############################################################################
 
 def convert(source, sink, processes = None, verbose = False):
-  """Converts list of files to a sink in parallel
+  """
+  Converts list of files to a sink in parallel
   
   Arguments
   ---------
@@ -977,61 +981,74 @@ def convert(source, sink, processes = None, verbose = False):
   sink : Source
     The sink the data was converted to.
   """
-  
   # read files
   if not isinstance(source, Source):
-    raise ValueError('Source should be a FileList source, found %r!' % source);
+    raise ValueError(f'Source should be a FileList source, found {source}!')
   
-  expression  = source.expression;
-  shape = source.shape;
-  dtype = source.dtype;
-  shape_list = source.shape_list;
-  file_list = source.file_list;
+  expression = source.expression
+  shape = source.shape
+  dtype = source.dtype
+  shape_list = source.shape_list
+  file_list = source.file_list
   
-  #genereate file lists and slicings
-  indices_file_start = expression.indices(file_list[0]);
-  indices_slice = [np.arange(s) for s in shape_list];
-  indices_file  = [s + i for i,s in zip(indices_file_start, indices_slice)];
+  # genereate file lists and slicings
+  indices_file_start = expression.indices(file_list[0])
+  indices_slice = [np.arange(s) for s in shape_list]
+  indices_file = [s + i for i, s in zip(indices_file_start, indices_slice)]
   
   indices_file.reverse()
-  indices_file = itertools.product(*indices_file);
-  indices_file = [i[::-1] for i in indices_file];
+  indices_file = itertools.product(*indices_file)
+  indices_file = [i[::-1] for i in indices_file]
   
   indices_slice.reverse()
-  indices_slice = itertools.product(*indices_slice);
-  indices_slice = [i[::-1] for i in indices_slice];
+  indices_slice = itertools.product(*indices_slice)
+  indices_slice = [i[::-1] for i in indices_slice]
     
-  axes_to_tags = source.axes_to_tag_order();
+  axes_to_tags = source.axes_to_tag_order()
   if len(axes_to_tags) > 1 and axes_to_tags != list(range(len(axes_to_tags))):
-    indices_file = [tuple(i[j] for j in axes_to_tags) for i in indices_file];
-  file_list = [expression.string_from_index(i) for i in indices_file];
+    indices_file = [tuple(i[j] for j in axes_to_tags) for i in indices_file]
+  file_list = [expression.string_from_index(i) for i in indices_file]
   
-  print(sink);
-  sink = io.create(sink, shape=shape, dtype=dtype);
-  sink_virtual = sink.as_virtual();
+  print(sink)
+  sink = io.create(sink, shape=shape, dtype=dtype)
+  sink_virtual = sink.as_virtual()
   
   if processes is None:
-    processes = mp.cpu_count();
+    processes = mp.cpu_count()
 
   @ptb.parallel_traceback
   def _convert(filename, index_slicing, sink=sink_virtual, verbose=verbose):
-    slicing = (Ellipsis,) + index_slicing;
-    if verbose:
-      print('Converting slice %r' % (slicing,))
-    sink.as_real()[slicing] = io.read(filename, processes='serial');
+    try:
+      slicing = (Ellipsis,) + index_slicing
+      if verbose:
+        print(f'Converting slice {slicing} from {filename} to {sink}')
+      sink.as_real()[slicing] = io.read(filename, processes='serial')
+      return True
+    except Exception as e:
+      print(f'Error converting slice {slicing} from {filename} to {sink}: {e}')
+      traceback.print_exc()
+      raise
   
   if processes == 'serial':
-    for f,i in zip(file_list, indices_slice):
-      _convert(f,i);
+    for f, i in zip(file_list, indices_slice):
+      _convert(f, i)
   else:
     with concurrent.futures.ThreadPoolExecutor(processes) as executor:
-      executor.map(_convert, file_list, indices_slice);
+      futures = [executor.submit(_convert, f, i)
+                 for f, i in zip(file_list, indices_slice)]
+      for future in as_completed(futures):
+        try:
+          future.result()
+        except Exception as e:
+          print(f'Error in future: {e}')
+          traceback.print_exc()
+          raise
 
-  return sink;
+  return sink
   
 
 ###############################################################################
-### Tests
+# ## Tests
 ###############################################################################
 
 def _test():
