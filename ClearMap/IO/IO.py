@@ -22,6 +22,7 @@ import functools
 import math
 import pathlib
 import multiprocessing as mp
+import warnings
 
 import numpy as np
 
@@ -35,6 +36,8 @@ import ClearMap.IO.NPY as npy
 import ClearMap.IO.MMP as mmp
 import ClearMap.IO.SMA as sma
 import ClearMap.IO.MHD as mhd
+from ClearMap.Utils.exceptions import IncompatibleSource, SourceModuleNotFoundError
+
 try:
     import ClearMap.IO.GT as gt
     gt_loaded = True
@@ -55,7 +58,7 @@ from ClearMap.Utils.utilities import CancelableProcessPoolExecutor
 # ## File manipulation
 ###############################################################################
 # FIXME:
-from ClearMap.IO.FileUtils import (is_file, is_directory, file_extension,   #analysis:ignore
+from ClearMap.IO.FileUtils import (is_file, is_directory, file_extension,   # analysis:ignore
                                    join, split, abspath, create_directory, 
                                    delete_directory, copy_file, delete_file)
 
@@ -111,13 +114,13 @@ def source_to_module(source_):
         raise ValueError(f'The source {source_} is not a valid source!')
 
 
-def location_to_module(location):
+def location_to_module(location_):
     """
     Returns the IO module associated with a location string.
 
     Arguments
     ---------
-    location : object
+    location_ : str or te.Expression or pathlib.Path
         Location of the source.
 
     Returns
@@ -125,10 +128,10 @@ def location_to_module(location):
     module : module
         The module that handles the IO of the source specified by its location.
     """
-    if fl.is_file_list(location):
+    if fl.is_file_list(location_):
         return fl
     else:
-        return filename_to_module(location)
+        return filename_to_module(location_)
 
 
 def filename_to_module(filename):
@@ -149,7 +152,7 @@ def filename_to_module(filename):
 
     mod = file_extension_to_module.get(ext, None)
     if mod is None:
-        raise ValueError(f"Cannot determine module for file {filename} with extension {ext}!")
+        raise SourceModuleNotFoundError(f"Cannot determine module for file {filename} with extension {ext}!")
 
     return mod
 
@@ -167,7 +170,7 @@ def filename_to_module(filename):
 
 def is_source(source_, exists=True):
     """
-    Checks if source is a valid source.
+    Checks if `source_` is a valid Source.
 
     Arguments
     ---------
@@ -189,7 +192,7 @@ def is_source(source_, exists=True):
     elif isinstance(source_, str):
         try:
             mod = location_to_module(source_)
-        except:  # FIXME: more specific exception
+        except SourceModuleNotFoundError:
             return False
         if exists:
             return mod.Source(source_).exists()
@@ -383,8 +386,8 @@ def element_strides(source_):
     try:
         source_ = as_source(source_)
         strides = source_.element_strides
-    except:  # FIXME: more specific exception
-        raise ValueError('Cannot determine the strides for the source!')
+    except Exception as e:
+        raise ValueError(f'Cannot determine the strides for the source!; {e}')
 
     return strides
 
@@ -405,11 +408,11 @@ def buffer(source_):
     """
     try:
         source_ = as_source(source_)
-        buffer = source_.as_buffer()
-    except:  # FIXME: more specific exception
-        raise ValueError('Cannot get a io buffer for the source!')
+        buffer_ = source_.as_buffer()
+    except Exception as e:
+        raise ValueError(f'Cannot get a io buffer for the source!; {e}')
 
-    return buffer
+    return buffer_
 
 
 # TODO: arg memory= to specify which kind of array is created, better use device=
@@ -546,7 +549,7 @@ def initialize(source_=None, shape=None, dtype=None, order=None, location=None,
                     mod = location_to_module(location)
                     return mod.create(location=location, shape=shape, dtype=dtype, order=order, **kwargs)
                 except Exception as error:
-                    raise ValueError(f'Cannot initialize source for location {location} - {error}')
+                    raise ValueError(f'Cannot initialize source for location {location}; {error}')
 
     if isinstance(source_, np.ndarray):
         source_ = as_source(source_)
@@ -554,16 +557,15 @@ def initialize(source_=None, shape=None, dtype=None, order=None, location=None,
     if not isinstance(source_, src.Source):
         raise ValueError(f'Source specification {source_} not a valid location, array or Source class!')
 
-    if shape is not None and shape != source_.shape:
-        raise ValueError('Incompatible shapes %r != %r for the source %r!' % (shape, source_.shape, source_))
-    if dtype is not None and dtype != source_.dtype:
-        raise ValueError('Incompatible dtype %r != %r for the source %r!' % (dtype, source_.dtype, source_))
-    if order is not None and order != source_.order:
-        raise ValueError('Incompatible order %r != %r for the source %r!' % (order, source_.order, source_))
+    current_vars = locals()
+    for attr in ('shape', 'dtype', 'order'):
+        if current_vars.get(attr) is not None and current_vars[attr] != getattr(source_, attr, None):
+            raise IncompatibleSource(source_, attr, current_vars)
+
     if location is not None and abspath(location) != abspath(source_.location):
-        raise ValueError('Incompatible location %r != %r for the source %r!' % (location, source_.location, source_))
+        raise IncompatibleSource(source_, 'location', current_vars)
     if memory == 'shared' and not sma.is_shared(source_):
-        raise ValueError('Incompatible memory type, the source %r is not shared!' % (source_,))
+        raise ValueError(f'Incompatible memory type, the source {source_} is not shared!')
 
     return source_
 
@@ -582,18 +584,11 @@ def _from_like(like, shape, dtype, order):
 
 def _from_hint(hint, shape, dtype, order):
     """Helper for initialize."""
-    if hint is not None:
-        try:
-            hint = as_source(hint)
-            if shape is None:
-                shape = hint.shape
-            if dtype is None:
-                dtype = hint.dtype
-            if order is None:
-                order = hint.order
-        except:  # FIXME: more specific exception
-            pass
-    return shape, dtype, order
+    try:
+        return _from_like(hint, shape, dtype, order)
+    except Exception as err:
+        warnings.warn(f'Cannot infer shape, dtype and order from hint {hint}, keeping defaults; {err}')
+        return shape, dtype, order
   
 
 def initialize_buffer(source_, shape=None, dtype=None, order=None, location=None, memory=None, like=None, **kwargs):
@@ -663,41 +658,63 @@ def file_list(expression=None, file_list=None, sort=True, verbose=False):
     return fl._file_list(expression=expression, file_list=file_list, sort=sort, verbose=verbose)
 
 
-def max_value(source_):
+def get_info(d_type):
     """
-    Returns the maximal value of a source data type.
+    Get the numpy info object for a data type. (automatically determines if integer or float)
 
-    Arguments
-    ---------
-    source_ : str, array, dtype or Source
-        The source specification.
+    Parameters
+    ----------
+    d_type: dtype
+        The data type to get the info for.
 
     Returns
     -------
-    max_value : number
-       The maximal value for the data type of the source
+    info: numpy info object
+        The info object for the data type.
     """
+    try:
+        return np.iinfo(d_type)
+    except ValueError:
+        return np.finfo(d_type)
+
+
+def get_value(source_, value_type):  # REFACTOR: should be moved to io_utils or Source module
+    """
+    Get the minimal or maximal value of a source data type.
+
+    Parameters
+    ----------
+    source_: str, array, dtype or Source
+        The source specification.
+    value_type: str
+        The value type to get, either 'min' or 'max'.
+
+    Returns
+    -------
+    value: number
+        The value of the data type.
+    """
+    if value_type not in ['min', 'max']:
+        raise ValueError(f'Unknown value type {value_type}, accepted arguments are "min" and "max"!')
+
     if isinstance(source_, (src.Source, np.ndarray)):
         source_ = source_.dtype
 
     if isinstance(source_, str):
         try:
             source_ = np.dtype(source_)
-        except:  # FIXME: more specific exception
+        except TypeError:
             pass
 
     if not isinstance(source_, (type, np.dtype)):
         source_ = dtype(source_)
 
     try:
-        max_value = np.iinfo(source_).max
-    except:  # FIXME: more specific exception
-        try:
-            max_value = np.finfo(source_).max
-        except:
-            raise ValueError(f'Cannot determine the maximal value for the type {source_}!')
-    return max_value
-                             
+        info = get_info(source_)
+        return getattr(info, value_type)
+    except ValueError as e:
+        raise ValueError(f'Cannot determine the {value_type} value for the type {source_}!; {e}')
+
 
 def min_value(source_):
     """
@@ -713,23 +730,25 @@ def min_value(source_):
     min_value : number
         The minimal value for the data type of the source
     """
-    if isinstance(source_, str):
-        try:
-            source_ = np.dtype(source_)
-        except:  # FIXME: more specific exception
-            pass
+    return get_value(source_, 'min')
 
-    if not isinstance(source_, (type, np.dtype)):
-        source_ = dtype(source_)
 
-    try:
-        min_value = np.iinfo(source_).min
-    except:  # FIXME: more specific exception
-        try:
-            min_value = np.finfo(source_).min
-        except:
-            raise ValueError(f'Cannot determine the minimal value for the type {source_}!')
-    return min_value
+def max_value(source_):
+    """
+    Returns the maximal value of a source data type.
+
+    Arguments
+    ---------
+    source_ : str, array, dtype or Source
+        The source specification.
+
+    Returns
+    -------
+    max_value : number
+       The maximal value for the data type of the source
+    """
+    max_value = get_value(source_, 'max')
+    return max_value
 
 
 def convert(source_, sink, processes=None, verbose=False, **kwargs):
@@ -842,10 +861,10 @@ _order = order
 _location = location
 _memory = memory
 
+
 ###############################################################################
 # ## Tests
 ###############################################################################
-
 def _test():
     import ClearMap.IO.IO as io
 
