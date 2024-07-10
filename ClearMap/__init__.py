@@ -32,13 +32,16 @@ More information and downloads for *ClearMap* can be found in our
 `repository <https://www.github.com/ChristophKirst/ClearMap2>`_.
 
 """
-from importlib.metadata import version
+from importlib.metadata import version, PackageNotFoundError
 
 __title__ = 'ClearMap'
-__version__ = version("ClearMap2")
 __author__ = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
 __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
+try:
+    __version__ = version("ClearMap")
+except PackageNotFoundError:
+    __version__ = '2.1.0'
 
