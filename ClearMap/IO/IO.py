@@ -554,6 +554,7 @@ def initialize(source_=None, shape=None, dtype=None, order=None, location=None,
     if isinstance(source_, np.ndarray):
         source_ = as_source(source_)
 
+    # ######## Exception handling ##############
     if not isinstance(source_, src.Source):
         raise ValueError(f'Source specification {source_} not a valid location, array or Source class!')
 
