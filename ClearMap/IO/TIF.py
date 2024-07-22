@@ -7,17 +7,20 @@ Note
 This module relies on the tifffile library.
 """
 __author__ = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
-__license__ = 'GPLv3 - GNU General Pulic License v3 (see LICENSE.txt)'
+__license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
 
+import warnings
+from functools import cached_property
 
 import numpy as np
-import tifffile as tif
+from tifffile import tifffile
 
-import ClearMap.IO.Source as src
-import ClearMap.IO.Slice as slc
+from ClearMap.IO.Source import Source as AbstractSource
+from ClearMap.IO.Source import VirtualSource as AbstractVirtualSource
+import ClearMap.IO.Slice as cmp_clicing
 
 from ClearMap.Utils.Lazy import lazyattr
 
@@ -26,20 +29,25 @@ from ClearMap.Utils.Lazy import lazyattr
 # ## Source class
 ###############################################################################
 
-class Source(src.Source):
+class Source(AbstractSource):
     """Class to handle a tif file source
 
     Note
     ----
     Its assumed that the image data is stored in a series of the tif file.
+
+    .. warning:: It is also assumed that the last 3 dimensions are the image dimensions in the order z,y,x.
     """
-    def __init__(self, location, series=0, multi_file = False):
+    def __init__(self, location, series=0, multi_file=False):
         try:
-            self._tif = tif.TiffFile(location, multifile=multi_file)
+            self._tif = tifffile.TiffFile(location, multifile=multi_file)
         except TypeError:  # TODO: filter with message
-            self._tif = tif.TiffFile(location, _multifile=multi_file)  # Versions >= 2020.9.30
+            self._tif = tifffile.TiffFile(location, _multifile=multi_file)  # Versions >= 2020.9.30
+        # FIXME: to see if read or write mode, check 1) if the file exists, 2) if there is metadata in the file
         self._series = series
         self.multi_file = multi_file
+        if not self.series_mode and not self.pages_mode:
+            raise ValueError(f'Unknown metadata type {self._metadata_type}')
 
     @property
     def name(self):
@@ -50,23 +58,60 @@ class Source(src.Source):
         return self._tif.series[self._series]
 
     @property
-    def shape(self):
-        return shape_from_tif(self.tif_shape)
+    def is_clearmap(self):
+        return self._tif.is_shaped  # Likely written by clearmap if not more metadata
 
     @property
+    def axes_order(self):
+        md = self.metadata(info=['shape'])
+        return md['order']
+
+    @cached_property
+    def series_mode(self):
+        return (self._tif._multifile or
+                self._metadata_type == 'imagej_metadata' or
+                self._metadata_type == 'shaped_metadata' or
+                self._metadata_type is None)
+
+    @cached_property
+    def pages_mode(self):
+        return self._metadata_type == 'ome_metadata'
+
+    @cached_property
+    def shape(self):
+        try:
+            shape_ = shape_from_tif(self.tif_shape)
+        except ValueError as err:
+            print(f'ERROR transposing shape of {self._tif.filename} ({self.tif_shape}) from {self.axes_order} to ZYX order!')
+            raise err
+        return shape_
+
+    @cached_property
     def tif_shape(self):
-        if self._tif._multifile:
-            return self._tif.series[self._series].shape
+        if self.series_mode:
+            shape = self._parse_series_shape()
         else:
-            _shape = self._tif.pages[0].shape  # The 2D shape of the image
-            n_pages = len(self._tif.pages)
-            if n_pages > 1:
-                _shape = (n_pages,) + _shape
+            shape = self._parse_pages_shape()
+        # Remove empty dimensions
+        shape = tuple(dim for dim in shape if dim != 1)
+        return shape
+
+    def _parse_series_shape(self):
+        return self.series.shape
+
+    def _parse_pages_shape(self):
+        _shape = self._tif.pages[0].shape  # The 2D shape of the image
+        n_pages = len(self._tif.pages)
+        if n_pages > 1:
+            _shape = (n_pages,) + _shape
         return _shape
 
-    @property
+    @cached_property
     def dtype(self):
-        return self._tif.pages[0].dtype
+        if self.series_mode:
+            return self.series.dtype
+        else:
+            return self._tif.pages[0].dtype
 
     @property
     def location(self):
@@ -75,14 +120,14 @@ class Source(src.Source):
     @location.setter
     def location(self, value):
         if value != self.location:
-            self._tif = tif.TiffFile(value, multifile = False)
+            self._tif = tifffile.TiffFile(value, multifile=False)
 
     @property
     def array(self, processes=None):
         array = self._tif.asarray(maxworkers=processes)
-        return array_from_tif(array)
+        return self.to_clearmap_order(array)
 
-    @property
+    @cached_property
     def element_strides(self):
         """The strides of the array elements.
 
@@ -101,108 +146,198 @@ class Source(src.Source):
     def __getitem__(self, slicing, processes=None):
         ndim = self.ndim
         if ndim >= 3:
-            slicing = slc.unpack_slicing(slicing, ndim)
+            slicing = cmp_clicing.unpack_slicing(slicing, ndim)  # matches dimensions for slicing (may assume space at the end)
 
             slicing_z = slicing[-1]
             if isinstance(slicing_z, (int, np.int64)):
                 slicing_z = int(slicing_z)
             array = self._tif.asarray(key=slicing_z, maxworkers=processes)
-            array = array_from_tif(array)
+            array = self.to_clearmap_order(array)
 
-            slicing_xy = (Ellipsis,) + slicing[-3:-1]
-            if len(array.shape) > len(self._tif.pages[0].shape):
-                slicing_xy = slicing_xy + (slice(None),)
+            slicing_xy = (Ellipsis,) + slicing[-3: -1]  #  Assumes that the last dimensions are space and in the order z,y,x ??
+            if len(array.shape) > len(self._tif.pages[0].shape):  # FIXME: is self._tif.pages[0].shape used for series mode?
+                slicing_xy = slicing_xy + (slice(None), )
             return array[slicing_xy]
         else:
             array = self._tif.asarray(maxworkers=processes)
-            array = array_from_tif(array)
-            return array.__getitem__(slicing)
+            array = self.to_clearmap_order(array)
+
+            return array[slicing]
 
     def __setitem__(self, *args):
         memmap = self.as_memmap()
         memmap.__setitem__(*args)
 
-    def metadata(self, info=None):
+    def to_clearmap_order(self, array):
+        try:
+            transposed = tif_to_clearmap_order(array, self.axes_order)
+        except ValueError as err:
+            print(f'ERROR transposing array {self._tif.filename} with shape {array.shape} '
+                  f'from {self.axes_order} to ClearMap (ZYX) order!')
+            raise err
+        return transposed
+
+    @cached_property
+    def _metadata_type(self):
+        populated_metadata = [f'{t}_metadata' for t in self._tif.flags
+                              if getattr(self._tif, f'{t}_metadata', None) is not None]
+        if not populated_metadata:
+            return None
+        elif len(populated_metadata) > 1:
+            warnings.warn(f'Multiple metadata types found in tif file {self.location}!; metadata: {populated_metadata}')
+        return populated_metadata[0]
+
+    def get_raw_metadata_dictionary(self):
+        if not self._metadata_type:
+            return {}
+        md = getattr(self._tif, self._metadata_type) or {}
+        if self._tif.is_ome:
+            md = tifffile.xml2dict(md).get('OME', {})
+        return md
+
+    def metadata(self, info=('shape', 'resolution', 'overlap')):
         """Returns metadata from this tif file.
 
         Arguments
         ---------
-        info : list or all
-            Optional list of keywords, if all return full tif metadata, if None return default set info.
+        info : list, 'all' or None
+            Optional list of keywords, if 'all' return full tif metadata, if None return default set info.
 
         Returns
         -------
         metadata : dict
             Dictionary with the metadata.
         """
-        md = None
-        for t in self._tif.flags:
-            attr_name = f'{t}_metadata'
-            if hasattr(self._tif, attr_name):
-                md = getattr(self._tif, attr_name)
-                if md is not None:
-                    break
+        md = self.get_raw_metadata_dictionary()
+        if not md:
+            warnings.warn(f'No metadata found in tif file {self._tif.filename}!'
+                          f'Assuming XYZ order and shape {self.shape}.')
+            shape = self.shape
+            order = ''.join([ax for i, ax in zip(shape, 'XYZ')])
+            return {'shape': shape, 'order': order}
 
-        if md is None:
-            md = {}
-
-        if info is all:  # FIXME: string instead of all constant
+        if info is all:
+            raise DeprecationWarning('The all argument is deprecated. Use "all" instead.')
+        elif info == 'all':
             return md
-        elif info is None:
-            info = ['shape', 'resolution', 'overlap']
         elif isinstance(info, str):
             info = [info]
         info = {k: None for k in info}
 
         def update_info(info, name, keys, mdict, astype, include_keys=False):
+            # value = [astype(mdict.get(k)) for k in keys if mdict.get(k) is not None]
+
             value = []
             for k in keys:
-                try:
-                    v = mdict
-                    for kk in k.split('.'):
-                        v = v.get(kk, None)
-                        if v is None:
-                            break
-                    if include_keys and v is not None:
-                        info[k] = v
+                v = mdict
+                for kk in k.split('.'):
+                    v = v.get(kk, None)
+                    if v is None:
+                        break
+                if include_keys and v is not None:
+                    info[k] = v
+                if v is not None:
                     value.append(astype(v))
-                except Exception:
-                    pass
             if len(value) > 0:
                 info[name] = tuple(value)
 
         # get info
-        mdp = md.get('Image', {}).get('Pixels', {})
-        keys = info.keys()
+        if self._tif.is_ome:
+            mdp = md.get('Image', {}).get('Pixels', {})
+        elif self._tif.is_imagej:
+            labels = md.get('Labels')
+            if labels:
+                mdp = {(line.split('=', 1)[0]).strip(): (line.split('=', 1)[1]).strip()
+                       for line in labels[0].split('\n') if '=' in line}
+            else:  # Try to get metadata from the Info field
+                print(f'WARNING: Image: {self._tif.filename}, no labels found in imagej metadata!;'
+                      f' metadata: {md}')
+                try:
+                    md_info = md['Info'].split('\n')
+                except KeyError:
+                    warnings.warn(f'No Info metadata found in tif file {self._tif.filename}!'
+                                  f'Metadata: {md}')
+                    md['order'] = 'XYZ'
+                    return md
+                if md_info[0].startswith('NRRD'):
+                    md_info = {ln.split(':', 1)[0]: ln.split(':', 1)[1] for ln in md_info if ':' in ln}
+                    if 'sizes' in md_info:
+                        info['shape'] = tuple(int(sz) for sz in md_info['sizes'].split(' ') if sz)
+                        index_to_dim = {0: 'X', 1: 'Y', 2: 'Z'}
+                        space_directions = md_info.get('space directions', None)
+                        space_directions = tuple(tuple([int(dim_) for dim_ in v.strip('()').split(',')])
+                                                 for v in space_directions.split(' ') if v)
+                        info['order'] = [index_to_dim[np.argmax(v)] for v in space_directions]
+                        info['resolution'] = tuple([max(v) for v in space_directions])
+                    else:
+                        raise ValueError(f'Unknown metadata type {self._metadata_type} and format: {md_info[0]};'
+                                         f' info: {md_info}')
+                    return info
+                else:
+                    raise ValueError(f'Unknown metadata type {self._metadata_type} and format: {md_info[0]};'
+                                     f' info: {md_info}')
+        elif self.is_clearmap:
+            info = md[0]
+            info['order'] = 'XYZ'
+            return info
+        else:
+            raise ValueError(f'Unknown metadata type {self._metadata_type}')
 
+        keys = info.keys()
         if 'shape' in keys:
-            # info['shape'] = self.shape;
             order = mdp.get('DimensionOrder', None)
-            if order is None:
-                order = ''.join([d for d in 'XYZTC' if f'Size{d}' in mdp.keys()])
+            if order is None and self.is_clearmap:
+                warnings.warn('WARNING: No dimension order found in tif metadata! Assuming "XYZTC" order.')
+                ''.join([d for d in 'XYZTC' if f'Size{d}' in mdp.keys()])
             info['order'] = order
-            skeys = ['Size' + d for d in order]
-            update_info(info, 'shape', skeys, mdp, int)
+
+            update_info(info, 'shape', [f'Size{d}' for d in order], mdp, int)
+            if info['shape'] is not None and [d for d in info['shape'] if d != 1] != self.shape:
+                order = [d for s, d in zip(info['shape'], order) if s > 1]
+                info['order'] = order
+                info['shape'] = self.shape
 
         if 'description' in keys:
-            info['description'] = self._tif.pages[0].description
+            if self.pages_mode:
+                info['description'] = self._tif.pages[0].description
+            else:
+                info['description'] = self.series.description
+            if info['description'] is None:
+                info['description'] = md.get('Image', {}).get('Description', None)
 
         if 'resolution' in keys:
-            rkeys = ['PhysicalSizeX', 'PhysicalSizeY', 'PhysicalSizeZ']
-            update_info(info, 'resolution', rkeys, mdp, float)
+            update_info(info, 'resolution', [f'PhysicalSize{dim}' for dim in 'XYZ'], mdp, float)
 
         if 'overlap' in keys:
-            mdc = md.get('CustomAttributes', {}).get('PropArray', {})
-            okeys = ['xyz-Table_X_Overlap.Value', 'xyz-Table_Y_Overlap.Value']
-            update_info(info, 'overlap', okeys, mdc, float)
+            mdc = md.get('CustomAttributes', {}).get('PropArray', {})  # UM2
+            if mdc:
+                overlap_keys = [f'xyz-Table_{dim}_Overlap.Value' for dim in 'XY']
+                update_info(info, 'overlap', overlap_keys, mdc, float)
+            else:
+                mdc = md.get('CustomAttributes', {}).get('Properties', {}).get('prop', {})  # Blaze
+                overlap_keys = [f'xyz-Table {dim} Overlap' for dim in 'XY']
+                overlaps = [float(label.get('Value')) for label in mdc if label.get('label') in overlap_keys]
+                info['overlap'] = tuple(overlaps) if overlaps else None
+
+        if 'tile_configuration' in keys:
+            tile_cfg_txt = (md.get('Image', {}).get('CustomAttributes', {})
+                            .get('TileConfiguration', {}).get('TileConfiguration', ''))
+            if tile_cfg_txt:
+                tile_cfg_txt = [ln.strip() for ln in tile_cfg_txt[1:].split(')') if ln]
+                tile_cfg = [ln.split(';;') for ln in tile_cfg_txt]
+                tile_cfg = [(ln[0], ln[1][1:]) for ln in tile_cfg]
+                info['tile_configuration'] = tile_cfg
+
+        if 'date' in keys:
+            info['date'] = md.get('Image', {}).get('CreationDate', None)
 
         return info
 
     def as_memmap(self):
         try:
-            return array_from_tif(tif.memmap(self.location))
-        except:  # FIXME: too broad
-            raise ValueError('The tif file %s cannot be memmaped!' % self.location)
+            return self.to_clearmap_order(tifffile.memmap(self.location))
+        except ValueError as err:
+            raise ValueError(f'The tif file {self.location} cannot be memmaped!; {err}')
 
     def as_virtual(self):
         return VirtualSource(source=self)
@@ -228,7 +363,7 @@ class Source(src.Source):
         return f'{name}{shape}{dtype}{order}{location}'
 
 
-class VirtualSource(src.VirtualSource):
+class VirtualSource(AbstractVirtualSource):
     def __init__(self, source=None, shape=None, dtype=None, order=None, location=None, name=None):
         super(VirtualSource, self).__init__(source=source, shape=shape, dtype=dtype, order=order, location=location, name=name)
         if isinstance(source, Source):
@@ -255,13 +390,13 @@ class VirtualSource(src.VirtualSource):
 
 
 def is_tif(source):
-    """Checks if this source a TIF source"""
+    """Checks if this is a TIF source"""
     if isinstance(source, Source):
         return True
     if isinstance(source, str):
         try:
             Source(source)
-        except:  # FIXME: too broad
+        except tifffile.TiffFileError:  # Do not catch missing file or permission errors
             return False
         return True
     return False
@@ -287,7 +422,7 @@ def read(source, slicing=None, sink=None, **args):
     if slicing is None:
         return source.array
     else:
-        return source.__getitem__(slicing)
+        return source[slicing]
 
 
 def write(sink, data, **args):
@@ -303,7 +438,15 @@ def write(sink, data, **args):
     sink : str
         The name of the tif file.
     """
-    tif.imsave(sink, array_to_tif(data), **args)
+    try:
+        data = array_to_tif(data)
+    except ValueError as err:
+        raise ValueError(f'Cannot write array to tif file {sink}!; {err}')
+    # TODO: add axes order 'XYZ(C)' to metadata
+    try:
+        tifffile.imsave(sink, data, **args)  # noqa
+    except AttributeError:
+        tifffile.imwrite(sink, data, **args)
     return sink
 
 
@@ -334,11 +477,15 @@ def create(location=None, shape=None, dtype=None, mode=None, as_source=True, **k
     """
     if shape is None:
         raise ValueError('Shape for new tif file must be given!')
-    shape = shape_to_tif(shape)
+    try:
+        shape = shape_to_tif(shape)
+    except ValueError as err:
+        print(f'ERROR: could not transpose shape of {location} ({shape}) to ZYX order!; {err}')
+        raise err
     mode = 'r+' if mode == 'w+' or mode is None else mode
     dtype = 'float64' if dtype is None else dtype
 
-    memmap = tif.memmap(filename=location, shape=shape, dtype=dtype, mode=mode)
+    memmap = tifffile.memmap(location, shape=shape, dtype=dtype, mode=mode)
     if as_source:
         return Source(location)
     else:
@@ -349,76 +496,186 @@ def create(location=None, shape=None, dtype=None, mode=None, as_source=True, **k
 # ### Array axes order
 ################################################################################
 
-def shape_from_tif(shape):
-    ndim = len(shape)
-    shape = shape[:max(0, ndim-3)] + shape[-3:][::-1]  # FIXME: rewrite for color and use in array_from_tiff too
-    return shape
+def map_axes(source_order, dest_order, ndim=None):
+    """
+    Generate a mapping of axes from source order to destination order.
+    The mapping is a tuple of integers that can be used with np.transpose to reorder the axes of an array.
+
+    Parameters
+    ----------
+    source_order : str
+        The order of the axes in the source array (e.g., 'ZYX').
+    dest_order : str
+        The desired order of axes in the output array (e.g., 'XYZ').
+
+    Returns
+    -------
+    tuple
+        A tuple of integers that can be used with np.transpose to reorder the axes of an array.
+    """
+    if not ndim:
+        ndim = len(source_order)
+    if isinstance(source_order, (tuple, list)):
+        source_order = ''.join(source_order)
+    if isinstance(dest_order, (tuple, list)):
+        dest_order = ''.join(dest_order)
+    source_order = source_order.upper()
+    dest_order = dest_order.upper()
+
+    if 'C' in source_order and 'C' not in dest_order:
+        warnings.warn('Color channel is present in source order but not explicitly in destination order, '
+                      'assuming it should be moved to the end of the array.')
+        dest_order += 'C'
+    elif 'C' in dest_order and 'C' not in source_order:
+        raise ValueError('Cannot add color channel to array without color channel.')
+
+    # if order were given with too much information, discard by least significant
+    for dim in 'TCZ':
+        if ((ndim < len(source_order) and dim in source_order) or
+                (ndim < len(dest_order) and dim in dest_order)):
+            source_order = source_order.replace(dim, '')
+            dest_order = dest_order.replace(dim, '')
+
+    if len(source_order) != len(dest_order):
+        raise ValueError(f'Source and destination order must have the same number of axes.'
+                         f' Source order: {source_order}, Destination order: {dest_order}')
+
+    return tuple(source_order.index(axis) for axis in dest_order)
 
 
-def shape_to_tif(shape):
-    return shape_from_tif(shape)
+def transpose_array(array, source_order, dest_order):
+    """
+    Transpose the axes on array from source_order to dest_order.
+
+    Parameters
+    ----------
+    array : np.ndarray
+        The array to transpose
+    source_order : str
+        The order of the axes in the array (with letters representing the axes)
+    dest_order : str
+        The desired order of axes in the output array (with letters representing the axes)
+
+    Returns
+    -------
+    The transposed array
+    """
+    transposition = map_axes(source_order, dest_order, ndim=array.ndim)
+    return np.transpose(array, transposition)
 
 
-def array_from_tif(array):
-    ndim = array.ndim
-    n_colors = min(array.shape)  # valid if rgb
-    if ndim == 4 and n_colors in (3, 4):  # Put color last for RGB images
-        col_idx = array.shape.index(n_colors)
+def tif_to_clearmap_order(array, array_order='XYZ'):
+    """
+    Transpose the axes on array to the ClearMap order ('ZYX')
 
-        new_axes = list(range(ndim))
-        new_axes.pop(col_idx)
-        new_axes = new_axes[::-1]
-        new_axes.append(col_idx)
-        array = np.transpose(array, new_axes)
-    else:
-        axes = list(range(ndim))
-        axes = axes[:max(0, ndim-3)] + axes[-3:][::-1]
-        array = array.transpose(axes)
-    return array
+    Parameters
+    ----------
+    array : np.ndarray
+        The array to transpose
+    array_order : str
+        The order of the input array (with letters representing the axes)
 
-
-def array_to_tif(array):
-    return array_from_tif(array)
+    Returns
+    -------
+    The transposed array
+    """
+    return transpose_array(array, array_order, 'ZYX')
 
 
-################################################################################
-# ### Metadata
-################################################################################
+def reorder_shape(shape, order, dest_order):
+    """
+    Rearrange the shape tuple to match the given order.
+
+    Parameters
+    ----------
+    shape : tuple
+        The original shape of the array
+    order : str
+        The order of the axes in the array (e.g., 'ZYX' or 'CZYX')
+    dest_order : str
+        The desired order of axes in the output array (e.g., 'XYZ' or 'XYZC')
+
+    Returns
+    -------
+    tuple
+        The shape rearranged to match the given order
+    """
+    axes_mapping = map_axes(order, dest_order, ndim=len(shape))
+    rearranged_shape = tuple(shape[ax] for ax in axes_mapping)
+    return rearranged_shape
+
+
+def shape_from_tif(shape, order='XYZ', dest_order='ZYX'):   # FIXME: extract CLEARMAP_ORDER and TIF_ORDER to constants
+    """
+    Rearrange the shape tuple to match the 'XYZ' (or 'XYZC') order based on the given axes order.
+
+    Parameters
+    ----------
+    shape : tuple
+        The original shape of the array.
+    order : str
+        The order of the axes in the array (e.g., 'ZYX' or 'CZYX'). Default is 'XYZ' (Default tiff order).
+    dest_order : str
+        The desired order of axes in the output array (e.g., 'XYZ' or 'XYZC'). Default is 'ZYX' (ClearMap array order).
+
+    Returns
+    -------
+    tuple
+        The shape rearranged to match the 'XYZ' (or 'XYZC') order.
+    """
+    return reorder_shape(shape, order, dest_order)
+
+
+def shape_to_tif(shape, order='ZYX', dest_order='XYZ'):
+    """
+    Rearrange the shape tuple to match the 'XYZ' (or 'XYZC') order based on the given axes order.
+
+    Parameters
+    ----------
+    shape : tuple
+        The original shape of the array.
+    order : str
+        The order of the axes in the array (e.g., 'ZYX' or 'CZYX'). Default is 'ZYX' (ClearMap array order).
+    dest_order : str
+        The desired order of axes in the output array (e.g., 'XYZ' or 'XYZC'). Default is 'XYZ' (Default tiff order).
+
+    Returns
+    -------
+    tuple
+        The shape rearranged to match the 'XYZ' (or 'XYZC') order.
+    """
+    return reorder_shape(shape, order, dest_order)
+
 #
-# def change_OME_meta_data_string(description, info  = None):
-#  """Changes the meta data in an ome image descriptor
-#  
-#  Arguments:
-#    description (str): xml ome image description
-#    info (dict): dictionary of entries to try to change
-#  
-#  Returns:
-#    str: modified xml image descriptor
-#  """
-#  if not isinstance(info, dict):
-#    return description;
-#    
-#  try:
-#    xml = etree.fromstring(description);
-#  except:
-#    raise RuntimeError('could not parse ome xml description!');
-#  
-#  keys = info.keys();
-#  
-#  if 'overlap' in keys:
-#    try:
-#      #get the overlap
-#      overlap = info['overlap'];
-#      ex = [x for x in xml.iter('{*}xyz-Table_X_Overlap')][0];
-#      ey = [x for x in xml.iter('{*}xyz-Table_Y_Overlap')][0];
-#      ex.attrib['Value'] = str(overlap[0]);
-#      ey.attrib['Value'] = str(overlap[1]);
-#    except:
-#      raise RuntimeWarning('could not change overlap in ome image description');
-#    
-#  #add other meta data keys here
-#  
-#  return etree.tostring(xml, pretty_print = False);
+# def shape_from_tif(shape):
+#     ndim = len(shape)
+#     shape = shape[:max(0, ndim-3)] + shape[-3:][::-1]  # FIXME: rewrite for color and use in array_from_tiff too
+#     return shape
+#
+#
+# def array_from_tif(array):  # to ZYXC orientation
+#     ndim = array.ndim
+#     n_colors = min(array.shape)  # valid if rgb
+#     if ndim == 4 and n_colors in (3, 4):  # Put color last for RGB images
+#         col_idx = array.shape.index(n_colors)
+#
+#         new_axes = list(range(ndim))
+#         new_axes.pop(col_idx)
+#         new_axes = new_axes[::-1]
+#         new_axes.append(col_idx)
+#         array = np.transpose(array, new_axes)
+#     else:
+#         axes = list(range(ndim))
+#         axes = axes[:max(0, ndim-3)] + axes[-3:][::-1]
+#         array = array.transpose(axes)
+#     return array
+
+# def array_from_tif(array):  # to ZYXC orientation
+#     return tif_to_clearmap_order(array)
+
+
+def array_to_tif(array, source_order='ZYX'):
+    return transpose_array(array, source_order, 'XYZ')
 
 
 ################################################################################
