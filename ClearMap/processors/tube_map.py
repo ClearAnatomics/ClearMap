@@ -15,6 +15,7 @@ import re
 import numpy as np
 from PyQt5.QtWidgets import QDialogButtonBox
 
+from ClearMap.ParallelProcessing.DataProcessing.ArrayProcessing import initialize_sink
 from ClearMap.Utils.exceptions import PlotGraphError, ClearMapVRamException
 from ClearMap.Visualization.Qt.utils import link_dataviewers_cursors
 from ClearMap.processors.generic_tab_processor import TabProcessor, ProcessorSteps
@@ -244,6 +245,8 @@ class BinaryVesselProcessor(TabProcessor):
         source = self.workspace.filename('binary', postfix=postfix)
         sink_postfix = f'{postfix}_postprocessed' if postfix else 'postprocessed'
         sink = self.workspace.filename('binary', postfix=sink_postfix)
+        sink = initialize_sink(sink, shape=source.shape, dtype=source.dtype, order=source.order,
+                               return_buffer=False)
 
         params = copy.deepcopy(vasculature.default_postprocessing_processing_parameter)
         params.update(size_max=50)
@@ -274,6 +277,11 @@ class BinaryVesselProcessor(TabProcessor):
                 source = self.postprocessing_tmp_params['fill_source']
             else:
                 source = self.workspace.filename('binary', postfix=postfix)
+
+        source = clearmap_io.as_source(source)
+
+        sink = initialize_sink(sink, shape=source.shape, dtype=source.dtype, order=source.order,
+                               return_buffer=False)
 
         binary_filling.fill(source, sink=sink, processes=None, verbose=True)  # WARNING: prange if filling
         if run_smoothing and not self.postprocessing_tmp_params['save']:

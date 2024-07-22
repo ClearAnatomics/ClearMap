@@ -101,10 +101,10 @@ for p in data_dirs:
     data_files.extend([(k, v) for k, v in find_data_files(p).items()])
 data_files.extend([('', ['start_gui.sh'])])
 
-packages = find_packages(exclude=('doc', 'tests*', 'pickle_python_2'))
+packages = find_packages(exclude=('doc', 'tests*', 'pickle_python_2', 'deprecated'))
 setup(
     name='ClearMap2',
-    version='2.1.0',
+    version='2.1.2',
     description='3D cell counting and vasculature analysis for lightsheet microscopy',
     install_requires=requirements,
     packages=packages,
