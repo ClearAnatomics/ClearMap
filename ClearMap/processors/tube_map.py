@@ -205,7 +205,7 @@ class BinaryVesselProcessor(TabProcessor):
         postfix = channel if channel == 'arteries' else None
         self.steps[channel].remove_next_steps_files(self.steps[channel].binary)
 
-        source = self.workspace.filename('stitched', postfix=postfix)
+        source = self.workspace.source('stitched', postfix=postfix)
         sink = self.workspace.filename('binary', postfix=postfix)
 
         binarization_parameter = copy.deepcopy(vasculature.default_binarization_parameter)
@@ -242,7 +242,7 @@ class BinaryVesselProcessor(TabProcessor):
 
         self.steps[channel].remove_next_steps_files(self.steps[channel].postprocessed)
 
-        source = self.workspace.filename('binary', postfix=postfix)
+        source = self.workspace.source('binary', postfix=postfix)
         sink_postfix = f'{postfix}_postprocessed' if postfix else 'postprocessed'
         sink = self.workspace.filename('binary', postfix=sink_postfix)
         sink = initialize_sink(sink, shape=source.shape, dtype=source.dtype, order=source.order,
