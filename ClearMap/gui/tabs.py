@@ -1341,7 +1341,7 @@ class VasculatureTab(PostProcessingTab):
 
         """
         # FIXME: n_steps = 4
-        self.wrap_step('Building vessel graph', self.vessel_graph_processor.build_graph,
+        self.wrap_step('Building vessel graph', self.vessel_graph_processor.skeletonize_and_build_graph,
                        abort_func=self.vessel_graph_processor.stop_process, main_thread=True)
         self.wrap_step('Building vessel graph', self.vessel_graph_processor.clean_graph,
                        abort_func=self.vessel_graph_processor.stop_process)
