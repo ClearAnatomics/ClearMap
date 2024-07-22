@@ -15,7 +15,6 @@ __download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
 import math
 import os
 import sys
-import time
 from datetime import datetime
 
 from multiprocessing.pool import ThreadPool
@@ -101,6 +100,11 @@ pg.setConfigOption('background', PLOT_3D_BG)
 
 
 CLEARMAP_VERSION = version('ClearMap2')
+tmp_folder = ConfigLoader.get_cfg_from_path(ConfigLoader.get_default_path('machine')).get('tmp_folder', None)
+if tmp_folder is not None:
+    for var_name in ('TMP', 'TEMP', 'TMPDIR'):
+        os.environ[var_name] = tmp_folder
+
 
 # TODO
 """
