@@ -205,7 +205,7 @@ class BinaryVesselProcessor(TabProcessor):
         postfix = channel if channel == 'arteries' else None
         self.steps[channel].remove_next_steps_files(self.steps[channel].binary)
 
-        source = self.workspace.filename('stitched', postfix=postfix)
+        source = self.workspace.source('stitched', postfix=postfix)
         sink = self.workspace.filename('binary', postfix=postfix)
 
         binarization_parameter = copy.deepcopy(vasculature.default_binarization_parameter)
@@ -242,7 +242,7 @@ class BinaryVesselProcessor(TabProcessor):
 
         self.steps[channel].remove_next_steps_files(self.steps[channel].postprocessed)
 
-        source = self.workspace.filename('binary', postfix=postfix)
+        source = self.workspace.source('binary', postfix=postfix)
         sink_postfix = f'{postfix}_postprocessed' if postfix else 'postprocessed'
         sink = self.workspace.filename('binary', postfix=sink_postfix)
         sink = initialize_sink(sink, shape=source.shape, dtype=source.dtype, order=source.order,
@@ -340,7 +340,7 @@ class BinaryVesselProcessor(TabProcessor):
     def combine_binary(self):
         # MERGE
         sink = self.workspace.filename('binary', postfix='combined')  # Temporary
-        if not self.processing_config['binarization']['arteries']['binarization']['run']:
+        if self.processing_config['binarization']['arteries']['binarization']['run']:
             source = self.workspace.filename('binary', postfix='filled')
             source_arteries = self.workspace.filename('binary', postfix='arteries_filled')
             block_processing.process(np.logical_or, [source, source_arteries], sink,
@@ -494,7 +494,7 @@ class VesselGraphProcessor(TabProcessor):
         self.processing_config.reload()
         graph_cfg = self.processing_config['graph_construction']
         self.skeletonize(self.workspace.filename('skeleton'))# WARNING: main thread (prange)
-        if graph_cfg['build'] or graph_cfg['skeletonize']:
+        if graph_cfg['build']:
             self._build_graph_from_skeleton()  # WARNING: main thread (prange)
 
     def clean_graph(self):

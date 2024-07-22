@@ -31,5 +31,6 @@ dependencies:
   - scikit-learn
   - graph-tool
   - pytorch
+  - mkl<2024.1  # Breaks pytorch (https://github.com/pytorch/pytorch/issues/123097)
   - pip:
     - lxml
