@@ -340,7 +340,7 @@ class BinaryVesselProcessor(TabProcessor):
     def combine_binary(self):
         # MERGE
         sink = self.workspace.filename('binary', postfix='combined')  # Temporary
-        if not self.processing_config['binarization']['arteries']['binarization']['run']:
+        if self.processing_config['binarization']['arteries']['binarization']['run']:
             source = self.workspace.filename('binary', postfix='filled')
             source_arteries = self.workspace.filename('binary', postfix='arteries_filled')
             block_processing.process(np.logical_or, [source, source_arteries], sink,
