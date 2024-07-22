@@ -1,5 +1,6 @@
 import os
 import sys
+import warnings
 from concurrent.futures.process import BrokenProcessPool
 
 
@@ -33,6 +34,7 @@ class ProcessorSteps:
         for step_name in self.get_next_steps(target_step_name):
             f_path = self.path_from_step_name(step_name)
             if os.path.exists(f_path):
+                warnings.warn(f"WARNING: Remove previous step {step_name}, file {f_path}")
                 os.remove(f_path)
 
     def path(self, step, step_back=False, n_before=0):
