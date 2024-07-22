@@ -3,7 +3,7 @@
 widgets
 =======
 
-A set of custom widgets
+A set of custom widgets for the ClearMap GUI
 """
 import functools
 import json
@@ -21,9 +21,9 @@ from qdarkstyle import DarkPalette
 
 from skimage import transform as sk_transform  # WARNING: Slowish import, should be replaced
 
-from PyQt5 import QtGui, QtCore, QtWidgets
+from PyQt5 import QtCore, QtWidgets
 from PyQt5.QtGui import QColor
-from PyQt5.QtCore import QRectF, QTimer
+from PyQt5.QtCore import QTimer
 from PyQt5.QtWidgets import QWidget, QDialogButtonBox, QListWidget, QHBoxLayout, QPushButton, QVBoxLayout, QTableWidget, \
     QTableWidgetItem, QToolBox, QRadioButton, QTreeWidget, QTreeWidgetItem
 
@@ -34,7 +34,7 @@ from ClearMap.Settings import atlas_folder
 from ClearMap.Utils.utilities import gpu_params
 from ClearMap.Visualization import Plot3d as plot_3d
 from ClearMap.config.config_loader import ConfigLoader
-from ClearMap.gui.dialogs import make_splash, get_directory_dlg, update_pbar
+from ClearMap.gui.dialogs import make_splash, update_pbar
 from ClearMap.gui.gui_utils import create_clearmap_widget, get_pseudo_random_color, is_dark
 
 __author__ = 'Charly Rousseau <charly.rousseau@icm-institute.org>'
@@ -110,9 +110,10 @@ class OrthoViewer(object):
     def shape(self):
         """
         Get the shape of the image
+
         Returns
         -------
-
+        tuple(int, int, int)
         """
         return self.img.shape if self.img is not None else None
 
@@ -120,9 +121,10 @@ class OrthoViewer(object):
     def width(self):
         """
         Get the width of the image
+
         Returns
         -------
-
+        int
         """
         return self.shape[0]
 
@@ -130,9 +132,10 @@ class OrthoViewer(object):
     def height(self):
         """
         Get the height of the image
+
         Returns
         -------
-
+        int
         """
         return self.shape[1]
 
@@ -140,9 +143,10 @@ class OrthoViewer(object):
     def depth(self):
         """
         Get the depth of the image
+
         Returns
         -------
-
+        int
         """
         return self.shape[2]
 
@@ -153,10 +157,6 @@ class OrthoViewer(object):
         Parameters
         ----------
         ranges : list(tuple(float, float))
-
-        Returns
-        -------
-
         """
         for i, rng in enumerate(ranges):
             region_item = self.linear_regions[i]
@@ -173,9 +173,6 @@ class OrthoViewer(object):
     def add_regions(self):  # FIXME: improve documenation
         """
         Add the regions to the viewer
-        Returns
-        -------
-
         """
         # y_axis_idx = (1, 2, 0)
         for i, dv in enumerate(self.dvs):
@@ -198,7 +195,7 @@ class OrthoViewer(object):
 
         Returns
         -------
-
+        list(DataViewer)
         """
         if img is None:
             img = self.img.array
@@ -323,6 +320,7 @@ class ProgressWatcher(QWidget):  # Inspired from https://stackoverflow.com/a/662
 
     def prepare_for_substep(self, step_length, pattern, step_name):
         """
+        Setup the watcher for a new substep
 
         Parameters
         ----------
@@ -332,10 +330,6 @@ class ProgressWatcher(QWidget):  # Inspired from https://stackoverflow.com/a/662
             int The number of steps in the operation
         pattern
             str or re.Pattern or (str, re.Pattern) the text to look for in the logs to check for progress
-
-        Returns
-        -------
-
         """
         self.max_progress = step_length
         self.pattern = pattern
@@ -344,15 +338,38 @@ class ProgressWatcher(QWidget):  # Inspired from https://stackoverflow.com/a/662
         self.sub_step_name = step_name
 
     def get_progress(self):
+        """
+        Get the current progress
+
+        Returns
+        -------
+        int
+        """
         return self.__progress
 
     def set_progress(self, value):
+        """
+        Set the progress value of the current main or sub step
+
+        Parameters
+        ----------
+        value: int
+            The progress value
+        """
         if self.__progress == value:
             return
         self.__progress = round(value)
         self.progress_changed.emit(self.__progress)
 
     def set_main_progress(self, value):
+        """
+        Set the progress value for the main step
+
+        Parameters
+        ----------
+        value: int
+            The progress value
+        """
         if self.__main_progress == value:
             return
         self.__main_progress = round(value)
@@ -362,9 +379,25 @@ class ProgressWatcher(QWidget):  # Inspired from https://stackoverflow.com/a/662
             self.finished.emit(self.main_step_name)
 
     def increment_main_progress(self, increment=1):
+        """
+        Integer increment of the main progress
+
+        Parameters
+        ----------
+        increment: int
+            The increment value (default is 1)
+        """
         self.set_main_progress(self.__main_progress + round(increment))
 
     def increment(self, increment):
+        """
+        Increment the progress value of the current main or sub step
+
+        Parameters
+        ----------
+        increment: int or float
+            The increment value. If float, it is considered as a percentage of the maximum progress value
+        """
         if isinstance(increment, float):
             self.set_progress(self.__progress + int(self.max_progress * increment))
         elif isinstance(increment, int):
@@ -415,6 +448,16 @@ class ProgressWatcher(QWidget):  # Inspired from https://stackoverflow.com/a/662
             return self.pattern.match(line)
 
     def count_dones(self):
+        """
+        Parse the logs to extract the number of `done` operations (based on self.pattern)
+        For each `done` operation, the progress is incremented by 1
+        For efficiency, the logs are read from the last read position
+
+        Returns
+        -------
+        int
+            The number of `done` operations found
+        """
         if self.pattern is None:
             return 0
         with open(self.log_path, 'r') as log:
@@ -425,7 +468,10 @@ class ProgressWatcher(QWidget):  # Inspired from https://stackoverflow.com/a/662
         self.previous_log_length += self.__get_log_bytes(new_lines)
         return self.n_dones
 
-    def reset_log_length(self):  # TODO: bind
+    def reset_log_length(self):
+        """
+        Resets dones to 0 and seeks to the end of the log file
+        """
         with open(self.log_path, 'r') as log:
             self.previous_log_length = self.__get_log_bytes(log.readlines())
             self.n_dones = 0
@@ -434,22 +480,32 @@ class ProgressWatcher(QWidget):  # Inspired from https://stackoverflow.com/a/662
         return sum([len(ln) for ln in log])
 
     def finish(self):
+        """
+        Trigger the finish signal
+        """
         self.finished.emit(self.main_step_name)
 
 
 # Adapted from https://stackoverflow.com/a/54917151 by https://stackoverflow.com/users/6622587/eyllanesc
 class TwoListSelection(QWidget):
+    """
+    A widget that allows to select items from a list and move them to another list
+    This is useful for selecting items from a list of available items and moving them to a list of selected items
+    """
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setup_layout()
+        self.__setup_layout()
         # self.app = app
 
-    def setup_layout(self):
+    def __setup_layout(self):
+        """
+        Setup the layout of the widget with the two columns for the lists and the buttons
+        """
         lay = QHBoxLayout(self)
         self.mInput = QListWidget()
         self.mOuput = QListWidget()
 
-        move_btns, up_down_btns = self.layout_buttons()
+        move_btns, up_down_btns = self.__layout_buttons()
 
         lay.addWidget(self.mInput)
         lay.addLayout(move_btns)
@@ -457,9 +513,12 @@ class TwoListSelection(QWidget):
         lay.addLayout(up_down_btns)
 
         self.update_buttons_status()
-        self.connections()
+        self.__connections()
 
-    def layout_buttons(self):
+    def __layout_buttons(self):
+        """
+        Create and lay out the control buttons of the widget
+        """
         self.mButtonToSelected = QPushButton(">>")
         self.mBtnMoveToAvailable = QPushButton(">")
         self.mBtnMoveToSelected = QPushButton("<")
@@ -489,56 +548,82 @@ class TwoListSelection(QWidget):
         self.mBtnMoveToAvailable.setDisabled(not bool(self.mInput.selectedItems()) or self.mOuput.currentRow() == 0)
         self.mBtnMoveToSelected.setDisabled(not bool(self.mOuput.selectedItems()))
 
-    def connections(self):
+    def __connections(self):
+        """
+        Bind the buttons to their slots
+        """
         self.mInput.itemSelectionChanged.connect(self.update_buttons_status)
         self.mOuput.itemSelectionChanged.connect(self.update_buttons_status)
-        self.mBtnMoveToAvailable.clicked.connect(self.on_mBtnMoveToAvailable_clicked)
-        self.mBtnMoveToSelected.clicked.connect(self.on_mBtnMoveToSelected_clicked)
-        self.mButtonToAvailable.clicked.connect(self.on_mButtonToAvailable_clicked)
-        self.mButtonToSelected.clicked.connect(self.on_mButtonToSelected_clicked)
-        self.mBtnUp.clicked.connect(self.on_mBtnUp_clicked)
-        self.mBtnDown.clicked.connect(self.on_mBtnDown_clicked)
+        self.mBtnMoveToAvailable.clicked.connect(self.__on_mBtnMoveToAvailable_clicked)
+        self.mBtnMoveToSelected.clicked.connect(self.__on_mBtnMoveToSelected_clicked)
+        self.mButtonToAvailable.clicked.connect(self.__on_mButtonToAvailable_clicked)
+        self.mButtonToSelected.clicked.connect(self.__on_mButtonToSelected_clicked)
+        self.mBtnUp.clicked.connect(self.__on_mBtnUp_clicked)
+        self.mBtnDown.clicked.connect(self.__on_mBtnDown_clicked)
 
     @QtCore.pyqtSlot()
-    def on_mBtnMoveToAvailable_clicked(self):
+    def __on_mBtnMoveToAvailable_clicked(self):
         self.mOuput.addItem(self.mInput.takeItem(self.mInput.currentRow()))
 
     @QtCore.pyqtSlot()
-    def on_mBtnMoveToSelected_clicked(self):
+    def __on_mBtnMoveToSelected_clicked(self):
         self.mInput.addItem(self.mOuput.takeItem(self.mOuput.currentRow()))
 
     @QtCore.pyqtSlot()
-    def on_mButtonToAvailable_clicked(self):
+    def __on_mButtonToAvailable_clicked(self):
         while self.mOuput.count() > 0:
             self.mInput.addItem(self.mOuput.takeItem(0))
 
     @QtCore.pyqtSlot()
-    def on_mButtonToSelected_clicked(self):
+    def __on_mButtonToSelected_clicked(self):
         while self.mInput.count() > 0:
             self.mOuput.addItem(self.mInput.takeItem(0))
 
     @QtCore.pyqtSlot()
-    def on_mBtnUp_clicked(self):
+    def __on_mBtnUp_clicked(self):
         row = self.mOuput.currentRow()
         currentItem = self.mOuput.takeItem(row)
         self.mOuput.insertItem(row - 1, currentItem)
         self.mOuput.setCurrentRow(row - 1)
 
     @QtCore.pyqtSlot()
-    def on_mBtnDown_clicked(self):
+    def __on_mBtnDown_clicked(self):
         row = self.mOuput.currentRow()
         currentItem = self.mOuput.takeItem(row)
         self.mOuput.insertItem(row + 1, currentItem)
         self.mOuput.setCurrentRow(row + 1)
 
+    # The actual user functions
     def addAvailableItems(self, items):
+        """
+        Add the list of available items to the left list
+
+        Parameters
+        ----------
+        items: list(str)
+            The list of items to add
+        """
         self.mInput.addItems(items)
 
     def setSelectedItems(self, items):
+        """
+        Add the list of selected items to the right list
+        Parameters
+        ----------
+        items: list(str)
+            The list of items to add
+        """
         self.mOuput.clear()
         self.mOuput.addItems(items)
 
     def get_left_elements(self):
+        """
+        Get the list of items in the left list (available items)
+
+        Returns
+        -------
+        list(str)
+        """
         r = []
         for i in range(self.mInput.count()):
             it = self.mInput.item(i)
@@ -546,6 +631,13 @@ class TwoListSelection(QWidget):
         return r
 
     def get_right_elements(self):
+        """
+        Get the list of items in the right list (selected items)
+
+        Returns
+        -------
+        list(str)
+        """
         r = []
         for i in range(self.mOuput.count()):
             it = self.mOuput.item(i)
@@ -554,15 +646,30 @@ class TwoListSelection(QWidget):
 
 
 class DataFrameWidget(QWidget):  # TODO: optional format attribute with shape of df
+    """
+    A simple widget to display a pandas DataFrame
+    """
     def __init__(self, df, n_digits=2, parent=None):
+        """
+        Initialize the widget
+
+        Parameters
+        ----------
+        df: pd.DataFrame
+            The DataFrame to display
+        n_digits: int
+            The number of digits to display for float values
+        parent: QWidget
+            The parent widget to attach the widget to
+        """
         super().__init__(parent)
         self.df = df
         self.n_digits = n_digits
         self.table = QTableWidget(len(df.index), df.columns.size, parent=parent)
         self.table.setHorizontalHeaderLabels(self.df.columns)
-        self.set_content()
+        self._set_content()
 
-    def set_content(self):
+    def _set_content(self):
         for i in range(len(self.df.index)):
             for j in range(self.df.columns.size):
                 v = self.df.iloc[i, j]
@@ -573,12 +680,34 @@ class DataFrameWidget(QWidget):  # TODO: optional format attribute with shape of
 
 
 class WizardDialog:
-    def __init__(self, src_folder, ui_name, ui_title, size, params=None, app=None):
+    """
+    A base class for a complex dialogs designed with QT creator and exported as ui files.
+    It is meant to be subclassed. The subclass should implement the `setup` and `connect_buttons` methods
+    This class needs a src_folder, a ui_name, a ui_title. The ui names and titles are used to build
+    a dialog from the ui file of the same name and parametrise the dialog
+    """
+    def __init__(self, ui_name, ui_title, src_folder="", params=None, app=None, size=None):
+        """
+        Initialize the dialog
+
+        Parameters
+        ----------
+        src_folder: str
+            The source folder
+        ui_name: str
+            The name of the ui file to use. ClearMap automatically locates and loads the file
+        ui_title: str
+            The title of the dialog
+        size: tuple(int, int) (optional)
+            The size of the dialog. If None, the dialog will be resized to its content
+        params: UiParameter (optional)
+            The parameters object to use to parametrise the dialog
+        app: QApplication (optional)
+            The QApplication instance to use. If None, ClearMap will try to use the existing instance
+        """
         self.src_folder = src_folder
         self.params = params
-        if app is None:
-            app = QtWidgets.QApplication.instance()
-        self.app = app
+        self.app = app or QtWidgets.QApplication.instance()
 
         dlg = create_clearmap_widget(f'{ui_name}.ui', patch_parent_class='QDialog', window_title=ui_title)
 
@@ -594,41 +723,102 @@ class WizardDialog:
         self.setup()
 
         # self.dlg.setStyleSheet(qdarkstyle.load_stylesheet())
-        self.fix_btn_boxes_text()
+        self.__fix_btn_boxes_text()
         self.connect_buttons()
 
     def setup(self):
+        """
+        Setup the dialog after creation from the ui file.
+        This method is called automatically in the constructor
+        but should be implemented in the subclass
+        """
         raise NotImplementedError
 
-    def fix_btn_boxes_text(self):
+    def __fix_btn_boxes_text(self):
+        """
+        Patch the name of button boxes to match the text in the ui file
+        """
         for btn_box in self.dlg.findChildren(QDialogButtonBox):
             if btn_box.property('applyText'):
                 btn_box.button(QDialogButtonBox.Apply).setText(btn_box.property('applyText'))
 
     def connect_buttons(self):
+        """
+        Connect the buttons to their slots.
+        This method is called automatically in the constructor
+        but should be implemented in the subclass
+        """
         raise NotImplementedError
 
     @staticmethod
     def enable_widgets(widgets):
+        """
+        Helper method to enable a list of widgets
+
+        Parameters
+        ----------
+        widgets: list(QWidget)
+            The list of widgets to enable
+        """
         for w in widgets:
             w.setEnabled(True)
 
     @staticmethod
     def hide_widgets(widgets):
+        """
+        Helper method to hide a list of widgets
+
+        Parameters
+        ----------
+        widgets: list(QWidget)
+            The list of widgets to hide
+        """
         for w in widgets:
             w.setVisible(False)
 
     def exec(self):
+        """
+        Execute the dialog
+        """
         self.dlg.exec()
 
 
 class PatternDialog(WizardDialog):
-    def __init__(self, src_folder, params=None, app=None, min_file_number=10, tile_extension='.ome.tif'):
+    """
+    A wizard dialog to help the user define file patterns for a set of image file paths
+    The dialog scans the source folder to find patterns in the file names and suggests them to the user
+    there must be at least `min_file_number` files in the folder with the extension `tile_extension`
+    to trigger the pattern search
+    """
+    def __init__(self, src_folder, params, app=None, min_file_number=10, tile_extension='.ome.tif'):
+        """
+        Initialize the dialog
+
+        Parameters
+        ----------
+        src_folder: str
+            The source folder to scan for patterns
+        params: UiParameter (optional)
+            The parameters object to use to parametrise the dialog
+        app: QApplication (optional)
+            The QApplication instance to use. If None, ClearMap will try to use the existing instance
+        min_file_number: int (optional)
+            The minimum number of files to trigger the pattern search. Default is 10
+        tile_extension: str (optional)
+            The extension of the files to consider. Default is '.ome.tif'
+        """
         self.tile_extension = tile_extension
         self.min_file_number = min_file_number
-        super().__init__(src_folder, 'pattern_prompt', 'File paths wizard', [600, None], params, app)
+        super().__init__('pattern_prompt', 'File paths wizard', src_folder, params, app, [600, None])
+        self.n_image_groups = 0
+        self.pattern_strings = {}
+        self.patterns_finders = None
 
     def setup(self):
+        """
+        Setup the dialog after creation from the ui file.
+        This method is called automatically in the constructor
+        """
         self.n_image_groups = 0
         self.dlg.patternToolBox = QToolBox(parent=self.dlg)
         self.dlg.patternWizzardLayout.insertWidget(0, self.dlg.patternToolBox)
@@ -640,10 +830,25 @@ class PatternDialog(WizardDialog):
                 label_widget, pattern_widget, combo_widget = self.get_widgets(pattern_idx, axis)
                 pattern_widget.setText(p_finder.pattern.highlight_digits(axis))
                 self.enable_widgets((label_widget, pattern_widget, combo_widget))
-            for axis in range(axis + 1, 4):  # Hide the rest
-                self.hide_widgets(self.get_widgets(pattern_idx, axis))
+            for ax in range(axis + 1, 4):  # Hide the rest
+                self.hide_widgets(self.get_widgets(pattern_idx, ax))
 
     def get_widgets(self, image_group_id, axis):
+        """
+        Get the widgets (label, pattern and combo) for a given image group and axis
+
+        Parameters
+        ----------
+        image_group_id: int
+            The index of the image group
+        axis: int
+            The index of the axis
+
+        Returns
+        -------
+        tuple(QLabel, QLabel, QComboBox)
+            The label of the axis, pattern for the axis pattern and combobox containing the axis name (as a letter)
+        """
         page = self.dlg.patternToolBox.widget(image_group_id)
         if page is None:
             raise IndexError(f'No widget at index {image_group_id}')
@@ -654,6 +859,10 @@ class PatternDialog(WizardDialog):
         return label_widget, pattern_widget, combo_widget
 
     def add_group(self):
+        """
+        Add a new group of widgets to the dialog
+        This is a group of widgets to define a pattern for a set of image files (typically a channel)
+        """
         group_controls = create_clearmap_widget('image_group_ctrls.ui', patch_parent_class='QWidget')
         self.dlg.patternToolBox.addItem(group_controls, f'Image group {self.n_image_groups}')
 
@@ -662,10 +871,18 @@ class PatternDialog(WizardDialog):
         self.n_image_groups += 1
 
     def connect_buttons(self):
+        """
+        Connect the buttons to their slots.
+        This method is called automatically in the constructor
+        """
         self.dlg.mainButtonBox.button(QDialogButtonBox.Apply).clicked.connect(self.save_results)
         self.dlg.mainButtonBox.button(QDialogButtonBox.Cancel).clicked.connect(self.dlg.close)
 
     def validate_pattern(self):
+        """
+        Validate the pattern defined by the user and update the result widget
+        The result is saved in the pattern_strings attribute for the current channel name
+        """
         pattern_idx = self.dlg.patternToolBox.currentIndex()
         pattern = self.patterns_finders[pattern_idx].pattern
         for subpattern_idx, digit_cluster in enumerate(pattern.digit_clusters):
@@ -690,6 +907,14 @@ class PatternDialog(WizardDialog):
         self.pattern_strings[channel_name] = pattern_string
 
     def get_patterns(self):
+        """
+        Scan the current source folder to get the pattern finders for the image files
+
+        Returns
+        -------
+        list(PatternFinder)
+            The pattern finders for the source folder
+        """
         splash, progress_bar = make_splash(bar_max=100)
         splash.show()
         with ThreadPool(processes=1) as pool:
@@ -705,6 +930,9 @@ class PatternDialog(WizardDialog):
         return pattern_finders
 
     def save_results(self):
+        """
+        Save the file patterns to the `sample` configuration file and close the dialog
+        """
         config_loader = ConfigLoader(self.src_folder)
         sample_cfg = config_loader.get_cfg('sample')
         for channel_name, pattern_string in self.pattern_strings.items():
@@ -715,53 +943,71 @@ class PatternDialog(WizardDialog):
 
 
 class SamplePickerDialog(WizardDialog):
-    def __init__(self, src_folder, params=None, app=None):
-        super().__init__(src_folder, 'sample_picker', 'File paths wizard', [None, 600], params, app)
+    """
+    A dialog to help the user pick the sample folders from a source folder.
+    The dialog scans the source folder to find the sample folders based on the presence
+    of a `sample_params.cfg` file
+    The results are displayed in two lists. The user can move the sample folders from the
+    left (available items) list to the right (selected items) list.
+    The samples can be split into groups to allow for different processing of the groups.
+    """
+    def __init__(self, src_folder, params, app=None):
+        """
+        Initialize the dialog
+
+        Parameters
+        ----------
+        src_folder: str
+            The source folder to scan for sample folders
+        params: UiParameter
+            The parameters object to use to parametrise the dialog
+        app: QApplication (optional)
+            The QApplication instance to use. If None, ClearMap will try to use the existing instance
+        """
+        self.group_paths = None
+        self.current_group = 0
+        self.list_selection = TwoListSelection()
+        super().__init__('sample_picker', 'File paths wizard', src_folder=src_folder,
+                         params=params, app=app, size=[None, 600])
         self.list_selection.addAvailableItems(self.parse_sample_folders())
         self.exec()
 
     def setup(self):
+        """
+        Setup the dialog after creation from the ui file.
+        This method is called automatically in the constructor
+        """
         self.group_paths = [[]]
         self.current_group = 1
         for i in range(self.params.n_groups - 1):
-            self.handle_add_group(add_to_params=False)
+            self.__handle_add_group(add_to_params=False)
         self.list_selection = TwoListSelection()
         self.dlg.listPickerLayout.addWidget(self.list_selection)
 
     def connect_buttons(self):
-        self.dlg.addGroupPushButton.clicked.connect(functools.partial(self.handle_add_group, add_to_params=True))
-        self.dlg.groupsComboBox.currentIndexChanged.connect(self.handle_group_changed)
-        self.dlg.buttonBox.accepted.connect(self.apply_changes)
+        """
+        Connect the buttons to their slots.
+        This method is called automatically in the constructor
+        """
+        self.dlg.addGroupPushButton.clicked.connect(functools.partial(self.__handle_add_group, add_to_params=True))
+        self.dlg.groupsComboBox.currentIndexChanged.connect(self.__handle_group_changed)
+        self.dlg.buttonBox.accepted.connect(self.__apply_changes)
         self.dlg.buttonBox.rejected.connect(self.dlg.close)
 
         selected_model = self.list_selection.mOuput.model()
-        selected_model.rowsInserted.connect(self.update_current_group_paths)  # Update group when selection updated
-        selected_model.rowsRemoved.connect(self.update_current_group_paths)  # Update group when selection updated
-
-    def apply_changes(self):
-        for group, paths in enumerate(self.group_paths):
-            if group > self.params.n_groups:
-                self.params.add_group()
-            if paths:
-                self.params.set_paths(group+1, paths)
-        self.dlg.close()
-
-    def handle_group_changed(self):
-        self.update_current_group_paths()
-        current_gp_id = self.dlg.groupsComboBox.currentIndex()
-        self.current_group = max(0, current_gp_id) + 1  # WARNING: update current_group after update
-        self.list_selection.setSelectedItems(self.group_paths[self.current_group - 1])
-
-    def update_current_group_paths(self):
-        self.group_paths[self.current_group - 1] = self.list_selection.get_right_elements()
-
-    def handle_add_group(self, add_to_params=True):
-        self.dlg.groupsComboBox.addItem(f'{self.dlg.groupsComboBox.count() + 1}')
-        if add_to_params:
-            self.params.add_group()
-        self.group_paths.append([])
+        selected_model.rowsInserted.connect(self.__update_current_group_paths)  # Update group when selection updated
+        selected_model.rowsRemoved.connect(self.__update_current_group_paths)  # Update group when selection updated
 
     def parse_sample_folders(self):
+        """
+        Scan the source folder to find the sample folders based on
+        the presence of a `sample_params.cfg` file (skip `config_snapshots` folders)
+
+        Returns
+        -------
+        list(str)
+            The list of sample folders
+        """
         sample_folders = []
         for root, dirs, files in os.walk(self.src_folder):
             for fldr in dirs:
@@ -772,16 +1018,75 @@ class SamplePickerDialog(WizardDialog):
                     sample_folders.append(fldr)
         return sample_folders
 
+    def __apply_changes(self):
+        """
+        Save the selected groups of samples to the configuration file and close the dialog
+        """
+        for group, paths in enumerate(self.group_paths):
+            if group > self.params.n_groups:
+                self.params.add_group()
+            if paths:
+                self.params.set_paths(group+1, paths)
+        self.dlg.close()
+
+    def __handle_group_changed(self):
+        """
+        Handle the change of the current group (display the corresponding paths in the list selection)
+        """
+        self.__update_current_group_paths()
+        current_gp_id = self.dlg.groupsComboBox.currentIndex()
+        self.current_group = max(0, current_gp_id) + 1  # WARNING: update current_group after update
+        self.list_selection.setSelectedItems(self.group_paths[self.current_group - 1])
+
+    def __update_current_group_paths(self):
+        """
+        Update the paths of the current group with the selected items in the list selection
+        """
+        self.group_paths[self.current_group - 1] = self.list_selection.get_right_elements()
+
+    def __handle_add_group(self, add_to_params=True):
+        """
+        Add a new group to the dialog
+
+        Parameters
+        ----------
+        add_to_params: bool
+            Whether to add the group to the parameters object. Default is True
+        """
+        self.dlg.groupsComboBox.addItem(f'{self.dlg.groupsComboBox.count() + 1}')
+        if add_to_params:
+            self.params.add_group()
+        self.group_paths.append([])
+
 
 class LandmarksSelectorDialog(WizardDialog):  # TODO: bind qColorDialog to color buttons
+    """
+    A dialog to select landmarks in 3D space for registration
+    The dialog allows to select landmarks in two views (fixed and moving)
+    The landmarks are displayed in two 3D viewers with matching colors
+    """
 
-    def __init__(self, src_folder, params=None, app=None):
-        super().__init__(src_folder, 'landmark_selector', 'Landmark selector', None, params, app)
+    def __init__(self, app=None):
+        """
+        Initialize the dialog
+
+        Parameters
+        ----------
+        app: QApplication (optional)
+            The QApplication instance to use. If None, ClearMap will try to use the existing instance
+        """
+        self.markers = []
+        self.coords = []
+        super().__init__('landmark_selector', 'Landmark selector', app=app)
         # self.dlg.setModal(False)
-        self.data_viewers = []
+        self.data_viewers = {}
         self.dlg.show()
 
     def setup(self):
+        """
+        Setup the dialog after creation from the ui file.
+        This method is called automatically in the constructor
+        """
         btn = self.dlg.marker0RadioButton
         btn.setChecked(True)
         color_btn = self.dlg.marker0ColorBtn
@@ -794,6 +1099,12 @@ class LandmarksSelectorDialog(WizardDialog):  # TODO: bind qColorDialog to color
 
     @property
     def current_marker(self):
+        """
+        Get the index of the currently selected  marker
+        Returns
+        -------
+        int : the index of the currently selected marker
+        """
         return [marker[0].isChecked() for marker in self.markers].index(True)
 
     # def get_marker_btn(self, idx):
@@ -803,26 +1114,30 @@ class LandmarksSelectorDialog(WizardDialog):  # TODO: bind qColorDialog to color
     #     return getattr(self.dlg, f'marker{idx}ColorLabel', None)
 
     def connect_buttons(self):
+        """
+        Connect the buttons to their slots.
+        This method is called automatically in the constructor
+        """
         self.dlg.addMarkerPushButton.clicked.connect(self.add_marker)
         self.dlg.delMarkerPushButton.clicked.connect(self.remove_marker)
         # self.dlg.buttonBox.accepted.connect(self.accept)
         self.dlg.buttonBox.rejected.connect(self.dlg.close)
 
+    @property
     def fixed_coords(self):
         return np.array([c[0] for c in self.coords])
-        # return np.array([c[0] for c in self.coords if c[0] is not None])
 
+    @property
     def moving_coords(self):
         return np.array([c[1] for c in self.coords])
-        # return np.array([c[1] for c in self.coords if c[1] is not None])
 
     def set_fixed_coords(self, x, y, z):
         self.coords[self.current_marker][0] = (x, y, z)
-        self._set_viewer_coords(0, self.fixed_coords())
+        self._set_viewer_coords(0, self.fixed_coords)
 
     def set_moving_coords(self, x, y, z):
         self.coords[self.current_marker][1] = (x, y, z)
-        self._set_viewer_coords(1, self.moving_coords())
+        self._set_viewer_coords(1, self.moving_coords)
 
     def _set_viewer_coords(self, viewer_idx, coords):
         viewer = self.data_viewers[viewer_idx]
@@ -835,16 +1150,32 @@ class LandmarksSelectorDialog(WizardDialog):  # TODO: bind qColorDialog to color
         viewer.refresh()
 
     @property
+    def __style_sheets(self):
+        return [color_btn.styleSheet() for _, color_btn in self.markers]
+
+    @property
     def colors(self):
-        return [sheet.replace('background-color: ', '').strip() for sheet in self.style_sheets]
+        """
+        Get the ordered list of colors of the markers
+
+        Returns
+        -------
+        list(str)
+            The markers colors
+        """
+        return [sheet.replace('background-color: ', '').strip() for sheet in self.__style_sheets]
 
     @property
     def current_color(self):
-        return self.colors[self.current_marker]
+        """
+        Get the color of the currently selected marker
 
-    @property
-    def style_sheets(self):
-        return [color_btn.styleSheet() for _, color_btn in self.markers]
+        Returns
+        -------
+        str
+            The color of the currently selected marker
+        """
+        return self.colors[self.current_marker]
 
     def add_marker(self):
         new_idx = len(self)
@@ -893,7 +1224,7 @@ class StructurePickerWidget(QTreeWidget):
 
     @staticmethod
     def parse_json():
-        with open(annotation.label_file, 'r') as json_handle:
+        with open(annotation.label_file, 'r') as json_handle:  # FIXME: make parameter in case it hasn't been initialised
             aba = json.load(json_handle)
         root = aba['msg'][0]
         return root
@@ -921,8 +1252,8 @@ class StructurePickerWidget(QTreeWidget):
 
 
 class StructureSelector(WizardDialog):
-    def __init__(self, src_folder, params=None, app=None):
-        super().__init__(src_folder, 'structure_selector', 'Structure selector', None, params, app)
+    def __init__(self, app=None):
+        super().__init__('structure_selector', 'Structure selector', app=app)
         self.structure_selected = self.picker_widget.itemClicked
         self.onAccepted = self.dlg.buttonBox.accepted.connect
         self.onRejected = self.dlg.buttonBox.rejected.connect
