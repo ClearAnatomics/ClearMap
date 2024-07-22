@@ -540,14 +540,17 @@ class AlignmentTab(GenericTab):
                            parent=self.main_window.centralWidget())
         self.main_window.setup_plots(dvs)
 
-        landmark_selector = LandmarksSelectorDialog('', params=self.params)
-        landmark_selector.data_viewers = dvs
+        landmark_selector = LandmarksSelectorDialog(params=self.params)
+        landmark_selector.data_viewers = {
+            'fixed': dvs[0],
+            'moving': dvs[1]
+        }
         for i in range(2):
             scatter = pg.ScatterPlotItem()
             dvs[i].enable_mouse_clicks()
             dvs[i].view.addItem(scatter)
             dvs[i].scatter = scatter
-            coords = [landmark_selector.fixed_coords(), landmark_selector.moving_coords()][i]  # FIXME: check order (A to B)
+            coords = [landmark_selector.fixed_coords, landmark_selector.moving_coords][i]  # FIXME: check order (A to B)
             dvs[i].scatter_coords = Scatter3D(coords, colors=np.array(landmark_selector.colors),
                                               half_slice_thickness=3)
             callback = [landmark_selector.set_fixed_coords, landmark_selector.set_moving_coords][i]
@@ -1639,7 +1642,7 @@ class BatchTab(GenericTab):
 
     def create_wizard(self):
         self.params.ui_to_cfg()
-        return SamplePickerDialog(self.params.results_folder, params=self.params)  # FIXME: check if results_folder or make both equal with self.params.src_folder
+        return SamplePickerDialog(self.params.results_folder, self.params)  # FIXME: check if results_folder or make both equal with self.params.src_folder
 
 
 class GroupAnalysisTab(BatchTab):
