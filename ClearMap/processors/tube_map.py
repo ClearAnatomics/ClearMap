@@ -243,8 +243,7 @@ class BinaryVesselProcessor(TabProcessor):
 
         self.steps[channel].remove_next_steps_files(self.steps[channel].postprocessed)
 
-        source = self.workspace.filename('binary', postfix=postfix)
-        source = clearmap_io.as_source(source)
+        source = self.workspace.source('binary', postfix=postfix)
         sink_postfix = f'{postfix}_postprocessed' if postfix else 'postprocessed'
         sink = self.workspace.filename('binary', postfix=sink_postfix)
         sink = initialize_sink(sink, shape=source.shape, dtype=source.dtype, order=source.order,
