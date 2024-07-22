@@ -340,7 +340,7 @@ def smooth_by_configuration_block(source, iterations = 1, verbose = False):
   Returns
   -------
   smoothed : array
-    Thre smoothed binary array.
+    The smoothed binary array.
   """
   try:
     if isinstance(source, io.src.Source):
@@ -360,8 +360,9 @@ def smooth_by_configuration_block(source, iterations = 1, verbose = False):
       smoothed = lut[smoothed];
 
       if verbose:
-        print(f'Binary Smoothing: itertion {i+1} / {iterations} done!', flush=True)
+        print(f'Binary Smoothing: iteration {i+1} / {iterations} done!', flush=True)
   except Exception as err:
+    print(f"ERROR in smooth_by_configuration")
     print(err, flush=True)
     raise
   
