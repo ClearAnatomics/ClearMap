@@ -806,7 +806,7 @@ class ClearMapGui(ClearMapGuiBase):
         self.sample_tab_mgr.mini_brain_scaling, self.sample_tab_mgr.mini_brain = setup_mini_brain()
 
         self.preference_editor = PreferenceUi(self)
-        self.structure_selector = StructureSelector('', app=self)
+        self.structure_selector = StructureSelector(app=self)
 
         self.setWindowIcon(QtGui.QIcon(os.path.join(ICONS_FOLDER, 'logo_cyber.png')))
 
