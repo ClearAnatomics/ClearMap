@@ -494,7 +494,7 @@ class VesselGraphProcessor(TabProcessor):
         self.processing_config.reload()
         graph_cfg = self.processing_config['graph_construction']
         self.skeletonize(self.workspace.filename('skeleton'))# WARNING: main thread (prange)
-        if graph_cfg['build'] or graph_cfg['skeletonize']:
+        if graph_cfg['build']:
             self._build_graph_from_skeleton()  # WARNING: main thread (prange)
 
     def clean_graph(self):
