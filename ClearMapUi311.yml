@@ -35,7 +35,7 @@ dependencies:
   - tqdm
   - matplotlib
   - seaborn  #=0.12.2
-  - tifffile<2020.9.22  # Adds "Use DimensionOrder to determine axes order in OmeXml." which breaks ClearMap.IO
+  - tifffile
   - pyqt<6
   - pyqtwebengine
   - qtpy  # for qdarkstyle
