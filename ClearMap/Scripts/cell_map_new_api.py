@@ -9,12 +9,13 @@ optionally, provide the atlas base name as second argument
 import sys
 
 from ClearMap.Scripts.align_new_api import plot_registration_results, register, convert_stitched, stitch
+from ClearMap.config.atlas import ATLAS_NAMES_MAP
 from ClearMap.config.config_loader import ConfigLoader, get_configs
 from ClearMap.processors.cell_map import CellDetector
 from ClearMap.processors.sample_preparation import PreProcessor
 
 
-def main(src_directory, atlas_base_name='ABA_25um_2017'):
+def main(src_directory):
     cfg_loader = ConfigLoader(src_directory)
     configs = get_configs(cfg_loader.get_cfg_path('sample'), cfg_loader.get_cfg_path('processing'))
     pre_proc = PreProcessor()
@@ -26,6 +27,8 @@ def main(src_directory, atlas_base_name='ABA_25um_2017'):
 
     convert_stitched(pre_proc)
 
+    atlas_id = pre_proc.processing_config['registration']['atlas']['id']
+    atlas_base_name = ATLAS_NAMES_MAP[atlas_id]['base_name']
     register(atlas_base_name, pre_proc)
     plot_registration_results(pre_proc)
 
@@ -48,7 +51,4 @@ def main(src_directory, atlas_base_name='ABA_25um_2017'):
 
 
 if __name__ == '__main__':
-    if len(sys.argv) > 2:
-        main(sys.argv[1], sys.argv[2])
-    else:
-        main(sys.argv[1])
+    main(sys.argv[1])
