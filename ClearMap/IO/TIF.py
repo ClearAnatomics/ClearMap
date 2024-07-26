@@ -6,7 +6,7 @@ Note
 ----
 This module relies on the tifffile library.
 """
-__author__ = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
+__author__ = 'Christoph Kirst <christoph.kirst.ck@gmail.com>, Charly Rousseau <charly.rousseau@icm-institute.org>'
 __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__ = 'https://idisco.info'
@@ -208,8 +208,8 @@ class Source(AbstractSource):
         metadata : dict
             Dictionary with the metadata.
         """
-        md = self.get_raw_metadata_dictionary()
-        if not md:
+        metadata = self.get_raw_metadata_dictionary()
+        if not metadata:
             warnings.warn(f'No metadata found in tif file {self._tif.filename}!'
                           f'Assuming XYZ order and shape {self.shape}.')
             shape = self.shape
@@ -219,119 +219,20 @@ class Source(AbstractSource):
         if info is all:
             raise DeprecationWarning('The all argument is deprecated. Use "all" instead.')
         elif info == 'all':
-            return md
-        elif isinstance(info, str):
-            info = [info]
-        info = {k: None for k in info}
+            return metadata
 
-        def update_info(info, name, keys, mdict, astype, include_keys=False):
-            # value = [astype(mdict.get(k)) for k in keys if mdict.get(k) is not None]
-
-            value = []
-            for k in keys:
-                v = mdict
-                for kk in k.split('.'):
-                    v = v.get(kk, None)
-                    if v is None:
-                        break
-                if include_keys and v is not None:
-                    info[k] = v
-                if v is not None:
-                    value.append(astype(v))
-            if len(value) > 0:
-                info[name] = tuple(value)
-
-        # get info
-        if self._tif.is_ome:
-            mdp = md.get('Image', {}).get('Pixels', {})
-        elif self._tif.is_imagej:
-            labels = md.get('Labels')
-            if labels:
-                mdp = {(line.split('=', 1)[0]).strip(): (line.split('=', 1)[1]).strip()
-                       for line in labels[0].split('\n') if '=' in line}
-            else:  # Try to get metadata from the Info field
-                print(f'WARNING: Image: {self._tif.filename}, no labels found in imagej metadata!;'
-                      f' metadata: {md}')
-                try:
-                    md_info = md['Info'].split('\n')
-                except KeyError:
-                    warnings.warn(f'No Info metadata found in tif file {self._tif.filename}!'
-                                  f'Metadata: {md}')
-                    md['order'] = 'XYZ'
-                    return md
-                if md_info[0].startswith('NRRD'):
-                    md_info = {ln.split(':', 1)[0]: ln.split(':', 1)[1] for ln in md_info if ':' in ln}
-                    if 'sizes' in md_info:
-                        info['shape'] = tuple(int(sz) for sz in md_info['sizes'].split(' ') if sz)
-                        index_to_dim = {0: 'X', 1: 'Y', 2: 'Z'}
-                        space_directions = md_info.get('space directions', None)
-                        space_directions = tuple(tuple([int(dim_) for dim_ in v.strip('()').split(',')])
-                                                 for v in space_directions.split(' ') if v)
-                        info['order'] = [index_to_dim[np.argmax(v)] for v in space_directions]
-                        info['resolution'] = tuple([max(v) for v in space_directions])
-                    else:
-                        raise ValueError(f'Unknown metadata type {self._metadata_type} and format: {md_info[0]};'
-                                         f' info: {md_info}')
-                    return info
-                else:
-                    raise ValueError(f'Unknown metadata type {self._metadata_type} and format: {md_info[0]};'
-                                     f' info: {md_info}')
-        elif self.is_clearmap:
-            info = md[0]
-            info['order'] = 'XYZ'
-            return info
+        if self._metadata_type == 'ome_metadata':
+            parser = OMEMetadataParser(self, metadata, info)
+        elif self._metadata_type == 'imagej_metadata':
+            parser = ImageJMetadataParser(self, metadata, info)
+        elif self._metadata_type == 'shaped_metadata':
+            parser = ClearMapMetadataParser(self, metadata, info)
         else:
-            raise ValueError(f'Unknown metadata type {self._metadata_type}')
+            raise ValueError(f'Unknown metadata type {self._metadata_type}.'
+                             f'Please subclass BaseMetadataParser to handle this metadata type.')
 
-        keys = info.keys()
-        if 'shape' in keys:
-            order = mdp.get('DimensionOrder', None)
-            if order is None and self.is_clearmap:
-                warnings.warn('WARNING: No dimension order found in tif metadata! Assuming "XYZTC" order.')
-                ''.join([d for d in 'XYZTC' if f'Size{d}' in mdp.keys()])
-            info['order'] = order
-
-            update_info(info, 'shape', [f'Size{d}' for d in order], mdp, int)
-            if info['shape'] is not None and [d for d in info['shape'] if d != 1] != self.shape:
-                order = [d for s, d in zip(info['shape'], order) if s > 1]
-                info['order'] = order
-                info['shape'] = self.shape
-
-        if 'description' in keys:
-            if self.pages_mode:
-                info['description'] = self._tif.pages[0].description
-            else:
-                info['description'] = self.series.description
-            if info['description'] is None:
-                info['description'] = md.get('Image', {}).get('Description', None)
-
-        if 'resolution' in keys:
-            update_info(info, 'resolution', [f'PhysicalSize{dim}' for dim in 'XYZ'], mdp, float)
-
-        if 'overlap' in keys:
-            mdc = md.get('CustomAttributes', {}).get('PropArray', {})  # UM2
-            if mdc:
-                overlap_keys = [f'xyz-Table_{dim}_Overlap.Value' for dim in 'XY']
-                update_info(info, 'overlap', overlap_keys, mdc, float)
-            else:
-                mdc = md.get('CustomAttributes', {}).get('Properties', {}).get('prop', {})  # Blaze
-                overlap_keys = [f'xyz-Table {dim} Overlap' for dim in 'XY']
-                overlaps = [float(label.get('Value')) for label in mdc if label.get('label') in overlap_keys]
-                info['overlap'] = tuple(overlaps) if overlaps else None
-
-        if 'tile_configuration' in keys:
-            tile_cfg_txt = (md.get('Image', {}).get('CustomAttributes', {})
-                            .get('TileConfiguration', {}).get('TileConfiguration', ''))
-            if tile_cfg_txt:
-                tile_cfg_txt = [ln.strip() for ln in tile_cfg_txt[1:].split(')') if ln]
-                tile_cfg = [ln.split(';;') for ln in tile_cfg_txt]
-                tile_cfg = [(ln[0], ln[1][1:]) for ln in tile_cfg]
-                info['tile_configuration'] = tile_cfg
-
-        if 'date' in keys:
-            info['date'] = md.get('Image', {}).get('CreationDate', None)
-
-        return info
+        parser.parse()
+        return parser.info
 
     def as_memmap(self):
         try:
@@ -382,6 +283,198 @@ class VirtualSource(AbstractVirtualSource):
 
     def as_buffer(self):
         return self.as_real().as_buffer()
+
+
+###############################################################################
+# ## TIF Parsers
+###############################################################################
+class BaseMetadataParser:
+    def __init__(self, source, metadata, info_categories):
+        self.source = source
+        self.metadata = metadata
+        if isinstance(info_categories, str):
+            info_categories = [info_categories]
+        self.info = {k: None for k in info_categories}
+
+    def parse(self):
+        if 'shape' in self.info:
+            self.parse_pixel_metadata()
+        if 'resolution' in self.info:
+            self.parse_resolution()
+        if 'overlap' in self.info:
+            self.parse_overlap()
+        if 'description' in self.info:
+            self.parse_description()
+        if 'tile_configuration' in self.info:
+            self.parse_tile_configuration()
+        if 'date' in self.info:
+            self.parse_date()
+
+    def update_info(self, name, keys, mdict, astype):
+        value = []
+        for k in keys:
+            v = mdict
+            for kk in k.split('.'):  # Iterate over dot nested keys
+                v = v.get(kk, None)
+                if v is None:
+                    break
+            if v is not None:
+                value.append(astype(v))
+        if value:
+            self.info[name] = tuple(value)
+
+    def parse_order(self):
+        self.info['order'] = self.pixels_metadata.get('DimensionOrder', None)
+
+    def parse_shape(self):
+        self.update_info('shape', tuple([f'Size{d}' for d in self.info['order']]),
+                         self.pixels_metadata, int)
+        # Remove empty dimensions
+        if self.info['shape'] is not None and [d for d in self.info['shape'] if d != 1] != self.source.shape:
+            order = [d for s, d in zip(self.info['shape'], self.info['order']) if s > 1]
+            self.info['order'] = order
+            self.info['shape'] = self.source.shape
+
+    def parse_pixel_metadata(self):
+        """
+        Parse only the pixel metadata (i.e. shape and order) from the OME metadata.
+
+        Returns
+        -------
+
+        """
+        self.parse_order()
+        self.parse_shape()
+
+    def parse_resolution(self):
+        self.info['resolution'] = tuple(float(self.pixels_metadata[f'PhysicalSize{dim}'])
+                                        for dim in self.info['order'] if dim in 'XYZ')
+
+    def parse_date(self):
+        self.info['date'] = self.metadata.get('Image', {}).get('CreationDate', None)
+
+    def parse_description(self):
+        if self.source.pages_mode:
+            desc = self.source._tif.pages[0].description
+        else:
+            desc = self.source.series.description
+        if desc:
+            self.info['description'] = desc
+        else:
+            self.info['description'] = self.metadata.get('Image', {}).get('Description', None)
+
+    def parse_tile_configuration(self):
+        warnings.warn(f"Tile configuration parsing is not available for {self.__class__}, skipping!")
+
+    def parse_overlap(self):
+        warnings.warn(f"Overlap parsing is not available for {self.__class__}, skipping!")
+
+    @cached_property
+    def pixels_metadata(self):
+        raise NotImplementedError("Subclasses should implement this method")
+
+
+class OMEMetadataParser(BaseMetadataParser):
+    """
+    Parser for OME metadata.
+    Typically, this is tuned for the metadata of the OME-TIFF files
+    generated by either the UltraMicroscopeII or the Blaze
+    light-sheet microscopes from LaVision BioTec (now Miltenyi Biotec).
+    """
+
+    @cached_property
+    def pixels_metadata(self):
+        return self.metadata.get('Image', {}).get('Pixels', {})
+
+    def parse_overlap(self):
+        custom_md = self.metadata.get('CustomAttributes', {}).get('PropArray', {})  # UM2
+        if custom_md:
+            overlap_keys = [f'xyz-Table_{dim}_Overlap.Value' for dim in 'XY']
+            self.update_info('overlap', overlap_keys, custom_md, float)
+        else:
+            custom_md = self.metadata.get('CustomAttributes', {}).get('Properties', {}).get('prop', {})
+            overlap_keys = [f'xyz-Table {dim} Overlap' for dim in 'XY']
+            overlaps = [float(label.get('Value')) for label in custom_md
+                        if label.get('label') in overlap_keys]
+            self.info['overlap'] = tuple(overlaps) if overlaps else None
+
+    def parse_tile_configuration(self):
+        tile_cfg_txt = (self.metadata.get('Image', {}).get('CustomAttributes', {})
+                        .get('TileConfiguration', {}).get('TileConfiguration', ''))
+        if tile_cfg_txt:
+            tile_cfg_txt = [ln.strip() for ln in tile_cfg_txt[1:].split(')') if ln]
+            tile_cfg = [ln.split(';;') for ln in tile_cfg_txt]
+            tile_cfg = [(ln[0], ln[1][1:]) for ln in tile_cfg]
+            self.info['tile_configuration'] = tile_cfg
+
+
+class ImageJMetadataParser(BaseMetadataParser):
+
+    @cached_property
+    def pixels_metadata(self):
+        labels = self.metadata.get('Labels')
+        if labels:
+            return {(line.split('=', 1)[0]).strip(): (line.split('=', 1)[1]).strip()
+                    for line in labels[0].split('\n') if '=' in line}
+        else:
+            print(f'WARNING: Image: {self.source._tif.filename}, no labels found in imagej metadata!;'
+                  f' metadata: {self.metadata}')
+            return self.parse_info_field()
+
+    def parse_info_field(self):
+        parsed_info = {}
+        try:
+            md_info = self.metadata['Info'].split('\n')
+        except KeyError:
+            warnings.warn(f'No Info metadata found in tif file {self.source._tif.filename}!'
+                          f'Metadata: {self.metadata}')
+            parsed_info['order'] = 'XYZ'
+            return parsed_info
+        if md_info[0].startswith('NRRD'):  # FIXME: just get pixel metadata
+            self.__parse_nrrd(md_info, parsed_info)
+        else:
+            raise ValueError(f'Unknown metadata type {self.source._metadata_type} and format: {md_info[0]};'
+                             f' info: {md_info}')
+        return parsed_info
+
+    def __parse_nrrd(self, md_info, parsed_info):
+        md_info = {ln.split(':', 1)[0]: ln.split(':', 1)[1]
+                   for ln in md_info if ':' in ln}
+        if 'sizes' in md_info:
+            index_to_dim = {0: 'X', 1: 'Y', 2: 'Z'}
+            space_directions = md_info.get('space directions', None)
+            space_directions = tuple(tuple([int(dim_) for dim_ in v.strip('()').split(',')])
+                                     for v in space_directions.split(' ') if v)
+            parsed_info['DimensionOrder'] = [index_to_dim[np.argmax(v)]
+                                             for v in space_directions]
+            dim_to_index = {d: i for i, d in index_to_dim.items()}
+            shape = [int(sz) for sz in md_info['sizes'].split(' ') if sz]
+            for ax in parsed_info['DimensionOrder']:
+                parsed_info[f'Size{ax}'] = shape[dim_to_index[ax]]
+                if ax in 'XYZ':
+                    parsed_info[f'PhysicalSize{ax}'] = max(space_directions[dim_to_index[ax]])
+        else:
+            raise ValueError(f'Unknown metadata type {self.source._metadata_type} and format: {md_info[0]};'
+                             f' info: {md_info}')
+
+
+class ClearMapMetadataParser(BaseMetadataParser):
+    """
+    Parser for ClearMap metadata.
+
+    Typically, this is tuned for the metadata of the ClearMap generated tif
+    files which might lack some of the metadata fields but where the axes
+    order is bound to be 'XYZ'.
+    """
+    def parse_order(self):
+        # parsed_info = self.metadata[0]  # FIXME: check, which is best
+        super().parse_order()
+        if self.info['order'] is None:
+            warnings.warn('WARNING: No dimension order found in tif metadata! Assuming "XYZTC" order.')
+            self.info['order'] = ''.join([d for d in 'XYZTC'
+                                          if f'Size{d}' in self.pixels_metadata.keys()])
+            if not self.info['order']:
+                self.info['order'] = 'XYZ'
 
 
 ###############################################################################
