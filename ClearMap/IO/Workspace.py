@@ -334,8 +334,8 @@ def file_name(f_type, dirtype=None, ws_type=None, directory=None, default_direct
     if f_name_expression.tags:
         f_name = f_name_expression.string(values=values)
         # Note: expressions are used for raw data only atm -> no prefix, debug
-        # prefix = None
-        # debug = None
+        prefix = None
+        debug = None
 
     if f_name is None:
         raise ValueError(f'Cannot find name for type {f_type}!')
