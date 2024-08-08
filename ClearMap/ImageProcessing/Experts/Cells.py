@@ -23,6 +23,7 @@ import numpy as np
 
 import cv2
 import scipy.ndimage.filters as ndf
+import scipy.ndimage as ndi
 
 import ClearMap.IO.IO as clearmap_io
 
@@ -392,7 +393,10 @@ def detect_cells_block(source, parameter=default_cell_detection_parameter, n_thr
         if parameter_maxima['h_max']:  # FIXME: check if source or dog
             centers = md.find_center_of_maxima(source, maxima=maxima, verbose=parameter.get('verbose'))
         else:
-            centers = ap.where(maxima, processes=n_threads).array  # WARNING: prange
+            # We treat the eventuality of connected components of size>1 in the mask (maxima>0);
+            # the choice of the structure matrix for connectivity could need discussion.
+            maxima_labels, _ = ndi.label(maxima,structure=np.ones((3,)*3,dtype='bool'))
+            centers = np.vstack((md.label_representatives(maxima_labels))).transpose()
         del maxima
 
         # correct for valid region
