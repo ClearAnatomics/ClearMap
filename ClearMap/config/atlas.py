@@ -4,8 +4,8 @@ display the available atlases.
 """
 
 ATLAS_NAMES_MAP = {
-    'ABA 2017 - adult mouse - 25µm': {'resolution': 25, 'base_name': 'ABA_25um_2017'},
-    'ABA - adult mouse - 25µm': {'resolution': 25, 'base_name': 'ABA_25um'},
+    "ABA 2017 - adult mouse - 25µm": {"resolution": 25, "base_name": "ABA_25um_2017"},
+    "ABA - adult mouse - 25µm": {"resolution": 25, "base_name": "ABA_25um"},
     # 'LAMBADA - P1 - 25µm': {'resolution': 25, 'base_name': 'LAMBADA_P1_25um'},
     # 'LAMBADA - P3 - 25µm': {'resolution': 25, 'base_name': 'LAMBADA_P3_25um'},
     # 'LAMBADA - P5 - 25µm': {'resolution': 25, 'base_name': 'LAMBADA_P5_25um'},
@@ -19,6 +19,6 @@ ATLAS_NAMES_MAP = {
 
 
 STRUCTURE_TREE_NAMES_MAP = {
-    'ABA json 2022': 'ABA_annotation_last.json',
-    'ABA json clearmap': 'ABA_annotation.json',
+    "ABA json 2022": "ABA_annotation_last.json",
+    "ABA json clearmap": "ABA_annotation.json",
 }
