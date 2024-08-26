@@ -423,7 +423,7 @@ def read(source_, *args, **kwargs):
 
     Arguments
     ---------
-    source_ : str, array, Source class
+    source_ : str, pathlib.Path, array, Source class
        The source to read the data from.
 
     Returns
@@ -443,7 +443,7 @@ def write(sink, data, *args, **kwargs):
 
     Arguments
     ---------
-    sink : str, array, Source class
+    sink : str, pathlib.Path, array, Source class
         The source to write data to.
     data : array
         The data to write to the sink.
@@ -467,7 +467,7 @@ def create(source_, *args, **kwargs):
 
     Arguments
     ---------
-    source_ : str, array, Source class
+    source_ : str, pathlib.Path, array, Source class
         The source to write data to.
 
     Returns

@@ -220,3 +220,33 @@ def handle_deprecated_args(deprecated_args_map):
             return func(*args, **kwargs)
         return wrapper
     return decorator
+
+
+def substitute_deprecated_arg(old_arg, new_arg, old_arg_name, new_arg_name):
+    if new_arg is not None:
+        raise ValueError(f'Cannot use both {old_arg_name} and {new_arg_name} arguments.')
+    else:
+        warnings.warn(f'The {old_arg_name} argument is deprecated. Use {new_arg_name} instead.',
+                      DeprecationWarning, stacklevel=2)
+        return old_arg
+
+
+def validate_arg(arg_name, value, valid_values):
+    """
+    Check if the value is in the list of valid values and raise a ValueError if not.
+
+    Parameters
+    ----------
+    arg_name
+    value
+    valid_values
+
+    Returns
+    -------
+    value if it is in the list of valid values,
+    otherwise raises a ValueError
+    """
+    if value not in valid_values:
+        raise ValueError(f'Unknown {arg_name} "{value}". '
+                         f'Supported values are "{valid_values}".')
+    return value
