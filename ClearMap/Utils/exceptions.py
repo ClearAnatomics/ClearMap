@@ -77,3 +77,24 @@ class GroupStatsError(ClearMapException):
     Exception raised when there is an error with the group statistics
     """
     pass
+
+
+class ClearMapWorkspaceError(ClearMapException):
+    """
+    Exception raised when there is an error with the workspace
+    """
+    pass
+
+
+class ClearMapAssetError(ClearMapWorkspaceError):
+    """
+    Exception raised when there is an error with the asset
+    """
+    pass
+
+
+class AssetNotFoundError(ClearMapAssetError):
+    """
+    Exception raised when an asset is not found
+    """
+    pass

@@ -23,6 +23,11 @@ __all__ = ['is_file', 'is_directory', 'file_extension', 'join', 'split',
            'abspath', 'create_directory', 'delete_directory',
            'copy_file', 'delete_file']
 
+from pathlib import Path
+
+from ClearMap.IO import IO as clearmap_io
+
+
 ##############################################################################
 # ## Basic file queries
 ##############################################################################
@@ -257,7 +262,7 @@ def uncompress(file_path, extension='zip', check=True, verbose=False):
 
     Arguments
     ---------
-    file_path : str
+    file_path : str or pathlib.Path
         The file path to search for.
     extension : str
         The extension for the compressed file.
@@ -271,29 +276,33 @@ def uncompress(file_path, extension='zip', check=True, verbose=False):
     filename : str or None
         The uncompressed filename or None if failed.
     """
-    if not os.path.exists(file_path) or not check:
+    compression_algorithms = ('zip', 'bz2', 'gzip', 'lzma')
+    file_path = Path(file_path)
+    if file_path.exists() and file_path.suffix in compression_algorithms:
+        return uncompress(file_path.with_suffix(''), extension=file_path.suffix, check=check, verbose=verbose)
+    if not file_path.exists() or not check:
         if extension == 'auto':
-            for algo in ('zip', 'bz2', 'gzip', 'lzma'):
-                f_path_w_ext = f'{file_path}.{algo}'
-                if os.path.exists(f_path_w_ext):
+            for algo in compression_algorithms:
+                f_path_w_ext = file_path.with_suffix(f'{file_path.suffix}.{algo}')
+                if f_path_w_ext.exists():
                     extension = algo
                     break
             else:
                 raise ValueError(f'Could not find compressed source for {file_path}')
 
-        compressed_path = f'{file_path}.{extension}'
-        if os.path.exists(compressed_path):
+        compressed_path = file_path.with_suffix(f'{file_path.suffix}.{algo}')
+        if compressed_path.exists():
             if verbose:
                 print(f'Decompressing source: {compressed_path}')
             if extension == 'zip':
                 import zipfile
                 try:
                     with zipfile.ZipFile(compressed_path, 'r') as zipf:
-                        if os.path.splitext(file_path)[-1] in ('.tif', '.nrrd'):
-                            zipf.extract(os.path.basename(file_path), path=os.path.dirname(compressed_path))
+                        if file_path.suffix in ('.tif', '.nrrd'):
+                            zipf.extract(file_path.name, path=compressed_path.parent)
                         else:
-                            zipf.extractall(path=os.path.dirname(compressed_path))
-                    if not os.path.exists(file_path):
+                            zipf.extractall(path=compressed_path.parent)
+                    if not file_path.exists():
                         raise FileNotFoundError
                 except Exception as err:  # FIXME: TOO broad
                     print(err)
@@ -318,7 +327,7 @@ def compress(file_path, extension='zip', check=True, verbose=False):
 
     Arguments
     ---------
-    file_path : str
+    file_path : str or pathlib.Path
         The file path to search for.
     extension : str
         The extension for the compressed file.
@@ -329,28 +338,28 @@ def compress(file_path, extension='zip', check=True, verbose=False):
 
     Returns
     -------
-    filename : str or None
+    filename : Path or None
         The compressed filename or None if failed.
     """
-
-    if os.path.exists(file_path) and check:
+    file_path = Path(file_path)
+    if file_path.exists() and check:
         if extension == 'auto':
             extension = 'zip'
-        compressed_path = f'{file_path}.{extension}'  # FIXME: replace existing extension
-        if not os.path.exists(compressed_path):
+        compressed_path = file_path.with_suffix(f'{file_path.suffix}.{extension}')
+        if not compressed_path.exists():
             if verbose:
                 print(f'Compressing source: {file_path}')
             if extension == 'zip':
                 import zipfile
                 with zipfile.ZipFile(compressed_path, 'w', compression=zipfile.ZIP_DEFLATED) as zipf:
-                    if os.path.splitext(file_path)[-1] in ('.tif', '.nrrd'):
-                        zipf.write(file_path, arcname=os.path.basename(file_path))
+                    if file_path.suffix in ('.tif', '.nrrd'):
+                        zipf.write(file_path, arcname=file_path.name)
                     else:
-                        for root, dirs, files in os.walk(file_path):
+                        for root, dirs, files in file_path.walk():
                             for file in files:
-                                zipf.write(os.path.join(root, file), arcname=os.path.join(root, file))
-                if not os.path.exists(compressed_path):
-                    raise FileNotFoundError
+                                zipf.write(root / file, arcname=root / file)
+                if not compressed_path.exists():
+                    raise FileNotFoundError(f'Could not create compressed file {compressed_path} from {file_path}')
             elif extension in ('bz2', 'gzip', 'lzma'):
                 mod = importlib.import_module(extension)
                 with open(file_path, 'rb') as in_file, open(compressed_path, 'wb') as compressed_file:
@@ -368,7 +377,7 @@ def checksum(file_path, algorithm='md5', verbose=False):
 
     Arguments
     ---------
-    file_path : str
+    file_path : str or pathlib.Path
         The file path to search for.
     algorithm : str
         The algorithm to use for the checksum.
@@ -380,7 +389,8 @@ def checksum(file_path, algorithm='md5', verbose=False):
     checksum : str or None
         The checksum or None if failed.
     """
-    if os.path.exists(file_path):
+    file_path = Path(file_path)
+    if file_path.exists():
         if verbose:
             print(f'Calculating checksum for {file_path}')
         import hashlib
@@ -392,11 +402,69 @@ def checksum(file_path, algorithm='md5', verbose=False):
     else:
         raise FileNotFoundError(f'Cannot find file {file_path}')
     return file_checksum
+
+
+def find_existing_extension(path, extensions):  # FIXME: see if could use Glob
+    """
+    Return the first extension in the list of `extensions` that creates
+    and existing file with `path`.
+
+    Parameters
+    ----------
+    path
+    extensions
+
+    Returns
+    -------
+    str or None
+    """
+    for extension in extensions:
+        if path.with_suffix(extension).exists():
+            return extension
+
+
+def check_extensions(extensions):
+    """
+    Check if the extensions are valid (i.e. correctly constructed and
+    supported by ClearMap IO).
+
+    Parameters
+    ----------
+    extensions: list[str]
+        The list of extensions to check.
+
+    Raises
+    ------
+    ValueError
+    """
+    for ext in extensions:
+        if not ext.startswith('.'):
+            raise ValueError(f'Extension "{ext}" should start with a dot.')
+        if not is_clearmap_source_extension(ext):
+            raise ValueError(f'Unknown extension "{ext}". '
+                             f'Supported extensions are "{clearmap_io.file_extension_to_module.keys()}".')
+
+
+def is_clearmap_source_extension(extension):
+    """
+    Check if the extension is supported by ClearMap IO.
+
+    Parameters
+    ----------
+    extension: str
+        The extension to check.
+
+    Returns
+    -------
+    bool
+    """
+    return extension.lstrip('.') in clearmap_io.file_extension_to_module.keys()
     
 
 ###############################################################################
 # ## Tests
 ###############################################################################
+
 
 def test():
     import ClearMap.IO.FileUtils as fu

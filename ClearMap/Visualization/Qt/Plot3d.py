@@ -15,6 +15,7 @@ __webpage__ = 'https://idisco.info'
 __download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
 
 import itertools
+from pathlib import Path
 
 import numpy as np
 import pyqtgraph as pg
@@ -41,7 +42,7 @@ def plot(source, axis=None, scale=None, title=None, invert_y=True, min_max=None,
 
     Arguments
     ---------
-    source : Source, list or dict
+    source : Source, pathlib.Path, list or dict
         The source to plot. If a list is given several synchronized windows are
         generated. If an element in the list is a list of sources those are
         overlayed in different colors in that window.
@@ -64,6 +65,8 @@ def plot(source, axis=None, scale=None, title=None, invert_y=True, min_max=None,
     plot : DataViewer
       A data viewer class.
     """
+    if isinstance(source, Path):
+        source = str(source)
 
     if not isinstance(source, (list, tuple)):
         source = [source]
