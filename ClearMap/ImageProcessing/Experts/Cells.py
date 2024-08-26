@@ -16,10 +16,10 @@ __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
 
+import gc
 import multiprocessing
 
 import numpy as np
-import gc
 
 import cv2
 import scipy.ndimage.filters as ndf
