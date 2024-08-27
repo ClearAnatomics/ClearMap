@@ -28,7 +28,7 @@ def print_params(step_params, param_key, prefix, verbose):
 
 
 def run_step(param_key, previous_result, step_function, args=(), remove_previous_result=False,
-             extra_kwargs=None, parameter=None, steps_to_measure=None, prefix='',
+             presave_parser=None, extra_kwargs=None, parameter=None, steps_to_measure=None, prefix='',
              base_slicing=None, valid_slicing=None):
     if steps_to_measure is None:
         steps_to_measure = {}
@@ -50,11 +50,12 @@ def run_step(param_key, previous_result, step_function, args=(), remove_previous
             else:                    
                 save = clearmap_io.as_source(save,dtype=save_dtype)
 
+            to_save=presave_parser(result)
             # usefull sanity check
             if save_dtype=='bool':
-                save[base_slicing] = (result[valid_slicing] > 0)
+                save[base_slicing] = (to_save[valid_slicing] > 0)
             else:
-                save[base_slicing] = result[valid_slicing]
+                save[base_slicing] = to_save[valid_slicing]
 
         if parameter.get('verbose'):
             timer.print_elapsed_time(param_key.title())
