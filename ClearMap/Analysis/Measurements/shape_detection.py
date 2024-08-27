@@ -83,9 +83,9 @@ def detect_shape(source, seeds, threshold=None, verbose=False, processes=None, a
 
     peaks = vox.voxelize(seeds, shape=source.shape, weights=np.arange(1, seeds.shape[0]+1), processes=processes).array
     try:
-        shapes = skimage.morphology.watershed(-source, peaks, mask=mask)
+        shapes = skimage.morphology.watershed(-source, peaks, mask=mask, watershed_line=True)
     except AttributeError:
-        shapes = skimage.segmentation.watershed(-source, peaks, mask=mask)
+        shapes = skimage.segmentation.watershed(-source, peaks, mask=mask, watershed_line=True)
     # shapes = watershed_ift(-source.astype('uint16'), peaks)
     # shapes[numpy.logical_not(mask)] = 0
 
