@@ -44,10 +44,16 @@ def run_step(param_key, previous_result, step_function, args=(), remove_previous
         if save:
             if save_dtype is None:
                 save = clearmap_io.as_source(save)
-            else:
+            else:                    
                 save = clearmap_io.as_source(save,dtype=save_dtype)
 
-            save[base_slicing] = result[valid_slicing]
+            # usefull sanity check
+            if save_dtype=='bool':
+                save[base_slicing] = (result[valid_slicing] > 0)
+            else:
+                save[base_slicing] = result[valid_slicing]
+
+
 
         if parameter.get('verbose'):
             timer.print_elapsed_time(param_key.title())
