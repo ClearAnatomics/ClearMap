@@ -8,7 +8,6 @@ import ClearMap.Utils.HierarchicalDict as hdict
 def initialize_sinks(cell_detection_parameter, shape, order):
     for key in cell_detection_parameter.keys():
         par = cell_detection_parameter[key]
-        print(key,par)
         if isinstance(par, dict):
             filename = par.get('save')
             if filename:
