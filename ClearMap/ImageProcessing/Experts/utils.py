@@ -8,10 +8,14 @@ import ClearMap.Utils.HierarchicalDict as hdict
 def initialize_sinks(cell_detection_parameter, shape, order):
     for key in cell_detection_parameter.keys():
         par = cell_detection_parameter[key]
+        print(key,par)
         if isinstance(par, dict):
             filename = par.get('save')
             if filename:
-                ap.initialize_sink(filename, shape=shape, order=order, dtype='float')
+                dtype = par.get('save_dtype')
+                if dtype is None:
+                    dtype='float'
+                ap.initialize_sink(filename, shape=shape, order=order, dtype=dtype)
 
 
 def print_params(step_params, param_key, prefix, verbose):
@@ -36,7 +40,7 @@ def run_step(param_key, previous_result, step_function, args=(), remove_previous
     step_param = parameter.get(param_key)
     if step_param:
         step_param, timer = print_params(step_param, param_key, prefix, parameter.get('verbose'))
-
+        print("step_param:",step_param)
         save = step_param.pop('save', None)  # FIXME: check if always goes before step_function call
         save_dtype = step_param.pop('save_dtype', None)  
         result = step_function(previous_result, *args, **{**step_param, **extra_kwargs})
@@ -52,8 +56,6 @@ def run_step(param_key, previous_result, step_function, args=(), remove_previous
                 save[base_slicing] = (result[valid_slicing] > 0)
             else:
                 save[base_slicing] = result[valid_slicing]
-
-
 
         if parameter.get('verbose'):
             timer.print_elapsed_time(param_key.title())
