@@ -410,7 +410,6 @@ def detect_cells_block(source, parameter=default_cell_detection_parameter, n_thr
     else:
         results = ()
 
-    # WARNING: sd.detect_shape uses prange
     # cell shape detection  # FIXME: may use centers without assignment
     shape = run_step('shape_detection', dog, sd.detect_shape, remove_previous_result=True, **default_step_params,
                      args=[centers], extra_kwargs={'verbose': parameter.get('verbose'), 'processes': n_threads})
