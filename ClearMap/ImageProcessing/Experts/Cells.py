@@ -411,12 +411,11 @@ def detect_cells_block(source, parameter=default_cell_detection_parameter, n_thr
         results = ()
 
     # cell shape detection  # FIXME: may use centers without assignment
-    shape = run_step('shape_detection', dog, sd.detect_shape, remove_previous_result=True, **default_step_params,
-                     args=[centers], extra_kwargs={'verbose': parameter.get('verbose'), 'processes': n_threads})
     if parameter_shape:
-        # size detection
-        max_label = centers.shape[0]
-        sizes = sd.find_size(shape, max_label=max_label)
+        parser=(lambda t: t[0]>0)
+        shape, sizes = run_step('shape_detection', dog, sd.detect_shape, remove_previous_result=True, **default_step_params,
+        args=[centers], presave_parser=parser, extra_kwargs={'verbose': parameter.get('verbose'), 'processes': n_threads, 'return_sizes': True})
+        
         valid = sizes > 0
 
         results += (sizes,)
@@ -436,6 +435,7 @@ def detect_cells_block(source, parameter=default_cell_detection_parameter, n_thr
 
         for m in measure:
             if shape is not None:
+                max_label=shape.max()
                 intensity = sd.find_intensity(steps_to_measure[m], label=shape,
                                               max_label=max_label, **parameter_intensity)
             else:  # WARNING: prange but me.measure_expression not parallel since processes=1
