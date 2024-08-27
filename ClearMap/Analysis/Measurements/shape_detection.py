@@ -98,6 +98,8 @@ def detect_shape(source, seeds, threshold=None, verbose=False, processes=None, a
     
         if as_binary_mask:
             return (shapes>0),sizes
+        else:
+            return shapes,sizes
     else:
         if as_binary_mask:
             return shapes>0
