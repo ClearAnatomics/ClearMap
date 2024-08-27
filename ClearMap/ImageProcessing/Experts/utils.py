@@ -33,11 +33,7 @@ def run_step(param_key, previous_result, step_function, args=(), remove_previous
         parameter = {}
     if extra_kwargs is None:
         extra_kwargs = {}
-    print('In',param_key,)
-
     step_param = parameter.get(param_key)
-    print('In',param_key,'step_param:',step_param)
-
     if step_param:
         step_param, timer = print_params(step_param, param_key, prefix, parameter.get('verbose'))
 
