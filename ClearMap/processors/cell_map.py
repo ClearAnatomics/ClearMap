@@ -257,7 +257,7 @@ class CellDetector(TabProcessor):
                                     sink=self.get_path('cells', channel=self.channel, asset_sub_type='filtered'),
                                     thresholds=thresholds)
 
-    def run_cell_detection(self, tuning=False, save_shape=False, save_maxima=False):
+    def run_cell_detection(self, tuning=False, save_shape=False, save_as_binary_mask=False):
         self.reload_config()
         self.workspace.debug = tuning  # TODO: use context manager
         cell_detection_param = copy.deepcopy(cell_detection.default_cell_detection_parameter)
@@ -276,6 +276,8 @@ class CellDetector(TabProcessor):
 
         if save_shape:
             cell_detection_param['shape_detection']['save'] = shape_path
+            if save_as_binary_mask:
+                cell_detection_param['shape_detection']['save_dtype'] = 'bool'
 
         if save_maxima:
             maxima_path = self.get_path('cells', channel=self.channel, asset_sub_type='maxima')
