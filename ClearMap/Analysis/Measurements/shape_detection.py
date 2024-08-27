@@ -41,12 +41,14 @@ import ClearMap.Utils.HierarchicalDict as hdict
 ##############################################################################
 
 
-def detect_shape(source, seeds, threshold=None, verbose=False, processes=None):
-    """
-    Detect object shapes by generating a labeled image from seeds.
-  
-    Arguments
-    ---------
+def detect_shape(source, seeds, threshold=None, verbose=False, processes=None, as_binary_mask=False, return_sizes=False):
+    """Detect object shapes by generating a labeled image from seeds.
+
+    Optionally, the output is replaced by to a mere binary mask and the
+    distinct shapes sizes are also returned.
+
+    Parameters
+    ----------
     source : array, str or Source
         Source image.
     seeds : array, str or Source
@@ -56,11 +58,18 @@ def detect_shape(source, seeds, threshold=None, verbose=False, processes=None):
         treated as background. If None, the seeds are expanded indefinitely.
     verbose :bool
         If True, print progress info.
-  
+    as_binary_mask : bool, optional
+        If the first output is to be the mask of all shapes, by default False.
+    return_sizes : bool, optional
+        If the sizes of the various shapes are to be returned too, by default False.
+
     Returns
     -------
     shapes : array
-        Labeled image, where each label indicates an object.
+        Labeled image, where each label indicates an object. Optionally replaced
+        by shapes>0, see above.
+
+    sizes : (optional) the sizes of the shapes, in the same order are the seeds.
     """
 
     if verbose:
@@ -83,57 +92,17 @@ def detect_shape(source, seeds, threshold=None, verbose=False, processes=None):
     if verbose:
         timer.print_elapsed_time('Shape detection')
 
-    return shapes
-
-
-
-def detect_shapes_mask(source, seeds, threshold=None, verbose=False, processes=None):
-    """
-    Binary version of detect_shapes. A binary mask is outputted.
-
-    For the mask to allow recovery of the initial labelling, the watershed_line=True
-    option is passed to skimage.morphology.watershed 
-  
-    Arguments
-    ---------
-    source : array, str or Source
-        Source image.
-    seeds : array, str or Source
-        Cell centers as point coordinates.
-    threshold : float or None
-        Threshold to determine mask for watershed, pixel below this are
-        treated as background. If None, the seeds are expanded indefinitely.
-    verbose :bool
-        If True, print progress info.
-  
-    Returns
-    -------
-    shapes_mask : array
-        binary mask whose labelling gives the shapes
-    """
-
-    if verbose:
-        timer = tmr.Timer()
-        hdict.pprint(head='Shape detection, binary version', threshold=threshold)
-  
-    source = io.as_source(source).array
-    seeds = io.as_source(seeds)
-
-    mask = None if threshold is None else source > threshold
-
-    peaks = vox.voxelize(seeds, shape=source.shape, weights=np.arange(1, seeds.shape[0]+1), processes=processes).array
-    try:
-        shapes = skimage.morphology.watershed(-source, peaks, mask=mask, watershed_line=True)
-    except AttributeError:
-        shapes = skimage.segmentation.watershed(-source, peaks, mask=mask, watershed_line=True)
-    # shapes = watershed_ift(-source.astype('uint16'), peaks)
-    # shapes[numpy.logical_not(mask)] = 0
-
-    if verbose:
-        timer.print_elapsed_time('Shape detection')
-
-    return (shapes > 0) 
-
+    if return_sizes:
+        max_label = shapes.max()
+        sizes = find_size(shapes, max_label=max_label)
+    
+        if as_binary_mask:
+            return (shapes>0),sizes
+    else:
+        if as_binary_mask:
+            return shapes>0
+        else:
+            return shapes
 
 def find_size(label, max_label=None, verbose=False):
     """
