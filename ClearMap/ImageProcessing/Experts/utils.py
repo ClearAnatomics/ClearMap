@@ -39,7 +39,6 @@ def run_step(param_key, previous_result, step_function, args=(), remove_previous
     step_param = parameter.get(param_key)
     if step_param:
         step_param, timer = print_params(step_param, param_key, prefix, parameter.get('verbose'))
-        print("step_param:",step_param)
         save = step_param.pop('save', None)  # FIXME: check if always goes before step_function call
         save_dtype = step_param.pop('save_dtype', None)  
         result = step_function(previous_result, *args, **{**step_param, **extra_kwargs})
