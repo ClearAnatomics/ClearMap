@@ -84,9 +84,14 @@ def detect_shape(source, seeds, threshold=None, verbose=False, processes=None, a
 
 
     try:
-        shapes = skimage.morphology.watershed(-source, peaks, mask=mask, watershed_line=False)
+        shapes = skimage.morphology.watershed(-source, peaks, mask=mask, watershed_line=True)
     except AttributeError:
-        shapes = skimage.segmentation.watershed(-source, peaks, mask=mask, watershed_line=False)
+        shapes = skimage.segmentation.watershed(-source, peaks, mask=mask, watershed_line=True)
+
+    if np.unique(shapes).size!=np.unique(peaks*mask).size:
+        raise RuntimeError(f'watersheding yields unexepected results: the seed number was {np.unique(peaks*mask).size-1}'
+                           + f'and the number of labeled region in output was {np.unique(shapes).size} counting the zero labeled region'
+                           + 'However,' + ( 'there was no zero labeled pixel' if np.count_nonzero(shapes==0)==0  else 'there was some zero labeled pixel') )
 
     if verbose:
         timer.print_elapsed_time('Shape detection')
