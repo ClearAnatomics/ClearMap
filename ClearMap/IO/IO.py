@@ -559,7 +559,7 @@ def initialize(source_=None, shape=None, dtype=None, order=None, location=None,
                 return npy.create(shape=shape, dtype=dtype, order=order)
         else:
             try:
-                source_ = as_source(location,shape=shape,order=order)
+                source_ = as_source(location,shape=shape,order=order,dtype=dtype)
             except FileNotFoundError:  # TODO: see if nore exceptions are needed
                 try:
                     shape, dtype, order = _from_hint(hint, shape, dtype, order)
