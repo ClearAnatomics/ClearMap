@@ -393,10 +393,19 @@ def detect_cells_block(source, parameter=default_cell_detection_parameter, n_thr
         if parameter_maxima['h_max']:  # FIXME: check if source or dog
             centers = md.find_center_of_maxima(source, maxima=maxima, verbose=parameter.get('verbose'))
         else:
+            if parameter_shape:
+                threshold = parameter_shape.get('threshold',0)
+                print(f"masking maxima centers by (dog > {threshold}) for shape detection")
+                mask = dog > threshold
+                maxima = maxima * mask
+
             # We treat the eventuality of connected components of size>1 in the mask (maxima>0);
             # the choice of the structure matrix for connectivity could need discussion.
-            maxima_labels, _ = ndi.label(maxima,structure=np.ones((3,)*3,dtype='bool'))
+            # with no further adaptation the maxima_labeling consumes too much memory
+            maxima_labels, _ = ndi.label(maxima, structure=np.ones((3,)*3,dtype='bool'))
             centers = np.vstack((md.label_representatives(maxima_labels))).transpose()
+            # we could come back to the ancient version
+            # centers = ap.where(maxima, processes=n_threads).array 
         del maxima
 
         # correct for valid region
@@ -412,12 +421,11 @@ def detect_cells_block(source, parameter=default_cell_detection_parameter, n_thr
 
     # cell shape detection  # FIXME: may use centers without assignment
     if parameter_shape:
-        parser=(lambda t: t[0]>0)
+        parser = (lambda t: t[0]>0)
         shape, sizes = run_step('shape_detection', dog, sd.detect_shape, remove_previous_result=True, **default_step_params,
         args=[centers], presave_parser=parser, extra_kwargs={'verbose': parameter.get('verbose'), 'processes': n_threads, 'return_sizes': True})
         
         valid = sizes > 0
-
         results += (sizes,)
     else:
         valid = None
@@ -435,11 +443,12 @@ def detect_cells_block(source, parameter=default_cell_detection_parameter, n_thr
 
         for m in measure:
             if shape is not None:
-                max_label=shape.max()
+                max_label = centers.shape[0]
                 intensity = sd.find_intensity(steps_to_measure[m], label=shape,
                                               max_label=max_label, **parameter_intensity)
             else:  # WARNING: prange but me.measure_expression not parallel since processes=1
                 intensity = me.measure_expression(steps_to_measure[m], centers, search_radius=r,
+            
                                                   **parameter_intensity, processes=1, verbose=False)
             results += (intensity,)
 
