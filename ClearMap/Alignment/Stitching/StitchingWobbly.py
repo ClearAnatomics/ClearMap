@@ -30,7 +30,7 @@ import ClearMap.Alignment.Stitching.Tracking as trk
 import ClearMap.ParallelProcessing.ParallelTraceback as ptb
 
 import ClearMap.Utils.Timer as tmr
-import ClearMap.Utils.TagExpression as te
+import ClearMap.Utils.tag_expression as te
 
 from ClearMap.Utils.utilities import CancelableProcessPoolExecutor
 

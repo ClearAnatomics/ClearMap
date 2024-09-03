@@ -31,7 +31,7 @@ import ClearMap.ParallelProcessing.ProcessWriter as pw
 import ClearMap.ParallelProcessing.ParallelTraceback as ptb
 
 import ClearMap.Utils.Timer as tmr
-from ClearMap.Utils.TagExpression import Expression
+from ClearMap.Utils.tag_expression import Expression
 
 from .Transformations.Transformation import TransformationBase
 from ClearMap.Alignment.orientation import (format_orientation, orientation_to_transposition, orient_resolution,

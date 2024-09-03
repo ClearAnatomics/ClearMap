@@ -26,7 +26,7 @@ __download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
 
 import functools
 
-from ClearMap.Utils.TagExpression import Expression
+from ClearMap.Utils.tag_expression import Expression
 from ClearMap.Utils.exceptions import MissingRequirementException, SmiError
 
 colors = {

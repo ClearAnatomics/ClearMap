@@ -46,7 +46,7 @@ except ImportError:
 import ClearMap.IO.FileList as fl
 import ClearMap.IO.FileUtils as fu
 
-import ClearMap.Utils.TagExpression as te
+import ClearMap.Utils.tag_expression as te
 import ClearMap.Utils.Timer as tmr
 
 import ClearMap.ParallelProcessing.ParallelTraceback as ptb
