@@ -71,7 +71,7 @@ def detect_shape(source, seeds, threshold=None, verbose=False, processes=None, a
 
     sizes : (optional) the sizes of the shapes, in the same order are the seeds.
     """
-
+    print(f'debug: in detect_shape: threshold={threshold}')
     if verbose:
         timer = tmr.Timer()
         hdict.pprint(head='Shape detection', threshold=threshold)
@@ -88,7 +88,7 @@ def detect_shape(source, seeds, threshold=None, verbose=False, processes=None, a
     except AttributeError:
         shapes = skimage.segmentation.watershed(-source, peaks, mask=mask, watershed_line=True)
 
-    if np.unique(shapes).size!=np.unique(peaks*mask).size:
+    if np.unique(shapes).size != np.unique((peaks if mask is None else peaks*mask)).size:
         raise RuntimeError(f'watersheding yields unexepected results: the seed number was {np.unique(peaks*mask).size-1}'
                            + f'and the number of labeled region in output was {np.unique(shapes).size} counting the zero labeled region'
                            + 'However,' + ( 'there was no zero labeled pixel' if np.count_nonzero(shapes==0)==0  else 'there was some zero labeled pixel') )
