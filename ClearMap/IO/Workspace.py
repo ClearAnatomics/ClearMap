@@ -28,7 +28,7 @@ from collections import OrderedDict
 import numpy as np
 
 import ClearMap.IO.IO as clearmap_io
-from ClearMap.Utils.TagExpression import Expression
+from ClearMap.Utils.tag_expression import Expression
 # import ClearMap.ParallelProcessing.DataProcessing.ArrayProcessing as array_processing
 import ClearMap.Visualization.Plot3d as q_plot_3d
 

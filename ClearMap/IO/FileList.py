@@ -38,7 +38,7 @@ if sys.version_info[0] < 3:
 else:
   from . import IO as io
 
-import ClearMap.Utils.TagExpression as te
+import ClearMap.Utils.tag_expression as te
 
 import ClearMap.ParallelProcessing.ParallelTraceback as ptb
 

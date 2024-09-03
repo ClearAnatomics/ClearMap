@@ -39,7 +39,7 @@ import ClearMap.ParallelProcessing.ParallelTraceback as ptb
 import ClearMap.Visualization.Plot3d as p3d
 import ClearMap.Visualization.Color as col
 
-import ClearMap.Utils.TagExpression as te
+import ClearMap.Utils.tag_expression as te
 import ClearMap.Utils.Timer as tmr
 
 from ClearMap.Utils.Formatting import ensure
