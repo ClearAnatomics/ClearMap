@@ -410,6 +410,7 @@ def detect_cells_block(source, parameter=default_cell_detection_parameter, n_thr
 
         # correct for valid region
         if valid:
+            print('filtering centers for correct block processing.')
             ids = np.ones(len(centers), dtype=bool)
             for c, l, u in zip(centers.T, valid_lower, valid_upper):
                 ids = np.logical_and(ids, np.logical_and(l <= c, c < u))
@@ -456,6 +457,8 @@ def detect_cells_block(source, parameter=default_cell_detection_parameter, n_thr
             timer.print_elapsed_time('Shape detection')
 
     if valid is not None:
+        print('for debugging: results shapes:', *[r.shape for r in results])
+        print('valid shape:', valid.shape)
         results = tuple(r[valid] for r in results)
     # correct coordinate offsets of blocks
     results = (results[0] + lower,) + results[1:]
