@@ -34,7 +34,7 @@ import ClearMap.Analysis.Measurements.Voxelization as vox
 
 import ClearMap.Utils.Timer as tmr
 import ClearMap.Utils.HierarchicalDict as hdict
-
+from ClearMap.Utils.exceptions import ClearMapValueError
 
 ##############################################################################
 # Cell shape detection
@@ -82,6 +82,14 @@ def detect_shape(source, seeds, threshold=None, verbose=False, processes=None, a
 
     peaks = vox.voxelize(seeds, shape=source.shape, weights=np.arange(1, seeds.shape[0]+1), processes=processes).array
 
+    # We check that source has no 0 value otherwise the map source -> -source is not necessarily decreasing, eg for source.dtype=uint16.
+    if np.any(source == 0) and np.issubdtype(source.dtype,np.unsignedinteger):
+        print('For sanity, we shift the source intensity by 1 prior to taking its opposite.')
+        if source.max() < np.ma.minimum_fill_value(source):
+            source+=1
+
+        else:
+            raise ClearMapValueError('An uint array with 0 values will lead to inconsistent results, consider a histogram transform or dtype conversion.')
 
     try:
         shapes = skimage.morphology.watershed(-source, peaks, mask=mask, watershed_line=True)
@@ -89,7 +97,7 @@ def detect_shape(source, seeds, threshold=None, verbose=False, processes=None, a
         shapes = skimage.segmentation.watershed(-source, peaks, mask=mask, watershed_line=True)
 
     if np.unique(shapes).size != np.unique((peaks if mask is None else peaks*mask)).size:
-        raise RuntimeError(f'watersheding yields unexepected results: the seed number was {np.unique(peaks*mask).size-1}'
+        raise RuntimeError(f'watersheding yields unexpected results: the seed number was {np.unique(peaks*mask).size-1}'
                            + f'and the number of labeled region in output was {np.unique(shapes).size} counting the zero labeled region'
                            + 'However,' + ( 'there was no zero labeled pixel' if np.count_nonzero(shapes==0)==0  else 'there was some zero labeled pixel') )
 
