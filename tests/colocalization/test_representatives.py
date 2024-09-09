@@ -34,9 +34,11 @@ def test_representatives():
     for i in range(100):
         array = rand_array(3,10)
         elem_assert(array)
+        elem_assert(array.transpose())
 
 #TODO: have this integrated within pytest framework
 
 if __name__ == '__main__':
     print('testing label_representatives')
     test_representatives()
+    print('test successful!')
