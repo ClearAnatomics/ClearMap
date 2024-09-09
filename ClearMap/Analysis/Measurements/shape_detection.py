@@ -132,7 +132,7 @@ def detect_shape(source, seeds, threshold=None, verbose=False, processes=None, a
     seeds = io.as_source(seeds)
     mask = None if threshold is None else source > threshold
 
-    peaks = 
+    peaks = labeled_pixels_from_centers(seeds,np.arange(1, seeds.shape[0]+1), source.shape)
 
     # We check that source has no 0 value otherwise the map source -> -source is not necessarily decreasing, eg for source.dtype=uint16.
     if np.any(source == 0) and np.issubdtype(source.dtype,np.unsignedinteger):
