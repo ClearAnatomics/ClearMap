@@ -93,7 +93,7 @@ def labeled_pixels_from_centers(centers,weights,shape):
     B[xs,ys,zs]=weights
     return B
 
-def detect_shape(source, seeds, threshold=None, verbose=False, processes=None, as_binary_mask=False, return_sizes=False):
+def detect_shape(source, seeds, threshold=None, verbose=False, processes=None, as_binary_mask=False, return_sizes=False, seeds_as_labels = False):
     """Detect object shapes by generating a labeled image from seeds.
 
     Optionally, the output is replaced by to a mere binary mask and the
@@ -104,7 +104,7 @@ def detect_shape(source, seeds, threshold=None, verbose=False, processes=None, a
     source : array, str or Source
         Source image.
     seeds : array, str or Source
-        Cell centers as point coordinates.
+        Cell centers as point coordinates if seeds_as_labels is False. See below otherwise.
     threshold : float or None
         Threshold to determine mask for watershed, pixel below this are
         treated as background. If None, the seeds are expanded indefinitely.
@@ -114,6 +114,9 @@ def detect_shape(source, seeds, threshold=None, verbose=False, processes=None, a
         If the first output is to be the mask of all shapes, by default False.
     return_sizes : bool, optional
         If the sizes of the various shapes are to be returned too, by default False.
+    seeds_as_labels: bool, optional
+        Defaults to Faulse. If True the input seeds is considered to be a labeled image w/
+        the initial basins.
 
     Returns
     -------
@@ -131,8 +134,10 @@ def detect_shape(source, seeds, threshold=None, verbose=False, processes=None, a
     source = io.as_source(source).array
     seeds = io.as_source(seeds)
     mask = None if threshold is None else source > threshold
-
-    peaks = labeled_pixels_from_centers(seeds,np.arange(1, seeds.shape[0]+1), source.shape)
+    if seeds_as_labels:
+        peaks = seeds
+    else:
+        peaks = labeled_pixels_from_centers(seeds,np.arange(1, seeds.shape[0]+1), source.shape)
 
     # We check that source has no 0 value otherwise the map source -> -source is not necessarily decreasing, eg for source.dtype=uint16.
     if np.any(source == 0) and np.issubdtype(source.dtype,np.unsignedinteger):
