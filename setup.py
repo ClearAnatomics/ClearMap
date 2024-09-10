@@ -41,7 +41,9 @@ if not os_name.startswith('windows'):
     DEFAULT_LIBRARIES += ['m']
 
 if os_name.startswith('linux'):
-    DEFAULT_COMPILE_ARGS += ['-flarge-source-files']
+    out = subprocess.check_output(['gcc', '--help=common']).decode('utf-8')
+    if '-flarge-source-files' in out:  # Add only if supported by the compiler
+        DEFAULT_COMPILE_ARGS += ['-flarge-source-files']
 
 if len(sys.argv) > 2:
     USE_OPENMP = sys.argv[2].lower() in ('use_openmp', 'true')
