@@ -5,6 +5,7 @@ import numpy as np
 sys.path.insert(0, "../..")
 from ClearMap.Analysis.Measurements.maxima_detection import label_representatives
 from ClearMap.colocalization import bilabel_bincount
+from ClearMap.colocalization import distances
 
 
 ### for label_representatives
@@ -56,6 +57,21 @@ def test_bilabel_bincount():
         assert np.all(res == counts)
 
 
+### for distances
+
+
+def test_distances():
+    for i in range(100):
+        dim = np.random.randint(1, 10)
+        A = np.random.randint(10, size=(30, dim))
+        B = np.random.randint(10, size=(30, dim))
+        res = np.zeros((A.shape[0], B.shape[0]))
+        for i in range(A.shape[0]):
+            for j in range(B.shape[0]):
+                res[i, j] = (np.sum((A[i] - B[j]) ** 2)) ** 0.5
+        assert np.all(res == distances(A, B))
+
+
 # TODO: have this integrated within pytest framework
 
 if __name__ == "__main__":
@@ -63,4 +79,6 @@ if __name__ == "__main__":
     test_representatives()
     print("testing bilabel_bincount")
     test_bilabel_bincount()
+    print("testing distances")
+    test_distances()
     print("The tests were successful!")
