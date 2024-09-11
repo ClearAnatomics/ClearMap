@@ -43,6 +43,30 @@ import scipy.ndimage as ndi
 from ..IO.Source import Source
 
 
+# batch distance computation
+def distances(points_1: np.ndarray, points_2: np.ndarray) -> np.ndarray:
+    """Compute the distances between the points in points_1 and those of points_2.
+
+    Parameters
+    ----------
+    points_1 : np.ndarray
+        array of points of shape (n_points_1,dim)
+    points_2 : np.ndarray
+        array of points of shape (n_points_2,dim)
+    Returns
+    -------
+    np.ndarray
+        distance matrix A: A[i,j] is the distance between the ith point in
+        points_1 and the jth point in points_2.
+    """
+    return (
+        np.sum(
+            (points_1[:, np.newaxis, :] - points_2[np.newaxis, :, :]) ** 2,
+            axis=-1,
+        )
+    ) ** 0.5
+
+
 # a cool auxiliary function
 def bilabel_bincount(labels_1: np.array, labels_2: np.array) -> np.array:
     """Count the number of occurences for all the conjunctions of labels.
@@ -233,15 +257,19 @@ class Channel:
         return np.max(counts, axis=1)[self.index_label_correspondance] / self.sizes
 
     def centers_distances(self, other_channel: Channel) -> np.array:
-        """
+        """Return array of distances between centers across the two channels.
 
         Parameters
         ----------
         other_channel : Channel
-            _description_
+            Channel to compare with self
 
         Returns
         -------
         np.array
-            _description_
+            distance matrix A: A[index_1,index_2] is the distance between the centers
+            of the nucleus indexed by index_1 in self.dataframe and  the nucleus
+            indexed by index_2 in other_channel.dataframe.
         """
+
+        return distances(self.centers, other_channel.centers)
