@@ -2,7 +2,7 @@ import sys
 
 import numpy as np
 
-sys.path.insert(0, "../..")
+sys.path.insert(0, "ClearMap2")
 from ClearMap.Analysis.Measurements.maxima_detection import label_representatives
 from ClearMap.colocalization import bilabel_bincount
 from ClearMap.colocalization import distances
