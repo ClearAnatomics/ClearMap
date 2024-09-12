@@ -154,6 +154,21 @@ class Channel:
         ]
 
     @cached_property
+    def label_index_correspondance(self):
+        # beware that not all label corresponds to an index,
+        # if we do not have a complete set of reps in the dataframe.
+        # We set arbitrarily the index value 0 for the labels that will not be used.
+        max_label = max(self.index_label_correspondance)
+        return [
+            (
+                self.index_label_correspondance.index(label)
+                if label in self.index_label_correspondance
+                else 0
+            )
+            for label in range(max_label + 1)
+        ]
+
+    @cached_property
     def _shifted_index_label_correspondance(self):
         """Return the index_label_correspondance shifted by 1
 
@@ -265,8 +280,11 @@ class Channel:
 
         return self.masked_sizes(other_channel.binary_img) / self.sizes
 
-    def single_blob_overlap_rates(self, other_channel: Channel) -> np.ndarray:
+    def single_blob_overlap_rates(
+        self, other_channel: Channel, return_max_indices=True
+    ) -> np.ndarray:
         """For each nucleus of self, compute the max overlap rate with a single nucleus of other_channel.
+            if return_max_indices is True, nuclei indices that realize the max are also returned.
 
         Parameters
         ----------
@@ -277,13 +295,41 @@ class Channel:
         -------
         np.ndarray
             the max overlap rate for each nucleus in the order of self.dataframe
+
+        np.ndarray
+            the array of nucleus indices of other_channel that realize the maxima.
         """
 
         counts = bilabel_bincount(self.labels, other_channel.labels)
-        return (
-            np.max(counts[1:, 1:], axis=1)[self._shifted_index_label_correspondance]
-            / self.sizes
-        )
+
+        if return_max_indices:
+            argmax = np.argmax(counts[1:, 1:], axis=1)
+            self_labels_to_other_channel_labels_of_max = argmax + 1
+            self_nuclei_indices_to_other_channel_labels_of_max = (
+                self_labels_to_other_channel_labels_of_max[
+                    self._shifted_index_label_correspondance
+                ]
+            )
+
+            self_nuclei_indices_to_other_channel_index_of_max = (
+                other_channel.label_index_correspondance[
+                    self_nuclei_indices_to_other_channel_labels_of_max
+                ]
+            )
+
+            max_by_label = counts[1:, 1:][np.arange(counts.shape[0] - 1), argmax]
+            max_by_index = max_by_label[self._shifted_index_label_correspondance]
+
+            return (
+                max_by_index / self.sizes,
+                self_nuclei_indices_to_other_channel_index_of_max,
+            )
+
+        else:
+            return (
+                np.max(counts[1:, 1:], axis=1)[self._shifted_index_label_correspondance]
+                / self.sizes
+            )
 
     def centers_distances(self, other_channel: Channel) -> np.array:
         """Return array of distances between centers across the two channels.
