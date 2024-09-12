@@ -86,9 +86,11 @@ def bilabel_bincount(labels_1: np.array, labels_2: np.array) -> np.array:
     """
 
     # inspired by the join segmentation of skimage
-    factor = labels_1.max() + 1
-    max_val = labels_2.max() * factor + factor - 1
-
+    max_1 = labels_1.max()
+    max_2 = labels_2.max()
+    factor = max_2 + 1
+    # factor will also be the heigth of the output
+    max_val = max_1 * factor + max_2
     # determine the cheapest dtype to hold the join
     dtypes = ["uint8", "uint16", "uint32", "uint64", "argh"]
     for i, dtype in enumerate(dtypes):
@@ -97,14 +99,23 @@ def bilabel_bincount(labels_1: np.array, labels_2: np.array) -> np.array:
     if dtype == "argh":
         raise RuntimeError("This software is not able to store the join labels.")
 
-    joined_labels = factor * labels_2.astype(dtype) + labels_1.astype(dtype)
+    joined_labels = factor * labels_1.astype(dtype) + labels_2.astype(dtype)
 
-    counts = np.bincount(
-        joined_labels.flatten(), minlength=factor * (max_val // factor + 1)
-    )
+    counts = np.bincount(joined_labels.flatten(), minlength=(max_1 + 1) * (max_2 + 1))
 
     # We return the counts recast in 2d
-    return counts.reshape((factor, -1)).transpose()
+    return counts.reshape((max_1 + 1, max_2 + 1))
+
+
+# for comparison purposes
+def _naive_bilabel_bincount(A, B):
+    m = A.max() + 1
+    n = B.max() + 1
+    res = np.zeros((m, n), dtype="uint8")
+    for i in range(m):
+        for j in range(n):
+            res[i, j] = np.count_nonzero((A == i) * (B == j))
+    return res
 
 
 class Channel:
@@ -115,9 +126,12 @@ class Channel:
     """
 
     def __init__(
-        self, binary_img: Source, dataframe: pd.DataFrame, coord_names=["x", "y", "z"]
+        self,
+        binary_img: np.ndarray,
+        dataframe: pd.DataFrame,
+        coord_names=["x", "y", "z"],
     ) -> None:
-        self.binary_img = binary_img.array
+        self.binary_img = binary_img
         self.dataframe = dataframe
         self.coord_names = coord_names
         self.ndim = len(self.coord_names)
@@ -138,6 +152,17 @@ class Channel:
             self.labels[tuple(self.dataframe[self.coord_names].iloc[index])]
             for index in range(len(self.dataframe))
         ]
+
+    @cached_property
+    def _shifted_index_label_correspondance(self):
+        """Return the index_label_correspondance shifted by 1
+
+        Returns
+        -------
+        list[int]
+            the list L such that L[i]=index_label_correspondance[i]-1
+        """
+        return list(np.array(self.index_label_correspondance) - 1)
 
     def nucleus(self, index):
         """Return the nucleus associated to a given index, as a mask.
@@ -253,8 +278,12 @@ class Channel:
         np.ndarray
             the max overlap rate for each nucleus in the order of self.dataframe
         """
+
         counts = bilabel_bincount(self.labels, other_channel.labels)
-        return np.max(counts, axis=0)[self.index_label_correspondance] / self.sizes
+        return (
+            np.max(counts[1:, 1:], axis=1)[self._shifted_index_label_correspondance]
+            / self.sizes
+        )
 
     def centers_distances(self, other_channel: Channel) -> np.array:
         """Return array of distances between centers across the two channels.

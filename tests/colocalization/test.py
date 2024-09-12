@@ -5,6 +5,8 @@ import numpy as np
 sys.path.insert(0, "ClearMap2")
 from ClearMap.Analysis.Measurements.maxima_detection import label_representatives
 from ClearMap.colocalization import bilabel_bincount
+from ClearMap.colocalization import _naive_bilabel_bincount
+
 from ClearMap.colocalization import distances
 
 
@@ -45,15 +47,14 @@ def test_representatives():
 
 def test_bilabel_bincount():
     for u in range(100):
-        A = np.random.randint(5, size=(20, 20))
-        B = np.random.randint(5, size=(20, 20))
+        if u % 2:
+            A = np.asfortranarray(np.random.randint(5, size=(20, 20)))
+            B = np.random.randint(6, size=(20, 20))
+        else:
+            A = np.random.randint(6, size=(20, 20))
+            B = np.random.randint(5, size=(20, 20))
         counts = bilabel_bincount(A, B)
-        m = A.max() + 1
-        n = B.max() + 1
-        res = np.zeros((m, n), dtype="uint8")
-        for i in range(m):
-            for j in range(n):
-                res[i, j] = np.count_nonzero((A == i) * (B == j))
+        res = _naive_bilabel_bincount(A, B)
         assert np.all(res == counts)
 
 
