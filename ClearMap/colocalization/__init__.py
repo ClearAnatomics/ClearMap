@@ -62,7 +62,7 @@ def distances(points_1: np.ndarray, points_2: np.ndarray) -> np.ndarray:
     return (
         np.sum(
             (points_1[:, np.newaxis, :] - points_2[np.newaxis, :, :]) ** 2,
-            axis=-1,
+            axis=2,
         )
     ) ** 0.5
 
@@ -181,9 +181,9 @@ class Channel:
 
     @cached_property
     def centers(self):
-        starts = self._bounding_boxes_array[:, :, 0]
-        stops = self._bounding_boxes_array[:, :, 1]
-        return ((starts + stops) // 2).reshape(self._bounding_boxes_array.shape[:2])
+        starts = self._bounding_boxes_array[:, :, 0].astype("float32")
+        stops = self._bounding_boxes_array[:, :, 1].astype("float32")
+        return ((starts + stops) / 2).reshape(self._bounding_boxes_array.shape[:2])
 
     def center(self, i) -> tuple[int, ...]:
         """Return the center of the bounding box of the ith nucleus.
@@ -220,9 +220,9 @@ class Channel:
             The list of counts of True pixels in mask for each nucleus, in the
             order of our dataframe.
         """
-        return np.bincount((mask * self.labels).flatten(), minlength=self.sizes.size)[
-            self.index_label_correspondance
-        ]
+        return np.bincount(
+            (mask * self.labels).flatten(), minlength=self.sizes.size + 1
+        )[self.index_label_correspondance]
 
     def overlap_rates(self, other_channel: Channel):
         """Return the rate of positive pixels for other_channel in each nucleus
@@ -238,7 +238,7 @@ class Channel:
             The array of rates, in the order of self.dataframe
         """
 
-        return self.sizes / self.masked_sizes(other_channel.binary_img)
+        return self.masked_sizes(other_channel.binary_img) / self.sizes
 
     def single_blob_overlap_rates(self, other_channel: Channel) -> np.ndarray:
         """For each nucleus of self, compute the max overlap rate with a single nucleus of other_channel.
@@ -254,7 +254,7 @@ class Channel:
             the max overlap rate for each nucleus in the order of self.dataframe
         """
         counts = bilabel_bincount(self.labels, other_channel.labels)
-        return np.max(counts, axis=1)[self.index_label_correspondance] / self.sizes
+        return np.max(counts, axis=0)[self.index_label_correspondance] / self.sizes
 
     def centers_distances(self, other_channel: Channel) -> np.array:
         """Return array of distances between centers across the two channels.
