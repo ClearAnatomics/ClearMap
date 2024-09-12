@@ -2,10 +2,14 @@ import sys
 
 import numpy as np
 import pandas as pd
+import skimage
+import skimage.measure
 
 sys.path.insert(0, "ClearMap2")
 
 from ClearMap.colocalization import Channel
+from ClearMap.colocalization import _naive_bilabel_bincount
+
 from ClearMap.IO.IO import source
 
 shape = (20, 20)
@@ -18,8 +22,8 @@ binary_1[3:19, 2:18] = 1
 binary_2[:10, :11] = 1
 binary_2[:10, 14:] = 1
 
-binary_1 = source(binary_1)
-binary_2 = source(binary_2)
+# binary_1 = source(binary_1)
+# binary_2 = source(binary_2)
 
 reps_1 = [(3, 17)]
 reps_2 = [(0, 19), (3, 3)]
@@ -67,12 +71,10 @@ assert [channel_2.center(index) for index in range(len(channel_2.dataframe))] ==
 # print("channel2 index ot label", channel_2.index_label_correspondance)
 
 
-def almost_zero(val):
-    return val**2 < 0.0001
-
-
 # check overlap computations
-np.allclose(channel_1.overlap_rates(channel_2), np.array([global_rate]), atol=1e-05)
+assert np.allclose(
+    channel_1.overlap_rates(channel_2), np.array([global_rate]), atol=1e-05
+)
 
 
 # print(
@@ -80,12 +82,12 @@ np.allclose(channel_1.overlap_rates(channel_2), np.array([global_rate]), atol=1e
 #     channel_1.single_blob_overlap_rates(channel_2),
 #     np.array([single_rate_1, single_rate_2]),
 # )
-assert almost_zero(
-    np.sum(
-        channel_1.single_blob_overlap_rates(channel_2)
-        - np.max(np.array([single_rate_1, single_rate_2]))
-    )
+assert np.allclose(
+    channel_1.single_blob_overlap_rates(channel_2),
+    np.max(np.array([single_rate_1, single_rate_2])),
+    atol=1e-05,
 )
+
 
 # check distances
 # print("distances", channel_1.centers_distances(channel_2))
