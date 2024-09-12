@@ -83,7 +83,7 @@ assert np.allclose(
 #     np.array([single_rate_1, single_rate_2]),
 # )
 assert np.allclose(
-    channel_1.single_blob_overlap_rates(channel_2),
+    channel_1.single_blob_overlap_rates(channel_2, return_max_indices=False),
     np.max(np.array([single_rate_1, single_rate_2])),
     atol=1e-05,
 )
@@ -94,4 +94,13 @@ assert np.allclose(
 assert np.allclose(
     np.array([[9.219544, 7.5]]), channel_1.centers_distances(channel_2), atol=1e-7
 )
+
+
+max_rates, max_indices = channel_1.single_blob_overlap_rates(
+    channel_2, return_max_indices=True
+)
+assert np.allclose(
+    max_rates, np.max(np.array([single_rate_1, single_rate_2])), atol=1e-05
+)
+assert max_indices == np.array([1])
 print("test passed !")
