@@ -79,11 +79,11 @@ assert np.allclose(
 
 # print(
 #     "single_blob..., single_rates:",
-#     channel_1.single_blob_overlap_rates(channel_2),
+#     channel_1.blobwise_overlap_rates(channel_2),
 #     np.array([single_rate_1, single_rate_2]),
 # )
 assert np.allclose(
-    channel_1.single_blob_overlap_rates(channel_2, return_max_indices=False),
+    channel_1.max_blobwise_overlap_rates(channel_2, return_max_indices=False),
     np.max(np.array([single_rate_1, single_rate_2])),
     atol=1e-05,
 )
@@ -96,7 +96,7 @@ assert np.allclose(
 )
 
 
-max_rates, max_indices = channel_1.single_blob_overlap_rates(
+max_rates, max_indices = channel_1.max_blobwise_overlap_rates(
     channel_2, return_max_indices=True
 )
 assert np.allclose(
