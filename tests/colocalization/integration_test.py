@@ -1,5 +1,8 @@
 import sys
 
+sys.path.append(
+    "/home/gael.cousin/Documents/my_code/colocalization/ClearMap2/ClearMap/colocalization"
+)
 import numpy as np
 import pandas as pd
 import skimage
@@ -7,8 +10,8 @@ import skimage.measure
 
 sys.path.insert(0, "ClearMap2")
 
-from ClearMap.colocalization import Channel
-from ClearMap.colocalization import _naive_bilabel_bincount
+from ClearMap.colocalization.channel import Channel
+from ClearMap.colocalization.channel import _naive_bilabel_bincount
 
 from ClearMap.IO.IO import source
 
