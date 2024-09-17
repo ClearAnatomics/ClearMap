@@ -38,13 +38,9 @@ from __future__ import annotations
 from functools import cached_property
 
 import numpy as np
-from . import test
 import bounding_boxes
 import pandas as pd
 import scipy.ndimage as ndi
-
-
-from ..IO.Source import Source
 
 
 # batch distance computation
@@ -137,12 +133,25 @@ class Channel:
         binary_img: np.ndarray,
         dataframe: pd.DataFrame,
         coord_names=["x", "y", "z"],
+        voxel_dims=None,
+        physical_origin=None,
         channel_name="",
     ) -> None:
         self.binary_img = binary_img
         self.dataframe = dataframe
         self.coord_names = coord_names
         self.ndim = len(self.coord_names)
+        if voxel_dims is None:
+            voxel_dims = [1] * self.ndim
+        if physical_origin is None:
+            physical_origin = [0] * self.ndim
+        self.voxel_dims = np.array(voxel_dims)
+        self.physical_origin = np.array(physical_origin)
+
+        if self.voxel_dims.size != self.ndim or self.physical_origin.size != self.ndim:
+            raise ValueError(
+                "The lengths of voxel_dims, physical_origin and coord_names do not match."
+            )
 
         # we identify the channel by a name fo caching management
         if not channel_name:
@@ -374,6 +383,12 @@ class Channel:
             The matrix M such that M[i,j] is the overlap count in voxels for blob
             of index i for self and the blob of index j for other_channel.
         """
+        if np.any(self.voxel_dims != other_channel.voxel_dims) or np.any(
+            self.physical_origin != other_channel.physical_origin
+        ):
+            raise ValueError(
+                "The blobwise overlap is implemented only for two Channels with same voxel_dims and physical_origin."
+            )
 
         if other_channel.name in self._overlaps_dic:
             return self._overlaps_dic[other_channel.name]
@@ -459,5 +474,12 @@ class Channel:
             of the nucleus indexed by index_1 in self.dataframe and  the nucleus
             indexed by index_2 in other_channel.dataframe.
         """
+        physical_centers_1 = (
+            self.centers * (self.voxel_dims.reshape((-1, 1))) + self.physical_origin
+        )
+        physical_centers_2 = (
+            other_channel.centers * (other_channel.voxel_dims.reshape((-1, 1)))
+            + other_channel.physical_origin
+        )
 
-        return distances(self.centers, other_channel.centers)
+        return distances(physical_centers_1, physical_centers_2)
