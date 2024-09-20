@@ -15,9 +15,9 @@ ClearMap 2.1
 
 
 <p align="center">
-<img src="https://christophkirst.github.io/ClearMap2Documentation/images/TubeMap_graph_movie.gif" height="150">
-<img src="https://christophkirst.github.io/ClearMap2Documentation/images/CellMap_raw_movie.gif" height="150">
-<img src="https://christophkirst.github.io/ClearMap2Documentation/images/TubeMap_raw_movie.gif" height="150">
+<img src="https://clearanatomics.github.io/ClearMapDocumentation/images/TubeMap_graph_movie.gif" height="150">
+<img src="https://clearanatomics.github.io/ClearMapDocumentation/images/CellMap_raw_movie.gif" height="150">
+<img src="https://clearanatomics.github.io/ClearMapDocumentation/images/TubeMap_raw_movie.gif" height="150">
 </p>
 
 
@@ -44,15 +44,15 @@ data from cleared tissues.
 \
 *ClearMap's* tool box includes 
 
-## [Wobbly-Stitcher](https://christophkirst.github.io/ClearMap2Documentation/html/wobblystitcher.html) <a href="https://christophkirst.github.io/ClearMap2Documentation/html/TubeMap.html#Stitching"> <img src="https://christophkirst.github.io/ClearMap2Documentation/images/WobblyStitcher.jpg" alt="WobblyStitcher" width="150" align="right" vspace = "5"/></a>
+## [Wobbly-Stitcher](https://clearanatomics.github.io/ClearMapDocumentation/html/wobblystitcher.html) <a href="https://clearanatomics.github.io/ClearMapDocumentation/html/TubeMap.html#Stitching"> <img src="https://clearanatomics.github.io/ClearMapDocumentation/images/WobblyStitcher.jpg" alt="WobblyStitcher" width="150" align="right" vspace = "5"/></a>
 
 Stitch TB data sets non-rigidly.
   
-## [TubeMap](https://christophkirst.github.io/ClearMap2Documentation/html/tubemap.html) <a href="https://christophkirst.github.io/ClearMap2Documentation/html/TubeMap.html"> <img src="https://christophkirst.github.io/ClearMap2Documentation/images/TubeMap_graph_raw_movie.gif" alt="WobblyStitcher" width="150" align="right" vspace = "5"/></a>
+## [TubeMap](https://clearanatomics.github.io/ClearMapDocumentation/html/tubemap.html) <a href="https://clearanatomics.github.io/ClearMapDocumentation/html/TubeMap.html"> <img src="https://clearanatomics.github.io/ClearMapDocumentation/images/TubeMap_graph_raw_movie.gif" alt="WobblyStitcher" width="150" align="right" vspace = "5"/></a>
 
 Extract vasculature and other tubular networks from TB data.
 
-## [CellMap](https://christophkirst.github.io/ClearMap2Documentation/html/cellmap.html) <a href="https://christophkirst.github.io/ClearMap2Documentation/html/CellMap.html"> <img src="https://christophkirst.github.io/ClearMap2Documentation/images/CellMap_raw_bw.gif" alt="WobblyStitcher" width="150" align="right" vspace = "5"/></a>
+## [CellMap](https://clearanatomics.github.io/ClearMapDocumentation/html/cellmap.html) <a href="https://clearanatomics.github.io/ClearMapDocumentation/html/CellMap.html"> <img src="https://clearanatomics.github.io/ClearMapDocumentation/images/CellMap_raw_bw.gif" alt="WobblyStitcher" width="150" align="right" vspace = "5"/></a>
 
 Extract neuronal activity marker and cell shapes.
 
@@ -70,10 +70,10 @@ as well as vasculature networks of whole mouse brains
 
 <p align="center">
 <a href="https://doi.org/10.1016/j.cell.2016.05.007">
-<img src="https://christophkirst.github.io/ClearMap2Documentation/images/Cell_abstract_2016.jpg" 
+<img src="https://clearanatomics.github.io/ClearMapDocumentation/images/Cell_abstract_2016.jpg" 
  alt="Cell2016" width="300" hspace="40"/></a>
 <a href="https://doi.org/10.1016/j.cell.2020.01.028">
-<img src="https://christophkirst.github.io/ClearMap2Documentation/images/Cell_abstract_2020.jpg" 
+<img src="https://clearanatomics.github.io/ClearMapDocumentation/images/Cell_abstract_2020.jpg" 
  alt="Cell2020" width="300" hspace="40"/></a>
 </p>
 
@@ -88,40 +88,40 @@ to broaden the range of applications to different types of biological objects
 or structures.
 
 
-[Installation](https://christophkirst.github.io/ClearMap2Documentation/html/installation.html)
+[Installation](https://clearanatomics.github.io/ClearMapDocumentation/html/installation.html)
 ==============================================================================================
 
-Please refer to our [documentation](https://christophkirst.github.io/ClearMap2Documentation)
-on how to [install](https://christophkirst.github.io/ClearMap2Documentation/html/installation.html) ClearMap.
+Please refer to our [documentation](https://clearanatomics.github.io/ClearMapDocumentation)
+on how to [install](https://clearanatomics.github.io/ClearMapDocumentation/html/installation.html) ClearMap.
 
-[Tutorials](https://christophkirst.github.io/ClearMap2Documentation/html/usage.html)
+[Tutorials](https://clearanatomics.github.io/ClearMapDocumentation/html/usage.html)
 ====================================================================================
 
-Tutorials for [TubeMap](https://christophkirst.github.io/ClearMap2Documentation/html/tubemap.html) 
-and [CellMap](https://christophkirst.github.io/ClearMap2Documentation/html/tubemap.html) are
+Tutorials for [TubeMap](https://clearanatomics.github.io/ClearMapDocumentation/html/tubemap.html) 
+and [CellMap](https://clearanatomics.github.io/ClearMapDocumentation/html/tubemap.html) are
 avaialbe as [jupyer](https://jupyter.org/) notebooks:
   
-  * [TubeMap](https://christophkirst.github.io/ClearMap2Documentation/html/TubeMap.html)
+  * [TubeMap](https://clearanatomics.github.io/ClearMapDocumentation/html/TubeMap.html)
   
-  * [CellMap](https://christophkirst.github.io/ClearMap2Documentation/html/TubeMap.html)
+  * [CellMap](https://clearanatomics.github.io/ClearMapDocumentation/html/TubeMap.html)
 
 
-[Documentation](https://christophkirst.github.io/ClearMap2Documentation)
+[Documentation](https://clearanatomics.github.io/ClearMapDocumentation)
 ========================================================================
 
-ClearMap comes with a full [documentation](https://christophkirst.github.io/ClearMap2Documentation).
+ClearMap comes with a full [documentation](https://clearanatomics.github.io/ClearMapDocumentation).
 
 For experimental protocols also refer to [idisco.info](http:://idisco.info)
 
 
-[News and Media](https://christophkirst.github.io/ClearMap2Documentation/html/media.html)
+[News and Media](https://clearanatomics.github.io/ClearMapDocumentation/html/media.html)
 =========================================================================================
 
 ClearMap has been featured in differnet articles, interviews and a TEDx talk:
 
 <p align="center">
 <a href="https://www.ted.com/talks/christoph_kirst_a_transparent_journey_into_the_brain_and_its_flexible_function">
-<img src="https://christophkirst.github.io/ClearMap2Documentation/images/TEDx_video.jpeg" alt="Cell2016" height="200" hspace="40"/></a>
+<img src="https://clearanatomics.github.io/ClearMapDocumentation/images/TEDx_video.jpeg" alt="Cell2016" height="200" hspace="40"/></a>
 <a href="https://www.youtube.com/watch?v=-LEfL55-EUU">
 <img src="https://img.youtube.com/vi/-LEfL55-EUU/0.jpg" alt="Cell2020" height="200" hspace="40"/></a>
 </p>
@@ -134,7 +134,7 @@ ClearMap has been featured in differnet articles, interviews and a TEDx talk:
 <img src="https://publons.com/media/thumbs/publishers/logos/613fa6f5-fea2-4e4a-a934-ba44a1e85f21.png.200x200_q95_detail_letterbox_upscale.png" alt="Cell2020" height="80" hspace="40"/></a>
 </p>
 
-See also our [media gallery](https://christophkirst.github.io/ClearMap2Documentation/html/media.html).
+See also our [media gallery](https://clearanatomics.github.io/ClearMapDocumentation/html/media.html).
 
 
 References
@@ -214,10 +214,10 @@ VERSION 2.1
 VERSION 2.0
 -----------
 Rewrite of ClearMap 1.0 to handle larger data sets (TB).
-This version implements [TubeMap](https://christophkirst.github.io/ClearMap2Documentation/html/tubemap.html)
+This version implements [TubeMap](https://clearanatomics.github.io/ClearMapDocumentation/html/tubemap.html)
 
 VERSION 1.0
 -----------
-First version of ClearMap. Implements [CellMap](https://christophkirst.github.io/ClearMap2Documentation/html/cellmap.html) 
+First version of ClearMap. Implements [CellMap](https://clearanatomics.github.io/ClearMapDocumentation/html/cellmap.html) 
 See https://github.com/ChristophKirst/ClearMap
 
