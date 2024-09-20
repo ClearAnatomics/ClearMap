@@ -118,6 +118,16 @@ def _naive_bilabel_bincount(A, B):
     return res
 
 
+def _data_frame_ok(df: pd.DataFrame):
+    return (
+        isinstance(df.index, pd.RangeIndex)
+        and df.index.start == 0
+        and df.index.stop == len(df)
+        and df.index.step == 1
+        and "index" not in df.columns
+    )
+
+
 class Channel:
     """In our context a channel is represented by a binary mask and some voxel coordinates in a dataframe.
     The voxel coordinates should be a set of representatives for the partition of the True voxels in the binary mask
@@ -137,8 +147,37 @@ class Channel:
         physical_origin=None,
         channel_name="",
     ) -> None:
+        """Instantiate an object
+
+        Parameters
+        ----------
+        binary_img : np.ndarray
+            _description_
+        dataframe : pd.DataFrame
+            the index must correspond to the row rank, no funky index names or subsets.
+        coord_names : list, optional
+            _description_, by default ["x", "y", "z"]
+        voxel_dims : _type_, optional
+            _description_, by default None
+        physical_origin : _type_, optional
+            _description_, by default None
+        channel_name : str, optional
+            _description_, by default ""
+
+        Raises
+        ------
+        ValueError
+            _description_
+        ValueError
+            _description_
+        """
         self.binary_img = binary_img
-        self.dataframe = dataframe
+        if _data_frame_ok(dataframe):
+            self.dataframe = dataframe
+        else:
+            raise ValueError(
+                "Either the passed dataframe indexing is not a step 1 integer range starting from 0, or the 'index' column name is used."
+            )
         self.coord_names = coord_names
         self.ndim = len(self.coord_names)
         if voxel_dims is None:
@@ -149,9 +188,7 @@ class Channel:
         self.physical_origin = np.array(physical_origin)
 
         if self.voxel_dims.size != self.ndim or self.physical_origin.size != self.ndim:
-            raise ValueError(
-                "The lengths of voxel_dims, physical_origin and coord_names do not match."
-            )
+            raise ValueError("The lengths of voxel_dims, physical_origin and coord_names do not match.")
 
         # we identify the channel by a name fo caching management
         if not channel_name:
@@ -170,7 +207,9 @@ class Channel:
         return self.dataframe[self.coord_names]
 
     @cached_property
-    def labels(self):
+    def labels(
+        self,
+    ):  # TODO optimize relabeling from representatives, eg with watershedding
         """Return the labeled image from the binary mask"""
         labels, _ = ndi.label(self.binary_img)
         return labels
@@ -185,10 +224,7 @@ class Channel:
             the flat array of the labels in the nuclei index order
         """
         return np.array(
-            [
-                self.labels[tuple(self.dataframe[self.coord_names].iloc[index])]
-                for index in range(len(self.dataframe))
-            ]
+            [self.labels[tuple(self.dataframe[self.coord_names].iloc[index])] for index in range(len(self.dataframe))]
         )
 
     @cached_property
@@ -245,10 +281,7 @@ class Channel:
             the bounding box
         """
 
-        return tuple(
-            slice(*[self._bounding_boxes_array[i, axis, j] + j for j in range(2)])
-            for axis in self.ndim
-        )
+        return tuple(slice(*[self._bounding_boxes_array[i, axis, j] + j for j in range(2)]) for axis in self.ndim)
 
     # kept mainly for comparison and for the generic case of function below
     def _naive_bounding_boxes_array(self):
@@ -289,7 +322,7 @@ class Channel:
     def centers(self):
         starts = self._bounding_boxes_array[:, :, 0].astype("float32")
         stops = self._bounding_boxes_array[:, :, 1].astype("float32")
-        return ((starts + stops) / 2).reshape(self._bounding_boxes_array.shape[:2])
+        return (starts + stops) / 2
 
     def center(self, i) -> tuple[int, ...]:
         """Return the center of the bounding box of the ith nucleus.
@@ -305,6 +338,10 @@ class Channel:
             the tuple of coords for the central voxel
         """
         return tuple(self.centers[i])
+
+    def centers_df(self):
+        cols = ["center of bounding box " + coord_name for coord_name in self.coord_names]
+        return pd.DataFrame(centers, columns=cols)
 
     @cached_property
     def sizes(self):
@@ -326,9 +363,9 @@ class Channel:
             The list of counts of True pixels in mask for each nucleus, in the
             order of our dataframe.
         """
-        return np.bincount(
-            (mask * self.labels).flatten(), minlength=self.sizes.size + 1
-        )[self.index_label_correspondance]
+        return np.bincount((mask * self.labels).flatten(), minlength=self.sizes.size + 1)[
+            self.index_label_correspondance
+        ]
 
     def overlap_rates(self, other_channel: Channel):
         """Return the rate of positive pixels for other_channel in each nucleus
@@ -353,19 +390,11 @@ class Channel:
         """
         counts = bilabel_bincount(self.labels, other_channel.labels)
         # we reorder the lines and cols from label orders to index orders
-        col_selector = np.zeros(
-            (counts.shape[1], len(other_channel.index_label_correspondance))
-        )
-        col_selector[
-            other_channel.index_label_correspondance, np.arange(col_selector.shape[1])
-        ] = 1
+        col_selector = np.zeros((counts.shape[1], len(other_channel.index_label_correspondance)))
+        col_selector[other_channel.index_label_correspondance, np.arange(col_selector.shape[1])] = 1
 
-        line_selector = np.zeros(
-            (len(self.index_label_correspondance), counts.shape[0])
-        )
-        line_selector[
-            np.arange(line_selector.shape[0]), self.index_label_correspondance
-        ] = 1
+        line_selector = np.zeros((len(self.index_label_correspondance), counts.shape[0]))
+        line_selector[np.arange(line_selector.shape[0]), self.index_label_correspondance] = 1
 
         self._overlaps_dic[other_channel.name] = line_selector @ counts @ col_selector
 
@@ -399,9 +428,7 @@ class Channel:
             self._set_blobwise_overlaps(other_channel)
             return self._overlaps_dic[other_channel.name]
 
-    def max_blobwise_overlaps(
-        self, other_channel: Channel, return_max_indices=True
-    ) -> np.ndarray:
+    def max_blobwise_overlaps(self, other_channel: Channel, return_max_indices=True) -> np.ndarray:
         """For each nucleus of self, compute the max overlap with a single nucleus of other_channel.
             if return_max_indices is True, nuclei indices that realize the max are also returned.
 
@@ -430,9 +457,7 @@ class Channel:
         else:
             return np.max(counts, axis=1)
 
-    def max_blobwise_overlap_rates(
-        self, other_channel: Channel, return_max_indices=True
-    ) -> np.ndarray:
+    def max_blobwise_overlap_rates(self, other_channel: Channel, return_max_indices=True) -> np.ndarray:
         """For each nucleus of self, compute the max overlap rate with a single nucleus of other_channel.
             if return_max_indices is True, nuclei indices that realize the max are also returned.
 
@@ -451,15 +476,13 @@ class Channel:
         """
 
         if return_max_indices:
-            maxima, argmax = self.max_blobwise_overlaps(
-                other_channel, return_max_indices=True
-            )
+            maxima, argmax = self.max_blobwise_overlaps(other_channel, return_max_indices=True)
             return maxima / self.sizes, argmax
         else:
             maxima = self.max_blobwise_overlaps(other_channel, return_max_indices=False)
             return maxima / self.sizes
 
-    def centers_distances(self, other_channel: Channel) -> np.array:
+    def centers_distances(self, other_channel: Channel) -> np.ndarray:
         """Return array of distances between centers across the two channels.
 
         Parameters
@@ -469,17 +492,38 @@ class Channel:
 
         Returns
         -------
-        np.array
+        np.ndarray
             distance matrix A: A[index_1,index_2] is the distance between the centers
             of the nucleus indexed by index_1 in self.dataframe and  the nucleus
             indexed by index_2 in other_channel.dataframe.
         """
-        physical_centers_1 = (
-            self.centers * (self.voxel_dims.reshape((-1, 1))) + self.physical_origin
-        )
+        physical_centers_1 = self.centers * (self.voxel_dims.reshape((-1, 1))) + self.physical_origin
         physical_centers_2 = (
-            other_channel.centers * (other_channel.voxel_dims.reshape((-1, 1)))
-            + other_channel.physical_origin
+            other_channel.centers * (other_channel.voxel_dims.reshape((-1, 1))) + other_channel.physical_origin
         )
 
         return distances(physical_centers_1, physical_centers_2)
+
+    def closest_center_distances(self, other_channel: Channel, return_min_indices=True) -> np.ndarray:
+        """Return the distances to the closest centers in other.
+
+        Parameters
+        ----------
+        other_channel : Channel
+            _description_
+        return_min_indices : bool, optional.
+          Defaults to True.
+
+
+        Returns
+        similar to max_blobwise_overlap
+        -------
+        """
+        distances = self.centers_distances(other_channel)  # TODO cache distances as overlaps
+        argmin = np.argmin(distances, axis=1)
+        minima = distances[:, argmin]
+
+        if return_min_indices:
+            return minima, argmin
+        else:
+            return minima
