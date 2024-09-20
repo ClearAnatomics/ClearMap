@@ -44,7 +44,7 @@ import scipy.ndimage as ndi
 
 
 # batch distance computation
-def distances(points_1: np.ndarray, points_2: np.ndarray) -> np.ndarray:
+def distances(points_1: np.ndarray, points_2: np.ndarray, with_) -> np.ndarray:
     """Compute the distances between the points in points_1 and those of points_2.
 
     Parameters
