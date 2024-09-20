@@ -339,9 +339,9 @@ class Channel:
         """
         return tuple(self.centers[i])
 
-    def centers_df(self):
-        cols = ["center of bounding box " + coord_name for coord_name in self.coord_names]
-        return pd.DataFrame(centers, columns=cols)
+    def centers_df(self, description="center of bounding box"):
+        cols = [description + " " + coord_name for coord_name in self.coord_names]
+        return pd.DataFrame(self.centers, columns=cols)
 
     @cached_property
     def sizes(self):
