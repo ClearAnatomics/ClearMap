@@ -44,7 +44,7 @@ data from cleared tissues.
 \
 *ClearMap's* tool box includes 
 
-## [Wobbly-Stitcher](https://clearanatomics.github.io/ClearMapDocumentation/html/wobblystitcher.html) <a href="https://clearanatomics.github.io/ClearMapDocumentation/html/TubeMap.html#Stitching"> <img src="https://clearanatomics.github.io/ClearMapDocumentation/images/WobblyStitcher.jpg" alt="WobblyStitcher" width="150" align="right" vspace = "5"/></a>
+## [Wobbly-Stitcher](https://clearanatomics.github.io/ClearMapDocumentation/advanced/wobblystitcher.html) <a href="https://clearanatomics.github.io/ClearMapDocumentation/html/TubeMap.html#Stitching"> <img src="https://clearanatomics.github.io/ClearMapDocumentation/images/WobblyStitcher.jpg" alt="WobblyStitcher" width="150" align="right" vspace = "5"/></a>
 
 Stitch TB data sets non-rigidly.
   
