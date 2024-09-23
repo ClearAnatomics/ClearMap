@@ -1,8 +1,4 @@
 import sys
-
-sys.path.append(
-    "/home/gael.cousin/Documents/my_code/colocalization/ClearMap2/ClearMap/colocalization"
-)
 import numpy as np
 import pandas as pd
 import skimage
@@ -60,9 +56,7 @@ channel_2 = Channel(binary_2, df2, coord_names=["x", "y"])
 #     "channel 2 centers as returned by self.center",
 #     *[channel_2.center(index) for index in range(len(channel_2.dataframe))]
 # )
-assert [channel_1.center(index) for index in range(len(channel_1.dataframe))] == [
-    (10.5, 9.5)
-]
+assert [channel_1.center(index) for index in range(len(channel_1.dataframe))] == [(10.5, 9.5)]
 
 assert [channel_2.center(index) for index in range(len(channel_2.dataframe))] == [
     (4.5, 16.5),
@@ -75,9 +69,7 @@ assert [channel_2.center(index) for index in range(len(channel_2.dataframe))] ==
 
 
 # check overlap computations
-assert np.allclose(
-    channel_1.overlap_rates(channel_2), np.array([global_rate]), atol=1e-05
-)
+assert np.allclose(channel_1.overlap_rates(channel_2), np.array([global_rate]), atol=1e-05)
 
 
 # print(
@@ -94,16 +86,10 @@ assert np.allclose(
 
 # check distances
 # print("distances", channel_1.centers_distances(channel_2))
-assert np.allclose(
-    np.array([[9.219544, 7.5]]), channel_1.centers_distances(channel_2), atol=1e-7
-)
+assert np.allclose(np.array([[9.219544, 7.5]]), channel_1.centers_distances(channel_2), atol=1e-7)
 
 
-max_rates, max_indices = channel_1.max_blobwise_overlap_rates(
-    channel_2, return_max_indices=True
-)
-assert np.allclose(
-    max_rates, np.max(np.array([single_rate_1, single_rate_2])), atol=1e-05
-)
+max_rates, max_indices = channel_1.max_blobwise_overlap_rates(channel_2, return_max_indices=True)
+assert np.allclose(max_rates, np.max(np.array([single_rate_1, single_rate_2])), atol=1e-05)
 assert max_indices == np.array([1])
 print("test passed !")

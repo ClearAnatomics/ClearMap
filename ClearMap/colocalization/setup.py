@@ -17,6 +17,6 @@ def make_ext(modname, pyxfilename):
     return ext
 
 
-ext = make_ext("bounding_boxes", "bbox.pyx")
+ext = make_ext("ClearMap.colocalization.bounding_boxes", "bbox.pyx")
 
 setup(ext_modules=cythonize([ext]))
