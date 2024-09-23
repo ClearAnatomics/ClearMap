@@ -1,4 +1,5 @@
 # Copyright Gaël Cousin & Charly Rousseau
+from __future__ import annotations
 
 import numpy as np
 import pandas as pd
@@ -14,26 +15,26 @@ import ClearMap.ParallelProcessing.Block as block
 
 
 def compare(
-    img_0: str,
-    df_0: str,
-    img_1: str,
-    df_1: str,
+    img_0: str | np.ndarray,
+    df_0: str | pd.DataFrame,
+    img_1: str | np.ndarray,
+    df_1: str | pd.DataFrame,
     scale,
-    coord_names,
-    blob_diameter,
-    processes,
+    coord_names: list[str],
+    blob_diameter: int,
+    processes: int | None,
 ):
     """Make a report on colocalization between two channels
     Parameters
     ----------
-    img_0 : str
-        path to binary image for channel 0, as outputed by cell_map
-    df_0 : str
-        path to feather file for channel 0, as outputed by cell_map
-    img_1 : str
-        path to binary image for channel 0, as outputed by cell_map
+    img_0 : str | np.ndarray
+        binary image or path to binary image for channel 0, as outputed by cell_map
+    df_0 : str | pd.DataFrame
+        dataframe or path to feather file for channel 0, as outputed by cell_map
+    img_1 : str | np.ndarray
+        binary image or path to binary image for channel 1, as outputed by cell_map
     df_1 : str
-        path to feather file for channel 0, as outputed by cell_map
+        dataframe or path to feather file for channel 1, as outputed by cell_map
 
     scale : array like
         list of values specifying voxel dimensions. Caution: this scale
@@ -53,8 +54,10 @@ def compare(
     voxel_blob_diameters = np.array(blob_diameter) / scale
     source_0 = io.as_source(img_0)
     source_1 = io.as_source(img_1)
-    df_0 = pd.read_feather(df_0)
-    df_1 = pd.read_feather(df_1)
+    if not isinstance(df_0, pd.DataFrame):
+        df_0 = pd.read_feather(df_0)
+    if not isinstance(df_1, pd.DataFrame):
+        df_1 = pd.read_feather(df_1)
 
     if not ((processes is None) or (isinstance(processes, int) and processes >= 1)):
         raise ValueError("The passed processes argument must be a positive integer or None.")

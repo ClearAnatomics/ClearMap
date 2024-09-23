@@ -76,3 +76,4 @@ df_1 = pd.DataFrame({c: reps_1[i] for i, c in enumerate("xyz")})
 
 channel_0 = channel.Channel(labeled_0 > 0, df_0)
 channel_1 = channel.Channel(labeled_1 > 0, df_1)
+print(channel_0.compare(channel_1, blob_diameter=22, processes=32))
