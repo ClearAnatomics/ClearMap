@@ -39,13 +39,15 @@ from functools import cached_property
 
 import numpy as np
 import warnings
-import bounding_boxes
+from . import bounding_boxes
 import pandas as pd
 import scipy.ndimage as ndi
 
+from .parallelism import compare
+
 
 # batch distance computation
-def distances(points_1: np.ndarray, points_2: np.ndarray, with_) -> np.ndarray:
+def distances(points_1: np.ndarray, points_2: np.ndarray) -> np.ndarray:
     """Compute the distances between the points in points_1 and those of points_2.
 
     Parameters
@@ -532,3 +534,12 @@ class Channel:
             return minima, argmin
         else:
             return minima
+
+    def compare(self, other_channel: Channel, blob_diameter: int, processes: int | None = None):
+        """Return a final colocalization report"""
+        if np.any(self.voxel_dims != other_channel.voxels_dim):
+            raise ValueError("The two considered channels must have the same voxel_dims.")
+        scale = self.voxel_dims
+
+        if self.coord_names != other_channel.coord_names:
+            raise ValueError("The comparison of Channels with different coord_names is not implemented.")
