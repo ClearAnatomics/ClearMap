@@ -536,10 +536,40 @@ class Channel:
             return minima
 
     def compare(self, other_channel: Channel, blob_diameter: int, processes: int | None = None):
-        """Return a final colocalization report"""
-        if np.any(self.voxel_dims != other_channel.voxels_dim):
+        """Return a final colocalization report
+
+
+        Parameters
+        ----------
+        other_channel : Channel
+            _description_
+        blob_diameter : int
+            an upper bound for the sought blobs diameters, in PHYSICAL units
+        processes : int | None, optional
+            positive integer or None, the number of processes to use for block processing.
+            Defaults to None, if None the number of processes will equal the computer's number
+            of processors.
+
+        Returns
+        -------
+        pd.DataFrame
+            A colocalization report in pandas dataframe format
+
+        """
+
+        if np.any(self.voxel_dims != other_channel.voxel_dims):
             raise ValueError("The two considered channels must have the same voxel_dims.")
         scale = self.voxel_dims
 
         if self.coord_names != other_channel.coord_names:
             raise ValueError("The comparison of Channels with different coord_names is not implemented.")
+        return compare(
+            self.binary_img,
+            self.dataframe,
+            other_channel.binary_img,
+            other_channel.dataframe,
+            scale=scale,
+            coord_names=self.coord_names,
+            blob_diameter=blob_diameter,
+            processes=processes,
+        )
