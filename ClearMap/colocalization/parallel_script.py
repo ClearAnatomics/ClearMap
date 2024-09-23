@@ -2,6 +2,8 @@
 
 import numpy as np
 import pandas as pd
+from sklearn import neighbors
+
 from ClearMap.colocalization import channel
 
 import ClearMap.IO.IO as io
@@ -79,13 +81,25 @@ def compare(
     # join the c1_results, which might have twice the same center
     c1_result = pd.concat(c1_results).groupby(level=0).first()
 
-    # compute the distances
+    # compute closest point
     description = "center of bounding box"
     cols = [description + " " + coord_name for coord_name in coord_names]
-    points_0 = c0_result[cols] * np.array(scale).reshape((-1, 1))
-    points_1 = c1_result[cols] * np.array(scale).reshape((-1, 1))
+    points_0 = c0_result[cols].to_numpy() * np.array(scale).reshape((-1, 1))
+    points_1 = c1_result[cols].to_numpy() * np.array(scale).reshape((-1, 1))
+    learner = neighbors.NearestNeighbors(n_neighbors=1)
 
-    distances = channel.distances(points_0, points_1)
+    learner.fit(points_1)
+    if len(points_1) > 0:
+        distances, indices = learner.kneighbors(points_0)
+        c0_result["closest blob distance"] = distances
+        c0_result["closest blob bbox center index"] = indices
+        cols = ["closest blob center" + coord for coord in coord_names]
+        c0_result[cols] = c1_result[coord_names].iloc[indices]
+    else:
+        c0_result["closest blob distance"] = np.nan
+        c0_result["closest blob bbox center index"] = np.nan
+        cols = ["closest blob center" + coord for coord in coord_names]
+        c0_result[cols] = np.nan
 
     return c0_result
 
