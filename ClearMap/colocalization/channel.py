@@ -38,6 +38,7 @@ from __future__ import annotations
 from functools import cached_property
 
 import numpy as np
+import warnings
 import bounding_boxes
 import pandas as pd
 import scipy.ndimage as ndi
@@ -447,11 +448,15 @@ class Channel:
         """
 
         counts = self.blobwise_overlaps(other_channel)
+        # we handle the case of no blob for other_channel by adding a virtual empty blob
+        counts = np.hstack([counts, np.zeros((counts.shape[0], 1))])
 
         if return_max_indices:
             argmax = np.argmax(counts, axis=1)
             maxima = counts[np.arange(counts.shape[0]), argmax]
-
+            if (counts.shape[1] - 1) in argmax:
+                argmax = np.array([np.nan] * counts.shape[0])
+                warnings.warn("Returning nan argmax due to empty other_channel blob list.")
             return maxima, argmax
 
         else:
