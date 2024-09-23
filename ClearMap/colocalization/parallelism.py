@@ -4,9 +4,10 @@ import numpy as np
 import pandas as pd
 from sklearn import neighbors
 
-from ClearMap.colocalization import channel
+from . import channel
 
-import ClearMap.IO.IO as io
+
+from ..IO import IO as io
 
 import ClearMap.ParallelProcessing.BlockProcessing as blockprocessing
 import ClearMap.ParallelProcessing.Block as block
@@ -20,7 +21,7 @@ def compare(
     scale,
     coord_names,
     blob_diameter,
-    processes: int | None = None,
+    processes,
 ):
     """Make a report on colocalization between two channels
     Parameters
