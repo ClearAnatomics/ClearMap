@@ -14,13 +14,10 @@ import ClearMap.colocalization.channel as channel
 def random_shape(radius):
     dice = np.random.randint(3)
     if dice == 0:
-        print("cube")
         shape = skimage.morphology.cube(2 * int(radius / 1.8) + 1)
     if dice == 1:
-        print("octa")
         shape = skimage.morphology.octahedron(radius)
     if dice == 2:
-        print("ball")
         shape = skimage.morphology.ball(radius)
 
     locus = np.where(shape)
