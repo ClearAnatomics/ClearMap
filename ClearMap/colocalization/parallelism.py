@@ -22,6 +22,8 @@ def compare(
     scale,
     coord_names: list[str],
     blob_diameter: int,
+    size_min:int,
+    size_max:int,
     processes: int | None,
 ):
     """Make a report on colocalization between two channels
@@ -65,7 +67,7 @@ def compare(
     axes = blockprocessing.block_axes(source_0)
     axis_wise_overlap = 2 * voxel_blob_diameters  # we
     # be careful the filtration of overlap below is needed for proper def of overlap in bp.process call
-    overlap = axis_wise_overlap[axes]
+    overlap = int(np.ceil(axis_wise_overlap[axes]))
     results = blockprocessing.process(
         local_report,
         [source_0, source_1],
@@ -80,6 +82,9 @@ def compare(
         return_result=True,
         as_memory=False,
         verbose=True,
+        size_min=size_min,
+        size_max=size_max,
+        optimization=False
     )
     # We observe that using as_memory=True leads to a bug due to as_memory_block breaking the slicing attribute
     c0_results = [result[0] for result in results]
@@ -149,8 +154,8 @@ def local_report(
     # funky query to be pandas version agnostic
     data_array_0 = df_0[coord_names].to_numpy()
     data_array_1 = df_1[coord_names].to_numpy()
-    upper_bounds = block_0.base.shape
 
+    upper_bounds = block_0.base.shape
     slices = block_0.valid.base_slicing
     start_array = np.array([0 if slices[i].start is None else slices[i].start for i in range(ndim)])
     stop_array = np.array([upper_bounds[i] if slices[i].stop is None else slices[i].stop for i in range(ndim)])
@@ -163,11 +168,11 @@ def local_report(
 
     sub_df_0 = df_0.iloc[valid_indices_0].reset_index()
     sub_df_1 = df_1.iloc[contained_indices_1].reset_index()
-    channel_0 = channel.Channel(block_0.array, sub_df_0[coord_names], voxel_dims=scale, coord_names=coord_names)
-    channel_1 = channel.Channel(block_1.array, sub_df_1[coord_names], voxel_dims=scale, coord_names=coord_names)
+    channel_0 = channel.Channel(block_0.array, sub_df_0[coord_names] - start_array, voxel_dims=scale, coord_names=coord_names)
+    channel_1 = channel.Channel(block_1.array, sub_df_1[coord_names] - start_array, voxel_dims=scale, coord_names=coord_names)
     max_overlaps, max_overlaps_indices = channel_0.max_blobwise_overlaps(channel_1, return_max_indices=True)
     centers_df_0 = channel_0.centers_df()
-    c0_result = centers_df_0.set_index(sub_df_0["index"])
+    c0_result = centers_df_0.set_index(sub_df_0["index"]) + start_array
     blobwise_overlap_df = pd.DataFrame(
         {
             "max blobwise overlap (in voxels)": max_overlaps,
@@ -180,14 +185,12 @@ def local_report(
 
     # cook the max overlap center dataframe
     centers_df_1 = channel_1.centers_df(description="maximizing blob bbox center")
-    max_overlap_coords = centers_df_1.iloc[max_overlaps_indices].set_index(sub_df_0["index"])
+    max_overlap_coords = centers_df_1.iloc[max_overlaps_indices].set_index(sub_df_0["index"]) + start_array
 
     c0_result = c0_result.join(max_overlap_coords, validate="1:1")
 
-    centers_df_1 = channel_1.centers_df()
+    centers_df_1 = channel_1.centers_df() +start_array
     c1_result = centers_df_1.set_index(sub_df_1["index"])
 
     # the distances will be computed from the final joined dataframes.
-    print(c0_result)
-    print(c1_result)
     return c0_result, c1_result
