@@ -36,7 +36,7 @@ WARNING: The current version of this module deals only with 3d images.
 
 from __future__ import annotations
 from functools import cached_property
-
+from sklearn import neighbors
 import numpy as np
 import warnings
 from . import bounding_boxes
@@ -44,6 +44,7 @@ import pandas as pd
 import scipy.ndimage as ndi
 
 from .parallelism import compare
+
 
 
 # batch distance computation
@@ -535,7 +536,7 @@ class Channel:
         else:
             return minima
 
-    def compare(self, other_channel: Channel, blob_diameter: int, processes: int | None = None):
+    def compare(self, other_channel: Channel, blob_diameter: int,size_min:int, size_max:int, processes: int | None = None):
         """Return a final colocalization report
 
 
@@ -545,6 +546,10 @@ class Channel:
             _description_
         blob_diameter : int
             an upper bound for the sought blobs diameters, in PHYSICAL units
+        size_min : int
+            min size in voxels for a block dimension
+        size_max : int
+            max size in voxels for a block dimension
         processes : int | None, optional
             positive integer or None, the number of processes to use for block processing.
             Defaults to None, if None the number of processes will equal the computer's number
@@ -572,4 +577,55 @@ class Channel:
             coord_names=self.coord_names,
             blob_diameter=blob_diameter,
             processes=processes,
+            size_min=size_min,
+            size_max=size_max,
         )
+    
+
+    # for comparison/testing purposes
+    def _naive_compare(
+        self,
+        other_channel,
+        blob_diameter: int,
+    ):
+        voxel_blob_diameters = np.array(blob_diameter) / self.voxel_dims
+
+        max_overlaps, max_overlaps_indices = self.max_blobwise_overlaps(other_channel, return_max_indices=True)
+        centers_df_0 = self.centers_df()
+        c0_result = centers_df_0
+        blobwise_overlap_df = pd.DataFrame(
+            {
+                "max blobwise overlap (in voxels)": max_overlaps,
+                "max relative blobwise overlap": self.max_blobwise_overlap_rates(other_channel, return_max_indices=False),
+                "index of maximizing overlap blob": max_overlaps_indices,
+            },
+        )
+        c0_result = c0_result.join(blobwise_overlap_df, validate="1:1")
+
+        # cook the max overlap center dataframe
+        centers_df_1 = other_channel.centers_df(description="maximizing blob bbox center")
+        max_overlap_coords = centers_df_1.iloc[max_overlaps_indices].set_index(self.dataframe.index)
+
+        c0_result = c0_result.join(max_overlap_coords, validate="1:1")
+        c1_result = other_channel.centers_df()
+        # compute closest point
+        description = "center of bounding box"
+        cols = [description + " " + coord_name for coord_name in self.coord_names]
+        points_0 = c0_result[cols].to_numpy() * np.array(self.voxel_dims).reshape((1, -1))
+        points_1 = c1_result[cols].to_numpy() * np.array(self.voxel_dims).reshape((1, -1))
+        learner = neighbors.NearestNeighbors(n_neighbors=1)
+
+        learner.fit(points_1)
+        if len(points_1) > 0:
+            distances, indices = learner.kneighbors(points_0)
+            c0_result["closest blob distance "] = distances
+            c0_result["closest blob bbox center index "] = indices.flatten()
+            c0_cols = ["closest blob center " + coord for coord in self.coord_names]
+            c0_result[c0_cols] = c1_result[cols].iloc[indices.flatten()].to_numpy()
+        else:
+            c0_result["closest blob distance "] = np.nan
+            c0_result["closest blob bbox center index "] = np.nan
+            cols = ["closest blob center " + coord for coord in self.coord_names]
+            c0_result[cols] = np.nan
+
+        return c0_result
