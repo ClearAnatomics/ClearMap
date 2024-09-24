@@ -69,12 +69,19 @@ def compare(
     results = blockprocessing.process(
         local_report,
         [source_0, source_1],
+        df_0=df_0,
+        df_1=df_1,
+        scale=scale,
+        coord_names=coord_names,
         function_type="block",
         axes=axes,
         overlap=overlap,
         processes=processes,
         return_result=True,
+        as_memory=False,
+        verbose=True,
     )
+    # We observe that using as_memory=True leads to a bug due to as_memory_block breaking the slicing attribute
     c0_results = [result[0] for result in results]
     c1_results = [result[1] for result in results]
 
@@ -88,21 +95,21 @@ def compare(
     # compute closest point
     description = "center of bounding box"
     cols = [description + " " + coord_name for coord_name in coord_names]
-    points_0 = c0_result[cols].to_numpy() * np.array(scale).reshape((-1, 1))
-    points_1 = c1_result[cols].to_numpy() * np.array(scale).reshape((-1, 1))
+    points_0 = c0_result[cols].to_numpy() * np.array(scale).reshape((1, -1))
+    points_1 = c1_result[cols].to_numpy() * np.array(scale).reshape((1, -1))
     learner = neighbors.NearestNeighbors(n_neighbors=1)
 
     learner.fit(points_1)
     if len(points_1) > 0:
         distances, indices = learner.kneighbors(points_0)
-        c0_result["closest blob distance"] = distances
-        c0_result["closest blob bbox center index"] = indices
-        cols = ["closest blob center" + coord for coord in coord_names]
-        c0_result[cols] = c1_result[coord_names].iloc[indices]
+        c0_result["closest blob distance "] = distances
+        c0_result["closest blob bbox center index "] = indices.flatten()
+        c0_cols = ["closest blob center " + coord for coord in coord_names]
+        c0_result[c0_cols] = c1_result[cols].iloc[indices.flatten()].to_numpy()
     else:
-        c0_result["closest blob distance"] = np.nan
-        c0_result["closest blob bbox center index"] = np.nan
-        cols = ["closest blob center" + coord for coord in coord_names]
+        c0_result["closest blob distance "] = np.nan
+        c0_result["closest blob bbox center index "] = np.nan
+        cols = ["closest blob center " + coord for coord in coord_names]
         c0_result[cols] = np.nan
 
     return c0_result
@@ -110,9 +117,10 @@ def compare(
 
 def local_report(
     block_0: block.Block,
-    df_0: str,
     block_1: block.Block,
-    df_1: str,
+    /,
+    df_0: pd.DataFrame,
+    df_1: pd.DataFrame,
     scale,
     coord_names,
 ):
@@ -122,11 +130,11 @@ def local_report(
     ----------
     block_0 : block.Block
         _description_
-    df_0 : str
-        _description_
     block_1 : block.Block
         _description_
-    df_1 : str
+    df_0 : pd.DataFrame
+        _description_
+    df_1 : pd.DataFrame
         _description_
     scale : _type_
         _description_
@@ -135,43 +143,39 @@ def local_report(
     blob_diameter : _type_
         _description_
     """
-    df_0 = pd.read_feather(df_0)
-    df_1 = pd.read_feather(df_1)
     ndim = len(coord_names)
     # compute valid_indices, the ones of nuclei for which we can compute everything in this block
     # and contained_indices, the ones of nuclei whose representative is contained in the block
     # funky query to be pandas version agnostic
     data_array_0 = df_0[coord_names].to_numpy()
     data_array_1 = df_1[coord_names].to_numpy()
+    upper_bounds = block_0.base.shape
 
     slices = block_0.valid.base_slicing
-    start_array = np.array([slices[i].start for i in range(ndim)])
-    stop_array = np.array([slices[i].stop for i in range(ndim)])
-
-    valid_indices_0 = np.where((data_array_0 < stop_array) & (data_array_0 >= start_array))[0]
+    start_array = np.array([0 if slices[i].start is None else slices[i].start for i in range(ndim)])
+    stop_array = np.array([upper_bounds[i] if slices[i].stop is None else slices[i].stop for i in range(ndim)])
+    valid_indices_0 = np.where(np.all((data_array_0 < stop_array) & (data_array_0 >= start_array),axis=1))[0]
 
     slices = block_0.slicing
-    start_array = np.array([slices[i].start for i in range(channel_0.ndim)])
-    stop_array = np.array([slices[i].stop for i in range(channel_0.ndim)])
-
-    contained_indices_1 = np.where((data_array_1 < stop_array) & (data_array_1 >= start_array))
+    start_array = np.array([0 if slices[i].start is None else slices[i].start for i in range(ndim)])
+    stop_array = np.array([upper_bounds[i] if slices[i].stop is None else slices[i].stop for i in range(ndim)])
+    contained_indices_1 = np.where(np.all((data_array_1 < stop_array) & (data_array_1 >= start_array),axis=1))[0]
 
     sub_df_0 = df_0.iloc[valid_indices_0].reset_index()
     sub_df_1 = df_1.iloc[contained_indices_1].reset_index()
-    channel_0 = channel.Channel(block_0.array, sub_df_0, voxel_dims=scale, coord_names=coord_names)
-    channel_1 = channel.Channel(block_1.array, sub_df_1, voxel_dims=scale, coord_names=coord_names)
+    channel_0 = channel.Channel(block_0.array, sub_df_0[coord_names], voxel_dims=scale, coord_names=coord_names)
+    channel_1 = channel.Channel(block_1.array, sub_df_1[coord_names], voxel_dims=scale, coord_names=coord_names)
     max_overlaps, max_overlaps_indices = channel_0.max_blobwise_overlaps(channel_1, return_max_indices=True)
     centers_df_0 = channel_0.centers_df()
     c0_result = centers_df_0.set_index(sub_df_0["index"])
-
     blobwise_overlap_df = pd.DataFrame(
         {
             "max blobwise overlap (in voxels)": max_overlaps,
             "max relative blobwise overlap": channel_0.max_blobwise_overlap_rates(channel_1, return_max_indices=False),
             "index of maximizing overlap blob": sub_df_1.iloc[max_overlaps_indices]["index"],
         },
-        index=sub_df_0["index"],
     )
+    blobwise_overlap_df = blobwise_overlap_df.set_index(sub_df_0["index"])
     c0_result = c0_result.join(blobwise_overlap_df, validate="1:1")
 
     # cook the max overlap center dataframe
@@ -184,4 +188,6 @@ def local_report(
     c1_result = centers_df_1.set_index(sub_df_1["index"])
 
     # the distances will be computed from the final joined dataframes.
+    print(c0_result)
+    print(c1_result)
     return c0_result, c1_result
