@@ -102,7 +102,7 @@ def compare(
     cols = [description + " " + coord_name for coord_name in coord_names]
     points_0 = c0_result[cols].to_numpy() * np.array(scale).reshape((1, -1))
     points_1 = c1_result[cols].to_numpy() * np.array(scale).reshape((1, -1))
-    learner = neighbors.NearestNeighbors(n_neighbors=1)
+    learner = neighbors.NearestNeighbors(n_neighbors=1,algorithm='brute',n_jobs=-1)
 
     learner.fit(points_1)
     if len(points_1) > 0:
