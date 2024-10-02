@@ -4,84 +4,80 @@ import sys
 sys.path.insert(0, "ClearMap2")
 
 import numpy as np
-import pandas as pd
-import skimage.morphology
-from scipy.spatial.transform import Rotation
-import scipy.ndimage as ndi
 import ClearMap.colocalization.channel as channel
 
+import pickle
 
-def random_shape(radius):
-    dice = np.random.randint(3)
-    if dice == 0:
-        shape = skimage.morphology.cube(2 * int(radius / 1.8) + 1)
-    if dice == 1:
-        shape = skimage.morphology.octahedron(radius)
-    if dice == 2:
-        shape = skimage.morphology.ball(radius)
+READ = True
 
-    locus = np.where(shape)
-    points = np.vstack(locus).transpose()
+if not READ:
 
-    rand_rot = Rotation.random()
-    new_width = np.ceil((2 * radius + 1) * 1.8).astype("uint8") + 3
-    new_center = np.array([new_width // 2] * 3)
+    print("Generating random channels")
+    channel_0 = channel.random_channel((200, 200, 200), 500, 5, 10)
+    channel_1 = channel.random_channel((200, 200, 200), 500, 5, 10)
+    with open("/home/gael.cousin/Documents/my_code/colocalization/ClearMap2/tests/colocalization/c0.pickle", "wb") as f:
+        pickle.dump(channel_0, f)
 
-    centered = points - np.array([radius] * 3)
-    new_centered = rand_rot.apply(centered)
-    new_locus = (np.round(new_centered + new_center).astype("uint64")).transpose()
-    xs, ys, zs = new_locus[0], new_locus[1], new_locus[2]
+    with open("/home/gael.cousin/Documents/my_code/colocalization/ClearMap2/tests/colocalization/c1.pickle", "wb") as f:
+        pickle.dump(channel_1, f)
+    print("Random channels generation done.")
 
-    result = np.zeros((new_width,) * 3, dtype="bool")
-    result[xs, ys, zs] = 1
+else:
+    with open("/home/gael.cousin/Documents/my_code/colocalization/ClearMap2/tests/colocalization/c0.pickle", "rb") as f:
+        channel_0 = pickle.load(f)
+        channel_0.verbose = True
 
-    return ndi.binary_closing(result, structure=np.ones((3,) * 3)), new_center
+    with open("/home/gael.cousin/Documents/my_code/colocalization/ClearMap2/tests/colocalization/c1.pickle", "rb") as f:
+        channel_1 = pickle.load(f)
+        channel_1.verbose = True
 
-
-def random_blobs(shape, num_points, min_radius, max_radius):
-    if len(shape) != 3:
-        raise ValueError("Only 3dim shapes are accepted")
-    radii = np.random.randint(min_radius, max_radius, size=(num_points,))
-    centers = np.vstack([np.random.randint(shape[i] - 1, size=(num_points,)) for i in range(3)]).transpose()
-    margin = 2 * max_radius
-    centers += margin
-    result = np.zeros(tuple([size + 2 * margin for size in shape]), dtype="bool")
-    for i in range(num_points):
-        footprint, fp_center = random_shape(radii[i])
-        locus = np.vstack(np.where(footprint)).transpose()
-        locus = locus - np.array(fp_center) + centers[i]
-        locus = locus.transpose()
-        xs, ys, zs = locus[0], locus[1], locus[2]
-        result[xs, ys, zs] = 1
-
-    return result[margin:-margin, margin:-margin, margin:-margin]
+res_naive = channel_0._naive_compare(channel_1)
+print("naive computation done")
+res_parallel = channel_0.compare(channel_1, blob_diameter=22, size_min=50, size_max=50, processes=None)
 
 
-def random_channel(shape, num_points, min_radius, max_radius):
-    img = random_blobs(shape, num_points, min_radius, max_radius)
-    labels, _ = ndi.label(img)
-    vals, indices = np.unique(labels, return_index=True)
-    indices = indices[np.where(vals)]
-    representatives = np.unravel_index(indices, labels.shape)
-    return labels, representatives
+# distance & overlap check
+equal_cols = ["max relative blobwise overlap", "closest blob distance"]
+assert np.allclose(res_naive[equal_cols].to_numpy(), res_parallel[equal_cols].to_numpy(), atol=10 ** (-4))
+
+# indices check
+# even though the min dist (or max overlap) can be realized by two distinct points we check the options
+# chosen in res_parallel are correct (coord and corresponding distance)
+
+# for distance
+min_dist_index = res_parallel[["closest blob bbox center index"]].to_numpy().flatten()
+min_dist_coords = res_parallel[["closest blob center x", "closest blob center y", "closest blob center z"]].to_numpy()
+min_dist_vals = res_parallel[["closest blob distance"]].to_numpy()
+c1_centers = channel_1.centers_df()
+
+assert np.allclose(c1_centers.iloc[min_dist_index].to_numpy(), min_dist_coords, atol=10 ** (-3))
+
+assert np.allclose(
+    channel_0.centers_distances(channel_1)[np.arange(min_dist_index.size), min_dist_index].flatten(),
+    min_dist_vals.flatten(),
+    atol=10 ** (-3),
+)
+
+# for overlap
 
 
-labeled_0, reps_0 = random_channel((200, 200, 200), 500, 5, 10)
-labeled_1, reps_1 = random_channel((200, 200, 200), 500, 5, 10)
-df_0 = pd.DataFrame({c: reps_0[i] for i, c in enumerate("xyz")})
-df_1 = pd.DataFrame({c: reps_1[i] for i, c in enumerate("xyz")})
+max_overlap_index = res_parallel[["index of maximizing overlap blob"]].to_numpy().flatten()
+max_overlap_coords = res_parallel[
+    ["maximizing blob bbox center x", "maximizing blob bbox center y", "maximizing blob bbox center z"]
+].to_numpy()
+max_overlap_vals = res_parallel[["max blobwise overlap (in voxels)"]].to_numpy()
 
-channel_0 = channel.Channel(labeled_0 > 0, df_0)
-channel_1 = channel.Channel(labeled_1 > 0, df_1)
-res_naive=channel_0._naive_compare(channel_1, blob_diameter=22)
-res_parallel=channel_0.compare(channel_1, blob_diameter=30, size_min=40, size_max=150, processes=32)
-print('naive:',res_naive.to_numpy(),'parallel',res_parallel.to_numpy(),sep='\n')
-print(np.argmax((res_naive.to_numpy()-res_parallel.to_numpy())**2,axis=1),np.max((res_naive.to_numpy()-res_parallel.to_numpy())**2,axis=1),sep='\n')
-print(res_parallel.columns, res_naive.columns, sep='\n')
-indices=res_parallel.columns.to_list()
-print(*[indices[i] for i in [11,13,8,10]])
-res_parallel.to_csv('par_df.csv')
-res_naive.to_csv('seq_df.csv')
+assert np.allclose(c1_centers.iloc[max_overlap_index].to_numpy(), max_overlap_coords, atol=10 ** (-3))
 
-print(':-(')
-# print('test passed!')
+assert np.allclose(
+    channel_0.blobwise_overlaps(channel_1)[np.arange(max_overlap_index.size), max_overlap_index].flatten(),
+    max_overlap_vals.flatten(),
+    atol=10 ** (-3),
+)
+
+
+print("test passed!")
+
+
+# res_parallel.to_csv('par_df.csv', index=False)
+# res_naive.to_csv('seq_df.csv', index=False)

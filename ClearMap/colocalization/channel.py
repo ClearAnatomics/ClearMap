@@ -36,15 +36,17 @@ WARNING: The current version of this module deals only with 3d images.
 
 from __future__ import annotations
 from functools import cached_property
-from sklearn import neighbors
-import numpy as np
 import warnings
-from . import bounding_boxes
+
+import numpy as np
 import pandas as pd
 import scipy.ndimage as ndi
+from sklearn import neighbors
+import skimage.morphology
+from scipy.spatial.transform import Rotation
 
+from . import bounding_boxes
 from .parallelism import compare
-
 
 
 # batch distance computation
@@ -394,13 +396,13 @@ class Channel:
         """
         counts = bilabel_bincount(self.labels, other_channel.labels)
         # we reorder the lines and cols from label orders to index orders
-        col_selector = np.zeros((counts.shape[1], len(other_channel.index_label_correspondance)))
+        col_selector = np.zeros((counts.shape[1], len(other_channel.index_label_correspondance)), dtype="int64")
         col_selector[other_channel.index_label_correspondance, np.arange(col_selector.shape[1])] = 1
 
-        line_selector = np.zeros((len(self.index_label_correspondance), counts.shape[0]))
+        line_selector = np.zeros((len(self.index_label_correspondance), counts.shape[0]), dtype="int64")
         line_selector[np.arange(line_selector.shape[0]), self.index_label_correspondance] = 1
-
-        self._overlaps_dic[other_channel.name] = line_selector @ counts @ col_selector
+        res = line_selector @ counts @ col_selector
+        self._overlaps_dic[other_channel.name] = res
 
     def blobwise_overlaps(self, other_channel: Channel) -> np.ndarray:
         """Return the matrix of overlaps.
@@ -505,9 +507,9 @@ class Channel:
             of the nucleus indexed by index_1 in self.dataframe and  the nucleus
             indexed by index_2 in other_channel.dataframe.
         """
-        physical_centers_1 = self.centers * (self.voxel_dims.reshape((-1, 1))) + self.physical_origin
+        physical_centers_1 = self.centers * (self.voxel_dims.reshape((1, -1))) + self.physical_origin
         physical_centers_2 = (
-            other_channel.centers * (other_channel.voxel_dims.reshape((-1, 1))) + other_channel.physical_origin
+            other_channel.centers * (other_channel.voxel_dims.reshape((1, -1))) + other_channel.physical_origin
         )
 
         return distances(physical_centers_1, physical_centers_2)
@@ -536,7 +538,9 @@ class Channel:
         else:
             return minima
 
-    def compare(self, other_channel: Channel, blob_diameter: int,size_min:int, size_max:int, processes: int | None = None):
+    def compare(
+        self, other_channel: Channel, blob_diameter: int, size_min: int, size_max: int, processes: int | None = None
+    ):
         """Return a final colocalization report
 
 
@@ -580,23 +584,21 @@ class Channel:
             size_min=size_min,
             size_max=size_max,
         )
-    
 
     # for comparison/testing purposes
     def _naive_compare(
         self,
         other_channel,
-        blob_diameter: int,
     ):
-        voxel_blob_diameters = np.array(blob_diameter) / self.voxel_dims
-
         max_overlaps, max_overlaps_indices = self.max_blobwise_overlaps(other_channel, return_max_indices=True)
         centers_df_0 = self.centers_df()
         c0_result = centers_df_0
         blobwise_overlap_df = pd.DataFrame(
             {
                 "max blobwise overlap (in voxels)": max_overlaps,
-                "max relative blobwise overlap": self.max_blobwise_overlap_rates(other_channel, return_max_indices=False),
+                "max relative blobwise overlap": self.max_blobwise_overlap_rates(
+                    other_channel, return_max_indices=False
+                ),
                 "index of maximizing overlap blob": max_overlaps_indices,
             },
         )
@@ -613,19 +615,108 @@ class Channel:
         cols = [description + " " + coord_name for coord_name in self.coord_names]
         points_0 = c0_result[cols].to_numpy() * np.array(self.voxel_dims).reshape((1, -1))
         points_1 = c1_result[cols].to_numpy() * np.array(self.voxel_dims).reshape((1, -1))
-        learner = neighbors.NearestNeighbors(n_neighbors=1)
+        learner = neighbors.NearestNeighbors(n_neighbors=1, algorithm="brute", n_jobs=-1)
 
         learner.fit(points_1)
         if len(points_1) > 0:
             distances, indices = learner.kneighbors(points_0)
-            c0_result["closest blob distance "] = distances
-            c0_result["closest blob bbox center index "] = indices.flatten()
+            c0_result["closest blob distance"] = distances
+            c0_result["closest blob bbox center index"] = indices.flatten()
             c0_cols = ["closest blob center " + coord for coord in self.coord_names]
             c0_result[c0_cols] = c1_result[cols].iloc[indices.flatten()].to_numpy()
         else:
-            c0_result["closest blob distance "] = np.nan
-            c0_result["closest blob bbox center index "] = np.nan
+            c0_result["closest blob distance"] = np.nan
+            c0_result["closest blob bbox center index"] = np.nan
             cols = ["closest blob center " + coord for coord in self.coord_names]
             c0_result[cols] = np.nan
 
         return c0_result
+
+
+# random Channel generation
+
+
+def _random_shape(radius):
+    dice = np.random.randint(3)
+    if dice == 0:
+        shape = skimage.morphology.cube(2 * int(radius / 1.8) + 1)
+    if dice == 1:
+        shape = skimage.morphology.octahedron(radius)
+    if dice == 2:
+        shape = skimage.morphology.ball(radius)
+
+    locus = np.where(shape)
+    points = np.vstack(locus).transpose()
+
+    rand_rot = Rotation.random()
+    new_width = np.ceil((2 * radius + 1) * 1.8).astype("uint8") + 3
+    new_center = np.array([new_width // 2] * 3)
+
+    centered = points - np.array([radius] * 3)
+    new_centered = rand_rot.apply(centered)
+    new_locus = (np.round(new_centered + new_center).astype("uint64")).transpose()
+    xs, ys, zs = new_locus[0], new_locus[1], new_locus[2]
+
+    result = np.zeros((new_width,) * 3, dtype="bool")
+    result[xs, ys, zs] = 1
+
+    return ndi.binary_closing(result, structure=np.ones((3,) * 3)), new_center
+
+
+def _random_blobs(shape, num_points, min_radius, max_radius):
+    if len(shape) != 3:
+        raise ValueError("Only 3dim shapes are accepted")
+    radii = np.random.randint(min_radius, max_radius, size=(num_points,))
+    centers = np.vstack([np.random.randint(shape[i] - 1, size=(num_points,)) for i in range(3)]).transpose()
+    margin = 2 * max_radius
+    centers += margin
+    result = np.zeros(tuple([size + 2 * margin for size in shape]), dtype="bool")
+    for i in range(num_points):
+        footprint, fp_center = _random_shape(radii[i])
+        locus = np.vstack(np.where(footprint)).transpose()
+        locus = locus - np.array(fp_center) + centers[i]
+        locus = locus.transpose()
+        xs, ys, zs = locus[0], locus[1], locus[2]
+        # we make sure the added blob will not get connected to previous blobs (for 1-connectivity)
+        candidate = np.zeros(tuple([size + 2 * margin for size in shape]), dtype="bool")
+        candidate[xs, ys, zs] = 1
+        fattened = ndi.binary_dilation(candidate)
+        fattened_locus = np.where(fattened)
+        xs, ys, zs = fattened_locus[0], fattened_locus[1], fattened_locus[2]
+        if 1 not in result[xs, ys, zs]:
+            result += candidate
+
+    return result[margin:-margin, margin:-margin, margin:-margin]
+
+
+def _random_channel_data(shape, num_points, min_radius, max_radius):
+    img = _random_blobs(shape, num_points, min_radius, max_radius)
+    labels, _ = ndi.label(img)
+    vals, indices = np.unique(labels, return_index=True)
+    indices = indices[np.where(vals)]
+    representatives = np.unravel_index(indices, labels.shape)
+    return labels, representatives
+
+
+def random_channel(shape, num_points, min_radius, max_radius):
+    """Return a random Channel of given shape.
+    The udnerlying image is obtained by successive attempts of blob additions.
+    If the candidate blob would be connected with exisitng blobs, it is rejected.
+
+
+    Parameters
+    ----------
+    shape : tuple
+        3d shape for the Channel binary_image attribute
+    num_points : int
+        number of attempts to add a blob
+    min_radius : _type_
+        min radius for candidate blob, if on the boundary
+        the resulting blob could have smaller radius
+    max_radius : _type_
+        max radius for any blob in the final Channel,
+        as detected as 1-connected components
+    """
+    labels, reps = _random_channel_data(shape, num_points, min_radius, max_radius)
+    df = pd.DataFrame({c: reps[i] for i, c in enumerate("xyz")})
+    return Channel(labels > 0, df)

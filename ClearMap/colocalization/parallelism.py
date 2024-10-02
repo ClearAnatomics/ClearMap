@@ -25,6 +25,7 @@ def compare(
     size_min:int,
     size_max:int,
     processes: int | None,
+    verbose: bool = True
 ):
     """Make a report on colocalization between two channels
     Parameters
@@ -50,6 +51,10 @@ def compare(
         positive integer or None, the number of processes to use for block processing.
         Defaults to None, if None the number of processes will equal the computer's number
         of processors.
+
+    verbose : bool
+        print processing information if True. Defaults To true. 
+
     """
 
     scale = np.array(scale)
@@ -94,8 +99,8 @@ def compare(
     c0_result = pd.concat(c0_results)
     if len(c0_result) != len(df_0):
         raise RuntimeError("some channel 0 blob has been found twice, there is something wrong !")
-    # join the c1_results, which might have twice the same center
-    c1_result = pd.concat(c1_results).groupby(level=0).first()
+    # join the c1_results
+    c1_result = pd.concat(c1_results)
 
     # compute closest point
     description = "center of bounding box"
@@ -107,15 +112,27 @@ def compare(
     learner.fit(points_1)
     if len(points_1) > 0:
         distances, indices = learner.kneighbors(points_0)
-        c0_result["closest blob distance "] = distances
-        c0_result["closest blob bbox center index "] = indices.flatten()
+        c0_result["closest blob distance"] = distances
+        c0_result["closest blob bbox center index"] = indices.flatten()
         c0_cols = ["closest blob center " + coord for coord in coord_names]
         c0_result[c0_cols] = c1_result[cols].iloc[indices.flatten()].to_numpy()
     else:
-        c0_result["closest blob distance "] = np.nan
-        c0_result["closest blob bbox center index "] = np.nan
+        c0_result["closest blob distance"] = np.nan
+        c0_result["closest blob bbox center index"] = np.nan
         cols = ["closest blob center " + coord for coord in coord_names]
         c0_result[cols] = np.nan
+
+    # add max overlap blob coords
+    description = "maximizing blob bbox center"
+    max_coord_cols = [description + " " + coord_name for coord_name in coord_names]
+    if len(points_1) > 0:
+        indices = c0_result["index of maximizing overlap blob"].to_numpy()
+        c0_result[max_coord_cols] = c1_result[cols].iloc[indices.flatten()].to_numpy()
+    
+    # reorganize columns
+    current_cols = c0_result.columns
+    new_cols=[current_cols.to_list()[i] for i in [0,1,2,3,4,5,-3,-2,-1,6,7,8,9,10]]
+    c0_result=c0_result[new_cols]
 
     return c0_result
 
@@ -128,6 +145,7 @@ def local_report(
     df_1: pd.DataFrame,
     scale,
     coord_names,
+    verbose:bool =True
 ):
     """Return a report dataframe for the locally computable information.
 
@@ -148,6 +166,8 @@ def local_report(
     blob_diameter : _type_
         _description_
     """
+    if verbose: print(f'entering local_report for {block_0}')
+
     ndim = len(coord_names)
     # compute valid_indices, the ones of nuclei for which we can compute everything in this block
     # and contained_indices, the ones of nuclei whose representative is contained in the block
@@ -160,17 +180,27 @@ def local_report(
     start_array = np.array([0 if slices[i].start is None else slices[i].start for i in range(ndim)])
     stop_array = np.array([upper_bounds[i] if slices[i].stop is None else slices[i].stop for i in range(ndim)])
     valid_indices_0 = np.where(np.all((data_array_0 < stop_array) & (data_array_0 >= start_array),axis=1))[0]
+    valid_indices_1 = np.where(np.all((data_array_1 < stop_array) & (data_array_1 >= start_array),axis=1))[0]
+
 
     slices = block_0.slicing
     start_array = np.array([0 if slices[i].start is None else slices[i].start for i in range(ndim)])
     stop_array = np.array([upper_bounds[i] if slices[i].stop is None else slices[i].stop for i in range(ndim)])
+    # contained_indices_1 needed to compute all the overlaps but the bounded boxes for contained indices might trespass the block border
+    # we cannot compute the bbox center correctly for all elements, whnece the use of valid_indices_1 afterwards.
     contained_indices_1 = np.where(np.all((data_array_1 < stop_array) & (data_array_1 >= start_array),axis=1))[0]
 
     sub_df_0 = df_0.iloc[valid_indices_0].reset_index()
     sub_df_1 = df_1.iloc[contained_indices_1].reset_index()
     channel_0 = channel.Channel(block_0.array, sub_df_0[coord_names] - start_array, voxel_dims=scale, coord_names=coord_names)
     channel_1 = channel.Channel(block_1.array, sub_df_1[coord_names] - start_array, voxel_dims=scale, coord_names=coord_names)
+
+    if verbose: print(f'computing blobwise overlaps for {block_0}')
+
     max_overlaps, max_overlaps_indices = channel_0.max_blobwise_overlaps(channel_1, return_max_indices=True)
+
+    if verbose: print(f'computing bbbox centers for channe1_0 in {block_0}')
+
     centers_df_0 = channel_0.centers_df()
     c0_result = centers_df_0.set_index(sub_df_0["index"]) + start_array
     blobwise_overlap_df = pd.DataFrame(
@@ -183,14 +213,16 @@ def local_report(
     blobwise_overlap_df = blobwise_overlap_df.set_index(sub_df_0["index"])
     c0_result = c0_result.join(blobwise_overlap_df, validate="1:1")
 
-    # cook the max overlap center dataframe
-    centers_df_1 = channel_1.centers_df(description="maximizing blob bbox center")
-    max_overlap_coords = centers_df_1.iloc[max_overlaps_indices].set_index(sub_df_0["index"]) + start_array
+    # correct centers computation for channel_1
+    sub_df_1 = df_1.iloc[valid_indices_1].reset_index()
+    channel_1 = channel.Channel(block_1.array, sub_df_1[coord_names] - start_array, voxel_dims=scale, coord_names=coord_names)
+    
+    if verbose: print(f'computing bbbox centers for channe1_1 in {block_0}')
 
-    c0_result = c0_result.join(max_overlap_coords, validate="1:1")
-
-    centers_df_1 = channel_1.centers_df() +start_array
+    centers_df_1 = channel_1.centers_df() + start_array
     c1_result = centers_df_1.set_index(sub_df_1["index"])
 
     # the distances will be computed from the final joined dataframes.
+    if verbose: print(f'returning results of local_report for {block_0}')
+
     return c0_result, c1_result
