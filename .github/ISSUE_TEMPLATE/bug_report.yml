@@ -1,0 +1,84 @@
+name: Bug Report
+description: Report a bug to help us improve.
+title: "[BUG] "
+labels: [bug]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for taking the time to report a bug. Please fill out the information below.
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating System
+      description: Select your operating system.
+      options:
+        - Windows
+        - macOS
+        - Linux
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: os_version
+    attributes:
+      label: OS Version
+      description: Enter your OS version.
+      placeholder: e.g., Windows 10, macOS 12.0
+    validations:
+      required: true
+
+  - type: input
+    id: code_version
+    attributes:
+      label: Code Version
+      description: Specify the version of the code you are using (at least whether 2.0, 2.1...).
+      placeholder: e.g., v1.0.0, commit hash
+    validations:
+      required: true
+
+  - type: dropdown
+    id: interface
+    attributes:
+      label: How are you using the application?
+      options:
+        - Old scripts
+        - New scripts
+        - GUI
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: Describe what you expected to happen.
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: Describe what actually happened.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: Provide detailed steps to reproduce the issue.
+      placeholder: "1. Go to '...'\n2. Click on '...'\n3. Scroll down to '...'\n4. See error"
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs and Screenshots
+      description: Include any relevant logs or screenshots to help diagnose the problem.
+      render: shell
