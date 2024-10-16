@@ -20,6 +20,7 @@ body:
         - macOS
         - Linux
         - Other
+    validations:
       required: true
 
   - type: input
@@ -28,6 +29,7 @@ body:
       label: OS Version
       description: Enter your OS version.
       placeholder: e.g., Windows 10, macOS 12.0
+    validations:
       required: true
 
   - type: input
@@ -36,6 +38,7 @@ body:
       label: Code Version
       description: Specify the version of the code you are using (at least whether 2.0, 2.1...).
       placeholder: e.g., v1.0.0, commit hash
+    validations:
       required: true
 
   - type: dropdown
@@ -46,6 +49,7 @@ body:
         - Old scripts
         - New scripts
         - GUI
+    validations:
       required: true
 
   - type: textarea
@@ -53,6 +57,7 @@ body:
     attributes:
       label: Expected Behavior
       description: Describe what you expected to happen.
+    validations:
       required: true
 
   - type: textarea
@@ -60,6 +65,7 @@ body:
     attributes:
       label: Actual Behavior
       description: Describe what actually happened.
+    validations:
       required: true
 
   - type: textarea
@@ -68,7 +74,8 @@ body:
       label: Steps to Reproduce
       description: Provide detailed steps to reproduce the issue.
       placeholder: "1. Go to '...'\n2. Click on '...'\n3. Scroll down to '...'\n4. See error"
-      required: false
+    validations:
+      required: true
 
   - type: textarea
     id: logs
