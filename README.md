@@ -193,7 +193,7 @@ Contributions are very welcome.
 
 Acknowlegements
 ===============
-We are very grateful to the Kavli Foundation for supporting this porject.
+We are very grateful to the Kavli Foundation for supporting this project.
 
 License
 =======
