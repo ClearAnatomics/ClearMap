@@ -24,6 +24,7 @@ Thumbs.db
 dist
 build
 ClearMap2.egg-info/
+ClearMap.egg-info/
 conda_init.sh
 
 # pyc files
