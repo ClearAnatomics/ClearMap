@@ -5,89 +5,177 @@ params
 
 All the classes that define parameters or group thereof for the tabs of the graphical interface
 """
-import os
+import functools
 import string
+import warnings
+from copy import deepcopy
 from itertools import permutations
+from pathlib import Path
 from typing import List
 
 import numpy as np
 
-from ClearMap.config.atlas import ATLAS_NAMES_MAP
-from ClearMap.gui.gui_utils import create_clearmap_widget, clear_layout
-
-from ClearMap.gui.dialogs import get_directory_dlg
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtWidgets import QInputDialog, QToolBox, QCheckBox, QPushButton
+
+from ClearMap.IO.assets_constants import CONTENT_TYPE_TO_PIPELINE
+from ClearMap.Utils.utilities import validate_orientation
+from ClearMap.Utils.exceptions import ParamsOrientationError
+from ClearMap.config.atlas import ATLAS_NAMES_MAP
+
+from ClearMap.gui.gui_utils import create_clearmap_widget, clear_layout
+from ClearMap.gui.dialogs import get_directory_dlg
+from ClearMap.gui.params_interfaces import (ParamLink, UiParameter, UiParameterCollection,
+                                            ChannelsUiParameterCollection, ChannelUiParameter)
 
 __author__ = 'Charly Rousseau <charly.rousseau@icm-institute.org>'
 __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
 __copyright__ = 'Copyright © 2022 by Charly Rousseau'
 __webpage__ = 'https://idisco.info'
-__download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
-
-from ClearMap.gui.params_interfaces import ParamLink, UiParameter, UiParameterCollection
+__download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
 
-class ParamsOrientationError(ValueError):
-    pass
+class SampleChannelParameters(ChannelUiParameter):
+    def __init__(self, tab, channel_name):
+        super().__init__(tab, channel_name, 'nameLineEdit')
+        self.params_dict = {
+            'data_type': ParamLink(['data_type'], self.tab.dataTypeComboBox),
+            'extension': ParamLink(['extension'], self.tab.extensionComboBox),
+            'path': ParamLink(['path'], self.tab.pathPlainTextEdit),
+            'resolution': ParamLink(['resolution'], self.tab.resolutionTriplet),
+            'comments': ParamLink(['comments'], self.tab.commentsPlainTextEdit),
+            'slice_x': ParamLink(['slicing', 'x'], self.tab.sliceXDoublet),
+            'slice_y': ParamLink(['slicing', 'y'], self.tab.sliceYDoublet),
+            'slice_z': ParamLink(['slicing', 'z'], self.tab.sliceZDoublet),
+            'orientation': ['orientation']  #  Last in case of validation issues
+        }
+        # property to be dynamic
+        # self.cfg_subtree = ['channels', channel_name]
+        self.connect()
+
+    @property
+    def cfg_subtree(self):
+        return ['channels', self.name]
+
+    def handle_name_changed(self):
+        # private config because absolute path
+        # TODO: check if dict() is required
+        self._config['channels'][self.name] = self._config['channels'].pop(self._cached_name)
+        self._cached_name = self.name
+
+    def connect(self):
+        self.nameWidget.editingFinished.connect(self.handle_name_changed)
+        self.tab.orient_x.currentTextChanged.connect(self.handle_orientation_changed)  # REFACTOR: push to paramslinki instead
+        self.tab.orient_y.currentTextChanged.connect(self.handle_orientation_changed)
+        self.tab.orient_z.currentTextChanged.connect(self.handle_orientation_changed)
+        self.connect_simple_widgets()
+
+    @property
+    def orientation(self):
+        x = int(self.tab.orient_x.currentText())
+        y = int(self.tab.orient_y.currentText())
+        z = int(self.tab.orient_z.currentText())
+        orientation = (x, y, z)
+        self.validate_orientation(orientation)  # FIXME: add validator in paramslink instead
+        return orientation
+
+    @orientation.setter
+    def orientation(self, orientation):  # FIXME: only when all 3 are set
+        orientation = self.validate_orientation(orientation)
+        self.tab.orient_x.setCurrentText(f'{orientation[0]}')
+        self.tab.orient_y.setCurrentText(f'{orientation[1]}')
+        self.tab.orient_z.setCurrentText(f'{orientation[2]}')
+
+    def validate_orientation(self, orientation):
+        return validate_orientation(orientation, self.name, raise_error=False)
+
+    def handle_orientation_changed(self, val):  # WARNING: does not seem to move up the stack because of pyqtsignals
+        self.config['orientation'] = self.orientation
+
+    def handle_name_changed(self):
+        tab_widget = self.tab.parent().parent()  # Not clear what is n+1
+        tab_widget.setTabText(self.page_index, self.name)
+        self._config['channels'][self.name] = self._config['channels'].pop(self._cached_name)
+        self._cached_name = self.name
 
 
-class AlignmentParams(UiParameterCollection):
+class SampleParameters(UiParameterCollection):
     """
-    Class that groups all the parameters related to the alignment of the sample
-    This includes stitching and registration
+    Class that links the sample params file to the UI
     """
+    plotMiniBrain = pyqtSignal(int)    # Bind by number because name may change
+    plotAtlas = pyqtSignal(int)    # Bind by number because name may change
+
     def __init__(self, tab, src_folder=None):
-        super().__init__(tab, src_folder)
-        self.stitching_general = GeneralStitchingParams(tab, src_folder)
-        self.stitching_rigid = RigidStitchingParams(tab, src_folder)
-        self.stitching_wobbly = WobblyStitchingParams(tab, src_folder)
-        self.registration = RegistrationParams(tab, src_folder)
+        self.shared_sample_params = SharedSampleParams(tab, src_folder=src_folder)
+        self.channel_params = {}
+        super().__init__(tab)
 
-    def fix_cfg_file(self, f_path):
-        # cfg = ConfigLoader.get_cfg_from_path(f_path)
-        pipeline_name, ok = QInputDialog.getItem(self.tab, 'Please select pipeline type',
-                                                 'Pipeline name:', ['CellMap', 'TubeMap', 'Both'], 0, False)
-        if not ok:
-            raise ValueError('Missing sample ID')
-        self.config['pipeline_name'] = pipeline_name
-        # WARNING: needs to be self.config
-        #  to be sure that we are up to date
-        #  (otherwise write but potentially no reload)
-        self.write_config()
+    def __getitem__(self, channel):
+        return self.channel_params[channel]
+
+    def __setitem__(self, key, value):
+        self.channel_params[key] = value
+
+    def keys(self):
+        return self.channel_params.keys()
+
+    def values(self):
+        return self.channel_params.values()
+
+    def items(self):
+        return self.channel_params.items()
+
+    def __iter__(self):
+        return iter(self.channel_params)
+
+    @property
+    def channels(self):
+        return list(self.channel_params.keys())
 
     @property
     def params(self):
-        return self.stitching_general, self.stitching_rigid, self.stitching_wobbly, self.registration
+        return [self.shared_sample_params] + list(self.channel_params.values())
 
-    @property
-    def all_stitching_params(self):
-        return self.stitching_general, self.stitching_rigid, self.stitching_wobbly
+    # def fix_cfg_file(self, f_path):
 
-    @property
-    def pipeline_name(self):
-        return self.config['pipeline_name']
+    def cfg_to_ui(self):
+        self.shared_sample_params.cfg_to_ui()
+        for channel in self.config['channels'].keys():
+            self.add_channel(channel)
+            self.channel_params[channel].cfg_to_ui()
 
-    @pipeline_name.setter
-    def pipeline_name(self, name):
-        self.config['pipeline_name'] = name
+    def add_channel(self, channel_name):
+        if channel_name not in self.channel_params:
+            if channel_name not in self.config['channels']:  # WARNING: dangerous overwriting
+                self.config['channels'][channel_name] = deepcopy(self.default_channel_config())
+            channel_params = SampleChannelParameters(self.tab, channel_name)
+            channel_params.tab.plotMiniBrainPushButton.clicked.connect(
+                functools.partial(self.plotMiniBrain.emit, channel_params.page_index))
+            channel_params.tab.sampleViewAtlasPushButton.clicked.connect(
+                functools.partial(self.plotAtlas.emit, channel_params.page_index))
+            channel_params._config = self.config
+            self.channel_params[channel_name] = channel_params
 
-    # @property
-    # def pipeline_is_cell_map(self):
-    #     return self.pipeline_name.lower().replace('_', '') == 'cellmap'
-    #
-    # @property
-    # def pipeline_is_tube_map(self):
-    #     return self.pipeline_name.lower().replace('_', '') == 'tubemap'
-    #
-    # @property
-    # def pipeline_is_both(self):
-    #     return self.pipeline_name.lower().replace('_', '') == 'both'
+    def get_channel_name(self, channel_idx):
+        return self.tab.channelsParamsTabWidget.tabText(channel_idx)
+
+    def default_channel_config(self):
+        return {
+            'data_type': '',  # TODO: None or '' ?
+            'extension': '.ome.tif',
+            'path': '',
+            'resolution': [0, 0, 0],
+            'orientation': (1, 2, 3),
+            'comments': '',
+            'slicing': {'x': None, 'y': None, 'z': None}
+        }
 
 
-class SampleParameters(UiParameter):
+class SharedSampleParams(UiParameter):
     """
-    Class that links the sample params file to the UI
+    Links the shared sample parameters (i.e. independent of channel like
+    folder, sample_id...) to the UI
 
     Attributes
     ----------
@@ -95,74 +183,31 @@ class SampleParameters(UiParameter):
         The ID of the sample. This must be unique
     use_id_as_prefix : bool
         Whether to use the sample ID as a prefix for the output files
-    tile_extension : str
+    default_tile_extension : str
         The extension of the tile files
-    raw_path : str
-        The path to the raw data. This is typically an *expression* that will be expanded by ClearMap
-    autofluo_path : str
-        The path to the autofluorescence data. This is typically an *expression* that will be expanded by ClearMap
-    arteries_path : str
-        The path to the arteries data. This is typically an *expression* that will be expanded by ClearMap
-    raw_resolution : List[float]
-        The resolution (sampling) of the raw data
-    arteries_resolution : List[float]
-        The resolution (sampling) of the arteries data
-    autofluorescence_resolution : List[float]
-        The resolution (sampling) of the autofluorescence data
-    slice_x : List[int]
-        The slice in the x dimension
-    slice_y : List[int]
-        The slice in the y dimension
-    slice_z : List[int]
-        The slice in the z dimension
-    orientation : List[int]
-        The orientation of the data (x, y, z) as a tuple of integers (1, 2, 3), (3, 1, 2) ...
-        Negative values are allowed to indicate a flip of the axis
     """
     sample_id: str
     use_id_as_prefix: bool
-    tile_extension: str
-    raw_path: str
-    autofluo_path: str
-    arteries_path: str
-    raw_resolution: List[float]
-    arteries_resolution: List[float]
-    autofluorescence_resolution: List[float]
-    slice_x: List[int]
-    slice_y: List[int]
-    slice_z: List[int]
-    orientation: List[int]
+    default_tile_extension: str
 
     def __init__(self, tab, src_folder=None):
-        super().__init__(tab, src_folder)
+        super().__init__(tab)
         self.params_dict = {
-            'sample_id': ['sample_id'],
+            'sample_id': ParamLink(['sample_id'], self.tab.sampleIdTxt, connect=self.handle_sample_id_changed),
             'use_id_as_prefix': ParamLink(['use_id_as_prefix'], self.tab.useIdAsPrefixCheckBox),
-            'tile_extension': ParamLink(['src_paths', 'tile_extension'], self.tab.tileExtensionLineEdit),
-            'raw_path': ['src_paths', 'raw'],
-            'autofluo_path': ParamLink(['src_paths', 'autofluorescence'], self.tab.autofluoPathOptionalPlainTextEdit),
-            'arteries_path': ParamLink(['src_paths', 'arteries'], self.tab.arteriesPathOptionalPlainTextEdit),
-            'raw_resolution': ParamLink(['resolutions', 'raw'], self.tab.rawResolutionTriplet),
-            'arteries_resolution': ParamLink(['resolutions', 'arteries'], self.tab.arteriesResolutionTriplet),
-            'autofluorescence_resolution': ParamLink(['resolutions', 'autofluorescence'], self.tab.autofluorescenceResolutionTriplet),
-            'slice_x': ParamLink(['slice_x'], self.tab.sliceXDoublet),
-            'slice_y': ParamLink(['slice_y'], self.tab.sliceYDoublet),
-            'slice_z': ParamLink(['slice_z'], self.tab.sliceZDoublet),
-            'orientation': ['orientation']  # WARNING: Finish by orientation in case invalid,
+            'default_tile_extension': ParamLink(['default_tile_extension'], self.tab.defaultTileExtensionLineEdit),
         }
+        self.src_folder = src_folder
         self.connect()
         if self.sample_id:
             self.handle_sample_id_changed(self.sample_id)
 
+    @property
+    def channels(self):
+        return list(self.config['channels'].keys())
+
     def connect(self):
-        self.tab.sampleIdTxt.editingFinished.connect(self.handle_sample_id_changed)
-
-        self.tab.rawPath.textChanged.connect(self.handle_raw_path_changed)
-
-        self.tab.orient_x.currentTextChanged.connect(self.handle_orientation_changed)
-        self.tab.orient_y.currentTextChanged.connect(self.handle_orientation_changed)
-        self.tab.orient_z.currentTextChanged.connect(self.handle_orientation_changed)
-
+        # self.tab.sampleIdTxt.editingFinished.connect(self.handle_sample_id_changed)
         self.connect_simple_widgets()
 
     def _ui_to_cfg(self):
@@ -172,9 +217,9 @@ class SampleParameters(UiParameter):
         self.reload()
         super().cfg_to_ui()
 
-    def fix_cfg_file(self, f_path):  # FIXME: seems wrong to pass f_path just for that usage
-        # cfg = ConfigLoader.get_cfg_from_path(f_path)
-        self.config['base_directory'] = os.path.dirname(f_path)  # WARNING: needs to be self.config
+    def fix_cfg_file(self, f_path):  # REFACTOR: seems wrong to pass f_path just for that usage
+        f_path = Path(f_path)
+        self.config['base_directory'] = f_path.parent  # WARNING: needs to be self.config
                                                                  #  to be sure that we are up to date
                                                                  #  (otherwise write but potentially no reload)
         if not self.sample_id:
@@ -188,64 +233,121 @@ class SampleParameters(UiParameter):
         self.config.write()
 
     # Sample params
-    @property
-    def sample_id(self):
-        return self.tab.sampleIdTxt.text()
-
-    @sample_id.setter
-    def sample_id(self, id_):
-        self.tab.sampleIdTxt.setText(id_)
+    # @property
+    # def sample_id(self):
+    #     return self.tab.sampleIdTxt.text()
+    #
+    # @sample_id.setter
+    # def sample_id(self, id_):
+    #     self.tab.sampleIdTxt.setText(id_)
 
     def handle_sample_id_changed(self, id_=None):
         if self.config is not None:
             self.config['sample_id'] = self.sample_id
             self.ui_to_cfg()   # FIXME: check
 
-    @property
-    def raw_path(self):
-        f_path = self.tab.rawPath.toPlainText()
-        f_path = f_path if f_path else None
-        return f_path
 
-    @raw_path.setter
-    def raw_path(self, f_path):
-        f_path = f_path if f_path is not None else ''
-        self.tab.rawPath.setPlainText(f_path)
+class StitchingParams(ChannelsUiParameterCollection):
+    """
+    Class that groups all the parameters related to the stitching of the sample
+    (i.e. rigid and wobbly stitching)
+    """
+    def __init__(self, tab):
+        super().__init__(tab)
 
-    def handle_raw_path_changed(self):
-        self.config['src_paths']['raw'] = self.raw_path
-
-    @property
-    def orientation(self):
-        x = int(self.tab.orient_x.currentText())
-        y = int(self.tab.orient_y.currentText())
-        z = int(self.tab.orient_z.currentText())
-        n_axes = len(set([abs(e) for e in (x, y, z)]))
-        if n_axes != 3:
-            raise ParamsOrientationError('Number of different axis is only {} instead of 3. '
-                                         'Please amend duplicate axes'.format(n_axes))
-        return x, y, z
-
-    @orientation.setter
-    def orientation(self, orientation):
-        n_axes = len(set([abs(e) for e in orientation]))
-        if n_axes != 3:
-            raise ParamsOrientationError('Number of different axis is only {} instead of 3. '
-                                         'Please amend duplicate axes'.format(n_axes))
-        self.tab.orient_x.setCurrentText(f'{orientation[0]}')
-        self.tab.orient_y.setCurrentText(f'{orientation[1]}')
-        self.tab.orient_z.setCurrentText(f'{orientation[2]}')
-
-    def handle_orientation_changed(self, val):  # WARNING: does not seem to move up the stack because of pyqtsignals
-        try:
-            orientation = self.orientation
-        except ParamsOrientationError as err:
-            print('Invalid orientation, keeping current')
+    def add_channel(self, channel_name):
+        if channel_name in self.keys():
             return
-        self._config['orientation'] = orientation
+        else:
+            self[channel_name] = ChannelStitchingParams(self.tab, channel_name, config=self.config)
+
+    def compute_layout(self, channel):
+        return self[channel].compute_layout
+
+    def fix_cfg_file(self, f_path):
+        pass
+
+    def get_channels_to_run(self):
+        return [channel for channel in self.keys() if self[channel].run]  # FIXME: do not bind run
+
+    def set_channels_to_run(self, channels):
+        for channel in self.keys():
+            status = self[channel].run
+            self[channel].run = status or (channel in channels)
+
+    @property
+    def params(self):
+        return list(self.values())
 
 
-class RigidStitchingParams(UiParameter):
+class ChannelStitchingParams(UiParameterCollection):
+    def __init__(self, tab, channel, config):
+        super().__init__(tab)
+        self.name = channel
+        self.shared = GeneralChannelStitchingParams(tab, channel)
+        self.stitching_rigid = None
+        self.stitching_wobbly = None
+        self.read_configs(config.filename)  # Required for cfg_to_ui and compute_layout
+
+        if self.compute_layout():
+            self.stitching_rigid = RigidChannelStitchingParams(tab, channel)
+            self.stitching_wobbly = WobblyChannelStitchingParams(tab, channel)
+            self.read_configs(config.filename)
+
+        self.cfg_to_ui()
+
+
+    def compute_layout(self):
+        """
+        Checks if the layout should be computed for this channel.
+        This is the case if the layout channel is the current channel.
+        If the config has not been pushed to the ui yet, it will use the config directly.
+
+        Returns
+        -------
+        bool
+            Whether the stitching layout should be computed for this channel
+        """
+        return (self.shared.layout_channel or self.shared.config['layout_channel']) == self.name
+
+    @property
+    def params(self):
+        return self.shared, self.stitching_rigid, self.stitching_wobbly  # TODO: check if None is a problem
+
+
+
+class GeneralChannelStitchingParams(ChannelUiParameter):
+    use_npy: bool
+    run: bool
+    layout_channel: str
+
+    def __init__(self, tab, channel_name):
+        super().__init__(tab, channel_name)
+        self.params_dict = {
+            'use_npy': ParamLink(['use_npy'], self.tab.useNpyCheckBox),
+            'run': ParamLink(['run'], self.tab.runCheckBox),
+            'layout_channel': ParamLink(['layout_channel'], self.tab.layoutChannelComboBox),
+        }
+        self.connect()
+
+    @property
+    def cfg_subtree(self):
+        return ['channels', self.name]
+
+    def handle_name_changed(self, old_name, new_name):
+        if old_name != self._cached_name:
+            warnings.warn(f'Channel name changed from {old_name} to {new_name} but was not expected')
+        # private config because absolute path
+        # TODO: check if dict() is required
+        self._config['channels'][self.name] = self._config['channels'].pop(self._cached_name)
+        self._cached_name = self.name
+
+    def connect(self):
+        self.nameWidget.channelRenamed.connect(self.handle_name_changed)
+        self.connect_simple_widgets()
+
+
+class RigidChannelStitchingParams(ChannelUiParameter):
     skip: bool
     x_overlap: int
     y_overlap: int
@@ -256,25 +358,32 @@ class RigidStitchingParams(UiParameter):
     background_level: int
     background_pixels: int
 
-    def __init__(self, tab, src_folder=None):
-        super().__init__(tab, src_folder)
+    def __init__(self, tab, channel_name):
+        super().__init__(tab, channel_name)
         self.params_dict = {
-            'skip': ParamLink(['skip'], self.tab.skipRigidCheckbox),
+            'skip': ParamLink(['skip'], self.tab.rigidParamsGroupBox),
             'x_overlap': ParamLink(['overlap_x'], self.tab.xOverlapSinglet),
             'y_overlap': ParamLink(['overlap_y'], self.tab.yOverlapSinglet),
-            'projection_thickness': ['project_thickness'],  # FIXME: change to projection
+            'projection_thickness': ['projection_thickness'],
             'max_shifts_x': ParamLink(['max_shifts_x'], self.tab.rigidMaxShiftsXDoublet),
             'max_shifts_y': ParamLink(['max_shifts_y'], self.tab.rigidMaxShiftsYDoublet),
             'max_shifts_z': ParamLink(['max_shifts_z'], self.tab.rigidMaxShiftsZDoublet),
             'background_level': ParamLink(['background_level'], self.tab.rigidBackgroundLevel),
             'background_pixels': ParamLink(['background_pixels'], self.tab.rigidBackgroundPixels)
         }
-        self.cfg_subtree = ['stitching', 'rigid']
+        self.attrs_to_invert=['skip']
         self.connect()
 
     def connect(self):
         self.tab.projectionThicknessDoublet.valueChangedConnect(self.handle_projection_thickness_changed)
         self.connect_simple_widgets()
+
+    @property
+    def cfg_subtree(self):
+        return ['channels', self.name, 'rigid']
+
+    def handle_name_changed(self):
+        pass  #  handled by shared params
 
     @property
     def projection_thickness(self):
@@ -290,112 +399,165 @@ class RigidStitchingParams(UiParameter):
         self.tab.projectionThicknessDoublet.setValue(thickness)
 
     def handle_projection_thickness_changed(self):
-        self.config['project_thickness'] = self.projection_thickness
+        self.config['projection_thickness'] = self.projection_thickness
 
 
-class WobblyStitchingParams(UiParameter):
+class WobblyChannelStitchingParams(ChannelUiParameter):
     skip: bool
     max_shifts_x: List[int]
     max_shifts_y: List[int]
     max_shifts_z: List[int]
-    valid_range: list  # FIXME: missing pixel size
-    slice_range: List[int]
-    slice_pixel_size: int
+    stack_valid_range: list
+    stack_pixel_size: int | None
+    slice_valid_range: List[int]
+    slice_pixel_size: int  | None
 
-    def __init__(self, tab, src_folder=None):
-        super().__init__(tab, src_folder)
+    def __init__(self, tab, channel_name):
+        super().__init__(tab, channel_name)
         self.params_dict = {
-            'skip': ParamLink(['skip'], self.tab.skipWobblyCheckBox),
+            'skip': ParamLink(['skip'], self.tab.wobblyParamsGroupBox),
             'max_shifts_x': ParamLink(['max_shifts_x'], self.tab.wobblyMaxShiftsXDoublet),
             'max_shifts_y': ParamLink(['max_shifts_y'], self.tab.wobblyMaxShiftsYDoublet),
             'max_shifts_z': ParamLink(['max_shifts_z'], self.tab.wobblyMaxShiftsZDoublet),
-            'valid_range': ParamLink(['stack_valid_range'], self.tab.wobblyValidRangeDoublet),
-            'slice_range': ParamLink(['slice_valid_range'], self.tab.wobblySliceRangeDoublet),
+            'stack_valid_range': ParamLink(['stack_valid_range'], self.tab.wobblyStackValidRangeDoublet),
+            'stack_pixel_size': ParamLink(['stack_pixel_size'], self.tab.wobblyStackPixelSizeSinglet),
+            'slice_valid_range': ParamLink(['slice_valid_range'], self.tab.wobblySliceRangeDoublet),
             'slice_pixel_size': ParamLink(['slice_pixel_size'], self.tab.wobblySlicePixelSizeSinglet)
         }
-        self.cfg_subtree = ['stitching', 'wobbly']
+        self.params_to_invert = ['skip']
         self.connect()
 
     def connect(self):
-        self.connect_simple_widgets()
-
-
-class GeneralStitchingParams(UiParameter):
-    use_npy: bool
-    run_raw: bool
-    run_arteries: bool
-    preview_raw: bool
-    preview_arteries: bool
-    convert_output: bool
-    convert_raw: bool
-    convert_arteries: bool
-    conversion_fmt: str
-    # stitching_preview_step: str
-
-    def __init__(self, tab, src_folder=None):
-        super().__init__(tab, src_folder)
-        self.params_dict = {
-            'use_npy': ParamLink(['conversion', 'use_npy'], self.tab.stitchingUseNpyCheckBox),
-            'run_raw': ParamLink(['stitching', 'run', 'raw'], self.tab.stitchingRunRawCheckBox),
-            'run_arteries': ParamLink(['stitching', 'run', 'arteries'], self.tab.stitchingRunArteriesCheckBox),
-            'preview_raw': ParamLink(['stitching', 'preview', 'raw'], self.tab.stitchingPreviewRawCheckBox),
-            'preview_arteries': ParamLink(['stitching', 'preview', 'arteries'], self.tab.stitchingPreviewArteriesCheckBox),
-            'convert_output': ['stitching', 'output_conversion', 'skip'],
-            'convert_raw': ParamLink(['stitching', 'output_conversion', 'raw'], self.tab.stitchingConvertRawCheckBox),
-            'convert_arteries': ParamLink(['stitching', 'output_conversion', 'arteries'], self.tab.stitchingConvertArteriesCheckBox),
-            'conversion_fmt': ParamLink(['stitching', 'output_conversion', 'format'], self.tab.outputConversionFormat),
-            # 'stitching_preview_step': ParamLink([], self.tab.stitchingPreviewStep, connect=False)
-        }
-        self.attrs_to_invert = ['convert_output']  # FIXME: check
-        self.connect()
-
-    def connect(self):
-        self.tab.skipOutputConversioncheckBox.stateChanged.connect(self.handle_convert_output_changed)
         self.connect_simple_widgets()
 
     @property
-    def convert_output(self):
-        return not self.tab.skipOutputConversioncheckBox.isChecked()
+    def cfg_subtree(self):
+        return ['channels', self.name, 'wobbly']
 
-    @convert_output.setter
-    def convert_output(self, skip):
-        self.set_check_state(self.tab.skipOutputConversioncheckBox, not skip)
-
-    def handle_convert_output_changed(self, state):
-        self.config['stitching']['output_conversion']['skip'] = not self.convert_output
+    def handle_name_changed(self):
+        pass  #  handled by shared params
 
 
-class RegistrationParams(UiParameter):
+class ChannelRegistrationParams(ChannelUiParameter):  # FIXME: add signal for align_with_changed
+    align_with_changed = pyqtSignal(str, str)
+
+    def __init__(self, tab, channel_name):
+        super().__init__(tab, channel_name)
+        self.params_dict = {
+            'resample': ParamLink(['resample'], self.tab.resampleGroupBox),
+            'resampled_resolution': ParamLink(['resampled_resolution'], self.tab.resampleResolutionTriplet),
+            'align_with': ParamLink(['align_with'], self.tab.alignWithComboBox),
+            'moving_channel': ParamLink(['moving_channel'], self.tab.movingChannelComboBox),
+            'params_files': ParamLink(['params_files'], self.tab.paramsFilesListWidget),
+        }
+        self.connect()
+
+    @property
+    def cfg_subtree(self):
+        return ['channels', self.name]
+
+    def handle_name_changed(self, old_name, new_name):
+        if old_name != self._cached_name:
+            warnings.warn(f'Channel name changed from {old_name} to {new_name} but was not expected')
+        # private config because absolute path
+        # TODO: check if dict() is required
+        self._config['channels'][self.name] = self._config['channels'].pop(self._cached_name)
+        self._cached_name = self.name
+
+    @property
+    def n_registration_files(self):
+        return self.tab.paramsFilesListWidget.count()
+
+    @property
+    def landmarks_weights(self):
+        return {getattr(self.tab, f'param{x}Label').text(): getattr(self.tab, f'param{x}HorizontalSlider').value() for x in range(self.n_registration_files)}
+
+    @landmarks_weights.setter
+    def landmarks_weights(self, value):
+        for param_idx in range(self.n_registration_files):
+            param_name = getattr(self.tab, f'param{param_idx}Label').text()
+            if param_name in value:
+                getattr(self.tab, f'param{param_idx}HorizontalSlider').setValue(value[param_name])
+
+    @property
+    def use_landmarks_for(self):
+        return []
+
+    def connect(self):
+        self.nameWidget.channelRenamed.connect(self.handle_name_changed)
+        self.connect_simple_widgets()
+        self.tab.alignWithComboBox.currentTextChanged.connect(self.handle_align_with_changed)
+
+    def handle_align_with_changed(self, align_with):
+        # self.config['align_with'] = align_with
+        # self.ui_to_cfg()  # TODO: check
+        self.align_with_changed.emit(self.name, align_with)
+
+
+
+class SharedRegistrationParams(UiParameter):
+    def __init__(self, tab):
+        super().__init__(tab)
+        self.params_dict = {
+            'plot_channel': ParamLink(None, self.tab.plotChannelComboBox),
+            'plot_composite': ParamLink(None, self.tab.plotCompositeCheckBox),
+        }
+        self.connect()
+
+
+class RegistrationParams(ChannelsUiParameterCollection):  # FIXME: does not seem to follow tab click
+    launchLandmarksDialog = pyqtSignal(int)  # Bind by number because name may change
+
+    def __init__(self, tab):
+        super().__init__(tab)
+        self.atlas_params = AtlasParams(tab)
+        self.shared_params = SharedRegistrationParams(tab)
+
+    def add_channel(self, channel_name):
+        if channel_name in self.keys():
+            return
+        else:
+            if channel_name not in self.config['channels']:
+                warnings.warn(f'Channel {channel_name} not in config, adding default')
+                default_cfg = self._default_config['channels'].get(channel_name, self._default_config['channel_x'])
+                self.config['channels'][channel_name] = deepcopy(default_cfg)
+            channel_params = ChannelRegistrationParams(self.tab, channel_name)
+            self[channel_name] = channel_params
+            channel_params.tab.selectLandmarksPushButton.clicked.connect(
+                functools.partial(self.launchLandmarksDialog.emit, channel_params.page_index))
+
+    @property
+    def params(self):
+        return [self.atlas_params, self.shared_params] + list(self.values())
+
+    def get_channel_name(self, channel_idx):
+        return self.tab.channelsParamsTabWidget.tabText(channel_idx)
+
+
+class AtlasParams(UiParameter):
     atlas_id_changed = pyqtSignal(str)
     atlas_structure_tree_id_changed = pyqtSignal(str)
 
-    skip_resampling: bool
-    atlas_resolution: List[float]
     atlas_id: str
     structure_tree_id: str
     atlas_folder: str
-    channel_affine_file_path: str
-    ref_affine_file_path: str
-    ref_bspline_file_path: str
 
-    def __init__(self, tab, src_folder=None):
-        super().__init__(tab, src_folder)
+    def __init__(self, tab):
+        super().__init__(tab)
         self.params_dict = {
-            'skip_resampling': ParamLink(['resampling', 'skip'], self.tab.skipRegistrationResamplingCheckBox),
-            'atlas_resolution': ['resampling', 'raw_sink_resolution'],
-            'atlas_id': ['atlas', 'id'],
-            'structure_tree_id': ['atlas', 'structure_tree_id'],
-            'atlas_folder': ParamLink(['atlas', 'align_files_folder'], self.tab.atlasFolderPath, connect=False),  # FIXME: ensure that set correctly by picking
-            'channel_affine_file_path': ParamLink(['atlas', 'align_channels_affine_file'], self.tab.channelAffineFilePath),
-            'ref_affine_file_path': ParamLink(['atlas', 'align_reference_affine_file'], self.tab.refAffineFilePath),
-            'ref_bspline_file_path': ParamLink(['atlas', 'align_reference_bspline_file'], self.tab.refBsplineFilePath),
+            'atlas_id': ['id'],
+            'structure_tree_id': ['structure_tree_id'],
+            'atlas_folder': ParamLink(['align_files_folder'], self.tab.atlasFolderPath, connect=False),
+            'atlas_resolution': ParamLink(None, self.tab.atlasResolutionTriplet),  # TODO: check if we bind to cfg here
         }
         self.atlas_info = ATLAS_NAMES_MAP
-        self.cfg_subtree = ['registration']
+        self.cfg_subtree = ['atlas']
         self.connect()
+        # WARNING: after connect
+        self.tab.atlasResolutionTriplet.setValue([self.atlas_info[self.atlas_id]['resolution']] * 3)
 
     def connect(self):
-        self.tab.atlasResolutionTriplet.valueChangedConnect(self.handle_atlas_resolution_changed)
+        self.tab.atlasResolutionTriplet.valueChangedConnect(self.handle_atlas_resolution_changed)  # TODO: replace with label
         self.tab.atlasIdComboBox.currentTextChanged.connect(self.handle_atlas_id_changed)
         self.tab.structureTreeIdComboBox.currentTextChanged.connect(self.handle_structure_tree_id_changed)
         self.connect_simple_widgets()
@@ -403,18 +565,12 @@ class RegistrationParams(UiParameter):
     @property
     def atlas_base_name(self):
         return self.atlas_info[self.atlas_id]['base_name']
-        
-    @property
-    def atlas_resolution(self):
-        return self.tab.atlasResolutionTriplet.getValue()
-
-    @atlas_resolution.setter
-    def atlas_resolution(self, res):
-        self.tab.atlasResolutionTriplet.setValue(res)
 
     def handle_atlas_resolution_changed(self, state):
-        self.config['resampling']['raw_sink_resolution'] = self.atlas_resolution
-        self.config['resampling']['autofluo_sink_resolution'] = self.atlas_resolution
+        # WARNING: use parent config
+        if self._config is not None:  #  only if config is loaded
+            for channel_cfg in self._config['channels'].values():
+                channel_cfg['resampled_resolution'] = self.atlas_resolution
 
     @property
     def atlas_id(self):
@@ -425,8 +581,9 @@ class RegistrationParams(UiParameter):
         self.tab.atlasIdComboBox.setCurrentText(value)
 
     def handle_atlas_id_changed(self):
-        self.config['atlas']['id'] = self.atlas_id
-        self.atlas_resolution = self.atlas_info[self.atlas_id]['resolution']
+        self.config['id'] = self.atlas_id
+        resolution = [self.atlas_info[self.atlas_id]['resolution']] * 3
+        self.tab.atlasResolutionTriplet.setValue(resolution)
         self.ui_to_cfg()
         self.atlas_id_changed.emit(self.atlas_base_name)
 
@@ -439,12 +596,48 @@ class RegistrationParams(UiParameter):
         self.tab.structureTreeIdComboBox.setCurrentText(value)
 
     def handle_structure_tree_id_changed(self):
-        self.config['atlas']['structure_tree_id'] = self.structure_tree_id
+        self.config['structure_tree_id'] = self.structure_tree_id
         self.ui_to_cfg()   # TODO: check if required
         self.atlas_structure_tree_id_changed.emit(self.structure_tree_id)
 
 
-class CellMapParams(UiParameter):
+class CellMapParams(ChannelsUiParameterCollection):
+    def __init__(self, tab, sample_params, _, registration_params):
+        super().__init__(tab)
+        self.sample_params = sample_params
+        self.registration_params = registration_params
+
+    @property
+    def channels_to_detect(self):
+        return [c for c, v in self.sample_params.config['channels'].items() if
+                CONTENT_TYPE_TO_PIPELINE[v['data_type']] == 'CellMap']
+
+    def default_channel_config(self):
+        return self._default_config['channels']['example']
+
+    @property
+    def channel_params(self):
+        return self._channels.values()
+
+    def add_channel(self, channel_name):  # FIXME: not called
+        if channel_name not in self.keys():
+            if channel_name not in self.config['channels']:
+                self.config['channels'][channel_name] = dict(deepcopy(self.default_channel_config()))
+            dtype = np.uint16  # FIXME: read from stitched file
+            channel_params = ChannelCellMapParams(self.tab, channel_name, self, dtype=dtype)
+            channel_params._config = self.config
+            self[channel_name] = channel_params
+
+    @property
+    def params(self):
+        return self.values()
+
+    def handle_advanced_state_changed(self, state):
+        for channel in self.values():
+            channel.tab.handle_advanced_state_changed(state)
+
+
+class ChannelCellMapParams(ChannelUiParameter):
     background_correction_diameter: List[int]
     maxima_shape: int
     detection_threshold: int
@@ -463,9 +656,11 @@ class CellMapParams(UiParameter):
     crop_y_max: int  # TODO: if 99.9 % source put to 100% (None)
     crop_z_min: int
     crop_z_max: int  # TODO: if 99.9 % source put to 100% (None)
+    n_detected_cells: int
+    n_filtered_cells: int
 
-    def __init__(self, tab, sample_params=None, preprocessing_params=None, src_folder=None):
-        super().__init__(tab, src_folder)
+    def __init__(self, tab, channel, main_params, dtype=np.uint16):
+        super().__init__(tab, channel)
         self.params_dict = {
             'background_correction_diameter': ['detection', 'background_correction', 'diameter'],
             'maxima_shape': ParamLink(['detection', 'maxima_detection', 'shape'], self.tab.maximaShape),
@@ -475,21 +670,39 @@ class CellMapParams(UiParameter):
                                                self.tab.cellFilterThresholdIntensityDoublet,
                                                connect=False),
             'voxelization_radii': ParamLink(['voxelization', 'radii'], self.tab.voxelizationRadiusTriplet),
-            'detect_cells': ParamLink(None, self.tab.runCellMapDetectCellsCheckBox),
-            'filter_cells': ParamLink(None, self.tab.runCellMapFilterCellsCheckBox),
-            'voxelize': ParamLink(None, self.tab.runCellMapVoxelizeCheckBox),
-            'save_shape': ParamLink(None, self.tab.runCellMapSaveShapeCheckBox),
-            'plot_when_finished': ParamLink(['run', 'plot_when_finished'], self.tab.runCellMapPlotCheckBox),
             'crop_x_min': ParamLink(['detection', 'test_set_slicing', 'dim_0', 0], self.tab.detectionSubsetXRangeMin),
             'crop_x_max': ParamLink(['detection', 'test_set_slicing', 'dim_0', 1], self.tab.detectionSubsetXRangeMax),
             'crop_y_min': ParamLink(['detection', 'test_set_slicing', 'dim_1', 0], self.tab.detectionSubsetYRangeMin),
             'crop_y_max': ParamLink(['detection', 'test_set_slicing', 'dim_1', 1], self.tab.detectionSubsetYRangeMax),
             'crop_z_min': ParamLink(['detection', 'test_set_slicing', 'dim_2', 0], self.tab.detectionSubsetZRangeMin),
-            'crop_z_max': ParamLink(['detection', 'test_set_slicing', 'dim_2', 1], self.tab.detectionSubsetZRangeMax)
+            'crop_z_max': ParamLink(['detection', 'test_set_slicing', 'dim_2', 1], self.tab.detectionSubsetZRangeMax),
+            'plot_when_finished': ParamLink(['run', 'plot_when_finished'], self.tab.runCellMapPlotCheckBox),
+            'detect_cells': ParamLink(None, self.tab.runCellMapDetectCellsCheckBox),
+            'filter_cells': ParamLink(None, self.tab.runCellMapFilterCellsCheckBox),
+            'voxelize': ParamLink(None, self.tab.runCellMapVoxelizeCheckBox),
+            'save_shape': ParamLink(None, self.tab.runCellMapSaveShapeCheckBox),
+            'n_detected_cells': ParamLink(None, self.tab.nDetectedCellsLabel),
+            'n_filtered_cells': ParamLink(None, self.tab.nDetectedCellsAfterFilterLabel),
         }
-        self.sample_params = sample_params
-        self.preprocessing_params = preprocessing_params
+        self.main_params = main_params
+        self.dtype = dtype
+        self.advanced_controls = [self.tab.detectionShapeGroupBox]
         self.connect()
+
+    def handle_advanced_state_changed(self, state):
+        for ctrl in self.advanced_controls:
+            ctrl.setVisible(state)
+        self.tab.detectionShapeGroupBox.setVisible(state)
+
+    @property
+    def cfg_subtree(self):
+        return ['channels', self.name]
+
+    def handle_name_changed(self):
+        # private config because absolute path
+        # TODO: check if dict() is required
+        self._config['channels'][self.name] = self._config['channels'].pop(self._cached_name)
+        self._cached_name = self.name
 
     def connect(self):
         self.tab.backgroundCorrectionDiameter.valueChanged.connect(self.handle_background_correction_diameter_changed)
@@ -502,8 +715,8 @@ class CellMapParams(UiParameter):
 
     @property
     def ratios(self):
-        raw_res = np.array(self.sample_params.raw_resolution)
-        atlas_res = np.array(self.preprocessing_params.registration.atlas_resolution)
+        raw_res = np.array(self.main_params.sample_params[self.name].resolution)
+        atlas_res = np.array(self.main_params.registration_params.atlas_params.atlas_resolution)
         ratios = atlas_res / raw_res  # to original
         return ratios
 
@@ -528,7 +741,7 @@ class CellMapParams(UiParameter):
         else:
             intensities = list(intensities)
             if intensities[-1] == -1:
-                intensities[-1] = 65536  # FIXME: hard coded, should read max
+                intensities[-1] = np.iinfo(self.dtype).max
             return intensities
 
     @cell_filter_intensity.setter
@@ -558,13 +771,13 @@ class CellMapParams(UiParameter):
 
 
 class VesselParams(UiParameterCollection):
-    def __init__(self, tab, sample_params, preprocessing_params, src_folder=None):
-        super().__init__(tab, src_folder)
+    def __init__(self, tab, sample_params, stitching_params, registration_params):
+        super().__init__(tab)
         # self.sample_params = sample_params  # TODO: check if required
         # self.preprocessing_params = preprocessing_params  # TODO: check if required
-        self.binarization_params = VesselBinarizationParams(tab, src_folder)
-        self.graph_params = VesselGraphParams(tab, src_folder)
-        self.visualization_params = VesselVisualizationParams(tab, sample_params, preprocessing_params, src_folder)
+        self.binarization_params = VesselBinarizationParams(tab)
+        self.graph_params = VesselGraphParams(tab)
+        self.visualization_params = VesselVisualizationParams(tab, sample_params, stitching_params, registration_params)
 
     @property
     def params(self):
@@ -590,8 +803,8 @@ class VesselBinarizationParams(UiParameter):
     plot_channel_1: str
     plot_channel_2: str
 
-    def __init__(self, tab, src_folder=None):
-        super().__init__(tab, src_folder)
+    def __init__(self, tab):
+        super().__init__(tab)
         self.params_dict = {
             'run_raw_binarization': ParamLink(['raw', 'binarization', 'run'], self.tab.runRawBinarizationCheckBox),
             'raw_binarization_clip_range': ParamLink(['raw', 'binarization', 'clip_range'],
@@ -639,6 +852,13 @@ class VesselBinarizationParams(UiParameter):
         n_steps += self.fill_combined
         return
 
+    def get_steps_and_channels(self):
+        steps = (self.plot_step_1, self.plot_step_2)
+        channels = (self.plot_channel_1, self.plot_channel_2)
+        channels = [c for s, c in zip(steps, channels) if s is not None]
+        steps = [s for s in steps if s is not None]
+        return steps, channels
+
     @property
     def raw_binarization_threshold(self):
         return self.sanitize_neg_one(self.tab.rawBinarizationThresholdSpinBox.value())
@@ -680,8 +900,8 @@ class VesselGraphParams(UiParameter):
     min_artery_size: int
     min_vein_size: int
 
-    def __init__(self, tab, src_folder=None):
-        super().__init__(tab, src_folder)
+    def __init__(self, tab):
+        super().__init__(tab)
         self.params_dict = {
             'skeletonize': ParamLink(['graph_construction', 'skeletonize'], self.tab.buildGraphSkeletonizeCheckBox),
             'build': ParamLink(['graph_construction', 'build'], self.tab.buildGraphBuildCheckBox),
@@ -728,8 +948,8 @@ class VesselVisualizationParams(UiParameter):
     vertex_degrees: str
     weight_by_radius: bool
 
-    def __init__(self, tab, sample_params=None, preprocessing_params=None, src_folder=None):
-        super().__init__(tab, src_folder)
+    def __init__(self, tab, sample_params=None, stitching_params=None, registration_params=None):
+        super().__init__(tab)
         self.params_dict = {  # TODO: if 99.9 % source put to 100% (None)
             'crop_x_min': ParamLink(['slicing', 'dim_0', 0], self.tab.graphConstructionSlicerXRangeMin),
             'crop_x_max': ParamLink(['slicing', 'dim_0', 1], self.tab.graphConstructionSlicerXRangeMax),
@@ -748,7 +968,8 @@ class VesselVisualizationParams(UiParameter):
         self.structure_id = None
         self.cfg_subtree = ['visualization']
         self.sample_params = sample_params
-        self.preprocessing_params = preprocessing_params
+        self.stitching_params = stitching_params
+        self.registration_params = registration_params
         self.connect()
 
     def connect(self):
@@ -759,8 +980,10 @@ class VesselVisualizationParams(UiParameter):
 
     @property
     def ratios(self):
-        raw_res = np.array(self.sample_params.raw_resolution)
-        atlas_res = np.array(self.preprocessing_params.registration.atlas_resolution)
+        channel = [k for k, v in self.sample_params.items() if CONTENT_TYPE_TO_PIPELINE[v.data_type] == 'TubeMap'][0]
+        # First TubeMap channel
+        raw_res = np.array(self.main_params.sample_params[channel].resolution)
+        atlas_res = np.array(self.registration_params.atlas_params.atlas_resolution)
         ratios = atlas_res / raw_res  # to original
         return ratios
 
@@ -799,8 +1022,8 @@ class PreferencesParams(UiParameter):
     pattern_finder_min_n_files: int
     three_d_plot_bg: str
 
-    def __init__(self, tab, src_folder=None):
-        super().__init__(tab, src_folder)
+    def __init__(self, tab):
+        super().__init__(tab)
         self.params_dict = {
             'verbosity': ['verbosity'],
             'n_processes_file_conv': ['n_processes_file_conv'],
@@ -917,8 +1140,8 @@ class PreferencesParams(UiParameter):
 
 
 class BatchParameters(UiParameter):
-    def __init__(self, tab, src_folder=None, preferences=None):
-        super().__init__(tab, src_folder)
+    def __init__(self, tab, preferences=None):
+        super().__init__(tab)
         self.group_concatenator = ' vs '
         self.preferences = preferences
         self.tab.sampleFoldersToolBox = QToolBox(parent=self.tab)
@@ -1038,11 +1261,9 @@ class BatchParameters(UiParameter):
             self.gp_list_widget[gp].addItem(folder_path)
 
     def handle_remove_src_folder_clicked(self):
-        # print('call')
         gp = self.tab.sampleFoldersToolBox.currentIndex()
         sample_idx = self.gp_list_widget[gp].currentRow()
         _ = self.gp_list_widget[gp].takeItem(sample_idx)
-        # print(_.text())
 
     @property
     def results_folder(self):
@@ -1061,8 +1282,8 @@ class GroupAnalysisParams(BatchParameters):
     Essentially batch parameters with comparisons
     """
 
-    def __init__(self, tab, src_folder=None, preferences=None):
-        super().__init__(tab, src_folder, preferences)
+    def __init__(self, tab, preferences=None):
+        super().__init__(tab, preferences)
 
         self.comparison_checkboxes = []
 
@@ -1119,8 +1340,8 @@ class BatchProcessingParams(BatchParameters):
     Essentially BatchParameters with processing steps
     """
 
-    def __init__(self, tab, src_folder=None, preferences=None):
-        super().__init__(tab, src_folder, preferences)
+    def __init__(self, tab, preferences=None):
+        super().__init__(tab, preferences)
 
     @property
     def align(self):
