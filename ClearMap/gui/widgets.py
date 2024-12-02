@@ -5,61 +5,46 @@ widgets
 
 A set of custom widgets for the ClearMap GUI
 """
-import functools
-import json
 import os
 import re
 import tempfile
+import functools
+import json
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+from math import floor
+from multiprocessing import cpu_count
 from multiprocessing.pool import ThreadPool
-
+from pathlib import Path
 
 import numpy as np
 import psutil
+
 import pyqtgraph as pg
 from qdarkstyle import DarkPalette
 
-from skimage import transform as sk_transform  # WARNING: Slowish import, should be replaced
-
 from PyQt5 import QtCore, QtWidgets
-from PyQt5.QtGui import QColor
-from PyQt5.QtCore import QTimer
-from PyQt5.QtWidgets import QWidget, QDialogButtonBox, QListWidget, QHBoxLayout, QPushButton, QVBoxLayout, QTableWidget, \
-    QTableWidgetItem, QToolBox, QRadioButton, QTreeWidget, QTreeWidgetItem
+from PyQt5.QtCore import Qt, QTimer, pyqtSignal
+from PyQt5.QtGui import QColor, QIcon
+from PyQt5.QtWidgets import (QWidget, QDialogButtonBox, QListWidget, QHBoxLayout,
+                             QPushButton, QVBoxLayout, QTableWidget, QTableWidgetItem,
+                             QToolBox, QRadioButton, QTreeWidget, QTreeWidgetItem,
+                             QTabWidget, QListWidgetItem, QFileDialog)
 
-from ClearMap.Alignment.Annotation import annotation
-from ClearMap.IO import TIF
+from ClearMap import Settings
+from ClearMap.IO.assets_constants import DATA_CONTENT_TYPES, EXTENSIONS
 from ClearMap.IO.metadata import pattern_finders_from_base_dir
-from ClearMap.Settings import atlas_folder
 from ClearMap.Utils.utilities import gpu_params
 from ClearMap.Visualization import Plot3d as plot_3d
-from ClearMap.config.config_loader import ConfigLoader
-from ClearMap.gui.dialogs import make_splash, update_pbar
-from ClearMap.gui.gui_utils import create_clearmap_widget, get_pseudo_random_color, is_dark
+from ClearMap.Visualization.Qt.widgets import Scatter3D
+from ClearMap.config.atlas import STRUCTURE_TREE_NAMES_MAP
+from ClearMap.gui.dialogs import update_pbar, make_simple_progress_dialog, prompt_dialog, option_dialog, warning_popup
+from ClearMap.gui.gui_utils import create_clearmap_widget, get_pseudo_random_color, is_dark, compute_grid
 
 __author__ = 'Charly Rousseau <charly.rousseau@icm-institute.org>'
 __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
 __copyright__ = 'Copyright © 2022 by Charly Rousseau'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://github.com/ClearAnatomics/ClearMap'
-
-
-def setup_mini_brain(mini_brain_scaling=(5, 5, 5)):  # TODO: scaling in prefs
-    """
-    Create a downsampled version of the Allen Brain Atlas for the mini brain widget
-
-    Parameters
-    ----------
-    mini_brain_scaling : tuple(int, int, int)
-        The scaling factors for the mini brain. Default is (5, 5, 5)
-
-    Returns
-    -------
-    tuple(scale, downsampled_array)
-    """
-    atlas_path = os.path.join(atlas_folder, 'ABA_25um_annotation.tif')
-    arr = TIF.Source(atlas_path).array
-    return mini_brain_scaling, sk_transform.downscale_local_mean(arr, mini_brain_scaling)
 
 
 class OrthoViewer(object):
@@ -96,10 +81,6 @@ class OrthoViewer(object):
             The parameters object
         parent : QWidget
             The parent widget
-
-        Returns
-        -------
-
         """
         self.img = img
         self.params = params
@@ -271,13 +252,7 @@ class ProgressWatcher(QWidget):  # Inspired from https://stackoverflow.com/a/662
             self.parentWidget().app.processEvents()
 
     def reset(self):
-        """
-        Reset all the values to their initial state
-
-        Returns
-        -------
-
-        """
+        """Reset all the values to their initial state"""
         self.main_step_name = 'Processing'
         self.__main_progress = 1
         self.__main_max_progress = 1
@@ -300,10 +275,6 @@ class ProgressWatcher(QWidget):  # Inspired from https://stackoverflow.com/a/662
         main_step_length
         sub_step_length
         pattern
-
-        Returns
-        -------
-
         """
         self.main_step_name = main_step_name
         self.main_max_progress = main_step_length
@@ -852,7 +823,7 @@ class PatternDialog(WizardDialog):
         page = self.dlg.patternToolBox.widget(image_group_id)
         if page is None:
             raise IndexError(f'No widget at index {image_group_id}')
-        label_widget = getattr(page, f'label0_{axis}')
+        label_widget = getattr(page, f'label0_{axis}')  # FIXME: why label0_?
         pattern_widget = getattr(page, f'pattern0_{axis}')
         combo_widget = getattr(page, f'pattern0_{axis}ComboBox')
 
