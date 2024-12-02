@@ -123,6 +123,47 @@ Notes
 """
 
 
+class ElastixConfigPatcher:
+    def __init__(self, config_paths, modified_sections=None):
+        self.config_paths = config_paths
+        if modified_sections is None:
+            raise ValueError('modified_sections must be a dictionary of sections to modify')
+        self.modified_sections = modified_sections
+        self.original_sections = {p: self.get_original_sections(p) for p in config_paths}
+
+    def __enter__(self):
+        for config_path in self.config_paths:
+            if config_path:
+                self.patch_elastix_cfg_landmarks(config_path)
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        for config_path in self.config_paths:
+            if config_path:
+                self.restore_elastix_cfg_no_landmarks(config_path)
+
+    def patch_elastix_cfg_landmarks(self, elastix_cfg_path):
+        self.__patch_config(elastix_cfg_path, self.modified_sections)
+
+    def restore_elastix_cfg_no_landmarks(self, elastix_cfg_path):
+        self.__patch_config(elastix_cfg_path, self.original_sections)
+
+    @staticmethod
+    def __patch_config(config_path, sections):
+        cfg = ElastixParser(config_path)
+        for option, value in sections[config_path].items():
+            cfg[option] = value
+        cfg.write()
+
+    def get_original_sections(self, config_path):
+        original_sections = {}
+        cfg = ElastixParser(config_path)
+        for option in self.modified_sections[config_path].keys():
+            value = cfg.get(option)
+            if value is not None:
+                original_sections[option] = value
+        return original_sections
+
+
 def print_settings():
     """Prints the current elastix configuration.
 
@@ -548,6 +589,26 @@ def rescale_size_and_spacing(size, spacing, scale):
 ##############################################################################
 #  Elastix Runs
 ##############################################################################
+
+def align_from_dict(align_parameters, landmarks_files):
+    use_landmarks = all([str(f) and os.path.exists(f) for f in landmarks_files.values()])
+    if use_landmarks:
+        align_parameters.update(**landmarks_files)
+        tmp_registration_params = {p: {
+            'Registration': ['MultiMetricMultiResolutionRegistration'],
+            'Metric': ["AdvancedMattesMutualInformation", "CorrespondingPointsEuclideanDistanceMetric"],
+            'Metric0Weight': 1,
+            'Metric1Weight': 200,
+        } for p in align_parameters['parameter_files']}  # FIXME: maybe not for all steps
+    else:
+        tmp_registration_params = {p: {} for p in align_parameters['parameter_files']}
+    for k, v in align_parameters.items():
+        if not v:
+            raise ValueError(f'Registration missing parameter "{k}"')
+    # TODO: check which files to patch
+    with ElastixConfigPatcher(align_parameters['parameter_files'], tmp_registration_params):
+        align(**align_parameters)
+
 
 def align(fixed_image, moving_image, affine_parameter_file=None, bspline_parameter_file=None,
           result_directory=None, processes=None,
