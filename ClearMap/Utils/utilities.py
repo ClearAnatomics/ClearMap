@@ -11,6 +11,7 @@ import shutil
 import subprocess
 import tempfile
 import warnings
+from collections import deque
 from concurrent.futures import ProcessPoolExecutor
 from functools import reduce
 from operator import getitem
@@ -27,7 +28,7 @@ __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 import functools
 
 from ClearMap.Utils.tag_expression import Expression
-from ClearMap.Utils.exceptions import MissingRequirementException, SmiError
+from ClearMap.Utils.exceptions import MissingRequirementException, SmiError, ParamsOrientationError
 
 colors = {
     "WHITE": '\033[1;37m',
@@ -119,6 +120,9 @@ def is_iterable(obj):
 def title_to_snake(string):
     return re.sub('(?!^)([A-Z]+)', r'_\1', string).lower()
 
+def snake_to_title(string):
+    return string.replace('_', ' ').title()
+
 
 def backup_file(file_path):  # REFACTOR: put in workspace or IO
     base_path, ext = os.path.splitext(file_path)
@@ -136,7 +140,11 @@ def make_abs(directory, file_name):
 
 
 def get_item_recursive(container, keys):
-    return reduce(getitem, keys, container)
+    try:
+        return reduce(getitem, keys, container)
+    except TypeError as err:
+        print(f'ERROR attempting to read "{keys}" from "{container}"')
+        raise err
 
 
 def set_item_recursive(dictionary, keys_list, val, fix_missing_keys=True):
@@ -153,16 +161,35 @@ def set_item_recursive(dictionary, keys_list, val, fix_missing_keys=True):
     get_item_recursive(dictionary, keys_list[:-1])[keys_list[-1]] = val
 
 
-def requires_files(file_paths):
+def requires_assets(asset_specs):
+    """
+    Decorator to check if the required files exist before running the function.
+    For the case of channel, it can be extracted (in this order) from
+    - the kwargs
+    - the FilePath object
+    - the instance to which the wrapped function belongs
+
+    Parameters
+    ----------
+    asset_specs: List[FilePath]
+        List of FilePath objects
+    """
     def decorator(func):
         def wraps(*args, **kwargs):
             instance = args[0]
             workspace = instance.workspace
-            for f_p in file_paths:
-                f_path = workspace.filename(f_p.base, prefix=f_p.prefix, postfix=f_p.postfix, extension=f_p.extension)
+            for f_p in asset_specs:
+                channel = kwargs.get('channel')  # Get directly from the kwargs
+                if channel is None:
+                    if hasattr(f_p, 'channel'):  # Get from FilePath object
+                        channel = f_p.channel
+                    else:  # Get the global value from the instance
+                        channel = getattr(instance, 'channel', None)
+                f_path = workspace.filename(f_p.base, channel=channel, sample_id=f_p.prefix, asset_sub_type=f_p.postfix,
+                                            extension=f_p.extension)
                 msg = f'{type(instance).__name__}.{func.__name__} missing path: "{f_path}"'
                 if Expression(f_path).tags:
-                    file_list = workspace.file_list(f_p.base, prefix=f_p.prefix, postfix=f_p.postfix,
+                    file_list = workspace.file_list(f_p.base, sample_id=f_p.prefix, asset_sub_type=f_p.postfix,
                                                     extension=f_p.extension)
                     if not file_list:
                         raise MissingRequirementException(msg + ' Pattern but no file')
@@ -186,16 +213,16 @@ def get_free_temp_space():
     return free
 
 
-# FIXME: move to io
+# FIXME: move to io and rename to smth similar to AssetSpec (without conflicting with the existing AssetSpec)
 class FilePath:
-    def __init__(self, base, prefix=None, postfix=None, extension=None):
+    def __init__(self, base, prefix=None, postfix=None, extension=None, asset_sub_type=None):
         self.base = base
         self.prefix = prefix
-        self.postfix = postfix
+        self.postfix = asset_sub_type or postfix
         self.extension = extension
 
 
-def handle_deprecated_args(deprecated_args_map):
+def handle_deprecated_args(deprecated_args_map):  # FIXME: add a version_changed argument
     """
     Decorator to handle deprecated arguments by renaming them.
     It takes a dictionary and renames old arguments to new ones.
@@ -250,3 +277,65 @@ def validate_arg(arg_name, value, valid_values):
         raise ValueError(f'Unknown {arg_name} "{value}". '
                          f'Supported values are "{valid_values}".')
     return value
+
+
+def clear_cuda_cache():
+    import torch
+    torch.cuda.empty_cache()
+
+
+def topological_sort(graph, in_degree):
+    queue = deque([node for node in in_degree if in_degree[node] == 0])
+    sorted_list = []
+
+    while queue:
+        node = queue.popleft()
+        sorted_list.append(node)
+
+        for neighbor in graph[node]:
+            in_degree[neighbor] -= 1
+            if in_degree[neighbor] == 0:
+                queue.append(neighbor)
+
+    if len(sorted_list) != len(in_degree):
+        raise ValueError("Cycle detected in channel dependencies")
+
+    return sorted_list
+
+
+def check_stopped(func):
+    """
+    Decorator to check if the object is stopped (self.stopped) before running the function.
+    If the object is stopped, the function returns immediately.
+    The force argument can be used to force the function to run even if the object is stopped
+    and reset the stopped flag.
+    """
+    def wrapper(self, *args, _force=False, **kwargs):
+        if _force:
+            self.stopped = False
+        if self.stopped:
+            return
+        return func(self, *args, **kwargs)
+    return wrapper
+
+
+def validate_orientation(orientation, channel, raise_error=True):
+    """
+    Check that the orientation does not have redundant axes
+
+    Parameters
+    ----------
+    orientation: tuple(int)
+        The orientation to check
+    """
+    default_ori = (1, 2, 3)
+    n_axes = len(set([abs(e) for e in orientation]))
+    if n_axes != 3:
+        if raise_error:
+            raise ParamsOrientationError(f'Number of different axes in {orientation} is only {n_axes} instead of 3. '
+                                         'Please amend duplicate axes', channel=channel)
+        else:
+            warnings.warn(f'Invalid orientation {orientation} for {channel},'
+                          f' using default {default_ori}')
+            return default_ori
+    return orientation
