@@ -66,6 +66,12 @@ class ElastixParser:
         with open(self.path, 'w') as cfg:
             cfg.writelines([str(e) for e in self.data])
 
+    def get(self, item, default_value=None):
+        try:
+            return self[item]
+        except KeyError:
+            return default_value
+
     def __getitem__(self, item):
         if item not in self.keys:
             raise KeyError(f'Key {item} missing')
