@@ -71,15 +71,18 @@ import tempfile
 import shutil
 import re
 from io import UnsupportedOperation
+from pathlib import Path
 
 import numpy as np
 
 import multiprocessing as mp
 
+import ClearMap.Settings as settings
 from ClearMap.Utils.exceptions import ClearMapException
+from ClearMap.Utils.utilities import handle_deprecated_args, substitute_deprecated_arg
 
 import ClearMap.IO.IO as io
-import ClearMap.Settings as settings
+from ClearMap.IO.elastix_config import ElastixParser
 
 from .Transformations.Transformation import TransformationBase
 
@@ -134,6 +137,14 @@ def print_settings():
         print(f"transformix_binary = {transformix_binary}")
     else:
         print("Elastix not initialized")
+
+
+def check_success(result_directory):
+    result_directory = Path(result_directory)
+    log_path = result_directory / 'elastix.log'
+    with open(log_path) as f:
+        if 'fail' in f.read():
+            raise RuntimeError(f'Elastix failed, check log file: "{log_path}"')
 
 
 def set_elastix_library_path(elastix_lib_path=None):
@@ -536,9 +547,11 @@ def rescale_size_and_spacing(size, spacing, scale):
 #  Elastix Runs
 ##############################################################################
 
-def align(fixed_image, moving_image, affine_parameter_file, bspline_parameter_file=None,
+def align(fixed_image, moving_image, affine_parameter_file=None, bspline_parameter_file=None,
           result_directory=None, processes=None,
-          workspace=None, moving_landmarks_path=None, fixed_landmarks_path=None):
+          workspace=None, moving_landmarks_path=None, fixed_landmarks_path=None,
+          parameter_files=None,
+          check_alignment_success=False):
     """
     Align images using elastix, estimates a transformation :math:`T:` fixed image :math:`\\rightarrow` moving image.
 
@@ -562,12 +575,21 @@ def align(fixed_image, moving_image, affine_parameter_file, bspline_parameter_fi
         Path to the moving landmarks file.
     fixed_landmarks_path : str
         Path to the fixed landmarks file.
+    check_alignment_success : bool
+        Check if the alignment was successful.
 
     Returns
     -------
     result_directory : str
       Path to elastix result directory.
     """
+
+    if parameter_files is None:
+        parameter_files = [affine_parameter_file, bspline_parameter_file]
+        parameter_files = [f for f in parameter_files if f is not None]
+    else:
+        if affine_parameter_file or bspline_parameter_file:
+            raise ValueError('Cannot specify both parameter_files and affine_parameter_file or bspline_parameter_file')
 
     processes = processes if processes is not None else mp.cpu_count()
 
@@ -579,23 +601,29 @@ def align(fixed_image, moving_image, affine_parameter_file, bspline_parameter_fi
     if not os.path.exists(result_directory):
         os.mkdir(result_directory)
 
-    check_spaces(affine_parameter_file, bspline_parameter_file, fixed_image, moving_image,
+    check_spaces(*parameter_files, fixed_image, moving_image,
                  moving_landmarks_path, fixed_landmarks_path, result_directory)
 
     # run elastix
     cmd = [elastix_binary, '-threads', str(processes), '-m', f'{moving_image}', '-f', f'{fixed_image}']
-    if affine_parameter_file is not None:
-        cmd.extend(['-p', f'{affine_parameter_file}'])
-    if bspline_parameter_file is not None:
-        cmd.extend(['-p', f'{bspline_parameter_file}'])
+    for parameter_file in parameter_files:
+        cmd.extend(['-p', f'{parameter_file}'])
     if moving_landmarks_path is not None or fixed_landmarks_path is not None:
         cmd.extend(['-mp', f'{moving_landmarks_path}', '-fp', f'{fixed_landmarks_path}'])
     cmd.extend(['-out', f'{result_directory}'])
 
     try:
-        with subprocess.Popen(cmd, stdout=sys.stdout, stderr=sys.stdout) as proc:  # FIXME: check if we need an "if not sys.stdout.fileno"
-            if workspace is not None:
-                workspace.process = proc
+        # Check if sys.stdout has a valid file descriptor
+        if hasattr(sys.stdout, 'fileno') and callable(sys.stdout.fileno):
+            with subprocess.Popen(cmd, stdout=sys.stdout, stderr=sys.stdout) as proc:
+                if workspace is not None:
+                    workspace.process = proc
+        else:
+            # If sys.stdout does not have a valid file descriptor, redirect output to subprocess.PIPE
+            # This could happen e.g. in an IDE
+            with subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE) as proc:
+                if workspace is not None:
+                    workspace.process = proc
     except UnsupportedOperation:
         try:
             with subprocess.Popen(cmd) as proc:
@@ -609,12 +637,15 @@ def align(fixed_image, moving_image, affine_parameter_file, bspline_parameter_fi
         if workspace is not None:
             workspace.process = None
 
+    if check_alignment_success:
+        check_success(result_directory)
+
     return result_directory
 
 
 def check_spaces(*paths):
     for p in paths:
-        if p is not None and ' ' in p:
+        if p is not None and ' ' in str(p):
             raise ValueError(f'Could not run elastix with path containing spaces: {p}')
 
 
@@ -1039,9 +1070,7 @@ def inverse_transform(fixed_image, affine_parameter_file, bspline_parameter_file
     """
     check_elastix_initialized()
 
-    # result directory
-    if result_directory is None:
-        result_directory = tempfile.gettempdir()
+    result_directory = result_directory or tempfile.gettempdir()
 
     if not os.path.exists(result_directory):
         os.mkdir(result_directory)
@@ -1052,29 +1081,32 @@ def inverse_transform(fixed_image, affine_parameter_file, bspline_parameter_file
     set_path_transform_files(transform_parameter_dir)
 
     # set metric of the parameter files
-    if bspline_parameter_file is not None:
-        _, bspline_file = os.path.split(bspline_parameter_file)
-        bspline_file = os.path.join(result_directory, bspline_file)
-        shutil.copyfile(bspline_parameter_file, bspline_file)
-        set_metric_parameter_file(bspline_file, 'DisplacementMagnitudePenalty')
-    else:
-        bspline_file = None
+    parameter_files = {
+        'bspline': bspline_parameter_file,
+        'affine': affine_parameter_file
+    }
+    for key, param_file in parameter_files.items():
+        if param_file:
+            param_file_path = Path(param_file)
+            dest_file = Path(result_directory) / param_file_path.name
+            shutil.copyfile(param_file_path, dest_file)
+            set_metric_parameter_file(str(dest_file), 'DisplacementMagnitudePenalty')
+        else:
+            parameter_files[key] = None
 
-    if affine_parameter_file is not None:
-        _, affine_file = os.path.split(affine_parameter_file)
-        affine_file = os.path.join(result_directory, affine_file)
-        shutil.copyfile(affine_parameter_file, affine_file)
-        set_metric_parameter_file(affine_file, 'DisplacementMagnitudePenalty')
-    else:
-        affine_file = None
+    check_spaces(fixed_image, result_directory, transform_parameter_file, *parameter_files.values())
 
     # run elastix
-    check_spaces(fixed_image, result_directory, transform_parameter_file, affine_file, bspline_file)
-    cmd = f'{elastix_binary} -threads {processes} -m {fixed_image} -f {fixed_image} -t0 {transform_parameter_file} '  # FIXME: fixed_image is used twice
-    if affine_file is not None:
-        cmd += f'-p {affine_file} '
-    if bspline_file is not None:
-        cmd += f'-p {bspline_file} '
+    # The same image is used for fixed and moving image as per elastix documentation
+    # 6.1.6 `DisplacementMagnitudePenalty: inverting transformations`
+    # The DisplacementMagnitudePenalty is a cost function that penalises ||Tµ(x) − x||2. You can use this
+    # to invert transforms, by setting the transform to be inverted as an initial transform (using -t0), setting
+    # (HowToCombineTransforms "Compose"), and running elastix with this metric, using the original fixed
+    # image set both as fixed (-f) and moving (-m) image.
+    cmd = f'{elastix_binary} -threads {processes} -m {fixed_image} -f {fixed_image} -t0 {transform_parameter_file} '
+    for k, v in parameter_files:
+        if v:
+            cmd += f'-p {v} '
     cmd += f'-out {result_directory}'
 
     res = os.system(cmd)
