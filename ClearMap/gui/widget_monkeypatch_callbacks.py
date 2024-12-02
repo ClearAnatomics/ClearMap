@@ -6,12 +6,11 @@ widget_monkeypatch_callbacks
 A set of functions that will be monkey patched as methods to the graphical widgets,
 allowing notably compound widgets from QtCreator without defining plugins
 """
-
+import types
 from typing import Iterable
 
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QSpinBox, QDoubleSpinBox, QCheckBox, QLineEdit, QDialogButtonBox, QDockWidget, \
-    QPlainTextEdit, QTextEdit
+from PyQt5.QtWidgets import (QSpinBox, QDoubleSpinBox, QCheckBox, QLineEdit,
+                             QDialogButtonBox, QDockWidget, QPlainTextEdit, QTextEdit, QFrame)
 
 
 __author__ = 'Charly Rousseau <charly.rousseau@icm-institute.org>'
@@ -88,7 +87,10 @@ def get_sorted_spin_boxes(instance):
     if not spin_boxes:  # probably double
         spin_boxes = instance.findChildren(QDoubleSpinBox)
     for spin_box in spin_boxes:
-        indices.append(int(spin_box.objectName().split('_')[-1]))
+        try:
+            indices.append(int(spin_box.objectName().split('_')[-1]))
+        except ValueError:
+            raise ValueError(f'Could not extract index from "{spin_box.objectName()}" in "{instance.objectName()}"')
     sorted_spin_boxes = [box for _, box in sorted(zip(indices, spin_boxes))]
     return sorted_spin_boxes
 
@@ -210,3 +212,126 @@ def connect_cancel(instance, func):
 def dock_resize_event(instance, event):
     super(QDockWidget, instance).__init__()
     instance.resized.emit()
+
+
+def recursive_patch_compound_boxes(parent):
+    """
+    Since it is difficult to create real custom widgets in PyQt which can be used in QtCreator,
+    we chose a different approach based on the dynamic nature of Python.
+    We define new compound types (e.g. checkable text edit or triplets of values) based on
+    dynamic properties and the objectNames in QtCreator and then patch the behaviour of these
+    widgets in this method
+
+    Parameters
+    ----------
+    parent: QWidget
+        The main widget to start the recursive search
+    """
+    frames = parent.findChildren(QFrame)
+    for bx in frames:
+        bx_name = bx.objectName().lower()
+        if not is_compound_box(bx_name):
+            continue
+
+        bx.controlsEnabled = types.MethodType(controls_enabled, bx)
+        bx.getCheckBox = types.MethodType(get_check_box, bx)
+        bx.enableControls = types.MethodType(enable_controls, bx)
+        bx.disableControls = types.MethodType(disable_controls, bx)
+        if is_list_box(bx_name):
+            bx.getValue = types.MethodType(get_value, bx)
+            bx.setValue = types.MethodType(set_value, bx)
+            bx.valueChangedConnect = types.MethodType(connect_value_changed, bx)
+        elif is_optional_box(bx_name):
+            bx.setText = types.MethodType(set_text, bx)
+            bx.text = types.MethodType(get_text, bx)
+            bx.textChangedConnect = types.MethodType(connect_text_changed, bx)
+        else:
+            print(f'Skipping box "{bx_name}", type not recognised')
+
+
+def is_list_box(bx_name):
+    """
+    Check whether the name of the box is a list box i.e. a custom widget
+    ending in singlet double triplet that can be used to store a list of numbers
+    """
+    return bx_name.startswith('triplet') or bx_name.endswith('let')
+
+
+def is_optional_box(box_name):
+    return box_name.endswith('optionallineedit') or box_name.endswith('optionalplaintextedit')
+
+
+def is_compound_box(bx_name):
+    """
+    Check whether the name of the box is a compound box i.e. a custom widget
+    that is not natively supported by Qt but is based on elements inserted in a QFrame
+    in the .ui file. The behaviour is defined by the objectName
+
+    Parameters
+    ----------
+    bx_name: str
+        The objectName of the QFrame
+
+    Returns
+    -------
+    bool
+    """
+    return (bx_name.startswith('triplet') or
+            bx_name.endswith('let') or
+            bx_name.endswith('optionallineedit') or
+            bx_name.endswith('optionalplaintextedit'))
+
+
+def recursive_patch_button_boxes(parent):
+    """
+    To shorten the syntax, QDialogButtonBoxes are patched by this method
+    so that e.g.
+    bx.connectApply(f) replaces bx.button(QDialogButtonBox.Apply).clicked.connect(f)
+
+    Parameters
+    ----------
+    parent: QWidget
+        The main widget to start the recursive search
+    """
+    for bx in parent.findChildren(QDialogButtonBox):
+        bx.connectApply = types.MethodType(connect_apply, bx)
+        bx.connectClose = types.MethodType(connect_close, bx)
+        bx.connectSave = types.MethodType(connect_save, bx)
+        bx.connectOpen = types.MethodType(connect_open, bx)
+        bx.connectOk = types.MethodType(connect_ok, bx)
+        bx.connectCancel = types.MethodType(connect_cancel, bx)
+
+
+def fix_btn_boxes_text(widget):
+    """
+    Rewrite the text on top of QDialogButtonBox(es) based on the
+    dynamic properties 'applyText', 'okText' and 'openText' defined
+    in the ui files in QtCreator
+
+    Returns
+    -------
+
+    """
+    for btn_box in widget.findChildren(QDialogButtonBox):
+        if btn_box.property('applyText'):
+            btn_box.button(QDialogButtonBox.Apply).setText(btn_box.property('applyText'))
+        if btn_box.property('okText'):
+            btn_box.button(QDialogButtonBox.Ok).setText(btn_box.property('okText'))
+        if btn_box.property('openText'):
+            btn_box.button(QDialogButtonBox.Open).setText(btn_box.property('openText'))
+
+
+def recursive_patch_widgets(parent):
+    """
+    Recursively patch the widgets in the parent widget
+    This is used to add custom methods to the widgets that are not natively supported by Qt
+    yet do it mainly from the .ui file as it is based on the objectName
+
+    Parameters
+    ----------
+    parent: QWidget
+        The main widget to start the recursive search
+    """
+    recursive_patch_compound_boxes(parent)
+    recursive_patch_button_boxes(parent)
+    fix_btn_boxes_text(parent)
