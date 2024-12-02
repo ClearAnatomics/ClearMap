@@ -325,6 +325,9 @@ class BaseMetadataParser:
 
     def parse_order(self):
         self.info['order'] = self.pixels_metadata.get('DimensionOrder', None)
+        if not self.info['order']:
+            warnings.warn(f'No dimension order found in tif metadata! Assuming "XYZ" order.')
+            self.info['order'] = 'XYZ'
 
     def parse_shape(self):
         self.update_info('shape', tuple([f'Size{d}' for d in self.info['order']]),
@@ -364,14 +367,14 @@ class BaseMetadataParser:
             self.info['description'] = self.metadata.get('Image', {}).get('Description', None)
 
     def parse_tile_configuration(self):
-        warnings.warn(f"Tile configuration parsing is not available for {self.__class__}, skipping!")
+        warnings.warn(f"Tile configuration parsing is not available for {self.__class__.__name__}, skipping!")
 
     def parse_overlap(self):
-        warnings.warn(f"Overlap parsing is not available for {self.__class__}, skipping!")
+        warnings.warn(f"Overlap parsing is not available for {self.__class__.__name__}, skipping!")
 
     @cached_property
     def pixels_metadata(self):
-        raise NotImplementedError("Subclasses should implement this method")
+        raise NotImplementedError(f"Method missing in {self.__class__.__name__}. Subclasses should implement this method")
 
 
 class OMEMetadataParser(BaseMetadataParser):
@@ -424,7 +427,7 @@ class ImageJMetadataParser(BaseMetadataParser):
     def parse_info_field(self):
         parsed_info = {}
         try:
-            md_info = self.metadata['Info'].split('\n')
+            md_info = [ln.strip() for ln in self.metadata['Info'].split('\n')]
         except KeyError:
             warnings.warn(f'No Info metadata found in tif file {self.source._tif.filename}!'
                           f'Metadata: {self.metadata}')
@@ -433,8 +436,16 @@ class ImageJMetadataParser(BaseMetadataParser):
         if md_info[0].startswith('NRRD'):  # FIXME: just get pixel metadata
             self.__parse_nrrd(md_info, parsed_info)
         else:
-            raise ValueError(f'Unknown metadata type {self.source._metadata_type} and format: {md_info[0]};'
-                             f' info: {md_info}')
+            info = {ln.split('=', 1)[0].strip(): ln.split('=', 1)[1].strip() for ln in md_info if '=' in ln}
+            if 'DimensionOrder' in info:
+                order = info['DimensionOrder']
+                parsed_info['shape'] = [int(info[f'Size{d}']) for d in order]
+                # Remove empty dimensions
+                parsed_info['order'] = ''.join(d for s, d in zip(parsed_info['shape'], order) if s != 1)
+                parsed_info['shape'] = tuple(dim for dim in parsed_info['shape'] if dim != 1)
+            else:
+                raise ValueError(f'Unknown metadata type {self.source._metadata_type} and format: {md_info[0]};'
+                                 f' info: {md_info}')
         return parsed_info
 
     def __parse_nrrd(self, md_info, parsed_info):
@@ -471,10 +482,19 @@ class ClearMapMetadataParser(BaseMetadataParser):
         super().parse_order()
         if self.info['order'] is None:
             warnings.warn('WARNING: No dimension order found in tif metadata! Assuming "XYZTC" order.')
-            self.info['order'] = ''.join([d for d in 'XYZTC'
-                                          if f'Size{d}' in self.pixels_metadata.keys()])
+            self.info['order'] = ''.join([d for d in 'XYZTC' if f'Size{d}' in self.pixels_metadata.keys()])
             if not self.info['order']:
                 self.info['order'] = 'XYZ'
+
+    @cached_property
+    def pixels_metadata(self):  # TODO: We could also guesstimate the z based on the shape (smallest dim) with a warning
+        if isinstance(self.metadata, tuple):
+            return self.metadata[0].get('Pixels', {})
+        elif isinstance(self.metadata, dict):
+            return self.metadata.get('Pixels', {})
+        else:
+            raise ValueError(f'Unknown metadata type {self.source._metadata_type} and format: {self.metadata};'
+                             f' info: {self.metadata}')
 
 
 ###############################################################################
