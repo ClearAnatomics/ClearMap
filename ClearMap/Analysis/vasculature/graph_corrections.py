@@ -68,8 +68,8 @@ def join_neighbouring_degrees_1(graph, min_radius=5, dest_path='', reduction_com
 
     return graph
 
-
-def remove_spurious_branches(graph, r_min=None, min_length=1.0, view=False):  #  WARNING: isolated vertices are not removed
+# FIXME: tag graph where coordinates are removed
+def remove_spurious_branches(graph, r_min=None, min_length=1.0, view=False, reduction_compatible=True):  #  WARNING: isolated vertices are not removed
     """
     Removes spurious branches from the graph.
     Spurious branches are defined as small degree 1 branches (with a radius smaller than r_min).
@@ -97,10 +97,14 @@ def remove_spurious_branches(graph, r_min=None, min_length=1.0, view=False):  # 
 
     edge_filter = np.logical_not(degrees_filter & length_filter)
 
+    if not reduction_compatible:
+        spurious_vertices = np.unique(graph.edge_connectivity()[~edge_filter])
+        graph.add_vertex_property('spurious', np.isin(np.arange(graph.n_vertices), spurious_vertices))
+
     return graph.sub_graph(edge_filter=edge_filter, view=view)
 
 
-def remove_auto_loops(graph, min_length=None):
+def remove_auto_loops(graph, min_length=None, reduction_compatible=True):
     """
     Removes auto loops from the graph.
     Auto loops are defined as edges with the same source and destination.
@@ -126,10 +130,14 @@ def remove_auto_loops(graph, min_length=None):
 
     auto_loops_filter = np.logical_not(auto_loops_mask & bad_length_mask)
 
+    if not reduction_compatible:
+        auto_loop_vertices = np.unique(connectivity[auto_loops_mask])
+        graph.add_vertex_property('auto_loop', np.isin(np.arange(graph.n_vertices), auto_loop_vertices))
+
     return graph.sub_graph(edge_filter=auto_loops_filter)
 
 
-def remove_mutual_loops_gt(graph, min_radius, min_length):  # TODO: what are the defaults 5  & 3 ?
+def remove_mutual_loops_gt(graph, min_radius, min_length, reduction_compatible=True):  # TODO: what are the defaults 5  & 3 ?
     """
     Removes mutual loops from the graph.
     Mutual loops are defined as edges with the same source and destination. In other words, two edges that
@@ -142,7 +150,7 @@ def remove_mutual_loops_gt(graph, min_radius, min_length):  # TODO: what are the
         this function takes into account the length, i.e. the distance between
         the two vertices along the tract of the vessel, and the radius, i.e. the size of the vessel.
         For each pair of vertices where these two conditions are met,
-        only the edge with the smallest radius will be removed.
+        only the edges with the smallest radius/length will be removed.
 
     Parameters
     ----------
@@ -187,10 +195,16 @@ def remove_mutual_loops_gt(graph, min_radius, min_length):  # TODO: what are the
     good_edges = np.zeros(graph.n_edges, dtype=bool)
     good_edges[good_edges_indices] = 1
 
+    # The "or" with good_edges is to ensure we keep at least one edge for each group even if it is below criteria
     large_edges = (radii >= min_radius) | (lengths >= min_length)
     edge_filter = large_edges | good_edges  #| (mutual_loops == 0)
     # edge_filter = np.ones(graph.n_edges)
     # edge_filter[bad_edges] = 0
+
+    if not reduction_compatible:
+        mutual_loop_vertices = np.unique(graph.edge_connectivity()[~edge_filter])
+        graph.add_vertex_property('mutual_loop', np.isin(np.arange(graph.n_vertices), mutual_loop_vertices))
+
     return graph.sub_graph(edge_filter=edge_filter)
 
 
