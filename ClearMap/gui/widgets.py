@@ -565,6 +565,13 @@ class TwoListSelection(QWidget):
         self.mOuput.setCurrentRow(row + 1)
 
     # The actual user functions
+    def clear(self):
+        """
+        Clear the lists
+        """
+        self.mInput.clear()
+        self.mOuput.clear()
+
     def addAvailableItems(self, items):
         """
         Add the list of available items to the left list
