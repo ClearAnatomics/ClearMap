@@ -10,7 +10,14 @@ class ClearMapException(Exception):
     pass
 
 
-class ClearMapIoException(ClearMapException):
+class ClearMapValueError(ClearMapException, ValueError):
+    """
+    Base exception for all exceptions related to value errors
+    """
+    pass
+
+
+class ClearMapIoException(ClearMapException, IOError):
     """
     Base exception for all exceptions related to input/output operations
     """
@@ -98,3 +105,10 @@ class AssetNotFoundError(ClearMapAssetError):
     Exception raised when an asset is not found
     """
     pass
+
+
+class ParamsOrientationError(ClearMapValueError):
+    def __init__(self, message, channel):
+        # self.message = message
+        self.channel = channel
+        super().__init__(message)
