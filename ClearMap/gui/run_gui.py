@@ -931,6 +931,12 @@ class ClearMapGui(ClearMapGuiBase):
         self.tabWidget.tabBarClicked.connect(self.handle_tab_click)
         self.tabWidget.setCurrentIndex(0)
 
+    def reset_loggers(self):
+        self.logger = Printer(redirects=None if DEBUG else 'stdout')
+        self.logger.text_updated.connect(self.textBrowser.append)
+        self.error_logger = Printer(color='red', logger_type='error', redirects=None if DEBUG else 'stderr')
+        self.error_logger.text_updated.connect(self.textBrowser.append)
+
     def reload_prefs(self):
         self.set_font_size(self.preference_editor.params.font_size)
 
@@ -1222,24 +1228,11 @@ def main(app, splash):
     clearmap_main_win = create_main_window(app)
     app.setStyleSheet(qdarkstyle.load_stylesheet(qt_api='pyqt5'))
 
-    def except_hook(exc_type, exc_value, exc_tb):
-        lexer = PythonTracebackLexer()
-        default_style = 'native'
-        style = 'nord-darker' if 'nord-darker' in pygments.styles.get_all_styles() else default_style
-        formatter = HtmlFormatter(full=True, style=style, lineos='table', wrapcode=True, noclasses=True)
-        formatter.style.background_color = DarkPalette.COLOR_BACKGROUND_1
-        raw_traceback = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
-        formatted_traceback = pygments.highlight(raw_traceback, lexer, formatter)
-        clearmap_main_win.error_logger.write(formatted_traceback)
-        if isinstance(exc_type(), Warning):
-            clearmap_main_win.error_logger.write(f'<strong><p style="color:{WARNING_YELLOW}">'
-                                                 f'THIS IS A WARNING AND CAN NORMALLY BE SAFELY IGNORED</p></strong>')
-
     clearmap_main_win.show()
     clearmap_main_win.fix_styles()
     splash.finish(clearmap_main_win)
     if clearmap_main_win.preference_editor.params.verbosity != 'trace':  # WARNING: will disable progress bars
-        sys.excepthook = except_hook
+        clearmap_main_win.error_logger.setup_except_hook()
     sys.exit(app.exec())
 
 
