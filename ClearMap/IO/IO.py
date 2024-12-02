@@ -167,7 +167,7 @@ def filename_to_module(filename):
 ##############################################################################
 # ## IO Interface
 ##############################################################################
-
+# FIXME: add support for Assets
 
 # read write interface: specialized modules can assume the following
 # read(source, slicing=None, **kwargs)
