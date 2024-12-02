@@ -1702,17 +1702,23 @@ class PerfMonitor(QWidget):
             self.handle_cpu_vals_updated()
 
     def handle_gpu_vals_updated(self):
-        with open(self.gpu_proc_file_path, 'r') as proc_file:
-            line = proc_file.read()
-            if not line:
-                return
-            elems = line.split(',')
-            if len(elems) < 3:
-                return
-            mem_used, mem_total, gpu_percent = [s.strip() for s in elems]
-            percent_v_ram = int((float(mem_used) / float(mem_total)) * 100)
-            percent_gpu = int(gpu_percent)
-        if percent_gpu != self.percent_gpu or percent_v_ram != self.percent_v_ram:
-            self.percent_gpu = percent_gpu
-            self.percent_v_ram = percent_v_ram
-            self.gpu_vals_changed.emit(self.percent_gpu, self.percent_v_ram)
+        try:
+            with open(self.gpu_proc_file_path, 'r') as proc_file:
+                line = proc_file.read()
+                if not line:
+                    return
+                elems = line.split(',')
+                if len(elems) < 3:
+                    return
+                mem_used, mem_total, gpu_percent = [s.strip() for s in elems]
+                percent_v_ram = int((float(mem_used) / float(mem_total)) * 100)
+                percent_gpu = int(gpu_percent)
+            if percent_gpu != self.percent_gpu or percent_v_ram != self.percent_v_ram:
+                self.percent_gpu = percent_gpu
+                self.percent_v_ram = percent_v_ram
+                self.gpu_vals_changed.emit(self.percent_gpu, self.percent_v_ram)
+        except ValueError as err:
+            print(err)
+            pass
+
+
