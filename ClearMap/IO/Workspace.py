@@ -17,7 +17,7 @@ __author__ = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
 __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
 __copyright__ = 'Copyright © 2023 by Christoph Kirst'
 __webpage__ = 'https://idisco.info'
-__download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
+__download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
 # TODO: provide modularity -> e.g. modules for various files, adding/removing channels, test data slicing etc.
 
