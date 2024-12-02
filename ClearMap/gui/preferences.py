@@ -42,7 +42,7 @@ class PreferenceUi(GenericDialog):
         -------
 
         """
-        self.params = PreferencesParams(self.ui, self.main_window.src_folder)
+        self.params = PreferencesParams(self.ui)
 
     def setup_preferences(self):
         """
