@@ -466,7 +466,7 @@ def dirs_to_cells_dfs(directory, dirs):
 def get_volume_map(folder):
     preproc = init_preprocessor(folder)
     return annotation.annotation.get_lateralised_volume_map(
-        preproc.processing_config['registration']['resampling']['autofluo_sink_resolution'],
+        preproc.regitration_cfg['channels'][preproc.alignment_reference_channel]['resampled_resolution'],
         preproc.hemispheres_file_path
     )
 
