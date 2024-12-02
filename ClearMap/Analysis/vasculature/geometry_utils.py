@@ -25,9 +25,10 @@ f_min(X, p):
 
 import math
 
-import numexpr
 import numpy as np
 from scipy.interpolate import LinearNDInterpolator
+
+import numexpr
 
 
 def angle_between_vectors(vectors_1, vectors_2, in_degrees=True):
