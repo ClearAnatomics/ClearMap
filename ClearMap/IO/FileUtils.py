@@ -25,8 +25,8 @@ __all__ = ['is_file', 'is_directory', 'file_extension', 'join', 'split',
 
 from pathlib import Path
 
-from ClearMap.IO import IO as clearmap_io
-
+# FIXME: not clean but cannot import IO to avoid circular import. Should be from Source attributes ?
+SOURCE_EXTENSIONS = ['npy', 'tif', 'tiff', 'nrrd', 'nrdh', 'csv', 'mhd', 'gt']
 
 ##############################################################################
 # ## Basic file queries
@@ -442,7 +442,7 @@ def check_extensions(extensions):
             raise ValueError(f'Extension "{ext}" should start with a dot.')
         if not is_clearmap_source_extension(ext):
             raise ValueError(f'Unknown extension "{ext}". '
-                             f'Supported extensions are "{clearmap_io.file_extension_to_module.keys()}".')
+                             f'Supported extensions are "{SOURCE_EXTENSIONS}".')
 
 
 def is_clearmap_source_extension(extension):
@@ -458,7 +458,7 @@ def is_clearmap_source_extension(extension):
     -------
     bool
     """
-    return extension.lstrip('.') in clearmap_io.file_extension_to_module.keys()
+    return extension.lstrip('.') in SOURCE_EXTENSIONS
     
 
 ###############################################################################
