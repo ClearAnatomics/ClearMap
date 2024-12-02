@@ -3,48 +3,138 @@
 tabs
 ====
 
-The different tabs that correspond to different functionalities of the GUI
+The different tabs that correspond to different functionalities of the GUI.
+
+All the classes in this module are subclasses (direct or indirect) of the `GenericTab` class which
+provides the basic structure and methods that are common to all tabs.
+
+Presentation
+------------
+Each **tab** is responsible for a specific part of the processing pipeline and has its own UI elements.
+It is composed of:
+
+- A `ui` object which is the result of the construction of a `.ui` file that defines the layout and the widgets.
+- A `sample_manager` object that handles the sample data.
+- A `sample_params` object that links the UI to the sample configuration file.
+- A `params` object that links the UI to the configuration file. (For the `SampleInfoTab`, this is the `SampleParameters` object.)
+- A `name` that is used to identify the tab in the GUI.
+- A `processing_type` that identifies the type of tab. It can be one of (None, 'pre', 'post', 'batch').
+- A `progress_watcher` object that tracks the progress of the computation.
+
+Optionally, for `Pipeline` tabs (`PreProcessingTab` and `PostProcessingTab`), a `processor` object is used to handle the processing steps and computation.
+For `PostProcessing` tabs, the pre_processor objects (stitcher and aligner) can also be passed.
+
+Tab setup
+---------
+
+Inherited setup methods
+***********************
+
+- `init_ui`: Sets up the UI elements. This is already implemented in the `GenericTab` class.
+
+Setup methods to be implemented in the concrete tab classes
+***********************************************************
+
+- `setup`: Sets up the UI elements and the signal/slot connections (it should call `init_ui` at the beginning).
+- `set_params`: Sets the `params` object which links the UI and the configuration file.
+- `set_progress_watcher`: Sets up the watcher object that will handle the progress in the computation for this tab.
+
+`PipelineTab` additional setup methods
+**************************************
+
+- `setup_workers`: Sets up the worker (Processor) which handles the computations associated with this tab. Called after `load_config_to_gui` (see below). Also called when the sample config is applied. Sometimes called in `set_params`  # FIXME: check if this is necessary.
+
+`PostProcessingTab` additional setup methods
+********************************************
+
+- `finalise_workers_setup`: Sets up the worker (Processor). Called when the tab is selected to ensure the workers are fully set up.
+
+Tabs with channels
+******************
+
+Some tabs can have sub UIs for the different channels that are processed.
+In this case, the `add_channel_tab` method is called to add a new channel tab to the UI.
+This method is implemented in the `GenericTab` class. To control its behavior,
+the following methods can be implemented in the concrete tab classes:
+
+- `_set_channel_config` (optional): Sets the configuration for the channel.
+- `_setup_channel` (optional): Additional setup for the ui (before binding).
+- `_bind_channel` (Must be implemented): Binds the signal/slots of the UI elements
+for `channel` which are not automatically set through the params object attribute.
+
+- `add_channel_tab` is called in:
+
+  - `set_params`
+  - when (+) button is clicked (SampleInfoTab)
+
+Setup order
+***********
+
+Typical calling sequence is:
+
+- `tab.setup` (calls `tab.init_ui`)
+- `tab.set_params`
+    - sets sample_params if not SampleInfoTab
+    - calls `tab.set_pre_processors` for PostProcessingTab instances
+    - calls `tab.__set_params`
+    - calls `tab.read_configs`
+    - calls `tab.fix_config` if loaded from defaults
+    - calls `tab.setup_workers`
+    - calls `tab.create_channels`
+    - calls `tab.load_config_to_gui`  (called after fix_config except for BatchTab)
+    - calls `tab._bind_params_signals`
+
+- `tab.finalise_workers_setup`  # Only for PostProcessingTab
+
+Processing steps
+----------------
+
+The rest of the methods mainly handle the signal/slot connections for the buttons (as the
+other controls are handled by the `params` object) and the processing steps.
+
+====================
 """
+
 import functools
-import os.path
-import copy
-from shutil import copyfile
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
-import mpld3
-
 import pyqtgraph as pg
+from PyQt5.QtWidgets import QApplication, QLabel, QFrame
 
-from ClearMap.config.atlas import ATLAS_NAMES_MAP, STRUCTURE_TREE_NAMES_MAP
-from ClearMap.config.config_loader import ConfigLoader
-from PyQt5.QtWidgets import QApplication
+import mpld3
+from pyqtgraph import PlotWidget
+
+from ClearMap.IO.assets_constants import DATA_CONTENT_TYPES, EXTENSIONS
+from ClearMap.Utils.tag_expression import Expression
+
 app = QApplication.instance()
 if app is not None and app.applicationName() == 'ClearMap':
     from PyQt5.QtWebEngineWidgets import QWebEngineView
 from qdarkstyle import DarkPalette
 
-import ClearMap.IO.IO as clearmap_io
-from ClearMap.IO.MHD import read as mhd_read
+from ClearMap.config.atlas import ATLAS_NAMES_MAP, STRUCTURE_TREE_NAMES_MAP
+from ClearMap.config.config_loader import ConfigLoader
+
+import ClearMap.IO.IO as clm_io
 from ClearMap.Alignment import Annotation as annotation
 from ClearMap.Analysis.Statistics.group_statistics import make_summary, density_files_are_comparable, compare_groups
-from ClearMap.Utils.exceptions import PlotGraphError, ClearMapVRamException, GroupStatsError
+from ClearMap.Utils.exceptions import ClearMapVRamException, GroupStatsError, MissingRequirementException
+
+from ClearMap.gui.dialogs import prompt_dialog, option_dialog
+from ClearMap.gui.interfaces import GenericTab, PostProcessingTab, PreProcessingTab, BatchTab
+from ClearMap.gui.widgets import (PatternDialog, DataFrameWidget,
+                                  LandmarksSelectorDialog, CheckableListWidget, FileDropListWidget)
+from ClearMap.gui.gui_utils import format_long_nb, np_to_qpixmap, replace_widget, unique_connect, get_widget
+from ClearMap.gui.params import (VesselParams, SampleParameters, StitchingParams,
+                                 CellMapParams, GroupAnalysisParams, BatchProcessingParams, RegistrationParams)
 from ClearMap.Visualization.Matplotlib.PlotUtils import plot_sample_stats_histogram, plot_volcano
-from ClearMap.Visualization.atlas import create_color_annotation
-
-from ClearMap.gui.dialogs import prompt_dialog, get_directory_dlg, option_dialog
-from ClearMap.gui.gui_utils import format_long_nb_to_str, surface_project, np_to_qpixmap
-from ClearMap.gui.interfaces import GenericTab, PostProcessingTab
-from ClearMap.gui.params import ParamsOrientationError, VesselParams, SampleParameters, \
-    AlignmentParams, CellMapParams, GroupAnalysisParams, BatchProcessingParams
-from ClearMap.gui.widgets import PatternDialog, SamplePickerDialog, DataFrameWidget, LandmarksSelectorDialog
-from ClearMap.Visualization.Qt.widgets import Scatter3D
-
 from ClearMap.Visualization.Qt.utils import link_dataviewers_cursors
 from ClearMap.Visualization.Qt import Plot3d as plot_3d
 
-from ClearMap.processors.sample_preparation import PreProcessor, init_preprocessor
+from ClearMap.processors.sample_preparation import init_preprocessor, StitchingProcessor, RegistrationProcessor
 from ClearMap.processors.cell_map import CellDetector
 try:
     from ClearMap.processors.tube_map import BinaryVesselProcessor, VesselGraphProcessor
@@ -60,90 +150,62 @@ __webpage__ = 'https://idisco.info'
 __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
 
-class SampleTab(GenericTab):
+class SampleInfoTab(GenericTab):
     """
     The tab manager to define the parameters of the sample
     This refers to values that are intrinsic to the sample and the acquisition
     like resolution, orientation ...
     """
-    def __init__(self, main_window, tab_idx=0):
-        super().__init__(main_window, 'Sample', tab_idx, 'sample_tab')
-        self.mini_brain_scaling = None
-        self.mini_brain = None
+    def __init__(self, main_window, tab_idx, sample_manager=None):
+        super().__init__(main_window, 'sample_tab', tab_idx)
+        self.sample_manager = sample_manager
 
-    def set_params(self, *args):
-        """
-        Set the params object which links the UI and the configuration file
-        Parameters
-        ----------
-        args
+        self.channels_ui_name = 'channel_params'
+        self.with_add_btn = True
 
-        Returns
-        -------
-
-        """
+    def _set_params(self):
         self.params = SampleParameters(self.ui, self.main_window.src_folder)
+        # REFACTOR: trigger signal to update the UI
 
-    def setup(self):
+    def setup_workers(self):  # WARNING: a bit far fetched but necessary to have a consistent setup
+        self.sample_manager.setup(src_dir=self.main_window.src_folder, watcher=self.main_window.progress_watcher)
+
+    def _bind_params_signals(self):
+        self.params.plotMiniBrain.connect(self.plot_mini_brain)
+        self.params.plotAtlas.connect(self.display_atlas)
+
+    def _get_channels(self):
+        return self.sample_manager.channels  # or list(self.params.config['channels'].keys())
+
+    def _bind(self):
         """
-        Setup the UI elements, notably the signal/slot connections which are not
+        Bind the signal/slots of the UI elements which are not
         automatically set through the params object attribute
-
-        Returns
-        -------
-
         """
-        self.init_ui()
+        self.ui.channelsParamsTabWidget.addTabClicked.connect(self.add_channel_tab)
 
         self.ui.srcFolderBtn.clicked.connect(self.main_window.prompt_experiment_folder)
-        self.connect_whats_this(self.ui.srcFolderInfoToolButton, self.ui.srcFolderBtn)
-        self.ui.sampleIdPushButton.clicked.connect(self.main_window.load_config_and_setup_ui)
-        self.connect_whats_this(self.ui.sampleIdInfoToolButton, self.ui.sampleIdLabel)
+        self.ui.loadSamplePushButton.setIcon(self.main_window._reload_icon)
+        self.ui.loadSamplePushButton.clicked.connect(self.main_window.load_config_and_setup_ui)
 
         self.ui.launchPatternWizzardPushButton.clicked.connect(self.launch_pattern_wizard)
-        self.connect_whats_this(self.ui.patternWizzardBtnInfoToolButton, self.ui.launchPatternWizzardPushButton)
 
-        self.connect_whats_this(self.ui.mainChannelPathInfoToolButton, self.ui.mainChannelPathLbl)
-        self.connect_whats_this(self.ui.autofluoChannelPathInfoToolButton, self.ui.autofluoChannelPathLbl)
-        self.connect_whats_this(self.ui.secondaryChannelPathInfoToolButton, self.ui.secondaryChannelPathLbl)
-
-        self.connect_whats_this(self.ui.sampleOrientationInfoToolButton, self.ui.sampleOrientationLbl)
-        self.connect_whats_this(self.ui.miniBrainFrameInfoToolButton, self.ui.miniBrainFrame)
-        self.connect_whats_this(self.ui.sampleCropXLblInfoToolButton, self.ui.sampleCropXLbl)
-        self.connect_whats_this(self.ui.sampleCropYLblInfoToolButton, self.ui.sampleCropYLbl)
-        self.connect_whats_this(self.ui.sampleCropZLblInfoToolButton, self.ui.sampleCropZLbl)
-        self.ui.plotMiniBrainPushButton.clicked.connect(self.plot_mini_brain)
-
-        self.ui.sampleViewAtlasPushButton.clicked.connect(self.display_atlas)
-
-        self.ui.applyBox.connectApply(self.main_window.alignment_tab_mgr.setup_workers)  # FIXME: check if risks overwrite if still same sample
+        # TODO: why not on tab click ?
+        self.ui.applyBox.connectApply(self.main_window.update_pipelines)
         self.ui.applyBox.connectSave(self.save_cfg)
 
-        self.ui.sampleIdPushButton.setIcon(self.main_window._reload_icon)
+    def _bind_channel(self, page_widget, channel):
+        """
+        Bind the signal/slots of the UI elements for `channel` which are not
+        automatically set through the params object attribute
+        """
+        page_widget.dataTypeComboBox.addItems(list(set(DATA_CONTENT_TYPES)))
+        page_widget.extensionComboBox.addItems(EXTENSIONS['image'])
 
     def save_cfg(self):  # REFACTOR: use this instead of direct calls to ui_to_cfg
-        """
-        Save the config to file
-
-        Returns
-        -------
-
-        """
+        """Save the config to file"""
         self.params.ui_to_cfg()
         self.main_window.print_status_msg('Sample config saved')
-
-    def load_config_to_gui(self):
-        """
-        Set every control on the UI to the value in the params
-        Returns
-        -------
-
-        """
-        try:
-            self.params.cfg_to_ui()
-        except ParamsOrientationError as err:
-            self.main_window.popup(str(err), 'Invalid orientation. Defaulting')
-            self.params.orientation = (1, 2, 3)
 
     @property
     def src_folder(self):
@@ -160,10 +222,6 @@ class SampleTab(GenericTab):
         ----------
         sample_id : str
             The unique ID for that sample
-
-        Returns
-        -------
-
         """
         self.ui.sampleIdTxt.setText(sample_id)
 
@@ -176,30 +234,15 @@ class SampleTab(GenericTab):
         ----------
         use_id : bool
             Whether to se the sample ID as prefix in the file names
-
-        Returns
-        -------
-
         """
         self.ui.useIdAsPrefixCheckBox.setChecked(use_id)
 
     def get_sample_id(self):
-        """
-        Get the sample ID from the GUI widget
-        Returns
-        -------
-
-        """
+        """Get the sample ID from the GUI widget"""
         return self.ui.sampleIdTxt.text()
 
     def go_to_orientation(self):
-        """
-        Jump to the sample orientation (space info) tab
-
-        Returns
-        -------
-
-        """
+        """Jump to the sample orientation (space info) tab"""
         self.ui.toolBox.setCurrentIndex(2)
         self.main_window.tabWidget.setCurrentIndex(0)
 
@@ -208,168 +251,236 @@ class SampleTab(GenericTab):
         Start the pattern selection wizard. This wizard helps create the
         pattern strings for the individual tiles, with specific characters
         representing the digits for the different axes.
-
-        Returns
-        -------
-
         """
         dlg = PatternDialog(self.src_folder, self.params,
                             min_file_number=self.main_window.preference_editor.params.pattern_finder_min_n_files,
-                            tile_extension=self.params.tile_extension)
+                            tile_extension=self.params.shared_sample_params.default_tile_extension)
         dlg.exec()
 
-    def plot_mini_brain(self):
+    def plot_mini_brain(self, channel):
         """
         Plot the brain icon which represents the acquisition sample orientation graphically
         to help users pick the right orientation.
-
-        Returns
-        -------
-
         """
-        img = self.__transform_mini_brain()
-        mask, proj = surface_project(img)
-        img = np_to_qpixmap(proj, mask)
-        self.ui.miniBrainLabel.setPixmap(img)
+        if isinstance(channel, int):
+            channel = self.params.get_channel_name(channel)
+        # REFACTOR: a bit hacky to refer to other tab
+        mask, proj = self.main_window.tab_managers['registration'].aligner.project_mini_brain(channel)
+        self.get_channel_ui(channel).miniBrainLabel.setPixmap(np_to_qpixmap(proj, mask))
 
-    def __transform_mini_brain(self):  # REFACTOR: extract
-        """
-        Apply the set of transforms to the mini brain as defined by the crop and
-        orientation parameters input by the user.
-
-        Returns
-        -------
-
-        """
-        def scale_range(rng, scale):
-            for i in range(len(rng)):
-                if rng[i] is not None:
-                    rng[i] = round(rng[i] / scale)
-            return rng
-
-        def range_or_default(rng, scale):
-            if rng is not None:
-                return scale_range(rng, scale)
-            else:
-                return 0, None
-
-        orientation = self.params.orientation
-        x_scale, y_scale, z_scale = self.mini_brain_scaling
-        img = self.mini_brain.copy()
-        axes_to_flip = [abs(axis) - 1 for axis in orientation if axis < 0]
-        if axes_to_flip:
-            img = np.flip(img, axes_to_flip)
-        img = img.transpose([abs(axis) - 1 for axis in orientation])
-        x_min, x_max = range_or_default(self.params.slice_x, x_scale)
-        y_min, y_max = range_or_default(self.params.slice_y, y_scale)
-        z_min, z_max = range_or_default(self.params.slice_z, z_scale)
-        img = img[x_min:x_max, y_min:y_max:, z_min:z_max]
-        return img
-
-    def display_atlas(self):
-        """
-        Plot the atlas as a FIXME:
-        Returns
-        -------
-
-        """
-        self.main_window.alignment_tab_mgr.setup_workers()
-        dvs = self.main_window.alignment_tab_mgr.preprocessor.plot_atlas()   # REFACTOR:
-        self.main_window.setup_plots(dvs)
+    def display_atlas(self, channel):
+        """Plot the atlas as a grayscale image in the viewer"""
+        if isinstance(channel, int):
+            channel = self.params.get_channel_name(channel)
+        # REFACTOR: a bit hacky to refer to other tab
+        self.main_window.tab_managers['stitching'].setup_workers()
+        self.wrap_plot(self.main_window.tab_managers['stitching'].stitcher.plot_atlas, channel)
 
 
-class AlignmentTab(GenericTab):
+class StitchingTab(PreProcessingTab):
     """
     The tab responsible for all the alignments, including the stitching and
     aligning to the atlas.
     """
-    def __init__(self, main_window, tab_idx=1):
-        super().__init__(main_window, 'Alignment', tab_idx, 'alignment_tab')
+    def __init__(self, main_window, tab_idx, sample_manager=None):
+        super().__init__(main_window, 'stitching_tab', tab_idx)
+        self.channels_ui_name = 'stitching_params'
+        self.sample_manager = sample_manager
+        self.stitcher = StitchingProcessor(self.sample_manager)
 
-        self.processing_type = 'pre'
-        self.sample_params = None
-        self.preprocessor = PreProcessor()
-
-        self.advanced_control_names = ['advancedAtlasSettingsGroupBox']
-
-    def set_params(self, sample_params):
+    def _bind(self):
         """
-        Set the params object which links the UI and the configuration file
-        Parameters
-        ----------
-        sample_params : SampleParameters
-            The params object that links the UI to the config for all the properties intrinsic to the sample
-
-        Returns
-        -------
-
-        """
-        self.sample_params = sample_params
-        self.params = AlignmentParams(self.ui)
-        self.params.registration.atlas_id_changed.connect(self.preprocessor.setup_atlases)
-        self.params.registration.atlas_structure_tree_id_changed.connect(self.preprocessor.setup_atlases)
-
-    def setup_workers(self):
-        """
-        Setup the worker (PreProcessor) which handle the computations associated with this tab
-        Returns
-        -------
-
-        """
-        self.sample_params.ui_to_cfg()
-        self.preprocessor.setup((self.main_window.preference_editor.params.config,
-                                 self.sample_params.config, self.params.config),
-                                convert_tiles=False)
-
-        if self.preprocessor.has_tiles and not self.preprocessor.has_npy and\
-                prompt_dialog('Tile conversion', 'Convert individual tiles to npy for efficiency'):
-            self.convert_tiles()
-        self.wrap_step('Setting up atlas', self.setup_atlas, n_steps=1, save_cfg=False, nested=False)  # TODO: abort_func=self.preprocessor.stop_process
-
-    def convert_tiles(self):
-        if not self.preprocessor.has_tiles:
-            return
-        self.wrap_step('Converting tiles', self.preprocessor.convert_tiles, step_kw_args={'force': True}, n_steps=0,
-                       abort_func=self.preprocessor.stop_process, save_cfg=False, nested=False)
-
-    def setup(self):
-        """
-        Setup the UI elements, notably the signal/slot connections which are not
+        Bind the signal/slots of the UI elements which are not
         automatically set through the params object attribute
-
-        Returns
-        -------
-
         """
-        self.init_ui()
+        if not isinstance(self.ui.runChannelsCheckableListWidget, CheckableListWidget):
+            self.ui.runChannelsCheckableListWidget = replace_widget(self.ui.runChannelsCheckableListWidget,
+                                                                    CheckableListWidget(self.ui),
+                                                                    self.ui.runAndDisplayGridLayout)
+            self.ui.runChannelsCheckableListWidget.check_state_changed.connect(self.set_run_channel)
 
-        self.ui.convertTilesToNpyPushButton.clicked.connect(self.convert_tiles)
-
-        self.ui.previewStitchingPushButton.clicked.connect(functools.partial(self.preview_stitching_dumb, color=True))
-        self.connect_whats_this(self.ui.rigidProjectionThicknessLblInfoToolButton, self.ui.rigidProjectionThicknessLbl)
-        self.ui.stitchingPreviewLevelsPushButton.clicked.connect(functools.partial(self.preview_stitching_dumb, color=False))
-        self.ui.stitchingPreviewRigidPushButton.clicked.connect(functools.partial(self.preview_stitching_smart, postfix='aligned_axis'))
+        if not isinstance(self.ui.plotChannelsCheckableListWidget, CheckableListWidget):
+            self.ui.plotChannelsCheckableListWidget = replace_widget(self.ui.plotChannelsCheckableListWidget,
+                                                                     CheckableListWidget(self.ui),
+                                                                     self.ui.runAndDisplayGridLayout)
 
         self.ui.runStitchingPushButton.clicked.connect(self.run_stitching)
         self.ui.displayStitchingPushButton.clicked.connect(self.plot_stitching_results)
         self.ui.displayStitchingClearPlots.clicked.connect(self.main_window.clear_plots)
-        self.ui.convertOutputPushButton.clicked.connect(self.convert_output)
 
-        self.ui.registrationGoToSampleOrientationPushButton.clicked.connect(self.main_window.sample_tab_mgr.go_to_orientation)
+    def _bind_params_signals(self):  # WARNING: not really params signals but hack necessary to update the UI
+        self.ui.runChannelsCheckableListWidget.set_items(self._get_channels())
+
+    def _set_params(self):
+        self.params = StitchingParams(self.ui)# , self.ui.channelsParamsTabWidget is deduced from the UI
+
+    def _get_channels(self):
+        return self.sample_manager.get_stitchable_channels()
+
+    def _set_channel_config(self, channel):
+        # Force same instance  # TODO: inherited from parent
+        self.params[channel].read_configs(self.stitcher.config.filename)
+
+    def _setup_channel(self, page_widget, channel):
+        if stitchable_channels := self.sample_manager.get_stitchable_channels():
+            page_widget.layoutChannelComboBox.addItems(stitchable_channels)
+        is_first_channel = self.ui.channelsParamsTabWidget.last_real_tab_idx == 1
+        layout_channel = channel if is_first_channel else self.sample_manager.get_stitchable_channels()[0]
+        page_widget.layoutChannelComboBox.setCurrentText(layout_channel)
+        self.params[channel].ui_to_cfg()
+
+    def _bind_channel(self, page_widget, channel):
+        """
+        Bind the signal/slots of the UI elements for `channel` which are not
+        automatically set through the params object attribute
+        """
+        buttons_functions = [
+            ('previewStitchingPushButton', self.preview_stitching_dumb, {'color': True}),
+            ('stitchingPreviewLevelsPushButton', self.preview_stitching_dumb, {'color': False}),
+            ('stitchingPreviewRigidPushButton', self.preview_stitching_smart, {'asset_sub_type': 'aligned_axis'})
+        ]
+        for btn_name, func, kwargs in buttons_functions:
+            self._bind_btn(btn_name, func, channel, page_widget, **kwargs)
+        self.ui.runChannelsCheckableListWidget.set_item_checked(channel, self.params[channel].shared.run)
+
+    def setup_workers(self):
+        """
+        Setup the worker (Processor) which handles the computations associated with this tab
+        """
+        self.sample_params.ui_to_cfg()
+        self.stitcher.setup(self.sample_manager, convert_tiles=False)
+
+        if self.sample_manager.has_tiles() and not self.sample_manager.has_npy():
+            if  prompt_dialog('Tile conversion', 'Convert individual tiles to npy for efficiency'):
+                self.convert_tiles()
+
+    def convert_tiles(self):
+        if not self.sample_manager.has_tiles():
+            return
+        self.wrap_step('Converting tiles', self.stitcher.convert_tiles, step_kw_args={'force': True}, n_steps=0,
+                       abort_func=self.stitcher.stop_process, save_cfg=False, nested=False)
+
+    def set_run_channel(self, _, state, channel):
+        """
+        Set the channels to run the stitching on
+
+        Parameters
+        ----------
+        state : bool
+            Whether the channel is checked
+        channel : str
+            The name of the channel
+        """
+        self.params[channel].skip = not state  # TODO: check if skip sill exists
+
+    def set_progress_watcher(self, watcher):  # FIXME: could be for worker in self.workers
+        """
+        Setup the watcher object that will handle the progress in the computation for this tab
+
+        Parameters
+        ----------
+        watcher : ProgressWatcher
+            The object that tracks the progress of the computation
+        """
+        self.stitcher.set_progress_watcher(watcher)
+
+    def preview_stitching_dumb(self, channel, color):
+        """
+        Preview the stitching based only on a *dumb* overlay of the tiles
+        i.e. only using the fixed guess overlap
+
+        Parameters
+        ----------
+        channel : str
+            The channel to preview
+        color : bool
+            Whether to stitch in chessboard or continuous grayscale
+        """
+        stitched = self.stitcher.stitch_overlay(channel, color)
+        if color:
+            overlay = [pg.image(stitched)]
+        else:  # TODO: make DataViewer work with 2D color
+            overlay = plot_3d.plot(stitched, lut='flame', min_max=(100, 5000))
+        self.main_window.setup_plots(overlay)
+
+    def preview_stitching_smart(self, channel, asset_sub_type='aligned_axis'):
+        """
+        Preview the stitching based on the actual stitching variable, rigid by default.
+
+        Parameters
+        ----------
+        channel : str
+            The channel to preview
+        asset_sub_type : str
+            One of ('aligned_axis', 'aligned', 'placed')
+        """
+        n_steps = self.stitcher.n_rigid_steps_to_run
+        self.wrap_step('Stitching', self.stitcher.stitch_channel_rigid,
+                       step_args=[channel], step_kw_args={'_force': True},
+                       n_steps=n_steps, abort_func=self.stitcher.stop_process)
+        overlay = [pg.image(self.stitcher.plot_layout(channel=channel, asset_sub_type=asset_sub_type))]
+        self.main_window.setup_plots(overlay)
+
+    def run_stitching(self):
+        """Run the actual stitching steps based on the values in the config file (set from the UI)."""
+        for channel in self.sample_manager.channels:
+            if not self.sample_manager.is_tiled(channel):  # BYPASS stitching, just copy or stack
+                self.wrap_step('Stitching', self.stitcher.copy_or_stack, step_args=[channel], )
+
+        n_steps = self.stitcher.n_rigid_steps_to_run + self.stitcher.n_wobbly_steps_to_run
+        for channel in self.stitcher.get_stitching_order():
+            cfg = self.params[channel]
+            kwargs = {'n_steps': n_steps, 'abort_func': self.stitcher.stop_process, 'close_when_done': False}
+            try:
+                if channel == cfg.shared.layout_channel:  # Used as reference
+                    self.wrap_step('Stitching', self.stitcher.stitch_channel_rigid,
+                                   step_args=[channel], step_kw_args={'_force': True}, **kwargs)
+                    self.wrap_step(task_name='', func=self.stitcher.stitch_channel_wobbly, step_args=[channel],
+                                   step_kw_args={'_force': cfg.stitching_rigid.skip}, **kwargs)
+                else:  # Uses other channel as reference
+                    self.wrap_step('', self.stitcher._stitch_layout_wobbly,
+                                   step_args=[channel],  **kwargs)
+            except MissingRequirementException as err:
+                error_msg = str(err).replace("\n", "<br>")
+                self.main_window.print_status_msg(f'Skipping stitching for {channel} because of missing requirements: {error_msg}')
+
+        self.update_plotable_channels()
+        self.progress_watcher.finish()
+
+    def update_plotable_channels(self):  # FIXME: call on data load and populate with existing stitched channels
+        self.ui.plotChannelsCheckableListWidget.clear()
+        for chan in self.sample_manager.stitchable_channels:
+            if not self.params[chan].skip:
+                self.ui.plotChannelsCheckableListWidget.add_item(chan)
+                # self.ui.plotChannelsCheckableListWidget.set_item_checked(chan, self.params[chan].plot)  # FIXME: add param
+
+    def plot_stitching_results(self, _):
+        """Plot the stitched image in 3D in the viewer"""
+        channels = self.ui.plotChannelsCheckableListWidget.get_checked_items() or []
+        for channel in channels:
+            self.params[channel].shared.ui_to_cfg()
+        self.wrap_plot(self.stitcher.plot_stitching_results, channels=channels or None, parent=self.main_window.centralWidget())
+
+
+class RegistrationTab(PreProcessingTab):
+    def __init__(self, main_window, tab_idx, sample_manager=None):
+        super().__init__(main_window, 'registration_tab', tab_idx)
+        self.sample_manager = sample_manager
+        self.aligner = RegistrationProcessor(self.sample_manager)
+
+        self.channels_ui_name = 'registration_params'
+
+        self.advanced_controls_names = ['advancedAtlasSettingsGroupBox']
+
+    def _bind(self):
+        """
+        Bind the signal/slots of the UI elements which are not
+        automatically set through the params object attribute
+        """
         self.ui.registerPushButton.clicked.connect(self.run_registration)
-        self.ui.clearLandmarksFilesPushButton.clicked.connect(self.clear_landmarks)
-        self.ui.plotRegistrationResultsSideBySidePushButton.clicked.connect(self.plot_registration_results_side_by_side)
-        self.ui.plotRegistrationResultsCompositePushButton.clicked.connect(self.plot_registration_results_composite)
-        self.ui.plotRegistrationResultsRawSideBySidePushButton.clicked.connect(self.plot_registration_results_side_by_side_raw)
-        self.ui.plotRegistrationResultsRawCompositePushButton.clicked.connect(self.plot_registration_results_composite_raw)
+        self.ui.plotRegistrationResultsPushButton.clicked.connect(self.plot_registration_results)
 
-        # TODO: ?? connect alignment folder button
-
-        self.ui.useAutoToRefLandmarksPushButton.clicked.connect(self.display_auto_to_ref_landmarks_dialog)
-        self.ui.useResampledToAutoLandmarksPushButton.clicked.connect(self.display_resampled_to_auto_landmarks_dialog)
-        self.connect_whats_this(self.ui.resampledLandmarksInfoToolButton, self.ui.useResampledToAutoLandmarksPushButton)
-        self.connect_whats_this(self.ui.referenceLandmarksInfoToolButton, self.ui.useAutoToRefLandmarksPushButton)
-
+        # Populate atlas and structure tree combo boxes from config
         for k in ATLAS_NAMES_MAP.keys():
             if self.ui.atlasIdComboBox.findText(k) == -1:
                 self.ui.atlasIdComboBox.addItem(k)
@@ -378,6 +489,43 @@ class AlignmentTab(GenericTab):
             if self.ui.structureTreeIdComboBox.findText(k) == -1:
                 self.ui.structureTreeIdComboBox.addItem(k)
 
+    def _bind_params_signals(self):
+        self.params.atlas_params.atlas_id_changed.connect(self.aligner.setup_atlases)
+        self.params.atlas_params.atlas_structure_tree_id_changed.connect(self.aligner.setup_atlases)
+        self.params.launchLandmarksDialog.connect(self.launch_landmarks_dialog)
+        self._update_plotable_channels()
+
+    def _set_params(self):
+        self.params = RegistrationParams(self.ui)
+
+    def _get_channels(self):
+        return self.aligner.channels_to_register()
+
+    def _set_channel_config(self, channel):
+        self.params[channel]._config = self.aligner.config
+        self.params[channel].cfg_to_ui()  # Force it while the tab is active
+
+    def _bind_channel(self, page_widget, channel):
+        """
+        Bind the signal/slots of the UI elements for `channel` which are not
+        automatically set through the params object attribute
+        """
+        # TODO: set value of comboboxes to good defaults
+        page_widget.alignWithComboBox.addItems(self.aligner.channels_to_register())
+        page_widget.movingChannelComboBox.addItems(self.aligner.channels_to_register())
+        page_widget.paramsFilesListWidget = replace_widget(page_widget.paramsFilesListWidget,
+                                                           FileDropListWidget(page_widget,
+                                                                              page_widget.addParamFilePushButton,
+                                                                              page_widget.removeParamFilePushButton),
+                                                           page_widget.registrationChannelGridLayout)
+        self.params[channel].align_with_changed.connect(self.handle_align_with_changed)
+
+    def setup_workers(self):
+        self.sample_params.ui_to_cfg()
+        self.aligner.setup()
+        self.params.read_configs(self.aligner.config.filename)
+        self.wrap_step('Setting up atlas', self.setup_atlas, n_steps=1, save_cfg=False, nested=False)  # TODO: abort_func=self.aligner.stop_process
+
     def set_progress_watcher(self, watcher):
         """
         Setup the watcher object that will handle the progress in the computation for this tab
@@ -385,413 +533,206 @@ class AlignmentTab(GenericTab):
         Parameters
         ----------
         watcher : ProgressWatcher
-            The object that tracks the progress
-
-        Returns
-        -------
-
+            The object that tracks the progress of the computation
         """
-        self.preprocessor.set_progress_watcher(watcher)
+        self.aligner.set_progress_watcher(watcher)
 
     def setup_atlas(self):
         """
         Setup the atlas that corresponds to the orientation and crop
-
-        Returns
-        -------
-
         """
         self.sample_params.ui_to_cfg()  # To make sure we have the slicing up to date
-        self.params.registration.ui_to_cfg()
-        self.preprocessor.setup_atlases()
+        self.params.atlas_params.ui_to_cfg()
+        self.aligner.setup_atlases()
 
-    def preview_stitching_dumb(self, color):
-        """
-        Preview the stitching based only on a *dumb* overlay of the tiles
-        i.e. only using the fixed guess overlap
+    def clear_landmarks(self, channel):
+        self.aligner.clear_landmarks(channel)
+        # TODO: use landmark_selector
 
-        Parameters
-        ----------
-        color : bool
-            Whether to stitch in chessboard or continuous grayscale
+    def launch_landmarks_dialog(self, channel):
+        if isinstance(channel, int):
+            channel = self.params.get_channel_name(channel)
+        # We have to keep reference to make it persistent but should be per channel
+        self.landmark_selector = LandmarksSelectorDialog(
+            fixed_image_path=self.aligner.get_fixed_image(channel).path,
+            moving_image_path=self.aligner.get_moving_image(channel).path,
+            fixed_image_landmarks_path=self.aligner.get_elx_asset('fixed_landmarks',
+                                                                  channel=channel).path,
+            moving_image_landmarks_path=self.aligner.get_elx_asset('moving_landmarks',
+                                                                   channel=channel).path)
+        self.landmark_selector.plot(lut=self.main_window.preference_editor.params.lut,
+                                    parent=self.main_window.centralWidget())
+        self.main_window.setup_plots(self.landmark_selector.data_viewers.values())
 
-        Returns
-        -------
-
-        """
-        if color:
-            overlay = [pg.image(self.preprocessor.stitch_overlay('raw', color))]
-        else:  # TODO: make DataViewer work with 2D color
-            overlay = plot_3d.plot(self.preprocessor.stitch_overlay('raw', color), lut='flame', min_max=(100, 5000))
-        self.main_window.setup_plots(overlay)
-
-    def preview_stitching_smart(self, postfix='aligned_axis'):
-        """
-        Preview the stitching based on the actual stitching variable, rigid by default.
-
-        Parameters
-        ----------
-        postfix : str
-            One of ('aligned_axis', 'aligned', 'placed')
-
-        Returns
-        -------
-
-        """
-        n_steps = self.preprocessor.n_rigid_steps_to_run
-        self.wrap_step('Stitching', self.preprocessor.stitch_rigid, step_kw_args={'force': True},
-                       n_steps=n_steps, abort_func=self.preprocessor.stop_process)
-        overlay = [pg.image(self.preprocessor.plot_layout(postfix=postfix))]
-        self.main_window.setup_plots(overlay)
-
-    def run_stitching(self):
-        """
-        Run the actual stitching steps based on the values in the config file (set from the UI).
-        Returns
-        -------
-
-        """
-        if not self.preprocessor.is_tiled:  # BYPASS stitching, just copy or stack
-            self.wrap_step('Stitching', clearmap_io.convert,
-                           step_args=[self.preprocessor.filename('raw'), self.preprocessor.filename('stitched')])
-        else:
-            n_steps = self.preprocessor.n_rigid_steps_to_run + self.preprocessor.n_wobbly_steps_to_run
-            skip_wobbly = self.params.stitching_wobbly.skip
-            if not self.params.stitching_rigid.skip:
-                if not self.preprocessor.check_has_all_tiles('raw'):
-                    self.progress_watcher.finish()
-                    self.main_window.popup('Missing tiles, stitching aborted')
-                    return
-                self.wrap_step('Stitching', self.preprocessor.stitch_rigid, step_kw_args={'force': True},
-                               n_steps=n_steps, abort_func=self.preprocessor.stop_process, close_when_done=skip_wobbly)
-            if not skip_wobbly:
-                if self.preprocessor.was_stitched_rigid:
-                    self.wrap_step(task_name=None, func=self.preprocessor.stitch_wobbly,
-                                   step_kw_args={'force': self.params.stitching_rigid.skip}, n_steps=n_steps)
-
-                else:
-                    self.main_window.popup('Could not run wobbly stitching <br>without rigid stitching first')
-        self.progress_watcher.finish()
-
-    def plot_stitching_results(self):
-        """
-        Plot the stitched image in 3D in the viewer
-
-        Returns
-        -------
-
-        """
-        self.params.stitching_general.ui_to_cfg()
-        if not self.step_exists('stitching', (self.preprocessor.filename('stitched'))):  # TODO: add arteries option
-            return
-        dvs = self.preprocessor.plot_stitching_results(parent=self.main_window.centralWidget())
-        self.main_window.setup_plots(dvs)
-
-    def convert_output(self):
-        """
-        Convert the stitched output to the file type specified by the drop down
-        menu in the UI
-
-        Returns
-        -------
-
-        """
-        fmt = self.params.stitching_general.conversion_fmt
-        if not self.step_exists('stitching', (self.preprocessor.filename('stitched'))):  # TODO: add arteries option
-            return
-        self.params.stitching_general.ui_to_cfg()
-        self.wrap_step(f'Converting stitched image to {fmt}', self.preprocessor.convert_to_image_format,
-                       n_steps=self.preprocessor.n_channels_convert, abort_func=self.preprocessor.stop_process,
-                       save_cfg=False, nested=False)
-
-    def clear_landmarks(self):
-        self.preprocessor.clear_landmarks()
-
-    def display_auto_to_ref_landmarks_dialog(self):
-        """
-        Display the dialog to use landmarks for optimising the registration
-        of the autofluorescence to the reference
-
-        Returns
-        -------
-
-        """
-        images = [self.preprocessor.filename('resampled', postfix='autofluorescence'),
-                  self.preprocessor.reference_file_path]
-        self.__display_landmarks_dialog(images, 'auto_to_reference')
-
-    def display_resampled_to_auto_landmarks_dialog(self):
-        """
-        Display the dialog to use landmarks for optimising the registration
-        of the resampled main channel to autofluorescence
-
-        Returns
-        -------
-
-        """
-        images = [self.preprocessor.filename('resampled', postfix='autofluorescence'),
-                  self.preprocessor.filename('resampled')]
-        self.__display_landmarks_dialog(images, 'resampled_to_auto')
-
-    def __display_landmarks_dialog(self, images, direction):
-        titles = [os.path.basename(img) for img in images]
-        dvs = plot_3d.plot(images, title=titles, arrange=False, sync=False,
-                           lut=self.main_window.preference_editor.params.lut,
-                           parent=self.main_window.centralWidget())
-        self.main_window.setup_plots(dvs)
-
-        landmark_selector = LandmarksSelectorDialog(params=self.params)
-        landmark_selector.data_viewers = {
-            'fixed': dvs[0],
-            'moving': dvs[1]
-        }
-        for i in range(2):
-            scatter = pg.ScatterPlotItem()
-            dvs[i].enable_mouse_clicks()
-            dvs[i].view.addItem(scatter)
-            dvs[i].scatter = scatter
-            coords = [landmark_selector.fixed_coords, landmark_selector.moving_coords][i]  # FIXME: check order (A to B)
-            dvs[i].scatter_coords = Scatter3D(coords, colors=np.array(landmark_selector.colors),
-                                              half_slice_thickness=3)
-            callback = [landmark_selector.set_fixed_coords, landmark_selector.set_moving_coords][i]
-            dvs[i].mouse_clicked.connect(callback)
-        callbacks = {
-            'auto_to_reference': functools.partial(self.write_registration_landmark_coords, 'auto_to_reference'),
-            'resampled_to_auto': functools.partial(self.write_registration_landmark_coords, 'resampled_to_auto')
-        }
-        landmark_selector.dlg.buttonBox.accepted.connect(callbacks[direction])
-        self.landmark_selector = landmark_selector  # REFACTOR: find better way to keep in scope
-
-    def write_registration_landmark_coords(self, direction):
+    def write_registration_landmark_coords(self, channel):
         """
         Write the corresponding landmarks to file for use in landmark optimised registration
-
-
-        Parameters
-        ----------
-        direction : str
-            The direction of the transformation. One of ('auto_to_reference', 'resampled_to_auto')
-
-        Returns
-        -------
-
         """
-        landmarks_file_paths = [self.preprocessor.get_autofluo_pts_path(direction)]
-        if direction == 'auto_to_reference':
-            landmarks_file_paths.append(self.preprocessor.ref_pts_path)
-        elif direction == 'resampled_to_auto':
-            landmarks_file_paths.append(self.preprocessor.resampled_pts_path)
-        else:
-            raise ValueError(f'Direction must be one of ("auto_to_reference", "resampled_to_auto"), got {direction}')
-        markers = [mrkr for mrkr in self.landmark_selector.coords if all(mrkr)]
-        for i, f_path in enumerate(landmarks_file_paths):
-            if not os.path.exists(os.path.dirname(f_path)):
-                os.mkdir(os.path.dirname(f_path))
-            with open(f_path, 'w') as landmarks_file:
-                landmarks_file.write(f'point\n{len(markers)}\n')  # FIXME: use index ??
-                for marker in markers:
-                    x, y, z = marker[i]
-                    landmarks_file.write(f'{x} {y} {z}\n')
+        self.landmark_selector.write_coords()
         self.landmark_selector.dlg.close()
         self.landmark_selector = None
+
+    def handle_align_with_changed(self, channel, align_with):
+        if align_with == channel:
+            raise ValueError(f'Cannot align {channel=} with itself')
+        elif align_with is None:
+            # Remove registration pipeline from channel
+            pass
+        else:
+            self.sample_manager.workspace.add_pipeline('registration', channel_id=channel)
+            self.aligner.parametrize_assets()
 
     def run_registration(self):
         """
         Run the actual registration between the sample and the reference atlas.
-
-        Returns
-        -------
-
         """
-        self.main_window.make_progress_dialog('Registering', n_steps=4, abort=self.preprocessor.stop_process,
-                                              parent=self.main_window)  # FIXME: compute n_steps (par of processor)
+        # FIXME: compute n_steps (par of processor; n_channels * n_steps_per_channel)
+        self.main_window.make_progress_dialog('Registering', n_steps=4, abort=self.aligner.stop_process,
+                                              parent=self.main_window)
         self.setup_atlas()
-        if not self.params.registration.skip_resampling:
-            if self.preprocessor.autofluorescence_is_tiled and \
-                    not self.preprocessor.check_has_all_tiles('autofluorescence'):
-                self.main_window.progress_watcher.finish()
-                self.main_window.print_status_msg('Registration skipped because of missing tiles')
-                return
-            try:
-                self.main_window.wrap_in_thread(self.preprocessor.resample_for_registration, force=True)
-            except FileExistsError as err:
-                option_idx = option_dialog('Files exist',
-                                           'Resampled files exist, do you want to: ',
-                                           ['Delete and retry', 'Cancel and skip resampling'])
-                if option_idx == 0:
-                    self.preprocessor.delete_resampled_files()
-                    # self.run_registration()  # retry w/ recursion
-                self.main_window.progress_watcher.finish()
-                return
-            # self.main_window.print_status_msg('Resampled')
-        self.main_window.wrap_in_thread(self.preprocessor.align)
+        for i, channel in enumerate(self.params.keys()):
+            if self.params[channel].resample:
+                asset = self.aligner.get('stitched', channel=channel)
+                if not asset.exists:
+                    asset = self.aligner.get('raw', channel=channel)
+                    if asset.is_tiled and not asset.all_tiles_exist:
+                        self.main_window.progress_watcher.finish()
+                        self.main_window.print_status_msg(f'Registration skipped because of missing tiles'
+                                                          f'for channel {channel}')
+                        return
+                try:
+                    self.wrap_step(f'Resampling {channel} for registration', self.aligner.resample_channel,
+                                   step_kw_args={'channel': channel, 'increment_main':(i != 0)})
+                except FileExistsError:  # REFACTOR: factorise with the above
+                    option_idx = option_dialog('Files exist',
+                                               f'Resampled files exist for {channel}, do you want to: ',
+                                               ['Delete and retry', 'Skip resampling and continue'])
+                    if option_idx == 0:
+                        self.sample_manager.delete_resampled_files()
+                        self.wrap_step(f'Resampling {channel} for registration', self.aligner.resample_channel,
+                                       step_kw_args={'channel': channel, 'increment_main': (i != 0)})
+                    else:
+                        continue
+        self.main_window.wrap_in_thread(self.aligner.align)
+        self._update_plotable_channels()
+        self.main_window.print_status_msg('Registered')
 
-    def __prepare_registration_results_graph(self, step='ref_to_auto'):
-        if step == 'ref_to_auto':
-            img_paths = (self.preprocessor.filename('resampled', postfix='autofluorescence'),
-                         self.preprocessor.aligned_autofluo_path)
-        elif step == 'auto_to_raw':
-            img_paths = (self.preprocessor.filename('resampled'),  # TODO: check direction
-                         os.path.join(self.preprocessor.filename('resampled_to_auto'), 'result.0.mhd'))
-        else:
-            raise ValueError(f'Unrecognised step option {step}, should be one of ["ref_to_auto", "auto_to_raw"]')
-        if not self.step_exists('registration', img_paths):
+    def _update_plotable_channels(self):
+        self.ui.plotChannelComboBox.clear()  # TODO: extract to method
+        for channel in self.params.keys():
+            if self.aligner.get_elx_asset('aligned', channel=channel).exists:
+                self.ui.plotChannelComboBox.addItem(channel)
+
+    def __prepare_registration_results_graph(self, channel):
+        img_paths = [
+            self.aligner.get_fixed_image(channel).path,
+            self.aligner.get_aligned_image(channel)
+        ]
+        if not all([p.exists() for p in img_paths]):
             raise ValueError(f'Missing requirements {img_paths}')
-        image_sources = copy.deepcopy(list(img_paths))
-        for i, im_path in enumerate(image_sources):
-            if im_path.endswith('.mhd'):
-                image_sources[i] = mhd_read(im_path)
-        titles = [os.path.basename(img) for img in img_paths]
-        return image_sources, titles
+        titles = [img.parent.stem if 'aligned_to' in str(img) else img.stem for img in img_paths]
+        # TODO: replace result<N,1> by channel name
+        return img_paths, titles
 
-    def plot_registration_results_side_by_side_raw(self):
+    def plot_registration_results(self):
         """
-        Plot the result of the registration between raw and autofluorescence
-        side-by-side in synchronised plots
+        Plot the result of the registration between 2 channels. Either side by side or as a composite
 
-        Returns
-        -------
-
+        If the composite checkbox is checked, the two images are overlayed.
+        Otherwise, they are displayed side by side
         """
+        channel = self.params.shared_params.plot_channel
+        composite = self.params.shared_params.plot_composite
         self.main_window.clear_plots()
-        image_sources, titles = self.__prepare_registration_results_graph('auto_to_raw')
+        image_sources, titles = self.__prepare_registration_results_graph(channel)
+        if composite:
+            image_sources = [image_sources, ]
         dvs = plot_3d.plot(image_sources, title=titles, arrange=False, sync=True,
                            lut=self.main_window.preference_editor.params.lut,
                            parent=self.main_window.centralWidget())
-        link_dataviewers_cursors(dvs)
-        self.main_window.setup_plots(dvs, ['autofluo', 'aligned'])
-
-    def plot_registration_results_side_by_side(self):
-        """
-        Plot the result of the registration between autofluorescence and reference atlas
-        side-by-side in synchronised plots
-
-        Returns
-        -------
-
-        """
-        self.main_window.clear_plots()
-        image_sources, titles = self.__prepare_registration_results_graph()
-        dvs = plot_3d.plot(image_sources, title=titles, arrange=False, sync=True,
-                           lut=self.main_window.preference_editor.params.lut,
-                           parent=self.main_window.centralWidget())
-        link_dataviewers_cursors(dvs)
-        self.main_window.setup_plots(dvs, ['autofluo', 'aligned'])
-
-    def plot_registration_results_composite_raw(self):
-        """
-        Plot the result of the registration between raw and autofluorescence
-        as an overlay plot
-
-        Returns
-        -------
-
-        """
-        self.main_window.clear_plots()
-        image_sources, titles = self.__prepare_registration_results_graph('auto_to_raw')
-        dvs = plot_3d.plot([image_sources, ], title=' '.join(titles), arrange=False, sync=True,
-                           lut=self.main_window.preference_editor.params.lut,
-                           parent=self.main_window.centralWidget())
-        self.main_window.setup_plots(dvs)
-
-    def plot_registration_results_composite(self):
-        """
-        Plot the result of the registration between autofluorescence and reference atlas
-        as an overlay plot
-
-        Returns
-        -------
-
-        """
-        self.main_window.clear_plots()
-        image_sources, titles = self.__prepare_registration_results_graph()
-        dvs = plot_3d.plot([image_sources, ], title=' '.join(titles), arrange=False, sync=True,
-                           lut=self.main_window.preference_editor.params.lut,
-                           parent=self.main_window.centralWidget())
-        self.main_window.setup_plots(dvs)
+        self.main_window.setup_plots(dvs, graph_names=titles)
+        if not composite:
+            link_dataviewers_cursors(dvs)
 
 
 class CellCounterTab(PostProcessingTab):
     """
     The tab responsible for the cell detection and cell coordinates alignment
     """
-    def __init__(self, main_window, tab_idx=2):
-        super().__init__(main_window, 'CellMap', tab_idx, 'cell_map_tab')
+    def __init__(self, main_window, tab_idx, sample_manager=None):
+        super().__init__(main_window, 'cell_map_tab', tab_idx)
+
+        self.sample_manager = sample_manager
+        self.aligner = None  # Will be configured by self.set_pre_processors
+
+        self.cell_detectors = {}
+
+        self.channels_ui_name = 'cell_map_params'
 
         self.cell_intensity_histogram = None
         self.cell_size_histogram = None
-        self.preprocessor = None
-        self.cell_detector = None
 
-        self.advanced_control_names = ['detectionShapeGroupBox']
+    def _bind(self):
+        pass
 
-    def set_params(self, sample_params, alignment_params):
-        """
-        Set the params object which links the UI and the configuration file
-        Parameters
-        ----------
-        sample_params : SampleParameters
-            The params object that links the UI to the config for all the properties intrinsic to the sample
-        alignment_params: AlignmentParams
-            The params object that links the UI to the config for things related to sample alignment
+    def _bind_params_signals(self):
+        self.ui.advancedCheckBox.stateChanged.connect(self.params.handle_advanced_state_changed)
 
-        Returns
-        -------
-        """
-        self.params = CellMapParams(self.ui, sample_params, alignment_params, self.main_window.src_folder)
+    def _set_params(self):
+        # REFACTORING: accessing main_window is not the most elegant way
+        self.params = CellMapParams(self.ui, self.sample_params, None,
+                                    self.main_window.tab_managers['registration'].params)
+
+    def _get_channels(self):
+        return self.params.channels_to_detect
 
     def setup_workers(self):
         """
-         Setup the cell detection worker, which handle the computations associated with this tab
-
-         Returns
-         -------
-
-         """
-        if self.preprocessor.workspace is not None:
+        Setup the cell detection worker, which handle the computations associated with this tab
+        """
+        if self.sample_manager.workspace is not None:
             self.params.ui_to_cfg()
-            self.cell_detector = CellDetector(self.preprocessor)
+            self.cell_detectors = {channel: CellDetector(self.sample_manager, channel)
+                                   for channel in self.params.channels_to_detect}
         else:
             self.main_window.print_warning_msg('Workspace not initialised')
 
-    def setup_cell_detector(self):
-        """
-        Post configuration of the CellDetector object  # FIXME: check redundancy with above
+    def finalise_workers_setup(self):  #  When tab clicked  # FIXME: trigger with signal from self.sample_manager
+        """Post configuration of the CellDetector object"""
+        is_first_channel = True
+        for channel, detector in self.cell_detectors.items():
+            if detector.registration_processor is None and self.aligner is not None:  # TODO: might be redundant with setup_workers
+                if is_first_channel:
+                    self.params.ui_to_cfg()
+                    is_first_channel = False
+                detector.setup(self.sample_manager, channel, self.aligner)
+            self.update_cell_number(channel)
 
-        Returns
-        -------
+    def _set_channel_config(self, channel):
+        """Add a new channel tab to the UI"""
+        pass
+        # self.params.add_channel(channel)  # FIXME:
+        # self.params[channel].config = self.detectors[channel].config
 
+    def _bind_channel(self, page_widget, channel):
         """
-        if self.cell_detector.preprocessor is None and self.preprocessor.workspace is not None:  # preproc initialised
-            self.params.ui_to_cfg()
-            self.cell_detector.setup(self.preprocessor)
-            self.update_cell_number()
-
-    def setup(self):
-        """
-        Setup the UI elements, notably the signal/slot connections which are not
+        Bind the signal/slots of the UI elements for `channel` which are not
         automatically set through the params object attribute
-
-        Returns
-        -------
-
         """
-        self.init_ui()
+        page_widget.toolBox.currentChanged.connect(self.handle_tool_tab_changed)
+        buttons_functions = [
+            ('detectionPreviewTuningOpenPushButton', self.plot_debug_cropping_interface),  # TODO: add load icon
+            ('detectionPreviewTuningCropPushButton', self.create_cell_detection_tuning_sample),
+            ('detectionPreviewPushButton', self.run_tuning_cell_detection),
+            ('previewCellFiltersPushButton', self.preview_cell_filter),
+            ('runCellMapPushButton', self.run_channel),
 
-        self.ui.toolBox.currentChanged.connect(self.handle_tool_tab_changed)
-
-        self.ui.detectionPreviewTuningOpenPushButton.clicked.connect(self.plot_debug_cropping_interface)
-        # FIXME: add load icon
-        self.ui.detectionPreviewTuningCropPushButton.clicked.connect(self.create_cell_detection_tuning_sample)
-        self.ui.detectionPreviewPushButton.clicked.connect(self.run_tuning_cell_detection)
-
-        self.ui.previewCellFiltersPushButton.clicked.connect(self.preview_cell_filter)
-
-        self.ui.runCellMapPushButton.clicked.connect(self.run_cell_map)
-
-        self.ui.cellMapPlotVoxelizationPushButton.clicked.connect(self.plot_cell_map_results)
-        self.ui.cellMap3dScatterOnRefPushButton.clicked.connect(self.plot_cells_scatter_w_atlas_colors)
-        self.ui.cellMap3dScatterOnStitchedPushButton.clicked.connect(self.plot_cells_scatter_w_atlas_colors_raw)
+            ('cellMapPlotVoxelizationPushButton', self.plot_cell_map_results),
+            ('cellMap3dScatterOnRefPushButton', functools.partial(self.plot_labeled_cells_scatter, raw=False)),
+            ('cellMap3dScatterOnStitchedPushButton', functools.partial(self.plot_labeled_cells_scatter, raw=True)),
+        ]
+        for btn_name, func in buttons_functions:
+            self._bind_btn(btn_name, func, channel, page_widget)
 
     def setup_cell_param_histogram(self, cells, plot_item, key='size', x_log=False):
         """
@@ -808,11 +749,7 @@ class CellCounterTab(PostProcessingTab):
             The key (cell attribute) in the dataframe to plot.
              One of 'size' or 'source'
         x_log : bool
-            X axis is log
-
-        Returns
-        -------
-
+            X axis is logarithmic
         """
         values = cells[key].values
         hist, bin_edges = np.histogram(values, bins=20)
@@ -825,16 +762,12 @@ class CellCounterTab(PostProcessingTab):
         widget.setLogMode(x=x_log)
         return widget
 
-    def voxelize(self):
-        """
-        Creates the cell density plot
-        Returns
-        -------
-
-        """
-        if os.path.exists(self.preprocessor.filename('cells', postfix='filtered')):
-            self.wrap_step('Voxelization', self.cell_detector.voxelize,
-                           abort_func=self.cell_detector.stop_process, nested=False)#, main_thread=True)
+    def voxelize(self, channel):
+        """Creates the cell density plot """
+        if self.sample_manager.get('cells', channel=channel, postfix='filtered').exists:
+            detector = self.cell_detectors[channel]
+            self.wrap_step('Voxelization', detector.voxelize,
+                           abort_func=detector.stop_process, nested=False)#, main_thread=True)
         else:
             self.main_window.popup('Could not run voxelization, missing filtered cells table. '
                                    'Please ensure that cell filtering has been run.', base_msg='Missing file')
@@ -847,24 +780,18 @@ class CellCounterTab(PostProcessingTab):
         ----------
         watcher : ProgressWatcher
             The object that tracks the progress
-
-        Returns
-        -------
-
         """
-        if self.cell_detector is not None and self.cell_detector.preprocessor is not None:  # If initialised
-            self.cell_detector.set_progress_watcher(watcher)
+        for detector in self.cell_detectors.values():
+            if detector is not None and detector.sample_manager is not None:  # If initialised
+                detector.set_progress_watcher(watcher)
 
-    def plot_debug_cropping_interface(self):
+    def plot_debug_cropping_interface(self, channel):
         """
         Plot the orthoslicer to select a subset of the sample to perform cell detections
         tests on
-
-        Returns
-        -------
-
         """
-        self.plot_slicer('detectionSubset', self.ui, self.params)
+        self.plot_slicer('detectionSubset', self.ui.channelsParamsTabWidget.get_channel_widget(channel),
+                         self.params[channel])
 
     def handle_tool_tab_changed(self, tab_idx):
         """
@@ -874,325 +801,193 @@ class CellCounterTab(PostProcessingTab):
         Parameters
         ----------
         tab_idx
-
-        Returns
-        -------
-
         """
+        channel = self.ui.channelsParamsTabWidget.current_channel()
         if tab_idx == 1:
-            for sample_type in ('normal', 'debug'):
-                try:
-                    self.preprocessor.workspace.debug = sample_type == 'debug'
-                    cells_df = pd.DataFrame(np.load(self.preprocessor.workspace.filename('cells', postfix='raw')))
-                    self.__plot_histograms(cells_df)
-                    break
-                except FileNotFoundError:
-                    end = 'skipping' if sample_type == 'debug' else 'trying debug'
-                    print(f'Could not find {sample_type} cells dataframe file, {end}')
-                finally:
-                    self.preprocessor.workspace.debug = False
-            else:
-                self.main_window.popup('No cells file found, cannot display histograms yet')
+            self.__try_plot_histograms(channel)
         elif tab_idx == 3:
-            self.update_cell_number()
+            self.update_cell_number(channel)
 
-    def __plot_histograms(self, cells_df):
-        self.cell_size_histogram = self.setup_cell_param_histogram(cells_df, self.cell_size_histogram, 'size')
-        self.cell_intensity_histogram = self.setup_cell_param_histogram(cells_df, self.cell_intensity_histogram,
-                                                                        'source')
-        layout = self.ui.cellDetectionThresholdsLayout
-        if layout.count() <= 4:
-            label = layout.takeAt(2).widget()
-            controls = layout.takeAt(2).widget()
+    def __try_plot_histograms(self, channel):
+        for sample_type in ('normal', 'debug'):
+            old_status = self.sample_manager.workspace.debug
+            try:
+                self.sample_manager.workspace.debug = sample_type == 'debug'
+                self.__plot_histograms(channel)
+                break  # Exit as soon as any cells df is found
+            except FileNotFoundError:
+                end = 'skipping' if sample_type == 'debug' else 'trying debug'
+                print(f'Could not find {sample_type} cells dataframe file, {end}')
+            finally:
+                self.sample_manager.workspace.debug = old_status
+        else:
+            self.main_window.popup('No cells file found, cannot display histograms yet')
+
+    def __plot_histograms(self, channel):
+        df_path = self.sample_manager.get_path('cells', channel=channel, postfix='raw')
+        cells_df = pd.DataFrame(np.load(df_path))
+        self.cell_size_histogram = self.__plot_histogram(channel, cells_df, 'size', self.cell_size_histogram)
+        self.cell_intensity_histogram = self.__plot_histogram(channel, cells_df, 'source', self.cell_intensity_histogram)
+
+    def __plot_histogram(self, channel, cells_df, key, histogram):
+        histogram = self.setup_cell_param_histogram(cells_df, histogram, key)
+        layout = self.get_channel_ui(channel).cellDetectionThresholdsLayout
+
+        widgets = [layout.itemAt(i).widget() for i in range(layout.count())]
+        n_plots = len([w for w in widgets if isinstance(w, PlotWidget)])
+
+        count = 0 if key == 'size' else 1
+
+        if n_plots < 2:  # Histograms not yet added
+            label, idx = get_widget(layout, widget_type=QLabel, index=count)
+            controls, idx = get_widget(layout, key='Doublet', index=count)
             graph_width = label.width() + controls.width()
             graph_height = 50
-            self.cell_size_histogram.resize(graph_width, graph_height)
-            self.cell_size_histogram.setMaximumSize(graph_width, graph_height)
-            layout.addWidget(self.cell_size_histogram, 1, 0, 1, 2)
-            layout.addWidget(label, 2, 0, 1, 1)
-            layout.addWidget(controls, 2, 1, 1, 1)
-            self.cell_intensity_histogram.resize(graph_width, graph_height)
-            self.cell_intensity_histogram.setMaximumSize(graph_width, graph_height)
-            layout.addWidget(self.cell_intensity_histogram, 4, 0, 1, 2)
+            histogram.resize(graph_width, graph_height)
+            histogram.setMaximumSize(graph_width, graph_height)
+            row = 2 * n_plots
+            layout.addWidget(histogram, row, 0, 1, 3)
+            layout.addWidget(label, row+1, 0, 1, 1)
+            layout.addWidget(controls, row+1, 1, 1, 2)
 
-            lyt = self.ui.cellDetectionThresholdsLayout
-            group_box = lyt.parent()
-            # widgets = [lyt.itemAt(i).widget() for i in range(lyt.count())]
-            page = group_box.parent()
-            # heights = [lyt.itemAt(i).widget().height() for i in range(lyt.count())]
-            container = page.parent().parent()
-            container.setMinimumHeight(container.parent().height() - container.height()
-                                       + group_box.height())
+            container = layout.parent().parent().parent().parent()
+            container.setMinimumHeight(container.parent().height() - container.height() + layout.parent().height())
+        # else:
+        #     layout.  # update widget
+        return histogram
 
-    def create_cell_detection_tuning_sample(self):
-        """
-        Create an array from a subset of the sample to perform tests on
-        Returns
-        -------
+    def create_cell_detection_tuning_sample(self, channel):
+        """Create an array from a subset of the sample to perform tests on """
+        detector = self.cell_detectors[channel]
+        self.wrap_step('Creating tuning sample', detector.create_test_dataset,
+                       step_kw_args={'slicing': self.params[channel].slicing}, nested=False)
 
-        """
-        self.wrap_step('Creating tuning sample', self.cell_detector.create_test_dataset,
-                       step_kw_args={'slicing': self.params.slicing}, nested=False)
-
-    def run_tuning_cell_detection(self):
+    def run_tuning_cell_detection(self, channel):
         """
         Run the cell detection on a subset of the sample which was previously selected
-
-        Returns
-        -------
-
         """
-        self.wrap_step('Cell detection preview', self.cell_detector.run_cell_detection,
+        detector = self.cell_detectors[channel]
+        self.wrap_step('Cell detection preview', detector.run_cell_detection,
                        step_kw_args={'tuning': True})
-        if self.cell_detector.stopped:
+        if detector.stopped:
             return
-        with self.cell_detector.workspace.tmp_debug:
-            self.plot_detection_results()
+        with detector.workspace.tmp_debug:
+            self.plot_detection_results(channel)
 
-    def detect_cells(self):  # TODO: merge w/ above w/ tuning option
-        """
-        Run the cell detection on the whole sample
-
-        Returns
-        -------
-
-        """
-        self.wrap_step('Detecting cells', self.cell_detector.run_cell_detection,
-                       step_kw_args={'tuning': False, 'save_shape': self.params.save_shape},  # FIXME: seems to crash
-                       abort_func=self.cell_detector.stop_process)
-        if self.cell_detector.stopped:
+    def detect_cells(self, channel):  # TODO: merge w/ above w/ tuning option
+        """Run the cell detection on the whole sample"""
+        detector = self.cell_detectors[channel]
+        self.wrap_step('Detecting cells', detector.run_cell_detection,
+                       step_kw_args={'tuning': False, 'save_shape': self.params[channel].save_shape},  # FIXME: seems to crash
+                       abort_func=detector.stop_process)
+        if detector.stopped:
             return
-        self.update_cell_number()
+        self.update_cell_number(channel)
 
-    def update_cell_number(self):  # FIXME: try except or check that cells and cells filtered exist
+    def update_cell_number(self, channel):
         """
         Update the cell count number displayed based on the size of the raw and filtered cell detection files
-        Returns
-        -------
-
         """
-        self.ui.nDetectedCellsLabel.setText(
-            format_long_nb_to_str(self.cell_detector.get_n_detected_cells()))
-        self.ui.nDetectedCellsAfterFilterLabel.setText(
-            format_long_nb_to_str(self.cell_detector.get_n_filtered_cells()))
+        detector = self.cell_detectors[channel]
+        params = self.params[channel]
+        params.n_detected_cells = format_long_nb(detector.get_n_detected_cells())
+        params.n_filtered_cells = format_long_nb(detector.get_n_filtered_cells())
 
     # def reset_detected(self):
     #     self.cell_detector.detected = False
 
-    def plot_detection_results(self):  # FIXME: check only steps
+    def plot_detection_results(self, channel):  # FIXME: check only steps
         """
         Display the different steps of the cell detection in a grid to evaluate the filters
-
-        Returns
-        -------
-
         """
-        self.main_window.clear_plots()
-        if not self.step_exists('cell detection', [self.preprocessor.filename('stitched')]):
-            return
-        dvs = self.cell_detector.preview_cell_detection(parent=self.main_window.centralWidget(),
-                                                        arrange=False, sync=True)  # TODO: add close
+        dvs = self.wrap_plot(self.cell_detectors[channel].preview_cell_detection,
+                             parent=self.main_window.centralWidget(), arrange=False, sync=True)
         if len(dvs) == 1:
             self.main_window.print_warning_msg('Preview not run, '
-                                               'will only display stitched image for memory space reasons')
+                                               'will only display stitched image for memory usage reasons')
         else:
             link_dataviewers_cursors(dvs)
-        self.main_window.setup_plots(dvs)
 
-    def plot_cell_filter_results(self):
+    def plot_cell_filter_results(self, channel):
         """
         Plot the cells as colored dots on top of the raw image fraction used for tests
-        Returns
-        -------
-
         """
-        self.main_window.clear_plots()
-        if not self.step_exists('cell filtering', [self.preprocessor.filename('stitched'),
-                                                   self.preprocessor.filename('cells', postfix='filtered')]):
-            return
-        dvs = self.cell_detector.plot_filtered_cells(smarties=True)
-        self.main_window.setup_plots(dvs)
+        self.wrap_plot(self.cell_detectors[channel].plot_filtered_cells, smarties=True)
 
-    def plot_cells_scatter_w_atlas_colors(self):
+    def plot_labeled_cells_scatter(self, channel, raw=False):
         """
-        Plot the cells as colored symbols on top of the resampled (aligned) image
-        Returns
-        -------
-
+        Plot the cells as colored symbols on top of either the raw stitched (not aligned) image
+        or the resampled (aligned) image
         """
-        self.main_window.clear_plots()
-        if self.preprocessor.was_registered:
-            required_paths = [self.preprocessor.reference_file_path]
-        else:
-            required_paths = [self.preprocessor.filename('resampled')]
-        required_paths.append(self.cell_detector.df_path)
-        if not self.step_exists('cell count', required_paths):
-            return
-        dvs = self.cell_detector.plot_cells_3d_scatter_w_atlas_colors(parent=self.main_window)  # FIXME: add progress
-        self.main_window.setup_plots(dvs)
+        self.wrap_plot(self.cell_detectors[channel].plot_cells_3d_scatter_w_atlas_colors, raw=raw)
 
-    def plot_cells_scatter_w_atlas_colors_raw(self):
-        """
-        Plot the cells as colored symbols on top of the raw stitched (not aligned) image
-        Returns
-        -------
+    def __filter_cells(self, channel, is_last_step=True):
+        if self.sample_manager.get('cells', postfix='raw').exists:
+            detector = self.cell_detectors[channel]
+            self.wrap_step('Filtering cells', detector.filter_cells, n_steps=2 + (1 - is_last_step),
+                           abort_func=detector.stop_process, close_when_done=False)
+            self.wrap_step('Voxelizing', detector.voxelize, step_args=['filtered'], save_cfg=False,
+                           close_when_done=is_last_step)  # , main_thread=True)
+        self.plot_cell_filter_results(channel)
 
-        """
-        self.main_window.clear_plots()
-        if not self.step_exists('cell count', [self.preprocessor.filename('stitched'),
-                                               self.cell_detector.df_path]):
-            return
-        dvs = self.cell_detector.plot_cells_3d_scatter_w_atlas_colors(raw=True, parent=self.main_window)
-        self.main_window.setup_plots(dvs)
+    def preview_cell_filter(self, channel):  # FIXME: circular calls TEST
+        with self.cell_detectors[channel].workspace.tmp_debug:
+            self.__filter_cells(channel)
 
-    def __filter_cells(self, is_last_step=True):
-        raw_cells_path = self.preprocessor.filename('cells', postfix='raw')
-        if os.path.exists(raw_cells_path):
-            self.wrap_step('Filtering cells', self.cell_detector.filter_cells, n_steps=2+(1 - is_last_step),
-                           abort_func=self.cell_detector.stop_process, close_when_done=False)
-            self.wrap_step('Voxelizing', self.cell_detector.voxelize, step_args=['filtered'], save_cfg=False,
-                           close_when_done=is_last_step)#, main_thread=True)
-        self.plot_cell_filter_results()
-
-    def preview_cell_filter(self):  # FIXME: circular calls TEST
-        with self.cell_detector.workspace.tmp_debug:
-            self.__filter_cells()
-
-    def filter_cells(self):
-        self.__filter_cells(is_last_step=False)
-        self.wrap_step('Aligning', self.cell_detector.atlas_align, abort_func=self.cell_detector.stop_process,
-                       save_cfg=False)
-        self.cell_detector.export_collapsed_stats()
+    def filter_cells(self, channel):
+        self.__filter_cells(channel, is_last_step=False)
+        detector = self.cell_detectors[channel]
+        self.wrap_step('Aligning', detector.atlas_align, abort_func=detector.stop_process, save_cfg=False)
+        detector.export_collapsed_stats()
 
     def run_cell_map(self):
-        """
-        Run the whole pipeline at once
-        Returns
-        -------
-
-        """
+        """Run the whole pipeline at once"""
         self.params.ui_to_cfg()
-        self.update_cell_number()
-        if self.params.detect_cells:
-            self.detect_cells()
-            self.update_cell_number()
-        if self.params.filter_cells:
-            self.cell_detector.post_process_cells()  # FIXME: save cfg and use progress
-            self.update_cell_number()
-        if self.params.voxelize:
-            self.voxelize()
-        if self.params.plot_when_finished:
-            self.plot_cell_map_results()
+        for channel in self.params.channels_to_detect:
+            self.run_channel(channel)
+
+    def run_channel(self, channel):
+        """Run the whole pipeline at once for a single channel"""
+        # FIXME: check if ui_to_cfg is needed
+        self.update_cell_number(channel)
+        params = self.params[channel]
+        if params.detect_cells:
+            self.detect_cells(channel)
+            self.update_cell_number(channel)
+        if params.filter_cells:
+            self.cell_detectors[channel].post_process_cells()  # FIXME: save cfg and use progress
+            self.update_cell_number(channel)
+        if params.voxelize:
+            self.voxelize(channel)
+        if params.plot_when_finished:
+            self.plot_cell_map_results(channel)
         # WARNING: some plots in .post_process_cells() without UI params
 
-    def plot_cell_map_results(self):
-        """
-        Plot the voxelisation (density map) result
-        Returns
-        -------
-
-        """
-        self.main_window.clear_plots()
-        if not self.step_exists('voxelization', [self.preprocessor.filename('density', postfix='counts')]):
-            return
-        dvs = self.cell_detector.plot_voxelized_counts(arrange=False)
-        self.main_window.setup_plots(dvs)
+    def plot_cell_map_results(self, channel):
+        """Plot the voxelization (density map) result"""
+        self.wrap_plot(self.cell_detectors[channel].plot_voxelized_counts, arrange=False)
 
 
 class VasculatureTab(PostProcessingTab):
     """
     The tab responsible for the vasculature tracts detection, graph extraction and analysis
     """
-    def __init__(self, main_window, tab_idx=3):
-        super().__init__(main_window, 'Vasculature', tab_idx, 'vasculature_tab')
+    def __init__(self, main_window, tab_idx, sample_manager=None):
+        super().__init__(main_window, 'vasculature_tab', tab_idx)
 
-        self.params = None
-        self.preprocessor = None
+        self.sample_manager = sample_manager
+        self.aligner = None  # Will be configured by self.set_pre_processors
 
         self.binary_vessel_processor = None
         self.vessel_graph_processor = None
 
-    def set_params(self, sample_params, alignment_params):
+    def _bind(self):
         """
-        Set the params object which links the UI and the configuration file
-        Parameters
-        ----------
-        sample_params : SampleParameters
-            The params object that links the UI to the config for all the properties intrinsic to the sample
-        alignment_params: AlignmentParams
-            The params object that links the UI to the config for things related to sample alignment
-
-        Returns
-        -------
-        """
-        self.params = VesselParams(self.ui, sample_params, alignment_params, self.main_window.src_folder)
-
-    def setup_preproc(self, pre_processor):
-        """
-        Associate the preprocessor to the current tab
-
-        Parameters
-        ----------
-        pre_processor : PreProcessor
-
-        Returns
-        -------
-
-        """
-        self.preprocessor = pre_processor
-
-    def setup_workers(self):
-        """
-         Setup the BinaryVesselProcessor and VesselGraphProcessor workers,
-          which handle the computations associated with this tab
-
-         Returns
-         -------
-
-         """
-        if self.preprocessor.workspace is not None:
-            self.params.ui_to_cfg()
-            self.binary_vessel_processor = BinaryVesselProcessor(self.preprocessor)
-            self.vessel_graph_processor = VesselGraphProcessor(self.preprocessor)
-        else:
-            self.main_window.print_warning_msg('Workspace not initialised')
-
-    def setup_vessel_processors(self):
-        """
-        Post configuration of the BinaryVesselProcessor and VesselGraphProcessor objects  # FIXME: check redundancy with above
-
-        Returns
-        -------
-
-        """
-        if self.preprocessor.workspace is not None:  # Inited
-            if self.binary_vessel_processor.preprocessor is None:
-                self.params.ui_to_cfg()
-                self.binary_vessel_processor.setup(self.preprocessor)
-            if self.vessel_graph_processor.preprocessor is None:
-                self.params.ui_to_cfg()
-                self.vessel_graph_processor.setup(self.preprocessor)
-
-    def setup(self):
-        """
-        Setup the UI elements, notably the signal/slot connections which are not
+        Bind the signal/slots of the UI elements which are not
         automatically set through the params object attribute
-
-        Returns
-        -------
-
         """
-        self.init_ui()
-
         # ######################################## BINARIZATION ##############################
-        self.connect_whats_this(self.ui.binarizationRawClippingRangeInfoToolButton, self.ui.binarizationRawClippingRangeLbl)
-        self.connect_whats_this(self.ui.binarizationRawThresholdInfoToolButton, self.ui.binarizationRawThresholdLbl)
-        self.connect_whats_this(self.ui.binarizationRawDeepFillingInfoToolButton, self.ui.binarizationRawDeepFillingCheckBox)
-        self.ui.binarizeVesselsPushButton.clicked.connect(functools.partial(self.binarize_channel, channel='raw'))
-        self.connect_whats_this(self.ui.binarizationArteriesClippingRangeInfoToolButton, self.ui.binarizationArteriesClippingRangeLbl)
-        self.connect_whats_this(self.ui.binarizationArteriesThresholdInfoToolButton, self.ui.binarizationArteriesThresholdLbl)
-        self.connect_whats_this(self.ui.binarizationArteriesDeepFillingInfoToolButton, self.ui.binarizationArteriesDeepFillingCheckBox)
-        self.ui.binarizeArteriesPushButton.clicked.connect(functools.partial(self.binarize_channel, channel='arteries'))
+        # WARNING: some buttons need channels so setup when processor is defined
         self.ui.binarizationCombinePushButton.clicked.connect(self.combine)
 
         self.ui.binarizationPlotSideBySidePushButton.clicked.connect(
@@ -1204,22 +999,12 @@ class VasculatureTab(PostProcessingTab):
         self.ui.buildGraphSelectAllCheckBox.stateChanged.connect(self.__select_all_graph_steps)
         self.ui.buildGraphPushButton.clicked.connect(self.build_graph)
         self.ui.unloadGraphsPushButton.clicked.connect(self.unload_temporary_graphs)
-        self.connect_whats_this(self.ui.buildGraphPushButtonInfoToolButton, self.ui.buildGraphPushButton)
 
-        self.connect_whats_this(self.ui.maxArteriesTracingIterationsInfoToolButton, self.ui.maxArteriesTracingIterationsLbl)  # FIXME: try to automatise
-        self.connect_whats_this(self.ui.minArterySizeInfoToolButton, self.ui.minArterySizeLbl)
-        self.connect_whats_this(self.ui.veinIntensityRangeOnArteriesChannelInfoToolButton, self.ui.veinIntensityRangeOnArteriesChannelLbl)
-        self.connect_whats_this(self.ui.restrictiveMinVeinRadiusInfoToolButton, self.ui.restrictiveMinVeinRadiusLbl)
-        self.connect_whats_this(self.ui.permissiveMinVeinRadiusInfoToolButton, self.ui.permissiveMinVeinRadiusLbl)
-        self.connect_whats_this(self.ui.finalMinVeinRadiusInfoToolButton, self.ui.finalMinVeinRadiusLbl)
-        self.connect_whats_this(self.ui.maxVeinsTracingIterationsInfoToolButton, self.ui.maxVeinsTracingIterationsLbl)
-        self.connect_whats_this(self.ui.minVeinSizeInfoToolButton, self.ui.minVeinSizeLbl)
         self.ui.postProcessVesselTypesPushButton.clicked.connect(self.post_process_graph)
 
         # ######################################## DISPLAY ##############################
         # slicer
         self.ui.graphSlicerButtonBox.connectOpen(self.plot_graph_type_processing_chunk_slicer)
-        self.connect_whats_this(self.ui.graphSlicerGroupBoxInfoToolButton, self.ui.graphSlicerGroupBox)
 
         self.ui.plotGraphPickRegionPushButton.clicked.connect(self.pick_region)
         self.ui.plotGraphChunkPushButton.clicked.connect(self.display_graph_chunk_from_cfg)
@@ -1231,35 +1016,56 @@ class VasculatureTab(PostProcessingTab):
 
         self.ui.saveStatsPushButton.clicked.connect(self.save_stats)
 
+    def _set_params(self):
+        # REFACTORING: accessing main_window is not the most elegant way
+        self.params = VesselParams(self.ui, self.sample_params, None,
+                                   self.main_window.tab_managers['registration'].params)
+
+    def setup_workers(self):
+        """
+         Setup the BinaryVesselProcessor and VesselGraphProcessor workers,
+         which handle the computations associated with this tab
+         """
+        if self.sample_manager.workspace is not None:
+            self.params.ui_to_cfg()
+            self.binary_vessel_processor = BinaryVesselProcessor(self.sample_manager)
+            self.vessel_graph_processor = VesselGraphProcessor(self.sample_manager, self.aligner)
+        else:
+            self.main_window.print_warning_msg('Workspace not initialised')
+
+    def finalise_workers_setup(self):  # When tab clicked  # FIXME: trigger with signal from self.sample_manager
+        """
+        Post configuration of the BinaryVesselProcessor and VesselGraphProcessor objects.
+        Typically called when the tab is clicked
+        """
+        if self.sample_manager.setup_complete:
+            self.params.ui_to_cfg()
+            self.binary_vessel_processor.setup(self.sample_manager)
+            self.vessel_graph_processor.setup(self.sample_manager, self.aligner)
+
+            unique_connect(self.ui.binarizeVesselsPushButton.clicked,
+                           functools.partial(self.binarize_channel, channel=self.binary_vessel_processor.all_vessels_channel))
+
+            unique_connect(self.ui.binarizeArteriesPushButton.clicked,
+                           functools.partial(self.binarize_channel, channel=self.binary_vessel_processor.arteries_channel))
+
     def unload_temporary_graphs(self):
-        """
-        Unload the temporary vasculature graph objects to free up RAM
-        """
+        """Unload the temporary vasculature graph objects to free up RAM"""
         self.vessel_graph_processor.unload_temporary_graphs()
 
-    def set_progress_watcher(self, watcher):
+    def set_progress_watcher(self, watcher):  # FIXME: for worker in self.workers.values():
         """
         Setup the watcher object that will handle the progress in the computation for this tab
 
         Parameters
         ----------
-        watcher : ProgressWatcher
+        watcher: ProgressWatcher
             The object that tracks the progress
-
-        Returns
-        -------
-
         """
-        if self.binary_vessel_processor is not None and self.binary_vessel_processor.preprocessor is not None:
+        if self.binary_vessel_processor is not None and self.binary_vessel_processor.sample_manager is not None:
             self.binary_vessel_processor.set_progress_watcher(watcher)
-        if self.vessel_graph_processor is not None and self.vessel_graph_processor.preprocessor is not None:
+        if self.vessel_graph_processor is not None and self.vessel_graph_processor.sample_manager is not None:
             self.vessel_graph_processor.set_progress_watcher(watcher)
-
-    def __select_all_graph_steps(self, state):
-        for chk_bx in (self.ui.buildGraphSkeletonizeCheckBox, self.ui.buildGraphBuildCheckBox,
-                       self.ui.buildGraphCleanCheckBox, self.ui.buildGraphReduceCheckBox,
-                       self.ui.buildGraphTransformCheckBox, self.ui.buildGraphRegisterCheckBox):
-            chk_bx.setCheckState(state)  # TODO: check that not tristate
 
     # ####################### BINARY  #######################
 
@@ -1269,12 +1075,10 @@ class VasculatureTab(PostProcessingTab):
 
         Parameters
         ----------
-        channel
-        stop_on_error
-
-        Returns
-        -------
-
+        channel: str
+            The name of the channel to binarize.
+        stop_on_error: bool
+            Whether to stop the process if an error occurs.
         """
         # FIXME: n_steps = self.params.binarization_params.n_steps
         try:
@@ -1292,16 +1096,10 @@ class VasculatureTab(PostProcessingTab):
                 raise err
 
     def combine(self):
-        """
-        Combine the binarized (thresholded) version of the different channels.
-        Returns
-        -------
-
-        """
+        """Combine the binarized (thresholded) version of the different channels."""
         self.wrap_step('Combining channels', self.binary_vessel_processor.combine_binary,
                        abort_func=self.binary_vessel_processor.stop_process)
 
-    # FIXME: channel
     def plot_binarization_results(self, plot_side_by_side=True):
         """
         Plot the thresholded images resulting from the binarization at the steps specified
@@ -1309,45 +1107,27 @@ class VasculatureTab(PostProcessingTab):
 
         Parameters
         ----------
-        plot_side_by_side
-
-        Returns
-        -------
-
+        plot_side_by_side: bool
+            Whether to plot the images side by side (True) or overlay them (False).
         """
-        self.main_window.clear_plots()
-        binarization_params = self.params.binarization_params
-        steps = (binarization_params.plot_step_1,
-                 binarization_params.plot_step_2)
-        channels = (binarization_params.plot_channel_1,
-                    binarization_params.plot_channel_2)
-        channels = [c.replace('all vessels', 'raw') for c in channels]
-        channels = [c for s, c in zip(steps, channels) if s is not None]
-        steps = [s for s in steps if s is not None]
-        files = [self.binary_vessel_processor.steps[c].path_from_step_name(s) for s, c in zip(steps, channels)]
-        for f in files:
-            if not os.path.exists(f):
-                self.main_window.popup(f'Missing file {f}')
-                return
-
-        dvs = self.binary_vessel_processor.plot_results(steps, channels=channels,
-                                                        side_by_side=plot_side_by_side,
-                                                        arrange=False, parent=self.main_window)
-        self.main_window.setup_plots(dvs, steps)
+        steps, channels = self.params.binarization_params.get_selected_steps_and_channels()
+        self.wrap_plot(self.binary_vessel_processor.plot_results,
+                       steps, channels=channels, side_by_side=plot_side_by_side,
+                       arrange=False, parent=self.main_window)
 
     # ###########################  GRAPH  #############################
 
+    def __select_all_graph_steps(self, state):
+        for chk_bx in (self.ui.buildGraphSkeletonizeCheckBox, self.ui.buildGraphBuildCheckBox,
+                       self.ui.buildGraphCleanCheckBox, self.ui.buildGraphReduceCheckBox,
+                       self.ui.buildGraphTransformCheckBox, self.ui.buildGraphRegisterCheckBox):
+            chk_bx.setCheckState(state)  # TODO: check that not tristate
+
     def run_all(self):
-        """
-        Run the whole vasculature pipeline at once
-
-        Returns
-        -------
-
-        """
+        """Run the whole vasculature pipeline at once"""
         try:
-            self.binarize_channel('raw', stop_on_error=True)
-            self.binarize_channel('arteries', stop_on_error=True)
+            self.binarize_channel(self.binary_vessel_processor.all_vessels_channel, stop_on_error=True)
+            self.binarize_channel(self.binary_vessel_processor.arteries_channel, stop_on_error=True)
         except ClearMapVRamException:
             return
         self.combine()
@@ -1356,36 +1136,24 @@ class VasculatureTab(PostProcessingTab):
         self.voxelize()
 
     def build_graph(self):
-        """
-        Run the pipeline to build the vasculature graph
-        Returns
-        -------
-
-        """
+        """Run the pipeline to build the vasculature graph"""
         # FIXME: n_steps = 4
-        self.wrap_step('Building vessel graph', self.vessel_graph_processor.skeletonize_and_build_graph,
+        tile = 'Building vessel graph'
+        self.wrap_step(tile, self.vessel_graph_processor.skeletonize_and_build_graph,
                        abort_func=self.vessel_graph_processor.stop_process, main_thread=True)
-        self.wrap_step('Building vessel graph', self.vessel_graph_processor.clean_graph,
+        self.wrap_step(tile, self.vessel_graph_processor.clean_graph,
                        abort_func=self.vessel_graph_processor.stop_process)
-        self.wrap_step('Building vessel graph', self.vessel_graph_processor.reduce_graph,
+        self.wrap_step(tile, self.vessel_graph_processor.reduce_graph,
                        abort_func=self.vessel_graph_processor.stop_process)
-        self.wrap_step('Building vessel graph', self.vessel_graph_processor.register,
+        self.wrap_step(tile, self.vessel_graph_processor.register,
                        abort_func=self.vessel_graph_processor.stop_process)
 
     def plot_graph_type_processing_chunk_slicer(self):  # Refactor: rename
         """
-        Plot the orthoslicer to pick a sub part of the graph to display because
+        Plot the ortho-slicer to pick a sub part of the graph to display because
         depending on the display options, the whole graph may not fit in memory
-
-        Returns
-        -------
-
         """
         self.plot_slicer('graphConstructionSlicer', self.ui, self.params.visualization_params)
-
-    def __get_tube_map_slicing(self):
-        self.params.visualization_params.ui_to_cfg()  # Fix for lack of binding between 2 sets of range interfaces
-        return self.params.visualization_params.slicing
 
     def display_graph_chunk(self, graph_step):
         """
@@ -1395,20 +1163,11 @@ class VasculatureTab(PostProcessingTab):
         ----------
         graph_step : str
             The name of the step to display (from 'raw', 'cleaned', 'reduced', 'annotated')
-
-        Returns
-        -------
-
         """
-        self.main_window.clear_plots()
-        slicing = self.__get_tube_map_slicing()
-        try:
-            dvs = self.vessel_graph_processor.visualize_graph_annotations(slicing, plot_type='mesh',
-                                                                          graph_step=graph_step, show=False)
-        except PlotGraphError as err:
-            self.main_window.popup(str(err), base_msg='PlotGraphError')
-            return
-        self.main_window.setup_plots(dvs)
+        self.params.visualization_params.ui_to_cfg()  # Fix for lack of binding between 2 sets of range interfaces
+        dvs = self.wrap_plot(self.vessel_graph_processor.visualize_graph_annotations,
+                             self.params.visualization_params.slicing,
+                             plot_type='mesh', graph_step=graph_step, show=False)
         self.main_window.perf_monitor.stop()
 
     def display_graph_chunk_from_cfg(self):  # REFACTOR: split ?
@@ -1418,59 +1177,37 @@ class VasculatureTab(PostProcessingTab):
         """
         Plot a subregion of the vasculature graph corresponding to a structure
         using the atlas registration results
-        Returns
-        -------
-
         """
         structure_id = self.params.visualization_params.structure_id
         if structure_id is not None:
-            self._plot_graph_structure(structure_id, annotation.find(structure_id, key='id')['rgb'])
+            annotator = self.aligner.annotators['atlas']  # TODO: check but atlas should be OK to just do lookup
+            color = annotator.find(structure_id, key='id')['rgb']
+            self._plot_graph_structure(structure_id, color)
         else:
             print('No structure ID')
         self.main_window.structure_selector.close()
 
     def post_process_graph(self):
-        """
-        Post process the graph by filtering, tracing and removing capillaries
-        Returns
-        -------
-
-        """
+        """Post process the graph by filtering, tracing and removing capillaries """
         self.wrap_step('Post processing vasculature graph', self.vessel_graph_processor.post_process,
                        abort_func=self.vessel_graph_processor.stop_process)  # FIXME: n_steps = 8
 
     def pick_region(self):
-        """
-        Open a dialog to select a brain region and plot it
-        Returns
-        -------
-
-        """
-        self.main_window.structure_selector.structure_selected.connect(
-            self.params.visualization_params.set_structure_id)
-        self.main_window.structure_selector.onAccepted(self.plot_graph_structure)
-        self.main_window.structure_selector.onRejected(self.main_window.structure_selector.close)
-        self.main_window.structure_selector.show()
+        """Open a dialog to select a brain region and plot it """
+        picker = self.main_window.structure_selector
+        picker.structure_selected.connect(self.params.visualization_params.set_structure_id)
+        picker.onAccepted(self.plot_graph_structure)
+        picker.onRejected(picker.close)
+        picker.show()
 
     def _plot_graph_structure(self, structure_id, structure_color):
-        self.main_window.clear_plots()
-        try:
-            dvs = self.vessel_graph_processor.plot_graph_structure(structure_id,
-                                                                   self.params.visualization_params.plot_type)
-        except PlotGraphError as err:
-            self.main_window.popup(str(err), base_msg='PlotGraphError')
-            return
+        dvs = self.wrap_plot(self.vessel_graph_processor.plot_graph_structure,
+                       structure_id, self.params.visualization_params.plot_type)
         if dvs:
-            self.main_window.setup_plots(dvs)
             self.main_window.perf_monitor.stop()
 
     def voxelize(self):
-        """
-        Run the voxelisation (density map) on the vasculature graph
-        Returns
-        -------
-
-        """
+        """Run the voxelization (density map) on the vasculature graph """
         voxelization_params = {
             'weight_by_radius': self.params.visualization_params.weight_by_radius,
             'vertex_degrees': self.params.visualization_params.vertex_degrees
@@ -1479,23 +1216,11 @@ class VasculatureTab(PostProcessingTab):
                        step_kw_args=voxelization_params)#, main_thread=True)
 
     def plot_voxelization(self):
-        """
-        Plot the density map
-        Returns
-        -------
-
-        """
-        self.main_window.clear_plots()
-        dvs = self.vessel_graph_processor.plot_voxelization(self.main_window.centralWidget())
-        self.main_window.setup_plots(dvs)
+        """Plot the density map """
+        self.wrap_plot(self.vessel_graph_processor.plot_voxelization, self.main_window.centralWidget())
 
     def save_stats(self):
-        """
-        Save the stats of the graph
-        Returns
-        -------
-
-        """
+        """Save the stats of the graph to a feather file"""
         self.wrap_step('Saving stats', self.vessel_graph_processor.write_vertex_table)
 
 
@@ -1503,40 +1228,41 @@ class VasculatureTab(PostProcessingTab):
 
 class GroupAnalysisProcessor:
     def __init__(self, progress_watcher, results_folder=None):
-        self.results_folder = results_folder
+        self.results_folder = Path(results_folder) if results_folder is not None else None
         self.progress_watcher = progress_watcher
+        self.annotator = None  # FIXME:
 
     def plot_p_vals(self, selected_comparisons, groups, parent=None):
         p_vals_imgs = []
         for pair in selected_comparisons:  # TODO: Move to processor object to be wrapped
             gp1_name, gp2_name = pair
             # Reread because of cm_io orientation
-            p_val_path = os.path.join(self.results_folder, f'p_val_colors_{gp1_name}_{gp2_name}.tif')
+            p_val_path = self.results_folder / f'p_val_colors_{gp1_name}_{gp2_name}.tif'
 
-            p_vals_imgs.append(clearmap_io.read(p_val_path))
-        pre_proc = init_preprocessor(os.path.join(self.results_folder, groups[selected_comparisons[0][0]][0]))
-        atlas = clearmap_io.read(pre_proc.annotation_file_path)
+            p_vals_imgs.append(clm_io.read(p_val_path))
+        pre_proc = init_preprocessor(self.results_folder / groups[selected_comparisons[0][0]][0])
+        atlas = clm_io.read(pre_proc.annotation_file_path)
         if len(p_vals_imgs) == 1:
             gp1_name, gp2_name = selected_comparisons[0]
-            gp1_avg = clearmap_io.read(os.path.join(self.results_folder, f'avg_density_{gp1_name}.tif'))
-            gp1_sd_path = os.path.join(self.results_folder, f'sd_density_{gp1_name}.tif')
-            gp2_avg = clearmap_io.read(os.path.join(self.results_folder, f'avg_density_{gp2_name}.tif'))
-            gp2_sd_path = os.path.join(self.results_folder, f'sd_density_{gp2_name}.tif')
-            colored_atlas = create_color_annotation(pre_proc.annotation_file_path)
+            gp1_avg = clm_io.read(self.results_folder / f'avg_density_{gp1_name}.tif')
+            gp1_sd_path = self.results_folder / f'sd_density_{gp1_name}.tif'
+            gp2_avg = clm_io.read(self.results_folder / f'avg_density_{gp2_name}.tif')
+            gp2_sd_path = self.results_folder / f'sd_density_{gp2_name}.tif'
+            colored_atlas = pre_proc.annotators[channel].create_color_annotation()
             gp1_imgs = gp1_avg
-            if os.path.exists(gp1_sd_path):
-                gp1_sd = clearmap_io.read(gp1_sd_path)
+            if gp1_sd_path.exists():
+                gp1_sd = clm_io.read(gp1_sd_path)
                 gp1_imgs = [gp1_avg, gp1_sd]
             gp2_imgs = gp2_avg
-            if os.path.exists(gp2_sd_path):
-                gp2_sd = clearmap_io.read(gp2_sd_path)
+            if gp2_sd_path.exists():
+                gp2_sd = clm_io.read(gp2_sd_path)
                 gp2_imgs = [gp2_avg, gp2_sd]
             stats_imgs = p_vals_imgs[0]
             stats_title = 'P values'
             stats_luts = None
-            effect_size_path = os.path.join(self.results_folder, f'effect_size_{gp1_name}_{gp2_name}.tif')
-            if os.path.exists(effect_size_path):
-                stats_imgs = [stats_imgs, clearmap_io.read(effect_size_path)]
+            effect_size_path = self.results_folder / f'effect_size_{gp1_name}_{gp2_name}.tif'
+            if effect_size_path.exists():
+                stats_imgs = [stats_imgs, clm_io.read(effect_size_path)]
                 stats_title += ' and effect size'
                 stats_luts = [None, 'flame']
             images = [gp1_imgs, gp2_imgs, stats_imgs, colored_atlas]
@@ -1551,7 +1277,7 @@ class GroupAnalysisProcessor:
         dvs = plot_3d.plot(images, title=titles, arrange=False, sync=True,
                            lut=luts, min_max=min_maxes,
                            parent=parent)
-        names_map = annotation.get_names_map()
+        names_map = self.annotator.get_names_map()
         for dv in dvs:
             dv.atlas = atlas
             dv.structure_names = names_map
@@ -1578,7 +1304,7 @@ class GroupAnalysisProcessor:
             gp1_name, gp2_name = pair
             if 'group_names' in plot_kw_args.keys() and plot_kw_args['group_names'] is None:
                 plot_kw_args['group_names'] = pair
-            stats_df_path = os.path.join(self.results_folder, f'statistics_{gp1_name}_{gp2_name}.csv')
+            stats_df_path = self.results_folder / f'statistics_{gp1_name}_{gp2_name}.csv'
             fig = plot_function(pd.read_csv(stats_df_path), **plot_kw_args)
             browser = QWebEngineView()
             browser.setHtml(mpld3.fig_to_html(fig))  # WARNING: won't work if external objects. Then
@@ -1601,72 +1327,20 @@ class GroupAnalysisProcessor:
         return dvs
 
 
-class BatchTab(GenericTab):
-    @property
-    def initialised(self):
-        return self.params is not None
-
-    def setup(self):
-        self.init_ui()
-
-        self.ui.resultsFolderPushButton.clicked.connect(self.setup_results_folder)
-
-        self.ui.folderPickerHelperPushButton.clicked.connect(self.create_wizard)
-        self.connect_whats_this(self.ui.folderPickerHelperInfoToolButton, self.ui.folderPickerHelperPushButton)
-        self.ui.batchToolBox.setCurrentIndex(0)
-
-    def setup_results_folder(self):
-        results_folder = get_directory_dlg(self.main_window.preference_editor.params.start_folder,
-                                           'Select the folder where results will be written')
-        self.config_loader = ConfigLoader(results_folder)
-        cfg_path = self.config_loader.get_cfg_path('batch', must_exist=False)
-        if not os.path.exists(cfg_path):
-            try:
-                default_cfg_file_path = self.config_loader.get_default_path('batch')
-                copyfile(default_cfg_file_path, cfg_path)
-                self.params.fix_cfg_file(cfg_path)
-            except FileNotFoundError as err:
-                self.main_window.print_error_msg(f'Could not locate file for "batch"')
-                raise err
-
-        self.main_window.logger.set_file(os.path.join(results_folder, 'info.log'))  # WARNING: set logs to global results folder
-        self.main_window.error_logger.set_file(os.path.join(results_folder, 'errors.html'))
-        self.main_window.progress_watcher.log_path = self.main_window.logger.file.name
-
-        self.params.read_configs(cfg_path)
-
-        self.load_config_to_gui()
-        self.params.results_folder = results_folder
-        self.params.ui_to_cfg()
-        self.setup_workers()
-
-    def create_wizard(self):
-        self.params.ui_to_cfg()
-        return SamplePickerDialog(self.params.results_folder, self.params)  # FIXME: check if results_folder or make both equal with self.params.src_folder
-
-
 class GroupAnalysisTab(BatchTab):
-    def __init__(self, main_window, tab_idx=4):  # REFACTOR: offload computations to BatchProcessor object
-        super().__init__(main_window, 'Group analysis', tab_idx, 'group_analysis_tab')
-
-        self.params = None
+    def __init__(self, main_window, tab_idx):
+        super().__init__(main_window, tab_idx)
         self.processor = GroupAnalysisProcessor(self.main_window.progress_watcher)
 
-        self.processing_type = 'batch'
+    def _set_params(self):
+        self.params = GroupAnalysisParams(self.ui, preferences=self.main_window.preference_editor.params)
 
-    def set_params(self):
-        self.params = GroupAnalysisParams(self.ui, src_folder='', preferences=self.main_window.preference_editor.params)
-
-    def setup(self):
+    def _bind(self):
         """
-        Setup the UI elements, notably the signal/slot connections which are not
+        Bind the signal/slots of the UI elements which are not
         automatically set through the params object attribute
-
-        Returns
-        -------
-
         """
-        super().setup()
+        super()._bind()
         self.ui.runPValsPushButton.clicked.connect(self.run_p_vals)
         self.ui.plotPValsPushButton.clicked.connect(self.plot_p_vals)
         self.ui.batchStatsPushButton.clicked.connect(self.make_group_stats_tables)
@@ -1687,9 +1361,9 @@ class GroupAnalysisTab(BatchTab):
 
     def plot_density_maps(self, group_name):
         self.params.ui_to_cfg()
-
-        self.main_window.clear_plots()
         self.main_window.print_status_msg('Plotting density maps')
+
+        self.main_window.clear_plots()  # TODO: use wrap_plot
         dvs = self.processor.plot_density_maps(self.params.groups[group_name], parent=self.main_window.centralWidget())
         self.main_window.setup_plots(dvs)
 
@@ -1728,12 +1402,12 @@ class GroupAnalysisTab(BatchTab):
         self.main_window.print_status_msg('Plotting p_val maps')
         dvs = self.processor.plot_p_vals(self.params.selected_comparisons, self.params.groups,
                                          parent=self.main_window.centralWidget())
-        self.main_window.setup_plots(dvs)
+        self.main_window.setup_plots(dvs)  # TODO: use wrap_plot
 
     def run_plots(self, plot_function, plot_kw_args):
         self.main_window.clear_plots()
         dvs = self.processor.run_plots(plot_function, self.params.selected_comparisons, plot_kw_args)
-        self.main_window.setup_plots(dvs)
+        self.main_window.setup_plots(dvs)  # TODO: use wrap_plot
 
     def plot_volcanoes(self):
         self.run_plots(plot_volcano, {'group_names': None, 'p_cutoff': 0.05, 'show': False, 'save_path': ''})
@@ -1747,28 +1421,22 @@ class GroupAnalysisTab(BatchTab):
 
 
 class BatchProcessingTab(BatchTab):
-    def __init__(self, main_window, tab_idx=4):
-        super().__init__(main_window, 'Batch', tab_idx, 'batch_processing_tab')
-
-        self.params = None
+    def __init__(self, main_window, tab_idx):
+        super().__init__(main_window, tab_idx)
         self.processor = BatchProcessor(self.main_window.progress_watcher)
 
-        self.processing_type = 'batch'
+    def _set_params(self):
+        self.params = BatchProcessingParams(self.ui, preferences=self.main_window.preference_editor.params)
 
-    def set_params(self):
-        self.params = BatchProcessingParams(self.ui, src_folder='', preferences=self.main_window.preference_editor.params)
+    def setup_workers(self):
         self.processor.params = self.params
 
-    def setup(self):
+    def _bind(self):
         """
-        Setup the UI elements, notably the signal/slot connections which are not
+        Bind the signal/slots of the UI elements which are not
         automatically set through the params object attribute
-
-        Returns
-        -------
-
         """
-        super().setup()
+        super()._bind()
         self.ui.batchRunPushButton.clicked.connect(self.run_batch_process)
 
     def run_batch_process(self):
