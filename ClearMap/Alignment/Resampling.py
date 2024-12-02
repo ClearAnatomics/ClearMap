@@ -606,8 +606,8 @@ def resample(original, resampled=None,
     if new_path is not None:
         delete_files.append(new_path)
     for step, axes, shape in zip(range(n_steps), axes_order, shape_order):
-        if step == n_steps - 1 and orientation is None:
-            resampled_data = io.initialize(source=resampled, shape=resampled_shape, dtype=dtype, as_source=True)
+        if step == n_steps - 1 and orientation is None:  # Create final resampled file for last step
+            resampled_data = io.initialize(resampled, shape=resampled_shape, dtype=dtype, as_source=True)
         else:
             if method == 'shared':
                 resampled_data = io.sma.create(shape, dtype=dtype, order=order, as_source=True)
