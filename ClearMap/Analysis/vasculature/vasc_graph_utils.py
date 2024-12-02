@@ -68,11 +68,9 @@ def edge_to_vertex_property(graph, edge_property, dtype=None):
     return vertex_property_data
 
 
-def vertex_to_edge_property(graph, graph_property):
+def vertex_to_edge_property(graph, graph_property, dtype=None, aggregation=np.logical_and):
     """
     Converts graph_property from vertex to edge property
-
-    .. warning:: This function only works for binary properties
 
     Parameters
     ----------
@@ -80,6 +78,10 @@ def vertex_to_edge_property(graph, graph_property):
         The graph to convert the property from
     graph_property : str or np.array
         The name of the vertex property to convert or the vertex property itself
+    dtype : type | str | None
+        The type to cast the property to. If None, no casting is done. If 'int', the property is cast to int
+    aggregation : function | str
+        The aggregation function to use. Can be a function or one of 'mean', 'sum', 'max', 'min'
 
     Returns
     -------
@@ -87,7 +89,28 @@ def vertex_to_edge_property(graph, graph_property):
     """
     vertex_prop = graph.vertex_property(graph_property) if isinstance(graph_property, str) else graph_property
     connectivity = graph.edge_connectivity()
-    edge_prop = np.logical_and(vertex_prop[connectivity[:, 0]], vertex_prop[connectivity[:, 1]])
+
+    if isinstance(aggregation, str):
+        if aggregation == 'mean':
+            aggregation = np.mean
+        elif aggregation == 'sum':
+            aggregation = np.sum
+        elif aggregation == 'max':
+            aggregation = np.maximum
+        elif aggregation == 'min':
+            aggregation = np.minimum
+        else:
+            raise ValueError(f'Unknown aggregation function {aggregation}')
+
+    start_vertices = vertex_prop[connectivity[:, 0]]
+    end_vertices = vertex_prop[connectivity[:, 1]]
+
+    # FIXME: if logical, we need to pass several arrays to the function
+    print(start_vertices, end_vertices)
+    edge_prop = aggregation(start_vertices, end_vertices)
+
+    if dtype is not None:
+        edge_prop = edge_prop.astype(dtype)
     return edge_prop
 
 
