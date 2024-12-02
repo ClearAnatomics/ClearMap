@@ -10,20 +10,27 @@ a python dictionary.
 """
 import inspect
 import os
+import re
+from pathlib import Path
 
 import configobj
+from packaging.version import Version
+from importlib_metadata import version
+
+clearmap_version = version('ClearMap')
+VERSION_SUFFIX = f'v{Version(clearmap_version).major}_{Version(clearmap_version).minor}'
 
 # FIXME: implement validation
 
 
-INSTALL_CFG_DIR = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))  # Where this file resides (w cfgs)
-CLEARMAP_CFG_DIR = os.path.expanduser('~/.clearmap/')
+INSTALL_CFG_DIR = Path(inspect.getfile(inspect.currentframe())).parent.absolute()  # Where this file resides (w cfgs)
+CLEARMAP_CFG_DIR = Path('~/.clearmap/').expanduser()
 
 
-def get_configobj_cfg(cfg_path):
-    cfg_path = clean_path(cfg_path)
+def get_configobj_cfg(cfg_path, must_exist=True):
+    cfg_path = clean_path(str(cfg_path))
     try:
-        return configobj.ConfigObj(cfg_path, encoding="UTF8", indent_type='    ', unrepr=True, file_error=True)
+        return configobj.ConfigObj(cfg_path, encoding="UTF8", indent_type='    ', unrepr=True, file_error=must_exist)
     except configobj.ConfigObjError as err:
         print(f'Could not read config file "{cfg_path}", some errors were encountered: "{err}"')
 
@@ -57,11 +64,14 @@ def get_json_cfg(cfg_path):
 
 
 tabs_alternatives = [
-    ['sample'],
+    ['sample', 'sample_info', 'sample info'],
     ['alignment', 'processing'],
-    ['cell_map'],
+    ['stitching'],
+    ['registration'],
+    ['cell_map', 'cell counter'],
     ['vasculature', 'tube_map'],
-    ['batch'],
+    ['batch', 'batch_processing', 'batch processing'],
+    ['group_analysis', 'group analysis']
 ]
 
 alternative_names = tabs_alternatives + [['machine'], ['display']]
@@ -84,6 +94,7 @@ def flatten_alternatives(alternatives):
 
 def is_tab_file(cfg_name):
     cfg_name = cfg_name.replace('_params', '')
+    cfg_name = ConfigLoader.strip_version_suffix(cfg_name)
     return cfg_name in flatten_alternatives(tabs_alternatives)
 
 
@@ -115,22 +126,40 @@ class ConfigLoader(object):
     default_dir = CLEARMAP_CFG_DIR
 
     def __init__(self, src_dir):
+        self._src_dir = None
         self.src_dir = src_dir
         self.sample_cfg_path = ''  # OPTIMISE: could use cached property
         self.preferences_path = ''
         self.cell_map_cfg_path = ''
 
+    @property
+    def src_dir(self):
+        return self._src_dir
+
+    @src_dir.setter
+    def src_dir(self, value):
+        self._src_dir = Path(value).expanduser()  # TODO: normpath?
+
+
+
     def get_cfg_path(self, cfg_name, must_exist=True):
         """
+        Get the path to the configuration file with the given name.
+        Several extensions are tried in order of preference.
+        If None is found, the first possible option is returned if must_exist is False or
+        a FileNotFoundError is raised if must_exist is True.
 
         Parameters
         ----------
         cfg_name: str
+            The name (without params and extension) of the configuration file
         must_exist: bool
+            Whether the file must exist. If missing and True, a FileNotFoundError is raised.
 
         Returns
         -------
-
+        Path
+            The path to the configuration file
         """
 
         variants = get_alternatives(cfg_name)
@@ -138,62 +167,71 @@ class ConfigLoader(object):
             if not alternative_name.endswith('params'):
                 alternative_name += '_params'
             for ext in self.supported_exts:
-                cfg_path = clean_path(os.path.join(self.src_dir, f'{alternative_name}{ext}'))
-                if os.path.exists(cfg_path):
+                cfg_path = self.src_dir / f'{alternative_name}{ext}'
+                if cfg_path.exists():
                     return cfg_path
         if not must_exist:  # If none found but not necessary, return the first possible option
-            return clean_path(os.path.join(self.src_dir, f'{cfg_name}_params{self.supported_exts[0]}'))
+            return self.src_dir / f'{cfg_name}_params{self.supported_exts[0]}'
         raise FileNotFoundError(f'Could not find file {cfg_name} in {self.src_dir} with variants {variants}')
 
     def get_cfg(self, cfg_name):
-        if is_tab_file(cfg_name):
-            cfg_path = self.get_cfg_path(cfg_name)
+        if '/' in str(cfg_name):  # Already a path
+            cfg_path = cfg_name
         else:
-            cfg_path = self.get_default_path(cfg_name)
+            if is_tab_file(cfg_name):
+                cfg_path = self.get_cfg_path(cfg_name)
+            else:
+                cfg_path = self.get_default_path(cfg_name)
         return self.get_cfg_from_path(cfg_path)
 
     @staticmethod
     def get_cfg_from_path(cfg_path):
-        ext = os.path.splitext(cfg_path)[-1]
-        return ConfigLoader.loader_functions[ext](cfg_path)
+        cfg_path = Path(cfg_path)
+        return ConfigLoader.loader_functions[cfg_path.suffix](cfg_path)
+
+    @staticmethod
+    def strip_version_suffix(cfg_name):
+        pattern = r'_v\d+_\d+$'
+        return re.sub(pattern, '', cfg_name)
+
 
     @staticmethod
     def get_patched_cfg_from_path(cfg_path):
-        cfg_name = os.path.splitext(os.path.basename(cfg_path))[0]
+        cfg_path = Path(cfg_path)
         cfg = ConfigLoader.get_cfg_from_path(cfg_path)
-        default_cfg = ConfigLoader.get_cfg_from_path(ConfigLoader.get_default_path(cfg_name))
+        config_name = ConfigLoader.strip_version_suffix(cfg_path.stem)
+        default_cfg = ConfigLoader.get_cfg_from_path(ConfigLoader.get_default_path(config_name))
         patch_cfg(cfg, default_cfg)
         cfg.write()
         return cfg
 
     @staticmethod
-    def get_default_path(cfg_name, must_exist=True, install_mode=False):  # FIXME: recursive w/ alternatives
+    def get_default_path(cfg_name, must_exist=True, from_package=False):  # FIXME: recursive w/ alternatives
         if cfg_name.endswith('_params'):
             cfg_name = cfg_name.replace('_params', '')
+        paths_checked = []
         for name_variant in get_alternatives(cfg_name):
-            name_variant += '_params'
+            name_variant += f'_params'
             for ext in ConfigLoader.supported_exts:
-                cfg_path = ConfigLoader._name_to_default_path(name_variant, ext, install_mode=install_mode)
+                cfg_path = ConfigLoader._name_to_default_path(f'{name_variant}_{VERSION_SUFFIX}',
+                                                              ext, from_package=from_package)
+                paths_checked.append(cfg_path)
                 if os.path.exists(cfg_path):
-                    break
-            if os.path.exists(cfg_path):  # REFACTOR: avoid duplicate w/ above
-                break
+                    return cfg_path
         else:
             if must_exist:
-                cfg_dir = INSTALL_CFG_DIR if install_mode else ConfigLoader.default_dir
-                raise FileNotFoundError(f'Could not find file {cfg_name} in {cfg_dir}')
+                raise FileNotFoundError(f'Could not find file {cfg_name}, checked {paths_checked}')
             else:  # Return first (default) ext if none found
                 return ConfigLoader._name_to_default_path(f'{cfg_name}_params', ConfigLoader.supported_exts[0],
-                                                          install_mode=install_mode)
-        return cfg_path
+                                                          from_package=from_package)
 
     @staticmethod
-    def _name_to_default_path(cfg_name, ext, install_mode=False):
+    def _name_to_default_path(cfg_name, ext, from_package=False):
         prefix = 'default_' if is_tab_file(cfg_name) else ''
         cfg_name = f'{prefix}{cfg_name}{ext}'
 
-        cfg_dir = INSTALL_CFG_DIR if install_mode else ConfigLoader.default_dir
-        cfg_path = clean_path(os.path.join(cfg_dir, cfg_name))
+        cfg_dir = INSTALL_CFG_DIR if from_package else ConfigLoader.default_dir
+        cfg_path = clean_path(cfg_dir / cfg_name)
         return cfg_path
 
 
