@@ -11,18 +11,20 @@ import os.path
 
 import inspect
 import shutil
+from pathlib import Path
 
 from ClearMap.config.config_loader import ConfigLoader, get_alternatives, CONFIG_NAMES, get_cfg_reader_function
 
-CFG_DIR = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
-CLEARMAP_DIR = os.path.dirname(os.path.dirname(CFG_DIR))  # used by shell script
+
+CFG_DIR = Path(inspect.getfile(inspect.currentframe())).resolve().parent
+CLEARMAP_DIR = str(CFG_DIR.parent.parent)  # used by shell script
 
 
 def update_default_config():
     loader = ConfigLoader(None)
     for cfg_name in CONFIG_NAMES:
-        default_cfg_path = loader.get_default_path(cfg_name, must_exist=True, install_mode=True)
-        cfg_paths = [loader.get_default_path(alternative, must_exist=False, install_mode=False)
+        default_cfg_path = loader.get_default_path(cfg_name, must_exist=True, from_package=True)
+        cfg_paths = [loader.get_default_path(alternative, must_exist=False, from_package=False)
                      for alternative in get_alternatives(cfg_name)]
         existing_paths = [os.path.exists(p) for p in cfg_paths]
         if not any(existing_paths):  # missing then copy
@@ -48,7 +50,7 @@ def merge_config(source_cfg, dest_cfg):
 
 
 def remove_extra_keys(a, b):
-    """remove keys from a if not in b"""
+    """remove keys from `a` if not in `b`"""
     for key in a:
         if key in b:
             if isinstance(a[key], dict) and isinstance(b[key], dict):
