@@ -206,7 +206,7 @@ def get_random_color():
     return QColor(*np.random.randint(0, 255, 3))
 
 
-def get_pseudo_random_color():
+def get_pseudo_random_color(format='rgb'):
     """
     Return a pseudo random colour. The hue is random but
     The saturation and the value are kept in the upper half interval
@@ -219,8 +219,14 @@ def get_pseudo_random_color():
     hsv = (rand_gen.uniform(0, 1),
            rand_gen.uniform(0.5, 1),
            rand_gen.uniform(0.5, 1))
-    rgb = hsv_to_rgb(hsv)
-    return rgb
+    if format == 'hsv':
+        return hsv
+    elif format == 'rgb':
+        return hsv_to_rgb(hsv)
+    elif format == 'qcolor':
+        return QColor(*[int(c * 255) for c in hsv_to_rgb(hsv)])
+    else:
+        raise ValueError(f'Unknown format "{format}"')
 
 
 def is_dark(color):
