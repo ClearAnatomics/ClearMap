@@ -22,19 +22,24 @@ def main(src_directory):
     pre_proc.setup(configs)
 
     stitch(pre_proc)
-    # if all(pre_proc.processing_config['stitching']['preview'].values)
     pre_proc.plot_stitching_results()
 
     convert_stitched(pre_proc)
 
-    atlas_id = pre_proc.processing_config['registration']['atlas']['id']
+    atlas_id = pre_proc.registration_cfg['atlas']['id']
     atlas_base_name = ATLAS_NAMES_MAP[atlas_id]['base_name']
     register(atlas_base_name, pre_proc)
+    # plot_3d.plot(pre_proc.filename('resampled'))
     plot_registration_results(pre_proc)
 
     cell_detector = CellDetector(pre_proc)
 
     # TEST CELL DETECTION
+    # slicing = (
+    #    slice(*cell_detector.processing_config['test_set_slicing']['dim_0']),
+    #    slice(*cell_detector.processing_config['test_set_slicing']['dim_1']),
+    #    slice(*cell_detector.processing_config['test_set_slicing']['dim_2'])
+    # )
     # cell_detector.create_test_dataset(slicing=[......])
     # print('Cell detection preview')
     # cell_detector.run_cell_detection(tuning=True)

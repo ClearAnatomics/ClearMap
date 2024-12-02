@@ -26,7 +26,7 @@ def main(src_directory):
 
     # convert_stitched(pre_proc)
 
-    atlas_id = pre_proc.processing_config['registration']['atlas']['id']
+    atlas_id = pre_proc.registration_cfg['atlas']['id']
     atlas_base_name = ATLAS_NAMES_MAP[atlas_id]['base_name']
     register(atlas_base_name, pre_proc)
     # plot_registration_results(pre_proc)
