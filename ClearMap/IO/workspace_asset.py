@@ -28,11 +28,10 @@ In the future, it will also include:
     Add support for multiple extensions (glob ?)
     Check for graphs and other data types
 """
-__author__ = 'crousseau'
-__license__ = 'GPLv3 - GNU General Pulic License v3 (see LICENSE.txt)'
+__author__ = 'Charly Rousseau <charly.rousseau@icm-institute.org>'
+__license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
 __webpage__ = 'https://idisco.info'
-__download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
-
+__download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
 import os
 from functools import cached_property

@@ -57,7 +57,8 @@ __author__ = 'Christoph Kirst <christoph.kirst.ck@gmail.com>, Charly Rousseau <c
 __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__ = 'https://idisco.info'
-__download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
+__download__ = 'https://github.com/ClearAnatomics/ClearMap'
+
 
 if platform.system().lower().startswith('darwin'):
     USE_BINARY_POINTS_FILE = False

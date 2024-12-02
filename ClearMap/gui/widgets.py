@@ -41,7 +41,7 @@ __author__ = 'Charly Rousseau <charly.rousseau@icm-institute.org>'
 __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
 __copyright__ = 'Copyright © 2022 by Charly Rousseau'
 __webpage__ = 'https://idisco.info'
-__download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
+__download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
 
 def setup_mini_brain(mini_brain_scaling=(5, 5, 5)):  # TODO: scaling in prefs
