@@ -284,14 +284,12 @@ def transform_file(result_directory):
     returned.
     """
 
-    files = os.listdir(result_directory)
-    files = [x for x in files if re.match('TransformParameters.\d.txt', x)]
-    files.sort()
+    files = sorted(Path(result_directory).glob('TransformParameters.*.txt'))
 
     if not files:
         raise RuntimeError(f'Cannot find a valid transformation file in {result_directory}!')
 
-    return os.path.join(result_directory, files[-1])
+    return str(files[-1])
 
 
 def transform_directory_and_file(transform_parameter_file=None, transform_directory=None):
