@@ -635,9 +635,10 @@ def resample(original, resampled=None,
             # ThreadPool because of documented cv2 instability w/ multiprocessing. Is this still true ?
             with ThreadPoolExecutor(processes) as executor:
                 chunk_size = len(indices) // (processes * 3)  # REFACTOR: explain calculation
-                executor.map(_resample, indices, chunksize=chunk_size)  # default chunk_size is 1 (too small)
+                result = executor.map(_resample, indices, chunksize=chunk_size)  # default chunk_size is 1 (too small)
                 if workspace is not None:
                     workspace.executor = executor
+                result = list(result)
 
         last = resampled_data
 
