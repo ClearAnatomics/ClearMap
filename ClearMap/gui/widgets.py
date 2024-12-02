@@ -623,6 +623,77 @@ class TwoListSelection(QWidget):
         return r
 
 
+class CheckableListWidget(QWidget):
+    check_state_changed = pyqtSignal(int, bool, str)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.layout = QVBoxLayout(self)
+        self.list_widget = QListWidget(self)
+        self.layout.addWidget(self.list_widget)
+        self.setLayout(self.layout)
+        self.list_widget.itemChanged.connect(self.on_item_changed)
+
+    def clear(self):
+        self.list_widget.clear()
+
+    def set_items(self, items):
+        self.list_widget.clear()
+        for item in items:
+            list_item = QListWidgetItem(item)
+            list_item.setCheckState(Qt.Unchecked)
+            self.list_widget.addItem(list_item)
+
+    def get_checked_items(self):
+        checked_items = []
+        for index in range(self.list_widget.count()):
+            item = self.list_widget.item(index)
+            if item.checkState() == Qt.Checked:
+                checked_items.append(item.text())
+        return checked_items
+
+    def check_item_at(self, index):
+        if 0 <= index < self.list_widget.count():
+            item = self.list_widget.item(index)
+            item.setCheckState(Qt.Checked)
+
+    def set_item_checked(self, item_name, state):
+        for index in range(self.list_widget.count()):
+            item = self.list_widget.item(index)
+            if item.text() == item_name:
+                item.setCheckState(Qt.Checked if state else Qt.Unchecked)
+                return
+
+    def check_items(self, items_list):
+        for index in range(self.list_widget.count()):
+            item = self.list_widget.item(index)
+            if item.text() in items_list:
+                item.setCheckState(Qt.Checked)
+
+    def add_item(self, item):
+        if self.get_item(item) is not None:
+            return
+        list_item = QListWidgetItem(item)
+        list_item.setCheckState(Qt.Unchecked)
+        self.list_widget.addItem(list_item)
+
+    def get_item(self, item_name):
+        for index in range(self.list_widget.count()):
+            item = self.list_widget.item(index)
+            if item.text() == item_name:
+                return item
+        return None
+
+    def delete_item(self, index):
+        if 0 <= index < self.list_widget.count():
+            self.list_widget.takeItem(index)
+
+    def on_item_changed(self, item):
+        index = self.list_widget.row(item)
+        checked = item.checkState() == Qt.Checked
+        self.check_state_changed.emit(index, checked, item.text())
+
+
 class DataFrameWidget(QWidget):  # TODO: optional format attribute with shape of df
     """
     A simple widget to display a pandas DataFrame
