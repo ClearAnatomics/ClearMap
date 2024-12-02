@@ -84,8 +84,9 @@ update_pbar(app, progress_bar, 40)
 from ClearMap.gui.pyuic_utils import loadUiType
 from ClearMap.gui.dialogs import get_directory_dlg, warning_popup, make_nested_progress_dialog, DISPLAY_CONFIG
 from ClearMap.gui.gui_utils import html_to_ansi, html_to_plain_text, compute_grid
-from ClearMap.gui.style import DARK_BACKGROUND, PLOT_3D_BG, \
-    BTN_STYLE_SHEET, TOOLTIP_STYLE_SHEET, COMBOBOX_STYLE_SHEET, WARNING_YELLOW
+from ClearMap.gui.style import (DARK_BACKGROUND, PLOT_3D_BG, BTN_STYLE_SHEET,
+                                TOOLTIP_STYLE_SHEET, COMBOBOX_STYLE_SHEET,
+                                HIGHLIGHTED_BTN_STYLE)
 
 from ClearMap.gui.widgets import OrthoViewer, ProgressWatcher, setup_mini_brain, StructureSelector, \
     PerfMonitor  # needs plot_3d
@@ -307,18 +308,15 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         self.tabWidget.setMinimumHeight(600)
 
     def fix_styles(self):
-        """
-        The meta function calling all the style functions
-        Returns
-        -------
-
-        """
-        self.fix_btn_boxes_text()
+        """The meta function calling all the style functions"""
         self.setStyleSheet(BTN_STYLE_SHEET)  # Makes it look qdarkstyle
         # self.fix_btns_stylesheet()
         self.fix_widgets_backgrounds()
         self.fix_sizes()
         self.fix_tooltips_stylesheet()
+
+        btn = self.tab_managers['sample_info'].ui.launchPatternWizzardPushButton
+        btn.setStyleSheet(HIGHLIGHTED_BTN_STYLE)
 
     def fix_tooltips_stylesheet(self):
         for widg in self.findChildren(QWidget):
