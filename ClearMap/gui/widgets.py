@@ -1722,3 +1722,99 @@ class PerfMonitor(QWidget):
             pass
 
 
+class ExtendableTabWidget(QTabWidget):
+    addTabClicked = pyqtSignal()
+    channelChanged = pyqtSignal(str)
+    channelRenamed = pyqtSignal(str, str)
+
+    def __init__(self, parent=None, with_add_tab=True):
+        super().__init__(parent)
+        self.has_add_tab = with_add_tab
+        if with_add_tab:
+            plus_icon = QIcon(str(Path(Settings.clearmap_path) / 'gui/creator/icons/add.svg'))
+            self.addTab(QWidget(), plus_icon,"")
+        self.tabBarClicked.connect(self.handle_tab_bar_click)
+
+    def handle_tab_bar_click(self, index):
+        if self.has_add_tab and index == self.count() - 1:
+            self.addTabClicked.emit()
+        else:
+            self.channelChanged.emit(self.tabText(index))
+
+    def current_channel(self):
+        return self.tabText(self.currentIndex())
+
+    def set_current_channel_name(self, name):
+        current_name = self.tabText(self.currentIndex())
+        self.setTabText(self.currentIndex(), name)
+        self.channelRenamed.emit(current_name, name)
+
+    @property
+    def last_real_tab_idx(self):
+        return self.count() -(int(self.has_add_tab))
+
+    def get_channels_names(self):
+        return [self.tabText(i) for i in range(self.last_real_tab_idx)]
+
+    def add_channel_widget(self, widget, name=''):
+        tab_name = name if name else f"Channel_{self.count() - 1}"
+        self.insertTab(self.last_real_tab_idx, widget, tab_name)
+        self.setCurrentWidget(widget)
+        return tab_name
+
+    def get_channel_widget(self, name, return_idx=False):
+        for i in range(self.last_real_tab_idx):
+            if self.tabText(i) == name:
+                if return_idx:
+                    return self.widget(i), i
+                return self.widget(i)
+        if return_idx:
+            return None, -1
+        return None
+
+
+class FileDropListWidget(QListWidget):  # TODO: check if I need dragMoveEvent
+    def __init__(self, parent=None, plus_btn=None, minus_btn=None):
+        super().__init__(parent)
+        self.setAcceptDrops(True)
+        self.plus_btn = plus_btn
+        self.minus_btn = minus_btn
+
+        if self.plus_btn:
+            self.plus_btn.clicked.connect(self.add_files)
+        if self.minus_btn:
+            self.minus_btn.clicked.connect(self.remove_selected)
+
+    def add_files(self, file_paths=None):
+        file_paths = file_paths or QFileDialog.getOpenFileNames(self, 'Select files')[0]
+        if file_paths:
+            self.addItems(file_paths)
+
+    def remove_selected(self):
+        for item in self.selectedItems():
+            itm = self.takeItem(self.row(item))
+            itm.setParent(None)
+            itm.deleteLater()
+
+    def dragEnterEvent(self, event):
+        data = event.mimeData()
+        print(data.text())
+        if data.hasUrls():
+            event.acceptProposedAction()
+
+    def dragMoveEvent(self, event):
+        data = event.mimeData()
+        print(data.text())
+        if data.hasUrls():
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def dropEvent(self, event):
+        data = event.mimeData()
+        print(data.text())
+        if data.hasUrls():
+            for url in data.urls():
+                file_path = url.toLocalFile()
+                self.addItem(file_path)
+            event.acceptProposedAction()
