@@ -34,10 +34,11 @@ __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
 
 import os
-import sys
 import collections
 
 import json
+import warnings
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -53,29 +54,31 @@ from ClearMap.Alignment.Resampling import orientation_to_transposition, format_o
 import ClearMap.Utils.HierarchicalDict as hdict
 
 from ClearMap.Alignment.utils import create_label_table
+from ClearMap.IO import IO as clearmap_io
 
 from ClearMap.Visualization import Color as col
+from ClearMap.config.atlas import STRUCTURE_TREE_NAMES_MAP
 
 
 ###############################################################################
 # ## Atlas Structures
 ###############################################################################
 
-def decompress_atlases(atlas_base_name):
-    paths = []
+def decompress_atlases(atlas_base_name):  # FIXME: add option to move to a different folder if we can't write to the current one
+    paths = {}
     atlas_component_names = ('annotation', 'hemispheres', 'reference', 'distance_to_surface')
     for atlas_type in atlas_component_names:
         f_path = os.path.join(settings.atlas_folder, f'{atlas_base_name}_{atlas_type}.tif')
         fu.uncompress(f_path, extension='auto')
-        paths.append(f_path)
+        paths[atlas_type] = f_path
     return paths
 
 
-atlas_base_name = 'ABA_25um'  # FIXME: change if different atlas
+ATLAS_BASE_NAME = 'ABA_25um'  # warning: change if different atlas
 
 
 default_annotation_file, default_hemispheres_file,\
-default_reference_file, default_distance_to_surface_file = decompress_atlases(atlas_base_name)
+default_reference_file, default_distance_to_surface_file = decompress_atlases(ATLAS_BASE_NAME).values()
 """
 Note
 ----
@@ -194,14 +197,40 @@ class Label(object):
 class Annotation(object):
     """Class that holds information of the annotated regions."""
 
-    def __init__(self, label_file=None, extra_label=None, annotation_file=None):  # FIXME: add warning if None
+    def __init__(self, atlas_base_name, slicing, orientation, label_source, target_directory=None, extra_label=None):
         """Initialization
 
         Arguments
         ---------
-        label_file : str
-          File with label information in json format.
+        atlas_base_name: str
+            The prefix of the atlas files. They will be searched for in the ClearMap resources folder.
+        slicing : tuple
+            The slicing specification after reorienting.
+        orientation : tuple, or None.
+            The orientation specification. Strings can be 'left' or 'right', for the two hemispheres.
+        label_source : str
+            File with label information in json format. It can also be the name as defined in the atlas config.
+        target_directory : str
+            The target directory where to store the resliced/reoriented atlas files. If None, use ClearMap resources folder.
+        extra_label : list of tuples
+            Additional labels for IDs present in the atlas but not in the label file.
         """
+
+        if not label_source.startswith('/'):
+            label_file_path = Path(settings.atlas_folder) / STRUCTURE_TREE_NAMES_MAP[label_source]
+        else:
+            label_file_path = label_source
+
+        atlas_source_files = decompress_atlases(atlas_base_name)  # just return the paths if already decompressed
+        atlas_files = Annotation.prepare_annotation_files(slicing, orientation, directory=target_directory,
+                                                          hemispheres_file=atlas_source_files['hemispheres'],
+                                                          annotation_file=atlas_source_files['annotation'],
+                                                          distance_to_surface_file=atlas_source_files['distance_to_surface'],
+                                                          reference_file=atlas_source_files['reference'],
+                                                          verbose=True)
+        atlas_files = {k: v for k, v in zip(atlas_source_files.keys(), atlas_files) if v}
+        atlas_files['hemispheres'] = atlas_files.get('hemispheres', None)
+
         self.root = None
         self.structures = None
         self.ids = None
@@ -211,9 +240,14 @@ class Annotation(object):
         self.colors_rgb = None
         self.colors_hex = None
         self.df = None
-        self.extra_label = None
-        self.annotation_file = None
+
+        self.annotation_file = ''
+        self.hemispheres_file = ''
+        self.distance_to_surface_file = ''
+        self.reference_file = ''
+
         self.label_file = None
+        self.extra_label = None
 
         self.dict_id_to_acronym = {}
         self.dict_id_to_name = {}
@@ -222,7 +256,12 @@ class Annotation(object):
         self.dict_acronym_to_id = {}
         self.dict_name_to_id = {}
 
-        self.initialize(label_file=label_file, extra_label=extra_label, annotation_file=annotation_file)
+        self.initialize(annotation_file_path=atlas_files['annotation'],
+                        hemispheres_file_path=atlas_files['hemispheres'],
+                        distance_to_surface_file_path=atlas_files['distance_to_surface'],
+                        reference_file_path=atlas_files['reference'],
+                        label_file_path=label_file_path,
+                        extra_label=extra_label)
 
     def _initialize_dataframe(self):
         df = pd.DataFrame({
@@ -234,6 +273,14 @@ class Annotation(object):
         })
         df["colors_rgb"] = df["colors_hex"].map(lambda x: col.hex_to_rgb(x))
         return df
+
+    def get_atlas_paths(self):
+        return {
+            'annotation': self.annotation_file,
+            'hemispheres': self.hemispheres_file,
+            'distance_to_surface': self.distance_to_surface_file,
+            'reference': self.reference_file
+        }
 
     def get_dict(self, from_='id', to='acronym'):
         return dict(zip(self.df[from_], self.df[to]))
@@ -247,23 +294,50 @@ class Annotation(object):
     def get_colors_rgba(self, alpha=1):
         return self.df["colors_hex"].map(lambda x: col.hex_to_rgb(x, alpha=alpha))
 
-    def initialize(self, label_file=None, extra_label=None, annotation_file=None):
-        # read json file
-        if label_file is None:
-            label_file = default_label_file
-        if annotation_file is None:
-            annotation_file = default_annotation_file
+    def set_annotation_file(self, annotation_file_path):
+        print(f"Setting annotation file to {annotation_file_path}.\n"
+              f"The annotator will be reinitialized.")
+        self.initialize(annotation_file_path=annotation_file_path)
+
+    def set_label_file(self, label_file_path):
+        print(f"Setting label file to {label_file_path}.\n"
+              f"The annotator will be reinitialized.")
+        self.initialize(label_file_path=label_file_path)
+
+    def initialize(self, annotation_file_path=None, hemispheres_file_path=None,
+                   distance_to_surface_file_path=None, reference_file_path=None,
+                   label_file_path=None,
+                   extra_label=None):
+        if label_file_path is None:
+            if self.label_file is None:
+                warnings.warn(f'Label file not defined, using default: {default_label_file}.\n'
+                              f'Please note this is deprecated and will be removed in future versions.',
+                              DeprecationWarning)
+                label_file_path = default_label_file
+            else:
+                label_file_path = self.label_file
+        if annotation_file_path is None:
+            if self.annotation_file is None:
+                warnings.warn(f'Annotation file not defined, using default: {default_annotation_file}.\n'
+                              f'Please note this is deprecated and will be removed in future versions.',
+                              DeprecationWarning)
+                annotation_file_path = default_annotation_file
+            else:
+                annotation_file_path = self.annotation_file
         if extra_label is None:
-            extra_label = default_extra_label
-        if extra_label in ['None', '', False]:   # add nodes for missing labels
+            extra_label = self.extra_label or default_extra_label
+        if not extra_label:   # add nodes for missing labels
             extra_label = []
 
-        self.label_file = label_file
-        self.annotation_file = annotation_file
+        self.label_file = label_file_path
+        self.annotation_file = annotation_file_path
+        self.hemispheres_file = hemispheres_file_path or self.hemispheres_file
+        self.distance_to_surface_file = distance_to_surface_file_path or self.distance_to_surface_file
+        self.reference_file = reference_file_path or self.reference_file
         self.extra_label = extra_label
 
         # initialize label tree
-        with open(label_file, 'r') as file_in:
+        with open(label_file_path, 'r') as file_in:
             aba = json.load(file_in)
 
         root = aba['msg'][0]
@@ -310,7 +384,9 @@ class Annotation(object):
         self.dict_name_to_id = self.get_dict(from_='name', to='id')
 
         # import atlas
-        self.atlas = clearmap_io.read(self.annotation_file).astype(int)
+        self.atlas = clearmap_io.read(self.annotation_file)
+        if self.atlas.dtype.kind == 'f':
+            self.atlas = self.atlas.astype(int)
         self.children_df = create_label_table(self.label_file, save=False, from_cached=True)
 
     def initialize_tree(self, root, parent=None, level=0):
@@ -370,11 +446,11 @@ class Annotation(object):
             dictionary = collections.OrderedDict()
         else:
             dictionary = dict()
-        for k, v in  zip(keys, values):
+        for k, v in zip(keys, values):
             dictionary[k] = v
 
         if with_parents:
-            for k,v in dictionary.items():
+            for k, v in dictionary.items():
                 node = self.find(k, key=key)
                 parent_list = node.parent_list(max_depth=max_depth, min_level=min_level)
                 dictionary[k] = tuple(node[value] for node in parent_list)
@@ -395,17 +471,22 @@ class Annotation(object):
         for n, d in zip(nodes, data):
             n.data[name] = d
 
-    def convert_label(self, label, key='order', value='graph_order', node=None, level=None, method='map'):
-        if key in ('acronym', 'name', 'color_hex_triplet'):  # string keys
+    def convert_label(self, label, key='id', value='order', level=None, method='map', node=None):
+        if value.lower().startswith('rgb') and len(value) <= 4:
+            alpha = value.lower().endswith('a')
+            as_int = value.startswith('RGB')
+            return self.label_to_color(label, key=key, alpha=alpha, as_int=as_int)
+        # string keys or values, force dictionary mode
+        if key in ('acronym', 'name', 'color_hex_triplet') or value in ('acronym', 'name', 'color_hex_triplet'):
             method = 'dictionary'
-        if method in ['map']:
+        if method == 'map':
             m = self.get_map(key=key, value=value, node=node, level=level)
             return m[label]
         else:
             d = self.get_dictionary(key=key, value=value, node=node, level=level)
             return np.vectorize(d.__getitem__, otypes=[type(list(d.values())[0])])(label)
 
-    def label_to_color(self, label, key='order', level=None, alpha=True, as_int=False, int_type='uint8'):
+    def label_to_color(self, label, key='id', level=None, alpha=True, as_int=False, int_type='uint8'):
         cm = self.colors_rgb
         cm = col.color(cm, alpha=alpha, as_int=as_int, int_type=int_type)
         if key != 'order' or level is not None:
@@ -448,7 +529,9 @@ class Annotation(object):
         uniques, counts = np.unique(self.atlas, return_counts=True)
         return dict(zip(uniques, counts))
 
-    def get_lateralised_volume_map(self, atlas_scale, hemispheres_file_path):
+    def get_lateralised_volume_map(self, atlas_scale, hemispheres_file_path=None):
+        if hemispheres_file_path is None:
+            hemispheres_file_path = self.hemispheres_file
         hemispheres_atlas = clearmap_io.read(hemispheres_file_path)
         scale = np.prod(atlas_scale)
         hem_ids = sorted(np.unique(hemispheres_atlas))
@@ -497,24 +580,38 @@ class Annotation(object):
         df['acronym'] = df['id'].map(self.dict_id_to_acronym)
         return df
 
-    def label_points(self, points): #TODO Test me
-        """
+    def label_points_hemispheres(self, points, key='id', level=None, invalid=0):
+        return self.label_points(points, annotation_file_path=self.hemispheres_file, key=key, level=level, invalid=invalid)
 
-        Parameters
-        ----------
-        points: array representing coordinates (floats) of n points, shape (n_points, 3)
+    def label_points(self, points, annotation_file_path=None, key='id', level=None, invalid=0):  # FIXME: document level
+        if annotation_file_path:
+            atlas = clearmap_io.read(annotation_file_path)
+        else:
+            atlas = self.atlas
 
-        Returns
-        -------
-        array of structure ids, of shape (n_points,)
-
-        """
+        # Create mask of coordinates within annotation file coordinates (of shape = len(coordinates))  # TODO: check if warn
         xs, ys, zs = points.astype(int).T
         xmax, ymax, zmax = self.atlas.shape
-        mask = (xs >= 0) & (xs < xmax) & (ys >= 0) & (ys < ymax) & (zs >= 0) & (zs < zmax)
-        cell_labels = np.zeros_like(mask.astype(np.uint64))
-        cell_labels[mask] = self.atlas[xs[mask], ys[mask], zs[mask]]
+        within_atlas = (xs >= 0) & (xs < xmax) & (ys >= 0) & (ys < ymax) & (zs >= 0) & (zs < zmax)
+
+        # Create alist of labels (shape = len(coordinates)) which defaults to 'invalid' and where
+        # coordinates within the atlas have the atlas value
+        cell_labels = np.full(xs.shape, invalid, dtype=np.uint64)  # FIXME: dtype=int in original
+        cell_labels[within_atlas] = atlas[xs[within_atlas], ys[within_atlas], zs[within_atlas]]
+
+        # convert cell labels to 'key'
+        if key != 'id' or level is not None:
+            if annotation_file_path:
+                if 'hemisphere' in annotation_file_path.lower():
+                    raise ValueError(f'Label conversion for {annotation_file_path} is not implemented')
+                else:
+                    warnings.warn(f'Label conversion for {annotation_file_path} may not be implemented')
+            cell_labels[within_atlas] = self.convert_label(cell_labels[within_atlas], key='id', value=key, level=level)
+
         return cell_labels
+
+    def get_names_map(self):
+        return dict(zip(self.ids, self.names))
 
     def __str__(self):
         return f'Annotation({self.n_structures})[{self.max_level}]{{{self.label_file}}}'
@@ -522,276 +619,234 @@ class Annotation(object):
     def __repr__(self):
         return self.__str__()
 
+    @staticmethod
+    def prepare_annotation_files(slicing, orientation, directory=None, annotation_file=None,
+                                 hemispheres_file=None, reference_file=None, distance_to_surface_file=None,
+                                 overwrite=False, verbose=False):
+        """
+        Crop the annotation, reference and distance files to match the data.
 
-##########################################################################################
-# Handle singleton
-##########################################################################################
+        Arguments
+        ---------
+        slicing : tuple or None
+            The slice specification after reorienting.
+        orientation : tuple, str or None.
+            The orientation specification. Strings can be 'left' or 'right', for the
+            two hemispheres.
+        directory : str or None
+            The target directory. If None, use ClearMap resources folder.
+        annotation_file : str or None
+            The annotation file to use.
+        hemispheres_file : str or None
+            The hemispheres annotation file to use. "hemispheres" must be set to True
+        reference_file : str or None
+            The reference file to use.
+        distance_to_surface_file : str or None
+            The distance file to use.
+        overwrite : bool
+            If True, overwrite existing files.
+        verbose : bool
+            Whether to print verbose output.
 
-def create_singleton():
-    global annotation, n_structures, get_dictionary, get_list, get_map, find, initialized
-    annotation = Annotation()
-    """Information on the annotated regions"""
-    n_structures = annotation.n_structures  # remove
-    get_dictionary = annotation.get_dictionary  # remove
-    get_list = annotation.get_list  # remove
-    get_map = annotation.get_map  # remove
-    find = annotation.find  # Find and replace
-    initialized = False
+        Returns
+        -------
+        annotation_file : str
+            The cropped annotation file.
+        reference_file : str
+            The cropped reference file.
+        distance_to_surface_file : str
+            The distance cropped file.
+        """
+        return_hemispheres = hemispheres_file is not None
 
+        file_paths = {  # must be ordered
+            'annotation': annotation_file,
+            'hemispheres': hemispheres_file,
+            'reference': reference_file,
+            'distance_to_surface': distance_to_surface_file
+        }
+        specified_paths = {k: v for k, v in file_paths.items() if v}
+        if not specified_paths:
+            file_paths['annotation'] = default_annotation_file
+            file_paths['reference'] = default_reference_file
+            file_paths['distance_to_surface'] = default_distance_to_surface_file
+            if return_hemispheres:
+                file_paths['hemispheres'] = default_hemispheres_file
+        else:  # infer the other paths
+            existing_keys = list(specified_paths.keys())  # TODO: we should check that if > 1 key, they share pattern
+            missing_keys = [k for k in file_paths if k not in existing_keys]
+            for k in missing_keys:
+                file_paths[k] = file_paths[existing_keys[0]].replace(existing_keys[0], k)
 
-if 'sphinx' in sys.modules.keys():
-    print('Imported for documentation, skipping annotation singleton creation')
-    annotation = None
-else:
-    create_singleton()
+        if directory and not os.path.exists(directory):
+            os.makedirs(directory)
 
-
-def initialize(label_file=None, extra_label=None, annotation_file=None):
-    global initialized, annotation, n_structures, get_dictionary, get_list, get_map, find  # FIXME: avoid global
-    annotation = Annotation(label_file=label_file, extra_label=extra_label, annotation_file=annotation_file)
-
-    n_structures = annotation.n_structures
-    get_dictionary = annotation.get_dictionary
-    get_list = annotation.get_list
-    get_map = annotation.get_map
-    find = annotation.find
-    initialized = True
-
-
-def set_annotation_file(annotation_file):
-    initialize(annotation_file=annotation_file, label_file=annotation.label_file, extra_label=annotation.extra_label)
-
-
-def set_label_file(label_file, extra_label=None):
-    initialize(annotation_file=annotation.annotation_file, label_file=label_file, extra_label=extra_label)
-
-
-###############################################################################
-# ## Labeling
-###############################################################################
-
-# TODO:use parallel array processing and lut routines to speed up?
-
-def label_points(points, annotation_file=None, invalid=0, key='order', level=None):  # FIXME: document level
-    """Label points according to the annotation in the labeled image file.
-
-    Arguments
-    ---------
-    points : array
-        Array of ndim point coordinates to be labeled.
-    annotation_file : str
-        File name of the atlas annotation.
-    invalid : int
-        Label for invalid points.
-    key : str
-        The key of the label, by default the order of the labels.
-    level : int
-        The level of the hierarchy to use.
-
-    Returns
-    -------
-    label : array
-        Label of the points corresponding to the given key.
-    """
-
-    # TODO consider refactoring using annotation.label_points
-
-    n_points, n_spatial_dim = points.shape
-
-    atlas = clearmap_io.read(__get_module_annotation_file(annotation_file))
-    if atlas.dtype.kind == 'f':
-        atlas = np.array(atlas, dtype=int)
-
-    # Filter out of atlas coordinates
-    points_int = np.asarray(points, dtype=int)
-    valid = np.ones(n_points)
-    for d in range(n_spatial_dim):
-        in_dim_range = np.logical_and(points_int[:, d] >= 0, points_int[:, d] < atlas.shape[d])
-        valid = np.logical_and(valid, in_dim_range)
-
-    indices = tuple([points_int[valid, d] for d in range(n_spatial_dim)])
-    label = np.full(n_points, invalid, dtype=int)
-    label[valid] = atlas[indices]
-
-    if key != 'id' or level is not None:
-        label[valid] = convert_label(label[valid], key='id', value=key, level=level)
-
-    return label
-
-
-def convert_label(label, key='id', value='order', level=None, method=None):
-    """
-    Convert label using the atlas annotation data.
-
-    Arguments
-    ---------
-    label : array
-        List of labels to convert.
-    key : str
-        The key corresponding to the label. #TODO list possible keys
-    value : str
-        The key to convert the label to. #TODO list possible values
-    level : nt or None
-        Convert at this level of the hierarchy. If None use full hierarchy.
-    method : 'map' or 'dictionary'
-        Convert labels using a mapping array or a dictionary. Depending on the keys
-        either can be faster for large data sets.
-
-    Returns
-    -------
-    label : array
-        List of converted labels.
-    """
-
-    # TODO consider refactoring using instance attributes
-
-    if value in ('rgb', 'rgba', 'RGB', 'RGBA'):
-        alpha = value.lower().endswith('a')
-        as_int = value[:3] == 'RGB'
-        return annotation.label_to_color(label, key=key, alpha=alpha, as_int=as_int)
-    return annotation.convert_label(label, key=key, value=value, level=level, method=method)
-
-
-def __get_module_annotation_file(annotation_file):
-    if annotation_file is None:
-        if not initialized:
-            raise ValueError('Cannot use this function without an annotation file if '
-                             'the module has not been initialized. '
-                             'Please call set_annotation_file first.')
-        else:
-            return annotation.annotation_file
-    else:
-        return annotation_file
-
-
-# FIXME: add use_default kwarg to signature to make explicit and make orientation necessary
-# FIXME: + replace defaults with currently computed
-def prepare_annotation_files(slicing=None, orientation=None, directory=None, postfix=None, annotation_file=None,
-                             hemispheres_file=None, reference_file=None, distance_to_surface_file=None,
-                             hemispheres=False, overwrite=False, verbose=False):
-    """
-    Crop the annotation, reference and distance files to match the data.
-
-    Arguments
-    ---------
-    slicing : tuple or None
-        The slice specification after reorienting.
-    orientation : tuple, str or None.
-        The orientation specification. Strings can be 'left' or 'right', for the
-        two hemispheres.
-    directory : str or None
-        The target directory. If None, use ClearMap resources folder.
-    postfix : str or None
-        Use this postfix for the cropped annotation file. If None and automatic
-        label is chosen.
-    annotation_file : str or None
-        The annotation file to use.
-    hemispheres_file : str or None
-        The hemispheres annotation file to use. "hemispheres" must be set to True
-    reference_file : str or None
-        The reference file to use.
-    distance_to_surface_file : str or None
-        The distance file to use.
-    hemispheres : bool
-        Whether to return the hemispheres annotation
-    overwrite : bool
-        If True, overwrite existing files.
-    verbose : bool
-        Whether to print verbose output.
-
-    Returns
-    -------
-    annotation_file : str
-        The cropped annotation file.
-    reference_file : str
-        The cropped reference file.
-    distance_to_surface_file : str
-        The distance cropped file.
-    """
-    if annotation_file is None:
-        annotation_file = default_annotation_file
-    if hemispheres_file is None:
-        hemispheres_file = default_hemispheres_file
-    if reference_file is None:
-        reference_file = default_reference_file
-    if distance_to_surface_file is None:
-        distance_to_surface_file = default_distance_to_surface_file
-
-    files = [annotation_file, reference_file, distance_to_surface_file]
-    if hemispheres:
-        files.insert(1, hemispheres_file)
-
-    results = []
-    for f_path in files:
-        if f_path is not None:
-            fn = __format_annotation_filename(f_path, orientation=orientation, slicing=slicing, postfix=postfix, directory=directory)
+        results = []
+        for f_path in file_paths.values():
+            if not f_path:
+                continue
+            new_file_path = get_atlas_filepath(f_path, directory=directory, orientation=orientation, slicing=slicing)
             if verbose:
-                print('Preparing: %r' % fn)
+                print(f'Preparing: {new_file_path}')
 
-            if not overwrite and clearmap_io.is_file(fn):
+            if not overwrite and os.path.exists(new_file_path):
                 if verbose:
                     print('Atlas file exists, skipping')
-                results.append(fn)
+                results.append(new_file_path)
                 continue
 
-            if not clearmap_io.is_file(f_path):
-                raise ValueError(f'Cannot find annotation file: {f_path}')
+            if not os.path.exists(f_path):
+                raise FileNotFoundError(f'Cannot find annotation file: {f_path}')
 
-            s = clearmap_io.as_source(f_path)
+            # Extract array
+            src = clearmap_io.as_source(f_path)
             if verbose:
-                print('Preparing: from source %r' % s)
-
-            data = np.array(s.array)
+                print(f'Preparing: from source {src}')
+            data = np.array(src.array)
 
             if orientation is not None:
-                # permute
+                # transpose data to match orientation
                 per = orientation_to_transposition(orientation)
                 data = data.transpose(per)
 
-                # reverse axes
-                re_slice = False
-                sl = [slice(None)] * data.ndim
-                for d, o in enumerate(orientation):
-                    if o < 0:
-                        sl[d] = slice(None, None, -1)
-                        re_slice = True
-                if re_slice:
-                    data = data[tuple(sl)]
-
+                # reverse axes if orientation[axis] is negative
+                slices = [slice(None, None, -1) if ori < 0 else slice(None) for ori in orientation]
+                if any([s != slice(None) for s in slices]):
+                    data = data[tuple(slices)]
+            # Crop
             if slicing is not None:
                 data = data[slicing]
-            clearmap_io.write(fn, data)
-            results.append(fn)
+
+            clearmap_io.write(new_file_path, data)
+            results.append(new_file_path)
+
+        return results
+
+    def get_columns(self, coordinates_transformed, atlas_resolution, ids=None):  # TODO: rename
+        if ids is None:
+            ids = self.label_points(coordinates_transformed)
+        out = pd.DataFrame({'id': ids})
+        out['xt'] = coordinates_transformed[:, 0]
+        out['yt'] = coordinates_transformed[:, 1]
+        out['zt'] = coordinates_transformed[:, 2]
+        if self.hemispheres_file:
+            out['hemisphere'] = self.label_points_hemispheres(coordinates_transformed)
+
+        out['name'] = self.convert_label(out['id'], key='id', value='name')
+
+        unique_ids = np.sort(out['id'].unique())
+
+        order_map = {id_: self.find(id_, key='id')['order'] for id_ in unique_ids}
+        out['order'] = out['id'].map(order_map)
+
+        color_map = {id_: self.find(id_, key='id')['rgb'] for id_ in unique_ids}  # WARNING RGB upper case should give integer but does not work
+        out['color'] = out['id'].map(color_map)
+
+        volumes = self.get_lateralised_volume_map(atlas_resolution)
+        if self.hemispheres_file:
+            out['volume'] = out.set_index(['id', 'hemisphere']).index.map(volumes.get)
         else:
-            results.append(None)
+            out['volume'] = out['id'].map(volumes)
+        return out
 
-    return results
+    def color_map(self, color_ids=None, alpha=True, as_int=False, int_type='uint8'):
+        """
+        Generates a color map from color ids to rgb
+
+        Arguments
+        ---------
+        color_ids: list
+            The list of ids to generate the color map for.
+            e.g. a rgb tuple, color name from matplotlib or vispy, hex code
+        alpha : bool
+            If True return a color map with alpha values.
+        as_int : bool
+            If True return a color map with integer values in the range 0-255.
+        int_type : str
+            The integer type to use for the output, e.g. 'uint8', 'uint16'.
+
+        Returns
+        -------
+        color_map : array
+            An array of rgb colors for each label.
+        """
+        if color_ids is None:
+            color_ids = self.colors_rgb
+        return col.color(color_ids, alpha=alpha, as_int=as_int, int_type=int_type)
+
+    def write_color_palette(self, file_path=''):
+        """
+        Creates a pal or lut file for Imaris or Imagej based on label colors of atlas.
+
+        Arguments
+        ---------
+        file_path : str | Path
+            The name of the color palette file.
+
+        Returns
+        -------
+        filename : str
+            The name of the file to which the color palette was written.
+        """
+
+        cm = self.color_map(alpha=False, as_int=True)
+
+        extension = clearmap_io.file_extension(file_path)
+        if extension == 'pal':
+            col.write_PAL(file_path, cm)
+        elif extension == 'lut':
+            col.write_LUT(file_path, cm)
+        else:
+            raise RuntimeError(f'Color palette format: {extension} not lut or pal')
+
+        return file_path
+
+    def create_color_annotation(self, annotation_file_path='', dest_path=''):  # TEST:
+        """Creates a rgb image from the atlas color data.
+
+        Arguments
+        ---------
+        annotation_file_path : str
+            File name of the atlas annotation.
+        dest_path : str
+            The path to the file where the color atlas should be written.
+            If empty, the color atlas is only returned as an array.
+
+        Returns
+        -------
+        filename : str
+            The name of the file to which the color atlas was written.
+        """
+        if annotation_file_path:
+            atlas = clearmap_io.read(annotation_file_path)
+        else:
+            atlas = self.atlas
+        atlas = self.convert_label(atlas, key='id', value='order', method='map')  # FIXME: why value='order'?
+        # apply color map
+        cm = self.color_map(alpha=False, as_int=True)
+        atlas = cm[atlas]
+        if dest_path:
+            clearmap_io.write(dest_path, atlas)
+        return atlas
 
 
-def __substitute_chars(s):
-    chars_to_strip = ' '
-    chars_to_substitute = '(,)'  # TODO: check if we add '[]'
-    for c in chars_to_strip:
-        s = s.replace(c, '')
-    for c in chars_to_substitute:
-        s = s.replace(c, '_')
-    return s
-  
-
-def __format_annotation_filename(filename, orientation=None, slicing=None, postfix=None, directory=None):
+def get_atlas_filepath(filename, directory=None, orientation=None, slicing=None):
     """Formats the annotation filename given orientation and slicing."""
 
-    if postfix is None:
-        orientation = format_orientation(orientation, default=(1, 2, 3))
-        x, y, z = orientation
-        postfix = f'{x}_{y}_{z}_{slicing}'
-        postfix = __substitute_chars(postfix)
+    def substitute_chars(in_str, chars_to_strip=' ',
+                           chars_to_substitute='(,)'):  # TODO: check if we add '[]' to chars_to_substitute
+        for c in chars_to_strip:
+            in_str = in_str.replace(c, '')
+        for c in chars_to_substitute:
+            in_str = in_str.replace(c, '_')
+        return in_str
 
-    if postfix:
-        base, ext = os.path.splitext(filename)
-        fn = base + f'_{postfix}{ext}'
-    else:
-        fn = filename
+    x, y, z = format_orientation(orientation, default=(1, 2, 3))
+    postfix = substitute_chars(f'{x}_{y}_{z}_{slicing}')
+
+    base, ext = os.path.splitext(filename)
+    fn = base + f'_{postfix}{ext}'
+
     if directory is not None:
         fn = os.path.join(directory, os.path.basename(filename))
 
@@ -804,43 +859,6 @@ def annotation_to_distance_file(annotation_file_path):
     return distance_array
 
 
-def convert_array(array, key='id', value='order'):
-    if value =='color':
-        return colorize(array, key)
-    key_to_value = get_map(key=key, value=value)
-    array = np.asarray(array, dtype=int)
-    return key_to_value[array]
-
-
-def colorize(array, key='id'):
-    if key != 'order':
-        array = convert_array(array, key=key, value='order')
-    order_to_color = color_map()[...,:3]
-    return order_to_color[array]
-
-
-def color_map(alpha=True, as_int=False, int_type='uint8'):  # FIXME: this is bordeline circular (atlas module and annotation)
-    """
-    Generates a color map from color ids to rgb
-
-    Arguments
-    ---------
-    alpha : bool
-        If True return a color map with alpha values.
-
-    Returns
-    -------
-    color_map : array
-        An array of rgb colors for each label.
-    """
-    cm = annotation.colors_rgb
-    return col.color(cm, alpha=alpha, as_int=as_int, int_type=int_type)
-
-
-def get_names_map():
-    return dict(zip(annotation.ids, annotation.names))
-
-
 ###############################################################################
 # ## Tests
 ###############################################################################
@@ -851,35 +869,36 @@ def _test1():
     import ClearMap.Alignment.Annotation as ano
     from importlib import reload
     reload(ano)
+    annotator = ano.Annotation(ATLAS_BASE_NAME, None, None, default_label_file)
 
     points = np.array([[162, 200, 138], [246, 486, 138], [246, 486, 138]])
 
     label = ano.label_points(points)
     print(label)
 
-    cnts = ano.count_points(points)
+    cnts = annotator.count_points(points)
     print(cnts)
 
-    cnts = ano.count_points(points, hierarchical=False)
+    cnts = annotator.count_points(points, hierarchical=False)
     print(cnts)
 
     import ClearMap.IO.IO as io
     ano.write_color_annotation('test.tif')
     io.delete_file('test.tif')
 
-    l = ano.find(247, key='id')
+    l = annotator.find(247, key='id')
     print(l)
     l.info(with_children=True)
     print(l.level)
 
-    ano.annotation.get_dictionary(key='id', value='acronym', with_parents=True, min_level=3, max_depth=3)
+    annotator.get_dictionary(key='id', value='acronym', with_parents=True, min_level=3, max_depth=3)
 
 
 def _test2():
-    import numpy as np
     import ClearMap.Alignment.Annotation as ano
     from importlib import reload
     reload(ano)
+    annotation = ano.Annotation(ATLAS_BASE_NAME, None, None,default_label_file)
 
     assert annotation.df.shape == (1319, 5)
     assert annotation.dict_id_to_acronym[1] == "TMv"
@@ -889,9 +908,8 @@ def _test2():
     assert annotation.dict_id_to_color[200] == '61E7B7'
 
     ### annotation_new contains last annotation atlas (2017) and last annotation graph (from Allen, October 2022
-    annotation_fpath = os.path.join(ClearMap.Settings.atlas_folder, "ABA_25um_2017_annotation.tif")
     label_fpath = os.path.join(ClearMap.Settings.atlas_folder, "ABA_annotation_last.json")
-    annotation_new = Annotation(label_file=label_fpath, annotation_file=annotation_fpath)
+    annotation_new = Annotation('ABA_25um_2017', None, None, label_source=label_fpath)
 
     # assert annotation_new.df.shape == (1336, 5)
     # assert annotation_new.dict_id_to_acronym[1] == "TMv"
@@ -910,3 +928,4 @@ def _test2():
     # assert (annotation_new.enrich_df(pd.DataFrame([{"id": 1111}])).equals(
     #     pd.DataFrame([{'id': 1111, 'name': 'Primary somatosensory area, trunk, layer 5',
     #                    'acronym': 'SSp-tr5'}])))
+
