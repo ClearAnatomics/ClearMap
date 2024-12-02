@@ -123,7 +123,25 @@ def surface_project(img):
     return mask, proj
 
 
-def format_long_nb_to_str(nb):
+def format_long_nb(nb):
+    """
+    Formats a long number by inserting apostrophes every three digits for better readability.
+
+    Parameters
+    ----------
+    nb : int
+        The number to be formatted.
+
+    Returns
+    -------
+    str
+        The formatted number as a string with apostrophes inserted every three digits.
+
+    Examples
+    --------
+    >>> format_long_nb(123456789)
+    "123'456'789"
+    """
     out = ''
     for idx, c in enumerate(str(nb)[::-1]):
         tick = "'" if (idx and not idx % 3) else ""
@@ -161,12 +179,15 @@ def get_current_res(app):
 
 
 def create_clearmap_widget(ui_name, patch_parent_class, window_title=None):
+    if not ui_name.endswith('.ui'):
+        ui_name += '.ui'
     widget_class, _ = loadUiType(os.path.join(UI_FOLDER, 'creator', ui_name), from_imports=True,
                                  import_from='ClearMap.gui.creator', patch_parent_class=patch_parent_class)
     widget = widget_class()
     if window_title is not None:
         widget.setWindowTitle(window_title)
     widget.setupUi()
+    recursive_patch_widgets(widget)
     return widget
 
 
