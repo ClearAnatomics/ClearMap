@@ -1560,10 +1560,10 @@ class StructurePickerWidget(QTreeWidget):
     LIGHT_COLOR = 'white'
     DARK_COLOR = '#2E3436'
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, json_base_name='ABA json 2022'):
         super().__init__(parent)
         self.setColumnCount(4)
-        self.root = self.parse_json()
+        self.root = self.parse_json(json_base_name)
         self.build_tree(self.root, self)
         self.header().resizeSection(0, 300)
         self.setHeaderLabels(['Structure name', 'ID', 'Color', ''])  # TODO: see why 4 columns
@@ -1573,8 +1573,9 @@ class StructurePickerWidget(QTreeWidget):
         print([itm.text(i) for i in range(3)])
 
     @staticmethod
-    def parse_json():
-        with open(annotation.label_file, 'r') as json_handle:  # FIXME: make parameter in case it hasn't been initialised
+    def parse_json(base_name='ABA json 2022'):
+        label_file = Path(Settings.atlas_folder) / STRUCTURE_TREE_NAMES_MAP[base_name]
+        with open(label_file, 'r') as json_handle:
             aba = json.load(json_handle)
         root = aba['msg'][0]
         return root
