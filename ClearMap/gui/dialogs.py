@@ -11,7 +11,7 @@ import functools
 from PyQt5.QtCore import Qt, QSize
 from PyQt5.QtGui import QPixmap, QFont
 from PyQt5.QtWidgets import QFileDialog, QMessageBox, QLabel, QDialogButtonBox, QSplashScreen, \
-    QProgressBar, QDialog, QHBoxLayout, QPushButton, QVBoxLayout, QStyle
+    QProgressBar, QDialog, QHBoxLayout, QPushButton, QVBoxLayout, QStyle, QInputDialog
 
 from ClearMap.config.config_loader import clean_path, ConfigLoader
 from ClearMap.gui.gui_utils import UI_FOLDER, create_clearmap_widget
@@ -39,6 +39,26 @@ def get_directory_dlg(start_folder, title="Choose the source directory"):
 def prompt_dialog(title, msg):
     pressed_btn = QMessageBox.question(None, title, msg)
     return pressed_btn == QMessageBox.Yes
+
+
+def input_dialog(title, msg, data_type=str):
+    dlg = QInputDialog()
+    input_modes_map = {
+        str: QInputDialog.TextInput,
+        int: QInputDialog.IntInput,
+        float: QInputDialog.DoubleInput
+    }
+    dlg.setInputMode(input_modes_map[data_type])
+    dlg.setWindowTitle(title)
+    dlg.setLabelText(msg)
+
+    if dlg.exec() == QDialog.Accepted:
+        output_functions = {
+            str: dlg.textValue,
+            int: dlg.intValue,
+            float: dlg.doubleValue
+        }
+        return output_functions[data_type]()
 
 
 def option_dialog(base_msg, msg, options, parent=None):
@@ -78,7 +98,8 @@ def option_dialog(base_msg, msg, options, parent=None):
 
 
 # REFACTOR: make class
-def warning_popup(base_msg, msg):
+def warning_popup(base_msg, msg=''):
+    msg = msg or base_msg
     dlg = QMessageBox()
     dlg.setIcon(QMessageBox.Warning)
     dlg.setWindowTitle('Warning')
