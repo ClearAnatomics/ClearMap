@@ -99,6 +99,9 @@ def source_to_module(source_):
     type : module
         The module that handles the IO of the source.
     """
+    if isinstance(source_, pathlib.Path):
+        source_ = str(source_)
+
     if isinstance(source_, src.Source):
         return importlib.import_module(source_.__module__)
     elif isinstance(source_, (str, te.Expression)):
@@ -128,6 +131,8 @@ def location_to_module(location_):
     module : module
         The module that handles the IO of the source specified by its location.
     """
+    if isinstance(location_, pathlib.Path):
+        location_ = str(location_)
     if fl.is_file_list(location_):
         return fl
     else:
@@ -148,6 +153,9 @@ def filename_to_module(filename):
     module : module
        The module that handles the IO of the file.
     """
+    if isinstance(filename, pathlib.Path):
+        filename = str(filename)
+
     ext = fu.file_extension(filename)
 
     mod = file_extension_to_module.get(ext, None)
@@ -184,6 +192,9 @@ def is_source(source_, exists=True):
     is_source : bool
        True if source is a valid source.
     """
+    if isinstance(source_, pathlib.Path):
+        source_ = str(source_)
+
     if isinstance(source_, src.Source):
         if exists:
             return source_.exists()
@@ -218,6 +229,9 @@ def as_source(source_, slicing=None, *args, **kwargs):
     source : Source class
         The source class.
     """
+    if isinstance(source_, pathlib.Path):
+        source_ = str(source_)
+
     if not isinstance(source_, src.Source):
         mod = source_to_module(source_)
         source_ = mod.Source(source_, *args, **kwargs)
@@ -365,6 +379,9 @@ def memory(source_):
     memory : str or None
         The memory type of the source.
     """
+    if isinstance(source_, pathlib.Path):
+        source_ = str(source_)
+
     if sma.is_shared(source_):
         return 'shared'
 
@@ -695,6 +712,9 @@ def get_value(source_, value_type):  # REFACTOR: should be moved to io_utils or 
     value: number
         The value of the data type.
     """
+    if isinstance(source_, pathlib.Path):
+        source_ = str(source_)
+
     if value_type not in ['min', 'max']:
         raise ValueError(f'Unknown value type {value_type}, accepted arguments are "min" and "max"!')
 
@@ -768,6 +788,8 @@ def convert(source_, sink, processes=None, verbose=False, **kwargs):
     sink : sink specification
         The sink or list of sinks.
     """
+    if isinstance(sink, pathlib.Path):
+        sink = str(sink)
     source_ = as_source(source_)
     if verbose:
         print(f'converting {source_} -> {sink}')
