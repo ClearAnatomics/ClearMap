@@ -7,10 +7,13 @@ import sys
 import warnings
 from concurrent.futures.process import BrokenProcessPool
 
+from ClearMap.Utils.utilities import handle_deprecated_args
+
 
 class ProcessorSteps:
-    def __init__(self, workspace, postfix=''):
-        self.postfix = postfix
+    def __init__(self, workspace, channel='', sub_step=''):
+        self.channel = channel
+        self.sub_step = sub_step
         self.workspace = workspace
 
     @property
@@ -60,6 +63,35 @@ class TabProcessor:
         self.workspace = None
         self.machine_config = {}
 
+    @handle_deprecated_args(
+        {'postfix': 'asset_sub_type',
+         'prefix': 'sample_id'}
+    )
+    def get(self, asset_type, channel='current',
+            asset_sub_type=None, **kwargs):   # channel and asset_sub_type defined for completion
+        asset = self.workspace.get(asset_type, channel=channel, asset_sub_type=asset_sub_type, **kwargs)
+        return asset
+
+    def get_path(self, asset_type, channel='current',
+            asset_sub_type=None, **kwargs):   # channel and asset_sub_type defined for completion
+        return self.get(asset_type, channel=channel, asset_sub_type=asset_sub_type, **kwargs).path
+
+    def filename(self, *args, **kwargs):  # WARNING: deprecated
+        """
+        A shortcut to get the filename from the workspace
+
+        Parameters
+        ----------
+        args
+        kwargs
+
+        Returns
+        -------
+        str
+            The filename
+        """
+        return self.workspace.filename(*args, **kwargs)
+
     def set_progress_watcher(self, watcher):
         self.progress_watcher = watcher
 
@@ -98,16 +130,16 @@ class TabProcessor:
 
     def stop_process(self):  # REFACTOR: put in parent class ??
         self.stopped = True
-        if hasattr(self.workspace, 'executor') and self.workspace.executor is not None:
+        if executor := getattr(self.workspace, 'executor', None):
             if sys.version_info[:2] >= (3, 9):
                 print('Canceling process')
-                self.workspace.executor.shutdown(cancel_futures=True)  # The new clean version
+                executor.shutdown(cancel_futures=True)  # The new clean version
             else:
-                self.workspace.executor.immediate_shutdown()  # Dirty but we have no choice in python < 3.9
+                executor.immediate_shutdown()  # Dirty but we have no choice in python < 3.9
             self.workspace.executor = None
             # raise BrokenProcessPool
-        elif hasattr(self.workspace, 'process') and self.workspace.process is not None:
-            self.workspace.process.terminate()
+        elif process := getattr(self.workspace, 'process', None):
+            process.terminate()
             # self.workspace.process.wait()
             self.workspace.process = None
             raise CanceledProcessing
