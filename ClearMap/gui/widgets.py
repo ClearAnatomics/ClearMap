@@ -1018,10 +1018,10 @@ class PatternDialog(WizardDialog):
         """
         self.tile_extension = tile_extension
         self.min_file_number = min_file_number
-        super().__init__('pattern_prompt', 'File paths wizard', src_folder, params, app, [600, None])
-        self.n_image_groups = 0
-        self.pattern_strings = {}
         self.patterns_finders = None
+        self.n_image_groups = 0
+        # Init at the end to not overwrite result of setup
+        super().__init__('pattern_prompt', 'File paths wizard', src_folder, params, app, [600, None])
 
     def setup(self):
         """
@@ -1031,15 +1031,14 @@ class PatternDialog(WizardDialog):
         self.n_image_groups = 0
         self.dlg.patternToolBox = QToolBox(parent=self.dlg)
         self.dlg.patternWizzardLayout.insertWidget(0, self.dlg.patternToolBox)
-        self.pattern_strings = {}
         self.patterns_finders = self.get_patterns()
         for pattern_idx, p_finder in enumerate(self.patterns_finders):
             self.add_group()
-            for axis, digits_idx in enumerate(p_finder.pattern.digit_clusters):
-                label_widget, pattern_widget, combo_widget = self.get_widgets(pattern_idx, axis)
-                pattern_widget.setText(p_finder.pattern.highlight_digits(axis))
+            for axis_idx, axis_name in enumerate(p_finder.pattern.tag_names()):
+                label_widget, pattern_widget, combo_widget = self.get_widgets(pattern_idx, axis_idx)
+                pattern_widget.setText(p_finder.pattern.highlight_digits(axis_name))
                 self.enable_widgets((label_widget, pattern_widget, combo_widget))
-            for ax in range(axis + 1, 4):  # Hide the rest
+            for ax in range(p_finder.pattern.n_tags(), 4):  # Hide the rest
                 self.hide_widgets(self.get_widgets(pattern_idx, ax))
 
     def get_widgets(self, image_group_id, axis):
@@ -1076,6 +1075,9 @@ class PatternDialog(WizardDialog):
         self.dlg.patternToolBox.addItem(group_controls, f'Image group {self.n_image_groups}')
 
         group_controls.patternButtonBox.button(QDialogButtonBox.Apply).clicked.connect(self.validate_pattern)
+        group_controls.channelNameLineEdit.setText(f'Channel {self.n_image_groups}')  # REFACTOR: check if could read from CFG
+        data_types = list(dict.fromkeys(DATA_CONTENT_TYPES))  # avoid duplicates while keeping order
+        group_controls.dataTypeComboBox.addItems(data_types)
 
         self.n_image_groups += 1
 
@@ -1092,28 +1094,20 @@ class PatternDialog(WizardDialog):
         Validate the pattern defined by the user and update the result widget
         The result is saved in the pattern_strings attribute for the current channel name
         """
-        pattern_idx = self.dlg.patternToolBox.currentIndex()
+        tool_box = self.dlg.patternToolBox
+        pattern_idx = tool_box.currentIndex()
         pattern = self.patterns_finders[pattern_idx].pattern
-        for subpattern_idx, digit_cluster in enumerate(pattern.digit_clusters):
-            _, _, combo_widget = self.get_widgets(pattern_idx, subpattern_idx)
+        for i in range(pattern.n_tags()):
+            combo_widget = self.get_widgets(pattern_idx, i)[2]
             axis_name = combo_widget.currentText()
-            n_axis_chars = len(pattern.digit_clusters[subpattern_idx])
-
             if axis_name == 'C':
-                raise NotImplementedError('Channel splitting is not implemented yet')
-            else:
-                pattern_element = '<{axis},{length}>'.format(axis=axis_name, length=n_axis_chars)
-                pattern.pattern_elements[subpattern_idx] = pattern_element
+                raise NotImplementedError(f'Channel splitting is not implemented yet, cannot split {i}')
+            pattern.set_axis_name(i, axis_name)
 
-        result_widget = self.dlg.patternToolBox.widget(pattern_idx).result
-        pattern_string = pattern.get_formatted_pattern()
-        pattern_string = os.path.join(self.patterns_finders[pattern_idx].folder, pattern_string)
-        pattern_string = os.path.relpath(pattern_string, start=self.src_folder)
+        pattern_string = str(Path(pattern.string()).relative_to(self.src_folder))
 
+        result_widget = tool_box.widget(pattern_idx).result
         result_widget.setText(pattern_string)
-
-        channel_name = self.dlg.patternToolBox.widget(pattern_idx).channelComboBox.currentText()
-        self.pattern_strings[channel_name] = pattern_string
 
     def get_patterns(self):
         """
@@ -1124,30 +1118,31 @@ class PatternDialog(WizardDialog):
         list(PatternFinder)
             The pattern finders for the source folder
         """
-        splash, progress_bar = make_splash(bar_max=100)
-        splash.show()
+        progress_bar = make_simple_progress_dialog(title='Scanning source folder')
         with ThreadPool(processes=1) as pool:
             result = pool.apply_async(pattern_finders_from_base_dir,
-                                      [self.src_folder, None, self.min_file_number, self.tile_extension])
+                                      [self.src_folder, self.min_file_number, self.tile_extension])
             while not result.ready():
                 result.wait(0.25)
-                update_pbar(self.app, progress_bar, 1)  # TODO: real update
+                update_pbar(self.app, progress_bar.mainProgressBar, 1)  # TODO: real update
                 self.app.processEvents()
             pattern_finders = result.get()
-        update_pbar(self.app, progress_bar, 100)
-        splash.finish(self.dlg)
+        update_pbar(self.app, progress_bar.mainProgressBar, 100)
         return pattern_finders
 
     def save_results(self):
         """
         Save the file patterns to the `sample` configuration file and close the dialog
         """
-        config_loader = ConfigLoader(self.src_folder)
-        sample_cfg = config_loader.get_cfg('sample')
-        for channel_name, pattern_string in self.pattern_strings.items():
-            sample_cfg['src_paths'][channel_name] = pattern_string
-        sample_cfg.write()
-        self.params.cfg_to_ui()
+
+        for i in range(self.dlg.patternToolBox.count()):
+            page = self.dlg.patternToolBox.widget(i)
+            channel_name = page.channelNameLineEdit.text()
+            p = self.params[channel_name]  # FIXME: assert that updated when changing channel name
+            p.path = page.result.text()
+            p.data_type = page.dataTypeComboBox.currentText()
+            p.extension = self.tile_extension[0]
+        self.params.ui_to_cfg()
         self.dlg.close()
 
 
