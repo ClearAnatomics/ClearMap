@@ -6,20 +6,27 @@ gui_utils
 Various utility functions specific to the graphical interface
 """
 
-import inspect
 import os
 from math import sqrt, ceil
+import inspect
 
 import warnings
 
 import matplotlib
 import numpy as np
 import skimage.io
+
 from PyQt5 import QtGui
 from PyQt5.QtGui import QColor
+from PyQt5.QtWidgets import QLayout
 from matplotlib.colors import hsv_to_rgb
+from skimage import transform as sk_transform
+
+from ClearMap import Settings
+from ClearMap.IO import TIF
 
 from ClearMap.gui.pyuic_utils import loadUiType
+from ClearMap.gui.widget_monkeypatch_callbacks import recursive_patch_widgets
 
 warnings.filterwarnings('ignore', category=RuntimeWarning, module='ClearMap.gui.gui_utils')  # For surface_project
 
@@ -228,3 +235,95 @@ def clear_layout(layout):
             widg = item.widget()
             widg.setParent(None)
             widg.deleteLater()
+
+def find_parent_layout(widget):
+    parent = widget.parent()
+    while parent is not None:
+        if isinstance(parent, QLayout):
+            return parent
+        parent = parent.parent()
+    return None
+
+def delete_widget(widget, layout=None):
+    if layout is None:
+        layout = find_parent_layout(widget)
+    layout.removeWidget(widget)
+    widget.setParent(None)
+    widget.deleteLater()
+
+
+def disconnect_widget_signal(widget_signal, max_iter=10):
+    for i in range(max_iter):
+        try:
+            widget_signal.disconnect()
+        except TypeError:  # i.e. not connected
+            return
+    raise ValueError(f'Could not disconnect signal after {max_iter} iterations')
+
+
+def unique_connect(signal, slot, max_disconnect_iter=10):
+    """
+    Connect a signal to a slot, disconnecting any previous connection
+
+    Parameters
+    ----------
+    signal: pyqtSignal
+        The signal to connect
+    slot: callable
+        The slot to connect
+    """
+    disconnect_widget_signal(signal, max_iter=max_disconnect_iter)
+    signal.connect(slot)
+
+
+def replace_widget(old_widget, new_widget, layout=None):
+    """
+    Replace a widget in a layout. If no layout is provided, the parent layout of the old widget is used
+    The old widget is deleted.
+
+    Parameters
+    ----------
+    old_widget: QWidget
+        The widget to replace
+    new_widget: QWidget
+        The new widget to insert
+    layout: QLayout | None
+        The layout in which to replace the widget. If None, the parent layout of the old widget is used
+
+    Returns
+    -------
+    QWidget
+        The new widget
+    """
+    if layout is None:
+        layout = find_parent_layout(old_widget)
+    layout.replaceWidget(old_widget, new_widget)
+    old_widget.setParent(None)
+    old_widget.deleteLater()
+    return new_widget
+
+
+def get_widget(layout, key='', widget_type=None, index=0):
+    """
+    Retrieve the widget (label or control) based on the key and index.
+
+    Parameters:
+    layout (QLayout): The layout containing the widgets.
+    key (str): The key to search for in the widget's objectName.
+    index (int): The index to specify whether to get the first (0) or second (1) occurrence.
+
+    Returns:
+    QWidget: The widget that matches the key and index.
+    """
+    if not key and not widget_type:
+        raise ValueError('Either key or widget_type must be specified')
+    count = 0
+    for i in range(layout.count()):
+        widget = layout.itemAt(i).widget()
+        if widget:
+            if (key and key in widget.objectName() or
+                    widget_type and isinstance(widget, widget_type)):
+                if count == index:
+                    return widget, count
+                count += 1
+    return None, count
