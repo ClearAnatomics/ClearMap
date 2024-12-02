@@ -1005,7 +1005,7 @@ def align_layout(layout, axis_range=None, max_shifts=10, axis_mip=None,
                  find_shifts='minimization',
                  verbose=False, processes=None, workspace= None):
 
-  if validate is not None:
+  if validate is not None:  # FIXME: handle_deprecated_parameters
     if not stack_validation_params:
       stack_validation_params = validate
     warnings.warn('Parameter validate is deprecated, please use stack_validation_params instead',
@@ -2281,17 +2281,19 @@ def stitch_layout(layout, sink, method = 'interpolation', processes = None, verb
     #for l in layout_slices:
     #  l.sources_as_virtual();
     with CancelableProcessPoolExecutor(processes) as executor:
-      executor.map(_stitch, layout_slices, range(n_slices))
+      results = executor.map(_stitch, layout_slices, range(n_slices))
       if workspace is not None:
         workspace.executor = executor
     if workspace is not None:
       workspace.executor = None
-    
+    if verbose:
+      timer.print_elapsed_time('Stitching: parallel stitching wobbly layout done. Gathering results!')
+    results = list(results)
   
   if verbose:
-    timer.print_elapsed_time('Stitching: stitching wobbly layout done!');
+    timer.print_elapsed_time('Stitching: stitching wobbly layout done!')
 
-  return sink;
+  return sink
 
 
 @ptb.parallel_traceback
