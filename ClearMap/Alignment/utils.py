@@ -80,7 +80,7 @@ def create_label_table(fpath, save=False, from_cached=False):
     """
     Parameters
     ----------
-    fpath: str
+    fpath: str | Path
         Path to a JSON file similar to the one downloaded from 'http://api.brain-map.org/api/v2/structure_graph_download/1.json'
 
     Returns
@@ -88,7 +88,7 @@ def create_label_table(fpath, save=False, from_cached=False):
     df: pd.DataFrame
         dataframe holding informations on the labels ()
     """
-
+    fpath = str(fpath)
     assert fpath.endswith('.json')
 
     if from_cached:
