@@ -376,41 +376,45 @@ def set_path_transform_files(result_directory):
         shutil.move(tmpfn, ff)
 
 
-def set_metric_parameter_file(parameter_file, metric):
+def set_metric_parameter_file(parameter_file_path, new_metric):
     """Replaces the metric in the parameter file.
 
     Arguments
     ---------
-    parameter_file : str
+    parameter_file_path : str
       The parameter file name.
-    metric : str
+    new_metric : str
       The metric to use.
 
     Notes
     -----
     Used to replace the metric when inverse transform is estimated.
     """
-    fh, tmpfn = tempfile.mkstemp()
-    rec = re.compile("\(Metric \"(?P<parname>.*)\"\)")
-    mset = False
+    metric_pattern = re.compile(r'\(Metric "(?P<metric_name>.*)"\)')
+    metric_set = False
 
-    with open(tmpfn, 'w') as newfile, open(parameter_file) as parfile:
-        for line in parfile:
-            # print line
-            m = rec.match(line)
-            if m is not None:
-                pn = m.group('parname')
-                newfile.write(line.replace(pn, metric))
-                mset = True
-            else:
-                newfile.write(line)
+    try:
+        with tempfile.NamedTemporaryFile('w', delete=False) as temp_file:
+            temp_file_path = temp_file.name
+            with open(parameter_file_path, 'r') as parameter_file:
+                for line in parameter_file:
+                    match = metric_pattern.match(line)
+                    if match:
+                        current_metric = match.group('metric_name')
+                        temp_file.write(line.replace(current_metric, new_metric))
+                        metric_set = True
+                    else:
+                        temp_file.write(line)
+            if not metric_set:
+                temp_file.write(f'(Metric "{new_metric}")\n')
 
-    if not mset:
-        newfile.write(f'(Metric "{metric}")\n')
+        shutil.move(temp_file_path, parameter_file_path)
 
-    os.close(fh)  # FIXME: try finally
-    os.remove(parameter_file)
-    shutil.move(tmpfn, parameter_file)
+    except Exception as error:
+        print(f"Error setting metric in parameter file: {error}")
+        if os.path.exists(temp_file_path):
+            os.remove(temp_file_path)
+        raise error
 
 
 def result_data_file(result_directory):
