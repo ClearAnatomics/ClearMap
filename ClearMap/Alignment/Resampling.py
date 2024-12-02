@@ -733,8 +733,8 @@ def resample_inverse(resampled, original=None,
 # Resample Points
 ########################################################################################
 @handle_deprecated_args({
-    'source': 'resampled_points',
-    'sink': 'original_points',
+    'source': 'original_points',
+    'sink': 'resampled_points',
     'source_shape': 'original_shape',
     'sink_shape': 'resampled_shape',
     'source_resolution': 'original_resolution',
