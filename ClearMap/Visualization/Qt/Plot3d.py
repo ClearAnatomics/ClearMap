@@ -65,11 +65,15 @@ def plot(source, axis=None, scale=None, title=None, invert_y=True, min_max=None,
     plot : DataViewer
       A data viewer class.
     """
-    if isinstance(source, Path):
-        source = str(source)
-
     if not isinstance(source, (list, tuple)):
         source = [source]
+    if isinstance(source, tuple):
+        source = list(source)
+
+    for i, src in enumerate(source):
+        if isinstance(src, Path):
+            source[i] = str(src)
+
     m_plot = multi_plot(source, axis=axis, scale=scale, title=title, invert_y=invert_y,
                         min_max=min_max, max_projection=max_projection, screen=screen, arrange=arrange, lut=lut, to_front=to_front,
                         parent=parent, sync=sync)
