@@ -10,11 +10,11 @@ from ClearMap.processors.sample_preparation import init_preprocessor
 import ClearMap.Alignment.Stitching.StitchingRigid as stitching_rigid
 
 
-def stitch_and_plot_layout():
+def stitch_and_plot_layout(channel):
     pre_proc = init_preprocessor('/data/test/')
-    stitching_cfg = pre_proc.processing_config['stitching']
-    overlaps, projection_thickness = define_auto_stitching_params(pre_proc.workspace.source('raw').file_list[0],
-                                                                  stitching_cfg)
+    stitching_cfg = pre_proc.processing_config['stitching'][channel]['rigid']
+    overlaps, projection_thickness = define_auto_stitching_params(
+        pre_proc.workspace.source('raw', channel=channel).file_list[0], stitching_cfg)
     layout = pre_proc.get_wobbly_layout(overlaps)
     return pre_proc.overlay_layout_plane(layout.copy())
 
