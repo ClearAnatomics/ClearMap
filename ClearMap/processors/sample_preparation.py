@@ -9,45 +9,47 @@ import os
 import platform
 import re
 import sys
+from collections import defaultdict
 from concurrent.futures.process import BrokenProcessPool
+from pathlib import Path
 
 import numpy as np
 
 # noinspection PyPep8Naming
 import matplotlib
-import tifffile
+from configobj import ConfigObj
 
-from ClearMap.Visualization.Color.Color import gray_image_to_rgb
+from ClearMap.IO.assets_constants import CONTENT_TYPE_TO_PIPELINE
+from ClearMap.Utils.exceptions import MissingRequirementException
+from ClearMap.gui.gui_utils import surface_project, setup_mini_brain
 
 matplotlib.use('Qt5Agg')
 
-
 import ClearMap.Settings as settings
-from ClearMap.Utils.utilities import runs_on_ui, requires_files, FilePath
-from ClearMap.config.atlas import ATLAS_NAMES_MAP, STRUCTURE_TREE_NAMES_MAP
-from ClearMap.gui.gui_utils import TmpDebug  # REFACTOR: move to workspace object
+from ClearMap.Utils.utilities import topological_sort, check_stopped
+from ClearMap.config.atlas import ATLAS_NAMES_MAP
 from ClearMap.processors.generic_tab_processor import TabProcessor, CanceledProcessing
 # noinspection PyPep8Naming
 import ClearMap.Alignment.Elastix as elastix
 # noinspection PyPep8Naming
-import ClearMap.Alignment.Annotation as annotation
-# noinspection PyPep8Naming
-import ClearMap.IO.Workspace as workspace
+from ClearMap.Alignment.Annotation import Annotation
 # noinspection PyPep8Naming
 import ClearMap.IO.IO as clearmap_io
 # noinspection PyPep8Naming
 import ClearMap.Visualization.Qt.Plot3d as plot_3d
+import ClearMap.Visualization.Plot3d as q_plot_3d
 # noinspection PyPep8Naming
 import ClearMap.Alignment.Resampling as resampling
 # noinspection PyPep8Naming
 import ClearMap.Alignment.Stitching.StitchingRigid as stitching_rigid
 # noinspection PyPep8Naming
 import ClearMap.Alignment.Stitching.StitchingWobbly as stitching_wobbly
-from ClearMap.IO.metadata import define_auto_stitching_params, define_auto_resolution, pattern_finders_from_base_dir
-from ClearMap.IO.elastix_config import ElastixParser
+from ClearMap.IO.metadata import define_auto_stitching_params, define_auto_resolution
 from ClearMap.config.config_loader import get_configs, ConfigLoader, CLEARMAP_CFG_DIR
 from ClearMap.config.update_config import update_default_config
-import ClearMap.Visualization.Plot3d as q_plot_3d
+from ClearMap.IO.assets_specs import TypeSpec, ChannelSpec
+from ClearMap.IO.workspace2 import Workspace2
+from ClearMap.Visualization.Color.Color import gray_image_to_rgb
 
 
 __author__ = 'Christoph Kirst <christoph.kirst.ck@gmail.com>, Charly Rousseau <charly.rousseau@icm-institute.org>'
@@ -57,46 +59,76 @@ __webpage__ = 'https://idisco.info'
 __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
 
-class PreProcessor(TabProcessor):
+DEFAULT_ORIENTATION = (1, 2, 3)   # FIXME: defined in several places
+
+class SampleManager(TabProcessor):
     """
-    Handle the stitching and alignment of the raw images
+    This class is used to manage the sample information
+    Manage sample-level configurations and properties.
+    Handle configurations related to the sample.
+    Provide utility methods for checking sample properties.
+
     """
     def __init__(self):
         super().__init__()
         self.config_loader = None
         self.src_directory = None
-        self.resources_directory = None
-        self.sample_config = {}
-        self.processing_config = {}
-        self.align_channels_affine_file = ''
-        self.align_reference_affine_file = ''
-        self.align_reference_bspline_file = ''
-        self.default_annotation_file_path = None
-        self.default_hemispheres_file_path = None
-        self.default_reference_file_path = None
-        self.default_distance_file_path = None
-        self.annotation_file_path = ''
-        self.hemispheres_file_path = ''
-        self.reference_file_path = ''
-        self.distance_file_path = ''
-        self.__align_auto_to_ref_re = re.compile(r"\d+\s-?\d+\.\d+\s\d+\.\d+\s\d+\.\d+\s\d+\.\d+")
-        self.__align_resampled_to_auto_re = re.compile(r"\d+\s-\d+\.\d+\s\d+\.\d+\s\d+\.\d+\s\d+\.\d+\s\d+\.\d+")
-        self.__resample_re = ('Resampling: resampling',
-                              re.compile(r".*?Resampling:\sresampling\saxes\s.+\s?,\sslice\s.+\s/\s\d+"))
-        self.__wobbly_stitching_place_re = 'done constructing constraints for component'
-        self.__wobbly_stitching_algin_lyt_re = ('Alignment: Wobbly alignment',
-                                                re.compile(r"Alignment:\sWobbly alignment \(\d+, \d+\)->\(\d+, \d+\) "
-                                                           r"along axis [0-3] done: elapsed time: \d+:\d{2}:\d{2}.\d+"))
-        self.__wobbly_stitching_stitch_re = ('Stitching: stitching',
-                                             re.compile(r'Stitching: stitching wobbly slice \d+/\d+'))
-        self.__rigid_stitching_align_re = ('done',
-                                           re.compile(r"Alignment: aligning \(\d+, \d+\) with \(\d+, \d+\), alignment"
-                                                      r" pair \d+/\d+ done, shift = \(-?\d+, -?\d+, -?\d+\),"
-                                                      r" quality = -\d+\.\d+e\+\d+!"))
-        # if not runs_on_spyder():
-        #     pyqtgraph.mkQApp()
-        if not os.path.exists(CLEARMAP_CFG_DIR):
-            update_default_config()
+        self.config = {}
+        self.stitching_cfg = {}
+        self.registration_cfg = {}
+
+        self.setup_complete = False
+
+    def setup(self, cfgs=None, src_dir=None, watcher=None):
+        """
+        Setup the sample manager with the given configs.
+        If watcher is provided, it will be used to display progress.
+
+        Parameters
+        ----------
+        cfgs : tuple(str) | tuple(Path) | tuple(ConfigObj)
+            (machine_cfg_path, sample_cfg_path, stitching_cfg_path, registration_cfg_path) or
+            (machine_cfg, sample_cfg, stitching_cfg, registration_cfg)
+        src_dir : str | Path | None
+            The source directory of the sample
+        watcher: ProgressWatcher | None
+            The progress watcher to use
+        """
+        # Get source directory and setup the loader
+        if src_dir and not cfgs:
+            self.src_directory = Path(src_dir)
+            cfgs = self.load_configs_from_dir()
+        else:
+            sample_cfg = cfgs[1]  # Path, name or config
+            if isinstance(sample_cfg, (Path, str)) and '/' in str(sample_cfg):
+                self.src_directory = Path(sample_cfg).parent
+            elif isinstance(sample_cfg, ConfigObj):
+                self.src_directory = Path(sample_cfg.filename).parent
+            else:
+                if self.src_directory is None:
+                    raise ValueError('Source directory not set and required to load configs with names only')
+        self.config_loader = ConfigLoader(self.src_directory)
+
+        # Load the configs
+        cfgs = list(cfgs)
+        for i, cfg in enumerate(cfgs):
+            if isinstance(cfg, (Path, str)):
+                cfgs[i] = self.config_loader.get_cfg(cfg)
+        self.machine_config, self.config, self.stitching_cfg, self.registration_cfg = cfgs
+
+        if watcher is not None:
+            self.progress_watcher = watcher  # FIXME: in stitcher and registration too
+
+        first_channel = list(self.config['channels'].keys())[0]
+        self.workspace = Workspace2(self.src_directory, sample_id=self.prefix,
+                                    default_channel=first_channel)
+        for channel, cfg in self.config['channels'].items():
+            self.workspace.add_raw_data(file_path=cfg['path'],
+                                        channel_id=channel,
+                                        data_content_type=cfg['data_type'],
+                                        sample_id=self.prefix)
+        self.workspace.info()
+        self.setup_complete = True
 
     @property
     def prefix(self):
@@ -108,25 +140,31 @@ class PreProcessor(TabProcessor):
         str
             The prefix to use, None to not use any
         """
-        return self.sample_config['sample_id'] if self.sample_config['use_id_as_prefix'] else None
+        return self.config['sample_id'] if self.config['use_id_as_prefix'] else None
 
-    def filename(self, *args, **kwargs):
+    @property
+    def channels(self):
+        return list(self.config['channels'].keys())
+
+    @property
+    def data_types(self):
+        return [channel_cfg['data_type'] for channel_cfg in self.config['channels'].values()]
+
+    @property
+    def relevant_pipelines(self):
         """
-        A shortcut to get the filename from the workspace
-
-        Parameters
-        ----------
-        args
-        kwargs
+        All the pipelines relevant to any of the sample channels
 
         Returns
         -------
-        str
-            The filename
+        List[str]
+            The relevant pipeline names
         """
-        return self.workspace.filename(*args, **kwargs)
+        pipelines = [CONTENT_TYPE_TO_PIPELINE.get(d_type) for d_type in self.data_types]
+        pipelines = list(set([p for p in pipelines if p is not None]))
+        return pipelines
 
-    def z_only(self, channel='raw'):
+    def z_only(self, channel):
         """
         Check if the channel is z only (no x or y tiles)
 
@@ -140,28 +178,11 @@ class PreProcessor(TabProcessor):
         bool
             True if the channel is z only
         """
-        tags = self.workspace.expression(channel, prefix=self.prefix).tags
-        axes = [tag.name for tag in tags]
-        return axes == ['Z']
+        return self.get('raw', channel, prefix=self.prefix).tag_names == ['Z']
 
-    @property
-    def is_tiled(self):
-        """
-        Check if the raw channel is tiled (has x and y tiles)
-
-        Returns
-        -------
-        bool
-            True if the raw channel is tiled
-        """
-        return self.__is_tiled('raw')
-
-    def __is_tiled(self, channel):
-        tags = self.workspace.expression(channel, prefix=self.prefix).tags
-        if not tags:
-            return False
-        else:
-            return not self.z_only(channel)
+    def is_tiled(self, channel):
+        asset = self.get('raw', channel, prefix=self.prefix)
+        return asset.is_tiled and not self.z_only(channel)
 
     @property
     def autofluorescence_is_tiled(self):
@@ -172,17 +193,15 @@ class PreProcessor(TabProcessor):
         bool
             True if the autofluorescence channel is tiled
         """
-        return self.__is_tiled('autofluorescence')
+        return self.is_tiled(self.alignment_reference_channel)
 
-    def __has_tiles(self, channel):
-        # extension = 'npy' if self.use_npy() else None
+    def has_tiles(self, channel=None):
+        # extension = '.npy' if self.use_npy() else None
         # return len(clearmap_io.file_list(self.filename(channel, prefix=self.prefix, extension=extension)))
         # noinspection PyTypeChecker
-        return len(clearmap_io.file_list(self.filename(channel, prefix=self.prefix)))
-
-    @property
-    def has_tiles(self):
-        return self.__has_tiles('raw')
+        if channel is None:
+            return bool(self.stitchable_channels)
+        return self.get('raw', channel=channel, sample_id=self.prefix).n_tiles > 1
 
     def check_has_all_tiles(self, channel):
         """
@@ -198,122 +217,538 @@ class PreProcessor(TabProcessor):
         bool
             True if all the tiles exist
         """
-        extension = 'npy' if self.use_npy() else None
-        return self.workspace.all_tiles_exist(channel, extension=extension)
+        extension = '.npy' if self.use_npy(channel) else None
+        return self.get('raw', channel, extension=extension).exists
 
     @property
-    def has_npy(self):
+    def stitchable_channels(self):
+        return self.get_stitchable_channels()
+
+    def get_stitchable_channels(self):
+        candidates = self.config['channels'].keys()
+        assets = [self.get('raw', channel=c, sample_id=self.prefix) for c in candidates]
+        stitchable_channels = [c for c, asset in zip(candidates, assets) if asset.is_tiled]
+        return stitchable_channels
+
+    def can_convert(self, channel):
+        asset = self.get('raw', channel=channel, sample_id=self.prefix)
+        return asset.is_regular_file and not asset.with_extension('.npy').exists
+
+    @property
+    def channels_to_convert(self):
+        candidates = self.config['channels'].keys()
+        return [c for c in candidates if self.can_convert(c)]
+
+    def has_npy(self, channel=None):
         """
-        Check if the raw channel is in npy format
+        Check if the channel is in npy format
+
+        Parameters
+        ----------
+        channel : str
+            The channel to check
 
         Returns
         -------
         bool
             True if the raw channel is in npy format
         """
-        # noinspection PyTypeChecker
-        return len(clearmap_io.file_list(self.filename('raw', prefix=self.prefix, extension='.npy')))
+        channels = [channel] if channel is not None else self.stitchable_channels
+        return any([self.get('raw', channel=channel, sample_id=self.prefix).with_extension('.npy').exists
+                    for channel in channels])
 
-    def get_autofluo_pts_path(self, direction='resampled_to_auto'):
-        """
-        Get the path to the autofluorescence landmarks file
+    def use_npy(self, channel):
+        asset = self.workspace.get('raw', channel=channel, prefix=self.prefix)
+        cfg = self.stitching_cfg['channels'][channel]
+        return cfg['use_npy'] or asset.expression.endswith('.npy') or asset.with_extension('.npy').exists
 
-        Parameters
-        ----------
-        direction
+    def set_configs(self, cfg_paths):
+        cfg_paths = [os.path.expanduser(p) for p in cfg_paths]
+        self.machine_config, self.config, self.stitching_cfg, self.registration_cfg = get_configs(*cfg_paths)
 
-        Returns
-        -------
-        str
-            The path to the autofluorescence landmarks file
-        """
-        elastix_folder = self.filename(direction)
-        return os.path.join(elastix_folder, 'autolfuorescence_landmarks.pts')  # TODO: use workspace
+    def get_configs(self):
+        cfg = {
+            'machine': self.machine_config,
+            'sample': self.config,
+            'stitching': self.stitching_cfg,
+            'registration': self.registration_cfg
+        }
+        return cfg
 
-    def clear_landmarks(self):
+    @property
+    def alignment_reference_channel(self):
+        for channel, cfg in self.config['channels'].items():
+            if cfg['data_type'] == 'autofluorescence':
+                return channel
+        return
+
+    def delete_resampled_files(self):
+        for channel in self.registration_cfg['channels'].keys():
+            asset = self.get('resampled', channel=channel)
+            if asset.exists:
+                asset.delete()
+
+    def stitched_shape(self, channel):
+        asset = self.get('stitched', channel=channel, sample_id=self.prefix)
+        if asset.exists:
+            return asset.shape()
+        elif self.resampled_shape(channel) is not None:
+            raw_resampled_res_from_cfg = np.array(self.registration_cfg['channels'][channel]['resampled_resolution'])
+            raw_res_from_cfg = np.array(self.config['channels'][channel]['resolution'])
+            return self.resampled_shape(channel) * (raw_resampled_res_from_cfg / raw_res_from_cfg)
+        else:
+            raise FileNotFoundError(f'Could not get stitched shape without '
+                                    f'stitched or resampled file for channel {channel}')
+
+    def resampled_shape(self, channel):
+        asset = self.workspace.get('resampled', channel=channel, sample_id=self.prefix)
+        if asset.exists:
+            return asset.shape()
+
+    def load_configs_from_dir(self):
+        cfg_loader = ConfigLoader(self.src_directory)
+        return [cfg_loader.get_cfg(name) for name in ('machine', 'sample', 'stitching', 'registration')]
+
+    def asset_names_to_assets(self, asset_names, channel=None, sample_id=None):
+        return [self.workspace.get(asset_name) for asset_name in asset_names]
+
+    @staticmethod
+    def compress(assets, format=None):
+        for asset in assets:
+            asset.compress(algorithm=format)
+
+    @staticmethod
+    def decompress(assets, check=True):
+        for asset in assets:
+            asset.decompress(check=check)
+
+    @staticmethod
+    def plot(assets, **kwargs):  # FIXME: what if len(assets) > 1 ? Should plot together
+        for asset in assets:
+            asset.plot(**kwargs)
+
+    @staticmethod
+    def convert(assets, new_extension, processes=None, verbose=False, **kwargs):
+        for asset in assets:
+            asset.convert(new_extension, processes=processes, verbose=verbose, **kwargs)
+
+    @staticmethod
+    def resample(assets, x_scale=1, y_scale=1, z_scale=1,
+                 x_resolution=None, y_resolution=None, z_resolution=None,
+                 x_shape=None, y_shape=None, z_shape=None,
+                 orientation=None,  # TODO: add orientation
+                 processes=None, verbose=False, **kwargs):
+        resolution_params = {
+            'x_scale': x_scale,
+            'y_scale': y_scale,
+            'z_scale': z_scale,
+            'x_shape': x_shape,
+            'y_shape': y_shape,
+            'z_shape': z_shape,
+            'x_resolution': x_resolution,
+            'y_resolution': y_resolution,
+            'z_resolution': z_resolution
+        }
+        resolution_params = {k: v for k, v in resolution_params.items() if v not in (1, None)}
+        for asset in assets:
+            if 'x_shape' in resolution_params.keys():
+                resampling_params = {
+                    'original_shape': asset.shape(),
+                    'resampled_shape': tuple([resolution_params[f'{ax}_shape'] for ax in 'xyz'])}
+            elif 'x_resolution' in resolution_params.keys():
+                resampling_params = {
+                    'resampled_resolution': tuple([resolution_params[f'{ax}_resolution'] for ax in 'xyz'])}
+                # FIXME: needs original resolution
+                #   resampling_params = {'original_resolution': ...}
+            elif 'x_scale' in resolution_params.keys():
+                original_shape = {ax: s for ax, s in zip('xyz', asset.shape)}
+                resampling_params = {f'{ax}_shape': original_shape[ax] // resolution_params[f'{ax}_scale']
+                                     for ax in 'xyz'}
+
+            resampled_path = asset.path.with_suffix(f'.resampled.{asset.path.suffix}')
+            resampling.resample(original=str(asset.path), resampled=resampled_path,
+                                **resampling_params, orientation=orientation,
+                                processes=processes, verbose=verbose, **kwargs)
+
+
+
+class RegistrationProcessor(TabProcessor):
+    """
+    This class is used to manage the registration process
+    Perform image registration operations.
+    Manage atlas setup and transformations.
+    Handle registration configurations.
+    """
+    def __init__(self, sample_manager):
+        super().__init__()
+        self.sample_manager = sample_manager
+        self.config = {}
+        self.annotators = {}
+        self.mini_brains = {}  # 1 for each channel
+        self.progress_watcher = None  # FIXME:
+        self.__bspline_registration_re = re.compile(r"\d+\s-?\d+\.\d+\s\d+\.\d+\s\d+\.\d+\s\d+\.\d+")
+        self.__affine_registration_re = re.compile(r"\d+\s-\d+\.\d+\s\d+\.\d+\s\d+\.\d+\s\d+\.\d+\s\d+\.\d+")
+        self.__resample_re = ('Resampling: resampling',
+                              re.compile(r".*?Resampling:\sresampling\saxes\s.+\s?,\sslice\s.+\s/\s\d+"))
+
+    def setup(self, sample_manager=None):
+        self.sample_manager = sample_manager if sample_manager else self.sample_manager
+        if not self.sample_manager.registration_cfg:
+            raise ValueError('Registration config not set in sample manager')
+        self.config = self.sample_manager.registration_cfg
+        self.machine_config = self.sample_manager.machine_config
+        self.workspace = self.sample_manager.workspace
+        self.setup_atlases()  # TODO: check if needed
+
+        # WARNING: must be called once registration pipeline has been added to the Workspace for that channel
+        # self.parametrize_assets()
+
+    def parametrize_assets(self):
+        for channel in self.config['channels']:
+            for asset_type in ('fixed_landmarks', 'moving_landmarks', 'aligned'):
+                asset = self.get_elx_asset(asset_type, channel=channel)
+                if asset.is_expression:
+                    fixed_channel, moving_channel = self.get_fixed_moving_channels(channel)
+                    parametrized_asset = asset.specify({'moving_channel': moving_channel, 'fixed_channel': fixed_channel})
+                    self.workspace.asset_collections[channel][asset_type] = parametrized_asset
+
+    def channels_to_resample(self):
+        return [c for c, v in self.config['channels'].items() if v['resample']]
+
+    def channels_to_register(self):
+        return [c for c, v in self.config['channels'].items() if v['align_with'] is not None]
+
+    @property
+    def was_registered(self):  #  FIXME: much better if part of sample_manager
+        return self.get_elx_asset('aligned',
+                                  channel=self.sample_manager.alignment_reference_channel).exists
+
+    @property
+    def registration_params_files(self):
+        align_dir = Path(settings.resources_path) / self.config['atlas']['align_files_folder']
+        registration_params_files = {}
+        for channel in self.config['channels']:
+            params_file_names = self.config['channels'][channel]['params_files']
+            registration_params_files[channel] = [align_dir / name for name in params_file_names]  # TODO: property
+        return registration_params_files
+
+    def plot_atlas(self, channel):  # FIXME: idealy part of sample_manager
+        return q_plot_3d.plot(self.get('atlas', channel=channel, asset_sub_type='reference').path,
+                              lut=self.machine_config['default_lut'])
+
+    def clear_landmarks(self, channel=None):
         """
         Clear (remove) the landmarks files
         """
-        for f_path in (self.ref_pts_path, self.resampled_pts_path,
-                       self.get_autofluo_pts_path('resampled_to_auto'),
-                       self.get_autofluo_pts_path('auto_to_reference')):
-            if os.path.exists(f_path):
-                os.remove(f_path)
+        channels = [channel] if channel else self.config['channels'].keys()
+        for channel in channels:
+            for landmark_type in ('fixed', 'moving'):
+                asset = self.get_elx_asset(f'{landmark_type}_landmarks', channel=channel)
+                if asset.exists:
+                    asset.delete()
+
+    def get_fixed_moving_channels(self, channel):
+        moving_channel = self.config['channels'][channel]['moving_channel']
+        align_with = self.config['channels'][channel]['align_with']
+        if not align_with:
+            raise ValueError(f'Channel {channel} missing align_with in registration config')
+        # fixed is whichever channel from ('channel', 'align_with') is not 'moving_channel'
+        fixed_channel = channel if align_with == moving_channel else align_with
+        return fixed_channel, moving_channel
+
+    def get_elx_asset(self, asset_type, channel):
+        fixed_channel, moving_channel = self.get_fixed_moving_channels(channel)
+
+        asset = self.get(asset_type, channel=channel)
+        if not asset.is_expression:
+            return asset
+        else:
+            if asset.is_parametrized:
+                return asset
+            else:
+                parametrized_asset = asset.specify({'moving_channel': moving_channel, 'fixed_channel': fixed_channel})
+                self.workspace.asset_collections[channel][asset_type] = parametrized_asset
+                return parametrized_asset
+
+    def get_img_to_register(self, channel, other_channel):
+        if other_channel == 'atlas':
+            return self.get('atlas', channel=channel, asset_sub_type='reference')
+        else:
+            return self.get('resampled', channel=other_channel)
+
+    def get_moving_image(self, channel):
+        _, moving_channel = self.get_fixed_moving_channels(channel)
+        return self.get_img_to_register(channel, moving_channel)
+
+    def get_fixed_image(self, channel):
+        fixed_channel, _ = self.get_fixed_moving_channels(channel)
+        return self.get_img_to_register(channel, fixed_channel)
+
+    def get_aligned_image(self, channel):
+        aligned = self.get_elx_asset('aligned', channel=channel)
+        return aligned.all_existing_paths(sort=True)[-1]  # The last step is the final result
+
+
+    def resample_channel(self, channel, increment_main=False):  # set increment_main to True for channels > 0
+        resampled_asset = self.get('resampled', channel=channel)
+        if resampled_asset.exists:
+            raise FileExistsError(f'Resampled asset ({resampled_asset}) already exists')
+        default_resample_parameter = {
+            'processes': self.machine_config['n_processes_resampling'],
+            'verbose': self.config['verbose']
+        }  # WARNING: duplicate (use method ??)
+        clearmap_io.delete_file(resampled_asset.path)  # TODO: asset.delete() if exists
+        source = self.get('stitched', channel=channel, default=None)
+        source = source if source else self.get('raw', channel)
+        if not source.exists:
+            raise FileNotFoundError(f'Cannot resample {channel}, source {source} missing')
+
+        if source.is_tiled:
+            src_res = define_auto_resolution(source.file_list[0], self.sample_manager.config['channels'][channel]['resolution'])
+        else:
+            src_res = self.sample_manager.config['channels'][channel]['resolution']
+
+        # TODO: IMPROVE: use img metadata or z pattern instead
+        alignment_source = self.get('raw', channel=self.sample_manager.alignment_reference_channel)
+        n_planes = len(alignment_source.file_list)
+        if n_planes < 2:  # e.g. 1 file
+            n_planes = clearmap_io.shape(alignment_source.path)[-1]
+        self.prepare_watcher_for_substep(n_planes, self.__resample_re, f'Resampling {channel}',
+                                         increment_main=increment_main)
+
+        resampled_asset = self.get('resampled', channel=channel)
+        result = resampling.resample(str(source.path), resampled=str(resampled_asset.path),
+                                     original_resolution=src_res,
+                                     resampled_resolution=self.config['channels'][channel]['resampled_resolution'],
+                                     workspace=self.workspace,
+                                     **default_resample_parameter)
+        try:
+            pass
+        except BrokenProcessPool:
+            print('Resampling canceled')
+            return
+        assert result.array.max() != 0, f'Resampled {channel} has no data'
+        assert resampled_asset.exists, f'Resampled {channel} not saved at {resampled_asset.path}'
 
     @property
-    def resampled_pts_path(self):
-        return os.path.join(self.filename('resampled_to_auto'), 'resampled_landmarks.pts')
+    def n_registration_steps(self):
+        n_steps_atlas_setup = 1
+        n_steps_align = 2  # WARNING: probably 1 more when arteries included
+        n_resampling_steps = len(self.sample_manager.channels_to_resample())
+        return n_steps_atlas_setup + n_resampling_steps + n_steps_align
 
-    @property
-    def ref_pts_path(self):
-        return os.path.join(self.filename('auto_to_reference'), 'reference_landmarks.pts')  # TODO: use workspace
+    @check_stopped
+    def resample_for_registration(self, _force=False):
+        for i, channel in enumerate(self.sample_manager.channels_to_resample()):
+            self.resample_channel(channel, increment_main=i != 0)
+            if self.stopped:
+                return
+        self.update_watcher_main_progress()
 
-    def setup(self, cfgs, watcher=None, convert_tiles=True):
+    @check_stopped
+    def align(self, _force=False):
+        try:
+            for channel in self.channels_to_register():
+                self.align_channel(channel)
+                self.update_watcher_main_progress()
+        except CanceledProcessing:
+            print('Alignment canceled')
+        self.stopped = False
+
+    def align_channel(self, channel):
+        fixed_channel, moving_channel = self.get_fixed_moving_channels(channel)
+        run_bspline = any(['bspline' in self.config['channels'][channel]['params_files']])
+        n_steps = 17000 if run_bspline else 2000
+        regexp = self.__bspline_registration_re if run_bspline else self.__affine_registration_re
+        self.prepare_watcher_for_substep(n_steps, regexp, f'Align {moving_channel} to {fixed_channel}')
+        align_parameters = {
+            "moving_image": self.get_moving_image(channel).existing_path,
+            "fixed_image": self.get_fixed_image(channel).existing_path,
+
+            'parameter_files': self.registration_params_files[channel],
+
+            "result_directory": self.get_elx_asset('aligned', channel=channel).path.parent,
+            'workspace': self.workspace,  # FIXME: use semaphore instead
+            'check_alignment_success': True
+        }
+        landmarks_steps = self.config['channels'][channel]['use_landmarks_for']
+        if landmarks_steps:
+            if len(landmarks_steps) != len(self.registration_params_files[channel]):
+                raise NotImplemented('Selecting landmarks for a subset of steps is currently not implemented')
+            landmarks_files = {
+                'moving_landmarks_path': self.get_elx_asset('moving_landmarks', channel=channel).path,
+                'fixed_landmarks_path': self.get_elx_asset('fixed_landmarks', channel=channel).path,
+            }
+        else:
+            landmarks_files = {'moving_landmarks_path': '', 'fixed_landmarks_path': ''}  # Disable landmarks w/ empty str
+        elastix.align_from_dict(align_parameters, landmarks_files)
+
+    def get_atlas_files(self):
+        if not self.get('atlas', asset_sub_type='annotation',
+                        channel=self.sample_manager.alignment_reference_channel).exists:
+            self.setup_atlases()
+        atlas_files = {}
+        for channel in self.config['channels']:
+            atlas_files[channel] = self.annotators[channel].get_atlas_paths()
+        return atlas_files
+
+    def __setup_source_atlas(self, atlas_base_name):
+        default_annotator = Annotation(atlas_base_name, None, None, label_source='ABA json 2022')
+        # TODO: use workspace instead
+        channel_spec = ChannelSpec(channel_name='atlas', content_type='atlas')
+        self.create_atlas_asset(default_annotator, channel_spec)
+
+    def create_atlas_asset(self, annotator, channel_spec):
+        try:
+            atlas_asset = self.get('atlas', channel=channel_spec.name)
+            return atlas_asset
+        except KeyError:
+            type_spec = TypeSpec(
+                resource_type='atlas',
+                type_name='atlas',
+                file_format_category='image',
+                relevant_pipelines=['registration']
+            )
+            atlas_asset = self.workspace.create_asset(type_spec, channel_spec=channel_spec, sample_id=self.sample_manager.prefix)
+            for sub_type_name, file_path in annotator.get_atlas_paths().items():
+                atlas_asset.type_spec.add_sub_type(sub_type_name, expression=os.path.abspath(file_path))
+            atlas_asset.type_spec.add_sub_type('label', expression=annotator.label_file,
+                                               extensions=['json'])
+            return atlas_asset
+
+    def project_mini_brain(self, channel):  # FIXME: idealy part of sample_manager
         """
+        Project the mini brain of the channel as a mask and a surface projection
 
         Parameters
         ----------
-        cfgs tuple of (machine_cfg_path, sample_cfg_path, processing_cfg_path) or
-            (machine_cfg, sample_cfg, processing_cfg)
+        channel: str
+            The channel to project
 
         Returns
         -------
-
+        np.ndarray, np.ndarray
+            The mask and the projection
         """
-        self.resources_directory = settings.resources_path
-        if all([isinstance(cfg, str) for cfg in cfgs]):
-            self.set_configs(cfgs)
-        else:  # Directly the config
-            self.machine_config, self.sample_config, self.processing_config = cfgs
-        self.src_directory = os.path.dirname(self.sample_config.filename)
-        self.config_loader = ConfigLoader(self.src_directory)
+        img = self.__transform_mini_brain(channel)
+        mask, proj = surface_project(img)
+        return mask, proj
 
-        if watcher is not None:
-            self.progress_watcher = watcher
+    def __transform_mini_brain(self, channel):  # REFACTOR: move to preprocessor
+        """
+        Apply the set of transforms to the mini brain as defined by the crop and
+        orientation parameters input by the user.
 
-        self.workspace = workspace.Workspace(self.processing_config['pipeline_name'], directory=self.src_directory,
-                                             prefix=self.prefix)
-        self.workspace.tmp_debug = TmpDebug(self.workspace)
-        src_paths = {k: v for k, v in self.sample_config['src_paths'].items() if v is not None}
-        self.workspace.update(**src_paths)
-        self.workspace.info()
+        Returns
+        -------
+        np.ndarray
+            The transformed mini brain
+        """
+        def scale_range(rng, scale):
+            for i in range(len(rng)):
+                if rng[i] is not None:
+                    rng[i] = round(rng[i] / scale)
+            return rng
+
+        def range_or_default(rng, scale):
+            if rng is not None:
+                return scale_range(rng, scale)
+            else:
+                return 0, None
+
+        params = self.sample_manager.config['channels'][channel]
+        orientation = params['orientation']
+        img = self.mini_brains[channel]['array'].copy()
+        x_scale, y_scale, z_scale = self.mini_brains[channel]['scaling']
+
+        if axes_to_flip := [abs(axis) - 1 for axis in orientation if axis < 0]:
+            img = np.flip(img, axes_to_flip)
+        img = img.transpose([abs(axis) - 1 for axis in orientation])
+        x_min, x_max = range_or_default(params['slicing']['x'], x_scale)
+        y_min, y_max = range_or_default(params['slicing']['y'], y_scale)
+        z_min, z_max = range_or_default(params['slicing']['z'], z_scale)
+        img = img[x_min:x_max, y_min:y_max:, z_min:z_max]
+        return img
+
+    def setup_atlases(self):  # TODO: add possibility to load custom reference file (i.e. defaults to None in cfg)
+        if not self.config:
+            return  # Not setup yet. TODO: find better way around
+        self.prepare_watcher_for_substep(0, None, 'Initialising atlases')
+
+        sample_cfg = self.sample_manager.config['channels']
+        atlas_cfg = self.config['atlas']
+
+        atlas_base_name = ATLAS_NAMES_MAP[atlas_cfg['id']]['base_name']
+        self.__setup_source_atlas(atlas_base_name)
+
+        orientation = None
+        slicing = None
+        # TODO: atlas variants as multichannel assets
+        for channel in sample_cfg.keys():
+            if sample_cfg[channel]['orientation'] != orientation:
+                orientation = sample_cfg[channel]['orientation']
+            if sample_cfg[channel]['slicing'] != slicing:
+                slicing = sample_cfg[channel]['slicing']
+                xyz_slicing = tuple(slice(None) if slc is None else slice(*slc) for slc in slicing.values())
+            else:
+                xyz_slicing = None
+
+            if xyz_slicing is None and (orientation is None or orientation == DEFAULT_ORIENTATION):
+                target_directory = settings.atlas_folder  # For the unchanged atlas
+            else:
+                target_directory = self.sample_manager.src_directory / 'atlas'
+
+            self.annotators[channel] = Annotation(atlas_base_name, xyz_slicing, orientation,
+                                                  label_source=atlas_cfg['structure_tree_id'],
+                                                  target_directory=target_directory)
+
+            scaling, mini_brain = setup_mini_brain(atlas_base_name)
+            self.mini_brains[channel] = {}
+            self.mini_brains[channel]['scaling'] = scaling
+            self.mini_brains[channel]['array'] = mini_brain
+
+            # Add to workspace
+            channel_spec = self.get('raw', channel=channel).channel_spec
+            atlas_asset = self.create_atlas_asset(self.annotators[channel], channel_spec)
+            self.workspace.add_asset(atlas_asset)
+
+        self.update_watcher_main_progress()
+
+
+class StitchingProcessor(TabProcessor):
+    """
+    This class is used to manage the stitching process
+    Handle image stitching operations.
+    Manage stitching configurations and processes.
+    """
+    def __init__(self, sample_manager):
+        super().__init__()
+        self.sample_manager = sample_manager
+        self.config = {}  # REFACTOR: only cfg
+        self.progress_watcher = None  # FIXME:
+        self.__wobbly_stitching_place_re = 'done constructing constraints for component'
+        self.__wobbly_stitching_align_lyt_re = ('Alignment: Wobbly alignment',
+                                                re.compile(r"Alignment:\sWobbly alignment \(\d+, \d+\)->\(\d+, \d+\) "
+                                                           r"along axis [0-3] done: elapsed time: \d+:\d{2}:\d{2}.\d+"))
+        self.__wobbly_stitching_stitch_re = ('Stitching: stitching',
+                                             re.compile(r'Stitching: stitching wobbly slice \d+/\d+'))
+        self.__rigid_stitching_align_re = ('done',
+                                           re.compile(r"Alignment: aligning \(\d+, \d+\) with \(\d+, \d+\), alignment"
+                                                      r" pair \d+/\d+ done, shift = \(-?\d+, -?\d+, -?\d+\),"
+                                                      r" quality = -\d+\.\d+e\+\d+!"))
+
+    def setup(self, sample_manager=None, convert_tiles=False):
+        self.sample_manager = sample_manager if sample_manager else self.sample_manager
+        if not self.sample_manager.stitching_cfg:
+            raise ValueError('Stitching config not set in sample manager')
+        self.config = self.sample_manager.stitching_cfg
+        self.machine_config = self.sample_manager.machine_config
+        self.workspace = self.sample_manager.workspace
         if convert_tiles:
-            self.convert_tiles()
-        # FIXME: check if setup_atlas should go here
+            self.convert_tiles()  # TODO: check if needed
 
-    def unpack_atlas(self, atlas_base_name):
-        res = annotation.decompress_atlases(atlas_base_name)
-        self.default_annotation_file_path, self.default_hemispheres_file_path, \
-            self.default_reference_file_path, self.default_distance_file_path = res
-
-    def stack_columns(self):
-        pattern_finders = pattern_finders_from_base_dir(self.src_directory)
-        for pat_finder in pattern_finders:
-            for y in pat_finder.y_values:
-                for x in pat_finder.x_values:
-                    stack = np.vstack([tifffile.imread(f_path) for f_path in pat_finder.get_sub_tiff_paths(x=x, y=y)])
-                    new_path = pat_finder.sub_pattern_str(x=x, y=y)
-                    tifffile.imsave(new_path, stack)
-
-    @property
-    def aligned_autofluo_path(self):
-        return os.path.join(self.filename('auto_to_reference'), 'result.1.mhd')
-    
-    @property
-    def raw_stitched_shape(self):
-        if self.resampled_shape is not None:
-            raw_resampled_res_from_cfg = np.array(self.processing_config['registration']['resampling']['raw_sink_resolution'])
-            raw_res_from_cfg = np.array(self.sample_config['resolutions']['raw'])
-            return self.resampled_shape * (raw_resampled_res_from_cfg / raw_res_from_cfg)
-        else:
-            return clearmap_io.shape(self.filename('stitched'))
-
-    @property
-    def resampled_shape(self):
-        if os.path.exists(self.filename('resampled')):
-            return clearmap_io.shape(self.filename('resampled'))
-
-    def convert_tiles(self, force=False):
+    @check_stopped
+    def convert_tiles(self, _force=False):
         """
         Convert list of input files to numpy files for efficiency reasons
 
@@ -321,162 +756,125 @@ class PreProcessor(TabProcessor):
         -------
 
         """
-        if self.stopped:
-            return
-        if force or self.use_npy():
-            file_list = self.workspace.file_list('raw')
+        first_channel = list(self.config['channels'])[0]  # FIXME: less arbitrary than first channel
+        cfg = self.config['channels'][first_channel]
+        if _force:
+            state = cfg['use_npy']
+            cfg['use_npy'] = True
+        for channel in self.sample_manager.stitchable_channels:
+            self.convert_tiles_channel(channel)
+        self.update_watcher_main_progress()
+        if _force:
+            cfg['use_npy'] = state
+
+    def convert_tiles_channel(self, channel):
+        if self.sample_manager.use_npy(channel):
+            asset = self.get('raw', channel=channel, prefix=self.sample_manager.prefix)
+            file_list = asset.file_list
             if not file_list or os.path.splitext(file_list[0])[-1] == '.tif':
                 try:
-                    clearmap_io.convert_files(self.workspace.file_list('raw', extension='tif'), extension='npy',
-                                              processes=self.machine_config['n_processes_file_conv'],
-                                              workspace=self.workspace, verbose=self.verbose, verify=True)
+                    asset.convert('.npy', processes=self.machine_config['n_processes_file_conv'],
+                                  workspace=self.workspace, verbose=self.verbose, verify=True)
                 except BrokenProcessPool:
-                    print('File conversion canceled')
+                    print(f'File conversion of {channel} to numpy canceled')
                     return
-                if self.sample_config['src_paths']['arteries']:
-                    try:
-                        clearmap_io.convert_files(self.workspace.file_list('arteries', extension='tif'),
-                                                  extension='npy',
-                                                  processes=self.machine_config['n_processes_file_conv'],
-                                                  workspace=self.workspace, verbose=self.verbose, verify=True)
-                    except BrokenProcessPool:
-                        print('File conversion canceled')
-                        return
-            self.update_watcher_main_progress()
 
-    def use_npy(self):
-        return self.processing_config['conversion']['use_npy'] or \
-               self.filename('raw').endswith('.npy') or \
-               os.path.exists(self.filename('raw', extension='npy'))
+    def get_stitching_order(self):
+        """
+        Get the channels in the order they should be stitched
+        to respect the layout_channel dependency chain
 
-    def set_configs(self, cfg_paths):
-        cfg_paths = [os.path.expanduser(p) for p in cfg_paths]
-        self.machine_config, self.sample_config, self.processing_config = get_configs(*cfg_paths)
+        Returns
+        -------
+        list[str]
+            The channels in the order they should be stitched
+        """
+        graph = defaultdict(list)
+        in_degree = defaultdict(int)
 
-    def setup_atlases(self):  # TODO: add possibility to load custom reference file (i.e. defaults to None in cfg)
-        if not self.processing_config:
-            return  # Not setup yet. FIXME: find better way around
-        self.prepare_watcher_for_substep(0, None, 'Initialising atlases')
-        atlas_base_name = ATLAS_NAMES_MAP[self.processing_config['registration']['atlas']['id']]['base_name']
-        self.unpack_atlas(atlas_base_name)
-        x_slice = slice(None) if self.sample_config['slice_x'] is None else slice(*self.sample_config['slice_x'])
-        y_slice = slice(None) if self.sample_config['slice_y'] is None else slice(*self.sample_config['slice_y'])
-        z_slice = slice(None) if self.sample_config['slice_z'] is None else slice(*self.sample_config['slice_z'])
-        xyz_slicing = (x_slice, y_slice, z_slice)
-        res = annotation.prepare_annotation_files(
-            slicing=xyz_slicing,
-            orientation=self.sample_config['orientation'],
-            annotation_file=self.default_annotation_file_path, hemispheres_file=self.default_hemispheres_file_path,
-            reference_file=self.default_reference_file_path, distance_to_surface_file=self.default_distance_file_path,
-            hemispheres=True,
-            overwrite=False, verbose=True)
-        self.annotation_file_path, self.hemispheres_file_path, self.reference_file_path, self.distance_file_path = res
-        annotation.set_annotation_file(self.annotation_file_path)
+        for channel, cfg in self.config['channels'].items():
+            if not cfg['run']:
+                continue
+            layout_channel = cfg.get('layout_channel', channel)  # default to self
+            if layout_channel != channel:
+                graph[layout_channel].append(channel)
+                in_degree[channel] += 1
+            if channel not in in_degree:
+                in_degree[channel] = 0
 
-        structure_tree_id = self.processing_config['registration']['atlas']['structure_tree_id']
-        structure_file_name = STRUCTURE_TREE_NAMES_MAP[structure_tree_id]
-        annotation.set_label_file(os.path.join(settings.atlas_folder, structure_file_name))
+        return topological_sort(graph, in_degree)  # Could use graph_tool
 
-        self.update_watcher_main_progress()
-        atlas_cfg = self.processing_config['registration']['atlas']
-        align_dir = os.path.join(self.resources_directory, atlas_cfg['align_files_folder'])
-        self.align_channels_affine_file = os.path.join(align_dir, atlas_cfg['align_channels_affine_file'])
-        self.align_reference_affine_file = os.path.join(align_dir, atlas_cfg['align_reference_affine_file'])
-        self.align_reference_bspline_file = os.path.join(align_dir, atlas_cfg['align_reference_bspline_file'])
+    def stack_columns(self, channel):
+        asset = self.get('raw', channel=channel, prefix=self.sample_manager.prefix)
+        exp = asset.expression
+        if exp.n_tags() >= 3:
+            for y in range(exp.tag_max('Y')):
+                for x in range(exp.tag_max('X')):
+                    column_expression = exp.string(values={'X': x, 'Y': y})
+                    dest = column_expression.replace('_xyz-Table Z<Z,4>', '')  # REFACTOR: find better way
+                    clearmap_io.convert(column_expression, dest)
+            # squash Z axis  # REFACTOR: find better way
+            asset.expression = exp.string().replace('_xyz-Table Z<Z,4>', '')  # overwrite expression
+            self.sample_manager.config['channels'][channel]['path'] = asset.expression
+            self.sample_manager.config.write()
 
-    def plot_atlas(self):
-        return q_plot_3d.plot(self.reference_file_path, lut=self.machine_config['default_lut'])
+    def copy_or_stack(self, channel):
+        """
+        Copy or stack the channel data in case there is no X/Y tiling
 
-    def run(self):
-        self.stitch()
-        self.resample_for_registration()
-        self.align()
-        return self.workspace, self.get_configs(), self.get_atlas_files()
+        Parameters
+        ----------
+        channel : str
+            The channel to copy or stack
+        """
+        clearmap_io.convert(self.get_path('raw', channel=channel),
+                            self.get_path('stitched', channel=channel))
+
 
     def stitch(self):
         if self.stopped:
             return
-        stitching_cfg = self.processing_config['stitching']
-        if not stitching_cfg['rigid']['skip']:
-            self.stitch_rigid()
 
-        if not stitching_cfg['wobbly']['skip']:
-            self.stitch_wobbly()
+        # Get the channels in dependency order (based on layout_channel)
+        for channel in self.get_stitching_order():
+            self.stack_columns(channel)  # If x/y/z, stack first
+            channel_cfg = self.config['channels'][channel]
+            if channel == channel_cfg['layout_channel']:
+                if not channel_cfg['rigid']['skip']:
+                    self.stitch_channel_rigid(channel)
+                if not channel_cfg['wobbly']['skip']:
+                    self.stitch_channel_wobbly(channel)
+            else:
+                self._stitch_layout_wobbly(channel)
 
-        if self.stopped:
-            return
-        self.plot_stitching_results()
-
-        if not stitching_cfg['output_conversion']['skip']:
-            self.convert_to_image_format()
-
-    @property
-    def n_channels_convert(self):
-        return [self.processing_config['stitching']['output_conversion']['raw'],
-                self.processing_config['stitching']['output_conversion']['arteries']].count(True)
-
-    def convert_to_image_format(self):  # TODO: support progress
-        """
-        Convert (optionally) to image formats readable by e.g. Fiji
-        """
-        if self.stopped:
-            return
-        fmt = self.processing_config['stitching']['output_conversion']['format'].strip('.')
-        if self.processing_config['stitching']['output_conversion']['raw']:
-            try:
-                clearmap_io.convert_files(self.workspace.file_list('stitched', extension='npy', prefix=self.prefix),
-                                          extension=fmt, processes=self.machine_config['n_processes_file_conv'],
-                                          workspace=self.workspace, verbose=True, verify=True)
-                self.update_watcher_main_progress()
-            except BrokenProcessPool:
-                print('File conversion canceled')
-                return
-        if self.processing_config['stitching']['output_conversion']['arteries']:
-            try:
-                clearmap_io.convert_files(self.workspace.file_list('stitched', postfix='arteries',
-                                                                   prefix=self.prefix, extension='npy'),
-                                          extension=fmt, processes=self.machine_config['n_processes_file_conv'],
-                                          workspace=self.workspace, verbose=True, verify=True)
-                self.update_watcher_main_progress()
-            except BrokenProcessPool:
-                print('File conversion canceled')
+            if self.stopped:
                 return
 
-    @property
-    def was_stitched_rigid(self):
-        return os.path.exists(self.filename('layout', postfix='aligned_axis'))
-
-    @property
-    def was_registered(self):
-        # return os.path.exists(self.filename('resampled_to_auto'))
-        return os.path.exists(self.aligned_autofluo_path)
-
-    @property
-    def n_channels(self):
-        return (int(self.processing_config['stitching']['run']['raw']) +
-                int(self.processing_config['stitching']['run']['arteries']))
+    def channel_was_stitched_rigid(self, channel):
+        return self.get('layout', channel=channel, asset_sub_type='aligned_axis').exists
 
     @property
     def n_rigid_steps_to_run(self):
-        return int(not self.processing_config['stitching']['rigid']['skip'])
+        cfg = self.config['channels']
+        return [not cfg[channel]['rigid']['skip'] for channel in cfg.keys()].count(True)
 
-    @requires_files([FilePath('raw')])
-    def stitch_rigid(self, force=False):
-        if force:
-            self.stopped = False
-        if self.stopped:
-            return
-        self.set_watcher_step('Stitching rigid')
-        stitching_cfg = self.processing_config['stitching']
-        overlaps, projection_thickness = define_auto_stitching_params(self.workspace.source('raw').file_list[0],
-                                                                      stitching_cfg)
-        layout = self.get_wobbly_layout(overlaps)
-        if stitching_cfg['rigid']['background_pixels'] is None:
-            background_params = stitching_cfg['rigid']['background_level']
+    # @check_stopped
+    # @requires_assets([FilePath('raw')])
+    def stitch_channel_rigid(self, channel, _force=False):
+        if not self.sample_manager.check_has_all_tiles(channel):
+            raise MissingRequirementException(f'Channel {channel} missing tiles')
+        self.set_watcher_step(f'Stitching {channel} rigid')
+        rigid_cfg = self.config['channels'][channel]['rigid']
+        overlaps, projection_thickness = define_auto_stitching_params(
+            self.get('raw', channel=channel).file_list[0],
+            rigid_cfg)
+        layout = self.get_wobbly_layout(channel, overlaps)
+        if rigid_cfg['background_pixels'] is None:
+            background_params = rigid_cfg['background_level']
         else:
-            background_params = (stitching_cfg['rigid']['background_level'],
-                                 stitching_cfg['rigid']['background_pixels'])
-        max_shifts = [stitching_cfg['rigid'][f'max_shifts_{ax}'] for ax in 'xyz']
+            background_params = (rigid_cfg['background_level'],
+                                 rigid_cfg['background_pixels'])
+        max_shifts = [rigid_cfg[f'max_shifts_{ax}'] for ax in 'xyz']
         self.prepare_watcher_for_substep(len(layout.alignments), self.__rigid_stitching_align_re, 'Align layout rigid')
         try:
             stitching_rigid.align_layout_rigid_mip(layout, depth=projection_thickness, max_shifts=max_shifts,
@@ -486,32 +884,34 @@ class PreProcessor(TabProcessor):
         except BrokenProcessPool:
             print('Stitching canceled')
             self.stopped = True  # FIXME: see if appropriate solution
-            return  # FIXME: do not run stiching_wobbly if rigid failed
+            return  # WARNING: do not run stitching_wobbly if rigid failed
         layout.place(method='optimization', min_quality=-np.inf, lower_to_origin=True, verbose=True)
         self.update_watcher_main_progress()
 
-        # layout.plot_alignments()  # TODO: TEST
-        # plt.show()
+        stitching_rigid.save_layout(self.filename('layout', channel=channel, asset_sub_type='aligned_axis'),
+                                    layout)
 
-        stitching_rigid.save_layout(self.filename('layout', postfix='aligned_axis'), layout)
-        self.layout = layout
-
-    @requires_files([FilePath('raw')])  # TODO: optional requires npy
-    def get_wobbly_layout(self, overlaps=None):
+    # @requires_assets([FilePath('raw')])  # TODO: optional requires npy + requires that channel is kwarg
+    def get_wobbly_layout(self, channel, overlaps=None):
         if overlaps is None:
-            overlaps, projection_thickness = define_auto_stitching_params(self.workspace.source('raw').file_list[0],
-                                                                          self.processing_config['stitching'])
-        extension = 'npy' if self.use_npy() else None  # TODO: optional requires
-        raw_path = self.filename('raw', extension=extension)
-        layout = stitching_wobbly.WobblyLayout(expression=raw_path, tile_axes=['X', 'Y'], overlaps=overlaps)
+            rigid_cfg = self.config['channels'][channel]['rigid']
+            overlaps, projection_thickness = define_auto_stitching_params(
+                self.get('raw', channel=channel).file_list[0], rigid_cfg).as_source()
+        extension = '.npy' if self.sample_manager.use_npy(channel) else None  # TODO: optional requires
+        raw_expr = str(self.get_path('raw', channel=channel, extension=extension))
+        layout = stitching_wobbly.WobblyLayout(expression=raw_expr, tile_axes=['X', 'Y'], overlaps=overlaps)
         return layout
 
     @property
     def n_wobbly_steps_to_run(self):
-        return int(not self.processing_config['stitching']['wobbly']['skip']) * 3 + (self.n_channels - 1)
+        out = len(self.sample_manager.stitchable_channels) - 1
+        for channel in self.sample_manager.stitchable_channels:
+            if not self.config['channels'][channel]['wobbly']['skip']:
+                out += 3
+        return out
 
-    def __align_layout_wobbly(self, layout):
-        wobbly_cfg = self.processing_config['stitching']['wobbly']
+    def __align_layout_wobbly(self, channel, layout):
+        wobbly_cfg = self.config['channels'][channel]['wobbly']
         max_shifts = [
             wobbly_cfg['max_shifts_x'],
             wobbly_cfg['max_shifts_y'],
@@ -529,7 +929,7 @@ class PreProcessor(TabProcessor):
         )
 
         n_pairs = len(layout.alignments)
-        self.prepare_watcher_for_substep(n_pairs, self.__wobbly_stitching_algin_lyt_re, 'Align layout wobbly')
+        self.prepare_watcher_for_substep(n_pairs, self.__wobbly_stitching_align_lyt_re, 'Align layout wobbly')
         try:
             stitching_wobbly.align_layout(layout, axis_range=(None, None, 3), max_shifts=max_shifts, axis_mip=None,
                                           stack_validation_params=stack_validation_params,
@@ -545,11 +945,11 @@ class PreProcessor(TabProcessor):
         self.update_watcher_main_progress()
 
     def __place_layout_wobbly(self, layout):
-        self.prepare_watcher_for_substep(len(layout.alignments) / 2,  # WARNING: bad estimation
+        self.prepare_watcher_for_substep(len(layout.alignments) // 2,  # WARNING: bad estimation
                                          self.__wobbly_stitching_place_re, 'Place layout wobbly')
         try:
             n_processes = self.machine_config['n_processes_stitching']
-            if platform.system().lower().startswith('darwin'):
+            if platform.system().lower().startswith('darwin'):  # No parallel on MacOS
                 n_processes = 1
             stitching_wobbly.place_layout(layout, min_quality=-np.inf,
                                           method='optimization',
@@ -565,298 +965,81 @@ class PreProcessor(TabProcessor):
             return
         self.update_watcher_main_progress()
 
-    def __stitch_layout_wobbly(self):
-        layout = stitching_rigid.load_layout(self.filename('layout', postfix='placed'))
-        n_slices = len(self.workspace.file_list('autofluorescence'))  # TODO: find better proxy
-        self.prepare_watcher_for_substep(n_slices, self.__wobbly_stitching_stitch_re, 'Stitch layout wobbly', True)
+    def _stitch_layout_wobbly(self, channel):
+        layout_channel = self.config['channels'][channel]['layout_channel']
+        layout = stitching_rigid.load_layout(self.get_path('layout', channel=layout_channel, postfix='placed'))
+
+        ref_asset = self.get('raw', channel=self.sample_manager.alignment_reference_channel)
+        n_slices = len(ref_asset.file_list)  # TODO: find better proxy
+        self.prepare_watcher_for_substep(n_slices, self.__wobbly_stitching_stitch_re,
+                                         'Stitch layout wobbly', True)
         try:
-            stitching_wobbly.stitch_layout(layout, sink=self.filename('stitched'), method='interpolation',
+            layout_channel_asset = self.get('raw', channel=layout_channel)
+            channel_asset = self.get('raw', channel=channel)
+            if layout_channel != channel:
+                if self.sample_manager.use_npy(channel):  # FIXME: check if we need to copy layout first
+                    layout.replace_source_location(str(layout_channel_asset.with_extension('.npy')),
+                                                   str(channel_asset.with_extension('.npy')))
+                else:
+                    layout.replace_source_location(str(layout_channel_asset.path), str(channel_asset.path))
+            stitching_wobbly.stitch_layout(layout,
+                                           sink=str(self.get_path('stitched', channel=channel)),
+                                           method='interpolation',
                                            processes=self.machine_config['n_processes_stitching'],
                                            workspace=self.workspace, verbose=True)
         except BrokenProcessPool:
             print('Wobbly stitching canceled')
             return
 
-        if self.processing_config['stitching']['run']['arteries']:
-            self.prepare_watcher_for_substep(n_slices, self.__wobbly_stitching_stitch_re,
-                                             'Stitch layout wobbly arteries', True)
-            try:
-                if self.use_npy():
-                    layout.replace_source_location(self.filename('raw', extension='npy'),
-                                                   self.filename('arteries', extension='npy'))
-                else:
-                    layout.replace_source_location(self.filename('raw'), self.filename('arteries'))
-                stitching_wobbly.stitch_layout(layout, sink=self.filename('stitched', postfix='arteries'),
-                                               method='interpolation',
-                                               processes=self.machine_config['n_processes_stitching'],
-                                               workspace=self.workspace, verbose=True)
-            except BrokenProcessPool:
-                print('Wobbly stitching arteries canceled')
-                return
         self.update_watcher_main_progress()
 
-    def stitch_wobbly(self, force=False):
-        if force:
-            self.stopped = False
-        if self.stopped:
-            return
+    @check_stopped
+    def stitch_channel_wobbly(self, channel, _force=False):  # Warning, will stitch channel on its own
+        def get_layout_path(layout_sub_type):
+            return self.get_path('layout', channel=channel, asset_sub_type=layout_sub_type)
+# FIXME: check if ui_to_cfg is needed
+        if not self.channel_was_stitched_rigid(channel):
+            raise MissingRequirementException(f'Channel {channel} not stitched rigid yet')
         self.set_watcher_step('Stitching wobbly')
-        layout = stitching_rigid.load_layout(self.filename('layout', postfix='aligned_axis'))
-        self.__align_layout_wobbly(layout)
+        layout = stitching_rigid.load_layout(get_layout_path('aligned_axis'))
+        self.__align_layout_wobbly(channel, layout)
         if self.stopped:
             return
-        stitching_rigid.save_layout(self.filename('layout', postfix='aligned'), layout)
+        stitching_rigid.save_layout(get_layout_path('aligned'), layout)
 
-        # layout = st.load_layout(self.filename('layout', postfix='aligned'))  # FIXME: check if required
         self.__place_layout_wobbly(layout)
         if self.stopped:
             return
-        stitching_rigid.save_layout(self.filename('layout', postfix='placed'), layout)
+        stitching_rigid.save_layout(get_layout_path('placed'), layout)
 
-        self.__stitch_layout_wobbly()
+        self._stitch_layout_wobbly(channel)
         if self.stopped:
             return
 
-    def __resample_raw(self):
-        if os.path.exists(self.filename('resampled')):
-            raise FileExistsError(f'Resampled raw ({self.filename("resampled")}) already exists')
-        resampling_cfg = self.processing_config['registration']['resampling']
-        default_resample_parameter = {
-            'processes': self.machine_config['n_processes_resampling'],
-            'verbose': resampling_cfg['verbose']
-        }  # WARNING: duplicate (use method ??)
-        clearmap_io.delete_file(self.filename('resampled'))  # FIXME:
-        try:
-            f_list = self.workspace.source('raw').file_list
-        except AttributeError:  # e.g. single file, force use of config
-            f_list = None
-        if f_list:
-            src_res = define_auto_resolution(f_list[0], self.sample_config['resolutions']['raw'])
-        else:
-            src_res = self.sample_config['resolutions']['raw']
-
-        n_planes = len(self.workspace.file_list('autofluorescence'))  # FIXME: use uimg metadata or z pattern of raw instead
-        if n_planes < 2:  # e.g. 1 file
-            n_planes = clearmap_io.shape(self.workspace.filename('autofluorescence'))[-1]
-        self.prepare_watcher_for_substep(n_planes, self.__resample_re, 'Resampling raw')
-        try:
-            result = resampling.resample(self.filename('stitched'),
-                                         original_resolution=src_res,
-                                         resampled=self.filename('resampled'),
-                                         resampled_resolution=resampling_cfg['raw_sink_resolution'],
-                                         workspace=self.workspace,
-                                         **default_resample_parameter)
-        except BrokenProcessPool:
-            print('Resampling canceled')
-            return
-        assert result.array.max() != 0, 'Resampled raw has no data'
-
-    def __resample_autofluorescence(self):
-        if os.path.exists(self.filename('resampled', postfix='autofluorescence')):
-            raise FileExistsError(f'Resampled autofluorescence '
-                                  f'({self.filename("resampled", postfix="autofluorescence")}) already exists')
-        resampling_cfg = self.processing_config['registration']['resampling']
-        default_resample_parameter = {
-            'processes': self.machine_config['n_processes_resampling'],
-            'verbose': resampling_cfg['verbose']
-        }  # WARNING: duplicate (use method ??)
-        try:
-            auto_fluo_path = self.workspace.file_list('autofluorescence')[0]
-        except IndexError:
-            print('Could not resample autofluorescence, file not found')
-            return
-        auto_res = define_auto_resolution(auto_fluo_path, self.sample_config['resolutions']['autofluorescence'])
-        n_planes = len(self.workspace.file_list('autofluorescence'))  # TODO: find more elegant solution for counter
-        if n_planes < 2:  # e.g. 1 file
-            n_planes = clearmap_io.shape(self.workspace.filename('autofluorescence'))[-1]
-        self.prepare_watcher_for_substep(n_planes, self.__resample_re, 'Resampling autofluorescence', True)
-        try:
-            result = resampling.resample(self.filename('autofluorescence'),
-                                         original_resolution=auto_res,
-                                         resampled=self.filename('resampled', postfix='autofluorescence'),
-                                         resampled_resolution=resampling_cfg['autofluo_sink_resolution'],
-                                         workspace=self.workspace,
-                                         **default_resample_parameter)
-        except BrokenProcessPool:
-            print('Resampling canceled')
-            return
-        assert result.array.max() != 0, 'Resampled autofluorescence has no data'
-
-    @property
-    def n_registration_steps(self):
-        resampling_cfg = self.processing_config['registration']['resampling']  # WARNING: probably 1 more when arteries included
-        n_steps_atlas_setup = 1
-        n_steps_align = 2  # WARNING: probably 1 more when arteries included
-        return n_steps_atlas_setup + int(not resampling_cfg['skip'])*2 + n_steps_align
-
-    def resample_for_registration(self, force=False):
-        if force:
-            self.stopped = False
-        if self.stopped:
-            return
-        resampling_cfg = self.processing_config['registration']['resampling']
-        if not resampling_cfg['skip']:
-            # Raw
-            self.__resample_raw()
-            if self.stopped:
-                return
-            if resampling_cfg['plot_raw'] and not runs_on_ui():
-                plot_3d.plot(self.filename('resampled'))
-
-            # Autofluorescence
-            self.__resample_autofluorescence()
-            if self.stopped:
-                return
-            self.update_watcher_main_progress()
-            if resampling_cfg['plot_autofluo'] and not runs_on_ui():
-                plot_3d.plot([self.filename('resampled'),
-                              self.filename('resampled', postfix='autofluorescence')])
-
-    def align(self, force=False):
-        if force:
-            self.stopped = False
-        if self.stopped:
-            return
-        try:
-            self.__align_resampled_to_auto()
-            self.update_watcher_main_progress()
-            self.__align_auto_to_ref()
-            self.update_watcher_main_progress()
-        except CanceledProcessing:
-            print('Alignment canceled')
-        self.stopped = False
-
-    def __align_resampled_to_auto(self):
-        self.prepare_watcher_for_substep(2000, self.__align_resampled_to_auto_re, 'Align res to auto')
-        align_channels_parameter = {
-            # moving and reference images
-            "moving_image": self.filename('resampled', postfix='autofluorescence'),
-            "fixed_image": self.filename('resampled'),
-
-            # elastix parameter files for alignment
-            "affine_parameter_file": self.align_channels_affine_file,
-            "bspline_parameter_file": None,
-
-            "result_directory": self.filename('resampled_to_auto'),
-            'workspace': self.workspace
-        }
-        use_landmarks = os.path.exists(self.get_autofluo_pts_path('resampled_to_auto')) and os.path.exists(
-            self.resampled_pts_path)
-        if use_landmarks:  # FIXME: add use_landmarks to config
-            align_channels_parameter.update(moving_landmarks_path=self.resampled_pts_path,
-                                            fixed_landmarks_path=self.get_autofluo_pts_path('resampled_to_auto'))
-            self.patch_elastix_cfg_landmarks(self.align_channels_affine_file)
-        elastix.align(**align_channels_parameter)
-        self.restore_elastix_cfg_no_landmarks(self.align_channels_affine_file)  # FIXME: do in try except
-        self.__check_elastix_success('resampled_to_auto')
-
-    def __align_auto_to_ref(self):
-        self.prepare_watcher_for_substep(17000, self.__align_auto_to_ref_re, 'Align auto to ref')
-        align_reference_parameter = {
-            # moving and reference images
-            "moving_image": self.reference_file_path,
-            "fixed_image": self.filename('resampled', postfix='autofluorescence'),
-
-            # elastix parameter files for alignment
-            "affine_parameter_file": self.align_reference_affine_file,
-            "bspline_parameter_file": self.align_reference_bspline_file,
-            # directory of the alignment result
-            "result_directory": self.filename('auto_to_reference'),
-            'workspace': self.workspace
-        }
-        use_landmarks = os.path.exists(self.get_autofluo_pts_path('auto_to_reference')) and os.path.exists(self.ref_pts_path)
-        if use_landmarks:  # FIXME: add use_landmarks to config
-            align_reference_parameter.update(moving_landmarks_path=self.ref_pts_path,
-                                             fixed_landmarks_path=self.get_autofluo_pts_path('auto_to_reference'))
-            self.patch_elastix_cfg_landmarks(self.align_reference_bspline_file)
-        for k, v in align_reference_parameter.items():
-            if not v:
-                raise ValueError(f'Registration missing parameter "{k}"')
-        elastix.align(**align_reference_parameter)
-        for cfg_path in [self.align_reference_affine_file, self.align_reference_bspline_file]:
-            self.restore_elastix_cfg_no_landmarks(cfg_path)  # FIXME: do in try except
-        self.__check_elastix_success('auto_to_reference')
-
-    def __check_elastix_success(self, results_dir_name):
-        with open(os.path.join(self.filename(results_dir_name), 'elastix.log'), 'r') as logfile:
-            if 'fail' in logfile.read():
-                results_msg = results_dir_name.replace('_', ' ')
-                raise ValueError(f'Alignment {results_msg} failed')  # TODO: change exception type
-
-    def get_configs(self):
-        cfg = {
-            'machine': self.machine_config,
-            'sample': self.sample_config,
-            'processing': self.processing_config
-        }
-        return cfg
-
-    def get_atlas_files(self):
-        if not self.annotation_file_path:
-            self.setup_atlases()
-        atlas_files = {
-            'annotation': self.annotation_file_path,
-            'reference': self.reference_file_path,
-            'distance': self.distance_file_path
-        }
-        return atlas_files
-
-    def plot_stitching_results(self, parent=None):
-        cfg = self.processing_config['stitching']['preview']
+    def plot_stitching_results(self, channels=None, parent=None):
+        if channels is None:
+            channels = self.sample_manager.stitchable_channels
         paths = []
         titles = []
-        if cfg['raw']:
-            paths.append(self.filename('stitched'))
-            titles.append('Raw stitched')
-        if cfg['arteries']:
-            paths.append(self.filename('stitched', postfix='arteries'))  # WARNING: hard coded postfix
-            titles.append('Arteries stitched')
-        if len(paths) != 2:
+        for c in channels:
+            asset = self.get('stitched', channel=c)
+            if asset.exists:
+                paths.append(asset.path)
+                titles.append(f'{c.title()} stitched')
+            else:
+                print(f'No stitched file for channel {c}')
+        if not paths:
+            raise MissingRequirementException('No stitched files found')
+        if len(paths) == 1:
             paths = paths[0]
         dvs = plot_3d.plot(paths, title=titles, arrange=False, lut='white', parent=parent)
         return dvs
-
-    @staticmethod
-    def patch_elastix_cfg_landmarks(elastix_cfg_path):
-        """
-        Patches the elastix configuration file to use landmarks (CorrespondingPointsEuclideanDistanceMetric),
-        in addition to AdvancedMattesMutualInformation
-
-        .. warning:: This method modifies the file in place and assumes that the existing
-        metric is AdvancedMattesMutualInformation
-
-        Parameters
-        ----------
-        elastix_cfg_path : str
-            Path to the elastix configuration file
-        """
-        cfg = ElastixParser(elastix_cfg_path)
-        cfg['Registration'] = ['MultiMetricMultiResolutionRegistration']
-        cfg['Metric'] = ["AdvancedMattesMutualInformation", "CorrespondingPointsEuclideanDistanceMetric"]
-        cfg.write()
-
-    @staticmethod
-    def restore_elastix_cfg_no_landmarks(elastix_cfg_path):
-        """
-        Restores the elastix configuration file to not use landmarks (CorrespondingPointsEuclideanDistanceMetric),
-        only AdvancedMattesMutualInformation
-
-        .. warning:: This method modifies the file in place and assumes that the existing metric is
-        AdvancedMattesMutualInformation
-
-        Parameters
-        ----------
-        elastix_cfg_path
-        """
-        cfg = ElastixParser(elastix_cfg_path)
-        cfg['Registration'] = ['MultiResolutionRegistration']
-        cfg['Metric'] = ["AdvancedMattesMutualInformation"]
-        cfg.write()
 
     def stitch_overlay(self, channel, color=True):
         """
         This creates a *dumb* overlay of the tiles
         i.e. only using the fixed guess overlap
+
         Parameters
         ----------
         channel
@@ -864,26 +1047,25 @@ class PreProcessor(TabProcessor):
 
         Returns
         -------
-
+        np.array(dtype=uint8)
+            The overlay image
         """
-        positions = self.workspace.get_positions(channel)
-        mosaic_shape = {ax: max([p[ax] for p in positions]) + 1 for ax in 'XY'}  # +1 because 0 indexing
-        if self.has_npy:
-            files = self.workspace.file_list(channel, extension='npy')
-        else:
-            files = self.workspace.file_list(channel)
-        tile_shape = {k: v for k, v in zip('XYZ', clearmap_io.shape(files[0]))}
+        asset = self.get('raw', channel=channel, sample_id=self.sample_manager.prefix)
+        positions = asset.positions
+        tile_shape = {k: v for k, v in zip('XYZ', asset.tile_shape)}  # TODO: use asset.tile_grid_shape
         middle_z = int(tile_shape['Z'] / 2)
-        overlaps = {k: self.processing_config['stitching']['rigid'][f'overlap_{k.lower()}'] for k in 'XY'}
-        output_shape = [tile_shape[ax] * mosaic_shape[ax] - overlaps[ax] * (mosaic_shape[ax] - 1) for ax in 'XY']
+        overlaps = self._get_overlaps(channel)
+        output_shape = self._compute_stitched_shape_from_overlaps(overlaps, positions, tile_shape)
         layers = [np.zeros(output_shape, dtype=int), np.zeros(output_shape, dtype=int)]
+        if self.sample_manager.has_npy:
+            files = asset.variant(extension='.npy').file_list
+        else:
+            files = asset.file_list
         for tile_path, pos in zip(files, positions):
+            tile = self.__read_tile_middle_plane(tile_path, middle_z)
+
             starts = {ax: pos[ax] * tile_shape[ax] - pos[ax] * overlaps[ax] for ax in 'XY'}
             ends = {ax: starts[ax] + tile_shape[ax] for ax in starts.keys()}
-            if self.has_npy:
-                tile = clearmap_io.buffer(tile_path)[:, :, middle_z]
-            else:
-                tile = clearmap_io.read(tile_path)[:, :, middle_z]
             layer = layers[(pos['Y'] + pos['X']) % 2]  # Alternate colors
             layer[starts['X']: ends['X'], starts['Y']: ends['Y']] = tile
         if color:
@@ -894,7 +1076,24 @@ class PreProcessor(TabProcessor):
             output_image = output_image.clip(0, 255).astype(np.uint8)
         return output_image
 
-    def overlay_layout_plane(self, layout):
+    def __read_tile_middle_plane(self, tile_path, middle_z):
+        if self.sample_manager.has_npy:  # use memmap
+            tile = clearmap_io.buffer(tile_path)[:, :, middle_z]
+        else:
+            tile = clearmap_io.read(tile_path)[:, :, middle_z]
+        return tile
+
+    def _compute_stitched_shape_from_overlaps(self, overlaps, positions, tile_shape):
+        mosaic_shape = {ax: max([p[ax] for p in positions]) + 1 for ax in 'XY'}  # +1 because 0 indexing
+        output_shape = [tile_shape[ax] * mosaic_shape[ax] - overlaps[ax] * (mosaic_shape[ax] - 1) for ax in 'XY']
+        return output_shape
+
+    def _get_overlaps(self, channel):
+        layout_channel = self.config['channels'][channel]['layout_channel']
+        overlaps = {k: self.config['channels'][layout_channel]['rigid'][f'overlap_{k.lower()}'] for k in 'XY'}
+        return overlaps
+
+    def overlay_layout_plane(self, layout):  # REFACTOR: move to e.g. layout class
         """Overlays the sources to check their placement.
 
         Arguments
@@ -907,45 +1106,74 @@ class PreProcessor(TabProcessor):
         image : array
           A color image.
         """
-        sources = layout.sources
-
         dest_shape = tuple(layout.extent[:-1])
         full_lower = layout.lower
-        middle_z = round(sources[0].shape[-1] / 2)
+        middle_z = round(layout.sources[0].shape[-1] / 2)
 
         color_layers = [np.zeros(dest_shape, dtype=int), np.zeros(dest_shape, dtype=int)]
         # construct full image
-        for s in sources:
-            l = s.lower
-            u = s.upper
-            tile = clearmap_io.read(s.location)[:, :, middle_z]  # So as not to load the data into the list for memory efficiency
-            current_slicing = tuple(slice(ll - fl, uu - fl) for ll, uu, fl in zip(l, u, full_lower))[:2]
-
-            is_odd = sum(s.tile_position) % 2
+        for src in layout.sources:
+            tile = self.__read_tile_middle_plane(src.location,
+                                                 middle_z)  # So as not to load the data into the list for memory efficiency
+            is_odd = sum(src.tile_position) % 2
             layer = color_layers[is_odd]  # Alternate colors
+
+            current_slicing = self.__compute_overlay_slicing(full_lower, src)
             layer[current_slicing] = tile
 
         cyan_image = gray_image_to_rgb(color_layers[0], 'cyan', pseudo_z_score=True, range_max=255)
         magenta_image = gray_image_to_rgb(color_layers[1], 'magenta', pseudo_z_score=True, range_max=255)
 
-        output_image = cyan_image + magenta_image  # TODO: normalise
-        output_image = output_image.clip(0, 255).astype(np.uint8)
+        # TODO: normalise
+        output_image = np.clip(cyan_image + magenta_image, 0, 255).astype(np.uint8)
 
         return output_image
 
-    def plot_layout(self, postfix='aligned_axis'):
-        if postfix not in ('aligned_axis', 'aligned', 'placed'):
-            raise ValueError(f'Expected on of ("aligned_axis", "aligned", "placed") for postfix, got "{postfix}"')
-        layout = stitching_rigid.load_layout(self.filename('layout', postfix=postfix))
+    def __compute_overlay_slicing(self, full_lower, src):
+        l = src.lower
+        u = src.upper
+        current_slicing = tuple(slice(ll - fl, uu - fl) for ll, uu, fl in zip(l, u, full_lower))[:2]
+        return current_slicing
+
+    def plot_layout(self, channel, asset_sub_type='aligned_axis'):
+        valid_sub_types = ("aligned_axis", "aligned", "placed")
+        if asset_sub_type not in valid_sub_types:
+            raise ValueError(f'Expected on of {valid_sub_types} for asset_sub_type, got "{asset_sub_type}"')
+        layout = stitching_rigid.load_layout(self.get_path('layout', channel=channel, asset_sub_type=asset_sub_type))
         overlay = self.overlay_layout_plane(layout)
         return overlay
 
-    def delete_resampled_files(self):
-        for postfix in ('autofluorescence', ''):
-            path = self.filename('resampled', postfix=postfix)
-            if os.path.exists(path):
-                os.remove(path)
 
+class PreProcessor(TabProcessor):
+    """
+    Handle the stitching and alignment of the raw images
+    """
+    def __init__(self):
+        super().__init__()
+
+        self.sample_manager = SampleManager()
+        self.stitching_processor = StitchingProcessor(self.sample_manager)
+        self.registration_processor = RegistrationProcessor(self.sample_manager)
+
+        # if not runs_on_spyder():
+        #     pyqtgraph.mkQApp()
+        if not os.path.exists(CLEARMAP_CFG_DIR):
+            update_default_config()
+
+    def setup(self, configs, convert_tiles=False):
+        self.sample_manager.setup(configs['sample'])
+        self.stitching_processor.setup(configs['stitching'])
+        self.registration_processor.setup(configs['registration'])
+        if convert_tiles:
+            self.stitching_processor.convert_tiles()
+
+    def run(self):
+        self.stitching_processor.stitch()
+        self.registration_processor.resample_for_registration()
+        self.registration_processor.align()
+        return (self.sample_manager.workspace,
+                self.sample_manager.get_configs(),
+                self.registration_processor.get_atlas_files())
 
 def main():
     preprocessor = PreProcessor()
@@ -960,14 +1188,16 @@ if __name__ == '__main__':
 
 def init_preprocessor(folder, atlas_base_name=None, convert_tiles=False):
     cfg_loader = ConfigLoader(folder)
-    configs = get_configs(cfg_loader.get_cfg_path('sample'), cfg_loader.get_cfg_path('processing'))
+    machine_cfg_path = ConfigLoader.get_default_path('machine')
+    machine_cfg = cfg_loader.get_patched_cfg_from_path(machine_cfg_path)
+    cfg_names = ('sample', 'stitching', 'registration')
+    configs = {cfg_name: cfg_loader.get_patched_cfg_from_path(cfg_loader.get_cfg_path(cfg_name))
+               for cfg_name in cfg_names}
+    configs = {'machine': machine_cfg, **configs}
     pre_proc = PreProcessor()
     if atlas_base_name is None:
-        atlas_id = configs[2]['registration']['atlas']['id']
+        atlas_id = configs['registration']['atlas']['id']
         atlas_base_name = ATLAS_NAMES_MAP[atlas_id]['base_name']
-    json_file = os.path.join(settings.atlas_folder, STRUCTURE_TREE_NAMES_MAP[configs[2]['registration']['atlas']['structure_tree_id']])
-    pre_proc.unpack_atlas(atlas_base_name)
     pre_proc.setup(configs, convert_tiles=convert_tiles)
     pre_proc.setup_atlases()
-    annotation.initialize(annotation_file=pre_proc.annotation_file_path, label_file=json_file)
     return pre_proc
