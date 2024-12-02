@@ -4155,7 +4155,7 @@ def stitch_by_function(layout, sink = None, function = np.max):
   position, shape, regions = layout.embedding();
   
   # stitch image
-  if 'axis' in insp.getargspec(np.max).args:
+  if 'axis' in insp.getfullargspec(np.max).args:
     function = ft.partial(function, axis = 0);
   
   if sink is None:
@@ -4220,7 +4220,7 @@ def stitch_by_function_with_weights(layout, sink = None, function = np.sum, weig
   position, shape, regions = layout.embedding();
   
   # stitch image
-  if 'axis' in insp.getargspec(function).args:
+  if 'axis' in insp.getfullargspec(function).args:
     function = ft.partial(function, axis = 0);
   
   if sink is None:
