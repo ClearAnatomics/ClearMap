@@ -832,6 +832,166 @@ class WizardDialog:
         self.dlg.exec()
 
 
+class ManipulateAssetsDialog(WizardDialog):
+    # WARNING: need to check between asset type_name, basename and asset for mapping
+    def __init__(self, src_folder, params, sample_manager, app=None):
+        self.assets = []  # TODO: exclude is_folder assets and not asset.exists
+                          #     maybe exclude asset if asset.status == True
+        self.selected_assets = []
+        self.dlg.channelsComboBox.clear()
+        self.dlg.channelsComboBox.addItems(sample_manager.workspace.channels)
+        self.dlg.channelsComboBox.setCurrentIndex(0)
+        self.sample_manager = sample_manager
+        self.resampling_params = {'x_scale': 1, 'y_scale': 1, 'z_scale': 1,
+                                  'x_shape': None, 'y_shape': None, 'z_shape': None,
+                                  'x_resolution': None, 'y_resolution': None, 'z_resolution': None}
+        super().__init__('assets_manipulation', 'Assets manipulation wizard', src_folder, params, app, [600, None])
+        self.ortho_viewer = OrthoViewer()
+        self.list_selection = TwoListSelection()
+        self.dlg.listsLayout.addWidget(self.list_selection)
+        self.dlg.channelsComboBox.currentTextChanged.connect(self.__set_assets)
+
+    def bind(self):
+        self.dlg.buttonBox.accepted.connect(self.__apply_changes)
+        self.dlg.buttonBox.rejected.connect(self.dlg.close)
+
+        selected_model = self.list_selection.mOuput.model()
+        selected_model.rowsInserted.connect(self.__update_assets)  # Update group when selection updated
+        selected_model.rowsRemoved.connect(self.__update_assets)  # Update group when selection updated
+
+        actions = ['compress', 'decompress', 'convert', 'plot',
+                   'delete', 'resample', 'crop']
+        for action_name in actions:
+            btn = QPushButton(action_name.title(), self.dlg)
+            btn.clicked.connect(functools.partial(self.action, action_name))
+            self.dlg.controlsLayout.addWidget(btn)
+
+    @property
+    def channel(self):
+        return self.dlg.channelsComboBox.currentText()
+
+    def __set_assets(self, channel):
+        self.list_selection.clear()
+        self.assets = list(self.sample_manager.workspace.asset_collections[channel].keys())
+        self.list_selection.addAvailableItems([asset.base_name for asset in self.assets])
+
+    def __update_assets(self):
+        self.assets = [asset for asset in self.sample_manager.assets if asset.base_name in self.list_selection.get_left_elements()]
+        self.selected_assets = [asset for asset in self.assets if asset.base_name in self.list_selection.get_right_elements()]
+
+    def asset_names_to_assets(self, asset_names):  #  TEST:
+        return [self.sample_manager.get(asset_name, channel=self.channel) for asset_name in asset_names]
+
+    def action(self, action_name):
+        """
+        Perform the specified action on the selected assets.
+        This will broadcast the action to the appropriate method of the sample manager
+
+        Parameters
+        ----------
+        action_name: str
+            The name of the action to perform
+        """
+        method = getattr(self.sample_manager, f'{action_name}_assets')
+        # WARNING: resample and crop will need extra dialog to get the parameters
+        method(self.asset_names_to_assets(self.selected_assets))
+
+    def prompt_params(self, action_name):
+        """
+        Create a new dialog to prompt the user for the additional parameters of the specified action
+
+        Parameters
+        ----------
+        action_name: str
+            The name of the action to perform
+
+        Returns
+        -------
+        dict
+            The parameters to use for the action
+        """
+        params = {}
+        if action_name == 'decompress':
+            params['check'] = prompt_dialog('Decompression',
+                                            'Do you want to verify the integrity of the files?')
+        if action_name == 'convert':
+            params['processes'] = cpu_count() - 2
+            for asset in self.selected_assets:
+                if asset.type_spec.extensions:
+                    extensions = asset.type_spec.extensions
+                    break
+            else:
+                raise ValueError('No extension found in the selected assets')
+            idx = option_dialog('Select the output format',
+                                'Convert the selected asset to the following format', extensions)
+            params['extension'] = extensions[idx]
+        elif action_name == 'resample':
+            self.resample_dialog()
+        elif action_name == 'crop':
+            prompt_dialog('Crop', 'WARNING: all files will be cropped to the same region')
+            self.crop_dialog()  # Use the OrthoViewer to select the crop region
+        return params
+
+    def crop_dialog(self):
+        dlg = create_clearmap_widget('crop_dialog.ui', patch_parent_class='QDialog')  # FIXME: create ui file
+        self.ortho_viewer.setup(self.selected_assets[0].source, self.params, dlg)
+        dvs = self.ortho_viewer.plot_orthogonal_views()
+
+        n_rows, n_cols = compute_grid(len(dvs))
+        n_spacers = (n_rows * n_cols) - len(dvs)
+        for i in range(n_spacers):
+            spacer = QWidget(parent=self)
+            dvs.append(spacer)
+            # graph_names.append(f'spacer_{i}')
+
+        margin = 9
+        spacing = 6
+        for i, dv in enumerate(dvs):
+            # dv.setObjectName(graph_names[i])
+            row = i // n_cols
+            col = i % n_cols
+            if len(dvs) > 1:
+                width = floor((dlg.width() - (2 * margin) - (n_cols - 1) * spacing) / n_cols)
+                height = floor((dlg.height() - (2 * margin) - (n_rows - 1) * spacing) / n_rows)
+                dv.resize(width, height)
+                dv.setMinimumSize(width, height)  # required to avoid wobbly dv
+            dlg.graphLayout.addWidget(dv, row, col, 1, 1)
+        self.app.processEvents()
+
+
+
+    def assert_all_images(self):
+        if not all([asset.is_existing_source for asset in self.selected_assets]):
+            warning_popup('All assets must have a source image to crop')
+            return False
+        else:
+            return True
+
+    def resample_dialog(self):
+        dlg = create_clearmap_widget('resample_dialog.ui', patch_parent_class='QDialog')  # FIXME: create ui file
+        dlg.xScaleSpinBox.valueChanged.connect(functools.partial(self.update_resample_params, 'x_scale'))
+        dlg.yScaleSpinBox.valueChanged.connect(functools.partial(self.update_resample_params, 'y_scale'))
+        dlg.zScaleSpinBox.valueChanged.connect(functools.partial(self.update_resample_params, 'z_scale'))
+
+        dlg.xShapeSpinBox.valueChanged.connect(functools.partial(self.update_resample_params, 'x_shape'))
+        dlg.yShapeSpinBox.valueChanged.connect(functools.partial(self.update_resample_params, 'y_shape'))
+        dlg.zShapeSpinBox.valueChanged.connect(functools.partial(self.update_resample_params, 'z_shape'))
+
+        dlg.xResSpinBox.valueChanged.connect(functools.partial(self.update_resample_params, 'x_resolution'))
+        dlg.yResSpinBox.valueChanged.connect(functools.partial(self.update_resample_params, 'y_resolution'))
+        dlg.zResSpinBox.valueChanged.connect(functools.partial(self.update_resample_params, 'z_resolution'))
+        dlg.onAcceptButton.clicked.connect(self.resample_assets)
+        dlg.exec()
+
+    def update_resample_params(self, param_name, value):
+        self.resampling_params[param_name] = value
+
+    def resample_assets(self):
+        resampling_params = {k: v for k, v in self.resampling_params.items() if v not in (1, None)}
+        self.sample_manager.resample_assets(self.selected_assets, processes=cpu_count() -2, **resampling_params)
+
+
+
 class PatternDialog(WizardDialog):
     """
     A wizard dialog to help the user define file patterns for a set of image file paths
