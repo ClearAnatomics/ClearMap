@@ -19,7 +19,10 @@ __copyright__ = 'Copyright © 2023 by Christoph Kirst'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
-# TODO: provide modularity -> e.g. modules for various files, adding/removing channels, test data slicing etc.
+# TODO: provide modularity ->
+#   e.g. modules for various files,
+#   adding/removing channels,
+#   slicing of test data etc.
 
 import os
 
