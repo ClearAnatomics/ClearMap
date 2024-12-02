@@ -1268,27 +1268,104 @@ class SamplePickerDialog(WizardDialog):
         self.group_paths.append([])
 
 
+class Landmark:
+    def __init__(self, idx, dialog, color):
+        self.index = idx
+        self.dialog = dialog
+        self.coords = {
+            'fixed_image': (np.nan, np.nan, np.nan),
+            'moving_image': (np.nan, np.nan, np.nan)
+        }
+
+        btn_name = f'marker{idx}RadioButton'
+        btn = getattr(self.dialog, btn_name, None)
+        if not btn:
+            btn = QRadioButton(f'Marker {idx}:', self.dialog)
+            btn.setObjectName(btn_name)
+
+        color_btn_name = f'marker{idx}ColorBtn'
+        color_btn = getattr(self.dialog, color_btn_name, None)
+        if not color_btn:
+            color_btn = QPushButton(self.dialog)
+            color_btn.setObjectName(color_btn_name)
+            color_btn.setStyleSheet(f'background-color: {color}')
+
+        self.button = btn
+        self.color_btn = color_btn
+        self.activate()
+
+    def __del__(self):
+        for btn in (self.button, self.color_btn):
+            btn.setParent(None)
+            btn.deleteLater()
+
+    def __repr__(self):
+        return f'Landmark({self.coords=}, {self.color=})'
+
+    def formatted_coords(self, img_type):
+        x, y, z = self.coords[img_type]
+        return f'{z} {y} {x}\n'
+
+    @property
+    def color(self):
+        return self.color_btn.styleSheet().replace('background-color: ', '').strip()
+
+    def isChecked(self):
+        return self.button.isChecked()
+
+    def is_set(self):
+        """
+        Coords of both fixed and moving images are set
+
+        Returns
+        -------
+        bool
+        """
+        return all([all(coords) for coords in self.coords.values()])
+
+    def activate(self):
+        self.button.click()
+
+
 class LandmarksSelectorDialog(WizardDialog):  # TODO: bind qColorDialog to color buttons
     """
     A dialog to select landmarks in 3D space for registration
     The dialog allows to select landmarks in two views (fixed and moving)
     The landmarks are displayed in two 3D viewers with matching colors
+    The dialog saves the landmarks to files for the fixed and moving images
     """
 
-    def __init__(self, app=None):
+    def __init__(self, fixed_image_path, moving_image_path,
+                 fixed_image_landmarks_path, moving_image_landmarks_path, app=None):
         """
         Initialize the dialog
 
         Parameters
         ----------
+        fixed_image_path: str | Path
+            Path to the fixed image file.
+        moving_image_path: str | Path
+            Path to the moving image file.
+        fixed_image_landmarks_path: str | Path
+            Path to save the fixed image landmarks.
+        moving_image_landmarks_path: str | Path
+            Path to save the moving image landmarks.
         app: QApplication (optional)
             The QApplication instance to use. If None, ClearMap will try to use the existing instance
         """
+        self.image_paths = {
+            'fixed_image': Path(fixed_image_path),  # WARNING: fixed first so that in sync with data_viewers
+            'moving_image': Path(moving_image_path)
+        }
+        self.landmarks_file_paths = {
+            'fixed_image': Path(fixed_image_landmarks_path),
+            'moving_image': Path(moving_image_landmarks_path)
+        }
+        self.data_viewers = {k: None for k in self.image_paths.keys()}
         self.markers = []
-        self.coords = []
+
         super().__init__('landmark_selector', 'Landmark selector', app=app)
-        # self.dlg.setModal(False)
-        self.data_viewers = {}
+        self.dlg.setModal(False)
         self.dlg.show()
 
     def setup(self):
@@ -1296,15 +1373,58 @@ class LandmarksSelectorDialog(WizardDialog):  # TODO: bind qColorDialog to color
         Setup the dialog after creation from the ui file.
         This method is called automatically in the constructor
         """
-        btn = self.dlg.marker0RadioButton
-        btn.setChecked(True)
-        color_btn = self.dlg.marker0ColorBtn
-        self.markers = [(btn, color_btn)]
-        self.coords = [[(np.nan, np.nan, np.nan),
-                        (np.nan, np.nan, np.nan)]]
+        self.markers = [Landmark(idx=0, dialog=self.dlg, color=None)]
+
+    def connect_buttons(self):
+        """
+        Connect the buttons to their slots.
+        This method is called automatically in the constructor
+        """
+        self.dlg.addMarkerPushButton.clicked.connect(self.add_marker)
+        self.dlg.addMarkerPushButton.clicked.connect(functools.partial(print, 'Marker added'))
+        self.dlg.delMarkerPushButton.clicked.connect(self.remove_marker)
+        self.dlg.delMarkerPushButton.clicked.connect(functools.partial(print, 'Marker removed'))
+        self.dlg.buttonBox.accepted.connect(self.write_coords)
+        self.dlg.buttonBox.accepted.connect(functools.partial(print, 'Coords written'))
+        self.dlg.buttonBox.rejected.connect(self.dlg.close)
+        self.dlg.buttonBox.rejected.connect(functools.partial(print, 'Closing dialog'))
+
+        for btn in (self.dlg.addMarkerPushButton, self.dlg.delMarkerPushButton, self.dlg.buttonBox):
+            print(f'{btn.objectName()}, visible: {btn.isVisible()}, enabled: {btn.isEnabled()}')
+        print('Buttons connected')
 
     def __len__(self):
         return len(self.markers)
+
+    def plot(self, lut=None, parent=None):
+        """
+        Plot the 3D landmarks onto the fixed and moving images using data viewers.
+
+        Parameters
+        ----------
+        lut : str
+            Lookup table for coloring the 3D plot.
+        parent : QWidget
+            The parent widget for the plot.
+        """
+        parent = parent or self.dlg.parent()
+        titles = [os.path.basename(img) for img in self.image_paths.values()]
+        dvs = plot_3d.plot([str(p) for p in self.image_paths.values()], title=titles, arrange=False, sync=False,
+                           lut=lut, parent=parent)
+        self.data_viewers['fixed_image'] = dvs[0]
+        self.data_viewers['moving_image'] = dvs[1]
+        self.__initialize_viewers()
+
+    def __initialize_viewers(self):
+        for img_type, dv in self.data_viewers.items():
+            scatter = pg.ScatterPlotItem()
+            dv.enable_mouse_clicks()
+            dv.view.addItem(scatter)
+            dv.scatter = scatter
+            dv.scatter_coords = Scatter3D(self.get_coords(img_type),
+                                          colors=np.array(self.colors),
+                                          half_slice_thickness=3)
+            dv.mouse_clicked.connect(functools.partial(self.set_current_coords, img_type=img_type))
 
     @property
     def current_marker(self):
@@ -1314,42 +1434,41 @@ class LandmarksSelectorDialog(WizardDialog):  # TODO: bind qColorDialog to color
         -------
         int : the index of the currently selected marker
         """
-        return [marker[0].isChecked() for marker in self.markers].index(True)
+        return [marker.isChecked() for marker in self.markers].index(True)
 
-    # def get_marker_btn(self, idx):
-    #     return getattr(self.dlg, f'marker{idx}RadioButton', None)
-    #
-    # def get_marker_color_label(self, idx):
-    #     return getattr(self.dlg, f'marker{idx}ColorLabel', None)
-
-    def connect_buttons(self):
+    def write_coords(self):
         """
-        Connect the buttons to their slots.
-        This method is called automatically in the constructor
+        Write the coordinates of the markers to the respective landmarks files
         """
-        self.dlg.addMarkerPushButton.clicked.connect(self.add_marker)
-        self.dlg.delMarkerPushButton.clicked.connect(self.remove_marker)
-        # self.dlg.buttonBox.accepted.connect(self.accept)
-        self.dlg.buttonBox.rejected.connect(self.dlg.close)
+        markers = [mrkr for mrkr in self.markers if mrkr.is_set()]
+        for img_type, f_path in self.landmarks_file_paths.items():
+            f_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(f_path, 'w') as landmarks_file:
+                landmarks_file.write(f'point\n{len(markers)}\n')  # FIXME: use index ??
+                for marker in markers:
+                    landmarks_file.write(marker.formatted_coords(img_type))
 
-    @property
-    def fixed_coords(self):
-        return np.array([c[0] for c in self.coords])
+    def set_current_coords(self, x, y, z, img_type):
+        """
+        Set the coordinates for the specified image type.
 
-    @property
-    def moving_coords(self):
-        return np.array([c[1] for c in self.coords])
+        Parameters
+        ----------
+        img_type : str
+            The type of the image ('fixed_image' or 'moving_image').
+        x : float
+            The x-coordinate.
+        y : float
+            The y-coordinate.
+        z : float
+            The z-coordinate.
+        """
+        self.markers[self.current_marker].coords[img_type] = (x, y, z)
+        self._update_viewer_coords(img_type)
 
-    def set_fixed_coords(self, x, y, z):
-        self.coords[self.current_marker][0] = (x, y, z)
-        self._set_viewer_coords(0, self.fixed_coords)
-
-    def set_moving_coords(self, x, y, z):
-        self.coords[self.current_marker][1] = (x, y, z)
-        self._set_viewer_coords(1, self.moving_coords)
-
-    def _set_viewer_coords(self, viewer_idx, coords):
-        viewer = self.data_viewers[viewer_idx]
+    def _update_viewer_coords(self, img_type):
+        viewer = self.data_viewers[img_type]
+        coords = self.get_coords(img_type)
         viewer.scatter_coords.set_data({
             'x': coords[:, 0],
             'y': coords[:, 1],
@@ -1357,10 +1476,6 @@ class LandmarksSelectorDialog(WizardDialog):  # TODO: bind qColorDialog to color
             'colour': np.array([QColor(col) for col in self.colors])
         })
         viewer.refresh()
-
-    @property
-    def __style_sheets(self):
-        return [color_btn.styleSheet() for _, color_btn in self.markers]
 
     @property
     def colors(self):
@@ -1372,7 +1487,7 @@ class LandmarksSelectorDialog(WizardDialog):  # TODO: bind qColorDialog to color
         list(str)
             The markers colors
         """
-        return [sheet.replace('background-color: ', '').strip() for sheet in self.__style_sheets]
+        return [marker.color for marker in self.markers]
 
     @property
     def current_color(self):
@@ -1384,35 +1499,66 @@ class LandmarksSelectorDialog(WizardDialog):  # TODO: bind qColorDialog to color
         str
             The color of the currently selected marker
         """
-        return self.colors[self.current_marker]
+        return self.markers[self.current_marker].color
 
     def add_marker(self):
-        new_idx = len(self)
-        btn = QRadioButton(f'Marker {new_idx}:', self.dlg)
-        btn.setObjectName(f'marker{new_idx}RadioButton')
-        color_btn = QPushButton(self.dlg)
-        color_btn.setObjectName(f'marker{new_idx}ColorBtn')
-        color_btn.setStyleSheet(f'background-color: {self.get_new_color()}')
-        self.dlg.formLayout.insertRow(len(self), btn, color_btn)
-        self.markers.append((btn, color_btn))
-        self.coords.append([None, None])
-        btn.click()
+        """
+        Add a new marker to the dialog
+        """
+        marker = Landmark(idx=len(self), dialog=self.dlg, color=self.get_new_color())
+        self.dlg.formLayout.insertRow(len(self), marker.button, marker.color_btn)
+        self.markers.append(marker)
+        marker.activate()
 
-    def remove_marker(self):
-        if self.current_marker == len(self) - 1:
+    def remove_marker(self):  # TODO: add option to remove selected marker instead of last
+        """
+        Remove the last marker
+        """
+        if self.current_marker == len(self) - 1:  # If last marker, select previous
             self.markers[-2][0].setChecked(True)
-        btn, color_btn = self.markers[len(self) - 1]
-        for widg in (btn, color_btn):
-            widg.setParent(None)
-            widg.deleteLater()
-        self.markers.pop()
-        self.coords.pop()
+        marker = self.markers.pop()
+        del marker
 
     def get_new_color(self):
-        color = QColor(*[c*255 for c in get_pseudo_random_color()])
+        """
+        Get a new color for a marker (not already used)
+        Returns
+        -------
+        str
+            The new color name
+        """
+        color = QColor('red')
         while color.name() in self.colors:
-            color = QColor(*[c*255 for c in get_pseudo_random_color()])
+            color = get_pseudo_random_color('qcolor')
         return color.name()
+
+    def clear_landmarks(self):
+        """
+        Clear all the markers and the landmarks file paths and reset the dialog
+        """
+        for marker in self.markers:
+            del marker
+        self.markers = []
+        self.dlg.formLayout.removeRow(0, 1)
+        self.add_marker()
+        for f_path in self.landmarks_file_paths.values():
+            f_path.unlink(missing_ok=True)
+
+    def get_coords(self, img_type):
+        """
+        Get the coordinates of all the markers for the specified image type.
+
+        Parameters
+        ----------
+        img_type : str
+            The type of the image ('fixed_image' or 'moving_image').
+
+        Returns
+        -------
+        np.ndarray
+            The array of marker coordinates.
+        """
+        return np.array([m.coords[img_type] for m in self.markers])
 
 
 class StructurePickerWidget(QTreeWidget):
