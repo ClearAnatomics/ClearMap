@@ -6,6 +6,7 @@ gui_logging
 Defines the Printer class used to log to file and to the GUI widgets from simple prints
 """
 import sys
+import traceback
 from datetime import datetime
 from io import UnsupportedOperation
 
@@ -21,6 +22,14 @@ __copyright__ = 'Copyright © 2022 by Charly Rousseau'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
+import pygments
+from pygments.formatters.html import HtmlFormatter
+from pygments.lexers.python import PythonTracebackLexer  # noqa
+
+from qdarkstyle import DarkPalette
+
+from ClearMap.gui.style import WARNING_YELLOW
+
 
 class Printer(QWidget):
     text_updated = QtCore.pyqtSignal(str)
@@ -33,6 +42,9 @@ class Printer(QWidget):
         self.n_lines = 0
         self.color = color
         self.type = logger_type
+        # if logger_type == 'error':
+        #     self.setup_except_hook()
+        print(f'Logger initialized with type: {logger_type}, redirects: {redirects}, log path: {log_path}')
         self.redirects = redirects
 
         self.set_file(log_path, open_mode)
@@ -59,6 +71,21 @@ class Printer(QWidget):
             self.n_lines = 0
             self.__set_redirects()
 
+    def setup_except_hook(self):
+        def except_hook(exc_type, exc_value, exc_tb):
+            lexer = PythonTracebackLexer()
+            default_style = 'native'
+            style = 'nord-darker' if 'nord-darker' in pygments.styles.get_all_styles() else default_style
+            formatter = HtmlFormatter(full=True, style=style, linenos='table', wrapcode=True, noclasses=True)
+            formatter.style.background_color = DarkPalette.COLOR_BACKGROUND_1
+            raw_traceback = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
+            formatted_traceback = pygments.highlight(raw_traceback, lexer, formatter)
+            self.write(formatted_traceback)
+            if isinstance(exc_type(), Warning):
+                self.warning_disclaimer()
+
+        sys.excepthook = except_hook
+
     def __set_redirects(self):
         if self.redirects == 'stdout':
             sys.stdout = self
@@ -84,6 +111,10 @@ class Printer(QWidget):
             self.file.flush()
         except AttributeError:
             pass
+
+    def warning_disclaimer(self):
+        self.write(f'<strong><p style="color:{WARNING_YELLOW}">'
+                   f'THIS IS A WARNING AND CAN NORMALLY BE SAFELY IGNORED</p></strong>')
 
     def fileno(self):
         if self.file is not None:
