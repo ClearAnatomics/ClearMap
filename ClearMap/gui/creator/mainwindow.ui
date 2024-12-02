@@ -34,6 +34,18 @@
     </size>
    </property>
    <layout class="QHBoxLayout" name="horizontalLayout">
+    <property name="leftMargin">
+     <number>2</number>
+    </property>
+    <property name="topMargin">
+     <number>2</number>
+    </property>
+    <property name="rightMargin">
+     <number>2</number>
+    </property>
+    <property name="bottomMargin">
+     <number>2</number>
+    </property>
     <item>
      <layout class="QVBoxLayout" name="verticalLayout">
       <item>
@@ -61,26 +73,11 @@
       <item>
        <widget class="QTabWidget" name="tabWidget">
         <property name="currentIndex">
-         <number>5</number>
+         <number>2</number>
         </property>
         <widget class="QWidget" name="sample_tab">
          <attribute name="title">
           <string>Sample info</string>
-         </attribute>
-        </widget>
-        <widget class="QWidget" name="alignment_tab">
-         <attribute name="title">
-          <string>Alignment</string>
-         </attribute>
-        </widget>
-        <widget class="QWidget" name="cell_map_tab">
-         <attribute name="title">
-          <string>CellMap</string>
-         </attribute>
-        </widget>
-        <widget class="QWidget" name="vasculature_tab">
-         <attribute name="title">
-          <string>Vasculature</string>
          </attribute>
         </widget>
         <widget class="QWidget" name="group_analysis_tab">
@@ -90,7 +87,7 @@
         </widget>
         <widget class="QWidget" name="batch_tab">
          <attribute name="title">
-          <string>Batch</string>
+          <string>Batch processing</string>
          </attribute>
         </widget>
        </widget>
@@ -105,7 +102,7 @@
      <x>0</x>
      <y>0</y>
      <width>1950</width>
-     <height>25</height>
+     <height>21</height>
     </rect>
    </property>
    <widget class="QMenu" name="file_menu">
@@ -133,7 +130,6 @@
    <property name="font">
     <font>
      <pointsize>14</pointsize>
-     <weight>75</weight>
      <bold>true</bold>
     </font>
    </property>
