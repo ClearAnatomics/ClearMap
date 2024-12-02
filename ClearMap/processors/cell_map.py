@@ -20,17 +20,14 @@ e.g. to analyze immediate early gene expression data from iDISCO+ cleared tissue
 
 
 import copy
-import importlib
-import os
-import platform
 import re
+import platform
 import warnings
 from concurrent.futures.process import BrokenProcessPool
 
 import numpy as np
 import pandas as pd
-from PyQt5.QtGui import QColor
-from matplotlib import pyplot as plt
+
 import pyqtgraph as pg
 
 # noinspection PyPep8Naming
@@ -46,11 +43,10 @@ import ClearMap.Alignment.Resampling as resampling
 import ClearMap.ImageProcessing.Experts.Cells as cell_detection
 # noinspection PyPep8Naming
 import ClearMap.Analysis.Measurements.Voxelization as voxelization
-# noinspection PyPep8Naming
-import ClearMap.Alignment.Annotation as annotation
+from ClearMap.Utils.exceptions import MissingRequirementException
+from ClearMap.Utils.utilities import requires_assets, FilePath
 from ClearMap.processors.sample_preparation import PreProcessor
 from ClearMap.processors.generic_tab_processor import TabProcessor
-from ClearMap.Utils.utilities import runs_on_ui
 from ClearMap.Visualization.Qt.widgets import Scatter3D
 
 __author__ = 'Christoph Kirst <christoph.kirst.ck@gmail.com>, Charly Rousseau <charly.rousseau@icm-institute.org>'
@@ -60,101 +56,93 @@ __webpage__ = 'https://idisco.info'
 __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
 
-if platform.system().lower().startswith('darwin'):
-    USE_BINARY_POINTS_FILE = False
-else:
-    USE_BINARY_POINTS_FILE = True
+USE_BINARY_POINTS_FILE = not platform.system().lower().startswith('darwin')
 
 
 class CellDetector(TabProcessor):
-    def __init__(self, preprocessor=None):
+    def __init__(self, sample_manager=None, channel=None, registration_processor=None):
         super().__init__()
         self.sample_config = None
         self.processing_config = None
         self.machine_config = None
-        self.preprocessor = None
+        self.sample_manager = None
+        self.registration_processor = None
         self.workspace = None
+        self.channel = None
         self.cell_detection_re = ('Processing block',
                                   re.compile(r'.*?Processing block \d+/\d+.*?\selapsed time:\s\d+:\d+:\d+\.\d+'))
-        self.setup(preprocessor)
+        if channel is None:
+            raise ValueError(f'No channel specified. Please provide a channel name '
+                             f'that matches the one in the sample_params file.')
+        self.setup(sample_manager, channel, registration_processor)
 
-    def setup(self, preprocessor):
-        self.preprocessor = preprocessor
-        if preprocessor is not None:
-            self.workspace = preprocessor.workspace
-            configs = preprocessor.get_configs()
+    def setup(self, sample_manager, channel_name, registration_processor):
+        self.channel = channel_name
+        self.sample_config = sample_manager
+        if sample_manager is not None:
+            self.sample_manager = sample_manager
+            self.workspace = sample_manager.workspace
+            configs = sample_manager.get_configs()
             self.sample_config = configs['sample']
             self.machine_config = configs['machine']
-            self.processing_config = self.preprocessor.config_loader.get_cfg('cell_map')
+            self.processing_config = self.sample_manager.config_loader.get_cfg('cell_map')['channels'][self.channel]
 
-            self.set_progress_watcher(self.preprocessor.progress_watcher)
+            self.set_progress_watcher(self.sample_manager.progress_watcher)
+        self.registration_processor = registration_processor
 
     @property
     def detected(self):
-        return os.path.exists(self.workspace.filename('cells', postfix='raw'))
+        return self.get('cells', channel=self.channel, asset_sub_type='raw').exists
 
-    def run(self):
-        # select sub-slice for testing the pipeline
-        slicing = (
-            slice(*self.processing_config['test_set_slicing']['dim_0']),
-            slice(*self.processing_config['test_set_slicing']['dim_1']),
-            slice(*self.processing_config['test_set_slicing']['dim_2'])
-        )
-        self.create_test_dataset(slicing)
-        self.run_cell_detection(tuning=True)
-        if self.processing_config['detection']['preview']:
-            self.preview_cell_detection()
-
-        self.run_cell_detection()
-        # print(f"Number of cells detected: {self.get_n_detected_cells()}")
-
-        self.post_process_cells()
+    # WARNING: required because we pass a section of the config to the processor, not the whole config
+    #   Maybe we should pass the whole config to the processor and let it handle the section (with self.channel)
+    #   make sure this works with other config backends.
+    def reload_config(self, max_iter=10):
+        p = self.processing_config
+        iter = 0
+        while not hasattr(p, 'reload'):
+            p = p.parent
+            iter += 1
+            if iter > max_iter:
+                raise ValueError('Could not find a reload method in the config')
+        p.reload()
 
     def post_process_cells(self):
-        self.processing_config.reload()
-        if self.processing_config['detection']['plot_cells'] and not runs_on_ui():
-            self.plot_cells()
+        self.reload_config()
         self.filter_cells()
-        if self.processing_config['cell_filtration']['preview'] and not runs_on_ui():
-            self.plot_filtered_cells()
         self.atlas_align()
         self.export_collapsed_stats()
 
-    def voxelize(self, postfix=''):
-        self.processing_config.reload()
-        coordinates, cells, voxelization_parameter = self.get_voxelization_params(postfix=postfix)
+    def voxelize(self, sub_step=''):
+        self.reload_config()
+        coordinates, cells, voxelization_parameter = self.get_voxelization_params(sub_step=sub_step)
         # %% Unweighted
-        coordinates, counts_file_path = self.voxelize_unweighted(coordinates, voxelization_parameter)
-        if self.processing_config['voxelization']['preview']['counts'] and not runs_on_ui():
-            self.plot_voxelized_counts()
-        # %% Weighted
-        # intensities_file_path = self.voxelize_weighted(coordinates, cells, voxelization_parameter)  # WARNING: Currently causing issues
-        # if self.processing_config['voxelization']['preview']['densities']:
-        #     self.plot_voxelized_intensities()
+        _ = self.voxelize_unweighted(coordinates, voxelization_parameter)
 
+    @requires_assets([FilePath('density', postfix='counts')])
     def plot_voxelized_counts(self, arrange=True, parent=None):
-        scale = self.preprocessor.processing_config['registration']['resampling']['raw_sink_resolution']
-        return plot_3d.plot(self.workspace.filename('density', postfix='counts'),
+        scale = self.registration_processor.config['channels'][self.channel]['resampled_resolution']
+        return plot_3d.plot(self.get_path('density', channel=self.channel, asset_sub_type='counts'),
                             scale=scale, title='Cell density (voxelized)', lut='flame',
                             arrange=arrange, parent=parent)
 
     def create_test_dataset(self, slicing):
-        self.workspace.create_debug('stitched', slicing=slicing)
+        self.workspace.create_debug('stitched', channel=self.channel, slicing=slicing)
         self.update_watcher_main_progress()
 
-    def get_voxelization_params(self, postfix=''):
+    def get_voxelization_params(self, sub_step=''):
         voxelization_parameter = {
             'radius': self.processing_config['voxelization']['radii'],
             'verbose': True
         }
         if self.workspace.debug:  # Path will use debug
-            voxelization_parameter['shape'] = clearmap_io.shape(self.workspace.filename('cells', postfix='shape'))
-        elif self.preprocessor.was_registered:
-            voxelization_parameter['shape'] = clearmap_io.shape(self.preprocessor.annotation_file_path)
+            voxelization_parameter['shape'] = self.get('cells', channel=self.channel, asset_sub_type='shape').shape()
+        elif self.registration_processor.was_registered:
+            voxelization_parameter['shape'] = self.get('atlas', channel=self.channel, asset_sub_type='annotation').shape()
         else:
-            voxelization_parameter['shape'] = self.preprocessor.resampled_shape
-        if postfix:  # Hack to compensate for the fact that the realigned makes no sense in
-            cells, coordinates = self.get_coords(coord_type=postfix, aligned=False)
+            voxelization_parameter['shape'] = self.sample_manager.resampled_shape(self.channel)
+        if sub_step:  # Hack to compensate for the fact that the realigned makes no sense in
+            cells, coordinates = self.get_coords(coord_type=sub_step, aligned=False)
         else:
             cells, coordinates = self.get_coords(coord_type=None, aligned=True)
         return coordinates, cells, voxelization_parameter
@@ -162,18 +150,18 @@ class CellDetector(TabProcessor):
     def get_coords(self, coord_type='filtered', aligned=False):
         if coord_type not in ('filtered', 'raw', None):
             raise ValueError(f'Coordinate type "{coord_type}" not recognised')
-        if coord_type is None:
-            dataframe_path = self.workspace.filename('cells', extension='.feather')
-            if os.path.exists(dataframe_path):
-                table = pd.read_feather(dataframe_path)
-            else:
-                table = np.load(self.workspace.filename('cells')).T
-        else:
-            table = np.load(self.workspace.filename('cells', postfix=coord_type))
-        if aligned:
-            coordinates = np.array([table[axis] for axis in ['xt', 'yt', 'zt']]).T
-        else:
-            coordinates = np.array([table[axis] for axis in ['x', 'y', 'z']]).T
+
+        kwargs = {'asset_type': 'cells', 'channel': self.channel, 'asset_sub_type': coord_type}
+
+        table_path = self.get_path(**kwargs, extension='.feather')
+        if not table_path.exists:
+            table_path = self.get_path(**kwargs)
+
+        loaders = {'.feather': pd.read_feather, '.npy': np.load}
+        table = loaders[table_path.suffix](table_path)
+
+        axes = ['xt', 'yt', 'zt'] if aligned else ['x', 'y', 'z']
+        coordinates = np.array([table[axis] for axis in axes]).T  # .T for (n, axes)
         return table, coordinates
 
     def voxelize_unweighted(self, coordinates, voxelization_parameter):
@@ -182,23 +170,24 @@ class CellDetector(TabProcessor):
 
         Parameters
         ----------
-        coordinates
-            str, array or Source
+        coordinates: str, array or Source
             Source of point of nxd coordinates.
-
-        voxelization_parameter
-            dict
+        voxelization_parameter:  dict
+            Dictionary to be passed to voxelization.voxelise (i.e. with these optional keys:
+                shape, dtype, weights, method, radius, kernel, processes, verbose
 
         Returns
         -------
-
+        coordinates, counts_file_path: np.array, str
         """
-        counts_file_path = self.workspace.filename('density', postfix='counts')  # TODO: improve var name
+        counts_file_path = self.get_path('density', channel=self.channel, asset_sub_type='counts')
         clearmap_io.delete_file(counts_file_path)
         self.set_watcher_step('Unweighted voxelisation')
         voxelization.voxelize(coordinates, sink=counts_file_path, **voxelization_parameter)  # WARNING: prange
         self.update_watcher_main_progress()
-        # self.remove_crust(coordinates, voxelization_parameter)  # WARNING: currently causing issues
+        # uncrusted_coordinates = self.remove_crust(coordinates)  # WARNING: currently causing issues
+        #         density_path = self.get_path('density', channel=self.channel, asset_sub_type='counts_wcrust')
+        #         voxelization.voxelize(uncrusted_coordinates, sink=density_path, **voxelization_parameter)   # WARNING: prange
         return coordinates, counts_file_path
 
     def voxelize_weighted(self, coordinates, source, voxelization_parameter):
@@ -207,18 +196,11 @@ class CellDetector(TabProcessor):
 
         Parameters
         ----------
-        coordinates
-            np.array
-        source
-            Source.Source
-        voxelization_parameter
-            dict
-
-        Returns
-        -------
-
+        coordinates: np.array
+        source: Source.Source
+        voxelization_parameter: dict
         """
-        intensities_file_path = self.workspace.filename('density', postfix='intensities')
+        intensities_file_path = self.get_path('density', channel=self.channel, asset_sub_type='intensities')
         intensities = source['source']
         voxelization.voxelize(coordinates, sink=intensities_file_path, weights=intensities, **voxelization_parameter)   # WARNING: prange
         return intensities_file_path
@@ -230,72 +212,45 @@ class CellDetector(TabProcessor):
         df['size'] = table['size']
         df['source'] = table['source']
 
-        if self.preprocessor.was_registered:
+        if self.registration_processor.was_registered:  # FIXME: check if should be registered and raise error
             coordinates_transformed = self.transform_coordinates(coordinates)
-            df['xt'] = coordinates_transformed[:, 0]
-            df['yt'] = coordinates_transformed[:, 1]
-            df['zt'] = coordinates_transformed[:, 2]
+            annotator = self.registration_processor.annotators[self.channel]
+            channel_cfg = self.registration_processor.config['channels'][self.sample_manager.alignment_reference_channel]
+            atlas_resolution = channel_cfg['resampled_resolution']
+            extra_columns = annotator.get_columns(coordinates_transformed, atlas_resolution)  # OPTIMISE: parallel
+            df = pd.concat([df, extra_columns], axis=1)
+        else:
+            warnings.warn('Atlas alignment requires a registered sample.'
+                          'Skipping alignment and using resampled coordinates.')
 
-            structure_ids = annotation.label_points(coordinates_transformed,
-                                                    annotation_file=self.preprocessor.annotation_file_path,
-                                                    key='id')
-            df['id'] = structure_ids
 
-            hemisphere_labels = annotation.label_points(coordinates_transformed,
-                                                        annotation_file=self.preprocessor.hemispheres_file_path,
-                                                        key='id')
-            df['hemisphere'] = hemisphere_labels
-
-            names = annotation.convert_label(structure_ids, key='id', value='name')
-            df['name'] = names
-
-            unique_ids = np.sort(df['id'].unique())
-
-            order_map = {id_: annotation.find(id_, key='id')['order'] for id_ in unique_ids}
-            df['order'] = df['id'].map(order_map)
-
-            color_map = {id_: annotation.find(id_, key='id')['rgb'] for id_ in unique_ids}  # WARNING RGB upper case should give integer but does not work
-            df['color'] = df['id'].map(color_map)
-
-            volumes = annotation.annotation.get_lateralised_volume_map(
-                self.preprocessor.processing_config['registration']['resampling']['autofluo_sink_resolution'],
-                self.preprocessor.hemispheres_file_path
-            )
-            df['volume'] = df.set_index(['id', 'hemisphere']).index.map(volumes.get)
-
-        df.to_feather(self.workspace.filename('cells', extension='.feather'))
+        df.to_feather(self.get_path('cells', channel=self.channel, extension='.feather'))
 
     def transform_coordinates(self, coords):
         coords = resampling.resample_points(
-            coords, resampled=None,
-            original_shape=self.preprocessor.raw_stitched_shape,
-            resampled_shape=self.preprocessor.resampled_shape)
+            coords,
+            original_shape=self.sample_manager.stitched_shape(channel=self.channel),
+            resampled_shape=self.sample_manager.resampled_shape(channel=self.channel))
 
-        if self.preprocessor.was_registered:
-            coords = elastix.transform_points(
-                coords, sink=None,
-                transform_directory=self.workspace.filename('resampled_to_auto'),
-                binary=USE_BINARY_POINTS_FILE, indices=False)
-
-            coords = elastix.transform_points(
-                coords, sink=None,
-                transform_directory=self.workspace.filename('auto_to_reference'),
-                binary=USE_BINARY_POINTS_FILE, indices=False)
+        if self.registration_processor.was_registered:
+            for i, channel in enumerate(self.get_registration_sequence_channels()):
+                results_dir = self.get_path('aligned', channel=channel).parent
+                coords = elastix.transform_points(coords, transform_directory=results_dir, binary=USE_BINARY_POINTS_FILE)
 
         return coords
 
     def filter_cells(self):
-        self.processing_config.reload()
+        self.reload_config()
         thresholds = {
             'source': self.processing_config['cell_filtration']['thresholds']['intensity'],
             'size': self.processing_config['cell_filtration']['thresholds']['size']
         }
-        cell_detection.filter_cells(source=self.workspace.filename('cells', postfix='raw'),
-                                    sink=self.workspace.filename('cells', postfix='filtered'),
+        cell_detection.filter_cells(source=self.get_path('cells', channel=self.channel, asset_sub_type='raw'),
+                                    sink=self.get_path('cells', channel=self.channel, asset_sub_type='filtered'),
                                     thresholds=thresholds)
 
-    def run_cell_detection(self, tuning=False, save_shape=False):
-        self.processing_config.reload()
+    def run_cell_detection(self, tuning=False, save_shape=False, save_maxima=False):
+        self.reload_config()
         self.workspace.debug = tuning  # TODO: use context manager
         cell_detection_param = copy.deepcopy(cell_detection.default_cell_detection_parameter)
         cell_detection_param['illumination_correction'] = None  # WARNING: illumination or illumination_correction
@@ -303,17 +258,21 @@ class CellDetector(TabProcessor):
         cell_detection_param['maxima_detection']['shape'] = self.processing_config['detection']['maxima_detection']['shape']
         cell_detection_param['intensity_detection']['measure'] = ['source']
         cell_detection_param['shape_detection']['threshold'] = self.processing_config['detection']['shape_detection']['threshold']
+        shape_path = self.get_path('cells', channel=self.channel, asset_sub_type='shape')
         if tuning:
-            clearmap_io.delete_file(self.workspace.filename('cells', postfix='bkg'))
-            cell_detection_param['background_correction']['save'] = self.workspace.filename('cells', postfix='bkg')
-            clearmap_io.delete_file(self.workspace.filename('cells', postfix='shape'))
-            cell_detection_param['shape_detection']['save'] = self.workspace.filename('cells', postfix='shape')
+            bkg_path = self.get_path('cells', channel=self.channel, asset_sub_type='bkg')
+            clearmap_io.delete_file(bkg_path)
+            cell_detection_param['background_correction']['save'] = bkg_path
+            clearmap_io.delete_file(shape_path)
+            cell_detection_param['shape_detection']['save'] = shape_path
 
         if save_shape:
-            cell_detection_param['shape_detection']['save'] = self.workspace.filename('cells', postfix='shape')
+            cell_detection_param['shape_detection']['save'] = shape_path
 
-            # clearmap_io.delete_file(workspace.filename('cells', postfix='maxima'))
-            # cell_detection_param['maxima_detection']['save'] = workspace.filename('cells', postfix='maxima')
+        if save_maxima:
+            maxima_path = self.get_path('cells', channel=self.channel, asset_sub_type='maxima')
+            clearmap_io.delete_file(maxima_path)
+            cell_detection_param['maxima_detection']['save'] = maxima_path
 
         processing_parameter = copy.deepcopy(cell_detection.default_cell_detection_processing_parameter)
         processing_parameter.update(  # TODO: store as other dict and run .update(**self.extra_detection_params)
@@ -324,11 +283,12 @@ class CellDetector(TabProcessor):
             verbose=True
         )
 
-        n_steps = self.get_n_blocks(self.workspace.source('stitched').shape[2])  # OPTIMISE: read metadata w/out load  # TODO: round to processors
+        # TODO: round to processors
+        n_steps = self.get_n_blocks(self.get('stitched', channel=self.channel).shape()[2])
         self.prepare_watcher_for_substep(n_steps, self.cell_detection_re, 'Detecting cells')
         try:
-            cell_detection.detect_cells(self.workspace.filename('stitched'),
-                                        self.workspace.filename('cells', postfix='raw'),
+            cell_detection.detect_cells(self.get_path('stitched', channel=self.channel),
+                                        self.get_path('cells', channel=self.channel, asset_sub_type='raw'),
                                         cell_detection_parameter=cell_detection_param,
                                         processing_parameter=processing_parameter,
                                         workspace=self.workspace)  # WARNING: prange inside multiprocess (including arrayprocessing and devolvepoints for vox)
@@ -347,9 +307,10 @@ class CellDetector(TabProcessor):
             Use :func:`atlas_align` and `export_collapsed_stats` instead.
         """
         warnings.warn("export_as_csv is deprecated and will be removed in future versions;"
-                      "please use the new formats from atlas_align and export_collapsed_stats", DeprecationWarning, 2)
+                      "please use the new formats from atlas_align and export_collapsed_stats",
+                      DeprecationWarning, 2)
 
-        csv_file_path = self.workspace.filename('cells', extension='.csv')
+        csv_file_path = self.get_path('cells', channel=self.channel, extension='.csv')
         self.get_cells_df().to_csv(csv_file_path)
 
     def export_collapsed_stats(self, all_regions=True):
@@ -372,52 +333,46 @@ class CellDetector(TabProcessor):
 
             collapsed = pd.concat((collapsed, tmp))
 
+        annotator = self.registration_processor.annotators[self.channel]
         if all_regions:  # Add regions even if they are empty
-            uniq_ids = np.unique(annotation.annotation.atlas)
+            uniq_ids = np.unique(annotator.atlas)
             tmp = pd.DataFrame({'Structure ID': uniq_ids, 'mock': ''})
-            tmp['Structure name'] = annotation.convert_label(uniq_ids, key='id', value='name')
+            tmp['Structure name'] = annotator.convert_label(uniq_ids, key='id', value='name')
             df_mock = pd.DataFrame({'Hemisphere': [0, 255], 'mock': ''})
             tmp = tmp.merge(df_mock, on='mock').drop(columns='mock')
-            vol_map = annotation.annotation.get_lateralised_volume_map(
-                self.preprocessor.processing_config['registration']['resampling']['autofluo_sink_resolution'],
-                self.preprocessor.hemispheres_file_path
+            vol_map = annotator.get_lateralised_volume_map(
+                self.registration_processor.config['channels'][self.sample_manager.alignment_reference_channel]['resampled_resolution'],
+                self.get_path('atlas', channel=self.channel, asset_sub_type='hemispheres')
             )
             tmp['Structure volume'] = tmp.set_index(['Structure ID', 'Hemisphere']).index.map(vol_map.get)
-            order_map = {id_: annotation.find(id_, key='id')['order'] for id_ in uniq_ids}
+            order_map = {id_: annotator.find(id_, key='id')['order'] for id_ in uniq_ids}
             tmp['Structure order'] = tmp['Structure ID'].map(order_map)
             collapsed = tmp.merge(collapsed[['Structure ID', 'Hemisphere', 'Cell counts', 'Average cell size']],
                                   how='left', on=['Structure ID', 'Hemisphere'])
 
         collapsed = collapsed.sort_values(by='Structure ID')
 
-        csv_file_path = self.workspace.filename('cells', postfix='stats', extension='.csv')
+        csv_file_path = self.get_path('cells', channel=self.channel, asset_sub_type='stats', extension='.csv')
         collapsed.to_csv(csv_file_path, index=False)
 
-    def plot_cells(self):  # For non GUI
-        source = self.workspace.source('cells', postfix='raw')
-        plt.figure(1)
-        plt.clf()
-        names = source.dtype.names
-        nx, ny = plot_3d.subplot_tiling(len(names))
-        for i, name in enumerate(names):
-            plt.subplot(nx, ny, i + 1)
-            plt.hist(source[name])
-            plt.title(name)
-        plt.tight_layout()
-
     def plot_cells_3d_scatter_w_atlas_colors(self, raw=False, parent=None):
+        asset_properties = {'channel': self.channel}
         if raw:
-            dv = qplot_3d.plot(self.workspace.filename('stitched'), title='Stitched and cells',
-                               # scale=self.preprocessor.sample_config['resolutions']['raw'],# FIXME: correct scaling for anisotropic
-                               arrange=False, lut='white', parent=parent)[0]
+            asset_properties['asset_type'] = 'stitched'
         else:
-            if self.preprocessor.was_registered:  # REFACTORING: could extract
-                dv = qplot_3d.plot(clearmap_io.source(self.preprocessor.reference_file_path),
-                                   title='Reference and cells',
-                                   arrange=False, lut='white', parent=parent)[0]
+            if self.registration_processor.was_registered:
+                asset_properties['asset_type'] = 'atlas'
+                asset_properties['asset_sub_type'] = 'reference'
             else:
-                dv = qplot_3d.plot(self.workspace.filename('resampled'), title='Resampled and cells',
-                                   arrange=False, lut='white', parent=parent)[0]
+                asset_properties['asset_type'] = 'resampled'
+
+        asset = self.get(**asset_properties)
+        if not asset.exists or not self.df_path.exists:
+            raise MissingRequirementException(f'plot_cells_3d_scatter_w_atlas_colors missing files:'
+                                              f'image: {asset.path} {"not" if not asset.exists else ""} found'
+                                              f'cells data frame {"not" if not self.df_path.exists else ""} found')
+        dv = qplot_3d.plot(asset.path, title=f'{asset_properties["asset_type"].title()} and cells',  # FIXME: correct scaling for anisotropic if raw
+                           arrange=False, lut='white', parent=parent)[0]
 
         scatter = pg.ScatterPlotItem()
 
@@ -428,12 +383,12 @@ class CellDetector(TabProcessor):
 
         if raw:
             coordinates = df[['x', 'y', 'z']].values.astype(int)
-            # coordinates = coordinates * np.array(self.preprocessor.sample_config['resolutions']['raw'])
+            # coordinates = coordinates * np.array(self.sample_manager.config['resolutions']['raw'])
             # coordinates = coordinates.astype(int)  # required to match integer z  # FIXME: correct scaling for anisotropic
         else:
             coordinates = df[['xt', 'yt', 'zt']].values.astype(int)  # required to match integer z
-            dv.atlas = clearmap_io.read(self.preprocessor.annotation_file_path)
-            dv.structure_names = annotation.get_names_map()
+            dv.atlas = self.get('atlas', channel=self.channel, asset_sub_type='annotation').read()
+            dv.structure_names = self.registration_processor.annotators[self.channel].get_names_map()
         if 'hemisphere' in df.columns:
             hemispheres = df['hemisphere']
         else:
@@ -445,21 +400,23 @@ class CellDetector(TabProcessor):
 
     @property
     def df_path(self):
-        feather_path = self.workspace.filename('cells', extension='.feather')
-        if os.path.exists:
+        feather_path = self.get_path('cells', channel=self.channel, extension='.feather')
+        if feather_path.exists:
             return feather_path
         else:
-            return self.workspace.filename('cells')
+            return self.get_path('cells', channel=self.channel)
 
     def get_cells_df(self):
-        if self.df_path.endswith('.feather'):
-            return pd.read_feather(self.df_path)
+        df_path = self.df_path
+        if df_path.suffix == '.feather':
+            return pd.read_feather(df_path)
         else:
-            return pd.DataFrame(np.load(self.df_path))
+            return pd.DataFrame(np.load(df_path))
 
+    @requires_assets([FilePath('cells', asset_sub_type='filtered'), FilePath('stitched')])
     def plot_filtered_cells(self, parent=None, smarties=False):
         _, coordinates = self.get_coords('filtered')
-        stitched_path = self.workspace.filename('stitched')
+        stitched_path = self.get_path('stitched', channel=self.channel)
         dv = qplot_3d.plot(stitched_path, title='Stitched and filtered cells', arrange=False,
                            lut='white', parent=parent)[0]
         scatter = pg.ScatterPlotItem()
@@ -472,61 +429,58 @@ class CellDetector(TabProcessor):
         return [dv]
 
     def plot_background_subtracted_img(self):
-        coordinates = np.hstack([self.workspace.source('cells', postfix='raw')[c][:, None] for c in 'xyz'])
+        src = self.get('cells', channel=self.channel, asset_sub_type='raw').as_source()
+        coordinates = np.hstack([src[c][:, None] for c in 'xyz'])
         p = plot_3d.list_plot_3d(coordinates)
-        return plot_3d.plot_3d(self.workspace.filename('stitched'), view=p, cmap=plot_3d.grays_alpha(alpha=1))
+        return plot_3d.plot_3d(self.get_path('stitched', channel=self.channel),
+                               view=p, cmap=plot_3d.grays_alpha(alpha=1))
 
-    def remove_crust(self, coordinates, voxelization_parameter):
-        dist2surf = clearmap_io.read(self.preprocessor.distance_file_path)
-        threshold = 3
-        # Convert coordinates to integer
-        int_coordinates = np.floor(coordinates).astype(int)
+    def remove_crust(self, coordinates, threshold=3):
+        distance_to_surface = self.get('atlas', channel=self.channel, asset_sub_type='distance').read()
 
-        # Ensure all coordinates are within the dist2surf array bounds
-        valid_indices = (int_coordinates[:, 0] < dist2surf.shape[0]) & \
-                        (int_coordinates[:, 1] < dist2surf.shape[1]) & \
-                        (int_coordinates[:, 2] < dist2surf.shape[2])
+        # Convert coordinates to integer and insure they are within the distance_to_surface array bounds
+        int_coordinates = np.floor(coordinates).astype(int)  # TODO: check if floor required
+        xs, ys, zs = int_coordinates.T
+        xmax, ymax, zmax = distance_to_surface.shape
+        within_atlas = (xs >= 0) & (xs < xmax) & (ys >= 0) & (ys < ymax) & (zs >= 0) & (zs < zmax)
 
-        # Apply the mask to get valid coordinates
-        valid_coordinates = int_coordinates[valid_indices]
+        # Get the distance_to_surface values at the valid coordinates
+        valid_coordinates = int_coordinates[within_atlas]
+        dist_values = distance_to_surface[tuple(valid_coordinates.T)]
 
-        # Get the dist2surf values at the valid coordinates
-        dist_values = dist2surf[valid_coordinates[:, 0],
-                                valid_coordinates[:, 1],
-                                valid_coordinates[:, 2]]
-
-        # Apply the threshold
-        coordinates_wcrust = valid_coordinates[dist_values > threshold]
-
-        voxelization.voxelize(coordinates_wcrust, sink=self.workspace.filename('density', postfix='counts_wcrust'),
-                              **voxelization_parameter)   # WARNING: prange
+        uncrusted_coordinates = valid_coordinates[dist_values > threshold]
+        return uncrusted_coordinates
 
     def preview_cell_detection(self, parent=None, arrange=True, sync=True):
-        sources = [self.workspace.filename('stitched'),
-                   self.workspace.filename('cells', postfix='bkg'),
-                   self.workspace.filename('cells', postfix='shape')
-                   ]
-        sources = [s for s in sources if os.path.exists(s)]  # Remove missing files (if not tuning)
-        titles = [os.path.basename(s) for s in sources]
+        sources = [
+            self.get_path('stitched', channel=self.channel),
+            self.get_path('cells', channel=self.channel, asset_sub_type='bkg'),
+            self.get_path('cells', channel=self.channel, asset_sub_type='shape')
+        ]
+        sources = [s for s in sources if s.exists]  # Remove missing files (if not tuning)
+        if not sources:
+            raise MissingRequirementException('No files found for preview')
+        titles = [s.name for s in sources]
         luts = ['white', 'white', 'random']
         return plot_3d.plot(sources, title=titles, arrange=arrange, sync=sync, lut=luts, parent=parent)
 
     def get_n_detected_cells(self):
-        if os.path.exists(self.workspace.filename('cells', postfix='raw')):
+        if self.get('cells', channel=self.channel, asset_sub_type='raw').exists:
             _, coords = self.get_coords(coord_type='raw')
             return np.max(coords.shape)  # TODO: check dimension instead
         else:
             return 0
 
     def get_n_filtered_cells(self):
-        if os.path.exists(self.workspace.filename('cells', postfix='filtered')):
+        if self.get('cells', channel=self.channel, asset_sub_type='filtered').exists:
             _, coords = self.get_coords(coord_type='filtered')
             return np.max(coords.shape)  # TODO: check dimension instead
         else:
             return 0
 
     def plot_voxelized_intensities(self, arrange=True):
-        return plot_3d.plot(self.workspace.filename('density', postfix='intensities'), arrange=arrange)
+        density_path = self.get_path('density', channel=self.channel, asset_sub_type='intensities')
+        return plot_3d.plot(density_path, arrange=arrange)
 
     def get_n_blocks(self, dim_size):
         blk_size = self.machine_config['detection_chunk_size_max']
@@ -549,13 +503,13 @@ class CellDetector(TabProcessor):
         """
         warnings.warn("export_to_clearmap1_fmt is deprecated and will be removed in future versions;"
                       "please use the new formats from atlas_align and export_collapsed_stats", DeprecationWarning, 2)
-        source = self.workspace.source('cells')
+        source = self.get('cells', channel=self.channel).as_source()
         clearmap1_format = {'points': ['x', 'y', 'z'],
                             'points_transformed': ['xt', 'yt', 'zt'],
                             'intensities': ['source', 'dog', 'background', 'size']}
-        for filename, names in clearmap1_format.items():
-            sink = self.workspace.filename('cells', postfix=['ClearMap1', filename])
-            print(filename, sink)
+        for sub_type, names in clearmap1_format.items():
+            sink = self.get_path('cells', channel=self.channel, asset_sub_type=f'ClearMap1{sub_type}')
+            print(sub_type, sink)
             data = np.array(
                 [source[name] if name in source.dtype.names else np.full(source.shape[0], np.nan) for name in names]
             )
@@ -564,7 +518,7 @@ class CellDetector(TabProcessor):
 
     def convert_cm2_to_cm2_1_fmt(self):
         """Atlas alignment and annotation """
-        cells = np.load(self.workspace.filename('cells'))
+        cells = np.load(self.get_path('cells', channel=self.channel))
         df = pd.DataFrame({ax: cells[ax] for ax in 'xyz'})
         df['size'] = cells['size']
         df['source'] = cells['source']
@@ -575,17 +529,16 @@ class CellDetector(TabProcessor):
 
         coordinates_transformed = np.vstack([cells[f'{ax}t'] for ax in 'xyz']).T
 
-        # FIXME: Put key ID and get ID directly
-        hemisphere_label = annotation.label_points(coordinates_transformed,
-                                                   annotation_file=self.preprocessor.hemispheres_file_path,
-                                                   key='id')
-        unique_labels = np.sort(df['order'].unique())
-        color_map = {lbl: annotation.find(lbl, key='order')['rgb'] for lbl in
-                     unique_labels}  # WARNING RGB upper case should give integer but does not work
-        id_map = {lbl: annotation.find(lbl, key='order')['id'] for lbl in unique_labels}
+        annotator = self.registration_processor.annotators[self.channel]
+        hemisphere_label = annotator.label_points_hemispheres(coordinates_transformed)
 
-        atlas = clearmap_io.read(self.preprocessor.annotation_file_path)
-        atlas_scale = self.preprocessor.processing_config['registration']['resampling']['autofluo_sink_resolution']
+        unique_labels = np.sort(df['order'].unique())  # WARNING: ClearMap2 used order as key (now deprecated)
+        color_map = {lbl: annotator.find(lbl, key='order')['rgb'] for lbl in
+                     unique_labels}  # WARNING RGB upper case should give integer but does not work
+        id_map = {lbl: annotator.find(lbl, key='order')['id'] for lbl in unique_labels}
+
+        atlas = self.get('atlas', channel=self.channel, asset_sub_type='annotation').read()
+        atlas_scale = self.registration_processor.config['channels'][self.sample_manager.alignment_reference_channel]['resampled_resolution']
         atlas_scale = np.prod(atlas_scale)
         volumes = {_id: (atlas == _id).sum() * atlas_scale for _id in
                    id_map.values()}  # Volumes need a lookup on ID since the atlas is in ID space
@@ -595,7 +548,17 @@ class CellDetector(TabProcessor):
         df['color'] = df['order'].map(color_map)
         df['volume'] = df['id'].map(volumes)
 
-        df.to_feather(self.workspace.filename('cells', extension='.feather'))
+        df.to_feather(self.get_path('cells', channel=self.channel, extension='.feather'))
+
+    def get_registration_sequence_channels(self):
+        out = [self.channel]
+        registration_cfg = self.registration_processor.config['channels']
+        while True:
+            next_channel = registration_cfg[out[-1]]['align_with']
+            if next_channel in (None, 'atlas'):
+                break
+            out.append(next_channel)
+        return out
 
 
 if __name__ == "__main__":
