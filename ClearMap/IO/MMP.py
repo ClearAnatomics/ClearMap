@@ -16,6 +16,7 @@ __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__   = 'http://idisco.info'
 __download__  = 'https://github.com/ClearAnatomics/ClearMap'
 
+import pathlib
 
 import numpy as np
 
@@ -327,7 +328,9 @@ def _memmap(location = None, shape = None, dtype = None, order = None, mode = No
   Note
   ----
   By default memmaps are initialized as fortran contiguous if order is None.
-  """  
+  """
+  if isinstance(location, pathlib.Path):
+    location = str(location)
   #print location, shape, dtype, order, mode, array
   if isinstance(location, np.memmap):
     array = location
