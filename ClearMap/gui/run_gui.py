@@ -190,7 +190,8 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
 
         Returns
         -------
-
+        QWidget
+            The child widget matching the name and type
         """
         if parent is None:
             parent = self
@@ -210,10 +211,6 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         ----------
         msg : str
             The message to be printed
-
-        Returns
-        -------
-
         """
         self.__print_status_msg(msg, 'red')
 
@@ -225,10 +222,6 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         ----------
         msg : str
             The message to be printed
-
-        Returns
-        -------
-
         """
         self.__print_status_msg(msg, 'yellow')
 
@@ -255,10 +248,6 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         ----------
         target_font_size : int
             The main font size
-
-        Returns
-        -------
-
         """
         font_sizes = self.__get_font_sizes()
         if len(font_sizes) > 4:  # WARNING: Hacky
@@ -286,7 +275,7 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         for widget in self.findChildren(QWidget):
             font = widget.property("font")
             try:
-                font.setFamily(self.preference_editor.params.font_family)  # FIXME: part of child class
+                font.setFamily(self.preference_editor.params.font_family)  # REFACTOR: part of child class
             except KeyError:
                 print(f'Skipping widget {widget.objectName()}')
             widget.setFont(font)
@@ -332,20 +321,21 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
     def popup(self, msg, base_msg='Missing configuration file', print_warning=True):
         """
         Display a warning popup message which the user has to dismiss by clicking OK
-        Optionaly, a warning is also printed to the logs
+        Optionally, a warning is also printed to the logs
 
         Parameters
         ----------
         msg : str
             The more detailed text to display
         base_msg : str
-            The auick description of the problem
+            The quick description of the problem
         print_warning : bool
             Whether to also print msg to logs
 
         Returns
         -------
-
+        QMessageBox
+            The popup message box
         """
         if print_warning:
             self.print_warning_msg(html_to_plain_text(msg))
@@ -366,10 +356,6 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         ----------
         name : str
             The objectName of the graph widget we are looking for
-
-        Returns
-        -------
-
         """
         return [g for g in self.graphs if g.objectName() == name][0]
 
@@ -377,10 +363,6 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         """
         Remove all plots currently displayed in the DataViewer area of the interface
         The underlying widgets are also scheduled for garbage collection
-
-        Returns
-        -------
-
         """
         clear_layout(self.graphLayout)
         self.graphs = []
@@ -394,13 +376,10 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         Parameters
         ----------
         dvs : List[DataViewer]
-            The list of DataViewer (or any other QWidget derived object) to add the the display grid
+            The list of DataViewer (or any other QWidget derived object) to add
+            to the display grid
         graph_names: None or List[str]
             Optional The names attached to the graphs for later reference
-
-        Returns
-        -------
-
         """
         if graph_names is None:
             graph_names = [f'graph_{i}' for i in range(len(dvs))]
@@ -492,10 +471,6 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
             The function to trigger when the abort button is clicked
         parent : QWidget
             The parent widget to the dialog
-
-        Returns
-        -------
-
         """
         if n_steps:
             n_steps += 1  # To avoid range shrinking because starting from 1 not 0
@@ -562,10 +537,6 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         ----------
         msg : str
             The message to display
-
-        Returns
-        -------
-
         """
         if not any([kw in msg.lower() for kw in ('idle', 'done', 'finish')]):
             msg += ' finished'
@@ -584,10 +555,6 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         ----------
         step_name : str
             The new step name
-
-        Returns
-        -------
-
         """
         self.log_process_start(step_name)
         try:
@@ -605,10 +572,6 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         ----------
         step_name : str
             The new step name
-
-        Returns
-        -------
-
         """
         if self.progress_dialog is not None:
             self.progress_dialog.subProgressLabel.setText(step_name)
@@ -621,10 +584,6 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         ----------
         msg : str
             The message to log
-
-        Returns
-        -------
-
         """
         self.print_status_msg(msg)
         self.log_progress(msg)
@@ -636,10 +595,7 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
     def save_cfg(self):
         """
         Take a snapshot of all the configuration at that instant.
-        The config files will be save to a subfolder with the datetime in the name
-        Returns
-        -------
-
+        The config files will be saved to a subfolder with the datetime in the name
         """
         cfg_folder = os.path.join(self.src_folder, 'config_snapshots', datetime.now().strftime('%y%m%d_%H_%M_%S'))
         os.makedirs(cfg_folder, exist_ok=True)
@@ -655,12 +611,7 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
                 cfg.write(outfile=file_obj)
 
     def setup_monitoring_bars(self):
-        """
-        Create the performance monitoring bars in the status bar
-        Returns
-        -------
-
-        """
+        """Create the performance monitoring bars in the status bar"""
         for label, bar in zip(('CPU', None, 'RAM', 'GPU', 'VRAM'),
                               (self.cpu_bar, self.single_thread_bar, self.ram_bar, self.gpu_bar, self.vram_bar)):
             if label is not None:
@@ -684,10 +635,6 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
             The CPU usage percent to display
         ram_percent : int
             The RAM usage percent to display
-
-        Returns
-        -------
-
         """
         self.cpu_bar.setValue(cpu_percent)
         self.single_thread_bar.setValue(thread_percent)
@@ -703,10 +650,6 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
             The GPU usage percent to display
         v_ram_percent : int
             The Graphics RAM usage percent to display
-
-        Returns
-        -------
-
         """
         self.gpu_bar.setValue(gpu_percent)
         self.vram_bar.setValue(v_ram_percent)
@@ -717,7 +660,8 @@ class ClearMapGui(ClearMapGuiBase):
     The Main class of the GUI. This class focuses on the real business logic of the application.
     This represents the main window which has instances of the different
     tabs derived from GenericTab (the tab_managers), which correspond to different steps of the program.
-    Each tab_manager composed of a processor, a widget and a UiParameter or UiParameterCollection object.
+    Each tab_manager composed of a sample_manager, an optional pipeline object (e.g. Stitcher),
+     a widget and a UiParameter or UiParameterCollection object.
     """
     def __init__(self):
         super().__init__()
@@ -733,6 +677,7 @@ class ClearMapGui(ClearMapGuiBase):
 
         self.sample_tab_mgr.mini_brain_scaling, self.sample_tab_mgr.mini_brain = setup_mini_brain()
 
+        # Menu actions
         self.preference_editor = PreferenceUi(self)
         self.structure_selector = StructureSelector(app=self)
 
@@ -740,7 +685,6 @@ class ClearMapGui(ClearMapGuiBase):
 
         self.setupUi(self)
         self.amend_ui()
-
         self.setup_monitoring_bars()
 
         self.actionPreferences.triggered.connect(self.preference_editor.open)
@@ -810,11 +754,7 @@ class ClearMapGui(ClearMapGuiBase):
         self.popup(about_msg, 'About ClearMap GUI', print_warning=False)
 
     def amend_ui(self):
-        """
-        Setup the loggers and all the post instantiation fixes to the UI
-
-        Returns
-        -------
+        """Setup the loggers and all the post instantiation fixes to the UI"""
 
         """
         self.setup_loggers()
@@ -872,11 +812,8 @@ class ClearMapGui(ClearMapGuiBase):
 
         Parameters
         ----------
-        nested
-
-        Returns
-        -------
-
+        nested: bool
+            Whether to set the progress watcher of the tab managers to a nested progress watcher
         """
         if nested:
             for tab in self.tab_mgrs:
@@ -890,11 +827,8 @@ class ClearMapGui(ClearMapGuiBase):
 
         Parameters
         ----------
-        tab_index
-
-        Returns
-        -------
-
+        tab_index: int
+            The index of the tab clicked
         """
         all_tabs = [self.sample_tab_mgr, self.alignment_tab_mgr, self.cells_tab_mgr, self.vasculature_tab_mgr,
                     self.group_analysis_tab_mgr, self.batch_tab_mgr]
@@ -942,10 +876,6 @@ class ClearMapGui(ClearMapGuiBase):
         ----------
         conf_name : str
             The name of the config to load (without *params* and extension)
-
-        Returns
-        -------
-
         """
         conf_name = conf_name.replace('_', ' ').title()
         self.print_error_msg(f'Loading {conf_name} config file failed')
@@ -971,6 +901,7 @@ class ClearMapGui(ClearMapGuiBase):
 
         Returns
         -------
+        bool, str
             was_copied, cfg_path
             The first value indicates whether the file was copied from the defaults
             and may need amending
@@ -1034,10 +965,6 @@ class ClearMapGui(ClearMapGuiBase):
         """
         Read (potentially from defaults), fix and load the config for each tab manager
         into the GUI
-
-        Returns
-        -------
-
         """
         self.print_status_msg('Parsing configuration')
         self.assert_src_folder_set()
@@ -1094,13 +1021,7 @@ class ClearMapGui(ClearMapGuiBase):
                              f' got "{processing_type}"')
 
     def prompt_experiment_folder(self):
-        """
-        Prompt the user for the main experiment data folder and set it
-
-        Returns
-        -------
-
-        """
+        """Prompt the user for the main experiment data folder and set it"""
         folder = get_directory_dlg(self.preference_editor.params.start_folder)
         if folder and folder != self.src_folder:
             self.reset()
@@ -1115,9 +1036,6 @@ class ClearMapGui(ClearMapGuiBase):
         """
         Load the sample ID from the sample_params.cfg if it exists. Otherwise,
         default to empty string
-        Returns
-        -------
-
         """
         sample_cfg_path = self.config_loader.get_cfg_path('sample', must_exist=False)
         if not self.file_exists(sample_cfg_path):
