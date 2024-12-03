@@ -15,19 +15,25 @@ __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 import math
 import os
 import sys
+import tempfile
 from datetime import datetime
 
 from multiprocessing.pool import ThreadPool
+from pathlib import Path
 from shutil import copyfile
 from importlib_metadata import version
 
-from ClearMap.config.update_config import update_default_config
-from PyQt5 import QtGui
+# WARNING: Necessary for QCoreApplication creation
+from PyQt5.QtWebEngineWidgets import QWebEngineView  # noqa: F401
+
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QPalette, QColor
-from PyQt5.QtWebEngineWidgets import QWebEngineView  # WARNING: must be imported before app creation
-from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QSpinBox, QDoubleSpinBox, QFrame, \
-    QDialogButtonBox, QComboBox, QLineEdit, QStyle, QWidget, QMessageBox, QToolBox, QProgressBar, QLabel, QAction
+from PyQt5 import QtGui
+from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget,
+                             QPushButton, QSpinBox, QDoubleSpinBox, QComboBox,
+                             QLineEdit, QMessageBox, QToolBox, QProgressBar, QLabel,
+                             QStyle, QAction)
+
+import qdarkstyle
 from qdarkstyle import DarkPalette
 
 from ClearMap.Utils.tag_expression import Expression
@@ -37,7 +43,7 @@ DEBUG = False
 
 os.environ['CLEARMAP_GUI_HOSTED'] = "1"
 # ########################################### SPLASH SCREEN ###########################################################
-from ClearMap.gui.dialogs import make_splash, update_pbar, make_simple_progress_dialog, option_dialog
+from ClearMap.gui.dialogs import make_splash, update_pbar, make_simple_progress_dialog, option_dialog, input_dialog
 
 # To show splash before slow imports
 ICONS_FOLDER = 'ClearMap/gui/creator/icons/'   # REFACTOR: use qrc
@@ -48,13 +54,15 @@ app.setApplicationName('ClearMap')
 app.setApplicationDisplayName('ClearMap')
 app.setApplicationVersion('2.1')
 palette = app.palette()  # WARNING: necessary because QWhatsThis does not follow stylesheets
-palette.setColor(QPalette.ColorRole.ToolTipBase, QColor(DarkPalette.COLOR_BACKGROUND_2))
-palette.setColor(QPalette.ColorRole.ToolTipText, QColor(DarkPalette.COLOR_TEXT_2))
-app.setPalette(palette)
+palette.setColor(QtGui.QPalette.ColorRole.ToolTipBase, QtGui.QColor(DarkPalette.COLOR_BACKGROUND_2))
+palette.setColor(QtGui.QPalette.ColorRole.ToolTipText, QtGui.QColor(DarkPalette.COLOR_TEXT_2))
+app.setPalette(palette)  # noqa
 
 
-from ClearMap.gui.gui_utils import get_current_res, UI_FOLDER, clear_layout
+from ClearMap.IO.assets_constants import CONTENT_TYPE_TO_PIPELINE
+from ClearMap.config.update_config import update_default_config
 from ClearMap.gui.widget_monkeypatch_callbacks import recursive_patch_widgets
+from ClearMap.gui.gui_utils import get_current_res, UI_FOLDER, clear_layout, delete_widget
 
 CURRENT_RES = get_current_res(app)
 
@@ -83,12 +91,15 @@ from ClearMap.gui.style import (DARK_BACKGROUND, PLOT_3D_BG, BTN_STYLE_SHEET,
                                 TOOLTIP_STYLE_SHEET, COMBOBOX_STYLE_SHEET,
                                 HIGHLIGHTED_BTN_STYLE)
 
-from ClearMap.gui.widgets import OrthoViewer, ProgressWatcher, setup_mini_brain, StructureSelector, \
-    PerfMonitor  # needs plot_3d
+# Widgets import is quite slow
+from ClearMap.gui.widgets import (OrthoViewer, ProgressWatcher,
+                                  StructureSelector, PerfMonitor, ManipulateAssetsDialog)  # Perfmonitor needs plot_3d
 update_pbar(app, progress_bar, 60)
-from ClearMap.gui.tabs import SampleTab, AlignmentTab, CellCounterTab, VasculatureTab, GroupAnalysisTab, \
-    BatchProcessingTab
+from ClearMap.gui.tabs import (SampleInfoTab, StitchingTab, RegistrationTab, CellCounterTab,
+                               VasculatureTab, GroupAnalysisTab, BatchProcessingTab)
+from ClearMap.gui.interfaces import BatchTab
 from ClearMap.gui.preferences import PreferenceUi
+from ClearMap.processors.sample_preparation import SampleManager
 
 update_pbar(app, progress_bar, 80)
 
@@ -100,18 +111,23 @@ tmp_folder = ConfigLoader.get_cfg_from_path(ConfigLoader.get_default_path('machi
 if tmp_folder is not None:
     for var_name in ('TMP', 'TEMP', 'TMPDIR'):
         os.environ[var_name] = tmp_folder
+    tempfile.tempdir = None  # Force refresh of tempdir
 
+
+DATA_TYPE_TO_TAB_CLASS = {  # WARNING: not all data types are covered
+    'nuclei': CellCounterTab,
+    'cells': CellCounterTab,
+    'vessels': VasculatureTab,
+    'veins': VasculatureTab,
+    'arteries': VasculatureTab,
+}
 
 # TODO
 """
 Handle reset detected correctly
 Fix qrc resources (ui files should not be coded by path)
-Test and check that works with secondary channel
 Delete intermediate files
 Ensure all machine config params are in the preferences UI
-
-Previews:
-    - Add rigid alignment : plane in middle of stack from each column + stitch with different colours
 
     
 Analysis:
@@ -143,11 +159,11 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         self.progress_dialog = None
         self.progress_watcher = ProgressWatcher()
 
-        self.cpu_bar = QProgressBar()
-        self.single_thread_bar = QProgressBar()
-        self.ram_bar = QProgressBar()
-        self.gpu_bar = QProgressBar()
-        self.vram_bar = QProgressBar()
+        self.cpu_bar = QProgressBar()  # noqa
+        self.single_thread_bar = QProgressBar() # noqa
+        self.ram_bar = QProgressBar() # noqa
+        self.gpu_bar = QProgressBar() # noqa
+        self.vram_bar = QProgressBar() # noqa
 
         if torch.cuda.is_available():
             gpu_period = 500
