@@ -671,14 +671,10 @@ class ClearMapGui(ClearMapGuiBase):
         self.config_loader = ConfigLoader('')
         self.ortho_viewer = OrthoViewer()
 
-        self.sample_tab_mgr = SampleTab(self, tab_idx=0)
-        self.alignment_tab_mgr = AlignmentTab(self, tab_idx=1)
-        self.cells_tab_mgr = CellCounterTab(self, tab_idx=2)
-        self.vasculature_tab_mgr = VasculatureTab(self, tab_idx=3)
-        self.group_analysis_tab_mgr = GroupAnalysisTab(self, tab_idx=4)
-        self.batch_tab_mgr = BatchProcessingTab(self, tab_idx=5)
-
-        self.sample_tab_mgr.mini_brain_scaling, self.sample_tab_mgr.mini_brain = setup_mini_brain()
+        # Tabs
+        self.sample_manager = None  # SampleManager()
+        self.tab_managers = {}
+        self._init_sample_tab_mgr()
 
         # Menu actions
         self.preference_editor = PreferenceUi(self)
@@ -694,56 +690,123 @@ class ClearMapGui(ClearMapGuiBase):
             update_default_config()
 
     def __len__(self):
-        return len(self.tab_mgrs)
+        return len(self.tab_managers)
 
     def __getitem__(self, item):
-        return self.tab_mgrs[item]
+        return self.tab_managers[item]
 
     def reset(self):
         self.config_loader = ConfigLoader('')
         self.ortho_viewer = OrthoViewer()
 
-        self.sample_tab_mgr = SampleTab(self, tab_idx=0)
-        self.alignment_tab_mgr = AlignmentTab(self, tab_idx=1)
-        self.cells_tab_mgr = CellCounterTab(self, tab_idx=2)
-        self.vasculature_tab_mgr = VasculatureTab(self, tab_idx=3)
-        self.group_analysis_tab_mgr = GroupAnalysisTab(self, tab_idx=4)
-        self.batch_tab_mgr = BatchProcessingTab(self, tab_idx=5)
+        self._init_sample_tab_mgr()
 
         self.amend_ui()
 
-        for tab in self.tab_mgrs:
+    def _init_sample_tab_mgr(self):
+        """Clears all existing tabs and creates a new SampleInfoTab and group tabs"""
+        print('Initialising sample tab manager')
+        for tab in self.tab_managers.values():
             tab.params = None
+        self.tab_managers.clear()
+        for tab in self.tabWidget.findChildren(QWidget):
+            if tab.objectName().endswith('_tab'):
+                delete_widget(tab, self.verticalLayout)
+        self.sample_manager = SampleManager()
+        self.add_tab(SampleInfoTab, sample_manager=self.sample_manager)
+        self.__add_group_tabs()
+        self.setup_tabs()
 
-        self.amend_ui()
+    def __init_pipeline_tabs(self):
+        """ Initialises the pipeline tabs: Stitching, Registration, cell... based on sample"""
+        if self.sample_manager.stitchable_channels:
+            self.add_tab(StitchingTab, sample_manager=self.sample_manager)
+        self.add_tab(RegistrationTab, sample_manager=self.sample_manager)  # Always needed to allow setting None for atlas
+        self.__add_post_processing_tabs()
+        self.setup_tabs()
 
-    @property
-    def tab_mgrs(self):
-        tabs = [self.sample_tab_mgr, self.alignment_tab_mgr]
-        if self.cells_tab_mgr.ui is None or self.cells_tab_mgr.ui.isEnabled():
-            tabs.append(self.cells_tab_mgr)
-        if self.vasculature_tab_mgr.ui is None or self.vasculature_tab_mgr.ui.isEnabled():
-            tabs.append(self.vasculature_tab_mgr)
-        # #self.group_analysis_tab_mgr
-        return tabs
+    def reset_pipeline_tabs(self):
+        for name in ('stitching', 'registration'):  # FIXME: see why not postprocessing tabs too
+            if tab:=self.tab_managers.get(name):
+                tab.sample_manager = self.sample_manager
+                tab.set_params(self.tab_managers['sample_info'].params, self.config_loader.get_cfg(name))
+
+    def add_tab(self, manager_class, tab_name='', **kwargs):
+        """
+        Add a new tab to the GUI
+
+        Parameters
+        ----------
+        manager_class : class
+            The class of the tab manager to instantiate
+        tab_name : str
+            The name of the tab. If not given, will be the class name in snake case
+        kwargs : dict
+            The keyword arguments to pass to the manager class constructor
+        """
+        if not tab_name:
+            tab_name = manager_class.get_tab_name()
+        tab_manager_name = tab_name.lower().replace(' ', '_')  # WARNING: can't use title_to_snake
+
+        tab_idx = self._get_tab_index(tab_name) # check if tab exists
+        if tab_idx is None:  # compute if not
+            tab_idx = self.tabWidget.count()
+            if not issubclass(manager_class, BatchTab):  # Insert before batch tabs
+                tab_idx -= len([t for t in self.tab_managers.values() if isinstance(t, BatchTab)])
+        tab = manager_class(self, tab_idx=tab_idx, **kwargs)
+        self.tab_managers[tab_manager_name] = tab
+        tab.init_ui()
+
+    def update_pipelines(self):  # REFACTOR: better name
+        for tab_mgr in self.tab_managers:
+            if tab_mgr.processing_type in ('pre', 'post'):  # skip batch and sample_info
+                tab_mgr.setup_workers()  # FIXME: check if risks overwrite if still same sample
+
+    def _get_tab_index(self, tab_name):
+        return next((i for i in range(self.tabWidget.count()) if self.tabWidget.tabText(i) == tab_name), None)
+
+    def setup_tabs(self):   # WARNING: run only after all tabs have been added
+        for tab in self.tab_managers.values():
+            tab.setup()
+            self.tabWidget.setTabText(tab.tab_idx, tab.name)
+        self.tabWidget.tabBarClicked.connect(self.handle_tab_click)
+        self.tabWidget.setCurrentIndex(0)
+
+    def __add_post_processing_tabs(self):
+        for channel_param in getattr(self.tab_managers['sample_info'], 'params', {}).values():
+            cls = DATA_TYPE_TO_TAB_CLASS.get(channel_param.data_type)
+            if not cls:
+                continue  # Skip if no tab for that data type
+            if not any([isinstance(tab, cls) for tab in self.tab_managers.values()]):
+                self.add_tab(cls, sample_manager=self.sample_manager)
+
+    def __add_group_tabs(self):
+        for tab_class in (GroupAnalysisTab, BatchProcessingTab):
+            self.add_tab(tab_class)
 
     @property
     def params(self):
-        return [tab.params for tab in self.tab_mgrs]
+        return [tab.params for tab in self.tab_managers.values()]
 
     @property
     def src_folder(self):
-        return self.sample_tab_mgr.src_folder
+        return self.tab_managers['sample_info'].src_folder
 
     @src_folder.setter
     def src_folder(self, src_folder):
-        # FIXME: avoid if not src_folder or src_folder == os.curdir:
-        #     src_folder = tempfile.TemporaryDirectory()
-        self.logger.set_file(os.path.join(src_folder, 'info.log'))
+        if not src_folder:
+            return
+        src_folder = Path(src_folder)
+        if src_folder == Path('.').absolute():
+            return  # Do not write log files in the current folder
+        self.logger.set_file(src_folder / 'info.log')
         self.progress_watcher.log_path = self.logger.file.name
-        self.error_logger.set_file(os.path.join(src_folder, 'errors.html'))
-        self.progress_logger.set_file(os.path.join(src_folder, 'progress.log'))
-        self.sample_tab_mgr.src_folder = src_folder
+        self.error_logger.set_file(src_folder / 'errors.html')
+        self.progress_logger.set_file(src_folder / 'progress.log')
+        self.tab_managers['sample_info'].src_folder = str(src_folder)
+        # FIXME: self.sample_manager.src_folder = src_folder or something
+        # self.reset_loggers()
+        self.reset_pipeline_tabs()
 
     def display_about(self):
         about_msg = f'You are running ClearMap version {CLEARMAP_VERSION}'
@@ -761,7 +824,6 @@ class ClearMapGui(ClearMapGuiBase):
         self.setup_menus()
 
         self.setup_icons()
-        self.setup_tabs()
         self.preference_editor.setup(self.config_loader.get_cfg('display')[CURRENT_RES]['font_size'])
 
         self.monkey_patch()
@@ -831,10 +893,10 @@ class ClearMapGui(ClearMapGuiBase):
             Whether to set the progress watcher of the tab managers to a nested progress watcher
         """
         if nested:
-            for tab in self.tab_mgrs:
+            for tab in self.tab_managers.values():
                 tab.set_progress_watcher(self.progress_watcher)
         else:
-            self.alignment_tab_mgr.preprocessor.set_progress_watcher(self.progress_watcher)
+            self.sample_manager.set_progress_watcher(self.progress_watcher)
 
     def handle_tab_click(self, tab_index):
         """
@@ -845,43 +907,50 @@ class ClearMapGui(ClearMapGuiBase):
         tab_index: int
             The index of the tab clicked
         """
-        all_tabs = [self.sample_tab_mgr, self.alignment_tab_mgr, self.cells_tab_mgr, self.vasculature_tab_mgr,
-                    self.group_analysis_tab_mgr, self.batch_tab_mgr]
-        if 0 < tab_index < 4 and self.alignment_tab_mgr.preprocessor.workspace is None:
-            self.popup('WARNING', 'Workspace not initialised, '
-                                  'cannot proceed to alignment')
+        if not self.sample_manager.setup_complete and 0 < tab_index < self._get_tab_idx('group_analysis'):
+            self.popup('WARNING', 'Workspace not initialised, cannot proceed to alignment')
             self.tabWidget.setCurrentIndex(0)
-        processor_setup_functions = {
-            2: self.cells_tab_mgr.setup_cell_detector,
-            3: self.vasculature_tab_mgr.setup_vessel_processors
-        }
-        if tab_index in (2, 3):
-            if all_tabs[tab_index] is None or not all_tabs[tab_index].ui.isEnabled():
+
+        # FIXME: might be simpler to use the same string for the tab name and the manager name
+        manager_tab_name = self.tabWidget.tabText(tab_index).lower().replace(' ', '_')
+        tab = self.tab_managers[manager_tab_name]
+        if tab.processing_type == 'post':
+            if not tab.ui.isEnabled():
                 return
-            if self.alignment_tab_mgr.preprocessor.was_registered:
-                processor_setup_functions[tab_index]()
+            if self.needs_registering():
+                if self.popup('WARNING', 'Alignment not performed, please run first') == QMessageBox.Ok:
+                    self.select_tab('registration')
+                else:
+                    return
             else:
-                # TODO: use result
-                self.popup('WARNING', 'Alignment not performed, please run first') == QMessageBox.Ok
-                self.tabWidget.setCurrentIndex(1)  # WARNING: does not work
-        elif tab_index == 4 and not self.group_analysis_tab_mgr.initialised:
-            cfg_name = title_to_snake(self.group_analysis_tab_mgr.name)
-            try:
-                self.group_analysis_tab_mgr.setup()
-                self.group_analysis_tab_mgr.set_params()
-            except ConfigNotFoundError:
-                self.conf_load_error_msg(cfg_name)
-            except FileNotFoundError:  # message already printed, just stop
-                return
-        elif tab_index == 5 and not self.batch_tab_mgr.initialised:
-            cfg_name = title_to_snake(self.batch_tab_mgr.name)
-            try:
-                self.batch_tab_mgr.setup()
-                self.batch_tab_mgr.set_params()
-            except ConfigNotFoundError:
-                self.conf_load_error_msg(cfg_name)
-            except FileNotFoundError:  # message already printed, just stop
-                return
+                tab.finalise_workers_setup()
+        elif tab.processing_type == 'batch':
+            if not tab.initialised:
+                cfg_name = title_to_snake(tab.name)
+                try:
+                    tab.setup()
+                    tab.set_params(self.tab_managers['sample_info'].params, self.config_loader.get_cfg(cfg_name))
+                except ConfigNotFoundError:
+                    self.conf_load_error_msg(cfg_name)
+                except FileNotFoundError:  # message already printed, just stop
+                    return
+
+    def needs_registering(self):  # WARNING: can't use registration_processor.was_registered here
+        reg_cfg = self.sample_manager.registration_cfg
+        if all([cfg['align_with'] is None for cfg in reg_cfg['channels'].values()]):
+            return False  # Alignment deselected for all channels
+        else:
+            ref_channel = self.sample_manager.alignment_reference_channel
+            align_with = reg_cfg['channels'][ref_channel]['align_with']
+            moving_channel = reg_cfg['channels'][ref_channel]['moving_channel']
+
+            asset = self.sample_manager.get('aligned', channel=ref_channel)
+            fixed_channel = ref_channel if align_with == moving_channel else align_with
+            return not asset.specify({'moving_channel': moving_channel, 'fixed_channel': fixed_channel}).exists
+
+    def select_tab(self, tab_name):  # WARNING: does not work
+        tab_name_to_idx = {tab_name: self.tabWidget.indexOf(tab.ui) for tab_name, tab in self.tab_managers.items()}
+        self.tabWidget.setCurrentIndex(tab_name_to_idx[tab_name])
 
     def conf_load_error_msg(self, conf_name):
         """
@@ -920,35 +989,34 @@ class ClearMapGui(ClearMapGuiBase):
             The first value indicates whether the file was copied from the defaults
             and may need amending
         """
-        if config_loader is None:
-            config_loader = self.config_loader
+        config_loader = config_loader or self.config_loader
         cfg_path = config_loader.get_cfg_path(cfg_name, must_exist=False)
         was_copied = False
-        if cfg_name in ('cell_map', 'vasculature', 'tube_map'):
-            pipeline_name = title_to_snake(self.alignment_tab_mgr.params.pipeline_name)
-            is_cell_map = pipeline_name == 'cell_map' and cfg_name == 'cell_map'
-            is_tube_map = pipeline_name == 'tube_map' and cfg_name in ('tube_map', 'vasculature')
-            is_irrelevant_tab = not(pipeline_name == 'both' or is_tube_map or is_cell_map)
-            if is_irrelevant_tab:
-                return False, None
-        if not self.file_exists(cfg_path):  # REFACTOR: extract self.create_cfg_from_defaults
-            try:
-                default_cfg_file_path = config_loader.get_default_path(cfg_name)
-            except FileNotFoundError as err:
-                self.print_error_msg(f'Could not locate file for "{cfg_name}"')
-                raise err
-            base_msg, msg = self.create_missing_file_msg(cfg_name.title().replace('_', ''),
-                                                         cfg_path, default_cfg_file_path)
-            do_copy = self.popup(msg) == QMessageBox.Ok
-            if do_copy:
-                if not os.path.exists(os.path.dirname(cfg_path)):
-                    os.mkdir(os.path.dirname(cfg_path))
-                copyfile(default_cfg_file_path, cfg_path)
-                was_copied = True
-            else:
-                self.error_logger.write(self.error_logger.colourise(base_msg, force=True))
-                raise FileNotFoundError(html_to_ansi(base_msg))
+        # TODO: do as function of PostProcessingTab
+        if (cfg_name in ('cell_map', 'cell_counter', 'vasculature', 'tube_map') and
+                cfg_name not in [title_to_snake(p) for p in self.sample_manager.relevant_pipelines]):
+            return False, None
+        if not self.file_exists(cfg_path):
+            was_copied = self.__create_config_from_default(config_loader, cfg_name, cfg_path)
         return was_copied, cfg_path
+
+    def __create_config_from_default(self, config_loader, cfg_name, cfg_path):
+        try:
+            default_cfg_file_path = config_loader.get_default_path(cfg_name)
+        except FileNotFoundError as err:
+            self.print_error_msg(f'Could not locate file for "{cfg_name}"')
+            raise err
+
+        base_msg, msg = self.create_missing_file_msg(cfg_name.title().replace('_', ''),
+                                                     cfg_path, default_cfg_file_path)
+        if self.popup(msg) == QMessageBox.Ok:  # copy default config
+            if not cfg_path.parent.exists():
+                os.mkdir(cfg_path.parent)
+            copyfile(default_cfg_file_path, cfg_path)
+            return True
+        else:
+            self.error_logger.write(self.error_logger.colourise(base_msg, force=True))
+            raise FileNotFoundError(html_to_ansi(base_msg))
 
     def clone(self):
         folder = get_directory_dlg(self.preference_editor.params.start_folder,
@@ -956,7 +1024,7 @@ class ClearMapGui(ClearMapGuiBase):
         if not folder:
             return
         src_config_loader = ConfigLoader(folder)
-        for tab in self.tab_mgrs:
+        for tab in self.tab_managers.values():
             cfg_name = title_to_snake(tab.name)
             try:
                 src_cfg_path = src_config_loader.get_cfg_path(cfg_name, must_exist=True)
@@ -966,7 +1034,7 @@ class ClearMapGui(ClearMapGuiBase):
             copyfile(src_cfg_path, cfg_path)
 
     def load_default_cfg(self):
-        for tab in self.tab_mgrs:
+        for tab in self.tab_managers.values():
             cfg_name = title_to_snake(tab.name)
             try:
                 src_cfg_path = self.config_loader.get_default_path(cfg_name)
@@ -984,60 +1052,57 @@ class ClearMapGui(ClearMapGuiBase):
         self.assert_src_folder_set()
 
         error = False
-        for tab in self.tab_mgrs:
+        for tab in self.tab_managers.values():
             cfg_name = title_to_snake(tab.name)
             try:
                 # Load tab config
+                # FIXME: if old "alignment" or "processing": create stitching and registration cfg files and tabs
                 loaded_from_defaults, cfg_path = self.__get_cfg_path(cfg_name)
+
                 # Disable skipped tabs
                 if cfg_path is None:
                     tab.disable()
                     continue
 
-                self.set_tab_params(tab)
-                tab.read_configs(cfg_path)
-                # patch config if loaded from defaults or sample ID if it was set
-                if loaded_from_defaults or (cfg_name == 'sample' and self.sample_tab_mgr.get_sample_id()):
-                    tab.fix_config()  # TODO: see if this should be moved
+                if cfg_name == 'sample_info':
+                    sample_params = None
+                else:
+                    sample_params = self.tab_managers['sample_info'].params
 
-                tab.load_config_to_gui()
-                tab.setup_workers()
-            except ConfigNotFoundError:
-                self.conf_load_error_msg(cfg_name)
+                tab.set_params(sample_params, cfg_path, loaded_from_defaults)
+                if cfg_name == 'sample_info' and not tab.params.sample_id:
+                    self.prompt_sample_id()
+
+            except ConfigNotFoundError as err:
+                self.conf_load_error_msg(cfg_name + str(err))
                 error = True
-            except FileNotFoundError:  # message already printed, just stop without crashing
-                return
+            except FileNotFoundError as err:
+                print(f'ERRROR loading config {cfg_name}; {err}')
+                raise err
 
         if not error:
             self.print_status_msg('Config loaded')
-        self.sample_tab_mgr.plot_mini_brain()
+        else:
+            self.print_error_msg(f'Error loading configuration for tab: {tab.name}')
 
-    def set_tab_params(self, tab):
-        """
-        Set the tab manager parameters (which bind the file configuration and the
-        GUI widgets values) depending on the type of processor associated with the tab
-
-        Parameters
-        ----------
-        tab : GenericTab
-            The tab manager to setup
-        """
+    def get_params(self, tab):
         processing_type = tab.processing_type
-        if processing_type in (None, 'batch'):
-            tab.set_params()
-        elif processing_type == 'pre':
-            tab.set_params(self.sample_tab_mgr.params)
+        tab_names = []
+        if processing_type == 'pre':  # TODO: clean this up
+            tab_names.append('sample_info')
         elif processing_type == 'post':
-            tab.set_params(self.sample_tab_mgr.params, self.alignment_tab_mgr.params)
-            tab.setup_preproc(self.alignment_tab_mgr.preprocessor)
+            tab_names.extend(['stitching', 'registration'])
         else:
             raise ValueError(f'Processing type should be one of "pre", "post", "batch" or None,'
                              f' got "{processing_type}"')
+        params = [self.tab_managers[t].params for t in tab_names]
+        return params
 
     def prompt_experiment_folder(self):
         """Prompt the user for the main experiment data folder and set it"""
         folder = get_directory_dlg(self.preference_editor.params.start_folder)
-        if folder and folder != self.src_folder:
+        # if folder and folder != self.src_folder:
+        if folder and folder != self.tab_managers['sample_info'].src_folder:
             self.reset()
         self._set_src_folder(folder)
 
@@ -1045,6 +1110,20 @@ class ClearMapGui(ClearMapGuiBase):
         self.src_folder = src_folder
         self.config_loader.src_dir = src_folder
         self._load_sample_id()
+        self.tab_managers['sample_info'].set_params(None,  self.config_loader.get_cfg_path('sample', must_exist=False), False)
+
+        self.__init_pipeline_tabs()  # TODO: check if init or this
+
+    def prompt_sample_id(self):
+        """
+        Prompt the user for the sample ID and save it in the sample_params.cfg
+        """
+        sample_id = input_dialog('Enter the sample ID', 'No sample ID found. '
+                                                        'A sample ID is required to load the config'
+                                                        'Please enter the sample ID before proceeding')
+        if sample_id:
+            self.tab_managers['sample_info'].params.sample_id = sample_id
+            self.tab_managers['sample_info'].params.write()
 
     def _load_sample_id(self):
         """
@@ -1052,24 +1131,20 @@ class ClearMapGui(ClearMapGuiBase):
         default to empty string
         """
         sample_cfg_path = self.config_loader.get_cfg_path('sample', must_exist=False)
-        if not self.file_exists(sample_cfg_path):
-            option_idx = option_dialog('New experiment', 'This seems to be a new experiment. Do you want to: ',
-                                       ['Clone existing config', 'Load default config', 'Cancel'])
-            if option_idx == 0:
-                self.clone()
-            elif option_idx == 1:
-                self.load_default_cfg()
-            elif option_idx == 2:
-                self.src_folder = ''
-                self.config_loader.src_dir = ''
-                return
+        if not sample_cfg_path.exists():
+            match option_dialog('New experiment', 'This seems to be a new experiment. Do you want to: ',
+                                ['Clone existing config', 'Load default config', 'Cancel']):
+                case 0:
+                    self.clone()
+                case 1:
+                    self.load_default_cfg()
+                case 2:
+                    self.src_folder = ''
+                    self.config_loader.src_dir = ''
+                    return
         cfg = self.config_loader.get_cfg_from_path(sample_cfg_path)
-        sample_id = cfg['sample_id']
-        use_id_as_prefix = cfg['use_id_as_prefix']
-        if sample_id == 'undefined':
-            sample_id = ''
-        self.sample_tab_mgr.display_sample_id(sample_id)
-        self.sample_tab_mgr.display_use_id_as_prefix(use_id_as_prefix)
+        cfg['sample_id'] = cfg['sample_id'] if cfg['sample_id'] != 'undefined' else ''
+        cfg.write()
 
 
 def create_main_window(app, centered=True):
