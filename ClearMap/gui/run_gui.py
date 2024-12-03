@@ -665,6 +665,9 @@ class ClearMapGui(ClearMapGuiBase):
     """
     def __init__(self):
         super().__init__()
+        self.setupUi(self)
+        self.setWindowIcon(QtGui.QIcon(os.path.join(ICONS_FOLDER, 'logo_cyber.png')))
+
         self.config_loader = ConfigLoader('')
         self.ortho_viewer = OrthoViewer()
 
@@ -679,20 +682,13 @@ class ClearMapGui(ClearMapGuiBase):
 
         # Menu actions
         self.preference_editor = PreferenceUi(self)
-        self.structure_selector = StructureSelector(app=self)
-
-        self.setWindowIcon(QtGui.QIcon(os.path.join(ICONS_FOLDER, 'logo_cyber.png')))
-
-        self.setupUi(self)
-        self.amend_ui()
-        self.setup_monitoring_bars()
-
         self.actionPreferences.triggered.connect(self.preference_editor.open)
+        self.structure_selector = StructureSelector(app=self)
         self.actionStructureSelector.triggered.connect(self.structure_selector.show)
 
-        # self.actionPreferences.triggered.connect(self.raise_warning)
-
-        self.app = QApplication.instance()
+        self.amend_ui()
+        self.setup_monitoring_bars()
+        self.app = QApplication.instance() # noqa
 
         if not os.path.exists(CLEARMAP_CFG_DIR):
             update_default_config()
@@ -714,7 +710,7 @@ class ClearMapGui(ClearMapGuiBase):
         self.group_analysis_tab_mgr = GroupAnalysisTab(self, tab_idx=4)
         self.batch_tab_mgr = BatchProcessingTab(self, tab_idx=5)
 
-        self.sample_tab_mgr.mini_brain_scaling, self.sample_tab_mgr.mini_brain = setup_mini_brain()
+        self.amend_ui()
 
         for tab in self.tab_mgrs:
             tab.params = None
@@ -751,18 +747,18 @@ class ClearMapGui(ClearMapGuiBase):
 
     def display_about(self):
         about_msg = f'You are running ClearMap version {CLEARMAP_VERSION}'
+        try:
+            from ClearMap.config import commit_info # noqa
+            about_msg += f' from commit {commit_info.commit_hash}, {commit_info.commit_date}, branch {commit_info.branch}'
+        except ImportError:
+            pass
         self.popup(about_msg, 'About ClearMap GUI', print_warning=False)
 
     def amend_ui(self):
         """Setup the loggers and all the post instantiation fixes to the UI"""
+        self.reset_loggers()
 
-        """
-        self.setup_loggers()
-
-        helpMenu = self.menuBar().addMenu("&Help")
-        self.aboutAction = QAction("&About", self)
-        self.aboutAction.triggered.connect(self.display_about)
-        helpMenu.addAction(self.aboutAction)
+        self.setup_menus()
 
         self.setup_icons()
         self.setup_tabs()
@@ -778,24 +774,43 @@ class ClearMapGui(ClearMapGuiBase):
 
         self.print_status_msg('Idle, waiting for input')
 
-    def setup_loggers(self):
-        self.logger = Printer(redirects='stdout')
-        self.logger.text_updated.connect(self.textBrowser.append)
-        self.error_logger = Printer(color='red', logger_type='error', redirects='stderr')
-        self.error_logger.text_updated.connect(self.textBrowser.append)
+    def setup_menus(self):
+        for action in self.menuBar().actions():
+            if action.text() == "&Help":  # Skip if already exists
+                return
 
-    def setup_tabs(self):
-        """
-        Connect the main tabBar and setup all its tab managers
+        help_menu = self.menuBar().addMenu("&Help")
+        self.about_action = QAction("&About", self)
+        self.about_action.triggered.connect(self.display_about)
+        help_menu.addAction(self.about_action)
 
-        Returns
-        -------
+        workspace_menu = self.menuBar().addMenu("&Workspace")
 
-        """
-        for tab in self.tab_mgrs:
-            tab.setup()
-        self.tabWidget.tabBarClicked.connect(self.handle_tab_click)
-        self.tabWidget.setCurrentIndex(0)
+        show_info_action = QAction("Show Info", self)
+        show_info_action.triggered.connect(self.show_workspace_info)
+        workspace_menu.addAction(show_info_action)
+
+        # add_asset_action = QAction("Add Asset", self)
+        # add_asset_action.triggered.connect(self.add_asset)
+        # workspace_menu.addAction(add_asset_action)
+
+        manipulate_assets_action = QAction("Manipulate Assets", self)
+        manipulate_assets_action.triggered.connect(self.manipulate_assets)
+        workspace_menu.addAction(manipulate_assets_action)
+
+
+    def show_workspace_info(self):
+        self.popup(f'Workspace: {self.src_folder}, '
+                   f'{self.sample_manager.workspace.info()}')
+
+    def add_asset(self):
+        pass  # FIXME: implement
+
+    def manipulate_assets(self):
+        dlg = ManipulateAssetsDialog(self.src_folder, self.params,
+                                     sample_manager=self.sample_manager,
+                                     app=self)
+        dlg.exec_()
 
     def reset_loggers(self):
         self.logger = Printer(redirects=None if DEBUG else 'stdout')
@@ -877,8 +892,7 @@ class ClearMapGui(ClearMapGuiBase):
         conf_name : str
             The name of the config to load (without *params* and extension)
         """
-        conf_name = conf_name.replace('_', ' ').title()
-        self.print_error_msg(f'Loading {conf_name} config file failed')
+        self.print_error_msg(f'Loading {snake_to_title(conf_name)} config file failed')
 
     def assert_src_folder_set(self):
         if not self.src_folder:
