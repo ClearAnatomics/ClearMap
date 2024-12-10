@@ -16,7 +16,6 @@ __download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
 
 import numpy as np
 
-import ClearMap.Analysis.Graphs.type_conversions
 import ClearMap.IO.IO as io
 
 import ClearMap.Analysis.Graphs.GraphGt as ggt
@@ -295,12 +294,12 @@ def _group_labels(array):
 # ## Graph reduction
 ###############################################################################
 
-def reduce_graph(graph, vertex_to_edge_mappings={'radii': np.max},
+def reduce_graph(graph, vertex_to_edge_mappings={'radii': np.max},  # FIXME: use global settings
                  edge_to_edge_mappings={'length': np.sum},
                  edge_geometry=True, edge_length=None,
                  edge_geometry_vertex_properties=('coordinates', 'radii'),
                  edge_geometry_edge_properties=None,
-                 return_maps=False, verbose=False):
+                 return_maps=False, verbose=False, print_period=250000):
     """Reduce graph by replacing all vertices with degree two."""
 
     if verbose:
@@ -308,11 +307,7 @@ def reduce_graph(graph, vertex_to_edge_mappings={'radii': np.max},
         timer_all = tmr.Timer()
         print('Graph reduction: initialized.')
 
-    # ensure conditions for processing step are fulfilled
-    if graph.is_view:
-        raise ValueError('Cannot process on graph view, prune graph before graph reduction.')
-    if not np.all(np.diff(graph.vertex_indices()) == 1) or int(graph.vertex_iterator().next()) != 0:
-        raise ValueError('Graph vertices not ordered!')
+    check_graph_is_reduce_compatible(graph)
 
     # copy graph
     g = graph.copy()
@@ -329,14 +324,11 @@ def reduce_graph(graph, vertex_to_edge_mappings={'radii': np.max},
         timer.reset()
 
     # mappings
-    if edge_to_edge_mappings is None:
-        edge_to_edge_mappings = {}
-    if vertex_to_edge_mappings is None:
-        vertex_to_edge_mappings = {}
+    edge_to_edge_mappings = edge_to_edge_mappings or {}
+    vertex_to_edge_mappings = vertex_to_edge_mappings or {}
 
     if edge_length:
-        if 'length' not in edge_to_edge_mappings.keys():
-            edge_to_edge_mappings['length'] = np.sum
+        edge_to_edge_mappings['length'] = edge_to_edge_mappings.get('length', np.sum)
         if 'length' not in g.edge_properties:
             g.add_edge_property('length', np.ones(g.n_edges, dtype=float))
 
@@ -348,7 +340,6 @@ def reduce_graph(graph, vertex_to_edge_mappings={'radii': np.max},
             edge_to_edge[k] = edge_to_edge_mappings[k]
             edge_properties[k] = g.edge_property_map(k)
             edge_lists[k] = []
-    edge_to_edge_keys = edge_to_edge.keys()
 
     vertex_to_edge = {}
     vertex_properties = {}
@@ -358,33 +349,23 @@ def reduce_graph(graph, vertex_to_edge_mappings={'radii': np.max},
             vertex_to_edge[k] = vertex_to_edge_mappings[k]
             vertex_properties[k] = g.vertex_property_map(k)
             vertex_lists[k] = []
-    vertex_to_edge_keys = vertex_to_edge.keys()
 
     # edge geometry
-    calculate_vertex_to_vertex_map = False
-    calculate_edge_to_edge_map = False
-    calculate_edge_to_vertex_map = False
-
+    reduced_maps = {}
     if edge_geometry:
-        calculate_edge_to_vertex_map = True
-        reduced_edge_to_vertex_map = []
+        reduced_maps['edge_to_vertex'] = []
 
     if return_maps:
-        calculate_vertex_to_vertex_map = True
-        reduced_vertex_to_vertex_map = []
-        calculate_edge_to_vertex_map = True
-        reduced_edge_to_vertex_map = []
-        calculate_edge_to_edge_map = True
-        reduced_edge_to_edge_map = []
+        reduced_maps['vertex_to_vertex'] = []
+        reduced_maps['edge_to_edge'] = []
 
-    if edge_geometry_edge_properties is not None:
-        calculate_edge_to_edge_map = True
-        reduced_edge_to_edge_map = []
-
-    if edge_geometry_vertex_properties is None:
-        edge_geometry_vertex_properties = tuple()
     if edge_geometry_edge_properties is None:
         edge_geometry_edge_properties = []
+    else:
+        reduced_maps['edge_to_edge'] = []
+
+    if edge_geometry_vertex_properties is None:
+        edge_geometry_vertex_properties = []
 
     # direct edges between branch points
     edge_list = []
@@ -397,20 +378,20 @@ def reduce_graph(graph, vertex_to_edge_mappings={'radii': np.max},
                     checked[eid] = True
                     vertex_ids = [int(e.source()), int(e.target())]
                     edge_list.append(vertex_ids)
-                    for k in edge_to_edge_keys:
+                    for k in edge_to_edge.keys():
                         edge_lists[k].append(edge_to_edge[k]([edge_properties[k][e]]))
-                    for k in vertex_to_edge_keys:
+                    for k in vertex_to_edge.keys():
                         v_prop = vertex_properties[k]
                         vv = [v_prop[e.source()], v_prop[e.target()]]
                         vertex_lists[k].append(vertex_to_edge[k](vv))
 
-                    if calculate_edge_to_vertex_map:
-                        reduced_edge_to_vertex_map.append(vertex_ids)
+                    if 'edge_to_vertex' in reduced_maps.keys():
+                        reduced_maps['edge_to_vertex'].append(vertex_ids)
 
-                    if calculate_edge_to_edge_map:
-                        reduced_edge_to_edge_map.append([e])
+                    if 'edge_to_edge' in reduced_maps.keys():
+                        reduced_maps['edge_to_edge'].append([e])
 
-        if verbose and (i+1) % 250000 == 0:
+        if verbose and (i+1) % print_period == 0:
             timer.print_elapsed_time(
                 f'Graph reduction: Scanned {i + 1}/{n_branch_points} branching nodes, found {len(edge_list)} branches')
 
@@ -426,7 +407,6 @@ def reduce_graph(graph, vertex_to_edge_mappings={'radii': np.max},
             checked[v] = True
             vertex = g.vertex(v)
             vertices, edges, endpoints, isolated_loop = _graph_branch(vertex)
-            # print([int(vv) for vv in vertices], [[int(ee.source()), int(ee.target())] for ee in edges], endpoints, isolated_loop)
             if not isolated_loop:
                 vertices_ids = [int(vv) for vv in vertices]
                 checked[vertices_ids[1:-1]] = True
@@ -446,13 +426,13 @@ def reduce_graph(graph, vertex_to_edge_mappings={'radii': np.max},
                     #     index_pos += len(vertices_ids)
                     #     branch_end.append(index_pos)
 
-                if calculate_edge_to_vertex_map:
-                    reduced_edge_to_vertex_map.append(vertices_ids)
+                if 'edge_to_vertex' in reduced_maps.keys():
+                    reduced_maps['edge_to_vertex'].append(vertices_ids)
 
-                if calculate_edge_to_edge_map:
-                    reduced_edge_to_edge_map.append(edges)
+                if 'edge_to_edge' in reduced_maps.keys():
+                    reduced_maps['edge_to_edge'].append(edges)
 
-        if verbose and (i+1) % 250000 == 0:
+        if verbose and (i+1) % print_period == 0:
             timer.print_elapsed_time(
               f'Graph reduction: Scanned {i + 1}/{n_non_branch_points} non-branching nodes found {len(edge_list)} branches')
 
@@ -470,36 +450,31 @@ def reduce_graph(graph, vertex_to_edge_mappings={'radii': np.max},
     edge_order = gr.edge_indices()
 
     # remove non-branching points
-    if calculate_vertex_to_vertex_map:
+    if 'vertex_to_vertex' in reduced_maps.keys():
         gr.add_vertex_property('_vertex_id_', graph.vertex_indices())
     gr = gr.sub_graph(vertex_filter=np.logical_not(checked))
-    if calculate_vertex_to_vertex_map:
-        reduced_vertex_to_vertex_map = gr.vertex_property('_vertex_id_')
+    if 'vertex_to_vertex' in reduced_maps.keys():
+        reduced_maps['vertex_to_vertex'] = gr.vertex_property('_vertex_id_')
         gr.remove_vertex_property('_vertex_id_')
 
     # maps
-    if calculate_edge_to_vertex_map:
-        reduced_edge_to_vertex_map = np.array(reduced_edge_to_vertex_map, dtype=object)[edge_order]
-    if calculate_edge_to_edge_map:
-        reduced_edge_to_edge_map = np.array(reduced_edge_to_edge_map, dtype=object)[edge_order]
+    if 'edge_to_vertex' in reduced_maps.keys():
+        reduced_maps['edge_to_vertex'] = np.array(reduced_maps['edge_to_vertex'], dtype=object)[edge_order]
+    if 'edge_to_edge' in reduced_maps.keys():
+        reduced_maps['edge_to_edge'] = np.array(reduced_maps['edge_to_edge'], dtype=object)[edge_order]
 
     # add edge properties
-    for k in edge_to_edge_keys:
+    for k in edge_to_edge.keys():
         gr.define_edge_property(k, np.array(edge_lists[k])[edge_order])
-    for k in vertex_to_edge_keys:
+    for k in vertex_to_edge.keys():
         gr.define_edge_property(k, np.array(vertex_lists[k])[edge_order])
 
     if edge_geometry is not None:
-        branch_indices = np.hstack(reduced_edge_to_vertex_map)
-        indices = [0] + [len(m) for m in reduced_edge_to_vertex_map]
+        branch_indices = np.hstack(reduced_maps['edge_to_vertex'])
+        indices = [0] + [len(m) for m in reduced_maps['edge_to_vertex']]
         indices = np.cumsum(indices)
         indices = np.array([indices[:-1], indices[1:]]).T
 
-        # branch_start = np.array(branch_start)
-        # branch_end   = np.array(branch_end)
-        # vertex properties
-        # indices = np.array([branch_start, branch_end]).T
-        # indices = indices[edge_order]
         indices_use = indices
 
         for p in edge_geometry_vertex_properties:
@@ -513,21 +488,29 @@ def reduce_graph(graph, vertex_to_edge_mappings={'radii': np.max},
             if p in g.edge_properties:
                 values = g.edge_property_map(p)
                 # there is one edge less than vertices in each reduced edge !
-                values = [[values[e] for e in edge] + [values[edge[-1]]] for edge in reduced_edge_to_edge_map]
+                values = [[values[e] for e in edge] + [values[edge[-1]]] for edge in reduced_maps['edge_to_edge']]
                 gr.set_edge_geometry(name=f'edge_{p}', values=values, indices=indices_use)
                 indices_use = None
 
-    if calculate_edge_to_edge_map:
-        reduced_edge_to_edge_map = [[g.edge_index(e) for e in edge] for edge in reduced_edge_to_edge_map]
+    if 'edge_to_edge' in reduced_maps.keys():
+        reduced_maps['edge_to_edge'] = [[g.edge_index(e) for e in edge] for edge in reduced_maps['edge_to_edge']]
 
     if verbose:
         timer_all.print_elapsed_time(f'Graph reduction: Graph reduced from {graph.n_vertices} to {gr.n_vertices} nodes'
                                      f' and {graph.n_edges} to {gr.n_edges} edges')
 
     if return_maps:
-        return gr, (reduced_vertex_to_vertex_map, reduced_edge_to_vertex_map, reduced_edge_to_edge_map)
+        return gr, (reduced_maps[k] for k in ('vertex_to_vertex', 'edge_to_vertex', 'edge_to_edge'))
     else:
         return gr
+
+
+def check_graph_is_reduce_compatible(graph):
+    # ensure conditions for processing step are fulfilled
+    if graph.is_view:
+        raise ValueError('Cannot process on graph view, prune graph before graph reduction.')
+    if not np.all(np.diff(graph.vertex_indices()) == 1) or int(graph.vertex_iterator().next()) != 0:
+        raise ValueError('Graph vertices not ordered!')
 
 
 def _graph_branch(v0):
@@ -889,7 +872,8 @@ def _test():
     e, m = gp.expand_graph_length(graph, 'length', True)
 
     import graph_tool.draw as gd
-    pos = ClearMap.Analysis.Graphs.type_conversions.vertex_property_map_to_python(gd.sfdp_layout(e.base))
+    from ClearMap.Analysis.Graphs import GraphGt
+    pos = GraphGt.vertex_property_map_to_python(gd.sfdp_layout(e.base))
     import matplotlib.pyplot as plt
     plt.figure(1)
     plt.clf()
