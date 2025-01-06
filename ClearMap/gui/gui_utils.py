@@ -260,8 +260,9 @@ def clear_layout(layout):
         item = layout.takeAt(i)
         if item is not None:
             widg = item.widget()
-            widg.setParent(None)
-            widg.deleteLater()
+            if widg is not None:
+                widg.setParent(None)
+                widg.deleteLater()
 
 def find_parent_layout(widget):
     parent = widget.parent()
