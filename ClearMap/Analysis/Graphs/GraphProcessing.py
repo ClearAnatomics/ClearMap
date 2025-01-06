@@ -16,6 +16,7 @@ __download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
 
 import numpy as np
 
+import ClearMap.Analysis.Graphs.type_conversions
 import ClearMap.IO.IO as io
 
 import ClearMap.ImageProcessing.Topology.Topology3d as t3d
@@ -156,7 +157,7 @@ def mean_vertex_coordinates(coordinates):
 
 def clean_graph(graph, remove_self_loops=True, remove_isolated_vertices=True,
                 vertex_mappings={'coordinates' : mean_vertex_coordinates,
-                                   'radii'       : np.max},
+                                 'radii'       : np.max},
                 verbose=False):
     """
     Remove all cliques to get pure branch structure of a graph.
