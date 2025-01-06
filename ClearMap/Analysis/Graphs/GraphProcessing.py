@@ -18,11 +18,12 @@ import numpy as np
 
 import ClearMap.IO.IO as io
 
-import ClearMap.Analysis.Graphs.GraphGt as ggt
-
 import ClearMap.ImageProcessing.Topology.Topology3d as t3d
 
 import ClearMap.ParallelProcessing.DataProcessing.ArrayProcessing as ap
+
+import ClearMap.Analysis.Graphs.GraphGt as ggt
+from ClearMap.Analysis.Graphs.fast_graph_reduce import find_degree2_branches
 
 import ClearMap.Utils.Timer as tmr
 
@@ -313,10 +314,10 @@ def reduce_graph(graph, vertex_to_edge_mappings={'radii': np.max},  # FIXME: use
     g = graph.copy()
 
     # find non-branching points, i.e. vertices with deg 2
-    branch_ids = np.where(g.vertex_degrees() != 2)[0]
-    n_branch_points = len(branch_ids)
-    non_branch_ids = np.where(g.vertex_degrees() == 2)[0]
-    n_non_branch_points = len(non_branch_ids)
+    non_degree_2_vertices_ids = np.where(g.vertex_degrees() != 2)[0]
+    n_branch_points = len(non_degree_2_vertices_ids)
+    degree_2_vertices_ids = np.where(g.vertex_degrees() == 2)[0]
+    n_non_branch_points = len(degree_2_vertices_ids)
 
     if verbose:
         timer.print_elapsed_time(
@@ -367,95 +368,47 @@ def reduce_graph(graph, vertex_to_edge_mappings={'radii': np.max},  # FIXME: use
     if edge_geometry_vertex_properties is None:
         edge_geometry_vertex_properties = []
 
-    # direct edges between branch points
+    chains, edge_descriptors = find_chains(g)
+
     edge_list = []
-    checked = np.zeros(g.n_edges, dtype=bool)
-    for i, v in enumerate(branch_ids):
-        for e in g.vertex_edges_iterator(v):
-            if e.target().out_degree() != 2:
-                eid = g.edge_index(e)
-                if not checked[eid]:
-                    checked[eid] = True
-                    vertex_ids = [int(e.source()), int(e.target())]
-                    edge_list.append(vertex_ids)
-                    for k in edge_to_edge.keys():
-                        edge_lists[k].append(edge_to_edge[k]([edge_properties[k][e]]))
-                    for k in vertex_to_edge.keys():
-                        v_prop = vertex_properties[k]
-                        vv = [v_prop[e.source()], v_prop[e.target()]]
-                        vertex_lists[k].append(vertex_to_edge[k](vv))
+    for edges, vertices in chains:
+        edges = [edge_descriptors[eid] for eid in edges]  # Convert edge id to edge object
+        vertices_ids = [int(vv) for vv in vertices]  # FIXME: check if necessary
 
-                    if 'edge_to_vertex' in reduced_maps.keys():
-                        reduced_maps['edge_to_vertex'].append(vertex_ids)
+        edge_list.append([int(ep) for ep in [vertices[0], vertices[-1]]])  # we just need between branch_points to be considered end points
 
-                    if 'edge_to_edge' in reduced_maps.keys():
-                        reduced_maps['edge_to_edge'].append([e])
+        # mappings
+        for k in edge_to_edge.keys():
+            ep = edge_properties[k]
+            edge_lists[k].append(edge_to_edge[k]([ep[e] for e in edges]))
+        for k in vertex_to_edge.keys():
+            v_prop = vertex_properties[k]
+            vertex_lists[k].append(vertex_to_edge[k]([v_prop[vv] for vv in vertices]))
 
-        if verbose and (i+1) % print_period == 0:
-            timer.print_elapsed_time(
-                f'Graph reduction: Scanned {i + 1}/{n_branch_points} branching nodes, found {len(edge_list)} branches')
+        if 'edge_to_vertex' in reduced_maps.keys():
+            reduced_maps['edge_to_vertex'].append(vertices_ids)
 
-    if verbose:
-        timer.print_elapsed_time(
-            f'Graph reduction: Scanned {i + 1}/{n_branch_points} branching nodes, found {len(edge_list)} branches')
-
-    # reduce non-direct edges
-    checked = np.zeros(g.n_vertices, dtype=bool)
-    for i, v in enumerate(non_branch_ids):
-        if not checked[v]:
-            # extract branch
-            checked[v] = True
-            vertex = g.vertex(v)
-            vertices, edges, endpoints, isolated_loop = _graph_branch(vertex)
-            if not isolated_loop:
-                vertices_ids = [int(vv) for vv in vertices]
-                checked[vertices_ids[1:-1]] = True
-                edge_list.append([int(ep) for ep in endpoints])
-
-                # mappings
-                for k in edge_to_edge.keys():
-                    ep = edge_properties[k]
-                    edge_lists[k].append(edge_to_edge[k]([ep[e] for e in edges]))
-
-                for k in vertex_to_edge.keys():
-                    vp = vertex_properties[k]
-                    vertex_lists[k].append(vertex_to_edge[k]([vp[vv] for vv in vertices]))
-
-                    # if edge_geometry is not None:
-                    #     branch_start.append(index_pos)
-                    #     index_pos += len(vertices_ids)
-                    #     branch_end.append(index_pos)
-
-                if 'edge_to_vertex' in reduced_maps.keys():
-                    reduced_maps['edge_to_vertex'].append(vertices_ids)
-
-                if 'edge_to_edge' in reduced_maps.keys():
-                    reduced_maps['edge_to_edge'].append(edges)
-
-        if verbose and (i+1) % print_period == 0:
-            timer.print_elapsed_time(
-              f'Graph reduction: Scanned {i + 1}/{n_non_branch_points} non-branching nodes found {len(edge_list)} branches')
-
-    if verbose:
-        timer.print_elapsed_time(
-          f'Graph reduction: Scanned {i + 1}/{n_non_branch_points} non-branching nodes found {len(edge_list)} branches')
+        if 'edge_to_edge' in reduced_maps.keys():
+            reduced_maps['edge_to_edge'].append(edges)
 
     # REDUCE GRAPH
 
     # redefine branch edges
-    gr = g.sub_graph(edge_filter=np.zeros(g.n_edges, dtype=bool))
-    gr.add_edge(edge_list)
+    reduced_graph = g.sub_graph(edge_filter=np.zeros(g.n_edges, dtype=bool))
+    reduced_graph.add_edge(edge_list)
 
     # determine edge ordering
-    edge_order = gr.edge_indices()
+    edge_order = reduced_graph.edge_indices()
 
-    # remove non-branching points
+    # remove degree 2 nodes
     if 'vertex_to_vertex' in reduced_maps.keys():
-        gr.add_vertex_property('_vertex_id_', graph.vertex_indices())
-    gr = gr.sub_graph(vertex_filter=np.logical_not(checked))
+        reduced_graph.add_vertex_property('_vertex_id_', graph.vertex_indices())
+    v_filter = np.zeros(g.n_vertices, dtype=bool)
+    v_filter[non_degree_2_vertices_ids] = True
+    reduced_graph = reduced_graph.sub_graph(vertex_filter=v_filter)
     if 'vertex_to_vertex' in reduced_maps.keys():
-        reduced_maps['vertex_to_vertex'] = gr.vertex_property('_vertex_id_')
-        gr.remove_vertex_property('_vertex_id_')
+        reduced_maps['vertex_to_vertex'] = reduced_graph.vertex_property('_vertex_id_')
+        reduced_graph.remove_vertex_property('_vertex_id_')
 
     # maps
     if 'edge_to_vertex' in reduced_maps.keys():
@@ -465,44 +418,85 @@ def reduce_graph(graph, vertex_to_edge_mappings={'radii': np.max},  # FIXME: use
 
     # add edge properties
     for k in edge_to_edge.keys():
-        gr.define_edge_property(k, np.array(edge_lists[k])[edge_order])
+        reduced_graph.define_edge_property(k, np.array(edge_lists[k])[edge_order])
     for k in vertex_to_edge.keys():
-        gr.define_edge_property(k, np.array(vertex_lists[k])[edge_order])
+        reduced_graph.define_edge_property(k, np.array(vertex_lists[k])[edge_order])
 
-    if edge_geometry is not None:
+    if edge_geometry:   # Remap each edge property to the reduced graph (i.e. save as an edge_geometry as f'edge_{prop}' )
         branch_indices = np.hstack(reduced_maps['edge_to_vertex'])
-        indices = [0] + [len(m) for m in reduced_maps['edge_to_vertex']]
-        indices = np.cumsum(indices)
+        # Create start and end indices for edge geometry
+        indices = np.cumsum([0] + [len(m) for m in reduced_maps['edge_to_vertex']])  # Length of each branch
         indices = np.array([indices[:-1], indices[1:]]).T
+        indices_use = indices  # only use indices for first property, the rest uses the same indices
 
-        indices_use = indices
+        g.edge_geometry_indices_set = False
+        g.set_edge_geometry_vertex_properties(original_graph, edge_geometry_vertex_properties, branch_indices, indices)
+        g.edge_geometry_indices_set = True
+        g.set_edge_geometry_edge_properties(original_graph, edge_geometry_edge_properties, indices, reduced_maps['edge_to_edge'])
 
+        # vertices
         for p in edge_geometry_vertex_properties:
             if p in g.vertex_properties:
                 values = g.vertex_property(p)
                 values = values[branch_indices]
-                gr.set_edge_geometry(name=p, values=values, indices=indices_use)
+                reduced_graph.set_edge_geometry(name=p, values=values, indices=indices_use)
                 indices_use = None
 
+        # edges
         for p in edge_geometry_edge_properties:
             if p in g.edge_properties:
                 values = g.edge_property_map(p)
-                # there is one edge less than vertices in each reduced edge !
-                values = [[values[e] for e in edge] + [values[edge[-1]]] for edge in reduced_maps['edge_to_edge']]
-                gr.set_edge_geometry(name=f'edge_{p}', values=values, indices=indices_use)
+                # there is one fewer edge than vertices in each reduced edge !
+                values = [[values[e] for e in edges + [edges[-1]]] for edges in reduced_maps['edge_to_edge']]
+                # it seems that we repeat the last edge to have the same number of edges as vertices ?
+                reduced_graph.set_edge_geometry(name=f'edge_{p}', values=values, indices=indices_use)
                 indices_use = None
 
     if 'edge_to_edge' in reduced_maps.keys():
         reduced_maps['edge_to_edge'] = [[g.edge_index(e) for e in edge] for edge in reduced_maps['edge_to_edge']]
 
     if verbose:
-        timer_all.print_elapsed_time(f'Graph reduction: Graph reduced from {graph.n_vertices} to {gr.n_vertices} nodes'
-                                     f' and {graph.n_edges} to {gr.n_edges} edges')
+        timer_all.print_elapsed_time(f'Graph reduction: Graph reduced from {graph.n_vertices} to {reduced_graph.n_vertices} nodes'
+                                     f' and {graph.n_edges} to {reduced_graph.n_edges} edges')
 
     if return_maps:
-        return gr, (reduced_maps[k] for k in ('vertex_to_vertex', 'edge_to_vertex', 'edge_to_edge'))
+        return reduced_graph, (reduced_maps[k] for k in ('vertex_to_vertex', 'edge_to_vertex', 'edge_to_edge'))
     else:
-        return gr
+        return reduced_graph
+
+
+def find_chains(g):
+    """
+    Find chains (i.e. list of edges between vertices that are either branching points or end points) in a graph.
+
+    Parameters
+    ----------
+    g: Graph
+        The graph to process.
+
+    Returns
+    -------
+    chains: list of list of edges
+        List of chains in the graph.
+    """
+    connectivity_w_eid = g._base.get_edges(eprops=[g._base.edge_index]).astype(np.uint32)
+    connectivity_w_eid = np.roll(connectivity_w_eid, 1, axis=1)  # move edge id to the first column
+    v1_degs = g._base.get_out_degrees(connectivity_w_eid[:, 1]).astype(np.uint8)
+    v2_degs = g._base.get_out_degrees(connectivity_w_eid[:, 2]).astype(np.uint8)
+    end_branches = np.logical_xor(v1_degs == 2, v2_degs == 2)
+    end_branches_idx = np.where(end_branches)[0]
+    end_branch_ids = connectivity_w_eid[end_branches_idx, 0]
+    vertex_degs = g.vertex_degrees().astype(np.uint8)
+    chains = find_degree2_branches(np.ascontiguousarray(connectivity_w_eid),  # FIXME: Check if contiguous is necessary
+                                   end_branch_ids.astype(np.uint32),
+                                   vertex_degs)
+    edge_descriptors = list(g._base.edges())
+    direct_edges = connectivity_w_eid[np.logical_and(v1_degs != 2, v2_degs != 2)]
+
+    # Add direct edges to chains to process together
+    for eid, v1, v2 in direct_edges:
+        chains.append(([eid], [v1, v2]))
+    return chains, edge_descriptors
 
 
 def check_graph_is_reduce_compatible(graph):
