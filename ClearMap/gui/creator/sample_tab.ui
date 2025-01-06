@@ -231,30 +231,12 @@
        <string>Channels</string>
       </attribute>
       <layout class="QGridLayout" name="gridLayout">
-       <property name="leftMargin">
-        <number>0</number>
-       </property>
-       <property name="topMargin">
-        <number>0</number>
-       </property>
-       <property name="rightMargin">
-        <number>0</number>
-       </property>
-       <property name="bottomMargin">
-        <number>0</number>
-       </property>
-       <item row="0" column="0">
-        <spacer name="horizontalSpacer">
-         <property name="orientation">
-          <enum>Qt::Horizontal</enum>
+       <item row="3" column="1">
+        <widget class="QPushButton" name="updateWorkspacePushButton">
+         <property name="text">
+          <string>Update Workspace</string>
          </property>
-         <property name="sizeHint" stdset="0">
-          <size>
-           <width>265</width>
-           <height>20</height>
-          </size>
-         </property>
-        </spacer>
+        </widget>
        </item>
        <item row="0" column="1">
         <widget class="QPushButton" name="launchPatternWizzardPushButton">
@@ -273,7 +255,7 @@
          </property>
         </widget>
        </item>
-       <item row="0" column="2">
+       <item row="1" column="1">
         <widget class="QToolButton" name="launchPatternWizzardPushButtonInfoToolButton">
          <property name="text">
           <string>...</string>
@@ -284,22 +266,49 @@
          </property>
         </widget>
        </item>
-       <item row="1" column="0" colspan="3">
+       <item row="0" column="0">
+        <spacer name="horizontalSpacer">
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>265</width>
+           <height>20</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+       <item row="2" column="0" colspan="2">
         <layout class="QVBoxLayout" name="channelsParamsTabWidgetLayout">
          <item>
           <widget class="QTabWidget" name="channelsParamsTabWidget">
            <property name="currentIndex">
-            <number>0</number>
+            <number>1</number>
            </property>
            <widget class="QWidget" name="tab">
             <attribute name="title">
              <string>Channel 0</string>
             </attribute>
+            <widget class="QPushButton" name="pushButton">
+             <property name="geometry">
+              <rect>
+               <x>330</x>
+               <y>410</y>
+               <width>83</width>
+               <height>24</height>
+              </rect>
+             </property>
+             <property name="text">
+              <string>PushButton</string>
+             </property>
+            </widget>
            </widget>
            <widget class="QWidget" name="tab_2">
             <attribute name="title">
              <string>+</string>
             </attribute>
+            <layout class="QHBoxLayout" name="horizontalLayout"/>
            </widget>
           </widget>
          </item>

@@ -193,6 +193,14 @@ class Pattern(Expression):
         self.place_holder_symbol = '?'
         super().__init__(self.__placeholder_pattern_to_expression_string(pattern_str))
 
+    def string(self, values=None):
+        # if values is None:
+        #     return self.pattern_str
+        if isinstance(values, dict) and 'C' in values.keys():
+            if 'C' not in self.tag_names():
+                self.set_channel_tag_name()
+        return super().string(values)
+
     def set_axis_name(self, axis_index, new_name):
         self.tags[axis_index].name = new_name
 
@@ -204,6 +212,14 @@ class Pattern(Expression):
         else:
             for i, name in enumerate(names):
                 self.set_axis_name(i, name)
+
+    def set_channel_tag_name(self):
+        chan_start_idx = str(self).find('C<') + 1
+        for i, tag in enumerate(self.tag_names()):
+            tag_idx_range = self.char_index(tag, with_markups=True)
+            if tag_idx_range[0] == chan_start_idx:
+                self.set_axis_name(i, 'C')
+                break
 
     def get_channel_indices(self):
         if 'C' in self.tag_names():
@@ -289,8 +305,7 @@ class Pattern(Expression):
                     expression_string += f'{dim_size}>'
                     current_dim = chr(ord(current_dim) + 1)
                     dim_size = 0
-                else:
-                    expression_string += c
+                expression_string += c
         return expression_string
 
     def __fuse_zeros(self, pattern):
@@ -370,6 +385,8 @@ class PatternFinder:  # TODO: from_df class_method
 
         if len(dataframes) == 1:
             return dataframes[0]
+        elif len(dataframes) == 0:
+            raise ValueError(f'No files found in list: {file_names}')
         else:
             raise NotImplementedError('Multiple patterns other than channel (different length)'
                                       ' in the same folder not supported yet')
@@ -382,10 +399,10 @@ class PatternFinder:  # TODO: from_df class_method
         # Remove rows with identical values in channel_indices columns
         channel_df = df.iloc[:, channel_indices].drop_duplicates()
         # Concatenate remaining columns and cast to int
-        channel_numbers = channel_df.apply(lambda x: int(''.join(x.astype(str))), axis=1)
+        channel_numbers = channel_df.apply(lambda x: int(''.join(x.astype(str))), axis=1).values
 
         other_axes = {ax: '?' for ax in pattern.tag_names() if ax != 'C'}
-        expressions = [Expression(pattern.string(values={'C': c, **other_axes})) for c in channel_numbers]
+        expressions = [Pattern(pattern.string(values={'C': c, **other_axes})) for c in channel_numbers]
 
         pattern_finders = [cls(folder, e.glob()) for e in expressions]
         return pattern_finders
@@ -396,4 +413,5 @@ class PatternFinder:  # TODO: from_df class_method
         first_row = df.iloc[0]
         for i, col in enumerate(df):
             pattern += first_row[i] if (df[col] == first_row[i]).all() else '?'  # ? if not all letters are the same in the column
+        # FIXME: skips some spaces x and ]
         return Pattern(pattern)
