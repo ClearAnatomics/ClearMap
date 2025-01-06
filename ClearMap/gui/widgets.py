@@ -28,7 +28,7 @@ from PyQt5.QtGui import QColor, QIcon
 from PyQt5.QtWidgets import (QWidget, QDialogButtonBox, QListWidget, QHBoxLayout,
                              QPushButton, QVBoxLayout, QTableWidget, QTableWidgetItem,
                              QToolBox, QRadioButton, QTreeWidget, QTreeWidgetItem,
-                             QTabWidget, QListWidgetItem, QFileDialog)
+                             QTabWidget, QListWidgetItem, QFileDialog, QSpinBox, QDoubleSpinBox, QComboBox, QLineEdit)
 
 from ClearMap import Settings
 from ClearMap.IO.assets_constants import DATA_CONTENT_TYPES, EXTENSIONS
@@ -45,6 +45,8 @@ __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
 __copyright__ = 'Copyright © 2022 by Charly Rousseau'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://github.com/ClearAnatomics/ClearMap'
+
+from ClearMap.gui.style import DARK_BACKGROUND, COMBOBOX_STYLE_SHEET
 
 
 class OrthoViewer(object):
@@ -1075,7 +1077,7 @@ class PatternDialog(WizardDialog):
         self.dlg.patternToolBox.addItem(group_controls, f'Image group {self.n_image_groups}')
 
         group_controls.patternButtonBox.button(QDialogButtonBox.Apply).clicked.connect(self.validate_pattern)
-        group_controls.channelNameLineEdit.setText(f'Channel {self.n_image_groups}')  # REFACTOR: check if could read from CFG
+        group_controls.channelNameLineEdit.setText(f'channel_{self.n_image_groups}')  # FIXME: check if could read from CFG
         data_types = list(dict.fromkeys(DATA_CONTENT_TYPES))  # avoid duplicates while keeping order
         group_controls.dataTypeComboBox.addItems(data_types)
 
@@ -1376,17 +1378,9 @@ class LandmarksSelectorDialog(WizardDialog):  # TODO: bind qColorDialog to color
         This method is called automatically in the constructor
         """
         self.dlg.addMarkerPushButton.clicked.connect(self.add_marker)
-        self.dlg.addMarkerPushButton.clicked.connect(functools.partial(print, 'Marker added'))
         self.dlg.delMarkerPushButton.clicked.connect(self.remove_marker)
-        self.dlg.delMarkerPushButton.clicked.connect(functools.partial(print, 'Marker removed'))
         self.dlg.buttonBox.accepted.connect(self.write_coords)
-        self.dlg.buttonBox.accepted.connect(functools.partial(print, 'Coords written'))
         self.dlg.buttonBox.rejected.connect(self.dlg.close)
-        self.dlg.buttonBox.rejected.connect(functools.partial(print, 'Closing dialog'))
-
-        for btn in (self.dlg.addMarkerPushButton, self.dlg.delMarkerPushButton, self.dlg.buttonBox):
-            print(f'{btn.objectName()}, visible: {btn.isVisible()}, enabled: {btn.isEnabled()}')
-        print('Buttons connected')
 
     def __len__(self):
         return len(self.markers)
@@ -1442,6 +1436,7 @@ class LandmarksSelectorDialog(WizardDialog):  # TODO: bind qColorDialog to color
                 landmarks_file.write(f'point\n{len(markers)}\n')  # FIXME: use index ??
                 for marker in markers:
                     landmarks_file.write(marker.formatted_coords(img_type))
+        self.dlg.close()
 
     def set_current_coords(self, x, y, z, img_type):
         """
@@ -1510,7 +1505,7 @@ class LandmarksSelectorDialog(WizardDialog):  # TODO: bind qColorDialog to color
         Remove the last marker
         """
         if self.current_marker == len(self) - 1:  # If last marker, select previous
-            self.markers[-2][0].setChecked(True)
+            self.markers[-2].activate()
         marker = self.markers.pop()
         del marker
 
@@ -1774,6 +1769,7 @@ class ExtendableTabWidget(QTabWidget):
 
 
 class FileDropListWidget(QListWidget):  # TODO: check if I need dragMoveEvent
+    itemsChanged = pyqtSignal()
     def __init__(self, parent=None, plus_btn=None, minus_btn=None):
         super().__init__(parent)
         self.setAcceptDrops(True)
@@ -1785,26 +1781,38 @@ class FileDropListWidget(QListWidget):  # TODO: check if I need dragMoveEvent
         if self.minus_btn:
             self.minus_btn.clicked.connect(self.remove_selected)
 
+    def get_items_text(self):
+        return [self.item(i).text() for i in range(self.count())]
+
+    def addItem(self, *__args):
+        super().addItem(*__args)
+        self.itemsChanged.emit()
+
+    def addItems(self, *__args):
+        super().addItems(*__args)
+        self.itemsChanged.emit()
+
     def add_files(self, file_paths=None):
         file_paths = file_paths or QFileDialog.getOpenFileNames(self, 'Select files')[0]
         if file_paths:
             self.addItems(file_paths)
+            self.itemsChanged.emit()
 
     def remove_selected(self):
+        changed = False
         for item in self.selectedItems():
-            itm = self.takeItem(self.row(item))
-            itm.setParent(None)
-            itm.deleteLater()
+            self.takeItem(self.row(item))
+            changed = True
+        if changed:
+            self.itemsChanged.emit()
 
     def dragEnterEvent(self, event):
         data = event.mimeData()
-        print(data.text())
         if data.hasUrls():
             event.acceptProposedAction()
 
     def dragMoveEvent(self, event):
         data = event.mimeData()
-        print(data.text())
         if data.hasUrls():
             event.acceptProposedAction()
         else:
@@ -1812,7 +1820,6 @@ class FileDropListWidget(QListWidget):  # TODO: check if I need dragMoveEvent
 
     def dropEvent(self, event):
         data = event.mimeData()
-        print(data.text())
         if data.hasUrls():
             for url in data.urls():
                 file_path = url.toLocalFile()

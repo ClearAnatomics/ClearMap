@@ -96,6 +96,7 @@ other controls are handled by the `params` object) and the processing steps.
 """
 
 import functools
+import warnings
 from pathlib import Path
 
 import numpy as np
@@ -509,26 +510,34 @@ class RegistrationTab(PreProcessingTab):
         self.params[channel]._config = self.aligner.config
         self.params[channel].cfg_to_ui()  # Force it while the tab is active
 
+    def _setup_channel(self, page_widget, channel):
+        page_widget.alignWithComboBox.addItems(self.aligner.channels_to_register())
+        page_widget.movingChannelComboBox.addItems(self.aligner.channels_to_register())
+        alignment_files = [page_widget.paramsFilesListWidget.item(i).text() for i in
+                  range(page_widget.paramsFilesListWidget.count())]  # no shortcut for standard QListWidget
+        page_widget.paramsFilesListWidget = replace_widget(page_widget.paramsFilesListWidget,
+                                                           FileDropListWidget(page_widget,
+                                                                              page_widget.addParamFilePushButton,
+                                                                              page_widget.removeParamFilePushButton),
+                                                           page_widget.registrationChannelGridLayout)
+        page_widget.paramsFilesListWidget.addItems(alignment_files)  # Transfer existing files to new widget
+
     def _bind_channel(self, page_widget, channel):
         """
         Bind the signal/slots of the UI elements for `channel` which are not
         automatically set through the params object attribute
         """
         # TODO: set value of comboboxes to good defaults
-        page_widget.alignWithComboBox.addItems(self.aligner.channels_to_register())
-        page_widget.movingChannelComboBox.addItems(self.aligner.channels_to_register())
-        page_widget.paramsFilesListWidget = replace_widget(page_widget.paramsFilesListWidget,
-                                                           FileDropListWidget(page_widget,
-                                                                              page_widget.addParamFilePushButton,
-                                                                              page_widget.removeParamFilePushButton),
-                                                           page_widget.registrationChannelGridLayout)
+        page_widget.paramsFilesListWidget.itemsChanged.connect(self.params[channel].handle_params_files_changed)
+        self.params[channel].handle_params_files_changed()  # Force update
         self.params[channel].align_with_changed.connect(self.handle_align_with_changed)
 
     def setup_workers(self):
         self.sample_params.ui_to_cfg()
         self.aligner.setup()
         self.params.read_configs(self.aligner.config.filename)
-        self.wrap_step('Setting up atlas', self.setup_atlas, n_steps=1, save_cfg=False, nested=False)  # TODO: abort_func=self.aligner.stop_process
+        if self.sample_manager.setup_complete:
+            self.wrap_step('Setting up atlas', self.setup_atlas, n_steps=1, save_cfg=False, nested=False)  # TODO: abort_func=self.aligner.stop_process
 
     def set_progress_watcher(self, watcher):
         """
@@ -541,7 +550,7 @@ class RegistrationTab(PreProcessingTab):
         """
         self.aligner.set_progress_watcher(watcher)
 
-    def setup_atlas(self):
+    def setup_atlas(self):  # FIXME: delay this to update_workspace
         """
         Setup the atlas that corresponds to the orientation and crop
         """
@@ -583,8 +592,11 @@ class RegistrationTab(PreProcessingTab):
             # Remove registration pipeline from channel
             pass
         else:
-            self.sample_manager.workspace.add_pipeline('registration', channel_id=channel)
-            self.aligner.parametrize_assets()
+            if self.sample_manager.setup_complete:
+                self.sample_manager.workspace.add_pipeline('registration', channel_id=channel)
+                self.aligner.parametrize_assets()
+            else:
+                warnings.warn('Workspace not setup, cannot add registration pipeline')
 
     def run_registration(self):
         """
@@ -623,6 +635,8 @@ class RegistrationTab(PreProcessingTab):
 
     def _update_plotable_channels(self):
         self.ui.plotChannelComboBox.clear()  # TODO: extract to method
+        if not self.sample_manager.setup_complete:
+            return
         for channel in self.params.keys():
             if self.aligner.get_elx_asset('aligned', channel=channel).exists:
                 self.ui.plotChannelComboBox.addItem(channel)

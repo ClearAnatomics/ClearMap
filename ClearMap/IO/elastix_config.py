@@ -10,7 +10,7 @@ class ElastixEntry:
             self.parse()
         elif key is not None and values is not None:
             self.key = key
-            if not isinstance(values, Iterable):
+            if not isinstance(values, (tuple, list)):
                 values = [values]
             self.values = values
             self.build_ln()
@@ -22,6 +22,8 @@ class ElastixEntry:
             elements = self.ln[1:-2].split(' ')  # Remove leading "(" and trailing ")\n"
             self.key = elements[0]
             self.values = elements[1:]
+            if not isinstance(self.values, (tuple, list)):
+                self.values = [self.values]
 
     @property
     def type(self):
@@ -38,11 +40,15 @@ class ElastixEntry:
         return self.ln
 
     def build_ln(self):
-        values_str = ' '.join(self.__format_value(v) for v in self.values)
-        self.ln = f'({self.key} {values_str})\n'
+        try:
+            ln = [self.__format_value(v) for v in self.values]
+            values_str = ' '.join(ln)
+            self.ln = f'({self.key} {values_str})\n'
+        except Exception as e:
+            raise ValueError(f'Error building line for "{self.values}": {e}')
 
     def __format_value(self, val):
-        return f'"{val}"' if isinstance(val, str) else str(val)
+        return f'"{val}"' if (isinstance(val, str) and '"' not in val) else str(val)
 
 
 class ElastixParser:
@@ -83,6 +89,8 @@ class ElastixParser:
     def __setitem__(self, key, value):
         for d in self.data:
             if d.key == key:
+                if not isinstance(value, (tuple, list)):
+                    value = [value]  # FIXME: use setter instead
                 d.values = value
                 d.build_ln()
                 break

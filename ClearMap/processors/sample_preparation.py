@@ -410,14 +410,20 @@ class RegistrationProcessor(TabProcessor):
         self.__resample_re = ('Resampling: resampling',
                               re.compile(r".*?Resampling:\sresampling\saxes\s.+\s?,\sslice\s.+\s/\s\d+"))
 
+        self.setup_complete = False
+
     def setup(self, sample_manager=None):
         self.sample_manager = sample_manager if sample_manager else self.sample_manager
         if not self.sample_manager.registration_cfg:
             raise ValueError('Registration config not set in sample manager')
         self.config = self.sample_manager.registration_cfg
         self.machine_config = self.sample_manager.machine_config
-        self.workspace = self.sample_manager.workspace
-        self.setup_atlases()  # TODO: check if needed
+        if self.sample_manager.setup_complete:
+            self.workspace = self.sample_manager.workspace
+            self.setup_atlases()  # TODO: check if needed
+            self.setup_complete = True
+        else:
+            self.setup_complete = False  # FIXME: finish later
 
         # WARNING: must be called once registration pipeline has been added to the Workspace for that channel
         # self.parametrize_assets()
@@ -576,7 +582,8 @@ class RegistrationProcessor(TabProcessor):
 
     def align_channel(self, channel):
         fixed_channel, moving_channel = self.get_fixed_moving_channels(channel)
-        run_bspline = any(['bspline' in self.config['channels'][channel]['params_files']])
+        channel_cfg = self.config['channels'][channel]
+        run_bspline = any(['bspline' in channel_cfg['params_files']])
         n_steps = 17000 if run_bspline else 2000
         regexp = self.__bspline_registration_re if run_bspline else self.__affine_registration_re
         self.prepare_watcher_for_substep(n_steps, regexp, f'Align {moving_channel} to {fixed_channel}')
@@ -590,7 +597,9 @@ class RegistrationProcessor(TabProcessor):
             'workspace': self.workspace,  # FIXME: use semaphore instead
             'check_alignment_success': True
         }
-        landmarks_steps = self.config['channels'][channel]['use_landmarks_for']
+
+        landmarks_steps = [step for step, weight in zip(channel_cfg['params_files'], channel_cfg['landmarks_weights'])
+                           if weight > 0]
         if landmarks_steps:
             if len(landmarks_steps) != len(self.registration_params_files[channel]):
                 raise NotImplemented('Selecting landmarks for a subset of steps is currently not implemented')
@@ -600,7 +609,7 @@ class RegistrationProcessor(TabProcessor):
             }
         else:
             landmarks_files = {'moving_landmarks_path': '', 'fixed_landmarks_path': ''}  # Disable landmarks w/ empty str
-        elastix.align_from_dict(align_parameters, landmarks_files)
+        elastix.align_from_dict(align_parameters, landmarks_files, landmarks_weights=channel_cfg['landmarks_weights'])
 
     def get_atlas_files(self):
         if not self.get('atlas', asset_sub_type='annotation',
