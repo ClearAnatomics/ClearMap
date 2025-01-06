@@ -56,6 +56,9 @@ dependencies:
   - psutil
   - mpld3  # WARNING Maybe pip
   - lxml < 5.2  # lxml 5.2 breaks napari
+  - pip
+  - pip:
+    - itk-elastix
 variables:
   PYTHONNOUSERSITE: 1
 #  TMPDIR: /data/tmp

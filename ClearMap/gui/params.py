@@ -16,11 +16,10 @@ from typing import List
 import numpy as np
 
 from PyQt5.QtCore import Qt, pyqtSignal
-from PyQt5.QtWidgets import QInputDialog, QToolBox, QCheckBox, QPushButton
+from PyQt5.QtWidgets import QInputDialog, QToolBox, QCheckBox, QPushButton, QLabel, QSlider, QVBoxLayout, QHBoxLayout
 
 from ClearMap.IO.assets_constants import CONTENT_TYPE_TO_PIPELINE
-from ClearMap.Utils.utilities import validate_orientation
-from ClearMap.Utils.exceptions import ParamsOrientationError
+from ClearMap.Utils.utilities import validate_orientation, snake_to_title
 from ClearMap.config.atlas import ATLAS_NAMES_MAP
 
 from ClearMap.gui.gui_utils import create_clearmap_widget, clear_layout
@@ -449,6 +448,7 @@ class ChannelRegistrationParams(ChannelUiParameter):  # FIXME: add signal for al
             'align_with': ParamLink(['align_with'], self.tab.alignWithComboBox),
             'moving_channel': ParamLink(['moving_channel'], self.tab.movingChannelComboBox),
             'params_files': ParamLink(['params_files'], self.tab.paramsFilesListWidget),
+            # 'landmarks_weights': ['landmarks_weights'],
         }
         self.connect()
 
@@ -470,7 +470,8 @@ class ChannelRegistrationParams(ChannelUiParameter):  # FIXME: add signal for al
 
     @property
     def landmarks_weights(self):
-        return {getattr(self.tab, f'param{x}Label').text(): getattr(self.tab, f'param{x}HorizontalSlider').value() for x in range(self.n_registration_files)}
+        return {getattr(self.tab, f'param{x}Label').text(): getattr(self.tab, f'param{x}HorizontalSlider').value()
+                for x in range(self.n_registration_files)}
 
     @landmarks_weights.setter
     def landmarks_weights(self, value):
@@ -481,18 +482,67 @@ class ChannelRegistrationParams(ChannelUiParameter):  # FIXME: add signal for al
 
     @property
     def use_landmarks_for(self):
-        return []
+        return [k for k, v in self.landmarks_weights.items() if v > 0]
 
     def connect(self):
         self.nameWidget.channelRenamed.connect(self.handle_name_changed)
         self.connect_simple_widgets()
         self.tab.alignWithComboBox.currentTextChanged.connect(self.handle_align_with_changed)
+        if hasattr(self.tab.paramsFilesListWidget, 'itemsChanged'):
+            self.tab.paramsFilesListWidget.itemsChanged.connect(self.handle_params_files_changed)
 
     def handle_align_with_changed(self, align_with):
         # self.config['align_with'] = align_with
         # self.ui_to_cfg()  # TODO: check
         self.align_with_changed.emit(self.name, align_with)
 
+    def handle_params_files_changed(self):  # TODO: hide by default (unless advanced mode)
+        clear_layout(self.tab.landmarksWeightsLayout)
+
+        new_params_files = [snake_to_title(p.split('.')[0]) for p in self.tab.paramsFilesListWidget.get_items_text()]
+        for idx, param in enumerate(new_params_files):
+            label = QLabel(param)
+            slider = QSlider(Qt.Horizontal)
+            slider.setMinimum(0); slider.setMaximum(100)
+            slider.setValue(self.config['landmarks_weights'][idx])
+
+            zero_label = QLabel("<b>0</b>")
+            hundred_label = QLabel("<b>100%</b>")
+            value_label = QLabel(f"({slider.value()})")
+
+            # Create a vertical layout for the slider and value label
+            top_layout = QHBoxLayout()
+            top_layout.addWidget(label)
+            top_layout.addWidget(zero_label)
+            top_layout.addWidget(slider)
+            top_layout.addWidget(hundred_label)
+            top_layout.addWidget(value_label)
+
+            # ctrls_layout = QVBoxLayout()
+            # ctrls_layout.addLayout(top_layout)
+            # ctrls_layout.addLayout(btm_layout)
+
+            self.tab.landmarksWeightsLayout.addLayout(top_layout, idx, 0)
+
+
+            def update_label_value(value):
+                if value:
+                    value_label.setText(f"({value})")
+                else:
+                    value_label.setText("(disabled)")
+
+            slider.valueChanged.connect(update_label_value)
+            slider.valueChanged.connect(functools.partial(self.handle_landmarks_weight_changed, idx))
+
+    def handle_landmarks_weight_changed(self, idx, value):
+        if idx < len(self.config['landmarks_weights']):
+            self.config['landmarks_weights'][idx] = value
+        elif idx == len(self.config['landmarks_weights']):
+            self.config['landmarks_weights'].append(value)
+        else:
+            raise ValueError(f'Index {idx} out of bounds for channel {self.name} '
+                             f'landmarks weights {self.config["landmarks_weights"]}')
+        # self.ui_to_cfg()
 
 
 class SharedRegistrationParams(UiParameter):

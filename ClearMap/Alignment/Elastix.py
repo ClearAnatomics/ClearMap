@@ -62,7 +62,7 @@ __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
-
+import copy
 import os
 import sys
 import subprocess
@@ -72,19 +72,27 @@ import shutil
 import re
 from io import UnsupportedOperation
 from pathlib import Path
+import multiprocessing as mp
 
 import numpy as np
 
-import multiprocessing as mp
 
 import ClearMap.Settings as settings
 from ClearMap.Utils.exceptions import ClearMapException
-from ClearMap.Utils.utilities import handle_deprecated_args, substitute_deprecated_arg
 
 import ClearMap.IO.IO as io
 from ClearMap.IO.elastix_config import ElastixParser
 
-from .Transformations.Transformation import TransformationBase
+from ClearMap.Alignment.Transformations.Transformation import TransformationBase
+
+try:
+    import itk
+    dir(itk)  #  force read
+    from ClearMap.Alignment.landmarks_registration.engine import AlignmentTool
+    from ClearMap.Alignment.landmarks_registration.registration_data import ITKImage
+    itk_imported = True
+except ImportError:
+    itk_imported = False
 
 ##############################################################################
 # Initialization and Settings
@@ -590,16 +598,16 @@ def rescale_size_and_spacing(size, spacing, scale):
 #  Elastix Runs
 ##############################################################################
 
-def align_from_dict(align_parameters, landmarks_files):
+def align_from_dict(align_parameters, landmarks_files, landmarks_weights=None):
     use_landmarks = all([str(f) and os.path.exists(f) for f in landmarks_files.values()])
     if use_landmarks:
-        align_parameters.update(**landmarks_files)
+        align_parameters.update(itk_mode=True, **landmarks_files)
         tmp_registration_params = {p: {
             'Registration': ['MultiMetricMultiResolutionRegistration'],
             'Metric': ["AdvancedMattesMutualInformation", "CorrespondingPointsEuclideanDistanceMetric"],
             'Metric0Weight': 1,
-            'Metric1Weight': 200,
-        } for p in align_parameters['parameter_files']}  # FIXME: maybe not for all steps
+            'Metric1Weight': landmarks_weights[i],
+        } for i, p in enumerate(align_parameters['parameter_files'])}  # FIXME: maybe not for all steps
     else:
         tmp_registration_params = {p: {} for p in align_parameters['parameter_files']}
     for k, v in align_parameters.items():
@@ -607,14 +615,14 @@ def align_from_dict(align_parameters, landmarks_files):
             raise ValueError(f'Registration missing parameter "{k}"')
     # TODO: check which files to patch
     with ElastixConfigPatcher(align_parameters['parameter_files'], tmp_registration_params):
-        align(**align_parameters)
+        align(**align_parameters)  # WARNING: if using itk_mode, should use it to patch the files too
 
 
 def align(fixed_image, moving_image, affine_parameter_file=None, bspline_parameter_file=None,
           result_directory=None, processes=None,
           workspace=None, moving_landmarks_path=None, fixed_landmarks_path=None,
           parameter_files=None,
-          check_alignment_success=False):
+          check_alignment_success=False, itk_mode=False):
     """
     Align images using elastix, estimates a transformation :math:`T:` fixed image :math:`\\rightarrow` moving image.
 
@@ -664,43 +672,65 @@ def align(fixed_image, moving_image, affine_parameter_file=None, bspline_paramet
     if not os.path.exists(result_directory):
         os.mkdir(result_directory)
 
-    check_spaces(*parameter_files, fixed_image, moving_image,
-                 moving_landmarks_path, fixed_landmarks_path, result_directory)
+    if itk_mode:
+        if not itk_imported:
+            try:
+                import itk
+                dir(itk)  # WARNING: itk uses lazy loading
+                from itk import ParameterObject
+            except ImportError as err:
+                raise ImportError(f'Could not import itk, please select itk_mode=False or install itk. '
+                                  f'Details: {err}')
+        from itk import ParameterObject
+        from ClearMap.Alignment.landmarks_registration.engine import AlignmentTool
+        from ClearMap.Alignment.landmarks_registration.registration_data import ITKImage
+        tool = AlignmentTool(str(result_directory),
+                             fixed_image=ITKImage(fixed_image),
+                             moving_image=ITKImage(moving_image),
+                             fixed_landmarks_name=fixed_landmarks_path.name,
+                             moving_landmarks_name=moving_landmarks_path.name)
+        for param_file in parameter_files:  # TODO: use option to combine the different transforms if no intermediate results are needed
+            elx_params = ParameterObject.New()
+            elx_params.AddParameterFile(str(param_file))
+            tool.perform_registration(parameters=elx_params, debug=False, delete_tmp=False)
+    else:
+        check_spaces(*parameter_files, fixed_image, moving_image,
+                     moving_landmarks_path, fixed_landmarks_path, result_directory)
 
-    # run elastix
-    cmd = [elastix_binary, '-threads', str(processes), '-m', f'{moving_image}', '-f', f'{fixed_image}']
-    for parameter_file in parameter_files:
-        cmd.extend(['-p', f'{parameter_file}'])
-    if moving_landmarks_path is not None or fixed_landmarks_path is not None:
-        cmd.extend(['-mp', f'{moving_landmarks_path}', '-fp', f'{fixed_landmarks_path}'])
-    cmd.extend(['-out', f'{result_directory}'])
+        # run elastix
+        cmd = [elastix_binary, '-threads', str(processes), '-m', f'{moving_image}', '-f', f'{fixed_image}']
+        for parameter_file in parameter_files:
+            cmd.extend(['-p', f'{parameter_file}'])
+        if moving_landmarks_path is not None or fixed_landmarks_path is not None:
+            cmd.extend(['-mp', f'{moving_landmarks_path}', '-fp', f'{fixed_landmarks_path}'])
+        cmd.extend(['-out', f'{result_directory}'])
 
-    try:
-        # Check if sys.stdout has a valid file descriptor
-        if hasattr(sys.stdout, 'fileno') and callable(sys.stdout.fileno):
-            with subprocess.Popen(cmd, stdout=sys.stdout, stderr=sys.stdout) as proc:
-                if workspace is not None:
-                    workspace.process = proc
-        else:
-            # If sys.stdout does not have a valid file descriptor, redirect output to subprocess.PIPE
-            # This could happen e.g. in an IDE
-            with subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE) as proc:
-                if workspace is not None:
-                    workspace.process = proc
-    except UnsupportedOperation:
         try:
-            with subprocess.Popen(cmd) as proc:
-                if workspace is not None:
-                    workspace.process = proc
+            # Check if sys.stdout has a valid file descriptor
+            if hasattr(sys.stdout, 'fileno') and callable(sys.stdout.fileno):
+                with subprocess.Popen(cmd, stdout=sys.stdout, stderr=sys.stdout) as proc:
+                    if workspace is not None:
+                        workspace.process = proc
+            else:
+                # If sys.stdout does not have a valid file descriptor, redirect output to subprocess.PIPE
+                # This could happen e.g. in an IDE
+                with subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE) as proc:
+                    if workspace is not None:
+                        workspace.process = proc
+        except UnsupportedOperation:
+            try:
+                with subprocess.Popen(cmd) as proc:
+                    if workspace is not None:
+                        workspace.process = proc
+            except (subprocess.SubprocessError, OSError) as err:
+                raise ClearMapException(f'Align: failed executing: {" ".join(cmd)}') from err
         except (subprocess.SubprocessError, OSError) as err:
             raise ClearMapException(f'Align: failed executing: {" ".join(cmd)}') from err
-    except (subprocess.SubprocessError, OSError) as err:
-        raise ClearMapException(f'Align: failed executing: {" ".join(cmd)}') from err
-    finally:
-        if workspace is not None:
-            workspace.process = None
+        finally:
+            if workspace is not None:
+                workspace.process = None
 
-    if check_alignment_success:
+    if not itk_mode and check_alignment_success:
         check_success(result_directory)
 
     return result_directory

@@ -77,20 +77,6 @@
      </property>
     </widget>
    </item>
-   <item row="2" column="0">
-    <widget class="QPushButton" name="registerPushButton">
-     <property name="text">
-      <string>Register</string>
-     </property>
-    </widget>
-   </item>
-   <item row="3" column="0">
-    <widget class="QPushButton" name="plotResultPushButton">
-     <property name="text">
-      <string>plot result</string>
-     </property>
-    </widget>
-   </item>
   </layout>
  </widget>
  <resources/>

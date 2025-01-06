@@ -112,14 +112,15 @@ def convert_alignment_config_2_1_0_to_3_0_0(v1_path, v2_path, channel_names=None
     out_registration_cfg['verbose'] = config_v1['registration']['resampling']['verbose']
     out_registration_cfg['atlas'] = {k: config_v1['registration']['atlas'][k]
                                      for k in ('id', 'structure_tree_id', 'align_files_folder')}
+    params_files = [v for k, v in config_v1['registration']['atlas'].items() if k.startswith('align_reference')]
     out_registration_cfg['channels'] = {
         'autofluorescence': {
             'resample': not(config_v1['registration']['resampling']['skip']),
             'resampled_resolution': config_v1['registration']['resampling']['autofluo_sink_resolution'],
             'align_with': 'atlas',
             'moving_channel': 'atlas',
-            'params_files': [v for k, v in config_v1['registration']['atlas'].items() if k.startswith('align_reference')],
-            'use_landmarks_for': [],
+            'params_files': params_files,
+            'landmarks_weights': [0] * len(params_files),
         }
     }
     for channel in channel_names:
@@ -130,7 +131,7 @@ def convert_alignment_config_2_1_0_to_3_0_0(v1_path, v2_path, channel_names=None
                 'align_with': 'autofluorescence',
                 'moving_channel': channel,
                 'params_files': [config_v1['registration']['atlas']['align_channels_affine_file']],
-                'use_landmarks_for': [],
+                'landmarks_weights': [0],
             }
 
     out_stitching_cfg.write()
