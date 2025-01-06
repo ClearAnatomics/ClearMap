@@ -189,6 +189,7 @@ class SampleInfoTab(GenericTab):
         self.ui.loadSamplePushButton.clicked.connect(self.main_window.load_config_and_setup_ui)
 
         self.ui.launchPatternWizzardPushButton.clicked.connect(self.launch_pattern_wizard)
+        self.ui.updateWorkspacePushButton.clicked.connect(self.update_workspace)
 
         # TODO: why not on tab click ?
         self.ui.applyBox.connectApply(self.main_window.update_pipelines)
@@ -206,6 +207,9 @@ class SampleInfoTab(GenericTab):
         """Save the config to file"""
         self.params.ui_to_cfg()
         self.main_window.print_status_msg('Sample config saved')
+
+    def update_workspace(self):  # Necessary intermediate because at the beginning sample_manager is not set
+        self.sample_manager.update_workspace()
 
     @property
     def src_folder(self):

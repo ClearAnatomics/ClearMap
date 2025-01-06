@@ -9,6 +9,7 @@ import os
 import platform
 import re
 import sys
+import warnings
 from collections import defaultdict
 from concurrent.futures.process import BrokenProcessPool
 from pathlib import Path
@@ -77,6 +78,7 @@ class SampleManager(TabProcessor):
         self.stitching_cfg = {}
         self.registration_cfg = {}
 
+        self.incomplete_channels = []
         self.setup_complete = False
 
     def setup(self, cfgs=None, src_dir=None, watcher=None):
@@ -112,23 +114,35 @@ class SampleManager(TabProcessor):
         # Load the configs
         cfgs = list(cfgs)
         for i, cfg in enumerate(cfgs):
-            if isinstance(cfg, (Path, str)):
+            if isinstance(cfg, (Path, str)):  # path not config itself
                 cfgs[i] = self.config_loader.get_cfg(cfg)
         self.machine_config, self.config, self.stitching_cfg, self.registration_cfg = cfgs
 
         if watcher is not None:
             self.progress_watcher = watcher  # FIXME: in stitcher and registration too
 
-        first_channel = list(self.config['channels'].keys())[0]
-        self.workspace = Workspace2(self.src_directory, sample_id=self.prefix,
-                                    default_channel=first_channel)
-        for channel, cfg in self.config['channels'].items():
-            self.workspace.add_raw_data(file_path=cfg['path'],
-                                        channel_id=channel,
-                                        data_content_type=cfg['data_type'],
-                                        sample_id=self.prefix)
+        self.update_workspace()
         self.workspace.info()
-        self.setup_complete = True
+        self.setup_complete = not self.incomplete_channels
+
+    def update_workspace(self):
+        first_channel = list(self.config['channels'].keys())[0]
+        if self.workspace is None:
+            self.workspace = Workspace2(self.src_directory, sample_id=self.prefix,
+                                        default_channel=first_channel)
+        self.incomplete_channels = []
+        for channel, cfg in self.config['channels'].items():
+            if cfg['path']:
+                if channel not in self.workspace.asset_collections:
+                    self.workspace.add_raw_data(file_path=cfg['path'],
+                                                channel_id=channel,
+                                                data_content_type=cfg['data_type'],
+                                                sample_id=self.prefix)
+                else:
+                    pass
+                    # FIXME: update path of raw asset if different
+            else:
+                self.incomplete_channels.append(channel)
 
     @property
     def prefix(self):
@@ -226,7 +240,11 @@ class SampleManager(TabProcessor):
 
     def get_stitchable_channels(self):
         candidates = self.config['channels'].keys()
-        assets = [self.get('raw', channel=c, sample_id=self.prefix) for c in candidates]
+        try:
+            assets = [self.get('raw', channel=c, sample_id=self.prefix) for c in candidates]
+        except KeyError:  #  raw data not yet set up
+            warnings.warn(f'Trying to get stitchable channels before raw data is set up')
+            return []
         stitchable_channels = [c for c, asset in zip(candidates, assets) if asset.is_tiled]
         return stitchable_channels
 
@@ -307,7 +325,8 @@ class SampleManager(TabProcessor):
 
     def load_configs_from_dir(self):
         cfg_loader = ConfigLoader(self.src_directory)
-        return [cfg_loader.get_cfg(name) for name in ('machine', 'sample', 'stitching', 'registration')]
+        return [cfg_loader.get_cfg(name, must_exist) for name, must_exist in
+                (('machine', True), ('sample', True), ('stitching', False), ('registration', False))]
 
     def asset_names_to_assets(self, asset_names, channel=None, sample_id=None):
         return [self.workspace.get(asset_name) for asset_name in asset_names]
