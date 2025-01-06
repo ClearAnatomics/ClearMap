@@ -406,10 +406,11 @@ class GenericTab(GenericUi):
             if ctrl_name.endswith('InfoToolButton'):
                 base_name = ctrl_name.replace('InfoToolButton', '')
                 widgets = [widget for name, widget in children.items() if name.startswith(base_name) and name != ctrl_name]
+                widgets = [w for w in widgets if w.whatsThis()]
                 if len(widgets) == 1:
                     self.connect_whats_this_btn(ctrl, widgets[0])
                 else:
-                    raise ValueError(f'Could not find unique widget for {base_name} in {parent.objectName()},'
+                    raise ValueError(f'Could not find unique widget for "{base_name}" in "{parent.objectName()}",'
                                      f' got {[(w.objectName(), w) for w in widgets]}')
 
     def wrap_step(self, task_name, func, step_args=None, step_kw_args=None, n_steps=1, abort_func=None, save_cfg=True,
