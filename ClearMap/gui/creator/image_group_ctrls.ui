@@ -28,6 +28,12 @@
        <property name="enabled">
         <bool>false</bool>
        </property>
+       <property name="minimumSize">
+        <size>
+         <width>20</width>
+         <height>0</height>
+        </size>
+       </property>
        <property name="maximumSize">
         <size>
          <width>60</width>
@@ -98,6 +104,12 @@
      </item>
      <item row="2" column="2">
       <widget class="QComboBox" name="pattern0_0ComboBox">
+       <property name="minimumSize">
+        <size>
+         <width>50</width>
+         <height>0</height>
+        </size>
+       </property>
        <property name="maximumSize">
         <size>
          <width>60</width>
@@ -176,6 +188,12 @@
        <property name="enabled">
         <bool>false</bool>
        </property>
+       <property name="minimumSize">
+        <size>
+         <width>20</width>
+         <height>0</height>
+        </size>
+       </property>
        <property name="maximumSize">
         <size>
          <width>60</width>
@@ -235,6 +253,12 @@
       <widget class="QComboBox" name="pattern0_2ComboBox">
        <property name="enabled">
         <bool>false</bool>
+       </property>
+       <property name="minimumSize">
+        <size>
+         <width>20</width>
+         <height>0</height>
+        </size>
        </property>
        <property name="maximumSize">
         <size>
