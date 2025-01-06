@@ -280,28 +280,30 @@ def delete_widget(widget, layout=None):
     widget.deleteLater()
 
 
-def disconnect_widget_signal(widget_signal, max_iter=10):
-    for i in range(max_iter):
-        try:
-            widget_signal.disconnect()
-        except TypeError:  # i.e. not connected
-            return
-    raise ValueError(f'Could not disconnect signal after {max_iter} iterations')
-
-
-def unique_connect(signal, slot, max_disconnect_iter=10):
+def get_widget(layout, key='', widget_type=None, index=0):
     """
-    Connect a signal to a slot, disconnecting any previous connection
+    Retrieve the widget (label or control) based on the key and index.
 
-    Parameters
-    ----------
-    signal: pyqtSignal
-        The signal to connect
-    slot: callable
-        The slot to connect
+    Parameters:
+    layout (QLayout): The layout containing the widgets.
+    key (str): The key to search for in the widget's objectName.
+    index (int): The index to specify whether to get the first (0) or second (1) occurrence.
+
+    Returns:
+    QWidget: The widget that matches the key and index.
     """
-    disconnect_widget_signal(signal, max_iter=max_disconnect_iter)
-    signal.connect(slot)
+    if not key and not widget_type:
+        raise ValueError('Either key or widget_type must be specified')
+    count = 0
+    for i in range(layout.count()):
+        widget = layout.itemAt(i).widget()
+        if widget:
+            if (key and key in widget.objectName() or
+                    widget_type and isinstance(widget, widget_type)):
+                if count == index:
+                    return widget, count
+                count += 1
+    return None, count
 
 
 def replace_widget(old_widget, new_widget, layout=None):
@@ -331,6 +333,30 @@ def replace_widget(old_widget, new_widget, layout=None):
     return new_widget
 
 
+def disconnect_widget_signal(widget_signal, max_iter=10):
+    for i in range(max_iter):
+        try:
+            widget_signal.disconnect()
+        except TypeError:  # i.e. not connected
+            return
+    raise ValueError(f'Could not disconnect signal after {max_iter} iterations')
+
+
+def unique_connect(signal, slot, max_disconnect_iter=10):
+    """
+    Connect a signal to a slot, disconnecting any previous connection
+
+    Parameters
+    ----------
+    signal: pyqtSignal
+        The signal to connect
+    slot: callable
+        The slot to connect
+    """
+    disconnect_widget_signal(signal, max_iter=max_disconnect_iter)
+    signal.connect(slot)
+
+
 def setup_mini_brain(atlas_base_name, mini_brain_scaling=(5, 5, 5)):  # TODO: scaling in prefs
     """
     Create a downsampled version of the Allen Brain Atlas for the mini brain widget
@@ -347,29 +373,3 @@ def setup_mini_brain(atlas_base_name, mini_brain_scaling=(5, 5, 5)):  # TODO: sc
     atlas_path = os.path.join(Settings.atlas_folder, f'{atlas_base_name}_annotation.tif')
     arr = TIF.Source(atlas_path).array
     return mini_brain_scaling, sk_transform.downscale_local_mean(arr, mini_brain_scaling)
-
-
-def get_widget(layout, key='', widget_type=None, index=0):
-    """
-    Retrieve the widget (label or control) based on the key and index.
-
-    Parameters:
-    layout (QLayout): The layout containing the widgets.
-    key (str): The key to search for in the widget's objectName.
-    index (int): The index to specify whether to get the first (0) or second (1) occurrence.
-
-    Returns:
-    QWidget: The widget that matches the key and index.
-    """
-    if not key and not widget_type:
-        raise ValueError('Either key or widget_type must be specified')
-    count = 0
-    for i in range(layout.count()):
-        widget = layout.itemAt(i).widget()
-        if widget:
-            if (key and key in widget.objectName() or
-                    widget_type and isinstance(widget, widget_type)):
-                if count == index:
-                    return widget, count
-                count += 1
-    return None, count
