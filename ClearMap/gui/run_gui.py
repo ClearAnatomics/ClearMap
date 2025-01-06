@@ -80,7 +80,7 @@ update_pbar(app, progress_bar, 20)
 from ClearMap.Utils.utilities import title_to_snake, snake_to_title
 from ClearMap.gui.gui_logging import Printer
 from ClearMap.config.config_loader import ConfigLoader, CLEARMAP_CFG_DIR
-from ClearMap.Utils.exceptions import ConfigNotFoundError
+from ClearMap.Utils.exceptions import ConfigNotFoundError, ClearMapWorkspaceError, ClearMapIoException
 from ClearMap.gui.params_interfaces import UiParameter, UiParameterCollection
 
 update_pbar(app, progress_bar, 40)
@@ -997,7 +997,10 @@ class ClearMapGui(ClearMapGuiBase):
                 cfg_name not in [title_to_snake(p) for p in self.sample_manager.relevant_pipelines]):
             return False, None
         if not self.file_exists(cfg_path):
-            was_copied = self.__create_config_from_default(config_loader, cfg_name, cfg_path)
+            try:
+                was_copied = self.__create_config_from_default(config_loader, cfg_name, cfg_path)
+            except ClearMapIoException as err:  # Loading skipped
+                return False, None
         return was_copied, cfg_path
 
     def __create_config_from_default(self, config_loader, cfg_name, cfg_path):
@@ -1016,7 +1019,7 @@ class ClearMapGui(ClearMapGuiBase):
             return True
         else:
             self.error_logger.write(self.error_logger.colourise(base_msg, force=True))
-            raise FileNotFoundError(html_to_ansi(base_msg))
+            raise ClearMapIoException(html_to_ansi(base_msg))
 
     def clone(self):
         folder = get_directory_dlg(self.preference_editor.params.start_folder,
@@ -1041,7 +1044,8 @@ class ClearMapGui(ClearMapGuiBase):
             except FileNotFoundError:
                 pass #FIXME: deal with this
             cfg_path = self.config_loader.get_cfg_path(cfg_name, must_exist=False)
-            copyfile(src_cfg_path, cfg_path)
+            if not cfg_path.exists():
+                copyfile(src_cfg_path, cfg_path)
 
     def load_config_and_setup_ui(self):
         """
