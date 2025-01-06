@@ -135,6 +135,7 @@ widget_getters = {
     QTextEdit: lambda w: w.toHtml(),  # TODO: check if this always what we want
     QComboBox: combobox_getter,
     QGroupBox: lambda w: w.isChecked(),
+    FileDropListWidget: list_widget_getter,
     QListWidget: list_widget_getter,  # includes FileDropListWidget
     QFrame: frame_getter,  # QFrame always last because least specific
 }
@@ -148,6 +149,7 @@ widget_setters = {
     QTextEdit: lambda w, v: w.setText(v),
     QComboBox: combobox_setter,
     QGroupBox: lambda w, v: w.setChecked(v),
+    FileDropListWidget: list_widget_setter,
     QListWidget: list_widget_setter,  # includes FileDropListWidget
     QFrame: frame_setter,  # QFrame always last because least specific
 }
@@ -160,7 +162,8 @@ widget_connectors = {
     QPlainTextEdit: lambda w, cb: w.textChanged.connect(cb),
     QComboBox: lambda w, cb: w.currentTextChanged.connect(cb),
     QGroupBox: lambda w, cb: w.toggled.connect(cb),
-    QListWidget: lambda w, cb: w.itemChanged.connect(cb),  # includes FileDropListWidget
+    FileDropListWidget: lambda w, cb: w.itemsChanged.connect(cb),
+    QListWidget: lambda w, cb: w.itemChanged.connect(cb),  # FIXME: not the right signal (should be for any change)
     QFrame: None,  # updated in __connect_widget  # QFrame always last because least specific
 }
 
