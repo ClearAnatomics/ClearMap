@@ -194,7 +194,7 @@ class Workspace2:  # REFACTOR: subclass dict
             The channel id to use for the asset.
         """
         if channel_id not in self.asset_collections:
-            raise ClearMapWorkspaceError(f'Channel {channel_id} does not exist in the workspace.'
+            raise ClearMapWorkspaceError(f'Channel "{channel_id}" does not exist in the workspace.'
                                          f'Use add_raw_data to create a new channel.')
         if pipeline_name not in CONTENT_TYPE_TO_PIPELINE.values():
             raise ClearMapWorkspaceError(f'Pipeline {pipeline_name} does not exist in the workspace.')
