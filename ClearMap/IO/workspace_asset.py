@@ -249,6 +249,8 @@ class Asset:
                 raise ClearMapAssetError(f'Expression {self.type_spec.basename} cannot contain S tags. '
                                          f'Found {[tag.name for tag in self.type_spec.basename.tags if tag.ttype == "S"]}'
                                          f'Expression should be parameterized first.')
+            else:
+                name = self.type_spec.basename.string()
         else:  # Otherwise, build the name
             name = ''
             for part in self.name_parts:
