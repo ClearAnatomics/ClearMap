@@ -174,14 +174,20 @@ class ConfigLoader(object):
             return self.src_dir / f'{cfg_name}_params{self.supported_exts[0]}'
         raise FileNotFoundError(f'Could not find file {cfg_name} in {self.src_dir} with variants {variants}')
 
-    def get_cfg(self, cfg_name):
+    def get_cfg(self, cfg_name, must_exist=True):
         if '/' in str(cfg_name):  # Already a path
             cfg_path = cfg_name
         else:
             if is_tab_file(cfg_name):
-                cfg_path = self.get_cfg_path(cfg_name)
+                cfg_path = self.get_cfg_path(cfg_name, must_exist=must_exist)
             else:
-                cfg_path = self.get_default_path(cfg_name)
+                cfg_path = self.get_default_path(cfg_name, must_exist=must_exist)
+        cfg_path = Path(cfg_path)
+        if not cfg_path.exists():
+            if must_exist:
+                raise FileNotFoundError(f'Could not find file {cfg_name} in {self.src_dir}')
+            else:
+                return None
         return self.get_cfg_from_path(cfg_path)
 
     @staticmethod
