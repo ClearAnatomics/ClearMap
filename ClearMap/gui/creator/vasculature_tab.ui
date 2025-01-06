@@ -43,7 +43,7 @@
             </font>
            </property>
            <property name="currentIndex">
-            <number>4</number>
+            <number>1</number>
            </property>
            <widget class="QWidget" name="binarization">
             <property name="geometry">
@@ -691,7 +691,7 @@
               </spacer>
              </item>
              <item row="10" column="2">
-              <widget class="QToolButton" name="buildGraphPushButtonInfoToolButton">
+              <widget class="QToolButton" name="unloadGraphsPushButtonInfoToolButton">
                <property name="icon">
                 <iconset resource="icons.qrc">
                  <normaloff>:/icons/icons/info.svg</normaloff>:/icons/icons/info.svg</iconset>
@@ -709,6 +709,9 @@
               <widget class="QPushButton" name="unloadGraphsPushButton">
                <property name="statusTip">
                 <string>Unload the temporary (raw, cleaned, reduced) graphs from memory</string>
+               </property>
+               <property name="whatsThis">
+                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Unload the temporary (raw, cleaned, reduced) graphs from memory&lt;br/&gt;These graphs can take up a significant amount of memory.&lt;/p&gt;&lt;p&gt;If they are unloaded from memory, they will still be accessible transparently&lt;/p&gt;&lt;p&gt;but will be reloaded from graph when accessed&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                </property>
                <property name="text">
                 <string>Unload temp graphs</string>
@@ -1572,6 +1575,14 @@
             </layout>
            </widget>
            <widget class="QWidget" name="page">
+            <property name="geometry">
+             <rect>
+              <x>0</x>
+              <y>0</y>
+              <width>568</width>
+              <height>810</height>
+             </rect>
+            </property>
             <attribute name="label">
              <string>Stats</string>
             </attribute>
