@@ -392,6 +392,17 @@ class Workspace2:  # REFACTOR: subclass dict
             asset.subdirectory = subdirectory
         return asset.path
 
+    @handle_deprecated_args({'prefix': 'sample_id', 'postfix': 'asset_sub_type'})
+    def source(self, asset_type, channel=None,
+                 sample_id=None, asset_sub_type=None,
+                 subdirectory=None, extension=None, version=None, **kwargs):
+        warnings.warn('The source method is deprecated. Use the get method instead and call source on the asset')
+        asset = self.get(asset_type, channel, asset_sub_type=asset_sub_type, sample_id=sample_id,
+                            version=version, extension=extension)
+        if subdirectory:
+            asset.subdirectory = subdirectory
+        return asset.as_source(**kwargs)
+
     def plot(self, asset_type, channel=None, prefix=None, postfix=None,
                  subdirectory=None, extension=None, version=None):
         """
