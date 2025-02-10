@@ -548,17 +548,22 @@ class UiParameterCollection(QObject):
     def params(self) -> list[UiParameter]:
         raise NotImplementedError('Please subclass UiParameterCollection and implement params property')
 
-    def read_configs(self, cfg_path):  # FIXME: add option to pass already loaded config (in which case we still load default config)
-        cfg_path = Path(cfg_path)
+    def read_configs(self, cfg_path='', cfg=None):
+        if not cfg_path and not cfg:
+            raise ValueError('Either cfg_path or cfg must be provided')
+        if cfg:
+            self.config = cfg
+            cfg_path = Path(cfg.filename)
+        else:
+            cfg_path = Path(cfg_path)
+            self.config = ConfigLoader.get_cfg_from_path(cfg_path)
+            if not self.config:
+                raise ConfigNotFoundError(f'Config file not found: {cfg_path}')
 
-        self.config = ConfigLoader.get_cfg_from_path(cfg_path)
-        if not self.config:
-            raise ConfigNotFoundError(f'Config file not found: {cfg_path}')
+            if self.version < CLEARMAP_VERSION:
+                convert_config_versions.convert(cfg_path, backup=True, overwrite=True)
 
-        if self.version < CLEARMAP_VERSION:
-            convert_config_versions.convert(cfg_path, backup=True, overwrite=True)
-
-        self.config.reload()
+            self.config.reload()
 
         cfg_name = ConfigLoader.strip_version_suffix(cfg_path.stem)
         try:
@@ -574,7 +579,7 @@ class UiParameterCollection(QObject):
         self._default_config = ConfigLoader.get_cfg_from_path(default_path)
         for param in self.params:  # FIXME: ensure that we do that when adding channels + add here if any found
             if isinstance(param, UiParameterCollection):
-                param.read_configs(cfg_path)
+                param.read_configs(cfg=self.config)
             elif isinstance(param, UiParameter):
                 param._config = self.config
                 param._default_config = self._default_config
