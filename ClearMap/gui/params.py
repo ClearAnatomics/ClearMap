@@ -35,6 +35,7 @@ __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
 
 class SampleChannelParameters(ChannelUiParameter):
+    nameChanged = pyqtSignal(str, str)
     def __init__(self, tab, channel_name):
         super().__init__(tab, channel_name, 'nameLineEdit')
         self.params_dict = {
@@ -59,8 +60,10 @@ class SampleChannelParameters(ChannelUiParameter):
     def handle_name_changed(self):
         # private config because absolute path
         # TODO: check if dict() is required
+        cached_name = self._cached_name
         self._config['channels'][self.name] = self._config['channels'].pop(self._cached_name)
         self._cached_name = self.name
+        self.nameChanged.emit(cached_name, self.name)
 
     def connect(self):
         self.nameWidget.editingFinished.connect(self.handle_name_changed)
@@ -104,6 +107,7 @@ class SampleParameters(UiParameterCollection):
     """
     plotMiniBrain = pyqtSignal(int)    # Bind by number because name may change
     plotAtlas = pyqtSignal(int)    # Bind by number because name may change
+    channelNameChanged = pyqtSignal(str, str)
 
     def __init__(self, tab, src_folder=None):
         self.shared_sample_params = SharedSampleParams(tab, src_folder=src_folder)
@@ -149,12 +153,16 @@ class SampleParameters(UiParameterCollection):
             if channel_name not in self.config['channels']:  # WARNING: dangerous overwriting
                 self.config['channels'][channel_name] = deepcopy(self.default_channel_config())
             channel_params = SampleChannelParameters(self.tab, channel_name)
+            channel_params.nameChanged.connect(self.handle_channel_name_changed)
             channel_params.tab.plotMiniBrainPushButton.clicked.connect(
                 functools.partial(self.plotMiniBrain.emit, channel_params.page_index))
             channel_params.tab.sampleViewAtlasPushButton.clicked.connect(
                 functools.partial(self.plotAtlas.emit, channel_params.page_index))
             channel_params._config = self.config
             self.channel_params[channel_name] = channel_params
+
+    def handle_channel_name_changed(self, old_name, new_name):
+        self.channelNameChanged.emit(old_name, new_name)
 
     def get_channel_name(self, channel_idx):
         return self.tab.channelsParamsTabWidget.tabText(channel_idx)
