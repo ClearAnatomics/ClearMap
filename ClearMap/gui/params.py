@@ -294,12 +294,16 @@ class ChannelStitchingParams(UiParameterCollection):
         self.shared = GeneralChannelStitchingParams(tab, channel)
         self.stitching_rigid = None
         self.stitching_wobbly = None
-        self.read_configs(config.filename)  # Required for cfg_to_ui and compute_layout
+        self.read_configs(cfg=config)  # Required for cfg_to_ui and compute_layout
+        self.shared.tab.rigidParamsGroupBox.setVisible(self.compute_layout())
+        self.shared.tab.wobblyParamsGroupBox.setVisible(self.compute_layout())
 
         if self.compute_layout():
             self.stitching_rigid = RigidChannelStitchingParams(tab, channel)
             self.stitching_wobbly = WobblyChannelStitchingParams(tab, channel)
-            self.read_configs(config.filename)
+            self.read_configs(cfg=config)
+
+        self.shared.layoutChannelChanged.connect(self.handle_layout_channel_changed)
 
         self.cfg_to_ui()
 
