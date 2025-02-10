@@ -28,6 +28,7 @@ class GenericUi:
     The first layer of interface. This is not implemented directly but is the base class
     of GenericTab and GenericDialog, themselves interfaces
     """
+    # FIXME: seems to be called several times
     def __init__(self, main_window, ui_file_name, name, widget_class_name):
         """
 
@@ -46,7 +47,7 @@ class GenericUi:
         self.params = None
         self.progress_watcher = self.main_window.progress_watcher
 
-    def init_ui(self):
+    def _init_ui(self):
         self.ui = create_clearmap_widget(f'{self.ui_file_name}.ui', patch_parent_class=self.widget_class_name)
         recursive_patch_widgets(self.ui)
 
@@ -60,7 +61,7 @@ class GenericUi:
         """Set the params object which links the UI and the configuration file"""
         raise NotImplementedError()
 
-    def load_config_to_gui(self):
+    def _load_config_to_gui(self):
         """Set every control on the UI to the value in the params object"""
         self.params.cfg_to_ui()
 
@@ -75,8 +76,8 @@ class GenericDialog(GenericUi):
     def __init__(self, main_window, name, file_name):
         super().__init__(main_window, file_name, name, 'QDialog')
 
-    def init_ui(self):
-        super().init_ui()
+    def _init_ui(self):
+        super()._init_ui()
         self.ui.setWindowTitle(self.name.title())
 
     # @abstractmethod
@@ -127,7 +128,7 @@ class GenericTab(GenericUi):
         tab_name = words[0].title() + ' ' + ' '.join(words[1:])
         return tab_name.strip()
 
-    def init_ui(self):
+    def _init_ui(self):
         """
         Create and arrange the UI elements.
         Does minimum binding of signals.
@@ -138,7 +139,7 @@ class GenericTab(GenericUi):
         """
         if self.inited:
             return
-        super().init_ui()
+        super()._init_ui()
         self.ui.setMinimumWidth(self.minimum_width)
         if self.main_window.tabWidget.tabText(self.tab_idx) == self.name:
             self.main_window.tabWidget.removeTab(self.tab_idx)  # remove if same tab
@@ -151,7 +152,7 @@ class GenericTab(GenericUi):
     # @final
     def setup(self):
         """Setup more advanced features of the UI, notably the callbacks"""
-        self.init_ui()  #  Called in case the tab is not yet initialised (but protected)
+        self._init_ui()  #  Call protected by "self.inited". Called in case the tab is not yet initialised
         if self.setup_complete:
             return
 
@@ -177,13 +178,31 @@ class GenericTab(GenericUi):
         if isinstance(self, PostProcessingTab):
             self.set_pre_processors()
         self._set_params()
-        self.read_configs(cfg_path)
+        self._read_configs(cfg_path)
         if loaded_from_defaults:
-            self.fix_config()
-        self.setup_workers()
-        self.create_channels()
-        self.load_config_to_gui()
+            self._fix_config()
+
+        self.params_set = True
+
+        if not loaded_from_defaults:  #FIXME: check if needs to be called later for sample too
+            self.finalise_set_params()  # FIXME: check if better to pass loaded_from_defaults or inspect channel names
+
+    @final
+    def finalise_set_params(self):
+        if not self.params_set:
+            warnings.warn(f'Params not set for {self.__class__}. Call set_params before finalise_set_params')
+            return
+        self._setup_workers()
+        self._set_channels_names()
+        self._create_channels()  # Creates missing channels. FIXME: What about existing but renamed ones?
+        self._load_config_to_gui()
         self._bind_params_signals()
+        self.params_finalised = True
+
+    @abstractmethod
+    def _set_channels_names(self):
+        """Set the names of the channels based on the sample manager and data types"""
+        pass
 
     # @abstractmethod
     def _set_params(self):
@@ -199,12 +218,17 @@ class GenericTab(GenericUi):
     def _get_channels(self):
         return []  # Default to no channels when implementing a tab without channels
 
-    def create_channels(self):
+    def _create_channels(self):
+        if not hasattr(self.ui, 'channelsParamsTabWidget'):
+            return
+        if not isinstance(self.ui.channelsParamsTabWidget, ExtendableTabWidget):
+            warnings.warn(f'Channel tab widget not finalised for  {self.name}, skipping channel creation')
+            return
         for channel in self._get_channels():
             if channel not in self.ui.channelsParamsTabWidget.get_channels_names():
                 self.add_channel_tab(channel)
 
-    def setup_workers(self):
+    def _setup_workers(self):
         """Setup the optional workers (which handle the computations) associated with this tab"""
         pass
 
@@ -226,6 +250,7 @@ class GenericTab(GenericUi):
             Whether to add the add channel button
         """
         if not hasattr(self.ui, 'channelsParamsTabWidget'):
+            print(f'No channel tab widget found for {self.name}, skipping swap')
             return
         if not isinstance(self.ui.channelsParamsTabWidget, ExtendableTabWidget):
             layout = self.ui.channelsParamsTabWidgetLayout
@@ -313,7 +338,7 @@ class GenericTab(GenericUi):
         """
         pass
 
-    def read_configs(self, cfg_path):  # REFACTOR: parse_configs
+    def _read_configs(self, cfg_path):  # REFACTOR: parse_configs
         """
         Read the configuration file associated with the params from the filesystem
 
@@ -324,7 +349,7 @@ class GenericTab(GenericUi):
         """
         self.params.read_configs(cfg_path)
 
-    def fix_config(self):  # TODO: check if could make part of self.params may not be possible since not set
+    def _fix_config(self):  # TODO: check if could make part of self.params may not be possible since not set
         """Amend the config for the tabs that required live patching the config"""
         self.params.fix_cfg_file(self.params.config_path)
 
@@ -459,9 +484,10 @@ class GenericTab(GenericUi):
                 func(*step_args, **step_kw_args)
             else:
                 self.main_window.wrap_in_thread(func, *step_args, **step_kw_args)
-        except MissingRequirementException as ex:
-            self.main_window.print_error_msg(ex)
-            self.main_window.popup(str(ex), base_msg=f'Could not run operation {func.__name__}', print_warning=False)
+        except MissingRequirementException as err:
+            self.main_window.print_error_msg(err)
+            self.main_window.popup(str(err), base_msg=f'Could not run operation {func.__name__}', print_warning=False)
+            raise err
         finally:
             if self.sample_manager is not None and self.sample_manager.workspace is not None:  # WARNING: hacky
                 self.sample_manager.workspace.executor = None  # FIXME: do not pass workspace but semaphore instead
@@ -534,7 +560,7 @@ class PipelineTab(GenericTab):
             getattr(self.ui, btn_name).clicked.connect(func)
 
     # @abstractmethod
-    def setup_workers(self):
+    def _setup_workers(self):
         """
         Setup the optional workers (which handle the computations) associated with this tab
 
@@ -558,9 +584,8 @@ class PreProcessingTab(PipelineTab):
         self.processing_type = 'pre'
 
     # @abstractmethod
-    def setup_workers(self):
+    def _setup_workers(self):
         pass
-
 
 
 class PostProcessingTab(PipelineTab):
@@ -578,7 +603,7 @@ class PostProcessingTab(PipelineTab):
         self.processing_type = 'post'
 
     # @abstractmethod
-    def setup_workers(self):
+    def _setup_workers(self):
         pass
 
     def set_pre_processors(self, stitcher=None, aligner=None):
@@ -636,7 +661,7 @@ class BatchTab(GenericTab):
         return self.params is not None
 
     # @abstractmethod
-    def setup_workers(self):
+    def _setup_workers(self):
         pass
 
     def _bind(self):
@@ -674,8 +699,8 @@ class BatchTab(GenericTab):
         self.params.read_configs(cfg_path)
         self.params.results_folder = results_folder  # FIXME: patch config
 
-        self.load_config_to_gui()
-        self.setup_workers()
+        self._load_config_to_gui()
+        self._setup_workers()
 
     def create_wizard(self):
         self.params.ui_to_cfg()
