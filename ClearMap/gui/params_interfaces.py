@@ -592,6 +592,9 @@ class UiParameterCollection(QObject):
     def config_path(self):
         return self.config.filename
 
+    def write(self):
+        self.write_config()
+
     def write_config(self):
         self.config.write()
 
