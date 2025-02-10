@@ -846,9 +846,10 @@ def convert_files(filenames, extension=None, path=None, processes=None, verbose=
         [_convert(source_, sink, i) for i, source_, sink in zip(range(n_files), filenames, sinks)]
     else:
         with CancelableProcessPoolExecutor(processes) as executor:
-            executor.map(_convert, filenames, sinks, range(n_files))
+            results = executor.map(_convert, filenames, sinks, range(n_files))
             if workspace is not None:
                 workspace.executor = executor
+            results = list(results)  # to catch exceptions
         if workspace is not None:
             workspace.executor = None
 
