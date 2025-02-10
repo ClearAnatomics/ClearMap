@@ -136,17 +136,20 @@ class SampleManager(TabProcessor):
                                         default_channel=first_channel)
         self.incomplete_channels = []
         for channel, cfg in self.config['channels'].items():
-            if cfg['path']:
+            raw_path = cfg['path']
+            if raw_path:
                 if channel not in self.workspace.asset_collections:
-                    self.workspace.add_raw_data(file_path=cfg['path'],
+                    self.workspace.add_raw_data(file_path=raw_path,
                                                 channel_id=channel,
                                                 data_content_type=cfg['data_type'],
                                                 sample_id=self.prefix)
                 else:
-                    pass
-                    # FIXME: update path of raw asset if different
+                    old_asset = self.workspace.asset_collections[channel]['raw']
+                    if old_asset.expression != raw_path:
+                        self.workspace.asset_collections[channel]['raw'] = old_asset.variant(expression=raw_path)
             else:
                 self.incomplete_channels.append(channel)
+        self.workspace.info()
 
     @property
     def prefix(self):
