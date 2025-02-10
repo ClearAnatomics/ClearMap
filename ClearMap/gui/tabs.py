@@ -16,12 +16,14 @@ It is composed of:
 - A `ui` object which is the result of the construction of a `.ui` file that defines the layout and the widgets.
 - A `sample_manager` object that handles the sample data.
 - A `sample_params` object that links the UI to the sample configuration file.
-- A `params` object that links the UI to the configuration file. (For the `SampleInfoTab`, this is the `SampleParameters` object.)
+- A `params` object that links the UI to the configuration file.
+(For the `SampleInfoTab`, this is the `SampleParameters` object.)
 - A `name` that is used to identify the tab in the GUI.
 - A `processing_type` that identifies the type of tab. It can be one of (None, 'pre', 'post', 'batch').
 - A `progress_watcher` object that tracks the progress of the computation.
 
-Optionally, for `Pipeline` tabs (`PreProcessingTab` and `PostProcessingTab`), a `processor` object is used to handle the processing steps and computation.
+Optionally, for `Pipeline` tabs (`PreProcessingTab` and `PostProcessingTab`),
+a `processor` object is used to handle the processing steps and computation.
 For `PostProcessing` tabs, the pre_processor objects (stitcher and aligner) can also be passed.
 
 Tab setup
@@ -42,12 +44,14 @@ Setup methods to be implemented in the concrete tab classes
 `PipelineTab` additional setup methods
 **************************************
 
-- `setup_workers`: Sets up the worker (Processor) which handles the computations associated with this tab. Called after `load_config_to_gui` (see below). Also called when the sample config is applied. Sometimes called in `set_params`  # FIXME: check if this is necessary.
+- `setup_workers`: Sets up the worker (Processor) which handles the computations associated with this tab.
+Called in `set_params` and also when the sample config is applied.
 
 `PostProcessingTab` additional setup methods
 ********************************************
 
-- `finalise_workers_setup`: Sets up the worker (Processor). Called when the tab is selected to ensure the workers are fully set up.
+- `finalise_workers_setup`: Sets up the worker (Processor).
+Called when the tab is selected to ensure the workers are fully set up.
 
 Tabs with channels
 ******************
@@ -77,11 +81,11 @@ Typical calling sequence is:
     - sets sample_params if not SampleInfoTab
     - calls `tab.set_pre_processors` for PostProcessingTab instances
     - calls `tab.__set_params`
-    - calls `tab.read_configs`
-    - calls `tab.fix_config` if loaded from defaults
+    - calls `tab._read_configs`
+    - calls `tab._fix_config` if loaded from defaults
     - calls `tab.setup_workers`
-    - calls `tab.create_channels`
-    - calls `tab.load_config_to_gui`  (called after fix_config except for BatchTab)
+    - calls `tab._create_channels`
+    - calls `tab._load_config_to_gui`  (called after fix_config except for BatchTab)
     - calls `tab._bind_params_signals`
 
 - `tab.finalise_workers_setup`  # Only for PostProcessingTab
@@ -168,7 +172,7 @@ class SampleInfoTab(GenericTab):
         self.params = SampleParameters(self.ui, self.main_window.src_folder)
         # REFACTOR: trigger signal to update the UI
 
-    def setup_workers(self):  # WARNING: a bit far fetched but necessary to have a consistent setup
+    def _setup_workers(self):  # WARNING: a bit far fetched but necessary to have a consistent setup
         self.sample_manager.setup(src_dir=self.main_window.src_folder, watcher=self.main_window.progress_watcher)
 
     def _bind_params_signals(self):
@@ -293,6 +297,34 @@ class StitchingTab(PreProcessingTab):
         self.sample_manager = sample_manager
         self.stitcher = StitchingProcessor(self.sample_manager)
 
+    def _read_configs(self, cfg_path):
+        if self.sample_manager.stitching_cfg:
+            self.params.read_configs(cfg=self.sample_manager.stitching_cfg)
+        else:
+            self.params.read_configs(cfg_path=cfg_path)
+
+    def _load_config_to_gui(self):
+        super()._load_config_to_gui()
+        self.update_plotable_channels()
+
+    def _set_channels_names(self):  # FIXME: move to stitcher
+        stitchable_channels = self._get_channels()
+        # rename defaults
+        if 'channel_x' in self.stitcher.config['channels']:  # i.e. is default, otherwise already set
+            first_channel = stitchable_channels[0]
+            self.stitcher.config['channels'][first_channel] = self.stitcher.config['channels'].pop('channel_x')
+            self.stitcher.config['channels'][first_channel]['layout_channel'] = first_channel
+            for i in range(1, len(stitchable_channels)):
+                self.stitcher.config['channels'][stitchable_channels[i]] = deepcopy(self.stitcher.config['channels']['channel_y'])
+                self.stitcher.config['channels'][stitchable_channels[i]]['layout_channel'] = first_channel
+            self.stitcher.config['channels'].pop('channel_y')
+        else:  # rename existing
+            for old_name, new_name in zip(self.stitcher.config['channels'].keys(), stitchable_channels):
+                self.stitcher.config['channels'][new_name] = self.stitcher.config['channels'].pop(old_name)
+                if self.stitcher.config['channels'][new_name]['layout_channel'] == old_name:
+                    self.stitcher.config['channels'][new_name]['layout_channel'] = new_name
+        self.stitcher.config.write()
+
     def _bind(self):
         """
         Bind the signal/slots of the UI elements which are not
@@ -348,13 +380,14 @@ class StitchingTab(PreProcessingTab):
             self._bind_btn(btn_name, func, channel, page_widget, **kwargs)
         self.ui.runChannelsCheckableListWidget.set_item_checked(channel, self.params[channel].shared.run)
 
-    def setup_workers(self):
+    def _setup_workers(self):
         """
         Setup the worker (Processor) which handles the computations associated with this tab
         """
         self.sample_params.ui_to_cfg()
         self.stitcher.setup(self.sample_manager, convert_tiles=False)
 
+        # FIXME: this has to come after self.set_channels_names
         if self.sample_manager.has_tiles() and not self.sample_manager.has_npy():
             if  prompt_dialog('Tile conversion', 'Convert individual tiles to npy for efficiency'):
                 self.convert_tiles()
@@ -378,7 +411,7 @@ class StitchingTab(PreProcessingTab):
         """
         self.params[channel].skip = not state  # TODO: check if skip sill exists
 
-    def set_progress_watcher(self, watcher):  # FIXME: could be for worker in self.workers
+    def set_progress_watcher(self, watcher):  # REFACTOR: could be for worker in self.workers
         """
         Setup the watcher object that will handle the progress in the computation for this tab
 
@@ -480,6 +513,27 @@ class RegistrationTab(PreProcessingTab):
 
         self.advanced_controls_names = ['advancedAtlasSettingsGroupBox']
 
+    def _read_configs(self, cfg_path):
+        if self.sample_manager.registration_cfg:
+            self.params.read_configs(cfg=self.sample_manager.registration_cfg)
+        else:
+            self.params.read_configs(cfg_path=cfg_path)
+
+    def _set_channels_names(self):
+        if 'channel_x' in self.aligner.config['channels']:  # i.e. is default, otherwise already set
+            autofluo_config = deepcopy(self.aligner.config['channels']['autofluorescence'])
+            data_channel_config = deepcopy(self.aligner.config['channels']['channel_x'])
+            self.aligner.config['channels'] = {}
+            for channel in self.sample_manager.channels:
+                if self.sample_manager.config['channels'][channel]['data_type'] == 'autofluorescence':
+                        self.aligner.config['channels'][channel] = autofluo_config
+                else:
+                    self.aligner.config['channels'][channel] = data_channel_config
+                self.handle_align_with_changed(channel, self.aligner.config['channels'][channel]['align_with'])
+            self.aligner.config.write()  # FIXME: ensure that aligner defined. Why not self.params.ui_to_cfg()
+
+            self.aligner.add_pipeline()
+
     def _bind(self):
         """
         Bind the signal/slots of the UI elements which are not
@@ -536,7 +590,7 @@ class RegistrationTab(PreProcessingTab):
         self.params[channel].handle_params_files_changed()  # Force update
         self.params[channel].align_with_changed.connect(self.handle_align_with_changed)
 
-    def setup_workers(self):
+    def _setup_workers(self):
         self.sample_params.ui_to_cfg()
         self.aligner.setup()
         self.params.read_configs(self.aligner.config.filename)
@@ -554,10 +608,8 @@ class RegistrationTab(PreProcessingTab):
         """
         self.aligner.set_progress_watcher(watcher)
 
-    def setup_atlas(self):  # FIXME: delay this to update_workspace
-        """
-        Setup the atlas that corresponds to the orientation and crop
-        """
+    def setup_atlas(self):  # TODO: check if we delay this to update_workspace
+        """Setup the atlas that corresponds to the orientation and cropping of the sample"""
         self.sample_params.ui_to_cfg()  # To make sure we have the slicing up to date
         self.params.atlas_params.ui_to_cfg()
         self.aligner.setup_atlases()
@@ -694,6 +746,18 @@ class CellCounterTab(PostProcessingTab):
         self.cell_intensity_histogram = None
         self.cell_size_histogram = None
 
+    def _set_channels_names(self):
+        """Patch the config with the actual channels if not already done"""
+        # Update if channels are not a subset of valid channels
+        if not set(self.params.config['channels'].keys()) <= set(self.sample_manager.channels):
+            default_channel_config = deepcopy(self.params.config['channels']['example'])
+            self.params.config['channels'] = {}
+            for channel in self.params.channels_to_detect:
+                self.params.config['channels'][channel] = default_channel_config
+            self.params.config.write()
+            self._setup_workers()  # WARNING: a bit circular but if we need to amend channels
+                                   #    then we also reset the workers
+
     def _bind(self):
         pass
 
@@ -708,14 +772,17 @@ class CellCounterTab(PostProcessingTab):
     def _get_channels(self):
         return self.params.channels_to_detect
 
-    def setup_workers(self):
+    def _setup_workers(self):
         """
         Setup the cell detection worker, which handle the computations associated with this tab
         """
         if self.sample_manager.workspace is not None:
-            self.params.ui_to_cfg()
-            self.cell_detectors = {channel: CellDetector(self.sample_manager, channel)
-                                   for channel in self.params.channels_to_detect}
+            if 'example' not in self.params.config['channels']:
+                self.params.ui_to_cfg()
+                self.cell_detectors = {channel: CellDetector(self.sample_manager, channel)
+                                       for channel in self.params.channels_to_detect}
+            else:
+                self.main_window.print_warning_msg('Channels not yet set in config. Cannot define workers.')
         else:
             self.main_window.print_warning_msg('Workspace not initialised')
 
@@ -918,10 +985,8 @@ class CellCounterTab(PostProcessingTab):
     # def reset_detected(self):
     #     self.cell_detector.detected = False
 
-    def plot_detection_results(self, channel):  # FIXME: check only steps
-        """
-        Display the different steps of the cell detection in a grid to evaluate the filters
-        """
+    def plot_detection_results(self, channel):
+        """Display the different steps of the cell detection in a grid to evaluate the filters"""
         dvs = self.wrap_plot(self.cell_detectors[channel].preview_cell_detection,
                              parent=self.main_window.centralWidget(), arrange=False, sync=True)
         if len(dvs) == 1:
@@ -952,7 +1017,7 @@ class CellCounterTab(PostProcessingTab):
                            close_when_done=is_last_step)  # , main_thread=True)
         self.plot_cell_filter_results(channel)
 
-    def preview_cell_filter(self, channel):  # FIXME: circular calls TEST
+    def preview_cell_filter(self, channel):  # TEST: circular calls
         with self.cell_detectors[channel].workspace.tmp_debug:
             self.__filter_cells(channel)
 
@@ -1003,6 +1068,18 @@ class VasculatureTab(PostProcessingTab):
         self.binary_vessel_processor = None
         self.vessel_graph_processor = None
 
+    def _set_channels_names(self):
+        default_vessels_binarization_params = self.params.config['binarization'].pop('vessels')
+        default_arteries_binarization_params = self.params.config['binarization'].pop('arteries')
+        for channel in self.sample_manager.channels:
+            if self.sample_manager.config['channels'][channel]['data_type'] == 'vessels':
+                self.params.config['binarization'][channel] = default_vessels_binarization_params
+            elif self.sample_manager.config['channels'][channel]['data_type'] == 'arteries':
+                self.params.config['binarization'][channel] = default_arteries_binarization_params
+            elif self.sample_manager.config['channels'][channel]['data_type'] == 'veins':
+                self.params.config['binarization'][channel] = default_arteries_binarization_params
+        self.params.config.write()
+
     def _bind(self):
         """
         Bind the signal/slots of the UI elements which are not
@@ -1043,11 +1120,12 @@ class VasculatureTab(PostProcessingTab):
         self.params = VesselParams(self.ui, self.sample_params, None,
                                    self.main_window.tab_managers['registration'].params)
 
-    def setup_workers(self):
+    def _setup_workers(self):
         """
-         Setup the BinaryVesselProcessor and VesselGraphProcessor workers,
-         which handle the computations associated with this tab
-         """
+        Setup the BinaryVesselProcessor and VesselGraphProcessor workers,
+        which handle the computations associated with this tab
+        """
+        self._set_channels_names()
         if self.sample_manager.workspace is not None:
             self.params.ui_to_cfg()
             self.binary_vessel_processor = BinaryVesselProcessor(self.sample_manager)
@@ -1075,7 +1153,7 @@ class VasculatureTab(PostProcessingTab):
         """Unload the temporary vasculature graph objects to free up RAM"""
         self.vessel_graph_processor.unload_temporary_graphs()
 
-    def set_progress_watcher(self, watcher):  # FIXME: for worker in self.workers.values():
+    def set_progress_watcher(self, watcher):  # REFACTOR: for worker in self.workers.values():
         """
         Setup the watcher object that will handle the progress in the computation for this tab
 
@@ -1102,7 +1180,11 @@ class VasculatureTab(PostProcessingTab):
         stop_on_error: bool
             Whether to stop the process if an error occurs.
         """
-        # FIXME: n_steps = self.params.binarization_params.n_steps
+        # TODO: n_steps = self.params.binarization_params.n_steps
+        self.binary_vessel_processor.assert_input_shapes_match()
+        if not self.binary_vessel_processor.inputs_match:
+            self.main_window.print_status_msg('Cannot binarize because of shape mismatch between channels')
+            return
         try:
             self.wrap_step('Vessel binarization', self.binary_vessel_processor.binarize_channel,
                            step_args=[channel], abort_func=self.binary_vessel_processor.stop_process)
@@ -1159,7 +1241,7 @@ class VasculatureTab(PostProcessingTab):
 
     def build_graph(self):
         """Run the pipeline to build the vasculature graph"""
-        # FIXME: n_steps = 4
+        # TODO: n_steps = 4
         tile = 'Building vessel graph'
         self.wrap_step(tile, self.vessel_graph_processor.skeletonize_and_build_graph,
                        abort_func=self.vessel_graph_processor.stop_process, main_thread=True)
@@ -1212,7 +1294,7 @@ class VasculatureTab(PostProcessingTab):
     def post_process_graph(self):
         """Post process the graph by filtering, tracing and removing capillaries """
         self.wrap_step('Post processing vasculature graph', self.vessel_graph_processor.post_process,
-                       abort_func=self.vessel_graph_processor.stop_process)  # FIXME: n_steps = 8
+                       abort_func=self.vessel_graph_processor.stop_process)  # TODO: n_steps = 8
 
     def pick_region(self):
         """Open a dialog to select a brain region and plot it """
@@ -1368,11 +1450,11 @@ class GroupAnalysisTab(BatchTab):
         self.ui.batchStatsPushButton.clicked.connect(self.make_group_stats_tables)
         self.ui.batchToolBox.currentChanged.connect(self.handle_tool_changed)
 
-    def setup_workers(self):
+    def _setup_workers(self):
         self.processor.results_folder = self.params.results_folder
         self.processor.progress_watcher = self.main_window.progress_watcher
 
-    # def setup_workers(self):
+    # def _setup_workers(self):
     #     self.processor = BatchProcessor(self.params.config)
 
     def handle_tool_changed(self, idx):
@@ -1405,7 +1487,7 @@ class GroupAnalysisTab(BatchTab):
         self.main_window.setup_plots(dvs)
         self.main_window.signal_process_finished()
 
-    def run_p_vals(self):  # FIXME: split compute and display
+    def run_p_vals(self):  # REFACTOR: split compute and display
         self.params.ui_to_cfg()
 
         self.main_window.print_status_msg('Computing p_val maps')
@@ -1450,7 +1532,7 @@ class BatchProcessingTab(BatchTab):
     def _set_params(self):
         self.params = BatchProcessingParams(self.ui, preferences=self.main_window.preference_editor.params)
 
-    def setup_workers(self):
+    def _setup_workers(self):
         self.processor.params = self.params
 
     def _bind(self):
