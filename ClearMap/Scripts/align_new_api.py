@@ -8,7 +8,7 @@ from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
 
 def plot_registration_results(pre_proc):
     img_paths = (pre_proc.filename('resampled', postfix='autofluorescence'),
-                 pre_proc.filename('aligned_to_reference', channel='autofluorescence'))
+                 pre_proc.filename('aligned_to_reference', channel=pre_proc.sample_manager.alignment_reference_channel))
     image_sources = copy.deepcopy(list(img_paths))
     for i, im_path in enumerate(image_sources):
         if im_path.endswith('.mhd'):
