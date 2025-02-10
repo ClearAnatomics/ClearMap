@@ -553,44 +553,38 @@ class ChannelRegistrationParams(ChannelUiParameter):  # FIXME: add signal for al
         self.align_with_changed.emit(self.name, align_with)
 
     def handle_params_files_changed(self):  # TODO: hide by default (unless advanced mode)
+
+        def update_label_value(idx, value):
+            lbl = self._value_labels[idx]
+            lbl.setText(f"({value if value else 'disabled'})")
+
         clear_layout(self.tab.landmarksWeightsLayout)
 
         new_params_files = [snake_to_title(p.split('.')[0]) for p in self.tab.paramsFilesListWidget.get_items_text()]
+        self._value_labels = []
         for idx, param in enumerate(new_params_files):
             label = QLabel(param)
             slider = QSlider(Qt.Horizontal)
             slider.setMinimum(0); slider.setMaximum(100)
             slider.setValue(self.config['landmarks_weights'][idx])
 
-            zero_label = QLabel("<b>0</b>")
-            hundred_label = QLabel("<b>100%</b>")
-            value_label = QLabel(f"({slider.value()})")
+            self._value_labels.append(QLabel(f"({slider.value()})"))
 
             # Create a vertical layout for the slider and value label
             top_layout = QHBoxLayout()
             top_layout.addWidget(label)
-            top_layout.addWidget(zero_label)
+            top_layout.addWidget(QLabel("<b>0</b>"))
             top_layout.addWidget(slider)
-            top_layout.addWidget(hundred_label)
-            top_layout.addWidget(value_label)
-
-            # ctrls_layout = QVBoxLayout()
-            # ctrls_layout.addLayout(top_layout)
-            # ctrls_layout.addLayout(btm_layout)
+            top_layout.addWidget(QLabel("<b>100%</b>"))
+            top_layout.addWidget(self._value_labels[idx])
 
             self.tab.landmarksWeightsLayout.addLayout(top_layout, idx, 0)
 
-
-            def update_label_value(value):
-                if value:
-                    value_label.setText(f"({value})")
-                else:
-                    value_label.setText("(disabled)")
-
-            slider.valueChanged.connect(update_label_value)
+            slider.valueChanged.connect(functools.partial(update_label_value, idx))
             slider.valueChanged.connect(functools.partial(self.handle_landmarks_weight_changed, idx))
 
     def handle_landmarks_weight_changed(self, idx, value):
+        value = self.scale_landmarks(value)
         if idx < len(self.config['landmarks_weights']):
             self.config['landmarks_weights'][idx] = value
         elif idx == len(self.config['landmarks_weights']):
@@ -599,6 +593,28 @@ class ChannelRegistrationParams(ChannelUiParameter):  # FIXME: add signal for al
             raise ValueError(f'Index {idx} out of bounds for channel {self.name} '
                              f'landmarks weights {self.config["landmarks_weights"]}')
         # self.ui_to_cfg()
+
+    def scale_landmarks(self, value):
+        """
+        Scale the weight of the landmarks using an exponential function so that
+        the ratio between the weights follows a geometric progression with the slider value
+
+        Parameters
+        ----------
+        value: float
+            The value of the slider (between 0 and 100)
+
+        Returns
+        -------
+        float
+            The scaled weight (between 0 and max_ratio)
+        """
+        min_ratio = 1/20000
+        max_ratio = 200
+        if value == 0:
+            return 0
+        else:
+            return min_ratio * (max_ratio / min_ratio) ** (value / 100)
 
 
 class SharedRegistrationParams(UiParameter):
