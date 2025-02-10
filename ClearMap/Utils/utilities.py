@@ -118,7 +118,9 @@ def is_iterable(obj):
 
 
 def title_to_snake(string):
-    return re.sub('(?!^)([A-Z]+)', r'_\1', string).lower()
+    out = re.sub('(?!^)([A-Z]+)', r'_\1', string).lower()
+    out = out.replace(' ', '_')
+    return out
 
 def snake_to_title(string):
     return string.replace('_', ' ').title()

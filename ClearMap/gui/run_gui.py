@@ -59,7 +59,6 @@ palette.setColor(QtGui.QPalette.ColorRole.ToolTipText, QtGui.QColor(DarkPalette.
 app.setPalette(palette)  # noqa
 
 
-from ClearMap.IO.assets_constants import CONTENT_TYPE_TO_PIPELINE
 from ClearMap.config.update_config import update_default_config
 from ClearMap.gui.widget_monkeypatch_callbacks import recursive_patch_widgets
 from ClearMap.gui.gui_utils import get_current_res, UI_FOLDER, clear_layout, delete_widget
@@ -80,7 +79,7 @@ update_pbar(app, progress_bar, 20)
 from ClearMap.Utils.utilities import title_to_snake, snake_to_title
 from ClearMap.gui.gui_logging import Printer
 from ClearMap.config.config_loader import ConfigLoader, CLEARMAP_CFG_DIR
-from ClearMap.Utils.exceptions import ConfigNotFoundError, ClearMapWorkspaceError, ClearMapIoException
+from ClearMap.Utils.exceptions import ConfigNotFoundError, ClearMapIoException
 from ClearMap.gui.params_interfaces import UiParameter, UiParameterCollection
 
 update_pbar(app, progress_bar, 40)
@@ -746,7 +745,7 @@ class ClearMapGui(ClearMapGuiBase):
         """
         if not tab_name:
             tab_name = manager_class.get_tab_name()
-        tab_manager_name = tab_name.lower().replace(' ', '_')  # WARNING: can't use title_to_snake
+        tab_manager_name = title_to_snake(tab_name)
 
         tab_idx = self._get_tab_index(tab_name) # check if tab exists
         if tab_idx is None:  # compute if not
@@ -912,7 +911,7 @@ class ClearMapGui(ClearMapGuiBase):
             self.tabWidget.setCurrentIndex(0)
 
         # FIXME: might be simpler to use the same string for the tab name and the manager name
-        manager_tab_name = self.tabWidget.tabText(tab_index).lower().replace(' ', '_')
+        manager_tab_name = title_to_snake(self.tabWidget.tabText(tab_index))
         tab = self.tab_managers[manager_tab_name]
         if tab.processing_type == 'post':
             if not tab.ui.isEnabled():
