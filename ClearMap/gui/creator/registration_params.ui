@@ -26,103 +26,7 @@
    <property name="bottomMargin">
     <number>0</number>
    </property>
-   <item row="6" column="0" colspan="2">
-    <widget class="QGroupBox" name="landmarksWeightsGroupBox">
-     <property name="title">
-      <string>Landmarks weights:</string>
-     </property>
-     <layout class="QGridLayout" name="landmarksWeightsLayout">
-      <item row="0" column="0">
-       <widget class="QLabel" name="param0Label">
-        <property name="text">
-         <string>Affine</string>
-        </property>
-       </widget>
-      </item>
-      <item row="0" column="1">
-       <widget class="QSlider" name="param0HorizontalSlider">
-        <property name="toolTip">
-         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;put to 0 to not use landmarks for this step&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-        </property>
-        <property name="maximum">
-         <number>100</number>
-        </property>
-        <property name="singleStep">
-         <number>1</number>
-        </property>
-        <property name="orientation">
-         <enum>Qt::Horizontal</enum>
-        </property>
-        <property name="tickPosition">
-         <enum>QSlider::NoTicks</enum>
-        </property>
-        <property name="tickInterval">
-         <number>100</number>
-        </property>
-       </widget>
-      </item>
-     </layout>
-    </widget>
-   </item>
-   <item row="1" column="0">
-    <widget class="QLabel" name="label">
-     <property name="text">
-      <string>Align with:</string>
-     </property>
-    </widget>
-   </item>
-   <item row="1" column="1">
-    <widget class="QComboBox" name="alignWithComboBox">
-     <item>
-      <property name="text">
-       <string>None</string>
-      </property>
-     </item>
-     <item>
-      <property name="text">
-       <string>atlas</string>
-      </property>
-     </item>
-    </widget>
-   </item>
-   <item row="5" column="1">
-    <widget class="QToolButton" name="selectLandmarksPushButtonInfoToolButton">
-     <property name="icon">
-      <iconset resource="icons.qrc">
-       <normaloff>:/icons/icons/info.svg</normaloff>:/icons/icons/info.svg</iconset>
-     </property>
-    </widget>
-   </item>
-   <item row="4" column="2">
-    <widget class="QPushButton" name="removeParamFilePushButton">
-     <property name="minimumSize">
-      <size>
-       <width>25</width>
-       <height>25</height>
-      </size>
-     </property>
-     <property name="maximumSize">
-      <size>
-       <width>25</width>
-       <height>25</height>
-      </size>
-     </property>
-     <property name="toolTip">
-      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Remove current item&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-     </property>
-     <property name="text">
-      <string>-</string>
-     </property>
-    </widget>
-   </item>
-   <item row="3" column="0">
-    <widget class="QLabel" name="label_2">
-     <property name="text">
-      <string>Parameter files:</string>
-     </property>
-    </widget>
-   </item>
-   <item row="0" column="0" colspan="2">
+   <item row="0" column="0" colspan="3">
     <widget class="QGroupBox" name="resampleGroupBox">
      <property name="title">
       <string>Resample</string>
@@ -131,6 +35,24 @@
       <bool>true</bool>
      </property>
      <layout class="QGridLayout" name="gridLayout_2">
+      <property name="sizeConstraint">
+       <enum>QLayout::SetDefaultConstraint</enum>
+      </property>
+      <property name="leftMargin">
+       <number>0</number>
+      </property>
+      <property name="topMargin">
+       <number>9</number>
+      </property>
+      <property name="rightMargin">
+       <number>0</number>
+      </property>
+      <property name="bottomMargin">
+       <number>0</number>
+      </property>
+      <property name="verticalSpacing">
+       <number>0</number>
+      </property>
       <item row="0" column="0">
        <widget class="QLabel" name="label_3">
         <property name="text">
@@ -147,6 +69,21 @@
          <enum>QFrame::Raised</enum>
         </property>
         <layout class="QHBoxLayout" name="horizontalLayout">
+         <property name="sizeConstraint">
+          <enum>QLayout::SetDefaultConstraint</enum>
+         </property>
+         <property name="leftMargin">
+          <number>0</number>
+         </property>
+         <property name="topMargin">
+          <number>0</number>
+         </property>
+         <property name="rightMargin">
+          <number>0</number>
+         </property>
+         <property name="bottomMargin">
+          <number>0</number>
+         </property>
          <item>
           <widget class="QSpinBox" name="spinBox_1"/>
          </item>
@@ -162,17 +99,65 @@
      </layout>
     </widget>
    </item>
-   <item row="5" column="0">
-    <widget class="QPushButton" name="selectLandmarksPushButton">
-     <property name="whatsThis">
-      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Open a new dialog to pick landmarks in the image to help&lt;/p&gt;&lt;p&gt;constrain the alignment&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-     </property>
+   <item row="1" column="0">
+    <widget class="QLabel" name="label">
      <property name="text">
-      <string>Select landmarks</string>
+      <string>Align with:</string>
      </property>
     </widget>
    </item>
-   <item row="3" column="2">
+   <item row="1" column="1" colspan="2">
+    <widget class="QComboBox" name="alignWithComboBox">
+     <item>
+      <property name="text">
+       <string>None</string>
+      </property>
+     </item>
+     <item>
+      <property name="text">
+       <string>atlas</string>
+      </property>
+     </item>
+    </widget>
+   </item>
+   <item row="2" column="0">
+    <widget class="QLabel" name="label_4">
+     <property name="text">
+      <string>Moving channel:</string>
+     </property>
+    </widget>
+   </item>
+   <item row="2" column="1" colspan="2">
+    <widget class="QComboBox" name="movingChannelComboBox">
+     <item>
+      <property name="text">
+       <string>None</string>
+      </property>
+     </item>
+     <item>
+      <property name="text">
+       <string>atlas</string>
+      </property>
+     </item>
+    </widget>
+   </item>
+   <item row="3" column="0">
+    <widget class="QLabel" name="label_2">
+     <property name="text">
+      <string>Parameter files:</string>
+     </property>
+    </widget>
+   </item>
+   <item row="3" column="1" rowspan="2" colspan="2">
+    <widget class="QListWidget" name="paramsFilesListWidget">
+     <item>
+      <property name="text">
+       <string>align_affine.txt</string>
+      </property>
+     </item>
+    </widget>
+   </item>
+   <item row="3" column="3">
     <widget class="QPushButton" name="addParamFilePushButton">
      <property name="sizePolicy">
       <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
@@ -200,35 +185,99 @@
      </property>
     </widget>
    </item>
-   <item row="3" column="1" rowspan="2">
-    <widget class="QListWidget" name="paramsFilesListWidget">
-     <item>
-      <property name="text">
-       <string>align_affine.txt</string>
-      </property>
-     </item>
-    </widget>
-   </item>
-   <item row="2" column="0">
-    <widget class="QLabel" name="label_4">
+   <item row="4" column="3">
+    <widget class="QPushButton" name="removeParamFilePushButton">
+     <property name="minimumSize">
+      <size>
+       <width>25</width>
+       <height>25</height>
+      </size>
+     </property>
+     <property name="maximumSize">
+      <size>
+       <width>25</width>
+       <height>25</height>
+      </size>
+     </property>
+     <property name="toolTip">
+      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Remove current item&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+     </property>
      <property name="text">
-      <string>Moving channel:</string>
+      <string>-</string>
      </property>
     </widget>
    </item>
-   <item row="2" column="1">
-    <widget class="QComboBox" name="movingChannelComboBox">
-     <item>
-      <property name="text">
-       <string>None</string>
-      </property>
-     </item>
-     <item>
-      <property name="text">
-       <string>atlas</string>
-      </property>
-     </item>
+   <item row="5" column="0">
+    <widget class="QPushButton" name="selectLandmarksPushButton">
+     <property name="whatsThis">
+      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Open a new dialog to pick landmarks in the image to help&lt;/p&gt;&lt;p&gt;constrain the alignment&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+     </property>
+     <property name="text">
+      <string>Select landmarks</string>
+     </property>
     </widget>
+   </item>
+   <item row="5" column="1">
+    <widget class="QToolButton" name="selectLandmarksPushButtonInfoToolButton">
+     <property name="icon">
+      <iconset resource="icons.qrc">
+       <normaloff>:/icons/icons/info.svg</normaloff>:/icons/icons/info.svg</iconset>
+     </property>
+    </widget>
+   </item>
+   <item row="6" column="0" colspan="3">
+    <widget class="QGroupBox" name="landmarksWeightsGroupBox">
+     <property name="title">
+      <string>Landmarks weights</string>
+     </property>
+     <layout class="QGridLayout" name="landmarksWeightsLayout">
+      <item row="0" column="0">
+       <widget class="QLabel" name="param0Label">
+        <property name="text">
+         <string>Affine</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="1">
+       <widget class="QSlider" name="param0HorizontalSlider">
+        <property name="toolTip">
+         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;put to 0 to not use landmarks for this step&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+        </property>
+        <property name="minimum">
+         <number>-100</number>
+        </property>
+        <property name="maximum">
+         <number>100</number>
+        </property>
+        <property name="singleStep">
+         <number>1</number>
+        </property>
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
+        </property>
+        <property name="tickPosition">
+         <enum>QSlider::NoTicks</enum>
+        </property>
+        <property name="tickInterval">
+         <number>100</number>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item row="7" column="2">
+    <spacer name="verticalSpacer">
+     <property name="orientation">
+      <enum>Qt::Vertical</enum>
+     </property>
+     <property name="sizeHint" stdset="0">
+      <size>
+       <width>20</width>
+       <height>61</height>
+      </size>
+     </property>
+    </spacer>
    </item>
   </layout>
  </widget>
