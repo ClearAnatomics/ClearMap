@@ -250,7 +250,7 @@ class SampleManager(TabProcessor):
 
     def can_convert(self, channel):
         asset = self.get('raw', channel=channel, sample_id=self.prefix)
-        return asset.is_regular_file and not asset.with_extension('.npy').exists
+        return asset.is_regular_file and not asset.variant(extension='.npy').exists
 
     @property
     def channels_to_convert(self):
@@ -272,14 +272,15 @@ class SampleManager(TabProcessor):
             True if the raw channel is in npy format
         """
         channels = [channel] if channel is not None else self.stitchable_channels
-        return any([self.get('raw', channel=channel, sample_id=self.prefix).with_extension('.npy').exists
+        return any([self.get('raw', channel=channel, sample_id=self.prefix).variant(extension='.npy').exists
                     for channel in channels])
 
     def use_npy(self, channel):
-        asset = self.workspace.get('raw', channel=channel, prefix=self.prefix)
+        asset = self.get('raw', channel=channel, prefix=self.prefix)
         cfg = self.stitching_cfg['channels'][channel]
-        return cfg['use_npy'] or asset.expression.endswith('.npy') or asset.with_extension('.npy').exists
+        return cfg['use_npy'] and str(asset.expression).endswith('.npy') or asset.variant(extension='.npy').exists
 
+    # FIXME: get_configs is currently incomplete
     def set_configs(self, cfg_paths):
         cfg_paths = [os.path.expanduser(p) for p in cfg_paths]
         self.machine_config, self.config, self.stitching_cfg, self.registration_cfg = get_configs(*cfg_paths)
