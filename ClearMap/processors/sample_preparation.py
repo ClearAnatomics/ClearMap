@@ -924,7 +924,12 @@ class StitchingProcessor(TabProcessor):
     # @requires_assets([FilePath('raw')])
     def stitch_channel_rigid(self, channel, _force=False):
         if not self.sample_manager.check_has_all_tiles(channel):
-            raise MissingRequirementException(f'Channel {channel} missing tiles')
+            if self.sample_manager.use_npy(channel):
+                self.convert_tiles_channel(channel)
+                if not self.sample_manager.check_has_all_tiles(channel):
+                    raise MissingRequirementException(f'Channel {channel} missing tiles')
+            else:
+                raise MissingRequirementException(f'Channel {channel} missing tiles')
         self.set_watcher_step(f'Stitching {channel} rigid')
         rigid_cfg = self.config['channels'][channel]['rigid']
         overlaps, projection_thickness = define_auto_stitching_params(
