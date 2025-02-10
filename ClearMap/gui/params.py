@@ -307,6 +307,39 @@ class ChannelStitchingParams(UiParameterCollection):
 
         self.cfg_to_ui()
 
+    def write_config(self):
+        cfg = deepcopy(self.config)
+        if not self.compute_layout():
+            cfg['channels'][self.name].pop('rigid', None)
+            cfg['channels'][self.name].pop('wobbly', None)
+        cfg.write()
+
+    def handle_layout_channel_changed(self, channel, layout_channel):
+        if not self.ready:
+            return
+        compute_layout = self.compute_layout()
+        created = False
+        if self.stitching_rigid and self.stitching_wobbly:
+            self.stitching_rigid.set_visible(compute_layout)
+            self.stitching_wobbly.set_visible(compute_layout)
+        else:
+            if compute_layout:
+                self.stitching_rigid = RigidChannelStitchingParams(self.tab, self.name)
+                self.stitching_wobbly = WobblyChannelStitchingParams(self.tab, self.name)
+                self.stitching_rigid.set_visible(compute_layout)
+                self.stitching_wobbly.set_visible(compute_layout)
+                created = True
+        if created:
+            self.read_configs(cfg=self.config)
+        config = self.config['channels'][self.name]
+        if compute_layout and 'rigid' not in config.keys():
+            config['rigid'] = self._default_config['channels']['channel_x']['rigid']
+            config['wobbly'] = self._default_config['channels']['channel_x']['wobbly']
+            self.write_config()
+        if not compute_layout and 'rigid' in config.keys():
+            self.config['channels'][self.name].pop('rigid')
+            self.config['channels'][self.name].pop('wobbly')
+            self.write_config()
 
     def compute_layout(self):
         """
@@ -319,15 +352,16 @@ class ChannelStitchingParams(UiParameterCollection):
         bool
             Whether the stitching layout should be computed for this channel
         """
-        return (self.shared.layout_channel or self.shared.config['layout_channel']) == self.name
+        layout_channel = self.shared.layout_channel or self.shared.config['layout_channel']
+        return layout_channel == self.name
 
     @property
     def params(self):
         return self.shared, self.stitching_rigid, self.stitching_wobbly  # TODO: check if None is a problem
 
 
-
 class GeneralChannelStitchingParams(ChannelUiParameter):
+    layoutChannelChanged = pyqtSignal(str, str)
     use_npy: bool
     run: bool
     layout_channel: str
@@ -356,6 +390,10 @@ class GeneralChannelStitchingParams(ChannelUiParameter):
     def connect(self):
         self.nameWidget.channelRenamed.connect(self.handle_name_changed)
         self.connect_simple_widgets()
+        self.tab.layoutChannelComboBox.currentTextChanged.connect(self.handle_layout_channel_changed)
+
+    def handle_layout_channel_changed(self, layout_channel):
+        self.layoutChannelChanged.emit(self.name, layout_channel)
 
 
 class RigidChannelStitchingParams(ChannelUiParameter):
