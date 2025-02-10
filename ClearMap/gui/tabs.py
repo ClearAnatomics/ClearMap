@@ -561,7 +561,7 @@ class RegistrationTab(PreProcessingTab):
         self.params = RegistrationParams(self.ui)
 
     def _get_channels(self):
-        return self.aligner.channels_to_register()
+        return [c for c in self.aligner.config['channels'].keys()]  # Not only channels to register so we can decide in UI
 
     def _set_channel_config(self, channel):
         self.params[channel]._config = self.aligner.config
