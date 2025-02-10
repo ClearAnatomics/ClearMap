@@ -710,7 +710,8 @@ class RegistrationTab(PreProcessingTab):
         if not self.sample_manager.setup_complete:
             return
         for channel in self.params.keys():
-            if self.aligner.get_elx_asset('aligned', channel=channel).exists:
+            asset = self.aligner.get_elx_asset('aligned', channel=channel)
+            if asset is not None and asset.exists:
                 self.ui.plotChannelComboBox.addItem(channel)
 
     def __prepare_registration_results_graph(self, channel):
