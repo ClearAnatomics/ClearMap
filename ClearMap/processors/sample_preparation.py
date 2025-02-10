@@ -126,7 +126,11 @@ class SampleManager(TabProcessor):
         self.setup_complete = not self.incomplete_channels
 
     def update_workspace(self):
-        first_channel = list(self.config['channels'].keys())[0]
+        channel_names = self.config['channels'].keys()
+        if not channel_names:
+            first_channel = None
+        else:
+            first_channel = list(channel_names)[0]
         if self.workspace is None:
             self.workspace = Workspace2(self.src_directory, sample_id=self.prefix,
                                         default_channel=first_channel)
