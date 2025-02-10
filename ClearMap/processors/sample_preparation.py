@@ -1061,7 +1061,7 @@ class StitchingProcessor(TabProcessor):
         if self.stopped:
             return
 
-    def plot_stitching_results(self, channels=None, parent=None):
+    def plot_stitching_results(self, channels=None, mode='side-by-side', parent=None):
         if channels is None:
             channels = self.sample_manager.stitchable_channels
         paths = []
@@ -1077,6 +1077,14 @@ class StitchingProcessor(TabProcessor):
             raise MissingRequirementException('No stitched files found')
         if len(paths) == 1:
             paths = paths[0]
+        if mode == 'overlay':
+            titles = ' and '.join(titles)
+            paths = [paths]
+        elif mode == 'side-by-side':
+            pass
+        else:
+            raise ValueError(f'Unknown mode {mode}')
+
         dvs = plot_3d.plot(paths, title=titles, arrange=False, lut='white', parent=parent)
         return dvs
 
