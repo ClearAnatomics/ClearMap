@@ -68,7 +68,7 @@ tabs_alternatives = [
     ['alignment', 'processing'],
     ['stitching'],
     ['registration'],
-    ['cell_map', 'cell counter'],
+    ['cell_map', 'cell_counter'],
     ['vasculature', 'tube_map'],
     ['batch', 'batch_processing', 'batch processing'],
     ['group_analysis', 'group analysis']
