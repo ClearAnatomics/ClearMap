@@ -91,6 +91,31 @@ class EnvFileManager:
         self.cfg['dependencies'] = patched_dependencies
         self.write()
 
+    def add_pip_option(self, option):
+        if 'pip' in self.cfg['dependencies']:
+            try:
+                pip_section = [d for d in self.cfg['dependencies'] if isinstance(d, dict) and 'pip' in d.keys()][0]
+                pip_section['pip'].append(option)
+            except IndexError:
+                self.cfg['dependencies'].append({'pip': [option]})
+        else:
+            self.add_dependency('pip')
+            self.cfg['dependencies'].append({'pip': [option]})
+        self.write()
+
+    def add_pip_dependency(self, package_name):
+        if 'pip' in self.cfg['dependencies']:
+            try:
+                pip_section = [d for d in self.cfg['dependencies'] if isinstance(d, dict) and 'pip' in d.keys()][0]
+                pip_section['pip'].append(package_name)
+            except IndexError:
+                self.cfg['dependencies'].append({'pip': [package_name]})
+        else:
+            self.add_dependency('pip')
+            self.cfg['dependencies'].append({'pip': [package_name]})
+        self.write()
+
+
     def patch_env_var(self, var_name, var_val):
         if 'variables' in self.cfg.keys():
             self.cfg['variables'][var_name] = var_val
@@ -234,7 +259,27 @@ class PytorchVersionManager:  # TODO: inherit from condaparser ??
         return [e.replace('cuda', '') for e in build.split('_') if 'cuda' in e][0]
 
 
-def patch_env(cfg_path, dest_path, use_cuda_torch=True, use_spyder=False, tmp_dir=None):
+def patch_env(cfg_path, dest_path, use_cuda_torch=True, pip_version=False, use_spyder=False, tmp_dir=None):
+    """
+    Patch the environment file to match the desired configuration. This is mostly to
+    get a working pytorch installation with the correct cuda version.
+
+    Parameters
+    ----------
+    cfg_path
+    dest_path : str
+        If evaluates to False, the cfg_path is overwritten
+    use_cuda_torch : bool
+        If True, install pytorch with cuda support
+    pip_version : bool
+        If True, install pytorch with pip (since the nvidia channel is not available anymore in conda)
+    use_spyder
+    tmp_dir
+
+    Returns
+    -------
+
+    """
     env_mgr = EnvFileManager(cfg_path, dest_path)
 
     if platform.system().lower().startswith('darwin'):
@@ -245,18 +290,26 @@ def patch_env(cfg_path, dest_path, use_cuda_torch=True, use_spyder=False, tmp_di
 
     pytorch_v_mgr = PytorchVersionManager(cfg_path, env_mgr.python_version, env_mgr.get_package_version('pytorch'))
     if use_cuda_torch:
-        if Version(pytorch_v_mgr.pytorch_version) >= Version('2.0'):
-            pytorch_cuda_version = pytorch_v_mgr.match_pytorch_to_cuda()
-            env_mgr.add_dependency('pytorch-cuda', pkg_version=pytorch_cuda_version)
+        if pip_version:
+            env_mgr.remove_dependency('pytorch')
+            env_mgr.remove_dependency('pytorch-cuda')
+            env_mgr.remove_dependency('mkl')
             env_mgr.remove_dependency('cudatoolkit')
+            env_mgr.add_pip_option('--extra-index-url https://download.pytorch.org/whl/cu121')
+            env_mgr.add_pip_dependency('torch')
         else:
-            torch_pkg = pytorch_v_mgr.match_pytorch_to_toolkit()
-            torch_v_string = f"{torch_pkg['version']}={torch_pkg['build']}"
-            env_mgr.patch_environment_package_line('pytorch', torch_v_string)
+            if Version(pytorch_v_mgr.pytorch_version) >= Version('2.0'):
+                pytorch_cuda_version = pytorch_v_mgr.match_pytorch_to_cuda()
+                env_mgr.add_dependency('pytorch-cuda', pkg_version=pytorch_cuda_version)
+                env_mgr.remove_dependency('cudatoolkit')
+            else:
+                torch_pkg = pytorch_v_mgr.match_pytorch_to_toolkit()
+                torch_v_string = f"{torch_pkg['version']}={torch_pkg['build']}"
+                env_mgr.patch_environment_package_line('pytorch', torch_v_string)
 
-            toolkit_v_tuple = pytorch_v_mgr.toolkit_version_from_torch_pkg(torch_pkg)
-            toolkit_v_string = f"{toolkit_v_tuple[0]}.{toolkit_v_tuple[1]}"
-            env_mgr.patch_environment_package_line('cudatoolkit', toolkit_v_string)
+                toolkit_v_tuple = pytorch_v_mgr.toolkit_version_from_torch_pkg(torch_pkg)
+                toolkit_v_string = f"{toolkit_v_tuple[0]}.{toolkit_v_tuple[1]}"
+                env_mgr.patch_environment_package_line('cudatoolkit', toolkit_v_string)
     else:
         torch_pkg = pytorch_v_mgr.get_pytorch_cpu_info()[-1]
         torch_v_string = f"{torch_pkg['version']}={torch_pkg['build']}"
