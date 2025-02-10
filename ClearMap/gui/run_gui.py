@@ -36,8 +36,6 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget,
 import qdarkstyle
 from qdarkstyle import DarkPalette
 
-from ClearMap.Utils.tag_expression import Expression
-
 DEBUG = False
 
 
@@ -596,7 +594,7 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         Take a snapshot of all the configuration at that instant.
         The config files will be saved to a subfolder with the datetime in the name
         """
-        cfg_folder = os.path.join(self.src_folder, 'config_snapshots', datetime.now().strftime('%y%m%d_%H_%M_%S'))
+        cfg_folder = os.path.join(self.src_folder, 'config_snapshots', datetime.now().strftime('%y%m%d_%H_%M_%S'))  # REFACTOR: use pathlib
         os.makedirs(cfg_folder, exist_ok=True)
         for param in self.params:
             if isinstance(param, UiParameterCollection):
@@ -702,27 +700,13 @@ class ClearMapGui(ClearMapGuiBase):
 
         self.amend_ui()
 
-    def _init_sample_tab_mgr(self):
-        """Clears all existing tabs and creates a new SampleInfoTab and group tabs"""
-        print('Initialising sample tab manager')
+    def _reset_tab_manager(self):
         for tab in self.tab_managers.values():
             tab.params = None
         self.tab_managers.clear()
         for tab in self.tabWidget.findChildren(QWidget):
             if tab.objectName().endswith('_tab'):
                 delete_widget(tab, self.verticalLayout)
-        self.sample_manager = SampleManager()
-        self.add_tab(SampleInfoTab, sample_manager=self.sample_manager)
-        self.__add_group_tabs()
-        self.setup_tabs()
-
-    def __init_pipeline_tabs(self):
-        """ Initialises the pipeline tabs: Stitching, Registration, cell... based on sample"""
-        if self.sample_manager.stitchable_channels:
-            self.add_tab(StitchingTab, sample_manager=self.sample_manager)
-        self.add_tab(RegistrationTab, sample_manager=self.sample_manager)  # Always needed to allow setting None for atlas
-        self.__add_post_processing_tabs()
-        self.setup_tabs()
 
     def reset_pipeline_tabs(self):
         for name in ('stitching', 'registration'):  # FIXME: see why not postprocessing tabs too
@@ -730,7 +714,50 @@ class ClearMapGui(ClearMapGuiBase):
                 tab.sample_manager = self.sample_manager
                 tab.set_params(self.tab_managers['sample_info'].params, self.config_loader.get_cfg(name))
 
-    def add_tab(self, manager_class, tab_name='', **kwargs):
+    def finalise_tab_params(self):   # WARNING: run only after all tabs have been added
+        for tab in self.tab_managers.values():
+            if not tab.params_finalised:  # FIXME: check if we really want this when we update the workspace with different channel names
+                tab.finalise_set_params()
+
+    def _init_sample_tab_mgr(self):
+        """
+        Clears all existing tabs and creates a new SampleInfoTab and group tabs.
+        Typically called at the start of the program or when a new sample is loaded
+        """
+        print('Initialising sample tab manager')
+        self._reset_tab_manager()
+        self.sample_manager = SampleManager()
+        self.add_tab(SampleInfoTab, sample_manager=self.sample_manager)
+        for tab_class in (GroupAnalysisTab, BatchProcessingTab):
+            self.add_tab(tab_class)
+        self.finalise_tab_params()
+        self.tabWidget.tabBarClicked.connect(self.handle_tab_click)
+        self.tabWidget.setCurrentIndex(0)
+
+    def __init_pipeline_tabs(self):
+        """ Initialises the pipeline tabs: Stitching, Registration, cell... based on sample"""
+        stitching_cfg = None
+        if self.sample_manager.stitchable_channels:
+            self.add_tab(StitchingTab, sample_manager=self.sample_manager, set_params=True)
+            stitching_cfg = self.tab_managers['stitching'].params.config
+        self.add_tab(RegistrationTab, sample_manager=self.sample_manager, set_params=True)  # WARNING: Always needed to allow setting None for atlas
+        # FIXME: do we push to config to sample_manager here ?
+        self.__add_post_processing_tabs()
+        self.sample_manager.load_processors_config(stitching_cfg,
+                                                   self.tab_managers['registration'].params.config)
+        self.finalise_tab_params()
+
+    def __add_post_processing_tabs(self):
+        sample_params = getattr(self.tab_managers['sample_info'], 'params', {})
+        for channel_param in sample_params.values():
+            cls = DATA_TYPE_TO_TAB_CLASS.get(channel_param.data_type)
+            if not cls:
+                continue  # Skip if no tab for that data type
+            if not any([isinstance(tab, cls) for tab in self.tab_managers.values()]):
+                self.add_tab(cls, sample_manager=self.sample_manager, set_params=True)
+
+
+    def add_tab(self, manager_class, tab_name='', set_params=False, **kwargs):
         """
         Add a new tab to the GUI
 
@@ -747,41 +774,43 @@ class ClearMapGui(ClearMapGuiBase):
             tab_name = manager_class.get_tab_name()
         tab_manager_name = title_to_snake(tab_name)
 
-        tab_idx = self._get_tab_index(tab_name) # check if tab exists
-        if tab_idx is None:  # compute if not
-            tab_idx = self.tabWidget.count()
-            if not issubclass(manager_class, BatchTab):  # Insert before batch tabs
-                tab_idx -= len([t for t in self.tab_managers.values() if isinstance(t, BatchTab)])
+        tab_idx = self._get_tab_index(tab_name, tab_class=manager_class, increment=True)
         tab = manager_class(self, tab_idx=tab_idx, **kwargs)
         self.tab_managers[tab_manager_name] = tab
-        tab.init_ui()
+        tab.setup()
+        self.tabWidget.setTabText(tab.tab_idx, tab.name)
+        if set_params:
+            cfg_name = title_to_snake(manager_class.get_tab_name())
+            loaded_from_defaults, cfg_path = self.__get_cfg_path(cfg_name)
+            if cfg_path is not None:
+                tab.set_params(self.tab_managers['sample_info'].params, cfg_path, loaded_from_defaults)
+        return tab
 
-    def update_pipelines(self):  # REFACTOR: better name
-        for tab_mgr in self.tab_managers:
-            if tab_mgr.processing_type in ('pre', 'post'):  # skip batch and sample_info
-                tab_mgr.setup_workers()  # FIXME: check if risks overwrite if still same sample
+    def _get_tab_index(self, tab_name, tab_class=None, increment=False):
+        """
+        Get the index of a tab in the tabWidget.
+        If the tab does not exist and increment is True, get the index that it should have when added.
 
-    def _get_tab_index(self, tab_name):
-        return next((i for i in range(self.tabWidget.count()) if self.tabWidget.tabText(i) == tab_name), None)
+        Parameters
+        ----------
+        tab_name: str
+            The name of the tab
+        tab_class: GenericTab
+            Optional, provide if increment is True. The class of the tab
+        increment: bool
+            Whether to increment the index if the tab does not exist
 
-    def setup_tabs(self):   # WARNING: run only after all tabs have been added
-        for tab in self.tab_managers.values():
-            tab.setup()
-            self.tabWidget.setTabText(tab.tab_idx, tab.name)
-        self.tabWidget.tabBarClicked.connect(self.handle_tab_click)
-        self.tabWidget.setCurrentIndex(0)
-
-    def __add_post_processing_tabs(self):
-        for channel_param in getattr(self.tab_managers['sample_info'], 'params', {}).values():
-            cls = DATA_TYPE_TO_TAB_CLASS.get(channel_param.data_type)
-            if not cls:
-                continue  # Skip if no tab for that data type
-            if not any([isinstance(tab, cls) for tab in self.tab_managers.values()]):
-                self.add_tab(cls, sample_manager=self.sample_manager)
-
-    def __add_group_tabs(self):
-        for tab_class in (GroupAnalysisTab, BatchProcessingTab):
-            self.add_tab(tab_class)
+        Returns
+        -------
+        int
+            The index of the tab in the tabWidget
+        """
+        tab_index = next((i for i in range(self.tabWidget.count()) if self.tabWidget.tabText(i) == tab_name), None)
+        if tab_index is None and increment:
+            tab_index = self.tabWidget.count()
+            if not issubclass(tab_class, BatchTab):  # Insert before batch tabs
+                tab_index -= len([t for t in self.tab_managers.values() if isinstance(t, BatchTab)])
+        return tab_index
 
     @property
     def params(self):
@@ -992,8 +1021,14 @@ class ClearMapGui(ClearMapGuiBase):
         cfg_path = config_loader.get_cfg_path(cfg_name, must_exist=False)
         was_copied = False
         # TODO: do as function of PostProcessingTab
+        relevant_pipelines = [title_to_snake(p) for p in self.sample_manager.relevant_pipelines]
+        # REFACTORING: extract synonyms
+        if 'tube_map' in relevant_pipelines:
+            relevant_pipelines += ['vasculature']
+        if 'cell_map' in relevant_pipelines:
+            relevant_pipelines += ['cell_counter']
         if (cfg_name in ('cell_map', 'cell_counter', 'vasculature', 'tube_map') and
-                cfg_name not in [title_to_snake(p) for p in self.sample_manager.relevant_pipelines]):
+                cfg_name not in relevant_pipelines):
             return False, None
         if not self.file_exists(cfg_path):
             try:
@@ -1114,8 +1149,8 @@ class ClearMapGui(ClearMapGuiBase):
     def _set_src_folder(self, src_folder):
         self.src_folder = src_folder
         self.config_loader.src_dir = src_folder
-        self._load_sample_id()
-        self.tab_managers['sample_info'].set_params(None,  self.config_loader.get_cfg_path('sample', must_exist=False), False)
+        sample_cfg_path = self._load_sample_id()
+        self.tab_managers['sample_info'].set_params(None, sample_cfg_path, False)
 
         self.__init_pipeline_tabs()  # TODO: check if init or this
 
@@ -1150,6 +1185,7 @@ class ClearMapGui(ClearMapGuiBase):
         cfg = self.config_loader.get_cfg_from_path(sample_cfg_path)
         cfg['sample_id'] = cfg['sample_id'] if cfg['sample_id'] != 'undefined' else ''
         cfg.write()
+        return cfg.filename
 
 
 def create_main_window(app, centered=True):
