@@ -1073,7 +1073,7 @@ class ClearMapGui(ClearMapGuiBase):
                     sample_params = self.tab_managers['sample_info'].params
 
                 tab.set_params(sample_params, cfg_path, loaded_from_defaults)
-                if cfg_name == 'sample_info' and not tab.params.sample_id:
+                if cfg_name == 'sample_info' and not tab.params.shared_sample_params.sample_id:
                     self.prompt_sample_id()
 
             except ConfigNotFoundError as err:
@@ -1125,7 +1125,7 @@ class ClearMapGui(ClearMapGuiBase):
                                                         'A sample ID is required to load the config'
                                                         'Please enter the sample ID before proceeding')
         if sample_id:
-            self.tab_managers['sample_info'].params.sample_id = sample_id
+            self.tab_managers['sample_info'].params.shared_sample_params.sample_id = sample_id
             self.tab_managers['sample_info'].params.write()
 
     def _load_sample_id(self):
