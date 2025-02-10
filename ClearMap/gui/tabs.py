@@ -356,7 +356,7 @@ class StitchingTab(PreProcessingTab):
 
     def _set_channel_config(self, channel):
         # Force same instance  # TODO: inherited from parent
-        self.params[channel].read_configs(self.stitcher.config.filename)
+        self.params[channel].read_configs(cfg=self.stitcher.config)  # WARNING: should this be self.sample_manager.stitching_config ?
 
     def _setup_channel(self, page_widget, channel):
         if stitchable_channels := self.sample_manager.get_stitchable_channels():
@@ -593,7 +593,7 @@ class RegistrationTab(PreProcessingTab):
     def _setup_workers(self):
         self.sample_params.ui_to_cfg()
         self.aligner.setup()
-        self.params.read_configs(self.aligner.config.filename)
+        self.params.read_configs(cfg=self.aligner.config)
         if self.sample_manager.setup_complete:
             self.wrap_step('Setting up atlas', self.setup_atlas, n_steps=1, save_cfg=False, nested=False)  # TODO: abort_func=self.aligner.stop_process
 
