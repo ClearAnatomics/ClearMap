@@ -456,6 +456,17 @@ class RegistrationProcessor(TabProcessor):
                     parametrized_asset = asset.specify({'moving_channel': moving_channel, 'fixed_channel': fixed_channel})
                     self.workspace.asset_collections[channel][asset_type] = parametrized_asset
 
+    def add_pipeline(self):  # WARNING: hacky
+        for channel in self.config['channels']:
+            try:
+                self.get('aligned', channel=channel)
+            except KeyError:
+                if self.sample_manager.setup_complete:
+                    self.sample_manager.workspace.add_pipeline('registration', channel_id=channel)
+                    self.parametrize_assets()
+                else:
+                    warnings.warn('Workspace not setup, cannot add registration pipeline')
+
     def channels_to_resample(self):
         return [c for c, v in self.config['channels'].items() if v['resample']]
 
@@ -651,7 +662,7 @@ class RegistrationProcessor(TabProcessor):
         channel_spec = ChannelSpec(channel_name='atlas', content_type='atlas')
         self.create_atlas_asset(default_annotator, channel_spec)
 
-    def create_atlas_asset(self, annotator, channel_spec):
+    def create_atlas_asset(self, annotator, channel_spec):  # FIXME: ensure that uses atlas subfolder from asset_constants
         try:
             atlas_asset = self.get('atlas', channel=channel_spec.name)
             return atlas_asset
