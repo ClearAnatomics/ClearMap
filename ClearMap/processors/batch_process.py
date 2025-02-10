@@ -143,7 +143,7 @@ def rescale_img(f_path, scaling_factor):
     clearmap_io.write(f_path, rescaled_img)
 
 
-def rescale_channel(folder, atlas_base_name=None, dest_resolution=(3, 3, 6), n_cpus=None, channel='raw', ext='.tif',
+def rescale_channel(folder, atlas_base_name=None, dest_resolution=(3, 3, 6), n_cpus=None, channel='cfos', ext='.tif',
                     chunk_size=1):
     """
     Used to rescale to create e.g. test samples that can be ran quickly
@@ -187,8 +187,8 @@ def batch_crop(folder, crop_x=0, crop_y=0, suffix='_cropped'):
     from ClearMap.processors.sample_preparation import init_preprocessor
     preproc = init_preprocessor(folder)
 
-    shape = clearmap_io.shape(preproc.workspace.file_list('raw')[-1])
-    for f_path in preproc.workspace.file_list('raw'):
+    shape = clearmap_io.shape(preproc.workspace.file_list('cfos')[-1])
+    for f_path in preproc.workspace.file_list('cfos'):
         img = clearmap_io.read(f_path)
         cropped_img = img[crop_x:shape[0] - crop_x, crop_y:shape[1] - crop_y, :]
         cropped_path = f_path.replace('.ome.tif', f'{suffix}.ome.tif')
