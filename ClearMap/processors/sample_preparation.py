@@ -1039,11 +1039,16 @@ class StitchingProcessor(TabProcessor):
             layout_channel_asset = self.get('raw', channel=layout_channel)
             channel_asset = self.get('raw', channel=channel)
             if layout_channel != channel:
-                if self.sample_manager.use_npy(channel):  # FIXME: check if we need to copy layout first
-                    layout.replace_source_location(str(layout_channel_asset.with_extension('.npy')),
-                                                   str(channel_asset.with_extension('.npy')))
+                layout_extension = Path(layout.sources[0].location).suffix  # Use the actual extension that was used
+                if layout_extension == '.npy':
+                    layout_pattern = layout_channel_asset.with_extension(extension='.npy')
                 else:
-                    layout.replace_source_location(str(layout_channel_asset.path), str(channel_asset.path))
+                    layout_pattern = layout_channel_asset.path
+                if self.sample_manager.use_npy(channel):  # FIXME: check if we need to copy layout first
+                    channel_pattern = channel_asset.with_extension(extension='.npy')
+                else:
+                    channel_pattern = channel_asset.path
+                layout.replace_source_location(str(layout_pattern), str(channel_pattern))
             stitching_wobbly.stitch_layout(layout,
                                            sink=str(self.get_path('stitched', channel=channel)),
                                            method='interpolation',
