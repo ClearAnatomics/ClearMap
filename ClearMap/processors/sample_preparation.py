@@ -677,7 +677,7 @@ class RegistrationProcessor(TabProcessor):
             for sub_type_name, file_path in annotator.get_atlas_paths().items():
                 atlas_asset.type_spec.add_sub_type(sub_type_name, expression=os.path.abspath(file_path))
             atlas_asset.type_spec.add_sub_type('label', expression=annotator.label_file,
-                                               extensions=['json'])
+                                               extensions=['.json'])
             return atlas_asset
 
     def project_mini_brain(self, channel):  # FIXME: idealy part of sample_manager
