@@ -108,6 +108,8 @@ class GenericTab(GenericUi):
 
         self.inited = False
         self.setup_complete = False
+        self.params_set = False
+        self.params_finalised = False
 
         self.sample_manager = None
         self.sample_params = None
@@ -172,7 +174,7 @@ class GenericTab(GenericUi):
         raise NotImplementedError(f"Method _bind not implemented in {self.__class__.__name__}")
 
     # @final
-    def set_params(self, sample_params=None, cfg_path='', loaded_from_defaults=False):  # FIXME: rename to initialise or similar
+    def set_params(self, sample_params=None, cfg_path='', loaded_from_defaults=False):  # REFACTOR: rename to initialise or similar
         """Set the params object which links the UI and the configuration file"""
         if sample_params:
             self.sample_params = sample_params  # REFACTORING: consider using sample_manager
