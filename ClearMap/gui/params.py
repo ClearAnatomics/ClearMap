@@ -420,7 +420,7 @@ class RigidChannelStitchingParams(ChannelUiParameter):
             'background_level': ParamLink(['background_level'], self.tab.rigidBackgroundLevel),
             'background_pixels': ParamLink(['background_pixels'], self.tab.rigidBackgroundPixels)
         }
-        self.attrs_to_invert=['skip']
+        self.attrs_to_invert = ['skip']
         self.connect()
 
     def connect(self):
@@ -473,7 +473,7 @@ class WobblyChannelStitchingParams(ChannelUiParameter):
             'slice_valid_range': ParamLink(['slice_valid_range'], self.tab.wobblySliceRangeDoublet),
             'slice_pixel_size': ParamLink(['slice_pixel_size'], self.tab.wobblySlicePixelSizeSinglet)
         }
-        self.params_to_invert = ['skip']
+        self.attrs_to_invert = ['skip']
         self.connect()
 
     def connect(self):
