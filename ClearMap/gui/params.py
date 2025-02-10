@@ -643,7 +643,8 @@ class RegistrationParams(ChannelsUiParameterCollection):  # FIXME: does not seem
         else:
             if channel_name not in self.config['channels']:
                 warnings.warn(f'Channel {channel_name} not in config, adding default')
-                default_cfg = self._default_config['channels'].get(channel_name, self._default_config['channel_x'])
+                absolute_default = self._default_config['channels']['channel_x']
+                default_cfg = self._default_config['channels'].get(channel_name, absolute_default)
                 self.config['channels'][channel_name] = deepcopy(default_cfg)
             channel_params = ChannelRegistrationParams(self.tab, channel_name)
             self[channel_name] = channel_params
