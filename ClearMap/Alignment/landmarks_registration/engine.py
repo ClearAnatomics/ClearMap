@@ -8,7 +8,6 @@ import numpy as np
 import itk
 
 from ClearMap.Alignment.landmarks_registration.registration_data import ITKImage
-from ClearMap.IO import IO as clmio
 
 
 class ElastixPointFileManager:
@@ -240,6 +239,11 @@ class AlignmentTool:
             self.moving_image.image,
             **reg_args
         )
+        num_maps = self.transform_params.GetNumberOfParameterMaps()
+        for map_idx in range(num_maps):
+            out_file = self.data_dir / f"TransformParameters.{self.step}.{map_idx}.txt"
+            itk.ParameterObject.WriteParameterFile(self.transform_params, map_idx, str(out_file))
+            # itk.elxParameterObjectPython.elastixParameterObject(self.transform_params, map_idx).PrintParameterMap()
         self.pullback_image = pullback_image
         itk.imwrite(pullback_image, self.data_dir / f"result.{self.step}.mhd")  # REFACTOR: use self.result_template
         if not isinstance(self.pullback_image, ITKImage):
