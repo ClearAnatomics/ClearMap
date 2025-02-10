@@ -822,6 +822,8 @@ def convert_files(filenames, extension=None, path=None, processes=None, verbose=
     filenames : list of str
         The new file names.
     """
+    if extension.startswith('.'):  # FIXME: downstream code should handle extension with or without dot
+        extension = extension[1:]
     if not isinstance(filenames, (tuple, list)):
         filenames = [filenames]
     if len(filenames) == 0:
@@ -829,8 +831,8 @@ def convert_files(filenames, extension=None, path=None, processes=None, verbose=
     n_files = len(filenames)
 
     if path is not None:
-        filenames = [fu.join(path, fu.split(f)[1]) for f in filenames]
-    sinks = ['.'.join(f.split('.')[:-1] + [extension]) for f in filenames]
+        filenames = [fu.join(path, fu.split(f)[1]) for f in filenames]  # TODO: replace with pathlib
+    sinks = [str(pathlib.Path(f).with_suffix('.'+extension)) for f in filenames]
 
     if verbose:
         timer = tmr.Timer()
