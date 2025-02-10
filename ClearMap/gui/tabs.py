@@ -174,6 +174,7 @@ class SampleInfoTab(GenericTab):
 
     def _setup_workers(self):  # WARNING: a bit far fetched but necessary to have a consistent setup
         self.sample_manager.setup(src_dir=self.main_window.src_folder, watcher=self.main_window.progress_watcher)
+        self.sample_manager.config = self.params.config  # WARNING: hacky way to force shared reference
 
     def _bind_params_signals(self):
         self.params.plotMiniBrain.connect(self.plot_mini_brain)
