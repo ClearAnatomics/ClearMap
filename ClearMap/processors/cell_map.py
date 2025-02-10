@@ -241,6 +241,8 @@ class CellDetector(TabProcessor):
 
         if self.registration_processor.was_registered:
             for i, channel in enumerate(self.get_registration_sequence_channels(stop_channel=target_channel)):
+                if self.registration_processor.config['channels'][channel]['moving_channel'] in (None, 'intrinsically aligned'):
+                    continue
                 results_dir = self.get_path('aligned', channel=channel).parent
                 coords = elastix.transform_points(coords, transform_directory=results_dir, binary=USE_BINARY_POINTS_FILE)
 
