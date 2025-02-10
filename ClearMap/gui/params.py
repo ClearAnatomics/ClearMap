@@ -261,7 +261,7 @@ class StitchingParams(ChannelsUiParameterCollection):
             self[channel_name] = ChannelStitchingParams(self.tab, channel_name, config=self.config)
 
     def compute_layout(self, channel):
-        return self[channel].compute_layout
+        return self[channel].compute_layout()
 
     def fix_cfg_file(self, f_path):
         pass
