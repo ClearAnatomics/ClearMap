@@ -13,6 +13,7 @@ import os
 import copy
 import re
 import platform
+import warnings
 
 import numpy as np
 import pandas as pd
@@ -107,6 +108,7 @@ class BinaryVesselProcessorSteps(ProcessorSteps):
 class BinaryVesselProcessor(TabProcessor):
     def __init__(self, sample_manager=None):
         super().__init__()
+        self.inputs_match = False
         self.postprocessing_tmp_params = None
         self.sample_config = None
         self.processing_config = None
@@ -136,30 +138,51 @@ class BinaryVesselProcessor(TabProcessor):
 
             self.set_progress_watcher(self.sample_manager.progress_watcher)
 
-            self.all_vessels_channel = [c for c, v in self.sample_config['channels'].items() if v['data_type'] == 'vessels'][0]
+            self.all_vessels_channel = [c for c, v in self.sample_config['channels'].items() if v['data_type'] == 'vessels'][0]  # FIXME: extract ??
             if not self.all_vessels_channel:
                 raise ValueError('Vessels channel not set')
-            art_chanels = [c for c, v in self.sample_config['channels'].items() if v['data_type'] == 'arteries']
+            art_chanels = [c for c, v in self.sample_config['channels'].items() if v['data_type'] == 'arteries']  # FIXME: extract ??
             if len(art_chanels) > 1:
                 raise ValueError('Multiple arteries channels found')
             self.arteries_channel = art_chanels[0] if art_chanels else ''
 
-            shapes = [self.workspace.source('stitched', channel=c).shape() for c in self.channels_to_binarize()]
-            if not all([s == shapes[0] for s in shapes]):
-                raise ValueError('Channels to binarize have different shapes. This is not supported yet.')
+            self.assert_input_shapes_match()
 
             self.steps = {
                 'all_vessels': BinaryVesselProcessorSteps(self.workspace, channel=self.all_vessels_channel),
                 'arteries': BinaryVesselProcessorSteps(self.workspace, channel=self.arteries_channel),
             }
 
+    def assert_input_shapes_match(self):
+        """
+        Ensure that the input shapes (stitched images of the different color channels) match
+        before starting the binarization process since they must overlap.
+
+        .. warning::
+            stitched may not exist when processor is created.
+            if not, check again in the run/binarize method
+        """
+        try:
+            shapes = [self.workspace.get('stitched', channel=c).shape() for c in self.channels_to_binarize()]
+        except FileNotFoundError:
+            warnings.warn('Stitched images not found. Cannot check shapes.')
+            return
+        if not all([s == shapes[0] for s in shapes]):
+            raise ValueError('Channels to binarize have different shapes. This is not supported yet.')
+        self.inputs_match = True  # WARNING: may need to be reset when changing channels to binarize
+
     def run(self):
         self.binarize()
         self.combine_binary()
 
     def binarize(self):
-        for channel in self.channels_to_binarize():
-            self.binarize_channel(channel)
+        if not self.inputs_match:
+            self.assert_input_shapes_match()
+        if self.inputs_match:
+            for channel in self.channels_to_binarize():
+                self.binarize_channel(channel)
+        else:
+            raise ValueError('Channels to binarize have different shapes. This is not supported yet.')
 
     def channels_to_binarize(self):
         return [c for c in self.processing_config['binarization'].keys() if c != 'combined']
@@ -329,13 +352,7 @@ class BinaryVesselProcessor(TabProcessor):
         clear_cuda_cache()
 
     def combine_binary(self):
-        """
-        Merge the binary images of the different vascular network components into a single mask
-
-        Returns
-        -------
-
-        """
+        """Merge the binary images of the different vascular network components into a single mask"""
         sink_asset = self.get('binary', channel=self.channels_to_binarize(), asset_sub_type='combined')  # Temporary
         if len(self.channels_to_binarize()) > 1:
             sources = [self.get_path('binary', channel=channel, asset_sub_type='filled') for channel in self.channels_to_binarize()]
@@ -354,9 +371,7 @@ class BinaryVesselProcessor(TabProcessor):
 
 
     def post_process_binary_combined(self):
-        """
-        Postprocess the combined binary image (typically smooth and fill)
-        """
+        """Postprocess the combined binary image (typically smooth and fill)"""
         postprocessing_parameter = copy.deepcopy(vasculature.default_postprocessing_parameter)
         postprocessing_processing_parameter = copy.deepcopy(vasculature.default_postprocessing_processing_parameter)
         postprocessing_processing_parameter['size_max'] = 50
