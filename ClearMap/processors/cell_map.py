@@ -228,10 +228,16 @@ class CellDetector(TabProcessor):
 
     def transform_coordinates(self, coords):
         target_channel = 'atlas'  # FIXME: add control for target channel
+        resampled_shape = self.sample_manager.resampled_shape(channel=self.channel)
+        if resampled_shape is None:
+            if target_channel == 'atlas':
+                resampled_shape = self.get('atlas', channel=self.channel, asset_sub_type='reference').shape()
+            else:
+                raise ValueError(f'Resampled shape not found for channel {self.channel}')
         coords = resampling.resample_points(
             coords,
             original_shape=self.sample_manager.stitched_shape(channel=self.channel),
-            resampled_shape=self.sample_manager.resampled_shape(channel=self.channel))
+            resampled_shape=resampled_shape)
 
         if self.registration_processor.was_registered:
             for i, channel in enumerate(self.get_registration_sequence_channels(stop_channel=target_channel)):
