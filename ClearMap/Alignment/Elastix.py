@@ -336,7 +336,7 @@ def transform_file(result_directory):
     files = sorted(Path(result_directory).glob('TransformParameters.*.txt'))
 
     if not files:
-        raise RuntimeError(f'Cannot find a valid transformation file in {result_directory}!')
+        raise RuntimeError(f'Cannot find a valid transformation file in "{result_directory}" !')
 
     return str(files[-1])
 
