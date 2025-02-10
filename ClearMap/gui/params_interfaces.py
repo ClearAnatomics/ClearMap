@@ -125,8 +125,12 @@ def list_widget_getter(widget):
 
 
 def list_widget_setter(widget, itm_list):
-    widget.clear()
-    widget.addItems(itm_list)
+    try:
+        widget.clear()
+        widget.addItems(itm_list)
+    except RuntimeError:  # Widget has been deleted
+        print(f'Widget {widget} has been deleted')
+        pass
 
 
 widget_getters = {
