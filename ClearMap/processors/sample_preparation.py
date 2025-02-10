@@ -918,7 +918,7 @@ class StitchingProcessor(TabProcessor):
     @property
     def n_rigid_steps_to_run(self):
         cfg = self.config['channels']
-        return [not cfg[channel]['rigid']['skip'] for channel in cfg.keys()].count(True)
+        return [not cfg[channel]['rigid']['skip'] for channel in cfg.keys() if 'rigid' in cfg[channel]].count(True)
 
     # @check_stopped
     # @requires_assets([FilePath('raw')])
