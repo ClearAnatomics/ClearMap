@@ -42,6 +42,7 @@ Mapping of content types (i.e. intrinsic labels)
 to the pipeline(s) that are relevant for that content type.
 """
 CONTENT_TYPE_TO_PIPELINE = {
+    None: None,
     'autofluorescence': 'registration',
     'nuclei': 'CellMap',  # TODO: list ?
     'cells': 'CellMap',
