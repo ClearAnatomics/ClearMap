@@ -209,6 +209,8 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         msg : str
             The message to be printed
         """
+        if isinstance(msg, Exception):
+            msg = str(msg)
         self.__print_status_msg(msg, 'red')
 
     def print_warning_msg(self, msg):
