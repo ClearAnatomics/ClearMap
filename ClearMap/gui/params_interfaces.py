@@ -10,7 +10,7 @@ from packaging.version import Version
 
 from PyQt5.QtCore import QObject, Qt
 from PyQt5.QtWidgets import QCheckBox, QLabel, QLineEdit, QSpinBox, QFrame, QComboBox, QPlainTextEdit, QTextEdit, \
-    QGroupBox, QWidget, QListWidget
+    QGroupBox, QWidget, QListWidget, QDoubleSpinBox
 
 from ClearMap.config import convert_config_versions
 from ClearMap.config.config_loader import ConfigLoader
@@ -131,6 +131,7 @@ widget_getters = {
     QLabel: lambda w: w.text(),
     QLineEdit: line_edit_getter,
     QSpinBox: lambda w: w.value(),
+    QDoubleSpinBox: lambda w: w.value(),
     QPlainTextEdit: lambda w: w.toPlainText(),
     QTextEdit: lambda w: w.toHtml(),  # TODO: check if this always what we want
     QComboBox: combobox_getter,
@@ -145,6 +146,7 @@ widget_setters = {
     QLabel: lambda w, v: w.setText(v),
     QLineEdit: lambda w, v: w.setText(str(v)),
     QSpinBox: lambda w, v: w.setValue(v),
+    QDoubleSpinBox: lambda w, v: w.setValue(v),
     QPlainTextEdit: lambda w, v: w.setPlainText(v),
     QTextEdit: lambda w, v: w.setText(v),
     QComboBox: combobox_setter,
@@ -159,6 +161,7 @@ widget_connectors = {
     QLabel: lambda w, cb: w.textChanged.connect(cb),
     QLineEdit: lambda w, cb: w.textChanged.connect(cb),
     QSpinBox: lambda w, cb: w.valueChanged.connect(cb),
+    QDoubleSpinBox: lambda w, cb: w.valueChanged.connect(cb),
     QPlainTextEdit: lambda w, cb: w.textChanged.connect(cb),
     QComboBox: lambda w, cb: w.currentTextChanged.connect(cb),
     QGroupBox: lambda w, cb: w.toggled.connect(cb),
