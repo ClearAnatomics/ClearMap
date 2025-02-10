@@ -18,7 +18,7 @@ class PreferenceUi(GenericDialog):
         super().__init__(main_window, 'Preferences', 'preferences_editor')
 
     def setup(self, font_size):
-        self.init_ui()
+        self._init_ui()
         self.ui.setMinimumHeight(700)  # FIXME: adapt to screen resolution
 
         self.setup_preferences()
