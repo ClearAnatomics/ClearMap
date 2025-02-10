@@ -43,7 +43,7 @@
             </font>
            </property>
            <property name="currentIndex">
-            <number>1</number>
+            <number>2</number>
            </property>
            <widget class="QWidget" name="binarization">
             <property name="geometry">
@@ -95,7 +95,7 @@
                       </property>
                       <layout class="QGridLayout" name="gridLayout_3">
                        <item row="0" column="0">
-                        <widget class="QLabel" name="binarizationRawClippingRangeLbl">
+                        <widget class="QLabel" name="binarizationVesselsClippingRangeLbl">
                          <property name="toolTip">
                           <string>The range for the vessel detection</string>
                          </property>
@@ -108,7 +108,7 @@
                         </widget>
                        </item>
                        <item row="0" column="1" colspan="2">
-                        <widget class="QFrame" name="rawBinarizationClipRangeDoublet">
+                        <widget class="QFrame" name="vesselsBinarizationClipRangeDoublet">
                          <property name="frameShape">
                           <enum>QFrame::StyledPanel</enum>
                          </property>
@@ -146,7 +146,7 @@
                         </widget>
                        </item>
                        <item row="0" column="3">
-                        <widget class="QToolButton" name="binarizationRawClippingRangeInfoToolButton">
+                        <widget class="QToolButton" name="binarizationVesselsClippingRangeInfoToolButton">
                          <property name="icon">
                           <iconset resource="icons.qrc">
                            <normaloff>:/icons/icons/info.svg</normaloff>:/icons/icons/info.svg</iconset>
@@ -154,7 +154,7 @@
                         </widget>
                        </item>
                        <item row="1" column="0">
-                        <widget class="QLabel" name="binarizationRawThresholdLbl">
+                        <widget class="QLabel" name="binarizationVesselsThresholdLbl">
                          <property name="toolTip">
                           <string>Pseudo deconvolution threshold.</string>
                          </property>
@@ -167,7 +167,7 @@
                         </widget>
                        </item>
                        <item row="1" column="1">
-                        <widget class="QSpinBox" name="rawBinarizationThresholdSpinBox">
+                        <widget class="QSpinBox" name="vesselsBinarizationThresholdSpinBox">
                          <property name="minimum">
                           <number>0</number>
                          </property>
@@ -177,7 +177,7 @@
                         </widget>
                        </item>
                        <item row="1" column="2">
-                        <widget class="QToolButton" name="binarizationRawThresholdInfoToolButton">
+                        <widget class="QToolButton" name="binarizationVesselsThresholdInfoToolButton">
                          <property name="icon">
                           <iconset resource="icons.qrc">
                            <normaloff>:/icons/icons/info.svg</normaloff>:/icons/icons/info.svg</iconset>
@@ -195,7 +195,7 @@
                      </widget>
                     </item>
                     <item row="0" column="0">
-                     <widget class="QCheckBox" name="runRawBinarizationCheckBox">
+                     <widget class="QCheckBox" name="runVesselsBinarizationCheckBox">
                       <property name="text">
                        <string>Binarize</string>
                       </property>
@@ -204,14 +204,14 @@
                     <item row="5" column="0">
                      <layout class="QGridLayout" name="gridLayout_9">
                       <item row="1" column="0">
-                       <widget class="QCheckBox" name="rawBinarizationBinaryFillingCheckBox">
+                       <widget class="QCheckBox" name="vesselsBinarizationBinaryFillingCheckBox">
                         <property name="text">
                          <string>Binary filling</string>
                         </property>
                        </widget>
                       </item>
                       <item row="2" column="0">
-                       <widget class="QCheckBox" name="binarizationRawDeepFillingCheckBox">
+                       <widget class="QCheckBox" name="binarizationVesselsDeepFillingCheckBox">
                         <property name="whatsThis">
                          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;In this step a trained convolutional deep network &lt;/p&gt;&lt;p&gt;is applied to fill the holes of hollow vessels in the &lt;/p&gt;&lt;p&gt;vasculature and arteries data.&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                         </property>
@@ -221,14 +221,14 @@
                        </widget>
                       </item>
                       <item row="0" column="0">
-                       <widget class="QCheckBox" name="rawBinarizationSmoothingCheckBox">
+                       <widget class="QCheckBox" name="vesselsBinarizationSmoothingCheckBox">
                         <property name="text">
                          <string>Smooth</string>
                         </property>
                        </widget>
                       </item>
                       <item row="2" column="1">
-                       <widget class="QToolButton" name="binarizationRawDeepFillingInfoToolButton">
+                       <widget class="QToolButton" name="binarizationVesselsDeepFillingInfoToolButton">
                         <property name="icon">
                          <iconset resource="icons.qrc">
                           <normaloff>:/icons/icons/info.svg</normaloff>:/icons/icons/info.svg</iconset>
@@ -428,8 +428,8 @@
                  <rect>
                   <x>0</x>
                   <y>0</y>
-                  <width>390</width>
-                  <height>108</height>
+                  <width>550</width>
+                  <height>732</height>
                  </rect>
                 </property>
                 <attribute name="label">
@@ -736,7 +736,7 @@
              <item>
               <widget class="QToolBox" name="toolBox">
                <property name="currentIndex">
-                <number>0</number>
+                <number>1</number>
                </property>
                <widget class="QWidget" name="arteries">
                 <property name="geometry">
@@ -753,13 +753,6 @@
                 <layout class="QGridLayout" name="gridLayout_5">
                  <item row="2" column="1">
                   <widget class="QSpinBox" name="minArterySizeSpinBox">
-                   <property name="maximum">
-                    <number>65535</number>
-                   </property>
-                  </widget>
-                 </item>
-                 <item row="1" column="1">
-                  <widget class="QSpinBox" name="maxArteriesTracingIterationsSpinBox">
                    <property name="maximum">
                     <number>65535</number>
                    </property>
@@ -817,13 +810,6 @@
                    </property>
                   </widget>
                  </item>
-                 <item row="0" column="1">
-                  <widget class="QSpinBox" name="arteriesMinRadiusSpinBox">
-                   <property name="maximum">
-                    <number>65535</number>
-                   </property>
-                  </widget>
-                 </item>
                  <item row="3" column="0">
                   <spacer name="verticalSpacer_5">
                    <property name="orientation">
@@ -837,6 +823,26 @@
                    </property>
                   </spacer>
                  </item>
+                 <item row="0" column="1">
+                  <widget class="QDoubleSpinBox" name="arteriesMinRadiusDoubleSpinBox">
+                   <property name="decimals">
+                    <number>1</number>
+                   </property>
+                   <property name="maximum">
+                    <double>1000.000000000000000</double>
+                   </property>
+                   <property name="singleStep">
+                    <double>0.100000000000000</double>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="1" column="1">
+                  <widget class="QSpinBox" name="maxArteriesTracingIterationsSpinBox">
+                   <property name="maximum">
+                    <number>65535</number>
+                   </property>
+                  </widget>
+                 </item>
                 </layout>
                </widget>
                <widget class="QWidget" name="veins">
@@ -844,8 +850,8 @@
                  <rect>
                   <x>0</x>
                   <y>0</y>
-                  <width>367</width>
-                  <height>212</height>
+                  <width>550</width>
+                  <height>702</height>
                  </rect>
                 </property>
                 <attribute name="label">
@@ -899,19 +905,6 @@
                    </property>
                   </widget>
                  </item>
-                 <item row="1" column="1">
-                  <widget class="QSpinBox" name="restrictiveMinVeinRadiusSpinBox">
-                   <property name="mouseTracking">
-                    <bool>false</bool>
-                   </property>
-                   <property name="suffix">
-                    <string/>
-                   </property>
-                   <property name="maximum">
-                    <number>65535</number>
-                   </property>
-                  </widget>
-                 </item>
                  <item row="3" column="2">
                   <widget class="QToolButton" name="finalMinVeinRadiusInfoToolButton">
                    <property name="icon">
@@ -920,25 +913,11 @@
                    </property>
                   </widget>
                  </item>
-                 <item row="5" column="1">
-                  <widget class="QSpinBox" name="minVeinSizeSpinBox">
-                   <property name="maximum">
-                    <number>65535</number>
-                   </property>
-                  </widget>
-                 </item>
                  <item row="4" column="2">
                   <widget class="QToolButton" name="maxVeinsTracingIterationsInfoToolButton">
                    <property name="icon">
                     <iconset resource="icons.qrc">
                      <normaloff>:/icons/icons/info.svg</normaloff>:/icons/icons/info.svg</iconset>
-                   </property>
-                  </widget>
-                 </item>
-                 <item row="3" column="1">
-                  <widget class="QSpinBox" name="finalMinVeinRadiusSpinBox">
-                   <property name="maximum">
-                    <number>65535</number>
                    </property>
                   </widget>
                  </item>
@@ -975,13 +954,6 @@
                    <property name="icon">
                     <iconset resource="icons.qrc">
                      <normaloff>:/icons/icons/info.svg</normaloff>:/icons/icons/info.svg</iconset>
-                   </property>
-                  </widget>
-                 </item>
-                 <item row="2" column="1">
-                  <widget class="QSpinBox" name="permissiveMinVeinRadiusSpinBox">
-                   <property name="maximum">
-                    <number>65535</number>
                    </property>
                   </widget>
                  </item>
@@ -1069,6 +1041,61 @@
                     </size>
                    </property>
                   </spacer>
+                 </item>
+                 <item row="1" column="1">
+                  <widget class="QDoubleSpinBox" name="restrictiveMinVeinRadiusDoubleSpinBox">
+                   <property name="mouseTracking">
+                    <bool>false</bool>
+                   </property>
+                   <property name="decimals">
+                    <number>1</number>
+                   </property>
+                   <property name="maximum">
+                    <double>1000.000000000000000</double>
+                   </property>
+                   <property name="singleStep">
+                    <double>0.100000000000000</double>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="2" column="1">
+                  <widget class="QDoubleSpinBox" name="permissiveMinVeinRadiusDoubleSpinBox">
+                   <property name="decimals">
+                    <number>1</number>
+                   </property>
+                   <property name="maximum">
+                    <double>1000.000000000000000</double>
+                   </property>
+                   <property name="singleStep">
+                    <double>0.100000000000000</double>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="3" column="1">
+                  <widget class="QDoubleSpinBox" name="finalMinVeinRadiusDoubleSpinBox">
+                   <property name="decimals">
+                    <number>1</number>
+                   </property>
+                   <property name="maximum">
+                    <double>1000.000000000000000</double>
+                   </property>
+                   <property name="singleStep">
+                    <double>0.100000000000000</double>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="5" column="1">
+                  <widget class="QDoubleSpinBox" name="minVeinSizeDoubleSpinBox">
+                   <property name="decimals">
+                    <number>1</number>
+                   </property>
+                   <property name="maximum">
+                    <double>1000.000000000000000</double>
+                   </property>
+                   <property name="singleStep">
+                    <double>0.100000000000000</double>
+                   </property>
+                  </widget>
                  </item>
                 </layout>
                </widget>
