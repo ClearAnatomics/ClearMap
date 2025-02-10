@@ -869,7 +869,7 @@ def _convert_files(source_, sink, fid, n_files, extension, verbose, verify=False
         raise ValueError(f"Cannot determine module for extension {extension}!")
     mod.write(sink, source_)
     if verify:
-        src_mean = source_.mean()
+        src_mean = source_.array.mean()
         sink_mean = mod.read(sink).mean()
         if not math.isclose(src_mean, sink_mean, rel_tol=1e-5):
             raise RuntimeError(f"Conversion of {source_} to {sink} failed, means differ")
