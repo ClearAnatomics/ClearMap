@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>520</width>
-    <height>1145</height>
+    <height>976</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -47,10 +47,10 @@
      </property>
     </widget>
    </item>
-   <item row="2" column="1">
+   <item row="2" column="2">
     <widget class="QComboBox" name="layoutChannelComboBox"/>
    </item>
-   <item row="3" column="0" colspan="2">
+   <item row="3" column="0" colspan="3">
     <widget class="QGroupBox" name="rigidParamsGroupBox">
      <property name="title">
       <string>Rigid</string>
@@ -66,7 +66,7 @@
        <number>2</number>
       </property>
       <property name="topMargin">
-       <number>2</number>
+       <number>6</number>
       </property>
       <property name="rightMargin">
        <number>2</number>
@@ -444,7 +444,7 @@
      </layout>
     </widget>
    </item>
-   <item row="4" column="0" colspan="2">
+   <item row="4" column="0" colspan="3">
     <widget class="QGroupBox" name="wobblyParamsGroupBox">
      <property name="title">
       <string>Wobbly</string>
@@ -457,7 +457,7 @@
        <number>2</number>
       </property>
       <property name="topMargin">
-       <number>2</number>
+       <number>6</number>
       </property>
       <property name="rightMargin">
        <number>2</number>
@@ -465,16 +465,6 @@
       <property name="bottomMargin">
        <number>2</number>
       </property>
-      <item row="2" column="0">
-       <widget class="QLabel" name="label_9">
-        <property name="toolTip">
-         <string>Maximum number of pixels to shift in either direction along that axis to compute the alignment (correlograms).</string>
-        </property>
-        <property name="text">
-         <string>Max shifts Z</string>
-        </property>
-       </widget>
-      </item>
       <item row="1" column="1">
        <widget class="QFrame" name="wobblyMaxShiftsYDoublet">
         <property name="frameShape">
@@ -511,6 +501,13 @@
           </widget>
          </item>
         </layout>
+       </widget>
+      </item>
+      <item row="6" column="0">
+       <widget class="QLabel" name="label_18">
+        <property name="text">
+         <string>Slice pixel size</string>
+        </property>
        </widget>
       </item>
       <item row="3" column="1">
@@ -551,93 +548,6 @@
         </layout>
        </widget>
       </item>
-      <item row="2" column="1">
-       <widget class="QFrame" name="wobblyMaxShiftsZDoublet">
-        <property name="frameShape">
-         <enum>QFrame::StyledPanel</enum>
-        </property>
-        <property name="frameShadow">
-         <enum>QFrame::Raised</enum>
-        </property>
-        <layout class="QHBoxLayout" name="horizontalLayout_12">
-         <item>
-          <widget class="QSpinBox" name="spinBox_16">
-           <property name="suffix">
-            <string>px</string>
-           </property>
-           <property name="minimum">
-            <number>-1024</number>
-           </property>
-           <property name="maximum">
-            <number>1024</number>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QSpinBox" name="spinBox_17">
-           <property name="suffix">
-            <string>px</string>
-           </property>
-           <property name="minimum">
-            <number>-1024</number>
-           </property>
-           <property name="maximum">
-            <number>1024</number>
-           </property>
-          </widget>
-         </item>
-        </layout>
-       </widget>
-      </item>
-      <item row="6" column="1">
-       <widget class="QFrame" name="wobblySlicePixelSizeSinglet">
-        <property name="frameShape">
-         <enum>QFrame::StyledPanel</enum>
-        </property>
-        <property name="frameShadow">
-         <enum>QFrame::Raised</enum>
-        </property>
-        <property name="disabledValue" stdset="0">
-         <string>None</string>
-        </property>
-        <layout class="QHBoxLayout" name="horizontalLayout_15">
-         <item>
-          <widget class="QCheckBox" name="checkBox_10">
-           <property name="text">
-            <string/>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QSpinBox" name="spinBox_26">
-           <property name="enabled">
-            <bool>false</bool>
-           </property>
-           <property name="maximum">
-            <number>65535</number>
-           </property>
-          </widget>
-         </item>
-        </layout>
-       </widget>
-      </item>
-      <item row="5" column="0">
-       <widget class="QLabel" name="label_13">
-        <property name="toolTip">
-         <string>Pixel intensity range for a typical tile. Tiles outside this range (typically oustide the brain) will be droppped.</string>
-        </property>
-        <property name="text">
-         <string>Slice valid range</string>
-        </property>
-       </widget>
-      </item>
-      <item row="6" column="0">
-       <widget class="QLabel" name="label_18">
-        <property name="text">
-         <string>Slice pixel size</string>
-        </property>
-       </widget>
-      </item>
       <item row="5" column="1">
        <widget class="QFrame" name="wobblySliceRangeDoublet">
         <property name="frameShape">
@@ -673,13 +583,6 @@
         </layout>
        </widget>
       </item>
-      <item row="3" column="0">
-       <widget class="QLabel" name="label_12">
-        <property name="text">
-         <string>Stack valid range</string>
-        </property>
-       </widget>
-      </item>
       <item row="0" column="0">
        <widget class="QLabel" name="label_11">
         <property name="toolTip">
@@ -690,13 +593,13 @@
         </property>
        </widget>
       </item>
-      <item row="1" column="0">
-       <widget class="QLabel" name="label_10">
+      <item row="5" column="0">
+       <widget class="QLabel" name="label_13">
         <property name="toolTip">
-         <string>Maximum number of pixels to shift in either direction along that axis to compute the alignment (correlograms).</string>
+         <string>Pixel intensity range for a typical tile. Tiles outside this range (typically oustide the brain) will be droppped.</string>
         </property>
         <property name="text">
-         <string>Max shifts Y</string>
+         <string>Slice valid range</string>
         </property>
        </widget>
       </item>
@@ -724,6 +627,61 @@
          </item>
          <item>
           <widget class="QSpinBox" name="spinBox_19">
+           <property name="suffix">
+            <string>px</string>
+           </property>
+           <property name="minimum">
+            <number>-1024</number>
+           </property>
+           <property name="maximum">
+            <number>1024</number>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+      </item>
+      <item row="3" column="0">
+       <widget class="QLabel" name="label_12">
+        <property name="text">
+         <string>Stack valid range</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="0">
+       <widget class="QLabel" name="label_10">
+        <property name="toolTip">
+         <string>Maximum number of pixels to shift in either direction along that axis to compute the alignment (correlograms).</string>
+        </property>
+        <property name="text">
+         <string>Max shifts Y</string>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="1">
+       <widget class="QFrame" name="wobblyMaxShiftsZDoublet">
+        <property name="frameShape">
+         <enum>QFrame::StyledPanel</enum>
+        </property>
+        <property name="frameShadow">
+         <enum>QFrame::Raised</enum>
+        </property>
+        <layout class="QHBoxLayout" name="horizontalLayout_12">
+         <item>
+          <widget class="QSpinBox" name="spinBox_16">
+           <property name="suffix">
+            <string>px</string>
+           </property>
+           <property name="minimum">
+            <number>-1024</number>
+           </property>
+           <property name="maximum">
+            <number>1024</number>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QSpinBox" name="spinBox_17">
            <property name="suffix">
             <string>px</string>
            </property>
@@ -777,8 +735,63 @@
         </property>
        </widget>
       </item>
+      <item row="6" column="1">
+       <widget class="QFrame" name="wobblySlicePixelSizeSinglet">
+        <property name="frameShape">
+         <enum>QFrame::StyledPanel</enum>
+        </property>
+        <property name="frameShadow">
+         <enum>QFrame::Raised</enum>
+        </property>
+        <property name="disabledValue" stdset="0">
+         <string>None</string>
+        </property>
+        <layout class="QHBoxLayout" name="horizontalLayout_15">
+         <item>
+          <widget class="QCheckBox" name="checkBox_10">
+           <property name="text">
+            <string/>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QSpinBox" name="spinBox_26">
+           <property name="enabled">
+            <bool>false</bool>
+           </property>
+           <property name="maximum">
+            <number>65535</number>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+      </item>
+      <item row="2" column="0">
+       <widget class="QLabel" name="label_9">
+        <property name="toolTip">
+         <string>Maximum number of pixels to shift in either direction along that axis to compute the alignment (correlograms).</string>
+        </property>
+        <property name="text">
+         <string>Max shifts Z</string>
+        </property>
+       </widget>
+      </item>
      </layout>
     </widget>
+   </item>
+   <item row="5" column="1">
+    <spacer name="verticalSpacer">
+     <property name="orientation">
+      <enum>Qt::Vertical</enum>
+     </property>
+     <property name="sizeHint" stdset="0">
+      <size>
+       <width>20</width>
+       <height>23</height>
+      </size>
+     </property>
+    </spacer>
    </item>
   </layout>
  </widget>
