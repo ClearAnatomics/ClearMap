@@ -91,6 +91,8 @@ class GenericTab(GenericUi):
     A tab manager includes a tab widget, the associated parameters and
     an optional processor object which handles the computations.
     """
+    processing_type = None  # Not a pipeline tab by default
+
     def __init__(self, main_window, ui_file_name, tab_idx, name=''):
         """
 
@@ -114,7 +116,6 @@ class GenericTab(GenericUi):
         self.channels_ui_name = ''  # The name of the ui file to create the channel tabs
         self.with_add_btn = False  # Whether to add the add channel (+) button to the channels tab
 
-        self.processing_type = None
         self.tab_idx = tab_idx
 
         self.minimum_width = 200  # REFACTOR:
@@ -536,11 +537,18 @@ class GenericTab(GenericUi):
         return dvs
 
 class PipelineTab(GenericTab):
+    processing_type = ''
     def __init__(self, main_window, ui_file_name, tab_idx, name=''):
         super().__init__(main_window, ui_file_name, tab_idx, name)
         self.sample_params = None
         self.sample_manager = None  # REFACTORING: check if redundant
-        self.processing_type = None  # FIXME: needs to be set in the subclasses
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        if not cls.processing_type:
+            raise NotImplementedError(
+                f"Class '{cls.__name__}' must override 'processing_type' with a string value."
+            )
 
     def setup_sample_manager(self, sample_manager):
         """
@@ -579,9 +587,9 @@ class PipelineTab(GenericTab):
 
 
 class PreProcessingTab(PipelineTab):
+    processing_type = 'pre'
     def __init__(self, main_window, ui_file_name, tab_idx, name=''):
         super().__init__(main_window, ui_file_name, tab_idx, name)
-        self.processing_type = 'pre'
 
     # @abstractmethod
     def _setup_workers(self):
@@ -595,12 +603,11 @@ class PostProcessingTab(PipelineTab):
     A tab manager includes a tab widget, the associated parameters
     and potentially a processor object which handles the computations.
     """
-
+    processing_type = 'post'
     def __init__(self, main_window, ui_file_name, tab_idx, name=''):
         super().__init__(main_window, ui_file_name, tab_idx, name)
         self.stitcher = None
         self.aligner = None
-        self.processing_type = 'post'
 
     # @abstractmethod
     def _setup_workers(self):
