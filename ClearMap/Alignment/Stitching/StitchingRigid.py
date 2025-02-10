@@ -1445,36 +1445,48 @@ class Layout(SourceRegion, src.AbstractSource):
     This function is useful to stitch other color channels of imagining data
     using the same alignments.
     """
-    
-    if method == 'expression':
-      locations = [s.location for s in self._sources];
+    initial_locations = [s.location for s in self.sources]
+    if isinstance(match, list) and isinstance(replace, list):
+      if len(match) != len(replace):
+        raise ValueError('Match and replace lists length do not match')
+      for i, pair in enumerate(zip(match, replace)):
+        old, new = pair
+        loc = self.sources[i].location
+        if loc != old:
+          raise ValueError(f"Source nb {i} does not match pattern {old}")
+        self.sources[i].location = new
+    elif method == 'expression':  # FIXME: raise exception if we did not actually replace anything
+      locations = [s.location for s in self._sources]
       for l in locations:
         if not isinstance(l, str):
-          raise RuntimeError('The layout contains sources without locations!');
+          raise RuntimeError('The layout contains sources without locations!')
       
       ##change location expressions
       #locations = [l.replace(match, replace) for l in locations];
       
-      e_match = te.Expression(match);
-      e_replace = te.Expression(replace);
+      e_match = te.Expression(match)
+      e_replace = te.Expression(replace)
       for s,l in zip(self.sources, locations):
-        values = e_match.values(l);
-        s.location = l.replace(e_match.string(values), e_replace.string(values));
-      
+        values = e_match.values(l)
+        s.location = l.replace(e_match.string(values), e_replace.string(values))
     elif method == 'replace':
       #get locations
-      locations = [s.location for s in self._sources];
+      locations = [s.location for s in self._sources]
       for l in locations:
         if not isinstance(l, str):
-          raise RuntimeError('The layout contains sources without locations!');
+          raise RuntimeError('The layout contains sources without locations!')
       
       #change location expressions
-      locations = [l.replace(match, replace) for l in locations];
+      locations = [l.replace(match, replace) for l in locations]
   
       for s,l in zip(self.sources, locations):
-        s.location = l;
+        s.location = l
     else:
-      raise ValueError('Method %r not valid!' % method);
+      raise ValueError('Method %r not valid!' % method)
+
+    final_locations = [s.location for s in self.sources]
+    if initial_locations == final_locations:
+      raise ValueError('No source locations were replaced')
   
   
   def sort_sources_by_position(self):
