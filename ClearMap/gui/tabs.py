@@ -101,19 +101,19 @@ other controls are handled by the `params` object) and the processing steps.
 
 import functools
 import warnings
+from copy import deepcopy
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
 import pyqtgraph as pg
-from PyQt5.QtWidgets import QApplication, QLabel, QFrame
+from PyQt5.QtWidgets import QApplication, QLabel
 
 import mpld3
 from pyqtgraph import PlotWidget
 
 from ClearMap.IO.assets_constants import DATA_CONTENT_TYPES, EXTENSIONS
-from ClearMap.Utils.tag_expression import Expression
 
 app = QApplication.instance()
 if app is not None and app.applicationName() == 'ClearMap':
