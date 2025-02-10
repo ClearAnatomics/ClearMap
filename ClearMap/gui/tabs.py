@@ -257,7 +257,7 @@ class SampleInfoTab(GenericTab):
         pattern strings for the individual tiles, with specific characters
         representing the digits for the different axes.
         """
-        dlg = PatternDialog(self.src_folder, self.params,
+        dlg = PatternDialog(self.src_folder, self.params, tab=self,
                             min_file_number=self.main_window.preference_editor.params.pattern_finder_min_n_files,
                             tile_extension=self.params.shared_sample_params.default_tile_extension)
         dlg.exec()
