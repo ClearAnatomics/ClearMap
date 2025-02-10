@@ -59,6 +59,9 @@ class ParamLink:
         self.default = default
         self.connect = connect
 
+    def has_connect_function(self):
+        return callable(self.connect)
+
 
 def frame_getter(widget):
     """
@@ -260,7 +263,10 @@ class UiParameter(QObject):
 
     def connect_simple_widgets(self):
         for k in self.params_dict.keys():
-            if self.is_simple_attr(k) and self.params_dict[k].connect and not hasattr(self, f'handle_{k}_changed'):
+            link = self.params_dict[k]
+            if isinstance(link, ParamLink) and link.has_connect_function():
+                self.__connect_widget(k)
+            elif self.is_simple_attr(k) and link.connect and not hasattr(self, f'handle_{k}_changed'):
                 self.__connect_widget(k)
 
     def __connect_widget(self, key):
