@@ -42,7 +42,6 @@ from pathlib import Path
 
 import natsort
 import numpy as np
-from vtkmodules.generate_pyi import fix_annotations
 
 from ClearMap.IO import IO as clearmap_io
 from ClearMap.IO import FileUtils as file_utils
@@ -213,7 +212,10 @@ class Asset:
             if not isinstance(expression, Expression):
                 expression = Expression(expression)
         else:
-            expression = Expression(str(self.with_extension(extension))) if self.is_expression else None
+            if extension:
+                expression = Expression(str(self.with_extension(extension))) if self.is_expression else None
+            else:
+                expression = self.expression
         type_spec = deepcopy(self.type_spec)
         if not self.is_expression and extension:
             type_spec.extensions = list(dict.fromkeys([extension] + self.type_spec.extensions))
@@ -635,7 +637,7 @@ class ExpressionAsset(Asset):
     def convert(self, new_extension, processes=None, verbose=False, **kwargs):
         if self.is_existing_source:
             clearmap_io.convert_files(self.file_list, extension=new_extension,
-                                      processes=processes, verbose=verbose, **kwargs)
+                                      processes=processes, verbose=verbose, verify=True, **kwargs)
 
     @property
     def base_name(self):
@@ -650,7 +652,7 @@ class ExpressionAsset(Asset):
         for f in self.file_list:
             os.remove(f)
 
-    @property
+    @property  # FIXME: make function to avoid confusion with pathlib.Path.exists() (parenthesis and no parenthesis)
     def exists(self):
         """
         Whether all tiles exist on disk.
