@@ -452,19 +452,22 @@ class StitchingTab(PreProcessingTab):
         self.update_plotable_channels()
         self.progress_watcher.finish()
 
-    def update_plotable_channels(self):  # FIXME: call on data load and populate with existing stitched channels
+    def update_plotable_channels(self):
         self.ui.plotChannelsCheckableListWidget.clear()
         for chan in self.sample_manager.stitchable_channels:
-            if not self.params[chan].skip:
+            # if not self.params[chan].skip:
+            if self.sample_manager.get('stitched', channel=chan).exists:
                 self.ui.plotChannelsCheckableListWidget.add_item(chan)
-                # self.ui.plotChannelsCheckableListWidget.set_item_checked(chan, self.params[chan].plot)  # FIXME: add param
+                # self.ui.plotChannelsCheckableListWidget.set_item_checked(chan, self.params[chan].plot)
 
     def plot_stitching_results(self, _):
         """Plot the stitched image in 3D in the viewer"""
+        mode = self.ui.stitchingPlotModeComboBox.currentText()
         channels = self.ui.plotChannelsCheckableListWidget.get_checked_items() or []
         for channel in channels:
             self.params[channel].shared.ui_to_cfg()
-        self.wrap_plot(self.stitcher.plot_stitching_results, channels=channels or None, parent=self.main_window.centralWidget())
+        self.wrap_plot(self.stitcher.plot_stitching_results, channels=channels or None,
+                       mode=mode, parent=self.main_window.centralWidget())
 
 
 class RegistrationTab(PreProcessingTab):
