@@ -291,7 +291,7 @@ class Workspace2:  # REFACTOR: subclass dict
 
         if channel == 'current':
             channel = self.current_channel
-        elif channel == 'auto':  # WARNING: automatic, not autofluorescence. Better keyword required like
+        elif channel == 'default':
             channel = self.default_channel
 
         # Handle deprecated arguments  # FIXME: use decorator
