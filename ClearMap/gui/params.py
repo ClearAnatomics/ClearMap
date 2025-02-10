@@ -548,7 +548,9 @@ class ChannelRegistrationParams(ChannelUiParameter):  # FIXME: add signal for al
             self.tab.paramsFilesListWidget.itemsChanged.connect(self.handle_params_files_changed)
 
     def handle_align_with_changed(self, align_with):
-        # self.config['align_with'] = align_with
+        if align_with == 'None':
+            align_with = None
+        self.config['align_with'] = align_with  # TODO: check why necessary
         # self.ui_to_cfg()  # TODO: check
         self.align_with_changed.emit(self.name, align_with)
 
