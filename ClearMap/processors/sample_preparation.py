@@ -973,7 +973,8 @@ class StitchingProcessor(TabProcessor):
     def n_wobbly_steps_to_run(self):
         out = len(self.sample_manager.stitchable_channels) - 1
         for channel in self.sample_manager.stitchable_channels:
-            if not self.config['channels'][channel]['wobbly']['skip']:
+            cfg = self.config['channels'][channel]
+            if 'wobbly' in cfg and not cfg['wobbly']['skip']:
                 out += 3
         return out
 
