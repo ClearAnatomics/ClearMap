@@ -673,7 +673,8 @@ class RegistrationTab(PreProcessingTab):
         """
         Run the actual registration between the sample and the reference atlas.
         """
-        # FIXME: compute n_steps (par of processor; n_channels * n_steps_per_channel)
+        self.params.ui_to_cfg()
+        # TODO: compute n_steps (part of processor; n_channels * n_steps_per_channel)
         self.main_window.make_progress_dialog('Registering', n_steps=4, abort=self.aligner.stop_process,
                                               parent=self.main_window)
         self.setup_atlas()
