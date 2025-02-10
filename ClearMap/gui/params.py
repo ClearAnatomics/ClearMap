@@ -16,7 +16,7 @@ from typing import List
 import numpy as np
 
 from PyQt5.QtCore import Qt, pyqtSignal
-from PyQt5.QtWidgets import QInputDialog, QToolBox, QCheckBox, QPushButton, QLabel, QSlider, QVBoxLayout, QHBoxLayout
+from PyQt5.QtWidgets import QInputDialog, QToolBox, QCheckBox, QPushButton, QLabel, QSlider, QHBoxLayout
 
 from ClearMap.IO.assets_constants import CONTENT_TYPE_TO_PIPELINE
 from ClearMap.Utils.utilities import validate_orientation, snake_to_title
@@ -834,12 +834,12 @@ class VesselParams(UiParameterCollection):
         return self.binarization_params, self.graph_params, self.visualization_params
 
 
-class VesselBinarizationParams(UiParameter):
-    run_raw_binarization: bool
-    raw_binarization_clip_range: List[int]
-    raw_binarization_threshold: int
-    smooth_raw: bool
-    binary_fill_raw: bool
+class VesselBinarizationParams(UiParameter):  # FIXME: add channels
+    run_vessels_binarization: bool
+    vessels_binarization_clip_range: List[int]
+    vessels_binarization_threshold: int
+    smooth_vessels: bool
+    binary_fill_vessels: bool
     fill_main_channel: bool
     run_arteries_binarization: bool
     arteries_binarization_clip_range: List[int]
@@ -856,23 +856,23 @@ class VesselBinarizationParams(UiParameter):
     def __init__(self, tab):
         super().__init__(tab)
         self.params_dict = {
-            'run_raw_binarization': ParamLink(['raw', 'binarization', 'run'], self.tab.runRawBinarizationCheckBox),
-            'raw_binarization_clip_range': ParamLink(['raw', 'binarization', 'clip_range'],
-                                                     self.tab.rawBinarizationClipRangeDoublet),
-            'raw_binarization_threshold': ['raw', 'binarization', 'threshold'],
-            'smooth_raw': ParamLink(['raw', 'smoothing', 'run'], self.tab.rawBinarizationSmoothingCheckBox),
-            'binary_fill_raw': ParamLink(['raw', 'binary_filling', 'run'], self.tab.rawBinarizationBinaryFillingCheckBox),
-            'fill_main_channel': ParamLink(['raw', 'deep_filling', 'run'], self.tab.binarizationRawDeepFillingCheckBox),
-            'run_arteries_binarization': ParamLink(['arteries', 'binarization', 'run'],
+            'run_vessels_binarization': ParamLink(['vessels', 'binarize', 'run'], self.tab.runVesselsBinarizationCheckBox),
+            'vessels_binarization_clip_range': ParamLink(['vessels', 'binarize', 'clip_range'],
+                                                     self.tab.vesselsBinarizationClipRangeDoublet),
+            'vessels_binarization_threshold': ['vessels', 'binarize', 'threshold'],
+            'smooth_vessels': ParamLink(['vessels', 'smooth', 'run'], self.tab.vesselsBinarizationSmoothingCheckBox),
+            'binary_fill_vessels': ParamLink(['vessels', 'binary_fill', 'run'], self.tab.vesselsBinarizationBinaryFillingCheckBox),
+            'fill_main_channel': ParamLink(['vessels', 'deep_fill', 'run'], self.tab.binarizationVesselsDeepFillingCheckBox),
+            'run_arteries_binarization': ParamLink(['arteries', 'binarize', 'run'],
                                                    self.tab.runArteriesBinarizationCheckBox),
-            'arteries_binarization_clip_range': ParamLink(['arteries', 'binarization', 'clip_range'],
+            'arteries_binarization_clip_range': ParamLink(['arteries', 'binarize', 'clip_range'],
                                                           self.tab.arteriesBinarizationClipRangeDoublet),
-            'arteries_binarization_threshold': ['arteries', 'binarization', 'threshold'],
-            'smooth_arteries': ParamLink(['arteries', 'smoothing', 'run'],
+            'arteries_binarization_threshold': ['arteries', 'binarize', 'threshold'],
+            'smooth_arteries': ParamLink(['arteries', 'smooth', 'run'],
                                          self.tab.arteriesBinarizationSmoothingCheckBox),
-            'binary_fill_arteries': ParamLink(['arteries', 'binary_filling', 'run'],
+            'binary_fill_arteries': ParamLink(['arteries', 'binary_fill', 'run'],
                                               self.tab.arteriesBinarizationBinaryFillingCheckBox),
-            'fill_secondary_channel': ParamLink(['arteries', 'deep_filling', 'run'],
+            'fill_secondary_channel': ParamLink(['arteries', 'deep_fill', 'run'],
                                                 self.tab.binarizationArteriesDeepFillingCheckBox),
             'fill_combined': ParamLink(['combined', 'binary_fill'], self.tab.binarizationConbineBinaryFillingCheckBox),
             'plot_step_1': ParamLink(None, self.tab.binarizationPlotStep1ComboBox),
@@ -885,7 +885,7 @@ class VesselBinarizationParams(UiParameter):
         self.connect()
 
     def connect(self):
-        self.tab.rawBinarizationThresholdSpinBox.valueChanged.connect(self.handle_raw_binarization_threshold_changed)
+        self.tab.vesselsBinarizationThresholdSpinBox.valueChanged.connect(self.handle_vessels_binarization_threshold_changed)
 
         self.tab.arteriesBinarizationThresholdSpinBox.valueChanged.connect(
             self.handle_arteries_binarization_threshold_changed)
@@ -893,8 +893,8 @@ class VesselBinarizationParams(UiParameter):
 
     @property
     def n_steps(self):
-        n_steps = self.run_raw_binarization
-        n_steps += self.smooth_raw or self.binary_fill_raw
+        n_steps = self.run_vessels_binarization
+        n_steps += self.smooth_vessels or self.binary_fill_vessels
         n_steps += self.fill_main_channel
         n_steps += self.run_arteries_binarization
         n_steps += self.smooth_arteries or self.binary_fill_arteries
@@ -910,15 +910,15 @@ class VesselBinarizationParams(UiParameter):
         return steps, channels
 
     @property
-    def raw_binarization_threshold(self):
-        return self.sanitize_neg_one(self.tab.rawBinarizationThresholdSpinBox.value())
+    def vessels_binarization_threshold(self):
+        return self.sanitize_neg_one(self.tab.vesselsBinarizationThresholdSpinBox.value())
 
-    @raw_binarization_threshold.setter
-    def raw_binarization_threshold(self, value):
-        self.tab.rawBinarizationThresholdSpinBox.setValue(self.sanitize_nones(value))
+    @vessels_binarization_threshold.setter
+    def vessels_binarization_threshold(self, value):
+        self.tab.vesselsBinarizationThresholdSpinBox.setValue(self.sanitize_nones(value))
 
-    def handle_raw_binarization_threshold_changed(self):
-        self.config['raw']['binarization']['threshold'] = self.raw_binarization_threshold
+    def handle_vessels_binarization_threshold_changed(self):
+        self.config['vessels']['binarize']['threshold'] = self.vessels_binarization_threshold
 
     @property
     def arteries_binarization_threshold(self):
@@ -929,7 +929,7 @@ class VesselBinarizationParams(UiParameter):
         self.tab.arteriesBinarizationThresholdSpinBox.setValue(self.sanitize_nones(value))
 
     def handle_arteries_binarization_threshold_changed(self):
-        self.config['arteries']['binarization']['threshold'] = self.arteries_binarization_threshold
+        self.config['arteries']['binarize']['threshold'] = self.arteries_binarization_threshold
 
 
 class VesselGraphParams(UiParameter):
@@ -963,21 +963,21 @@ class VesselGraphParams(UiParameter):
             'vein_intensity_range_on_arteries_channel': ParamLink(['vessel_type_postprocessing', 'pre_filtering', 'vein_intensity_range_on_arteries_ch'],
                                                                   self.tab.veinIntensityRangeOnArteriesChannelDoublet),
             'restrictive_min_vein_radius': ParamLink(['vessel_type_postprocessing', 'pre_filtering', 'restrictive_vein_radius'],
-                                                     self.tab.restrictiveMinVeinRadiusSpinBox),
+                                                     self.tab.restrictiveMinVeinRadiusDoubleSpinBox),
             'permissive_min_vein_radius': ParamLink(['vessel_type_postprocessing', 'pre_filtering', 'permissive_vein_radius'],
-                                                    self.tab.permissiveMinVeinRadiusSpinBox),
+                                                    self.tab.permissiveMinVeinRadiusDoubleSpinBox),
             'final_min_vein_radius': ParamLink(['vessel_type_postprocessing', 'pre_filtering', 'final_vein_radius'],
-                                               self.tab.finalMinVeinRadiusSpinBox),
+                                               self.tab.finalMinVeinRadiusDoubleSpinBox),
             'arteries_min_radius': ParamLink(['vessel_type_postprocessing', 'pre_filtering', 'arteries_min_radius'],
-                                             self.tab.arteriesMinRadiusSpinBox),
+                                             self.tab.arteriesMinRadiusDoubleSpinBox),
             'max_arteries_tracing_iterations': ParamLink(['vessel_type_postprocessing', 'tracing', 'max_arteries_iterations'],
                                                          self.tab.maxArteriesTracingIterationsSpinBox),
             'max_veins_tracing_iterations': ParamLink(['vessel_type_postprocessing', 'tracing', 'max_veins_iterations'],
                                                       self.tab.maxVeinsTracingIterationsSpinBox),
             'min_artery_size': ParamLink(['vessel_type_postprocessing', 'capillaries_removal', 'min_artery_size'],
-                                         self.tab.minArterySizeSpinBox),
+                                         self.tab.minArterySizeSpinBox),  # WARNING: not the same unit as below
             'min_vein_size': ParamLink(['vessel_type_postprocessing', 'capillaries_removal', 'min_vein_size'],
-                                       self.tab.minVeinSizeSpinBox)
+                                       self.tab.minVeinSizeDoubleSpinBox)
         }
         self.connect()
 
