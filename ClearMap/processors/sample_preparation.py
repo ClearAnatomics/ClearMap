@@ -830,13 +830,13 @@ class StitchingProcessor(TabProcessor):
             cfg['use_npy'] = state
 
     def convert_tiles_channel(self, channel):
-        if self.sample_manager.use_npy(channel):
+        if self.config['channels'][channel]['use_npy']:
             asset = self.get('raw', channel=channel, prefix=self.sample_manager.prefix)
             file_list = asset.file_list
-            if not file_list or os.path.splitext(file_list[0])[-1] == '.tif':
+            if not file_list or Path(file_list[0]).suffix == '.tif':
                 try:
                     asset.convert('.npy', processes=self.machine_config['n_processes_file_conv'],
-                                  workspace=self.workspace, verbose=self.verbose, verify=True)
+                                  workspace=self.workspace, verbose=self.verbose)
                 except BrokenProcessPool:
                     print(f'File conversion of {channel} to numpy canceled')
                     return
