@@ -227,13 +227,14 @@ class CellDetector(TabProcessor):
         df.to_feather(self.get_path('cells', channel=self.channel, extension='.feather'))
 
     def transform_coordinates(self, coords):
+        target_channel = 'atlas'  # FIXME: add control for target channel
         coords = resampling.resample_points(
             coords,
             original_shape=self.sample_manager.stitched_shape(channel=self.channel),
             resampled_shape=self.sample_manager.resampled_shape(channel=self.channel))
 
         if self.registration_processor.was_registered:
-            for i, channel in enumerate(self.get_registration_sequence_channels()):
+            for i, channel in enumerate(self.get_registration_sequence_channels(stop_channel=target_channel)):
                 results_dir = self.get_path('aligned', channel=channel).parent
                 coords = elastix.transform_points(coords, transform_directory=results_dir, binary=USE_BINARY_POINTS_FILE)
 
@@ -550,12 +551,12 @@ class CellDetector(TabProcessor):
 
         df.to_feather(self.get_path('cells', channel=self.channel, extension='.feather'))
 
-    def get_registration_sequence_channels(self):
+    def get_registration_sequence_channels(self, stop_channel='atlas'):
         out = [self.channel]
         registration_cfg = self.registration_processor.config['channels']
         while True:
             next_channel = registration_cfg[out[-1]]['align_with']
-            if next_channel in (None, 'atlas'):
+            if next_channel in (None, stop_channel):
                 break
             out.append(next_channel)
         return out
