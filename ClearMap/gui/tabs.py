@@ -347,9 +347,12 @@ class StitchingTab(PreProcessingTab):
 
     def _bind_params_signals(self):  # WARNING: not really params signals but hack necessary to update the UI
         self.ui.runChannelsCheckableListWidget.set_items(self._get_channels())
+        for chan in self._get_channels():
+            self.ui.runChannelsCheckableListWidget.set_item_checked(chan, self.params[chan].shared.run)
+            # self.ui.plotChannelsCheckableListWidget.set_item_checked(chan, self.params[chan].shared.plot)
 
     def _set_params(self):
-        self.params = StitchingParams(self.ui)# , self.ui.channelsParamsTabWidget is deduced from the UI
+        self.params = StitchingParams(self.ui)  # , self.ui.channelsParamsTabWidget is deduced from the UI
 
     def _get_channels(self):
         return self.sample_manager.get_stitchable_channels()
@@ -409,7 +412,7 @@ class StitchingTab(PreProcessingTab):
         channel : str
             The name of the channel
         """
-        self.params[channel].skip = not state  # TODO: check if skip sill exists
+        self.params[channel].shared.run = state
 
     def set_progress_watcher(self, watcher):  # REFACTOR: could be for worker in self.workers
         """
@@ -461,13 +464,16 @@ class StitchingTab(PreProcessingTab):
 
     def run_stitching(self):
         """Run the actual stitching steps based on the values in the config file (set from the UI)."""
-        for channel in self.sample_manager.channels:
+        self.params.ui_to_cfg()
+        for channel in self.sample_manager.channels:  # FIXME: check if should do and if done
             if not self.sample_manager.is_tiled(channel):  # BYPASS stitching, just copy or stack
                 self.wrap_step('Stitching', self.stitcher.copy_or_stack, step_args=[channel], )
 
         n_steps = self.stitcher.n_rigid_steps_to_run + self.stitcher.n_wobbly_steps_to_run
         for channel in self.stitcher.get_stitching_order():
             cfg = self.params[channel]
+            if not cfg.shared.run:
+                continue
             kwargs = {'n_steps': n_steps, 'abort_func': self.stitcher.stop_process, 'close_when_done': False}
             try:
                 if channel == cfg.shared.layout_channel:  # Used as reference
