@@ -434,6 +434,9 @@ class RigidChannelStitchingParams(ChannelUiParameter):
     def handle_name_changed(self):
         pass  #  handled by shared params
 
+    def set_visible(self, state):
+        self.tab.rigidParamsGroupBox.setVisible(state)
+
     @property
     def projection_thickness(self):
         val = self.tab.projectionThicknessDoublet.getValue()
@@ -485,6 +488,9 @@ class WobblyChannelStitchingParams(ChannelUiParameter):
 
     def handle_name_changed(self):
         pass  #  handled by shared params
+
+    def set_visible(self, state):
+        self.tab.wobblyParamsGroupBox.setVisible(state)
 
 
 class ChannelRegistrationParams(ChannelUiParameter):  # FIXME: add signal for align_with_changed
