@@ -855,7 +855,7 @@ class StitchingProcessor(TabProcessor):
         in_degree = defaultdict(int)
 
         for channel, cfg in self.config['channels'].items():
-            if not cfg['run']:
+            if not cfg['run'] and not self.get('stitched', channel=channel).exists:
                 continue
             layout_channel = cfg.get('layout_channel', channel)  # default to self
             if layout_channel != channel:
