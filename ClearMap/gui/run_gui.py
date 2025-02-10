@@ -1038,6 +1038,8 @@ class ClearMapGui(ClearMapGuiBase):
     def load_default_cfg(self):
         for tab in self.tab_managers.values():
             cfg_name = title_to_snake(tab.name)
+            if cfg_name == 'sample_info':
+                cfg_name = 'sample'  # WARNING: a bit hacky
             try:
                 src_cfg_path = self.config_loader.get_default_path(cfg_name)
             except FileNotFoundError:
