@@ -36,7 +36,7 @@ def main(src_directory):
     binary_vessel_processor.setup(pre_proc)
 
     binary_vessel_processor.binarize()
-    for channel in ('raw', 'arteries'):  # TODO: edit as required
+    for channel in ('vessels', 'arteries'):  # TODO: edit as required
         binary_vessel_processor.smooth_channel(channel)
         binary_vessel_processor.fill_channel(channel)
         binary_vessel_processor.deep_fill_channel(channel)
