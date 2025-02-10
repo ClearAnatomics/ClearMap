@@ -167,6 +167,7 @@ class SampleInfoTab(GenericTab):
 
         self.channels_ui_name = 'channel_params'
         self.with_add_btn = True
+        self.names_map = []
 
     def _set_params(self):
         self.params = SampleParameters(self.ui, self.main_window.src_folder)
@@ -179,6 +180,7 @@ class SampleInfoTab(GenericTab):
     def _bind_params_signals(self):
         self.params.plotMiniBrain.connect(self.plot_mini_brain)
         self.params.plotAtlas.connect(self.display_atlas)
+        self.params.channelNameChanged.connect(self.update_workspace)
 
     def _get_channels(self):
         return self.sample_manager.channels  # or list(self.params.config['channels'].keys())
@@ -197,15 +199,19 @@ class SampleInfoTab(GenericTab):
         self.ui.launchPatternWizzardPushButton.clicked.connect(self.launch_pattern_wizard)
         self.ui.updateWorkspacePushButton.clicked.connect(self.update_workspace)
 
-        # TODO: why not on tab click ?
-        self.ui.applyBox.connectApply(self.main_window.update_pipelines)
-        self.ui.applyBox.connectSave(self.save_cfg)
+        # TODO: why not on tab click ?  # FIXME: remove buttons or reestablish
+        # self.ui.applyBox.connectApply(self.main_window.update_pipelines)
+        # self.ui.applyBox.connectSave(self.save_cfg)
 
     def _bind_channel(self, page_widget, channel):
         """
         Bind the signal/slots of the UI elements for `channel` which are not
         automatically set through the params object attribute
         """
+        if len(self.names_map) < self.ui.channelsParamsTabWidget.last_real_tab_idx:
+            self.names_map.append([channel, channel])
+        else:
+            self.names_map[self.ui.channelsParamsTabWidget.last_real_tab_idx - 1] = [channel, channel]
         page_widget.dataTypeComboBox.addItems(list(set(DATA_CONTENT_TYPES)))
         page_widget.extensionComboBox.addItems(EXTENSIONS['image'])
 
@@ -214,8 +220,36 @@ class SampleInfoTab(GenericTab):
         self.params.ui_to_cfg()
         self.main_window.print_status_msg('Sample config saved')
 
-    def update_workspace(self):  # Necessary intermediate because at the beginning sample_manager is not set
+    def rename_channels(self, old_name='', new_name=''):
+        if old_name:
+            names_map = [[old_name, new_name]]
+        else:
+            for i, name in enumerate(self.ui.channelsParamsTabWidget.get_channels_names()):
+                try:
+                    self.names_map[i][1] = name  # Update to new name
+                except IndexError:
+                    self.names_map.append((name, name))  # FIXME: what is the old_name in that case ??
+            names_map = self.names_map
+        self.sample_manager.rename_channels(names_map)  # REFACTOR: delegate to self.params instead
+        # FIXME: rename mini_brains in aligner
+        # FIXME: rename annotators in aligner
+        self.params.ui_to_cfg()  # The channels now match so we can update the other params
         self.sample_manager.update_workspace()
+
+        if old_name:
+            self.names_map[self.ui.channelsParamsTabWidget.currentIndex] = [[new_name, new_name]]
+        else:
+            self.names_map = []
+
+
+    def update_workspace(self, old_name='', new_name=''):  # Necessary intermediate because at the beginning sample_manager is not set
+        self.rename_channels(old_name, new_name)  # Includes call to sample_manager.update_workspace
+        self._setup_workers()  # Load the stitching and registration processors
+        # WARNING: not ideal to reload all.
+        #  Should have option to reload only the workers if already setup (and not new exp)
+        # Update other configs.
+        self.main_window.finalise_tab_params()
+        self.save_cfg()
 
     @property
     def src_folder(self):
@@ -373,11 +407,13 @@ class StitchingTab(PreProcessingTab):
 
     def _setup_channel(self, page_widget, channel):
         if stitchable_channels := self.sample_manager.get_stitchable_channels():
+            self.params[channel].ready = self.params_finalised
             page_widget.layoutChannelComboBox.addItems(stitchable_channels)
         is_first_channel = self.ui.channelsParamsTabWidget.last_real_tab_idx == 1
         layout_channel = channel if is_first_channel else self.sample_manager.get_stitchable_channels()[0]
         page_widget.layoutChannelComboBox.setCurrentText(layout_channel)
-        self.params[channel].ui_to_cfg()
+        self.params[channel].ready = True
+        # self.params[channel].ui_to_cfg()  # FIXME: check if we need to put this back
 
     def _bind_channel(self, page_widget, channel):
         """

@@ -125,6 +125,27 @@ class SampleManager(TabProcessor):
         self.workspace.info()
         self.setup_complete = not self.incomplete_channels
 
+    def load_processors_config(self, stitching_config=None, registration_config=None):
+        if self.stitching_cfg is None:
+            self.stitching_cfg = stitching_config
+
+        if self.registration_cfg is None:
+            self.registration_cfg = registration_config
+
+        self.update_workspace()
+        self.workspace.info()
+        self.setup_complete = not self.incomplete_channels
+
+    def rename_channels(self, names_map):
+        for old_name, new_name in names_map:
+            if new_name != old_name:
+                self.config['channels'][new_name] = self.config['channels'].pop(old_name)
+                if old_name in self.workspace.asset_collections:
+                    self.workspace.asset_collections[new_name] = self.workspace.asset_collections.pop(old_name)
+                    self.workspace.asset_collections[new_name].channel_spec.name = new_name
+                    # FIXME: update ChannelSpec.channel_names
+                # The WS is updated through update_workspace
+
     def update_workspace(self):
         channel_names = self.config['channels'].keys()
         if not channel_names:
