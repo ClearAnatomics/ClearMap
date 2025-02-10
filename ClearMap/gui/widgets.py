@@ -1001,7 +1001,7 @@ class PatternDialog(WizardDialog):
     there must be at least `min_file_number` files in the folder with the extension `tile_extension`
     to trigger the pattern search
     """
-    def __init__(self, src_folder, params, app=None, min_file_number=10, tile_extension='.ome.tif'):
+    def __init__(self, src_folder, params, tab, app=None, min_file_number=10, tile_extension='.ome.tif'):
         """
         Initialize the dialog
 
@@ -1011,6 +1011,8 @@ class PatternDialog(WizardDialog):
             The source folder to scan for patterns
         params: UiParameter (optional)
             The parameters object to use to parametrise the dialog
+        tab: QTabWidget
+            The parent tab to embed the new paths into
         app: QApplication (optional)
             The QApplication instance to use. If None, ClearMap will try to use the existing instance
         min_file_number: int (optional)
@@ -1023,6 +1025,7 @@ class PatternDialog(WizardDialog):
         self.patterns_finders = None
         self.n_image_groups = 0
         # Init at the end to not overwrite result of setup
+        self.tab = tab
         super().__init__('pattern_prompt', 'File paths wizard', src_folder, params, app, [600, None])
 
     def setup(self):
@@ -1140,6 +1143,8 @@ class PatternDialog(WizardDialog):
         for i in range(self.dlg.patternToolBox.count()):
             page = self.dlg.patternToolBox.widget(i)
             channel_name = page.channelNameLineEdit.text()
+            if channel_name not in self.params:
+                self.tab.add_channel_tab(channel_name)
             p = self.params[channel_name]  # FIXME: assert that updated when changing channel name
             p.path = page.result.text()
             p.data_type = page.dataTypeComboBox.currentText()
