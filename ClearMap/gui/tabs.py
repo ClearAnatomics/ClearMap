@@ -512,6 +512,7 @@ class RegistrationTab(PreProcessingTab):
 
     def _setup_channel(self, page_widget, channel):
         page_widget.alignWithComboBox.addItems(self.aligner.channels_to_register())
+        page_widget.movingChannelComboBox.addItem('intrinsically aligned')
         page_widget.movingChannelComboBox.addItems(self.aligner.channels_to_register())
         alignment_files = [page_widget.paramsFilesListWidget.item(i).text() for i in
                   range(page_widget.paramsFilesListWidget.count())]  # no shortcut for standard QListWidget

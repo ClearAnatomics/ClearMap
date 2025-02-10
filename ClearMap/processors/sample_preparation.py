@@ -21,7 +21,7 @@ import matplotlib
 from configobj import ConfigObj
 
 from ClearMap.IO.assets_constants import CONTENT_TYPE_TO_PIPELINE
-from ClearMap.Utils.exceptions import MissingRequirementException
+from ClearMap.Utils.exceptions import MissingRequirementException, ClearMapAssetError
 from ClearMap.gui.gui_utils import surface_project, setup_mini_brain
 
 matplotlib.use('Qt5Agg')
@@ -390,7 +390,6 @@ class SampleManager(TabProcessor):
                                 processes=processes, verbose=verbose, **kwargs)
 
 
-
 class RegistrationProcessor(TabProcessor):
     """
     This class is used to manage the registration process
@@ -430,8 +429,20 @@ class RegistrationProcessor(TabProcessor):
 
     def parametrize_assets(self):
         for channel in self.config['channels']:
+            if self.config['channels'][channel]['align_with'] is None:
+                continue
+            if self.config['channels'][channel]['moving_channel'] in (None, 'intrinsically aligned'):
+                continue
             for asset_type in ('fixed_landmarks', 'moving_landmarks', 'aligned'):
-                asset = self.get_elx_asset(asset_type, channel=channel)
+                try:
+                    asset = self.get_elx_asset(asset_type, channel=channel)
+                except KeyError:
+                    continue  # FIXME: this should be handled more elegantly
+                              #  the idea is to delay the parametrization
+                              #  until the assets for all channels have been created
+                except ClearMapAssetError:  # Check that align_with is None
+                    warnings.warn(f'Could not parametrized {asset_type} for {channel=}')
+                    continue
                 if asset.is_expression:
                     fixed_channel, moving_channel = self.get_fixed_moving_channels(channel)
                     parametrized_asset = asset.specify({'moving_channel': moving_channel, 'fixed_channel': fixed_channel})
@@ -475,6 +486,8 @@ class RegistrationProcessor(TabProcessor):
     def get_fixed_moving_channels(self, channel):
         moving_channel = self.config['channels'][channel]['moving_channel']
         align_with = self.config['channels'][channel]['align_with']
+        if align_with is None:
+            return None, moving_channel
         if not align_with:
             raise ValueError(f'Channel {channel} missing align_with in registration config')
         # fixed is whichever channel from ('channel', 'align_with') is not 'moving_channel'
@@ -483,6 +496,8 @@ class RegistrationProcessor(TabProcessor):
 
     def get_elx_asset(self, asset_type, channel):
         fixed_channel, moving_channel = self.get_fixed_moving_channels(channel)
+        if fixed_channel is None or moving_channel is None:
+            return None
 
         asset = self.get(asset_type, channel=channel)
         if not asset.is_expression:
@@ -582,6 +597,8 @@ class RegistrationProcessor(TabProcessor):
 
     def align_channel(self, channel):
         fixed_channel, moving_channel = self.get_fixed_moving_channels(channel)
+        if moving_channel is None or moving_channel == 'intrinsically aligned':
+            return
         channel_cfg = self.config['channels'][channel]
         run_bspline = any(['bspline' in channel_cfg['params_files']])
         n_steps = 17000 if run_bspline else 2000
