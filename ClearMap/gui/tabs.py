@@ -407,7 +407,7 @@ class StitchingTab(PreProcessingTab):
     def convert_tiles(self):
         if not self.sample_manager.has_tiles():
             return
-        self.wrap_step('Converting tiles', self.stitcher.convert_tiles, step_kw_args={'force': True}, n_steps=0,
+        self.wrap_step('Converting tiles', self.stitcher.convert_tiles, step_kw_args={'_force': True}, n_steps=0,
                        abort_func=self.stitcher.stop_process, save_cfg=False, nested=False)
 
     def set_run_channel(self, _, state, channel):
