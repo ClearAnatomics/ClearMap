@@ -1046,13 +1046,12 @@ class CellCounterTab(PostProcessingTab):
 
     def run_cell_map(self):
         """Run the whole pipeline at once"""
-        self.params.ui_to_cfg()
         for channel in self.params.channels_to_detect:
             self.run_channel(channel)
 
     def run_channel(self, channel):
         """Run the whole pipeline at once for a single channel"""
-        # FIXME: check if ui_to_cfg is needed
+        self.params.ui_to_cfg()
         self.update_cell_number(channel)
         params = self.params[channel]
         if params.detect_cells:
