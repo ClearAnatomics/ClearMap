@@ -274,16 +274,25 @@ class SampleInfoTab(GenericTab):
         if isinstance(channel, int):
             channel = self.params.get_channel_name(channel)
         # REFACTOR: a bit hacky to refer to other tab
-        mask, proj = self.main_window.tab_managers['registration'].aligner.project_mini_brain(channel)
-        self.get_channel_ui(channel).miniBrainLabel.setPixmap(np_to_qpixmap(proj, mask))
+        aligner = self.main_window.tab_managers['registration'].aligner
+        if aligner.setup_complete:
+            mask, proj = aligner.project_mini_brain(channel)
+            self.get_channel_ui(channel).miniBrainLabel.setPixmap(np_to_qpixmap(proj, mask))
+        else:
+            warnings.warn('RegistrationProcessor not setup, cannot plot mini brain. '
+                          'Please call registration_tab.finalise_set_params() first')
 
     def display_atlas(self, channel):
         """Plot the atlas as a grayscale image in the viewer"""
         if isinstance(channel, int):
             channel = self.params.get_channel_name(channel)
         # REFACTOR: a bit hacky to refer to other tab
-        self.main_window.tab_managers['stitching'].setup_workers()
-        self.wrap_plot(self.main_window.tab_managers['stitching'].stitcher.plot_atlas, channel)
+        stitcher = self.main_window.tab_managers['stitching'].stitcher
+        if stitcher.config:  # TODO: use setup_complete attribute or property instead
+            self.wrap_plot(self.main_window.tab_managers['stitching'].stitcher.plot_atlas, channel)
+        else:
+            warnings.warn('StitchingProcessor not setup, cannot plot atlas. '
+                          'Please call stitching_tab.finalise_set_params() first')
 
 
 class StitchingTab(PreProcessingTab):
