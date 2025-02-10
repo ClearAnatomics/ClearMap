@@ -835,11 +835,12 @@ def get_atlas_filepath(filename, directory=None, orientation=None, slicing=None)
 
     def substitute_chars(in_str, chars_to_strip=' ',
                            chars_to_substitute='(,)'):  # TODO: check if we add '[]' to chars_to_substitute
+        out_str = in_str
         for c in chars_to_strip:
-            in_str = in_str.replace(c, '')
+            out_str = out_str.replace(c, '')
         for c in chars_to_substitute:
-            in_str = in_str.replace(c, '_')
-        return in_str
+            out_str = out_str.replace(c, '_')
+        return out_str
 
     x, y, z = format_orientation(orientation, default=(1, 2, 3))
     postfix = substitute_chars(f'{x}_{y}_{z}_{slicing}')
@@ -848,7 +849,7 @@ def get_atlas_filepath(filename, directory=None, orientation=None, slicing=None)
     fn = base + f'_{postfix}{ext}'
 
     if directory is not None:
-        fn = os.path.join(directory, os.path.basename(filename))
+        fn = os.path.join(directory, os.path.basename(fn))
 
     return fn
 
