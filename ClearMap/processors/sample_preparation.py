@@ -746,13 +746,12 @@ class RegistrationProcessor(TabProcessor):
         self.__setup_source_atlas(atlas_base_name)
 
         orientation = None
-        slicing = None
         # TODO: atlas variants as multichannel assets
         for channel in sample_cfg.keys():
             if sample_cfg[channel]['orientation'] != orientation:
                 orientation = sample_cfg[channel]['orientation']
-            if sample_cfg[channel]['slicing'] != slicing:
-                slicing = sample_cfg[channel]['slicing']
+            slicing = sample_cfg[channel]['slicing']
+            if slicing is not None and slicing.values() != (None, None, None):
                 xyz_slicing = tuple(slice(None) if slc is None else slice(*slc) for slc in slicing.values())
             else:
                 xyz_slicing = None
@@ -760,16 +759,15 @@ class RegistrationProcessor(TabProcessor):
             if xyz_slicing is None and (orientation is None or orientation == DEFAULT_ORIENTATION):
                 target_directory = settings.atlas_folder  # For the unchanged atlas
             else:
-                target_directory = self.sample_manager.src_directory / 'atlas'
+                target_directory = self.sample_manager.src_directory / 'atlas'  # FIXME: user asset_constants
 
             self.annotators[channel] = Annotation(atlas_base_name, xyz_slicing, orientation,
                                                   label_source=atlas_cfg['structure_tree_id'],
                                                   target_directory=target_directory)
 
             scaling, mini_brain = setup_mini_brain(atlas_base_name)
-            self.mini_brains[channel] = {}
-            self.mini_brains[channel]['scaling'] = scaling
-            self.mini_brains[channel]['array'] = mini_brain
+            self.mini_brains[channel] = {'scaling': scaling,
+                                         'array': mini_brain}
 
             # Add to workspace
             channel_spec = self.get('raw', channel=channel).channel_spec
