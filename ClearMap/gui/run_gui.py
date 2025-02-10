@@ -906,7 +906,7 @@ class ClearMapGui(ClearMapGuiBase):
         tab_index: int
             The index of the tab clicked
         """
-        if not self.sample_manager.setup_complete and 0 < tab_index < self._get_tab_idx('group_analysis'):
+        if not self.sample_manager.setup_complete and 0 < tab_index < self._get_tab_index('group_analysis', increment=False):
             self.popup('WARNING', 'Workspace not initialised, cannot proceed to alignment')
             self.tabWidget.setCurrentIndex(0)
 
