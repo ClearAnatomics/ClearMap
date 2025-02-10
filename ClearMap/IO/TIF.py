@@ -124,7 +124,7 @@ class Source(AbstractSource):
 
     @property
     def array(self, processes=None):
-        array = self._tif.asarray(maxworkers=processes)
+        array = self._tif.asarray(maxworkers=processes, squeeze=True)
         return self.to_clearmap_order(array)
 
     @cached_property
@@ -333,8 +333,15 @@ class BaseMetadataParser:
         self.update_info('shape', tuple([f'Size{d}' for d in self.info['order']]),
                          self.pixels_metadata, int)
         # Remove empty dimensions
-        if self.info['shape'] is not None and [d for d in self.info['shape'] if d != 1] != self.source.shape:
-            order = [d for s, d in zip(self.info['shape'], self.info['order']) if s > 1]
+        if self.info['shape'] is not None and [d for d in self.info['shape'] if d != 1] != self.source.shape:   # Trim empty dimensions
+            muxed = [(s, d) for s, d in zip(self.info['shape'], self.info['order']) if s > 1]
+            shape, order = zip(*muxed)
+            shape = list(shape)
+            order = list(order)
+            if len(shape) > len(self.source.shape):  # pop virtual C dimension
+                c_loc = [i for i, d in enumerate(order) if d == 'C'][0]
+                shape.pop(c_loc)
+                order.pop(c_loc)
             self.info['order'] = order
             self.info['shape'] = self.source.shape
 
