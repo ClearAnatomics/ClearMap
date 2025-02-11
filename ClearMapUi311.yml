@@ -12,17 +12,15 @@
 # update:  conda env update -f ClearMap.yml 
 name: ClearMapUi311
 channels:
-  - nvidia
   - pytorch
   - conda-forge
-  - defaults
 
 dependencies:
   - python=3.11  # constraining seems to speed up resolution
   - cython
-  - pip
   - ipython
   - jupyter
+  - ipywidgets  # For pyvista
   - numpy
   - scipy
   - pandas<2  # Groupby syntax changes
@@ -44,6 +42,7 @@ dependencies:
   - qdarkstyle
   - vispy
   - pyvista
+  - vtk
   - pyopengl
   - napari
   - graph-tool<=2.45  # Cannot remove self loops with later versions

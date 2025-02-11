@@ -128,6 +128,13 @@ class EnvFileManager:
         self.cfg['dependencies'].append(f'{package_name}{version_str}')
         self.write()
 
+    def remove_channel(self, channel_name):
+        self.cfg['channels'] = [c for c in self.cfg['channels'] if c != channel_name]
+
+    def add_channel(self, channel_name):
+        if channel_name not in self.cfg['channels']:
+            self.cfg['channels'].append(channel_name)
+
 
 class CondaParser:
     @staticmethod
@@ -259,7 +266,7 @@ class PytorchVersionManager:  # TODO: inherit from condaparser ??
         return [e.replace('cuda', '') for e in build.split('_') if 'cuda' in e][0]
 
 
-def patch_env(cfg_path, dest_path, use_cuda_torch=True, pip_version=False, use_spyder=False, tmp_dir=None):
+def patch_env(cfg_path, dest_path, use_cuda_torch=True, pip_mode=False, use_spyder=False, tmp_dir=None):
     """
     Patch the environment file to match the desired configuration. This is mostly to
     get a working pytorch installation with the correct cuda version.
@@ -271,8 +278,8 @@ def patch_env(cfg_path, dest_path, use_cuda_torch=True, pip_version=False, use_s
         If evaluates to False, the cfg_path is overwritten
     use_cuda_torch : bool
         If True, install pytorch with cuda support
-    pip_version : bool
-        If True, install pytorch with pip (since the nvidia channel is not available anymore in conda)
+    pip_mode : bool
+        If True, install pytorch with pip (since the nvidia channel is now considered a paid channel)
     use_spyder
     tmp_dir
 
@@ -290,7 +297,9 @@ def patch_env(cfg_path, dest_path, use_cuda_torch=True, pip_version=False, use_s
 
     pytorch_v_mgr = PytorchVersionManager(cfg_path, env_mgr.python_version, env_mgr.get_package_version('pytorch'))
     if use_cuda_torch:
-        if pip_version:
+        if pip_mode:
+            # remove the nvidia channel if it is present
+            env_mgr.remove_channel('nvidia')
             env_mgr.remove_dependency('pytorch')
             env_mgr.remove_dependency('pytorch-cuda')
             env_mgr.remove_dependency('mkl')
@@ -298,6 +307,8 @@ def patch_env(cfg_path, dest_path, use_cuda_torch=True, pip_version=False, use_s
             env_mgr.add_pip_option('--extra-index-url https://download.pytorch.org/whl/cu121')
             env_mgr.add_pip_dependency('torch')
         else:
+            # ensure that the nvidia channel is available
+            env_mgr.add_channel('nvidia')
             if Version(pytorch_v_mgr.pytorch_version) >= Version('2.0'):
                 pytorch_cuda_version = pytorch_v_mgr.match_pytorch_to_cuda()
                 env_mgr.add_dependency('pytorch-cuda', pkg_version=pytorch_cuda_version)

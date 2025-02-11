@@ -188,6 +188,20 @@ else
     USE_TORCH="False";
 fi
 
+if [[ $USE_TORCH == "True" ]]; then
+    green "Installing pytorch through conda may be restricted due to the license of the nvidia channel.
+      If you prefer installing pytorch through pip, please select 'pip' below."
+    read -r -p "Do you wish to install pytorch through conda (y/[n])?" answer
+    case "$answer" in
+        [yY][eE][sS]|[yY])
+            pip_mode="False";
+            ;;
+        *)
+            pip_mode="True";
+            ;;
+    esac
+fi
+
 echo "  Getting env name"
 ENV_NAME=$(python -c "import os; from ClearMap.Utils.install_utils import EnvFileManager; \
 env_mgr = EnvFileManager(os.path.normpath(os.path.join(os.getcwd(), '$ENV_FILE_PATH')), None); \
@@ -214,7 +228,7 @@ green "Using temp folder: $tmp_dir"
 
 python -c "$prep_python \
 from ClearMap.Utils.install_utils import patch_env; \
-patch_env(os.path.join(os.getcwd(), '$ENV_FILE_PATH'), 'tmp_env_file.yml', use_cuda_torch=$USE_TORCH, use_spyder=$USE_SPYDER, tmp_dir='$tmp_dir')" || exit 1
+patch_env(os.path.join(os.getcwd(), '$ENV_FILE_PATH'), 'tmp_env_file.yml', use_cuda_torch=$USE_TORCH, pip_mode=$pip_mode, use_spyder=$USE_SPYDER, tmp_dir='$tmp_dir')" || exit 1
 conda deactivate
 conda env remove -y -n clearmap_tmp_env
 green "Done"
