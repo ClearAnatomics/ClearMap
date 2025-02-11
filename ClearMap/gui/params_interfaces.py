@@ -103,6 +103,10 @@ def combobox_getter(widget):
 def combobox_setter(widget, value):
     if value is None:
         value = 'None'  # TODO: decide 'None' or ''
+    found = widget.findText(value)
+    if found == -1 and widget.count() > 0:
+        warnings.warn(f'Value "{value}" not found in combobox, '
+                      f'possible values are "{", ".join([widget.itemText(i) for i in range(widget.count())])}"')
     widget.setCurrentText(value)
 
 
