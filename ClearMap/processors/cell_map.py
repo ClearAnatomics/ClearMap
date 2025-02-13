@@ -16,8 +16,12 @@ e.g. to analyze immediate early gene expression data from iDISCO+ cleared tissue
 
   iDISCO+ and ClearMap: A Pipeline for Cell Detection, Registration, and 
   Mapping in Intact Samples Using Light Sheet Microscopy.
-"""
 
+
+References
+----------
+.. [Renier2016] `Mapping of brain activity by automated volume analysis of immediate early genes. Renier* N, Adams* EL, Kirst* C, Wu* Z, et al. Cell. 2016 165(7):1789-802 <https://doi.org/10.1016/j.cell.2016.05.007>`_
+"""
 
 import copy
 import importlib
@@ -197,7 +201,6 @@ class CellDetector(TabProcessor):
         self.set_watcher_step('Unweighted voxelisation')
         voxelization.voxelize(coordinates, sink=counts_file_path, **voxelization_parameter)  # WARNING: prange
         self.update_watcher_main_progress()
-        # self.remove_crust(coordinates, voxelization_parameter)  # WARNING: currently causing issues
         return coordinates, counts_file_path
 
     def voxelize_weighted(self, coordinates, source, voxelization_parameter):
@@ -219,7 +222,8 @@ class CellDetector(TabProcessor):
         """
         intensities_file_path = self.workspace.filename('density', postfix='intensities')
         intensities = source['source']
-        voxelization.voxelize(coordinates, sink=intensities_file_path, weights=intensities, **voxelization_parameter)   # WARNING: prange
+        voxelization.voxelize(coordinates, sink=intensities_file_path, weights=intensities,
+                              **voxelization_parameter)  # WARNING: prange
         return intensities_file_path
 
     def atlas_align(self):
@@ -240,12 +244,17 @@ class CellDetector(TabProcessor):
                                                     key='id')
             df['id'] = structure_ids
 
-            hemisphere_labels = annotation.label_points(coordinates_transformed,
+            distance_to_surface_threshold = self.processing_config['cell_filtration']['thresholds'].get(
+                'distance_to_surface', 0)
+            if distance_to_surface_threshold:
+                df = self.remove_crust(df, distance_to_surface_threshold, discard_cells=False)
+
+            hemisphere_labels = annotation.label_points(df[['xt', 'yt', 'zt']].values,
                                                         annotation_file=self.preprocessor.hemispheres_file_path,
                                                         key='id')
             df['hemisphere'] = hemisphere_labels
 
-            names = annotation.convert_label(structure_ids, key='id', value='name')
+            names = annotation.convert_label(df['id'].values, key='id', value='name')
             df['name'] = names
 
             unique_ids = np.sort(df['id'].unique())
@@ -253,7 +262,8 @@ class CellDetector(TabProcessor):
             order_map = {id_: annotation.find(id_, key='id')['order'] for id_ in unique_ids}
             df['order'] = df['id'].map(order_map)
 
-            color_map = {id_: annotation.find(id_, key='id')['rgb'] for id_ in unique_ids}  # WARNING RGB upper case should give integer but does not work
+            color_map = {id_: annotation.find(id_, key='id')['rgb'] for id_ in
+                         unique_ids}  # WARNING RGB upper case should give integer but does not work
             df['color'] = df['id'].map(color_map)
 
             volumes = annotation.annotation.get_lateralised_volume_map(
@@ -262,11 +272,12 @@ class CellDetector(TabProcessor):
             )
             df['volume'] = df.set_index(['id', 'hemisphere']).index.map(volumes.get)
 
+        df.reset_index(drop=True, inplace=True)  # Reset the index before saving
         df.to_feather(self.workspace.filename('cells', extension='.feather'))
 
     def transform_coordinates(self, coords):
         coords = resampling.resample_points(
-            coords, resampled=None,
+            coords,
             original_shape=self.preprocessor.raw_stitched_shape,
             resampled_shape=self.preprocessor.resampled_shape)
 
@@ -298,10 +309,13 @@ class CellDetector(TabProcessor):
         self.workspace.debug = tuning  # TODO: use context manager
         cell_detection_param = copy.deepcopy(cell_detection.default_cell_detection_parameter)
         cell_detection_param['illumination_correction'] = None  # WARNING: illumination or illumination_correction
-        cell_detection_param['background_correction']['shape'] = self.processing_config['detection']['background_correction']['diameter']
-        cell_detection_param['maxima_detection']['shape'] = self.processing_config['detection']['maxima_detection']['shape']
+        cell_detection_param['background_correction']['shape'] = \
+        self.processing_config['detection']['background_correction']['diameter']
+        cell_detection_param['maxima_detection']['shape'] = self.processing_config['detection']['maxima_detection'][
+            'shape']
         cell_detection_param['intensity_detection']['measure'] = ['source']
-        cell_detection_param['shape_detection']['threshold'] = self.processing_config['detection']['shape_detection']['threshold']
+        cell_detection_param['shape_detection']['threshold'] = self.processing_config['detection']['shape_detection'][
+            'threshold']
         if tuning:
             clearmap_io.delete_file(self.workspace.filename('cells', postfix='bkg'))
             cell_detection_param['background_correction']['save'] = self.workspace.filename('cells', postfix='bkg')
@@ -475,30 +489,27 @@ class CellDetector(TabProcessor):
         p = plot_3d.list_plot_3d(coordinates)
         return plot_3d.plot_3d(self.workspace.filename('stitched'), view=p, cmap=plot_3d.grays_alpha(alpha=1))
 
-    def remove_crust(self, coordinates, voxelization_parameter):
-        dist2surf = clearmap_io.read(self.preprocessor.distance_file_path)
-        threshold = 3
-        # Convert coordinates to integer
-        int_coordinates = np.floor(coordinates).astype(int)
+    def remove_crust(self, df, threshold=3, discard_cells=False):
+        distance_to_surface = clearmap_io.read(self.preprocessor.distance_file_path)
 
-        # Ensure all coordinates are within the dist2surf array bounds
-        valid_indices = (int_coordinates[:, 0] < dist2surf.shape[0]) & \
-                        (int_coordinates[:, 1] < dist2surf.shape[1]) & \
-                        (int_coordinates[:, 2] < dist2surf.shape[2])
+        integer_coordinates = df[['xt', 'yt', 'zt']].values.astype(int)  # Use transformed
 
-        # Apply the mask to get valid coordinates
-        valid_coordinates = int_coordinates[valid_indices]
+        xs, ys, zs = integer_coordinates.T
+        xmax, ymax, zmax = distance_to_surface.shape
+        within_atlas = (xs >= 0) & (xs < xmax) & (ys >= 0) & (ys < ymax) & (zs >= 0) & (zs < zmax)
 
-        # Get the dist2surf values at the valid coordinates
-        dist_values = dist2surf[valid_coordinates[:, 0],
-                                valid_coordinates[:, 1],
-                                valid_coordinates[:, 2]]
+        integer_coordinates = integer_coordinates[within_atlas]
+        integer_coordinates = tuple(integer_coordinates.T)
 
-        # Apply the threshold
-        coordinates_wcrust = valid_coordinates[dist_values > threshold]
+        df = df[within_atlas].copy()  # Ensure we are working on a copy
 
-        voxelization.voxelize(coordinates_wcrust, sink=self.workspace.filename('density', postfix='counts_wcrust'),
-                              **voxelization_parameter)   # WARNING: prange
+        df.loc[:, 'distance_to_surface'] = distance_to_surface[integer_coordinates]
+        if discard_cells:
+            df = df[df['distance_to_surface'] > threshold]
+        else:
+            df.loc[df['distance_to_surface'] <= threshold, 'id'] = 0
+
+        return df
 
     def preview_cell_detection(self, parent=None, arrange=True, sync=True):
         sources = [self.workspace.filename('stitched'),
@@ -541,7 +552,7 @@ class CellDetector(TabProcessor):
         In order to align the coordinates when we have right and left hemispheres,
         if the orientation of the brain is left, will calculate the new coordinates for the Y axes,
         this change will not affect the orientation of the heatmaps, since these are generated from
-        the ClearMap2 file 'cells'
+         the ClearMap2 file 'cells'
 
         .. deprecated:: 2.1
             Use :func:`atlas_align` and `export_collapsed_stats` instead.
@@ -599,6 +610,7 @@ class CellDetector(TabProcessor):
 
 if __name__ == "__main__":
     import sys
+
     preprocessor = PreProcessor()
     preprocessor.setup(sys.argv[1:3])
     preprocessor.setup_atlases()
