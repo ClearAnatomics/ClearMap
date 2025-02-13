@@ -45,7 +45,9 @@ from sklearn import neighbors
 import skimage.morphology
 from scipy.spatial.transform import Rotation
 
-from . import bounding_boxes
+from ClearMap.colocalization import (
+    bounding_boxes,
+)  # absolute import needed for cython style modules since they are built globally
 from .parallelism import compare
 
 
@@ -229,8 +231,9 @@ class Channel:
         np.array
             the flat array of the labels in the nuclei index order
         """
+        coords = self.dataframe[self.coord_names]
         return np.array(
-            [self.labels[tuple(self.dataframe[self.coord_names].iloc[index])] for index in range(len(self.dataframe))]
+            [self.labels[tuple(coords.iloc[index])] for index in range(len(self.dataframe))]
         )
 
     @cached_property
@@ -318,9 +321,9 @@ class Channel:
         # optimized bounding_boxes, to avoid looping on all labels
         if self.labels.ndim == 1:
             res = bounding_boxes.bbox_1d(self.labels)
-        if self.labels.ndim == 2:
+        elif self.labels.ndim == 2:
             res = bounding_boxes.bbox_2d(self.labels)
-        if self.labels.ndim == 3:
+        else:
             res = bounding_boxes.bbox_3d(self.labels)
         return np.ascontiguousarray(res[self.index_label_correspondance])
 
