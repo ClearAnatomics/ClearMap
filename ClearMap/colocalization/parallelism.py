@@ -1,6 +1,9 @@
 # Copyright Gaël Cousin & Charly Rousseau
 from __future__ import annotations
 
+import cProfile
+import tempfile
+
 import numpy as np
 import pandas as pd
 from sklearn import neighbors
@@ -12,6 +15,7 @@ from ..IO import IO as io
 
 import ClearMap.ParallelProcessing.BlockProcessing as blockprocessing
 import ClearMap.ParallelProcessing.Block as block
+from ClearMap.ParallelProcessing import ParallelTraceback as ptb
 
 
 def compare(
@@ -22,10 +26,10 @@ def compare(
     scale,
     coord_names: list[str],
     blob_diameter: int,
-    size_min:int,
-    size_max:int,
+    size_min: int,
+    size_max: int,
     processes: int | None,
-    verbose: bool = True
+    verbose: bool = True,
 ):
     """Make a report on colocalization between two channels
     Parameters
@@ -53,7 +57,7 @@ def compare(
         of processors.
 
     verbose : bool
-        print processing information if True. Defaults To true. 
+        print processing information if True. Defaults To true.
 
     """
 
@@ -89,7 +93,7 @@ def compare(
         verbose=True,
         size_min=size_min,
         size_max=size_max,
-        optimization=False
+        optimization=False,
     )
     # We observe that using as_memory=True leads to a bug due to as_memory_block breaking the slicing attribute
     c0_results = [result[0] for result in results]
@@ -107,7 +111,7 @@ def compare(
     cols = [description + " " + coord_name for coord_name in coord_names]
     points_0 = c0_result[cols].to_numpy() * np.array(scale).reshape((1, -1))
     points_1 = c1_result[cols].to_numpy() * np.array(scale).reshape((1, -1))
-    learner = neighbors.NearestNeighbors(n_neighbors=1,algorithm='brute',n_jobs=-1)
+    learner = neighbors.NearestNeighbors(n_neighbors=1, algorithm="brute", n_jobs=-1)
 
     learner.fit(points_1)
     if len(points_1) > 0:
@@ -128,15 +132,16 @@ def compare(
     if len(points_1) > 0:
         indices = c0_result["index of maximizing overlap blob"].to_numpy()
         c0_result[max_coord_cols] = c1_result[cols].iloc[indices.flatten()].to_numpy()
-    
+
     # reorganize columns
     current_cols = c0_result.columns
-    new_cols=[current_cols.to_list()[i] for i in [0,1,2,3,4,5,-3,-2,-1,6,7,8,9,10]]
-    c0_result=c0_result[new_cols]
+    new_cols = [current_cols.to_list()[i] for i in [0, 1, 2, 3, 4, 5, -3, -2, -1, 6, 7, 8, 9, 10]]
+    c0_result = c0_result[new_cols]
 
     return c0_result
 
 
+@ptb.parallel_traceback
 def local_report(
     block_0: block.Block,
     block_1: block.Block,
@@ -145,7 +150,7 @@ def local_report(
     df_1: pd.DataFrame,
     scale,
     coord_names,
-    verbose:bool =True
+    verbose: bool = True,
 ):
     """Return a report dataframe for the locally computable information.
 
@@ -166,41 +171,52 @@ def local_report(
     blob_diameter : _type_
         _description_
     """
-    if verbose: print(f'entering local_report for {block_0}')
+    # for profiling.
+    # prof = cProfile.Profile()
+    # prof.enable()
+    if verbose:
+        print(f"entering local_report for {block_0}")
 
+    c0_result, c1_result = local_report_body(df_0, df_1, block_0, block_1, coord_names, scale, verbose)
+
+    # prof.disable()
+    # with tempfile.NamedTemporaryFile(suffix="local_report_profile.pstat", delete=False) as prof_file:
+    #     prof.dump_stats(prof_file.name)
+    return c0_result, c1_result
+
+
+def local_report_body(df_0, df_1, block_0, block_1, coord_names, scale, verbose):
     ndim = len(coord_names)
     # compute valid_indices, the ones of nuclei for which we can compute everything in this block
     # and contained_indices, the ones of nuclei whose representative is contained in the block
     # funky query to be pandas version agnostic
     data_array_0 = df_0[coord_names].to_numpy()
     data_array_1 = df_1[coord_names].to_numpy()
-
     upper_bounds = block_0.base.shape
     slices = block_0.valid.base_slicing
     start_array = np.array([0 if slices[i].start is None else slices[i].start for i in range(ndim)])
     stop_array = np.array([upper_bounds[i] if slices[i].stop is None else slices[i].stop for i in range(ndim)])
-    valid_indices_0 = np.where(np.all((data_array_0 < stop_array) & (data_array_0 >= start_array),axis=1))[0]
-    valid_indices_1 = np.where(np.all((data_array_1 < stop_array) & (data_array_1 >= start_array),axis=1))[0]
-
-
+    valid_indices_0 = np.where(np.all((data_array_0 < stop_array) & (data_array_0 >= start_array), axis=1))[0]
+    valid_indices_1 = np.where(np.all((data_array_1 < stop_array) & (data_array_1 >= start_array), axis=1))[0]
     slices = block_0.slicing
     start_array = np.array([0 if slices[i].start is None else slices[i].start for i in range(ndim)])
     stop_array = np.array([upper_bounds[i] if slices[i].stop is None else slices[i].stop for i in range(ndim)])
     # contained_indices_1 needed to compute all the overlaps but the bounded boxes for contained indices might trespass the block border
     # we cannot compute the bbox center correctly for all elements, whnece the use of valid_indices_1 afterwards.
-    contained_indices_1 = np.where(np.all((data_array_1 < stop_array) & (data_array_1 >= start_array),axis=1))[0]
-
+    contained_indices_1 = np.where(np.all((data_array_1 < stop_array) & (data_array_1 >= start_array), axis=1))[0]
     sub_df_0 = df_0.iloc[valid_indices_0].reset_index()
     sub_df_1 = df_1.iloc[contained_indices_1].reset_index()
-    channel_0 = channel.Channel(block_0.array, sub_df_0[coord_names] - start_array, voxel_dims=scale, coord_names=coord_names)
-    channel_1 = channel.Channel(block_1.array, sub_df_1[coord_names] - start_array, voxel_dims=scale, coord_names=coord_names)
-
-    if verbose: print(f'computing blobwise overlaps for {block_0}')
-
+    channel_0 = channel.Channel(
+        block_0.array, sub_df_0[coord_names] - start_array, voxel_dims=scale, coord_names=coord_names
+    )
+    channel_1 = channel.Channel(
+        block_1.array, sub_df_1[coord_names] - start_array, voxel_dims=scale, coord_names=coord_names
+    )
+    if verbose:
+        print(f"computing blobwise overlaps for {block_0}")
     max_overlaps, max_overlaps_indices = channel_0.max_blobwise_overlaps(channel_1, return_max_indices=True)
-
-    if verbose: print(f'computing bbbox centers for channe1_0 in {block_0}')
-
+    if verbose:
+        print(f"computing bbox centers for channel_0 in {block_0}")
     centers_df_0 = channel_0.centers_df()
     c0_result = centers_df_0.set_index(sub_df_0["index"]) + start_array
     blobwise_overlap_df = pd.DataFrame(
@@ -212,17 +228,16 @@ def local_report(
     )
     blobwise_overlap_df = blobwise_overlap_df.set_index(sub_df_0["index"])
     c0_result = c0_result.join(blobwise_overlap_df, validate="1:1")
-
     # correct centers computation for channel_1
     sub_df_1 = df_1.iloc[valid_indices_1].reset_index()
-    channel_1 = channel.Channel(block_1.array, sub_df_1[coord_names] - start_array, voxel_dims=scale, coord_names=coord_names)
-    
-    if verbose: print(f'computing bbbox centers for channe1_1 in {block_0}')
-
+    channel_1 = channel.Channel(
+        block_1.array, sub_df_1[coord_names] - start_array, voxel_dims=scale, coord_names=coord_names
+    )
+    if verbose:
+        print(f"computing bbox centers for channel_1 in {block_0}")
     centers_df_1 = channel_1.centers_df() + start_array
     c1_result = centers_df_1.set_index(sub_df_1["index"])
-
     # the distances will be computed from the final joined dataframes.
-    if verbose: print(f'returning results of local_report for {block_0}')
-
+    if verbose:
+        print(f"returning results of local_report for {block_0}")
     return c0_result, c1_result
