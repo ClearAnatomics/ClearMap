@@ -208,17 +208,22 @@ class Channel:
 
         self._overlaps_dic = {}
 
+        self._labels = None
+        self.__bounding_boxes_array = None
+        self.__centers = None
+
     @property
     def representative_points(self):
         return self.dataframe[self.coord_names]
 
-    @cached_property
+    # @cached_property
     def labels(
         self,
     ):  # TODO optimize relabeling from representatives, eg with watershedding
         """Return the labeled image from the binary mask"""
-        labels, _ = ndi.label(self.binary_img)
-        return labels
+        if self._labels is None:
+            self._labels, _ = ndi.label(self.binary_img)
+        return self._labels
 
     @cached_property
     def index_label_correspondance(self) -> np.array:
@@ -229,9 +234,8 @@ class Channel:
         np.array
             the flat array of the labels in the nuclei index order
         """
-        return np.array(
-            [self.labels[tuple(self.dataframe[self.coord_names].iloc[index])] for index in range(len(self.dataframe))]
-        )
+        coords = self.dataframe[self.coord_names]
+        return np.array([self.labels()[tuple(coords.iloc[index])] for index in range(len(self.dataframe))])
 
     @cached_property
     def label_index_correspondance(self):
@@ -270,7 +274,7 @@ class Channel:
         index for the chosen representative point in self.dataframe
 
         """
-        return self.index_label_correspondance[index] == self.labels
+        return self.index_label_correspondance[index] == self.labels()
 
     def bounding_box(self, i) -> tuple[slice, ...]:
         """Return the bounding box of the ith nucleus.
@@ -287,7 +291,7 @@ class Channel:
             the bounding box
         """
 
-        return tuple(slice(*[self._bounding_boxes_array[i, axis, j] + j for j in range(2)]) for axis in self.ndim)
+        return tuple(slice(*[self._bounding_boxes_array()[i, axis, j] + j for j in range(2)]) for axis in self.ndim)
 
     # kept mainly for comparison and for the generic case of function below
     def _naive_bounding_boxes_array(self):
@@ -298,9 +302,9 @@ class Channel:
             stack += [[[locus[i].min(), locus[i].max()] for i in range(self.ndim)]]
         return np.array(stack)
 
-    @cached_property
+    # @cached_property
     def _bounding_boxes_array(self):
-        """Return an array that specifies the bounding boxes for self.labels
+        """Return an array that specifies the bounding boxes for self.labels()
 
         Returns
         -------
@@ -313,22 +317,28 @@ class Channel:
             Beware that from this max, 1 must added to obtained the stop attribute
             for a slice defining the corresponding bounding box.
         """
-        if self.labels.ndim not in [1, 2, 3]:
-            return self._naive_bounding_boxes_array()
+        if self.labels().ndim not in [1, 2, 3]:
+            if self.__bounding_boxes_array is None:
+                self.__bounding_boxes_array = self._naive_bounding_boxes_array()
+            return self.__bounding_boxes_array
         # optimized bounding_boxes, to avoid looping on all labels
-        if self.labels.ndim == 1:
-            res = bounding_boxes.bbox_1d(self.labels)
-        if self.labels.ndim == 2:
-            res = bounding_boxes.bbox_2d(self.labels)
-        if self.labels.ndim == 3:
-            res = bounding_boxes.bbox_3d(self.labels)
-        return np.ascontiguousarray(res[self.index_label_correspondance])
+        if self.__bounding_boxes_array is None:
+            if self.labels().ndim == 1:
+                res = bounding_boxes.bbox_1d(self.labels())
+            elif self.labels().ndim == 2:
+                res = bounding_boxes.bbox_2d(self.labels())
+            else:
+                res = bounding_boxes.bbox_3d(self.labels())
+            self.__bounding_boxes_array = np.ascontiguousarray(res[self.index_label_correspondance])
+        return self.__bounding_boxes_array
 
-    @cached_property
+    # @cached_property
     def centers(self):
-        starts = self._bounding_boxes_array[:, :, 0].astype("float32")
-        stops = self._bounding_boxes_array[:, :, 1].astype("float32")
-        return (starts + stops) / 2
+        if self.__centers is None:
+            starts = self._bounding_boxes_array()[:, :, 0].astype("float32")
+            stops = self._bounding_boxes_array()[:, :, 1].astype("float32")
+            self.__centers = (starts + stops) / 2
+        return self.__centers
 
     def center(self, i) -> tuple[int, ...]:
         """Return the center of the bounding box of the ith nucleus.
@@ -343,11 +353,11 @@ class Channel:
         tuple[int,...]
             the tuple of coords for the central voxel
         """
-        return tuple(self.centers[i])
+        return tuple(self.centers()[i])
 
     def centers_df(self, description="center of bounding box"):
         cols = [description + " " + coord_name for coord_name in self.coord_names]
-        return pd.DataFrame(self.centers, columns=cols)
+        return pd.DataFrame(self.centers(), columns=cols)
 
     @cached_property
     def sizes(self):
@@ -358,7 +368,7 @@ class Channel:
         list[int]
             The list of sizes of nuclei in the order of our dataframe.
         """
-        return np.bincount(self.labels.flatten())[self.index_label_correspondance]
+        return np.bincount(self.labels().flatten())[self.index_label_correspondance]
 
     def masked_sizes(self, mask):
         """Return the list of the sizes of the non-masked part of each nucleus
@@ -369,7 +379,7 @@ class Channel:
             The list of counts of True pixels in mask for each nucleus, in the
             order of our dataframe.
         """
-        return np.bincount((mask * self.labels).flatten(), minlength=self.sizes.size + 1)[
+        return np.bincount((mask * self.labels()).flatten(), minlength=self.sizes.size + 1)[
             self.index_label_correspondance
         ]
 
@@ -394,15 +404,11 @@ class Channel:
         Compute and store the matrix M of overlaps wher M[i,j] is the overlap between blob
         of index i for self and the blob of index j for other_channel.
         """
-        counts = bilabel_bincount(self.labels, other_channel.labels)
-        # we reorder the lines and cols from label orders to index orders
-        col_selector = np.zeros((counts.shape[1], len(other_channel.index_label_correspondance)), dtype="int64")
-        col_selector[other_channel.index_label_correspondance, np.arange(col_selector.shape[1])] = 1
+        counts = bilabel_bincount(self.labels(), other_channel.labels())
+        self._overlaps_dic[other_channel.name] = self._reorder_counts(other_channel, counts)
 
-        line_selector = np.zeros((len(self.index_label_correspondance), counts.shape[0]), dtype="int64")
-        line_selector[np.arange(line_selector.shape[0]), self.index_label_correspondance] = 1
-        res = line_selector @ counts @ col_selector
-        self._overlaps_dic[other_channel.name] = res
+    def _reorder_counts(self, other_channel, counts):
+        return counts[self.index_label_correspondance, :][:, other_channel.index_label_correspondance]
 
     def blobwise_overlaps(self, other_channel: Channel) -> np.ndarray:
         """Return the matrix of overlaps.
@@ -507,9 +513,9 @@ class Channel:
             of the nucleus indexed by index_1 in self.dataframe and  the nucleus
             indexed by index_2 in other_channel.dataframe.
         """
-        physical_centers_1 = self.centers * (self.voxel_dims.reshape((1, -1))) + self.physical_origin
+        physical_centers_1 = self.centers() * (self.voxel_dims.reshape((1, -1))) + self.physical_origin
         physical_centers_2 = (
-            other_channel.centers * (other_channel.voxel_dims.reshape((1, -1))) + other_channel.physical_origin
+            other_channel.centers() * (other_channel.voxel_dims.reshape((1, -1))) + other_channel.physical_origin
         )
 
         return distances(physical_centers_1, physical_centers_2)
