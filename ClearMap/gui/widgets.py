@@ -28,7 +28,8 @@ from PyQt5.QtGui import QColor, QIcon
 from PyQt5.QtWidgets import (QWidget, QDialogButtonBox, QListWidget, QHBoxLayout,
                              QPushButton, QVBoxLayout, QTableWidget, QTableWidgetItem,
                              QToolBox, QRadioButton, QTreeWidget, QTreeWidgetItem,
-                             QTabWidget, QListWidgetItem, QFileDialog, QSpinBox, QDoubleSpinBox, QComboBox, QLineEdit)
+                             QTabWidget, QListWidgetItem, QFileDialog, QSpinBox, QDoubleSpinBox, QComboBox, QLineEdit,
+                             QMessageBox)
 
 from ClearMap import Settings
 from ClearMap.IO.assets_constants import DATA_CONTENT_TYPES, EXTENSIONS
@@ -1135,6 +1136,13 @@ class PatternDialog(WizardDialog):
         update_pbar(self.app, progress_bar.mainProgressBar, 100)
         return pattern_finders
 
+    def get_channel_names(self):
+        names = []
+        for i in range(self.dlg.patternToolBox.count()):
+            page = self.dlg.patternToolBox.widget(i)
+            names.append(page.channelNameLineEdit.text())
+        return names
+
     def save_results(self):
         """
         Save the file patterns to the `sample` configuration file and close the dialog
@@ -1762,7 +1770,15 @@ class ExtendableTabWidget(QTabWidget):
         self.setCurrentWidget(widget)
         return tab_name
 
-    def get_channel_widget(self, name, return_idx=False):
+    def remove_channel_widget(self, name):
+        widget, idx = self.get_channel_widget(name, return_idx=True)
+        if widget:
+            self.removeTab(idx)
+            widget.deleteLater()
+
+    def get_channel_widget(self, name=None, return_idx=False):
+        if name is None:
+            name = self.current_channel()
         for i in range(self.last_real_tab_idx):
             if self.tabText(i) == name:
                 if return_idx:

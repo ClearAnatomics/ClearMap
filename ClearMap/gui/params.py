@@ -120,6 +120,10 @@ class SampleParameters(UiParameterCollection):
     def __setitem__(self, key, value):
         self.channel_params[key] = value
 
+    def pop(self, key):
+        self.config['channels'].pop(key)
+        return self.channel_params.pop(key)
+
     def keys(self):
         return self.channel_params.keys()
 
