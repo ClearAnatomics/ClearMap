@@ -369,9 +369,7 @@ def transform_directory_and_file(transform_parameter_file=None, transform_direct
         transform_parameter_dir = transform_directory
         transform_parameter_file = transform_file(transform_parameter_dir)
     else:
-        transform_parameter_dir = os.path.split(transform_parameter_file)
-        transform_parameter_dir = transform_parameter_dir[0]
-        transform_parameter_file = transform_parameter_file
+        transform_parameter_dir = os.path.dirname(transform_parameter_file)
 
     return transform_parameter_dir, transform_parameter_file
 
@@ -955,7 +953,8 @@ def write_points(filename, points, indices=False, binary=True):
       File name of the elastix point file.
     """
 
-    points = io.read(points)
+    if not isinstance(points, np.ndarray):
+        points = io.read(points)
 
     if binary:
         with open(filename, 'wb') as point_file:
@@ -1036,7 +1035,7 @@ def read_points(filename, indices=False, binary=True):
 
 
 def transform_points(source, sink=None, transform_parameter_file=None, transform_directory=None, indices=False,
-                     result_directory=None, temp_file=None, binary=True):
+                     result_directory=None, temp_file=None, binary=True, n_processes=None):
     """Transform coordinates math:`x` via elastix estimated transformation to :math:`T(x)`.
 
     Arguments
@@ -1110,6 +1109,8 @@ def transform_points(source, sink=None, transform_parameter_file=None, transform
     # run transformix
     check_spaces(point_file, out_dirname, transform_parameter_file)
     cmd = f'{transformix_binary} -def {point_file} -out {out_dirname} -tp {transform_parameter_file}'
+    if n_processes is not None:
+        cmd += f' -threads {n_processes}'
     print(cmd)
 
     res = os.system(cmd)
