@@ -121,6 +121,21 @@ def abort_retry_popup(base_msg, msg):  # REFACTOR: duplicate code
     return dlg.exec()
 
 
+class AboutDialog(QDialog):
+    def __init__(self, about_info, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(f"About {about_info.software_name}")
+
+        about_label = QLabel()
+        about_label.setOpenExternalLinks(True)
+        about_label.setTextInteractionFlags(Qt.TextBrowserInteraction)
+        about_label.setText(about_info.to_html())
+
+        layout = QVBoxLayout()
+        layout.addWidget(about_label)
+        self.setLayout(layout)
+
+
 # REFACTOR: make class
 def make_nested_progress_dialog(title='Processing', overall_maximum=100, sub_process_name='', abort_callback=None, parent=None):
     dlg = create_clearmap_widget('nested_progress_dialog.ui', patch_parent_class='QDialog', window_title='Progress')
