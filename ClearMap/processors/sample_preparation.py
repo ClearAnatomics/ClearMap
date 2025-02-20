@@ -1254,46 +1254,20 @@ class StitchingProcessor(TabProcessor):
         return overlay
 
 
-class PreProcessor(TabProcessor):
-    """
-    Handle the stitching and alignment of the raw images
-    """
-    def __init__(self):
-        super().__init__()
+def init_sample_manager_and_processors(folder='', configs=None):
+    sample_manager = SampleManager()
+    if folder:
+        sample_manager.setup(src_dir=folder)
+    elif configs:
+        sample_manager.setup(configs)
 
-        self.sample_manager = SampleManager()
-        self.stitching_processor = StitchingProcessor(self.sample_manager)
-        self.registration_processor = RegistrationProcessor(self.sample_manager)
+    stitcher = StitchingProcessor(sample_manager)
+    stitcher.setup()
 
-        # if not runs_on_spyder():
-        #     pyqtgraph.mkQApp()
-        if not os.path.exists(CLEARMAP_CFG_DIR):
-            update_default_config()
+    registration_processor = RegistrationProcessor(sample_manager)
+    registration_processor.setup()
 
-    def setup(self, configs, convert_tiles=False):
-        self.sample_manager.setup(configs['sample'])
-        self.stitching_processor.setup(configs['stitching'])
-        self.registration_processor.setup(configs['registration'])
-        if convert_tiles:
-            self.stitching_processor.convert_tiles()
-
-    def run(self):
-        self.stitching_processor.stitch()
-        self.registration_processor.resample_for_registration()
-        self.registration_processor.align()
-        return (self.sample_manager.workspace,
-                self.sample_manager.get_configs(),
-                self.registration_processor.get_atlas_files())
-
-def main():
-    preprocessor = PreProcessor()
-    preprocessor.setup(sys.argv[1:3])
-    preprocessor.setup_atlases()
-    preprocessor.run()
-
-
-if __name__ == '__main__':
-    main()
+    return {'sample_manager': sample_manager, 'stitcher': stitcher, 'registration_processor': registration_processor}
 
 
 def init_preprocessor(folder, atlas_base_name=None, convert_tiles=False):
