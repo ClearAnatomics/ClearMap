@@ -632,7 +632,8 @@ class ExpressionAsset(Asset):
         if self.is_tiled:
             raise ValueError(f'Asset {self} is tiled. Cannot determine shape without stitching.')
         else:
-            return clearmap_io.shape(self.file_list[0]) * len(self.file_list)
+            tile_shape = clearmap_io.shape(self.file_list[0])
+            return len(self.file_list), tile_shape[0], tile_shape[1]
 
     def convert(self, new_extension, processes=None, verbose=False, **kwargs):
         if self.is_existing_source:
