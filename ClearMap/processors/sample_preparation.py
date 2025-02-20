@@ -592,11 +592,14 @@ class RegistrationProcessor(TabProcessor):
         else:
             src_res = self.sample_manager.config['channels'][channel]['resolution']
 
-        # TODO: IMPROVE: use img metadata or z pattern instead
-        alignment_source = self.get('raw', channel=self.sample_manager.alignment_reference_channel)
-        n_planes = len(alignment_source.file_list)
-        if n_planes < 2:  # e.g. 1 file
-            n_planes = clearmap_io.shape(alignment_source.path)[-1]
+        if source.is_tiled:
+            if 'Z' in source.tag_names:
+                n_planes = source.expression.tag_range('Z')[1] + 1
+            else:
+                n_planes = clearmap_io.shape(source.file_list[0])[0]
+        else: # Stacked or single file, take the first dimension of the asset
+            n_planes = source.shape[0]
+
         self.prepare_watcher_for_substep(n_planes, self.__resample_re, f'Resampling {channel}',
                                          increment_main=increment_main)
 
