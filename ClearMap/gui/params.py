@@ -16,7 +16,7 @@ from typing import List
 import numpy as np
 
 from PyQt5.QtCore import Qt, pyqtSignal
-from PyQt5.QtWidgets import QInputDialog, QToolBox, QCheckBox, QPushButton, QLabel, QSlider, QHBoxLayout
+from PyQt5.QtWidgets import QInputDialog, QToolBox, QCheckBox, QPushButton, QLabel, QSlider, QHBoxLayout, QComboBox
 
 from ClearMap.IO.assets_constants import CONTENT_TYPE_TO_PIPELINE
 from ClearMap.Utils.utilities import validate_orientation, snake_to_title
@@ -1426,8 +1426,12 @@ class GroupAnalysisParams(BatchParameters):
 
     def __init__(self, tab, preferences=None):
         super().__init__(tab, preferences)
-
+        # self.params_dict = {
+        #     'plot_channel': ParamLink(None, self.tab.plotChannelComboBox),
+        # }
+        self.plot_density_maps_buttons = []
         self.comparison_checkboxes = []
+        self.plot_channel = ''
 
     def _ui_to_cfg(self):
         super()._ui_to_cfg()
@@ -1463,18 +1467,33 @@ class GroupAnalysisParams(BatchParameters):
 
     def update_comparisons(self):
         clear_layout(self.tab.comparisonsVerticalLayout)
+
+        # checkboxes
         self.comparison_checkboxes = []
         for pair in self.comparisons:
             chk = QCheckBox(self.group_concatenator.join(pair))
             chk.setChecked(False)
             self.tab.comparisonsVerticalLayout.addWidget(chk)
             self.comparison_checkboxes.append(chk)
+
         self.tab.comparisonsVerticalLayout.addStretch()
+
+        # plot buttons
         self.plot_density_maps_buttons = []
         for gp in self.group_names:
             btn = QPushButton(f'Plot {gp} group density maps')
             self.tab.comparisonsVerticalLayout.addWidget(btn)
             self.plot_density_maps_buttons.append(btn)
+
+        self.tab.comparisonsVerticalLayout.addStretch()
+
+        plot_channel_combobox = QComboBox()
+        plot_channel_combobox.addItems(self.main_params.sample_params.channels_to_detect)
+        self.tab.comparisonsVerticalLayout.addWidget(plot_channel_combobox)
+        plot_channel_combobox.currentTextChanged.connect(self.handle_plot_channel_changed)
+
+    def handle_plot_channel_changed(self):
+        self.plot_channel = self.tab.plotChannelComboBox.currentText()
 
 
 class BatchProcessingParams(BatchParameters):

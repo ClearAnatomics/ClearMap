@@ -139,7 +139,8 @@ from ClearMap.Visualization.Matplotlib.PlotUtils import plot_sample_stats_histog
 from ClearMap.Visualization.Qt.utils import link_dataviewers_cursors
 from ClearMap.Visualization.Qt import Plot3d as plot_3d
 
-from ClearMap.processors.sample_preparation import init_preprocessor, StitchingProcessor, RegistrationProcessor
+from ClearMap.processors.sample_preparation import (StitchingProcessor,
+                                                    RegistrationProcessor,  init_sample_manager_and_processors)
 from ClearMap.processors.cell_map import CellDetector
 try:
     from ClearMap.processors.tube_map import BinaryVesselProcessor, VesselGraphProcessor
@@ -1428,7 +1429,7 @@ class GroupAnalysisProcessor:
         self.progress_watcher = progress_watcher
         self.annotator = None  # FIXME:
 
-    def plot_p_vals(self, selected_comparisons, groups, parent=None):
+    def plot_p_vals(self, selected_comparisons, groups, channel, parent=None):
         p_vals_imgs = []
         for pair in selected_comparisons:  # TODO: Move to processor object to be wrapped
             gp1_name, gp2_name = pair
@@ -1436,15 +1437,16 @@ class GroupAnalysisProcessor:
             p_val_path = self.results_folder / f'p_val_colors_{gp1_name}_{gp2_name}.tif'
 
             p_vals_imgs.append(clm_io.read(p_val_path))
-        pre_proc = init_preprocessor(self.results_folder / groups[selected_comparisons[0][0]][0])
-        atlas = clm_io.read(pre_proc.annotation_file_path)
+        folder = self.results_folder / groups[selected_comparisons[0][0]][0]
+        processors = init_sample_manager_and_processors(folder)
+        registration_processor = processors['registration_processor']
         if len(p_vals_imgs) == 1:
             gp1_name, gp2_name = selected_comparisons[0]
             gp1_avg = clm_io.read(self.results_folder / f'avg_density_{gp1_name}.tif')
             gp1_sd_path = self.results_folder / f'sd_density_{gp1_name}.tif'
             gp2_avg = clm_io.read(self.results_folder / f'avg_density_{gp2_name}.tif')
             gp2_sd_path = self.results_folder / f'sd_density_{gp2_name}.tif'
-            colored_atlas = pre_proc.annotators[channel].create_color_annotation()
+            colored_atlas = registration_processor.annotators[channel].create_color_annotation()
             gp1_imgs = gp1_avg
             if gp1_sd_path.exists():
                 gp1_sd = clm_io.read(gp1_sd_path)
@@ -1475,13 +1477,14 @@ class GroupAnalysisProcessor:
                            parent=parent)
         names_map = self.annotator.get_names_map()
         for dv in dvs:
-            dv.atlas = atlas
+            dv.atlas = registration_processor.annotators[channel].atlas
             dv.structure_names = names_map
         link_dataviewers_cursors(dvs)
         return dvs
 
     def compute_p_vals(self, selected_comparisons, groups, wrapping_func, advanced=False):
         for pair in selected_comparisons:  # TODO: Move to processor object to be wrapped
+            # FIXME: for all channels
             gp1_name, gp2_name = pair
             gp1, gp2 = [groups[gp_name] for gp_name in pair]
             _ = density_files_are_comparable(self.results_folder, gp1, gp2)
@@ -1509,14 +1512,15 @@ class GroupAnalysisProcessor:
             dvs.append(browser)
         return dvs
 
-    def plot_density_maps(self, group_folders, parent=None):
+    def plot_density_maps(self, group_folders, channel, parent=None):
         density_map_paths = []
         titles = []
         for folder in group_folders:
-            preproc = init_preprocessor(folder)
-            map_path = preproc.workspace.filename('density', postfix='counts')
+            managers = init_sample_manager_and_processors(folder)
+            sample_manager = managers['sample_manager']
+            map_path = sample_manager.get('density', channel=channel, asset_sub_type='counts').path
             density_map_paths.append(map_path)  # TODO: make work for tubemap too
-            titles.append(preproc.sample_config['sample_id'])
+            titles.append(sample_manager.config['sample_id'])
         luts = ['flame'] * len(density_map_paths)
         dvs = plot_3d.plot(density_map_paths, title=titles, arrange=False, sync=True, lut=luts, parent=parent)
         link_dataviewers_cursors(dvs)
@@ -1529,6 +1533,9 @@ class GroupAnalysisTab(BatchTab):
         self.processor = GroupAnalysisProcessor(self.main_window.progress_watcher)
 
         self.advanced_controls_names = ['computeSdAndEffectSizeCheckBox']
+
+    def _set_channels_names(self):
+        pass  # TODO: check if required
 
     def _set_params(self):
         self.params = GroupAnalysisParams(self.ui, preferences=self.main_window.preference_editor.params)
@@ -1552,7 +1559,7 @@ class GroupAnalysisTab(BatchTab):
     #     self.processor = BatchProcessor(self.params.config)
 
     def handle_tool_changed(self, idx):
-        if idx == 1:
+        if idx == 1:  # Density maps
             for i, gp in enumerate(self.params.group_names):
                 self.params.plot_density_maps_buttons[i].clicked.connect(
                     functools.partial(self.plot_density_maps, gp))
@@ -1562,26 +1569,12 @@ class GroupAnalysisTab(BatchTab):
         self.main_window.print_status_msg('Plotting density maps')
 
         self.main_window.clear_plots()  # TODO: use wrap_plot
-        dvs = self.processor.plot_density_maps(self.params.groups[group_name], parent=self.main_window.centralWidget())
+        dvs = self.processor.plot_density_maps(self.params.groups[group_name],
+                                               channel=self.params.plot_channel,
+                                               parent=self.main_window.centralWidget())
         self.main_window.setup_plots(dvs)
 
-    def make_group_stats_tables(self):
-        self.main_window.print_status_msg('Computing stats table')
-        self.main_window.clear_plots()
-        # TODO: set abort callback
-        self.main_window.make_progress_dialog('Group stats', n_steps=len(self.params.selected_comparisons))
-        dvs = []
-        for gp1_name, gp2_name in self.params.selected_comparisons:
-            df = self.main_window.wrap_in_thread(make_summary, self.params.results_folder,
-                                                 gp1_name, gp2_name,
-                                                 self.params.groups[gp1_name], self.params.groups[gp2_name],
-                                                 output_path=None, save=True)
-            self.main_window.progress_watcher.increment_main_progress()
-            dvs.append(DataFrameWidget(df).table)
-        self.main_window.setup_plots(dvs)
-        self.main_window.signal_process_finished()
-
-    def run_p_vals(self):  # REFACTOR: split compute and display
+    def run_p_vals(self):
         self.params.ui_to_cfg()
 
         self.main_window.print_status_msg('Computing p_val maps')
@@ -1590,15 +1583,32 @@ class GroupAnalysisTab(BatchTab):
         try:
             self.processor.compute_p_vals(self.params.selected_comparisons, self.params.groups,
                                           self.main_window.wrap_in_thread,
-                                          advanced=self.ui.advancedCheckBox.isChecked())
+                                          advanced=self.params.compute_sd_and_effect_size)
         except GroupStatsError as err:
             self.main_window.popup(str(err), base_msg='Cannot proceed with analysis')
+        self.main_window.signal_process_finished()
+
+    def make_group_stats_tables(self):
+        self.main_window.print_status_msg('Computing stats table')
+        self.main_window.clear_plots()
+        # TODO: set abort callback
+        self.main_window.make_progress_dialog('Group stats', n_steps=len(self.params.selected_comparisons))
+        dvs = []
+        for gp1_name, gp2_name in self.params.selected_comparisons:
+            dfs = self.main_window.wrap_in_thread(make_summary, self.params.results_folder,
+                                                 gp1_name, gp2_name,
+                                                 self.params.groups[gp1_name], self.params.groups[gp2_name],
+                                                 output_path=None, save=True)
+            self.main_window.progress_watcher.increment_main_progress()
+            dvs.append(DataFrameWidget(dfs[channel]).table)  # FIXME:
+        self.main_window.setup_plots(dvs)
         self.main_window.signal_process_finished()
 
     def plot_p_vals(self):
         self.main_window.clear_plots()
         self.main_window.print_status_msg('Plotting p_val maps')
         dvs = self.processor.plot_p_vals(self.params.selected_comparisons, self.params.groups,
+                                         channel=self.params.plot_channel,
                                          parent=self.main_window.centralWidget())
         self.main_window.setup_plots(dvs)  # TODO: use wrap_plot
 
@@ -1611,6 +1621,7 @@ class GroupAnalysisTab(BatchTab):
         self.run_plots(plot_volcano, {'group_names': None, 'p_cutoff': 0.05, 'show': False, 'save_path': ''})
 
     def plot_histograms(self, fold_threshold=2):
+        # FIXME: use aligner.annotators[channel]
         aba_json_df_path = annotation.default_label_file  # FIXME: aba_json needs fold levels
         self.run_plots(plot_sample_stats_histogram, {'aba_df': pd.read_csv(aba_json_df_path),
                                                      'sort_by_order': True, 'value_cutoff': 0,
@@ -1622,6 +1633,9 @@ class BatchProcessingTab(BatchTab):
     def __init__(self, main_window, tab_idx):
         super().__init__(main_window, tab_idx)
         self.processor = BatchProcessor(self.main_window.progress_watcher)
+
+    def _set_channels_names(self):
+        pass  # TODO: check if required
 
     def _set_params(self):
         self.params = BatchProcessingParams(self.ui, preferences=self.main_window.preference_editor.params)
