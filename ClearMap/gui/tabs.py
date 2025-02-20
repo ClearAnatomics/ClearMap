@@ -452,10 +452,9 @@ class StitchingTab(PreProcessingTab):
         self.sample_params.ui_to_cfg()
         self.stitcher.setup(self.sample_manager, convert_tiles=False)
 
-        # FIXME: this has to come after self.set_channels_names
-        if self.sample_manager.has_tiles() and not self.sample_manager.has_npy():
-            if  prompt_dialog('Tile conversion', 'Convert individual tiles to npy for efficiency'):
-                self.convert_tiles()
+        # if self.sample_manager.has_tiles() and not self.sample_manager.has_npy():
+        #     if  prompt_dialog('Tile conversion', 'Convert individual tiles to npy for efficiency'):
+        #         self.convert_tiles()
 
     def handle_layout_channel_changed(self, channel, layout_channel):
         self.layout_channel_changed.emit(channel, layout_channel)
@@ -539,6 +538,8 @@ class StitchingTab(PreProcessingTab):
             cfg = self.params[channel]
             if not cfg.shared.run:
                 continue
+            if self.params[channel].shared.use_npy and not self.sample_manager.has_npy(channel):
+                self.convert_tiles()
             kwargs = {'n_steps': n_steps, 'abort_func': self.stitcher.stop_process, 'close_when_done': False}
             try:
                 if channel == cfg.shared.layout_channel:  # Used as reference
