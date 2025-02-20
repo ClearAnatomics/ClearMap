@@ -338,10 +338,12 @@ class BaseMetadataParser:
             shape, order = zip(*muxed)
             shape = list(shape)
             order = list(order)
-            if len(shape) > len(self.source.shape):  # pop virtual C dimension
-                c_loc = [i for i, d in enumerate(order) if d == 'C'][0]
-                shape.pop(c_loc)
-                order.pop(c_loc)
+            if len(shape) > len(self.source.shape):  # Remove any extra dimensions (with shape 1), by priority
+                for extra_axis in 'TCZ':
+                    if extra_axis in order:
+                        axis_idx = [i for i, d in enumerate(order) if d == extra_axis][0]
+                        shape.pop(axis_idx)
+                        order.pop(axis_idx)
             self.info['order'] = order
             self.info['shape'] = self.source.shape
 
