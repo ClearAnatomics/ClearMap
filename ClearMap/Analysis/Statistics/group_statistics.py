@@ -14,10 +14,10 @@ __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
 import math
 import os
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
-import tifffile
 from scipy import stats
 
 import ClearMap.Analysis.Statistics.StatisticalTests as clearmap_stat_tests
@@ -28,7 +28,8 @@ from ClearMap.IO import IO as clearmap_io
 from ClearMap.Utils.exceptions import GroupStatsError
 from ClearMap.Utils.path_utils import is_density_file, find_density_file, find_cells_df, dir_to_sample_id
 from ClearMap.Utils.utilities import make_abs
-from ClearMap.processors.sample_preparation import init_preprocessor
+from ClearMap.config.atlas import ATLAS_NAMES_MAP
+from ClearMap.processors.sample_preparation import init_sample_manager_and_processors, SampleManager
 
 colors = {  # REFACTOR: move to visualisation module
     'red': [255, 0, 0],
@@ -230,7 +231,7 @@ def remove_p_val_nans(p_vals, t_vals):
     return p_vals_c, t_vals_c
 
 
-def stack_voxelizations(directory, f_list, suffix):
+def stack_voxelizations(directory, f_list, suffix, channel=None):
     """
     Regroup voxelizations to simplify further processing
 
@@ -252,19 +253,19 @@ def stack_voxelizations(directory, f_list, suffix):
             stacked_voxelizations = np.concatenate((stacked_voxelizations, img[:, :, :, np.newaxis]), axis=3)
     stacked_voxelizations = stacked_voxelizations.astype(np.float32)
     try:
-        clearmap_io.write(os.path.join(directory, f'stacked_density_{suffix}.tif'), stacked_voxelizations, bigtiff=True)
+        clearmap_io.write(directory /f'{channel}_stacked_density_{suffix}.tif', stacked_voxelizations, bigtiff=True)
     except ValueError:
         pass
     return stacked_voxelizations
 
 
-def average_voxelization_groups(stacked_voxelizations, directory, suffix, compute_sd=False):
+def average_voxelization_groups(stacked_voxelizations, directory, suffix, channel='', compute_sd=False):
     avg_voxelization = np.mean(stacked_voxelizations, axis=3)
-    clearmap_io.write(os.path.join(directory, f'avg_density_{suffix}.tif'), avg_voxelization)
+    clearmap_io.write(directory / f'{channel}_avg_density_{suffix}.tif', avg_voxelization)
 
     if compute_sd:
         sd_voxelization = np.std(stacked_voxelizations, axis=3)
-        clearmap_io.write(os.path.join(directory, f'sd_density_{suffix}.tif'), sd_voxelization)
+        clearmap_io.write(directory / f'{channel}_sd_density_{suffix}.tif', sd_voxelization)
 
 
 # REFACTOR: move to visualisation module
@@ -348,12 +349,12 @@ def get_colored_p_vals(p_vals, t_vals, significance, color_names):
                           negative_color=colors[color_names[1]])
 
 
-def dirs_to_density_files(directory, f_list):
+def dirs_to_density_files(directory, f_list, channel):
     out = []
     for i, f_name in enumerate(f_list):
         f_name = make_abs(directory, f_name)
         if not is_density_file(f_name):
-            f_name = find_density_file(f_name)
+            f_name = find_density_file(f_name, channel)
         out.append(f_name)
     return out
 
@@ -457,47 +458,65 @@ def dirs_to_cells_dfs(directory, dirs):
     out = []
     for i, f_name in enumerate(dirs):
         f_name = make_abs(directory, f_name)
-        if not f_name.endswith('cells.feather'):
+        if not f_name.endswith('cells.feather'):  # FIXME: per channel
             f_name = find_cells_df(f_name)
         out.append(pd.read_feather(f_name))
     return out
 
 
-def get_volume_map(folder):
-    preproc = init_preprocessor(folder)
-    return annotation.annotation.get_lateralised_volume_map(
-        preproc.regitration_cfg['channels'][preproc.alignment_reference_channel]['resampled_resolution'],
-        preproc.hemispheres_file_path
-    )
+def get_volume_map(folder, channel=None):
+    res = init_sample_manager_and_processors(folder)
+    sample_manager = res['sample_manager']
+    registration_manager = res['registration_processor']
+
+    if channel is None:
+        annotator = registration_manager.annotators[sample_manager.alignment_reference_channel]
+    else:
+        annotator = registration_manager.annotators[channel]
+    atlas_id = registration_manager.config['atlas']['id']
+    atlas_scale = [ATLAS_NAMES_MAP[atlas_id]['resolution']] * 3
+    return annotator.get_lateralised_volume_map(atlas_scale)
 
 
 # REFACTOR: move to separate module
-def make_summary(directory, gp1_name, gp2_name, gp1_dirs, gp2_dirs, output_path=None, save=True):
-    gp1_dfs = dirs_to_cells_dfs(directory, gp1_dirs)
-    gp2_dfs = dirs_to_cells_dfs(directory, gp2_dirs)
-    gp_cells_dfs = [gp1_dfs, gp2_dfs]
-    structs = get_all_structs(gp1_dfs + gp2_dfs)
+def make_summary(directory, gp1_name, gp2_name, gp1_dirs, gp2_dirs, channel=None, output_path=None, save=True):
+    directory = Path(directory)
 
-    gp1_sample_ids = [dir_to_sample_id(folder) for folder in gp1_dirs]
-    gp2_sample_ids = [dir_to_sample_id(folder) for folder in gp2_dirs]
-    sample_ids = [gp1_sample_ids, gp2_sample_ids]
+    dfs = {}
+    if channel is None:
+        sample_manager = SampleManager()
+        sample_manager.setup(src_dir=directory / gp1_dirs[0])
+        channels = sample_manager.channels_to_detect
+    else:
+        channels = [channel]
 
-    volume_map = get_volume_map(gp1_dirs[0])  # WARNING Hacky
+    for channel_ in channels:
+        gp1_dfs = dirs_to_cells_dfs(directory, gp1_dirs)
+        gp2_dfs = dirs_to_cells_dfs(directory, gp2_dirs)
+        gp_cells_dfs = [gp1_dfs, gp2_dfs]
+        structs = get_all_structs(gp1_dfs + gp2_dfs)
 
-    aggregated_dfs = {gp_name: group_cells_counts(structs, gp_cells_dfs[i], sample_ids[i], volume_map)
-                      for i, gp_name in enumerate((gp1_name, gp2_name))}
-    total_df = generate_summary_table(aggregated_dfs)
+        gp1_sample_ids = [dir_to_sample_id(folder) for folder in gp1_dirs]
+        gp2_sample_ids = [dir_to_sample_id(folder) for folder in gp2_dirs]
+        sample_ids = [gp1_sample_ids, gp2_sample_ids]
 
-    if output_path is None and save:
-        output_path = os.path.join(directory, f'statistics_{gp1_name}_{gp2_name}.csv')
-    if save:
-        total_df.to_csv(output_path)
-    return total_df
+        volume_map = get_volume_map(gp1_dirs[0], channel=channel)  # WARNING Hacky
+
+        aggregated_dfs = {gp_name: group_cells_counts(structs, gp_cells_dfs[i], sample_ids[i], volume_map)
+                          for i, gp_name in enumerate((gp1_name, gp2_name))}
+        total_df = generate_summary_table(aggregated_dfs)
+
+        if output_path is None and save:
+            output_path = directory / f'{channel}_statistics_{gp1_name}_{gp2_name}.csv'  # FIXME: per channel
+        if save:
+            total_df.to_csv(output_path)
+        dfs[channel_] = total_df
+    return dfs
 
 
 def density_files_are_comparable(directory, gp1_dirs, gp2_dirs):
-    gp1_f_list = dirs_to_density_files(directory, gp1_dirs)
-    gp2_f_list = dirs_to_density_files(directory, gp2_dirs)
+    gp1_f_list = dirs_to_density_files(directory, gp1_dirs, channel)  # FIXME: channel
+    gp2_f_list = dirs_to_density_files(directory, gp2_dirs, channel)  # FIXME: channel
     all_files = gp1_f_list + gp2_f_list
     sizes = [os.path.getsize(f) for f in all_files]
     tolerance = 1024  # 1 KB
@@ -514,34 +533,46 @@ def density_files_are_comparable(directory, gp1_dirs, gp2_dirs):
 
 # REFACTOR: move to separate module
 def compare_groups(directory, gp1_name, gp2_name, gp1_dirs, gp2_dirs, prefix='p_val_colors', advanced=True):
-    gp1_f_list = dirs_to_density_files(directory, gp1_dirs)
-    gp2_f_list = dirs_to_density_files(directory, gp2_dirs)
+    directory = Path(directory)
 
-    gp1_stacked_voxelizations = stack_voxelizations(directory, gp1_f_list, suffix=gp1_name)
-    average_voxelization_groups(gp1_stacked_voxelizations, directory, gp1_name, compute_sd=advanced)
-    gp2_stacked_voxelizations = stack_voxelizations(directory, gp2_f_list, suffix=gp2_name)
-    average_voxelization_groups(gp2_stacked_voxelizations, directory, gp2_name, compute_sd=advanced)
+    sample_manager = SampleManager()
+    sample_manager.setup(src_dir=directory / gp1_dirs[0])
+    result = {}
+    for channel in sample_manager.channels:
+        if not sample_manager.get('density', channel=channel).exists:
+            print(f'No density files found for channel {channel}, skipping')
+            continue
 
-    t_vals, p_vals = stats.ttest_ind(gp1_stacked_voxelizations, gp2_stacked_voxelizations, axis=3, equal_var=False)
-    p_vals, t_vals = remove_p_val_nans(p_vals, t_vals)
+        gp1_f_list = dirs_to_density_files(directory, gp1_dirs, channel)
+        gp2_f_list = dirs_to_density_files(directory, gp2_dirs, channel)
 
-    colored_p_vals_05 = get_colored_p_vals(p_vals, t_vals, 0.05, ('red', 'green'))
-    colored_p_vals_01 = get_colored_p_vals(p_vals, t_vals, 0.01, ('green', 'blue'))
-    colored_p_vals = np.maximum(colored_p_vals_05, colored_p_vals_01).astype(np.uint8)
+        gp1_stacked_voxelizations = stack_voxelizations(directory, gp1_f_list, channel=channel, suffix=gp1_name)
+        average_voxelization_groups(gp1_stacked_voxelizations, directory, gp1_name, channel=channel, compute_sd=advanced)
+        gp2_stacked_voxelizations = stack_voxelizations(directory, gp2_f_list, channel=channel, suffix=gp2_name)
+        average_voxelization_groups(gp2_stacked_voxelizations, directory, gp2_name, channel=channel, compute_sd=advanced)
 
-    output_f_name = f'{prefix}_{gp1_name}_{gp2_name}.tif'
-    output_file_path = os.path.join(directory, output_f_name)
-    clearmap_io.write(output_file_path, colored_p_vals, photometric='rgb', imagej=True)
+        t_vals, p_vals = stats.ttest_ind(gp1_stacked_voxelizations, gp2_stacked_voxelizations, axis=3, equal_var=False)
+        p_vals, t_vals = remove_p_val_nans(p_vals, t_vals)
 
-    if advanced:
-        effect_size = np.abs(np.mean(gp1_stacked_voxelizations, axis=3).astype(int) -
-                             np.mean(gp2_stacked_voxelizations, axis=3).astype(int))
-        effect_size = effect_size.astype(np.uint16)  # for imagej compatibility
-        output_f_name = f'effect_size_{gp1_name}_{gp2_name}.tif'
-        output_file_path = os.path.join(directory, output_f_name)
-        clearmap_io.write(output_file_path, effect_size, imagej=True)
+        colored_p_vals_05 = get_colored_p_vals(p_vals, t_vals, 0.05, ('red', 'green'))
+        colored_p_vals_01 = get_colored_p_vals(p_vals, t_vals, 0.01, ('green', 'blue'))
+        colored_p_vals = np.maximum(colored_p_vals_05, colored_p_vals_01).astype(np.uint8)
 
-    return colored_p_vals
+        output_f_name = f'{channel}_{prefix}_{gp1_name}_{gp2_name}.tif'
+        output_file_path = directory / output_f_name
+        clearmap_io.write(output_file_path, colored_p_vals, photometric='rgb', imagej=True)
+
+        if advanced:
+            effect_size = np.abs(np.mean(gp1_stacked_voxelizations, axis=3).astype(int) -
+                                 np.mean(gp2_stacked_voxelizations, axis=3).astype(int))
+            effect_size = effect_size.astype(np.uint16)  # for imagej compatibility
+            output_f_name = f'{channel}_effect_size_{gp1_name}_{gp2_name}.tif'
+            output_file_path = directory / output_f_name
+            clearmap_io.write(output_file_path, effect_size, imagej=True)
+
+        result[channel] = colored_p_vals
+
+    return result
 
 
 # def test_completed_cumulatives_in_spheres(points1, intensities1, points2, intensities2,
