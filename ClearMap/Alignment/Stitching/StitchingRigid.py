@@ -1430,7 +1430,7 @@ class Layout(SourceRegion, src.AbstractSource):
     self.change_sources(sources);
 
   
-  def replace_source_location(self, match, replace, method = 'expression'):
+  def replace_source_location(self, match, replace, method='expression'):
     """Change the sources to point to a new location.
       
     Arguments
@@ -1461,25 +1461,25 @@ class Layout(SourceRegion, src.AbstractSource):
         if not isinstance(l, str):
           raise RuntimeError('The layout contains sources without locations!')
       
-      ##change location expressions
-      #locations = [l.replace(match, replace) for l in locations];
+      # change location expressions
+      # locations = [l.replace(match, replace) for l in locations]
       
       e_match = te.Expression(match)
       e_replace = te.Expression(replace)
-      for s,l in zip(self.sources, locations):
+      for s, l in zip(self.sources, locations):
         values = e_match.values(l)
         s.location = l.replace(e_match.string(values), e_replace.string(values))
     elif method == 'replace':
-      #get locations
+      # get locations
       locations = [s.location for s in self._sources]
       for l in locations:
         if not isinstance(l, str):
           raise RuntimeError('The layout contains sources without locations!')
       
-      #change location expressions
+      # change location expressions
       locations = [l.replace(match, replace) for l in locations]
   
-      for s,l in zip(self.sources, locations):
+      for s, l in zip(self.sources, locations):
         s.location = l
     else:
       raise ValueError('Method %r not valid!' % method)
