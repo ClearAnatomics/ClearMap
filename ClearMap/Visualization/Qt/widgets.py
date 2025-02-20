@@ -11,7 +11,6 @@ class Scatter3D:
     def __init__(self, coordinates, smarties=False, colors=None, hemispheres=None, half_slice_thickness=None):
         self.__coordinates = None
         self.__has_hemispheres = hemispheres is not None
-        self.__has_colours = colors is not None or smarties
         self.default_symbol = '+'
         self.alternate_symbol = 'p'
         self.half_slice_thickness = half_slice_thickness
@@ -22,6 +21,8 @@ class Scatter3D:
             colors = pseudo_random_rgb_array(n_samples)
         if colors is not None and not isinstance(colors[0], str):  # Convert to hex if not yet
             colors = [to_hex(c) for c in colors]
+
+        self.__has_colours = colors is not None
 
         if hemispheres is not None:
             self.symbol_map = {
