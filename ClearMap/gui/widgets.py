@@ -1147,6 +1147,18 @@ class PatternDialog(WizardDialog):
         """
         Save the file patterns to the `sample` configuration file and close the dialog
         """
+        channel_names = self.get_channel_names()
+        tab_widget = self.params.tab.channelsParamsTabWidget
+        tab_channel_names = tab_widget.get_channels_names()
+        # If tab_channel_names has channel names not in channel_names, prompt to remove the tabs
+        if set(tab_channel_names) - set(channel_names):
+            answer = warning_popup('Extra channels found in the tab, do you want to remove them ?')
+            if answer == QMessageBox.Ok:
+                for channel_name in tab_channel_names:
+                    if channel_name not in channel_names:
+                        self.tab.remove_channel(channel_name)
+            else:
+                print('No changes made')
 
         for i in range(self.dlg.patternToolBox.count()):
             page = self.dlg.patternToolBox.widget(i)
