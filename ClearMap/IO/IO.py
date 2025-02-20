@@ -560,7 +560,10 @@ def initialize(source_=None, shape=None, dtype=None, order=None, location=None,
         else:
             try:
                 source_ = as_source(location)
-            except FileNotFoundError:  # TODO: see if nore exceptions are needed
+            except (FileNotFoundError, ValueError) as err:  # TODO: see if nore exceptions are needed
+                if isinstance(err, ValueError):
+                    if not str(err).startswith('Cannot create memmap without shape at location'):
+                        raise err
                 try:
                     shape, dtype, order = _from_hint(hint, shape, dtype, order)
                     mod = location_to_module(location)
