@@ -372,14 +372,17 @@ class BinaryVesselProcessor(TabProcessor):
 
     def post_process_binary_combined(self):
         """Postprocess the combined binary image (typically smooth and fill)"""
-        postprocessing_parameter = copy.deepcopy(vasculature.default_postprocessing_parameter)
-        postprocessing_processing_parameter = copy.deepcopy(vasculature.default_postprocessing_processing_parameter)
-        postprocessing_processing_parameter['size_max'] = 50
         source = self.get_path('binary', self.channels_to_binarize(), asset_sub_type='combined')
         sink = self.get_path('binary', self.channels_to_binarize(), asset_sub_type='final')
-        vasculature.postprocess(source, sink, postprocessing_parameter=postprocessing_parameter,
-                                processing_parameter=postprocessing_processing_parameter,
-                                processes=None, verbose=True)
+        if self.processing_config['binarization']['combined']['binary_fill']:
+            postprocessing_parameter = copy.deepcopy(vasculature.default_postprocessing_parameter)
+            postprocessing_processing_parameter = copy.deepcopy(vasculature.default_postprocessing_processing_parameter)
+            postprocessing_processing_parameter['size_max'] = 50
+            vasculature.postprocess(source, sink, postprocessing_parameter=postprocessing_parameter,
+                                    processing_parameter=postprocessing_processing_parameter,
+                                    processes=None, verbose=True)
+        else:
+            clearmap_io.copy_file(source, sink)  # FIXME: could be a symlink
 
     def plot_vessel_filling_results(self, parent=None, channel='', arrange=False):
         channel = channel if channel else self.all_vessels_channel
