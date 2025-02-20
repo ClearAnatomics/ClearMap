@@ -335,6 +335,8 @@ class StitchingTab(PreProcessingTab):
     The tab responsible for all the alignments, including the stitching and
     aligning to the atlas.
     """
+    layout_channel_changed = pyqtSignal(str, str)
+
     def __init__(self, main_window, tab_idx, sample_manager=None):
         super().__init__(main_window, 'stitching_tab', tab_idx)
         self.channels_ui_name = 'stitching_params'
@@ -428,6 +430,7 @@ class StitchingTab(PreProcessingTab):
         for btn_name, func, kwargs in buttons_functions:
             self._bind_btn(btn_name, func, channel, page_widget, **kwargs)
         self.ui.runChannelsCheckableListWidget.set_item_checked(channel, self.params[channel].shared.run)
+        self.params[channel].layout_channel_changed.connect(self.handle_layout_channel_changed)
 
     def _setup_workers(self):
         """
@@ -440,6 +443,9 @@ class StitchingTab(PreProcessingTab):
         if self.sample_manager.has_tiles() and not self.sample_manager.has_npy():
             if  prompt_dialog('Tile conversion', 'Convert individual tiles to npy for efficiency'):
                 self.convert_tiles()
+
+    def handle_layout_channel_changed(self, channel, layout_channel):
+        self.layout_channel_changed.emit(channel, layout_channel)
 
     def convert_tiles(self):
         if not self.sample_manager.has_tiles():
@@ -649,6 +655,11 @@ class RegistrationTab(PreProcessingTab):
         if self.sample_manager.setup_complete:
             self.wrap_step('Setting up atlas', self.setup_atlas, n_steps=1, save_cfg=False, nested=False)  # TODO: abort_func=self.aligner.stop_process
 
+    def handle_layout_channel_changed(self, channel, layout_channel):
+        self.params[channel].align_with = layout_channel
+        self.params[channel].moving_channel = 'intrinsically aligned'
+        self.params[channel].cfg_to_ui()  # Update the UI to reflect the changes
+
     def set_progress_watcher(self, watcher):
         """
         Setup the watcher object that will handle the progress in the computation for this tab
@@ -816,7 +827,8 @@ class CellCounterTab(PostProcessingTab):
         pass
 
     def _bind_params_signals(self):
-        self.ui.advancedCheckBox.stateChanged.connect(self.params.handle_advanced_state_changed)
+        pass
+        # self.ui.advancedCheckBox.stateChanged.connect(self.params.handle_advanced_state_changed)
 
     def _set_params(self):
         # REFACTORING: accessing main_window is not the most elegant way

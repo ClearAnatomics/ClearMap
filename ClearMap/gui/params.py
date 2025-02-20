@@ -268,6 +268,9 @@ class StitchingParams(ChannelsUiParameterCollection):
         else:
             self[channel_name] = ChannelStitchingParams(self.tab, channel_name, config=self.config)
 
+    def handle_layout_channel_changed(self, channel, layout_channel):
+        self.layoutChannelChanged.emit(channel, layout_channel)
+
     def compute_layout(self, channel):
         return self[channel].compute_layout()
 
@@ -288,6 +291,7 @@ class StitchingParams(ChannelsUiParameterCollection):
 
 
 class ChannelStitchingParams(UiParameterCollection):
+    layoutChannelChanged = pyqtSignal(str, str)
     def __init__(self, tab, channel, config):
         super().__init__(tab)
         self.name = channel
