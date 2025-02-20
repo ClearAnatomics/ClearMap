@@ -72,6 +72,7 @@
     <widget class="QToolBox" name="batchToolBox">
      <property name="font">
       <font>
+       <weight>75</weight>
        <bold>true</bold>
       </font>
      </property>
@@ -79,7 +80,7 @@
       <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Compute the summary stats table for all the pairs of groups selected in the &lt;span style=&quot; font-style:italic;&quot;&gt;comparisons&lt;/span&gt; tab&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
      </property>
      <property name="currentIndex">
-      <number>3</number>
+      <number>2</number>
      </property>
      <widget class="QWidget" name="sampleFoldersPage">
       <property name="geometry">
@@ -87,7 +88,7 @@
         <x>0</x>
         <y>0</y>
         <width>438</width>
-        <height>620</height>
+        <height>600</height>
        </rect>
       </property>
       <attribute name="label">
@@ -153,7 +154,7 @@
         <x>0</x>
         <y>0</y>
         <width>438</width>
-        <height>620</height>
+        <height>600</height>
        </rect>
       </property>
       <attribute name="label">
@@ -171,13 +172,20 @@
         <x>0</x>
         <y>0</y>
         <width>438</width>
-        <height>620</height>
+        <height>600</height>
        </rect>
       </property>
       <attribute name="label">
        <string>P Values</string>
       </attribute>
       <layout class="QVBoxLayout" name="verticalLayout">
+       <item>
+        <widget class="QCheckBox" name="computeSdAndEffectSizeCheckBox">
+         <property name="text">
+          <string>Compute SD and effect size</string>
+         </property>
+        </widget>
+       </item>
        <item>
         <widget class="QPushButton" name="runPValsPushButton">
          <property name="toolTip">
@@ -203,7 +211,7 @@
         <x>0</x>
         <y>0</y>
         <width>438</width>
-        <height>620</height>
+        <height>600</height>
        </rect>
       </property>
       <attribute name="label">

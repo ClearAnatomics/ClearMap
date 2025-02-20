@@ -200,6 +200,7 @@ class GenericTab(GenericUi):
         self._create_channels()  # Creates missing channels. FIXME: What about existing but renamed ones?
         self._load_config_to_gui()
         self._bind_params_signals()
+        self.handle_advanced_checked()  # in case channel.qtControl in advanced_controls_names
         self.params_finalised = True
 
     @abstractmethod
@@ -370,8 +371,22 @@ class GenericTab(GenericUi):
             Whether to show the advanced controls
         """
         for ctrl_name in self.advanced_controls_names:
-            ctrl = getattr(self.ui, ctrl_name)
-            ctrl.setVisible(visible)
+            if ctrl_name.startswith('channel.'):
+                if not self.params:  # Tab not yet initialised
+                    return
+                _, ctrl_name = ctrl_name.split('.')
+                if not hasattr(self.ui, 'channelsParamsTabWidget'):  # Channels not set yet
+                    warnings.warn(f'Could not find channel tab widget for {self.name}')
+                    return
+                for channel in self._get_channels():
+                    ctrl = getattr(self.ui.channelsParamsTabWidget.get_channel_widget(channel), ctrl_name)
+                    ctrl.setVisible(visible)
+            else:
+                ctrl = getattr(self.ui, ctrl_name, None)
+                if ctrl:
+                    ctrl.setVisible(visible)
+                else:
+                    warnings.warn(f'Could not find control {ctrl_name} in {self.name}')
 
     def disable(self):
         """Disable this tab (UI element)"""
