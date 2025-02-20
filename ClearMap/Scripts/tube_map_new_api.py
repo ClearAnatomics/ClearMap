@@ -8,35 +8,30 @@ optionally, provide the atlas base name as second argument
 """
 import sys
 
-from ClearMap.Scripts.align_new_api import stitch, convert_stitched, register, plot_registration_results
-from ClearMap.config.atlas import ATLAS_NAMES_MAP
-from ClearMap.config.config_loader import ConfigLoader, get_configs
-from ClearMap.processors.sample_preparation import PreProcessor
+from ClearMap.Scripts.align_new_api import stitch, register, plot_registration_results
+from ClearMap.processors.sample_preparation import SampleManager, StitchingProcessor, RegistrationProcessor
 from ClearMap.processors.tube_map import BinaryVesselProcessor, VesselGraphProcessor
 
 
 def main(src_directory):
-    cfg_loader = ConfigLoader(src_directory)
-    configs = get_configs(cfg_loader.get_cfg_path('sample'), cfg_loader.get_cfg_path('processing'))
-    pre_proc = PreProcessor()
-    pre_proc.setup(configs)
+    sample_manager = SampleManager()
+    sample_manager.setup(src_directory)
 
-    stitch(pre_proc)
-    # pre_proc.plot_stitching_results()
+    stitcher = StitchingProcessor(sample_manager)
+    stitcher.setup()
+    registration_processor = RegistrationProcessor(sample_manager)
+    registration_processor.setup()
 
-    # convert_stitched(pre_proc)
+    stitch(stitcher)
+    stitcher.plot_stitching_results(mode='overlay')
 
-    atlas_id = pre_proc.registration_cfg['atlas']['id']
-    atlas_base_name = ATLAS_NAMES_MAP[atlas_id]['base_name']
-    register(atlas_base_name, pre_proc)
-    # plot_registration_results(pre_proc)
+    register(registration_processor)
+    plot_registration_results(registration_processor, sample_manager.alignment_reference_channel)
 
-    binary_vessel_processor = BinaryVesselProcessor(pre_proc)
+    binary_vessel_processor = BinaryVesselProcessor(sample_manager)
 
-    binary_vessel_processor.setup(pre_proc)
-
-    binary_vessel_processor.binarize()
-    for channel in ('vessels', 'arteries'):  # TODO: edit as required
+    for channel in binary_vessel_processor.processing_config['channels'].keys():  # TODO: assert config has been updated
+        binary_vessel_processor.binarize_channel(channel)
         binary_vessel_processor.smooth_channel(channel)
         binary_vessel_processor.fill_channel(channel)
         binary_vessel_processor.deep_fill_channel(channel)
@@ -44,8 +39,7 @@ def main(src_directory):
     binary_vessel_processor.combine_binary()
     # binary_vessel_processor.plot_combined(arrange=True)
 
-    vessel_graph_processor = VesselGraphProcessor(pre_proc)
-    vessel_graph_processor.setup(pre_proc)
+    vessel_graph_processor = VesselGraphProcessor(sample_manager, registration_processor)
     vessel_graph_processor.pre_process()
     # TODO: slice
     vessel_graph_processor.post_process()
