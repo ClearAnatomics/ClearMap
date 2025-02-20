@@ -378,10 +378,19 @@ class GeneralChannelStitchingParams(ChannelUiParameter):
         super().__init__(tab, channel_name)
         self.params_dict = {
             'use_npy': ParamLink(['use_npy'], self.tab.useNpyCheckBox),
-            'run': ParamLink(['run'], self.tab.runCheckBox),
+            # 'run': ParamLink(['run'], self.tab.runCheckBox),
+            'run': ['run'],
             'layout_channel': ParamLink(['layout_channel'], self.tab.layoutChannelComboBox),
         }
         self.connect()
+
+    @property
+    def run(self):
+        return self.config['run']
+
+    @run.setter
+    def run(self, value):
+        self.config['run'] = value
 
     @property
     def cfg_subtree(self):
