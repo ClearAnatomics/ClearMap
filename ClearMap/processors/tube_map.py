@@ -986,17 +986,21 @@ class VesselGraphProcessor(TabProcessor):
                                                     dtype='float32',
                                                     **voxelize_branch_parameter)  # WARNING: prange
 
-    @requires_graph('traced')
+    # @requires_graph('traced')
     def voxelize(self, weight_by_radius=False, vertex_degrees=None):
-        vertices = self.graph_traced.vertex_property('coordinates_atlas')
+        try:
+            graph = self.graph_traced
+        except FileNotFoundError:
+            graph = self.graph_annotated
+        vertices = graph.vertex_property('coordinates_atlas')
         voxelize_branch_parameter = self.__get_branch_voxelization_params()
 
         if vertex_degrees and vertex_degrees >= 1:
-            degrees = self.graph_traced.vertex_degrees() == vertex_degrees
+            degrees = graph.vertex_degrees() == vertex_degrees
             vertices = vertices[degrees]
 
         if weight_by_radius:
-            voxelize_branch_parameter.update(weights=self.graph_traced.vertex_radii())
+            voxelize_branch_parameter.update(weights=graph.vertex_radii())
 
         self.__voxelize(vertices, voxelize_branch_parameter)
 
