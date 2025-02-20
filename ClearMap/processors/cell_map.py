@@ -45,7 +45,6 @@ import ClearMap.ImageProcessing.Experts.Cells as cell_detection
 import ClearMap.Analysis.Measurements.Voxelization as voxelization
 from ClearMap.Utils.exceptions import MissingRequirementException
 from ClearMap.Utils.utilities import requires_assets, FilePath
-from ClearMap.processors.sample_preparation import PreProcessor
 from ClearMap.processors.generic_tab_processor import TabProcessor
 from ClearMap.Visualization.Qt.widgets import Scatter3D
 
@@ -568,13 +567,3 @@ class CellDetector(TabProcessor):
                 break
             out.append(next_channel)
         return out
-
-
-if __name__ == "__main__":
-    import sys
-    preprocessor = PreProcessor()
-    preprocessor.setup(sys.argv[1:3])
-    preprocessor.setup_atlases()
-    # preprocessor.run()
-
-    detector = CellDetector(preprocessor)
