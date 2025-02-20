@@ -846,16 +846,17 @@ class StitchingProcessor(TabProcessor):
         -------
 
         """
-        first_channel = list(self.config['channels'])[0]  # FIXME: less arbitrary than first channel
-        cfg = self.config['channels'][first_channel]
-        if _force:
-            state = cfg['use_npy']
-            cfg['use_npy'] = True
+        use_npy_backup = {}
         for channel in self.sample_manager.stitchable_channels:
+            cfg = self.config['channels'][channel]
+            if _force:
+                use_npy_backup[channel] = cfg['use_npy']
+                cfg['use_npy'] = True
             self.convert_tiles_channel(channel)
         self.update_watcher_main_progress()
         if _force:
-            cfg['use_npy'] = state
+            for channel in self.sample_manager.stitchable_channels:
+                self.config['channels'][channel]['use_npy'] = use_npy_backup[channel]
 
     def convert_tiles_channel(self, channel):
         if self.config['channels'][channel]['use_npy']:
