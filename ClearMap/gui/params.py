@@ -765,9 +765,9 @@ class CellMapParams(ChannelsUiParameterCollection):
     def params(self):
         return self.values()
 
-    def handle_advanced_state_changed(self, state):
-        for channel in self.values():
-            channel.tab.handle_advanced_state_changed(state)
+    # def handle_advanced_state_changed(self, state):
+    #     for channel in self.values():
+    #         channel.tab.handle_advanced_state_changed(state)
 
 
 class ChannelCellMapParams(ChannelUiParameter):

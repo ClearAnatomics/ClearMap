@@ -352,6 +352,9 @@ class StitchingTab(PreProcessingTab):
         self.channels_ui_name = 'stitching_params'
         self.sample_manager = sample_manager
         self.stitcher = StitchingProcessor(self.sample_manager)
+        self.advanced_controls_names = [
+            'channel.useNpyCheckBox',
+        ]
 
     def _read_configs(self, cfg_path):
         if self.sample_manager.stitching_cfg:
@@ -579,7 +582,16 @@ class RegistrationTab(PreProcessingTab):
 
         self.channels_ui_name = 'registration_params'
 
-        self.advanced_controls_names = ['advancedAtlasSettingsGroupBox']
+        self.advanced_controls_names = [
+            'advancedAtlasSettingsGroupBox',
+            'channel.parameterFilesLabel',
+            'channel.paramsFilesListWidget',
+            'channel.addParamFilePushButton',
+            'channel.removeParamFilePushButton',
+            'channel.selectLandmarksPushButton',
+            'channel.selectLandmarksPushButtonInfoToolButton',
+            'channel.landmarksWeightsGroupBox',
+        ]
 
     def _read_configs(self, cfg_path):
         if self.sample_manager.registration_cfg:
@@ -820,6 +832,8 @@ class CellCounterTab(PostProcessingTab):
 
         self.cell_intensity_histogram = None
         self.cell_size_histogram = None
+
+        self.advanced_controls_names = ['channel.detectionShapeGroupBox']
 
     def _set_channels_names(self):
         """Patch the config with the actual channels if not already done"""
@@ -1510,6 +1524,8 @@ class GroupAnalysisTab(BatchTab):
     def __init__(self, main_window, tab_idx):
         super().__init__(main_window, tab_idx)
         self.processor = GroupAnalysisProcessor(self.main_window.progress_watcher)
+
+        self.advanced_controls_names = ['computeSdAndEffectSizeCheckBox']
 
     def _set_params(self):
         self.params = GroupAnalysisParams(self.ui, preferences=self.main_window.preference_editor.params)
