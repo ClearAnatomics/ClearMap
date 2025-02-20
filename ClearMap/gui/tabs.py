@@ -571,7 +571,9 @@ class StitchingTab(PreProcessingTab):
         channels = self.ui.plotChannelsCheckableListWidget.get_checked_items() or []
         for channel in channels:
             self.params[channel].shared.ui_to_cfg()
-        self.wrap_plot(self.stitcher.plot_stitching_results, channels=channels or None,
+        if not channels:
+            return self.main_window.print_status_msg('No channels selected to plot')
+        self.wrap_plot(self.stitcher.plot_stitching_results, channels=channels,
                        mode=mode, parent=self.main_window.centralWidget())
 
 
