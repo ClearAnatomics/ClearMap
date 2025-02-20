@@ -241,7 +241,7 @@ def where(source, sink=None, blocks=None, cutoff=None, processes=None, verbose=F
     if ndim == 1:
       sums = code.block_sums_1d(source_buffer, blocks=blocks, processes=processes)
     elif ndim == 2:
-      sums = code.block_sums21d(source_buffer, blocks=blocks, processes=processes)
+      sums = code.block_sums_2d(source_buffer, blocks=blocks, processes=processes)
     else:
       sums = code.block_sums_3d(source_buffer, blocks=blocks, processes=processes)
 
