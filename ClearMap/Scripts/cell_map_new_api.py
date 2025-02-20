@@ -8,51 +8,52 @@ optionally, provide the atlas base name as second argument
 """
 import sys
 
-from ClearMap.Scripts.align_new_api import plot_registration_results, register, convert_stitched, stitch
-from ClearMap.config.atlas import ATLAS_NAMES_MAP
-from ClearMap.config.config_loader import ConfigLoader, get_configs
+from ClearMap.processors.sample_preparation import SampleManager, StitchingProcessor,  RegistrationProcessor
+from ClearMap.Scripts.align_new_api import plot_registration_results, register, stitch
 from ClearMap.processors.cell_map import CellDetector
-from ClearMap.processors.sample_preparation import PreProcessor
 
 
 def main(src_directory):
-    cfg_loader = ConfigLoader(src_directory)
-    configs = get_configs(cfg_loader.get_cfg_path('sample'), cfg_loader.get_cfg_path('processing'))
-    pre_proc = PreProcessor()
-    pre_proc.setup(configs)
+    sample_manager = SampleManager()
+    sample_manager.setup(src_directory)
 
-    stitch(pre_proc)
-    pre_proc.plot_stitching_results()
+    stitcher = StitchingProcessor(sample_manager)
+    stitcher.setup()
+    registration_processor = RegistrationProcessor(sample_manager)
+    registration_processor.setup()
 
-    convert_stitched(pre_proc)
+    stitch(stitcher)
+    stitcher.plot_stitching_results(mode='overlay')
 
-    atlas_id = pre_proc.registration_cfg['atlas']['id']
-    atlas_base_name = ATLAS_NAMES_MAP[atlas_id]['base_name']
-    register(atlas_base_name, pre_proc)
-    # plot_3d.plot(pre_proc.filename('resampled'))
-    plot_registration_results(pre_proc)
+    register(registration_processor)
+    plot_registration_results(registration_processor, sample_manager.alignment_reference_channel)
 
-    cell_detector = CellDetector(pre_proc)
+    cell_detection_config = sample_manager.config_loader.get_cfg('cell_map')
+    if 'example' in cell_detection_config:
+        print('Channels not yet configured in cell_map_params.cfg. Aborting.')
+        return
 
-    # TEST CELL DETECTION
-    # slicing = (
-    #    slice(*cell_detector.processing_config['test_set_slicing']['dim_0']),
-    #    slice(*cell_detector.processing_config['test_set_slicing']['dim_1']),
-    #    slice(*cell_detector.processing_config['test_set_slicing']['dim_2'])
-    # )
-    # cell_detector.create_test_dataset(slicing=[......])
-    # print('Cell detection preview')
-    # cell_detector.run_cell_detection(tuning=True)
-    # dvs = cell_detector.preview_cell_detection(arrange=True, sync=True)
-    # link_dataviewers_cursors(dvs, RedCross)
+    for channel in cell_detection_config.keys():
+        cell_detector = CellDetector(sample_manager, channel=channel, registration_processor=registration_processor)
+        # TEST CELL DETECTION
+        # slicing = (
+        #    slice(*cell_detector.processing_config['test_set_slicing']['dim_0']),
+        #    slice(*cell_detector.processing_config['test_set_slicing']['dim_1']),
+        #    slice(*cell_detector.processing_config['test_set_slicing']['dim_2'])
+        # )
+        # cell_detector.create_test_dataset(slicing=[......])
+        # print('Cell detection preview')
+        # cell_detector.run_cell_detection(tuning=True)
+        # dvs = cell_detector.preview_cell_detection(arrange=True, sync=True)
+        # link_dataviewers_cursors(dvs, RedCross)
 
-    print('Starting cell detection')
-    cell_detector.run_cell_detection(tuning=False)
-    cell_detector.post_process_cells()
-    cell_detector.plot_voxelized_counts(arrange=True)
-    print('Cell detection done')
+        print('Starting cell detection')
+        cell_detector.run_cell_detection(tuning=False)
+        cell_detector.post_process_cells()
+        cell_detector.plot_voxelized_counts(arrange=True)
+        print('Cell detection done')
 
-    cell_detector.plot_cells_3d_scatter_w_atlas_colors()
+        cell_detector.plot_cells_3d_scatter_w_atlas_colors()
 
 
 if __name__ == '__main__':
