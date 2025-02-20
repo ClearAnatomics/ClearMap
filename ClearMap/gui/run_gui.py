@@ -41,7 +41,11 @@ DEBUG = False
 
 os.environ['CLEARMAP_GUI_HOSTED'] = "1"
 # ########################################### SPLASH SCREEN ###########################################################
-from ClearMap.gui.dialogs import make_splash, update_pbar, make_simple_progress_dialog, option_dialog, input_dialog
+from ClearMap.Alignment.Stitching import layout_graph_utils  # noqa: F401 # WARNING: first because otherwise, breaks with pytorch
+
+from ClearMap.gui.about import AboutInfo
+from ClearMap.gui.dialogs import make_splash, update_pbar, make_simple_progress_dialog, option_dialog, input_dialog, \
+    AboutDialog
 
 # To show splash before slow imports
 ICONS_FOLDER = 'ClearMap/gui/creator/icons/'   # REFACTOR: use qrc
@@ -839,13 +843,24 @@ class ClearMapGui(ClearMapGuiBase):
         self.reset_pipeline_tabs()
 
     def display_about(self):
-        about_msg = f'You are running ClearMap version {CLEARMAP_VERSION}'
+        info = AboutInfo(
+            software_name=f'You are running ClearMap version {CLEARMAP_VERSION}',
+            version=CLEARMAP_VERSION,
+            authors=["Christoph Kirst", "Charly Rousseau", "Sophie Skriabine", "the ClearMap team"],
+            github_url="https://github.com/ClearAnatomics/ClearMap.git",
+            documentation_url="https://clearanatomics.github.io/ClearMapDocumentation/",
+            website_url="https://idisco.info/",
+            license_info="Released under the GNU GPLv3 License."
+        )
         try:
             from ClearMap.config import commit_info # noqa
-            about_msg += f' from commit {commit_info.commit_hash}, {commit_info.commit_date}, branch {commit_info.branch}'
+            info.commit_info = (f' from commit {commit_info.commit_hash}, {commit_info.commit_date},'
+                                f' branch {commit_info.branch}')
         except ImportError:
             pass
-        self.popup(about_msg, 'About ClearMap GUI', print_warning=False)
+        dialog = AboutDialog(info)
+        dialog.exec_()
+
 
     def amend_ui(self):
         """Setup the loggers and all the post instantiation fixes to the UI"""
