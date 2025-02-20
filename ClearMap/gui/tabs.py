@@ -199,6 +199,8 @@ class SampleInfoTab(GenericTab):
         self.ui.launchPatternWizzardPushButton.clicked.connect(self.launch_pattern_wizard)
         self.ui.updateWorkspacePushButton.clicked.connect(self.update_workspace)
 
+        self.ui.removeCurrentChannelToolButton.clicked.connect(self.remove_current_channel)
+
         # TODO: why not on tab click ?  # FIXME: remove buttons or reestablish
         # self.ui.applyBox.connectApply(self.main_window.update_pipelines)
         # self.ui.applyBox.connectSave(self.save_cfg)
@@ -241,6 +243,14 @@ class SampleInfoTab(GenericTab):
         else:
             self.names_map = []
 
+    def remove_current_channel(self):
+        """Remove the current channel from the sample"""
+        self.remove_channel(self.ui.channelsParamsTabWidget.current_channel())
+
+    def remove_channel(self, channel):
+        self.params.pop(channel)
+        self.ui.channelsParamsTabWidget.remove_channel_widget(channel)
+        self.params.ui_to_cfg()
 
     def update_workspace(self, old_name='', new_name=''):  # Necessary intermediate because at the beginning sample_manager is not set
         self.rename_channels(old_name, new_name)  # Includes call to sample_manager.update_workspace

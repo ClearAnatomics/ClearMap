@@ -314,6 +314,19 @@
          </item>
         </layout>
        </item>
+       <item row="3" column="0">
+        <widget class="QToolButton" name="removeCurrentChannelToolButton">
+         <property name="text">
+          <string>Remove current channel</string>
+         </property>
+         <property name="icon">
+          <iconset theme="list-remove"/>
+         </property>
+         <property name="toolButtonStyle">
+          <enum>Qt::ToolButtonTextBesideIcon</enum>
+         </property>
+        </widget>
+       </item>
       </layout>
      </widget>
     </widget>
