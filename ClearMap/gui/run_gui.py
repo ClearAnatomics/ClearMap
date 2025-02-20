@@ -1158,6 +1158,8 @@ class ClearMapGui(ClearMapGuiBase):
     def prompt_experiment_folder(self):
         """Prompt the user for the main experiment data folder and set it"""
         folder = get_directory_dlg(self.preference_editor.params.start_folder)
+        if not folder:
+            return
         # if folder and folder != self.src_folder:
         if folder and folder != self.tab_managers['sample_info'].src_folder:
             self.reset()
