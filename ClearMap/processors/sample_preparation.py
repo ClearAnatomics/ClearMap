@@ -193,6 +193,10 @@ class SampleManager(TabProcessor):
         return [channel_cfg['data_type'] for channel_cfg in self.config['channels'].values()]
 
     @property
+    def channels_to_detect(self):
+        return [c for c, v in self.config['channels'].items() if CONTENT_TYPE_TO_PIPELINE[v['data_type']] == 'CellMap']
+
+    @property
     def relevant_pipelines(self):
         """
         All the pipelines relevant to any of the sample channels
