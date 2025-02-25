@@ -45,7 +45,7 @@ from sklearn import neighbors
 import skimage.morphology
 from scipy.spatial.transform import Rotation
 
-from . import bounding_boxes
+from ClearMap.colocalization import bbox as bounding_boxes
 from .parallelism import compare
 
 
