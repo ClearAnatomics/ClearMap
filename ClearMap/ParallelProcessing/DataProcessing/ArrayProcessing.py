@@ -666,7 +666,7 @@ def initialize_sink(sink=None, shape=None, dtype=None, order=None, memory=None, 
     Element strides of the source. 
   """
        
-  sink = io.initialize(sink, shape=shape, dtype=dtype, order=order, memory=memory, location=location, mode=mode,
+  sink = io.initialize(sink, shape_=shape, dtype_=dtype, order_=order, memory_=memory, location_=location, mode=mode,
                        like=source, as_source=True)
 
   result = (sink,)
