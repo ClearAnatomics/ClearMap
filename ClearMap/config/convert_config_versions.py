@@ -62,13 +62,13 @@ def convert_sample_config_2_1_0_to_3_0_0(v1_path, v2_path=''):
     return config_v2.filename
 
 
-def convert_cell_map_config_2_1_0_to_3_0_0(v1_path, v2_path):
+def convert_cell_map_config_2_1_0_to_3_0_0(v1_path, v2_path, channel_name='channel_0'):
     config_v1, config_v2 = get_configs(v1_path, v2_path)
     if config_v1['clearmap_version'] != '2.1.0':
         raise ValueError('Only version 2.1.0 is supported')
 
     config_v2['clearmap_version'] = '3.0.0'
-    config_v2['channel_0'] = {
+    config_v2[channel_name] = {
         'detection': config_v1['detection'],
         'cell_filtration': config_v1['cell_filtration'],
         'voxelization': config_v1['voxelization'],
@@ -79,24 +79,27 @@ def convert_cell_map_config_2_1_0_to_3_0_0(v1_path, v2_path):
     return config_v2.filename
 
 
-def convert_alignment_config_2_1_0_to_3_0_0(v1_path, v2_path, channel_names=None):  # TODO: get actual channel name form sample config
+def convert_alignment_config_2_1_0_to_3_0_0(v1_path, v2_path, sample_config=None):
     config_v1 = get_configobj_cfg(v1_path)
     if config_v1['clearmap_version'] != '2.1.0':
         raise ValueError('Only version 2.1.0 is supported')
 
-    if not v2_path:
-        v2_path = v1_path
+    v2_path = v2_path or v1_path
 
-    out_stitching_cfg = get_configobj_cfg(v2_path.with_name(f'stitching_config_{VERSION_SUFFIX}.cfg'), must_exist=False)
-    out_registration_cfg = get_configobj_cfg(v2_path.with_name(f'registration_config_{VERSION_SUFFIX}.cfg'), must_exist=False)
+    out_stitching_cfg = alignment_to_stitching_v3(v2_path, config_v1, sample_config)
 
+    out_registration_cfg = alignment_to_registration_v3(v2_path, config_v1, sample_config)
+
+    return out_stitching_cfg.filename, out_registration_cfg.filename
+
+
+def alignment_to_stitching_v3(output_path_base, config_v1):
+    out_stitching_cfg = get_configobj_cfg(output_path_base.with_name(f'stitching_config_{VERSION_SUFFIX}.cfg'), must_exist=False)
     # Copy general parameters
     out_stitching_cfg['clearmap_version'] = '3.0.0'
-    out_registration_cfg['clearmap_version'] = '3.0.0'
     # drop pipeline_name and conversion section
-
     # Copy stitching parameters
-    channel_names = channel_names or [k for k, use in config_v1['stitching']['run'].items() if use]
+    channel_names = [k for k, use in config_v1['stitching']['run'].items() if use]
     for i, channel in enumerate(channel_names):
         out_stitching_cfg[channel] = {}
         out_stitching_cfg[channel]['use_npy'] = config_v1['conversion']['use_npy']
@@ -105,38 +108,54 @@ def convert_alignment_config_2_1_0_to_3_0_0(v1_path, v2_path, channel_names=None
         if i == 0:  # By default, stitch other channels to the first one
             # This (dict(...)) is weird but required to get the extra indentation level
             out_stitching_cfg[channel]['rigid'] = dict(config_v1['stitching']['rigid'])
-            out_stitching_cfg[channel]['rigid']['projection_thickness'] = out_stitching_cfg[channel]['rigid'].pop('project_thickness')
+            out_stitching_cfg[channel]['rigid']['projection_thickness'] = out_stitching_cfg[channel]['rigid'].pop(
+                'project_thickness')
             out_stitching_cfg[channel]['wobbly'] = dict(config_v1['stitching']['wobbly'])
+    out_stitching_cfg.write()
+    return out_stitching_cfg
 
+
+def alignment_to_registration_v3(output_path_base, config_v1, sample_config):
+    out_registration_cfg = get_configobj_cfg(output_path_base.with_name(f'registration_config_{VERSION_SUFFIX}.cfg'),
+                                             must_exist=False)
+    out_registration_cfg['clearmap_version'] = '3.0.0'
     # Copy registration parameters
     out_registration_cfg['verbose'] = config_v1['registration']['resampling']['verbose']
     out_registration_cfg['atlas'] = {k: config_v1['registration']['atlas'][k]
                                      for k in ('id', 'structure_tree_id', 'align_files_folder')}
-    params_files = [v for k, v in config_v1['registration']['atlas'].items() if k.startswith('align_reference')]
+    autofluo_params_files = [v for k, v in config_v1['registration']['atlas'].items() if k.startswith('align_reference')]
+    resample = not (config_v1['registration']['resampling']['skip'])
+
+    channel_names = sample_config['channels'].keys()
+    reference_channel = [c for c, v in sample_config['channels'].items() if v['data_type'] == 'autofluorescence']
+    if not reference_channel:
+        reference_channel = 'autofluorescence'
+    else:
+        reference_channel = reference_channel[0]
+
     out_registration_cfg['channels'] = {
-        'autofluorescence': {
-            'resample': not(config_v1['registration']['resampling']['skip']),
+        reference_channel: {
+            'resample': resample,
             'resampled_resolution': config_v1['registration']['resampling']['autofluo_sink_resolution'],
             'align_with': 'atlas',
             'moving_channel': 'atlas',
-            'params_files': params_files,
-            'landmarks_weights': [0] * len(params_files),
+            'params_files': autofluo_params_files,
+            'landmarks_weights': [0] * len(autofluo_params_files),
         }
     }
+
     for channel in channel_names:
         if channel not in out_registration_cfg['channels']:
             out_registration_cfg['channels'][channel] = {
-                'resample': not(config_v1['registration']['resampling']['skip']),
+                'resample': resample,
                 'resampled_resolution': config_v1['registration']['resampling']['raw_sink_resolution'],
-                'align_with': 'autofluorescence',
-                'moving_channel': channel,
+                'align_with': reference_channel,
+                'moving_channel': reference_channel,
                 'params_files': [config_v1['registration']['atlas']['align_channels_affine_file']],
                 'landmarks_weights': [0],
             }
-
-    out_stitching_cfg.write()
     out_registration_cfg.write()
-    return out_stitching_cfg.filename, out_registration_cfg.filename
+    return out_registration_cfg
 
 
 def convert_machine_config_2_1_0_to_3_0_0(v1_path, v2_path=''):
@@ -150,6 +169,7 @@ def convert(cfg_path, backup=False, overwrite=False):
         'processing': convert_alignment_config_2_1_0_to_3_0_0,
         'cell_map': convert_cell_map_config_2_1_0_to_3_0_0,
         'machine': convert_machine_config_2_1_0_to_3_0_0,
+        # FIXME: implement vasculature, batch, group_analysis, display
     }
     config_type = next((k for k in conversion_funcs if k in str(cfg_path.stem)), None)
     if config_type is None:
@@ -159,18 +179,30 @@ def convert(cfg_path, backup=False, overwrite=False):
         if cfg_path.with_suffix('.bak').exists():
             raise FileExistsError(f'Backup file already exists: {cfg_path.with_suffix(".bak")}')
         shutil.copyfile(cfg_path, cfg_path.with_suffix('.bak'))
+
+    if config_type != 'sample':  # We already have a sample config for v3
+        config_loader = ConfigLoader(Path(cfg_path).parent)
+        sample_cfg_path = config_loader.get_cfg_path('sample', must_exist=False)
+        if os.path.exists(sample_cfg_path):  # FIXME: Make sure v3 sample config exists
+            sample_cfg = config_loader.get_cfg_from_path(sample_cfg_path)
     if overwrite:
         with tempfile.NamedTemporaryFile(suffix='.cfg', delete=False) as tmp:
             dest = Path(tmp.name)
-        dest_path = Path(conversion_funcs[config_type](cfg_path, dest))
+        args = [cfg_path, dest]
+        if config_type in ('alignment', 'processing'):
+            args.append(sample_cfg)
+        dest_path = Path(conversion_funcs[config_type](*args))
         shutil.move(dest_path, cfg_path)
         dest_path = cfg_path
     else:
-        dest_path = Path(conversion_funcs[config_type](cfg_path))
+        args = [cfg_path]
+        if config_type in ('alignment', 'processing'):
+            args.append(sample_cfg)
+        dest_path = Path(conversion_funcs[config_type](*args))
     return dest_path
 
 
-def main():
+def test():
     # Example usage
     convert_sample_config_2_1_0_to_3_0_0('/ClearMap/config/default_sample_params.cfg',
                                          '/tmp/test_sample_v3.cfg')
@@ -180,4 +212,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    test()

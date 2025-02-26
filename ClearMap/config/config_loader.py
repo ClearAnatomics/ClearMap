@@ -143,8 +143,6 @@ class ConfigLoader(object):
     def src_dir(self, value):
         self._src_dir = Path(value).expanduser()  # TODO: normpath?
 
-
-
     def get_cfg_path(self, cfg_name, must_exist=True):
         """
         Get the path to the configuration file with the given name.
