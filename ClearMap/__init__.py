@@ -43,5 +43,4 @@ __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 try:
     __version__ = version("ClearMap")
 except PackageNotFoundError:
-    __version__ = "2.1.0"
-from . import colocalization
+    __version__ = '3.0.0'
