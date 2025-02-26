@@ -21,7 +21,7 @@ CLEARMAP_DIR = str(CFG_DIR.parent.parent)  # used by shell script
 
 
 def update_default_config():
-    loader = ConfigLoader(None)
+    loader = ConfigLoader('~/.clearmap')
     for cfg_name in CONFIG_NAMES:
         default_cfg_path = loader.get_default_path(cfg_name, must_exist=True, from_package=True)
         cfg_paths = [loader.get_default_path(alternative, must_exist=False, from_package=False)

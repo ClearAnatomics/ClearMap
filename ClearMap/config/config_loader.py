@@ -65,7 +65,6 @@ def get_json_cfg(cfg_path):
 
 tabs_alternatives = [
     ['sample', 'sample_info', 'sample info'],
-    ['alignment', 'processing'],
     ['stitching'],
     ['registration'],
     ['cell_map', 'cell_counter'],
@@ -73,6 +72,10 @@ tabs_alternatives = [
     ['batch', 'batch_processing', 'batch processing'],
     ['group_analysis', 'group analysis']
 ]
+
+if clearmap_version < '3.0.0':
+    tabs_alternatives.insert(1, ['alignment', 'processing'])
+
 
 alternative_names = tabs_alternatives + [['machine'], ['display']]
 CONFIG_NAMES = [names[0] for names in alternative_names]
@@ -228,8 +231,10 @@ class ConfigLoader(object):
             if must_exist:
                 raise FileNotFoundError(f'Could not find file {cfg_name}, checked {paths_checked}')
             else:  # Return first (default) ext if none found
-                return ConfigLoader._name_to_default_path(f'{cfg_name}_params', ConfigLoader.supported_exts[0],
-                                                          from_package=from_package)
+                ext = ConfigLoader.supported_exts[0]
+                return ConfigLoader._name_to_default_path(f'{cfg_name}_params_{VERSION_SUFFIX}',  ext, from_package=from_package)
+                #return ConfigLoader._name_to_default_path(f'{cfg_name}_params', ConfigLoader.supported_exts[0],
+                #                                          from_package=from_package)
 
     @staticmethod
     def _name_to_default_path(cfg_name, ext, from_package=False):
