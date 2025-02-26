@@ -24,6 +24,7 @@ import re
 import platform
 import warnings
 from concurrent.futures.process import BrokenProcessPool
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -276,6 +277,8 @@ class CellDetector(TabProcessor):
 
         if save_shape:
             cell_detection_param['shape_detection']['save'] = shape_path
+            # erase any prior exisiting file to prevent confusion of sink with source in IO.initialize
+            Path(shape_path).unlink(missing_ok=True)
             if save_as_binary_mask:
                 cell_detection_param['shape_detection']['save_dtype'] = 'bool'
 
