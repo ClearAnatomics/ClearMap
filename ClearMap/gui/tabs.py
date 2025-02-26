@@ -121,14 +121,14 @@ if app is not None and app.applicationName() == 'ClearMap':
 from qdarkstyle import DarkPalette
 
 from ClearMap.config.atlas import ATLAS_NAMES_MAP, STRUCTURE_TREE_NAMES_MAP
-from ClearMap.config.config_loader import ConfigLoader
 
 import ClearMap.IO.IO as clm_io
 from ClearMap.Alignment import Annotation as annotation
-from ClearMap.Analysis.Statistics.group_statistics import make_summary, density_files_are_comparable, compare_groups
+from ClearMap.Analysis.Statistics.group_statistics import make_summary, density_files_are_comparable, compare_groups, \
+    check_ids_are_unique
 from ClearMap.Utils.exceptions import ClearMapVRamException, GroupStatsError, MissingRequirementException
 
-from ClearMap.gui.dialogs import prompt_dialog, option_dialog
+from ClearMap.gui.dialogs import option_dialog
 from ClearMap.gui.interfaces import GenericTab, PostProcessingTab, PreProcessingTab, BatchTab
 from ClearMap.gui.widgets import (PatternDialog, DataFrameWidget,
                                   LandmarksSelectorDialog, CheckableListWidget, FileDropListWidget)
@@ -140,7 +140,8 @@ from ClearMap.Visualization.Qt.utils import link_dataviewers_cursors
 from ClearMap.Visualization.Qt import Plot3d as plot_3d
 
 from ClearMap.processors.sample_preparation import (StitchingProcessor,
-                                                    RegistrationProcessor,  init_sample_manager_and_processors)
+                                                    RegistrationProcessor, init_sample_manager_and_processors,
+                                                    SampleManager)
 from ClearMap.processors.cell_map import CellDetector
 try:
     from ClearMap.processors.tube_map import BinaryVesselProcessor, VesselGraphProcessor
@@ -1423,11 +1424,11 @@ class VasculatureTab(PostProcessingTab):
 
 ################################################################################################
 
+
 class GroupAnalysisProcessor:
     def __init__(self, progress_watcher, results_folder=None):
         self.results_folder = Path(results_folder) if results_folder is not None else None
         self.progress_watcher = progress_watcher
-        self.annotator = None  # FIXME:
 
     def plot_p_vals(self, selected_comparisons, groups, channel, parent=None):
         p_vals_imgs = []
@@ -1475,25 +1476,21 @@ class GroupAnalysisProcessor:
         dvs = plot_3d.plot(images, title=titles, arrange=False, sync=True,
                            lut=luts, min_max=min_maxes,
                            parent=parent)
-        names_map = self.annotator.get_names_map()
+        names_map = registration_processor.annotator.get_names_map()
         for dv in dvs:
             dv.atlas = registration_processor.annotators[channel].atlas
             dv.structure_names = names_map
         link_dataviewers_cursors(dvs)
         return dvs
 
-    def compute_p_vals(self, selected_comparisons, groups, wrapping_func, advanced=False):
-        for pair in selected_comparisons:  # TODO: Move to processor object to be wrapped
-            # FIXME: for all channels
+    def compute_p_vals(self, selected_comparisons, groups, wrapping_func, channels, advanced=False):
+        for pair in selected_comparisons:
             gp1_name, gp2_name = pair
             gp1, gp2 = [groups[gp_name] for gp_name in pair]
-            _ = density_files_are_comparable(self.results_folder, gp1, gp2)
-            ids = []
-            for gp_dir in gp1 + gp2:
-                loader = ConfigLoader(gp_dir)
-                ids.append(loader.get_cfg('sample')['sample_id'])
-            if len(ids) != len(set(ids)):
-                raise GroupStatsError('Analysis impossible, some IDs are not unique. please check and start again')
+            for channel in channels:
+                _ = density_files_are_comparable(self.results_folder, gp1, gp2, channel)
+            check_ids_are_unique(gp1, gp2)
+            # compare_groups is automatically for each channel (loads the first sample to find the channels)
             wrapping_func(compare_groups, self.results_folder, gp1_name, gp2_name, gp1, gp2, advanced=advanced)
             self.progress_watcher.increment_main_progress()
 
@@ -1564,6 +1561,29 @@ class GroupAnalysisTab(BatchTab):
                 self.params.plot_density_maps_buttons[i].clicked.connect(
                     functools.partial(self.plot_density_maps, gp))
 
+    def get_analysable_channels(self):
+        """
+        List the channels that have density maps available for analysis
+
+        .. warning:: This method assumes that all the samples have the same channels
+
+        Returns
+        -------
+        list of str
+            The list of channels that have density maps available
+        """
+        gp_0 = self.params.group_names[0]
+        sample_folder = self.params.groups[gp_0][0]
+        
+        sample_manager = SampleManager()
+        sample_manager.setup(sample_folder)
+
+        analysable_channels = []
+        for channel in sample_manager.channels:
+            if sample_manager.get('density', channel=channel, asset_sub_type='counts').exists:
+                analysable_channels.append(channel)
+        return analysable_channels
+
     def plot_density_maps(self, group_name):
         self.params.ui_to_cfg()
         self.main_window.print_status_msg('Plotting density maps')
@@ -1583,6 +1603,7 @@ class GroupAnalysisTab(BatchTab):
         try:
             self.processor.compute_p_vals(self.params.selected_comparisons, self.params.groups,
                                           self.main_window.wrap_in_thread,
+                                          channels=self.get_analysable_channels(),
                                           advanced=self.params.compute_sd_and_effect_size)
         except GroupStatsError as err:
             self.main_window.popup(str(err), base_msg='Cannot proceed with analysis')
@@ -1600,7 +1621,7 @@ class GroupAnalysisTab(BatchTab):
                                                  self.params.groups[gp1_name], self.params.groups[gp2_name],
                                                  output_path=None, save=True)
             self.main_window.progress_watcher.increment_main_progress()
-            dvs.append(DataFrameWidget(dfs[channel]).table)  # FIXME:
+            dvs.append(DataFrameWidget(dfs[self.params.plot_channel]).table)
         self.main_window.setup_plots(dvs)
         self.main_window.signal_process_finished()
 
@@ -1621,9 +1642,13 @@ class GroupAnalysisTab(BatchTab):
         self.run_plots(plot_volcano, {'group_names': None, 'p_cutoff': 0.05, 'show': False, 'save_path': ''})
 
     def plot_histograms(self, fold_threshold=2):
-        # FIXME: use aligner.annotators[channel]
-        aba_json_df_path = annotation.default_label_file  # FIXME: aba_json needs fold levels
-        self.run_plots(plot_sample_stats_histogram, {'aba_df': pd.read_csv(aba_json_df_path),
+        folder = self.params.results_folder / self.params.groups[self.params.group_names[0]][0] # FIXME: check if absolute
+        processors = init_sample_manager_and_processors(folder)
+        registration_processor = processors['registration_processor']
+        annotator = registration_processor.annotators[self.params.plot_channel]
+        aba_df = annotator.df
+        # aba_json_df_path = annotation.default_label_file  # FIXME: aba_json needs fold levels
+        self.run_plots(plot_sample_stats_histogram, {'aba_df': pd.read_csv(aba_df),
                                                      'sort_by_order': True, 'value_cutoff': 0,
                                                      'fold_threshold': fold_threshold, 'fold_regions': True,
                                                      'show': False})

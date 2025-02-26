@@ -29,6 +29,7 @@ from ClearMap.Utils.exceptions import GroupStatsError
 from ClearMap.Utils.path_utils import is_density_file, find_density_file, find_cells_df, dir_to_sample_id
 from ClearMap.Utils.utilities import make_abs
 from ClearMap.config.atlas import ATLAS_NAMES_MAP
+from ClearMap.config.config_loader import ConfigLoader
 from ClearMap.processors.sample_preparation import init_sample_manager_and_processors, SampleManager
 
 colors = {  # REFACTOR: move to visualisation module
@@ -514,7 +515,7 @@ def make_summary(directory, gp1_name, gp2_name, gp1_dirs, gp2_dirs, channel=None
     return dfs
 
 
-def density_files_are_comparable(directory, gp1_dirs, gp2_dirs):
+def density_files_are_comparable(directory, gp1_dirs, gp2_dirs, channel):
     gp1_f_list = dirs_to_density_files(directory, gp1_dirs, channel)  # FIXME: channel
     gp2_f_list = dirs_to_density_files(directory, gp2_dirs, channel)  # FIXME: channel
     all_files = gp1_f_list + gp2_f_list
@@ -524,7 +525,7 @@ def density_files_are_comparable(directory, gp1_dirs, gp2_dirs):
     if comparable:
         return True
     else:
-        raise GroupStatsError(f'Could not compare files, sizes differ\n\n'
+        raise GroupStatsError(f'Could not compare files, for channel {channel} sizes differ\n\n'
                               f'Group 1: {gp1_f_list}\n'
                               f'Group 2: {gp2_f_list}\n'
                               f'Sizes 1: {[os.path.getsize(f) for f in gp1_f_list]}\n'
@@ -647,3 +648,12 @@ def compare_groups(directory, gp1_name, gp2_name, gp1_dirs, gp2_dirs, prefix='p_
 #
 #     import ClearMap.Visualization.Plot3d as p3d
 #     p3d.plot(pvalscol)
+
+
+def check_ids_are_unique(gp1, gp2):
+    ids = []
+    for gp_dir in gp1 + gp2:
+        loader = ConfigLoader(gp_dir)
+        ids.append(loader.get_cfg('sample')['sample_id'])
+    if len(ids) != len(set(ids)):
+        raise GroupStatsError('Analysis impossible, some IDs are not unique. please check and start again')
