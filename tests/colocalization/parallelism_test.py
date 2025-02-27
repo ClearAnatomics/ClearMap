@@ -1,3 +1,4 @@
+from pathlib import Path
 import sys
 
 # TODO set automatically the correct path
@@ -8,26 +9,29 @@ import ClearMap.colocalization.channel as channel
 
 import pickle
 
-READ = True
+READ = False
+SAVE = False
+save_path = Path('/home/gael.cousin/Documents/my_code/colocalization/ClearMap2/tests/colocalization/')
 
 if not READ:
 
     print("Generating random channels")
     channel_0 = channel.random_channel((200, 200, 200), 500, 5, 10)
     channel_1 = channel.random_channel((200, 200, 200), 500, 5, 10)
-    with open("/home/gael.cousin/Documents/my_code/colocalization/ClearMap2/tests/colocalization/c0.pickle", "wb") as f:
-        pickle.dump(channel_0, f)
+    if SAVE:
+        with open(save_path/"c0.pickle", "wb") as f:
+            pickle.dump(channel_0, f)
 
-    with open("/home/gael.cousin/Documents/my_code/colocalization/ClearMap2/tests/colocalization/c1.pickle", "wb") as f:
-        pickle.dump(channel_1, f)
-    print("Random channels generation done.")
+        with open(save_path/"c1.pickle", "wb") as f:
+            pickle.dump(channel_1, f)
+        print("Random channels generation done.")
 
 else:
-    with open("/home/gael.cousin/Documents/my_code/colocalization/ClearMap2/tests/colocalization/c0.pickle", "rb") as f:
+    with open(save_path/"c0.pickle", "rb") as f:
         channel_0 = pickle.load(f)
         channel_0.verbose = True
 
-    with open("/home/gael.cousin/Documents/my_code/colocalization/ClearMap2/tests/colocalization/c1.pickle", "rb") as f:
+    with open(save_path/"c1.pickle", "rb") as f:
         channel_1 = pickle.load(f)
         channel_1.verbose = True
 
