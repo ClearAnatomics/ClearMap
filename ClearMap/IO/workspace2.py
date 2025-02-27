@@ -307,8 +307,9 @@ class Workspace2:  # REFACTOR: subclass dict
 
         if asset_sub_type:
             asset_type += f'_{asset_sub_type}'
-        asset = self.asset_collections[channel][asset_type]
-        if asset is None:
+        if asset_type in self.asset_collections[channel]:
+            asset = self.asset_collections[channel][asset_type]
+        else: # asset is somehow None
             if default == 'closest':
                 warnings.warn('No exact match found. Using partial matching from start.')
                 asset = self.get_closest_matching_asset(asset_type, channel)
