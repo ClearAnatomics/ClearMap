@@ -5,6 +5,7 @@ widgets
 
 A set of custom widgets for the ClearMap GUI
 """
+import getpass
 import os
 import re
 import tempfile
@@ -1688,8 +1689,11 @@ class PerfMonitor(QWidget):
 
     def get_thread_percent(self):
         try:
+            user_name = getpass.getuser()
             clear_map_proc_cpu = [proc.cpu_percent() for proc in psutil.process_iter()
-                                  if proc and 'python' in proc.name().lower() and 'clearmap' in proc.exe().lower()]
+                                  if proc and 'python' in proc.name().lower() and
+                                  user_name in proc.username() and
+                                  'clearmap' in proc.exe().lower()]
         except psutil.NoSuchProcess:
             clear_map_proc_cpu = []
         # The name filter is not sufficient but necessary because the exe is not always allowed
