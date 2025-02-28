@@ -13,7 +13,8 @@ import inspect
 import shutil
 from pathlib import Path
 
-from ClearMap.config.config_loader import ConfigLoader, get_alternatives, CONFIG_NAMES, get_cfg_reader_function
+from ClearMap.config.config_loader import (ConfigLoader, get_alternatives, CONFIG_NAMES,
+                                           get_cfg_reader_function, clearmap_version)
 
 
 CFG_DIR = Path(inspect.getfile(inspect.currentframe())).resolve().parent
@@ -23,6 +24,8 @@ CLEARMAP_DIR = str(CFG_DIR.parent.parent)  # used by shell script
 def update_default_config():
     loader = ConfigLoader('~/.clearmap')
     for cfg_name in CONFIG_NAMES:
+        if cfg_name == 'alignment' and clearmap_version >= '3.0.0':
+            continue
         default_cfg_path = loader.get_default_path(cfg_name, must_exist=True, from_package=True)
         cfg_paths = [loader.get_default_path(alternative, must_exist=False, from_package=False)
                      for alternative in get_alternatives(cfg_name)]
