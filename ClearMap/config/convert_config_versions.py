@@ -6,8 +6,12 @@ from pathlib import Path
 from packaging.version import Version
 from importlib_metadata import version
 
-from ClearMap.Settings import clearmap_path
+import qdarkstyle
+from PyQt5.QtWidgets import QApplication, QDialog, QFileDialog
+
 from ClearMap.config.config_loader import ConfigLoader, get_configobj_cfg
+
+from ClearMap.gui.dialogs import RenameChannelsDialog, VerifyRenamingDialog, get_directory_dlg
 
 clearmap_version = version('ClearMap')
 VERSION_SUFFIX = f'v{Version(clearmap_version).major}_{Version(clearmap_version).minor}'
@@ -79,14 +83,14 @@ def convert_cell_map_config_2_1_0_to_3_0_0(v1_path, v2_path, channel_name='chann
     return config_v2.filename
 
 
-def convert_alignment_config_2_1_0_to_3_0_0(v1_path, v2_path, sample_config=None):
+def convert_alignment_config_2_1_0_to_3_0_0(v1_path, v2_path='', sample_config=None):
     config_v1 = get_configobj_cfg(v1_path)
     if config_v1['clearmap_version'] != '2.1.0':
         raise ValueError('Only version 2.1.0 is supported')
 
     v2_path = v2_path or v1_path
 
-    out_stitching_cfg = alignment_to_stitching_v3(v2_path, config_v1, sample_config)
+    out_stitching_cfg = alignment_to_stitching_v3(v2_path, config_v1)
 
     out_registration_cfg = alignment_to_registration_v3(v2_path, config_v1, sample_config)
 
@@ -195,11 +199,96 @@ def convert(cfg_path, backup=False, overwrite=False):
         shutil.move(dest_path, cfg_path)
         dest_path = cfg_path
     else:
-        args = [cfg_path]
         if config_type in ('alignment', 'processing'):
-            args.append(sample_cfg)
-        dest_path = Path(conversion_funcs[config_type](*args))
+            res = conversion_funcs[config_type](cfg_path, sample_config=sample_cfg)
+        else:
+            res = conversion_funcs[config_type](cfg_path)
+        if isinstance(res, tuple):
+            dest_path = Path(res[-1])
+        else:
+            dest_path = Path(res)
     return dest_path
+
+
+def convert_v2_1_to_v3_0(main_folder=''):
+    app = QApplication([])
+    app.setStyleSheet(qdarkstyle.load_stylesheet_pyqt5())
+
+    if not main_folder:
+        main_folder = get_directory_dlg("~/")
+
+    if not main_folder:
+        return
+
+    # Initialize ConfigLoader
+    cfg_loader = ConfigLoader(main_folder)
+
+    # Get paths to the configuration files
+    sample_cfg_path, alignment_cfg_path, cell_map_cfg_path = (
+        [cfg_loader.get_cfg_path(name) for name in ('sample', 'alignment', 'cell_map')])
+
+    # Convert sample config
+    v3_sample_cfg_path = convert(sample_cfg_path, backup=True, overwrite=True)
+
+    # Create SampleManager
+    sample_cfg = ConfigLoader.get_cfg_from_path(v3_sample_cfg_path)
+
+    # Extract channels with paths
+    channels = {name: data for name, data in sample_cfg['channels'].items() if data['path']}
+
+    # Pop up dialog to rename channels and define data_type
+    dialog = RenameChannelsDialog(channels)
+    if dialog.exec() == QDialog.Accepted:
+        new_channels = dialog.get_new_channels()
+    else:
+        new_channels = {}
+
+    if new_channels:
+        print(f'{new_channels=}')
+    else:
+        return
+
+    # Rename channels in the v3 sample config file
+    for old_name, (new_name, data_type) in new_channels.items():
+        sample_cfg['channels'][new_name] = sample_cfg['channels'].pop(old_name)
+        sample_cfg['channels'][new_name]['data_type'] = data_type
+    sample_cfg.write()
+
+    # Convert alignment and cell_map config files
+    convert(alignment_cfg_path, backup=True, overwrite=False)
+    # convert(cell_map_cfg_path, backup=True, overwrite=False)  # FIXME: add if exists
+
+    # Rename assets
+    assets = [f for f in os.listdir(main_folder) if not f.endswith(('.log', '.html', '.cfg', '.bak'))]
+    folders_to_rename = ['elastix_auto_to_reference', 'elastix_resampled_to_auto']
+    files_to_rename = {f: f for f in assets if os.path.isfile(os.path.join(main_folder, f))}
+    files_to_rename.update({f: f for f in assets if os.path.isdir(os.path.join(main_folder, f)) and f in folders_to_rename})
+
+    # Compute new names
+    for file in files_to_rename:
+        new_name = file
+        if 'arteries' in file:
+            new_channel = new_channels["arteries"][0]
+            new_name = f'{new_channel}_{file.replace("arteries", "")}'
+        elif 'autofluorescence' in file:
+            autofluo_channel = next((name for name, data in new_channels.items() if data[1] == 'autofluorescence'), None)
+            if autofluo_channel:
+                new_name = f'{autofluo_channel}_{file.replace("autofluorescence", "")}'  # FIXME: may be surrounding underscores
+        else:
+            new_channel = new_channels["raw"][0]
+            new_name = f'{new_channel}_{new_name}'
+        files_to_rename[file] = new_name
+
+    # Verify renaming
+    dialog = VerifyRenamingDialog(files_to_rename)
+    if dialog.exec() == QDialog.Accepted:
+        files_to_rename = dialog.get_selected_files()
+    else:
+        return
+
+    main_folder = Path(main_folder)
+    for old_name, new_name in files_to_rename:
+        os.rename(main_folder / old_name, main_folder / new_name)
 
 
 def test():
@@ -212,4 +301,5 @@ def test():
 
 
 if __name__ == '__main__':
-    test()
+    # test()
+    convert_v2_1_to_v3_0()
