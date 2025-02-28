@@ -160,9 +160,13 @@ class SampleManager(TabProcessor):
             raw_path = cfg['path']
             if raw_path:
                 if channel not in self.workspace.asset_collections:
+                    content_type = cfg['data_type']
+                    if not content_type:
+                        raise ValueError(f'No data type specified for channel {channel}. '
+                                         f'Cannot create asset without data type')
                     self.workspace.add_raw_data(file_path=raw_path,
                                                 channel_id=channel,
-                                                data_content_type=cfg['data_type'],
+                                                data_content_type=content_type,
                                                 sample_id=self.prefix)
                 else:
                     old_asset = self.workspace.asset_collections[channel]['raw']
