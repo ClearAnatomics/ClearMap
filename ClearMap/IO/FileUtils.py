@@ -290,7 +290,7 @@ def uncompress(file_path, extension='zip', check=True, verbose=False):
             else:
                 raise ValueError(f'Could not find compressed source for {file_path}')
 
-        compressed_path = file_path.with_suffix(f'{file_path.suffix}.{algo}')
+        compressed_path = file_path.with_suffix(f'{file_path.suffix}.{extension}')
         if compressed_path.exists():
             if verbose:
                 print(f'Decompressing source: {compressed_path}')
