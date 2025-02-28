@@ -371,7 +371,7 @@ if __name__ == '__main__':
   
   #%% Artery binary measure
   
-  binary_arteries = ws.filename('binary', postfix='filled');
+  binary_arteries = ws.filename('binary', postfix='arteries_filled');
   
   coordinates = graph_raw.vertex_coordinates();
   radii = graph_raw.vertex_radii();
