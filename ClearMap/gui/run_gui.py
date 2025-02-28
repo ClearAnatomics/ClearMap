@@ -747,9 +747,9 @@ class ClearMapGui(ClearMapGuiBase):
             self.add_tab(StitchingTab, sample_manager=self.sample_manager, set_params=True)
             stitching_cfg = self.tab_managers['stitching'].params.config
         self.add_tab(RegistrationTab, sample_manager=self.sample_manager, set_params=True)  # WARNING: Always needed to allow setting None for atlas
-        if self.sample_manager.stitchable_channels:
-            self.tab_managers['stitching'].layout_channel_changed.connect(
-                self.tab_managers['registration'].handle_layout_channel_changed)
+        # if self.sample_manager.stitchable_channels:
+        #    self.tab_managers['stitching'].layout_channel_changed.connect(
+        #        self.tab_managers['registration'].handle_layout_channel_changed)
         # FIXME: do we push to config to sample_manager here ?
         self.__add_post_processing_tabs()
         self.sample_manager.load_processors_config(stitching_cfg,

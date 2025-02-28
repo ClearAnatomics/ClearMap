@@ -347,7 +347,7 @@ class StitchingTab(PreProcessingTab):
     The tab responsible for all the alignments, including the stitching and
     aligning to the atlas.
     """
-    layout_channel_changed = pyqtSignal(str, str)
+    # layout_channel_changed = pyqtSignal(str, str)
 
     def __init__(self, main_window, tab_idx, sample_manager=None):
         super().__init__(main_window, 'stitching_tab', tab_idx)
@@ -445,7 +445,7 @@ class StitchingTab(PreProcessingTab):
         for btn_name, func, kwargs in buttons_functions:
             self._bind_btn(btn_name, func, channel, page_widget, **kwargs)
         self.ui.runChannelsCheckableListWidget.set_item_checked(channel, self.params[channel].shared.run)
-        self.params[channel].layout_channel_changed.connect(self.handle_layout_channel_changed)
+        # self.params[channel].layout_channel_changed.connect(self.handle_layout_channel_changed)
 
     def _setup_workers(self):
         """
@@ -458,8 +458,8 @@ class StitchingTab(PreProcessingTab):
         #     if  prompt_dialog('Tile conversion', 'Convert individual tiles to npy for efficiency'):
         #         self.convert_tiles()
 
-    def handle_layout_channel_changed(self, channel, layout_channel):
-        self.layout_channel_changed.emit(channel, layout_channel)
+    # def handle_layout_channel_changed(self, channel, layout_channel):
+    #    self.layout_channel_changed.emit(channel, layout_channel)
 
     def convert_tiles(self):
         if not self.sample_manager.has_tiles():
