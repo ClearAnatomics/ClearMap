@@ -12,6 +12,7 @@ from shutil import copyfile
 from abc import abstractmethod
 from typing import final
 
+import numpy as np
 from PyQt5.QtWidgets import QWhatsThis, QToolButton, QWidget
 
 from ClearMap.Utils.exceptions import MissingRequirementException, PlotGraphError
@@ -648,7 +649,7 @@ class PostProcessingTab(PipelineTab):
         else:
             self.aligner = self.main_window.tab_managers['registration'].aligner
 
-    def plot_slicer(self, slicer_prefix, tab, params):
+    def plot_slicer(self, slicer_prefix, tab, params, channel):
         """
         Display the ortho-slicer to pick a subset of 3D data.
         This is typically used to create a small  dataset to evaluate parameters
@@ -661,9 +662,16 @@ class PostProcessingTab(PipelineTab):
         params
         """
         self.main_window.clear_plots()
-        img = self.sample_manager.get('resampled', channel=channel).as_source()  # FIXME: channel undefined
+        if isinstance(channel, (list, tuple)):
+            sources = [self.sample_manager.get('resampled', channel=ch).as_source() for ch in channel]
+            if not np.all([src.shape == sources[0].shape for src in sources]):
+                raise ValueError('Channels have different shapes')
+            resampled_img = np.mean([self.sample_manager.get('resampled', channel=ch).as_source() for ch in channel], axis=0)
+            channel = channel[0]
+        else:
+            resampled_img = self.sample_manager.get('resampled', channel=channel).as_source()
         # FIXME: try stitched if npy and resampled missing
-        self.main_window.ortho_viewer.setup(img, params, parent=self.main_window)
+        self.main_window.ortho_viewer.setup(resampled_img, params, parent=self.main_window)
         dvs = self.main_window.ortho_viewer.plot_orthogonal_views()
         ranges = [[params.reverse_scale_axis(v, ax) for v in vals] for ax, vals in zip('xyz', params.slice_tuples)]
         self.main_window.ortho_viewer.update_ranges(ranges)
