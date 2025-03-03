@@ -463,7 +463,6 @@ def detect_cells_block(source, parameter=default_cell_detection_parameter, n_thr
             else:  # WARNING: prange but me.measure_expression not parallel since processes=1
                 # FIXME : How can r be defined in this branch ???
                 intensity = me.measure_expression(steps_to_measure[m], centers, search_radius=r,
-            
                                                     **parameter_intensity, processes=1, verbose=False)
 
             results += (intensity,)
