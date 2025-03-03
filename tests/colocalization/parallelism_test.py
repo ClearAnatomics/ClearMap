@@ -11,7 +11,7 @@ import pickle
 
 READ = False
 SAVE = False
-save_path = Path('~/Documents/my_code/colocalization/ClearMap2/tests/colocalization/').expanduser()
+save_path = Path('~/Documents/my_code/colocalization/ClearMap2/tests/colocalization/').expanduser() 
 
 if not READ:
 
