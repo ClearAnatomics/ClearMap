@@ -114,6 +114,7 @@ import mpld3
 from pyqtgraph import PlotWidget
 
 from ClearMap.IO.assets_constants import DATA_CONTENT_TYPES, EXTENSIONS
+from ClearMap.processors.tract_map import TractMapProcessor
 
 app = QApplication.instance()
 if app is not None and app.applicationName() == 'ClearMap':
@@ -134,7 +135,8 @@ from ClearMap.gui.widgets import (PatternDialog, DataFrameWidget,
                                   LandmarksSelectorDialog, CheckableListWidget, FileDropListWidget)
 from ClearMap.gui.gui_utils import format_long_nb, np_to_qpixmap, replace_widget, unique_connect, get_widget
 from ClearMap.gui.params import (VesselParams, SampleParameters, StitchingParams,
-                                 CellMapParams, GroupAnalysisParams, BatchProcessingParams, RegistrationParams)
+                                 CellMapParams, GroupAnalysisParams, BatchProcessingParams, RegistrationParams,
+                                 TractMapParams)
 from ClearMap.Visualization.Matplotlib.PlotUtils import plot_sample_stats_histogram, plot_volcano
 from ClearMap.Visualization.Qt.utils import link_dataviewers_cursors
 from ClearMap.Visualization.Qt import Plot3d as plot_3d
@@ -1420,6 +1422,176 @@ class VasculatureTab(PostProcessingTab):
     def save_stats(self):
         """Save the stats of the graph to a feather file"""
         self.wrap_step('Saving stats', self.vessel_graph_processor.write_vertex_table)
+
+
+class TractMapTab(PostProcessingTab):
+    """
+    The tab responsible for the tract map processing and visualization.
+    """
+    def __init__(self, main_window, tab_idx, sample_manager=None):
+        super().__init__(main_window, 'tract_map_tab', tab_idx)
+        self.sample_manager = sample_manager
+        self.aligner = None
+
+        self.tract_mappers = {}
+
+        self.channels_ui_name = 'tract_map_params'
+
+        # self.advanced_controls_names = ['channel.tractMapAdvancedGroupBox']
+
+    def _set_channels_names(self):
+        """Patch the config with the actual channels if not already done"""
+        if not set(self.params.config['channels'].keys()) <= set(self.sample_manager.channels):
+            default_channel_config = deepcopy(self.params.config['channels']['example'])
+            self.params.config['channels'] = {}
+            for channel in self.params.channels_to_process:
+                self.params.config['channels'][channel] = default_channel_config
+            self.params.config.write()
+            self._setup_workers()
+
+    def _bind(self):
+        pass
+
+    def _bind_params_signals(self):
+        pass
+
+    def _set_params(self):
+        self.params = TractMapParams(self.ui, self.sample_params, None,
+                                     self.main_window.tab_managers['registration'].params)
+
+    def _get_channels(self):
+        return self.params.channels_to_process
+
+    def _setup_workers(self):
+        if self.sample_manager.workspace is not None:
+            if self.config_initialised():
+                self.params.ui_to_cfg()
+                self.tract_mappers = {channel: TractMapProcessor(self.sample_manager, channel)
+                                  for channel in self.params.channels_to_process}
+            else:
+                self.main_window.print_warning_msg('Channels not yet set in config. Cannot define workers.')
+        else:
+            self.main_window.print_warning_msg('Workspace not initialised')
+
+    def config_initialised(self):
+        return 'example' not in self.params.config['channels']
+
+    def finalise_workers_setup(self):
+        is_first_channel = True
+        for channel, processor in self.tract_mappers.items():
+            if processor.registration_processor is None and self.aligner is not None:
+                if is_first_channel:
+                    self.params.ui_to_cfg()
+                    is_first_channel = False
+                processor.setup(self.sample_manager, channel, self.aligner)
+
+    def _set_channel_config(self, channel):
+        pass
+
+    def _bind_channel(self, page_widget, channel):
+        buttons_functions = [
+            ('tractMapPreviewTuningOpenPushButton', self.plot_debug_cropping_interface),
+            ('tractMapPreviewTuningCropPushButton', self.create_tract_map_tuning_sample),
+            ('tractMapPreviewPushButton', self.run_tuning_tract_map),
+            ('runTractMapPushButton', self.run_tract_map),
+            ('tractMapPlotVoxelizationPushButton', self.plot_tract_map_results),
+            ('tractMap3dScatterOnRefPushButton', functools.partial(self.plot_labeled_cells_scatter, raw=False)),
+            ('tractMap3dScatterOnStitchedPushButton', functools.partial(self.plot_labeled_cells_scatter, raw=True)),
+            # TODO: self.voxelize
+        ]
+        for btn_name, func in buttons_functions:
+            self._bind_btn(btn_name, func, channel, page_widget)
+
+    def set_progress_watcher(self, watcher):
+        for processor in self.tract_mappers.values():
+            if processor is not None and processor.sample_manager is not None:
+                processor.set_progress_watcher(watcher)
+
+    def run_tuning_tract_map(self, channel):
+        self.run_tract_map(channel, tuning=True)
+
+    def run_tract_map(self, channel, tuning=False):
+        processor = self.tract_mappers[channel]
+        self.wrap_step('Running tract map', processor.run_pipeline,
+                       step_kw_args={'tuning': tuning},
+                       abort_func=processor.stop_process)
+        if processor.stopped:
+            return
+        if tuning:
+            with processor.workspace.tmp_debug:
+                self.plot_tract_map_results(channel)
+
+    def binarize_channel(self, channel):
+        processor = self.tract_mappers[channel]
+        self.wrap_step('Binarization', processor.binarize_channel,
+                       abort_func=processor.stop_process)
+
+    def extract_coordinates(self, channel):
+        processor = self.tract_mappers[channel]
+        self.wrap_step('Extracting coordinates', processor.mask_to_coordinates,
+                       step_kw_args={'as_memmap': True},
+                       abort_func=processor.stop_process)
+
+    def transform_coordinates(self, channel):
+        processor = self.tract_mappers[channel]
+        self.wrap_step('Transforming coordinates', processor.parallel_transform,
+                       abort_func=processor.stop_process)
+
+    def label_coordinates(self, channel):
+        processor = self.tract_mappers[channel]
+        self.wrap_step('Labeling coordinates', processor.label,
+                       abort_func=processor.stop_process)
+
+    def export_df(self, channel):
+        processor = self.tract_mappers[channel]
+        self.wrap_step('Exporting coordinates', processor.export_df,
+                       abort_func=processor.stop_process)
+
+    def run_channel(self, channel):  # FIXME: missing calls to wrap step
+        self.params.ui_to_cfg()
+        params = self.params[channel]
+        processor = self.tract_mappers[channel]
+        if params.binarize:
+            self.binarize_channel(channel)
+        if params.extract_coordinates:
+            self.extract_coordinates(channel)  # mask_to_coordinates
+        if params.transform_coordinates:
+            self.transform_coordinates(channel)
+        if params.label_coordinates:
+            self.label_coordinates(channel)
+        if params.voxelize:
+            self.voxelize(channel)
+        if params.export_df:
+            processor.export_df(channel)
+
+    def voxelize(self, channel):
+        if self.tract_mappers[channel].get('binary', asset_sub_type='coordinates_transformed', channel=self.channel).exists:
+            self.wrap_step('Voxelization', self.tract_mappers[channel].voxelize,
+                           abort_func=self.tract_mappers[channel].stop_process, nested=False)
+        else:
+            self.main_window.popup('Could not run voxelization, missing transformed coordinates. ',
+                                   base_msg='Missing file')
+
+    def plot_debug_cropping_interface(self, channel):
+        """
+        Plot the orthoslicer to select a subset of the sample to perform cell detections
+        tests on
+        """
+        self.plot_slicer('detectionSubset', self.ui.channelsParamsTabWidget.get_channel_widget(channel),
+                         self.params[channel], channel)
+
+    def create_tract_map_tuning_sample(self, channel):
+        """Create an array from a subset of the sample to perform tests on """
+        processor = self.tract_mappers[channel]
+        self.wrap_step('Creating tuning sample', processor.create_test_dataset,
+                       step_kw_args={'slicing': self.params[channel].slicing}, nested=False)
+
+
+    def plot_tract_map_results(self, channel):
+        self.wrap_plot(self.tract_mappers[channel].plot_voxelized_counts)
+
+    def plot_labeled_cells_scatter(self, channel, raw=False):
+        self.wrap_plot(self.tract_mappers[channel].plot_cells_3d_scatter_w_atlas_colors, raw=raw)
 
 
 ################################################################################################

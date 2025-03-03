@@ -746,13 +746,14 @@ class AtlasParams(UiParameter):
 class CellMapParams(ChannelsUiParameterCollection):
     def __init__(self, tab, sample_params, _, registration_params):
         super().__init__(tab)
+        self.pipeline_name = 'CellMap'
         self.sample_params = sample_params
         self.registration_params = registration_params
 
     @property
     def channels_to_detect(self):
         return [c for c, v in self.sample_params.config['channels'].items() if
-                CONTENT_TYPE_TO_PIPELINE[v['data_type']] == 'CellMap']
+                CONTENT_TYPE_TO_PIPELINE[v['data_type']] == self.pipeline_name]
 
     def default_channel_config(self):
         return self._default_config['channels']['example']
@@ -834,7 +835,7 @@ class ChannelCellMapParams(ChannelUiParameter):
     def handle_advanced_state_changed(self, state):
         for ctrl in self.advanced_controls:
             ctrl.setVisible(state)
-        self.tab.detectionShapeGroupBox.setVisible(state)
+        self.tab.detectionShapeGroupBox.setVisible(state)  # FIXME: seems redundant
 
     @property
     def cfg_subtree(self):
@@ -858,8 +859,8 @@ class ChannelCellMapParams(ChannelUiParameter):
     @property
     def ratios(self):
         raw_res = np.array(self.main_params.sample_params[self.name].resolution)
-        atlas_res = np.array(self.main_params.registration_params.atlas_params.atlas_resolution)
-        ratios = atlas_res / raw_res  # to original
+        resampled_res = np.array(self.main_params.registration_params[self.name].resampled_resolution)
+        ratios = resampled_res / raw_res  # to original
         return ratios
 
     @property
@@ -892,6 +893,135 @@ class ChannelCellMapParams(ChannelUiParameter):
 
     def handle_filter_intensity_changed(self, _):
         self.config['cell_filtration']['thresholds']['intensity'] = self.cell_filter_intensity
+
+    def scale_axis(self, val, axis='x'):
+        axis_ratio = self.ratios['xyz'.index(axis)]
+        return round(val * axis_ratio)
+
+    def reverse_scale_axis(self, val, axis='x'):
+        axis_ratio = self.ratios['xyz'.index(axis)]
+        return round(val / axis_ratio)
+
+    @property
+    def slice_tuples(self):
+        return ((self.crop_x_min, self.crop_x_max),
+                (self.crop_y_min, self.crop_y_max),
+                (self.crop_z_min, self.crop_z_max))
+
+    @property
+    def slicing(self):
+        return tuple([slice(ax[0], ax[1]) for ax in self.slice_tuples])
+
+
+class TractMapParams(ChannelsUiParameterCollection):
+    def __init__(self, tab, sample_params, _, registration_params):
+        super().__init__(tab)
+        self.pipeline_name = 'TractMap'
+        self.sample_params = sample_params
+        self.registration_params = registration_params
+
+    @property
+    def channels_to_process(self):
+        return [c for c, v in self.sample_params.config['channels'].items() if
+                CONTENT_TYPE_TO_PIPELINE[v['data_type']] == self.pipeline_name]
+
+    def default_channel_config(self):
+        return self._default_config['channels']['example']
+
+    @property
+    def channel_params(self):
+        return self._channels.values()
+
+    def add_channel(self, channel_name):  # FIXME: not called
+        if channel_name not in self.keys():
+            if channel_name not in self.config['channels']:
+                self.config['channels'][channel_name] = dict(deepcopy(self.default_channel_config()))
+            channel_params = ChannelTractMapParams(self.tab, channel_name, self)
+            channel_params._config = self.config
+            self[channel_name] = channel_params
+
+    @property
+    def params(self):
+        return self.values()
+
+
+class ChannelTractMapParams(ChannelUiParameter):
+    clipping_decimation_ratio: int
+    clip_range = List[int]
+    crop_x_min: int
+    crop_x_max: int  # TODO: if 99.9 % source put to 100% (None)
+    crop_y_min: int
+    crop_y_max: int  # TODO: if 99.9 % source put to 100% (None)
+    crop_z_min: int
+    crop_z_max: int  # TODO: if 99.9 % source put to 100% (None)
+    display_decimation_ratio: int  # For the "cells.feather" file
+    voxelization_radii: List[int]
+    binarize: bool
+    extract_coordinates: bool
+    transform_coordinates: bool
+    label_coordinates: bool
+    voxelize: bool
+    export_df: bool
+    # [[[parallel_params]]]
+    # min_point_list_size = 1000000
+    # max_point_list_size = 10000000
+    # n_processes_binarization = 15
+    # n_processes_resampling = 15
+    # n_processes_where = 23
+    # n_processes_transform = 23
+    # n_processes_label = 23
+
+    def __init__(self, tab, channel, main_params):
+        super().__init__(tab, channel)
+        self.params_dict = {
+            'clipping_decimation_ratio': ParamLink(['binarization', 'decimation_ratio'], self.tab.clippingDecimationRatioSpinBox),
+            'clip_range': ParamLink(['binarization', 'clip_range'], self.tab.clipRangeDoublet),
+            'crop_x_min': ParamLink(['test_set_slicing', 'dim_0', 0], self.tab.detectionSubsetXRangeMin),
+            'crop_x_max': ParamLink(['test_set_slicing', 'dim_0', 1], self.tab.detectionSubsetXRangeMax),
+            'crop_y_min': ParamLink(['test_set_slicing', 'dim_1', 0], self.tab.detectionSubsetYRangeMin),
+            'crop_y_max': ParamLink(['test_set_slicing', 'dim_1', 1], self.tab.detectionSubsetYRangeMax),
+            'crop_z_min': ParamLink(['test_set_slicing', 'dim_2', 0], self.tab.detectionSubsetZRangeMin),
+            'crop_z_max': ParamLink(['test_set_slicing', 'dim_2', 1], self.tab.detectionSubsetZRangeMax),
+            'display_decimation_ratio': ParamLink(['display', 'decimation_ratio'], self.tab.displayDecimationRatioSpinBox),
+            'voxelization_radii': ParamLink(['voxelization', 'radii'], self.tab.voxelizationRadiusTriplet),
+            'binarize': ParamLink(['steps', 'binarize'], self.tab.binarizeCheckBox),
+            'extract_coordinates': ParamLink(['steps', 'extract_coordinates'], self.tab.extractCoordinatesCheckBox),
+            'transform_coordinates': ParamLink(['steps', 'transform_coordinates'], self.tab.transformCoordinatesCheckBox),
+            'label_coordinates': ParamLink(['steps', 'label_coordinates'], self.tab.labelCoordinatesCheckBox),
+            'voxelize': ParamLink(['steps', 'voxelize'], self.tab.voxelizeCheckBox),
+            'export_df': ParamLink(['steps', 'export_df'], self.tab.exportDfCheckBox),
+        }
+        self.main_params = main_params
+        self.advanced_controls = []  # FIXME: put as default in parent class
+        self.connect()
+
+    def handle_advanced_state_changed(self, state):
+        for ctrl in self.advanced_controls:
+            ctrl.setVisible(state)
+
+    @property
+    def cfg_subtree(self):
+        return ['channels', self.name]
+
+    def handle_name_changed(self):
+        # private config because absolute path
+        # TODO: check if dict() is required
+        self._config['channels'][self.name] = self._config['channels'].pop(self._cached_name)
+        self._cached_name = self.name
+
+    def connect(self):
+        self.connect_simple_widgets()
+
+    def cfg_to_ui(self):
+        self.reload()
+        super().cfg_to_ui()
+
+    @property
+    def ratios(self):
+        raw_res = np.array(self.main_params.sample_params[self.name].resolution)
+        resampled_res = np.array(self.main_params.registration_params[self.name].resampled_resolution)
+        ratios = resampled_res / raw_res  # to original
+        return ratios
 
     def scale_axis(self, val, axis='x'):
         axis_ratio = self.ratios['xyz'.index(axis)]
@@ -1124,9 +1254,9 @@ class VesselVisualizationParams(UiParameter):
     def ratios(self):
         channel = [k for k, v in self.sample_params.items() if CONTENT_TYPE_TO_PIPELINE[v.data_type] == 'TubeMap'][0]
         # First TubeMap channel
-        raw_res = np.array(self.main_params.sample_params[channel].resolution)
-        atlas_res = np.array(self.registration_params.atlas_params.atlas_resolution)
-        ratios = atlas_res / raw_res  # to original
+        raw_res = np.array(self.main_params.sample_params[self.name].resolution)
+        resampled_res = np.array(self.main_params.registration_params[self.name].resampled_resolution)
+        ratios = resampled_res / raw_res  # to original
         return ratios
 
     def scale_axis(self, val, axis='x'):
