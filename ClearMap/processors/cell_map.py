@@ -258,7 +258,7 @@ class CellDetector(TabProcessor):
                                     sink=self.get_path('cells', channel=self.channel, asset_sub_type='filtered'),
                                     thresholds=thresholds)
 
-    def run_cell_detection(self, tuning=False, save_maxima=True, save_shape=False, save_as_binary_mask=False):
+    def run_cell_detection(self, tuning=False, save_maxima=False, save_shape=False, save_as_binary_mask=False):
         self.reload_config()
         self.workspace.debug = tuning  # TODO: use context manager
         cell_detection_param = copy.deepcopy(cell_detection.default_cell_detection_parameter)
