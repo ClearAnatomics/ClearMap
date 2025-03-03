@@ -77,7 +77,7 @@ class CellDetector(TabProcessor):
 
     def setup(self, sample_manager, channel_name, registration_processor):
         self.channel = channel_name
-        self.sample_config = sample_manager
+        self.sample_config = None
         if sample_manager is not None:
             self.sample_manager = sample_manager
             self.workspace = sample_manager.workspace

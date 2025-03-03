@@ -874,7 +874,7 @@ class CellCounterTab(PostProcessingTab):
         Setup the cell detection worker, which handle the computations associated with this tab
         """
         if self.sample_manager.workspace is not None:
-            if 'example' not in self.params.config['channels']:
+            if self.config_initialized():
                 self.params.ui_to_cfg()
                 self.cell_detectors = {channel: CellDetector(self.sample_manager, channel)
                                        for channel in self.params.channels_to_detect}
@@ -882,6 +882,9 @@ class CellCounterTab(PostProcessingTab):
                 self.main_window.print_warning_msg('Channels not yet set in config. Cannot define workers.')
         else:
             self.main_window.print_warning_msg('Workspace not initialised')
+
+    def config_initialized(self):
+        return 'example' not in self.params.config['channels']
 
     def finalise_workers_setup(self):  #  When tab clicked  # FIXME: trigger with signal from self.sample_manager
         """Post configuration of the CellDetector object"""
@@ -977,7 +980,7 @@ class CellCounterTab(PostProcessingTab):
         tests on
         """
         self.plot_slicer('detectionSubset', self.ui.channelsParamsTabWidget.get_channel_widget(channel),
-                         self.params[channel])
+                         self.params[channel], channel)
 
     def handle_tool_tab_changed(self, tab_idx):
         """
@@ -1353,7 +1356,10 @@ class VasculatureTab(PostProcessingTab):
         Plot the ortho-slicer to pick a sub part of the graph to display because
         depending on the display options, the whole graph may not fit in memory
         """
-        self.plot_slicer('graphConstructionSlicer', self.ui, self.params.visualization_params)
+        self.plot_slicer('graphConstructionSlicer', self.ui, self.params.visualization_params,
+                         channel=self.vessel_graph_processor.parent_channels)
+        # TODO: check iif best option is to
+        #   average the parent channels
 
     def display_graph_chunk(self, graph_step):
         """
@@ -1365,9 +1371,9 @@ class VasculatureTab(PostProcessingTab):
             The name of the step to display (from 'raw', 'cleaned', 'reduced', 'annotated')
         """
         self.params.visualization_params.ui_to_cfg()  # Fix for lack of binding between 2 sets of range interfaces
-        dvs = self.wrap_plot(self.vessel_graph_processor.visualize_graph_annotations,
-                             self.params.visualization_params.slicing,
-                             plot_type='mesh', graph_step=graph_step, show=False)
+        self.wrap_plot(self.vessel_graph_processor.visualize_graph_annotations,
+                       self.params.visualization_params.slicing,
+                       plot_type='mesh', graph_step=graph_step, show=False)
         self.main_window.perf_monitor.stop()
 
     def display_graph_chunk_from_cfg(self):  # REFACTOR: split ?
