@@ -49,7 +49,7 @@ def run_step(param_key, previous_result, step_function, args=(), remove_previous
             else:                    
                 save = clearmap_io.as_source(save,dtype=save_dtype)
             if presave_parser is None:
-            presave_parser = lambda t : t
+                presave_parser = lambda t : t
             to_save = presave_parser(result)
             # usefull sanity check
             if save_dtype=='bool':
