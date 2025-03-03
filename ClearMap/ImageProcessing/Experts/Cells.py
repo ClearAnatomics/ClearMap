@@ -459,7 +459,7 @@ def detect_cells_block(source, parameter=default_cell_detection_parameter, n_thr
             if shape is not None:
                 max_label = centers.shape[0]
                 intensity = sd.find_intensity(steps_to_measure[m], label=shape,
-                                             max_label=max_label, **parameter_intensity)
+                                              max_label=max_label, **parameter_intensity)
             else:  # WARNING: prange but me.measure_expression not parallel since processes=1
                 # FIXME : How can r be defined in this branch ???
                 intensity = me.measure_expression(steps_to_measure[m], centers, search_radius=r,
