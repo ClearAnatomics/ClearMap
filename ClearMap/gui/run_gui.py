@@ -97,7 +97,7 @@ from ClearMap.gui.widgets import (OrthoViewer, ProgressWatcher,
                                   StructureSelector, PerfMonitor, ManipulateAssetsDialog)  # Perfmonitor needs plot_3d
 update_pbar(app, progress_bar, 60)
 from ClearMap.gui.tabs import (SampleInfoTab, StitchingTab, RegistrationTab, CellCounterTab,
-                               VasculatureTab, GroupAnalysisTab, BatchProcessingTab)
+                               VasculatureTab, GroupAnalysisTab, BatchProcessingTab, TractMapTab)
 from ClearMap.gui.interfaces import BatchTab
 from ClearMap.gui.preferences import PreferenceUi
 from ClearMap.processors.sample_preparation import SampleManager
@@ -121,6 +121,7 @@ DATA_TYPE_TO_TAB_CLASS = {  # WARNING: not all data types are covered
     'vessels': VasculatureTab,
     'veins': VasculatureTab,
     'arteries': VasculatureTab,
+    'meylin': TractMapTab,
 }
 
 # TODO
@@ -1047,7 +1048,7 @@ class ClearMapGui(ClearMapGuiBase):
             relevant_pipelines += ['vasculature']
         if 'cell_map' in relevant_pipelines:
             relevant_pipelines += ['cell_counter']
-        if (cfg_name in ('cell_map', 'cell_counter', 'vasculature', 'tube_map') and
+        if (cfg_name in ('cell_map', 'cell_counter', 'vasculature', 'tube_map', 'tract_map') and
                 cfg_name not in relevant_pipelines):
             return False, None
         if not self.file_exists(cfg_path):
