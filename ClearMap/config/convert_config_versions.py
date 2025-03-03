@@ -98,23 +98,27 @@ def convert_alignment_config_2_1_0_to_3_0_0(v1_path, v2_path='', sample_config=N
 
 
 def alignment_to_stitching_v3(output_path_base, config_v1):
-    out_stitching_cfg = get_configobj_cfg(output_path_base.with_name(f'stitching_config_{VERSION_SUFFIX}.cfg'), must_exist=False)
+    out_stitching_cfg = get_configobj_cfg(output_path_base.with_name(f'stitching_config_{VERSION_SUFFIX}.cfg'),
+                                          must_exist=False)
     # Copy general parameters
     out_stitching_cfg['clearmap_version'] = '3.0.0'
+    out_stitching_cfg['channels'] = {}
     # drop pipeline_name and conversion section
     # Copy stitching parameters
     channel_names = [k for k, use in config_v1['stitching']['run'].items() if use]
     for i, channel in enumerate(channel_names):
-        out_stitching_cfg[channel] = {}
-        out_stitching_cfg[channel]['use_npy'] = config_v1['conversion']['use_npy']
-        out_stitching_cfg[channel]['run'] = config_v1['stitching']['run'][channel]
-        out_stitching_cfg[channel]['layout_channel'] = channel
+        out_stitching_cfg['channels'][channel] = {
+            'use_npy': config_v1['conversion']['use_npy'],
+            'run': config_v1['stitching']['run'][channel],
+            'layout_channel': channel,
+        }
         if i == 0:  # By default, stitch other channels to the first one
             # This (dict(...)) is weird but required to get the extra indentation level
-            out_stitching_cfg[channel]['rigid'] = dict(config_v1['stitching']['rigid'])
-            out_stitching_cfg[channel]['rigid']['projection_thickness'] = out_stitching_cfg[channel]['rigid'].pop(
-                'project_thickness')
-            out_stitching_cfg[channel]['wobbly'] = dict(config_v1['stitching']['wobbly'])
+            out_stitching_cfg['channels'][channel]['rigid'] = dict(config_v1['stitching']['rigid'])
+            # Rename project_thickness to projection_thickness
+            out_stitching_cfg['channels'][channel]['rigid']['projection_thickness'] = (
+                out_stitching_cfg['channels'][channel]['rigid'].pop('project_thickness'))
+            out_stitching_cfg['channels'][channel]['wobbly'] = dict(config_v1['stitching']['wobbly'])
     out_stitching_cfg.write()
     return out_stitching_cfg
 
