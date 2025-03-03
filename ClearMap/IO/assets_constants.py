@@ -51,6 +51,7 @@ CONTENT_TYPE_TO_PIPELINE = {
     'arteries': 'TubeMap',
     'axons': 'AxonMap',
     'atlas': 'registration',
+    'myelin': 'TractMap'
 }
 DATA_CONTENT_TYPES = list(CONTENT_TYPE_TO_PIPELINE.keys())
 
@@ -115,7 +116,7 @@ CHANNELS_ASSETS_TYPES_CONFIG = {
     'cells': {
         'file_format_category': 'table',
         'resource_type': 'results',
-        'relevant_pipelines': ['CellMap'],
+        'relevant_pipelines': ['CellMap', 'TractMap'],  # TODO: tune relevance for subsets
         'sub_types': ['raw', 'filtered', 'shape']
     },
     'cells_stats': {
@@ -127,14 +128,14 @@ CHANNELS_ASSETS_TYPES_CONFIG = {
     'density': {
         'file_format_category': 'portable_image',
         'resource_type': 'results',
-        'relevant_pipelines': ['CellMap', 'TubeMap', 'AxonMap'],
+        'relevant_pipelines': ['CellMap', 'TubeMap', 'AxonMap', 'TractMap'],
         'sub_types': ['counts', 'intensities', 'branches']  # WARNING: different subtypes as f(pipeline)
     },
     'binary': {
         'file_format_category': 'image',
         'resource_type': 'results',
-        'relevant_pipelines': ['TubeMap', 'AxonMap'],
-        'sub_types': ['status']
+        'relevant_pipelines': ['TubeMap', 'AxonMap', 'TractMap'],
+        'sub_types': ['status', 'pixels_raw', 'coordinates_transformed', 'coordinates_raw', 'labels']
     },
     'skeleton': {
         'file_format_category': 'image',
