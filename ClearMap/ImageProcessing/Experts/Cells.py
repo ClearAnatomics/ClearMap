@@ -427,7 +427,7 @@ def detect_cells_block(source, parameter=default_cell_detection_parameter, n_thr
         try:
             parser = (lambda t: t[0]>0)
             shape, sizes = run_step('shape_detection', dog, sd.detect_shape, remove_previous_result=True, **default_step_params,
-            args=[centers], presave_parser=parser, extra_kwargs={'verbose': parameter.get('verbose'), 'processes': n_threads, 'return_sizes': True})
+            args = [centers], presave_parser=parser, extra_kwargs={'verbose': parameter.get('verbose'), 'processes': n_threads, 'return_sizes': True})
         except ClearMapValueError as err:
             if str(err) == 'An uint array with 0 values will lead to inconsistent results, consider a histogram transform or dtype conversion.':
                 warnings.warn('This block is likely to contain corrupted data, an empty output will be provided for this block.')
@@ -459,7 +459,7 @@ def detect_cells_block(source, parameter=default_cell_detection_parameter, n_thr
             if shape is not None:
                 max_label = centers.shape[0]
                 intensity = sd.find_intensity(steps_to_measure[m], label=shape,
-                                            max_label=max_label, **parameter_intensity)
+                                             max_label=max_label, **parameter_intensity)
             else:  # WARNING: prange but me.measure_expression not parallel since processes=1
                 # FIXME : How can r be defined in this branch ???
                 intensity = me.measure_expression(steps_to_measure[m], centers, search_radius=r,
