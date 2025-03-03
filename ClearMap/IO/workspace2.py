@@ -230,7 +230,7 @@ class Workspace2:  # REFACTOR: subclass dict
         type_spec: TypeSpec
             The type specification of the asset to create.
         channel_spec: ChannelSpec | None
-            The channel to create the asset fora
+            The channel to create the asset for.
         sample_id : str | None
             The sample id to create the asset for. If None, use the workspace sample_id.
             If the workspace sample_id is None, the assets will not use the sample_id
