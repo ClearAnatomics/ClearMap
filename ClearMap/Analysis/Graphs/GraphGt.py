@@ -1438,9 +1438,27 @@ class Graph(grp.AnnotatedGraph):
     return Graph(name = copy.copy(self.name), base = self.base.copy())
   
 
-def load(filename):
-  g = gt.load_graph(filename);
-  return Graph(base = g);
+def load(filename, ignore_vp=None, ignore_ep=None, ignore_gp=None):
+  """Read graph from file.
+
+  Arguments
+  ---------
+  filename : str
+    Path to the GT file.
+  ignore_vp : list
+    Vertex properties that will be ignored.
+  ignore_ep : list
+    Edge properties that will be ignored.
+  ignore_gp : list
+    Graph properties that will be ignored.
+
+  Returns
+  -------
+  graph : Graph
+    The graph as a Graph object.
+  """
+  g = gt.load_graph(filename, ignore_vp=ignore_vp, ignore_ep=ignore_ep, ignore_gp=ignore_gp)
+  return Graph(base=g)
 
 def save(filename, graph):
   graph.save(filename);
