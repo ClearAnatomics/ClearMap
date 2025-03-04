@@ -21,6 +21,8 @@ from datetime import datetime
 from multiprocessing.pool import ThreadPool
 from pathlib import Path
 from shutil import copyfile
+from statistics import mode
+
 from importlib_metadata import version
 
 # WARNING: Necessary for QCoreApplication creation
@@ -35,6 +37,8 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget,
 
 import qdarkstyle
 from qdarkstyle import DarkPalette
+
+HARD_DEFAULT_FONT_SIZE = 11
 
 DEBUG = False
 
@@ -161,6 +165,8 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         self.progress_dialog = None
         self.progress_watcher = ProgressWatcher()
 
+        self.default_font_size = self.compute_default_font_size()
+
         self.cpu_bar = QProgressBar()  # noqa
         self.single_thread_bar = QProgressBar() # noqa
         self.ram_bar = QProgressBar() # noqa
@@ -253,27 +259,20 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         target_font_size : int
             The main font size
         """
-        font_sizes = self.__get_font_sizes()
-        if len(font_sizes) > 4:  # WARNING: Hacky
-            font_sizes = font_sizes[:4]
-        small, regular, big, huge = font_sizes
-        if target_font_size == regular:
-            return
+        self.default_font_size = self.compute_default_font_size()  # or self.compute_default_font_size_mean()
+        min_font_size = 1  # Define a minimum font size to avoid negative or zero font sizes
 
-        font_swap = {
-            'small': target_font_size - 3,
-            'regular': target_font_size,
-            'big': target_font_size + 2,
-            'huge': target_font_size + 10
-        }
+        scaling_factor = target_font_size / self.default_font_size
 
         for widget in self.findChildren(QWidget):
-            font = widget.property("font")
-            try:
-                font.setPointSize(font_swap[widget.property('font_size_name')])
-            except KeyError:
-                print(f'Skipping widget {widget.objectName()}')
-            widget.setFont(font)
+            font = widget.font()  #  font = widget.property("font")
+            current_size = font.pointSize()
+            if current_size > 0:  # Ensure the font size is valid
+                # Calculate the new font size relative to the target font size
+                new_size = int(current_size * scaling_factor)
+                # Ensure the new font size is not less than the minimum font size
+                font.setPointSize(max(new_size, min_font_size))
+                widget.setFont(font)
 
     def set_font(self):
         for widget in self.findChildren(QWidget):
@@ -283,6 +282,20 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
             except KeyError:
                 print(f'Skipping widget {widget.objectName()}')
             widget.setFont(font)
+
+    def compute_default_font_size(self):
+        """
+        Gets the most represented font size in the program. This is the default font size
+
+        Returns
+        -------
+        int
+            The default font size
+        """
+        font_sizes = [widget.font().pointSize() for widget in self.findChildren(QWidget) if widget.font().pointSize() > 0]
+        if font_sizes:
+            return mode(font_sizes)
+        return HARD_DEFAULT_FONT_SIZE  # Fallback to a default value if no valid font sizes are found
 
     def fix_sizes(self):
         # self.set_font_size()
@@ -304,12 +317,6 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         for widg in self.findChildren(QWidget):
             if hasattr(widg, 'toolTip') and widg.toolTip():
                 widg.setStyleSheet(TOOLTIP_STYLE_SHEET)
-
-    def __get_font_sizes(self):
-        point_sizes = set()
-        for widg in self.findChildren(QWidget):
-            point_sizes.add(widg.property("font").pointSize())
-        return sorted(point_sizes)
 
     def fix_btns_stylesheet(self):
         for btn in self.findChildren(QPushButton):
@@ -846,7 +853,7 @@ class ClearMapGui(ClearMapGuiBase):
         # self.reset_loggers()
         self.reset_pipeline_tabs()
 
-    def display_about(self):
+    def display_about(self):  # TODO: get authors list from separate file or documentation
         info = AboutInfo(
             software_name=f'You are running ClearMap version {CLEARMAP_VERSION}',
             version=CLEARMAP_VERSION,
