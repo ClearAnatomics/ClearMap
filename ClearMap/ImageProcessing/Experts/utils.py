@@ -11,9 +11,7 @@ def initialize_sinks(cell_detection_parameter, shape, order):
         if isinstance(par, dict):
             filename = par.get('save')
             if filename:
-                dtype = par.get('save_dtype')
-                if dtype is None:
-                    dtype='float'
+                dtype = par.get('save_dtype', 'float')
                 ap.initialize_sink(filename, shape=shape, order=order, dtype=dtype)
 
 
