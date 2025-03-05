@@ -153,9 +153,9 @@ def detect_shape(source, seeds, threshold=None, verbose=False, processes=None, a
             raise ClearMapValueError('An uint array with 0 values will lead to inconsistent results, consider a histogram transform or dtype conversion.')
 
     try:
-        shapes = skimage.morphology.watershed(-source, peaks, mask=mask, watershed_line=True)
+        shapes = skimage.morphology.watershed(-source, peaks, mask=mask, watershed_line=watershed_line)
     except AttributeError:
-        shapes = skimage.segmentation.watershed(-source, peaks, mask=mask, watershed_line=True)
+        shapes = skimage.segmentation.watershed(-source, peaks, mask=mask, watershed_line=watershed_line)
 
     if np.unique(shapes).size != np.unique((peaks if mask is None else peaks*mask)).size:
         raise RuntimeError(f'watersheding yields unexpected results: the seed number was {np.unique(peaks*mask).size-1}'
