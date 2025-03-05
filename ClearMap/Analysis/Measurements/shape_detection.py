@@ -93,7 +93,7 @@ def labeled_pixels_from_centers(centers,weights,shape):
     B[xs,ys,zs]=weights
     return B
 
-def detect_shape(source, seeds, threshold=None, verbose=False, processes=None, as_binary_mask=False, return_sizes=False, seeds_as_labels = False):
+def detect_shape(source, seeds, threshold=None, verbose=False, processes=None, as_binary_mask=False, return_sizes=False, seeds_as_labels = False, watershed_line=True):
     """Detect object shapes by generating a labeled image from seeds.
 
     Optionally, the output is replaced by to a mere binary mask and the
@@ -115,9 +115,12 @@ def detect_shape(source, seeds, threshold=None, verbose=False, processes=None, a
     return_sizes : bool, optional
         If the sizes of the various shapes are to be returned too, by default False.
     seeds_as_labels: bool, optional
-        Defaults to Faulse. If True the input seeds is considered to be a labeled image w/
+        Defaults to False. If True the input seeds is considered to be a labeled image w/
         the initial basins.
-
+    watershed_line: bool, optional
+        Defaults to True. If True the watershedding is made with a line of background pixels
+        inbetween the labeled regions. The value True is forced if as_binary_mask is True.
+        
     Returns
     -------
     shapes : array
@@ -126,7 +129,8 @@ def detect_shape(source, seeds, threshold=None, verbose=False, processes=None, a
 
     sizes : (optional) the sizes of the shapes, in the same order are the seeds.
     """
-    print(f'debug: in detect_shape: threshold={threshold}')
+    # if we as_binary_mask=True, there is only one reasonable choice for watershed_line
+    watershed_line = as_binary_mask or watershed_line
     if verbose:
         timer = tmr.Timer()
         hdict.pprint(head='Shape detection', threshold=threshold)
