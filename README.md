@@ -98,12 +98,12 @@ on how to [install](https://clearanatomics.github.io/ClearMapDocumentation/html/
 ====================================================================================
 
 Tutorials for [TubeMap](https://clearanatomics.github.io/ClearMapDocumentation/html/tubemap.html) 
-and [CellMap](https://clearanatomics.github.io/ClearMapDocumentation/html/tubemap.html) are
-avaialbe as [jupyer](https://jupyter.org/) notebooks:
+and [CellMap](https://clearanatomics.github.io/ClearMapDocumentation/html/cellmap.html) are
+avaialbe as [jupyter](https://jupyter.org/) notebooks:
   
-  * [TubeMap](https://clearanatomics.github.io/ClearMapDocumentation/html/TubeMap.html)
+  * [TubeMap](https://github.com/ClearAnatomics/ClearMapDocumentation/tree/master/docs/html/TubeMap.ipynb)
   
-  * [CellMap](https://clearanatomics.github.io/ClearMapDocumentation/html/TubeMap.html)
+  * [CellMap](https://github.com/ClearAnatomics/ClearMapDocumentation/tree/master/docs/html/CellMap.ipynb)
 
 
 [Documentation](https://clearanatomics.github.io/ClearMapDocumentation)
