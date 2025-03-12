@@ -334,16 +334,18 @@ class BaseMetadataParser:
                          self.pixels_metadata, int)
         # Remove empty dimensions
         if self.info['shape'] is not None and [d for d in self.info['shape'] if d != 1] != self.source.shape:   # Trim empty dimensions
-            muxed = [(s, d) for s, d in zip(self.info['shape'], self.info['order']) if s > 1]
-            shape, order = zip(*muxed)
-            shape = list(shape)
-            order = list(order)
-            if len(shape) > len(self.source.shape):  # Remove any extra dimensions (with shape 1), by priority
-                for extra_axis in 'TCZ':
-                    if extra_axis in order:
-                        axis_idx = [i for i, d in enumerate(order) if d == extra_axis][0]
-                        shape.pop(axis_idx)
-                        order.pop(axis_idx)
+            shape_dict = {d: s for s, d in zip(self.info['shape'], self.info['order']) if s > 1}
+            shape = list(shape_dict.values())
+            order = list(shape_dict.keys())
+            extra_axes = 'TCZ'  # Remove any extra dimensions (with shape 1), by priority
+            i = 0
+            while len(shape) > len(self.source.shape) and i < len(extra_axes):  # Remove while too many dimensions
+                axis = extra_axes[i]
+                if axis in order:
+                    axis_idx = order.index(axis)
+                    shape.pop(axis_idx)
+                    order.pop(axis_idx)
+                i += 1
             self.info['order'] = order
             self.info['shape'] = self.source.shape
 
