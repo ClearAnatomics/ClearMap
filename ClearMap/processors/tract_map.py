@@ -404,11 +404,3 @@ class TractMapProcessor(TabProcessor):
             raise MissingRequirementException(f'plot_voxelized_counts missing file: {asset.path} not found')
         dv = q_plot_3d.plot(asset.path, title=f'Voxelized counts', arrange=False, lut='flame')[0]
         return [dv]
-
-# Required params:
-# channel
-# ['voxelization']['radii']
-# ['clip_low']
-# ['clip_high']
-# ['decimation_ratio']
-# ['slicing']  # For debug
