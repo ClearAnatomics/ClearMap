@@ -18,11 +18,13 @@ __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
 import gc
 import multiprocessing
+import warnings
 
 import numpy as np
 
 import cv2
 import scipy.ndimage.filters as ndf
+import scipy.ndimage as ndi
 
 import ClearMap.IO.IO as clearmap_io
 
@@ -41,6 +43,7 @@ import ClearMap.Utils.Timer as tmr
 from ClearMap.ImageProcessing.Experts.utils import initialize_sinks, run_step, print_params
 from ClearMap.ImageProcessing.LocalStatistics import local_percentile
 
+from ClearMap.Utils.exceptions import ClearMapValueError
 ###############################################################################
 # ## Default parameter
 ###############################################################################
@@ -392,11 +395,24 @@ def detect_cells_block(source, parameter=default_cell_detection_parameter, n_thr
         if parameter_maxima['h_max']:  # FIXME: check if source or dog
             centers = md.find_center_of_maxima(source, maxima=maxima, verbose=parameter.get('verbose'))
         else:
-            centers = ap.where(maxima, processes=n_threads).array  # WARNING: prange
+            if parameter_shape:
+                threshold = parameter_shape.get('threshold',0)
+                print(f"masking maxima centers by (dog > {threshold}) for shape detection")
+                mask = dog > threshold
+                maxima = maxima * mask
+
+            # We treat the eventuality of connected components of size>1 in the mask (maxima>0);
+            # the choice of the structure matrix for connectivity could need discussion.
+            # with no further adaptation the maxima_labeling consumes too much memory
+            maxima_labels, _ = ndi.label(maxima, structure=np.ones((3,)*3,dtype='bool'))
+            centers = np.vstack(md.label_representatives(maxima_labels)).transpose()
+            # we could come back to the ancient version
+            # centers = ap.where(maxima, processes=n_threads).array 
         del maxima
 
         # correct for valid region
         if valid:
+            print('Filtering centers for correct block processing.')
             ids = np.ones(len(centers), dtype=bool)
             for c, l, u in zip(centers.T, valid_lower, valid_upper):
                 ids = np.logical_and(ids, np.logical_and(l <= c, c < u))
@@ -406,16 +422,24 @@ def detect_cells_block(source, parameter=default_cell_detection_parameter, n_thr
     else:
         results = ()
 
-    # WARNING: sd.detect_shape uses prange
     # cell shape detection  # FIXME: may use centers without assignment
-    shape = run_step('shape_detection', dog, sd.detect_shape, remove_previous_result=True, **default_step_params,
-                     args=[centers], extra_kwargs={'verbose': parameter.get('verbose'), 'processes': n_threads})
     if parameter_shape:
-        # size detection
-        max_label = centers.shape[0]
-        sizes = sd.find_size(shape, max_label=max_label)
-        valid = sizes > 0
+        try:
+            parser = (lambda t: t[0]>0)
+            shape, sizes = run_step('shape_detection', dog, sd.detect_shape, remove_previous_result=True, **default_step_params,
+            args = [centers], presave_parser=parser, extra_kwargs={'verbose': parameter.get('verbose'), 'processes': n_threads, 'return_sizes': True})
+        except ClearMapValueError as err:
+            if str(err) == 'An uint array with 0 values will lead to inconsistent results, consider a histogram transform or dtype conversion.':
+                warnings.warn('This block is likely to contain corrupted data, an empty output will be provided for this block.')
+                results = (centers[:0],)
+                sizes = np.array([])
+                shape = None
+            else:
+                raise err
+                          
 
+            
+        valid = sizes > 0
         results += (sizes,)
     else:
         valid = None
@@ -433,11 +457,14 @@ def detect_cells_block(source, parameter=default_cell_detection_parameter, n_thr
 
         for m in measure:
             if shape is not None:
+                max_label = centers.shape[0]
                 intensity = sd.find_intensity(steps_to_measure[m], label=shape,
                                               max_label=max_label, **parameter_intensity)
             else:  # WARNING: prange but me.measure_expression not parallel since processes=1
+                # FIXME : How can r be defined in this branch ???
                 intensity = me.measure_expression(steps_to_measure[m], centers, search_radius=r,
-                                                  **parameter_intensity, processes=1, verbose=False)
+                                                    **parameter_intensity, processes=1, verbose=False)
+
             results += (intensity,)
 
         if parameter.get('verbose'):
