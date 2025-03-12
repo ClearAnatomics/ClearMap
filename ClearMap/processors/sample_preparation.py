@@ -1296,20 +1296,3 @@ def init_sample_manager_and_processors(folder='', configs=None):
     registration_processor.setup()
 
     return {'sample_manager': sample_manager, 'stitcher': stitcher, 'registration_processor': registration_processor}
-
-
-def init_preprocessor(folder, atlas_base_name=None, convert_tiles=False):
-    cfg_loader = ConfigLoader(folder)
-    machine_cfg_path = ConfigLoader.get_default_path('machine')
-    machine_cfg = cfg_loader.get_patched_cfg_from_path(machine_cfg_path)
-    cfg_names = ('sample', 'stitching', 'registration')
-    configs = {cfg_name: cfg_loader.get_patched_cfg_from_path(cfg_loader.get_cfg_path(cfg_name))
-               for cfg_name in cfg_names}
-    configs = {'machine': machine_cfg, **configs}
-    pre_proc = PreProcessor()
-    if atlas_base_name is None:
-        atlas_id = configs['registration']['atlas']['id']
-        atlas_base_name = ATLAS_NAMES_MAP[atlas_id]['base_name']
-    pre_proc.setup(configs, convert_tiles=convert_tiles)
-    pre_proc.setup_atlases()
-    return pre_proc
