@@ -21,6 +21,7 @@ import warnings
 import itertools as itt
 import functools as ft
 import inspect as insp
+from pathlib import Path
 
 import numpy as np
 import multiprocessing as mp
@@ -1430,15 +1431,22 @@ class Layout(SourceRegion, src.AbstractSource):
     self.change_sources(sources);
 
   
-  def replace_source_location(self, match, replace, method='expression'):
+  def replace_source_location(self, match, replace, method='expression', source_dir=''):
     """Change the sources to point to a new location.
       
     Arguments
     ---------
-    match : str or Expression
+    match : str or list[str] or Expression
       Expression of source names to match and substitute.
-    replace : str or Expression
+    replace : str or list[str] or Expression
       Expression to replace source names with.
+    method: str
+      Replacement method to interpret the match and replace arguments as
+        - list (default if match, and replace are list[str])
+        - expressions ("expression") or just
+        - raw strings to replace ("replace").
+    source_dir: str
+        The source directory to use for relative path matching.
       
     Note
     ----
@@ -1466,9 +1474,20 @@ class Layout(SourceRegion, src.AbstractSource):
       
       e_match = te.Expression(match)
       e_replace = te.Expression(replace)
+      absolute_mode = bool(e_match.values(locations[0]))
+      if not absolute_mode:  # match does not match existing locations. Try relative path
+        match = str(Path(match).relative_to(source_dir))
+        old_dir = locations[0].replace(te.Expression(match).string({'X':0, 'Y':0}), '')  # Blindly trying to replace X and Y
+        match = str(Path(old_dir) / match)
+        e_match = te.Expression(match)
+        if not e_match.values(locations[0]):
+          raise ValueError(f'The pattern {match} does not match any of the {locations=}')
       for s, l in zip(self.sources, locations):
         values = e_match.values(l)
-        s.location = l.replace(e_match.string(values), e_replace.string(values))
+        if values:
+          s.location = l.replace(e_match.string(values), e_replace.string(values))
+        else:
+          raise ValueError(f'The pattern {match} does not match any of the {locations=}')
     elif method == 'replace':
       # get locations
       locations = [s.location for s in self._sources]

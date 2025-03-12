@@ -1111,7 +1111,8 @@ class StitchingProcessor(TabProcessor):
                     channel_pattern = channel_asset.with_extension(extension='.npy')
                 else:
                     channel_pattern = channel_asset.path
-                layout.replace_source_location(str(layout_pattern), str(channel_pattern))
+                layout.replace_source_location(str(layout_pattern), str(channel_pattern),
+                                               source_dir=self.workspace.directory)
             stitching_wobbly.stitch_layout(layout,
                                            sink=str(self.get_path('stitched', channel=channel)),
                                            method='interpolation',
