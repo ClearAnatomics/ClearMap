@@ -69,11 +69,12 @@ class OrthoViewer(object):
         """
         self.img = img
         self.parent = parent
+        self.no_scale = False
         self.params = None
         self.linear_regions = []
         self.dvs = []
 
-    def setup(self, img, params, parent=None):
+    def setup(self, img, params, parent=None, no_scale=False):
         """
         Initialize the viewer after the object has been created
 
@@ -89,6 +90,7 @@ class OrthoViewer(object):
         self.img = img
         self.params = params
         self.parent = parent
+        self.no_scale = no_scale
         self.linear_regions = []
 
     @property
@@ -151,7 +153,8 @@ class OrthoViewer(object):
     def __update_range(self, region_item, axis=0):
         rng = region_item.getRegion()
         if self.params is not None:
-            rng = [self.params.scale_axis(val, 'xyz'[axis]) for val in rng]
+            if not self.no_scale:
+                rng = [self.params.scale_axis(val, 'xyz'[axis]) for val in rng]
             setattr(self.params, f'crop_{"xyz"[axis]}_min', rng[0])
             setattr(self.params, f'crop_{"xyz"[axis]}_max', rng[1])
 
@@ -161,7 +164,7 @@ class OrthoViewer(object):
         """
         # y_axis_idx = (1, 2, 0)
         for i, dv in enumerate(self.dvs):
-            transparency = '4B'
+            transparency = '4B'  # 75% transparency
             linear_region = pg.LinearRegionItem([0, self.shape[i]], brush=DarkPalette.COLOR_BACKGROUND_2 + transparency)
             linear_region.sigRegionChanged.connect(functools.partial(self.__update_range, axis=i))
             self.linear_regions.append(linear_region)
