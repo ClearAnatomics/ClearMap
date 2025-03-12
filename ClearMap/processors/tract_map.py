@@ -179,7 +179,7 @@ class TractMapProcessor(TabProcessor):
         return coords
 
     def parallel_transform(self):
-        coords = self.get('binary', channel=self.channel, asset_sub_type='pixels_raw').as_source
+        coords = self.get('binary', channel=self.channel, asset_sub_type='pixels_raw').as_source()
         transformed_coords = array_processing.initialize_sink(
             self.get_path('binary', asset_sub_type='coordinates_transformed', channel=self.channel),
             dtype='float64', shape=coords.shape, return_buffer=False
@@ -231,7 +231,7 @@ class TractMapProcessor(TabProcessor):
         AnnotationManager.register('Annotation', AnnotationProxy)  # added 3.11 shutdown_timeout
 
         coordinates_transformed = self.get('binary', channel=self.channel,
-                                           asset_sub_type='coordinates_transformed').as_source
+                                           asset_sub_type='coordinates_transformed').as_source()
         labels = array_processing.initialize_sink(self.get_path('binary', channel=self.channel,
                                                                 asset_sub_type='labels'),
                                  dtype='int64', shape=(coordinates_transformed.shape[0], 1),
@@ -276,26 +276,26 @@ class TractMapProcessor(TabProcessor):
     def export_df(self, asset_sub_type='fake'):  # FIXME: needs dynamic asset_sub_type
         ratio = self.processing_config['display']['decimation_ratio']
         decimated_coordinates_raw = self.get(
-            'binary', channel=self.channel, asset_sub_type='pixels_raw').as_source[::ratio, :]
-        cmp_io.write(self.get_path(
-            'binary', channel=self.channel,
-            asset_sub_type=f'coordinates_raw_decimated_{ratio}'),
-            decimated_coordinates_raw)
+            'binary', channel=self.channel, asset_sub_type='pixels_raw').as_source()[::ratio, :]
+        # cmp_io.write(self.get_path(
+        #     'binary', channel=self.channel,
+        #     asset_sub_type=f'pixels_raw_decimated_{ratio}'),
+        #     decimated_coordinates_raw)
 
         decimated_coordinates_transformed = self.get(
             'binary', channel=self.channel,
-            asset_sub_type='coordinates_transformed').as_source[::ratio, :]
-        cmp_io.write(self.get_path(
-            'binary', channel=self.channel,
-            asset_sub_type=f'coordinates_transformed_decimated_{ratio}'),
-            decimated_coordinates_transformed)
+            asset_sub_type='coordinates_transformed').as_source()[::ratio, :]
+        # cmp_io.write(self.get_path(
+        #     'binary', channel=self.channel,
+        #     asset_sub_type=f'coordinates_transformed_decimated_{ratio}'),
+        #     decimated_coordinates_transformed)
 
         decimated_labels = self.get('binary', channel=self.channel,
-                                    asset_sub_type='labels').as_source[::ratio, :]
-        cmp_io.write(self.get_path(
-            'binary', channel=self.channel,
-            asset_sub_type=f'labels_decimated_{ratio}'),
-            decimated_labels)
+                                    asset_sub_type='labels').as_source()[::ratio, :]
+        # cmp_io.write(self.get_path(
+        #     'binary', channel=self.channel,
+        #     asset_sub_type=f'labels_decimated_{ratio}'),
+        #     decimated_labels)
 
         # Build the DataFrame
         df = pd.DataFrame({'id': decimated_labels[:, 0]})
@@ -329,11 +329,10 @@ class TractMapProcessor(TabProcessor):
             processes=None,
             verbose=True
         )
-        voxelize(self.get('binary', asset_sub_type='coordinates_transformed', channel=self.channel).source,
+        voxelize(self.get('binary', asset_sub_type='coordinates_transformed', channel=self.channel).as_source(),
                  sink=self.get_path('density', channel=self.channel, asset_sub_type='counts'),
                  **voxelization_parameter
         )
-
 
     def plot_cells_3d_scatter_w_atlas_colors(self, raw=False, parent=None):
         asset_properties = {'channel': self.channel}
