@@ -1525,8 +1525,11 @@ class TractMapTab(PostProcessingTab):
         if processor.stopped:
             return
         if tuning:
-            with processor.workspace.tmp_debug:
-                self.plot_tract_map_results(channel)
+            status_backup = processor.workspace.debug
+            processor.workspace.debug = tuning
+            self.plot_tract_map_results(channel)
+            processor.workspace.debug = status_backup
+
 
     def binarize_channel(self, channel):
         processor = self.tract_mappers[channel]
@@ -1598,7 +1601,14 @@ class TractMapTab(PostProcessingTab):
         self.wrap_plot(self.tract_mappers[channel].plot_voxelized_counts)
 
     def plot_labeled_cells_scatter(self, channel, raw=False):
-        self.wrap_plot(self.tract_mappers[channel].plot_cells_3d_scatter_w_atlas_colors, raw=raw)
+        self.main_window.clear_plots()
+        tract_mapper = self.tract_mappers[channel]
+        status = self.ui.channelsParamsTabWidget.get_channel_widget(channel).tractMapDebugCheckBox.isChecked()
+        backup_status = self.sample_manager.workspace.debug
+        self.sample_manager.workspace.debug = status
+        self.wrap_plot(tract_mapper.plot_cells_3d_scatter_w_atlas_colors, raw=raw)
+        self.sample_manager.workspace.debug = backup_status
+
 
 
 ################################################################################################
