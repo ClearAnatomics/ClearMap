@@ -249,29 +249,49 @@ class TractMapProcessor(TabProcessor):
                                      verbose=True)
         return labels
 
+    def shift_coordinates(self):
+        """Shift the coordinates by the cropping amount to get the values in whole sample reference frame"""
+        coords_asset = self.get('binary', asset_sub_type='pixels_raw', channel=self.channel)
+        coordinates = coords_asset.as_source()
+        for i in range(3):
+            shift = self.processing_config['test_set_slicing'][f'dim_{i}'][0]
+            coordinates[:, i] += shift
+        cmp_io.write(coords_asset.path, coordinates)
+
     def run_pipeline(self, tuning=False):
         self.reload_config()
 
         self.update_watcher_main_progress()
         self.binarize(*self.processing_config['binarization']['clip_range'])
         self.update_watcher_main_progress()
+        print('TractMap binarization finished')
 
         self.mask_to_coordinates(as_memmap=USE_BINARY_POINTS_FILE)
         self.update_watcher_main_progress()
+        print('TractMap coordinates extraction finished')
+
+        if tuning:
+            # Shift coordinates by the cropping amount to get the values in whole sample reference frame
+            self.shift_coordinates()
+            print('TractMap coordinates shifted')
 
         self.parallel_transform()
         self.update_watcher_main_progress()
+        print('TractMap coordinates transformed')
 
         self.label()
         self.update_watcher_main_progress()
+        print('TractMap coordinates labeled')
 
         self.voxelize()
         self.update_watcher_main_progress()
+        print('TractMap voxelization finished')
 
         self.export_df(asset_sub_type=None)
         self.update_watcher_main_progress()
+        print('TractMap "cells" DF exported')
 
-        self.plot_cells_3d_scatter_w_atlas_colors(raw=False)
+        # self.plot_cells_3d_scatter_w_atlas_colors(raw=False)
 
     def export_df(self, asset_sub_type='fake'):  # FIXME: needs dynamic asset_sub_type
         ratio = self.processing_config['display']['decimation_ratio']
