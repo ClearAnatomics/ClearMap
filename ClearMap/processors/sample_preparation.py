@@ -27,7 +27,7 @@ from ClearMap.gui.gui_utils import surface_project, setup_mini_brain
 matplotlib.use('Qt5Agg')
 
 import ClearMap.Settings as settings
-from ClearMap.Utils.utilities import topological_sort, check_stopped
+from ClearMap.Utils.utilities import check_stopped
 from ClearMap.config.atlas import ATLAS_NAMES_MAP
 from ClearMap.processors.generic_tab_processor import TabProcessor, CanceledProcessing
 # noinspection PyPep8Naming
@@ -874,30 +874,53 @@ class StitchingProcessor(TabProcessor):
                     print(f'File conversion of {channel} to numpy canceled')
                     return
 
-    def get_stitching_order(self):
+    def get_stitching_order(self, strict=False):
         """
-        Get the channels in the order they should be stitched
-        to respect the layout_channel dependency chain
-
-        Returns
-        -------
-        list[str]
-            The channels in the order they should be stitched
+        Returns a list of trees (each tree is a list of channels in hierarchical order).
+        Raises a ValueError if any channel is unreachable or if there is a cycle.
         """
-        graph = defaultdict(list)
-        in_degree = defaultdict(int)
+        config = self.config
+        channels = set(config['channels'].keys())  # All channels
+        root_channels = [ch for ch, cfg in config['channels'].items()
+                         if cfg.get('layout_channel', ch) == ch]
+        visited = set()
+        forest = {}
 
-        for channel, cfg in self.config['channels'].items():
-            if not cfg['run'] and not self.get('stitched', channel=channel).exists:
+        def traverse_tree(root):
+            stack = [root]
+            tree = []
+            while stack:
+                node = stack.pop()
+                tree.append(node)
+                visited.add(node)
+                # Find immediate children whose layout_channel == node
+                for ch, c_cfg in config['channels'].items():
+                    if ch not in visited and c_cfg.get('layout_channel', ch) == node:
+                        stack.append(ch)
+            return tree
+
+        def tree_is_stitchable(tree, strict):
+            root_channel = tree[0]
+            cfg = self.config['channels'].get(root_channel)
+            has_layout = self.get('layout', channel=root_channel, asset_sub_type='placed').exists
+            if not (cfg['run'] or has_layout):
+                msg = (f"Cannot stitch tree with root `{root_channel}`:"
+                       f" {root_channel} does not have a layout and is not set for stitching.")
+                if strict:
+                    raise ValueError(msg)
+                else:
+                    warnings.warn(msg, stacklevel=2)
+
+        for root in root_channels:
+            if not tree_is_stitchable(root, strict):
                 continue
-            layout_channel = cfg.get('layout_channel', channel)  # default to self
-            if layout_channel != channel:
-                graph[layout_channel].append(channel)
-                in_degree[channel] += 1
-            if channel not in in_degree:
-                in_degree[channel] = 0
+            if root not in visited:
+                forest[root] = traverse_tree(root)
 
-        return topological_sort(graph, in_degree)  # Could use graph_tool
+        unassigned = channels - visited
+        if unassigned:
+            raise ValueError(f"Unreachable or extra channels found: {unassigned}")
+        return forest
 
     def stack_columns(self, channel):
         asset = self.get('raw', channel=channel, prefix=self.sample_manager.prefix)
@@ -931,19 +954,20 @@ class StitchingProcessor(TabProcessor):
             return
 
         # Get the channels in dependency order (based on layout_channel)
-        for channel in self.get_stitching_order():
-            self.stack_columns(channel)  # If x/y/z, stack first
-            channel_cfg = self.config['channels'][channel]
-            if channel == channel_cfg['layout_channel']:
-                if not channel_cfg['rigid']['skip']:
-                    self.stitch_channel_rigid(channel)
-                if not channel_cfg['wobbly']['skip']:
-                    self.stitch_channel_wobbly(channel)
-            else:
-                self._stitch_layout_wobbly(channel)
+        for stitching_tree in self.get_stitching_order().values():
+            for channel in stitching_tree:
+                self.stack_columns(channel)  # If x/y/z, stack first
+                channel_cfg = self.config['channels'][channel]
+                if channel == channel_cfg['layout_channel']:
+                    if not channel_cfg['rigid']['skip']:
+                        self.stitch_channel_rigid(channel)
+                    if not channel_cfg['wobbly']['skip']:
+                        self.stitch_channel_wobbly(channel)
+                else:
+                    self._stitch_layout_wobbly(channel)
 
-            if self.stopped:
-                return
+                if self.stopped:
+                    return
 
     def channel_was_stitched_rigid(self, channel):
         return self.get('layout', channel=channel, asset_sub_type='aligned_axis').exists
