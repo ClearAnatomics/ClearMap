@@ -142,45 +142,39 @@ class TractMapProcessor(TabProcessor):
             out.append(next_channel)
         return out
 
-    def transformation(self, coords):
-        target_channel = 'atlas'  # FIXME: add control for target channel
-        resampled_shape = self.sample_manager.resampled_shape(channel=self.channel)
-        if resampled_shape is None:
-            if target_channel == 'atlas':
-                resampled_shape = self.get('atlas', channel=self.channel, asset_sub_type='reference').shape()
-            else:
-                raise ValueError(f'Resampled shape not found for channel {self.channel}')
+    @staticmethod
+    def transformation(coords, source_shape, resampled_shape, results_directories):
         coords = resample_points(
             coords, sink=None, orientation=None,
-            source_shape=self.sample_manager.stitched_shape(channel=self.channel),
+            source_shape=source_shape,
             sink_shape=resampled_shape
         )
 
-        if self.registration_processor.was_registered:
-            for i, channel in enumerate(self.get_registration_sequence_channels(stop_channel=target_channel)):
-                if self.registration_processor.config['channels'][channel]['moving_channel'] in (None, 'intrinsically aligned'):
-                    continue
-                results_dir = self.get_path('aligned', channel=channel).parent
-                with (tempfile.TemporaryDirectory(suffix='elastix_output') as temp_dir,
-                      tempfile.TemporaryDirectory(suffix='elastix_params') as temp_params_dir,
-                      tempfile.NamedTemporaryFile(suffix='elastix_input.bin', delte=False) as temp_file):
+        for results_dir in results_directories:
+            # We copy the files to temporary directories to avoid conflicts during parallel processing
+            with (tempfile.TemporaryDirectory(suffix='_elastix_output') as temp_dir,
+                  tempfile.TemporaryDirectory(suffix='_elastix_params') as temp_params_dir,
+                  tempfile.NamedTemporaryFile(suffix='_elastix_input.bin', delete=False) as temp_file):
 
-                    # _, transform_parameter_file = transform_directory_and_file(transform_directory=ws.filename('resampled_to_auto'))
 
-                    # Copy the params files to avoid a race condition because they get edited by each process
-                    for f_name in glob.glob(results_dir / 'TransformParameters.*.txt'):
-                        f_path = results_dir / f_name
-                        shutil.copy(f_path, temp_params_dir)
+                # Copy the params files to avoid a race condition because they get edited by each process
+                file_names = glob.glob(str(results_dir / 'TransformParameters.*.txt'))
+                if not file_names:
+                    raise FileNotFoundError(f'No parameter files found in {results_dir}')
+                # print(f'Copying {file_names} to {temp_params_dir}')
+                for f_name in file_names:
+                    f_path = results_dir / f_name
+                    shutil.copy(f_path, temp_params_dir)
 
-                    coords = elastix.transform_points(
-                        coords, sink=None,
-                        transform_directory=temp_params_dir,
-                        result_directory=temp_dir,
-                        temp_file=temp_file.name,
-                        binary=True, indices=False)
+                coords = elastix.transform_points(
+                    coords, sink=None,
+                    transform_directory=temp_params_dir,
+                    result_directory=temp_dir,
+                    temp_file=temp_file.name,
+                    binary=True, indices=False)
 
-                    tmp_f_path = Path(temp_file.name)
-                tmp_f_path.unlink(missing_ok=True)
+                tmp_f_path = Path(temp_file.name)
+            tmp_f_path.unlink(missing_ok=True)
 
         return coords
 
@@ -192,7 +186,30 @@ class TractMapProcessor(TabProcessor):
         )
         # FIXME: see if works with method or if we should use a function and pass params here
         perf_params = self.processing_config['parallel_params']
-        block_processing.process(self.transformation, coords, transformed_coords,
+
+        target_channel = 'atlas'  # FIXME: add control for target channel
+        resampled_shape = self.sample_manager.resampled_shape(channel=self.channel)
+        if resampled_shape is None:
+            if target_channel == 'atlas':
+                resampled_shape = self.get('atlas', channel=self.channel, asset_sub_type='reference').shape()
+            else:
+                raise ValueError(f'Resampled shape not found for channel {self.channel}')
+
+        results_directories = []
+        for channel in self.get_registration_sequence_channels(stop_channel=target_channel):
+            if self.registration_processor.config['channels'][channel]['moving_channel'] in (None, 'intrinsically aligned'):
+                continue
+            else:
+                results_directories.append(self.get_path('aligned', channel=channel).parent)
+
+        transfo = functools.partial(TractMapProcessor.transformation,
+                                    source_shape=self.sample_manager.stitched_shape(channel=self.channel),
+                                    resampled_shape=resampled_shape,
+                                    results_directories=results_directories
+                                    )
+        transfo.__name__ = 'parallel_transform'
+
+        block_processing.process(transfo, coords, transformed_coords,
                                  axes=[0], processes=perf_params['n_processes_transform'],
                                  size_min=perf_params['min_point_list_size'],
                                  size_max=perf_params['max_point_list_size'],
