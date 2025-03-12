@@ -48,9 +48,9 @@ done
 if git rev-parse --is-inside-work-tree > /dev/null 2>&1; then
     COMMIT_NUMBER=$(git rev-parse HEAD)
     if [ -d "ClearMap/config/" ]; then
-        echo "commit_hash = $COMMIT_NUMBER" > ClearMap/config/commit_info.py
-        echo "commit_date = $(git log -1 --format=%cd)" >> ClearMap/config/commit_info.py
-        echo "branch = $(git rev-parse --abbrev-ref HEAD)" >> ClearMap/config/commit_info.py
+        echo "commit_hash = \"$COMMIT_NUMBER\"" > ClearMap/config/commit_info.py
+        echo "commit_date = \"$(git log -1 --format=%cd)\"" >> ClearMap/config/commit_info.py
+        echo "branch = \"$(git rev-parse --abbrev-ref HEAD)\"" >> ClearMap/config/commit_info.py
         green "Commit number saved to commit_info.py"
     else
         red "Directory ClearMap/config/ does not exist. Skipping commit number save.
