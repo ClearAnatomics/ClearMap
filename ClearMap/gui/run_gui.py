@@ -125,7 +125,7 @@ DATA_TYPE_TO_TAB_CLASS = {  # WARNING: not all data types are covered
     'vessels': VasculatureTab,
     'veins': VasculatureTab,
     'arteries': VasculatureTab,
-    'meylin': TractMapTab,
+    'myelin': TractMapTab,
 }
 
 # TODO
