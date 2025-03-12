@@ -538,25 +538,26 @@ class StitchingTab(PreProcessingTab):
                 self.wrap_step('Stitching', self.stitcher.copy_or_stack, step_args=[channel], )
 
         n_steps = self.stitcher.n_rigid_steps_to_run + self.stitcher.n_wobbly_steps_to_run
-        for channel in self.stitcher.get_stitching_order():
-            cfg = self.params[channel]
-            if not cfg.shared.run:
-                continue
-            if self.params[channel].shared.use_npy and not self.sample_manager.has_npy(channel):
-                self.convert_tiles()
-            kwargs = {'n_steps': n_steps, 'abort_func': self.stitcher.stop_process, 'close_when_done': False}
-            try:
-                if channel == cfg.shared.layout_channel:  # Used as reference
-                    self.wrap_step('Stitching', self.stitcher.stitch_channel_rigid,
-                                   step_args=[channel], step_kw_args={'_force': True}, **kwargs)
-                    self.wrap_step(task_name='', func=self.stitcher.stitch_channel_wobbly, step_args=[channel],
-                                   step_kw_args={'_force': cfg.stitching_rigid.skip}, **kwargs)
-                else:  # Uses other channel as reference
-                    self.wrap_step('', self.stitcher._stitch_layout_wobbly,
-                                   step_args=[channel],  **kwargs)
-            except MissingRequirementException as err:
-                error_msg = str(err).replace("\n", "<br>")
-                self.main_window.print_status_msg(f'Skipping stitching for {channel} because of missing requirements: {error_msg}')
+        for stitching_tree in self.stitcher.get_stitching_order().values():
+            for channel in stitching_tree:
+                cfg = self.params[channel]
+                if not cfg.shared.run:
+                    continue
+                if self.params[channel].shared.use_npy and not self.sample_manager.has_npy(channel):
+                    self.convert_tiles()
+                kwargs = {'n_steps': n_steps, 'abort_func': self.stitcher.stop_process, 'close_when_done': False}
+                try:
+                    if channel == cfg.shared.layout_channel:  # Used as reference
+                        self.wrap_step('Stitching', self.stitcher.stitch_channel_rigid,
+                                       step_args=[channel], step_kw_args={'_force': True}, **kwargs)
+                        self.wrap_step(task_name='', func=self.stitcher.stitch_channel_wobbly, step_args=[channel],
+                                       step_kw_args={'_force': cfg.stitching_rigid.skip}, **kwargs)
+                    else:  # Uses other channel as reference
+                        self.wrap_step('', self.stitcher._stitch_layout_wobbly,
+                                       step_args=[channel],  **kwargs)
+                except MissingRequirementException as err:
+                    error_msg = str(err).replace("\n", "<br>")
+                    self.main_window.print_status_msg(f'Skipping stitching for {channel} because of missing requirements: {error_msg}')
 
         self.update_plotable_channels()
         self.progress_watcher.finish()
