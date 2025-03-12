@@ -16,6 +16,7 @@ import math
 import os
 import sys
 import tempfile
+import warnings
 from datetime import datetime
 
 from multiprocessing.pool import ThreadPool
@@ -767,8 +768,10 @@ class ClearMapGui(ClearMapGuiBase):
     def __add_post_processing_tabs(self):
         sample_params = getattr(self.tab_managers['sample_info'], 'params', {})
         for channel_param in sample_params.values():
-            cls = DATA_TYPE_TO_TAB_CLASS.get(channel_param.data_type)
+            data_content_type = channel_param.data_type
+            cls = DATA_TYPE_TO_TAB_CLASS.get(data_content_type)
             if not cls:
+                warnings.warn(f'No tab class found for data_type: {data_content_type}')
                 continue  # Skip if no tab for that data type
             if not any([isinstance(tab, cls) for tab in self.tab_managers.values()]):
                 self.add_tab(cls, sample_manager=self.sample_manager, set_params=True)
