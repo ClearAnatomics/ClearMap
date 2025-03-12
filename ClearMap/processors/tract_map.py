@@ -108,7 +108,7 @@ class TractMapProcessor(TabProcessor):
         binarization_parameter['adaptive'] = None
 
         processing_parameter = vasculature.default_binarization_processing_parameter.copy()
-        processing_parameter.update(processes=self.machine_config['n_processes_binarization'],
+        processing_parameter.update(processes=self.processing_config['parallel_params']['n_processes_binarization'],
                                     as_memory=False,
                                     verbose=True)
 
@@ -122,7 +122,7 @@ class TractMapProcessor(TabProcessor):
         output_path = self.get_path('binary', asset_sub_type='pixels_raw', channel=self.channel)
         if as_memmap:
             return array_processing.where(mask, output_path,
-                                          processes=self.machine_config['n_processes_tract_map'],
+                                          processes=self.processing_config['parallel_params']['n_processes_where'],
                                           verbose=True)
         else:
             raise NotImplementedError('Output to file not implemented yet')
