@@ -1,8 +1,4 @@
-import copy
-import os
 
-from ClearMap.IO import IO as clearmap_io
-from ClearMap.IO.MHD import read as mhd_read
 from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
 from ClearMap.Visualization.Qt.utils import link_dataviewers_cursors
 from ClearMap.processors.sample_preparation import StitchingProcessor, RegistrationProcessor
@@ -43,14 +39,15 @@ def stitch(stitcher: StitchingProcessor):  # FIXME: part of stitcher object
         if not sample_manager.is_tiled(channel):
             stitcher.copy_or_stack(channel)
 
-    for channel in stitcher.get_stitching_order():
-        config = stitcher.config['channels'][channel]
-        if not config['run']:
-            continue
-        if config['use_npy'] and not sample_manager.has_npy(channel):
-                stitcher.convert_tiles()
-        if channel == config['layout_channel']:
-            stitcher.stitch_channel_rigid(channel, _force=True)
-            stitcher.stitch_channel_wobbly(channel, _force=True)  # TODO: check if force
-        else:
-            stitcher._stitch_layout_wobbly(channel)
+    for stitching_tree in stitcher.get_stitching_order(strict=True).values():
+        for channel in stitching_tree:
+            config = stitcher.config['channels'][channel]
+            if not config['run']:
+                continue
+            if config['use_npy'] and not sample_manager.has_npy(channel):
+                    stitcher.convert_tiles()
+            if channel == config['layout_channel']:
+                stitcher.stitch_channel_rigid(channel, _force=True)
+                stitcher.stitch_channel_wobbly(channel, _force=True)  # TODO: check if force
+            else:
+                stitcher._stitch_layout_wobbly(channel)
