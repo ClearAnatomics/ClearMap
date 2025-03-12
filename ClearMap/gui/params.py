@@ -947,7 +947,7 @@ class TractMapParams(ChannelsUiParameterCollection):
 
 class ChannelTractMapParams(ChannelUiParameter):
     clipping_decimation_ratio: int
-    clip_range = List[int]
+    clip_range: List[int]
     crop_x_min: int
     crop_x_max: int  # TODO: if 99.9 % source put to 100% (None)
     crop_y_min: int
@@ -995,13 +995,13 @@ class ChannelTractMapParams(ChannelUiParameter):
         self.advanced_controls = []  # FIXME: put as default in parent class
         self.connect()
 
-    def handle_advanced_state_changed(self, state):
-        for ctrl in self.advanced_controls:
-            ctrl.setVisible(state)
-
     @property
     def cfg_subtree(self):
         return ['channels', self.name]
+
+    def handle_advanced_state_changed(self, state):
+        for ctrl in self.advanced_controls:
+            ctrl.setVisible(state)
 
     def handle_name_changed(self):
         # private config because absolute path
