@@ -662,24 +662,31 @@ class PostProcessingTab(PipelineTab):
         params
         """
         self.main_window.clear_plots()
+        no_scale = False
         if isinstance(channel, (list, tuple)):
             sources = [self.sample_manager.get('resampled', channel=ch).as_source() for ch in channel]
             if not np.all([src.shape == sources[0].shape for src in sources]):
                 raise ValueError('Channels have different shapes')
-            resampled_img = np.mean([self.sample_manager.get('resampled', channel=ch).as_source() for ch in channel], axis=0)
+            plot_image = np.mean([self.sample_manager.get('resampled', channel=ch).as_source() for ch in channel], axis=0)
             channel = channel[0]
         else:
-            resampled_img = self.sample_manager.get('resampled', channel=channel).as_source()
-        # FIXME: try stitched if npy and resampled missing
-        self.main_window.ortho_viewer.setup(resampled_img, params, parent=self.main_window)
+            # asset = self.sample_manager.get('stitched', channel=channel)
+            # if asset.exists:
+            #     no_scale = True
+            # else:  # missing stitched
+            # FIXME: we cannot currently use stitched because we need to transpose it and it is too heavy for that
+            asset = self.sample_manager.get('resampled', channel=channel)
+            plot_image = asset.as_source()
+        self.main_window.ortho_viewer.setup(plot_image, params, parent=self.main_window, no_scale=no_scale)
         dvs = self.main_window.ortho_viewer.plot_orthogonal_views()
-        ranges = [[params.reverse_scale_axis(v, ax) for v in vals] for ax, vals in zip('xyz', params.slice_tuples)]
-        self.main_window.ortho_viewer.update_ranges(ranges)
+        if not no_scale:
+            ranges = [[params.reverse_scale_axis(v, ax) for v in vals] for ax, vals in zip('xyz', params.slice_tuples)]
+            self.main_window.ortho_viewer.update_ranges(ranges)
         self.main_window.setup_plots(dvs, ['x', 'y', 'z'])
 
         # WARNING: needs to be done after setup
         for axis, ax_max in zip('XYZ', self.sample_manager.stitched_shape(channel)):  # WARNING: assumes stitched shape
-            getattr(tab, f'{slicer_prefix}{axis}RangeMax').setMaximum(ax_max)
+            getattr(tab, f'{slicer_prefix}{axis}RangeMax').setMaximum(round(ax_max))
 
 
 class BatchTab(GenericTab):
