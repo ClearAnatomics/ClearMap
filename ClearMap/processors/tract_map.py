@@ -26,6 +26,11 @@ from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
 USE_BINARY_POINTS_FILE = not platform.system().lower().startswith('darwin')  # i.e. binary is available in elastix
 
 
+# WARNING: this has to be top level to be pickleable (because of the way multiprocessing works)
+def label_points_wrapper(annotator, coords):
+    return np.expand_dims(annotator.label_points(coords), axis=-1)  # Add empty dim to match shape of coords
+
+
 class TractMapProcessor(TabProcessor):
     def __init__(self, sample_manager=None, channel=None, registration_processor=None):
         super().__init__()
@@ -214,9 +219,6 @@ class TractMapProcessor(TabProcessor):
                                                                 asset_sub_type='labels'),
                                  dtype='int64', shape=(coordinates_transformed.shape[0], 1),
                                  return_buffer=False)
-        # labeling_fn = functools.partial(ano.label_points, key='id')
-        def label_points_wrapper(annotator, coords):
-            return np.expand_dims(annotator.label_points(coords), axis=-1)  # Add empty dim to match shape of coords
 
         with AnnotationManager() as manager:
             annotator = manager.Annotation(self.registration_processor.annotators[self.channel])
