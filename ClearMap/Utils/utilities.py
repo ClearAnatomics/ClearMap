@@ -286,23 +286,23 @@ def clear_cuda_cache():
     torch.cuda.empty_cache()
 
 
-def topological_sort(graph, in_degree):
-    queue = deque([node for node in in_degree if in_degree[node] == 0])
-    sorted_list = []
-
-    while queue:
-        node = queue.popleft()
-        sorted_list.append(node)
-
-        for neighbor in graph[node]:
-            in_degree[neighbor] -= 1
-            if in_degree[neighbor] == 0:
-                queue.append(neighbor)
-
-    if len(sorted_list) != len(in_degree):
-        raise ValueError("Cycle detected in channel dependencies")
-
-    return sorted_list
+# def topological_sort(graph, in_degree):
+#     queue = deque([node for node in in_degree if in_degree[node] == 0])
+#     sorted_list = []
+#
+#     while queue:
+#         node = queue.popleft()
+#         sorted_list.append(node)
+#
+#         for neighbor in graph[node]:
+#             in_degree[neighbor] -= 1
+#             if in_degree[neighbor] == 0:
+#                 queue.append(neighbor)
+#
+#     if len(sorted_list) != len(in_degree):
+#         raise ValueError("Cycle detected in channel dependencies")
+#
+#     return sorted_list
 
 
 def check_stopped(func):
