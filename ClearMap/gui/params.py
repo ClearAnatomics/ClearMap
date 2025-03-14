@@ -19,6 +19,7 @@ from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtWidgets import QInputDialog, QToolBox, QCheckBox, QPushButton, QLabel, QSlider, QHBoxLayout, QComboBox
 
 from ClearMap.IO.assets_constants import CONTENT_TYPE_TO_PIPELINE
+from ClearMap.Utils.exceptions import ClearMapValueError
 from ClearMap.Utils.utilities import validate_orientation, snake_to_title
 from ClearMap.config.atlas import ATLAS_NAMES_MAP
 
@@ -308,7 +309,11 @@ class ChannelStitchingParams(UiParameterCollection):
 
         if self.compute_layout():
             self.stitching_rigid = RigidChannelStitchingParams(tab, channel)
+            if 'rigid' not in self.config['channels'][channel].keys():
+                raise ClearMapValueError('Missing rigid stitching config although set for computing')
             self.stitching_wobbly = WobblyChannelStitchingParams(tab, channel)
+            if 'wobbly' not in self.config['channels'][channel].keys():
+                raise ClearMapValueError('Missing wobbly stitching config although set for computing')
             self.read_configs(cfg=config)
 
         self.shared.layoutChannelChanged.connect(self.handle_layout_channel_changed)
@@ -410,6 +415,7 @@ class GeneralChannelStitchingParams(ChannelUiParameter):
         self.tab.layoutChannelComboBox.currentTextChanged.connect(self.handle_layout_channel_changed)
 
     def handle_layout_channel_changed(self, layout_channel):
+        self.config['layout_channel'] = layout_channel
         self.layoutChannelChanged.emit(self.name, layout_channel)
 
 
