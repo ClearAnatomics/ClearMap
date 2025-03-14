@@ -685,7 +685,11 @@ def transpose_array(array, source_order, dest_order):
     The transposed array
     """
     transposition = map_axes(source_order, dest_order, ndim=array.ndim)
-    return np.transpose(array, transposition)
+    try:
+        return np.transpose(array, transposition)
+    except ValueError as err:
+        raise ValueError(f'Error with transposition of array with {array.shape} shape, and dtype {array.dtype}'
+                         f'{source_order=}, {dest_order=}, {transposition=}; {err}')
 
 
 def tif_to_clearmap_order(array, array_order='XYZ'):
