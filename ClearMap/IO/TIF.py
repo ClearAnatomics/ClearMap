@@ -454,6 +454,11 @@ class ImageJMetadataParser(BaseMetadataParser):
                 # Remove empty dimensions
                 parsed_info['order'] = ''.join(d for s, d in zip(parsed_info['shape'], order) if s != 1)
                 parsed_info['shape'] = tuple(dim for dim in parsed_info['shape'] if dim != 1)
+            elif 'ImageDescription' in md_info[0] and 'shape' in md_info[0]:
+                parsed_info['order'] = 'xyz'
+                warnings.warn(f'Order not found, assuming {"xyz"}')
+                desc = eval(md_info[0].replace('ImageDescription:', '').strip())  # WARNING: dangerous
+                parsed_info['shape'] = desc['shape']
             else:
                 raise ValueError(f'Unknown metadata type {self.source._metadata_type} and format: {md_info[0]};'
                                  f' info: {md_info}')
@@ -661,6 +666,12 @@ def map_axes(source_order, dest_order, ndim=None):
             dest_order = dest_order.replace(dim, '')
 
     if len(source_order) != len(dest_order):
+        # if (len(dest_order) == len(source_order) + 1) and 'z' in dest_order.lower():
+            # dest_order = ''.join([ax for ax in dest_order if ax.lower() != 'z'])
+            # if ndim > len(dest_order):
+                # raise ValueError(f'Cannot remap because data has more dimensions than specified in mapping')
+            # warnings.warn(f'Extra Z axis found in dest_order. Stripped')
+        # else:
         raise ValueError(f'Source and destination order must have the same number of axes.'
                          f' Source order: {source_order}, Destination order: {dest_order}')
 
