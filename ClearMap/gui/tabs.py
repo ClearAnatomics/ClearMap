@@ -373,7 +373,7 @@ class StitchingTab(PreProcessingTab):
     def _set_channels_names(self):  # FIXME: move to stitcher
         stitchable_channels = self._get_channels()
         # rename defaults
-        if 'channel_x' in self.stitcher.config['channels']:  # i.e. is default, otherwise already set
+        if 'channel_x' in self.stitcher.config['channels'].keys():  # i.e. is default, otherwise already set
             first_channel = stitchable_channels[0]
             self.stitcher.config['channels'][first_channel] = self.stitcher.config['channels'].pop('channel_x')
             self.stitcher.config['channels'][first_channel]['layout_channel'] = first_channel
@@ -383,6 +383,8 @@ class StitchingTab(PreProcessingTab):
             self.stitcher.config['channels'].pop('channel_y')
         else:  # rename existing
             for old_name, new_name in zip(self.stitcher.config['channels'].keys(), stitchable_channels):
+                if old_name == new_name:
+                    continue
                 self.stitcher.config['channels'][new_name] = self.stitcher.config['channels'].pop(old_name)
                 if self.stitcher.config['channels'][new_name]['layout_channel'] == old_name:
                     self.stitcher.config['channels'][new_name]['layout_channel'] = new_name
@@ -427,7 +429,7 @@ class StitchingTab(PreProcessingTab):
     def _setup_channel(self, page_widget, channel):
         if stitchable_channels := self.sample_manager.get_stitchable_channels():
             self.params[channel].ready = self.params_finalised
-            page_widget.layoutChannelComboBox.addItems(stitchable_channels)
+            page_widget.layoutChannelComboBox.addItems(stitchable_channels)  # FIXME: select proper entry from config
         is_first_channel = self.ui.channelsParamsTabWidget.last_real_tab_idx == 1
         layout_channel = channel if is_first_channel else self.sample_manager.get_stitchable_channels()[0]
         page_widget.layoutChannelComboBox.setCurrentText(layout_channel)
@@ -609,7 +611,7 @@ class RegistrationTab(PreProcessingTab):
 
     def _set_channels_names(self):
         if 'channel_x' in self.aligner.config['channels']:  # i.e. is default, otherwise already set
-            autofluo_config = deepcopy(self.aligner.config['channels']['autofluorescence'])
+            autofluo_config = deepcopy(self.aligner.config['channels'].get('autofluorescence'))  # FIXME: may not exist
             data_channel_config = deepcopy(self.aligner.config['channels']['channel_x'])
             self.aligner.config['channels'] = {}
             for channel in self.sample_manager.channels:
@@ -620,7 +622,7 @@ class RegistrationTab(PreProcessingTab):
                 self.handle_align_with_changed(channel, self.aligner.config['channels'][channel]['align_with'])
             self.aligner.config.write()  # FIXME: ensure that aligner defined. Why not self.params.ui_to_cfg()
 
-            self.aligner.add_pipeline()
+        self.aligner.add_pipeline()
 
     def _bind(self):
         """
@@ -1169,8 +1171,8 @@ class VasculatureTab(PostProcessingTab):
         self.vessel_graph_processor = None
 
     def _set_channels_names(self):
-        default_vessels_binarization_params = self.params.config['binarization'].pop('vessels')
-        default_arteries_binarization_params = self.params.config['binarization'].pop('arteries')
+        default_vessels_binarization_params = self.params.config['binarization'].pop('vessels', {})
+        default_arteries_binarization_params = self.params.config['binarization'].pop('arteries', {})
         for channel in self.sample_manager.channels:
             if self.sample_manager.config['channels'][channel]['data_type'] == 'vessels':
                 self.params.config['binarization'][channel] = default_vessels_binarization_params
