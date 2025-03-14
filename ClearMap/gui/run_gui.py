@@ -46,6 +46,16 @@ DEBUG = False
 
 os.environ['CLEARMAP_GUI_HOSTED'] = "1"
 # ########################################### SPLASH SCREEN ###########################################################
+CLEARMAP_VERSION = version('ClearMap')
+from ClearMap.config.config_loader import ConfigLoader, CLEARMAP_CFG_DIR
+machine_cfg = ConfigLoader.get_cfg_from_path(ConfigLoader.get_default_path('machine'))
+tmp_folder = machine_cfg.get('tmp_folder', None)
+if tmp_folder is not None:
+    for var_name in ('TMP', 'TEMP', 'TMPDIR'):
+        os.environ[var_name] = tmp_folder
+    tempfile.tempdir = None  # Force refresh of tempdir
+DEBUG = machine_cfg['verbosity'] in ('trace', 'debug')
+
 from ClearMap.Alignment.Stitching import layout_graph_utils  # noqa: F401 # WARNING: first because otherwise, breaks with pytorch
 
 from ClearMap.gui.about import AboutInfo
@@ -85,7 +95,6 @@ import torch
 update_pbar(app, progress_bar, 20)
 from ClearMap.Utils.utilities import title_to_snake, snake_to_title
 from ClearMap.gui.gui_logging import Printer
-from ClearMap.config.config_loader import ConfigLoader, CLEARMAP_CFG_DIR
 from ClearMap.Utils.exceptions import ConfigNotFoundError, ClearMapIoException
 from ClearMap.gui.params_interfaces import UiParameter, UiParameterCollection
 
@@ -110,14 +119,6 @@ from ClearMap.processors.sample_preparation import SampleManager
 update_pbar(app, progress_bar, 80)
 
 pg.setConfigOption('background', PLOT_3D_BG)
-
-
-CLEARMAP_VERSION = version('ClearMap')
-tmp_folder = ConfigLoader.get_cfg_from_path(ConfigLoader.get_default_path('machine')).get('tmp_folder', None)
-if tmp_folder is not None:
-    for var_name in ('TMP', 'TEMP', 'TMPDIR'):
-        os.environ[var_name] = tmp_folder
-    tempfile.tempdir = None  # Force refresh of tempdir
 
 
 DATA_TYPE_TO_TAB_CLASS = {  # WARNING: not all data types are covered
