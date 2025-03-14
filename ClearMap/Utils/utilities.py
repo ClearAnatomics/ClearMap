@@ -27,6 +27,8 @@ __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
 import functools
 
+from configobj import ConfigObj
+
 from ClearMap.Utils.tag_expression import Expression
 from ClearMap.Utils.exceptions import MissingRequirementException, SmiError, ParamsOrientationError
 
@@ -144,9 +146,13 @@ def make_abs(directory, file_name):
 def get_item_recursive(container, keys):
     try:
         return reduce(getitem, keys, container)
-    except TypeError as err:
-        print(f'ERROR attempting to read "{keys}" from "{container}"')
-        raise err
+    except (TypeError, KeyError) as err:
+        err_type = type(err).__name__
+        err_msg = f'{err_type} attempting to read "{keys}"'
+        if isinstance(container, ConfigObj):
+            err_msg += f' path: {container.filename}'
+        print(f'{err_msg} from "{container}"')
+        raise
 
 
 def set_item_recursive(dictionary, keys_list, val, fix_missing_keys=True):
