@@ -20,7 +20,7 @@ class Scatter3D:
             n_samples = coordinates.shape[0]
             colors = pseudo_random_rgb_array(n_samples)
         if colors is not None and not isinstance(colors[0], str):  # Convert to hex if not yet
-            colors = [to_hex(c) for c in colors]
+            colors = [to_hex((1, 0, 0) if c is None else c) for c in colors]
 
         self.__has_colours = colors is not None
 
