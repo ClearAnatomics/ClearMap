@@ -175,7 +175,7 @@ class Workspace2:  # REFACTOR: subclass dict
         # if raw_asset.is_expression:
 
         # FIXME: this shouldn't be the case for just stacking
-        pipelines.append('stitching')  # We need the "stitched" asset even for file conversion
+        pipelines.append('stitching')  # WARNING: We need the "stitched" asset even for file conversion
 
         for name, spec in CHANNEL_ASSETS_TYPES.items():
             if any(p in pipelines for p in spec.relevant_pipelines):
