@@ -1,5 +1,7 @@
 import functools
 import glob
+import multiprocessing
+import os
 import platform
 import shutil
 import tempfile
@@ -29,6 +31,13 @@ USE_BINARY_POINTS_FILE = not platform.system().lower().startswith('darwin')  # i
 # WARNING: this has to be top level to be pickleable (because of the way multiprocessing works)
 def label_points_wrapper(annotator, coords):
     return np.expand_dims(annotator.label_points(coords), axis=-1)  # Add empty dim to match shape of coords
+
+
+def sanitize_n_processes(processes):
+    if processes < 0:
+        processes = multiprocessing.cpu_count + processes
+    processes = max(processes, 1)
+    return processes
 
 
 class TractMapProcessor(TabProcessor):
@@ -101,12 +110,12 @@ class TractMapProcessor(TabProcessor):
                 binarization_parameter['equalize']['save'] = str(
                     self.get_path('binary', channel=self.channel, asset_sub_type='equalize')
                 )
-            binarization_parameter['vesselize']['save'] = str(
-                self.get_path('binary', channel=self.channel, asset_sub_type='vesselize')
-            )
-            binarization_parameter['median']['save'] = str(
-                self.get_path('binary', channel=self.channel, asset_sub_type='median')
-            )
+            # binarization_parameter['vesselize']['save'] = str(
+            #     self.get_path('binary', channel=self.channel, asset_sub_type='vesselize')
+            # )
+            # binarization_parameter['median']['save'] = str(
+            #     self.get_path('binary', channel=self.channel, asset_sub_type='median')
+            # )
         binarization_parameter['vesselize']['threshold'] = 1
         binarization_parameter['vesselize']['tubeness']['sigma'] = 1
         binarization_parameter['deconvolve'] = None
@@ -121,14 +130,20 @@ class TractMapProcessor(TabProcessor):
                       self.get_path('binary', channel=self.channel),
                       binarization_parameter=binarization_parameter,
                       processing_parameter=processing_parameter)
+        print('TractMap binarization finished')
+        self.update_watcher_main_progress()
 
     def mask_to_coordinates(self, as_memmap=False):
         mask = str(self.get_path('binary', channel=self.channel))
-        output_path = self.get_path('binary', asset_sub_type='pixels_raw', channel=self.channel)
+        output_asset = self.get('binary', asset_sub_type='pixels_raw', channel=self.channel)
+        if output_asset.exists:
+            output_asset.delete()
         if as_memmap:
-            return array_processing.where(mask, output_path,
+            return array_processing.where(mask, output_asset.path,
                                           processes=self.processing_config['parallel_params']['n_processes_where'],
                                           verbose=True)
+            self.update_watcher_main_progress()
+            print('TractMap coordinates extraction finished')
         else:
             raise NotImplementedError('Output to file not implemented yet')
 
@@ -158,7 +173,7 @@ class TractMapProcessor(TabProcessor):
 
 
                 # Copy the params files to avoid a race condition because they get edited by each process
-                file_names = glob.glob(str(results_dir / 'TransformParameters.*.txt'))
+                file_names = results_dir.glob('TransformParameters.*.txt')
                 if not file_names:
                     raise FileNotFoundError(f'No parameter files found in {results_dir}')
                 # print(f'Copying {file_names} to {temp_params_dir}')
@@ -178,22 +193,23 @@ class TractMapProcessor(TabProcessor):
 
         return coords
 
-    def parallel_transform(self):
+    def parallel_transform(self, processes=-1):
         coords = self.get('binary', channel=self.channel, asset_sub_type='pixels_raw').as_source()
-        transformed_coords = array_processing.initialize_sink(
-            self.get_path('binary', asset_sub_type='coordinates_transformed', channel=self.channel),
+        coordinates_transformed_path = self.get_path('binary', asset_sub_type='coordinates_transformed', channel=self.channel)
+        coordinates_transformed_path.unlink(missing_ok=True)
+        transformed_coords = array_processing.initialize_sink(coordinates_transformed_path,
             dtype='float64', shape=coords.shape, return_buffer=False
         )
-        # FIXME: see if works with method or if we should use a function and pass params here
         perf_params = self.processing_config['parallel_params']
 
         target_channel = 'atlas'  # FIXME: add control for target channel
+        status_bcp = self.workspace.debug
+        self.workspace.debug = False
         resampled_shape = self.sample_manager.resampled_shape(channel=self.channel)
+        self.workspace.debug = status_bcp
         if resampled_shape is None:
-            if target_channel == 'atlas':
-                resampled_shape = self.get('atlas', channel=self.channel, asset_sub_type='reference').shape()
-            else:
-                raise ValueError(f'Resampled shape not found for channel {self.channel}')
+            # FIXME: in this case compute from scale differences
+            raise ValueError(f'Resampled shape not found for channel {self.channel}')
 
         results_directories = []
         for channel in self.get_registration_sequence_channels(stop_channel=target_channel):
@@ -202,19 +218,29 @@ class TractMapProcessor(TabProcessor):
             else:
                 results_directories.append(self.get_path('aligned', channel=channel).parent)
 
+        debug_bcp = self.workspace.debug
+        self.workspace.debug = False
+        source_shape = self.sample_manager.stitched_shape(channel=self.channel)
+        self.workspace.debug = debug_bcp
         transfo = functools.partial(TractMapProcessor.transformation,
-                                    source_shape=self.sample_manager.stitched_shape(channel=self.channel),
+                                    source_shape=source_shape,
                                     resampled_shape=resampled_shape,
                                     results_directories=results_directories
                                     )
         transfo.__name__ = 'parallel_transform'
 
-        block_processing.process(transfo, coords, transformed_coords,
-                                 axes=[0], processes=perf_params['n_processes_transform'],
-                                 size_min=perf_params['min_point_list_size'],
-                                 size_max=perf_params['max_point_list_size'],
-                                 verbose=True)
+        processes = sanitize_n_processes(processes)
 
+        if processes == 1:
+            transformed_coords[:, :] = transfo(coords)
+        else:
+            block_processing.process(transfo, coords, transformed_coords,
+                                     axes=[0], processes=perf_params['n_processes_transform'],
+                                     size_min=perf_params['min_point_list_size'],
+                                     size_max=perf_params['max_point_list_size'],
+                                     verbose=True)
+        self.update_watcher_main_progress()
+        print('TractMap coordinates transformed')
         return transformed_coords
 
     def label(self):
@@ -247,6 +273,8 @@ class TractMapProcessor(TabProcessor):
                                      size_min=perf_params['min_point_list_size'],
                                      size_max=perf_params['max_point_list_size'],
                                      verbose=True)
+        self.update_watcher_main_progress()
+        print('TractMap coordinates labeled')
         return labels
 
     def shift_coordinates(self):
@@ -257,65 +285,37 @@ class TractMapProcessor(TabProcessor):
             shift = self.processing_config['test_set_slicing'][f'dim_{i}'][0]
             coordinates[:, i] += shift
         cmp_io.write(coords_asset.path, coordinates)
+        print('TractMap coordinates shifted')
 
     def run_pipeline(self, tuning=False):
+        self.workspace.debug = tuning
         self.reload_config()
 
-        self.update_watcher_main_progress()
         self.binarize(*self.processing_config['binarization']['clip_range'])
-        self.update_watcher_main_progress()
-        print('TractMap binarization finished')
-
         self.mask_to_coordinates(as_memmap=USE_BINARY_POINTS_FILE)
-        self.update_watcher_main_progress()
-        print('TractMap coordinates extraction finished')
 
         if tuning:
-            # Shift coordinates by the cropping amount to get the values in whole sample reference frame
             self.shift_coordinates()
-            print('TractMap coordinates shifted')
 
         self.parallel_transform()
-        self.update_watcher_main_progress()
-        print('TractMap coordinates transformed')
-
         self.label()
-        self.update_watcher_main_progress()
-        print('TractMap coordinates labeled')
-
         self.voxelize()
-        self.update_watcher_main_progress()
-        print('TractMap voxelization finished')
 
         self.export_df(asset_sub_type=None)
-        self.update_watcher_main_progress()
-        print('TractMap "cells" DF exported')
 
-        # self.plot_cells_3d_scatter_w_atlas_colors(raw=False)
+        self.workspace.debug = False
 
-    def export_df(self, asset_sub_type='fake'):  # FIXME: needs dynamic asset_sub_type
+    def export_df(self, asset_sub_type='fake'):  # FIXME: find other name than cells and add to constants
         ratio = self.processing_config['display']['decimation_ratio']
         decimated_coordinates_raw = self.get(
             'binary', channel=self.channel, asset_sub_type='pixels_raw').as_source()[::ratio, :]
-        # cmp_io.write(self.get_path(
-        #     'binary', channel=self.channel,
-        #     asset_sub_type=f'pixels_raw_decimated_{ratio}'),
-        #     decimated_coordinates_raw)
 
         decimated_coordinates_transformed = self.get(
             'binary', channel=self.channel,
             asset_sub_type='coordinates_transformed').as_source()[::ratio, :]
-        # cmp_io.write(self.get_path(
-        #     'binary', channel=self.channel,
-        #     asset_sub_type=f'coordinates_transformed_decimated_{ratio}'),
-        #     decimated_coordinates_transformed)
 
         decimated_labels = self.get('binary', channel=self.channel,
                                     asset_sub_type='labels').as_source()[::ratio, :]
-        # cmp_io.write(self.get_path(
-        #     'binary', channel=self.channel,
-        #     asset_sub_type=f'labels_decimated_{ratio}'),
-        #     decimated_labels)
 
         # Build the DataFrame
         df = pd.DataFrame({'id': decimated_labels[:, 0]})
@@ -328,6 +328,7 @@ class TractMapProcessor(TabProcessor):
         unique_ids = np.sort(np.unique(decimated_labels))
         annotator = self.registration_processor.annotators[self.channel]
         color_map = {id_: annotator.find(id_, key='id')['rgb'] for id_ in unique_ids}
+        color_map[0] = np.array((1, 0, 0))  # default to red
         df['color'] = df['id'].map(color_map)
 
         # WARNING: asset_sub_type is "fake" because it is not really cells.
@@ -335,7 +336,8 @@ class TractMapProcessor(TabProcessor):
         #  and make sure to use it in the plots
         df.to_feather(self.get_path('cells', channel=self.channel,
                                     asset_sub_type=asset_sub_type, extension='.feather'))
-
+        self.update_watcher_main_progress()
+        print('TractMap "cells" DF exported')
         return df
 
     def voxelize(self):
@@ -353,11 +355,14 @@ class TractMapProcessor(TabProcessor):
                  sink=self.get_path('density', channel=self.channel, asset_sub_type='counts'),
                  **voxelization_parameter
         )
+        self.update_watcher_main_progress()
+        print('TractMap voxelization finished')
 
-    def plot_cells_3d_scatter_w_atlas_colors(self, raw=False, parent=None):
+    def plot_cells_3d_scatter_w_atlas_colors(self, raw=False, cells_from_debug=False, plot_onto_debug=False, parent=None):
         asset_properties = {'channel': self.channel}
         if raw:
-            asset_properties['asset_type'] = 'stitched'
+            asset_properties['asset_type'] = 'stitched'  # FIXME: select based on range
+            # asset_properties['asset_type'] = 'resampled'
         else:
             if self.registration_processor.was_registered:
                 asset_properties['asset_type'] = 'atlas'
@@ -365,13 +370,19 @@ class TractMapProcessor(TabProcessor):
             else:
                 asset_properties['asset_type'] = 'resampled'
 
+        ws_debug_backup = self.workspace.debug
+        self.workspace.debug = plot_onto_debug
         asset = self.get(**asset_properties)
+        asset_path = asset.path
+
+        self.workspace.debug = cells_from_debug
         df_path = self.get_path('cells', channel=self.channel, extension='.feather')
-        if not asset.exists or not df_path.exists():
+        self.workspace.debug = ws_debug_backup
+        if not asset_path.exists() or not df_path.exists():
             raise MissingRequirementException(f'plot_cells_3d_scatter_w_atlas_colors missing files:'
-                                              f'image: {asset.path} {"not" if not asset.exists else ""} found'
+                                              f'image: {asset_path} {"not" if not asset_path.exists() else ""} found'
                                               f'cells data frame {"not" if not df_path.exists() else ""} found')
-        dv = q_plot_3d.plot(asset.path, title=f'{asset_properties["asset_type"].title()} and cells',  # FIXME: correct scaling for anisotropic if raw
+        dv = q_plot_3d.plot(asset_path, title=f'{asset_properties["asset_type"].title()} and cells',  # FIXME: correct scaling for anisotropic if raw
                            arrange=False, lut='white', parent=parent)[0]
 
         scatter = pg.ScatterPlotItem()
