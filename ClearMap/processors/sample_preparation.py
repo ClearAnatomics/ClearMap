@@ -1097,8 +1097,11 @@ class StitchingProcessor(TabProcessor):
         layout_channel = self.config['channels'][channel]['layout_channel']
         layout = stitching_rigid.load_layout(self.get_path('layout', channel=layout_channel, postfix='placed'))
 
-        ref_asset = self.get('raw', channel=self.sample_manager.alignment_reference_channel)
-        n_slices = len(ref_asset.file_list)  # TODO: find better proxy
+        try:
+            ref_asset = self.get('raw', channel=self.sample_manager.alignment_reference_channel)
+            n_slices = len(ref_asset.file_list)  # TODO: find better proxy
+        except KeyError:
+            n_slices = clearmap_io.shape(self.get('raw', channel=channel).file_list[0])[0]
         self.prepare_watcher_for_substep(n_slices, self.__wobbly_stitching_stitch_re,
                                          'Stitch layout wobbly', True)
         try:
