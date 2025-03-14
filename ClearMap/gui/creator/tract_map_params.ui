@@ -14,6 +14,18 @@
    <string>Form</string>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
+   <property name="leftMargin">
+    <number>0</number>
+   </property>
+   <property name="topMargin">
+    <number>0</number>
+   </property>
+   <property name="rightMargin">
+    <number>0</number>
+   </property>
+   <property name="bottomMargin">
+    <number>0</number>
+   </property>
    <item>
     <widget class="QToolBox" name="toolBox">
      <property name="currentIndex">
@@ -24,8 +36,8 @@
        <rect>
         <x>0</x>
         <y>0</y>
-        <width>622</width>
-        <height>307</height>
+        <width>640</width>
+        <height>330</height>
        </rect>
       </property>
       <attribute name="label">
@@ -102,8 +114,8 @@
        <rect>
         <x>0</x>
         <y>0</y>
-        <width>622</width>
-        <height>307</height>
+        <width>640</width>
+        <height>330</height>
        </rect>
       </property>
       <attribute name="label">
@@ -318,7 +330,7 @@
           <string>Load</string>
          </property>
          <property name="icon">
-          <iconset resource="icons.qrc">
+          <iconset>
            <normaloff>:/icons/icons/folder_open.svg</normaloff>:/icons/icons/folder_open.svg</iconset>
          </property>
         </widget>
@@ -344,8 +356,8 @@
        <rect>
         <x>0</x>
         <y>0</y>
-        <width>622</width>
-        <height>307</height>
+        <width>640</width>
+        <height>330</height>
        </rect>
       </property>
       <attribute name="label">
@@ -411,8 +423,8 @@
        <rect>
         <x>0</x>
         <y>0</y>
-        <width>622</width>
-        <height>307</height>
+        <width>640</width>
+        <height>330</height>
        </rect>
       </property>
       <attribute name="label">
@@ -484,8 +496,8 @@
        <rect>
         <x>0</x>
         <y>0</y>
-        <width>622</width>
-        <height>307</height>
+        <width>640</width>
+        <height>330</height>
        </rect>
       </property>
       <attribute name="label">
@@ -493,45 +505,12 @@
       </attribute>
       <layout class="QGridLayout" name="gridLayout_2">
        <item row="3" column="2">
-        <widget class="QPushButton" name="tractMap3dScatterOnRefPushButton">
-         <property name="toolTip">
-          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Display a scatter of the cell coordinates &lt;/p&gt;&lt;p&gt;on top of the atlas reference (atlas coordinates)&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-         </property>
-         <property name="text">
-          <string> 3D scatter on reference</string>
-         </property>
-        </widget>
-       </item>
-       <item row="2" column="2">
         <widget class="QPushButton" name="tractMapPlotVoxelizationPushButton">
          <property name="toolTip">
           <string>Display the results of the voxelization</string>
          </property>
          <property name="text">
           <string>Plot voxelization</string>
-         </property>
-        </widget>
-       </item>
-       <item row="0" column="1">
-        <widget class="QSpinBox" name="displayDecimationRatioSpinBox">
-         <property name="suffix">
-          <string>px</string>
-         </property>
-         <property name="minimum">
-          <number>1</number>
-         </property>
-         <property name="maximum">
-          <number>1000</number>
-         </property>
-        </widget>
-       </item>
-       <item row="4" column="2">
-        <widget class="QPushButton" name="tractMap3dScatterOnStitchedPushButton">
-         <property name="toolTip">
-          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Display a scatter of the cell coordinates&lt;/p&gt;&lt;p&gt;on top of the stitched image (sample coordinates)&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-         </property>
-         <property name="text">
-          <string>3D scatter on stitched</string>
          </property>
         </widget>
        </item>
@@ -542,10 +521,50 @@
          </property>
         </widget>
        </item>
+       <item row="4" column="2">
+        <widget class="QPushButton" name="tractMap3dScatterOnRefPushButton">
+         <property name="toolTip">
+          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Display a scatter of the cell coordinates &lt;/p&gt;&lt;p&gt;on top of the atlas reference (atlas coordinates)&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+         </property>
+         <property name="text">
+          <string> 3D scatter on reference</string>
+         </property>
+        </widget>
+       </item>
        <item row="1" column="0">
         <widget class="QCheckBox" name="tractMapDebugCheckBox">
          <property name="text">
           <string>debug</string>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="1">
+        <widget class="QSpinBox" name="displayDecimationRatioSpinBox">
+         <property name="suffix">
+          <string>pt</string>
+         </property>
+         <property name="minimum">
+          <number>1</number>
+         </property>
+         <property name="maximum">
+          <number>1000</number>
+         </property>
+        </widget>
+       </item>
+       <item row="5" column="2">
+        <widget class="QPushButton" name="tractMap3dScatterOnStitchedPushButton">
+         <property name="toolTip">
+          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Display a scatter of the cell coordinates&lt;/p&gt;&lt;p&gt;on top of the stitched image (sample coordinates)&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+         </property>
+         <property name="text">
+          <string>3D scatter on stitched</string>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="0">
+        <widget class="QCheckBox" name="tractMapTargetDebugCheckBox">
+         <property name="text">
+          <string>plot onto debug</string>
          </property>
         </widget>
        </item>
@@ -555,8 +574,6 @@
    </item>
   </layout>
  </widget>
- <resources>
-  <include location="icons.qrc"/>
- </resources>
+ <resources/>
  <connections/>
 </ui>

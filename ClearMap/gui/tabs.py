@@ -1521,28 +1521,32 @@ class TractMapTab(PostProcessingTab):
 
     def run_tract_map(self, channel, tuning=False):
         processor = self.tract_mappers[channel]
-        self.wrap_step('Running tract map', processor.run_pipeline,
-                       step_kw_args={'tuning': tuning},
-                       abort_func=processor.stop_process)
+        if tuning:
+            status_backup = processor.workspace.debug
+            processor.workspace.debug = True
+        # self.wrap_step('Running tract map', processor.run_pipeline,
+        #                step_kw_args={'tuning': tuning},
+        #                abort_func=processor.stop_process)
+        self.run_channel(channel, tuning=tuning)
         if processor.stopped:
             return
         if tuning:
-            status_backup = processor.workspace.debug
-            processor.workspace.debug = tuning
-            self.plot_tract_map_results(channel)
             processor.workspace.debug = status_backup
 
 
     def binarize_channel(self, channel):
         processor = self.tract_mappers[channel]
-        self.wrap_step('Binarization', processor.binarize_channel,
+        self.wrap_step('Binarization', processor.binarize,
+                       step_args=self.params[channel].clip_range,
                        abort_func=processor.stop_process)
 
-    def extract_coordinates(self, channel):
+    def extract_coordinates(self, channel, tuning):
         processor = self.tract_mappers[channel]
         self.wrap_step('Extracting coordinates', processor.mask_to_coordinates,
                        step_kw_args={'as_memmap': True},
                        abort_func=processor.stop_process)
+        if tuning:
+            processor.shift_coordinates()
 
     def transform_coordinates(self, channel):
         processor = self.tract_mappers[channel]
@@ -1557,16 +1561,18 @@ class TractMapTab(PostProcessingTab):
     def export_df(self, channel):
         processor = self.tract_mappers[channel]
         self.wrap_step('Exporting coordinates', processor.export_df,
+                       step_kw_args={'asset_sub_type': None},
                        abort_func=processor.stop_process)
 
-    def run_channel(self, channel):  # FIXME: missing calls to wrap step
+    def run_channel(self, channel, tuning):  # FIXME: missing calls to wrap step
         self.params.ui_to_cfg()
         params = self.params[channel]
         processor = self.tract_mappers[channel]
+        processor.reload_config()
         if params.binarize:
             self.binarize_channel(channel)
         if params.extract_coordinates:
-            self.extract_coordinates(channel)  # mask_to_coordinates
+            self.extract_coordinates(channel, tuning=tuning)  # mask_to_coordinates
         if params.transform_coordinates:
             self.transform_coordinates(channel)
         if params.label_coordinates:
@@ -1597,6 +1603,7 @@ class TractMapTab(PostProcessingTab):
         processor = self.tract_mappers[channel]
         self.wrap_step('Creating tuning sample', processor.create_test_dataset,
                        step_kw_args={'slicing': self.params[channel].slicing}, nested=False)
+        self.sample_manager.workspace.debug = False  # FIXME
 
 
     def plot_tract_map_results(self, channel):
@@ -1605,12 +1612,11 @@ class TractMapTab(PostProcessingTab):
     def plot_labeled_cells_scatter(self, channel, raw=False):
         self.main_window.clear_plots()
         tract_mapper = self.tract_mappers[channel]
-        status = self.ui.channelsParamsTabWidget.get_channel_widget(channel).tractMapDebugCheckBox.isChecked()
-        backup_status = self.sample_manager.workspace.debug
-        self.sample_manager.workspace.debug = status
-        self.wrap_plot(tract_mapper.plot_cells_3d_scatter_w_atlas_colors, raw=raw)
-        self.sample_manager.workspace.debug = backup_status
-
+        cells_source_is_debug = self.ui.channelsParamsTabWidget.get_channel_widget(channel).tractMapDebugCheckBox.isChecked()
+        cells_target_is_debug = self.ui.channelsParamsTabWidget.get_channel_widget(channel).tractMapTargetDebugCheckBox.isChecked()
+        self.wrap_plot(tract_mapper.plot_cells_3d_scatter_w_atlas_colors, raw=raw,
+                       cells_from_debug=cells_source_is_debug,
+                       plot_onto_debug=cells_target_is_debug)
 
 
 ################################################################################################
