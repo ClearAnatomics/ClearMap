@@ -774,7 +774,7 @@ class RegistrationTab(PreProcessingTab):
                                                f'Resampled files exist for {channel}, do you want to: ',
                                                ['Delete and retry', 'Skip resampling and continue'])
                     if option_idx == 0:
-                        self.sample_manager.delete_resampled_files()
+                        self.sample_manager.delete_resampled_files(channel)
                         self.wrap_step(f'Resampling {channel} for registration', self.aligner.resample_channel,
                                        step_kw_args={'channel': channel, 'increment_main': (i != 0)})
                     else:
