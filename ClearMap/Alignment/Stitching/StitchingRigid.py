@@ -1431,7 +1431,7 @@ class Layout(SourceRegion, src.AbstractSource):
     self.change_sources(sources);
 
   
-  def replace_source_location(self, match, replace, method='expression', source_dir=''):
+  def replace_source_location(self, match, replace, method='expression'):
     """Change the sources to point to a new location.
       
     Arguments
@@ -1445,8 +1445,8 @@ class Layout(SourceRegion, src.AbstractSource):
         - list (default if match, and replace are list[str])
         - expressions ("expression") or just
         - raw strings to replace ("replace").
-    source_dir: str
-        The source directory to use for relative path matching.
+        - 'infer' will parse the expression of the current locations,
+        set it as match and revert to expression
       
     Note
     ----
@@ -1454,6 +1454,16 @@ class Layout(SourceRegion, src.AbstractSource):
     using the same alignments.
     """
     initial_locations = [s.location for s in self.sources]
+
+    if match is None or method == 'infer':
+      from ClearMap.IO.metadata import PatternFinder
+      df = PatternFinder.file_list_to_df(initial_locations)
+      pattern = PatternFinder.pattern_from_df(df)
+      axes = te.Expression(replace).tag_names()
+      pattern.set_axes_names(axes)
+      match = str(pattern)
+      method = 'expression'
+
     if isinstance(match, list) and isinstance(replace, list):
       if len(match) != len(replace):
         raise ValueError('Match and replace lists length do not match')
@@ -1463,7 +1473,7 @@ class Layout(SourceRegion, src.AbstractSource):
         if loc != old:
           raise ValueError(f"Source nb {i} does not match pattern {old}")
         self.sources[i].location = new
-    elif method == 'expression':  # FIXME: raise exception if we did not actually replace anything
+    elif method == 'expression':
       locations = [s.location for s in self._sources]
       for l in locations:
         if not isinstance(l, str):
@@ -1474,14 +1484,6 @@ class Layout(SourceRegion, src.AbstractSource):
       
       e_match = te.Expression(match)
       e_replace = te.Expression(replace)
-      absolute_mode = bool(e_match.values(locations[0]))
-      if not absolute_mode:  # match does not match existing locations. Try relative path
-        match = str(Path(match).relative_to(source_dir))
-        old_dir = locations[0].replace(te.Expression(match).string({'X':0, 'Y':0}), '')  # Blindly trying to replace X and Y
-        match = str(Path(old_dir) / match)
-        e_match = te.Expression(match)
-        if not e_match.values(locations[0]):
-          raise ValueError(f'The pattern {match} does not match any of the {locations=}')
       for s, l in zip(self.sources, locations):
         values = e_match.values(l)
         if values:

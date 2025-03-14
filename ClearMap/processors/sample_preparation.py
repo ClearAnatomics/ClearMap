@@ -576,7 +576,6 @@ class RegistrationProcessor(TabProcessor):
         aligned = self.get_elx_asset('aligned', channel=channel)
         return aligned.all_existing_paths(sort=True)[-1]  # The last step is the final result
 
-
     def resample_channel(self, channel, increment_main=False):  # set increment_main to True for channels > 0
         resampled_asset = self.get('resampled', channel=channel)
         if resampled_asset.exists:
@@ -1103,16 +1102,11 @@ class StitchingProcessor(TabProcessor):
             channel_asset = self.get('raw', channel=channel)
             if layout_channel != channel:
                 layout_extension = Path(layout.sources[0].location).suffix  # Use the actual extension that was used
-                if layout_extension == '.npy':
-                    layout_pattern = layout_channel_asset.with_extension(extension='.npy')
-                else:
-                    layout_pattern = layout_channel_asset.path
                 if self.sample_manager.use_npy(channel):  # FIXME: check if we need to copy layout first
                     channel_pattern = channel_asset.with_extension(extension='.npy')
                 else:
                     channel_pattern = channel_asset.path
-                layout.replace_source_location(str(layout_pattern), str(channel_pattern),
-                                               source_dir=self.workspace.directory)
+                layout.replace_source_location(None, str(channel_pattern), method='infer')
             stitching_wobbly.stitch_layout(layout,
                                            sink=str(self.get_path('stitched', channel=channel)),
                                            method='interpolation',
