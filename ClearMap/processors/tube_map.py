@@ -138,16 +138,19 @@ class BinaryVesselProcessor(TabProcessor):
 
             self.set_progress_watcher(self.sample_manager.progress_watcher)
 
-            self.all_vessels_channel = [c for c, v in self.sample_config['channels'].items() if v['data_type'] == 'vessels'][0]  # FIXME: extract ??
+            vessels_channels = [c for c, v in self.sample_config['channels'].items() if v['data_type'] == 'vessels']
+            self.all_vessels_channel = vessels_channels[0] if vessels_channels else '' # FIXME: extract ??
             if not self.all_vessels_channel:
-                raise ValueError('Vessels channel not set')
-            art_chanels = [c for c, v in self.sample_config['channels'].items() if v['data_type'] == 'arteries']  # FIXME: extract ??
-            if len(art_chanels) > 1:
+                warnings.warn('Vessels channel not set')
+                return
+            art_channels = [c for c, v in self.sample_config['channels'].items() if v['data_type'] == 'arteries']  # FIXME: extract ??
+            if len(art_channels) > 1:
                 raise ValueError('Multiple arteries channels found')
-            self.arteries_channel = art_chanels[0] if art_chanels else ''
+            self.arteries_channel = art_channels[0] if art_channels else ''
 
             self.assert_input_shapes_match()
 
+            # FIXME: dynamic as function of what is found
             self.steps = {
                 'all_vessels': BinaryVesselProcessorSteps(self.workspace, channel=self.all_vessels_channel),
                 'arteries': BinaryVesselProcessorSteps(self.workspace, channel=self.arteries_channel),
