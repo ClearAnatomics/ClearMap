@@ -27,7 +27,7 @@ from ClearMap.gui.gui_utils import surface_project, setup_mini_brain
 matplotlib.use('Qt5Agg')
 
 import ClearMap.Settings as settings
-from ClearMap.Utils.utilities import check_stopped
+from ClearMap.Utils.utilities import check_stopped, runs_on_ui
 from ClearMap.config.atlas import ATLAS_NAMES_MAP
 from ClearMap.processors.generic_tab_processor import TabProcessor, CanceledProcessing
 # noinspection PyPep8Naming
@@ -582,36 +582,36 @@ class RegistrationProcessor(TabProcessor):
 
     def resample_channel(self, channel, increment_main=False):  # set increment_main to True for channels > 0
         resampled_asset = self.get('resampled', channel=channel)
+        if not runs_on_ui() and resampled_asset.exists:
+            resampled_asset.delete()
         if resampled_asset.exists:
             raise FileExistsError(f'Resampled asset ({resampled_asset}) already exists')
         default_resample_parameter = {
             'processes': self.machine_config['n_processes_resampling'],
             'verbose': self.config['verbose']
         }  # WARNING: duplicate (use method ??)
-        clearmap_io.delete_file(resampled_asset.path)  # TODO: asset.delete() if exists
-        source = self.get('stitched', channel=channel, default=None)
-        source = source if source else self.get('raw', channel)
-        if not source.exists:
-            raise FileNotFoundError(f'Cannot resample {channel}, source {source} missing')
+        source_asset = self.get('stitched', channel=channel, default=None)
+        source_asset = source_asset if source_asset else self.get('raw', channel)
+        if not source_asset.exists:
+            raise FileNotFoundError(f'Cannot resample {channel}, source {source_asset} missing')
 
-        if source.is_tiled:
-            src_res = define_auto_resolution(source.file_list[0], self.sample_manager.config['channels'][channel]['resolution'])
+        if source_asset.is_tiled:
+            src_res = define_auto_resolution(source_asset.file_list[0], self.sample_manager.config['channels'][channel]['resolution'])
         else:
             src_res = self.sample_manager.config['channels'][channel]['resolution']
 
-        if source.is_tiled:
-            if 'Z' in source.tag_names:
-                n_planes = source.expression.tag_range('Z')[1] + 1
+        if source_asset.is_tiled:
+            if 'Z' in source_asset.tag_names:
+                n_planes = source_asset.expression.tag_range('Z')[1] + 1
             else:
-                n_planes = clearmap_io.shape(source.file_list[0])[0]
+                n_planes = clearmap_io.shape(source_asset.file_list[0])[0]
         else: # Stacked or single file, take the first dimension of the asset
-            n_planes = source.shape[0]
+            n_planes = source_asset.shape()[0]
 
         self.prepare_watcher_for_substep(n_planes, self.__resample_re, f'Resampling {channel}',
                                          increment_main=increment_main)
 
-        resampled_asset = self.get('resampled', channel=channel)
-        result = resampling.resample(str(source.path), resampled=str(resampled_asset.path),
+        result = resampling.resample(str(source_asset.path), resampled=str(resampled_asset.path),
                                      original_resolution=src_res,
                                      resampled_resolution=self.config['channels'][channel]['resampled_resolution'],
                                      workspace=self.workspace,
