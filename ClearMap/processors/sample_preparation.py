@@ -485,6 +485,8 @@ class RegistrationProcessor(TabProcessor):
                     self.workspace.asset_collections[channel][asset_type] = parametrized_asset
 
     def add_pipeline(self):  # WARNING: hacky
+        if self.workspace is None:
+            return
         for channel in self.config['channels']:
             try:
                 self.get('aligned', channel=channel)
