@@ -337,11 +337,10 @@ class SampleManager(TabProcessor):
                 return channel
         return
 
-    def delete_resampled_files(self):
-        for channel in self.registration_cfg['channels'].keys():
-            asset = self.get('resampled', channel=channel)
-            if asset.exists:
-                asset.delete()
+    def delete_resampled_files(self, channel):
+        asset = self.get('resampled', channel=channel)
+        if asset.exists:
+            asset.delete()
 
     def stitched_shape(self, channel):
         asset = self.get('stitched', channel=channel, sample_id=self.prefix)
