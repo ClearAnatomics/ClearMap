@@ -405,7 +405,7 @@ class Source(src.VirtualSource):
   
   @property
   def array(self):
-    return self._getitem__(slice(None));
+    return self.__getitem__(slice(None));
   
   
   
