@@ -124,7 +124,6 @@ from qdarkstyle import DarkPalette
 from ClearMap.config.atlas import ATLAS_NAMES_MAP, STRUCTURE_TREE_NAMES_MAP
 
 import ClearMap.IO.IO as clm_io
-from ClearMap.Alignment import Annotation as annotation
 from ClearMap.Analysis.Statistics.group_statistics import make_summary, density_files_are_comparable, compare_groups, \
     check_ids_are_unique
 from ClearMap.Utils.exceptions import ClearMapVRamException, GroupStatsError, MissingRequirementException
@@ -1504,8 +1503,8 @@ class TractMapTab(PostProcessingTab):
             ('tractMapPreviewPushButton', self.run_tuning_tract_map),
             ('runTractMapPushButton', self.run_tract_map),
             ('tractMapPlotVoxelizationPushButton', self.plot_tract_map_results),
-            ('tractMap3dScatterOnRefPushButton', functools.partial(self.plot_labeled_cells_scatter, raw=False)),
-            ('tractMap3dScatterOnStitchedPushButton', functools.partial(self.plot_labeled_cells_scatter, raw=True)),
+            ('tractMap3dScatterOnRefPushButton', functools.partial(self.plot_labeled_tracts_scatter, raw=False)),
+            ('tractMap3dScatterOnStitchedPushButton', functools.partial(self.plot_labeled_tracts_scatter, raw=True)),
             # TODO: self.voxelize
         ]
         for btn_name, func in buttons_functions:
@@ -1592,7 +1591,7 @@ class TractMapTab(PostProcessingTab):
 
     def plot_debug_cropping_interface(self, channel):
         """
-        Plot the orthoslicer to select a subset of the sample to perform cell detections
+        Plot the orthoslicer to select a subset of the sample to perform tracts detections
         tests on
         """
         self.plot_slicer('detectionSubset', self.ui.channelsParamsTabWidget.get_channel_widget(channel),
@@ -1609,14 +1608,14 @@ class TractMapTab(PostProcessingTab):
     def plot_tract_map_results(self, channel):
         self.wrap_plot(self.tract_mappers[channel].plot_voxelized_counts)
 
-    def plot_labeled_cells_scatter(self, channel, raw=False):
+    def plot_labeled_tracts_scatter(self, channel, raw=False):
         self.main_window.clear_plots()
         tract_mapper = self.tract_mappers[channel]
-        cells_source_is_debug = self.ui.channelsParamsTabWidget.get_channel_widget(channel).tractMapDebugCheckBox.isChecked()
-        cells_target_is_debug = self.ui.channelsParamsTabWidget.get_channel_widget(channel).tractMapTargetDebugCheckBox.isChecked()
-        self.wrap_plot(tract_mapper.plot_cells_3d_scatter_w_atlas_colors, raw=raw,
-                       cells_from_debug=cells_source_is_debug,
-                       plot_onto_debug=cells_target_is_debug)
+        coords_source_is_debug = self.ui.channelsParamsTabWidget.get_channel_widget(channel).tractMapDebugCheckBox.isChecked()
+        coords_target_is_debug = self.ui.channelsParamsTabWidget.get_channel_widget(channel).tractMapTargetDebugCheckBox.isChecked()
+        self.wrap_plot(tract_mapper.plot_tracts_3d_scatter_w_atlas_colors, raw=raw,
+                       coordinates_from_debug=coords_source_is_debug,
+                       plot_onto_debug=coords_target_is_debug)
 
 
 ################################################################################################

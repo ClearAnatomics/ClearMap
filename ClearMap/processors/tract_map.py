@@ -305,7 +305,7 @@ class TractMapProcessor(TabProcessor):
 
         self.workspace.debug = False
 
-    def export_df(self, asset_sub_type='fake'):  # FIXME: find other name than cells and add to constants
+    def export_df(self, asset_sub_type=None):
         ratio = self.processing_config['display']['decimation_ratio']
         decimated_coordinates_raw = self.get(
             'binary', channel=self.channel, asset_sub_type='pixels_raw').as_source()[::ratio, :]
@@ -331,13 +331,10 @@ class TractMapProcessor(TabProcessor):
         color_map[0] = np.array((1, 0, 0))  # default to red
         df['color'] = df['id'].map(color_map)
 
-        # WARNING: asset_sub_type is "fake" because it is not really cells.
-        #  Rename to tract_coords or something
-        #  and make sure to use it in the plots
-        df.to_feather(self.get_path('cells', channel=self.channel,
+        df.to_feather(self.get_path('tract_voxels', channel=self.channel,
                                     asset_sub_type=asset_sub_type, extension='.feather'))
         self.update_watcher_main_progress()
-        print('TractMap "cells" DF exported')
+        print('TractMap DF exported')
         return df
 
     def voxelize(self):
@@ -358,7 +355,7 @@ class TractMapProcessor(TabProcessor):
         self.update_watcher_main_progress()
         print('TractMap voxelization finished')
 
-    def plot_cells_3d_scatter_w_atlas_colors(self, raw=False, cells_from_debug=False, plot_onto_debug=False, parent=None):
+    def plot_tracts_3d_scatter_w_atlas_colors(self, raw=False, coordinates_from_debug=False, plot_onto_debug=False, parent=None):
         asset_properties = {'channel': self.channel}
         if raw:
             asset_properties['asset_type'] = 'stitched'  # FIXME: select based on range
@@ -375,14 +372,15 @@ class TractMapProcessor(TabProcessor):
         asset = self.get(**asset_properties)
         asset_path = asset.path
 
-        self.workspace.debug = cells_from_debug
-        df_path = self.get_path('cells', channel=self.channel, extension='.feather')
+        self.workspace.debug = coordinates_from_debug
+        df_path = self.get_path('tract_voxels', channel=self.channel, extension='.feather')
         self.workspace.debug = ws_debug_backup
         if not asset_path.exists() or not df_path.exists():
-            raise MissingRequirementException(f'plot_cells_3d_scatter_w_atlas_colors missing files:'
+            raise MissingRequirementException(f'plot_3d_scatter_w_atlas_colors missing files:'
                                               f'image: {asset_path} {"not" if not asset_path.exists() else ""} found'
-                                              f'cells data frame {"not" if not df_path.exists() else ""} found')
-        dv = q_plot_3d.plot(asset_path, title=f'{asset_properties["asset_type"].title()} and cells',  # FIXME: correct scaling for anisotropic if raw
+                                              f'tract voxels data frame {"not" if not df_path.exists() else ""} found')
+        # FIXME: correct scaling for anisotropic if raw
+        dv = q_plot_3d.plot(asset_path, title=f'{asset_properties["asset_type"].title()} and tracts coordinates',
                            arrange=False, lut='white', parent=parent)[0]
 
         scatter = pg.ScatterPlotItem()

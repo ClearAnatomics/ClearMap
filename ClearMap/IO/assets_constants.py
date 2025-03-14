@@ -117,7 +117,13 @@ CHANNELS_ASSETS_TYPES_CONFIG = {
     'cells': {
         'file_format_category': 'table',
         'resource_type': 'results',
-        'relevant_pipelines': ['CellMap', 'TractMap'],  # TODO: tune relevance for subsets
+        'relevant_pipelines': ['CellMap'],  # TODO: tune relevance for subsets
+        'sub_types': ['raw', 'filtered', 'shape']
+    },
+    'tract_voxels': {
+        'file_format_category': 'table',
+        'resource_type': 'results',
+        'relevant_pipelines': ['TractMap'],
         'sub_types': ['raw', 'filtered', 'shape']
     },
     'cells_stats': {
