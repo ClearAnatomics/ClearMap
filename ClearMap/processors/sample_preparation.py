@@ -902,8 +902,7 @@ class StitchingProcessor(TabProcessor):
                         stack.append(ch)
             return tree
 
-        def tree_is_stitchable(tree, strict):
-            root_channel = tree[0]
+        def tree_is_stitchable(root_channel, strict):
             cfg = self.config['channels'].get(root_channel)
             has_layout = self.get('layout', channel=root_channel, asset_sub_type='placed').exists
             if not (cfg['run'] or has_layout):
@@ -913,6 +912,8 @@ class StitchingProcessor(TabProcessor):
                     raise ValueError(msg)
                 else:
                     warnings.warn(msg, stacklevel=2)
+                return False
+            return True
 
         for root in root_channels:
             if not tree_is_stitchable(root, strict):
