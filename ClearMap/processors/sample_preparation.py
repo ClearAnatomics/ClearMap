@@ -139,7 +139,10 @@ class SampleManager(TabProcessor):
     def rename_channels(self, names_map):
         for old_name, new_name in names_map:
             if new_name != old_name:
-                self.config['channels'][new_name] = self.config['channels'].pop(old_name)
+                if old_name not in self.config['channels'] and new_name in self.config['channels']:
+                    pass
+                else:
+                    self.config['channels'][new_name] = self.config['channels'].pop(old_name)
                 if old_name in self.workspace.asset_collections:
                     self.workspace.asset_collections[new_name] = self.workspace.asset_collections.pop(old_name)
                     self.workspace.asset_collections[new_name].channel_spec.name = new_name
@@ -484,7 +487,7 @@ class RegistrationProcessor(TabProcessor):
                     parametrized_asset = asset.specify({'moving_channel': moving_channel, 'fixed_channel': fixed_channel})
                     self.workspace.asset_collections[channel][asset_type] = parametrized_asset
 
-    def add_pipeline(self):  # WARNING: hacky
+    def add_pipeline(self):  # WARNING: hacky. Maybe add_pipeline_if_missing
         if self.workspace is None:
             return
         for channel in self.config['channels']:
