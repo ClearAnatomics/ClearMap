@@ -7,7 +7,6 @@ import numpy as np
 cimport numpy as np
 from libcpp.map cimport map as cpp_map
 from libcpp.vector cimport vector as cpp_vector
-# from libcpp.array cimport array as cpp_array
 
 
 ctypedef fused source_int_t:
@@ -19,40 +18,22 @@ ctypedef fused source_int_t:
 
 ctypedef Py_ssize_t index_t
 
-# ctypedef unsigned long long ull
+
+# Define inline C-level min and max functions. These will be inlined by the C compiler for maximum speed.
+cdef inline source_int_t c_min(source_int_t a, source_int_t b):
+    return a if a < b else b
+
+cdef inline source_int_t c_max(source_int_t a, source_int_t b):
+    return a if a > b else b
 
 
-# cdef struct Point:
-#     ull x
-#     ull y
-#     ull z
-
-
-# cpdef find_values_coordinates(np.ndarray[source_int_t, ndim=3] arr):
-#     cdef cpp_map[source_int_t, cpp_vector[Point]] result
-#     cdef index_t i, j, k
-#     cdef source_int_t value
-
-#     cdef index_t dim1 = arr.shape[0]
-#     cdef index_t dim2 = arr.shape[1]
-#     cdef index_t dim3 = arr.shape[2]
-
-#     with cython.boundscheck(False), cython.wraparound(False):
-#         for i in range(dim1):
-#             for j in range(dim2):
-#                 for k in range(dim3):
-#                     value = arr[i, j, k]
-#                     if not result.count(value):
-#                         result[value] = cpp_vector[Point]()
-#                     result[value].push_back(Point(i, j, k))
-#     return result
-
-
-cpdef bbox_3d(np.ndarray[source_int_t, ndim=3] img):
+cpdef bbox_3d(np.ndarray[source_int_t, ndim=3] img_):
+    cdef source_int_t[:, :, :]img = img_
     cdef source_int_t n_labels = img.max() + 1  # WARNING: because +1 if max, could overflow
     # what we do for zero could be done for any axis
-    cdef np.ndarray[np.uint32_t, ndim=3] res = np.empty((n_labels, 3, 2), dtype='uint32')
-    cdef index_t i, j, k
+    cdef np.ndarray[np.uint32_t, ndim=3] res_ = np.empty((n_labels, 3, 2), dtype='uint32')
+    cdef np.uint32_t[:,:,:] res = res_
+    cdef index_t i, j, k, axis
 
     cdef index_t shape[3]
     cdef index_t max_shape = 0
@@ -65,6 +46,7 @@ cpdef bbox_3d(np.ndarray[source_int_t, ndim=3] img):
 
     cdef source_int_t val
     cdef index_t coordinates[3]
+    cdef index_t coord_val = 0
     with cython.boundscheck(False), cython.wraparound(False):
         for i in range(shape[0]):
             for j in range(shape[1]):
@@ -74,16 +56,19 @@ cpdef bbox_3d(np.ndarray[source_int_t, ndim=3] img):
                     coordinates[2] = k   # TODO: check if we could do a one liner without loosing performance
                     val = img[i, j, k]
                     for axis in range(3):
-                        res[val, axis, 0] = min(coordinates[axis], res[val, axis, 0])
-                        res[val, axis, 1] = max(coordinates[axis], res[val, axis, 1])
+                        coord_val = coordinates[axis]
+                        res[val, axis, 0] = c_min(coord_val, res[val, axis, 0])
+                        res[val, axis, 1] = c_max(coord_val, res[val, axis, 1])
     return res
 
 
-cpdef bbox_2d(np.ndarray[source_int_t, ndim=2] img):
+cpdef bbox_2d(np.ndarray[source_int_t, ndim=2] img_):
+    cdef source_int_t[:, :] img = img_
     cdef source_int_t n_labels = img.max() + 1  # WARNING: because +1 if max, could overflow
     # what we do for zero could be done for any axis
-    cdef np.ndarray[np.uint32_t, ndim=3] res = np.empty((n_labels, 2, 2), dtype='uint32')
-    cdef index_t i, j
+    cdef np.ndarray[np.uint32_t, ndim=3] res_ = np.empty((n_labels, 2, 2), dtype='uint32')
+    cdef np.uint32_t[:,:,:] res = res_
+    cdef index_t i, j, axis
 
     cdef index_t shape[2]
     cdef index_t max_shape = 0
@@ -96,6 +81,7 @@ cpdef bbox_2d(np.ndarray[source_int_t, ndim=2] img):
 
     cdef source_int_t val
     cdef index_t coordinates[2]
+    cdef index_t coord_val = 0
     with cython.boundscheck(False), cython.wraparound(False):
         for i in range(shape[0]):
             for j in range(shape[1]):
@@ -103,17 +89,20 @@ cpdef bbox_2d(np.ndarray[source_int_t, ndim=2] img):
                 coordinates[1] = j
                 val = img[i, j]
                 for axis in range(2):
-                    res[val, axis, 0] = min(coordinates[axis], res[val, axis, 0])
-                    res[val, axis, 1] = max(coordinates[axis], res[val, axis, 1])
+                    coord_val = coordinates[axis]
+                    res[val, axis, 0] = c_min(coord_val, res[val, axis, 0])
+                    res[val, axis, 1] = c_max(coord_val, res[val, axis, 1])
     return res
 
 
 
-cpdef bbox_1d(np.ndarray[source_int_t, ndim=1] img):
+cpdef bbox_1d(np.ndarray[source_int_t, ndim=1] img_):
+    cdef source_int_t[:] img = img_
     cdef source_int_t n_labels = img.max() + 1  # WARNING: because +1 if max, could overflow
     # what we do for zero could be done for any axis
-    cdef np.ndarray[np.uint32_t, ndim=3] res = np.empty((n_labels, 1, 2), dtype='uint32')
-    cdef index_t i, j
+    cdef np.ndarray[np.uint32_t, ndim=3] res_ = np.empty((n_labels, 1, 2), dtype='uint32')
+    cdef np.uint32_t[:,:,:] res = res_
+    cdef index_t i, j, axis
 
     cdef index_t shape[1]
     cdef index_t max_shape = 0
@@ -126,11 +115,13 @@ cpdef bbox_1d(np.ndarray[source_int_t, ndim=1] img):
 
     cdef source_int_t val
     cdef index_t coordinates[1]
+    cdef index_t coord_val = 0
     with cython.boundscheck(False), cython.wraparound(False):
         for i in range(shape[0]):
-                coordinates[0] = i
-                val = img[i]
-                for axis in range(2):
-                    res[val, axis, 0] = min(coordinates[axis], res[val, axis, 0])
-                    res[val, axis, 1] = max(coordinates[axis], res[val, axis, 1])
+            coordinates[0] = i
+            val = img[i]
+            axis = 0
+            coord_val = coordinates[axis]
+            res[val, axis, 0] = c_min(coord_val, res[val, axis, 0])
+            res[val, axis, 1] = c_max(coord_val, res[val, axis, 1])
     return res
