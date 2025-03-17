@@ -1,9 +1,6 @@
 # Copyright Gaël Cousin & Charly Rousseau
 from __future__ import annotations
 
-import cProfile
-import tempfile
-
 import numpy as np
 import pandas as pd
 from sklearn import neighbors
@@ -11,7 +8,7 @@ from sklearn import neighbors
 from . import channel
 
 
-from ..IO import IO as io
+from ClearMap.IO import IO as io
 
 import ClearMap.ParallelProcessing.BlockProcessing as blockprocessing
 import ClearMap.ParallelProcessing.Block as block
