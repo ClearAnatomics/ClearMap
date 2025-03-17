@@ -1,15 +1,10 @@
 import sys
 import numpy as np
 import pandas as pd
-import skimage
-import skimage.measure
 
 sys.path.insert(0, "ClearMap2")
 
-from ClearMap.colocalization.channel import Channel
-from ClearMap.colocalization.channel import _naive_bilabel_bincount
-
-from ClearMap.IO.IO import source
+from ClearMap.Analysis.colocalization import Channel
 
 shape = (20, 20)
 binary_1 = np.zeros(shape, dtype="uint8")
