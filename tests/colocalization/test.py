@@ -4,10 +4,10 @@ import numpy as np
 
 sys.path.insert(0, "ClearMap2")
 from ClearMap.Analysis.Measurements.maxima_detection import label_representatives
-from ClearMap.colocalization.channel import bilabel_bincount
-from ClearMap.colocalization.channel import _naive_bilabel_bincount
+from ClearMap.Analysis.colocalization import bilabel_bincount
+from ClearMap.Analysis.colocalization import _naive_bilabel_bincount
 
-from ClearMap.colocalization.channel import distances
+from ClearMap.Analysis.colocalization import distances
 
 
 ### for label_representatives
