@@ -118,13 +118,13 @@ def bilabel_bincount(labels_1: np.array, labels_2: np.array) -> np.array:
 
 
 # for comparison/test purposes
-def _naive_bilabel_bincount(A, B):
-    m = A.max() + 1
-    n = B.max() + 1
+def _naive_bilabel_bincount(arr_a, arr_b):
+    m = arr_a.max() + 1
+    n = arr_b.max() + 1
     res = np.zeros((m, n), dtype="uint8")
     for i in range(m):
         for j in range(n):
-            res[i, j] = np.count_nonzero((A == i) * (B == j))
+            res[i, j] = np.count_nonzero((arr_a == i) * (arr_b == j))
     return res
 
 
@@ -369,8 +369,8 @@ class Channel:
 
         Returns
         -------
-        list[int]
-            The list of sizes of nuclei in the order of our dataframe.
+        np.ndarray
+            The 1D array of sizes of nuclei (ints) in the order of our dataframe.
         """
         return np.bincount(self.labels().flatten())[self.index_label_correspondence]
 
@@ -444,14 +444,18 @@ class Channel:
             self._set_blobwise_overlaps(other_channel)
             return self._overlaps_dic[other_channel.name]
 
-    def max_blobwise_overlaps(self, other_channel: Channel, return_max_indices=True) -> np.ndarray:
+    def max_blobwise_overlaps(self, other_channel: Channel, return_max_indices: bool = True) -> (
+            np.ndarray | tuple[np.ndarray, np.ndarray]):
         """For each nucleus of self, compute the max overlap with a single nucleus of other_channel.
             if return_max_indices is True, nuclei indices that realize the max are also returned.
 
         Parameters
         ----------
-        other_channel : Channel
+        other_channel: Channel
             channel to compare with self
+        return_max_indices: bool
+            whether to return the indices of the nuclei of other_channel that realize the maxima (i.e. argmax).
+             (default True)
 
         Returns
         -------
@@ -477,14 +481,18 @@ class Channel:
         else:
             return np.max(counts, axis=1)
 
-    def max_blobwise_overlap_rates(self, other_channel: Channel, return_max_indices=True) -> np.ndarray:
+    def max_blobwise_overlap_rates(self, other_channel: Channel, return_max_indices: bool = True) -> (
+            np.ndarray | tuple[np.ndarray, np.ndarray]):
         """For each nucleus of self, compute the max overlap rate with a single nucleus of other_channel.
             if return_max_indices is True, nuclei indices that realize the max are also returned.
 
         Parameters
         ----------
-        other_channel : Channel
+        other_channel: Channel
             channel to compare with self
+        return_max_indices: bool
+            Whether to return the indices of the nuclei of other_channel that realize the maxima (i.e. argmax).
+                (default True)
 
         Returns
         -------
@@ -524,8 +532,10 @@ class Channel:
 
         return distances(physical_centers_1, physical_centers_2)
 
-    def closest_center_distances(self, other_channel: Channel, return_min_indices=True) -> np.ndarray:
-        """Return the distances to the closest centers in other.
+    def closest_center_distances(self, other_channel: Channel, return_min_indices=True) -> (
+            np.ndarray | tuple[np.ndarray, np.ndarray]):
+        """
+        Return the distances to the closest centers in `other_channel` for each center in `self`.
 
         Parameters
         ----------
