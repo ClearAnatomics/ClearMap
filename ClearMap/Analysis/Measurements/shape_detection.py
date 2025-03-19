@@ -22,6 +22,7 @@ __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
+import sys
 
 import numpy as np
 
@@ -41,36 +42,8 @@ from ClearMap.Utils.exceptions import ClearMapValueError
 ##############################################################################
 
 # version for python >=3.11
-# def labeled_pixels_from_centers(centers,weights,shape):
-#     """label the pixels specify by the centers with the weights.
-
-#     Parameters
-#     ----------
-#     centers : np.ndarray
-#         (n_points,dim) array with points coords, its dtype is the one of weights
-#     weights : np.ndarray
-#         (n_points,) shaped array
-#     shape : tuple
-#         the shape of the output array.
-#     """
-
-#     if centers.shape[0]!=weights.shape[0]:
-#         raise ValueError("The number of weights must equal the number of points.")
-    
-#     if len(shape)!=centers.shape[1]:
-#         raise ValueError("Received shape, points with points.shape[1] != len(shape) ")
-    
-#     B = np.zeros(shape,dtype = weights.dtype)
-#     transposed = centers.transpose()
-#     B[*(transposed)]=weights
-#     return B
-
-
-def labeled_pixels_from_centers(centers,weights,shape):
+def labeled_pixels_from_centers(centers, weights, shape):
     """label the pixels specify by the centers with the weights.
-
-    This is restricted to 3d shapes for now, a code that will work with python >=3.11
-    is commented out for now
 
     Parameters
     ----------
@@ -81,17 +54,50 @@ def labeled_pixels_from_centers(centers,weights,shape):
     shape : tuple
         the shape of the output array.
     """
+    if sys.version_info < (3, 11):
+        raise RuntimeError('This function requires Python 3.11 or higher.')
 
-    if centers.shape[0]!=weights.shape[0]:
-        raise ValueError("The number of weights must equal the number of points.")
+    if centers.shape[0] != weights.shape[0]:
+        raise ValueError(f'The number of weights must equal the number of points. '
+                         f'got {weights.shape[0]} weights and {centers.shape[0]} points')
     
-    if len(shape)!=centers.shape[1]:
-        raise ValueError("Received shape, points with points.shape[1] != len(shape) ")
+    if len(shape) != centers.shape[1]:
+        raise ValueError(f'Received shape, points with points.shape[1] != len(shape) '
+                         f'got {len(shape)} shape and {centers.shape[1]} points')
     
-    B = np.zeros(shape,dtype = weights.dtype)
-    xs,ys,zs = centers.transpose()
-    B[xs,ys,zs]=weights
-    return B
+    out = np.zeros(shape, dtype=weights.dtype)
+    transposed = centers.transpose()
+    out[*transposed] = weights
+
+    return out
+
+# For python < 3.11
+# def labeled_pixels_from_centers(centers,weights,shape):
+#     """label the pixels specify by the centers with the weights.
+#
+#     This is restricted to 3d shapes for now, a code that will work with python >=3.11
+#     is commented out for now
+#
+#     Parameters
+#     ----------
+#     centers : np.ndarray
+#         (n_points,dim) array with points coords, its dtype is the one of weights
+#     weights : np.ndarray
+#         (n_points,) shaped array
+#     shape : tuple
+#         the shape of the output array.
+#     """
+#
+#     if centers.shape[0]!=weights.shape[0]:
+#         raise ValueError("The number of weights must equal the number of points.")
+#
+#     if len(shape)!=centers.shape[1]:
+#         raise ValueError("Received shape, points with points.shape[1] != len(shape) ")
+#
+#     B = np.zeros(shape,dtype = weights.dtype)
+#     xs,ys,zs = centers.transpose()
+#     B[xs,ys,zs]=weights
+#     return B
 
 def detect_shape(source, seeds, threshold=None, verbose=False, processes=None, as_binary_mask=False, return_sizes=False, seeds_as_labels = False, watershed_line=True):
     """Detect object shapes by generating a labeled image from seeds.
