@@ -72,7 +72,7 @@ def compare(
         raise ValueError("The passed processes argument must be a positive integer or None.")
 
     axes = blockprocessing.block_axes(source_0)
-    axis_wise_overlap = 2 * voxel_blob_diameters  # we
+    axis_wise_overlap = 4 * voxel_blob_diameters
     # be careful the filtration of overlap below is needed for proper def of overlap in bp.process call
     overlap = int(np.ceil(axis_wise_overlap[axes]))
     results = blockprocessing.process(
