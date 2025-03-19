@@ -29,7 +29,7 @@
    <item>
     <widget class="QToolBox" name="toolBox">
      <property name="currentIndex">
-      <number>4</number>
+      <number>3</number>
      </property>
      <widget class="QWidget" name="page">
       <property name="geometry">
@@ -345,7 +345,7 @@
        <item row="3" column="1">
         <widget class="QPushButton" name="tractMapPreviewPushButton">
          <property name="text">
-          <string>Preview detection</string>
+          <string>Select steps</string>
          </property>
         </widget>
        </item>
@@ -486,6 +486,13 @@
         <widget class="QPushButton" name="runTractMapPushButton">
          <property name="text">
           <string>Run</string>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="1">
+        <widget class="QCheckBox" name="tractMapStepsUseDebugCheckBox">
+         <property name="text">
+          <string>Use debug</string>
          </property>
         </widget>
        </item>
