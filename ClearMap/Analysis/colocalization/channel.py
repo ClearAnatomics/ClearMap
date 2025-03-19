@@ -295,7 +295,7 @@ class Channel:
             the bounding box
         """
 
-        return tuple(slice(*[self._bounding_boxes_array()[i, axis, j] + j for j in range(2)]) for axis in self.ndim)
+        return tuple(slice(*[self._bounding_boxes_array()[i, axis, j] + j for j in range(2)]) for axis in range(self.ndim))
 
     # kept mainly for comparison and for the generic case of function below
     def _naive_bounding_boxes_array(self):
