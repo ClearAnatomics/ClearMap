@@ -36,7 +36,7 @@ def label_points_wrapper(annotator, coords):
 
 def sanitize_n_processes(processes):
     if processes < 0:
-        processes = multiprocessing.cpu_count + processes
+        processes = multiprocessing.cpu_count() + processes
     processes = max(processes, 1)
     return processes
 
