@@ -58,9 +58,9 @@ assert [channel_2.center(index) for index in range(len(channel_2.dataframe))] ==
     (4.5, 5.0),
 ]
 
-# # check index_label correspondance
-# print("channel1 index ot label", channel_1.index_label_correspondance)
-# print("channel2 index ot label", channel_2.index_label_correspondance)
+# # check index_label correspondence
+# print("channel1 index ot label", channel_1.index_label_correspondence)
+# print("channel2 index ot label", channel_2.index_label_correspondence)
 
 
 # check overlap computations
