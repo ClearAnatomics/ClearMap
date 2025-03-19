@@ -1516,9 +1516,11 @@ class TractMapTab(PostProcessingTab):
                 processor.set_progress_watcher(watcher)
 
     def run_tuning_tract_map(self, channel):
-        self.run_tract_map(channel, tuning=True)
+        # self.run_tract_map(channel, tuning=True)
+        self.ui.channelsParamsTabWidget.get_channel_widget(channel).toolBox.setCurrentIndex(3)
 
-    def run_tract_map(self, channel, tuning=False):
+    def run_tract_map(self, channel):
+        tuning = self.ui.channelsParamsTabWidget.get_channel_widget(channel).tractMapStepsUseDebugCheckBox.isChecked()
         processor = self.tract_mappers[channel]
         if tuning:
             status_backup = processor.workspace.debug
