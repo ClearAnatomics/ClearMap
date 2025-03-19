@@ -30,6 +30,7 @@ import numpy as np
 import pandas as pd
 
 import pyqtgraph as pg
+from matplotlib.colors import to_hex
 
 # noinspection PyPep8Naming
 import ClearMap.Alignment.Elastix as elastix
@@ -277,7 +278,7 @@ class CellDetector(TabProcessor):
 
         if save_shape:
             cell_detection_param['shape_detection']['save'] = shape_path
-            # erase any prior exisiting file to prevent confusion of sink with source in IO.initialize
+            # erase any prior existing file to prevent confusion of sink with source in IO.initialize
             Path(shape_path).unlink(missing_ok=True)
             if save_as_binary_mask:
                 cell_detection_param['shape_detection']['save_dtype'] = 'bool'
@@ -406,7 +407,14 @@ class CellDetector(TabProcessor):
             hemispheres = df['hemisphere']
         else:
             hemispheres = None
-        dv.scatter_coords = Scatter3D(coordinates, colors=df['color'].values,
+
+        unique_ids = np.sort(np.unique(df['id']))
+        annotator = self.registration_processor.annotators[self.channel]
+        # color_map = {id_: annotator.find(id_, key='id')['rgb'] for id_ in unique_ids}
+        color_map = {id_: annotator.convert_label(id_, key='id', value='color_hex_triplet') for id_ in unique_ids}
+        color_map[0] = np.array(to_hex((1, 0, 0)))  # default to red
+        df['color'] = df['id'].map(color_map)
+        dv.scatter_coords = Scatter3D(coordinates, colors=df['color'].to_list(),
                                       hemispheres=hemispheres, half_slice_thickness=0)
         dv.refresh()
         return [dv]

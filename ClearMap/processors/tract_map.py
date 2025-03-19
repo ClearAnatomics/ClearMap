@@ -11,6 +11,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pyqtgraph as pg
+from matplotlib.colors import to_hex
 
 from ClearMap.IO import IO as cmp_io
 from ClearMap.Utils.exceptions import MissingRequirementException
@@ -402,7 +403,14 @@ class TractMapProcessor(TabProcessor):
             hemispheres = df['hemisphere']
         else:
             hemispheres = None
-        dv.scatter_coords = Scatter3D(coordinates, colors=df['color'].values,
+
+        unique_ids = np.sort(np.unique(df['id']))
+        annotator = self.registration_processor.annotators[self.channel]
+        # color_map = {id_: annotator.find(id_, key='id')['rgb'] for id_ in unique_ids}
+        color_map = {id_: annotator.convert_label(id_, key='id', value='color_hex_triplet') for id_ in unique_ids}
+        color_map[0] = np.array(to_hex((1, 0, 0)))  # default to red
+        df['color'] = df['id'].map(color_map)
+        dv.scatter_coords = Scatter3D(coordinates, colors=df['color'].to_list(),
                                       hemispheres=hemispheres, half_slice_thickness=0)
         dv.refresh()
         return [dv]
