@@ -152,7 +152,7 @@ class Channel:
         self,
         binary_img: np.ndarray,
         dataframe: pd.DataFrame,
-        coord_names=["x", "y", "z"],
+        coord_names=("x", "y", "z"),
         voxel_dims=None,
         physical_origin=None,
         channel_name="",
@@ -165,8 +165,8 @@ class Channel:
             _description_
         dataframe : pd.DataFrame
             the index must correspond to the row rank, no funky index names or subsets.
-        coord_names : list, optional
-            _description_, by default ["x", "y", "z"]
+        coord_names : tuple, optional
+            _description_, by default ("x", "y", "z")
         voxel_dims : _type_, optional
             _description_, by default None
         physical_origin : _type_, optional

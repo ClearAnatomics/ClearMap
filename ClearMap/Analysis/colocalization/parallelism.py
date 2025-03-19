@@ -21,7 +21,7 @@ def compare(
     img_1: str | np.ndarray,
     df_1: str | pd.DataFrame,
     scale,
-    coord_names: list[str],
+    coord_names: list[str] | tuple[str],
     blob_diameter: int,
     size_min: int,
     size_max: int,
