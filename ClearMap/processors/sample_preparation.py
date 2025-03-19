@@ -8,9 +8,7 @@ It includes file conversion, stitching and registration
 import os
 import platform
 import re
-import sys
 import warnings
-from collections import defaultdict
 from concurrent.futures.process import BrokenProcessPool
 from pathlib import Path
 
