@@ -2,36 +2,39 @@
 
 """
 Colocalization
-----------------
+--------------
 
 This module allows to compare signal between different channels
 
 The basic idea is to exploit the data of 
 - a binary mask per channel
 - a dataframe with a representative point per connected component, given in pixel coords
-    with possibly extra measurment information for the nucleus in the respective channel,
-    eg some intensity measurment.
+    with possibly extra measurement information for the nucleus in the respective channel,
+    eg some intensity measurement.
 
-The idea is to be able to determine if two  detected nuclei in distinct channels
+The idea is to be able to determine if two detected nuclei in distinct channels
 correspond indeed to the same nucleus.
 
-We have to rely on well aligned channel images for this sake.
+.. note::
+    We have to rely on well aligned channel images for this module to work.
 
 The simplest method is to break symmetry and have a reference channel that
-marks all nuclei of the studied cell catagory (e.g. all cell type or neurons)
+marks all nuclei of the studied cell category (e.g. all cell type or neurons)
 
 Then, for each reference channel detected nucleus, decide if it is to be considered 
 positive for the the other channels.
 
 This can be made relying on the following capabilities, given two channels
 - Compute the overlap of each connected component of a given channel with the 
-other channel, componentwise or globally or, more generally
+other channel, component-wise or globally or, more generally
 - compute a matching score based on the information we have
 
 Ideally, all of this is to be made efficiently both with quick sequential code
 and parallelization techniques.
 
-WARNING: The current version of this module deals only with 3d images.
+.. warning::
+    The current version of this module deals only with 3d images.
+    See shape_detection.label_pixels_from_centers commented version for a 2d version.
 """
 
 from __future__ import annotations
@@ -41,12 +44,13 @@ import warnings
 import numpy as np
 import pandas as pd
 import scipy.ndimage as ndi
+from scipy.spatial.transform import Rotation
 from sklearn import neighbors
 import skimage.morphology
-from scipy.spatial.transform import Rotation
 
-from . import bbox as bounding_boxes
-from .parallelism import compare
+from ClearMap.Analysis.colocalization import bbox as bounding_boxes
+from ClearMap.Analysis.colocalization.parallelism import compare
+from ClearMap.Utils.exceptions import ClearMapValueError
 
 
 # batch distance computation
@@ -75,7 +79,7 @@ def distances(points_1: np.ndarray, points_2: np.ndarray) -> np.ndarray:
 
 # a cool auxiliary function
 def bilabel_bincount(labels_1: np.array, labels_2: np.array) -> np.array:
-    """Count the number of occurences for all the conjunctions of labels.
+    """Count the number of occurrences for all the conjunctions of labels.
 
     Parameters
     ----------
@@ -95,7 +99,7 @@ def bilabel_bincount(labels_1: np.array, labels_2: np.array) -> np.array:
     max_1 = labels_1.max()
     max_2 = labels_2.max()
     factor = max_2 + 1
-    # factor will also be the heigth of the output
+    # factor will also be the height of the output
     max_val = max_1 * factor + max_2
     # determine the cheapest dtype to hold the join
     dtypes = ["uint8", "uint16", "uint32", "uint64", "argh"]
@@ -226,7 +230,7 @@ class Channel:
         return self._labels
 
     @cached_property
-    def index_label_correspondance(self) -> np.array:
+    def index_label_correspondence(self) -> np.array:
         """Return the labels of nuclei in the nuclei index order
 
         Returns
@@ -238,16 +242,16 @@ class Channel:
         return np.array([self.labels()[tuple(coords.iloc[index])] for index in range(len(self.dataframe))])
 
     @cached_property
-    def label_index_correspondance(self):
+    def label_index_correspondence(self):
         # beware that not all label corresponds to an index,
         # if we do not have a complete set of reps in the dataframe.
         # We set arbitrarily the index value 0 for the labels that will not be used.
-        max_label = self.index_label_correspondance.max()
+        max_label = self.index_label_correspondence.max()
         return np.array(
             [
                 (
-                    np.where(self.index_label_correspondance == label)[0][0]
-                    if label in self.index_label_correspondance
+                    np.where(self.index_label_correspondence == label)[0][0]
+                    if label in self.index_label_correspondence
                     else 0
                 )
                 for label in range(max_label + 1)
@@ -255,15 +259,15 @@ class Channel:
         )
 
     @cached_property
-    def _shifted_index_label_correspondance(self):
-        """Return the index_label_correspondance shifted by 1
+    def _shifted_index_label_correspondence(self):
+        """Return the index_label_correspondence shifted by 1
 
         Returns
         -------
         list[int]
-            the list L such that L[i]=index_label_correspondance[i]-1
+            the list L such that L[i]=index_label_correspondence[i]-1
         """
-        return np.array(self.index_label_correspondance) - 1
+        return np.array(self.index_label_correspondence) - 1
 
     def nucleus(self, index):
         """Return the nucleus associated to a given index, as a mask.
@@ -274,7 +278,7 @@ class Channel:
         index for the chosen representative point in self.dataframe
 
         """
-        return self.index_label_correspondance[index] == self.labels()
+        return self.index_label_correspondence[index] == self.labels()
 
     def bounding_box(self, i) -> tuple[slice, ...]:
         """Return the bounding box of the ith nucleus.
@@ -314,7 +318,7 @@ class Channel:
             For any axis, A[i][axis_index][0] is the least index value along axis
             with index axis_index for a pixel of the ith nucleus and A[i][axis_index][1]
             is the maximal reached index value for the same nucleus.
-            Beware that from this max, 1 must added to obtained the stop attribute
+            Beware that from this max, 1 must be added to obtain the stop attribute
             for a slice defining the corresponding bounding box.
         """
         if self.labels().ndim not in [1, 2, 3]:
@@ -329,7 +333,7 @@ class Channel:
                 res = bounding_boxes.bbox_2d(self.labels())
             else:
                 res = bounding_boxes.bbox_3d(self.labels())
-            self.__bounding_boxes_array = np.ascontiguousarray(res[self.index_label_correspondance])
+            self.__bounding_boxes_array = np.ascontiguousarray(res[self.index_label_correspondence])
         return self.__bounding_boxes_array
 
     # @cached_property
@@ -368,7 +372,7 @@ class Channel:
         list[int]
             The list of sizes of nuclei in the order of our dataframe.
         """
-        return np.bincount(self.labels().flatten())[self.index_label_correspondance]
+        return np.bincount(self.labels().flatten())[self.index_label_correspondence]
 
     def masked_sizes(self, mask):
         """Return the list of the sizes of the non-masked part of each nucleus
@@ -380,7 +384,7 @@ class Channel:
             order of our dataframe.
         """
         return np.bincount((mask * self.labels()).flatten(), minlength=self.sizes.size + 1)[
-            self.index_label_correspondance
+            self.index_label_correspondence
         ]
 
     def overlap_rates(self, other_channel: Channel):
@@ -401,14 +405,14 @@ class Channel:
 
     def _set_blobwise_overlaps(self, other_channel: Channel):
         """
-        Compute and store the matrix M of overlaps wher M[i,j] is the overlap between blob
+        Compute and store the matrix M of overlaps where M[i,j] is the overlap between blob
         of index i for self and the blob of index j for other_channel.
         """
         counts = bilabel_bincount(self.labels(), other_channel.labels())
         self._overlaps_dic[other_channel.name] = self._reorder_counts(other_channel, counts)
 
     def _reorder_counts(self, other_channel, counts):
-        return counts[self.index_label_correspondance, :][:, other_channel.index_label_correspondance]
+        return counts[self.index_label_correspondence, :][:, other_channel.index_label_correspondence]
 
     def blobwise_overlaps(self, other_channel: Channel) -> np.ndarray:
         """Return the matrix of overlaps.
@@ -547,7 +551,8 @@ class Channel:
     def compare(
         self, other_channel: Channel, blob_diameter: int, size_min: int, size_max: int, processes: int | None = None
     ):
-        """Return a final colocalization report
+        """
+        Return a final colocalization report
 
 
         Parameters
@@ -569,7 +574,6 @@ class Channel:
         -------
         pd.DataFrame
             A colocalization report in pandas dataframe format
-
         """
 
         if np.any(self.voxel_dims != other_channel.voxel_dims):
@@ -625,8 +629,8 @@ class Channel:
 
         learner.fit(points_1)
         if len(points_1) > 0:
-            distances, indices = learner.kneighbors(points_0)
-            c0_result["closest blob distance"] = distances
+            distances_, indices = learner.kneighbors(points_0)
+            c0_result["closest blob distance"] = distances_
             c0_result["closest blob bbox center index"] = indices.flatten()
             c0_cols = ["closest blob center " + coord for coord in self.coord_names]
             c0_result[c0_cols] = c1_result[cols].iloc[indices.flatten()].to_numpy()
@@ -706,8 +710,8 @@ def _random_channel_data(shape, num_points, min_radius, max_radius):
 
 def random_channel(shape, num_points, min_radius, max_radius):
     """Return a random Channel of given shape.
-    The udnerlying image is obtained by successive attempts of blob additions.
-    If the candidate blob would be connected with exisitng blobs, it is rejected.
+    The underlying image is obtained by successive attempts of blob additions.
+    If the candidate blob would be connected with existing blobs, it is rejected.
 
 
     Parameters
