@@ -102,11 +102,11 @@ def bilabel_bincount(labels_1: np.array, labels_2: np.array) -> np.array:
     # factor will also be the height of the output
     max_val = max_1 * factor + max_2
     # determine the cheapest dtype to hold the join
-    dtypes = ["uint8", "uint16", "uint32", "uint64", "argh"]
+    dtypes = ["uint8", "uint16", "uint32", "uint64"]
     for i, dtype in enumerate(dtypes):
         if 2 ** (2 ** (3 + i)) > max_val:
             break
-    if dtype == "argh":
+    else:
         raise RuntimeError("This software is not able to store the join labels.")
 
     joined_labels = factor * labels_1.astype(dtype) + labels_2.astype(dtype)
@@ -546,12 +546,12 @@ class Channel:
 
 
         Returns
-        similar to max_blobwise_overlap
         -------
+            similar to max_blobwise_overlap
         """
-        distances = self.centers_distances(other_channel)  # TODO cache distances as overlaps
-        argmin = np.argmin(distances, axis=1)
-        minima = distances[:, argmin]
+        distances_ = self.centers_distances(other_channel)  # TODO cache distances as overlaps
+        argmin = np.argmin(distances_, axis=1)
+        minima = distances_[:, argmin]
 
         if return_min_indices:
             return minima, argmin
@@ -660,10 +660,12 @@ def _random_shape(radius):
     dice = np.random.randint(3)
     if dice == 0:
         shape = skimage.morphology.cube(2 * int(radius / 1.8) + 1)
-    if dice == 1:
+    elif dice == 1:
         shape = skimage.morphology.octahedron(radius)
-    if dice == 2:
+    elif dice == 2:
         shape = skimage.morphology.ball(radius)
+    else:
+        raise ClearMapValueError(f"The dice should not have rolled that way. ({dice})")
 
     locus = np.where(shape)
     points = np.vstack(locus).transpose()
