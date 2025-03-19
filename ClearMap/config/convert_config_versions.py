@@ -1,14 +1,17 @@
 import os.path
 import shutil
 import tempfile
+import warnings
 from pathlib import Path
 
 from packaging.version import Version
 from importlib_metadata import version
 
 import qdarkstyle
-from PyQt5.QtWidgets import QApplication, QDialog, QFileDialog
+from PyQt5.QtWidgets import QApplication, QDialog
 
+from ClearMap.IO.assets_constants import CHANNELS_ASSETS_TYPES_CONFIG
+from ClearMap.Utils.tag_expression import Expression
 from ClearMap.config.config_loader import ConfigLoader, get_configobj_cfg
 
 from ClearMap.gui.dialogs import RenameChannelsDialog, VerifyRenamingDialog, get_directory_dlg
@@ -228,6 +231,7 @@ def convert_v2_1_to_v3_0(main_folder=''):
     cfg_loader = ConfigLoader(main_folder)
 
     # Get paths to the configuration files
+    # FIXME: vasculature, batch, group_analysis
     sample_cfg_path, alignment_cfg_path, cell_map_cfg_path = (
         [cfg_loader.get_cfg_path(name) for name in ('sample', 'alignment', 'cell_map')])
 
@@ -236,6 +240,8 @@ def convert_v2_1_to_v3_0(main_folder=''):
 
     # Create SampleManager
     sample_cfg = ConfigLoader.get_cfg_from_path(v3_sample_cfg_path)
+    use_id_as_prefix = sample_cfg['use_id_as_prefix']
+    sample_id = sample_cfg['sample_id']
 
     # Extract channels with paths
     channels = {name: data for name, data in sample_cfg['channels'].items() if data['path']}
@@ -266,7 +272,6 @@ def convert_v2_1_to_v3_0(main_folder=''):
     assets = [f for f in os.listdir(main_folder) if not f.endswith(('.log', '.html', '.cfg', '.bak'))]
     folders_to_rename = ['elastix_auto_to_reference', 'elastix_resampled_to_auto']
     files_to_rename = {f: f for f in assets if os.path.isfile(os.path.join(main_folder, f))}
-    files_to_rename.update({f: f for f in assets if os.path.isdir(os.path.join(main_folder, f)) and f in folders_to_rename})
 
     # Compute new names
     for file in files_to_rename:
@@ -281,7 +286,32 @@ def convert_v2_1_to_v3_0(main_folder=''):
         else:
             new_channel = new_channels["raw"][0]
             new_name = f'{new_channel}_{new_name}'
+        if use_id_as_prefix:
+            new_name = f'{sample_id}_{new_name}'
         files_to_rename[file] = new_name
+
+    alignment_reference_channel = [name for name, section in sample_cfg['channels'].items()
+                                   if section['data_type'] == 'autofluorescence']
+    if alignment_reference_channel:
+        alignment_reference_channel = alignment_reference_channel[0]
+    for folder in folders_to_rename:
+        if folder == 'elastix_auto_to_reference':
+            if not alignment_reference_channel:
+                warnings.warn('No reference channel found in the sample config file')
+                continue
+            new_name = Expression(str(Path(CHANNELS_ASSETS_TYPES_CONFIG['aligned']['basename']).parent))
+            new_name = new_name.string(values={'moving_channel': 'atlas',
+                                               'fixed_channel': 'atlas'})
+            files_to_rename[folder] = new_name
+        elif folder == 'elastix_resampled_to_auto':
+            if not alignment_reference_channel:
+                warnings.warn('No reference channel found in the sample config file')
+                continue
+            new_name = Expression(str(Path(CHANNELS_ASSETS_TYPES_CONFIG['resampled']['basename']).parent))
+            new_name = new_name.string(values={'moving_channel': alignment_reference_channel,
+                                               'fixed_channel': alignment_reference_channel})
+            files_to_rename[folder] = new_name
+
 
     # Verify renaming
     dialog = VerifyRenamingDialog(files_to_rename)
