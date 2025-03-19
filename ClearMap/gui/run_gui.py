@@ -1138,6 +1138,9 @@ class ClearMapGui(ClearMapGuiBase):
 
                 if cfg_name == 'sample_info':
                     sample_params = None
+                    if ConfigLoader.get_cfg_from_path(cfg_path)['clearmap_version'] == '2.1.0':
+                        from ClearMap.config.convert_config_versions import convert_v2_1_to_v3_0
+                        convert_v2_1_to_v3_0(cfg_path.parent)
                 else:
                     sample_params = self.tab_managers['sample_info'].params
 
