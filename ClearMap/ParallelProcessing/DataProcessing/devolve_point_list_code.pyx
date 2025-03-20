@@ -1,8 +1,8 @@
 #cython: language_level=3, boundscheck=False, wraparound=False, nonecheck=False, initializedcheck=False, cdivision=True
 
 """
-DevolvePointListCode
-====================
+devolve_point_list_code
+=======================
 
 Cython code for devolving or smearing out points in a large array.
 
