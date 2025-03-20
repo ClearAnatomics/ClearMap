@@ -333,6 +333,13 @@ def convert_v2_1_to_v3_0(main_folder=''):
         os.rename(main_folder / old_name, main_folder / new_name)
 
 
+def convert_versions(previous_version: str, new_verison: str, main_folder: str = ''):
+    if previous_version == '2.1.0' and new_verison == '3.0.0':
+        convert_v2_1_to_v3_0(main_folder)
+    else:
+        raise NotImplementedError(f'Conversion from {previous_version} to {new_verison} is not supported yet.')
+
+
 def test():
     # Example usage
     convert_sample_config_2_1_0_to_3_0_0('/ClearMap/config/default_sample_params.cfg',

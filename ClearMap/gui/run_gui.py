@@ -69,7 +69,7 @@ app = QApplication([])
 # Attempt to force appearance
 app.setApplicationName('ClearMap')
 app.setApplicationDisplayName('ClearMap')
-app.setApplicationVersion('2.1')
+app.setApplicationVersion(CLEARMAP_VERSION)
 palette = app.palette()  # WARNING: necessary because QWhatsThis does not follow stylesheets
 palette.setColor(QtGui.QPalette.ColorRole.ToolTipBase, QtGui.QColor(DarkPalette.COLOR_BACKGROUND_2))
 palette.setColor(QtGui.QPalette.ColorRole.ToolTipText, QtGui.QColor(DarkPalette.COLOR_TEXT_2))
@@ -1168,9 +1168,10 @@ class ClearMapGui(ClearMapGuiBase):
         self.src_folder = src_folder
         self.config_loader.src_dir = src_folder
         sample_cfg_path = self._load_sample_id()
-        if ConfigLoader.get_cfg_from_path(sample_cfg_path)['clearmap_version'] == '2.1.0':
-            from ClearMap.config.convert_config_versions import convert_v2_1_to_v3_0
-            convert_v2_1_to_v3_0(src_folder)
+        sample_version = ConfigLoader.get_cfg_from_path(sample_cfg_path)['clearmap_version']
+        if sample_version != CLEARMAP_VERSION:
+            from ClearMap.config.convert_config_versions import convert_versions
+            convert_versions(sample_version, CLEARMAP_VERSION, src_folder)
         self.tab_managers['sample_info'].set_params(None, sample_cfg_path, False)
 
         self.__init_pipeline_tabs()  # TODO: check if init or this
