@@ -101,7 +101,7 @@ def convert_alignment_config_2_1_0_to_3_0_0(v1_path, v2_path='', sample_config=N
 
 
 def alignment_to_stitching_v3(output_path_base, config_v1):
-    out_stitching_cfg = get_configobj_cfg(output_path_base.with_name(f'stitching_config_{VERSION_SUFFIX}.cfg'),
+    out_stitching_cfg = get_configobj_cfg(output_path_base.with_name(f'stitching_params.cfg'),
                                           must_exist=False)
     # Copy general parameters
     out_stitching_cfg['clearmap_version'] = '3.0.0'
@@ -127,7 +127,7 @@ def alignment_to_stitching_v3(output_path_base, config_v1):
 
 
 def alignment_to_registration_v3(output_path_base, config_v1, sample_config):
-    out_registration_cfg = get_configobj_cfg(output_path_base.with_name(f'registration_config_{VERSION_SUFFIX}.cfg'),
+    out_registration_cfg = get_configobj_cfg(output_path_base.with_name(f'registration_params.cfg'),
                                              must_exist=False)
     out_registration_cfg['clearmap_version'] = '3.0.0'
     # Copy registration parameters
@@ -271,11 +271,15 @@ def convert_v2_1_to_v3_0(main_folder=''):
     # Rename assets
     assets = [f for f in os.listdir(main_folder) if not f.endswith(('.log', '.html', '.cfg', '.bak'))]
     folders_to_rename = ['elastix_auto_to_reference', 'elastix_resampled_to_auto']
+    if use_id_as_prefix:
+        folders_to_rename = [f'{sample_id}_{f}' for f in folders_to_rename]
     files_to_rename = {f: f for f in assets if os.path.isfile(os.path.join(main_folder, f))}
 
     # Compute new names
     for file in files_to_rename:
         new_name = file
+        if use_id_as_prefix and new_name.startswith(f'{sample_id}_'):  # Strip sample id if exists
+            new_name = new_name[len(f'{sample_id}_'):]
         if 'arteries' in file:
             new_channel = new_channels["arteries"][0]
             new_name = f'{new_channel}_{file.replace("arteries", "")}'
@@ -294,6 +298,10 @@ def convert_v2_1_to_v3_0(main_folder=''):
                                    if section['data_type'] == 'autofluorescence']
     if alignment_reference_channel:
         alignment_reference_channel = alignment_reference_channel[0]
+    data_channel = [name for name, section in sample_cfg['channels'].items()
+                                   if section['data_type'] != 'autofluorescence']
+    if data_channel:
+        data_channel = data_channel[0]
     for folder in folders_to_rename:
         if folder == 'elastix_auto_to_reference':
             if not alignment_reference_channel:
@@ -301,15 +309,15 @@ def convert_v2_1_to_v3_0(main_folder=''):
                 continue
             new_name = Expression(str(Path(CHANNELS_ASSETS_TYPES_CONFIG['aligned']['basename']).parent))
             new_name = new_name.string(values={'moving_channel': 'atlas',
-                                               'fixed_channel': 'atlas'})
+                                               'fixed_channel': alignment_reference_channel})
             files_to_rename[folder] = new_name
         elif folder == 'elastix_resampled_to_auto':
             if not alignment_reference_channel:
                 warnings.warn('No reference channel found in the sample config file')
                 continue
-            new_name = Expression(str(Path(CHANNELS_ASSETS_TYPES_CONFIG['resampled']['basename']).parent))
+            new_name = Expression(str(Path(CHANNELS_ASSETS_TYPES_CONFIG['aligned']['basename']).parent))
             new_name = new_name.string(values={'moving_channel': alignment_reference_channel,
-                                               'fixed_channel': alignment_reference_channel})
+                                               'fixed_channel': data_channel})
             files_to_rename[folder] = new_name
 
 
