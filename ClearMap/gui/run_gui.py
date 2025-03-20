@@ -439,25 +439,9 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         for tb in self.findChildren(QToolBox):
             tb.setCurrentIndex(0)
 
-    def patch_font_size_name(self):
-        font_names = {
-            9: 'small',
-            10: 'small',
-            11: 'regular',
-            12: 'regular',
-            13: 'regular',
-            14: 'big',
-            22: 'huge'
-        }
-        for widget in self.findChildren(QWidget):
-            font = widget.property('font')
-            font_size_name = font_names[font.pointSize()]
-            widget.setProperty('font_size_name', font_size_name)
-
     def monkey_patch(self):
         recursive_patch_widgets(self)
         self.patch_tool_boxes()
-        self.patch_font_size_name()
         # self.fix_styles()
 
     @staticmethod
