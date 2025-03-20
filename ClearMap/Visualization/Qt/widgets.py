@@ -1,8 +1,9 @@
 import numpy as np
 import pandas as pd
-import pyqtgraph as pg
-from PyQt5.QtGui import QColor
+
 from matplotlib.colors import to_hex
+from PyQt5.QtGui import QColor
+import pyqtgraph as pg
 
 from ClearMap.gui.gui_utils import pseudo_random_rgb_array
 
@@ -10,51 +11,57 @@ from ClearMap.gui.gui_utils import pseudo_random_rgb_array
 class Scatter3D:
     def __init__(self, coordinates, smarties=False, colors=None, hemispheres=None, half_slice_thickness=None):
         self.__coordinates = None
-        self.__has_hemispheres = hemispheres is not None
-        self.default_symbol = '+'
-        self.alternate_symbol = 'p'
+        self.__has_hemispheres = hemispheres is not None  # FIXME: this should be renamed to has_different_symbols
         self.half_slice_thickness = half_slice_thickness
         self.axis = 2
 
-        if smarties and colors is None:
-            n_samples = coordinates.shape[0]
-            colors = pseudo_random_rgb_array(n_samples)
-        if colors is not None and not str(colors[0]).startswith('#'):  # Convert to hex if not yet
-            if not smarties:
-                colors_dict = {col: to_hex(col) for col in np.unique(colors, axis=0)}
-                colors_dict[None] = to_hex((1, 0, 0))  # default to red
-                colors = [colors_dict[col] for col in colors]
-            else:
-                colors = [to_hex((1, 0, 0) if c is None else c) for c in colors]
+        if isinstance(coordinates, pd.DataFrame):
+            self.data = coordinates
+            self.symbols = self.data['symbol'].unique().tolist()
+            self.__has_colours = self.data['colour'].nunique() > 1
+            self.__has_hemispheres = len(self.symbols) > 1
+        else:
+            self.symbols = ['+', 'p']
 
-        self.__has_colours = colors is not None
+            if smarties and colors is None:
+                n_samples = coordinates.shape[0]
+                colors = pseudo_random_rgb_array(n_samples)
+            if colors is not None and not str(colors[0]).startswith('#'):  # Convert to hex if not yet
+                if not smarties:
+                    colors_dict = {col: to_hex(col) for col in np.unique(colors, axis=0)}
+                    colors_dict[None] = to_hex((1, 0, 0))  # default to red
+                    colors = [colors_dict[col] for col in colors]
+                else:
+                    colors = [to_hex((1, 0, 0) if c is None else c) for c in colors]
 
-        if hemispheres is not None:
-            self.symbol_map = {
-                0: self.default_symbol,
-                255: self.alternate_symbol
-            }
-            # symbols = symbols.decode()
+            self.__has_colours = colors is not None
 
-        # colors = if colors is None else np.array([QColor( * col.astype(int)) for col in colors]
-        self.data = pd.DataFrame({
-            'x': coordinates[:, 0],
-            'y': coordinates[:, 1],
-            'z': coordinates[:, 2],
-            'hemisphere': hemispheres,
-            'colour': colors
-        })  # TODO: could use id instead of colour
-        self.data['colour'] = self.data['colour'].astype(str)
-        if colors is not None:
-            unique_colors = np.unique(colors)
-            self.point_map = pd.DataFrame({
-                'colour': unique_colors,
-                'pen': [pg.mkPen(c) for c in unique_colors],
-                'brush': [pg.mkBrush(c) for c in unique_colors]
-            })
+            if hemispheres is not None:
+                self.symbol_map = {id_: self.symbols[i] for i, id_ in enumerate(np.unique(hemispheres))}
 
-        self.data['pen'] = self.data['colour'].map(dict(self.point_map[['colour', 'pen']].values))
-        self.data['brush'] = self.data['colour'].map(dict(self.point_map[['colour', 'brush']].values))
+            # colors = colors if colors is None else np.array([QColor( * col.astype(int)) for col in colors]
+            self.data = pd.DataFrame({
+                'x': coordinates[:, 0],
+                'y': coordinates[:, 1],
+                'z': coordinates[:, 2],
+                'hemisphere': hemispheres,
+                'colour': colors
+            })  # TODO: could use id instead of colour
+            self.data['symbol'] = self.data['hemisphere'].map(self.symbol_map) if self.__has_hemispheres else self.symbols[0]
+            self.data['colour'] = self.data['colour'].astype(str)
+
+        if self.__has_colours and not 'pen' in self.data.columns:
+            # Finalise DF
+            if colors is not None:
+                unique_colors = np.unique(colors)
+                self.point_map = pd.DataFrame({
+                    'colour': unique_colors,
+                    'pen': [pg.mkPen(c) for c in unique_colors],
+                    'brush': [pg.mkBrush(c) for c in unique_colors]
+                })
+
+            self.data['pen'] = self.data['colour'].map(dict(self.point_map[['colour', 'pen']].values))
+            self.data['brush'] = self.data['colour'].map(dict(self.point_map[['colour', 'brush']].values))
 
     @property
     def coordinates(self):
@@ -156,11 +163,11 @@ class Scatter3D:
         if self.has_hemispheres:
             indices = self.current_slice_indices(current_slice)
             if indices is not None:
-                return self.data.loc[indices, 'hemisphere'].map(self.symbol_map).values  # FIXME: cache in main DF
+                return self.data.loc[indices, 'symbol'].values
             else:
                 return np.array([])
         else:
-            return self.default_symbol
+            return self.symbols[0]
 
     def get_symbol_sizes(self, main_slice_idx, slice_idx, indices=None, half_size=3):
         marker_size = round(10 * ((half_size - abs(main_slice_idx - slice_idx)) / half_size))
