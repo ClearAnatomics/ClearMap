@@ -1581,10 +1581,10 @@ class TractMapTab(PostProcessingTab):
         if params.voxelize:
             self.voxelize(channel)
         if params.export_df:
-            processor.export_df(channel)
+            processor.export_df()
 
     def voxelize(self, channel):
-        if self.tract_mappers[channel].get('binary', asset_sub_type='coordinates_transformed', channel=self.channel).exists:
+        if self.tract_mappers[channel].get('binary', asset_sub_type='coordinates_transformed', channel=channel).exists:
             self.wrap_step('Voxelization', self.tract_mappers[channel].voxelize,
                            abort_func=self.tract_mappers[channel].stop_process, nested=False)
         else:
