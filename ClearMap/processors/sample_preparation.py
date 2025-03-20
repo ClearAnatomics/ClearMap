@@ -457,6 +457,7 @@ class RegistrationProcessor(TabProcessor):
         if self.sample_manager.setup_complete:
             self.workspace = self.sample_manager.workspace
             self.setup_atlases()  # TODO: check if needed
+            self.add_pipeline()
             self.setup_complete = True
         else:
             self.setup_complete = False  # FIXME: finish later
