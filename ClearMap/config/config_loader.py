@@ -74,14 +74,9 @@ tabs_alternatives = [
     ['group_analysis', 'group analysis']
 ]
 
-if clearmap_version < '3.0.0':
-    tabs_alternatives.insert(1, ['alignment', 'processing'])
+alternative_names = tabs_alternatives + [['machine'], ['display'], ['alignment', 'processing']]  # alignment for v2 compatibility
 
-
-alternative_names = tabs_alternatives + [['machine'], ['display']]
 CONFIG_NAMES = [names[0] for names in alternative_names]
-if 'alignment' not in CONFIG_NAMES:
-    CONFIG_NAMES.append('alignment')  # For compatibility with older versions. Only in names, not tabs_alternatives
 
 
 def get_alternatives(cfg_name):
