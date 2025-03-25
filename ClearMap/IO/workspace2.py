@@ -24,7 +24,8 @@ import numpy as np
 from ClearMap.IO.assets_constants import CONTENT_TYPE_TO_PIPELINE, CHANNELS_ASSETS_TYPES_CONFIG, RESOURCE_TYPE_TO_FOLDER
 from ClearMap.IO.assets_specs import ChannelSpec, TypeSpec, StateManager
 from ClearMap.IO.workspace_asset import Asset, AssetCollection
-from ClearMap.Utils.exceptions import AssetNotFoundError, ClearMapWorkspaceError, ClearMapAssetError
+from ClearMap.Utils.exceptions import AssetNotFoundError, ClearMapWorkspaceError, ClearMapAssetError, \
+    MissingChannelError
 from ClearMap.Utils.utilities import substitute_deprecated_arg, handle_deprecated_args
 
 
@@ -198,8 +199,8 @@ class Workspace2:  # REFACTOR: subclass dict
             The channel id to use for the asset.
         """
         if channel_id not in self.asset_collections:
-            raise ClearMapWorkspaceError(f'Channel "{channel_id}" does not exist in the workspace.'
-                                         f'Use add_raw_data to create a new channel.')
+            raise MissingChannelError(f'Channel "{channel_id}" does not exist in the workspace.'
+                                      f'Use add_raw_data to create a new channel.')
         if pipeline_name not in CONTENT_TYPE_TO_PIPELINE.values():
             raise ClearMapWorkspaceError(f'Pipeline {pipeline_name} does not exist in the workspace.')
 
@@ -314,6 +315,8 @@ class Workspace2:  # REFACTOR: subclass dict
 
         if asset_sub_type:
             asset_type += f'_{asset_sub_type}'
+        if channel not in self.asset_collections and isinstance(channel, (tuple, list)):
+            channel = ('-'.join(channel)).lower()  # Try string version if tuple version not found
         if asset_type in self.asset_collections[channel]:
             asset = self.asset_collections[channel][asset_type]
         else: # asset is somehow None
