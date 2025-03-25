@@ -517,8 +517,8 @@ class RegistrationProcessor(TabProcessor):
             try:
                 self.get('aligned', channel=channel)
             except KeyError:
-                if self.sample_manager.setup_complete:
-                    self.sample_manager.workspace.add_pipeline('registration', channel_id=channel)
+                if self.sample_manager.setup_complete and channel in self.workspace.asset_collections:
+                    self.workspace.add_pipeline('registration', channel_id=channel)
                     self.parametrize_assets()
                 else:
                     warnings.warn('Workspace not setup, cannot add registration pipeline')
