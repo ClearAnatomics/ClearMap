@@ -560,7 +560,7 @@ class Channel:
 
     def compare(
         self, other_channel: Channel, blob_diameter: int, size_min: int, size_max: int, processes: int | None = None
-    ):
+    ) -> pd.DataFrame:
         """
         Return a final colocalization report
 
