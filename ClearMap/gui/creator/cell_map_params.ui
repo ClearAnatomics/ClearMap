@@ -40,7 +40,7 @@
       </font>
      </property>
      <property name="currentIndex">
-      <number>0</number>
+      <number>3</number>
      </property>
      <widget class="QWidget" name="page">
       <property name="geometry">
@@ -77,8 +77,8 @@
            <rect>
             <x>0</x>
             <y>0</y>
-            <width>640</width>
-            <height>270</height>
+            <width>216</width>
+            <height>228</height>
            </rect>
           </property>
           <attribute name="label">
@@ -689,40 +689,7 @@
        <string>Run CellMap</string>
       </attribute>
       <layout class="QGridLayout" name="gridLayout">
-       <item row="1" column="0">
-        <widget class="QCheckBox" name="runCellMapFilterCellsCheckBox">
-         <property name="text">
-          <string>Filter cells</string>
-         </property>
-         <property name="checked">
-          <bool>true</bool>
-         </property>
-        </widget>
-       </item>
-       <item row="7" column="0">
-        <widget class="QLabel" name="label_18">
-         <property name="text">
-          <string>After filter</string>
-         </property>
-        </widget>
-       </item>
-       <item row="6" column="2">
-        <widget class="QLabel" name="nDetectedCellsLabel">
-         <property name="font">
-          <font>
-           <pointsize>22</pointsize>
-           <bold>true</bold>
-          </font>
-         </property>
-         <property name="text">
-          <string>0</string>
-         </property>
-         <property name="alignment">
-          <set>Qt::AlignCenter</set>
-         </property>
-        </widget>
-       </item>
-       <item row="7" column="2">
+       <item row="8" column="2">
         <widget class="QLabel" name="nDetectedCellsAfterFilterLabel">
          <property name="font">
           <font>
@@ -738,20 +705,24 @@
          </property>
         </widget>
        </item>
-       <item row="4" column="0">
+       <item row="3" column="0">
+        <widget class="QCheckBox" name="runCellMapSaveShapeCheckBox">
+         <property name="text">
+          <string>Save shape</string>
+         </property>
+        </widget>
+       </item>
+       <item row="5" column="0">
         <widget class="QCheckBox" name="runCellMapPlotCheckBox">
          <property name="text">
           <string>Plot when finished</string>
          </property>
         </widget>
        </item>
-       <item row="0" column="0">
-        <widget class="QCheckBox" name="runCellMapDetectCellsCheckBox">
+       <item row="6" column="2">
+        <widget class="QPushButton" name="runCellMapPushButton">
          <property name="text">
-          <string>Detect cells</string>
-         </property>
-         <property name="checked">
-          <bool>true</bool>
+          <string>Run</string>
          </property>
         </widget>
        </item>
@@ -765,14 +736,50 @@
          </property>
         </widget>
        </item>
-       <item row="5" column="2">
-        <widget class="QPushButton" name="runCellMapPushButton">
+       <item row="8" column="0">
+        <widget class="QLabel" name="label_18">
          <property name="text">
-          <string>Run</string>
+          <string>After filter</string>
          </property>
         </widget>
        </item>
-       <item row="6" column="0">
+       <item row="0" column="0">
+        <widget class="QCheckBox" name="runCellMapDetectCellsCheckBox">
+         <property name="text">
+          <string>Detect cells</string>
+         </property>
+         <property name="checked">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item row="7" column="2">
+        <widget class="QLabel" name="nDetectedCellsLabel">
+         <property name="font">
+          <font>
+           <pointsize>22</pointsize>
+           <bold>true</bold>
+          </font>
+         </property>
+         <property name="text">
+          <string>0</string>
+         </property>
+         <property name="alignment">
+          <set>Qt::AlignCenter</set>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="0">
+        <widget class="QCheckBox" name="runCellMapFilterCellsCheckBox">
+         <property name="text">
+          <string>Filter cells</string>
+         </property>
+         <property name="checked">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item row="7" column="0">
         <widget class="QLabel" name="label_17">
          <property name="toolTip">
           <string/>
@@ -782,10 +789,13 @@
          </property>
         </widget>
        </item>
-       <item row="3" column="0">
-        <widget class="QCheckBox" name="runCellMapSaveShapeCheckBox">
+       <item row="4" column="0">
+        <widget class="QCheckBox" name="runCellMapColocalizationCompatibleCheckBox">
+         <property name="toolTip">
+          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Select this if you want the results of your cell detection to be usable &lt;/p&gt;&lt;p&gt;by the colocalization pipeline (detection algorithm is adjusted and&lt;/p&gt;&lt;p&gt;intermediates results are saved)&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+         </property>
          <property name="text">
-          <string>Save shape</string>
+          <string>Colocalization compatible results</string>
          </property>
         </widget>
        </item>

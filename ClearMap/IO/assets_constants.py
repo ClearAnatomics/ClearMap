@@ -44,6 +44,8 @@ to the pipeline(s) that are relevant for that content type.
 CONTENT_TYPE_TO_PIPELINE = {
     None: None,  # not configured
     'no-pipeline': None,  # configured but no pipeline
+    'compound': None,
+    'colocalization': 'Colocalization',
     'autofluorescence': 'registration',
     'nuclei': 'CellMap',  # TODO: list ?
     'cells': 'CellMap',
@@ -131,6 +133,12 @@ CHANNELS_ASSETS_TYPES_CONFIG = {
         'resource_type': 'results',
         'relevant_pipelines': ['CellMap'],
         'extensions': ['.csv', '.feather']
+    },
+    'colocalization': {
+        'file_format_category': 'table',
+        'resource_type': 'results',
+        'relevant_pipelines': ['Colocalization'],
+        'sub_types': ['report', 'filtered_report']
     },
     'density': {
         'file_format_category': 'portable_image',

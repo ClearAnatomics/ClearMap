@@ -71,7 +71,8 @@ tabs_alternatives = [
     ['tract_map'],
     ['vasculature', 'tube_map'],
     ['batch', 'batch_processing', 'batch processing'],
-    ['group_analysis', 'group analysis']
+    ['group_analysis', 'group analysis'],
+    ['colocalization']
 ]
 
 alternative_names = tabs_alternatives + [['machine'], ['display'], ['alignment', 'processing']]  # alignment for v2 compatibility

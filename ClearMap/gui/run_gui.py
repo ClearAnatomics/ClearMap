@@ -111,7 +111,7 @@ from ClearMap.gui.widgets import (OrthoViewer, ProgressWatcher,
                                   StructureSelector, PerfMonitor, ManipulateAssetsDialog)  # Perfmonitor needs plot_3d
 update_pbar(app, progress_bar, 60)
 from ClearMap.gui.tabs import (SampleInfoTab, StitchingTab, RegistrationTab, CellCounterTab,
-                               VasculatureTab, GroupAnalysisTab, BatchProcessingTab, TractMapTab)
+                               VasculatureTab, GroupAnalysisTab, BatchProcessingTab, TractMapTab, ColocalizationTab)
 from ClearMap.gui.interfaces import BatchTab
 from ClearMap.gui.preferences import PreferenceUi
 from ClearMap.processors.sample_preparation import SampleManager

@@ -100,6 +100,7 @@ other controls are handled by the `params` object) and the processing steps.
 """
 
 import functools
+import itertools
 import warnings
 from copy import deepcopy
 from pathlib import Path
@@ -114,6 +115,7 @@ from pyqtgraph import PlotWidget
 import mpld3
 
 from ClearMap.IO.assets_constants import DATA_CONTENT_TYPES, EXTENSIONS
+from ClearMap.processors.colocalization import ColocalizationProcessor
 from ClearMap.processors.tract_map import TractMapProcessor
 
 app = QApplication.instance()
@@ -135,7 +137,7 @@ from ClearMap.gui.widgets import (PatternDialog, DataFrameWidget, LandmarksSelec
 from ClearMap.gui.gui_utils import format_long_nb, np_to_qpixmap, replace_widget, unique_connect, get_widget
 from ClearMap.gui.params import (VesselParams, SampleParameters, StitchingParams,
                                  CellMapParams, GroupAnalysisParams, BatchProcessingParams, RegistrationParams,
-                                 TractMapParams)
+                                 TractMapParams, ColocalizationParams)
 from ClearMap.Visualization.Matplotlib.PlotUtils import plot_sample_stats_histogram, plot_volcano
 from ClearMap.Visualization.Qt.utils import link_dataviewers_cursors
 from ClearMap.Visualization.Qt import Plot3d as plot_3d
@@ -860,8 +862,10 @@ class CellCounterTab(PostProcessingTab):
     def _bind(self):
         pass
 
-    def _bind_params_signals(self):
-        pass
+    def _bind_params_signals(self):  # Execute at the end of finalise_set_params
+        if len(self.params.channels_to_detect) > 1:
+            if not self.main_window.has_tab(ColocalizationTab):
+                self.main_window.add_tab(ColocalizationTab, sample_manager=self.sample_manager, set_params=True)
         # self.ui.advancedCheckBox.stateChanged.connect(self.params.handle_advanced_state_changed)
 
     def _set_params(self):
@@ -899,6 +903,11 @@ class CellCounterTab(PostProcessingTab):
                     is_first_channel = False
                 detector.setup(self.sample_manager, channel, self.aligner)
             self.update_cell_number(channel)
+        if len(self.params.channels_to_detect) > 1:
+            for channel in self.cell_detectors.keys():
+                self.make_colocalization_compatible(channel)
+            if not self.main_window.has_tab(ColocalizationTab):
+                self.main_window.add_tab(ColocalizationTab, sample_manager=self.sample_manager, set_params=True)
 
     def _set_channel_config(self, channel):
         """Add a new channel tab to the UI"""
@@ -912,6 +921,7 @@ class CellCounterTab(PostProcessingTab):
         automatically set through the params object attribute
         """
         page_widget.toolBox.currentChanged.connect(self.handle_tool_tab_changed)
+        page_widget.runCellMapColocalizationCompatibleCheckBox.setVisible(False)
         buttons_functions = [
             ('detectionPreviewTuningOpenPushButton', self.plot_debug_cropping_interface),  # TODO: add load icon
             ('detectionPreviewTuningCropPushButton', self.create_cell_detection_tuning_sample),
@@ -925,6 +935,11 @@ class CellCounterTab(PostProcessingTab):
         ]
         for btn_name, func in buttons_functions:
             self._bind_btn(btn_name, func, channel, page_widget)
+
+    def make_colocalization_compatible(self, channel):
+        page_widget = self.ui.channelsParamsTabWidget.get_channel_widget(channel)
+        page_widget.runCellMapColocalizationCompatibleCheckBox.setVisible(True)
+        self.params[channel].colocalization_compatible = True
 
     def setup_cell_param_histogram(self, cells, plot_item, key='size', x_log=False):
         """
@@ -1619,6 +1634,120 @@ class TractMapTab(PostProcessingTab):
         self.wrap_plot(tract_mapper.plot_tracts_3d_scatter_w_atlas_colors, raw=raw,
                        coordinates_from_debug=coords_source_is_debug,
                        plot_onto_debug=coords_target_is_debug)
+
+
+class ColocalizationTab(PostProcessingTab):
+    def __init__(self, main_window, tab_idx, sample_manager, cell_tab: CellCounterTab | None = None):
+        super().__init__(main_window, 'colocalization_tab', tab_idx)
+        self.sample_manager = sample_manager
+        self.colocalization_processors = {}
+        if cell_tab is None:
+            self.main_window.print_warning_msg('Cell tab not passed to colocalization tab')
+        self.cell_tab = cell_tab
+        self.channels_ui_name = 'colocalization_params'
+        # self._setup_colocalization_pairs()
+
+    def _set_params(self):
+        self.params = ColocalizationParams(self.ui, self.sample_params, None)
+
+    def _get_channels(self):
+        # Create combinations (e.g., [('Ch0','Ch1'), ('Ch0','Ch2'), ('Ch1','Ch2')])
+        return itertools.combinations(self.sample_manager.channels_to_detect, 2)
+
+    def _set_channels_names(self):
+        if self.config_initialized():
+            return
+        default_channel_config = deepcopy(self.params.config['channels'].get('example'))
+        if default_channel_config:
+            self.params.config['channels'] = {}
+            for pair in self._get_channels():
+                pair_str = ('-'.join(pair)).lower()
+                if pair_str not in self.params.config['channels']:
+                    self.params.config['channels'][pair_str] = default_channel_config
+            self.params.config.write()
+            self._setup_workers()  # WARNING: a bit circular but if we need to amend channels
+                                   #    then we also reset the workers
+
+    def config_initialized(self):
+        return 'example' not in self.params.config['channels']
+
+    def _bind(self):
+        pass  # OK
+
+    def _bind_params_signals(self):
+        pass  # OK
+
+    def _setup_workers(self):
+        if self.sample_manager.workspace is not None:
+            if self.config_initialized():
+                self.params.ui_to_cfg()
+                for pair in self._get_channels():
+                    if pair not in self.colocalization_processors:
+                        self.colocalization_processors[pair] = ColocalizationProcessor(
+                            sample_manager=self.sample_manager,
+                            channels=pair)
+            else:
+                self.main_window.print_warning_msg(f'Channels not yet set in config. '
+                                                   f'Cannot define workers for {self.__class__}.')
+        else:
+            self.main_window.print_warning_msg('Workspace not initialised')
+
+    def finalise_workers_setup(self):  # REFACTORING: see if could be on_tab_clicked
+        pass # FIXME: assert that all channels detected
+        # is_first_channel = True
+        # for pair, processor in self.colocalization_processors.items():
+        #     if processor.registration_processor is None and self.aligner is not None:  # TODO: might be redundant with setup_workers
+        #         if is_first_channel:
+        #             self.params.ui_to_cfg()
+        #             is_first_channel = False
+        #         processor.setup(self.sample_manager, pair)
+
+    def _set_channel_config(self, channel):
+        """Add a new channel tab to the UI"""
+        pass  # OK
+
+    def _create_channels(self):  # WARNING: override necessary because we have pairs of channels
+        if not hasattr(self.ui, 'channelsParamsTabWidget'):
+            return
+        if not isinstance(self.ui.channelsParamsTabWidget, ExtendableTabWidget):
+            warnings.warn(f'Channel tab widget not finalised for  {self.name}, skipping channel creation')
+            return
+        for pair in self._get_channels():
+            channels_names_str = ('-'.join(pair)).lower()
+            if channels_names_str not in self.ui.channelsParamsTabWidget.get_channels_names():
+                self.add_channel_tab(channels_names_str)
+
+    def _bind_channel(self, page_widget, channel):
+        channel_a, channel_b = channel.split('-')
+        buttons_functions = [
+            ('colocalizationRunPushButton', functools.partial(self.run_colocalization_for_pair,
+                                                              channel_a=channel_a,
+                                                              channel_b=channel_b)),  # TODO: add load icon
+            ('colocalizationPlotPushButton', functools.partial(self.plot,
+                                                               channel_a=channel_a,
+                                                               channel_b=channel_b)),
+            ('colocalizationPlotSaveFilteredTablePushButton', functools.partial(self.save_filtered_table,
+                                                                                channel_a=channel_a,
+                                                                                channel_b=channel_b)),
+        ]
+        for btn_name, func in buttons_functions:
+            getattr(page_widget, btn_name).clicked.connect(func)
+
+    def run_colocalization_for_pair(self, channel_a, channel_b):
+        self._setup_workers()  # FIXME: see why not already setup
+        processor = self.colocalization_processors.get((channel_a, channel_b))
+        if processor:
+            processor.compute_colocalization()
+
+    def plot(self, channel_a, channel_b):
+        processor = self.colocalization_processors.get((channel_a, channel_b))
+        if processor:
+            self.wrap_plot(processor.plot_nearest_neighbors, channel_a=channel_a, channel_b=channel_b)
+
+    def save_filtered_table(self, channel_a, channel_b):
+        processor = self.colocalization_processors.get((channel_a, channel_b))
+        if processor:
+            processor.save_filtered_table()
 
 
 ################################################################################################
