@@ -152,7 +152,7 @@ def get_item_recursive(container, keys):
         if isinstance(container, ConfigObj):
             err_msg += f' path: {container.filename}'
         print(f'{err_msg} from "{container}"')
-        raise
+        raise err
 
 
 def set_item_recursive(dictionary, keys_list, val, fix_missing_keys=True):
