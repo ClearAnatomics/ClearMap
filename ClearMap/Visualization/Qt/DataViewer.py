@@ -615,11 +615,23 @@ class DataViewer(QWidget):
         self.scatter.clear()
         self.scatter_coords.axis = ax
         pos = self.scatter_coords.get_pos(index)
+        x_range, y_range = self.view.viewRange()
+        # Compute scale from the ratio between original and current view range
+        # TODO: link to     self.view.sigRangeChanged.connect(self.onRangeChanged) so it updates on zoom too
+        scale_x = self.source_range_x / (x_range[1] - x_range[0])
+        scale_y = self.source_range_y / (y_range[1] - y_range[0])
+        # transform = self.view.viewTransform()
+        # scale_x, scale_y = transform.m11(), transform.m22()
+        zoom_factor = (scale_x + scale_y) / 2.0
+
+        base_size = 10.0  # FIXME: that should be part of self.scatter
+        scaled_size = base_size * zoom_factor
+
         if all(pos.shape):
             if self.scatter_coords.has_colours:
                 self.scatter.setData(pos=pos,
                                      symbol=(self.scatter_coords.get_symbols(index)),
-                                     size=10,  # FIXME: scale size as function of zoom
+                                     size=scaled_size,
                                      **self.scatter_coords.get_draw_params(index))
             else:
                 self.scatter.setData(pos=pos, **DataViewer.DEFAULT_SCATTER_PARAMS.copy())  # TODO: check if copy required
@@ -627,8 +639,10 @@ class DataViewer(QWidget):
             if self.scatter_coords.half_slice_thickness is not None:
                 marker_params = self.scatter_coords.get_all_data(index)
                 if marker_params['pos'].shape[0]:
-                    self.scatter.addPoints(symbol='o', brush=pg.mkBrush((0, 0, 0, 0)),
-                                           **marker_params)  # FIXME: scale size as function of zoom
+                    marker_params['size'] *= zoom_factor
+                    self.scatter.addPoints(brush=pg.mkBrush((0, 0, 0, 0)), **marker_params)
+                    # self.scatter.addPoints(symbol='o', brush=pg.mkBrush((0, 0, 0, 0)),
+                    #                        **marker_params)  # FIXME: scale size as function of zoom
         except KeyError as err:
             print(f'DataViewer error: {err}')
 
