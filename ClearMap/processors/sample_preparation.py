@@ -360,6 +360,30 @@ class SampleManager(TabProcessor):
         if asset.exists:
             return asset.shape()
 
+    def needs_registering(self):  #  TODO: see if could be moved to RegistrationProcessor
+        reg_cfg = self.registration_cfg
+        alignment_partners = [cfg['align_with'] for cfg in reg_cfg['channels'].values()]
+
+        def check_registered(channel):
+            align_with = reg_cfg['channels'][channel]['align_with']
+            moving_channel = reg_cfg['channels'][channel]['moving_channel']
+            asset = self.get('aligned', channel=channel)
+            fixed_channel = channel if align_with == moving_channel else align_with
+            return asset.specify({'moving_channel': moving_channel, 'fixed_channel': fixed_channel}).exists
+
+        if all([p is None for p in alignment_partners]):  # Alignment deselected for all channels
+            return False
+        else:
+            ref_channel = self.alignment_reference_channel
+            for channel in self.channels:
+                if not ref_channel and reg_cfg['channels'][channel]['align_with'] == 'autofluorescence':
+                    warnings.warn(f'This should not happen, {channel=} set for registration against '
+                                  f'autofluorescence but no reference channel found')
+                    return False
+                else:
+                    if not check_registered(channel):
+                        return False
+
     def load_configs_from_dir(self):
         cfg_loader = ConfigLoader(self.src_directory)
         return [cfg_loader.get_cfg(name, must_exist) for name, must_exist in
