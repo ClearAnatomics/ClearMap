@@ -52,6 +52,8 @@ class Scatter3D:
 
         if self.__has_colours and not 'pen' in self.data.columns:
             # Finalise DF
+            if colors is None:
+                colors = self.data['colour'].values
             if colors is not None:
                 unique_colors = np.unique(colors)
                 self.point_map = pd.DataFrame({
@@ -137,15 +139,19 @@ class Scatter3D:
             current_z_data['colour'] = self.get_colours(indices=indices).values  # Otherwise uses index from source
             current_z_data['size'] = self.get_symbol_sizes(main_slice_idx, current_slice,
                                                            indices=indices, half_size=half_slice_thickness)
+            current_z_data['symbol'] = self.get_symbols(current_slice)  # FIXME: check if we need to verify that symbools exist
             if self.has_colours:
-                current_z_data['pen'] = self.data.loc[indices, 'pen'].values,
+                current_z_data['pen'] = self.data.loc[indices, 'pen'].values
+                # current_z_data['brush'] = self.data.loc[indices, 'brush'].values
             rows.append(current_z_data)
 
-        data_df = pd.concat(rows)
+        data_df = pd.concat(rows)  # FIXME: check if to_dict method in dataframe
         output = {'pos': data_df[['x', 'y']].values,  # WARNING: this is x/y of the view, not the 3D image
                   'size': data_df['size'].values}
         if self.has_colours:
             output['pen'] = data_df['pen'].values
+            output['symbol'] = data_df['symbol'].values
+            # output['brush'] = data_df['brush'].values
         return output
 
     def get_draw_params(self, current_slice):
