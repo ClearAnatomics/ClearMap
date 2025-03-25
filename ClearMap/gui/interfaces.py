@@ -275,9 +275,9 @@ class GenericTab(GenericUi):
             channels_ui_name to the name of the UI file for the channel tabs.
         """
         if not self.channels_ui_name:
-            warnings.warn(f'No channel UI name set for {self.name}.'
-                          f'This method is meant to be used for tab with channels. To use it'
-                          f'ensure that your tab has a channelsParamsTabWidget attribute and set'
+            warnings.warn(f'No channel UI name set for {self.name}. '
+                          f'This method is meant to be used for tab with channels. To use it, '
+                          f'ensure that your tab has a channelsParamsTabWidget attribute and set '
                           f'channels_ui_name to the name of the UI file for the channel tabs.')
             return
         channel, page_widget = self._init_channel_ui(channel)
