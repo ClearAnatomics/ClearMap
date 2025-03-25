@@ -715,6 +715,7 @@ class ClearMapGui(ClearMapGuiBase):
                 tab.set_params(self.tab_managers['sample_info'].params, self.config_loader.get_cfg(name))
 
     def finalise_tab_params(self):   # WARNING: run only after all tabs have been added
+        self.__add_post_processing_tabs()  # If e.g. workspace.update
         for tab in self.tab_managers.values():
             if not tab.params_finalised:  # FIXME: check if we really want this when we update the workspace with different channel names
                 tab.finalise_set_params()
@@ -753,8 +754,11 @@ class ClearMapGui(ClearMapGuiBase):
                                                    self.tab_managers['registration'].params.config)
         self.finalise_tab_params()
 
-    def __add_post_processing_tabs(self):
+    def __add_post_processing_tabs(self):  # FIXME: add or update
         sample_params = getattr(self.tab_managers['sample_info'], 'params', {})
+        if not sample_params:
+            warnings.warn(f'Sample params not set yet, skipping')
+            return
         for channel_param in sample_params.values():
             data_content_type = channel_param.data_type
             cls = DATA_TYPE_TO_TAB_CLASS.get(data_content_type)
