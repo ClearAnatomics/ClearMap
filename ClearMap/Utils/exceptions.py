@@ -93,6 +93,13 @@ class ClearMapWorkspaceError(ClearMapException):
     pass
 
 
+class MissingChannelError(ClearMapWorkspaceError):
+    """
+    Exception raised when a channel is missing
+    """
+    pass
+
+
 class ClearMapAssetError(ClearMapWorkspaceError):
     """
     Exception raised when there is an error with the asset
