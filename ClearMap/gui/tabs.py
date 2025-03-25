@@ -612,6 +612,8 @@ class RegistrationTab(PreProcessingTab):
             autofluo_config = deepcopy(self.aligner.config['channels'].get('autofluorescence'))  # FIXME: may not exist
             data_channel_config = deepcopy(self.aligner.config['channels']['channel_x'])
             self.aligner.config['channels'] = {}
+            reference_channel = self.sample_manager.alignment_reference_channel
+            data_channel_config['align_with'] = reference_channel
             for channel in self.sample_manager.channels:
                 if self.sample_manager.config['channels'][channel]['data_type'] == 'autofluorescence':
                         self.aligner.config['channels'][channel] = autofluo_config
