@@ -107,11 +107,11 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-import pyqtgraph as pg
 from PyQt5.QtWidgets import QApplication, QLabel
+import pyqtgraph as pg
+from pyqtgraph import PlotWidget
 
 import mpld3
-from pyqtgraph import PlotWidget
 
 from ClearMap.IO.assets_constants import DATA_CONTENT_TYPES, EXTENSIONS
 from ClearMap.processors.tract_map import TractMapProcessor
@@ -130,8 +130,8 @@ from ClearMap.Utils.exceptions import ClearMapVRamException, GroupStatsError, Mi
 
 from ClearMap.gui.dialogs import option_dialog
 from ClearMap.gui.interfaces import GenericTab, PostProcessingTab, PreProcessingTab, BatchTab
-from ClearMap.gui.widgets import (PatternDialog, DataFrameWidget,
-                                  LandmarksSelectorDialog, CheckableListWidget, FileDropListWidget)
+from ClearMap.gui.widgets import (PatternDialog, DataFrameWidget, LandmarksSelectorDialog,
+                                  CheckableListWidget, FileDropListWidget, ExtendableTabWidget)
 from ClearMap.gui.gui_utils import format_long_nb, np_to_qpixmap, replace_widget, unique_connect, get_widget
 from ClearMap.gui.params import (VesselParams, SampleParameters, StitchingParams,
                                  CellMapParams, GroupAnalysisParams, BatchProcessingParams, RegistrationParams,
@@ -140,9 +140,8 @@ from ClearMap.Visualization.Matplotlib.PlotUtils import plot_sample_stats_histog
 from ClearMap.Visualization.Qt.utils import link_dataviewers_cursors
 from ClearMap.Visualization.Qt import Plot3d as plot_3d
 
-from ClearMap.processors.sample_preparation import (StitchingProcessor,
-                                                    RegistrationProcessor, init_sample_manager_and_processors,
-                                                    SampleManager)
+from ClearMap.processors.sample_preparation import (SampleManager, StitchingProcessor,
+                                                    RegistrationProcessor, init_sample_manager_and_processors)
 from ClearMap.processors.cell_map import CellDetector
 try:
     from ClearMap.processors.tube_map import BinaryVesselProcessor, VesselGraphProcessor
