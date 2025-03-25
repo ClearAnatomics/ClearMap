@@ -719,6 +719,9 @@ class ClearMapGui(ClearMapGuiBase):
             if not tab.params_finalised:  # FIXME: check if we really want this when we update the workspace with different channel names
                 tab.finalise_set_params()
 
+    def has_tab(self, tab_cls):
+        return any([isinstance(tab, tab_cls) for tab in self.tab_managers.values()])
+
     def _init_sample_tab_mgr(self):
         """
         Clears all existing tabs and creates a new SampleInfoTab and group tabs.
@@ -758,9 +761,8 @@ class ClearMapGui(ClearMapGuiBase):
             if not cls:
                 warnings.warn(f'No tab class found for data_type: {data_content_type}')
                 continue  # Skip if no tab for that data type
-            if not any([isinstance(tab, cls) for tab in self.tab_managers.values()]):
+            if not self.has_tab(cls):
                 self.add_tab(cls, sample_manager=self.sample_manager, set_params=True)
-
 
     def add_tab(self, manager_class, tab_name='', set_params=False, **kwargs):
         """
@@ -772,6 +774,8 @@ class ClearMapGui(ClearMapGuiBase):
             The class of the tab manager to instantiate
         tab_name : str
             The name of the tab. If not given, will be the class name in snake case
+        set_params: bool
+            Whether to set the parameters of the tab from the config file immediately after creation
         kwargs : dict
             The keyword arguments to pass to the manager class constructor
         """
@@ -961,7 +965,7 @@ class ClearMapGui(ClearMapGuiBase):
         if tab.processing_type == 'post':
             if not tab.ui.isEnabled():
                 return
-            if self.needs_registering():
+            if self.sample_manager.needs_registering():
                 if self.popup('WARNING', 'Alignment not performed, please run first') == QMessageBox.Ok:
                     self.select_tab('registration')
                 else:
@@ -978,19 +982,6 @@ class ClearMapGui(ClearMapGuiBase):
                     self.conf_load_error_msg(cfg_name)
                 except FileNotFoundError:  # message already printed, just stop
                     return
-
-    def needs_registering(self):  # WARNING: can't use registration_processor.was_registered here
-        reg_cfg = self.sample_manager.registration_cfg
-        if all([cfg['align_with'] is None for cfg in reg_cfg['channels'].values()]):
-            return False  # Alignment deselected for all channels
-        else:
-            ref_channel = self.sample_manager.alignment_reference_channel
-            align_with = reg_cfg['channels'][ref_channel]['align_with']
-            moving_channel = reg_cfg['channels'][ref_channel]['moving_channel']
-
-            asset = self.sample_manager.get('aligned', channel=ref_channel)
-            fixed_channel = ref_channel if align_with == moving_channel else align_with
-            return not asset.specify({'moving_channel': moving_channel, 'fixed_channel': fixed_channel}).exists
 
     def select_tab(self, tab_name):  # WARNING: does not work
         tab_name_to_idx = {tab_name: self.tabWidget.indexOf(tab.ui) for tab_name, tab in self.tab_managers.items()}
