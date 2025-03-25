@@ -797,6 +797,7 @@ class ChannelCellMapParams(ChannelUiParameter):
     filter_cells: bool
     voxelize: bool
     save_shape: bool
+    colocalization_compatible: bool
     plot_when_finished: bool
     plot_detected_cells: bool
     crop_x_min: int
@@ -830,6 +831,9 @@ class ChannelCellMapParams(ChannelUiParameter):
             'filter_cells': ParamLink(None, self.tab.runCellMapFilterCellsCheckBox),
             'voxelize': ParamLink(None, self.tab.runCellMapVoxelizeCheckBox),
             'save_shape': ParamLink(None, self.tab.runCellMapSaveShapeCheckBox),
+            'colocalization_compatible': ParamLink(['detection', 'colocalization_compatible'],
+                                                   self.tab.runCellMapColocalizationCompatibleCheckBox,
+                                                   default=False, missing_ok=True),
             'n_detected_cells': ParamLink(None, self.tab.nDetectedCellsLabel),
             'n_filtered_cells': ParamLink(None, self.tab.nDetectedCellsAfterFilterLabel),
         }
@@ -938,7 +942,7 @@ class TractMapParams(ChannelsUiParameterCollection):
     def channel_params(self):
         return self._channels.values()
 
-    def add_channel(self, channel_name):  # FIXME: not called
+    def add_channel(self, channel_name):
         if channel_name not in self.keys():
             if channel_name not in self.config['channels']:
                 self.config['channels'][channel_name] = dict(deepcopy(self.default_channel_config()))
@@ -1046,6 +1050,82 @@ class ChannelTractMapParams(ChannelUiParameter):
     @property
     def slicing(self):
         return tuple([slice(ax[0], ax[1]) for ax in self.slice_tuples])
+
+
+class ColocalizationParams(ChannelsUiParameterCollection):
+    def __init__(self, tab, sample_params, _):#, registration_params):
+        super().__init__(tab)
+        self.pipeline_name = 'Colocalization'
+        self.sample_params = sample_params
+        # self.registration_params = registration_params
+
+    @property
+    def channels_to_process(self):
+        return [c for c, v in self.sample_params.config['channels'].items() if
+                CONTENT_TYPE_TO_PIPELINE[v['data_type']] == self.pipeline_name]  # FIXME:
+
+    def default_channel_config(self):
+        return self._default_config['channels']['example']
+
+    @property
+    def channel_params(self):
+        return self._channels.values()
+
+    def add_channel(self, channel_name):
+        if channel_name not in self.keys():
+            if channel_name not in self.config['channels']:
+                self.config['channels'][channel_name] = dict(deepcopy(self.default_channel_config()))
+            channel_params = ChannelColocalizationParams(self.tab, channel_name, self)
+            channel_params._config = self.config
+            self[channel_name] = channel_params
+
+    @property
+    def params(self):
+        return self.values()
+
+
+class ChannelColocalizationParams(ChannelUiParameter):
+    particle_diameter: int
+    max_particle_distance: float
+    relative_overlap_threshold: float
+    voxel_number_overlap_threshold: int
+
+    def __init__(self, tab, channel, main_params):
+        super().__init__(tab, channel)
+        self.params_dict = {
+            'particle_diameter': ParamLink(['comparison', 'particle_diameter'],
+                                           self.tab.colocalizationDiameterSpinBox),
+            'max_particle_distance': ParamLink(['analysis', 'max_particle_distance'],
+                                               self.tab.colocalizationMaxDistanceSpinBox),
+            'relative_overlap_threshold': ParamLink(['analysis', 'relative_overlap_threshold'],
+                                                    self.tab.colocalizationRelativeThresholdDoubleSpinBox),
+            'voxel_number_overlap_threshold': ParamLink(['analysis', 'voxel_number_overlap_threshold'],
+                                                        self.tab.colocalizationAbsoluteOverlapThresholdSpinBox),
+        }
+        self.main_params = main_params
+        self.advanced_controls = []  # FIXME: put as default in parent class
+        self.connect()
+
+    @property
+    def cfg_subtree(self):
+        return ['channels', self.name]
+
+    def handle_advanced_state_changed(self, state):
+        for ctrl in self.advanced_controls:
+            ctrl.setVisible(state)
+
+    def handle_name_changed(self):
+        # private config because absolute path
+        # TODO: check if dict() is required
+        self._config['channels'][self.name] = self._config['channels'].pop(self._cached_name)
+        self._cached_name = self.name
+
+    def connect(self):
+        self.connect_simple_widgets()
+
+    def cfg_to_ui(self):
+        self.reload()
+        super().cfg_to_ui()
 
 
 class VesselParams(UiParameterCollection):
