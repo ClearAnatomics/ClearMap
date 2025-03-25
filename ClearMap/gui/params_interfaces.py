@@ -50,13 +50,15 @@ class ParamLink:
                  widget: QWidget,
                  attr_name: str | None=None,
                  default: Any | None=None,
-                 connect: bool=True):
+                 connect: bool=True,
+                 missing_ok: bool=False):
         if keys is None:
             connect = False
         self.keys = keys
         self.widget = widget
         self.attr_name = attr_name
         self.default = default
+        self.missing_ok = missing_ok or bool(default)
         self.connect = connect
 
     def has_connect_function(self):
@@ -396,7 +398,14 @@ class UiParameter(QObject):
                     keys_list = keys_list.keys
                     if keys_list is None:  # For params without cfg
                         continue
-                val, current_amended = self._get_config_value(keys_list)
+                try:
+                    val, current_amended = self._get_config_value(keys_list)
+                except (KeyError, ConfigNotFoundError) as err:
+                    if self.params_dict[attr].missing_ok:
+                        val = self.params_dict[attr].default
+                        current_amended = True
+                    else:
+                        raise err
                 if attr in self.attrs_to_invert:
                     val = not val
                 if current_amended: # Update the config
@@ -427,6 +436,8 @@ class UiParameter(QObject):
             val = get_item_recursive(self.config, keys_list)
             return val, False
         except KeyError:
+            if self._default_config is None:
+                raise ConfigNotFoundError('Default config not set')
             val = get_item_recursive(self.default_config, keys_list)
             return val, True
 
