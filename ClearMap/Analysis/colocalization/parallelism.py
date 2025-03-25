@@ -81,7 +81,7 @@ def compare(
         df_0=df_0,
         df_1=df_1,
         scale=scale,
-        coord_names=coord_names,
+        coord_names=list(coord_names),
         function_type="block",
         axes=axes,
         overlap=overlap,
