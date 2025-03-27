@@ -425,7 +425,7 @@ def detect_cells_block(source, parameter=default_cell_detection_parameter, n_thr
     # cell shape detection  # FIXME: may use centers without assignment
     if parameter_shape:
         try:
-            parser = (lambda t: t[0]>0)
+            parser = (lambda t: t[0])
             shape, sizes = run_step('shape_detection', dog, sd.detect_shape, remove_previous_result=True, **default_step_params,
             args = [centers], presave_parser=parser, extra_kwargs={'verbose': parameter.get('verbose'), 'processes': n_threads, 'return_sizes': True})
         except ClearMapValueError as err:
