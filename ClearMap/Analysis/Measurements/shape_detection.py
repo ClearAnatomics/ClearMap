@@ -23,6 +23,7 @@ __webpage__ = 'https://idisco.info'
 __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
 import sys
+import warnings
 
 import numpy as np
 
@@ -151,12 +152,12 @@ def detect_shape(source, seeds, threshold=None, verbose=False, processes=None, a
 
     # We check that source has no 0 value otherwise the map source -> -source is not necessarily decreasing, eg for source.dtype=uint16.
     if np.any(source == 0) and np.issubdtype(source.dtype,np.unsignedinteger):
-        print('For sanity, we shift the source intensity by 1 prior to taking its opposite.')
-        if source.max() < np.ma.minimum_fill_value(source):
-            source+=1
-
-        else:
-            raise ClearMapValueError('An uint array with 0 values will lead to inconsistent results, consider a histogram transform or dtype conversion.')
+        max_val = np.ma.minimum_fill_value(source)
+        print('Received uint source array with 0 values. To avoid inconsistent results in watershedding, we need to shift the source intensity by 1 prior to taking its opposite.')
+        if not source.max() < max_val:
+            source = np.minimum(source,max_val-1)
+            warnings.warn(f'Received an uint source using the full range of available values. We had to clip upper values to {max_val-1} before shifting intensity by 1.')
+        source += 1
 
     try:
         shapes = skimage.morphology.watershed(-source, peaks, mask=mask, watershed_line=watershed_line)
