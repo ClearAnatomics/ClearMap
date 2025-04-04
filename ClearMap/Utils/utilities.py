@@ -5,6 +5,7 @@ utilities
 
 Various utilities that do not have a specific category
 """
+import multiprocessing
 import os
 import re
 import shutil
@@ -347,3 +348,10 @@ def validate_orientation(orientation, channel, raise_error=True):
                           f' using default {default_ori}')
             return default_ori
     return orientation
+
+
+def sanitize_n_processes(processes):
+    if processes < 0:
+        processes = multiprocessing.cpu_count() + processes
+    processes = max(processes, 1)
+    return processes

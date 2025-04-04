@@ -1,6 +1,4 @@
 import functools
-import glob
-import multiprocessing
 import os
 import platform
 import shutil
@@ -15,6 +13,7 @@ from matplotlib.colors import to_hex
 
 from ClearMap.IO import IO as cmp_io
 from ClearMap.Utils.exceptions import MissingRequirementException
+from ClearMap.Utils.utilities import sanitize_n_processes
 from ClearMap.processors.generic_tab_processor import TabProcessor
 from ClearMap.Alignment import Elastix as elastix
 from ClearMap.Alignment.Resampling import resample_points
@@ -32,13 +31,6 @@ USE_BINARY_POINTS_FILE = not platform.system().lower().startswith('darwin')  # i
 # WARNING: this has to be top level to be pickleable (because of the way multiprocessing works)
 def label_points_wrapper(annotator, coords):
     return np.expand_dims(annotator.label_points(coords), axis=-1)  # Add empty dim to match shape of coords
-
-
-def sanitize_n_processes(processes):
-    if processes < 0:
-        processes = multiprocessing.cpu_count() + processes
-    processes = max(processes, 1)
-    return processes
 
 
 class TractMapProcessor(TabProcessor):
