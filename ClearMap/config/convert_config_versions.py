@@ -225,8 +225,11 @@ def convert(cfg_path, backup=False, overwrite=False):
     return dest_path
 
 
-def convert_v2_1_to_v3_0(main_folder=''):
-    app = QApplication([])
+def convert_v2_1_to_v3_0(main_folder='', create_app=True):
+    if not create_app:
+        app = QApplication.instance()
+    else:
+        app = QApplication([])
     app.setStyleSheet(qdarkstyle.load_stylesheet_pyqt5())
 
     if not main_folder:
@@ -341,9 +344,13 @@ def convert_v2_1_to_v3_0(main_folder=''):
         os.rename(main_folder / old_name, main_folder / new_name)
 
 
-def convert_versions(previous_version: str, new_verison: str, main_folder: str = ''):
+def convert_versions(previous_version: str, new_verison: str, main_folder: str = '', create_app: bool = True):
     if previous_version == '2.1.0' and new_verison == '3.0.0':
-        convert_v2_1_to_v3_0(main_folder)
+        try:
+            convert_v2_1_to_v3_0(main_folder, create_app=create_app)
+        except Exception as err:
+            warnings.warn(f'Error converting {main_folder}: {err}')
+            return
     else:
         raise NotImplementedError(f'Conversion from {previous_version} to {new_verison} is not supported yet.')
 
