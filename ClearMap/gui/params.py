@@ -540,7 +540,7 @@ class ChannelRegistrationParams(ChannelUiParameter):  # FIXME: add signal for al
     def __init__(self, tab, channel_name):
         super().__init__(tab, channel_name)
         self.params_dict = {
-            'resample': ParamLink(['resample'], self.tab.resampleGroupBox),
+            'resample': ParamLink(['resample'], self.tab.resampleCheckBox),
             'resampled_resolution': ParamLink(['resampled_resolution'], self.tab.resampleResolutionTriplet),
             'align_with': ParamLink(['align_with'], self.tab.alignWithComboBox),
             'moving_channel': ParamLink(['moving_channel'], self.tab.movingChannelComboBox),
