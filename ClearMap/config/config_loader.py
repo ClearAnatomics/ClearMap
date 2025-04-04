@@ -31,7 +31,10 @@ def get_configobj_cfg(cfg_path, must_exist=True):
     cfg_path = clean_path(str(cfg_path))
     try:
         return configobj.ConfigObj(cfg_path, encoding="UTF8", indent_type='    ', unrepr=True, file_error=must_exist)
-    except configobj.ConfigObjError as err:
+    except configobj.ConfigObjError as err:  # FIXME: parse error message and reraise if
+                                             #   Could not read config file "/data/...registration_params.cfg",
+                                             #   some errors were encountered: "Parsing failed with several errors.
+                                             #   First error at line 19."
         print(f'Could not read config file "{cfg_path}", some errors were encountered: "{err}"')
 
 
@@ -62,7 +65,9 @@ def get_json_cfg(cfg_path):
     """
     raise NotImplementedError
 
-
+"""
+List of alternative names for configuration files.
+"""
 tabs_alternatives = [
     ['sample', 'sample_info', 'sample info'],
     ['stitching'],
