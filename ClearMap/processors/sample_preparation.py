@@ -444,7 +444,7 @@ class SampleManager(TabProcessor):
                 # FIXME: needs original resolution
                 #   resampling_params = {'original_resolution': ...}
             elif 'x_scale' in resolution_params.keys():
-                original_shape = {ax: s for ax, s in zip('xyz', asset.shape)}
+                original_shape = {ax: s for ax, s in zip('xyz', asset.shape())}
                 resampling_params = {f'{ax}_shape': original_shape[ax] // resolution_params[f'{ax}_scale']
                                      for ax in 'xyz'}
 
