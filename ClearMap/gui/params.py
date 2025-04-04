@@ -875,9 +875,16 @@ class ChannelCellMapParams(ChannelUiParameter):
         self._config['channels'][self.name] = self._config['channels'].pop(self._cached_name)
         self._cached_name = self.name
 
+    def handle_colocalization_compatible_changed(self, state):
+        self.config['detection']['colocalization_compatible'] = self.colocalization_compatible
+        if self.colocalization_compatible:
+            self.save_shape = True
+        self.tab.runCellMapSaveShapeCheckBox.setEnabled(not self.colocalization_compatible)
+
     def connect(self):
         self.tab.backgroundCorrectionDiameter.valueChanged.connect(self.handle_background_correction_diameter_changed)
         self.tab.cellFilterThresholdIntensityDoublet.valueChangedConnect(self.handle_filter_intensity_changed)
+        self.tab.runCellMapColocalizationCompatibleCheckBox.stateChanged.connect(self.handle_colocalization_compatible_changed)
         self.connect_simple_widgets()  # |TODO: automatise in parent class
 
     def cfg_to_ui(self):
