@@ -1,3 +1,5 @@
+import re
+
 import numpy as np
 import pandas as pd
 
@@ -6,6 +8,13 @@ from PyQt5.QtGui import QColor
 import pyqtgraph as pg
 
 from ClearMap.gui.gui_utils import pseudo_random_rgb_array
+
+
+def is_valid_hex_color(s):
+    """
+    To check if the input is a valid hex color triplet despite the lack of # at the start
+    """
+    return bool(re.fullmatch(r'(?:#[0-9a-fA-F]{6}|[0-9a-fA-F]{6})', s))
 
 
 class Scatter3D:
@@ -26,7 +35,7 @@ class Scatter3D:
             if smarties and colors is None:
                 n_samples = coordinates.shape[0]
                 colors = pseudo_random_rgb_array(n_samples)
-            if colors is not None and not str(colors[0]).startswith('#'):  # Convert to hex if not yet
+            if colors is not None and not is_valid_hex_color(str(colors[0])):  # Convert to hex if not yet
                 if not smarties:
                     colors_dict = {col: to_hex(col) for col in np.unique(colors, axis=0)}
                     colors_dict[None] = to_hex((1, 0, 0))  # default to red
