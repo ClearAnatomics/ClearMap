@@ -964,7 +964,7 @@ class CellCounterTab(PostProcessingTab):
         """
         if self.sample_manager.workspace is not None:
             if self.config_initialized():
-                self.params.ui_to_cfg()
+                self.params.ui_to_cfg()  # WARNING: check why
                 self.cell_detectors = {channel: CellDetector(self.sample_manager, channel)
                                        for channel in self.params.channels_to_detect}
             else:
@@ -1770,8 +1770,8 @@ class ColocalizationTab(PostProcessingTab):
 
     def _setup_workers(self):
         if self.sample_manager.workspace is not None:
-            if self.config_initialized():
-                self.params.ui_to_cfg()
+            if self.config_initialized():  # FIXME: we need to ensure the ui has already been loaded
+                # self.params.ui_to_cfg()
                 for pair in self._get_channels():
                     if pair not in self.colocalization_processors:
                         self.colocalization_processors[pair] = ColocalizationProcessor(
