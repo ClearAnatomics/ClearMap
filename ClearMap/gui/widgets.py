@@ -1186,7 +1186,8 @@ class PatternDialog(WizardDialog):
             p.path = page.result.text()
             p.data_type = page.dataTypeComboBox.currentText()
             p.extension = self.tile_extension[0]
-        self.params.ui_to_cfg()
+        # self.params.ui_to_cfg()
+        self.tab.update_pipelines()
         self.dlg.close()
 
 

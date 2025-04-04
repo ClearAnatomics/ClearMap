@@ -16,7 +16,9 @@ import math
 import os
 import sys
 import tempfile
+import time
 import warnings
+from copy import deepcopy
 from datetime import datetime
 
 from multiprocessing.pool import ThreadPool
@@ -38,6 +40,7 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget,
 
 import qdarkstyle
 from qdarkstyle import DarkPalette
+from torch import NoneType
 
 HARD_DEFAULT_FONT_SIZE = 11
 
@@ -110,25 +113,15 @@ from ClearMap.gui.style import (DARK_BACKGROUND, PLOT_3D_BG, BTN_STYLE_SHEET,
 from ClearMap.gui.widgets import (OrthoViewer, ProgressWatcher,
                                   StructureSelector, PerfMonitor, ManipulateAssetsDialog)  # Perfmonitor needs plot_3d
 update_pbar(app, progress_bar, 60)
-from ClearMap.gui.tabs import (SampleInfoTab, StitchingTab, RegistrationTab, CellCounterTab,
-                               VasculatureTab, GroupAnalysisTab, BatchProcessingTab, TractMapTab, ColocalizationTab)
-from ClearMap.gui.interfaces import BatchTab
+from ClearMap.gui.tabs import (SampleInfoTab, StitchingTab, RegistrationTab, GroupAnalysisTab, BatchProcessingTab,
+                               DATA_TYPE_TO_TAB_CLASS, CellCounterTab, ColocalizationTab)
+from ClearMap.gui.interfaces import BatchTab, PipelineTab
 from ClearMap.gui.preferences import PreferenceUi
 from ClearMap.processors.sample_preparation import SampleManager
 
 update_pbar(app, progress_bar, 80)
 
 pg.setConfigOption('background', PLOT_3D_BG)
-
-
-DATA_TYPE_TO_TAB_CLASS = {  # WARNING: not all data types are covered
-    'nuclei': CellCounterTab,
-    'cells': CellCounterTab,
-    'vessels': VasculatureTab,
-    'veins': VasculatureTab,
-    'arteries': VasculatureTab,
-    'myelin': TractMapTab,
-}
 
 # TODO
 """
@@ -596,7 +589,7 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         """
         cfg_folder = os.path.join(self.src_folder, 'config_snapshots', datetime.now().strftime('%y%m%d_%H_%M_%S'))  # REFACTOR: use pathlib
         os.makedirs(cfg_folder, exist_ok=True)
-        for param in self.params:
+        for param in self.params.values():
             if isinstance(param, UiParameterCollection):
                 cfg = param.config
             elif isinstance(param, UiParameter):
@@ -712,12 +705,28 @@ class ClearMapGui(ClearMapGuiBase):
         for name in ('stitching', 'registration'):  # FIXME: see why not postprocessing tabs too
             if tab:=self.tab_managers.get(name):
                 tab.sample_manager = self.sample_manager
+                # FIXME: check if the cfg passed here is a proper singleton
                 tab.set_params(self.tab_managers['sample_info'].params, self.config_loader.get_cfg(name))
 
     def finalise_tab_params(self):   # WARNING: run only after all tabs have been added
-        for tab in self.tab_managers.values():
+        self.__add_post_processing_tabs()  # If e.g. workspace.update
+        tabs = list(self.tab_managers.values())  # Avoid iterable resize during loop
+        for tab in tabs:
             if not tab.params_finalised:  # FIXME: check if we really want this when we update the workspace with different channel names
                 tab.finalise_set_params()
+
+        # Finalise second order tabs that might have been added
+        new_tabs = list(set(self.tab_managers.values()) - set(tabs))
+        if new_tabs:
+            for tab in new_tabs:
+                if not tab.params_finalised:
+                    tab.finalise_set_params()
+        if self.has_tab(CellCounterTab):
+            tab = self.tab_managers['cell_counter']
+            if len(tab.params.channels_to_detect) > 1:
+                if not self.has_tab(ColocalizationTab):
+                    tab = self.add_tab(ColocalizationTab, sample_manager=self.sample_manager, set_params=True)
+                    tab.finalise_set_params()
 
     def has_tab(self, tab_cls):
         return any([isinstance(tab, tab_cls) for tab in self.tab_managers.values()])
@@ -737,24 +746,89 @@ class ClearMapGui(ClearMapGuiBase):
         self.tabWidget.tabBarClicked.connect(self.handle_tab_click)
         self.tabWidget.setCurrentIndex(0)
 
-    def __init_pipeline_tabs(self):
+    def update_tabs(self, former_channels=None, new_channels=None):
         """ Initialises the pipeline tabs: Stitching, Registration, cell... based on sample"""
-        stitching_cfg = None
+
+        # Add stitching (if required) and registration tabs
+        stitching_tab = self.tab_managers.get('stitching', None)
+        stitching_params = getattr(stitching_tab, 'params', None)
+        stitching_cfg = getattr(stitching_params, 'config', None)
+        if not self.has_tab(RegistrationTab):
+            self.add_tab(RegistrationTab, sample_manager=self.sample_manager, set_params=True)  # WARNING: Always needed to allow setting None for atlas
+        reg_cfg = self.tab_managers['registration'].params.config
+
+        # WARNING: We need a first call to load_processors_config before checking the stitchable_channels (otherwise empty)
+        self.sample_manager.load_processors_config(stitching_cfg, reg_cfg)
         if self.sample_manager.stitchable_channels:
-            self.add_tab(StitchingTab, sample_manager=self.sample_manager, set_params=True)
+            if not self.has_tab(StitchingTab):
+                self.add_tab(StitchingTab, sample_manager=self.sample_manager, set_params=True)
             stitching_cfg = self.tab_managers['stitching'].params.config
-        self.add_tab(RegistrationTab, sample_manager=self.sample_manager, set_params=True)  # WARNING: Always needed to allow setting None for atlas
-        # if self.sample_manager.stitchable_channels:
-        #    self.tab_managers['stitching'].layout_channel_changed.connect(
-        #        self.tab_managers['registration'].handle_layout_channel_changed)
-        # FIXME: do we push to config to sample_manager here ?
+        self.sample_manager.load_processors_config(stitching_cfg, reg_cfg)
+
+        # Add post processing tabs
         self.__add_post_processing_tabs()
-        self.sample_manager.load_processors_config(stitching_cfg,
-                                                   self.tab_managers['registration'].params.config)
+
+        # Remove unnecessary tabs
+        sample_params = self.params.get('Sample info')
+        if sample_params is None:
+            warnings.warn(f'Sample params not set yet, skipping')
+            return
+
+        missing_channels = set(sample_params.channels) - set(self.sample_manager.workspace.asset_collections.keys())
+        if missing_channels:
+            warnings.warn(f'Channels {missing_channels} not found in workspace, skipping')
+            self.finalise_tab_params()
+            return
+
+        valid_tab_classes = self.__get_valid_tabs(sample_params)
+
+        tab_names = list(self.tab_managers.keys())
+        tabs = list(self.tab_managers.values())
+        for tab_name, tab in zip(tab_names, tabs):
+            if isinstance(tab, PipelineTab):
+                if not isinstance(tab, valid_tab_classes):
+                    # if no data_type justifies the pipelines in pipelines, remove the tab
+                    self.tab_managers.pop(tab_name)
+                    continue
+
+                new_channels = tab.filter_relevant_channels(new_channels)
+                former_channels = tab.filter_relevant_channels(former_channels, must_exist=False)
+
+                tab.update_channels(former_channels, new_channels)
+                time.sleep(2)  # FIXME: we shouldn't need this
+
+        # FIXME: tabs kept even if no channels     are selected
         self.finalise_tab_params()
 
+    def __get_valid_tabs(self, sample_params):
+        valid_tab_classes = [DATA_TYPE_TO_TAB_CLASS[sample_params[channel].data_type]
+                             for channel in sample_params.channels]
+        valid_tab_classes = [c for c in valid_tab_classes if c is not None]
+        valid_tab_classes += [NoneType]
+        # valid_tab_classes = [c for c in valid_tab_classes if c is not None]
+        has_tiled_channel = any([self.sample_manager.get('raw', channel=channel).is_tiled for
+                                 channel in sample_params.channels])
+        if has_tiled_channel:
+            valid_tab_classes.append(StitchingTab)
+        valid_tab_classes.append(RegistrationTab)
+        # Add compound type tabs to valid_tab_classes (e.g. colocalization)
+        if self.sample_manager.is_colocalization_compatible:
+            valid_tab_classes += [ColocalizationTab]
+        return tuple(set(valid_tab_classes))  # TODO: see way to preserve order if it matters
+
     def __add_post_processing_tabs(self):
+        """
+        Adds or removes postprocessing tabs as required by sample configuration
+        Returns
+        -------
+
+        """
         sample_params = getattr(self.tab_managers['sample_info'], 'params', {})
+        if not sample_params:
+            warnings.warn(f'Sample params not set yet, skipping')
+            return
+
+        # Add missing tabs
         for channel_param in sample_params.values():
             data_content_type = channel_param.data_type
             cls = DATA_TYPE_TO_TAB_CLASS.get(data_content_type)
@@ -823,7 +897,7 @@ class ClearMapGui(ClearMapGuiBase):
 
     @property
     def params(self):
-        return [tab.params for tab in self.tab_managers.values()]
+        return {tab.name: tab.params for tab in self.tab_managers.values()}
 
     @property
     def src_folder(self):
@@ -917,7 +991,7 @@ class ClearMapGui(ClearMapGuiBase):
         pass  # FIXME: implement
 
     def manipulate_assets(self):
-        dlg = ManipulateAssetsDialog(self.src_folder, self.params,
+        dlg = ManipulateAssetsDialog(self.src_folder, self.params['sample_info'],
                                      sample_manager=self.sample_manager,
                                      app=self)
         dlg.exec_()
@@ -955,7 +1029,7 @@ class ClearMapGui(ClearMapGuiBase):
         tab_index: int
             The index of the tab clicked
         """
-        if not self.sample_manager.setup_complete and 0 < tab_index < self._get_tab_index('group_analysis', increment=False):
+        if not self.sample_manager.setup_complete and 0 < tab_index < self._get_tab_index('Group analysis', increment=False):
             self.popup('WARNING', 'Workspace not initialised, cannot proceed to alignment')
             self.tabWidget.setCurrentIndex(0)
 
@@ -977,10 +1051,13 @@ class ClearMapGui(ClearMapGuiBase):
                 cfg_name = title_to_snake(tab.name)
                 try:
                     tab.setup()
-                    tab.set_params(self.tab_managers['sample_info'].params, self.config_loader.get_cfg(cfg_name))
+                    # FIXME: accepts path only ensure singleton
+                    tab.set_params(self.tab_managers['sample_info'].params,
+                                   self.config_loader.get_cfg_path(cfg_name))
+                    # FIXME: loading config will never work because exp not set for batch
                 except ConfigNotFoundError:
                     self.conf_load_error_msg(cfg_name)
-                except FileNotFoundError:  # message already printed, just stop
+                except FileNotFoundError as err:  # message already printed, just stop
                     return
 
     def select_tab(self, tab_name):  # WARNING: does not work
@@ -1051,9 +1128,10 @@ class ClearMapGui(ClearMapGuiBase):
             self.print_error_msg(f'Could not locate file for "{cfg_name}"')
             raise err
 
-        base_msg, msg = self.create_missing_file_msg(cfg_name.title().replace('_', ''),
-                                                     cfg_path, default_cfg_file_path)
-        if self.popup(msg) == QMessageBox.Ok:  # copy default config
+        # base_msg, msg = self.create_missing_file_msg(cfg_name.title().replace('_', ''),
+        #                                              cfg_path, default_cfg_file_path)
+        # if self.popup(msg) == QMessageBox.Ok:  # copy default config
+        if True:
             if not cfg_path.parent.exists():
                 os.mkdir(cfg_path.parent)
             copyfile(default_cfg_file_path, cfg_path)
@@ -1165,7 +1243,7 @@ class ClearMapGui(ClearMapGuiBase):
             convert_versions(sample_version, CLEARMAP_VERSION, src_folder)
         self.tab_managers['sample_info'].set_params(None, sample_cfg_path, False)
 
-        self.__init_pipeline_tabs()  # TODO: check if init or this
+        self.update_tabs()  # TODO: check if init or this
 
     def prompt_sample_id(self):
         """

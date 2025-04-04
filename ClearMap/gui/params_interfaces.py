@@ -8,7 +8,7 @@ from typing import List, Any
 from importlib_metadata import version
 from packaging.version import Version
 
-from PyQt5.QtCore import QObject, Qt
+from PyQt5.QtCore import QObject, Qt, pyqtSignal
 from PyQt5.QtWidgets import QCheckBox, QLabel, QLineEdit, QSpinBox, QFrame, QComboBox, QPlainTextEdit, QTextEdit, \
     QGroupBox, QWidget, QListWidget, QDoubleSpinBox
 
@@ -271,6 +271,12 @@ class UiParameter(QObject):
         else:
             QObject.__setattr__(self, key, value)
 
+    def get(self, item, default_value=None):
+        try:
+            return self.__getattribute__(item)
+        except AttributeError:
+            return default_value
+
     def connect_simple_widgets(self):
         for k in self.params_dict.keys():
             link = self.params_dict[k]
@@ -437,7 +443,8 @@ class UiParameter(QObject):
             return val, False
         except KeyError:
             if self._default_config is None:
-                raise ConfigNotFoundError('Default config not set')
+                raise ConfigNotFoundError(f'Default config not set for {self.__class__.__name__}. '
+                                          f'Regular config path is {self._config.filename}')
             val = get_item_recursive(self.default_config, keys_list)
             return val, True
 
@@ -493,6 +500,9 @@ class ChannelUiParameter(UiParameter, ABC, metaclass=UiParameterMeta):
     def __init__(self, tab, channel_name, name_widget_name=None):  # FIXME: not really a tab but a widget
         tab_widget = tab.channelsParamsTabWidget
         page, self.page_index = tab_widget.get_channel_widget(channel_name, return_idx=True)
+        if page is None:
+            raise ClearMapValueError(f'Channel {channel_name} not found in tab for {self.__class__.__name__}. '
+                                     f'Please add it first.')
         if name_widget_name is not None:
             self.nameWidget = getattr(page, name_widget_name)
             if page is None:
@@ -542,6 +552,7 @@ class UiParameterCollection(QObject):
     Although the attributes of contained `UiParameters` are accessible,
     it is recommended to first dereference them to avoid clashes.
     """
+    channelsChanged = pyqtSignal(list, list)  # FIXME: should be in ChannelsUiParameterCollection
     def __init__(self, tab, parent=None, *args, **kwargs):
         if parent is None:
             parent = tab
@@ -550,6 +561,21 @@ class UiParameterCollection(QObject):
         self.config = None
         self._default_config = None
 
+    def pop(self, key):
+        if not self.channels:
+            warnings.warn(f'Could not pop "{key}" from empty channels')
+        channels_before = self.channels
+        if key not in self.channels:
+            warnings.warn(f'Could not remove channel "{key}" not found in channels')
+            return
+        self.config['channels'].pop(key)
+        popped_channel = self.channel_params.pop(key)
+        tab = self.tab.channelsParamsTabWidget
+        tab.remove_channel_widget(key)
+        channels_after = self.channels
+        self.write_config()
+        self.channelsChanged.emit(channels_before, channels_after)
+        return popped_channel
 
     def fix_cfg_file(self, f_path):
         """Fix the file if it was copied from defaults, tailor to current sample"""
@@ -631,6 +657,14 @@ class ChannelsUiParameterCollection(UiParameterCollection):
     def __init__(self, tab):
         super().__init__(tab)
         self._channels = {}
+
+    @property
+    def channels(self):
+        return list(self._channels.keys())
+
+    @property
+    def channel_params(self):  # FIXME: just to match SampleParameters
+        return self._channels
 
     def __getitem__(self, item):
         return self._channels[item]

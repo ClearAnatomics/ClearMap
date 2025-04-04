@@ -108,8 +108,9 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from PyQt5.QtWidgets import QApplication, QLabel
+from PyQt5.QtWidgets import QApplication, QLabel, QButtonGroup
 import pyqtgraph as pg
+from natsort import natsorted
 from pyqtgraph import PlotWidget
 
 import mpld3
@@ -131,7 +132,7 @@ from ClearMap.Analysis.Statistics.group_statistics import make_summary, density_
 from ClearMap.Utils.exceptions import ClearMapVRamException, GroupStatsError, MissingRequirementException
 
 from ClearMap.gui.dialogs import option_dialog
-from ClearMap.gui.interfaces import GenericTab, PostProcessingTab, PreProcessingTab, BatchTab
+from ClearMap.gui.interfaces import GenericTab, PostProcessingTab, PreProcessingTab, BatchTab, PipelineTab
 from ClearMap.gui.widgets import (PatternDialog, DataFrameWidget, LandmarksSelectorDialog,
                                   CheckableListWidget, FileDropListWidget, ExtendableTabWidget)
 from ClearMap.gui.gui_utils import format_long_nb, np_to_qpixmap, replace_widget, unique_connect, get_widget
@@ -145,11 +146,7 @@ from ClearMap.Visualization.Qt import Plot3d as plot_3d
 from ClearMap.processors.sample_preparation import (SampleManager, StitchingProcessor,
                                                     RegistrationProcessor, init_sample_manager_and_processors)
 from ClearMap.processors.cell_map import CellDetector
-try:
-    from ClearMap.processors.tube_map import BinaryVesselProcessor, VesselGraphProcessor
-    graph_gt = True
-except ImportError:
-    graph_gt = False
+from ClearMap.processors.tube_map import BinaryVesselProcessor, VesselGraphProcessor
 from ClearMap.processors.batch_process import BatchProcessor
 
 __author__ = 'Charly Rousseau <charly.rousseau@icm-institute.org>'
@@ -172,6 +169,8 @@ class SampleInfoTab(GenericTab):
         self.channels_ui_name = 'channel_params'
         self.with_add_btn = True
         self.names_map = []
+        self.detached = False  # WARNING: To avoid calling update when channels are setup by
+                               #   the wizzard
 
     def _set_params(self):
         self.params = SampleParameters(self.ui, self.main_window.src_folder)
@@ -185,6 +184,7 @@ class SampleInfoTab(GenericTab):
         self.params.plotMiniBrain.connect(self.plot_mini_brain)
         self.params.plotAtlas.connect(self.display_atlas)
         self.params.channelNameChanged.connect(self.update_workspace)
+        self.params.channelsChanged.connect(self.update_pipelines)
 
     def _get_channels(self):
         return self.sample_manager.channels  # or list(self.params.config['channels'].keys())
@@ -218,8 +218,35 @@ class SampleInfoTab(GenericTab):
             self.names_map.append([channel, channel])
         else:
             self.names_map[self.ui.channelsParamsTabWidget.last_real_tab_idx - 1] = [channel, channel]
-        page_widget.dataTypeComboBox.addItems(list(set(DATA_CONTENT_TYPES)))
+        content_types = natsorted(list(set(DATA_CONTENT_TYPES)))
+        page_widget.dataTypeComboBox.addItems(content_types)
+        page_widget.dataTypeComboBox.setCurrentText('undefined')
         page_widget.extensionComboBox.addItems(EXTENSIONS['image'])
+        self.params[channel].nameChanged.connect(
+            functools.partial(self.invalidate_pipelines, channel=channel, name_changed=True))
+        page_widget.dataTypeComboBox.currentTextChanged.connect(
+            functools.partial(self.invalidate_pipelines, channel=channel, dtype_changed=True))
+
+    def invalidate_pipelines(self, channel, name_changed=False, dtype_changed=False):
+        """
+        This should be called whenever the channels change.
+        Either
+        Parameters
+        ----------
+        channel
+        name_changed
+        dtype_changed
+
+        Returns
+        -------
+
+        """
+        if channel not in self.sample_manager.channels:
+            pass # Remove from all tabs
+        else:
+            if dtype_changed:
+                self.update_pipelines()
+                # for each pipeline, check if that channel makes sense. If yes, keep or add otherwise, remove
 
     def save_cfg(self):  # REFACTOR: use this instead of direct calls to ui_to_cfg
         """Save the config to file"""
@@ -253,8 +280,6 @@ class SampleInfoTab(GenericTab):
 
     def remove_channel(self, channel):
         self.params.pop(channel)
-        self.ui.channelsParamsTabWidget.remove_channel_widget(channel)
-        self.params.ui_to_cfg()
 
     def update_workspace(self, old_name='', new_name=''):  # Necessary intermediate because at the beginning sample_manager is not set
         self.rename_channels(old_name, new_name)  # Includes call to sample_manager.update_workspace
@@ -262,8 +287,16 @@ class SampleInfoTab(GenericTab):
         # WARNING: not ideal to reload all.
         #  Should have option to reload only the workers if already setup (and not new exp)
         # Update other configs.
+        self.main_window.update_tabs()
         self.main_window.finalise_tab_params()
         self.save_cfg()
+
+    def update_pipelines(self, former_channels=None, new_channels=None):  # WARNING: unused args
+        if self.detached:
+            return
+        self.params.ui_to_cfg()
+        self.main_window.update_tabs(former_channels, new_channels)
+
 
     @property
     def src_folder(self):
@@ -310,10 +343,14 @@ class SampleInfoTab(GenericTab):
         pattern strings for the individual tiles, with specific characters
         representing the digits for the different axes.
         """
+        self.detached = True
+        former_channels = self.params.channels
         dlg = PatternDialog(self.src_folder, self.params, tab=self,
                             min_file_number=self.main_window.preference_editor.params.pattern_finder_min_n_files,
                             tile_extension=self.params.shared_sample_params.default_tile_extension)
         dlg.exec()
+        self.detached = False
+        self.update_pipelines(former_channels, self.params.channels)
 
     def plot_mini_brain(self, channel):
         """
@@ -328,8 +365,13 @@ class SampleInfoTab(GenericTab):
             mask, proj = aligner.project_mini_brain(channel)
             self.get_channel_ui(channel).miniBrainLabel.setPixmap(np_to_qpixmap(proj, mask))
         else:
-            warnings.warn('RegistrationProcessor not setup, cannot plot mini brain. '
-                          'Please call registration_tab.finalise_set_params() first')
+            self.update_workspace()
+            if aligner.setup_complete:
+                mask, proj = aligner.project_mini_brain(channel)
+                self.get_channel_ui(channel).miniBrainLabel.setPixmap(np_to_qpixmap(proj, mask))
+            else:
+                warnings.warn('RegistrationProcessor not setup, cannot plot mini brain. '
+                              'Please call registration_tab.finalise_set_params() first')
 
     def display_atlas(self, channel):
         """Plot the atlas as a grayscale image in the viewer"""
@@ -340,8 +382,12 @@ class SampleInfoTab(GenericTab):
         if stitcher.config:  # TODO: use setup_complete attribute or property instead
             self.wrap_plot(self.main_window.tab_managers['stitching'].stitcher.plot_atlas, channel)
         else:
-            warnings.warn('StitchingProcessor not setup, cannot plot atlas. '
-                          'Please call stitching_tab.finalise_set_params() first')
+            self.update_workspace()
+            if stitcher.config:
+                self.wrap_plot(self.main_window.tab_managers['stitching'].stitcher.plot_atlas, channel)
+            else:
+                warnings.warn('StitchingProcessor not setup, cannot plot atlas. '
+                              'Please call stitching_tab.finalise_set_params() first')
 
 
 class StitchingTab(PreProcessingTab):
@@ -359,6 +405,18 @@ class StitchingTab(PreProcessingTab):
         self.advanced_controls_names = [
             'channel.useNpyCheckBox',
         ]
+        self.set_relevant_data_types(DATA_TYPE_TO_TAB_CLASS)
+
+    def filter_relevant_channels(self, channels, must_exist=True):
+        if channels is None:
+            return
+        if must_exist:
+            new_channels = [c for c in channels if self.sample_manager.is_tiled(c)]
+        else:
+            new_channels = [c for c in channels if
+                            c not in self.sample_params or self.sample_manager.is_tiled(c)]
+        return new_channels
+
 
     def _read_configs(self, cfg_path):
         if self.sample_manager.stitching_cfg:
@@ -456,6 +514,7 @@ class StitchingTab(PreProcessingTab):
         Setup the worker (Processor) which handles the computations associated with this tab
         """
         self.sample_params.ui_to_cfg()
+        # FIXME: must ensure this is called before adding channels
         self.stitcher.setup(self.sample_manager, convert_tiles=False)
 
         # if self.sample_manager.has_tiles() and not self.sample_manager.has_npy():
@@ -495,6 +554,21 @@ class StitchingTab(PreProcessingTab):
         """
         self.stitcher.set_progress_watcher(watcher)
 
+    def prompt_conversion(self, channel):
+        """
+        Prompt the user to convert the tiles to npy for efficiency
+
+        Parameters
+        ----------
+        channel : str
+            The channel to convert
+        """
+        if not self.sample_manager.has_npy(channel):
+            if option_dialog('Convert tiles',
+                             'This operation is much slower with tiff files. '
+                             'Convert to npy for efficiency ?'):
+                self.convert_tiles()
+
     def preview_stitching_dumb(self, channel, color):
         """
         Preview the stitching based only on a *dumb* overlay of the tiles
@@ -507,6 +581,7 @@ class StitchingTab(PreProcessingTab):
         color : bool
             Whether to stitch in chessboard or continuous grayscale
         """
+        self.prompt_conversion(channel)
         stitched = self.stitcher.stitch_overlay(channel, color)
         if color:
             overlay = [pg.image(stitched)]
@@ -525,6 +600,7 @@ class StitchingTab(PreProcessingTab):
         asset_sub_type : str
             One of ('aligned_axis', 'aligned', 'placed')
         """
+        self.prompt_conversion(channel)
         n_steps = self.stitcher.n_rigid_steps_to_run
         self.wrap_step('Stitching', self.stitcher.stitch_channel_rigid,
                        step_args=[channel], step_kw_args={'_force': True},
@@ -602,6 +678,8 @@ class RegistrationTab(PreProcessingTab):
             'channel.selectLandmarksPushButtonInfoToolButton',
             'channel.landmarksWeightsGroupBox',
         ]
+        # self.set_relevant_data_types(DATA_TYPE_TO_TAB_CLASS)
+        self.relevant_data_types = 'all'
 
     def _read_configs(self, cfg_path):
         if self.sample_manager.registration_cfg:
@@ -653,16 +731,17 @@ class RegistrationTab(PreProcessingTab):
         self.params = RegistrationParams(self.ui)
 
     def _get_channels(self):
-        return [c for c in self.aligner.config['channels'].keys()]  # Not only channels to register so we can decide in UI
+        return self.sample_manager.channels  # All channels so we can decide whether to register in UI
 
     def _set_channel_config(self, channel):
         self.params[channel]._config = self.aligner.config
         self.params[channel].cfg_to_ui()  # Force it while the tab is active
 
     def _setup_channel(self, page_widget, channel):
-        page_widget.alignWithComboBox.addItems(self.aligner.channels_to_register())
+        page_widget.alignWithComboBox.addItems(list(set(self.aligner.channels_to_register()) - {channel}))
         page_widget.movingChannelComboBox.addItem('intrinsically aligned')
         page_widget.movingChannelComboBox.addItems(self.aligner.channels_to_register())
+        # FIXME: only available should be self or align_with
         alignment_files = [page_widget.paramsFilesListWidget.item(i).text() for i in
                   range(page_widget.paramsFilesListWidget.count())]  # no shortcut for standard QListWidget
         page_widget.paramsFilesListWidget = replace_widget(page_widget.paramsFilesListWidget,
@@ -689,10 +768,11 @@ class RegistrationTab(PreProcessingTab):
         if self.sample_manager.setup_complete:
             self.wrap_step('Setting up atlas', self.setup_atlas, n_steps=1, save_cfg=False, nested=False)  # TODO: abort_func=self.aligner.stop_process
 
-    def handle_layout_channel_changed(self, channel, layout_channel):
-        self.params[channel].align_with = layout_channel
-        self.params[channel].moving_channel = 'intrinsically aligned'
-        self.params[channel].cfg_to_ui()  # Update the UI to reflect the changes
+    # def handle_layout_channel_changed(self, channel, layout_channel):
+    #    """To select automatically "intrinsically aligned" if 2 channels have same stitching layout"""
+    #     self.params[channel].align_with = layout_channel
+    #     self.params[channel].moving_channel = 'intrinsically aligned'
+    #     self.params[channel].cfg_to_ui()  # Update the UI to reflect the changes
 
     def set_progress_watcher(self, watcher):
         """
@@ -740,7 +820,7 @@ class RegistrationTab(PreProcessingTab):
 
     def handle_align_with_changed(self, channel, align_with):
         if align_with == channel:
-            raise ValueError(f'Cannot align {channel=} with itself')
+            raise ValueError(f'Cannot align {channel=} with itself')  # FIXME: popup instead of crashing whole app (QT anyway)
         elif align_with is None:
             # Remove registration pipeline from channel
             pass
@@ -846,6 +926,7 @@ class CellCounterTab(PostProcessingTab):
         self.cell_size_histogram = None
 
         self.advanced_controls_names = ['channel.detectionShapeGroupBox']
+        self.set_relevant_data_types(DATA_TYPE_TO_TAB_CLASS)
 
     def _set_channels_names(self):
         """Patch the config with the actual channels if not already done"""
@@ -863,9 +944,10 @@ class CellCounterTab(PostProcessingTab):
         pass
 
     def _bind_params_signals(self):  # Execute at the end of finalise_set_params
-        if len(self.params.channels_to_detect) > 1:
-            if not self.main_window.has_tab(ColocalizationTab):
-                self.main_window.add_tab(ColocalizationTab, sample_manager=self.sample_manager, set_params=True)
+        pass
+        # if len(self.params.channels_to_detect) > 1:
+        #     if not self.main_window.has_tab(ColocalizationTab):
+        #         self.main_window.add_tab(ColocalizationTab, sample_manager=self.sample_manager, set_params=True)
         # self.ui.advancedCheckBox.stateChanged.connect(self.params.handle_advanced_state_changed)
 
     def _set_params(self):
@@ -903,7 +985,7 @@ class CellCounterTab(PostProcessingTab):
                     is_first_channel = False
                 detector.setup(self.sample_manager, channel, self.aligner)
             self.update_cell_number(channel)
-        if len(self.params.channels_to_detect) > 1:
+        if self.sample_manager.is_colocalization_compatible:
             for channel in self.cell_detectors.keys():
                 self.make_colocalization_compatible(channel)
             if not self.main_window.has_tab(ColocalizationTab):
@@ -1085,7 +1167,9 @@ class CellCounterTab(PostProcessingTab):
         """Run the cell detection on the whole sample"""
         detector = self.cell_detectors[channel]
         self.wrap_step('Detecting cells', detector.run_cell_detection,
-                       step_kw_args={'tuning': False, 'save_shape': self.params[channel].save_shape},  # FIXME: seems to crash
+                       step_kw_args={'tuning': False,
+                                     'save_shape': self.params[channel].save_shape or self.params[channel].colocalization_compatible,
+                                     'save_as_binary_mask': self.params[channel].colocalization_compatible},  # FIXME: seems to crash
                        abort_func=detector.stop_process)
         if detector.stopped:
             return
@@ -1157,6 +1241,9 @@ class CellCounterTab(PostProcessingTab):
         params = self.params[channel]
         if params.detect_cells:
             self.detect_cells(channel)
+            if not self.sample_manager.get('cells', channel=channel, asset_sub_type='raw').exists:
+                print('Cell detection aborted or failed. Exiting')
+                return
             self.update_cell_number(channel)
         if params.filter_cells:
             self.cell_detectors[channel].post_process_cells()  # FIXME: save cfg and use progress
@@ -1184,6 +1271,8 @@ class VasculatureTab(PostProcessingTab):
 
         self.binary_vessel_processor = None
         self.vessel_graph_processor = None
+
+        self.set_relevant_data_types(DATA_TYPE_TO_TAB_CLASS)
 
     def _set_channels_names(self):
         default_vessels_binarization_params = self.params.config['binarization'].pop('vessels', {})
@@ -1463,6 +1552,8 @@ class TractMapTab(PostProcessingTab):
 
         # self.advanced_controls_names = ['channel.tractMapAdvancedGroupBox']
 
+        self.set_relevant_data_types(DATA_TYPE_TO_TAB_CLASS)
+
     def _set_channels_names(self):
         """Patch the config with the actual channels if not already done"""
         if not set(self.params.config['channels'].keys()) <= set(self.sample_manager.channels):
@@ -1540,7 +1631,7 @@ class TractMapTab(PostProcessingTab):
         processor = self.tract_mappers[channel]
         if tuning:
             status_backup = processor.workspace.debug
-            processor.workspace.debug = True
+        processor.workspace.debug = tuning
         # self.wrap_step('Running tract map', processor.run_pipeline,
         #                step_kw_args={'tuning': tuning},
         #                abort_func=processor.stop_process)
@@ -1686,6 +1777,8 @@ class ColocalizationTab(PostProcessingTab):
                         self.colocalization_processors[pair] = ColocalizationProcessor(
                             sample_manager=self.sample_manager,
                             channels=pair)
+                    elif not self.colocalization_processors[pair].setup_finalised:
+                        self.colocalization_processors[pair].finalise_setup()
             else:
                 self.main_window.print_warning_msg(f'Channels not yet set in config. '
                                                    f'Cannot define workers for {self.__class__}.')
@@ -1729,25 +1822,62 @@ class ColocalizationTab(PostProcessingTab):
             ('colocalizationPlotSaveFilteredTablePushButton', functools.partial(self.save_filtered_table,
                                                                                 channel_a=channel_a,
                                                                                 channel_b=channel_b)),
+            ('colocalizationVoxelizeFilteredTablePushButton', functools.partial(self.voxelize_filtered_table,
+                                                                                channel_a=channel_a,
+                                                                                channel_b=channel_b)),
         ]
         for btn_name, func in buttons_functions:
             getattr(page_widget, btn_name).clicked.connect(func)
+
+        group = QButtonGroup(page_widget)
+        group.addButton(page_widget.colocalizationChannelAFirstRadioButton)
+        group.addButton(page_widget.colocalizationChannelBFirstRadioButton)
+        group.setExclusive(True)
+
+    def sort_channels(self, channel_a, channel_b):
+        """
+        Return the channels ordered based on the state of the First channel radio buttons
+
+        Parameters
+        ----------
+        channel_a: str
+            The name of the first channel
+        channel_b: str
+            The name of the second channel
+
+        Returns
+        -------
+        List[str]
+            The ordered list of channels where the first channel is the one selected by the user
+        """
+        page_widget = self.ui.channelsParamsTabWidget.get_channel_widget(f'{channel_a}-{channel_b}')
+        if page_widget.colocalizationChannelAFirstRadioButton.isChecked():
+            return channel_a, channel_b
+        else:
+            return channel_b, channel_a
 
     def run_colocalization_for_pair(self, channel_a, channel_b):
         self._setup_workers()  # FIXME: see why not already setup
         processor = self.colocalization_processors.get((channel_a, channel_b))
         if processor:
-            processor.compute_colocalization()
+            processor.compute_colocalization(self.sort_channels(channel_a, channel_b))
+
 
     def plot(self, channel_a, channel_b):
         processor = self.colocalization_processors.get((channel_a, channel_b))
         if processor:
-            self.wrap_plot(processor.plot_nearest_neighbors, channel_a=channel_a, channel_b=channel_b)
+            sorted_chan_a, sorted_chan_b = self.sort_channels(channel_a, channel_b)
+            self.wrap_plot(processor.plot_nearest_neighbors, channel_a=sorted_chan_a, channel_b=sorted_chan_b)
 
     def save_filtered_table(self, channel_a, channel_b):
         processor = self.colocalization_processors.get((channel_a, channel_b))
         if processor:
-            processor.save_filtered_table()
+            processor.save_filtered_table(self.sort_channels(channel_a, channel_b))
+
+    def voxelize_filtered_table(self, channel_a, channel_b):
+        processor = self.colocalization_processors.get((channel_a, channel_b))
+        if processor:
+            processor.voxelize_filtered_table(self.sort_channels(channel_a, channel_b))
 
 
 ################################################################################################
@@ -1862,7 +1992,7 @@ class GroupAnalysisTab(BatchTab):
     def _set_channels_names(self):
         pass  # TODO: check if required
 
-    def _set_params(self):
+    def _set_params(self):  # FIXME: not called before clicking "Results Folder"
         self.params = GroupAnalysisParams(self.ui, preferences=self.main_window.preference_editor.params)
 
     def _bind(self):
@@ -2008,3 +2138,17 @@ class BatchProcessingTab(BatchTab):
         self.params.ui_to_cfg()
         self.main_window.make_progress_dialog('Analysing samples', n_steps=0, maximum=0)  # TODO: see abort callback
         self.main_window.wrap_in_thread(self.processor.process_folders)
+
+
+DATA_TYPE_TO_TAB_CLASS = {  # WARNING: not all data types are covered
+    'nuclei': CellCounterTab,
+    'cells': CellCounterTab,
+    'vessels': VasculatureTab,
+    'veins': VasculatureTab,
+    'arteries': VasculatureTab,
+    'myelin': TractMapTab,
+    'autofluorescence': RegistrationTab,
+    'no-pipeline': None,
+    'undefined': None,
+    None: None,
+}

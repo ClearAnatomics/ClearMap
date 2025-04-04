@@ -109,13 +109,14 @@ class SampleChannelParameters(ChannelUiParameter):
         self._cached_name = self.name
 
 
-class SampleParameters(UiParameterCollection):
+class SampleParameters(UiParameterCollection):  # FIXME: why is this not a ChannelsUiParameterCollection
     """
     Class that links the sample params file to the UI
     """
     plotMiniBrain = pyqtSignal(int)    # Bind by number because name may change
     plotAtlas = pyqtSignal(int)    # Bind by number because name may change
     channelNameChanged = pyqtSignal(str, str)
+    channelsChanged = pyqtSignal(list, list)
 
     def __init__(self, tab, src_folder=None):
         self.shared_sample_params = SharedSampleParams(tab, src_folder=src_folder)
@@ -128,9 +129,8 @@ class SampleParameters(UiParameterCollection):
     def __setitem__(self, key, value):
         self.channel_params[key] = value
 
-    def pop(self, key):
-        self.config['channels'].pop(key)
-        return self.channel_params.pop(key)
+    def get(self, channel, default_value=None):
+        return self.channel_params.get(channel, default_value)
 
     def keys(self):
         return self.channel_params.keys()
@@ -161,8 +161,10 @@ class SampleParameters(UiParameterCollection):
             self.channel_params[channel].cfg_to_ui()
 
     def add_channel(self, channel_name):
+        channels_before = []
         if channel_name not in self.channel_params:
-            if channel_name not in self.config['channels']:  # WARNING: dangerous overwriting
+            if channel_name not in self.config['channels']:  # i.e. if we add after loading
+                channels_before = self.channels  # FIXME: what do we do if chan in self.config but not in self.channels
                 self.config['channels'][channel_name] = deepcopy(self.default_channel_config())
             channel_params = SampleChannelParameters(self.tab, channel_name)
             channel_params.nameChanged.connect(self.handle_channel_name_changed)
@@ -172,6 +174,7 @@ class SampleParameters(UiParameterCollection):
                 functools.partial(self.plotAtlas.emit, channel_params.page_index))
             channel_params._config = self.config
             self.channel_params[channel_name] = channel_params
+            channels_after = self.channels
 
         for chan, params in self.channel_params.items():
             new_items = list(set(self.channels) - {chan})
@@ -179,6 +182,8 @@ class SampleParameters(UiParameterCollection):
             params.tab.sampleChannelGeometryChannelCopyPushButton.clicked.connect(
                 functools.partial(self.propagate_params, chan))
 
+        if channels_before:  # TODO: check if empty list should not be passed
+            self.channelsChanged.emit(channels_before, channels_after)
 
     def handle_channel_name_changed(self, old_name, new_name):
         self.channelNameChanged.emit(old_name, new_name)
@@ -286,12 +291,25 @@ class StitchingParams(ChannelsUiParameterCollection):
     """
     def __init__(self, tab):
         super().__init__(tab)
+        self.__extra_channel = {}
 
-    def add_channel(self, channel_name):
-        if channel_name in self.keys():
+    def add_channel(self, channel_name, data_type=None):
+        if channel_name in self.channels:
             return
         else:
+            if 'channel_x' in self.config['channels']:
+                self.fix_default_config(channel_name)
+            if channel_name not in self.config['channels']:
+                self.config['channels'][channel_name] = deepcopy(self.__extra_channel)
+                self.config['channels'][channel_name]['layout_channel'] = self.channels[0]
             self[channel_name] = ChannelStitchingParams(self.tab, channel_name, config=self.config)
+
+    def fix_default_config(self, channel_name):
+        default_section = deepcopy(self.config['channels']['channel_x'])
+        self.__extra_channel = dict(self.config['channels']['channel_y'])
+        self.config['channels'] = {}
+        self.config['channels'][channel_name] = default_section
+        self.config['channels'][channel_name]['layout_channel'] = channel_name
 
     def handle_layout_channel_changed(self, channel, layout_channel):
         self.layoutChannelChanged.emit(channel, layout_channel)
@@ -680,13 +698,16 @@ class RegistrationParams(ChannelsUiParameterCollection):  # FIXME: does not seem
         self.atlas_params = AtlasParams(tab)
         self.shared_params = SharedRegistrationParams(tab)
 
-    def add_channel(self, channel_name):
+    def add_channel(self, channel_name, data_type=None):
         if channel_name in self.keys():
             return
         else:
             if channel_name not in self.config['channels']:
                 warnings.warn(f'Channel {channel_name} not in config, adding default')
-                absolute_default = self._default_config['channels']['channel_x']
+                if data_type == 'autofluorescence':
+                    absolute_default = self._default_config['channels']['autofluorescence']
+                else:
+                    absolute_default = self._default_config['channels']['channel_x']
                 default_cfg = self._default_config['channels'].get(channel_name, absolute_default)
                 self.config['channels'][channel_name] = deepcopy(default_cfg)
             channel_params = ChannelRegistrationParams(self.tab, channel_name)
@@ -779,16 +800,16 @@ class CellMapParams(ChannelsUiParameterCollection):
     @property
     def channels_to_detect(self):
         return [c for c, v in self.sample_params.config['channels'].items() if
-                CONTENT_TYPE_TO_PIPELINE[v['data_type']] == self.pipeline_name]
+                v['data_type'] and CONTENT_TYPE_TO_PIPELINE[v['data_type']] == self.pipeline_name]
 
     def default_channel_config(self):
         return self._default_config['channels']['example']
 
     @property
     def channel_params(self):
-        return self._channels.values()
+        return self._channels
 
-    def add_channel(self, channel_name):  # FIXME: not called
+    def add_channel(self, channel_name, data_type=None):  # FIXME: not called
         if channel_name not in self.keys():
             if channel_name not in self.config['channels']:
                 self.config['channels'][channel_name] = dict(deepcopy(self.default_channel_config()))
@@ -967,9 +988,9 @@ class TractMapParams(ChannelsUiParameterCollection):
 
     @property
     def channel_params(self):
-        return self._channels.values()
+        return self._channels
 
-    def add_channel(self, channel_name):
+    def add_channel(self, channel_name, data_type=None):
         if channel_name not in self.keys():
             if channel_name not in self.config['channels']:
                 self.config['channels'][channel_name] = dict(deepcopy(self.default_channel_config()))
@@ -1096,9 +1117,11 @@ class ColocalizationParams(ChannelsUiParameterCollection):
 
     @property
     def channel_params(self):
-        return self._channels.values()
+        return self._channels
 
-    def add_channel(self, channel_name):
+    def add_channel(self, channel_name, data_type=None):
+        if isinstance(channel_name, (tuple, list)):
+            channel_name = '-'.join(channel_name)
         if channel_name not in self.keys():
             if channel_name not in self.config['channels']:
                 self.config['channels'][channel_name] = dict(deepcopy(self.default_channel_config()))

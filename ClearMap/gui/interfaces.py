@@ -282,7 +282,12 @@ class GenericTab(GenericUi):
             return
         channel, page_widget = self._init_channel_ui(channel)
         if channel not in self.params.keys():
-            self.params.add_channel(channel)
+            if isinstance(self, PipelineTab):
+                chan_params = self.sample_params.get(channel, {})
+                d_type = getattr(chan_params, 'data_type', None)
+                self.params.add_channel(channel, d_type)
+            else:
+                self.params.add_channel(channel)
         self._set_channel_config(channel)
         self._setup_channel(page_widget, channel)
         self._bind_channel(page_widget, channel)
@@ -554,12 +559,14 @@ class GenericTab(GenericUi):
             self.main_window.setup_plots(dvs)
         return dvs
 
+
 class PipelineTab(GenericTab):
     processing_type = ''
     def __init__(self, main_window, ui_file_name, tab_idx, name=''):
         super().__init__(main_window, ui_file_name, tab_idx, name)
         self.sample_params = None
         self.sample_manager = None  # REFACTORING: check if redundant
+        self.relevant_data_types = []
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
@@ -567,6 +574,71 @@ class PipelineTab(GenericTab):
             raise NotImplementedError(
                 f"Class '{cls.__name__}' must override 'processing_type' with a string value."
             )
+
+    def filter_relevant_channels(self, channels, must_exist=True):
+        if channels is None:
+            return
+        if must_exist:
+            new_channels = [c for c in channels if self.relevant_data_types == 'all' or
+                            self.sample_params[c].data_type in self.relevant_data_types]
+        else:
+            new_channels = [c for c in channels if
+                            self.relevant_data_types == 'all' or
+                            c not in self.sample_params or
+                            self.sample_params[c].data_type in self.relevant_data_types]
+        return new_channels
+
+    def set_relevant_data_types(self, data_types_dict):
+        """
+        Set the relevant data types for this tab
+
+        Parameters
+        ----------
+        data_types_dict: dict
+            The dictionary of data types
+        """
+        self.relevant_data_types = list(set([k for k, v in data_types_dict.items() if v == self.__class__]))
+
+    def update_channels(self, former_channels=None, new_channels=None):
+        """
+        Update the configuration for the channels and the associated widgets
+
+        Parameters
+        ----------
+        former_channels: List[str] | None
+            The current list of channels
+        new_channels: List[str] | None
+            The updated list of channels
+        """
+        print(f'Updating channels for {self.name} from {former_channels} to {new_channels}')
+        if not self.params:
+            return
+        if not former_channels and not new_channels:  # FIXME: we need to calculate former channels
+            new_channels = self._get_channels()
+            if not former_channels:
+                former_channels = self.ui.channelsParamsTabWidget.get_channels_names()
+
+        former_channels_set = set(former_channels or [])
+        new_channels_set = set(new_channels or [])
+        if former_channels_set == new_channels_set:
+            return
+        if removed_channels := former_channels_set - new_channels_set:
+            for ch in removed_channels:
+                self.params.pop(ch)
+                # FIXME: try block to avoid error when channel not found
+                self.ui.channelsParamsTabWidget.remove_channel_widget(ch)
+        if added_channels := new_channels_set - former_channels_set:
+            for ch in added_channels:
+                try:
+                    self._setup_workers()  # FIXME: called in too many places
+                except KeyError:
+                    pass
+                self.add_channel_tab(ch)
+                self._setup_workers()
+                self.params.add_channel(ch)
+        # if new_channels is a superset of former_channels, we can just add the new channels
+
+
 
     def setup_sample_manager(self, sample_manager):
         """
@@ -730,6 +802,8 @@ class BatchTab(GenericTab):
             except FileNotFoundError as err:
                 self.main_window.print_error_msg(f'Could not locate file for "batch"')
                 raise err
+
+        self.set_params(cfg_path=cfg_path)
 
         self.main_window.logger.set_file(results_folder / 'info.log')  # WARNING: set logs to global results folder
         self.main_window.error_logger.set_file(results_folder / 'errors.html')
