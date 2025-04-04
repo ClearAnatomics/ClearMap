@@ -165,6 +165,9 @@ class SampleManager(TabProcessor):
                     if not content_type:
                         raise ValueError(f'No data type specified for channel {channel}. '
                                          f'Cannot create asset without data type')
+                        # FIXME: see if we could leave None and have minimum required assets
+                    elif content_type == 'undefined':  # Difference with None is intention
+                        continue
                     self.workspace.add_raw_data(file_path=raw_path,
                                                 channel_id=channel,
                                                 data_content_type=content_type,
