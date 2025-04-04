@@ -1111,6 +1111,7 @@ class ColocalizationParams(ChannelsUiParameterCollection):
 
 class ChannelColocalizationParams(ChannelUiParameter):
     particle_diameter: int
+    n_processes: int
     max_particle_distance: float
     relative_overlap_threshold: float
     voxel_number_overlap_threshold: int
@@ -1120,6 +1121,7 @@ class ChannelColocalizationParams(ChannelUiParameter):
         self.params_dict = {
             'particle_diameter': ParamLink(['comparison', 'particle_diameter'],
                                            self.tab.colocalizationDiameterSpinBox),
+            'n_processes': ParamLink(['performance', 'n_processes'], self.tab.colocalizationNProcessesSpinBox),
             'max_particle_distance': ParamLink(['analysis', 'max_particle_distance'],
                                                self.tab.colocalizationMaxDistanceSpinBox),
             'relative_overlap_threshold': ParamLink(['analysis', 'relative_overlap_threshold'],
