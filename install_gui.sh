@@ -188,6 +188,7 @@ else
     USE_TORCH="False";
 fi
 
+pip_mode="True"
 if [[ $USE_TORCH == "True" ]]; then
     green "Installing pytorch through conda may be restricted due to the license of the nvidia channel.
       If you prefer installing pytorch through pip, please select 'pip' below."
