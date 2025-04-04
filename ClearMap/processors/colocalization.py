@@ -9,6 +9,7 @@ import pyqtgraph as pg
 from ClearMap.Analysis.colocalization.channel import Channel as ColocalizationChannel
 from ClearMap.IO.assets_specs import ChannelSpec
 from ClearMap.Utils.exceptions import ClearMapValueError
+from ClearMap.Utils.utilities import sanitize_n_processes
 from ClearMap.Visualization.Qt.widgets import Scatter3D
 from ClearMap.processors.generic_tab_processor import TabProcessor
 
@@ -91,10 +92,13 @@ class ColocalizationProcessor(TabProcessor):
         channel_a, channel_b = self.channels
         # voxel_blob_diameter will also be used to compute the overlap
         voxel_blob_diameter = self.processing_config['comparison']['particle_diameter']
+        n_processes = sanitize_n_processes(self.processing_config['performance']['n_processes'])
+
         report = self.colocalization_channels[channel_a].compare(self.colocalization_channels[channel_b],
                                                                  blob_diameter=voxel_blob_diameter,
                                                                  size_min=4*voxel_blob_diameter,
-                                                                 size_max=8*voxel_blob_diameter)
+                                                                 size_max=8*voxel_blob_diameter, #  FIXME: add control for size_max
+                                                                 processes=n_processes)
         report_path = self.get_path('colocalization', channel=(channel_a, channel_b),
                                     asset_sub_type='report')
         report.reset_index(inplace=True)  # WARNING: extract the index (no drop) to a separate column to allow saving to feather
