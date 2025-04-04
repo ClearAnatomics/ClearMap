@@ -43,6 +43,7 @@ to the pipeline(s) that are relevant for that content type.
 """
 CONTENT_TYPE_TO_PIPELINE = {
     None: None,  # not configured
+    'undefined': None,
     'no-pipeline': None,  # configured but no pipeline
     'compound': None,
     'colocalization': 'Colocalization',
