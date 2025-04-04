@@ -621,7 +621,7 @@ class RegistrationProcessor(TabProcessor):
             'verbose': self.config['verbose']
         }  # WARNING: duplicate (use method ??)
         source_asset = self.get('stitched', channel=channel, default=None)
-        source_asset = source_asset if source_asset else self.get('raw', channel)
+        source_asset = source_asset if source_asset.exists else self.get('raw', channel)
         if not source_asset.exists:
             raise FileNotFoundError(f'Cannot resample {channel}, source {source_asset} missing')
 
