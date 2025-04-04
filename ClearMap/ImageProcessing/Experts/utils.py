@@ -49,7 +49,7 @@ def run_step(param_key, previous_result, step_function, args=(), remove_previous
             if presave_parser is None:
                 presave_parser = lambda t : t
             to_save = presave_parser(result)
-            # usefull sanity check
+            # useful sanity check
             if save_dtype=='bool':
                 save[base_slicing] = (to_save[valid_slicing] > 0)
             else:
