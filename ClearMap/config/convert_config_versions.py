@@ -305,6 +305,15 @@ def convert_v2_1_to_v3_0(main_folder='', create_app=True):
             new_name = f'{sample_id}_{new_name}'
         files_to_rename[file] = new_name
 
+    # remove stray underscore before extension in files_to_rename
+    def fix_stray_underscore(name):
+        f_path = Path(name)
+        if f_path.suffix and f_path.stem.endswith('_'):
+            return f_path.stem[:-1] + f_path.suffix
+        return name
+
+    files_to_rename = {k: fix_stray_underscore(v) for k, v in files_to_rename.items()}
+
     alignment_reference_channel = [name for name, section in sample_cfg['channels'].items()
                                    if section['data_type'] == 'autofluorescence']
     if alignment_reference_channel:
