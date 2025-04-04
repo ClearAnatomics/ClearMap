@@ -88,7 +88,10 @@ class Asset:
     def __new__(cls, *args, **kwargs):  # Used to optionally return an ExpressionAsset
         instance = super(Asset, cls).__new__(cls)
         instance.__init__(*args, **kwargs)
-        if instance.is_expression:  # TODO: maybe separate ExpressionAsset and TiledAsset
+        if instance.is_tiled:
+            instance = super(Asset, cls).__new__(TiledAsset)
+            instance.__init__(*args, **kwargs)
+        elif instance.is_expression:  # TODO: maybe separate ExpressionAsset and TiledAsset
             instance = super(Asset, cls).__new__(ExpressionAsset)
             instance.__init__(*args, **kwargs)
         return instance
@@ -627,7 +630,6 @@ class ExpressionAsset(Asset):
     def create(self, *args, **kwargs):
         raise NotImplementedError('Cannot create a tiled asset. This needs to be implemented in the FileList module')
 
-    @property
     def shape(self):
         if self.is_tiled:
             raise ValueError(f'Asset {self} is tiled. Cannot determine shape without stitching.')
@@ -676,6 +678,8 @@ class ExpressionAsset(Asset):
             True if all tiles exist, False otherwise.
         """
         # noinspection PyTypeChecker
+        if not self.file_list:
+            return False
         return len(self.file_list) == self.n_tiles
 
     @property
