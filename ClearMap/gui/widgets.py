@@ -21,6 +21,7 @@ import numpy as np
 import psutil
 
 import pyqtgraph as pg
+from natsort import natsorted
 from qdarkstyle import DarkPalette
 
 from PyQt5 import QtCore, QtWidgets
@@ -1086,8 +1087,9 @@ class PatternDialog(WizardDialog):
 
         group_controls.patternButtonBox.button(QDialogButtonBox.Apply).clicked.connect(self.validate_pattern)
         group_controls.channelNameLineEdit.setText(f'channel_{self.n_image_groups}')  # FIXME: check if could read from CFG
-        data_types = list(dict.fromkeys(DATA_CONTENT_TYPES))  # avoid duplicates while keeping order
+        data_types = natsorted(list(dict.fromkeys(DATA_CONTENT_TYPES)))  # avoid duplicates while keeping order
         group_controls.dataTypeComboBox.addItems(data_types)
+        group_controls.dataTypeComboBox.setCurrentText('undefined')
 
         self.n_image_groups += 1
 
@@ -1154,6 +1156,17 @@ class PatternDialog(WizardDialog):
         channel_names = self.get_channel_names()
         tab_widget = self.params.tab.channelsParamsTabWidget
         tab_channel_names = tab_widget.get_channels_names()
+
+        undefined = False
+        for i in range(self.dlg.patternToolBox.count()):
+            page = self.dlg.patternToolBox.widget(i)
+            if page.dataTypeComboBox.currentText() == 'undefined':
+                undefined = True
+                break
+        if undefined:
+            warning_popup('Some data types are not defined, '
+                          'please select a valid data type before saving')
+            return
         # If tab_channel_names has channel names not in channel_names, prompt to remove the tabs
         if set(tab_channel_names) - set(channel_names):
             answer = warning_popup('Extra channels found in the tab, do you want to remove them ?')
