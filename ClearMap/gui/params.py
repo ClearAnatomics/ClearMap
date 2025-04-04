@@ -40,6 +40,7 @@ class SampleChannelParameters(ChannelUiParameter):
     def __init__(self, tab, channel_name):
         super().__init__(tab, channel_name, 'nameLineEdit')
         self.params_dict = {
+            'geometry_settings_from': ParamLink(None, self.tab.sampleChannelGeometryChannelComboBox),
             'data_type': ParamLink(['data_type'], self.tab.dataTypeComboBox),
             'extension': ParamLink(['extension'], self.tab.extensionComboBox),
             'path': ParamLink(['path'], self.tab.pathPlainTextEdit),
@@ -53,6 +54,10 @@ class SampleChannelParameters(ChannelUiParameter):
         # property to be dynamic
         # self.cfg_subtree = ['channels', channel_name]
         self.connect()
+
+    def set_geometry_settings_from_options(self, items):
+        self.tab.sampleChannelGeometryChannelComboBox.clear()
+        self.tab.sampleChannelGeometryChannelComboBox.addItems(items)
 
     @property
     def cfg_subtree(self):
@@ -166,15 +171,28 @@ class SampleParameters(UiParameterCollection):
             channel_params._config = self.config
             self.channel_params[channel_name] = channel_params
 
+        for chan, params in self.channel_params.items():
+            new_items = list(set(self.channels) - {chan})
+            params.set_geometry_settings_from_options(new_items)
+            params.tab.sampleChannelGeometryChannelCopyPushButton.clicked.connect(
+                functools.partial(self.propagate_params, chan))
+
+
     def handle_channel_name_changed(self, old_name, new_name):
         self.channelNameChanged.emit(old_name, new_name)
 
     def get_channel_name(self, channel_idx):
         return self.tab.channelsParamsTabWidget.tabText(channel_idx)
 
+    def propagate_params(self, channel):
+        target_params = self[channel]
+        ref_params = self[target_params.geometry_settings_from]
+        for key in ('slice_x', 'slice_y', 'slice_z', 'resolution', 'orientation'):
+            setattr(target_params, key, getattr(ref_params, key))
+
     def default_channel_config(self):
         return {
-            'data_type': '',  # TODO: None or '' ?
+            'data_type': 'undefined',
             'extension': '.ome.tif',
             'path': '',
             'resolution': [0, 0, 0],
