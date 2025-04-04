@@ -30,8 +30,13 @@ def get_configs(v1_path, v2_path=''):
 
 def convert_sample_config_2_1_0_to_3_0_0(v1_path, v2_path=''):
     config_v1, config_v2 = get_configs(v1_path, v2_path)
+    if config_v1['clearmap_version'] == '3.0.0':
+        warnings.warn('Sample config already in version 3.0.0')
+        return config_v1.filename
     if config_v1['clearmap_version'] != '2.1.0':
-        raise ValueError('Only version 2.1.0 is supported')
+        raise ValueError(f'Error converting {v1_path} '
+                         f'with version {config_v1["clearmap_version"]}'
+                         f'Only version 2.1.0 is supported')
 
     def v1_or_default(key):
         return config_v1.get(key, default_cfg[key])
@@ -71,6 +76,9 @@ def convert_sample_config_2_1_0_to_3_0_0(v1_path, v2_path=''):
 
 def convert_cell_map_config_2_1_0_to_3_0_0(v1_path, v2_path, channel_name='channel_0'):
     config_v1, config_v2 = get_configs(v1_path, v2_path)
+    if config_v1['clearmap_version'] == '3.0.0':
+        warnings.warn('Sample config already in version 3.0.0')
+        return config_v1.filename
     if config_v1['clearmap_version'] != '2.1.0':
         raise ValueError('Only version 2.1.0 is supported')
 
