@@ -1,5 +1,6 @@
 import glob
 import os
+import re
 from copy import deepcopy
 from pathlib import Path
 
@@ -7,6 +8,7 @@ import pandas as pd
 
 import tifffile
 from PIL import Image
+from natsort import natsorted
 from tqdm import tqdm
 
 from ClearMap.IO.Workspace import Workspace
@@ -160,6 +162,13 @@ def get_tiles_list_from_sample_folder(src_dir: Path, min_file_number=10, tile_ex
     return data_dirs
 
 
+def extract_channel_number(pattern_str):
+    match = re.search(r'(?:_)?[cC](\d{1,2})\b', pattern_str)
+    if match:
+        return int(match.group(1))
+    return None
+
+
 def pattern_finders_from_base_dir(src_dir, min_file_number=10, tile_extension=['.ome.tif', '.ome.npy']):
     src_dir = Path(src_dir)
     if not isinstance(tile_extension, (tuple, list)):
@@ -174,7 +183,19 @@ def pattern_finders_from_base_dir(src_dir, min_file_number=10, tile_extension=['
             finders.extend(tmp)
         else:
             finders.append(tmp)
-    return finders
+
+    channel_finders = []
+    no_channel_finders = []
+    for finder in finders:
+        if extract_channel_number(finder.pattern.pattern_str) is not None:
+            channel_finders.append(finder)
+        else:
+            no_channel_finders.append(finder)
+
+    channel_finders = natsorted(channel_finders, key=lambda f: extract_channel_number(f.pattern.pattern_str))
+    no_channel_finders = natsorted(no_channel_finders, key=lambda f: f.pattern.pattern_str)
+
+    return no_channel_finders + channel_finders
 
 
 class Pattern(Expression):
