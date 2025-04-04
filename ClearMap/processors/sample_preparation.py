@@ -1023,8 +1023,14 @@ class StitchingProcessor(TabProcessor):
                 raise MissingRequirementException(f'Channel {channel} missing tiles')
         self.set_watcher_step(f'Stitching {channel} rigid')
         rigid_cfg = self.config['channels'][channel]['rigid']
+
+        raw_asset = self.get('raw', channel=channel)
+        if raw_asset.is_expression:
+            params_file = raw_asset.file_list[0]
+        else:
+            params_file = raw_asset.existing_path
         overlaps, projection_thickness = define_auto_stitching_params(
-            self.get('raw', channel=channel).file_list[0],
+            params_file,
             rigid_cfg)
         layout = self.get_wobbly_layout(channel, overlaps)
         if rigid_cfg['background_pixels'] is None:
