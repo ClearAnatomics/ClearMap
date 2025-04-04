@@ -356,6 +356,7 @@ class BinaryVesselProcessor(TabProcessor):
 
     def combine_binary(self):
         """Merge the binary images of the different vascular network components into a single mask"""
+        # FIXME: probably missing the call to workspace.add_channel(self.channels_to_binarize())
         sink_asset = self.get('binary', channel=self.channels_to_binarize(), asset_sub_type='combined')  # Temporary
         if len(self.channels_to_binarize()) > 1:
             sources = [self.get_path('binary', channel=channel, asset_sub_type='filled') for channel in self.channels_to_binarize()]
