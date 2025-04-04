@@ -17,6 +17,13 @@ class ClearMapValueError(ClearMapException, ValueError):
     pass
 
 
+class ClearMapRuntimeError(ClearMapException, RuntimeError):
+    """
+    Base exception for all exceptions related to runtime errors
+    """
+    pass
+
+
 class ClearMapIoException(ClearMapException, IOError):
     """
     Base exception for all exceptions related to input/output operations
