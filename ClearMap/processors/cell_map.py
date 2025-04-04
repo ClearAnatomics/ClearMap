@@ -86,6 +86,7 @@ class CellDetector(TabProcessor):
             configs = sample_manager.get_configs()
             self.sample_config = configs['sample']
             self.machine_config = configs['machine']
+            # FIXME: potential issue of config duplication if several instances are called
             self.processing_config = self.sample_manager.config_loader.get_cfg('cell_map')['channels'][self.channel]
 
             self.set_progress_watcher(self.sample_manager.progress_watcher)
@@ -277,11 +278,12 @@ class CellDetector(TabProcessor):
             cell_detection_param['shape_detection']['save'] = shape_path
 
         if save_shape:
+            clearmap_io.delete_file(shape_path)
             cell_detection_param['shape_detection']['save'] = shape_path
             # erase any prior existing file to prevent confusion of sink with source in IO.initialize
-            Path(shape_path).unlink(missing_ok=True)
-            if save_as_binary_mask:
-                cell_detection_param['shape_detection']['save_dtype'] = 'bool'
+            # Path(shape_path).unlink(missing_ok=True)
+            # if save_as_binary_mask:
+                # cell_detection_param['shape_detection']['save_dtype'] = 'bool'
 
         if save_maxima:
             maxima_path = self.get_path('cells', channel=self.channel, asset_sub_type='maxima')
@@ -306,8 +308,10 @@ class CellDetector(TabProcessor):
                                         cell_detection_parameter=cell_detection_param,
                                         processing_parameter=processing_parameter,
                                         workspace=self.workspace)  # WARNING: prange inside multiprocess (including arrayprocessing and devolvepoints for vox)
+            if save_shape and save_as_binary_mask and clearmap_io.dtype(shape_path) != 'bool':
+                clearmap_io.write(shape_path, np.array(clearmap_io.read(shape_path).astype('bool')))
         except BrokenProcessPool as err:
-            print('Cell detection canceled')
+            print(f'Cell detection canceled, see: {err}')
             return
         finally:
             self.workspace.debug = False
