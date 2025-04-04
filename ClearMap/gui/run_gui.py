@@ -18,13 +18,13 @@ import sys
 import tempfile
 import time
 import warnings
-from copy import deepcopy
 from datetime import datetime
 
 from multiprocessing.pool import ThreadPool
 from pathlib import Path
 from shutil import copyfile
 from statistics import mode
+from types import NoneType
 
 from importlib_metadata import version
 
@@ -40,7 +40,6 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget,
 
 import qdarkstyle
 from qdarkstyle import DarkPalette
-from torch import NoneType
 
 HARD_DEFAULT_FONT_SIZE = 11
 
