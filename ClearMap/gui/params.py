@@ -34,6 +34,8 @@ __copyright__ = 'Copyright © 2022 by Charly Rousseau'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
+from ClearMap.processors.sample_preparation import SampleManager
+
 
 class SampleChannelParameters(ChannelUiParameter):
     nameChanged = pyqtSignal(str, str)
@@ -1731,9 +1733,13 @@ class GroupAnalysisParams(BatchParameters):
         self.tab.comparisonsVerticalLayout.addStretch()
 
         plot_channel_combobox = QComboBox()
-        plot_channel_combobox.addItems(self.main_params.sample_params.channels_to_detect)
-        self.tab.comparisonsVerticalLayout.addWidget(plot_channel_combobox)
-        plot_channel_combobox.currentTextChanged.connect(self.handle_plot_channel_changed)
+        sample_manager = SampleManager()
+        sample_folders_paths = self.get_all_paths()
+        if sample_folders_paths:
+            sample_manager.setup(sample_folders_paths[0])
+            plot_channel_combobox.addItems(sample_manager.channels_to_detect)  # FIXME: load first sample and compute
+            self.tab.comparisonsVerticalLayout.addWidget(plot_channel_combobox)
+            plot_channel_combobox.currentTextChanged.connect(self.handle_plot_channel_changed)
 
     def handle_plot_channel_changed(self):
         self.plot_channel = self.tab.plotChannelComboBox.currentText()
