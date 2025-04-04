@@ -1797,6 +1797,8 @@ class ExtendableTabWidget(QTabWidget):
         return [self.tabText(i) for i in range(self.last_real_tab_idx)]
 
     def add_channel_widget(self, widget, name=''):
+        if isinstance(name, (tuple, list)):  # For compound channels, concatenate names
+            name = '-'.join(name)
         tab_name = name if name else f"Channel_{self.count() - 1}"
         self.insertTab(self.last_real_tab_idx, widget, tab_name)
         self.setCurrentWidget(widget)
