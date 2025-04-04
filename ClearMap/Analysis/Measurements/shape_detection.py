@@ -155,7 +155,7 @@ def detect_shape(source, seeds, threshold=None, verbose=False, processes=None, a
         max_val = np.ma.minimum_fill_value(source)
         print('Received uint source array with 0 values. To avoid inconsistent results in watershedding, we need to shift the source intensity by 1 prior to taking its opposite.')
         if not source.max() < max_val:
-            source = np.minimum(source,max_val-1)
+            source = np.clip(source, a_min=None, a_max=max_val-1)
             warnings.warn(f'Received an uint source using the full range of available values. We had to clip upper values to {max_val-1} before shifting intensity by 1.')
         source += 1
 
