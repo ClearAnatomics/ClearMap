@@ -185,7 +185,6 @@ class Workspace2:  # REFACTOR: subclass dict
     def add_channel(self, channel_spec, sample_id=''):
         self.asset_collections[channel_spec.name] = AssetCollection(self.directory, sample_id, channel_spec)
 
-
     def add_pipeline(self, pipeline_name, channel_id=None, **kwargs):
         """
         Add a pipeline to the workspace. This implies creating the corresponding assets
