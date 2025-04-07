@@ -137,6 +137,29 @@ def _data_frame_ok(df: pd.DataFrame):
         and "index" not in df.columns
     )
 
+def contiguous_labels(labels):#TODO: try optimization with return_index argument of np.unique
+    vals = np.unique(labels)
+    labels = np.searchsorted(vals,labels)
+    return labels
+
+def cleanup(binary_img:np.ndarray,df:pd.DataFrame,coord_names):
+    """Return the labeled image giving exactly the connected components of binary_img that correspond to a representative in dataframe.
+    Parameters
+    ----------
+    binary_img : np.ndarray
+        _description_
+    df : pd.DataFrame
+        _description_
+    coord_names : _type_
+        _description_
+    """
+    labels = ndi.label(binary_img)
+    coords = df[coord_names]
+    relevant_labels = np.array([labels[tuple(coords.iloc[index])] for index in range(df)])
+    cleaned_labels = np.where(np.isin(labels, relevant_labels), labels,0)
+    cleaned_labels = contiguous_labels(cleaned_labels)
+    return cleaned_labels
+
 
 class Channel:
     """In our context a channel is represented by a binary mask and some voxel coordinates in a dataframe.
@@ -156,6 +179,8 @@ class Channel:
         voxel_dims=None,
         physical_origin=None,
         channel_name="",
+        clean_image:bool=False,
+        already_clean:bool=False
     ) -> None:
         """Instantiate an object
 
@@ -173,7 +198,11 @@ class Channel:
             _description_, by default None
         channel_name : str, optional
             _description_, by default ""
-
+        clean_image: bool
+            If connected components of binary_img corresponding to no representative in dataframe should be erased. Defaults to False.
+            This is a costly operation designed to be used only in blocks. 
+        already_clean: bool
+            Bypass prior cleaning for the blocks if True. Defaults to False.
         Raises
         ------
         ValueError
@@ -181,13 +210,20 @@ class Channel:
         ValueError
             _description_
         """
-        self.binary_img = binary_img
         if _data_frame_ok(dataframe):
             self.dataframe = dataframe
         else:
             raise ValueError(
                 "Either the passed dataframe indexing is not a step 1 integer range starting from 0, or the 'index' column name is used."
             )
+        self.already_clean = already_clean
+        if clean_image and not self.already_clean:
+            labels = cleanup(binary_img,dataframe,coord_names)
+            self._labels = labels
+            self.binary_img = labels > 0
+        else:
+            self.binary_img = binary_img
+
         self.coord_names = coord_names
         self.ndim = len(self.coord_names)
         if voxel_dims is None:
@@ -603,6 +639,7 @@ class Channel:
             processes=processes,
             size_min=size_min,
             size_max=size_max,
+            are_already_clean=(self.already_clean,other_channel.already_clean)
         )
 
     # for comparison/testing purposes
