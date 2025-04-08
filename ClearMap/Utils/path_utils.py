@@ -4,6 +4,7 @@ Utility functions for working with paths
 import os
 from pathlib import Path
 
+from ClearMap.IO.assets_constants import EXTENSIONS
 from ClearMap.config.config_loader import ConfigLoader
 
 
@@ -36,8 +37,15 @@ def is_density_file(f_name):
     return f_name.endswith('density_counts.tif')  # FIXME add menu for alternatives
 
 
-def find_density_file(target_dir):
-    return find_file(target_dir, is_density_file, 'density')
+def find_density_file(target_dir, channel):
+    target_dir = Path(target_dir)
+    extensions = [ext[1:] for ext in EXTENSIONS['image']]
+    pattern = f'{channel}_density*.'
+    files = []
+    for ext in extensions:
+        files.extend(target_dir.glob(pattern + ext))
+    return files[0] if files else None
+    # return find_file(target_dir, is_density_file, 'density')
 
 
 def find_cells_df(target_dir):

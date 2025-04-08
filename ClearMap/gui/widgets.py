@@ -1275,7 +1275,7 @@ class SamplePickerDialog(WizardDialog):
             if group > self.params.n_groups:
                 self.params.add_group()
             if paths:
-                self.params.set_paths(group+1, paths)
+                self.params.set_paths(group, paths)
         self.dlg.close()
 
     def __handle_group_changed(self):

@@ -1890,21 +1890,22 @@ class GroupAnalysisProcessor:
 
     def plot_p_vals(self, selected_comparisons, groups, channel, parent=None):
         p_vals_imgs = []
+        results_folder = Path(self.results_folder)
         for pair in selected_comparisons:  # TODO: Move to processor object to be wrapped
             gp1_name, gp2_name = pair
             # Reread because of cm_io orientation
-            p_val_path = self.results_folder / f'p_val_colors_{gp1_name}_{gp2_name}.tif'
+            p_val_path = results_folder / f'p_val_colors_{gp1_name}_{gp2_name}.tif'
 
             p_vals_imgs.append(clm_io.read(p_val_path))
-        folder = self.results_folder / groups[selected_comparisons[0][0]][0]
+        folder = results_folder / groups[selected_comparisons[0][0]][0]
         processors = init_sample_manager_and_processors(folder)
         registration_processor = processors['registration_processor']
         if len(p_vals_imgs) == 1:
             gp1_name, gp2_name = selected_comparisons[0]
-            gp1_avg = clm_io.read(self.results_folder / f'avg_density_{gp1_name}.tif')
-            gp1_sd_path = self.results_folder / f'sd_density_{gp1_name}.tif'
-            gp2_avg = clm_io.read(self.results_folder / f'avg_density_{gp2_name}.tif')
-            gp2_sd_path = self.results_folder / f'sd_density_{gp2_name}.tif'
+            gp1_avg = clm_io.read(results_folder / f'avg_density_{gp1_name}.tif')
+            gp1_sd_path = results_folder / f'sd_density_{gp1_name}.tif'
+            gp2_avg = clm_io.read(results_folder / f'avg_density_{gp2_name}.tif')
+            gp2_sd_path = results_folder / f'sd_density_{gp2_name}.tif'
             colored_atlas = registration_processor.annotators[channel].create_color_annotation()
             gp1_imgs = gp1_avg
             if gp1_sd_path.exists():
@@ -1917,7 +1918,7 @@ class GroupAnalysisProcessor:
             stats_imgs = p_vals_imgs[0]
             stats_title = 'P values'
             stats_luts = None
-            effect_size_path = self.results_folder / f'effect_size_{gp1_name}_{gp2_name}.tif'
+            effect_size_path = results_folder / f'effect_size_{gp1_name}_{gp2_name}.tif'
             if effect_size_path.exists():
                 stats_imgs = [stats_imgs, clm_io.read(effect_size_path)]
                 stats_title += ' and effect size'
@@ -1934,7 +1935,7 @@ class GroupAnalysisProcessor:
         dvs = plot_3d.plot(images, title=titles, arrange=False, sync=True,
                            lut=luts, min_max=min_maxes,
                            parent=parent)
-        names_map = registration_processor.annotator.get_names_map()
+        names_map = registration_processor.annotators[channel].get_names_map()  # FIXME: AttributeError("'RegistrationProcessor' object has no attribute 'annotator'")
         for dv in dvs:
             dv.atlas = registration_processor.annotators[channel].atlas
             dv.structure_names = names_map
@@ -1971,8 +1972,8 @@ class GroupAnalysisProcessor:
         density_map_paths = []
         titles = []
         for folder in group_folders:
-            managers = init_sample_manager_and_processors(folder)
-            sample_manager = managers['sample_manager']
+            sample_manager = SampleManager()
+            sample_manager.setup(src_dir=folder)
             map_path = sample_manager.get('density', channel=channel, asset_sub_type='counts').path
             density_map_paths.append(map_path)  # TODO: make work for tubemap too
             titles.append(sample_manager.config['sample_id'])
@@ -2030,15 +2031,14 @@ class GroupAnalysisTab(BatchTab):
         list of str
             The list of channels that have density maps available
         """
-        gp_0 = self.params.group_names[0]
-        sample_folder = self.params.groups[gp_0][0]
-        
+        # Use the very first sample as template for the others
         sample_manager = SampleManager()
-        sample_manager.setup(sample_folder)
+        sample_manager.setup(src_dir=self.params.get_all_paths()[0][0])
 
         analysable_channels = []
         for channel in sample_manager.channels:
-            if sample_manager.get('density', channel=channel, asset_sub_type='counts').exists:
+            asset = sample_manager.get('density', channel=channel, asset_sub_type='counts', default=None)
+            if asset is not None and asset.exists:
                 analysable_channels.append(channel)
         return analysable_channels
 
