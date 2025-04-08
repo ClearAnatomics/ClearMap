@@ -133,13 +133,16 @@ class Scatter3D:
                 output['pen'] = np.empty(0)
             return output
         half_slice_thickness = self.half_slice_thickness if self.half_slice_thickness is not None else half_slice_thickness
-        rows = [pd.DataFrame(columns=['x', 'y', 'colour', 'size'])]
+        columns = ['x', 'y', 'colour', 'size', 'symbol']
+        if self.has_colours:
+            columns += ['pen']
+        rows = [pd.DataFrame(columns=columns)]
         for i in range(main_slice_idx - half_slice_thickness, main_slice_idx + half_slice_thickness):
             if i < 0:  # or i > self.coordinates[:, 2].max()
                 continue
             else:
                 current_slice = i
-            current_z_data = pd.DataFrame(columns=['x', 'y', 'colour', 'size'])  # WARNING: this is x/y of the view, not the 3D image
+            current_z_data = pd.DataFrame(columns=['x', 'y', 'colour', 'size', 'symbol'])  # WARNING: this is x/y of the view, not the 3D image
             indices = self.current_slice_indices(current_slice)
             pos = self.get_pos(indices=indices)
             if not all(pos.shape):  # empty
@@ -156,10 +159,10 @@ class Scatter3D:
 
         data_df = pd.concat(rows)  # FIXME: check if to_dict method in dataframe
         output = {'pos': data_df[['x', 'y']].values,  # WARNING: this is x/y of the view, not the 3D image
-                  'size': data_df['size'].values}
+                  'size': data_df['size'].values,
+                  'symbol': data_df['symbol'].values}
         if self.has_colours:
             output['pen'] = data_df['pen'].values
-            output['symbol'] = data_df['symbol'].values
             # output['brush'] = data_df['brush'].values
         return output
 
