@@ -443,8 +443,16 @@ class UiParameter(QObject):
             return val, False
         except KeyError:
             if self._default_config is None:
-                raise ConfigNotFoundError(f'Default config not set for {self.__class__.__name__}. '
-                                          f'Regular config path is {self._config.filename}')
+                try:
+                    cfg_name = ConfigLoader.strip_version_suffix(self.config.filename.stem)
+                    self._default_config = ConfigLoader.get_cfg_from_path(ConfigLoader.get_default_path(cfg_name))
+                except FileNotFoundError:
+                    try:
+                        self._default_config = ConfigLoader.get_cfg_from_path(
+                            ConfigLoader.get_default_path(cfg_name, from_package=True))
+                    except FileNotFoundError:
+                        raise ConfigNotFoundError(f'Default config not set for {self.__class__.__name__}. '
+                                                  f'Regular config path is {self._config.filename}')
             val = get_item_recursive(self.default_config, keys_list)
             return val, True
 
