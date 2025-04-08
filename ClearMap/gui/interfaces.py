@@ -793,6 +793,10 @@ class BatchTab(GenericTab):
         results_folder = Path(get_directory_dlg(self.main_window.preference_editor.params.start_folder,
                                            'Select the folder where results will be written'))
         self.config_loader = ConfigLoader(results_folder)
+        self.main_window.logger.set_file(results_folder / 'info.log')  # WARNING: set logs to global results folder
+        self.main_window.error_logger.set_file(results_folder / 'errors.html')
+        self.main_window.progress_watcher.log_path = self.main_window.logger.file.name
+
         cfg_path = self.config_loader.get_cfg_path('batch', must_exist=False)
         if not cfg_path.exists():
             try:
@@ -805,14 +809,10 @@ class BatchTab(GenericTab):
 
         self.set_params(cfg_path=cfg_path)
 
-        self.main_window.logger.set_file(results_folder / 'info.log')  # WARNING: set logs to global results folder
-        self.main_window.error_logger.set_file(results_folder / 'errors.html')
-        self.main_window.progress_watcher.log_path = self.main_window.logger.file.name
-
         self.params.read_configs(cfg_path)
-        self.params.results_folder = results_folder  # FIXME: patch config
+        self.params.results_folder = str(results_folder)  # FIXME: patch config
 
-        self._load_config_to_gui()
+        self._load_config_to_gui()  # FIXME: second call to add group
         self._setup_workers()
 
     def create_wizard(self):

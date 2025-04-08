@@ -1564,11 +1564,12 @@ class BatchParameters(UiParameter):
     def cfg_to_ui(self):
         self.reload()
         self.results_folder = self.config['paths']['results_folder']
-        for i in range(len(self.config['groups'].keys())):
-            self.add_group()
-        self.group_names = self.config['groups'].keys()  # FIXME: check that ordered
-        for i, paths in enumerate(self.config['groups'].values()):
-            self.set_paths(i+1, paths)
+        self.group_names = self.config['groups'].keys()
+        for i, gp_name in enumerate(self.group_names):
+            if i >= self.n_groups:
+                self.add_group()
+            self.set_group_name(i, gp_name)
+            self.set_paths(i, self.config['groups'][gp_name])
 
     def __connect_btn(self, btn, callback):
         try:
@@ -1610,7 +1611,7 @@ class BatchParameters(UiParameter):
         self.connect_groups()
 
     def remove_group(self):
-        last_idx = self.tab.sampleFoldersToolBox.count() - 1
+        last_idx = self.n_groups - 1
         widg = self.tab.sampleFoldersToolBox.widget(last_idx)
         self.tab.sampleFoldersToolBox.removeItem(last_idx)
         widg.setParent(None)
@@ -1626,8 +1627,15 @@ class BatchParameters(UiParameter):
 
     @group_names.setter
     def group_names(self, names):
+        if len(names) > self.n_groups:
+            for i, name in enumerate(names):
+                if i >= self.n_groups:
+                    self.add_group()
         for w, name in zip(self.gp_group_name_ctrls, names):
             w.setText(name)
+
+    def set_group_name(self, idx, name):
+        self.gp_group_name_ctrls[idx].setText(name)
 
     @property
     def gp_group_name_ctrls(self):
@@ -1648,8 +1656,21 @@ class BatchParameters(UiParameter):
     def get_gp_ctrls(self, ctrl_name):
         return [getattr(self.tab.sampleFoldersToolBox.widget(i), f'gp{ctrl_name}') for i in range(self.n_groups)]
 
-    def set_paths(self, gp, paths):
-        list_widget = self.gp_list_widget[gp - 1]
+    def set_paths(self, gp_idx, paths):
+        """
+        Set the sample folder paths for group nb `gp_idx`
+
+        .. warning::
+            contrary to the interface, gp_idx is the 0 based index, not the displayed number
+
+        Parameters
+        ----------
+        gp_idx: int
+            The 0 based index of the group
+        paths: List[str]
+            The list of sample folder paths to set for this group
+        """
+        list_widget = self.gp_list_widget[gp_idx]
         list_widget.clear()
         list_widget.addItems(paths)
 
@@ -1691,12 +1712,15 @@ class GroupAnalysisParams(BatchParameters):
     """
     Essentially batch parameters with comparisons
     """
+    # plot_channel: str
+    compute_sd_and_effect_size: bool
 
     def __init__(self, tab, preferences=None):
         super().__init__(tab, preferences)
-        # self.params_dict = {
-        #     'plot_channel': ParamLink(None, self.tab.plotChannelComboBox),
-        # }
+        self.params_dict = {
+            # 'plot_channel': ParamLink(None, self.tab.plotChannelComboBox),
+            'compute_sd_and_effect_size': ParamLink(None, self.tab.computeSdAndEffectSizeCheckBox),
+        }
         self.plot_density_maps_buttons = []
         self.comparison_checkboxes = []
         self.plot_channel = ''
@@ -1726,7 +1750,6 @@ class GroupAnalysisParams(BatchParameters):
         -------
             The list of all possible pairs of groups
         """
-        # return list(combinations(self.group_names, 2))
         return list(permutations(self.group_names, 2))
 
     @property
@@ -1744,6 +1767,8 @@ class GroupAnalysisParams(BatchParameters):
             self.tab.comparisonsVerticalLayout.addWidget(chk)
             self.comparison_checkboxes.append(chk)
 
+        self.comparison_checkboxes[0].setChecked(True)
+
         self.tab.comparisonsVerticalLayout.addStretch()
 
         # plot buttons
@@ -1759,13 +1784,15 @@ class GroupAnalysisParams(BatchParameters):
         sample_manager = SampleManager()
         sample_folders_paths = self.get_all_paths()
         if sample_folders_paths:
-            sample_manager.setup(sample_folders_paths[0])
-            plot_channel_combobox.addItems(sample_manager.channels_to_detect)  # FIXME: load first sample and compute
+            sample_manager.setup(src_dir=sample_folders_paths[0][0])  # gp 0, sample 0
+            plot_channel_combobox.addItems(sample_manager.channels_to_detect)
             self.tab.comparisonsVerticalLayout.addWidget(plot_channel_combobox)
+            self.plot_channel = sample_manager.channels_to_detect[0]
             plot_channel_combobox.currentTextChanged.connect(self.handle_plot_channel_changed)
+        self.plot_channel_combobox = plot_channel_combobox
 
     def handle_plot_channel_changed(self):
-        self.plot_channel = self.tab.plotChannelComboBox.currentText()
+        self.plot_channel = self.plot_channel_combobox.currentText()
 
 
 class BatchProcessingParams(BatchParameters):

@@ -540,7 +540,9 @@ def compare_groups(directory, gp1_name, gp2_name, gp1_dirs, gp2_dirs, prefix='p_
     sample_manager.setup(src_dir=directory / gp1_dirs[0])
     result = {}
     for channel in sample_manager.channels:
-        if not sample_manager.get('density', channel=channel).exists:
+        # FIXME: counts is only for cell_map, make compatible with other pipelines
+        density_asset = sample_manager.get('density', channel=channel, asset_sub_type='counts', default=None)
+        if density_asset is None or not density_asset.exists:
             print(f'No density files found for channel {channel}, skipping')
             continue
 
