@@ -650,6 +650,9 @@ def map_axes(source_order, dest_order, ndim=None):
         dest_order = ''.join(dest_order)
     source_order = source_order.upper()
     dest_order = dest_order.upper()
+    if len(source_order) == len(dest_order) and len(source_order) < ndim:
+        source_order += 'C'
+        dest_order += 'C'
 
     if 'C' in source_order and 'C' not in dest_order:
         warnings.warn('Color channel is present in source order but not explicitly in destination order, '
@@ -699,7 +702,7 @@ def transpose_array(array, source_order, dest_order):
     try:
         return np.transpose(array, transposition)
     except ValueError as err:
-        raise ValueError(f'Error with transposition of array with {array.shape} shape, and dtype {array.dtype}'
+        raise ValueError(f'Error with transposition of array with {array.shape} shape, and dtype {array.dtype} '
                          f'{source_order=}, {dest_order=}, {transposition=}; {err}')
 
 
