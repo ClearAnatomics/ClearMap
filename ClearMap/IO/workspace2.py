@@ -316,6 +316,7 @@ class Workspace2:  # REFACTOR: subclass dict
             asset_type += f'_{asset_sub_type}'
         if channel not in self.asset_collections and isinstance(channel, (tuple, list)):
             channel = ('-'.join(channel)).lower()  # Try string version if tuple version not found
+
         if asset_type in self.asset_collections[channel]:
             asset = self.asset_collections[channel][asset_type]
         else: # asset is somehow None
