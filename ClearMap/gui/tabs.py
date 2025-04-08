@@ -588,6 +588,7 @@ class StitchingTab(PreProcessingTab):
         choice = self.prompt_conversion(channel)
         if choice == 'cancel':
             return
+        self.params.ui_to_cfg()
         stitched = self.stitcher.stitch_overlay(channel, color)
         if color:
             overlay = [pg.image(stitched)]
@@ -609,6 +610,7 @@ class StitchingTab(PreProcessingTab):
         choice = self.prompt_conversion(channel)
         if choice == 'cancel':
             return
+        self.params.ui_to_cfg()
         n_steps = self.stitcher.n_rigid_steps_to_run
         self.wrap_step('Stitching', self.stitcher.stitch_channel_rigid,
                        step_args=[channel], step_kw_args={'_force': True},
