@@ -705,11 +705,16 @@ class RegistrationParams(ChannelsUiParameterCollection):  # FIXME: does not seem
             if channel_name not in self.config['channels']:
                 warnings.warn(f'Channel {channel_name} not in config, adding default')
                 if data_type == 'autofluorescence':
-                    absolute_default = self._default_config['channels']['autofluorescence']
+                    absolute_default = self._default_config['channels']['autofluorescence'] # because default config
                 else:
                     absolute_default = self._default_config['channels']['channel_x']
                 default_cfg = self._default_config['channels'].get(channel_name, absolute_default)
                 self.config['channels'][channel_name] = deepcopy(default_cfg)
+                if data_type != 'autofluorescence':
+                    for channel, cfg in self.config['channels']:
+                        if cfg['align_with'] == 'atlas':
+                            self.config['channels'][channel_name]['align_with'] = channel
+                            break
             channel_params = ChannelRegistrationParams(self.tab, channel_name)
             self[channel_name] = channel_params
             channel_params.tab.selectLandmarksPushButton.clicked.connect(
