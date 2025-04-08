@@ -27,6 +27,8 @@ def compare(
     size_max: int,
     processes: int | None,
     verbose: bool = True,
+    are_already_clean: tuple[bool,bool] = (False,False)
+
 ):
     """Make a report on colocalization between two channels
     Parameters
@@ -82,6 +84,7 @@ def compare(
         df_1=df_1,
         scale=scale,
         coord_names=list(coord_names),
+        are_already_clean=are_already_clean,
         function_type="block",
         axes=axes,
         overlap=overlap,
@@ -148,6 +151,7 @@ def local_report(
     scale,
     coord_names,
     verbose: bool = True,
+    are_already_clean:tuple[bool,bool]=(False,False)
 ):
     """Return a report dataframe for the locally computable information.
 
@@ -174,7 +178,7 @@ def local_report(
     if verbose:
         print(f"entering local_report for {block_0}")
 
-    c0_result, c1_result = local_report_body(df_0, df_1, block_0, block_1, coord_names, scale, verbose)
+    c0_result, c1_result = local_report_body(df_0, df_1, block_0, block_1, coord_names, scale, verbose,are_already_clean=are_already_clean)
 
     # prof.disable()
     # with tempfile.NamedTemporaryFile(suffix="local_report_profile.pstat", delete=False) as prof_file:
@@ -182,7 +186,7 @@ def local_report(
     return c0_result, c1_result
 
 # WARNING: This function is separate from local_report to allow for profiling
-def local_report_body(df_0, df_1, block_0, block_1, coord_names, scale, verbose):
+def local_report_body(df_0, df_1, block_0, block_1, coord_names, scale, verbose,are_already_clean):
     ndim = len(coord_names)
     # compute valid_indices, the ones of nuclei for which we can compute everything in this block
     # and contained_indices, the ones of nuclei whose representative is contained in the block
@@ -204,10 +208,10 @@ def local_report_body(df_0, df_1, block_0, block_1, coord_names, scale, verbose)
     sub_df_0 = df_0.iloc[valid_indices_0].reset_index()
     sub_df_1 = df_1.iloc[contained_indices_1].reset_index()
     channel_0 = channel.Channel(
-        block_0.array, sub_df_0[coord_names] - start_array, voxel_dims=scale, coord_names=coord_names
+        block_0.array, sub_df_0[coord_names] - start_array, voxel_dims=scale, coord_names=coord_names,clean_image=True, already_clean=are_already_clean[0]
     )
     channel_1 = channel.Channel(
-        block_1.array, sub_df_1[coord_names] - start_array, voxel_dims=scale, coord_names=coord_names
+        block_1.array, sub_df_1[coord_names] - start_array, voxel_dims=scale, coord_names=coord_names,clean_image=True, already_clean=are_already_clean[1]
     )
     if verbose:
         print(f"computing blobwise overlaps for {block_0}")
