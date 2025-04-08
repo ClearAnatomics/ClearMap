@@ -378,16 +378,16 @@ class SampleInfoTab(GenericTab):
         if isinstance(channel, int):
             channel = self.params.get_channel_name(channel)
         # REFACTOR: a bit hacky to refer to other tab
-        stitcher = self.main_window.tab_managers['stitching'].stitcher
-        if stitcher.config:  # TODO: use setup_complete attribute or property instead
-            self.wrap_plot(self.main_window.tab_managers['stitching'].stitcher.plot_atlas, channel)
+        aligner = self.main_window.tab_managers['registration'].aligner
+        if aligner.config:  # TODO: use setup_complete attribute or property instead
+            self.wrap_plot(aligner.plot_atlas, channel)
         else:
             self.update_workspace()
-            if stitcher.config:
-                self.wrap_plot(self.main_window.tab_managers['stitching'].stitcher.plot_atlas, channel)
+            if aligner.config:
+                self.wrap_plot(aligner.plot_atlas, channel)
             else:
-                warnings.warn('StitchingProcessor not setup, cannot plot atlas. '
-                              'Please call stitching_tab.finalise_set_params() first')
+                warnings.warn('RegistrationProcessor not setup, cannot plot atlas. '
+                              'Please call registration_tab.finalise_set_params() first')
 
 
 class StitchingTab(PreProcessingTab):
