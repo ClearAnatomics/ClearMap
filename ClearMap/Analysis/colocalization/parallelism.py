@@ -1,6 +1,8 @@
 # Copyright Gaël Cousin & Charly Rousseau
 from __future__ import annotations
 
+import gc
+
 import numpy as np
 import pandas as pd
 from sklearn import neighbors
@@ -60,6 +62,9 @@ def compare(
     verbose : bool
         print processing information if True. Defaults To true.
     """
+    if verbose:
+       print(f'Starting channels comparison with the following parameters: '
+             f'{scale=}, {coord_names=}, {blob_diameter=}, {size_min=}, {size_max=}, {processes=}')
 
     scale = np.array(scale)
     voxel_blob_diameters = np.array(blob_diameter) / scale
@@ -96,6 +101,8 @@ def compare(
         size_max=size_max,
         optimization=False,
     )
+    if verbose:
+        print(f'Compare finished processing {len(results)} blocks')
     # We observe that using as_memory=True leads to a bug due to as_memory_block breaking the slicing attribute
     c0_results = [result[0] for result in results]
     c1_results = [result[1] for result in results]
@@ -176,9 +183,11 @@ def local_report(
     # prof = cProfile.Profile()
     # prof.enable()
     if verbose:
-        print(f"entering local_report for {block_0}")
+        print(f"Entering local_report for {block_0}")
 
-    c0_result, c1_result = local_report_body(df_0, df_1, block_0, block_1, coord_names, scale, verbose,are_already_clean=are_already_clean)
+    c0_result, c1_result = local_report_body(df_0, df_1, block_0, block_1, coord_names, scale,
+                                             verbose, are_already_clean=are_already_clean)
+    gc.collect()
 
     # prof.disable()
     # with tempfile.NamedTemporaryFile(suffix="local_report_profile.pstat", delete=False) as prof_file:
@@ -198,6 +207,7 @@ def local_report_body(df_0, df_1, block_0, block_1, coord_names, scale, verbose,
     start_array = np.array([0 if slices[i].start is None else slices[i].start for i in range(ndim)])
     stop_array = np.array([upper_bounds[i] if slices[i].stop is None else slices[i].stop for i in range(ndim)])
     valid_indices_0 = np.where(np.all((data_array_0 < stop_array) & (data_array_0 >= start_array), axis=1))[0]
+    del data_array_0
     valid_indices_1 = np.where(np.all((data_array_1 < stop_array) & (data_array_1 >= start_array), axis=1))[0]
     slices = block_0.slicing
     start_array = np.array([0 if slices[i].start is None else slices[i].start for i in range(ndim)])
@@ -205,6 +215,10 @@ def local_report_body(df_0, df_1, block_0, block_1, coord_names, scale, verbose,
     # contained_indices_1 needed to compute all the overlaps but the bounded boxes for contained indices might trespass the block border
     # we cannot compute the bbox center correctly for all elements, hence the use of valid_indices_1 afterward.
     contained_indices_1 = np.where(np.all((data_array_1 < stop_array) & (data_array_1 >= start_array), axis=1))[0]
+    del data_array_1
+
+    gc.collect()
+
     sub_df_0 = df_0.iloc[valid_indices_0].reset_index()
     sub_df_1 = df_1.iloc[contained_indices_1].reset_index()
     channel_0 = channel.Channel(
@@ -227,7 +241,11 @@ def local_report_body(df_0, df_1, block_0, block_1, coord_names, scale, verbose,
             "index of maximizing overlap blob": sub_df_1.iloc[max_overlaps_indices]["index"],
         },
     )
+    del channel_0
+
     blobwise_overlap_df = blobwise_overlap_df.set_index(sub_df_0["index"])
+    del sub_df_0
+
     c0_result = c0_result.join(blobwise_overlap_df, validate="1:1")
     # correct centers computation for channel_1
     sub_df_1 = df_1.iloc[valid_indices_1].reset_index()
@@ -237,8 +255,11 @@ def local_report_body(df_0, df_1, block_0, block_1, coord_names, scale, verbose,
     if verbose:
         print(f"computing bbox centers for channel_1 in {block_0}")
     centers_df_1 = channel_1.centers_df() + start_array
+    del channel_1
     c1_result = centers_df_1.set_index(sub_df_1["index"])
+    del sub_df_1
     # the distances will be computed from the final joined dataframes.
     if verbose:
         print(f"returning results of local_report for {block_0}")
+
     return c0_result, c1_result
