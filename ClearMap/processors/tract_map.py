@@ -69,13 +69,12 @@ class TractMapProcessor(TabProcessor):
     #   make sure this works with other config backends.
     def reload_config(self, max_iter=10):
         p = self.processing_config
-        iter = 0
-        while not hasattr(p, 'reload'):
-            p = p.parent
-            iter += 1
-            if iter > max_iter:
-                raise ValueError('Could not find a reload method in the config')
-        p.reload()
+        for i in range(max_iter):
+            if hasattr(p, 'reload'):
+                p.reload()
+                return
+        else:
+            raise ValueError(f'Could not find a reload method in the config, after {max_iter} iterations')
 
     def create_test_dataset(self, slicing):
         self.workspace.create_debug('stitched', channel=self.channel, slicing=slicing)
