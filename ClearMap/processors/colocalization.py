@@ -94,6 +94,8 @@ class ColocalizationProcessor(TabProcessor):
             if hasattr(p, 'reload'):
                 p.reload()
                 return
+            else:
+                p = p.parent
         else:
             raise ValueError(f'Could not find a reload method in the config after {max_iter} iterations')
 
