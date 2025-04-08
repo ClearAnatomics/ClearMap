@@ -91,7 +91,7 @@ def bilabel_bincount(labels_1: np.array, labels_2: np.array) -> np.array:
     Returns
     -------
     np.array
-        The array counts such that counts[i,j]==np.count_nonzero((labels_1==i)*(labels_2==j)).
+        The array counts such that counts[i,j] == np.count_nonzero((labels_1==i) * (labels_2==j)).
 
     """
 
@@ -102,9 +102,9 @@ def bilabel_bincount(labels_1: np.array, labels_2: np.array) -> np.array:
     # factor will also be the height of the output
     max_val = max_1 * factor + max_2
     # determine the cheapest dtype to hold the join
-    dtypes = ["uint8", "uint16", "uint32", "uint64"]
-    for i, dtype in enumerate(dtypes):
-        if 2 ** (2 ** (3 + i)) > max_val:
+    for bit_width in (8, 16, 32, 64):
+        if 2**(bit_width -1) > max_val:  # -1 because signed
+            dtype = f'int{bit_width}'
             break
     else:
         raise RuntimeError("This software is not able to store the join labels.")
