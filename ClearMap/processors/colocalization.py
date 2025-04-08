@@ -111,7 +111,7 @@ class ColocalizationProcessor(TabProcessor):
         report = self.colocalization_channels[channel_a].compare(self.colocalization_channels[channel_b],
                                                                  blob_diameter=voxel_blob_diameter,
                                                                  size_min=4*voxel_blob_diameter,
-                                                                 size_max=8*voxel_blob_diameter, #  FIXME: add control for size_max
+                                                                 size_max=6*voxel_blob_diameter, #  FIXME: add control for size_max
                                                                  processes=n_processes)
         report_path = self.get_path('colocalization', channel=(channel_a, channel_b),
                                     asset_sub_type='report')
