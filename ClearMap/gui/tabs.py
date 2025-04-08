@@ -1866,26 +1866,30 @@ class ColocalizationTab(PostProcessingTab):
 
     def run_colocalization_for_pair(self, channel_a, channel_b):
         self._setup_workers()  # FIXME: see why not already setup
+        self.params.ui_to_cfg()
         processor = self.colocalization_processors.get((channel_a, channel_b))
         if processor:
-            processor.compute_colocalization(self.sort_channels(channel_a, channel_b))
+            processor.compute_colocalization(*self.sort_channels(channel_a, channel_b))
 
 
     def plot(self, channel_a, channel_b):
+        self.params.ui_to_cfg()
         processor = self.colocalization_processors.get((channel_a, channel_b))
         if processor:
             sorted_chan_a, sorted_chan_b = self.sort_channels(channel_a, channel_b)
             self.wrap_plot(processor.plot_nearest_neighbors, channel_a=sorted_chan_a, channel_b=sorted_chan_b)
 
     def save_filtered_table(self, channel_a, channel_b):
+        self.params.ui_to_cfg()
         processor = self.colocalization_processors.get((channel_a, channel_b))
         if processor:
-            processor.save_filtered_table(self.sort_channels(channel_a, channel_b))
+            processor.save_filtered_table(*self.sort_channels(channel_a, channel_b))
 
     def voxelize_filtered_table(self, channel_a, channel_b):
+        self.params.ui_to_cfg()
         processor = self.colocalization_processors.get((channel_a, channel_b))
         if processor:
-            processor.voxelize_filtered_table(self.sort_channels(channel_a, channel_b))
+            processor.voxelize_filtered_table(*self.sort_channels(channel_a, channel_b))
 
 
 ################################################################################################
