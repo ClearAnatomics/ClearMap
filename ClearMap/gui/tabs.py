@@ -564,10 +564,14 @@ class StitchingTab(PreProcessingTab):
             The channel to convert
         """
         if not self.sample_manager.has_npy(channel):
-            if option_dialog('Convert tiles',
-                             'This operation is much slower with tiff files. '
-                             'Convert to npy for efficiency ?'):
+            choices = ['Yes', 'No', 'Cancel']
+            choice = option_dialog('Convert tiles', 'This operation is much slower with tiff files. ' \
+                                                    'Convert to npy for efficiency ?',
+                                   options=choices, )
+            if choice == choices.index('Yes'):
                 self.convert_tiles()
+            elif choice == choices.index('Cancel'):
+                return 'cancel'
 
     def preview_stitching_dumb(self, channel, color):
         """
@@ -581,7 +585,9 @@ class StitchingTab(PreProcessingTab):
         color : bool
             Whether to stitch in chessboard or continuous grayscale
         """
-        self.prompt_conversion(channel)
+        choice = self.prompt_conversion(channel)
+        if choice == 'cancel':
+            return
         stitched = self.stitcher.stitch_overlay(channel, color)
         if color:
             overlay = [pg.image(stitched)]
@@ -600,7 +606,9 @@ class StitchingTab(PreProcessingTab):
         asset_sub_type : str
             One of ('aligned_axis', 'aligned', 'placed')
         """
-        self.prompt_conversion(channel)
+        choice = self.prompt_conversion(channel)
+        if choice == 'cancel':
+            return
         n_steps = self.stitcher.n_rigid_steps_to_run
         self.wrap_step('Stitching', self.stitcher.stitch_channel_rigid,
                        step_args=[channel], step_kw_args={'_force': True},
