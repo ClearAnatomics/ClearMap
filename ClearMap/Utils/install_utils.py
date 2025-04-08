@@ -5,6 +5,7 @@ install_utils
 
 Utilities module with minimal dependencies (standard library only) for installation
 """
+import re
 import sys
 import platform
 import subprocess
@@ -24,6 +25,28 @@ __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
 __copyright__ = 'Copyright (c) 2022 by Charly Rousseau'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://github.com/ClearAnatomics/ClearMap'
+
+
+class CondaPackage:
+    split_pattern = re.compile(r'^(?P<name>[\w\.\-]+)(?P<version>[\s=><,]+[\d\.\*]+)?(?:\s*(?P<comment>\#.*))?$')
+
+    def __init__(self, line: str):
+        self.line = line
+
+    @property
+    def name(self):
+        match = self.split_pattern.match(self.line.strip())
+        return match.group('name') if match else ''
+
+    @property
+    def version(self):
+        match = self.split_pattern.match(self.line.strip())
+        return match.group('version').strip() if match and match.group('version') else ''
+
+    @property
+    def comment(self):
+        match = self.split_pattern.match(self.line.strip())
+        return match.group('comment') if match and match.group('comment') else ''
 
 
 class EnvFileManager:
@@ -47,8 +70,11 @@ class EnvFileManager:
         return self.cfg['name']
 
     def get_package_version(self, package_name):
-        lines = [ln for ln in self.cfg['dependencies'] if isinstance(ln, str) and ln.startswith(package_name)]
-        return lines[0].split('=')[-1]
+        for dep in self.cfg['dependencies']:
+            if isinstance(dep, str) and dep.startswith(package_name):
+                pkg = CondaPackage(dep)
+                if pkg.name == package_name:
+                    return pkg.version
 
     def write(self):
         dest_path = self.dest_path if self.dest_path else self.cfg_path
@@ -70,8 +96,8 @@ class EnvFileManager:
         """
         patched_dependencies = []
         for dep in self.cfg['dependencies']:
-            if isinstance(dep, str) and dep.startswith(package_name):
-                version_str = (f'{comparison_operator}{pkg_version}') if pkg_version else ''
+            if isinstance(dep, str) and CondaPackage(dep).name == package_name:
+                version_str = f'{comparison_operator}{pkg_version}' if pkg_version else ''
                 patched_dependencies.append(f'{package_name}{version_str}')
             else:
                 patched_dependencies.append(dep)
@@ -83,7 +109,8 @@ class EnvFileManager:
         patched_dependencies = []
         for dep in self.cfg['dependencies']:
             if isinstance(dep, str):
-                if not dep.startswith(package_name):
+                pkg = CondaPackage(dep)
+                if not pkg.name == package_name:
                     patched_dependencies.append(dep)
             else:
                 patched_dependencies.append(dep)
@@ -95,7 +122,7 @@ class EnvFileManager:
         patched_dependencies = []
         for dep in self.cfg['dependencies']:
             if isinstance(dep, str):
-                if not any(dep.startswith(pkg) for pkg in package_names):
+                if not any(CondaPackage(dep).name == pkg for pkg in package_names):
                     patched_dependencies.append(dep)
             else:
                 patched_dependencies.append(dep)
@@ -304,7 +331,11 @@ def patch_env(cfg_path, dest_path, use_cuda_torch=True, pip_mode=False, use_spyd
         if platform.processor().lower().startswith('x86'):
             env_mgr.add_dependency('nomkl')  # MacOS includes "accelerate" and does not need Intel MKL on Intel CPU
             env_mgr.patch_env_var('KMP_DUPLICATE_LIB_OK', 'TRUE')  # FIXME: find cleaner fix
-        env_mgr.patch_environment_package_line('pyqt', '5.13', comparison_operator='<=')  # REFACTOR: get from other env file instead
+
+        if env_mgr.python_version.startswith('3.9'):
+            env_mgr.patch_environment_package_line('pyqt', '5.13', comparison_operator='<=')
+        elif env_mgr.python_version.startswith('3.11'):
+            env_mgr.patch_environment_package_line('pyqt', '5.15', comparison_operator='=')
 
     pytorch_v_mgr = PytorchVersionManager(cfg_path, env_mgr.python_version, env_mgr.get_package_version('pytorch'))
     if pip_mode:
