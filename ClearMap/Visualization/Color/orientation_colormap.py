@@ -229,13 +229,12 @@ def orientation_colormap_cache(n=200, **kwargs):
     return col
 
 
-orientation_colormap_cache()
-
-
 def orientation_color_cached(xyz, cache=None):
     """Fast no interpolation between colors."""
     if cache is None:
         cache = _colormap_cache
+        if cache is None:
+            cache = orientation_colormap_cache()
 
     nx, ny, nz = np.array(cache.shape[:3]) - 1
 
