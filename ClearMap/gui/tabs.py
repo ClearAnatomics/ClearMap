@@ -751,6 +751,10 @@ class RegistrationTab(PreProcessingTab):
         self.params[channel].cfg_to_ui()  # Force it while the tab is active
 
     def __update_channel_comboboxes(self, channel, page_widget=None):
+        if self.params[channel].align_with:
+            partner_channel = self.params[channel].align_with
+        else:
+            partner_channel = self.aligner.config['channels'][channel]['align_with']
         if page_widget is None:
             page_widget = self.ui.channelsParamsTabWidget.get_channel_widget(channel)
         page_widget.alignWithComboBox.clear()
@@ -759,7 +763,16 @@ class RegistrationTab(PreProcessingTab):
         page_widget.movingChannelComboBox.clear()
         page_widget.movingChannelComboBox.addItems([None, 'atlas', 'intrinsically aligned'])
         page_widget.movingChannelComboBox.addItems(self.aligner.channels_to_register())
-        # FIXME: select most logical entry here
+        channel_dtype = self.sample_manager.config['channels'][channel]['data_type']
+        if not partner_channel:
+            if channel_dtype == 'autofluorescence':
+                partner_channel = 'atlas'
+            elif channel_dtype:
+                partner_channel = self.sample_manager.alignment_reference_channel
+            else:
+                return
+        page_widget.alignWithComboBox.setCurrentText(partner_channel)
+        page_widget.movingChannelComboBox.setCurrentText(partner_channel)
 
     def _setup_channel(self, page_widget, channel):
         self.__update_channel_comboboxes(channel, page_widget)
