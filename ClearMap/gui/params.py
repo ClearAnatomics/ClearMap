@@ -1676,6 +1676,8 @@ class BatchParameters(UiParameter):
         paths: List[str]
             The list of sample folder paths to set for this group
         """
+        if gp_idx >= self.n_groups:
+            self.add_group()
         list_widget = self.gp_list_widget[gp_idx]
         list_widget.clear()
         list_widget.addItems(paths)
