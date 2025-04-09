@@ -711,9 +711,10 @@ class RegistrationParams(ChannelsUiParameterCollection):  # FIXME: does not seem
                 default_cfg = self._default_config['channels'].get(channel_name, absolute_default)
                 self.config['channels'][channel_name] = deepcopy(default_cfg)
                 if data_type != 'autofluorescence':
-                    for channel, cfg in self.config['channels']:
-                        if cfg['align_with'] == 'atlas':
-                            self.config['channels'][channel_name]['align_with'] = channel
+                    for other_channel, cfg in self.config['channels'].items():
+                        if cfg['align_with'] == 'atlas':  # Ref channel
+                            self.config['channels'][channel_name]['align_with'] = other_channel
+                            self.config['channels'][channel_name]['moving_channel'] = other_channel
                             break
             channel_params = ChannelRegistrationParams(self.tab, channel_name)
             self[channel_name] = channel_params
