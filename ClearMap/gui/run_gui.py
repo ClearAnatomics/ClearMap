@@ -1240,7 +1240,13 @@ class ClearMapGui(ClearMapGuiBase):
         sample_version = ConfigLoader.get_cfg_from_path(sample_cfg_path)['clearmap_version']
         if sample_version != CLEARMAP_VERSION:
             from ClearMap.config.convert_config_versions import convert_versions
-            convert_versions(sample_version, CLEARMAP_VERSION, src_folder)
+            option_idx = option_dialog('Old version detected',
+                                       f'An old version of ClearMap was detecte, do you want to: ',
+                                       [f'Upgrade to {CLEARMAP_VERSION}', 'Abort'])
+            if option_idx == 1:
+                return
+            elif option_idx == 0:
+                convert_versions(sample_version, CLEARMAP_VERSION, src_folder)
         self.tab_managers['sample_info'].set_params(None, sample_cfg_path, False)
 
         self.update_tabs()  # TODO: check if init or this
