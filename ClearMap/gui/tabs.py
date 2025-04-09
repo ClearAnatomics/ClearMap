@@ -1170,8 +1170,11 @@ class CellCounterTab(PostProcessingTab):
                        step_kw_args={'tuning': True})
         if detector.stopped:
             return
-        with detector.workspace.tmp_debug:
+        try:
+            detector.workspace.debug = True
             self.plot_detection_results(channel)
+        finally:
+            detector.workspace.debug = False
 
     def detect_cells(self, channel):  # TODO: merge w/ above w/ tuning option
         """Run the cell detection on the whole sample"""
@@ -1230,8 +1233,12 @@ class CellCounterTab(PostProcessingTab):
         self.plot_cell_filter_results(channel)
 
     def preview_cell_filter(self, channel):  # TEST: circular calls
-        with self.cell_detectors[channel].workspace.tmp_debug:
+        detector = self.cell_detectors[channel]
+        try:
+            detector.workspace.debug = True
             self.__filter_cells(channel)
+        finally:
+            detector.workspace.debug = False
 
     def filter_cells(self, channel):
         self.__filter_cells(channel, is_last_step=False)
