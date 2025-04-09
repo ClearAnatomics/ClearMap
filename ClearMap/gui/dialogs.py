@@ -10,7 +10,7 @@ import functools
 
 from ClearMap.IO.assets_constants import DATA_CONTENT_TYPES
 from PyQt5.QtCore import Qt, QSize
-from PyQt5.QtGui import QPixmap, QFont
+from PyQt5.QtGui import QPixmap, QFont, QPainter, QFontMetrics, QPen
 from PyQt5.QtWidgets import (QFileDialog, QMessageBox, QLabel, QDialogButtonBox, QSplashScreen,
                              QProgressBar, QDialog, QHBoxLayout, QPushButton, QVBoxLayout, QStyle,
                              QInputDialog, QFormLayout, QLineEdit, QScrollArea, QGroupBox, QCheckBox,
@@ -168,6 +168,43 @@ def make_splash(img_source=None, bar_max=100, res='hd'):
     if img_source is None:
         img_source = os.path.join(UI_FOLDER, 'creator', 'graphics_resources', 'splash.png')
     splash_pix = QPixmap(img_source)  # .scaled(848, 480)
+
+    # Prepare the painter to overlay text and lines onto the image.
+    painter = QPainter(splash_pix)
+    painter.setRenderHint(QPainter.Antialiasing)
+
+    # Set up the font for the overlay text.
+    font = QFont("Arial", 30, QFont.Bold)
+    painter.setFont(font)
+    metrics = QFontMetrics(font)
+
+    from packaging.version import Version
+    from importlib_metadata import version
+
+    clearmap_version = Version(version('ClearMap'))
+    text = f"ClearMap {clearmap_version.major}.{clearmap_version.minor}"
+
+    # Calculate horizontal centering for the text.
+    text_width = metrics.horizontalAdvance(text)
+    x_text = (splash_pix.width() - text_width) // 4
+
+    # Define a top margin. The first line will overlap the top of the image.
+    top_margin = 10
+    pen = QPen(Qt.white, 2)
+    painter.setPen(pen)
+
+    # Draw the top horizontal line.
+    # Calculate the y coordinate for the top line: it is aligned with 80% of the font’s ascent.
+    # line_y_top = top_margin + metrics.ascent() * 0.8
+    # painter.drawLine(0, int(line_y_top), splash_pix.width(), int(line_y_top))
+
+    # Draw the text just below the top line.
+    # Compute a y coordinate for the text baseline.
+    y_text = top_margin + metrics.ascent() + 10
+    painter.drawText(x_text, y_text, text)
+
+    painter.end()
+
     splash = QSplashScreen(splash_pix, Qt.WindowStaysOnTopHint)
     splash.setMask(splash_pix.mask())
     progress_bar = QProgressBar(splash)
