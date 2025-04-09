@@ -155,9 +155,9 @@ esac
 echo "Updating CUDA dependencies for ClearMap"
 echo "  Creating temporary environment"
 if  [[ "$OSTYPE" == "msys"* ]]; then
-    conda create -y -n clearmap_tmp_env -c conda-forge python packaging pyyaml "$solver_string"
+    conda create -y -n clearmap_tmp_env -c conda-forge python packaging pyyaml configobj "$solver_string"
 else
-    conda create -y -n clearmap_tmp_env -c conda-forge python packaging pyyaml "$solver_string" || exit 1
+    conda create -y -n clearmap_tmp_env -c conda-forge python packaging pyyaml configobj "$solver_string" || exit 1
 fi
 conda activate clearmap_tmp_env || exit 1
 green "Done"
