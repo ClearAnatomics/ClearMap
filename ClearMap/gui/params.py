@@ -1766,13 +1766,11 @@ class GroupAnalysisParams(BatchParameters):
 
         # checkboxes
         self.comparison_checkboxes = []
-        for pair in self.comparisons:
+        for i, pair in enumerate(self.comparisons):
             chk = QCheckBox(self.group_concatenator.join(pair))
-            chk.setChecked(False)
+            chk.setChecked(i == 0)
             self.tab.comparisonsVerticalLayout.addWidget(chk)
             self.comparison_checkboxes.append(chk)
-
-        self.comparison_checkboxes[0].setChecked(True)
 
         self.tab.comparisonsVerticalLayout.addStretch()
 
