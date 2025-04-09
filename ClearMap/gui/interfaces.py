@@ -17,6 +17,7 @@ from PyQt5.QtWidgets import QWhatsThis, QToolButton, QWidget
 
 from ClearMap.Utils.exceptions import MissingRequirementException, PlotGraphError
 from ClearMap.Utils.utilities import title_to_snake
+from ClearMap.Visualization.Qt.DataViewer import DataViewer
 from ClearMap.config.config_loader import ConfigLoader
 from ClearMap.gui.dialogs import get_directory_dlg
 from ClearMap.gui.gui_utils import create_clearmap_widget, replace_widget
@@ -557,7 +558,7 @@ class GenericTab(GenericUi):
             self.main_window.setup_plots(dvs, titles)
         else:
             self.main_window.setup_plots(dvs)
-        return dvs
+        return [widg for widg in dvs if isinstance(widg, DataViewer)]
 
 
 class PipelineTab(GenericTab):
