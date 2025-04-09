@@ -174,7 +174,7 @@ def make_splash(img_source=None, bar_max=100, res='hd'):
     painter.setRenderHint(QPainter.Antialiasing)
 
     # Set up the font for the overlay text.
-    font = QFont("Arial", 30, QFont.Bold)
+    font = QFont("Arial", 40, QFont.Bold)
     painter.setFont(font)
     metrics = QFontMetrics(font)
 
