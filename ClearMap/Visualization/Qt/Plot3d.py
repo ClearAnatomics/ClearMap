@@ -74,14 +74,15 @@ def plot(source, axis=None, scale=None, title=None, invert_y=True, min_max=None,
         if isinstance(src, Path):
             source[i] = str(src)
 
-    m_plot = multi_plot(source, axis=axis, scale=scale, title=title, invert_y=invert_y,
-                        min_max=min_max, max_projection=max_projection, screen=screen, arrange=arrange, lut=lut, to_front=to_front,
-                        parent=parent, sync=sync)
+    data_viewers = multi_plot(source, axis=axis, scale=scale, title=title, invert_y=invert_y,
+                              min_max=min_max, max_projection=max_projection, screen=screen,
+                              arrange=arrange, lut=lut, to_front=to_front,
+                              parent=parent, sync=sync)
     if not runs_on_spyder():
         inst = QApplication.instance()
         # if inst is not None:
         #   inst.exec_()
-    return m_plot
+    return data_viewers
 
 
 def multi_plot(sources, axis=None, scale=None, title=None, invert_y=True, min_max=None,
