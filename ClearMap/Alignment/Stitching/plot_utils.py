@@ -12,7 +12,7 @@ import ClearMap.Alignment.Stitching.StitchingRigid as stitching_rigid
 
 def plot_all_layouts(folder):
     sample_manager = SampleManager()
-    sample_manager.setup(folder)
+    sample_manager.setup(src_dir=folder)
     stitcher = StitchingProcessor(sample_manager)
     for postfix in ('aligned_axis', 'aligned', 'placed'):
         layout = stitching_rigid.load_layout(sample_manager.get_path('layout', postfix=postfix))
