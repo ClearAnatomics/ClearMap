@@ -111,14 +111,15 @@ from ClearMap.gui.style import (DARK_BACKGROUND, PLOT_3D_BG, BTN_STYLE_SHEET,
 # Widgets import is quite slow
 from ClearMap.gui.widgets import (OrthoViewer, ProgressWatcher,
                                   StructureSelector, PerfMonitor, ManipulateAssetsDialog)  # Perfmonitor needs plot_3d
-update_pbar(app, progress_bar, 60)
-from ClearMap.gui.tabs import (SampleInfoTab, StitchingTab, RegistrationTab, GroupAnalysisTab, BatchProcessingTab,
-                               DATA_TYPE_TO_TAB_CLASS, CellCounterTab, ColocalizationTab)
+update_pbar(app, progress_bar, 50)
 from ClearMap.gui.interfaces import BatchTab, PipelineTab
 from ClearMap.gui.preferences import PreferenceUi
 from ClearMap.processors.sample_preparation import SampleManager
+update_pbar(app, progress_bar, 70)
+from ClearMap.gui.tabs import (SampleInfoTab, StitchingTab, RegistrationTab, GroupAnalysisTab, BatchProcessingTab,
+                               DATA_TYPE_TO_TAB_CLASS, CellCounterTab, ColocalizationTab)
 
-update_pbar(app, progress_bar, 80)
+update_pbar(app, progress_bar, 90)
 
 pg.setConfigOption('background', PLOT_3D_BG)
 
