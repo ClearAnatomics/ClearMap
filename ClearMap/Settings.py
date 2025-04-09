@@ -26,6 +26,9 @@ __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
 import os
 
+import configobj
+
+
 ###############################################################################
 # ## Paths
 ###############################################################################
@@ -67,7 +70,16 @@ test_data_path = os.path.join(test_path, 'Data')
 # ## Paths to external programs and resources
 ###############################################################################
 
-elastix_path = os.path.join(external_path, 'elastix', 'build')
+cfg_path = os.path.expanduser('~/.clearmap/machine_params_v3_0.cfg')
+if cfg_path:
+    config = configobj.ConfigObj(cfg_path, encoding="UTF8", indent_type='    ', unrepr=True, file_error=True)
+else:
+    config = {}
+
+default_elastix_path = os.path.join(external_path, 'elastix', 'build')
+elastix_path = config.get('elastix_path', default_elastix_path)
+if elastix_path is None:
+    elastix_path = default_elastix_path
 """Absolute path to the elastix installation
 
 Note
@@ -75,7 +87,7 @@ Note
   `Elastix Webpage <https://elastix.lumc.nl/>`_
 """
 
-tera_stitcher_path = None
+tera_stitcher_path = config.get('tera_stitcher_path')
 """Absolute path to the TeraStitcher installation
 
 Note
@@ -83,7 +95,7 @@ Note
   `TeraSticher Webpage <https://abria.github.io/TeraStitcher/>`_
 """
 
-imagej_path = None  # '/usr/local/Fiji.app'
+imagej_path = config.get('imagej_path')
 """Absolute path to the ImageJ/Fiji installation
 
 Note
@@ -91,7 +103,7 @@ Note
   `ImageJ/Fiji Webpage <https://fiji.sc/>`_
 """
 
-ilastik_path = None  # '/usr/local/ilastik/ilastik-1.2.0-Linux'
+ilastik_path = config.get('ilastik_path')
 """Absolute path to the Ilastik installation
 
 Note
