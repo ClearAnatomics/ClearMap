@@ -803,17 +803,19 @@ class BatchTab(GenericTab):
             try:
                 default_cfg_file_path = self.config_loader.get_default_path('batch')
                 copyfile(default_cfg_file_path, cfg_path)
+                self.set_params(cfg_path=cfg_path)
                 self.params.fix_cfg_file(cfg_path)
             except FileNotFoundError as err:
                 self.main_window.print_error_msg(f'Could not locate file for "batch"')
                 raise err
-
-        self.set_params(cfg_path=cfg_path)
+        else:
+            self.set_params(cfg_path=cfg_path)
 
         self.params.read_configs(cfg_path)
-        self.params.results_folder = str(results_folder)  # FIXME: patch config
 
         self._load_config_to_gui()  # FIXME: second call to add group
+        self.params.results_folder = str(results_folder)
+        self.params.ui_to_cfg()
         self._setup_workers()
 
     def create_wizard(self):

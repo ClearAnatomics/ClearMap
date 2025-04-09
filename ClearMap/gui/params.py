@@ -1709,6 +1709,7 @@ class BatchParameters(UiParameter):
     @results_folder.setter
     def results_folder(self, value):
         self.tab.resultsFolderLineEdit.setText(value)
+        self.config['paths']['results_folder'] = value
 
     def handle_results_folder_changed(self):
         self.config['paths']['results_folder'] = self.results_folder
