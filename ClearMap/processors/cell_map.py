@@ -348,7 +348,7 @@ class CellDetector(TabProcessor):
             tmp['Hemisphere'] = first['hemisphere']
             tmp['Structure volume'] = first['volume']
             tmp['Cell counts'] = grouped.count()['name']
-            tmp['Average cell size'] = grouped['size'].mean()
+            tmp['Average cell size'] = grouped['size'].mean()['size']
 
             collapsed = pd.concat((collapsed, tmp))
 
