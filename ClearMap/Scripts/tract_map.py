@@ -7,7 +7,7 @@ from ClearMap.processors.tract_map import TractMapProcessor
 
 def main(src_directory):
     sample_manager = SampleManager()
-    sample_manager.setup(src_directory)
+    sample_manager.setup(src_dir=src_directory)
 
     stitcher = StitchingProcessor(sample_manager)
     stitcher.setup()

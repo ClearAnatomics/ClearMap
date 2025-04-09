@@ -15,7 +15,7 @@ from ClearMap.processors.cell_map import CellDetector
 
 def main(src_directory):
     sample_manager = SampleManager()
-    sample_manager.setup(src_directory)
+    sample_manager.setup(src_dir=src_directory)
 
     stitcher = StitchingProcessor(sample_manager)
     stitcher.setup()
