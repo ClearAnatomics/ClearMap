@@ -1230,6 +1230,7 @@ class CellCounterTab(PostProcessingTab):
                            abort_func=detector.stop_process, close_when_done=False)
             self.wrap_step('Voxelizing', detector.voxelize, step_args=['filtered'], save_cfg=False,
                            close_when_done=is_last_step)  # , main_thread=True)
+        self.update_cell_number(channel)
         self.plot_cell_filter_results(channel)
 
     def preview_cell_filter(self, channel):  # TEST: circular calls
