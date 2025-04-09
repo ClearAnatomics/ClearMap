@@ -121,7 +121,7 @@ CHANNELS_ASSETS_TYPES_CONFIG = {
         'file_format_category': 'table',
         'resource_type': 'results',
         'relevant_pipelines': ['CellMap'],  # TODO: tune relevance for subsets
-        'sub_types': ['raw', 'filtered', 'shape']
+        'sub_types': ['raw', 'filtered', 'shape', 'bkg']
     },
     'tract_voxels': {
         'file_format_category': 'table',
