@@ -704,6 +704,7 @@ class RegistrationTab(PreProcessingTab):
             self.aligner.config['channels'] = {}
             reference_channel = self.sample_manager.alignment_reference_channel
             data_channel_config['align_with'] = reference_channel
+            data_channel_config['moving_channel'] = reference_channel
             for channel in self.sample_manager.channels:
                 if self.sample_manager.config['channels'][channel]['data_type'] == 'autofluorescence':
                         self.aligner.config['channels'][channel] = autofluo_config
@@ -736,6 +737,8 @@ class RegistrationTab(PreProcessingTab):
         self.params.atlas_params.atlas_structure_tree_id_changed.connect(self.aligner.setup_atlases)
         self.params.launchLandmarksDialog.connect(self.launch_landmarks_dialog)
         self._update_plotable_channels()
+        for channel in self.aligner.config['channels']:
+            self.__update_channel_comboboxes(channel)
 
     def _set_params(self):
         self.params = RegistrationParams(self.ui)
@@ -747,11 +750,19 @@ class RegistrationTab(PreProcessingTab):
         self.params[channel]._config = self.aligner.config
         self.params[channel].cfg_to_ui()  # Force it while the tab is active
 
-    def _setup_channel(self, page_widget, channel):
+    def __update_channel_comboboxes(self, channel, page_widget=None):
+        if page_widget is None:
+            page_widget = self.ui.channelsParamsTabWidget.get_channel_widget(channel)
+        page_widget.alignWithComboBox.clear()
+        page_widget.alignWithComboBox.addItems([None, 'atlas'])
         page_widget.alignWithComboBox.addItems(list(set(self.aligner.channels_to_register()) - {channel}))
-        page_widget.movingChannelComboBox.addItem('intrinsically aligned')
+        page_widget.movingChannelComboBox.clear()
+        page_widget.movingChannelComboBox.addItems([None, 'atlas', 'intrinsically aligned'])
         page_widget.movingChannelComboBox.addItems(self.aligner.channels_to_register())
-        # FIXME: only available should be self or align_with
+        # FIXME: select most logical entry here
+
+    def _setup_channel(self, page_widget, channel):
+        self.__update_channel_comboboxes(channel, page_widget)
         alignment_files = [page_widget.paramsFilesListWidget.item(i).text() for i in
                   range(page_widget.paramsFilesListWidget.count())]  # no shortcut for standard QListWidget
         page_widget.paramsFilesListWidget = replace_widget(page_widget.paramsFilesListWidget,
