@@ -1940,7 +1940,7 @@ class GroupAnalysisProcessor:
         for pair in selected_comparisons:  # TODO: Move to processor object to be wrapped
             gp1_name, gp2_name = pair
             # Reread because of cm_io orientation
-            p_val_path = results_folder / f'p_val_colors_{gp1_name}_{gp2_name}.tif'
+            p_val_path = results_folder / f'{channel}_p_val_colors_{gp1_name}_{gp2_name}.tif'
 
             p_vals_imgs.append(clm_io.read(p_val_path))
         folder = results_folder / groups[selected_comparisons[0][0]][0]
@@ -1948,10 +1948,10 @@ class GroupAnalysisProcessor:
         registration_processor = processors['registration_processor']
         if len(p_vals_imgs) == 1:
             gp1_name, gp2_name = selected_comparisons[0]
-            gp1_avg = clm_io.read(results_folder / f'avg_density_{gp1_name}.tif')
-            gp1_sd_path = results_folder / f'sd_density_{gp1_name}.tif'
-            gp2_avg = clm_io.read(results_folder / f'avg_density_{gp2_name}.tif')
-            gp2_sd_path = results_folder / f'sd_density_{gp2_name}.tif'
+            gp1_avg = clm_io.read(results_folder / f'{channel}_avg_density_{gp1_name}.tif')
+            gp1_sd_path = results_folder / f'{channel}_sd_density_{gp1_name}.tif'
+            gp2_avg = clm_io.read(results_folder / f'{channel}_avg_density_{gp2_name}.tif')
+            gp2_sd_path = results_folder / f'{channel}_sd_density_{gp2_name}.tif'
             colored_atlas = registration_processor.annotators[channel].create_color_annotation()
             gp1_imgs = gp1_avg
             if gp1_sd_path.exists():
@@ -1964,7 +1964,7 @@ class GroupAnalysisProcessor:
             stats_imgs = p_vals_imgs[0]
             stats_title = 'P values'
             stats_luts = None
-            effect_size_path = results_folder / f'effect_size_{gp1_name}_{gp2_name}.tif'
+            effect_size_path = results_folder / f'{channel}_effect_size_{gp1_name}_{gp2_name}.tif'
             if effect_size_path.exists():
                 stats_imgs = [stats_imgs, clm_io.read(effect_size_path)]
                 stats_title += ' and effect size'
