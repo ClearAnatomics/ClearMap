@@ -571,7 +571,7 @@ class RegistrationProcessor(TabProcessor):
         if align_with is None:
             return None, moving_channel
         if not align_with:
-            raise ValueError(f'Channel {channel} missing align_with in registration config')
+            raise KeyError(f'Channel {channel} missing align_with in registration config')
         # fixed is whichever channel from ('channel', 'align_with') is not 'moving_channel'
         fixed_channel = channel if align_with == moving_channel else align_with
         return fixed_channel, moving_channel
