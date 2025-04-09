@@ -611,6 +611,7 @@ class RegistrationProcessor(TabProcessor):
         return aligned.all_existing_paths(sort=True)[-1]  # The last step is the final result
 
     def resample_channel(self, channel, increment_main=False):  # set increment_main to True for channels > 0
+        self.config.reload()
         resampled_asset = self.get('resampled', channel=channel)
         if not runs_on_ui() and resampled_asset.exists:
             resampled_asset.delete()
@@ -680,6 +681,7 @@ class RegistrationProcessor(TabProcessor):
         self.stopped = False
 
     def align_channel(self, channel):
+        self.config.reload()
         fixed_channel, moving_channel = self.get_fixed_moving_channels(channel)
         if moving_channel is None or moving_channel == 'intrinsically aligned':
             return
