@@ -284,7 +284,7 @@ class GenericTab(GenericUi):
         channel, page_widget = self._init_channel_ui(channel)
         if channel not in self.params.keys():
             if isinstance(self, PipelineTab):
-                chan_params = self.sample_params.get(channel, {})
+                chan_params = self.sample_params.config['channels'][channel]  # FIXME: do we want the loaded or the disk params
                 d_type = getattr(chan_params, 'data_type', None)
                 self.params.add_channel(channel, d_type)
             else:
