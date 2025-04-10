@@ -469,7 +469,8 @@ class GeneralChannelStitchingParams(ChannelUiParameter):
         self.layoutChannelChanged.emit(self.name, layout_channel)
 
     def handle_use_existing_layout_changed(self, state):
-        self.config['use_existing_layout'] = bool(state)
+        state = bool(state)
+        self.config['use_existing_layout'] = state
         self.useExistingLayoutChanged.emit(self.name, state)
 
 
