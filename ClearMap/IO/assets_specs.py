@@ -129,6 +129,20 @@ class TypeSpec:
         return sub_type
 
     def add_sub_type(self, sub_type_name, extensions=None, file_format_category=None, expression=None):
+        """
+        Adds or updates an asset subtype
+
+        Parameters
+        ----------
+        sub_type_name
+        extensions
+        file_format_category
+        expression
+
+        Returns
+        -------
+
+        """
         if extensions is None and file_format_category is not None:
             extensions = EXTENSIONS[file_format_category]
         sub_type = SubTypeSpec(resource_type=self.resource_type,
