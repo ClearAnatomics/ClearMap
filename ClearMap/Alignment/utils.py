@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 
 
-def get_all_structs(dfs):
+def get_all_region_ids(dfs):
     """
     Get all the structures that are in any of the dataframes
 
@@ -16,10 +16,10 @@ def get_all_structs(dfs):
     -------
 
     """
-    structs = pd.Series()
+    region_ids = pd.Series()
     for df in dfs:
-        structs = pd.concat((structs, df['id']))
-    return np.sort(structs.unique())
+        region_ids = pd.concat((region_ids, df['id']))
+    return np.sort(region_ids.unique())
 
 ########################### Label table creation
 
