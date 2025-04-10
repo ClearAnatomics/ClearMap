@@ -162,6 +162,63 @@ def cleanup(binary_img: np.ndarray, df: pd.DataFrame, coord_names):
     cleaned_labels = contiguous_labels(cleaned_labels)
     return cleaned_labels
 
+def get_minimum_dtype(max_val, signed=True):
+    for bit_width in (8, 16, 32, 64):
+        if 2 ** (bit_width - int(signed)) > max_val:  # -1 because signed
+            dtype = f'{"" if signed else "u"}int{bit_width}'
+            break
+    else:
+        raise RuntimeError(f"No integer dtype is suitable to store values up to {max_val}.")
+    return dtype
+
+# an efficie,t alternative to cleanup, yet it seems that it does not work properly if binary_img is read from a file.
+# replacing binary_img by binary_img.copy() in the function call fixes this strange bug.
+def watershed_label(binary_img: np.ndarray, representatives:tuple[np.ndarray,...], label_values:np.ndarray, connectivity=1, dtype=None):
+    """Label the connected components of binary image, assigning the values for a set of representatives.
+
+    Any connected component without a reprenstative is labeled 0.
+
+
+    Parameters
+    ----------
+    binary_img: np.ndaray
+        n-dimensional binary image (0= background,1=foreground)
+    representatives : tuple[np.ndarray,...]
+        n-tuple of flat integer arrays of the same size, say k. They give the n coordinates of the k representatives.
+    label_values : np.ndarray
+        flat size k array specifying the sought label for each representative in the output
+    connectivity : int | np.ndarray optional
+        a specification of the connectivity notion, as in skimage label or watershed
+    dtype : _type_, optional
+        dtype of the output. must be a uint or float dtype if specified. Defaults to None.
+        If None, the smallest suitable uint dtype is used.
+
+    Returns
+    -------
+    np.ndarray :
+        The labeling of binary_img with the specified labels, where all the connected components without any element
+        in repesentatives ares erased.
+
+    Raises
+    ------
+    ValueError
+        An error is raised if negative label_values are passed.
+    """
+    
+    values = label_values
+    if values.min() < 0:
+        raise ValueError("No negative label value accepted.")
+    if dtype is None:
+        dtype = get_minimum_dtype(values.max(), signed=False)
+    seeds = np.zeros_like(binary_img, dtype=dtype)
+    seeds[representatives] = values
+    res=skimage.segmentation.watershed(
+        np.zeros_like(seeds), markers=seeds, mask=binary_img, connectivity=connectivity
+    )
+    return  res
+
+
+
 
 class Channel:
     """In our context a channel is represented by a binary mask and some voxel coordinates in a dataframe.
