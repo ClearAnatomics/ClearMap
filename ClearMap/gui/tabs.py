@@ -379,11 +379,11 @@ class SampleInfoTab(GenericTab):
             channel = self.params.get_channel_name(channel)
         # REFACTOR: a bit hacky to refer to other tab
         aligner = self.main_window.tab_managers['registration'].aligner
-        if aligner.config:  # TODO: use setup_complete attribute or property instead
+        if aligner.setup_complete:
             self.wrap_plot(aligner.plot_atlas, channel)
         else:
             self.update_workspace()
-            if aligner.config:
+            if aligner.setup_complete:
                 self.wrap_plot(aligner.plot_atlas, channel)
             else:
                 warnings.warn('RegistrationProcessor not setup, cannot plot atlas. '
