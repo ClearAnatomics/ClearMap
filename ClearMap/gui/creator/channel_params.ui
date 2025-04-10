@@ -399,132 +399,33 @@
          </property>
          <layout class="QHBoxLayout" name="horizontalLayout">
           <item>
-           <widget class="QComboBox" name="orient_x">
-            <property name="minimumSize">
-             <size>
-              <width>10</width>
-              <height>0</height>
-             </size>
+           <widget class="QSpinBox" name="orientXSpinBox">
+            <property name="minimum">
+             <number>-3</number>
             </property>
-            <property name="currentText">
-             <string>-3</string>
+            <property name="maximum">
+             <number>3</number>
             </property>
-            <item>
-             <property name="text">
-              <string>-3</string>
-             </property>
-            </item>
-            <item>
-             <property name="text">
-              <string>-2</string>
-             </property>
-            </item>
-            <item>
-             <property name="text">
-              <string>-1</string>
-             </property>
-            </item>
-            <item>
-             <property name="text">
-              <string>1</string>
-             </property>
-            </item>
-            <item>
-             <property name="text">
-              <string>2</string>
-             </property>
-            </item>
-            <item>
-             <property name="text">
-              <string>3</string>
-             </property>
-            </item>
            </widget>
           </item>
           <item>
-           <widget class="QComboBox" name="orient_y">
-            <property name="minimumSize">
-             <size>
-              <width>10</width>
-              <height>0</height>
-             </size>
+           <widget class="QSpinBox" name="orientYSpinBox">
+            <property name="minimum">
+             <number>-3</number>
             </property>
-            <property name="currentText">
-             <string>-3</string>
+            <property name="maximum">
+             <number>3</number>
             </property>
-            <item>
-             <property name="text">
-              <string>-3</string>
-             </property>
-            </item>
-            <item>
-             <property name="text">
-              <string>-2</string>
-             </property>
-            </item>
-            <item>
-             <property name="text">
-              <string>-1</string>
-             </property>
-            </item>
-            <item>
-             <property name="text">
-              <string>1</string>
-             </property>
-            </item>
-            <item>
-             <property name="text">
-              <string>2</string>
-             </property>
-            </item>
-            <item>
-             <property name="text">
-              <string>3</string>
-             </property>
-            </item>
            </widget>
           </item>
           <item>
-           <widget class="QComboBox" name="orient_z">
-            <property name="minimumSize">
-             <size>
-              <width>10</width>
-              <height>0</height>
-             </size>
+           <widget class="QSpinBox" name="orientZSpinBox">
+            <property name="minimum">
+             <number>-3</number>
             </property>
-            <property name="currentText">
-             <string>-3</string>
+            <property name="maximum">
+             <number>3</number>
             </property>
-            <item>
-             <property name="text">
-              <string>-3</string>
-             </property>
-            </item>
-            <item>
-             <property name="text">
-              <string>-2</string>
-             </property>
-            </item>
-            <item>
-             <property name="text">
-              <string>-1</string>
-             </property>
-            </item>
-            <item>
-             <property name="text">
-              <string>1</string>
-             </property>
-            </item>
-            <item>
-             <property name="text">
-              <string>2</string>
-             </property>
-            </item>
-            <item>
-             <property name="text">
-              <string>3</string>
-             </property>
-            </item>
            </widget>
           </item>
           <item>
@@ -571,7 +472,7 @@
           <string>The orientation of the sample during acquisition</string>
          </property>
          <property name="whatsThis">
-          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The order in which are represented the X, Y and Z axes. A minus sign indicates an inversion of the axis direction. &lt;span style=&quot; color:#edd400;&quot;&gt;WARNING: do not select the same order for multiple axes.&lt;/span&gt;&lt;/p&gt;&lt;p&gt;Once selected, click on the magnifying glass to view the result.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The order in which are represented the X, Y and Z axes. &lt;/p&gt;&lt;p&gt;A &lt;span style=&quot; font-weight:700;&quot;&gt;negative value&lt;/span&gt; indicates an &lt;span style=&quot; font-weight:700;&quot;&gt;inversion&lt;/span&gt; of the axis direction.&lt;/p&gt;&lt;p&gt;The value 0 means this axis is undefined.&lt;/p&gt;&lt;p&gt;Orientation is invalid untill all axes are specified.&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:700;&quot;/&gt;&lt;span style=&quot; font-weight:700; color:#edd400;&quot;&gt;WARNING: do not select the same order for multiple axes.&lt;/span&gt;&lt;/p&gt;&lt;p&gt;Once selected, select &lt;span style=&quot; font-weight:700;&quot;&gt;update workspace&lt;/span&gt; and then,&lt;/p&gt;&lt;p&gt;click on the magnifying glass to view the result.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
          </property>
          <property name="text">
           <string>Orientation

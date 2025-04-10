@@ -337,12 +337,15 @@ def validate_orientation(orientation, channel, raise_error=True):
     orientation: tuple(int)
         The orientation to check
     """
-    default_ori = (1, 2, 3)
-    n_axes = len(set([abs(e) for e in orientation]))
-    if n_axes != 3:
+    # default_ori = (1, 2, 3)
+    default_ori = (0, 0, 0)
+
+    defined_axes = [abs(e) for e in orientation if e != 0]
+    if len(defined_axes) != len(set(defined_axes)):
         if raise_error:
-            raise ParamsOrientationError(f'Number of different axes in {orientation} is only {n_axes} instead of 3. '
-                                         'Please amend duplicate axes', channel=channel)
+            raise ParamsOrientationError(f'Number of different defined axes in {orientation} is'
+                                         f'{len(set(defined_axes))}. Defined axes cannot be duplicated. '
+                                         f'Please amend duplicate axes.', channel=channel)
         else:
             warnings.warn(f'Invalid orientation {orientation} for {channel},'
                           f' using default {default_ori}')
