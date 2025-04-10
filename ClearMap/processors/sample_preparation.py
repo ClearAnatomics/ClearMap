@@ -728,7 +728,10 @@ class RegistrationProcessor(TabProcessor):
         self.create_atlas_asset(default_annotator, channel_spec)
 
     def create_atlas_asset(self, annotator, channel_spec):  # FIXME: ensure that uses atlas subfolder from asset_constants
-        atlas_asset = self.get('atlas', channel=channel_spec.name, default=None)
+        try:
+            atlas_asset = self.get('atlas', channel=channel_spec.name, default=None)
+        except KeyError:
+            atlas_asset = None
         if atlas_asset is not None:
             return atlas_asset
         else:
@@ -736,7 +739,7 @@ class RegistrationProcessor(TabProcessor):
                                  file_format_category='image', relevant_pipelines=['registration'])
             atlas_asset = self.workspace.create_asset(type_spec, channel_spec=channel_spec,
                                                       sample_id=self.sample_manager.prefix)
-            return self.update_atlas_asset(channel_spec.name)
+            return self.update_atlas_asset(channel_spec.name, annotator=annotator)
 
     def update_atlas_asset(self, channel, annotator=None):
         if annotator is None:
