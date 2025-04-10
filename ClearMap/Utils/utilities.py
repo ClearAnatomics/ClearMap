@@ -33,6 +33,10 @@ from configobj import ConfigObj
 from ClearMap.Utils.tag_expression import Expression
 from ClearMap.Utils.exceptions import MissingRequirementException, SmiError, ParamsOrientationError
 
+
+DEFAULT_ORIENTATION = (0, 0, 0)
+
+
 colors = {
     "WHITE": '\033[1;37m',
     "GREEN": '\033[0;32m',
@@ -337,9 +341,6 @@ def validate_orientation(orientation, channel, raise_error=True):
     orientation: tuple(int)
         The orientation to check
     """
-    # default_ori = (1, 2, 3)
-    default_ori = (0, 0, 0)
-
     defined_axes = [abs(e) for e in orientation if e != 0]
     if len(defined_axes) != len(set(defined_axes)):
         if raise_error:
@@ -348,8 +349,8 @@ def validate_orientation(orientation, channel, raise_error=True):
                                          f'Please amend duplicate axes.', channel=channel)
         else:
             warnings.warn(f'Invalid orientation {orientation} for {channel},'
-                          f' using default {default_ori}')
-            return default_ori
+                          f' using default {DEFAULT_ORIENTATION}')
+            return DEFAULT_ORIENTATION
     return orientation
 
 
