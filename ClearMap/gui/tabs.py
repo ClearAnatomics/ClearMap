@@ -205,10 +205,6 @@ class SampleInfoTab(GenericTab):
 
         self.ui.removeCurrentChannelToolButton.clicked.connect(self.remove_current_channel)
 
-        # TODO: why not on tab click ?  # FIXME: remove buttons or reestablish
-        # self.ui.applyBox.connectApply(self.main_window.update_pipelines)
-        # self.ui.applyBox.connectSave(self.save_cfg)
-
     def _bind_channel(self, page_widget, channel):
         """
         Bind the signal/slots of the UI elements for `channel` which are not
@@ -491,7 +487,7 @@ class StitchingTab(PreProcessingTab):
         is_first_channel = self.ui.channelsParamsTabWidget.last_real_tab_idx == 1
         # layout_channel = channel if is_first_channel else self.sample_manager.get_stitchable_channels()[0]
         page_widget.layoutChannelComboBox.setCurrentText('undefined')
-        layout_chan_from_cfg = self.params[channel].config['layout_channel']
+        layout_chan_from_cfg = self.params[channel].config['channels'][channel]['layout_channel']  # FIXME: why is the config not pointing to channel directly
         if layout_chan_from_cfg not in ('undefined', 'channel_x', 'channel_y'):
             self.params[channel].layout_channel = channel
         self.params[channel].ready = True
@@ -638,7 +634,7 @@ class StitchingTab(PreProcessingTab):
                     self.convert_tiles()
                 kwargs = {'n_steps': n_steps, 'abort_func': self.stitcher.stop_process, 'close_when_done': False}
                 try:
-                    if channel == cfg.shared.layout_channel:  # Used as reference
+                    if channel == cfg.shared.layout_channel and not cfg.shared.use_existing_layout:  # Used as reference
                         self.wrap_step('Stitching', self.stitcher.stitch_channel_rigid,
                                        step_args=[channel], step_kw_args={'_force': True}, **kwargs)
                         self.wrap_step(task_name='', func=self.stitcher.stitch_channel_wobbly, step_args=[channel],

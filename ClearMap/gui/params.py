@@ -421,9 +421,11 @@ class ChannelStitchingParams(UiParameterCollection):
 class GeneralChannelStitchingParams(ChannelUiParameter):
     layoutChannelChanged = pyqtSignal(str, str)
     useExistingLayoutChanged = pyqtSignal(str, bool)
+
     use_npy: bool
     run: bool
     layout_channel: str
+    use_existing_layout: bool
 
     def __init__(self, tab, channel_name):
         super().__init__(tab, channel_name)
