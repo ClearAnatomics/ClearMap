@@ -130,7 +130,7 @@ class Workspace2:  # REFACTOR: subclass dict
         -------
 
         """
-        self.get(asset_type, channel=channel, **kwargs).create_debug(slicing, debug)
+        return self.get(asset_type, channel=channel, **kwargs).create_debug(slicing, debug)
 
     @property
     def channels(self):
