@@ -49,7 +49,7 @@ from ClearMap.IO.assets_constants import CONTENT_TYPE_TO_PIPELINE
 from ClearMap.IO.assets_specs import TypeSpec, ChannelSpec, StateManager
 from ClearMap.Utils.tag_expression import Expression
 from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
-from ClearMap.Utils.exceptions import ClearMapAssetError
+from ClearMap.Utils.exceptions import ClearMapAssetError, AssetNotFoundError
 
 
 class Asset:
@@ -380,8 +380,8 @@ class Asset:
                 finally:
                     self.sample_id = sample_id
                 if not path:
-                    raise FileNotFoundError(f'Asset "{self.type_spec.name}" does not exist. '
-                                            f'Search location: "{self.path}"')
+                    raise AssetNotFoundError(f'Asset "{self.type_spec.name}" does not exist. '
+                                             f'Search location: "{self.path}"')
         else:
             path = self.path
         return path

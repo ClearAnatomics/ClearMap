@@ -114,7 +114,7 @@ class ClearMapAssetError(ClearMapWorkspaceError):
     pass
 
 
-class AssetNotFoundError(ClearMapAssetError):
+class AssetNotFoundError(ClearMapAssetError, FileNotFoundError):
     """
     Exception raised when an asset is not found
     """
