@@ -129,9 +129,10 @@ class CellDetector(TabProcessor):
                             scale=scale, title='Cell density (voxelized)', lut='flame',
                             arrange=arrange, parent=parent)
 
-    def create_test_dataset(self, slicing):
-        self.workspace.create_debug('stitched', channel=self.channel, slicing=slicing)
+    def create_test_dataset(self, slicing, debug='debug'):
+        dbg_path = self.workspace.create_debug('stitched', channel=self.channel, slicing=slicing, debug=debug)
         self.update_watcher_main_progress()
+        return dbg_path
 
     def get_voxelization_params(self, sub_step=''):
         voxelization_parameter = {
