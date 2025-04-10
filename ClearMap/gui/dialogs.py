@@ -164,7 +164,7 @@ def make_simple_progress_dialog(title='Processing', overall_maximum=100, sub_pro
     return dlg
 
 
-def make_splash(img_source=None, bar_max=100, res='hd'):
+def make_splash(img_source=None, bar_max=100, message=None, res='hd', font_size=60):
     if img_source is None:
         img_source = os.path.join(UI_FOLDER, 'creator', 'graphics_resources', 'splash.png')
     splash_pix = QPixmap(img_source)  # .scaled(848, 480)
@@ -174,18 +174,18 @@ def make_splash(img_source=None, bar_max=100, res='hd'):
     painter.setRenderHint(QPainter.Antialiasing)
 
     # Set up the font for the overlay text.
-    font = QFont("Arial", 60, QFont.Bold)  # FIXME: put settting in config
+    font = QFont("Arial", font_size, QFont.Bold)  # FIXME: put settting in config
     painter.setFont(font)
     metrics = QFontMetrics(font)
 
-    from packaging.version import Version
-    from importlib_metadata import version
-
-    clearmap_version = Version(version('ClearMap'))
-    text = f"ClearMap {clearmap_version.major}.{clearmap_version.minor}"
+    if message is None:
+        from packaging.version import Version
+        from importlib_metadata import version
+        clearmap_version = Version(version('ClearMap'))
+        message = f"ClearMap {clearmap_version.major}.{clearmap_version.minor}"
 
     # Calculate horizontal centering for the text.
-    text_width = metrics.horizontalAdvance(text)
+    text_width = metrics.horizontalAdvance(message)
     x_text = (splash_pix.width() - text_width) // 5
 
     # Define a top margin. The first line will overlap the top of the image.
@@ -201,7 +201,7 @@ def make_splash(img_source=None, bar_max=100, res='hd'):
     # Draw the text just below the top line.
     # Compute a y coordinate for the text baseline.
     y_text = top_margin + metrics.ascent() + 10
-    painter.drawText(x_text, y_text, text)
+    painter.drawText(x_text, y_text, message)
 
     painter.end()
 
