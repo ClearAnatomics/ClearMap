@@ -25,7 +25,7 @@ from ClearMap.gui.gui_utils import surface_project, setup_mini_brain
 matplotlib.use('Qt5Agg')
 
 import ClearMap.Settings as settings
-from ClearMap.Utils.utilities import check_stopped, runs_on_ui, validate_orientation
+from ClearMap.Utils.utilities import check_stopped, runs_on_ui, validate_orientation, DEFAULT_ORIENTATION
 from ClearMap.config.atlas import ATLAS_NAMES_MAP
 from ClearMap.processors.generic_tab_processor import TabProcessor, CanceledProcessing
 # noinspection PyPep8Naming
@@ -57,8 +57,6 @@ __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
-
-DEFAULT_ORIENTATION = (1, 2, 3)   # FIXME: defined in several places
 
 class SampleManager(TabProcessor):
     """
