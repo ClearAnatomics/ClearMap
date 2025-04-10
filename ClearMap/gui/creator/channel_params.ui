@@ -115,7 +115,8 @@
           <string>Resolution of the raw dataset. Uncheck to read from the metadata.</string>
          </property>
          <property name="text">
-          <string>Settings from:</string>
+          <string>Settings
+ from</string>
          </property>
         </widget>
        </item>
