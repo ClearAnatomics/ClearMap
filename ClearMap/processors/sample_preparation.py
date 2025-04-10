@@ -19,13 +19,13 @@ import matplotlib
 from configobj import ConfigObj
 
 from ClearMap.IO.assets_constants import CONTENT_TYPE_TO_PIPELINE
-from ClearMap.Utils.exceptions import MissingRequirementException, ClearMapAssetError
+from ClearMap.Utils.exceptions import MissingRequirementException, ClearMapAssetError, ParamsOrientationError
 from ClearMap.gui.gui_utils import surface_project, setup_mini_brain
 
 matplotlib.use('Qt5Agg')
 
 import ClearMap.Settings as settings
-from ClearMap.Utils.utilities import check_stopped, runs_on_ui
+from ClearMap.Utils.utilities import check_stopped, runs_on_ui, validate_orientation
 from ClearMap.config.atlas import ATLAS_NAMES_MAP
 from ClearMap.processors.generic_tab_processor import TabProcessor, CanceledProcessing
 # noinspection PyPep8Naming
@@ -828,18 +828,27 @@ class RegistrationProcessor(TabProcessor):
             else:
                 target_directory = self.sample_manager.src_directory / 'atlas'  # FIXME: user asset_constants
 
-            self.annotators[channel] = Annotation(atlas_base_name, xyz_slicing, orientation,
-                                                  label_source=atlas_cfg['structure_tree_id'],
-                                                  target_directory=target_directory)
+            try:
+                orientation = validate_orientation(orientation, channel=channel, raise_error=True)
+                if all([ax == 0 for ax in orientation]):
+                    print(f'Orientation not set for {channel}, skipping atlas setup')
+                    continue
+                self.annotators[channel] = Annotation(atlas_base_name, xyz_slicing, orientation,
+                                                      label_source=atlas_cfg['structure_tree_id'],
+                                                      target_directory=target_directory)
 
-            scaling, mini_brain = setup_mini_brain(atlas_base_name)
-            self.mini_brains[channel] = {'scaling': scaling,
-                                         'array': mini_brain}
+                scaling, mini_brain = setup_mini_brain(atlas_base_name)
+                self.mini_brains[channel] = {'scaling': scaling,
+                                             'array': mini_brain}
 
-            # Add to workspace
-            channel_spec = self.get('raw', channel=channel).channel_spec
-            atlas_asset = self.create_atlas_asset(self.annotators[channel], channel_spec)
-            self.workspace.add_asset(atlas_asset)
+                # Add to workspace
+                channel_spec = self.get('raw', channel=channel).channel_spec
+                atlas_asset = self.create_atlas_asset(self.annotators[channel], channel_spec)
+                self.workspace.add_asset(atlas_asset)
+            except ParamsOrientationError:
+                warnings.warn(f'Orientation not set for {channel}, skipping atlas setup')
+                self.annotators[channel] = None
+                self.mini_brains[channel] = None
 
         self.update_watcher_main_progress()
 

@@ -66,8 +66,8 @@ class SampleChannelParameters(ChannelUiParameter):
         return ['channels', self.name]
 
     def handle_name_changed(self):
-        # private config because absolute path
-        # TODO: check if dict() is required
+        tab_widget = self.tab.parent().parent()  # Not clear what is n+1
+        tab_widget.setTabText(self.page_index, self.name)
         cached_name = self._cached_name
         self._config['channels'][self.name] = self._config['channels'].pop(self._cached_name)
         self._cached_name = self.name
@@ -75,38 +75,32 @@ class SampleChannelParameters(ChannelUiParameter):
 
     def connect(self):
         self.nameWidget.editingFinished.connect(self.handle_name_changed)
-        self.tab.orient_x.currentTextChanged.connect(self.handle_orientation_changed)  # REFACTOR: push to paramslinki instead
-        self.tab.orient_y.currentTextChanged.connect(self.handle_orientation_changed)
-        self.tab.orient_z.currentTextChanged.connect(self.handle_orientation_changed)
+        self.tab.orientXSpinBox.valueChanged.connect(self.handle_orientation_changed)  # REFACTOR: push to paramslinki instead
+        self.tab.orientYSpinBox.valueChanged.connect(self.handle_orientation_changed)
+        self.tab.orientZSpinBox.valueChanged.connect(self.handle_orientation_changed)
         self.connect_simple_widgets()
 
     @property
     def orientation(self):
-        x = int(self.tab.orient_x.currentText())
-        y = int(self.tab.orient_y.currentText())
-        z = int(self.tab.orient_z.currentText())
+        x = self.tab.orientXSpinBox.value()
+        y = self.tab.orientYSpinBox.value()
+        z = self.tab.orientZSpinBox.value()
         orientation = (x, y, z)
-        self.validate_orientation(orientation)  # FIXME: add validator in paramslink instead
-        return orientation
+        return self.validate_orientation(orientation)  # FIXME: add validator in paramslink instead
 
     @orientation.setter
     def orientation(self, orientation):  # FIXME: only when all 3 are set
         orientation = self.validate_orientation(orientation)
-        self.tab.orient_x.setCurrentText(f'{orientation[0]}')
-        self.tab.orient_y.setCurrentText(f'{orientation[1]}')
-        self.tab.orient_z.setCurrentText(f'{orientation[2]}')
+        self.tab.orientXSpinBox.setValue(orientation[0])
+        self.tab.orientYSpinBox.setValue(orientation[1])
+        self.tab.orientZSpinBox.setValue(orientation[2])
 
     def validate_orientation(self, orientation):
         return validate_orientation(orientation, self.name, raise_error=False)
 
     def handle_orientation_changed(self, val):  # WARNING: does not seem to move up the stack because of pyqtsignals
+        # FIXME: bypasses the setter and hence the validation
         self.config['orientation'] = self.orientation
-
-    def handle_name_changed(self):
-        tab_widget = self.tab.parent().parent()  # Not clear what is n+1
-        tab_widget.setTabText(self.page_index, self.name)
-        self._config['channels'][self.name] = self._config['channels'].pop(self._cached_name)
-        self._cached_name = self.name
 
 
 class SampleParameters(UiParameterCollection):  # FIXME: why is this not a ChannelsUiParameterCollection
