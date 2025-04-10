@@ -25,13 +25,8 @@ ClearMap Experimental
 <img src="https://christophkirst.github.io/ClearMap2Documentation/images/TubeMap_raw_movie.gif" height="150">
 </p>
 
-
 *ClearMap* is a toolbox for the analysis and registration of volumetric
 data from cleared tissues.
-
-> :new: This is the new 2.1 version of ClearMap which includes a Graphical User Interface.
-> To use it, make sure that the *install_gui.sh* script is executable and run it by 
-> opening a terminal in the ClearMap2 folder and typing ./run_gui.sh. 
 
 *ClearMap's* tool box includes 
 
