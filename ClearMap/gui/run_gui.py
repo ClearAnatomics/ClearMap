@@ -296,6 +296,8 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         # self.set_font_size()
         self.tabWidget.setMinimumWidth(200)
         self.tabWidget.setMinimumHeight(600)
+        dock_width = round(self.width() * 4/5)
+        self.resizeDocks([self.graphDock], [dock_width], Qt.Horizontal)
 
     def fix_styles(self):
         """The meta function calling all the style functions"""
