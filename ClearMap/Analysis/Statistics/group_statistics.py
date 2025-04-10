@@ -21,8 +21,7 @@ import pandas as pd
 from scipy import stats
 
 import ClearMap.Analysis.Statistics.StatisticalTests as clearmap_stat_tests
-from ClearMap.Alignment import Annotation as annotation
-from ClearMap.Alignment.utils import get_all_structs
+from ClearMap.Alignment.utils import get_all_region_ids
 from ClearMap.Analysis.Statistics import MultipleComparisonCorrection as clearmap_FDR
 from ClearMap.IO import IO as clearmap_io
 from ClearMap.Utils.exceptions import GroupStatsError
@@ -30,7 +29,8 @@ from ClearMap.Utils.path_utils import is_density_file, find_density_file, find_c
 from ClearMap.Utils.utilities import make_abs
 from ClearMap.config.atlas import ATLAS_NAMES_MAP
 from ClearMap.config.config_loader import ConfigLoader
-from ClearMap.processors.sample_preparation import init_sample_manager_and_processors, SampleManager
+from ClearMap.processors.sample_preparation import init_sample_manager_and_processors, SampleManager, \
+    RegistrationProcessor
 
 colors = {  # REFACTOR: move to visualisation module
     'red': [255, 0, 0],
@@ -366,7 +366,7 @@ def dirs_to_density_files(directory, f_list, channel):
 #     return p_vals2, p_sign
 
 
-def group_cells_counts(struct_ids, group_cells_dfs, sample_ids, volume_map):
+def group_cells_counts(annotator, region_ids, group_cells_dfs, sample_ids, volume_map):
     """
 
     Parameters
@@ -387,9 +387,9 @@ def group_cells_counts(struct_ids, group_cells_dfs, sample_ids, volume_map):
     else:
         output = pd.DataFrame(columns=['id', 'hemisphere'] + [f'counts_{sample_ids[i]}' for i in range(len(group_cells_dfs))])
 
-    output['id'] = np.tile(struct_ids, 2)  # for each hemisphere
-    output['name'] = np.tile([annotation.find(id_, key='id')['name'] for id_ in struct_ids], 2)
-    output['hemisphere'] = np.repeat((0, 255), len(struct_ids))  # FIXME: translate hemisphere to plain text
+    output['id'] = np.tile(region_ids, 2)  # for each hemisphere
+    output['name'] = np.tile([annotator.find(id_, key='id')['name'] for id_ in region_ids], 2)
+    output['hemisphere'] = np.repeat((0, 255), len(region_ids))  # FIXME: translate hemisphere to plain text
     output['volume'] = output.set_index(['id', 'hemisphere']).index.map(volume_map.get)
     output = output[output['volume'].notna()]
 
@@ -402,7 +402,7 @@ def group_cells_counts(struct_ids, group_cells_dfs, sample_ids, volume_map):
 
             hem_sample_df = sample_df[sample_df['hemisphere'] == hem_id]
             # FIXME: replace loop (slow)
-            for i, struct_id in enumerate(struct_ids):
+            for i, struct_id in enumerate(region_ids):
                 row_idx = output[(output['id'] == struct_id) & (output['hemisphere'] == hem_id)].index
                 output.loc[row_idx, col_name] = len(hem_sample_df[hem_sample_df['id'] == struct_id])
     return output
@@ -492,10 +492,18 @@ def make_summary(directory, gp1_name, gp2_name, gp1_dirs, gp2_dirs, channel=None
         channels = [channel]
 
     for channel_ in channels:
+        # Use the first sample to get the annotator for the cohort
+        sample_manager = SampleManager()
+        sample_manager.setup(src_dir=directory / gp1_dirs[0])
+
+        aligner = RegistrationProcessor(sample_manager=sample_manager)
+        aligner.setup()
+        annotator = aligner.annotators[channel_]
+
         gp1_dfs = dirs_to_cells_dfs(directory, gp1_dirs)
         gp2_dfs = dirs_to_cells_dfs(directory, gp2_dirs)
         gp_cells_dfs = [gp1_dfs, gp2_dfs]
-        structs = get_all_structs(gp1_dfs + gp2_dfs)
+        region_ids = get_all_region_ids(gp1_dfs + gp2_dfs)
 
         gp1_sample_ids = [dir_to_sample_id(folder) for folder in gp1_dirs]
         gp2_sample_ids = [dir_to_sample_id(folder) for folder in gp2_dirs]
@@ -503,7 +511,7 @@ def make_summary(directory, gp1_name, gp2_name, gp1_dirs, gp2_dirs, channel=None
 
         volume_map = get_volume_map(gp1_dirs[0], channel=channel)  # WARNING Hacky
 
-        aggregated_dfs = {gp_name: group_cells_counts(structs, gp_cells_dfs[i], sample_ids[i], volume_map)
+        aggregated_dfs = {gp_name: group_cells_counts(annotator, region_ids, gp_cells_dfs[i], sample_ids[i], volume_map)
                           for i, gp_name in enumerate((gp1_name, gp2_name))}
         total_df = generate_summary_table(aggregated_dfs)
 
