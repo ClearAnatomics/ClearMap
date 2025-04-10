@@ -265,27 +265,24 @@ class CellDetector(TabProcessor):
     def run_cell_detection(self, tuning=False, save_maxima=False, save_shape=False, save_as_binary_mask=False):
         self.reload_config()
         self.workspace.debug = tuning  # TODO: use context manager
+
         cell_detection_param = copy.deepcopy(cell_detection.default_cell_detection_parameter)
         cell_detection_param['illumination_correction'] = None  # WARNING: illumination or illumination_correction
         cell_detection_param['background_correction']['shape'] = self.processing_config['detection']['background_correction']['diameter']
         cell_detection_param['maxima_detection']['shape'] = self.processing_config['detection']['maxima_detection']['shape']
         cell_detection_param['intensity_detection']['measure'] = ['source']
         cell_detection_param['shape_detection']['threshold'] = self.processing_config['detection']['shape_detection']['threshold']
-        shape_path = self.get_path('cells', channel=self.channel, asset_sub_type='shape')
         if tuning:
             bkg_path = self.get_path('cells', channel=self.channel, asset_sub_type='bkg')
             clearmap_io.delete_file(bkg_path)
             cell_detection_param['background_correction']['save'] = bkg_path
-            clearmap_io.delete_file(shape_path)
-            cell_detection_param['shape_detection']['save'] = shape_path
 
-        if save_shape:
+        shape_path = self.get_path('cells', channel=self.channel, asset_sub_type='shape')
+        if save_shape or tuning:
             clearmap_io.delete_file(shape_path)
             cell_detection_param['shape_detection']['save'] = shape_path
-            # erase any prior existing file to prevent confusion of sink with source in IO.initialize
-            # Path(shape_path).unlink(missing_ok=True)
             # if save_as_binary_mask:
-                # cell_detection_param['shape_detection']['save_dtype'] = 'bool'
+            # cell_detection_param['shape_detection']['save_dtype'] = 'bool'
 
         if save_maxima:
             maxima_path = self.get_path('cells', channel=self.channel, asset_sub_type='maxima')
@@ -305,8 +302,9 @@ class CellDetector(TabProcessor):
         n_steps = self.get_n_blocks(self.get('stitched', channel=self.channel).shape()[2])
         self.prepare_watcher_for_substep(n_steps, self.cell_detection_re, 'Detecting cells')
         try:
-            cell_detection.detect_cells(self.get_path('stitched', channel=self.channel),
-                                        self.get_path('cells', channel=self.channel, asset_sub_type='raw'),
+            dest_path = self.get_path('cells', channel=self.channel, asset_sub_type='raw')
+            clearmap_io.delete_file(dest_path)
+            cell_detection.detect_cells(self.get_path('stitched', channel=self.channel), dest_path,
                                         cell_detection_parameter=cell_detection_param,
                                         processing_parameter=processing_parameter,
                                         workspace=self.workspace)  # WARNING: prange inside multiprocess (including arrayprocessing and devolvepoints for vox)
