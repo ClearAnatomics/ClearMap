@@ -157,6 +157,8 @@ class ElastixConfigPatcher:
 
     @staticmethod
     def __patch_config(config_path, sections):
+        if all([not v for v in sections.values()]):
+            return
         cfg = ElastixParser(config_path)
         for option, value in sections[config_path].items():
             cfg[option] = value
