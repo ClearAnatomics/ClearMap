@@ -174,7 +174,7 @@ def make_splash(img_source=None, bar_max=100, res='hd'):
     painter.setRenderHint(QPainter.Antialiasing)
 
     # Set up the font for the overlay text.
-    font = QFont("Arial", 40, QFont.Bold)
+    font = QFont("Arial", 60, QFont.Bold)  # FIXME: put settting in config
     painter.setFont(font)
     metrics = QFontMetrics(font)
 
@@ -186,7 +186,7 @@ def make_splash(img_source=None, bar_max=100, res='hd'):
 
     # Calculate horizontal centering for the text.
     text_width = metrics.horizontalAdvance(text)
-    x_text = (splash_pix.width() - text_width) // 4
+    x_text = (splash_pix.width() - text_width) // 5
 
     # Define a top margin. The first line will overlap the top of the image.
     top_margin = 10
