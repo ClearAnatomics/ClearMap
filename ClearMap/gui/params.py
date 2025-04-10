@@ -338,6 +338,8 @@ class ChannelStitchingParams(UiParameterCollection):
         self.read_configs(cfg=config)  # Required for cfg_to_ui and compute_layout
         self.shared.tab.rigidParamsGroupBox.setVisible(self.compute_layout())
         self.shared.tab.wobblyParamsGroupBox.setVisible(self.compute_layout())
+        self.shared.tab.rigidParamsGroupBox.setEnabled(not self.shared.use_existing_layout)
+        self.shared.tab.wobblyParamsGroupBox.setEnabled(not self.shared.use_existing_layout)
 
         if self.compute_layout():
             self.stitching_rigid = RigidChannelStitchingParams(tab, channel)
@@ -348,7 +350,8 @@ class ChannelStitchingParams(UiParameterCollection):
                 raise ClearMapValueError('Missing wobbly stitching config although set for computing')
             self.read_configs(cfg=config)
 
-        self.shared.layoutChannelChanged.connect(self.handle_layout_channel_changed)
+        self.shared.layoutChannelChanged.connect(self.handle_layout_channel_changed)  # FIXME: why not in self.connect
+        self.shared.useExistingLayoutChanged.connect(self.handle_use_existing_layout_changed)
 
         self.cfg_to_ui()
 
@@ -386,6 +389,16 @@ class ChannelStitchingParams(UiParameterCollection):
             self.config['channels'][self.name].pop('wobbly')
             self.write_config()
 
+        self.shared.tab.useExistingLayoutCheckBox.setVisible(compute_layout)
+
+    def handle_use_existing_layout_changed(self, channel, use_existing_layout):
+        if not self.ready:
+            return
+        compute_layout = self.compute_layout()
+        if compute_layout:
+            self.stitching_rigid.set_enabled(not use_existing_layout)
+            self.stitching_wobbly.set_enabled(not use_existing_layout)
+
     def compute_layout(self):
         """
         Checks if the layout should be computed for this channel.
@@ -407,6 +420,7 @@ class ChannelStitchingParams(UiParameterCollection):
 
 class GeneralChannelStitchingParams(ChannelUiParameter):
     layoutChannelChanged = pyqtSignal(str, str)
+    useExistingLayoutChanged = pyqtSignal(str, bool)
     use_npy: bool
     run: bool
     layout_channel: str
@@ -418,6 +432,7 @@ class GeneralChannelStitchingParams(ChannelUiParameter):
             # 'run': ParamLink(['run'], self.tab.runCheckBox),
             'run': ['run'],
             'layout_channel': ParamLink(['layout_channel'], self.tab.layoutChannelComboBox),
+            'use_existing_layout': ParamLink(['use_existing_layout'], self.tab.useExistingLayoutCheckBox, default=False),
         }
         self.connect()
 
@@ -445,10 +460,15 @@ class GeneralChannelStitchingParams(ChannelUiParameter):
         self.nameWidget.channelRenamed.connect(self.handle_name_changed)
         self.connect_simple_widgets()
         self.tab.layoutChannelComboBox.currentTextChanged.connect(self.handle_layout_channel_changed)
+        self.tab.useExistingLayoutCheckBox.stateChanged.connect(self.handle_use_existing_layout_changed)
 
     def handle_layout_channel_changed(self, layout_channel):
         self.config['layout_channel'] = layout_channel
         self.layoutChannelChanged.emit(self.name, layout_channel)
+
+    def handle_use_existing_layout_changed(self, state):
+        self.config['use_existing_layout'] = bool(state)
+        self.useExistingLayoutChanged.emit(self.name, state)
 
 
 class RigidChannelStitchingParams(ChannelUiParameter):
@@ -491,6 +511,9 @@ class RigidChannelStitchingParams(ChannelUiParameter):
 
     def set_visible(self, state):
         self.tab.rigidParamsGroupBox.setVisible(state)
+
+    def set_enabled(self, state):
+        self.tab.rigidParamsGroupBox.setEnabled(state)
 
     @property
     def projection_thickness(self):
@@ -546,6 +569,9 @@ class WobblyChannelStitchingParams(ChannelUiParameter):
 
     def set_visible(self, state):
         self.tab.wobblyParamsGroupBox.setVisible(state)
+
+    def set_enabled(self, state):
+        self.tab.wobblyParamsGroupBox.setEnabled(state)
 
 
 class ChannelRegistrationParams(ChannelUiParameter):  # FIXME: add signal for align_with_changed
