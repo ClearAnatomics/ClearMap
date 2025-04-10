@@ -231,6 +231,8 @@ class Annotation(object):
         atlas_files = {k: v for k, v in zip(atlas_source_files.keys(), atlas_files) if v}
         atlas_files['hemispheres'] = atlas_files.get('hemispheres', None)
 
+        self.orientation = orientation
+
         self.root = None
         self.structures = None
         self.ids = None
