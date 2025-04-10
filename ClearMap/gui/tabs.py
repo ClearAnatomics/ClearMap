@@ -487,10 +487,13 @@ class StitchingTab(PreProcessingTab):
     def _setup_channel(self, page_widget, channel):
         if stitchable_channels := self.sample_manager.get_stitchable_channels():
             self.params[channel].ready = self.params_finalised
-            page_widget.layoutChannelComboBox.addItems(stitchable_channels)  # FIXME: select proper entry from config
+            page_widget.layoutChannelComboBox.addItems(['undefined'] + stitchable_channels)
         is_first_channel = self.ui.channelsParamsTabWidget.last_real_tab_idx == 1
-        layout_channel = channel if is_first_channel else self.sample_manager.get_stitchable_channels()[0]
-        page_widget.layoutChannelComboBox.setCurrentText(layout_channel)
+        # layout_channel = channel if is_first_channel else self.sample_manager.get_stitchable_channels()[0]
+        page_widget.layoutChannelComboBox.setCurrentText('undefined')
+        layout_chan_from_cfg = self.params[channel].config['layout_channel']
+        if layout_chan_from_cfg not in ('undefined', 'channel_x', 'channel_y'):
+            self.params[channel].layout_channel = channel
         self.params[channel].ready = True
         # self.params[channel].ui_to_cfg()  # FIXME: check if we need to put this back
 
