@@ -1,5 +1,10 @@
-ClearMap 2.1
-============
+ClearMap Experimental
+=====================
+
+** This is the experimental version of clearmap with lots of new features but not meant to be used for production **
+
+** We offer not support for this version **
+
 
 [![DOI](https://zenodo.org/badge/256322811.svg)](https://zenodo.org/badge/latestdoi/256322811)
 [![GitHub stars](https://img.shields.io/github/stars/ChristophKirst/ClearMap2.svg?style=social&label=Star)](https://github.com/ChristophKirst/ClearMap2) 
@@ -28,20 +33,6 @@ data from cleared tissues.
 > To use it, make sure that the *install_gui.sh* script is executable and run it by 
 > opening a terminal in the ClearMap2 folder and typing ./run_gui.sh. 
 
-## 2.1.0 what's new
-  * [x] Graphical user interface with many helper widgets
-  * [x] Redesigned code with config based parameters to replace the scripts
-  * [x] Atlas alignment improvements:
-    * [x] Updated Allen atlas files (no more "No Label")
-    * [x] Support for more atlases
-    * [x] Support for hemispheres information
-    * [x] Landmarks based registration
-  * [x] Batch mode for processing or analysis
-  * [x] New plots to visualise detected cells
-  * [x] Various bug fixes
-
-\
-\
 *ClearMap's* tool box includes 
 
 ## [Wobbly-Stitcher](https://christophkirst.github.io/ClearMap2Documentation/html/wobblystitcher.html) <a href="https://christophkirst.github.io/ClearMap2Documentation/html/TubeMap.html#Stitching"> <img src="https://christophkirst.github.io/ClearMap2Documentation/images/WobblyStitcher.jpg" alt="WobblyStitcher" width="150" align="right" vspace = "5"/></a>
