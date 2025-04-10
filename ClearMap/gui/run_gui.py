@@ -1170,48 +1170,6 @@ class ClearMapGui(ClearMapGuiBase):
             if not cfg_path.exists():
                 copyfile(src_cfg_path, cfg_path)
 
-    def load_config_and_setup_ui(self):
-        """
-        Read (potentially from defaults), fix and load the config for each tab manager
-        into the GUI
-        """
-        self.print_status_msg('Parsing configuration')
-        self.assert_src_folder_set()
-
-        error = False
-        for tab in self.tab_managers.values():
-            cfg_name = title_to_snake(tab.name)
-            try:
-                # Load tab config
-                # FIXME: if old "alignment" or "processing": create stitching and registration cfg files and tabs
-                loaded_from_defaults, cfg_path = self.__get_cfg_path(cfg_name)
-
-                # Disable skipped tabs
-                if cfg_path is None:
-                    tab.disable()
-                    continue
-
-                if cfg_name == 'sample_info':
-                    sample_params = None
-                else:
-                    sample_params = self.tab_managers['sample_info'].params
-
-                tab.set_params(sample_params, cfg_path, loaded_from_defaults)
-                if cfg_name == 'sample_info' and not tab.params.shared_sample_params.sample_id:
-                    self.prompt_sample_id()
-
-            except ConfigNotFoundError as err:
-                self.conf_load_error_msg(cfg_name + str(err))
-                error = True
-            except FileNotFoundError as err:
-                print(f'ERRROR loading config {cfg_name}; {err}')
-                raise err
-
-        if not error:
-            self.print_status_msg('Config loaded')
-        else:
-            self.print_error_msg(f'Error loading configuration for tab: {tab.name}')
-
     def get_params(self, tab):
         processing_type = tab.processing_type
         tab_names = []

@@ -197,8 +197,6 @@ class SampleInfoTab(GenericTab):
         self.ui.channelsParamsTabWidget.addTabClicked.connect(self.add_channel_tab)
 
         self.ui.srcFolderBtn.clicked.connect(self.main_window.prompt_experiment_folder)
-        self.ui.loadSamplePushButton.setIcon(self.main_window._reload_icon)
-        self.ui.loadSamplePushButton.clicked.connect(self.main_window.load_config_and_setup_ui)
 
         self.ui.launchPatternWizzardPushButton.clicked.connect(self.launch_pattern_wizard)
         self.ui.updateWorkspacePushButton.clicked.connect(self.update_workspace)
