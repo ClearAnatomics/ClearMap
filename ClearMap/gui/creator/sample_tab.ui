@@ -224,7 +224,7 @@
         <x>0</x>
         <y>0</y>
         <width>440</width>
-        <height>484</height>
+        <height>514</height>
        </rect>
       </property>
       <attribute name="label">
@@ -320,7 +320,8 @@
           <string>Remove current channel</string>
          </property>
          <property name="icon">
-          <iconset theme="list-remove"/>
+          <iconset theme="list-remove">
+           <normaloff>.</normaloff>.</iconset>
          </property>
          <property name="toolButtonStyle">
           <enum>Qt::ToolButtonTextBesideIcon</enum>
@@ -329,19 +330,6 @@
        </item>
       </layout>
      </widget>
-    </widget>
-   </item>
-   <item>
-    <widget class="QDialogButtonBox" name="applyBox">
-     <property name="maximumSize">
-      <size>
-       <width>380</width>
-       <height>16777215</height>
-      </size>
-     </property>
-     <property name="standardButtons">
-      <set>QDialogButtonBox::Apply|QDialogButtonBox::Save</set>
-     </property>
     </widget>
    </item>
    <item>
