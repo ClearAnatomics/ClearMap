@@ -1249,9 +1249,14 @@ class ClearMapGui(ClearMapGuiBase):
                 return
             elif option_idx == 0:
                 convert_versions(sample_version, CLEARMAP_VERSION, src_folder)
+        splash, pbar = make_splash(message=f'Loading sample {Path(sample_cfg_path).parent.name}', font_size=25)
+        splash.show()
+        update_pbar(self.app, progress_bar, 20)
         self.tab_managers['sample_info'].set_params(None, sample_cfg_path, False)
-
+        update_pbar(self.app, progress_bar, 40)
         self.update_tabs()  # TODO: check if init or this
+        update_pbar(self.app, progress_bar, 90)
+        splash.finish(self)
 
     def prompt_sample_id(self):
         """
