@@ -730,22 +730,24 @@ class RegistrationProcessor(TabProcessor):
         self.create_atlas_asset(default_annotator, channel_spec)
 
     def create_atlas_asset(self, annotator, channel_spec):  # FIXME: ensure that uses atlas subfolder from asset_constants
-        try:
-            atlas_asset = self.get('atlas', channel=channel_spec.name)
+        atlas_asset = self.get('atlas', channel=channel_spec.name, default=None)
+        if atlas_asset is not None:
             return atlas_asset
-        except KeyError:
-            type_spec = TypeSpec(
-                resource_type='atlas',
-                type_name='atlas',
-                file_format_category='image',
-                relevant_pipelines=['registration']
-            )
-            atlas_asset = self.workspace.create_asset(type_spec, channel_spec=channel_spec, sample_id=self.sample_manager.prefix)
-            for sub_type_name, file_path in annotator.get_atlas_paths().items():
-                atlas_asset.type_spec.add_sub_type(sub_type_name, expression=os.path.abspath(file_path))
-            atlas_asset.type_spec.add_sub_type('label', expression=annotator.label_file,
-                                               extensions=['.json'])
-            return atlas_asset
+        else:
+            type_spec = TypeSpec(resource_type='atlas', type_name='atlas',
+                                 file_format_category='image', relevant_pipelines=['registration'])
+            atlas_asset = self.workspace.create_asset(type_spec, channel_spec=channel_spec,
+                                                      sample_id=self.sample_manager.prefix)
+            return self.update_atlas_asset(channel_spec.name)
+
+    def update_atlas_asset(self, channel, annotator=None):
+        if annotator is None:
+            annotator = self.annotators[channel]
+        atlas_asset = self.get('atlas', channel=channel)
+        for sub_type_name, file_path in annotator.get_atlas_paths().items():
+            atlas_asset.type_spec.add_sub_type(sub_type_name, expression=os.path.abspath(file_path))
+        atlas_asset.type_spec.add_sub_type('label', expression=annotator.label_file, extensions=['.json'])
+        return atlas_asset
 
     def project_mini_brain(self, channel):  # FIXME: idealy part of sample_manager
         """
@@ -831,7 +833,7 @@ class RegistrationProcessor(TabProcessor):
             try:
                 orientation = validate_orientation(orientation, channel=channel, raise_error=True)
                 if all([ax == 0 for ax in orientation]):
-                    print(f'Orientation not set for {channel}, skipping atlas setup')
+                    warnings.warn(f'Orientation not set for {channel}, skipping atlas setup')
                     continue
                 self.annotators[channel] = Annotation(atlas_base_name, xyz_slicing, orientation,
                                                       label_source=atlas_cfg['structure_tree_id'],
@@ -842,11 +844,16 @@ class RegistrationProcessor(TabProcessor):
                                              'array': mini_brain}
 
                 # Add to workspace
-                channel_spec = self.get('raw', channel=channel).channel_spec
-                atlas_asset = self.create_atlas_asset(self.annotators[channel], channel_spec)
-                self.workspace.add_asset(atlas_asset)
+                asset = self.get('atlas', channel=channel, default=None)
+                if asset is None or not asset.exists:
+                    channel_spec = self.get('raw', channel=channel).channel_spec
+                    atlas_asset = self.create_atlas_asset(self.annotators[channel], channel_spec)
+                    self.workspace.add_asset(atlas_asset)
+                else:
+                    # FIXME: update_asset method in workspace2
+                    self.workspace.asset_collections[channel]['atlas'] = self.update_atlas_asset(channel)
             except ParamsOrientationError:
-                warnings.warn(f'Orientation not set for {channel}, skipping atlas setup')
+                warnings.warn(f'Orientation not set for {channel}, skipping atlas setup and erasing annotators.')
                 self.annotators[channel] = None
                 self.mini_brains[channel] = None
 
