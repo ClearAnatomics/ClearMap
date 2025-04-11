@@ -1625,6 +1625,8 @@ class BatchParameters(UiParameter):
         self.tab.sampleFoldersToolBox = QToolBox(parent=self.tab)
         self.tab.sampleFoldersPageLayout.addWidget(self.tab.sampleFoldersToolBox, 3, 0)
 
+        self.connect()
+
     def _ui_to_cfg(self):
         self.config['paths']['results_folder'] = self.results_folder
         self.config['groups'] = self.groups
@@ -1679,11 +1681,18 @@ class BatchParameters(UiParameter):
         self.connect_groups()
 
     def remove_group(self):
-        last_idx = self.n_groups - 1
-        widg = self.tab.sampleFoldersToolBox.widget(last_idx)
-        self.tab.sampleFoldersToolBox.removeItem(last_idx)
+        # last_idx = self.n_groups - 1  # remove current group instead
+        current_idx = self.tab.sampleFoldersToolBox.currentIndex()
+        group_name = self.group_names[current_idx]
+        widg = self.tab.sampleFoldersToolBox.widget(current_idx)
+        self.tab.sampleFoldersToolBox.removeItem(current_idx)
         widg.setParent(None)
         widg.deleteLater()
+        self.config['groups'].pop(group_name)
+        for k, v in self.config['comparisons'].items():
+            if group_name in v:
+                self.config['comparisons'].pop(k)
+        # TODO: check if we write config
 
     @property
     def n_groups(self):
