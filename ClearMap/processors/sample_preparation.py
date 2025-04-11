@@ -549,8 +549,8 @@ class RegistrationProcessor(TabProcessor):
         return registration_params_files
 
     def plot_atlas(self, channel):  # FIXME: idealy part of sample_manager
-        return q_plot_3d.plot(self.get('atlas', channel=channel, asset_sub_type='reference').path,
-                              lut=self.machine_config['default_lut'])
+        atlas_path = self.get_path('atlas', channel=channel, asset_sub_type='reference')
+        return q_plot_3d.plot(atlas_path, lut=self.machine_config['default_lut'])
 
     def clear_landmarks(self, channel=None):
         """
@@ -744,10 +744,43 @@ class RegistrationProcessor(TabProcessor):
     def update_atlas_asset(self, channel, annotator=None):
         if annotator is None:
             annotator = self.annotators[channel]
+            sample_cfg = self.sample_manager.config['channels'][channel]
+            if annotator.orientation != sample_cfg['orientation'] or \
+                annotator.slicing != sample_cfg['slicing']:
+
+                slicing = sample_cfg['slicing']
+                if slicing is not None and slicing.values() != (None, None, None):
+                    xyz_slicing = tuple(slice(None) if slc is None else slice(*slc) for slc in slicing.values())
+                else:
+                    xyz_slicing = None
+                orientation = sample_cfg['orientation']
+                if orientation == DEFAULT_ORIENTATION:
+                    warnings.warn(f'Orientation not set for {channel}, skipping atlas setup')
+                    return
+                atlas_cfg = self.config['atlas']
+                self.annotators[channel] = Annotation(atlas_base_name=ATLAS_NAMES_MAP[atlas_cfg['id']]['base_name'],
+                                                      slicing=xyz_slicing, orientation=orientation,
+                                                      label_source=atlas_cfg['structure_tree_id'],
+                                                      target_directory=annotator.target_directory)
+                annotator = self.annotators[channel]
         atlas_asset = self.get('atlas', channel=channel)
         for sub_type_name, file_path in annotator.get_atlas_paths().items():
-            atlas_asset.type_spec.add_sub_type(sub_type_name, expression=os.path.abspath(file_path))
-        atlas_asset.type_spec.add_sub_type('label', expression=annotator.label_file, extensions=['.json'])
+            sub_type = atlas_asset.type_spec.add_sub_type(sub_type_name, expression=os.path.abspath(file_path))
+            asset = self.workspace.asset_collections[channel].get(f'atlas_{sub_type_name}')
+            if not asset:
+                asset = self.workspace.create_asset(type_spec=sub_type, channel_spec=atlas_asset.channel_spec,
+                                                    sample_id=self.sample_manager.prefix)
+            else:
+                asset.type_spec = sub_type
+            self.workspace.asset_collections[channel][f'atlas_{sub_type_name}'] = asset  # FIXME: method in workspace2
+        sub_type = atlas_asset.type_spec.add_sub_type('label', expression=annotator.label_file, extensions=['.json'])
+        asset = self.workspace.asset_collections[channel].get('atlas_label')
+        if not asset:
+            asset = self.workspace.create_asset(type_spec=sub_type, channel_spec=atlas_asset.channel_spec,
+                                                sample_id=self.sample_manager.prefix)
+        else:
+            asset.type_spec = sub_type
+        self.workspace.asset_collections[channel]['atlas_label'] = asset
         return atlas_asset
 
     def project_mini_brain(self, channel):  # FIXME: idealy part of sample_manager
@@ -833,7 +866,7 @@ class RegistrationProcessor(TabProcessor):
 
             try:
                 orientation = validate_orientation(orientation, channel=channel, raise_error=True)
-                if all([ax == 0 for ax in orientation]):
+                if orientation == DEFAULT_ORIENTATION:
                     warnings.warn(f'Orientation not set for {channel}, skipping atlas setup')
                     continue
                 self.annotators[channel] = Annotation(atlas_base_name, xyz_slicing, orientation,

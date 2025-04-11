@@ -231,7 +231,12 @@ class Annotation(object):
         atlas_files = {k: v for k, v in zip(atlas_source_files.keys(), atlas_files) if v}
         atlas_files['hemispheres'] = atlas_files.get('hemispheres', None)
 
+        # Save the input parameters
+        self.atlas_base_name = atlas_base_name
+        self.slicing = slicing
         self.orientation = orientation
+        self.label_source = label_source
+        self.target_directory = target_directory
 
         self.root = None
         self.structures = None
@@ -296,17 +301,17 @@ class Annotation(object):
     def get_colors_rgba(self, alpha=1):
         return self.df["colors_hex"].map(lambda x: col.hex_to_rgb(x, alpha=alpha))
 
-    def set_annotation_file(self, annotation_file_path):
+    def set_annotation_file(self, annotation_file_path):  # FIXME: mark deprecated
         print(f"Setting annotation file to {annotation_file_path}.\n"
               f"The annotator will be reinitialized.")
         self.initialize(annotation_file_path=annotation_file_path)
 
-    def set_label_file(self, label_file_path):
+    def set_label_file(self, label_file_path):  # FIXME: mark deprecated
         print(f"Setting label file to {label_file_path}.\n"
               f"The annotator will be reinitialized.")
         self.initialize(label_file_path=label_file_path)
 
-    def initialize(self, annotation_file_path=None, hemispheres_file_path=None,
+    def initialize(self, annotation_file_path=None, hemispheres_file_path=None,  # TODO: make private
                    distance_to_surface_file_path=None, reference_file_path=None,
                    label_file_path=None,
                    extra_label=None):

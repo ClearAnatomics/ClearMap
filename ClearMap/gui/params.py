@@ -20,7 +20,7 @@ from PyQt5.QtWidgets import QInputDialog, QToolBox, QCheckBox, QPushButton, QLab
 
 from ClearMap.IO.assets_constants import CONTENT_TYPE_TO_PIPELINE
 from ClearMap.Utils.exceptions import ClearMapValueError
-from ClearMap.Utils.utilities import validate_orientation, snake_to_title
+from ClearMap.Utils.utilities import validate_orientation, snake_to_title, DEFAULT_ORIENTATION
 from ClearMap.config.atlas import ATLAS_NAMES_MAP
 
 from ClearMap.gui.gui_utils import create_clearmap_widget, clear_layout
@@ -39,6 +39,19 @@ from ClearMap.processors.sample_preparation import SampleManager
 
 class SampleChannelParameters(ChannelUiParameter):
     nameChanged = pyqtSignal(str, str)
+    orientationChanged = pyqtSignal(str, tuple)
+    cropChanged = pyqtSignal(str, list, list, list)
+
+    geometry_settings_from: str
+    data_type: str
+    extension: str
+    path: str
+    resolution: List[float]
+    comments: str
+    slice_x: List[int]
+    slice_y: List[int]
+    slice_z: List[int]
+
     def __init__(self, tab, channel_name):
         super().__init__(tab, channel_name, 'nameLineEdit')
         self.params_dict = {
@@ -98,9 +111,24 @@ class SampleChannelParameters(ChannelUiParameter):
     def validate_orientation(self, orientation):
         return validate_orientation(orientation, self.name, raise_error=False)
 
-    def handle_orientation_changed(self, val):  # WARNING: does not seem to move up the stack because of pyqtsignals
-        # FIXME: bypasses the setter and hence the validation
-        self.config['orientation'] = self.orientation
+    def handle_orientation_changed(self, _):  # WARNING: does not seem to move up the stack because of pyqtsignals
+        # WARNING: bypasses the setter and hence the validation
+        if self.orientation == DEFAULT_ORIENTATION or 0 not in self.orientation:  # Default or fully defined, proceed
+            self.config['orientation'] = self.orientation
+        if 0 not in self.orientation:  # i.e. fully defined
+            self.orientationChanged.emit(self.name, self.orientation)
+
+    def handle_slice_x_changed(self):
+        self.config['slicing']['x'] = self.slice_x
+        self.cropChanged.emit(self.name, self.slice_x, self.slice_y, self.slice_z)
+
+    def handle_slice_y_changed(self):
+        self.config['slicing']['y'] = self.slice_y
+        self.cropChanged.emit(self.name, self.slice_x, self.slice_y, self.slice_z)
+
+    def handle_slice_z_changed(self):
+        self.config['slicing']['z'] = self.slice_z
+        self.cropChanged.emit(self.name, self.slice_x, self.slice_y, self.slice_z)
 
 
 class SampleParameters(UiParameterCollection):  # FIXME: why is this not a ChannelsUiParameterCollection
@@ -111,6 +139,8 @@ class SampleParameters(UiParameterCollection):  # FIXME: why is this not a Chann
     plotAtlas = pyqtSignal(int)    # Bind by number because name may change
     channelNameChanged = pyqtSignal(str, str)
     channelsChanged = pyqtSignal(list, list)
+    orientationChanged = pyqtSignal(str, tuple)
+    cropChanged = pyqtSignal(str, list, list, list)
 
     def __init__(self, tab, src_folder=None):
         self.shared_sample_params = SharedSampleParams(tab, src_folder=src_folder)
@@ -162,6 +192,9 @@ class SampleParameters(UiParameterCollection):  # FIXME: why is this not a Chann
                 self.config['channels'][channel_name] = deepcopy(self.default_channel_config())
             channel_params = SampleChannelParameters(self.tab, channel_name)
             channel_params.nameChanged.connect(self.handle_channel_name_changed)
+            channel_params.orientationChanged.connect(self.handle_orientation_changed)
+            channel_params.cropChanged.connect(self.handle_slice_changed)
+
             channel_params.tab.plotMiniBrainPushButton.clicked.connect(
                 functools.partial(self.plotMiniBrain.emit, channel_params.page_index))
             channel_params.tab.sampleViewAtlasPushButton.clicked.connect(
@@ -181,6 +214,12 @@ class SampleParameters(UiParameterCollection):  # FIXME: why is this not a Chann
 
     def handle_channel_name_changed(self, old_name, new_name):
         self.channelNameChanged.emit(old_name, new_name)
+
+    def handle_orientation_changed(self, channel, orientation):
+        self.orientationChanged.emit(channel, orientation)
+
+    def handle_slice_changed(self, channel, slice_x, slice_y, slice_z):
+        self.cropChanged.emit(channel, slice_x, slice_y, slice_z)
 
     def get_channel_name(self, channel_idx):
         return self.tab.channelsParamsTabWidget.tabText(channel_idx)

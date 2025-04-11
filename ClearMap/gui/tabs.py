@@ -185,6 +185,8 @@ class SampleInfoTab(GenericTab):
         self.params.plotAtlas.connect(self.display_atlas)
         self.params.channelNameChanged.connect(self.update_workspace)
         self.params.channelsChanged.connect(self.update_pipelines)
+        self.params.orientationChanged.connect(self.update_atlas)
+        self.params.cropChanged.connect(self.update_atlas)
 
     def _get_channels(self):
         return self.sample_manager.channels  # or list(self.params.config['channels'].keys())
@@ -291,6 +293,15 @@ class SampleInfoTab(GenericTab):
         self.params.ui_to_cfg()
         self.main_window.update_tabs(former_channels, new_channels)
 
+    def update_atlas(self, channel, *args):
+        self.params.ui_to_cfg()
+        aligner = self.main_window.tab_managers['registration'].aligner
+        try:
+            aligner.update_atlas_asset(channel=channel)
+        except KeyError as err:
+            warnings.warn(f'Could not update atlas for channel {channel} because it is not in the workspace. '
+                          f'Setting all atlases to None; {err}')
+            aligner.setup_atlases()
 
     @property
     def src_folder(self):

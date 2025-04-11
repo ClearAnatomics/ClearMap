@@ -837,6 +837,12 @@ class AssetCollection:  # FIXME: fix how assets are retrieved
             raise KeyError(f'Asset "{item}" not found in collection with "{self.sample_id=}"'
                            f'{self.base_directory=}, {self.channel_spec=}')
 
+    def get(self, item, default=None):
+        try:
+            return self.assets[item]
+        except KeyError:
+            return default
+
     def __setitem__(self, key, value):
         if not isinstance(value, Asset):
             raise ClearMapAssetError(f'Value must be an Asset. Got "{type(value)}" instead.')
