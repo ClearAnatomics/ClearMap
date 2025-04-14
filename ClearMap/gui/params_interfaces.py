@@ -368,7 +368,18 @@ class UiParameter(QObject):
     @property
     def default_config(self):
         if self.cfg_subtree:
-            return get_item_recursive(self._default_config, self.cfg_subtree)
+            if self.name in self.cfg_subtree:
+                default_channel = self._default_config['channels'].keys()[0]
+                default_sub_tree = self.cfg_subtree.copy()
+                default_sub_tree[default_sub_tree.index(self.name)] = default_channel
+                return get_item_recursive(self._default_config, default_sub_tree)
+            else:
+                try:
+                    return get_item_recursive(self._default_config, self.cfg_subtree)
+                except KeyError as err:
+                    if self.name in str(err):
+                        raise KeyError(f'Could not find channel {self.name} in default config file. '
+                                       f'config sub tree: {self.cfg_subtree}')
         else:
             return self._default_config
 
