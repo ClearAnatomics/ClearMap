@@ -6,7 +6,7 @@ Colocalization
 
 This module allows to compare signal between different channels
 
-The basic idea is to exploit the data of 
+The basic idea is to exploit the data of
 - a binary mask per channel
 - a dataframe with a representative point per connected component, given in pixel coords
     with possibly extra measurement information for the nucleus in the respective channel,
@@ -21,11 +21,11 @@ correspond indeed to the same nucleus.
 The simplest method is to break symmetry and have a reference channel that
 marks all nuclei of the studied cell category (e.g. all cell type or neurons)
 
-Then, for each reference channel detected nucleus, decide if it is to be considered 
+Then, for each reference channel detected nucleus, decide if it is to be considered
 positive for the the other channels.
 
 This can be made relying on the following capabilities, given two channels
-- Compute the overlap of each connected component of a given channel with the 
+- Compute the overlap of each connected component of a given channel with the
 other channel, component-wise or globally or, more generally
 - compute a matching score based on the information we have
 
@@ -137,12 +137,14 @@ def _data_frame_ok(df: pd.DataFrame):
         and "index" not in df.columns
     )
 
-def contiguous_labels(labels):#TODO: try optimization with return_index argument of np.unique
+
+def contiguous_labels(labels):  # TODO: try optimization with return_index argument of np.unique
     vals = np.unique(labels)
-    labels = np.searchsorted(vals,labels)
+    labels = np.searchsorted(vals, labels)
     return labels
 
-def cleanup(binary_img:np.ndarray,df:pd.DataFrame,coord_names):
+
+def cleanup(binary_img: np.ndarray, df: pd.DataFrame, coord_names):
     """Return the labeled image giving exactly the connected components of binary_img that correspond to a representative in dataframe.
     Parameters
     ----------
@@ -153,12 +155,69 @@ def cleanup(binary_img:np.ndarray,df:pd.DataFrame,coord_names):
     coord_names : _type_
         _description_
     """
-    labels = ndi.label(binary_img)
+    labels, _ = ndi.label(binary_img)
     coords = df[coord_names]
-    relevant_labels = np.array([labels[tuple(coords.iloc[index])] for index in range(df)])
-    cleaned_labels = np.where(np.isin(labels, relevant_labels), labels,0)
+    relevant_labels = labels[*coords.values.transpose()]
+    cleaned_labels = np.where(np.isin(labels, relevant_labels), labels, 0)
     cleaned_labels = contiguous_labels(cleaned_labels)
     return cleaned_labels
+
+def get_minimum_dtype(max_val, signed=True):
+    for bit_width in (8, 16, 32, 64):
+        if 2 ** (bit_width - int(signed)) > max_val:  # -1 because signed
+            dtype = f'{"" if signed else "u"}int{bit_width}'
+            break
+    else:
+        raise RuntimeError(f"No integer dtype is suitable to store values up to {max_val}.")
+    return dtype
+
+# an efficie,t alternative to cleanup, yet it seems that it does not work properly if binary_img is read from a file.
+# replacing binary_img by binary_img.copy() in the function call fixes this strange bug.
+def watershed_label(binary_img: np.ndarray, representatives:tuple[np.ndarray,...], label_values:np.ndarray, connectivity=1, dtype=None):
+    """Label the connected components of binary image, assigning the values for a set of representatives.
+
+    Any connected component without a reprenstative is labeled 0.
+
+
+    Parameters
+    ----------
+    binary_img: np.ndaray
+        n-dimensional binary image (0= background,1=foreground)
+    representatives : tuple[np.ndarray,...]
+        n-tuple of flat integer arrays of the same size, say k. They give the n coordinates of the k representatives.
+    label_values : np.ndarray
+        flat size k array specifying the sought label for each representative in the output
+    connectivity : int | np.ndarray optional
+        a specification of the connectivity notion, as in skimage label or watershed
+    dtype : _type_, optional
+        dtype of the output. must be a uint or float dtype if specified. Defaults to None.
+        If None, the smallest suitable uint dtype is used.
+
+    Returns
+    -------
+    np.ndarray :
+        The labeling of binary_img with the specified labels, where all the connected components without any element
+        in repesentatives ares erased.
+
+    Raises
+    ------
+    ValueError
+        An error is raised if negative label_values are passed.
+    """
+    
+    values = label_values
+    if values.min() < 0:
+        raise ValueError("No negative label value accepted.")
+    if dtype is None:
+        dtype = get_minimum_dtype(values.max(), signed=False)
+    seeds = np.zeros_like(binary_img, dtype=dtype)
+    seeds[representatives] = values
+    res=skimage.segmentation.watershed(
+        np.zeros_like(seeds), markers=seeds, mask=binary_img, connectivity=connectivity
+    )
+    return  res
+
+
 
 
 class Channel:
@@ -179,8 +238,8 @@ class Channel:
         voxel_dims=None,
         physical_origin=None,
         channel_name="",
-        clean_image:bool=False,
-        already_clean:bool=False
+        clean_image: bool = False,
+        already_clean: bool = False,
     ) -> None:
         """Instantiate an object
 
@@ -200,7 +259,7 @@ class Channel:
             _description_, by default ""
         clean_image: bool
             If connected components of binary_img corresponding to no representative in dataframe should be erased. Defaults to False.
-            This is a costly operation designed to be used only in blocks. 
+            This is a costly operation designed to be used only in blocks.
         already_clean: bool
             Bypass prior cleaning for the blocks if True. Defaults to False.
         Raises
@@ -218,7 +277,7 @@ class Channel:
             )
         self.already_clean = already_clean
         if clean_image and not self.already_clean:
-            labels = cleanup(binary_img,dataframe,coord_names)
+            labels = cleanup(binary_img, dataframe, coord_names)
             self._labels = labels
             self.binary_img = labels > 0
         else:
@@ -331,7 +390,9 @@ class Channel:
             the bounding box
         """
 
-        return tuple(slice(*[self._bounding_boxes_array()[i, axis, j] + j for j in range(2)]) for axis in range(self.ndim))
+        return tuple(
+            slice(*[self._bounding_boxes_array()[i, axis, j] + j for j in range(2)]) for axis in range(self.ndim)
+        )
 
     # kept mainly for comparison and for the generic case of function below
     def _naive_bounding_boxes_array(self):
@@ -480,8 +541,9 @@ class Channel:
             self._set_blobwise_overlaps(other_channel)
             return self._overlaps_dic[other_channel.name]
 
-    def max_blobwise_overlaps(self, other_channel: Channel, return_max_indices: bool = True) -> (
-            np.ndarray | tuple[np.ndarray, np.ndarray]):
+    def max_blobwise_overlaps(
+        self, other_channel: Channel, return_max_indices: bool = True
+    ) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
         """For each nucleus of self, compute the max overlap with a single nucleus of other_channel.
             if return_max_indices is True, nuclei indices that realize the max are also returned.
 
@@ -517,8 +579,9 @@ class Channel:
         else:
             return np.max(counts, axis=1)
 
-    def max_blobwise_overlap_rates(self, other_channel: Channel, return_max_indices: bool = True) -> (
-            np.ndarray | tuple[np.ndarray, np.ndarray]):
+    def max_blobwise_overlap_rates(
+        self, other_channel: Channel, return_max_indices: bool = True
+    ) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
         """For each nucleus of self, compute the max overlap rate with a single nucleus of other_channel.
             if return_max_indices is True, nuclei indices that realize the max are also returned.
 
@@ -568,8 +631,9 @@ class Channel:
 
         return distances(physical_centers_1, physical_centers_2)
 
-    def closest_center_distances(self, other_channel: Channel, return_min_indices=True) -> (
-            np.ndarray | tuple[np.ndarray, np.ndarray]):
+    def closest_center_distances(
+        self, other_channel: Channel, return_min_indices=True
+    ) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
         """
         Return the distances to the closest centers in `other_channel` for each center in `self`.
 
@@ -639,7 +703,7 @@ class Channel:
             processes=processes,
             size_min=size_min,
             size_max=size_max,
-            are_already_clean=(self.already_clean,other_channel.already_clean)
+            are_already_clean=(self.already_clean, other_channel.already_clean),
         )
 
     # for comparison/testing purposes
