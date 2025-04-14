@@ -38,10 +38,19 @@ and parallelization techniques.
 """
 
 from __future__ import annotations
+
+import os
+import tempfile
+import gc
+
+import uuid
 from functools import cached_property
 import warnings
+from pathlib import Path
+from typing import List
 
 import numpy as np
+from numpy.core.memmap import memmap
 import pandas as pd
 import scipy.ndimage as ndi
 from scipy.spatial.transform import Rotation
@@ -50,12 +59,26 @@ import skimage.morphology
 
 from ClearMap.Analysis.colocalization import bbox as bounding_boxes
 from ClearMap.Analysis.colocalization.parallelism import compare
+from ClearMap.ParallelProcessing.DataProcessing.ArrayProcessing import initialize_sink
+from ClearMap.IO.MMP import Source as MemmapSource
 from ClearMap.Utils.exceptions import ClearMapValueError
 
+try:
+    from ClearMap.config.config_loader import ConfigLoader
+    machine_cfg = ConfigLoader.get_cfg_from_path(ConfigLoader.get_default_path('machine'))
+    tmp_folder = machine_cfg.get('temp_folder', None)
+    if tmp_folder is not None:
+        for var_name in ('TMP', 'TEMP', 'TMPDIR'):
+            os.environ[var_name] = tmp_folder
+        tempfile.tempdir = None  # Force refresh of tempdir
+    tempfile.gettempdir()  # Redefine tempdir to the new one
+except (FileNotFoundError, KeyError) as err:
+    print(f'No machine config file found, using default tempdir; {err}')
 
-# batch distance computation
+
 def distances(points_1: np.ndarray, points_2: np.ndarray) -> np.ndarray:
-    """Compute the distances between the points in points_1 and those of points_2.
+    """
+    Compute the distances between the points in points_1 and those of points_2.
 
     Parameters
     ----------
@@ -77,7 +100,6 @@ def distances(points_1: np.ndarray, points_2: np.ndarray) -> np.ndarray:
     ) ** 0.5
 
 
-# a cool auxiliary function
 def bilabel_bincount(labels_1: np.array, labels_2: np.array) -> np.array:
     """Count the number of occurrences for all the conjunctions of labels.
 
@@ -102,12 +124,7 @@ def bilabel_bincount(labels_1: np.array, labels_2: np.array) -> np.array:
     # factor will also be the height of the output
     max_val = max_1 * factor + max_2
     # determine the cheapest dtype to hold the join
-    for bit_width in (8, 16, 32, 64):
-        if 2**(bit_width -1) > max_val:  # -1 because signed
-            dtype = f'int{bit_width}'
-            break
-    else:
-        raise RuntimeError("This software is not able to store the join labels.")
+    dtype = get_minimum_dtype(max_val)
 
     joined_labels = factor * labels_1.astype(dtype) + labels_2.astype(dtype)
 
@@ -115,6 +132,18 @@ def bilabel_bincount(labels_1: np.array, labels_2: np.array) -> np.array:
 
     # We return the counts recast in 2d
     return counts.reshape((max_1 + 1, max_2 + 1))
+
+
+def get_minimum_dtype(max_val, signed=True):
+    sign_char = "" if signed else "u"
+    for bit_width in (8, 16, 32, 64):
+        if 2 ** (bit_width - int(signed)) > max_val:  # -1 because signed
+            dtype = f'{sign_char}int{bit_width}'
+            break
+    else:
+        raise RuntimeError("This software is not able to store the join labels.")
+    print(f'Found minimum dtype for {max_val} = {dtype}')
+    return dtype
 
 
 # for comparison/test purposes
@@ -137,28 +166,64 @@ def _data_frame_ok(df: pd.DataFrame):
         and "index" not in df.columns
     )
 
+
 def contiguous_labels(labels):#TODO: try optimization with return_index argument of np.unique
     vals = np.unique(labels)
-    labels = np.searchsorted(vals,labels)
+    labels = np.searchsorted(vals, labels)
     return labels
 
-def cleanup(binary_img:np.ndarray,df:pd.DataFrame,coord_names):
-    """Return the labeled image giving exactly the connected components of binary_img that correspond to a representative in dataframe.
+
+def compress_dtype(arr, signed):
+    return arr.astype(get_minimum_dtype(arr.max(), signed=signed))
+
+
+def cleanup(binary_img: np.ndarray, df: pd.DataFrame, coord_names: List[str], as_memmap: bool=False):
+    """
+    Return the labeled image giving exactly the connected components of binary_img
+     that correspond to a representative in dataframe.
+    This saves a lot of memory and time by not labeling the whole image.
+    To further save memory, use the as_memmap argument to store the result and temporary results in a memmap
+
     Parameters
     ----------
-    binary_img : np.ndarray
-        _description_
-    df : pd.DataFrame
-        _description_
-    coord_names : _type_
-        _description_
+    binary_img: np.ndarray
+        The source binary image
+    df: pd.DataFrame
+        The dataframe containing the coordinates of the representatives
+    coord_names: List[str]
+        The names of the columns in the dataframe that contain the coordinates
+    as_memmap: bool
+        If True, the result will be a memmap object, otherwise a numpy array.
+
+    Returns
+    -------
+    np.ndarray | MemmapSource
+        The labeled image, with the same shape as binary_img.
     """
-    labels = ndi.label(binary_img)
+    if as_memmap:
+        label_file_path = Path(tempfile.gettempdir()) / f'{uuid.uuid4()}.npy'
+        shape = binary_img.shape
+        labels = initialize_sink(label_file_path, shape=shape, dtype='uint64', return_buffer=False)  # FIXME: int64 or uint64 ??
+        ndi.label(binary_img, output=labels._array)
+    else:
+        labels, _ = ndi.label(binary_img)
     coords = df[coord_names]
-    relevant_labels = np.array([labels[tuple(coords.iloc[index])] for index in range(df)])
-    cleaned_labels = np.where(np.isin(labels, relevant_labels), labels,0)
-    cleaned_labels = contiguous_labels(cleaned_labels)
-    return cleaned_labels
+    relevant_labels = np.array(labels[*coords.values.transpose()])
+    compressed_labels = np.where(np.isin(labels, relevant_labels), labels, 0)
+    if as_memmap:
+        label_file_path.unlink()
+    del labels
+
+    compressed_labels = contiguous_labels(compressed_labels)
+    compressed_labels = compress_dtype(compressed_labels, signed=False)
+    if as_memmap:
+        compressed_labels_path = Path(tempfile.gettempdir()) / f'{uuid.uuid4()}.npy'
+        out = initialize_sink(compressed_labels_path, shape=compressed_labels.shape,
+                              dtype=compressed_labels.dtype, return_buffer=False)
+        out[:] = compressed_labels
+        return out
+    else:
+        return compressed_labels
 
 
 class Channel:
@@ -216,11 +281,14 @@ class Channel:
             raise ValueError(
                 "Either the passed dataframe indexing is not a step 1 integer range starting from 0, or the 'index' column name is used."
             )
+        self._labels = None
+
         self.already_clean = already_clean
         if clean_image and not self.already_clean:
-            labels = cleanup(binary_img,dataframe,coord_names)
-            self._labels = labels
-            self.binary_img = labels > 0
+            labels = cleanup(binary_img, dataframe, coord_names, True)
+            gc.collect()
+            self._labels = labels._array
+            self.binary_img = self._labels > 0  # FIXME: use memmap
         else:
             self.binary_img = binary_img
 
@@ -248,9 +316,14 @@ class Channel:
 
         self._overlaps_dic = {}
 
-        self._labels = None
         self.__bounding_boxes_array = None
         self.__centers = None
+
+    def __del__(self):
+        if isinstance(self._labels, MemmapSource):
+            Path(self._labels.location).unlink(missing_ok=True)
+        elif isinstance(self._labels, memmap):
+            Path(self._labels.filename).unlink(missing_ok=True)
 
     @property
     def representative_points(self):
@@ -275,7 +348,7 @@ class Channel:
             the flat array of the labels in the nuclei index order
         """
         coords = self.dataframe[self.coord_names]
-        return np.array([self.labels()[tuple(coords.iloc[index])] for index in range(len(self.dataframe))])
+        return np.array(self.labels()[*coords.values.transpose()])
 
     @cached_property
     def label_index_correspondence(self):
@@ -357,15 +430,16 @@ class Channel:
             Beware that from this max, 1 must be added to obtain the stop attribute
             for a slice defining the corresponding bounding box.
         """
-        if self.labels().ndim not in [1, 2, 3]:
+        n_dims = self.labels().ndim
+        if n_dims not in [1, 2, 3]:
             if self.__bounding_boxes_array is None:
                 self.__bounding_boxes_array = self._naive_bounding_boxes_array()
             return self.__bounding_boxes_array
         # optimized bounding_boxes, to avoid looping on all labels
         if self.__bounding_boxes_array is None:
-            if self.labels().ndim == 1:
+            if n_dims == 1:
                 res = bounding_boxes.bbox_1d(self.labels())
-            elif self.labels().ndim == 2:
+            elif n_dims == 2:
                 res = bounding_boxes.bbox_2d(self.labels())
             else:
                 res = bounding_boxes.bbox_3d(self.labels())
@@ -396,7 +470,7 @@ class Channel:
         return tuple(self.centers()[i])
 
     def centers_df(self, description="center of bounding box"):
-        cols = [description + " " + coord_name for coord_name in self.coord_names]
+        cols = [f'{description} {coord_name}' for coord_name in self.coord_names]
         return pd.DataFrame(self.centers(), columns=cols)
 
     @cached_property
