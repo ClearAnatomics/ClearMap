@@ -335,6 +335,7 @@ class StitchingParams(ChannelsUiParameterCollection):
             if channel_name not in self.config['channels']:
                 self.config['channels'][channel_name] = deepcopy(self.__extra_channel)
                 self.config['channels'][channel_name]['layout_channel'] = self.channels[0]
+                self.config.write()
             self[channel_name] = ChannelStitchingParams(self.tab, channel_name, config=self.config)
 
     def fix_default_config(self, channel_name):
@@ -343,6 +344,7 @@ class StitchingParams(ChannelsUiParameterCollection):
         self.config['channels'] = {}
         self.config['channels'][channel_name] = default_section
         self.config['channels'][channel_name]['layout_channel'] = channel_name
+        self.config.write()
 
     def handle_layout_channel_changed(self, channel, layout_channel):
         self.layoutChannelChanged.emit(channel, layout_channel)
@@ -371,6 +373,7 @@ class ChannelStitchingParams(UiParameterCollection):
     def __init__(self, tab, channel, config):
         super().__init__(tab)
         self.name = channel
+        self.ready = False
         self.shared = GeneralChannelStitchingParams(tab, channel)
         self.stitching_rigid = None
         self.stitching_wobbly = None
@@ -686,6 +689,8 @@ class ChannelRegistrationParams(ChannelUiParameter):  # FIXME: add signal for al
         clear_layout(self.tab.landmarksWeightsLayout)
 
         new_params_files = [snake_to_title(p.split('.')[0]) for p in self.tab.paramsFilesListWidget.get_items_text()]
+        if len(new_params_files) > len(self.config['landmarks_weights']):
+            self.config['landmarks_weights'] += [0] * (len(new_params_files) - len(self.config['landmarks_weights']))
         self._value_labels = []
         for idx, param in enumerate(new_params_files):
             label = QLabel(param)
