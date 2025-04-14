@@ -707,17 +707,18 @@ class RegistrationTab(PreProcessingTab):
 
     def _set_channels_names(self):
         if 'channel_x' in self.aligner.config['channels']:  # i.e. is default, otherwise already set
-            autofluo_config = deepcopy(self.aligner.config['channels'].get('autofluorescence'))  # FIXME: may not exist
-            data_channel_config = deepcopy(self.aligner.config['channels']['channel_x'])
+            autofluo_default_config = deepcopy(self.aligner.config['channels'].get('autofluorescence'))
+            data_channel_default_config = deepcopy(self.aligner.config['channels']['channel_x'])
+
             self.aligner.config['channels'] = {}
             reference_channel = self.sample_manager.alignment_reference_channel
-            data_channel_config['align_with'] = reference_channel
-            data_channel_config['moving_channel'] = reference_channel
+            data_channel_default_config['align_with'] = reference_channel
+            data_channel_default_config['moving_channel'] = reference_channel
             for channel in self.sample_manager.channels:
                 if self.sample_manager.config['channels'][channel]['data_type'] == 'autofluorescence':
-                        self.aligner.config['channels'][channel] = autofluo_config
+                        self.aligner.config['channels'][channel] = autofluo_default_config
                 else:
-                    self.aligner.config['channels'][channel] = data_channel_config
+                    self.aligner.config['channels'][channel] = data_channel_default_config
                 self.handle_align_with_changed(channel, self.aligner.config['channels'][channel]['align_with'])
             self.aligner.config.write()  # FIXME: ensure that aligner defined. Why not self.params.ui_to_cfg()
 
@@ -746,7 +747,7 @@ class RegistrationTab(PreProcessingTab):
         self.params.launchLandmarksDialog.connect(self.launch_landmarks_dialog)
         self._update_plotable_channels()
         for channel in self.aligner.config['channels']:
-            self.__update_channel_comboboxes(channel)
+            self.__update_channel_combo_boxes(channel)
 
     def _set_params(self):
         self.params = RegistrationParams(self.ui)
@@ -758,32 +759,34 @@ class RegistrationTab(PreProcessingTab):
         self.params[channel]._config = self.aligner.config
         self.params[channel].cfg_to_ui()  # Force it while the tab is active
 
-    def __update_channel_comboboxes(self, channel, page_widget=None):
+    def __update_channel_combo_boxes(self, channel, page_widget=None):
         if self.params[channel].align_with:
             partner_channel = self.params[channel].align_with
         else:
             partner_channel = self.aligner.config['channels'][channel]['align_with']
         if page_widget is None:
             page_widget = self.ui.channelsParamsTabWidget.get_channel_widget(channel)
+        other_channels = list(set(self.aligner.channels_to_register()) - {channel})
         page_widget.alignWithComboBox.clear()
-        page_widget.alignWithComboBox.addItems([None, 'atlas'])
-        page_widget.alignWithComboBox.addItems(list(set(self.aligner.channels_to_register()) - {channel}))
+        page_widget.alignWithComboBox.addItems([None, 'atlas'] + other_channels)
         page_widget.movingChannelComboBox.clear()
-        page_widget.movingChannelComboBox.addItems([None, 'atlas', 'intrinsically aligned'])
-        page_widget.movingChannelComboBox.addItems(self.aligner.channels_to_register())
+        page_widget.movingChannelComboBox.addItems([None, 'atlas', 'intrinsically aligned'] + other_channels + [channel])
         channel_dtype = self.sample_manager.config['channels'][channel]['data_type']
-        if not partner_channel:
+        print(id(self.sample_manager.config))
+        print(f'Configuring alignment partners for {channel=}, {channel_dtype=}, {partner_channel=}')
+        if not partner_channel or partner_channel == channel:
             if channel_dtype == 'autofluorescence':
                 partner_channel = 'atlas'
             elif channel_dtype:
                 partner_channel = self.sample_manager.alignment_reference_channel
             else:
+                warnings.warn(f'Skipping partner selection for {channel} because none was found')
                 return
         page_widget.alignWithComboBox.setCurrentText(partner_channel)
         page_widget.movingChannelComboBox.setCurrentText(partner_channel)
 
     def _setup_channel(self, page_widget, channel):
-        self.__update_channel_comboboxes(channel, page_widget)
+        self.__update_channel_combo_boxes(channel, page_widget)
         alignment_files = [page_widget.paramsFilesListWidget.item(i).text() for i in
                   range(page_widget.paramsFilesListWidget.count())]  # no shortcut for standard QListWidget
         page_widget.paramsFilesListWidget = replace_widget(page_widget.paramsFilesListWidget,
