@@ -1181,10 +1181,20 @@ class PatternDialog(WizardDialog):
             page = self.dlg.patternToolBox.widget(i)
             channel_name = page.channelNameLineEdit.text()
             if channel_name not in self.params:
+                self.tab.params.config['channels'][channel_name] = {  # FIXME: should not be defined here
+                    'data_type': page.dataTypeComboBox.currentText(),
+                    'extension': '.ome.tif',
+                    'path': page.result.text(),
+                    'resolution': [1, 1, 1],
+                    'orientation': (0, 0, 0),
+                    'comments': '',
+                    'slicing': {'x': None, 'y': None, 'z': None}
+                }
                 self.tab.add_channel_tab(channel_name)
             p = self.params[channel_name]  # FIXME: assert that updated when changing channel name
             p.path = page.result.text()
             p.data_type = page.dataTypeComboBox.currentText()
+            self.app.processEvents()
             p.extension = self.tile_extension[0]
         # self.params.ui_to_cfg()
         self.tab.update_pipelines()
