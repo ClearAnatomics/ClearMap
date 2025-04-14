@@ -26,8 +26,8 @@ cdef inline source_int_t c_max(source_int_t a, source_int_t b):
 
 
 cpdef bbox_3d(cnp.ndarray[source_int_t, ndim=3] img_):
-    print(img_.dtype, img_.max(), img_.shape[0], img_.shape[1], img_.shape[2])
-    cdef source_int_t[:, :, :]img = img_
+    print("bbox_3d, input image info: ", img_.dtype, img_.max(), img_.shape[0], img_.shape[1], img_.shape[2])
+    cdef source_int_t[:, :, :] img = img_
     cdef source_int_t n_labels = img_.max() + 1  # WARNING: because +1 if max, could overflow
     # what we do for zero could be done for any axis
     cdef cnp.ndarray[cnp.uint32_t, ndim=3] res_ = np.empty((n_labels, 3, 2), dtype='uint32')
