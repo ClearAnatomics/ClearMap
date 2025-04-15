@@ -7,13 +7,13 @@ TubeMap
 This module contains the classes to generate annotated graphs from vasculature
 lightsheet data [Kirst2020]_.
 """
-import functools
-import gc
 import os
 import copy
 import re
+import functools
 import platform
 import warnings
+import gc
 
 import numpy as np
 import pandas as pd
@@ -71,9 +71,8 @@ class VesselGraphProcessorSteps(ProcessorSteps):
     def steps(self):
         return self.graph_raw, self.graph_cleaned, self.graph_reduced, self.graph_annotated  # TODO: add traced
 
-    def path_from_step_name(self, step):
-        f_path = self.workspace.filename('graph', asset_sub_type=step)
-        return f_path
+    def asset_from_step_name(self, step):
+        return self.workspace.get('graph', asset_sub_type=step)
 
 
 class BinaryVesselProcessorSteps(ProcessorSteps):
@@ -90,12 +89,12 @@ class BinaryVesselProcessorSteps(ProcessorSteps):
     def steps(self):
         return self.stitched, self.binary, self.postprocessed, self.filled, self.combined, self.final
 
-    def path_from_step_name(self, step):  # FIXME: split step and substep
+    def asset_from_step_name(self, step):  # FIXME: split step and substep
         if step in (self.stitched, self.binary):
             asset = self.workspace.get(step, channel=self.channel)
         else:
             asset = self.workspace.get('binary', channel=self.channel, asset_sub_type=step)
-        return asset.path
+        return asset
 
     # def last_path(self, arteries=False):
     #     return self.path(self.last_step, arteries=arteries)
@@ -361,13 +360,13 @@ class BinaryVesselProcessor(TabProcessor):
         if len(self.channels_to_binarize()) > 1:
             sources = [self.get_path('binary', channel=channel, asset_sub_type='filled') for channel in self.channels_to_binarize()]
             for src in sources:
-                if not os.path.exists(src):
+                if not src.exists():
                     raise FileNotFoundError(f'File {src} not found')
             block_processing.process(np.logical_or, sources, sink_asset.path,
                                      size_max=500, overlap=0, processes=None, verbose=True)
         else:
-            source = self.steps[self.all_vessels_channel].path(self.steps[self.all_vessels_channel].filled,
-                                                               step_back=True)
+            source = self.steps[self.all_vessels_channel].get_asset(self.steps[self.all_vessels_channel].filled,
+                                                                    step_back=True)
             clearmap_io.copy_file(source, sink_asset.path)
 
         self.post_process_binary_combined()
@@ -390,7 +389,7 @@ class BinaryVesselProcessor(TabProcessor):
 
     def plot_vessel_filling_results(self, parent=None, channel='', arrange=False):
         channel = channel if channel else self.all_vessels_channel
-        images = [(self.steps[self.all_vessels_channel].path(
+        images = [(self.steps[self.all_vessels_channel].get_asset(
             self.steps[self.all_vessels_channel].postprocessed, step_back=True)),
                   (self.get_path('binary', channel=channel, asset_sub_type='filled'))]
         titles = [os.path.basename(img) for img in images]
@@ -398,7 +397,7 @@ class BinaryVesselProcessor(TabProcessor):
                           lut=self.machine_config['default_lut'], parent=parent)
 
     def plot_combined(self, parent=None, arrange=False):  # TODO: final or not option
-        all_vessels = self.steps[self.all_vessels_channel].path(self.steps[self.all_vessels_channel].filled, step_back=True)
+        all_vessels = self.steps[self.all_vessels_channel].get_asset(self.steps[self.all_vessels_channel].filled, step_back=True)
         combined = self.get_path('binary', channel=self.channels_to_binarize(), asset_sub_type='combined')
         if self.processing_config['binarization'][self.arteries_channel]['binarize']['run']:
             arteries_filled = self.get_path('binary', channel=self.arteries_channel, asset_sub_type='filled')
@@ -412,7 +411,7 @@ class BinaryVesselProcessor(TabProcessor):
     def plot_results(self, steps, channels=None, side_by_side=True, arrange=True, parent=None):
         if channels is None:
             channels = [self.all_vessels_channel, ]
-        images = [self.steps[channels[i]].path(steps[i], step_back=True) for i in range(len(steps))]
+        images = [self.steps[channels[i]].get_asset(steps[i], step_back=True) for i in range(len(steps))]
         for img in images:
             if not img.exists():
                 raise MissingRequirementException(f'File {img} not found')
