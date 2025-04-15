@@ -137,12 +137,13 @@ class BinaryVesselProcessor(TabProcessor):
 
             self.set_progress_watcher(self.sample_manager.progress_watcher)
 
-            vessels_channels = [c for c, v in self.sample_config['channels'].items() if v['data_type'] == 'vessels']
+            vessels_channels = tuple([c for c, v in self.sample_config['channels'].items()
+                                      if v['data_type'] == 'vessels'])
             self.all_vessels_channel = vessels_channels[0] if vessels_channels else '' # FIXME: extract ??
             if not self.all_vessels_channel:
                 warnings.warn('Vessels channel not set')
                 return
-            art_channels = [c for c, v in self.sample_config['channels'].items() if v['data_type'] == 'arteries']  # FIXME: extract ??
+            art_channels = tuple([c for c, v in self.sample_config['channels'].items() if v['data_type'] == 'arteries'])  # FIXME: extract ??
             if len(art_channels) > 1:
                 raise ValueError('Multiple arteries channels found')
             self.arteries_channel = art_channels[0] if art_channels else ''
@@ -281,7 +282,7 @@ class BinaryVesselProcessor(TabProcessor):
         run_smoothing = binarization_cfg['smooth']['run']
         run_filling = binarization_cfg['binary_fill']['run']
 
-        self.steps[channel].remove_next_steps_files(self.steps[channel].postprocessed)
+        self.steps[channel].remove_next_steps_files(self.steps[channel].postprocessed)  # TODO: do we keep ?
 
         source = self.workspace.source('binary', channel=channel)
         sink = self.get_path('binary', channel=channel, asset_sub_type='postprocessed')
@@ -455,8 +456,8 @@ class VesselGraphProcessor(TabProcessor):
         self.workspace = None
         self.steps = VesselGraphProcessorSteps(self.workspace)  # FIXME: handle skeleton
         self.setup(sample_manager, registration_processor)
-        self.parent_channels = [k for k in self.processing_config['binarization'].keys() if k != 'combined']
-        arteries_channel = [c for c, v in self.sample_config['channels'].items() if v['data_type'] == 'arteries']
+        self.parent_channels = tuple([k for k in self.processing_config['binarization'].keys() if k != 'combined'])
+        arteries_channel = tuple([c for c, v in self.sample_config['channels'].items() if v['data_type'] == 'arteries'])
         if len(arteries_channel) > 1:
             raise ValueError('Multiple arteries channels found')
         self.arteries_channel = arteries_channel[0] if arteries_channel  else ''
@@ -544,7 +545,7 @@ class VesselGraphProcessor(TabProcessor):
 
             self.set_progress_watcher(self.sample_manager.progress_watcher)
 
-            self.parent_channels = [k for k in self.processing_config['binarization'].keys() if k != 'combined']
+            self.parent_channels = tuple([k for k in self.processing_config['binarization'].keys() if k != 'combined'])
 
     @property
     def use_arteries_for_graph(self):  # TODO: see if improve
