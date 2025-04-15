@@ -20,7 +20,7 @@ class ProcessorSteps:
     def steps(self):
         raise NotImplementedError
 
-    def path_from_step_name(self, step_name):
+    def asset_from_step_name(self, step_name):
         raise NotImplementedError
 
     @property
@@ -35,25 +35,25 @@ class ProcessorSteps:
         return self.steps[self.steps.index(step_name)+1:]
 
     def step_exists(self, step_name):
-        return os.path.exists(self.path_from_step_name(step_name))
+        return self.asset_from_step_name(step_name).exists
 
     def remove_next_steps_files(self, target_step_name):
         for step_name in self.get_next_steps(target_step_name):
-            f_path = self.path_from_step_name(step_name)
-            if os.path.exists(f_path):
-                warnings.warn(f"WARNING: Remove previous step {step_name}, file {f_path}")
-                os.remove(f_path)
+            asset = self.asset_from_step_name(step_name)
+            if asset.exists:
+                warnings.warn(f"WARNING: Remove previous step {step_name}, file {asset.path}")
+                asset.path.unlink(missing_ok=True)
 
-    def path(self, step, step_back=False, n_before=0):
+    def get_asset(self, step, step_back=False, n_before=0):
         if n_before:
             step = self.steps[self.steps.index(step) - n_before]
-        f_path = self.path_from_step_name(step)
-        if not os.path.exists(f_path):
+        asset = self.asset_from_step_name(step)
+        if not asset.exists:
             if step_back:  # FIXME: steps back only once ??
-                f_path = self.path(self.steps[self.steps.index(step) - 1])
+                asset = self.get_asset(self.steps[self.steps.index(step) - 1])
             else:
-                raise IndexError(f'Could not find path "{f_path}" and not allowed to step back')
-        return f_path
+                raise IndexError(f'Could not find path "{asset}" and not allowed to step back')
+        return asset
 
 
 class TabProcessor:
