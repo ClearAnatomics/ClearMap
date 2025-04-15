@@ -151,7 +151,10 @@ CHANNELS_ASSETS_TYPES_CONFIG = {
         'file_format_category': 'image',
         'resource_type': 'results',
         'relevant_pipelines': ['TubeMap', 'AxonMap', 'TractMap'],
-        'sub_types': ['status', 'vesselize', 'median', 'pixels_raw', 'coordinates_transformed', 'coordinates_raw', 'labels']
+        'sub_types': ['status',
+                      'filled', 'combined', 'final', 'postprocessed',
+                      'vesselize', 'median', 'pixels_raw',
+                      'coordinates_transformed', 'coordinates_raw', 'labels']
     },
     'skeleton': {
         'file_format_category': 'image',

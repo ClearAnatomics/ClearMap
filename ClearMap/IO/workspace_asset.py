@@ -449,7 +449,7 @@ class Asset:
         """
         return bool(file_utils.find_existing_extension(self.path, self.type_spec.extensions))
 
-    def delete(self):
+    def delete(self):  # FIXME: add missing_ok -> then not existing_path but just path
         os.remove(self.existing_path)
 
     @property
