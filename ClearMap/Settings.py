@@ -71,10 +71,15 @@ test_data_path = os.path.join(test_path, 'Data')
 ###############################################################################
 
 cfg_path = os.path.expanduser('~/.clearmap/machine_params_v3_0.cfg')
-if cfg_path:
+if os.path.exists(cfg_path):
     config = configobj.ConfigObj(cfg_path, encoding="UTF8", indent_type='    ', unrepr=True, file_error=True)
 else:
-    config = {}
+    package_machine_path = os.path.join(clearmap_path, 'config', 'machine_params_v3_0.cfg')
+    if os.path.exists(package_machine_path):
+        config = configobj.ConfigObj(package_machine_path, encoding="UTF8", indent_type='    ',
+                                     unrepr=True, file_error=True)
+    else:
+        config = {}
 
 default_elastix_path = os.path.join(external_path, 'elastix', 'build')
 elastix_path = config.get('elastix_path', default_elastix_path)
