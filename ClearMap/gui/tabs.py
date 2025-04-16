@@ -1327,15 +1327,15 @@ class VasculatureTab(PostProcessingTab):
 
         self.set_relevant_data_types(DATA_TYPE_TO_TAB_CLASS)
 
-    def _set_channels_names(self):
+    # FIXME: create channels here ??
+    def _set_channels_names(self):  # FIXME: see if shouldn't be handled by params instead
         default_vessels_binarization_params = self.params.config['binarization'].pop('vessels', {})
         default_arteries_binarization_params = self.params.config['binarization'].pop('arteries', {})
         for channel in self.sample_manager.channels:
-            if self.sample_manager.config['channels'][channel]['data_type'] == 'vessels':
+            channel_type = self.sample_manager.get_channel_type(channel)
+            if channel_type == 'vessels':
                 self.params.config['binarization'][channel] = default_vessels_binarization_params
-            elif self.sample_manager.config['channels'][channel]['data_type'] == 'arteries':
-                self.params.config['binarization'][channel] = default_arteries_binarization_params
-            elif self.sample_manager.config['channels'][channel]['data_type'] == 'veins':
+            elif channel_type in ('arteries', 'veins'):
                 self.params.config['binarization'][channel] = default_arteries_binarization_params
         self.params.config.write()
 
@@ -1402,11 +1402,21 @@ class VasculatureTab(PostProcessingTab):
             self.binary_vessel_processor.setup(self.sample_manager)
             self.vessel_graph_processor.setup(self.sample_manager, self.aligner)
 
-            unique_connect(self.ui.binarizeVesselsPushButton.clicked,
-                           functools.partial(self.binarize_channel, channel=self.binary_vessel_processor.all_vessels_channel))
+            # FIXME: part of channels_connect
+            unique_connect(self.ui.binarizePushButton.clicked,
+                           functools.partial(self.binarize_channel,
+                                             channel=self.binary_vessel_processor.all_vessels_channel))
 
-            unique_connect(self.ui.binarizeArteriesPushButton.clicked,
-                           functools.partial(self.binarize_channel, channel=self.binary_vessel_processor.arteries_channel))
+    def _bind_params_signals(self):
+        pass
+
+    def _get_channels(self):
+        return self.params.channels
+
+    def _set_channel_config(self, channel):
+        pass
+
+    def _bind_channel(self, page_widget, channel):
 
     def unload_temporary_graphs(self):
         """Unload the temporary vasculature graph objects to free up RAM"""
@@ -1489,6 +1499,7 @@ class VasculatureTab(PostProcessingTab):
     def run_all(self):
         """Run the whole vasculature pipeline at once"""
         try:
+            # FIXME: ask binary_vessel_processor about channels
             self.binarize_channel(self.binary_vessel_processor.all_vessels_channel, stop_on_error=True)
             self.binarize_channel(self.binary_vessel_processor.arteries_channel, stop_on_error=True)
         except ClearMapVRamException:

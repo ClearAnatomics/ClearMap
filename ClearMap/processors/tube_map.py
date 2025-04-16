@@ -116,6 +116,7 @@ class BinaryVesselProcessor(TabProcessor):
         self.workspace = None
         self.all_vessels_channel = ''
         self.arteries_channel = ''
+        # TODO: add veins too
         self.steps = {}
         self.block_re = ('Processing block',
                          re.compile(r'.*?Processing block \d+/\d+.*?\selapsed time:\s\d+:\d+:\d+\.\d+'))
@@ -128,8 +129,6 @@ class BinaryVesselProcessor(TabProcessor):
         self.sample_manager = sample_manager
         if sample_manager is not None:
             self.workspace = sample_manager.workspace
-            for steps in self.steps.values():
-                steps.workspace = self.workspace
             configs = sample_manager.get_configs()
             self.sample_config = configs['sample']
             self.machine_config = configs['machine']
@@ -137,24 +136,24 @@ class BinaryVesselProcessor(TabProcessor):
 
             self.set_progress_watcher(self.sample_manager.progress_watcher)
 
-            vessels_channels = tuple([c for c, v in self.sample_config['channels'].items()
-                                      if v['data_type'] == 'vessels'])
-            self.all_vessels_channel = vessels_channels[0] if vessels_channels else '' # FIXME: extract ??
+            self.all_vessels_channel = self.sample_manager.get_channels_by_type(channel_type='vessels')
             if not self.all_vessels_channel:
                 warnings.warn('Vessels channel not set')
                 return
-            art_channels = tuple([c for c, v in self.sample_config['channels'].items() if v['data_type'] == 'arteries'])  # FIXME: extract ??
-            if len(art_channels) > 1:
-                raise ValueError('Multiple arteries channels found')
-            self.arteries_channel = art_channels[0] if art_channels else ''
+
+            self.arteries_channel = self.sample_manager.get_channels_by_type(channel_type='arteries',
+                                                                             multiple_found_action='warn')
 
             self.assert_input_shapes_match()
 
-            # FIXME: dynamic as function of what is found
-            self.steps = {
-                'all_vessels': BinaryVesselProcessorSteps(self.workspace, channel=self.all_vessels_channel),
-                'arteries': BinaryVesselProcessorSteps(self.workspace, channel=self.arteries_channel),
-            }
+            all_channels = self.sample_config['channels'].keys()
+            for k in self.steps.keys():
+                if k not in all_channels:
+                    self.steps.pop(k)
+
+            for channel_name in (self.all_vessels_channel, self.arteries_channel):  # TODO: add veins here too
+                if channel_name:
+                    self.steps[channel_name] = BinaryVesselProcessorSteps(self.workspace, channel=channel_name)
 
     def assert_input_shapes_match(self):
         """
@@ -359,13 +358,16 @@ class BinaryVesselProcessor(TabProcessor):
         # FIXME: probably missing the call to workspace.add_channel(self.channels_to_binarize())
         sink_asset = self.get('binary', channel=self.channels_to_binarize(), asset_sub_type='combined')  # Temporary
         if len(self.channels_to_binarize()) > 1:
-            sources = [self.get_path('binary', channel=channel, asset_sub_type='filled') for channel in self.channels_to_binarize()]
-            for src in sources:
-                if not src.exists():
-                    raise FileNotFoundError(f'File {src} not found')
+            sources = []
+            for channel in self.channels_to_binarize():
+                src_path = self.get_path('binary', channel=channel, asset_sub_type='filled')
+                if src_path.exists():
+                    sources.append(src_path)
+                else:
+                    raise FileNotFoundError(f'File {src_path} not found')
             block_processing.process(np.logical_or, sources, sink_asset.path,
                                      size_max=500, overlap=0, processes=None, verbose=True)
-        else:
+        else:  # We expect to have at least all_vessels_channel
             source = self.steps[self.all_vessels_channel].get_asset(self.steps[self.all_vessels_channel].filled,
                                                                     step_back=True)
             clearmap_io.copy_file(source, sink_asset.path)
