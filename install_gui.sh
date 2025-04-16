@@ -274,14 +274,18 @@ python "setup.py" install || exit 1
 echo "Done"
 
 # Create config folder if missing
+green "Checking if ClearMap configuration directory exists at \"$config_folder\""
 if [ ! -d "$config_folder" ]; then
-   mkdir "$config_folder" || exit 1
+    yellow "Config folder missing, creating it"
+    mkdir "$config_folder" || exit 1
 fi
 
 # Install or update ClearMap config
 srcdir=$(pwd)
 cd "$HOME" || exit 1 # Exit source folder to import from installed version
+green "Installing or updating ClearMap config"
 python -m ClearMap.config.update_config  || exit 1
+green "Done"
 
 # TODO: Prompt for environment variables (elastix ...) to be set in env activate
 
