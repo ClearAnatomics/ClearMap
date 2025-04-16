@@ -5,6 +5,7 @@ install_utils
 
 Utilities module with minimal dependencies (standard library only) for installation
 """
+import os.path
 import re
 import sys
 import platform
@@ -392,6 +393,14 @@ def patch_env(cfg_path, dest_path, use_cuda_torch=True, pip_mode=False, use_spyd
     if tmp_dir not in ('/tmp', '/tmp/'):
         print(f'Patching tmp_dir to {tmp_dir}')
         env_mgr.patch_env_var('TMP', tmp_dir)
+
+
+def set_elastix_path(elastix_path):
+    import configobj
+    machine_params_path = os.path.expanduser('~/.clearmap/machine_params_v3_0.cfg')
+    cfg = configobj.ConfigObj(machine_params_path, encoding="UTF8", indent_type='    ', unrepr=True, file_error=True)
+    cfg['elastix_path'] = elastix_path
+    cfg.write()
 
 
 if __name__ == '__main__':
