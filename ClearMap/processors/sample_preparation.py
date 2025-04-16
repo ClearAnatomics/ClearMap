@@ -200,7 +200,7 @@ class SampleManager(TabProcessor):
 
     @property
     def channels_to_detect(self):
-        return [c for c, v in self.config['channels'].items() if CONTENT_TYPE_TO_PIPELINE[v['data_type']] == 'CellMap']
+        return self.get_channels_by_pipeline('CellMap', as_list=True)
 
     @property
     def is_colocalization_compatible(self):
@@ -338,10 +338,7 @@ class SampleManager(TabProcessor):
 
     @property
     def alignment_reference_channel(self):
-        for channel, cfg in self.config['channels'].items():
-            if cfg['data_type'] == 'autofluorescence':
-                return channel
-        return
+        return self.get_channels_by_type('autofluorescence') or None
 
     def delete_resampled_files(self, channel):
         asset = self.get('resampled', channel=channel)
@@ -388,6 +385,97 @@ class SampleManager(TabProcessor):
                 else:
                     if not check_registered(channel):
                         return False
+
+    def get_channel_type(self, channel_name):
+        return self.config['channels'][channel_name]['data_type']
+
+    def get_channels_by_condition(self, condition, missing_action='ignore', multiple_found_action='ignore',
+                                  as_list=False, error_label='channel'):
+        filtered = [chan for chan, cfg in self.config['channels'].items() if condition(cfg)]
+        count = len(filtered)
+        if count == 0:
+            if missing_action == 'ignore':
+                return [] if as_list else ""
+            elif missing_action == 'warn':
+                warnings.warn(f'No {error_label} found')
+                return [] if as_list else ""
+            elif missing_action == 'raise':
+                raise KeyError(f'No {error_label} found')
+            else:
+                raise ValueError(f'Unknown missing action {missing_action}')
+        elif count > 1:
+            if multiple_found_action == 'ignore':
+                result = filtered
+            elif multiple_found_action == 'warn':
+                warnings.warn(f'Multiple {error_label}s found')
+                result = filtered
+            elif multiple_found_action == 'raise':
+                raise KeyError(f'Multiple {error_label}s found')
+            else:
+                raise ValueError(f'Unknown multiple found action {multiple_found_action}')
+        else:  # count == 1
+            result = filtered if as_list else filtered[0]
+        return result
+
+    def get_channels_by_type(self, channel_type, missing_action='warn', multiple_found_action='ignore', as_list=False):
+        """
+        Get the channel or list of channels that are of a given type.
+
+        Parameters
+        ----------
+        channel_type: str
+            Type of the channel as defined in asset_constants
+        missing_action: str
+            What to do in case the channel specified is not found. One of ['warn', 'raise', 'ignore']
+        multiple_found_action: str
+            What to do in case multiple matching channels are found. One of ['warn', 'raise', 'ignore']
+        as_list: bool
+            Whether to return the result as a list if a single channel is found.
+
+        Returns
+        -------
+        str | List[str]
+            The channel name or list of channels that match the type.
+        """
+        return self.get_channels_by_condition(
+            condition=lambda cfg: cfg['data_type'] == channel_type,
+            missing_action=missing_action,
+            multiple_found_action=multiple_found_action,
+            as_list=as_list,
+            error_label=channel_type
+        )
+
+    def get_channels_by_pipeline(self, pipeline_name, missing_action='ignore', multiple_found_action='ignore', as_list=False):
+        """
+        Get the channels that are relevant for a given pipeline
+
+        Parameters
+        ----------
+        pipeline_name : str
+            The name of the pipeline
+        missing_action : str
+            What to do if no channel is found
+            'ignore' : ignore and return empty list
+            'warn' : warn and return empty list
+            'raise' : raise an error
+        multiple_found_action : str
+            What to do if multiple channels are found
+            'ignore' : ignore and return all channels
+            'warn' : warn and return all channels
+            'raise' : raise an error
+
+        Returns
+        -------
+        List[str]
+            The channels that are relevant for the pipeline
+        """
+        return self.get_channels_by_condition(
+            condition=lambda cfg: CONTENT_TYPE_TO_PIPELINE[cfg['data_type']] == pipeline_name,
+            missing_action=missing_action,
+            multiple_found_action=multiple_found_action,
+            as_list=as_list,
+            error_label=pipeline_name
+        )
 
     def load_configs_from_dir(self):
         cfg_loader = ConfigLoader(self.src_directory)
