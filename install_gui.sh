@@ -297,6 +297,22 @@ if [ "$clearmap_install_path" == "" ];then
 fi
 echo "ClearMap installed at \"$clearmap_install_path\""
 
+if [[ "$OSTYPE" != "linux-gnu"* ]]; then
+    echo "Binary file support on your platform is currently not available
+    Please specify the path to the elastix binary"
+    read -r -p "Path to elastix binary: " elastix_path
+    if [ ! -d "$elastix_path" ]; then
+        red "Path to elastix binary not found"
+        exit 1
+    else
+        conda activate "$ENV_NAME" || exit 1
+        python -c "$prep_python \
+        import ClearMap; \
+        from ClearMap.Utils.install_utils import set_elastix_path; \
+        set_elastix_path('$elastix_path')" || exit 1
+    fi
+fi
+
 # Create Linux desktop menus
 echo "Do you want to create a desktop menu entry.
 Skip this if you are not running on linux or
