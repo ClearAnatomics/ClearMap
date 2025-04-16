@@ -43,7 +43,7 @@
             </font>
            </property>
            <property name="currentIndex">
-            <number>2</number>
+            <number>0</number>
            </property>
            <widget class="QWidget" name="binarization">
             <property name="geometry">
@@ -76,332 +76,30 @@
                  <string>Binarization</string>
                 </attribute>
                 <layout class="QVBoxLayout" name="verticalLayout_5">
+                 <property name="leftMargin">
+                  <number>0</number>
+                 </property>
+                 <property name="topMargin">
+                  <number>0</number>
+                 </property>
+                 <property name="rightMargin">
+                  <number>0</number>
+                 </property>
+                 <property name="bottomMargin">
+                  <number>0</number>
+                 </property>
                  <item>
-                  <widget class="QGroupBox" name="groupBox_2">
-                   <property name="styleSheet">
-                    <string notr="true"/>
-                   </property>
-                   <property name="title">
-                    <string>All vessels channel</string>
-                   </property>
-                   <layout class="QGridLayout" name="gridLayout">
-                    <item row="1" column="0">
-                     <widget class="QFrame" name="frame">
-                      <property name="frameShape">
-                       <enum>QFrame::StyledPanel</enum>
-                      </property>
-                      <property name="frameShadow">
-                       <enum>QFrame::Raised</enum>
-                      </property>
-                      <layout class="QGridLayout" name="gridLayout_3">
-                       <item row="0" column="0">
-                        <widget class="QLabel" name="binarizationVesselsClippingRangeLbl">
-                         <property name="toolTip">
-                          <string>The range for the vessel detection</string>
-                         </property>
-                         <property name="whatsThis">
-                          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;For optimal values, open the stitched image and look at the pixel intensities inside the brain (ignore the pixels outside the brain).&lt;/p&gt;&lt;p&gt;Set the minimum based on the lowest intensities you see.&lt;/p&gt;&lt;p&gt;For the higher intensity, look at the large vessels at the surface. You should set to the limit to a value that still excludes the halo.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-                         </property>
-                         <property name="text">
-                          <string>Clip range</string>
-                         </property>
-                        </widget>
-                       </item>
-                       <item row="0" column="1" colspan="2">
-                        <widget class="QFrame" name="vesselsBinarizationClipRangeDoublet">
-                         <property name="frameShape">
-                          <enum>QFrame::StyledPanel</enum>
-                         </property>
-                         <property name="frameShadow">
-                          <enum>QFrame::Raised</enum>
-                         </property>
-                         <layout class="QHBoxLayout" name="horizontalLayout_9">
-                          <item>
-                           <widget class="QSpinBox" name="spinBox_255">
-                            <property name="suffix">
-                             <string/>
-                            </property>
-                            <property name="minimum">
-                             <number>0</number>
-                            </property>
-                            <property name="maximum">
-                             <number>65535</number>
-                            </property>
-                           </widget>
-                          </item>
-                          <item>
-                           <widget class="QSpinBox" name="spinBox_256">
-                            <property name="suffix">
-                             <string/>
-                            </property>
-                            <property name="minimum">
-                             <number>0</number>
-                            </property>
-                            <property name="maximum">
-                             <number>65535</number>
-                            </property>
-                           </widget>
-                          </item>
-                         </layout>
-                        </widget>
-                       </item>
-                       <item row="0" column="3">
-                        <widget class="QToolButton" name="binarizationVesselsClippingRangeInfoToolButton">
-                         <property name="icon">
-                          <iconset resource="icons.qrc">
-                           <normaloff>:/icons/icons/info.svg</normaloff>:/icons/icons/info.svg</iconset>
-                         </property>
-                        </widget>
-                       </item>
-                       <item row="1" column="0">
-                        <widget class="QLabel" name="binarizationVesselsThresholdLbl">
-                         <property name="toolTip">
-                          <string>Pseudo deconvolution threshold.</string>
-                         </property>
-                         <property name="whatsThis">
-                          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Pseudo deconvolution threshold. &lt;/p&gt;&lt;p&gt;Voxels above this threshold will be added to the &lt;/p&gt;&lt;p&gt;binarization result in the multi-path biniarization.&lt;/p&gt;&lt;p&gt;Select slightly below the clip range min.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-                         </property>
-                         <property name="text">
-                          <string>Threshold</string>
-                         </property>
-                        </widget>
-                       </item>
-                       <item row="1" column="1">
-                        <widget class="QSpinBox" name="vesselsBinarizationThresholdSpinBox">
-                         <property name="minimum">
-                          <number>0</number>
-                         </property>
-                         <property name="maximum">
-                          <number>65535</number>
-                         </property>
-                        </widget>
-                       </item>
-                       <item row="1" column="2">
-                        <widget class="QToolButton" name="binarizationVesselsThresholdInfoToolButton">
-                         <property name="icon">
-                          <iconset resource="icons.qrc">
-                           <normaloff>:/icons/icons/info.svg</normaloff>:/icons/icons/info.svg</iconset>
-                         </property>
-                        </widget>
-                       </item>
-                      </layout>
-                     </widget>
-                    </item>
-                    <item row="9" column="0">
-                     <widget class="QPushButton" name="binarizeVesselsPushButton">
-                      <property name="text">
-                       <string>Run</string>
-                      </property>
-                     </widget>
-                    </item>
-                    <item row="0" column="0">
-                     <widget class="QCheckBox" name="runVesselsBinarizationCheckBox">
-                      <property name="text">
-                       <string>Binarize</string>
-                      </property>
-                     </widget>
-                    </item>
-                    <item row="5" column="0">
-                     <layout class="QGridLayout" name="gridLayout_9">
-                      <item row="1" column="0">
-                       <widget class="QCheckBox" name="vesselsBinarizationBinaryFillingCheckBox">
-                        <property name="text">
-                         <string>Binary filling</string>
-                        </property>
-                       </widget>
-                      </item>
-                      <item row="2" column="0">
-                       <widget class="QCheckBox" name="binarizationVesselsDeepFillingCheckBox">
-                        <property name="whatsThis">
-                         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;In this step a trained convolutional deep network &lt;/p&gt;&lt;p&gt;is applied to fill the holes of hollow vessels in the &lt;/p&gt;&lt;p&gt;vasculature and arteries data.&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-                        </property>
-                        <property name="text">
-                         <string>Deep filling</string>
-                        </property>
-                       </widget>
-                      </item>
-                      <item row="0" column="0">
-                       <widget class="QCheckBox" name="vesselsBinarizationSmoothingCheckBox">
-                        <property name="text">
-                         <string>Smooth</string>
-                        </property>
-                       </widget>
-                      </item>
-                      <item row="2" column="1">
-                       <widget class="QToolButton" name="binarizationVesselsDeepFillingInfoToolButton">
-                        <property name="icon">
-                         <iconset resource="icons.qrc">
-                          <normaloff>:/icons/icons/info.svg</normaloff>:/icons/icons/info.svg</iconset>
-                        </property>
-                       </widget>
-                      </item>
-                     </layout>
-                    </item>
-                   </layout>
-                  </widget>
-                 </item>
-                 <item>
-                  <widget class="QGroupBox" name="groupBox">
-                   <property name="enabled">
-                    <bool>true</bool>
-                   </property>
-                   <property name="title">
-                    <string>Arteries channel</string>
-                   </property>
-                   <layout class="QGridLayout" name="gridLayout_2">
-                    <item row="1" column="0">
-                     <widget class="QFrame" name="frame_2">
-                      <property name="frameShape">
-                       <enum>QFrame::StyledPanel</enum>
-                      </property>
-                      <property name="frameShadow">
-                       <enum>QFrame::Raised</enum>
-                      </property>
-                      <layout class="QGridLayout" name="gridLayout_13">
-                       <item row="0" column="0">
-                        <widget class="QLabel" name="binarizationArteriesClippingRangeLbl">
-                         <property name="toolTip">
-                          <string>The range for the arteries detection</string>
-                         </property>
-                         <property name="whatsThis">
-                          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;For optimal values, open the stitched image and look at the pixel intensities inside the brain (ignore the pixels outside the brain).&lt;/p&gt;&lt;p&gt;Set the minimum based on the lowest intensities you see.&lt;/p&gt;&lt;p&gt;For the higher intensity, look at the large vessels at the surface. You should set to the limit to a value that still excludes the halo.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-                         </property>
-                         <property name="text">
-                          <string>Clip range</string>
-                         </property>
-                        </widget>
-                       </item>
-                       <item row="0" column="1" colspan="2">
-                        <widget class="QFrame" name="arteriesBinarizationClipRangeDoublet">
-                         <property name="frameShape">
-                          <enum>QFrame::StyledPanel</enum>
-                         </property>
-                         <property name="frameShadow">
-                          <enum>QFrame::Raised</enum>
-                         </property>
-                         <layout class="QHBoxLayout" name="horizontalLayout_10">
-                          <item>
-                           <widget class="QSpinBox" name="spinBox_259">
-                            <property name="suffix">
-                             <string/>
-                            </property>
-                            <property name="minimum">
-                             <number>0</number>
-                            </property>
-                            <property name="maximum">
-                             <number>65535</number>
-                            </property>
-                           </widget>
-                          </item>
-                          <item>
-                           <widget class="QSpinBox" name="spinBox_260">
-                            <property name="suffix">
-                             <string/>
-                            </property>
-                            <property name="minimum">
-                             <number>0</number>
-                            </property>
-                            <property name="maximum">
-                             <number>65535</number>
-                            </property>
-                           </widget>
-                          </item>
-                         </layout>
-                        </widget>
-                       </item>
-                       <item row="0" column="3">
-                        <widget class="QToolButton" name="binarizationArteriesClippingRangeInfoToolButton">
-                         <property name="icon">
-                          <iconset resource="icons.qrc">
-                           <normaloff>:/icons/icons/info.svg</normaloff>:/icons/icons/info.svg</iconset>
-                         </property>
-                        </widget>
-                       </item>
-                       <item row="1" column="0">
-                        <widget class="QLabel" name="binarizationArteriesThresholdLbl">
-                         <property name="toolTip">
-                          <string>Pseudo deconvolution threshold.</string>
-                         </property>
-                         <property name="whatsThis">
-                          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Pseudo deconvolution threshold. &lt;/p&gt;&lt;p&gt;Voxels above this threshold will be added to the &lt;/p&gt;&lt;p&gt;binarization result in the multi-path biniarization.&lt;/p&gt;&lt;p&gt;Select slightly below the clip range min.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-                         </property>
-                         <property name="text">
-                          <string>Threshold</string>
-                         </property>
-                        </widget>
-                       </item>
-                       <item row="1" column="1">
-                        <widget class="QSpinBox" name="arteriesBinarizationThresholdSpinBox">
-                         <property name="minimum">
-                          <number>0</number>
-                         </property>
-                         <property name="maximum">
-                          <number>65535</number>
-                         </property>
-                        </widget>
-                       </item>
-                       <item row="1" column="2">
-                        <widget class="QToolButton" name="binarizationArteriesThresholdInfoToolButton">
-                         <property name="icon">
-                          <iconset resource="icons.qrc">
-                           <normaloff>:/icons/icons/info.svg</normaloff>:/icons/icons/info.svg</iconset>
-                         </property>
-                        </widget>
-                       </item>
-                      </layout>
-                     </widget>
-                    </item>
-                    <item row="0" column="0">
-                     <widget class="QCheckBox" name="runArteriesBinarizationCheckBox">
-                      <property name="text">
-                       <string>Binarize</string>
-                      </property>
-                     </widget>
-                    </item>
-                    <item row="8" column="0">
-                     <widget class="QPushButton" name="binarizeArteriesPushButton">
-                      <property name="text">
-                       <string>Run</string>
-                      </property>
-                     </widget>
-                    </item>
-                    <item row="4" column="0">
-                     <layout class="QGridLayout" name="gridLayout_10">
-                      <item row="0" column="0">
-                       <widget class="QCheckBox" name="arteriesBinarizationSmoothingCheckBox">
-                        <property name="text">
-                         <string>Smooth</string>
-                        </property>
-                       </widget>
-                      </item>
-                      <item row="1" column="0">
-                       <widget class="QCheckBox" name="arteriesBinarizationBinaryFillingCheckBox">
-                        <property name="text">
-                         <string>Binary filling</string>
-                        </property>
-                       </widget>
-                      </item>
-                      <item row="2" column="0">
-                       <widget class="QCheckBox" name="binarizationArteriesDeepFillingCheckBox">
-                        <property name="whatsThis">
-                         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;In this step a trained convolutional deep network &lt;/p&gt;&lt;p&gt;is applied to fill the holes of hollow vessels in the &lt;/p&gt;&lt;p&gt;vasculature and arteries data.&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-                        </property>
-                        <property name="text">
-                         <string>Deep filling</string>
-                        </property>
-                       </widget>
-                      </item>
-                      <item row="2" column="1">
-                       <widget class="QToolButton" name="binarizationArteriesDeepFillingInfoToolButton">
-                        <property name="icon">
-                         <iconset resource="icons.qrc">
-                          <normaloff>:/icons/icons/info.svg</normaloff>:/icons/icons/info.svg</iconset>
-                        </property>
-                       </widget>
-                      </item>
-                     </layout>
-                    </item>
-                   </layout>
+                  <widget class="QTabWidget" name="tabWidget">
+                   <widget class="QWidget" name="tab">
+                    <attribute name="title">
+                     <string>Tab 1</string>
+                    </attribute>
+                   </widget>
+                   <widget class="QWidget" name="tab_2">
+                    <attribute name="title">
+                     <string>Tab 2</string>
+                    </attribute>
+                   </widget>
                   </widget>
                  </item>
                  <item>
@@ -428,8 +126,8 @@
                  <rect>
                   <x>0</x>
                   <y>0</y>
-                  <width>390</width>
-                  <height>108</height>
+                  <width>550</width>
+                  <height>704</height>
                  </rect>
                 </property>
                 <attribute name="label">
