@@ -92,6 +92,7 @@ In a console run:
     > git clone https://github.com/ClearAnatomics/ClearMap
     > cd ClearMap
     > mamba create -f ClearMapUiBasic.yml
+    > conda activate clearmap
     > python setup.py install
 
 The last step will compile ClearMap and can take up to 20 minutes.
