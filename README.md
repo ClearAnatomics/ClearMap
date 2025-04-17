@@ -87,6 +87,7 @@ To use GPUs with ClearMap ensure your [pytorch installation supports cuda](https
 
 In a console run:
 
+    > conda config --add channels conda-forge
     > conda install mamba
     > git clone https://github.com/ClearAnatomics/ClearMap 
     > cd ClearMap
