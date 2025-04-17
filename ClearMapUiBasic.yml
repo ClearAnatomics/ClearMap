@@ -19,6 +19,7 @@ channels:
 dependencies:
   - python=3.9  # constraining seems to speed up resolution
   - pip
+  - gxx
   - ipython
   - vispy
   - pyopengl
@@ -47,4 +48,3 @@ dependencies:
   - psutil  # required for python < 3.9 for cancelable ProcessPoolExecutors
   - tqdm
   - mpld3  # WARNING Maybe pip
-
