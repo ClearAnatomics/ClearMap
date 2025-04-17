@@ -89,8 +89,9 @@ In a console run:
 
     > conda config --add channels conda-forge
     > conda install mamba
-    > git clone https://github.com/ClearAnatomics/ClearMap 
+    > git clone https://github.com/ClearAnatomics/ClearMap
     > cd ClearMap
+    > mamba create -f ClearMapUiBasic.yml
     > python setup.py install
 
 The last step will compile ClearMap and can take up to 20 minutes.
