@@ -77,7 +77,7 @@ Basic Installation
 
 For a basic installation on Ubuntu 24.04 first install 
 [miniconda](https://www.anaconda.com/docs/getting-started/miniconda/install#linux) and 
-[git](https://www.anaconda.com/docs/getting-started/miniconda/install#linux)
+[git](https://github.com/git-guides/install-git)
 
 To use GPUs with ClearMap ensure your [pytorch installation supports cuda](https://pytorch.org/get-started/locally/).
 
