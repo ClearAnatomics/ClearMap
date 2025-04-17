@@ -87,10 +87,10 @@ To use GPUs with ClearMap ensure your [pytorch installation supports cuda](https
 
 In a console run:
 
-    >>> conda install mamba
-    >>> git clone https://github.com/ClearAnatomics/ClearMap 
-    >>> cd ClearMap
-    >>> python setup.py install
+    > conda install mamba
+    > git clone https://github.com/ClearAnatomics/ClearMap 
+    > cd ClearMap
+    > python setup.py install
 
 The last step will compile ClearMap and can take up to 20 minutes.
 
