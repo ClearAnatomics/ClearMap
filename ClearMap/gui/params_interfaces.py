@@ -433,6 +433,19 @@ class UiParameter(QObject):
             if any_amended:
                 self.ui_to_cfg()  # Add the newly parsed field
 
+    def get_config_base_name(self, n_iter=5):
+        try:
+            return Path(self.config.filename).stem
+        except AttributeError:
+            cfg = self.config
+            for i in range(n_iter):
+                if hasattr(cfg, 'filename'):
+                    return Path(cfg.filename).stem
+                else:
+                    cfg = cfg.parent
+            else:
+                raise ValueError(f'Could not find config filename after {n_iter} iterations. '
+                                 f'Please set it manually or check the config file.')
 
     def _get_config_value(self, keys_list):
         """
@@ -455,7 +468,7 @@ class UiParameter(QObject):
         except KeyError:
             if self._default_config is None:
                 try:
-                    cfg_name = ConfigLoader.strip_version_suffix(self.config.filename.stem)
+                    cfg_name = ConfigLoader.strip_version_suffix(self.get_config_base_name())
                     self._default_config = ConfigLoader.get_cfg_from_path(ConfigLoader.get_default_path(cfg_name))
                 except FileNotFoundError:
                     try:
