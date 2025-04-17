@@ -639,8 +639,6 @@ class PipelineTab(GenericTab):
                 self.params.add_channel(ch)
         # if new_channels is a superset of former_channels, we can just add the new channels
 
-
-
     def setup_sample_manager(self, sample_manager):
         """
         Associate the sample_manager to the current tab
