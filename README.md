@@ -83,7 +83,7 @@ To use GPUs with ClearMap ensure your [pytorch installation supports cuda](https
 
 ### Install ClearMap
 
-#### Download CLearMap
+#### Download ClearMap
 
 In a console run:
 
