@@ -301,6 +301,9 @@ class Workspace2:  # REFACTOR: subclass dict
         elif channel == 'default':
             channel = self.default_channel
 
+        if isinstance(channel, list):
+            channel = tuple(channel)  # Make sure it is hashable
+
         # Handle deprecated arguments  # FIXME: use decorator
         if debug is not None:
             status = substitute_deprecated_arg(debug, status, 'debug', 'status')
@@ -314,7 +317,7 @@ class Workspace2:  # REFACTOR: subclass dict
 
         if asset_sub_type:
             asset_type += f'_{asset_sub_type}'
-        if channel not in self.asset_collections and isinstance(channel, (tuple, list)):
+        if channel not in self.asset_collections and isinstance(channel, tuple):
             channel = ('-'.join(channel)).lower()  # Try string version if tuple version not found
 
         if asset_type in self.asset_collections[channel]:
