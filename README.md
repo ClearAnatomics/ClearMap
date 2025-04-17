@@ -70,8 +70,8 @@ to broaden the range of applications to different types of biological objects
 or structures.
 
 
-Basic Install
-=============
+Basic Installation
+==================
 
 ### Prepare installation
 
@@ -139,7 +139,7 @@ In a console run:
 Please refer to our [documentation](https://clearanatomics.github.io/ClearMapDocumentation)
 on how to [install](https://clearanatomics.github.io/ClearMapDocumentation/html/installation.html) ClearMap.
 
-If the auto-installation scripts fail please use [Quick Install](#markdown-header-basic-install).
+If the auto-installation scripts fail please use [Basic Installation](#basic-installation).
 
 
 [Documentation](https://clearanatomics.github.io/ClearMapDocumentation)
