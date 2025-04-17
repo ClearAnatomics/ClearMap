@@ -103,6 +103,7 @@ In a console run:
 
     > cd ~
     > mkdir .clearmap
+    > cd ClearMap
     > python -m ClearMap.config.update_config 
 
 ### Run ClearMap
