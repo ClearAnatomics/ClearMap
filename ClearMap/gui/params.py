@@ -20,7 +20,7 @@ from PyQt5.QtWidgets import QInputDialog, QToolBox, QCheckBox, QPushButton, QLab
 
 from ClearMap.IO.assets_constants import CONTENT_TYPE_TO_PIPELINE
 from ClearMap.Utils.exceptions import ClearMapValueError
-from ClearMap.Utils.utilities import validate_orientation, snake_to_title, DEFAULT_ORIENTATION
+from ClearMap.Utils.utilities import validate_orientation, snake_to_title, DEFAULT_ORIENTATION, get_item_recursive
 from ClearMap.config.atlas import ATLAS_NAMES_MAP
 
 from ClearMap.gui.gui_utils import create_clearmap_widget, clear_layout
@@ -1301,7 +1301,7 @@ class VesselParams(ChannelsUiParameterCollection):
         else:
             if self.config['is_default']:
                 self.fix_default_config(channel_name, data_type)
-            if channel_name not in self.config['channels']:
+            if channel_name not in self.config['binarization']:
                 self.patch_config_section(channel_name, data_type)
             self[channel_name] = VesselBinarizationParams(self.tab, channel_name)
 
@@ -1347,8 +1347,28 @@ class VesselBinarizationParams(ChannelUiParameter):
             'run_binary_filling': ParamLink(['binary_fill', 'run'], self.tab.binarizationBinaryFillingCheckBox),
             'run_deep_filling': ParamLink(['deep_fill', 'run'], self.tab.binarizationDeepFillingCheckBox),
         }
-        self.tab.binarizationControlsGroupBox.setTitle(channel_name)
+        # self.tab.binarizationControlsGroupBox.setTitle(channel_name)
         self.connect()
+
+    # WARNING: we need to redefine this only because of the binarization key, should we use channels instead
+    # REFACTORING:
+    @property
+    def default_config(self):
+        if self.cfg_subtree:
+            if self.name in self.cfg_subtree:
+                default_channel = self._default_config['binarization'].keys()[0]
+                default_sub_tree = self.cfg_subtree.copy()
+                default_sub_tree[default_sub_tree.index(self.name)] = default_channel
+                return get_item_recursive(self._default_config, default_sub_tree)
+            else:
+                try:
+                    return get_item_recursive(self._default_config, self.cfg_subtree)
+                except KeyError as err:
+                    if self.name in str(err):
+                        raise KeyError(f'Could not find channel {self.name} in default config file. '
+                                       f'config sub tree: {self.cfg_subtree}')
+        else:
+            return self._default_config
 
     def handle_name_changed(self, old_name, new_name):
         if old_name != self._cached_name:
@@ -1357,7 +1377,7 @@ class VesselBinarizationParams(ChannelUiParameter):
         # TODO: check if dict() is required
         self._config['binarization'][self.name] = self._config['binarization'].pop(self._cached_name)
         self._cached_name = self.name
-        self.tab.binarizationControlsGroupBox.setTitle(new_name)
+        # self.tab.binarizationControlsGroupBox.setTitle(new_name)
 
     @property
     def cfg_subtree(self):
