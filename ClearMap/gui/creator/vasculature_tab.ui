@@ -61,7 +61,7 @@
              <item>
               <widget class="QToolBox" name="toolBox_26">
                <property name="currentIndex">
-                <number>0</number>
+                <number>1</number>
                </property>
                <widget class="QWidget" name="page_83">
                 <property name="geometry">
@@ -75,7 +75,7 @@
                 <attribute name="label">
                  <string>Binarization</string>
                 </attribute>
-                <layout class="QVBoxLayout" name="verticalLayout_5">
+                <layout class="QVBoxLayout" name="channelsParamsTabWidgetLayout">
                  <property name="leftMargin">
                   <number>0</number>
                  </property>
@@ -89,7 +89,7 @@
                   <number>0</number>
                  </property>
                  <item>
-                  <widget class="QTabWidget" name="tabWidget">
+                  <widget class="QTabWidget" name="channelsParamsTabWidget">
                    <widget class="QWidget" name="tab">
                     <attribute name="title">
                      <string>Tab 1</string>
@@ -134,92 +134,10 @@
                  <string>Display</string>
                 </attribute>
                 <layout class="QGridLayout" name="gridLayout_12">
-                 <item row="0" column="2">
-                  <widget class="QLabel" name="label_2">
-                   <property name="text">
-                    <string>Image B</string>
-                   </property>
-                  </widget>
-                 </item>
-                 <item row="0" column="3">
-                  <widget class="QComboBox" name="binarizationPlotStep2ComboBox">
-                   <property name="currentIndex">
-                    <number>1</number>
-                   </property>
-                   <item>
-                    <property name="text">
-                     <string>stitched</string>
-                    </property>
-                   </item>
-                   <item>
-                    <property name="text">
-                     <string>binary</string>
-                    </property>
-                   </item>
-                   <item>
-                    <property name="text">
-                     <string>postprocessed</string>
-                    </property>
-                   </item>
-                   <item>
-                    <property name="text">
-                     <string>filled</string>
-                    </property>
-                   </item>
-                   <item>
-                    <property name="text">
-                     <string>combined</string>
-                    </property>
-                   </item>
-                   <item>
-                    <property name="text">
-                     <string>final</string>
-                    </property>
-                   </item>
-                  </widget>
-                 </item>
-                 <item row="1" column="3">
-                  <widget class="QComboBox" name="binarizationPlotChannel2ComboBox">
-                   <property name="currentIndex">
-                    <number>0</number>
-                   </property>
-                   <item>
-                    <property name="text">
-                     <string>all vessels</string>
-                    </property>
-                   </item>
-                   <item>
-                    <property name="text">
-                     <string>arteries</string>
-                    </property>
-                   </item>
-                  </widget>
-                 </item>
-                 <item row="1" column="1">
-                  <widget class="QComboBox" name="binarizationPlotChannel1ComboBox">
-                   <item>
-                    <property name="text">
-                     <string>all vessels</string>
-                    </property>
-                   </item>
-                   <item>
-                    <property name="text">
-                     <string>arteries</string>
-                    </property>
-                   </item>
-                  </widget>
-                 </item>
                  <item row="3" column="3">
                   <widget class="QPushButton" name="binarizationPlotOverlayPushButton">
                    <property name="text">
                     <string>Plot overlay</string>
-                   </property>
-                  </widget>
-                 </item>
-                 <item row="0" column="0">
-                  <widget class="QLabel" name="label">
-                   <property name="text">
-                    <string>Image A</string>
                    </property>
                   </widget>
                  </item>
@@ -230,41 +148,127 @@
                    </property>
                   </widget>
                  </item>
-                 <item row="0" column="1">
-                  <widget class="QComboBox" name="binarizationPlotStep1ComboBox">
-                   <item>
-                    <property name="text">
-                     <string>stitched</string>
-                    </property>
-                   </item>
-                   <item>
-                    <property name="text">
-                     <string>binary</string>
-                    </property>
-                   </item>
-                   <item>
-                    <property name="text">
-                     <string>postprocessed</string>
-                    </property>
-                   </item>
-                   <item>
-                    <property name="text">
-                     <string>filled</string>
-                    </property>
-                   </item>
-                   <item>
-                    <property name="text">
-                     <string>combined</string>
-                    </property>
-                   </item>
-                   <item>
-                    <property name="text">
-                     <string>final</string>
-                    </property>
-                   </item>
+                 <item row="1" column="0" colspan="2">
+                  <widget class="QGroupBox" name="groupBox">
+                   <property name="title">
+                    <string>Image A</string>
+                   </property>
+                   <layout class="QVBoxLayout" name="verticalLayout_3">
+                    <item>
+                     <widget class="QComboBox" name="binarizationPlotStep1ComboBox">
+                      <item>
+                       <property name="text">
+                        <string>stitched</string>
+                       </property>
+                      </item>
+                      <item>
+                       <property name="text">
+                        <string>binary</string>
+                       </property>
+                      </item>
+                      <item>
+                       <property name="text">
+                        <string>postprocessed</string>
+                       </property>
+                      </item>
+                      <item>
+                       <property name="text">
+                        <string>filled</string>
+                       </property>
+                      </item>
+                      <item>
+                       <property name="text">
+                        <string>combined</string>
+                       </property>
+                      </item>
+                      <item>
+                       <property name="text">
+                        <string>final</string>
+                       </property>
+                      </item>
+                     </widget>
+                    </item>
+                    <item>
+                     <widget class="QComboBox" name="binarizationPlotChannel1ComboBox">
+                      <item>
+                       <property name="text">
+                        <string>all vessels</string>
+                       </property>
+                      </item>
+                      <item>
+                       <property name="text">
+                        <string>arteries</string>
+                       </property>
+                      </item>
+                     </widget>
+                    </item>
+                   </layout>
                   </widget>
                  </item>
-                 <item row="2" column="1">
+                 <item row="1" column="2" colspan="2">
+                  <widget class="QGroupBox" name="groupBox_2">
+                   <property name="title">
+                    <string>ImageB</string>
+                   </property>
+                   <layout class="QVBoxLayout" name="verticalLayout_4">
+                    <item>
+                     <widget class="QComboBox" name="binarizationPlotStep2ComboBox">
+                      <property name="currentIndex">
+                       <number>1</number>
+                      </property>
+                      <item>
+                       <property name="text">
+                        <string>stitched</string>
+                       </property>
+                      </item>
+                      <item>
+                       <property name="text">
+                        <string>binary</string>
+                       </property>
+                      </item>
+                      <item>
+                       <property name="text">
+                        <string>postprocessed</string>
+                       </property>
+                      </item>
+                      <item>
+                       <property name="text">
+                        <string>filled</string>
+                       </property>
+                      </item>
+                      <item>
+                       <property name="text">
+                        <string>combined</string>
+                       </property>
+                      </item>
+                      <item>
+                       <property name="text">
+                        <string>final</string>
+                       </property>
+                      </item>
+                     </widget>
+                    </item>
+                    <item>
+                     <widget class="QComboBox" name="binarizationPlotChannel2ComboBox">
+                      <property name="currentIndex">
+                       <number>0</number>
+                      </property>
+                      <item>
+                       <property name="text">
+                        <string>all vessels</string>
+                       </property>
+                      </item>
+                      <item>
+                       <property name="text">
+                        <string>arteries</string>
+                       </property>
+                      </item>
+                     </widget>
+                    </item>
+                   </layout>
+                  </widget>
+                 </item>
+                 <item row="4" column="1">
                   <spacer name="verticalSpacer">
                    <property name="orientation">
                     <enum>Qt::Vertical</enum>

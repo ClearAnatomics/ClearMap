@@ -1325,6 +1325,8 @@ class VasculatureTab(PostProcessingTab):
         self.binary_vessel_processor = None
         self.vessel_graph_processor = None
 
+        self.channels_ui_name = 'vasculature_params'
+
         self.set_relevant_data_types(DATA_TYPE_TO_TAB_CLASS)
 
     # FIXME: create channels here ??
@@ -1402,21 +1404,21 @@ class VasculatureTab(PostProcessingTab):
             self.binary_vessel_processor.setup(self.sample_manager)
             self.vessel_graph_processor.setup(self.sample_manager, self.aligner)
 
-            # FIXME: part of channels_connect
-            unique_connect(self.ui.binarizePushButton.clicked,
-                           functools.partial(self.binarize_channel,
-                                             channel=self.binary_vessel_processor.all_vessels_channel))
-
-    def _bind_params_signals(self):
-        pass
+    # def _bind_params_signals(self):
+    #     pass
 
     def _get_channels(self):
-        return self.params.channels
+        return self.sample_manager.get_channels_by_pipeline('TubeMap')
 
     def _set_channel_config(self, channel):
-        pass
+        self.params[channel]._config = self.params.config
+        # FIXME: it seems config for that channel was not set, emtpy dict
+        self.params[channel].cfg_to_ui()  # Force it while the tab is active
 
     def _bind_channel(self, page_widget, channel):
+        buttons_functions = [('binarizePushButton', self.binarize_channel)]
+        for btn_name, func in buttons_functions:
+            self._bind_btn(btn_name, func, channel, page_widget)
 
     def unload_temporary_graphs(self):
         """Unload the temporary vasculature graph objects to free up RAM"""
