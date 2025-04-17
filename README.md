@@ -24,24 +24,6 @@ ClearMap 2.1
 *ClearMap* is a toolbox for the analysis and registration of volumetric
 data from cleared tissues.
 
-> :new: This is the new 2.1 version of ClearMap which includes a Graphical User Interface.
-> To use it, make sure that the *install_gui.sh* script is executable and run it by 
-> opening a terminal in the ClearMap2 folder and typing ./run_gui.sh. 
-
-## 2.1.0 what's new
-  * [x] Graphical user interface with many helper widgets
-  * [x] Redesigned code with config based parameters to replace the scripts
-  * [x] Atlas alignment improvements:
-    * [x] Updated Allen atlas files (no more "No Label")
-    * [x] Support for more atlases
-    * [x] Support for hemispheres information
-    * [x] Landmarks based registration
-  * [x] Batch mode for processing or analysis
-  * [x] New plots to visualise detected cells
-  * [x] Various bug fixes
-
-\
-\
 *ClearMap's* tool box includes 
 
 ## [Wobbly-Stitcher](https://clearanatomics.github.io/ClearMapDocumentation/advanced/wobblystitcher.html) <a href="https://clearanatomics.github.io/ClearMapDocumentation/html/TubeMap.html#Stitching"> <img src="https://clearanatomics.github.io/ClearMapDocumentation/images/WobblyStitcher.jpg" alt="WobblyStitcher" width="150" align="right" vspace = "5"/></a>
@@ -88,22 +70,76 @@ to broaden the range of applications to different types of biological objects
 or structures.
 
 
+Basic Install
+=============
+
+### Prepare installation
+
+For a basic installation on Ubuntu 24.04 first install 
+[miniconda](https://www.anaconda.com/docs/getting-started/miniconda/install#linux) and 
+[git](https://www.anaconda.com/docs/getting-started/miniconda/install#linux)
+
+To use GPUs with ClearMap ensure your [pytorch installation supports cuda](https://pytorch.org/get-started/locally/).
+
+### Install ClearMap
+
+#### Download CLearMap
+
+In a console run:
+
+    >>> conda install mamba
+    >>> git clone https://github.com/ClearAnatomics/ClearMap 
+    >>> cd ClearMap
+    >>> python setup.py install
+
+The last step will compile ClearMap and can take up to 20 minutes.
+
+#### Create ClearMap configuration
+
+In a console run:
+
+    > cd ~
+    > mkdir .clearmap
+    > python -m ClearMap.config.update_config 
+
+### Run ClearMap
+
+There are multiple ways to run ClearMap, including through imports of ClearMap functions 
+in python scripts, or starting the gui.
+
+#### Python console
+
+Activate the CLearMap environment, change to the ClearMap folder and run python 
+
+In a console run:
+
+    > conda activate clearmap
+    > cd `path-to-clearmap`
+    > python
+
+In python run:
+
+    >>> import ClearMap.Environment as clm
+
+
+#### Gui
+
+Activate the conda ClearMap environment (clearmap)
+
+In a console run:
+
+    > conda activate clearmap
+    > clearmap-ui
+
+
+
 [Installation](https://clearanatomics.github.io/ClearMapDocumentation/html/installation.html)
 ==============================================================================================
 
 Please refer to our [documentation](https://clearanatomics.github.io/ClearMapDocumentation)
 on how to [install](https://clearanatomics.github.io/ClearMapDocumentation/html/installation.html) ClearMap.
 
-[Tutorials](https://clearanatomics.github.io/ClearMapDocumentation/html/usage.html)
-====================================================================================
-
-Tutorials for [TubeMap](https://clearanatomics.github.io/ClearMapDocumentation/html/tubemap.html) 
-and [CellMap](https://clearanatomics.github.io/ClearMapDocumentation/html/cellmap.html) are
-avaialbe as [jupyter](https://jupyter.org/) notebooks:
-  
-  * [TubeMap](https://github.com/ClearAnatomics/ClearMapDocumentation/tree/master/docs/html/TubeMap.ipynb)
-  
-  * [CellMap](https://github.com/ClearAnatomics/ClearMapDocumentation/tree/master/docs/html/CellMap.ipynb)
+If the auto-installation scripts fail please use [Quick Install](#markdown-header-quick-install).
 
 
 [Documentation](https://clearanatomics.github.io/ClearMapDocumentation)
@@ -117,19 +153,19 @@ For experimental protocols also refer to [idisco.info](http:://idisco.info)
 [News and Media](https://clearanatomics.github.io/ClearMapDocumentation/html/media.html)
 =========================================================================================
 
-ClearMap has been featured in differnet articles, interviews and a TEDx talk:
+ClearMap has been featured in different articles, interviews and a TEDx talk:
 
-<p align="center">
+<p>
 <a href="https://www.ted.com/talks/christoph_kirst_a_transparent_journey_into_the_brain_and_its_flexible_function">
 <img src="https://clearanatomics.github.io/ClearMapDocumentation/images/TEDx_video.jpeg" alt="Cell2016" height="200" hspace="40"/></a>
 <a href="https://www.youtube.com/watch?v=-LEfL55-EUU">
 <img src="https://img.youtube.com/vi/-LEfL55-EUU/0.jpg" alt="Cell2020" height="200" hspace="40"/></a>
 </p>
 
-<p align="center">
+<p>
 <a href="https://www.nature.com/articles/s41684-020-0556-7">
 <img src="https://media.springernature.com/full/nature-cms/uploads/product/nature/header-86f1267ea01eccd46b530284be10585e.svg" 
-  alt="Cell2016" height="80" hspace="40/></a>
+  alt="Cell2016" height="80" hspace="40"/></a>
 <a href="https://www.sciencedirect.com/science/article/pii/S0092867416307371">
 <img src="https://publons.com/media/thumbs/publishers/logos/613fa6f5-fea2-4e4a-a934-ba44a1e85f21.png.200x200_q95_detail_letterbox_upscale.png" alt="Cell2020" height="80" hspace="40"/></a>
 </p>
@@ -207,6 +243,24 @@ Copyright © 2020 by Christoph Kirst
 
 Versions
 ========
+
+> :new: This is the new 2.1 version of ClearMap which includes a Graphical User Interface.
+> To use it, make sure that the *install_gui.sh* script is executable and run it by 
+> opening a terminal in the ClearMap2 folder and typing ./run_gui.sh. 
+
+## 2.1.0 what's new
+  * [x] Graphical user interface with many helper widgets
+  * [x] Redesigned code with config based parameters to replace the scripts
+  * [x] Atlas alignment improvements:
+    * [x] Updated Allen atlas files (no more "No Label")
+    * [x] Support for more atlases
+    * [x] Support for hemispheres information
+    * [x] Landmarks based registration
+  * [x] Batch mode for processing or analysis
+  * [x] New plots to visualise detected cells
+  * [x] Various bug fixes
+
+
 
 VERSION 2.1
 -----------

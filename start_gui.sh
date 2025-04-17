@@ -20,7 +20,7 @@ fi
 conda activate ClearMapUi
 echo 'Conda Activated' >> "$log_path"
 
-clear_map_ui
+clearmap-ui
 echo 'UI started' >> "$log_path"
 
 conda deactivate
