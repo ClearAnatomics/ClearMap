@@ -172,8 +172,10 @@ class TractMapProcessor(TabProcessor):
                     raise FileNotFoundError(f'No parameter files found in {results_dir}')
                 # print(f'Copying {file_names} to {temp_params_dir}')
                 for f_name in file_names:
+                    f_name = Path(f_name).relative_to(results_dir)
                     f_path = results_dir / f_name
-                    shutil.copy(f_path, temp_params_dir)
+                    dest_path = Path(temp_params_dir) / f_name
+                    shutil.copyfile(f_path, dest_path)
 
                 coords = elastix.transform_points(
                     coords, sink=None,
@@ -182,8 +184,7 @@ class TractMapProcessor(TabProcessor):
                     temp_file=temp_file.name,
                     binary=True, indices=False)
 
-                tmp_f_path = Path(temp_file.name)
-            tmp_f_path.unlink(missing_ok=True)
+                Path(temp_file.name).unlink(missing_ok=True)
 
         return coords
 
