@@ -26,6 +26,7 @@ from shutil import copyfile
 from statistics import mode
 from types import NoneType
 
+import configobj
 from importlib_metadata import version
 
 # WARNING: Necessary for QCoreApplication creation
@@ -48,15 +49,20 @@ DEBUG = False
 
 os.environ['CLEARMAP_GUI_HOSTED'] = "1"
 # ########################################### SPLASH SCREEN ###########################################################
-CLEARMAP_VERSION = version('ClearMap')
-from ClearMap.config.config_loader import ConfigLoader, CLEARMAP_CFG_DIR
-machine_cfg = ConfigLoader.get_cfg_from_path(ConfigLoader.get_default_path('machine'))
+
+# Load directly to ensure not ClearMap module is loaded before fixing tmp folder
+machine_cfg = configobj.ConfigObj(os.path.expanduser('~/.clearmap/machine_params_v3_0.cfg'),
+                                  unrepr=True, encoding='utf-8', indent_type='    ')
 tmp_folder = machine_cfg.get('temp_folder', None)
 if tmp_folder is not None:
     for var_name in ('TMP', 'TEMP', 'TMPDIR'):
         os.environ[var_name] = tmp_folder
-    tempfile.tempdir = None  # Force refresh of tempdir
+    tempfile.tempdir = tmp_folder  # Force refresh of tempdir
+
 DEBUG = machine_cfg['verbosity'] in ('trace', 'debug')
+
+CLEARMAP_VERSION = version('ClearMap')
+from ClearMap.config.config_loader import ConfigLoader, CLEARMAP_CFG_DIR
 
 from ClearMap.Alignment.Stitching import layout_graph_utils  # noqa: F401 # WARNING: first because otherwise, breaks with pytorch
 
