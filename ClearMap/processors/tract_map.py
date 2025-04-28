@@ -167,7 +167,7 @@ class TractMapProcessor(TabProcessor):
 
 
                 # Copy the params files to avoid a race condition because they get edited by each process
-                file_names = results_dir.glob('TransformParameters.*.txt')
+                file_names = list(results_dir.glob('TransformParameters.*.txt'))
                 if not file_names:
                     raise FileNotFoundError(f'No parameter files found in {results_dir}')
                 # print(f'Copying {file_names} to {temp_params_dir}')
