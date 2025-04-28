@@ -629,6 +629,7 @@ class StitchingTab(PreProcessingTab):
     def run_stitching(self):
         """Run the actual stitching steps based on the values in the config file (set from the UI)."""
         self.params.ui_to_cfg()
+        self.stitcher.config.reload()
         for channel in self.sample_manager.channels:  # FIXME: check if should do and if done
             if not self.sample_manager.is_tiled(channel):  # BYPASS stitching, just copy or stack
                 self.wrap_step('Stitching', self.stitcher.copy_or_stack, step_args=[channel], )
