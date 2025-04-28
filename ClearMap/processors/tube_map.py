@@ -17,6 +17,7 @@ import gc
 
 import numpy as np
 import pandas as pd
+from ClearMap.IO.assets_specs import ChannelSpec
 from PyQt5.QtWidgets import QDialogButtonBox
 
 from ClearMap.ParallelProcessing.DataProcessing.ArrayProcessing import initialize_sink
@@ -155,6 +156,12 @@ class BinaryVesselProcessor(TabProcessor):
                 if channel_name:
                     self.steps[channel_name] = BinaryVesselProcessorSteps(self.workspace, channel=channel_name)
 
+            compound_channel = tuple(self.channels_to_binarize())
+            if compound_channel not in self.workspace.asset_collections.keys():  # FIXME: could be string version
+                sample_id = self.sample_manager.config['sample_id']
+                self.workspace.add_channel(ChannelSpec(compound_channel, 'compound'), sample_id=sample_id)
+                self.workspace.add_pipeline('TubeMap', compound_channel, sample_id=sample_id)
+
     def assert_input_shapes_match(self):
         """
         Ensure that the input shapes (stitched images of the different color channels) match
@@ -187,7 +194,7 @@ class BinaryVesselProcessor(TabProcessor):
             raise ValueError('Channels to binarize have different shapes. This is not supported yet.')
 
     def channels_to_binarize(self):
-        return [c for c in self.processing_config['binarization'].keys() if c != 'combined']
+        return tuple([c for c in self.processing_config['binarization'].keys() if c != 'combined'])
 
     def __get_n_blocks(self, channel):
         # TODO: use actual processing params to get real n blocks
@@ -548,6 +555,11 @@ class VesselGraphProcessor(TabProcessor):
             self.set_progress_watcher(self.sample_manager.progress_watcher)
 
             self.parent_channels = tuple([k for k in self.processing_config['binarization'].keys() if k != 'combined'])
+
+            if self.parent_channels not in self.workspace.asset_collections.keys():
+                sample_id = self.sample_manager.config['sample_id']
+                self.workspace.add_channel(ChannelSpec(self.parent_channels, 'compound'), sample_id=sample_id)
+                self.workspace.add_pipeline('TubeMap', self.parent_channels, sample_id=sample_id)
 
     @property
     def use_arteries_for_graph(self):  # TODO: see if improve
