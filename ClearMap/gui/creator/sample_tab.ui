@@ -144,11 +144,7 @@
        <item row="1" column="1">
         <layout class="QHBoxLayout" name="horizontalLayout_9">
          <item>
-          <widget class="QLineEdit" name="sampleIdTxt">
-           <property name="placeholderText">
-            <string>exp1</string>
-           </property>
-          </widget>
+          <widget class="QLineEdit" name="sampleIdTxt"/>
          </item>
          <item>
           <widget class="QToolButton" name="sampleIdLabelInfoToolButton">
