@@ -1309,19 +1309,19 @@ class VesselParams(ChannelsUiParameterCollection):
                 self.graph_params.use_arteries = True
 
     def fix_default_config(self, channel_name, data_type=None):
-        self.__default_vessels_section = deepcopy(dict(self.config['binarization']['vessels']))
-        self.__default_arteries_section = dict(self.config['binarization']['arteries'])
-        self.__default_combined_section = dict(self.config['binarization']['combined'])
-        self.config['binarization'] = {'combined': self.__default_combined_section}
+        self._default_vessels_section = deepcopy(dict(self.config['binarization']['vessels']))
+        self._default_arteries_section = dict(self.config['binarization']['arteries'])
+        self._default_combined_section = dict(self.config['binarization']['combined'])
+        self.config['binarization'] = {'combined': self._default_combined_section}
         self.patch_config_section(channel_name, data_type=data_type)
         self.config['is_default'] = False
         self.config.write()
 
     def patch_config_section(self, channel_name, data_type=None):
         if data_type in ('vessels', None):
-            self.config['binarization']['vessels'] = self.__default_vessels_section
+            self.config['binarization']['vessels'] = self._default_vessels_section
         else:
-            self.config['binarization'][channel_name] = self.__default_arteries_section
+            self.config['binarization'][channel_name] = self._default_arteries_section
         self.config.write()
 
     def fix_cfg_file(self, f_path):
