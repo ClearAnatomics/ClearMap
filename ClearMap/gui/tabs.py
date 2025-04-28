@@ -1331,15 +1331,13 @@ class VasculatureTab(PostProcessingTab):
         self.set_relevant_data_types(DATA_TYPE_TO_TAB_CLASS)
 
     # FIXME: create channels here ??
-    def _set_channels_names(self):  # FIXME: see if shouldn't be handled by params instead
-        default_vessels_binarization_params = self.params.config['binarization'].pop('vessels', {})
-        default_arteries_binarization_params = self.params.config['binarization'].pop('arteries', {})
-        for channel in self.sample_manager.channels:
+    def _set_channels_names(self):
+        if self.params.config['is_default']:
+            self.params.fix_default_config()
+        for channel in self.sample_manager.channels:  # TODO: see if shouldn't be handled by params instead
             channel_type = self.sample_manager.get_channel_type(channel)
-            if channel_type == 'vessels':
-                self.params.config['binarization'][channel] = default_vessels_binarization_params
-            elif channel_type in ('arteries', 'veins'):
-                self.params.config['binarization'][channel] = default_arteries_binarization_params
+            if channel not in self.params.config['binarization'].keys():
+                self.params.patch_config_section(channel, channel_type)
         self.params.config.write()
 
     def _bind(self):

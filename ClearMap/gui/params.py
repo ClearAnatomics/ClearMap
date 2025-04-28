@@ -1300,7 +1300,7 @@ class VesselParams(ChannelsUiParameterCollection):
             return
         else:
             if self.config['is_default']:
-                self.fix_default_config(channel_name, data_type)
+                self.fix_default_config()
             if channel_name not in self.config['binarization']:
                 self.patch_config_section(channel_name, data_type)
             self[channel_name] = VesselBinarizationParams(self.tab, channel_name)
@@ -1308,12 +1308,11 @@ class VesselParams(ChannelsUiParameterCollection):
             if data_type == 'arteries':
                 self.graph_params.use_arteries = True
 
-    def fix_default_config(self, channel_name, data_type=None):
+    def fix_default_config(self):
         self._default_vessels_section = deepcopy(dict(self.config['binarization']['vessels']))
         self._default_arteries_section = dict(self.config['binarization']['arteries'])
         self._default_combined_section = dict(self.config['binarization']['combined'])
         self.config['binarization'] = {'combined': self._default_combined_section}
-        self.patch_config_section(channel_name, data_type=data_type)
         self.config['is_default'] = False
         self.config.write()
 
