@@ -679,6 +679,7 @@ class ExpressionAsset(Asset):
         """
         # noinspection PyTypeChecker
         if not self.file_list:
+            warnings.warn(f'No tiles found for channel {self.base_name} with expression {self.expression}')
             return False
         return len(self.file_list) == self.n_tiles
 
