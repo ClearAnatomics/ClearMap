@@ -397,6 +397,18 @@ class TractMapProcessor(TabProcessor):
         self.update_watcher_main_progress()
         print('TractMap voxelization finished')
 
+    def plot_binarization_levels(self, low_spin_box, high_spin_box):  # TODO: default=None and create dialog if missing
+        asset = self.get('stitched', channel=self.channel)
+        if not asset.exists:  # FIXME: could compute
+            raise MissingRequirementException(f'plot_binarization_levels missing file: {asset} {asset.path} not found')
+
+        dv = q_plot_3d.plot(asset.path, title=f'Binarization levels', arrange=False)[0]
+        dv._add_hi_lo_lut(low_spin_box, high_spin_box)
+        return [dv]
+        # dvs = q_plot_3d.plot([[asset.path, asset.path]], title=f'Binarization levels', arrange=False)
+        # dvs[0]._add_hi_lo_lut(low_spin_box, high_spin_box)
+        # return dvs
+
     def plot_tracts_3d_scatter_w_atlas_colors(self, raw=False, coordinates_from_debug=False, plot_onto_debug=False, parent=None):
         asset_properties = {'channel': self.channel}
         if raw:

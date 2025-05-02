@@ -1670,6 +1670,9 @@ class TractMapTab(PostProcessingTab):
 
     def _bind_channel(self, page_widget, channel):
         buttons_functions = [
+            ('tractMapComputeClippRangePushButton', self.compute_clipping_range),
+            ('tractMapComputePixelsPercentRangePushButton', self.intensities_to_percentiles),
+            ('tractMapPlotBinarizationThresholdsPushButton', self.plot_binarization_thresholds),
             ('tractMapPreviewTuningOpenPushButton', self.plot_debug_cropping_interface),
             ('tractMapPreviewTuningCropPushButton', self.create_tract_map_tuning_sample),
             ('tractMapPreviewPushButton', self.run_tuning_tract_map),
@@ -1777,6 +1780,31 @@ class TractMapTab(PostProcessingTab):
         self.wrap_step('Creating tuning sample', processor.create_test_dataset,
                        step_kw_args={'slicing': self.params[channel].slicing}, nested=False)
         self.sample_manager.workspace.debug = False  # FIXME
+
+    def compute_clipping_range(self, channel):
+        processor = self.tract_mappers[channel]
+        # TODO: use wrap_step but must include return
+        pixel_percents = self.params[channel].clipping_percents
+        self.params.ui_to_cfg()
+        low_intensity, high_intensity = processor.compute_clip_range(pixel_percents)
+        self.params[channel].clip_range = [low_intensity, high_intensity]
+
+    def intensities_to_percentiles(self, channel):
+        """
+        Convert the intensities to percentiles
+        """
+        processor = self.tract_mappers[channel]
+        low_intensity, high_intensity = self.params[channel].clip_range
+        self.params.ui_to_cfg()
+        low_percent, high_percent = processor.intensities_to_percentiles(low_intensity, high_intensity)
+        self.params[channel].clipping_percents = [low_percent, high_percent]
+
+    def plot_binarization_thresholds(self, channel):
+        page = self.ui.channelsParamsTabWidget.currentWidget()
+        low_level_spin_box = page.binarizationThresholdsLowSpinBox_1
+        high_level_spin_box = page.binarizationThresholdsHighSpinBox_2
+        self.wrap_plot(self.tract_mappers[channel].plot_binarization_levels,
+                       low_level_spin_box, high_level_spin_box)
 
 
     def plot_tract_map_results(self, channel):

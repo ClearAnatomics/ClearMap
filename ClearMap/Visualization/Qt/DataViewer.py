@@ -32,9 +32,10 @@ from PyQt5.QtWidgets import QWidget, QRadioButton, QLabel, QSplitter, QApplicati
   QGraphicsPathItem, QGridLayout, QLineEdit, QScrollArea
 
 from ClearMap.Utils.utilities import runs_on_spyder
+from ClearMap.Utils.array_utils import dtype_range
 from ClearMap.IO.IO import as_source
 from ClearMap.IO.Source import Source
-from ClearMap.Visualization.Qt.data_viewer_luts import LUT
+from ClearMap.Visualization.Qt.data_viewer_luts import LUT, HighLowLUT
 
 pg.CONFIG_OPTIONS['useOpenGL'] = False  # set to False if trouble seeing data.
 
@@ -274,6 +275,7 @@ class DataViewer(QWidget):
         self.luts = [LUT(image=i, color=c) for i, c in zip(self.image_items, self.__get_colors(default_lut))]
 
         lut_layout = QtWidgets.QGridLayout()
+        self.lut_layout = lut_layout
 
         lut_layout.setContentsMargins(0, 0, 0, 0)
         for d, lut in enumerate(self.luts):
@@ -300,6 +302,23 @@ class DataViewer(QWidget):
         # self.change_orientations_threshold()
 
         self.show()
+
+    def _add_hi_lo_lut(self, low_threshold_spin_box, high_threshold_spin_box):
+        for sb in (low_threshold_spin_box, high_threshold_spin_box):
+            sb.setKeyboardTracking(False)
+        dtype_min, dtype_max = np.iinfo(self.sources[0].dtype).min, np.iinfo(self.sources[0].dtype).max
+        self.threshold_lut = HighLowLUT(view_box=self.view,
+                                        base_item=self.image_items[0],
+                                        hist_item=self.luts[0].lut,  # unwrap wrapper
+                                        low=low_threshold_spin_box.value(),
+                                        high=high_threshold_spin_box.value(),
+                                        dtype_min=dtype_min,
+                                        dtype_max=dtype_max)
+        low_threshold_spin_box.editingFinished.connect(lambda: self.threshold_lut.set_low(low_threshold_spin_box.value()))
+        high_threshold_spin_box.editingFinished.connect(lambda: self.threshold_lut.set_high(high_threshold_spin_box.value()))
+        # self.luts[0].setParent(None)  # Schedule for deletion
+        # self.luts[0] = self.threshold_lut  # replace
+        # self.lut_layout.addWidget(self.threshold_lut, 0, 0)  # FIXME: check if we keep it here
 
     @property
     def space_axes(self):
