@@ -28,3 +28,27 @@ def remap_array_ranges(src_array, new_array, src_ranges, new_ranges):
     else:
         result = functions_map[src_array.ndim](src_array, new_array, src_ranges, new_ranges)
         return np.asarray(result, dtype=src_array.dtype)
+
+
+def dtype_range(arr):
+    """
+    Return (min,max) that the dtype *could* hold.
+
+    Parameters
+    ----------
+    arr : array_like
+        The array whose dtype is to be checked.
+
+    Returns
+    -------
+    min, max : tuple
+        The minimum and maximum values that the dtype could hold.
+    """
+    if np.issubdtype(arr.dtype, np.integer):
+        info = np.iinfo(arr.dtype)
+        return info.min, info.max
+    elif np.issubdtype(arr.dtype, np.floating):
+        info = np.finfo(arr.dtype)
+        return info.min, info.max
+    else:                   # bool, complex, etc.
+        return 0.0, 1.0
