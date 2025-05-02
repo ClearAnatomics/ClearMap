@@ -1078,6 +1078,7 @@ class TractMapParams(ChannelsUiParameterCollection):
 
 class ChannelTractMapParams(ChannelUiParameter):
     clipping_decimation_ratio: int
+    clipping_percents: List[float]
     clip_range: List[int]
     crop_x_min: int
     crop_x_max: int  # TODO: if 99.9 % source put to 100% (None)
@@ -1106,6 +1107,9 @@ class ChannelTractMapParams(ChannelUiParameter):
         super().__init__(tab, channel)
         self.params_dict = {
             'clipping_decimation_ratio': ParamLink(['binarization', 'decimation_ratio'], self.tab.clippingDecimationRatioSpinBox),
+            'clipping_percents': ParamLink(['binarization', 'percentage_range'],
+                                           self.tab.clippingPixelsPercentDoublet,
+                                           default=[70, 99.999]),
             'clip_range': ParamLink(['binarization', 'clip_range'], self.tab.clipRangeDoublet),
             'crop_x_min': ParamLink(['test_set_slicing', 'dim_0', 0], self.tab.detectionSubsetXRangeMin),
             'crop_x_max': ParamLink(['test_set_slicing', 'dim_0', 1], self.tab.detectionSubsetXRangeMax),

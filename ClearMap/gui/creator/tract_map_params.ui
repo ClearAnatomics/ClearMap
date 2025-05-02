@@ -43,15 +43,88 @@
       <attribute name="label">
        <string>Binarization</string>
       </attribute>
-      <layout class="QFormLayout" name="formLayout">
+      <layout class="QGridLayout" name="gridLayout_4">
+       <item row="0" column="1" colspan="2">
+        <widget class="QFrame" name="clippingPixelsPercentDoublet">
+         <property name="frameShape">
+          <enum>QFrame::StyledPanel</enum>
+         </property>
+         <property name="frameShadow">
+          <enum>QFrame::Raised</enum>
+         </property>
+         <layout class="QHBoxLayout" name="horizontalLayout_10">
+          <item>
+           <widget class="QDoubleSpinBox" name="binarizationPixelsPercentLowDoubleSpinBox_2">
+            <property name="suffix">
+             <string>%</string>
+            </property>
+            <property name="decimals">
+             <number>3</number>
+            </property>
+            <property name="maximum">
+             <double>100.000000000000000</double>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="label_16">
+            <property name="text">
+             <string>    to</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QDoubleSpinBox" name="binarizationPixelsPercentHighDoubleSpinBox_3">
+            <property name="suffix">
+             <string>%</string>
+            </property>
+            <property name="decimals">
+             <number>3</number>
+            </property>
+            <property name="maximum">
+             <double>100.000000000000000</double>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
        <item row="0" column="0">
+        <widget class="QLabel" name="label_7">
+         <property name="text">
+          <string>Pixels percent:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="6" column="2">
+        <widget class="QPushButton" name="tractMapPlotBinarizationThresholdsPushButton">
+         <property name="text">
+          <string>Plot</string>
+         </property>
+        </widget>
+       </item>
+       <item row="3" column="2">
+        <widget class="QPushButton" name="tractMapComputeClippRangePushButton">
+         <property name="text">
+          <string>⬇ to intensities</string>
+         </property>
+        </widget>
+       </item>
+       <item row="3" column="1">
+        <widget class="QPushButton" name="tractMapComputePixelsPercentRangePushButton">
+         <property name="text">
+          <string>⬆ to percentage</string>
+         </property>
+        </widget>
+       </item>
+       <item row="4" column="0">
         <widget class="QLabel" name="label">
          <property name="text">
           <string>Clipping range:</string>
          </property>
         </widget>
        </item>
-       <item row="0" column="1">
+       <item row="4" column="1" colspan="2">
         <widget class="QFrame" name="clipRangeDoublet">
          <property name="frameShape">
           <enum>QFrame::StyledPanel</enum>
@@ -61,7 +134,7 @@
          </property>
          <layout class="QHBoxLayout" name="horizontalLayout_5">
           <item>
-           <widget class="QSpinBox" name="spinBox_1">
+           <widget class="QSpinBox" name="binarizationThresholdsLowSpinBox_1">
             <property name="suffix">
              <string/>
             </property>
@@ -81,7 +154,7 @@
            </widget>
           </item>
           <item>
-           <widget class="QSpinBox" name="spinBox_2">
+           <widget class="QSpinBox" name="binarizationThresholdsHighSpinBox_2">
             <property name="suffix">
              <string/>
             </property>
@@ -93,17 +166,20 @@
          </layout>
         </widget>
        </item>
-       <item row="1" column="0">
-        <widget class="QLabel" name="label_2">
-         <property name="text">
-          <string>Sampling:</string>
+       <item row="2" column="1">
+        <widget class="QSpinBox" name="clippingDecimationRatioSpinBox">
+         <property name="prefix">
+          <string>1 / </string>
+         </property>
+         <property name="maximum">
+          <number>1000</number>
          </property>
         </widget>
        </item>
-       <item row="1" column="1">
-        <widget class="QSpinBox" name="clippingDecimationRatioSpinBox">
-         <property name="maximum">
-          <number>1000</number>
+       <item row="2" column="0">
+        <widget class="QLabel" name="label_2">
+         <property name="text">
+          <string>Sampling:</string>
          </property>
         </widget>
        </item>
@@ -423,8 +499,8 @@
        <rect>
         <x>0</x>
         <y>0</y>
-        <width>640</width>
-        <height>330</height>
+        <width>626</width>
+        <height>362</height>
        </rect>
       </property>
       <attribute name="label">
@@ -445,9 +521,23 @@
            </widget>
           </item>
           <item>
+           <widget class="QLabel" name="label_17">
+            <property name="text">
+             <string>⬇</string>
+            </property>
+           </widget>
+          </item>
+          <item>
            <widget class="QCheckBox" name="extractCoordinatesCheckBox">
             <property name="text">
              <string>Extract coordinates</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="label_18">
+            <property name="text">
+             <string>⬇</string>
             </property>
            </widget>
           </item>
@@ -459,6 +549,13 @@
            </widget>
           </item>
           <item>
+           <widget class="QLabel" name="label_21">
+            <property name="text">
+             <string>⬇</string>
+            </property>
+           </widget>
+          </item>
+          <item>
            <widget class="QCheckBox" name="labelCoordinatesCheckBox">
             <property name="text">
              <string>Label coordinates</string>
@@ -466,9 +563,23 @@
            </widget>
           </item>
           <item>
+           <widget class="QLabel" name="label_22">
+            <property name="text">
+             <string>⬇</string>
+            </property>
+           </widget>
+          </item>
+          <item>
            <widget class="QCheckBox" name="voxelizeCheckBox">
             <property name="text">
              <string>Voxelize</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="label_23">
+            <property name="text">
+             <string>⬇</string>
             </property>
            </widget>
           </item>
