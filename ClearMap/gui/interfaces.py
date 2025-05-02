@@ -283,7 +283,12 @@ class GenericTab(GenericUi):
             return
         channel, page_widget = self._init_channel_ui(channel)
         if channel not in self.params.keys():
-            if isinstance(self, PipelineTab):
+            channel_is_compound = False
+            if isinstance(channel, str) and '-' in channel:
+                channel_is_compound = True
+            elif isinstance(channel, (tuple, list)):
+                channel_is_compound = True
+            if isinstance(self, PipelineTab) and not channel_is_compound:
                 # WARNING: ConfigObj Section does not support get() method
                 d_type = self.sample_params.config['channels'][channel]['data_type']  # FIXME: do we want the loaded or the disk params
                 self.params.add_channel(channel, d_type)
