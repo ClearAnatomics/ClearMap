@@ -118,7 +118,7 @@ class SampleManager(TabProcessor):
             self.progress_watcher = watcher  # FIXME: in stitcher and registration too
 
         self.update_workspace()
-        self.workspace.info()
+        print(self.workspace.info())
         self.setup_complete = not self.incomplete_channels
 
     def load_processors_config(self, stitching_config=None, registration_config=None):
@@ -129,7 +129,7 @@ class SampleManager(TabProcessor):
             self.registration_cfg = registration_config
 
         self.update_workspace()
-        self.workspace.info()
+        print(self.workspace.info())
         self.setup_complete = not self.incomplete_channels
 
     def rename_channels(self, names_map):
@@ -176,7 +176,7 @@ class SampleManager(TabProcessor):
                         self.workspace.asset_collections[channel]['raw'] = old_asset.variant(expression=raw_path)
             else:
                 self.incomplete_channels.append(channel)
-        self.workspace.info()
+        print(self.workspace.info())
 
     @property
     def prefix(self):
