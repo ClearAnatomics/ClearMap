@@ -44,6 +44,9 @@ class TractMapProcessor(TabProcessor):
         self.registration_processor = None
         self.workspace = None
         self.channel = None
+        self.uniques = None
+        self.uniq_counts = None
+        self.sampling = 1
 
         if channel is None:
             raise ValueError(f'No channel specified. Please provide a channel name '
@@ -82,17 +85,61 @@ class TractMapProcessor(TabProcessor):
         self.workspace.create_debug('stitched', channel=self.channel, slicing=slicing)
         self.update_watcher_main_progress()
 
-    def compute_clip_range(self, array_path, pixel_percents=(0.7, 0.99999)):  # TODO: display in UI and set in params
-        array = cmp_io.read(array_path)
-        print(f'{array.shape=}, {array.size=}')
-        # Sample every 10th pixel in each dimension, to have a smaller array to compute the quantiles
-        ratio = self.processing_config['detection']['decimation_ratio']
-        decimated_array = array[::ratio, ::ratio, ::ratio]
+    def compute_clip_range(self, pixel_percents=(70, 99.999)):
+        self.reload_config()
+        self._compute_uniques()
+        percents = np.asarray(pixel_percents, dtype=float)
+        target_idx = np.rint(percents / 100.0 * (self._n_pixels - 1)).astype(int)
 
-        min_quantile, max_quantile = [np.quantile(decimated_array, p) for p in pixel_percents]
-        print(f'Intensity values that contain {pixel_percents} percents respectively '
-              f'of the pixels: {min_quantile=}, {max_quantile=}')
-        return min_quantile, max_quantile  # TODO: add display in UI
+        clip_vals = self.uniques[np.searchsorted(self._cum_counts, target_idx, side="left")]
+
+        return tuple(clip_vals)  # e.g. (low, high)
+
+    def _compute_uniques(self):
+        sampling = self.processing_config['binarization']['decimation_ratio']
+        if self.uniques is None or sampling != self.sampling:
+            self.sampling = sampling
+            print('Computing histogram, this may take some time')
+            array = self.get('stitched', channel=self.channel).as_source()
+            uniques, counts = np.unique(array[::sampling, ::sampling, ::sampling], return_counts=True)
+            self.uniques = uniques
+            self.uniq_counts = counts
+
+            self._cum_counts = np.cumsum(self.uniq_counts)
+            self._n_pixels = int(self._cum_counts[-1])
+            print('Done')
+
+    def intensities_to_percentiles(self, low_intensity, high_intensity):
+        """
+        Convert two intensity thresholds to their percentile ranks (0‒100],
+        using the same *nearest-rank* convention as `compute_clip_range`.
+
+        Parameters
+        ----------
+        low_intensity, high_intensity : scalar
+            Intensity values (e.g. grey levels) whose positions in the global
+            histogram are required.
+
+        Returns
+        -------
+        list[float]
+            [low_percentile, high_percentile]
+        """
+        self.reload_config()
+        self._compute_uniques()
+        # For each intensity, count how many pixels are ≤ that value ----
+        # With side='right' we include pixels that are exactly equal to the queried intensity
+        # idx of the last ≤ value
+        idx = np.searchsorted(self.uniques, (low_intensity, high_intensity), side='right') - 1
+
+        # Handle values below the smallest unique (idx == -1 → 0 pixels)
+        idx = np.clip(idx, -1, self._cum_counts.size - 1)
+
+        # Number of pixels ≤ each threshold
+        counts = np.where(idx >= 0, self._cum_counts[idx], 0)
+
+        percentiles = counts * 100.0 / self._n_pixels
+        return percentiles.tolist()
 
     def binarize(self, clip_low, clip_high):
         binarization_parameter = vasculature.default_binarization_parameter.copy()
