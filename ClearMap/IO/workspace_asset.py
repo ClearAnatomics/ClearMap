@@ -259,8 +259,8 @@ class Asset:
         else:  # Otherwise, build the name
             name = ''
             for part in self.name_parts:
-                if isinstance(part, list):  # channel could be a list for compound assets
-                    part = '_'.join(part)
+                if isinstance(part, (list, tuple)):  # channel could be a tuple for compound assets
+                    part = '-'.join(part)
                 if Expression(part).tags:
                     part = Expression(part)  # FIXME: substitute None width tags
                     values = {}
