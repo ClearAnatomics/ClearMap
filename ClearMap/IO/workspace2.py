@@ -490,6 +490,8 @@ class Workspace2:  # REFACTOR: subclass dict
                 except ClearMapAssetError as e:
                     out += f'{asset.type_spec.basename}'   # FIXME:
 
+        return out
+
 
 def test_context_manager():
     ws = Workspace2(default_channel='auto')
