@@ -434,7 +434,6 @@ class StitchingTab(PreProcessingTab):
                             c not in self.sample_params or self.sample_manager.is_tiled(c)]
         return new_channels
 
-
     def _read_configs(self, cfg_path):
         if self.sample_manager.stitching_cfg:
             self.params.read_configs(cfg=self.sample_manager.stitching_cfg)
@@ -447,7 +446,9 @@ class StitchingTab(PreProcessingTab):
 
     def _set_channels_names(self):  # FIXME: move to stitcher
         stitchable_channels = self._get_channels()
-        # rename defaults
+        if not stitchable_channels:
+            return
+            # rename defaults
         if 'channel_x' in self.stitcher.config['channels'].keys():  # i.e. is default, otherwise already set
             first_channel = stitchable_channels[0]
             self.stitcher.config['channels'][first_channel] = self.stitcher.config['channels'].pop('channel_x')
