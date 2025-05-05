@@ -776,8 +776,10 @@ class RegistrationTab(PreProcessingTab):
     def __update_channel_combo_boxes(self, channel, page_widget=None):
         if self.params[channel].align_with:
             partner_channel = self.params[channel].align_with
+            moving_channel = self.params[channel].moving_channel
         else:
             partner_channel = self.aligner.config['channels'][channel]['align_with']
+            moving_channel = self.aligner.config['channels'][channel]['moving_channel']
         if page_widget is None:
             page_widget = self.ui.channelsParamsTabWidget.get_channel_widget(channel)
         other_channels = list(set(self.aligner.channels_to_register()) - {channel})
@@ -786,18 +788,19 @@ class RegistrationTab(PreProcessingTab):
         page_widget.movingChannelComboBox.clear()
         page_widget.movingChannelComboBox.addItems([None, 'atlas', 'intrinsically aligned'] + other_channels + [channel])
         channel_dtype = self.sample_manager.config['channels'][channel]['data_type']
-        print(id(self.sample_manager.config))
         print(f'Configuring alignment partners for {channel=}, {channel_dtype=}, {partner_channel=}')
         if not partner_channel or partner_channel == channel:
             if channel_dtype == 'autofluorescence':
                 partner_channel = 'atlas'
+                moving_channel = 'atlas'
             elif channel_dtype:
                 partner_channel = self.sample_manager.alignment_reference_channel
+                moving_channel = self.sample_manager.alignment_reference_channel
             else:
                 warnings.warn(f'Skipping partner selection for {channel} because none was found')
                 return
         page_widget.alignWithComboBox.setCurrentText(partner_channel)
-        page_widget.movingChannelComboBox.setCurrentText(partner_channel)
+        page_widget.movingChannelComboBox.setCurrentText(moving_channel)
 
     def _setup_channel(self, page_widget, channel):
         self.__update_channel_combo_boxes(channel, page_widget)
