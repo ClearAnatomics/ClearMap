@@ -259,6 +259,16 @@
      </property>
     </widget>
    </item>
+   <item row="0" column="2">
+    <widget class="QPushButton" name="registrationRunResamplingPushButton">
+     <property name="whatsThis">
+      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Open a new dialog to pick landmarks in the image to help&lt;/p&gt;&lt;p&gt;constrain the alignment&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+     </property>
+     <property name="text">
+      <string>Run resampling</string>
+     </property>
+    </widget>
+   </item>
   </layout>
  </widget>
  <resources>
