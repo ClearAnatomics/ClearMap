@@ -181,7 +181,7 @@ class SampleInfoTab(GenericTab):
         self.sample_manager.config = self.params.config  # WARNING: hacky way to force shared reference
 
     def _bind_params_signals(self):
-        self.params.convertToClearMapFormat.connect(self.convert_to_clearmap_format, channel)
+        self.params.convertToClearMapFormat.connect(self.convert_to_clearmap_format)
         self.params.plotMiniBrain.connect(self.plot_mini_brain)
         self.params.plotAtlas.connect(self.display_atlas)
         self.params.channelNameChanged.connect(self.update_workspace)
