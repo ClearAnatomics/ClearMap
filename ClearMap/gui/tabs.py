@@ -181,7 +181,7 @@ class SampleInfoTab(GenericTab):
         self.sample_manager.config = self.params.config  # WARNING: hacky way to force shared reference
 
     def _bind_params_signals(self):
-        self.params.convertToClearMapFormat.connect(self.convert_to_clearmap_format)
+        self.params.convertToClearMapFormat.connect(self.convert_to_clearmap_format, channel)
         self.params.plotMiniBrain.connect(self.plot_mini_brain)
         self.params.plotAtlas.connect(self.display_atlas)
         self.params.channelNameChanged.connect(self.update_workspace)
@@ -395,10 +395,10 @@ class SampleInfoTab(GenericTab):
                 warnings.warn('RegistrationProcessor not setup, cannot plot atlas. '
                               'Please call registration_tab.finalise_set_params() first')
 
-    def convert_to_clearmap_format(self):
+    def convert_to_clearmap_format(self, channel):
         self.params.ui_to_cfg()
         self.sample_manager.config.reload()
-        channel = self.ui.channelsParamsTabWidget.current_channel()
+        # channel = self.ui.channelsParamsTabWidget.current_channel()
         stitching_processor = self.main_window.tab_managers['stitching'].stitcher
         if self.sample_manager.is_tiled(channel):
             stitching_processor.convert_tiles_channel(channel)
