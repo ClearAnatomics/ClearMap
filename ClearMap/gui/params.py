@@ -194,7 +194,7 @@ class SampleParameters(UiParameterCollection):  # FIXME: why is this not a Chann
             channel_params = SampleChannelParameters(self.tab, channel_name)
             channel_params.nameChanged.connect(self.handle_channel_name_changed)
             channel_params.tab.convertToClearMapPushButton.clicked.connect(
-                functools.partial(self.convertToClearMapFormat.emit(channel_name)))
+                functools.partial(self.convertToClearMapFormat.emit, channel_name))
             channel_params.orientationChanged.connect(self.handle_orientation_changed)
             channel_params.cropChanged.connect(self.handle_slice_changed)
 
