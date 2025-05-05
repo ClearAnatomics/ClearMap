@@ -1112,7 +1112,7 @@ class StitchingProcessor(TabProcessor):
 
     def copy_or_stack(self, channel):
         """
-        Copy or stack the channel data in case there is no X/Y tiling
+        Copy or stack or convert to npy the channel data in case there is no X/Y tiling
 
         Parameters
         ----------
