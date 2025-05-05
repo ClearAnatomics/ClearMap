@@ -37,7 +37,7 @@
       </font>
      </property>
      <property name="currentIndex">
-      <number>0</number>
+      <number>1</number>
      </property>
      <widget class="QWidget" name="samplePage">
       <property name="geometry">
@@ -248,7 +248,7 @@
           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;This will &lt;span style=&quot; font-weight:700;&quot;&gt;open a new window with a wizard&lt;/span&gt; to help you construct the patterns for the paths.&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:700;&quot;&gt;For each channel&lt;/span&gt;:&lt;/p&gt;&lt;p&gt;    ∙ Select what type this channel is (autofluorescence, raw ...)&lt;/p&gt;&lt;p&gt;    ∙ For each group of digits highlighted as question marks, select the corresponding axis from the drop down menu.&lt;/p&gt;&lt;p&gt;    ∙ Click &amp;quot;Validate&amp;quot;&lt;br/&gt;&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:700;&quot;&gt;Once done, click &amp;quot;Apply&amp;quot;&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
          </property>
          <property name="text">
-          <string>Auto detect tiles</string>
+          <string>Auto detect raw file patterns</string>
          </property>
          <property name="icon">
           <iconset resource="icons.qrc">
