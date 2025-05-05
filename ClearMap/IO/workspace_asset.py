@@ -257,7 +257,7 @@ class Asset:
             else:
                 name = self.type_spec.basename.string()
         elif self.type_spec.name == 'raw':  # Use literal for raw because it does not follow ClearMap normalization
-            name = self.type_spec.basename
+            name = self.expression.string()
         else:  # Otherwise, build the name
             name = ''
             for part in self.name_parts:
