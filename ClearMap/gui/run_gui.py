@@ -762,7 +762,7 @@ class ClearMapGui(ClearMapGuiBase):
         if not self.has_tab(StitchingTab):
             self.add_tab(StitchingTab, sample_manager=self.sample_manager, set_params=True)
         stitching_cfg = self.tab_managers['stitching'].params.config
-        self.sample_manager.load_processors_config(stitching_cfg=stitching_cfg)
+        self.sample_manager.load_processors_config(stitching_config=stitching_cfg)
 
         # stitching_tab = self.tab_managers.get('stitching', None)
         # stitching_params = getattr(stitching_tab, 'params', None)
