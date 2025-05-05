@@ -701,7 +701,7 @@ class RegistrationTab(PreProcessingTab):
 
         self.advanced_controls_names = [
             'advancedAtlasSettingsGroupBox',
-            'channel.registrationRunResamplingPushButton'
+            'channel.registrationRunResamplingPushButton',
             'channel.parameterFilesLabel',
             'channel.paramsFilesListWidget',
             'channel.addParamFilePushButton',
