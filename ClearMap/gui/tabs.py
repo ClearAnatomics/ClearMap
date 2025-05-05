@@ -406,7 +406,6 @@ class SampleInfoTab(GenericTab):
             stitching_processor.copy_or_stack(channel)
 
 
-
 class StitchingTab(PreProcessingTab):
     """
     The tab responsible for all the alignments, including the stitching and
@@ -702,6 +701,7 @@ class RegistrationTab(PreProcessingTab):
 
         self.advanced_controls_names = [
             'advancedAtlasSettingsGroupBox',
+            'channel.registrationRunResamplingPushButton'
             'channel.parameterFilesLabel',
             'channel.paramsFilesListWidget',
             'channel.addParamFilePushButton',
@@ -819,6 +819,9 @@ class RegistrationTab(PreProcessingTab):
         page_widget.paramsFilesListWidget.itemsChanged.connect(self.params[channel].handle_params_files_changed)
         self.params[channel].handle_params_files_changed()  # Force update
         self.params[channel].align_with_changed.connect(self.handle_align_with_changed)
+        page_widget.registrationRunResamplingPushButton.clicked.connect(
+            functools.partial(self.resample_channel, channel)
+        )
 
     def _setup_workers(self):
         self.sample_params.ui_to_cfg()
@@ -889,6 +892,17 @@ class RegistrationTab(PreProcessingTab):
                 self.aligner.parametrize_assets()
             else:
                 warnings.warn('Workspace not setup, cannot add registration pipeline')
+
+    def resample_channel(self, channel):
+        self.main_window.make_progress_dialog('Registering', n_steps=2, abort=self.aligner.stop_process,
+                                              parent=self.main_window)
+        self.setup_atlas()
+        self.main_window.progress_watcher.increment_main_progress()
+        self.sample_manager.delete_resampled_files(channel)
+        self.wrap_step(f'Resampling {channel} for registration', self.aligner.resample_channel,
+                       step_kw_args={'channel': channel, 'increment_main': False})
+        self.main_window.progress_watcher.finish()
+        self.main_window.print_status_msg(f'Channel {channel} resampled for registration')
 
     def run_registration(self):
         """
