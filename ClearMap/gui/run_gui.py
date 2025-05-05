@@ -757,20 +757,21 @@ class ClearMapGui(ClearMapGuiBase):
     def update_tabs(self, former_channels=None, new_channels=None):
         """ Initialises the pipeline tabs: Stitching, Registration, cell... based on sample"""
 
-        # Add stitching (if required) and registration tabs
-        stitching_tab = self.tab_managers.get('stitching', None)
-        stitching_params = getattr(stitching_tab, 'params', None)
-        stitching_cfg = getattr(stitching_params, 'config', None)
+        # Add stitching (always) and registration tabs
+        # if self.sample_manager.stitchable_channels:
+        if not self.has_tab(StitchingTab):
+            self.add_tab(StitchingTab, sample_manager=self.sample_manager, set_params=True)
+        stitching_cfg = self.tab_managers['stitching'].params.config
+        self.sample_manager.load_processors_config(stitching_cfg=stitching_cfg)
+
+        # stitching_tab = self.tab_managers.get('stitching', None)
+        # stitching_params = getattr(stitching_tab, 'params', None)
+        # stitching_cfg = getattr(stitching_params, 'config', None)
         if not self.has_tab(RegistrationTab):
             self.add_tab(RegistrationTab, sample_manager=self.sample_manager, set_params=True)  # WARNING: Always needed to allow setting None for atlas
         reg_cfg = self.tab_managers['registration'].params.config
 
         # WARNING: We need a first call to load_processors_config before checking the stitchable_channels (otherwise empty)
-        self.sample_manager.load_processors_config(stitching_cfg, reg_cfg)
-        if self.sample_manager.stitchable_channels:
-            if not self.has_tab(StitchingTab):
-                self.add_tab(StitchingTab, sample_manager=self.sample_manager, set_params=True)
-            stitching_cfg = self.tab_managers['stitching'].params.config
         self.sample_manager.load_processors_config(stitching_cfg, reg_cfg)
 
         # Add post processing tabs
@@ -814,10 +815,10 @@ class ClearMapGui(ClearMapGuiBase):
         valid_tab_classes = [c for c in valid_tab_classes if c is not None]
         valid_tab_classes += [NoneType]
         # valid_tab_classes = [c for c in valid_tab_classes if c is not None]
-        has_tiled_channel = any([self.sample_manager.get('raw', channel=channel).is_tiled for
-                                 channel in sample_params.channels])
-        if has_tiled_channel:
-            valid_tab_classes.append(StitchingTab)
+        # has_tiled_channel = any([self.sample_manager.get('raw', channel=channel).is_tiled for
+        #                          channel in sample_params.channels])
+        # if has_tiled_channel:
+        valid_tab_classes.append(StitchingTab)
         valid_tab_classes.append(RegistrationTab)
         # Add compound type tabs to valid_tab_classes (e.g. colocalization)
         if self.sample_manager.is_colocalization_compatible:
