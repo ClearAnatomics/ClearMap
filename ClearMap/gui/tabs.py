@@ -1677,6 +1677,7 @@ class TractMapTab(PostProcessingTab):
             ('tractMapPreviewTuningCropPushButton', self.create_tract_map_tuning_sample),
             ('tractMapPreviewPushButton', self.run_tuning_tract_map),
             ('runTractMapPushButton', self.run_tract_map),
+            ('tractMapPlotBinaryPushButton', self.plot_binary),
             ('tractMapPlotVoxelizationPushButton', self.plot_tract_map_results),
             ('tractMap3dScatterOnRefPushButton', functools.partial(self.plot_labeled_tracts_scatter, raw=False)),
             ('tractMap3dScatterOnStitchedPushButton', functools.partial(self.plot_labeled_tracts_scatter, raw=True)),
@@ -1799,6 +1800,11 @@ class TractMapTab(PostProcessingTab):
         low_percent, high_percent = processor.intensities_to_percentiles(low_intensity, high_intensity)
         self.params[channel].clipping_percents = [low_percent, high_percent]
 
+    def plot_binary(self, channel):
+        page = self.ui.channelsParamsTabWidget.currentWidget()
+        debug = page.tractMapDebugCheckBox.isChecked()
+        self.wrap_plot(self.tract_mappers[channel].plot_binary, debug=debug)
+
     def plot_binarization_thresholds(self, channel):
         page = self.ui.channelsParamsTabWidget.currentWidget()
         low_level_spin_box = page.binarizationThresholdsLowSpinBox_1
@@ -1806,15 +1812,15 @@ class TractMapTab(PostProcessingTab):
         self.wrap_plot(self.tract_mappers[channel].plot_binarization_levels,
                        low_level_spin_box, high_level_spin_box)
 
-
     def plot_tract_map_results(self, channel):
         self.wrap_plot(self.tract_mappers[channel].plot_voxelized_counts)
 
     def plot_labeled_tracts_scatter(self, channel, raw=False):
         self.main_window.clear_plots()
         tract_mapper = self.tract_mappers[channel]
-        coords_source_is_debug = self.ui.channelsParamsTabWidget.get_channel_widget(channel).tractMapDebugCheckBox.isChecked()
-        coords_target_is_debug = self.ui.channelsParamsTabWidget.get_channel_widget(channel).tractMapTargetDebugCheckBox.isChecked()
+        page = self.ui.channelsParamsTabWidget.get_channel_widget(channel)
+        coords_source_is_debug = page.tractMapDebugCheckBox.isChecked()
+        coords_target_is_debug = page.tractMapTargetDebugCheckBox.isChecked()
         self.wrap_plot(tract_mapper.plot_tracts_3d_scatter_w_atlas_colors, raw=raw,
                        coordinates_from_debug=coords_source_is_debug,
                        plot_onto_debug=coords_target_is_debug)

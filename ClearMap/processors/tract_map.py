@@ -409,6 +409,16 @@ class TractMapProcessor(TabProcessor):
         # dvs[0]._add_hi_lo_lut(low_spin_box, high_spin_box)
         # return dvs
 
+    def plot_binary(self, debug=False):
+        ws_debug_backup = self.workspace.debug
+        self.workspace.debug = debug
+        asset = self.get('binary', channel=self.channel)
+        if not asset.exists:
+            raise MissingRequirementException(f'plot_binary missing file: {asset.path} not found')
+        dv = q_plot_3d.plot(asset.path, title=f'Binary mask', arrange=False)[0]
+        self.workspace.debug = ws_debug_backup
+        return [dv]
+
     def plot_tracts_3d_scatter_w_atlas_colors(self, raw=False, coordinates_from_debug=False, plot_onto_debug=False, parent=None):
         asset_properties = {'channel': self.channel}
         if raw:
