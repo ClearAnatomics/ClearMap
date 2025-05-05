@@ -135,6 +135,7 @@ class SampleParameters(UiParameterCollection):  # FIXME: why is this not a Chann
     """
     Class that links the sample params file to the UI
     """
+    convertToClearMapFormat = pyqtSignal(str)
     plotMiniBrain = pyqtSignal(int)    # Bind by number because name may change
     plotAtlas = pyqtSignal(int)    # Bind by number because name may change
     channelNameChanged = pyqtSignal(str, str)
@@ -192,6 +193,8 @@ class SampleParameters(UiParameterCollection):  # FIXME: why is this not a Chann
                 self.config['channels'][channel_name] = deepcopy(self.default_channel_config())
             channel_params = SampleChannelParameters(self.tab, channel_name)
             channel_params.nameChanged.connect(self.handle_channel_name_changed)
+            channel_params.tab.convertToClearMapPushButton.clicked.connect(
+                functools.partial(self.convertToClearMapFormat.emit(channel_name)))
             channel_params.orientationChanged.connect(self.handle_orientation_changed)
             channel_params.cropChanged.connect(self.handle_slice_changed)
 
