@@ -29,7 +29,7 @@
    <item>
     <widget class="QToolBox" name="toolBox">
      <property name="currentIndex">
-      <number>3</number>
+      <number>4</number>
      </property>
      <widget class="QWidget" name="page">
       <property name="geometry">
@@ -622,7 +622,17 @@
        <string>Visualize</string>
       </attribute>
       <layout class="QGridLayout" name="gridLayout_2">
-       <item row="3" column="2">
+       <item row="5" column="2">
+        <widget class="QPushButton" name="tractMap3dScatterOnRefPushButton">
+         <property name="toolTip">
+          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Display a scatter of the cell coordinates &lt;/p&gt;&lt;p&gt;on top of the atlas reference (atlas coordinates)&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+         </property>
+         <property name="text">
+          <string> 3D scatter on reference</string>
+         </property>
+        </widget>
+       </item>
+       <item row="4" column="2">
         <widget class="QPushButton" name="tractMapPlotVoxelizationPushButton">
          <property name="toolTip">
           <string>Display the results of the voxelization</string>
@@ -632,20 +642,20 @@
          </property>
         </widget>
        </item>
-       <item row="0" column="0">
-        <widget class="QLabel" name="label_3">
+       <item row="6" column="2">
+        <widget class="QPushButton" name="tractMap3dScatterOnStitchedPushButton">
+         <property name="toolTip">
+          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Display a scatter of the cell coordinates&lt;/p&gt;&lt;p&gt;on top of the stitched image (sample coordinates)&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+         </property>
          <property name="text">
-          <string>Keep 1 every:</string>
+          <string>3D scatter on stitched</string>
          </property>
         </widget>
        </item>
-       <item row="4" column="2">
-        <widget class="QPushButton" name="tractMap3dScatterOnRefPushButton">
-         <property name="toolTip">
-          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Display a scatter of the cell coordinates &lt;/p&gt;&lt;p&gt;on top of the atlas reference (atlas coordinates)&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-         </property>
+       <item row="2" column="0">
+        <widget class="QCheckBox" name="tractMapTargetDebugCheckBox">
          <property name="text">
-          <string> 3D scatter on reference</string>
+          <string>plot onto debug</string>
          </property>
         </widget>
        </item>
@@ -669,20 +679,20 @@
          </property>
         </widget>
        </item>
-       <item row="5" column="2">
-        <widget class="QPushButton" name="tractMap3dScatterOnStitchedPushButton">
-         <property name="toolTip">
-          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Display a scatter of the cell coordinates&lt;/p&gt;&lt;p&gt;on top of the stitched image (sample coordinates)&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-         </property>
+       <item row="0" column="0">
+        <widget class="QLabel" name="label_3">
          <property name="text">
-          <string>3D scatter on stitched</string>
+          <string>Keep 1 every:</string>
          </property>
         </widget>
        </item>
-       <item row="2" column="0">
-        <widget class="QCheckBox" name="tractMapTargetDebugCheckBox">
+       <item row="3" column="2">
+        <widget class="QPushButton" name="tractMapPlotBinaryPushButton">
+         <property name="toolTip">
+          <string>Display the results of the voxelization</string>
+         </property>
          <property name="text">
-          <string>plot onto debug</string>
+          <string>Plot binary</string>
          </property>
         </widget>
        </item>
