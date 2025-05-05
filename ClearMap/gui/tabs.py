@@ -397,12 +397,13 @@ class SampleInfoTab(GenericTab):
 
     def convert_to_clearmap_format(self):
         self.params.ui_to_cfg()
-        for channel in self.sample_manager.channels:
-            stitching_processor = self.main_window.tab_managers['stitching'].stitcher
-            if self.sample_manager.is_tiled(channel):
-                stitching_processor.convert_tiles_channel(channel)
-            else:
-                stitching_processor.copy_or_stack(channel)
+        self.sample_manager.config.reload()
+        channel = self.ui.channelsParamsTabWidget.current_channel()
+        stitching_processor = self.main_window.tab_managers['stitching'].stitcher
+        if self.sample_manager.is_tiled(channel):
+            stitching_processor.convert_tiles_channel(channel)
+        else:
+            stitching_processor.copy_or_stack(channel)
 
 
 
