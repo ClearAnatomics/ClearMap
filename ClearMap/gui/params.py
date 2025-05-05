@@ -40,7 +40,7 @@ from ClearMap.processors.sample_preparation import SampleManager
 class SampleChannelParameters(ChannelUiParameter):
     nameChanged = pyqtSignal(str, str)
     orientationChanged = pyqtSignal(str, tuple)
-    cropChanged = pyqtSignal(str, list, list, list)
+    cropChanged = pyqtSignal(str, object, object, object)  #  object because list or None
 
     geometry_settings_from: str
     data_type: str
@@ -91,6 +91,10 @@ class SampleChannelParameters(ChannelUiParameter):
         self.tab.orientXSpinBox.valueChanged.connect(self.handle_orientation_changed)  # REFACTOR: push to paramslinki instead
         self.tab.orientYSpinBox.valueChanged.connect(self.handle_orientation_changed)
         self.tab.orientZSpinBox.valueChanged.connect(self.handle_orientation_changed)
+        # FIXME: why do we need to connect the doublets since they are ParamLinks ?
+        self.tab.sliceXDoublet.valueChangedConnect(self.handle_slice_x_changed)
+        self.tab.sliceYDoublet.valueChangedConnect(self.handle_slice_y_changed)
+        self.tab.sliceZDoublet.valueChangedConnect(self.handle_slice_z_changed)
         self.connect_simple_widgets()
 
     @property
@@ -141,7 +145,7 @@ class SampleParameters(UiParameterCollection):  # FIXME: why is this not a Chann
     channelNameChanged = pyqtSignal(str, str)
     channelsChanged = pyqtSignal(list, list)
     orientationChanged = pyqtSignal(str, tuple)
-    cropChanged = pyqtSignal(str, list, list, list)
+    cropChanged = pyqtSignal(str, object, object, object)  # object because list or None
 
     def __init__(self, tab, src_folder=None):
         self.shared_sample_params = SharedSampleParams(tab, src_folder=src_folder)
