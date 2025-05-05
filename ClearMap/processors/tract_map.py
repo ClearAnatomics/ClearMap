@@ -412,10 +412,15 @@ class TractMapProcessor(TabProcessor):
     def plot_binary(self, debug=False):
         ws_debug_backup = self.workspace.debug
         self.workspace.debug = debug
-        asset = self.get('binary', channel=self.channel)
-        if not asset.exists:
-            raise MissingRequirementException(f'plot_binary missing file: {asset.path} not found')
-        dv = q_plot_3d.plot(asset.path, title=f'Binary mask', arrange=False)[0]
+        binary_asset = self.get('binary', channel=self.channel)
+        if not binary_asset.exists:
+            raise MissingRequirementException(f'plot_binary missing file: {binary_asset.path} not found')
+        stitched_asset = self.get('stitched', channel=self.channel)
+        if stitched_asset.exists:
+            to_plot = [[binary_asset.path, stitched_asset.path]]
+        else:
+            to_plot = binary_asset.path
+        dv = q_plot_3d.plot(to_plot, title=f'Binary mask', arrange=False)[0]
         self.workspace.debug = ws_debug_backup
         return [dv]
 
