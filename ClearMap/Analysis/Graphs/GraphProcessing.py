@@ -428,30 +428,11 @@ def reduce_graph(graph, vertex_to_edge_mappings={'radii': np.max},  # FIXME: use
         # Create start and end indices for edge geometry
         indices = np.cumsum([0] + [len(m) for m in reduced_maps['edge_to_vertex']])  # Length of each branch
         indices = np.array([indices[:-1], indices[1:]]).T
-        indices_use = indices  # only use indices for first property, the rest uses the same indices
 
-        g.edge_geometry_indices_set = False
-        g.set_edge_geometry_vertex_properties(original_graph, edge_geometry_vertex_properties, branch_indices, indices)
+        g.edge_geometry_indices_set = False  # FIXME: why
+        reduced_graph.set_edge_geometry_vertex_properties(g, edge_geometry_vertex_properties, branch_indices, indices)
         g.edge_geometry_indices_set = True
-        g.set_edge_geometry_edge_properties(original_graph, edge_geometry_edge_properties, indices, reduced_maps['edge_to_edge'])
-
-        # vertices
-        for p in edge_geometry_vertex_properties:
-            if p in g.vertex_properties:
-                values = g.vertex_property(p)
-                values = values[branch_indices]
-                reduced_graph.set_edge_geometry(name=p, values=values, indices=indices_use)
-                indices_use = None
-
-        # edges
-        for p in edge_geometry_edge_properties:
-            if p in g.edge_properties:
-                values = g.edge_property_map(p)
-                # there is one fewer edge than vertices in each reduced edge !
-                values = [[values[e] for e in edges + [edges[-1]]] for edges in reduced_maps['edge_to_edge']]
-                # it seems that we repeat the last edge to have the same number of edges as vertices ?
-                reduced_graph.set_edge_geometry(name=f'edge_{p}', values=values, indices=indices_use)
-                indices_use = None
+        reduced_graph.set_edge_geometry_edge_properties(g, edge_geometry_edge_properties, indices, reduced_maps['edge_to_edge'])
 
     if 'edge_to_edge' in reduced_maps.keys():
         reduced_maps['edge_to_edge'] = [[g.edge_index(e) for e in edge] for edge in reduced_maps['edge_to_edge']]
