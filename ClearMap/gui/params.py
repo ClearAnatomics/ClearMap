@@ -910,6 +910,7 @@ class CellMapParams(ChannelsUiParameterCollection):
 class ChannelCellMapParams(ChannelUiParameter):
     background_correction_diameter: List[int]
     maxima_shape: int
+    h_max: int | None
     detection_threshold: int
     cell_filter_size: List[int]
     cell_filter_intensity: List[int]
@@ -935,6 +936,8 @@ class ChannelCellMapParams(ChannelUiParameter):
         self.params_dict = {
             'background_correction_diameter': ['detection', 'background_correction', 'diameter'],
             'maxima_shape': ParamLink(['detection', 'maxima_detection', 'shape'], self.tab.maximaShape),
+            'h_max': ParamLink(['detection', 'maxima_detection', 'h_max'], self.tab.hMaxSinglet,
+                               default=None, missing_ok=True),
             'detection_threshold': ParamLink(['detection', 'shape_detection', 'threshold'], self.tab.detectionThreshold),
             'cell_filter_size': ParamLink(['cell_filtration', 'thresholds', 'size'], self.tab.cellFilterThresholdSizeDoublet),
             'cell_filter_intensity': ParamLink(['cell_filtration', 'thresholds', 'intensity'],

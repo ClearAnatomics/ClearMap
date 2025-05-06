@@ -774,7 +774,7 @@ class RegistrationTab(PreProcessingTab):
         self.params[channel].cfg_to_ui()  # Force it while the tab is active
 
     def __update_channel_combo_boxes(self, channel, page_widget=None):
-        if self.params[channel].align_with:
+        if self.params[channel].align_with:  # FIXME: which is correct at given time point
             partner_channel = self.params[channel].align_with
             moving_channel = self.params[channel].moving_channel
         else:
@@ -1001,7 +1001,10 @@ class CellCounterTab(PostProcessingTab):
         self.cell_intensity_histogram = None
         self.cell_size_histogram = None
 
-        self.advanced_controls_names = ['channel.detectionShapeGroupBox']
+        self.advanced_controls_names = [
+            'channel.detectionShapeGroupBox',
+            'channel.hMaxSinglet'
+        ]
         self.set_relevant_data_types(DATA_TYPE_TO_TAB_CLASS)
 
     def _set_channels_names(self):
