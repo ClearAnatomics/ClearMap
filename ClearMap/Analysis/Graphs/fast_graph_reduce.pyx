@@ -255,10 +255,11 @@ cpdef object find_degree2_branches(
     cdef list result = [], null_result = []
     cdef size_t num_edges = edges_array.shape[0]
     cdef vertex_t max_vertex_id = find_max_v_id(edges_array)  # FIXME: should be vertex_degs.shape[0] - 1
-    printf(b"Max vertex id = %d\n", max_vertex_id)
+    printf(b"Max vertex id = %u\n", max_vertex_id)
 
     # Build adjacency
     cdef vector[vector[adj_entry_t]] adjacency
+    # noinspection PyUnresolvedReferences
     adjacency.resize(max_vertex_id+1)
     printf(<const char *> b"Adjacency created\n")
 
@@ -278,25 +279,26 @@ cpdef object find_degree2_branches(
     cdef vector[uint8_t] visited_edges  # Store as uint8_t to avoid slow down due to c++ bool memory optimization
     cdef uint32_t max_eid = find_max_eid(edges_array)
     if max_eid > num_edges:
-        printf(b"WARNING: max edge id %u > num edges %u\n", max_eid, num_edges)
+        printf(b"WARNING: max edge id %u > num edges %zu\n", max_eid, num_edges)
         return null_result
+    # noinspection PyUnresolvedReferences
     visited_edges.resize(num_edges+1, 0)
 
     # Step 4: Trace chains
     # Start from edges that have exactly one endpoint degree=2 and the other not,
     # and not visited.
     cdef bint is_start_edge
-    printf(b"Starting loop on %d edges\n", num_edges)
+    printf(b"Starting loop on %zu edges\n", num_edges)
     cdef size_t i = 0, ret_code = 0, n_end_edges = len(end_edge_ids)
     for i, edge_id in enumerate(end_edge_ids):  # We only loop over end edges (i.e. mixed deg2, non deg2)
         if (i % print_step) == 0:
             # print(f'\r{i}/{n_end_edges}', end='')
-            printf(b"\r%d/%d", i, n_end_edges)
+            printf(b"\r%zu/%zu", i, n_end_edges)
             # draw_progress_bar(i, num_edges)
         if not visited_edges[edge_id]:
             ret_code = trace_chain(edge_id, edges_array, vertex_degs, adjacency, visited_edges, result)
             if ret_code != 0:
-                printf(b"\nError %d\n", ret_code)
+                printf(b"\nError %zu\n", ret_code)
                 return null_result
     printf(<const char *> b"\n")  # End progress bar
 
