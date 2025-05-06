@@ -1,0 +1,103 @@
+# pyproject.toml for ClearMap using setuptools and PEP 621
+
+[build-system]
+requires = [
+    "setuptools>=61",
+    "wheel",
+    "cython",
+    "numpy"
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ClearMap"
+version = "3.0.0"
+description = "3D cell counting and vasculature analysis for lightsheet microscopy"
+license = "MIT"
+license-files = ["LICENSE", "LICENSE.txt"]
+authors = [
+    {name = "Christoph Kirst"},
+    {name = "Sophie Skriabine"},
+    {name = "Charly Rousseau"},
+    {name = "Etienne Doumazane"},
+    {name = "Gael Cousin"},
+]
+dependencies = [
+    "cython",
+    "ipython",
+    "jupyter",
+    "ipywidgets",
+    "numpy",
+    "scipy",
+    "pandas<2",
+    "pyarrow",
+    "scikit-image",
+    "scikit-learn",
+    "opencv-python",
+    "configobj",
+    "natsort",
+    "tqdm",
+    "matplotlib",
+    "seaborn",
+    "tifffile",
+    "pyqt5<6",
+    "pyqtwebengine",
+    "qtpy",
+    "pyqtgraph==0.12.*",
+    "pygments",
+    "qdarkstyle",
+    "vispy",
+    "pyvista",
+    "vtk",
+    "PyOpenGL",
+    "napari",
+    "python-igraph",
+    "torch<=2.2",
+    "xmltodict",
+    "psutil",
+    "mpld3",
+    "lxml<5.2",
+    "itk-elastix",
+]
+requires-python = ">=3.8"
+
+[project.urls]
+Homepage = "https://github.com/ClearAnatomics/ClearMap"
+
+[project.optional-dependencies]
+# Define extras if needed later
+
+[project.scripts]
+cell_map = "ClearMap.Scripts.cell_map_new_api:main"
+clearmap-utils = "ClearMap.Scripts.clearmap_utils:main"
+
+[project.gui-scripts]
+clearmap-ui = "ClearMap.gui.run_gui:entry_point"
+
+[tool.setuptools]
+packages = ["ClearMap"]
+
+[tool.setuptools.package-data]
+"ClearMap.config" = ["*.cfg"]
+"ClearMap.gui" = [
+  "creator/*.ui",
+  "creator/*.qrc",
+  "creator/graphics_resources/*.png",
+  "creator/graphics_resources/*.jpg",
+  "creator/graphics_resources/*.svg",
+  "creator/icons/*.png",
+  "creator/icons/*.jpg",
+  "creator/icons/*.svg"
+]
+
+[tool.setuptools.data-files]
+"" = ["start_gui.sh"]
+"ClearMap/External/elastix" = []
+"ClearMap/External/geodesic_distance" = []
+"ClearMap/Resources" = []
+"ClearMap/ImageProcessing/Skeletonization" = []
+"ClearMap/ImageProcessing/Binary" = []
+"ClearMap/ImageProcessing/machine_learning/vessel_filling/resources" = []
+
+[tool.setuptools.cmdclass]
+build_ext = "build_ext_custom.build_ext"
