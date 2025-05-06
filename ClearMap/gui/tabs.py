@@ -1236,7 +1236,8 @@ class CellCounterTab(PostProcessingTab):
         """
         detector = self.cell_detectors[channel]
         self.wrap_step('Cell detection preview', detector.run_cell_detection,
-                       step_kw_args={'tuning': True})
+                       step_kw_args={'tuning': True},
+                       abort_func=detector.stop_process)
         if detector.stopped:
             return
         try:
