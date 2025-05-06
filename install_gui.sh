@@ -274,14 +274,18 @@ python "setup.py" install || exit 1
 echo "Done"
 
 # Create config folder if missing
+green "Checking if ClearMap configuration directory exists at \"$config_folder\""
 if [ ! -d "$config_folder" ]; then
-   mkdir "$config_folder" || exit 1
+    yellow "Config folder missing, creating it"
+    mkdir "$config_folder" || exit 1
 fi
 
 # Install or update ClearMap config
 srcdir=$(pwd)
 cd "$HOME" || exit 1 # Exit source folder to import from installed version
+green "Installing or updating ClearMap config"
 python -m ClearMap.config.update_config  || exit 1
+green "Done"
 
 # TODO: Prompt for environment variables (elastix ...) to be set in env activate
 
@@ -292,6 +296,22 @@ if [ "$clearmap_install_path" == "" ];then
     exit 1
 fi
 echo "ClearMap installed at \"$clearmap_install_path\""
+
+if [[ "$OSTYPE" != "linux-gnu"* ]]; then
+    echo "Binary file support on your platform is currently not available
+    Please specify the path to the elastix binary"
+    read -r -p "Path to elastix binary: " elastix_path
+    if [ ! -d "$elastix_path" ]; then
+        red "Path to elastix binary not found"
+        exit 1
+    else
+        conda activate "$ENV_NAME" || exit 1
+        python -c "$prep_python \
+        import ClearMap; \
+        from ClearMap.Utils.install_utils import set_elastix_path; \
+        set_elastix_path('$elastix_path')" || exit 1
+    fi
+fi
 
 # Create Linux desktop menus
 echo "Do you want to create a desktop menu entry.

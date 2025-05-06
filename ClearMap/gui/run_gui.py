@@ -51,7 +51,7 @@ os.environ['CLEARMAP_GUI_HOSTED'] = "1"
 CLEARMAP_VERSION = version('ClearMap')
 from ClearMap.config.config_loader import ConfigLoader, CLEARMAP_CFG_DIR
 machine_cfg = ConfigLoader.get_cfg_from_path(ConfigLoader.get_default_path('machine'))
-tmp_folder = machine_cfg.get('tmp_folder', None)
+tmp_folder = machine_cfg.get('temp_folder', None)
 if tmp_folder is not None:
     for var_name in ('TMP', 'TEMP', 'TMPDIR'):
         os.environ[var_name] = tmp_folder
