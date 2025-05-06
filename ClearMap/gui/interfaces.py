@@ -623,6 +623,10 @@ class PipelineTab(GenericTab):
             new_channels = self._get_channels()
             if not former_channels:
                 former_channels = self.ui.channelsParamsTabWidget.get_channels_names()
+                former_channels = [c if '-' not in c else tuple(c.split('-'))
+                                   for c in former_channels]  # Cast compound channels as tuples
+                # FIXME: this might break if users have '-' in their channel names
+                #  solution: prohibit '-' in channel names
 
         former_channels_set = set(former_channels or [])
         new_channels_set = set(new_channels or [])
