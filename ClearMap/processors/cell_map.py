@@ -64,7 +64,7 @@ class CellDetector(TabProcessor):
     def __init__(self, sample_manager=None, channel=None, registration_processor=None):
         super().__init__()
         self.sample_config = None
-        self.processing_config = None
+        self._processing_config = None
         self.machine_config = None
         self.sample_manager = None
         self.registration_processor = None
@@ -87,10 +87,14 @@ class CellDetector(TabProcessor):
             self.sample_config = configs['sample']
             self.machine_config = configs['machine']
             # FIXME: potential issue of config duplication if several instances are called
-            self.processing_config = self.sample_manager.config_loader.get_cfg('cell_map')['channels'][self.channel]
+            self._processing_config = self.sample_manager.config_loader.get_cfg('cell_map')
 
             self.set_progress_watcher(self.sample_manager.progress_watcher)
         self.registration_processor = registration_processor
+
+    @property
+    def processing_config(self):
+        return self._processing_config['channels'][self.channel]
 
     @property
     def detected(self):
@@ -99,16 +103,8 @@ class CellDetector(TabProcessor):
     # WARNING: required because we pass a section of the config to the processor, not the whole config
     #   Maybe we should pass the whole config to the processor and let it handle the section (with self.channel)
     #   make sure this works with other config backends.
-    def reload_config(self, max_iter=10):
-        p = self.processing_config
-        for i in range(max_iter):
-            if hasattr(p, 'reload'):
-                p.reload()
-                return
-            else:
-                p = p.parent
-        else:
-            raise ValueError(f'Could not find a reload method in the config, after {max_iter} iterations')
+    def reload_config(self):
+        self._processing_config.reload()
 
     def post_process_cells(self):
         self.reload_config()
