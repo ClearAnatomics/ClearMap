@@ -13,21 +13,21 @@ The logic is as follows:
     Suppose (v1, v2) is such an edge, and v1 is degree-2, v2 is not degree-2.
     Mark this edge visited.
     Initialize chain_edges = [this_edge] and chain_vertices = [v2, v1].
+    Then, while the current vertex has degree-2:
+        Find the other edge at current vertex (not back to prev_vertex and not visited).
+        Mark that new edge visited, append to chain_edges, and set current_vertex to the other end of that edge.
+    Once you exit, you have a maximal chain from v2 to a new non-degree-2 vertex.
 
-- From the degree-2 vertex (v1), follow connected edges through other degree-2 vertices:
-    Find the next edge out of v1 that isn't visited and leads to another vertex.
-    Continue until you reach a vertex with degree ≠ 2 or no unvisited edges remain.
-
-Append the resulting chain to result.
 """
 from libc.stdio cimport printf
 from libc.stdint cimport uint32_t, uint8_t
 
 from libcpp.vector cimport vector
-from libcpp.utility cimport pair
+from libcpp.pair cimport pair
+#from libcpp.utility cimport pair
 
-import numpy as np
-cimport numpy as cnp
+# import numpy as np
+# cimport numpy as cnp
 
 ctypedef uint32_t index_t
 ctypedef vector[index_t] index_vector_t
@@ -35,21 +35,24 @@ ctypedef vector[index_t] index_vector_t
 ctypedef uint32_t vertex_t
 ctypedef vector[vertex_t] vertex_vector_t
 
-ctypedef pair[vertex_t, vertex_t] edge_t
+ctypedef pair[vertex_t, vertex_t] edge_t  # (used by find_endpoint_vertex)
 ctypedef vector[edge_t] edge_vector_t
+
+ctypedef pair[index_t, vertex_t] adj_entry_t  # (edge ID, neighbour vertex)
 
 ctypedef uint8_t degree_t
 ctypedef vector[degree_t] degree_vector_t
 
-ctypedef np.uint32_t np_vertex_t
-ctypedef np.uint8_t np_degree_t
-ctypedef np.uint32_t[::1] np_vertex_array_t
-ctypedef np.uint32_t[::1] np_index_array_t
-ctypedef np.uint8_t[::1] np_degree_array_t
+# ctypedef np.uint32_t np_vertex_t
+# ctypedef np.uint8_t np_degree_t
+# ctypedef np.uint32_t[::1] np_vertex_array_t
+# ctypedef np.uint32_t[::1] np_index_array_t
+# ctypedef np.uint8_t[::1] np_degree_array_t
 
 # Define a sentinel value for uninitialized degrees
-cdef degree_t UN_INITIALIZED_DEGREE = 0xFF  # Replaces literal (type_max(degree_t) if unsigned, use -1 if signed
-cdef index_t INVALID_IDX = 0xFFFFFFFF  # Replaces literal (type_max(index_t) if unsigned, use -1 if signed
+# cdef degree_t UN_INITIALIZED_DEGREE = 0xFF  # Replaces literal (type_max(degree_t) if unsigned, use -1 if signed
+cdef index_t INVALID_IDX = <index_t> -1  # cast -1 to uint to wrap around to max  # Replaces literal (type_max(index_t) if unsigned, use -1 if signed
+cdef size_t OK = 0, INVALID_EDGE = 1, INVALID_DEGREE_2 = 2
 
 
 
@@ -65,11 +68,10 @@ cdef index_t INVALID_IDX = 0xFFFFFFFF  # Replaces literal (type_max(index_t) if 
 #   adjacency[w].push_back(edge_t(i, u))
 #   so that for vertex[u] we have the edge_id and the neighbour_vertex w
 
-cdef edge_t find_endpoint_vertex(
-    vertex_t v1, vertex_t v2, degree_t deg_v1, degree_t deg_v2
-):
+cdef edge_t find_endpoint_vertex(vertex_t v1, vertex_t v2,
+                                 degree_t deg_v1, degree_t deg_v2):
     """
-    Given two vertices and their degrees, return the endpoint vertex.
+    Given two vertices and their degrees, return (non-deg2, deg2) or (INVALID_IDX, INVALID_IDX).
     """
     if deg_v1 == 2 and deg_v2 != 2:
         return edge_t(v2, v1)
@@ -78,14 +80,13 @@ cdef edge_t find_endpoint_vertex(
     else:
         return edge_t(INVALID_IDX, INVALID_IDX)
 
-# A helper function to follow a chain starting from a specific edge that connects
-# a degree-2 vertex and a non-degree-2 vertex.
-cdef int trace_chain(
+
+cdef size_t trace_chain(
     index_t start_edge_idx,
     uint32_t[:, :] connectivity,
     uint8_t[:] vertex_degs,
-    vector[vector[pair[index_t, vertex_t]]]& adjacency,
-    vector[bint]& visited_edges,
+    vector[vector[adj_entry_t]] &adjacency,
+    vector[uint8_t] &visited_edges,
     list result
 ):
     """
@@ -102,17 +103,19 @@ cdef int trace_chain(
     cdef edge_t ordered_edge = find_endpoint_vertex(v1, v2, deg_v1, deg_v2)
     cdef vertex_t endpoint_vertex = ordered_edge.first
     cdef vertex_t deg2_vertex = ordered_edge.second
-    if endpoint_vertex == INVALID_IDX:
+    if endpoint_vertex == INVALID_IDX or deg2_vertex == INVALID_IDX:
         # print(f"{start_edge_idx} is not a valid start edge (degrees = {deg_v1}, {deg_v2}\n")
-        printf(b"%d is not a valid start edge (degrees = %d, %d)\n", start_edge_idx, deg_v1, deg_v2)
-        return 1  # INVALID edge
-    # TODO: assert that neither vertex is INVALID_IDX
+        printf(b"%u: invalid start edge (degrees = %u, %u)\n", start_edge_idx, deg_v1, deg_v2)
+        return INVALID_EDGE
 
     visited_edges[e] = 1
 
     # Initialize chain with this edge and its vertices
     cdef index_vector_t chain_edges
     cdef vertex_vector_t chain_verts
+    cdef uint8_t expected_chain_size = 200
+    chain_edges.reserve(expected_chain_size)
+    chain_verts.reserve(expected_chain_size + 1)
 
     chain_edges.push_back(e)
     # Order: endpoint_vertex (non-degree-2), deg2_vertex, then follow chain
@@ -122,50 +125,32 @@ cdef int trace_chain(
     cdef vertex_t current_vertex = deg2_vertex
     cdef vertex_t prev_vertex = endpoint_vertex
 
-    # Follow through degree-2 vertices
-    cdef size_t n_neighbours = 0
-    cdef vertex_t next_vertex = 0, neighbour_vertex = 0
-    cdef index_t next_edge_id = 0, eid = 0
-
-    cdef size_t i = 0
-    while True:
-        if vertex_degs[current_vertex] != 2:
-            # Reached a non-degree-2 vertex or can't continue
-            # print(f'\tVertex {current_vertex} is not degree-2')
-            break
-
-        # Find next edge from current_vertex not visited and not prev_vertex
+    cdef adj_entry_t entry
+    cdef size_t n_neighbours = 0, i = 0
+    while vertex_degs[current_vertex] == 2:
         n_neighbours = adjacency[current_vertex].size()
         if n_neighbours != 2:
-            printf(b"ERROR: Vertex %d should be degree 2 but has %zu neighbours\n",
-                   current_vertex, n_neighbours)
-            return 2  # invalid degree-2 vertex
-        next_edge_id = INVALID_IDX
-        next_vertex = INVALID_IDX
+            printf(b"ERROR: Vertex %u should be degree 2 but has %zu neighbours\n", current_vertex, n_neighbours)
+            return INVALID_DEGREE_2
+        entry = adj_entry_t(INVALID_IDX, INVALID_IDX)
         for i in range(n_neighbours):
-            eid = adjacency[current_vertex][i].first
-            neighbour_vertex = adjacency[current_vertex][i].second
-            if neighbour_vertex != prev_vertex and not visited_edges[eid]:
-                next_edge_id = eid
-                next_vertex = neighbour_vertex
+            entry = adjacency[current_vertex][i]
+            if entry.second != prev_vertex and not visited_edges[entry.first]:
                 break
-        # print(f'\tneighbour: {neighbour_vertex}')
-
-        if next_edge_id == INVALID_IDX:
-            # No way forward
+        if entry.first == INVALID_IDX or visited_edges[entry.first]:
             break
 
-        # Continue the chain
-        visited_edges[next_edge_id] = True
-        chain_edges.push_back(next_edge_id)
-        chain_verts.push_back(next_vertex)
+        visited_edges[entry.first] = True
+        chain_edges.push_back(entry.first)
+        chain_verts.push_back(entry.second)
 
         prev_vertex = current_vertex
-        current_vertex = next_vertex
+        current_vertex = entry.second
+
 
     # Append the chain to result
     to_python(chain_edges, chain_verts, connectivity[:, 0], result)
-    return 0
+    return OK
 
 
 cdef void to_python(
@@ -184,6 +169,7 @@ cdef void to_python(
     cdef list py_edges = []
     for i in range(full_edges.size()):
         py_edges.append(edge_ids[full_edges[i]])  # FIXME: unsure about this
+        # py_edges.append(full_edges[i])  # TODO: replace by this if pure index
 
     cdef list py_verts = []
     for j in range(full_verts.size()):
@@ -242,7 +228,7 @@ cpdef object find_degree2_branches(
     uint32_t[:, :] edges_array,
     uint32_t[:] end_edge_ids,
     uint8_t[:] vertex_degs,
-    int print_step = 10
+    int print_step=10
 ):
 # cpdef object find_degree2_branches(
 #     np_index_array_t  edges_array,
@@ -253,7 +239,7 @@ cpdef object find_degree2_branches(
     """
     Find chains formed by degree-2 vertices. Returns a list of tuples:
       (edge_ids_list, vertex_ids_list)
-      
+
     .. warning::
         We make 3 important assumptions:
         - there are no pure degree2 loops in the graph
@@ -266,47 +252,42 @@ cpdef object find_degree2_branches(
     - Start from edges that connect a degree-2 vertex to a non-degree-2 vertex.
     - Follow chains from these edges.
     """
-    cdef vertex_t max_vertex_id = find_max_v_id(edges_array)  # FIXME: should be len(vertex_degs) - 1
-    print(f'Max vertex id = {max_vertex_id}')
+    cdef list result = [], null_result = []
+    cdef size_t num_edges = edges_array.shape[0]
+    cdef vertex_t max_vertex_id = find_max_v_id(edges_array)  # FIXME: should be vertex_degs.shape[0] - 1
+    printf(b"Max vertex id = %d\n", max_vertex_id)
 
-    cdef vector[vector[pair[index_t, vertex_t]]] adjacency
-    adjacency.resize(max_vertex_id + 1)
-    print('Adjacency created')
+    # Build adjacency
+    cdef vector[vector[adj_entry_t]] adjacency
+    adjacency.resize(max_vertex_id+1)
+    printf(<const char *> b"Adjacency created\n")
 
     cdef size_t e  # edge counter
-    cdef size_t num_edges = edges_array.shape[0]
     cdef index_t edge_id
     cdef vertex_t v1, v2
-    # For each edge in edges_array:
-    # edges_array: (edge_id, v1, v2)
     for e in range(num_edges):
         edge_id = edges_array[e, 0]
         v1 = edges_array[e, 1]
         v2 = edges_array[e, 2]
 
-        adjacency[v1].push_back(pair[index_t, vertex_t](edge_id, v2))
-        adjacency[v2].push_back(pair[index_t, vertex_t](edge_id, v1))
+        adjacency[v1].push_back(adj_entry_t(edge_id, v2))
+        adjacency[v2].push_back(adj_entry_t(edge_id, v1))
 
-    print('Adjacency computed')
+    printf(<const char *> b"Adjacency computed\n")
 
     cdef vector[uint8_t] visited_edges  # Store as uint8_t to avoid slow down due to c++ bool memory optimization
     cdef uint32_t max_eid = find_max_eid(edges_array)
     if max_eid > num_edges:
-        print(f'WARNING: max edge id {max_eid} > num edges {num_edges}')
-        return []
-    visited_edges.resize(num_edges + 1, 0)
-
-    cdef list result = []
+        printf(b"WARNING: max edge id %u > num edges %u\n", max_eid, num_edges)
+        return null_result
+    visited_edges.resize(num_edges+1, 0)
 
     # Step 4: Trace chains
     # Start from edges that have exactly one endpoint degree=2 and the other not,
     # and not visited.
     cdef bint is_start_edge
-    cdef degree_t deg_v1, deg_v2
-    cdef size_t i = 0
-    print(f'Starting loop on {num_edges} edges')
-    cdef size_t n_end_edges = len(end_edge_ids)
-    cdef int ret_code = 0
+    printf(b"Starting loop on %d edges\n", num_edges)
+    cdef size_t i = 0, ret_code = 0, n_end_edges = len(end_edge_ids)
     for i, edge_id in enumerate(end_edge_ids):  # We only loop over end edges (i.e. mixed deg2, non deg2)
         if (i % print_step) == 0:
             # print(f'\r{i}/{n_end_edges}', end='')
@@ -315,7 +296,8 @@ cpdef object find_degree2_branches(
         if not visited_edges[edge_id]:
             ret_code = trace_chain(edge_id, edges_array, vertex_degs, adjacency, visited_edges, result)
             if ret_code != 0:
-                return []
-    printf(b'\n')  # End progress bar
+                printf(b"\nError %d\n", ret_code)
+                return null_result
+    printf(<const char *> b"\n")  # End progress bar
 
     return result
