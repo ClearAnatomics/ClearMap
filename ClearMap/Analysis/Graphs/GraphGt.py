@@ -685,6 +685,28 @@ class Graph(grp.AnnotatedGraph):
             else:
                 self._remove_edge_geometry_edge(name=n)
 
+    def set_edge_geometry_vertex_properties(self, original_graph, edge_geometry_vertex_properties,
+                                            branch_indices, indices):
+        indices_use = indices  # only use indices for first property, the rest uses the same indices
+        for v_prop_name in edge_geometry_vertex_properties:
+            if v_prop_name in original_graph.vertex_properties:
+                v_prop = original_graph.vertex_property(v_prop_name)[branch_indices]
+
+                self.set_edge_geometry(name=v_prop_name, values=v_prop, indices=indices_use)
+                indices_use = None
+
+    def set_edge_geometry_edge_properties(self, original_graph, edge_geometry_edge_properties,
+                                          indices, edge_to_edge_map):
+        indices_use = indices  # only use indices for first property, the rest uses the same indices
+        for e_prop_name in edge_geometry_edge_properties:
+            if e_prop_name in original_graph.edge_properties:
+                values = original_graph.edge_property_map(e_prop_name)
+                # there is one fewer edge than vertices in each reduced edge !
+                values = [[values[e] for e in edges + [edges[-1]]] for edges in edge_to_edge_map]
+                # it seems that we repeat the last edge to have the same number of edges as vertices ?
+                self.set_edge_geometry(name=f'edge_{e_prop_name}', values=values, indices=indices_use)
+                indices_use = None
+
     def edge_geometry_indices(self):
         if self.edge_geometry_type == 'graph':
             return self._edge_geometry_indices_graph()
