@@ -26,7 +26,7 @@ from ClearMap.IO.assets_specs import ChannelSpec, TypeSpec, StateManager
 from ClearMap.IO.workspace_asset import Asset, AssetCollection
 from ClearMap.Utils.exceptions import AssetNotFoundError, ClearMapWorkspaceError, ClearMapAssetError, \
     MissingChannelError
-from ClearMap.Utils.utilities import substitute_deprecated_arg, handle_deprecated_args
+from ClearMap.Utils.utilities import substitute_deprecated_arg, handle_deprecated_args, get_ok_n_ok_symbols
 
 
 def create_assets_types_config(type_spec_dict):
@@ -472,6 +472,8 @@ class Workspace2:  # REFACTOR: subclass dict
         out = f'{self}\n'
         out += 'directories:\n'
 
+        ok_symbol, n_ok_symbol = get_ok_n_ok_symbols()
+
         len_dirtype = max([len(k) for k in RESOURCE_TYPE_TO_FOLDER.keys()])
         for resource_type, folder in RESOURCE_TYPE_TO_FOLDER.items():
             out += f'  [{resource_type : >{len_dirtype}}]: {folder}\n'
@@ -485,7 +487,8 @@ class Workspace2:  # REFACTOR: subclass dict
             out += f'  Channel: {channel}\n'
             for asset_type, asset in assets_collection.items():
                 asset.header = header
-                out += f'    * {asset_type} ({asset.type_spec.resource_type}): '
+                symbol = ok_symbol if asset.exists else n_ok_symbol
+                out += f'    {symbol} {asset_type} ({asset.type_spec.resource_type}): '
                 try:
                     if asset.exists:
                         out += f'{asset}\n'
