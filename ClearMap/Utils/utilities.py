@@ -10,6 +10,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import warnings
 from collections import deque
@@ -359,3 +360,21 @@ def sanitize_n_processes(processes):
         processes = multiprocessing.cpu_count() + processes
     processes = max(processes, 1)
     return processes
+
+
+def get_ok_n_ok_symbols():
+    """
+    1) Detect whether we can print✓/✗ in this terminal
+    2) otherwise, use [OK]/[FAIL] instead
+
+    Returns
+    -------
+    tuple
+        ok_symbol, fail_symbol
+    """
+    enc = sys.stdout.encoding or ''
+    try:
+        '✓'.encode(enc)
+        return '✓', '✗'
+    except (UnicodeEncodeError, TypeError):
+        return '[OK]', '[FAIL]'
