@@ -3,10 +3,8 @@
 PROG_NAME=$0
 
 BASEDIR=$(dirname "$0")
-if [ "$1" == "" ]; then
-    ENV_FILE_PATH="ClearMapUi39.yml"
-else
-    ENV_FILE_PATH=$1
+if [ -z "$1" ]; then
+    set -- -f ClearMap3.yml
 fi
 
 usage() {
@@ -269,10 +267,13 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
     fi
 fi
 # Install ClearMap
-echo "Installing"
+green "Installing"
 python "setup.py" install || exit 1
-echo "Done"
+green "Done"
 
+echo
+echo "========================="
+echo
 # Create config folder if missing
 green "Checking if ClearMap configuration directory exists at \"$config_folder\""
 if [ ! -d "$config_folder" ]; then
