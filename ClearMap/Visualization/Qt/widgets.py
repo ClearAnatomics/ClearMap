@@ -18,11 +18,13 @@ def is_valid_hex_color(s):
 
 
 class Scatter3D:
-    def __init__(self, coordinates, smarties=False, colors=None, hemispheres=None, half_slice_thickness=None):
+    def __init__(self, coordinates, smarties=False, colors=None, hemispheres=None, half_slice_thickness=None,
+                 marker_size=5):
         self.__coordinates = None
         self.__has_hemispheres = hemispheres is not None  # FIXME: this should be renamed to has_different_symbols
         self.half_slice_thickness = half_slice_thickness
         self.axis = 2
+        self.marker_size = marker_size
 
         if isinstance(coordinates, pd.DataFrame):
             self.data = coordinates

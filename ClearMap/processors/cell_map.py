@@ -415,8 +415,11 @@ class CellDetector(TabProcessor):
         color_map = {id_: annotator.convert_label(id_, key='id', value='color_hex_triplet') for id_ in unique_ids}
         color_map[0] = np.array(to_hex((1, 0, 0)))  # default to red
         df['color'] = df['id'].map(color_map)
+
+        particle_size = self.processing_config['detection']['background_correction']['diameter'][0]
         dv.scatter_coords = Scatter3D(coordinates, colors=df['color'].to_list(),
-                                      hemispheres=hemispheres, half_slice_thickness=0)
+                                      hemispheres=hemispheres, half_slice_thickness=0,
+                                      marker_size=particle_size // 5)
         dv.refresh()
         return [dv]
 
