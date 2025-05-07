@@ -258,7 +258,9 @@ class TractMapProcessor(TabProcessor):
             if self.registration_processor.config['channels'][channel]['moving_channel'] in (None, 'intrinsically aligned'):
                 continue
             else:
-                results_directories.append(self.get_path('aligned', channel=channel).parent)
+                results_directories.append(
+                    self.registration_processor.get_elx_asset('aligned', channel=channel).path.parent
+                )
 
         debug_bcp = self.workspace.debug
         self.workspace.debug = False
