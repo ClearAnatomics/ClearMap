@@ -89,7 +89,10 @@ def reconstruct(seed, mask = None, method = 'dilation', selem = None, offset = N
   try:
       from skimage.morphology._greyreconstruct import reconstruction_loop
   except ImportError:
-      raise ImportError("_greyreconstruct extension not available.")
+    try:
+      from skimage.morphology._grayreconstruct import reconstruction_loop  # newer version
+    except ImportError as err:
+      raise ImportError(f"_gr[ea]yreconstruct extension not available; {err}")
 
   if selem is None:
       selem = np.ones([3] * seed.ndim, dtype=bool)
