@@ -6,7 +6,7 @@ Cells
 Expert cell image processing pipeline.
 
 This module provides the basic routines for processing immediate early
-gene data. 
+gene data.
 
 The routines are used in the :mod:`ClearMap.Scripts.CellMap` pipeline.
 """
@@ -82,7 +82,7 @@ default_cell_detection_parameter = dict(
                              shape=3,
                              measure=['source', 'background_correction']),
 )
-"""Parameter for the cell detection pipeline. 
+"""Parameter for the cell detection pipeline.
 See :func:`detect_cells` for details."""
 
 
@@ -96,15 +96,15 @@ default_cell_detection_processing_parameter = dict(
     verbose=None,
     processes=None
 )
-"""Parallel processing parameter for the cell detection pipeline. 
-See :func:`ClearMap.ParallelProcessing.BlockProcessing.process` for details."""       
+"""Parallel processing parameter for the cell detection pipeline.
+See :func:`ClearMap.ParallelProcessing.BlockProcessing.process` for details."""
 
 
 ###############################################################################
 # ## Cell detection
 ###############################################################################
-                   
-def detect_cells(source, sink=None, cell_detection_parameter=default_cell_detection_parameter,
+
+def detect_cells(source, sink=None, block_detection_function=None, cell_detection_parameter=default_cell_detection_parameter,
                  processing_parameter=default_cell_detection_processing_parameter, workspace=None):
     """Cell detection pipeline.
 
@@ -114,6 +114,10 @@ def detect_cells(source, sink=None, cell_detection_parameter=default_cell_detect
         The source of the stitched raw data.
     sink : sink specification or None
         The sink to write the result to. If None, an array is returned.
+    block_detection_function : function or None
+        The function apply to each block. If function, it should return a tuple of arrays
+        with the following specs: ndims should be 2, dimension 1 of first array should be 3,
+        and dimension 0 of all arrays should be the equal.
     cell_detection_parameter : dict
         Parameter for the binarization. See below for details.
     processing_parameter : dict
@@ -305,7 +309,11 @@ def detect_cells(source, sink=None, cell_detection_parameter=default_cell_detect
     n_processes = multiprocessing.cpu_count() if processing_parameter.get('processes') is None else processing_parameter.get('processes')
     n_threads = int(multiprocessing.cpu_count() / n_processes)  # Number of threads so that * n_processes, fills CPUs
 
-    results, blocks = bp.process(detect_cells_block, source, sink=None, function_type='block', return_result=True,
+    if block_detection_function is None:
+        # use default cell detection function
+        block_detection_function = detect_cells_block
+
+    results, blocks = bp.process(block_detection_function, source, sink=None, function_type='block', return_result=True,
                                  return_blocks=True, parameter=cell_detection_parameter, workspace=workspace,
                                  **{**processing_parameter, **{'n_threads': n_threads}})
 
@@ -407,7 +415,7 @@ def detect_cells_block(source, parameter=default_cell_detection_parameter, n_thr
             maxima_labels, _ = ndi.label(maxima, structure=np.ones((3,)*3,dtype='bool'))
             centers = np.vstack(md.label_representatives(maxima_labels)).transpose()
             # we could come back to the ancient version
-            # centers = ap.where(maxima, processes=n_threads).array 
+            # centers = ap.where(maxima, processes=n_threads).array
         del maxima
 
         # correct for valid region
@@ -436,9 +444,9 @@ def detect_cells_block(source, parameter=default_cell_detection_parameter, n_thr
                 shape = None
             else:
                 raise err
-                          
 
-            
+
+
         valid = sizes > 0
         results += (sizes,)
     else:
@@ -479,7 +487,7 @@ def detect_cells_block(source, parameter=default_cell_detection_parameter, n_thr
 
     if parameter.get('verbose'):
         total_time.print_elapsed_time('Cell detection')
-  
+
     gc.collect()
 
     return results
