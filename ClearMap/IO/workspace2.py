@@ -481,14 +481,18 @@ class Workspace2:  # REFACTOR: subclass dict
         len_f_type = max([len(k) for k in CHANNELS_ASSETS_TYPES_CONFIG.keys()])
         header = f'  [{{:{len_dirtype}}}] {{:{len_f_type}}}'
 
-        for channel, asset_group in self.asset_collections.items():
+        for channel, assets_collection in self.asset_collections.items():
             out += f'  Channel: {channel}\n'
-            for asset_type, asset in asset_group.items():
+            for asset_type, asset in assets_collection.items():
                 asset.header = header
+                out += f'    * {asset_type} ({asset.type_spec.resource_type}): '
                 try:
-                    out += f'{asset}'
+                    if asset.exists:
+                        out += f'{asset}\n'
+                    else:
+                        out += f'{asset.base_name} (not found)\n'
                 except ClearMapAssetError as e:
-                    out += f'{asset.type_spec.basename}'   # FIXME:
+                    out += f'{asset.type_spec.basename}\n'   # FIXME:
 
         return out
 
