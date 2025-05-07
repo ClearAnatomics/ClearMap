@@ -864,7 +864,7 @@ def convert_files(filenames, extension=None, path=None, processes=None, verbose=
             results = executor.map(_convert, filenames, sinks, range(n_files))
             if workspace is not None:
                 workspace.executor = executor
-            results = list(results)  # to catch exceptions
+            _ = list(results)  # to catch exceptions
         if workspace is not None:
             workspace.executor = None
 

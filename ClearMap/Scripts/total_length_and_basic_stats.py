@@ -150,7 +150,7 @@ def get_edge_annotations(graph):
         with ProcessPoolExecutor(MAX_PROCS) as executor:
             results = executor.map(vote_annotation, annotation_chunks, chunksize=n_chunks_per_core)
         results = list(results)
-        results = np.array(results)
+        _ = np.array(results)
     except BrokenProcessPool:  # Go single threaded
         annotations = np.array([vote_annotation(chunk) for chunk in annotation_chunks])
     return annotations

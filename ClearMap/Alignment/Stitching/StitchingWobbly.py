@@ -2288,7 +2288,7 @@ def stitch_layout(layout, sink, method = 'interpolation', processes = None, verb
       workspace.executor = None
     if verbose:
       timer.print_elapsed_time('Stitching: parallel stitching wobbly layout done. Gathering results!')
-    results = list(results)
+    _ = list(results)
   
   if verbose:
     timer.print_elapsed_time('Stitching: stitching wobbly layout done!')
