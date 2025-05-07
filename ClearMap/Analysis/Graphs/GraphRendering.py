@@ -109,6 +109,7 @@ def mesh_tube_from_coordinates_and_radii(coordinates, radii, indices, n_tube_poi
     smm.free(radii_hdl)
     smm.free(indices_hdl)
 
+    results = list(results)
     n_results = len(results)
 
     vertices = [np.reshape(r[0], (-1, 3)) for r in results]
@@ -261,6 +262,8 @@ def interpolate_edge_geometry(graph, smooth = 5, order = 2,
     smm.free(coordinates_hdl)
     smm.free(radii_hdl)
     smm.free(indices_hdl)
+
+    results = list(results)
 
     # smm.free(coordinates_interp_hdl)
     # smm.free(radii_interp_hdl)

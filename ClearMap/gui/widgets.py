@@ -1744,7 +1744,7 @@ class PerfMonitor(QWidget):
             self.cpu_vals_changed.emit(self.percent_cpu, self.percent_thread, self.percent_ram)
 
     def update_gpu_values(self):
-        self.pool.submit(gpu_params, self.gpu_proc_file_path)
+        self.pool.submit(gpu_params, self.gpu_proc_file_path)  # We don't care if exception are raised here
 
     def handle_proc_changed(self, file_path):
         if file_path == self.gpu_proc_file_path:

@@ -297,6 +297,9 @@ def generate_lookup_table(function = index_to_smoothing, verbose = True, process
     #  lut = executor.map(function, range(2**27));
     pool = mp.Pool(mp.cpu_count())
     lut = pool.map(function, range(2**27), chunksize=2**27//8//mp.cpu_count())
+    pool.close()
+    pool.join()
+    lut = list(lut)
 
   return np.array(lut, dtype = bool)
 
