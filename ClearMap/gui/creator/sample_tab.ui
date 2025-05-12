@@ -240,7 +240,7 @@
         </widget>
        </item>
        <item row="0" column="1">
-        <widget class="QPushButton" name="launchPatternWizzardPushButton">
+        <widget class="QPushButton" name="launchPatternWizardPushButton">
          <property name="toolTip">
           <string>Launch the paths helper wizard popup window</string>
          </property>
@@ -257,7 +257,7 @@
         </widget>
        </item>
        <item row="1" column="1">
-        <widget class="QToolButton" name="launchPatternWizzardPushButtonInfoToolButton">
+        <widget class="QToolButton" name="launchPatternWizardPushButtonInfoToolButton">
          <property name="text">
           <string>...</string>
          </property>
