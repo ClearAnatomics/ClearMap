@@ -258,9 +258,11 @@ class TractMapProcessor(TabProcessor):
             if self.registration_processor.config['channels'][channel]['moving_channel'] in (None, 'intrinsically aligned'):
                 continue
             else:
-                results_directories.append(
-                    self.registration_processor.get_elx_asset('aligned', channel=channel).path.parent
-                )
+                result_dir = self.registration_processor.get_elx_asset('aligned', channel=channel).path.parent
+                if not result_dir.exists():
+                    raise MissingRequirementException(f'Elastix result directory {result_dir} for {channel=} not found.'
+                                                      f'Please run the registration first.')
+                results_directories.append(result_dir)
 
         debug_bcp = self.workspace.debug
         self.workspace.debug = False
