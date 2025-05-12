@@ -313,7 +313,7 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         self.fix_sizes()
         self.fix_tooltips_stylesheet()
 
-        btn = self.tab_managers['sample_info'].ui.launchPatternWizzardPushButton
+        btn = self.tab_managers['sample_info'].ui.launchPatternWizardPushButton
         btn.setStyleSheet(HIGHLIGHTED_BTN_STYLE)
 
     def fix_tooltips_stylesheet(self):

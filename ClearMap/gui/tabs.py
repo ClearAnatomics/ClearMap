@@ -170,7 +170,7 @@ class SampleInfoTab(GenericTab):
         self.with_add_btn = True
         self.names_map = []
         self.detached = False  # WARNING: To avoid calling update when channels are setup by
-                               #   the wizzard
+                               #   the wizard
 
     def _set_params(self):
         self.params = SampleParameters(self.ui, self.main_window.src_folder)
@@ -201,7 +201,7 @@ class SampleInfoTab(GenericTab):
 
         self.ui.srcFolderBtn.clicked.connect(self.main_window.prompt_experiment_folder)
 
-        self.ui.launchPatternWizzardPushButton.clicked.connect(self.launch_pattern_wizard)
+        self.ui.launchPatternWizardPushButton.clicked.connect(self.launch_pattern_wizard)
         self.ui.updateWorkspacePushButton.clicked.connect(self.update_workspace)
 
         self.ui.removeCurrentChannelToolButton.clicked.connect(self.remove_current_channel)

@@ -966,8 +966,6 @@ class ManipulateAssetsDialog(WizardDialog):
             dlg.graphLayout.addWidget(dv, row, col, 1, 1)
         self.app.processEvents()
 
-
-
     def assert_all_images(self):
         if not all([asset.is_existing_source for asset in self.selected_assets]):
             warning_popup('All assets must have a source image to crop')
@@ -1041,7 +1039,7 @@ class PatternDialog(WizardDialog):
         """
         self.n_image_groups = 0
         self.dlg.patternToolBox = QToolBox(parent=self.dlg)
-        self.dlg.patternWizzardLayout.insertWidget(0, self.dlg.patternToolBox)
+        self.dlg.patternWizardLayout.insertWidget(0, self.dlg.patternToolBox)
         self.patterns_finders = self.get_patterns()
         for pattern_idx, p_finder in enumerate(self.patterns_finders):
             self.add_group()
