@@ -733,6 +733,7 @@ class RegistrationProcessor(TabProcessor):
                                      resampled_resolution=self.config['channels'][channel]['resampled_resolution'],
                                      workspace=self.workspace,
                                      **default_resample_parameter)
+
         try:
             pass
         except BrokenProcessPool:
