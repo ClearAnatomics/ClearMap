@@ -20,6 +20,7 @@ import tempfile as tmpf
 import numpy as np
 import scipy.ndimage as ndi
 import skimage.filters as skif
+import skimage.exposure as ske
 
 import ClearMap.IO.IO as io
 from ClearMap.Utils.exceptions import MissingRequirementException
@@ -33,6 +34,7 @@ import ClearMap.ImageProcessing.LightsheetCorrection as lc
 import ClearMap.ImageProcessing.Differentiation.Hessian as hes
 import ClearMap.ImageProcessing.Binary.Filling as bf
 import ClearMap.ImageProcessing.Binary.Smoothing as bs
+import ClearMap.ImageProcessing.Snake.morphsnake_1 as snk
 
 import ClearMap.Utils.Timer as tmr
 from ClearMap.ImageProcessing.Experts.utils import initialize_sinks, run_step, print_params
@@ -528,6 +530,7 @@ def binarize_block(source, sink, parameter=default_binarization_parameter):
 
         if save:
             save = io.as_source(save)
+            print("DEBUG:", source.info(), source.slicing)
             save[base_slicing] = clipped[valid_slicing]
 
         if binary_status is not None:
@@ -567,7 +570,7 @@ def binarize_block(source, sink, parameter=default_binarization_parameter):
             binarized = binary_status > 0
         else:
             binarized = sink[:]
-        deconvolved = deconvolve(median, binarized[:], **parameter_deconvolution)
+        deconvolved, background_subtracted = deconvolve(median, binarized[:], **parameter_deconvolution)
         del binarized
 
         if save:
@@ -590,9 +593,16 @@ def binarize_block(source, sink, parameter=default_binarization_parameter):
             if verbose:
                 timer.print_elapsed_time('Deconvolution: binarization')
     else:
-        deconvolved = median
+        deconvolved, background_subtracted = median, median
 
     # active arrays: median, mask, deconvolved
+
+    # morphACWE
+    morphsnake = run_step('morphsnake', background_subtracted, snk.morphological_chan_vese,
+                          remove_previous_result=False,
+                          extra_kwargs={'mask': mask, 'max_bin': max_bin}, **default_step_params)
+    morphsnake = morphsnake.astype(bool)
+    sink[valid_slicing] += morphsnake[valid_slicing]
 
     # adaptive
     parameter_adaptive = parameter.get('adaptive')
@@ -874,6 +884,19 @@ def clip(source, clip_range=(300, 60000), norm=MAX_BIN, dtype=DTYPE):
 
 
 def deconvolve(source, binarized, sigma=10):
+    from skimage.exposure import adjust_gamma
+    normalized = (source - np.min(source)) / (np.max(source) - np.min(source))
+
+    # alpha = 5
+    # exp_raised = np.exp(alpha * normalized) / np.log1p(alpha)
+    gamma_adjusted = adjust_gamma(normalized, 1.5)
+
+    background = np.zeros(gamma_adjusted.shape, dtype=float)
+    background[:] = gamma_adjusted[:]
+    for z in range(background.shape[2]):
+        background[:, :, z] = ndi.gaussian_filter(background[:, :, z], sigma=20)
+    bg_subtracted = gamma_adjusted - np.minimum(gamma_adjusted, background)
+
     convolved = np.zeros(source.shape, dtype=float)
     convolved[binarized] = source[binarized]
 
@@ -882,7 +905,7 @@ def deconvolve(source, binarized, sigma=10):
 
     deconvolved = source - np.minimum(source, convolved)
     deconvolved[binarized] = source[binarized]
-    return deconvolved
+    return deconvolved, bg_subtracted
 
 
 def threshold_isodata(source):

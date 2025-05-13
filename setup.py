@@ -76,7 +76,7 @@ def find_data_files(src_dir):
     return out
 
 
-excluded_pyx = ['_Old', '_Todo', 'StatisticsPointListCode', 'flow', 'OrientationCode']
+excluded_pyx = ['_Old', '_Todo', 'StatisticsPointListCode', 'flow', 'OrientationCode', 'morphsnake_2']
 extension_paths = [str(p) for p in Path('ClearMap').rglob('*.pyx') if not any([excl in str(p) for excl in excluded_pyx])]
 
 extra_args = ['-fopenmp'] if USE_OPENMP else []
