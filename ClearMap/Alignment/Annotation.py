@@ -587,10 +587,59 @@ class Annotation(object):
         df['acronym'] = df['id'].map(self.dict_id_to_acronym)
         return df
 
-    def label_points_hemispheres(self, points, key='id', level=None, invalid=0):
-        return self.label_points(points, annotation_file_path=self.hemispheres_file, key=key, level=level, invalid=invalid)
+    def label_points_hemispheres(self, points, key='id', level=None, invalid=-1):
+        """
+        Label points using the hemispheres annotation file (atlas with hemisphere id as voxels).
 
-    def label_points(self, points, annotation_file_path=None, key='id', level=None, invalid=0):  # FIXME: document level
+        Parameters
+        ----------
+        points: array-like
+            The points to label.
+        key: str
+            The key (in the ontology file) to use for the label conversion. The default is 'id'.
+            If key != 'id', the label will be converted to the specified key.
+            See label_points for details
+        level: None | int
+            The level in the hierarchy to use for the label conversion. The default is None.
+            (see `convert_label` for details)
+        invalid
+            The default value for points outside the atlas. The default is 0.
+        Returns
+        -------
+        point_labels: array-like
+
+        """
+        return self.label_points(points, annotation_file_path=self.hemispheres_file, key=key, level=level,
+                                 invalid=invalid, dtype=np.int32_t)  # We store a bool but historically 0 or 255 so
+                                                                     # as int32_t to handle outside of brain as negative
+
+    def label_points(self, points, annotation_file_path=None, key='id', level=None, invalid=0, d_type=np.uint64):
+        """
+        Label points using the annotation file (atlas with ids as voxels).
+
+        Parameters
+        ----------
+        points: array-like
+            The points to label.
+        annotation_file_path: str | Path | None
+            The path to the annotation file. If None, use the atlas attribute.
+        key: str
+            The key (in the ontology file) to use for the label conversion. The default is 'id'.
+            If key != 'id', the label will be converted to the specified key.
+        level: None | int
+            The level in the hierarchy to use for the label conversion. The default is None.
+            (see `convert_label` for details)
+        invalid: float | int
+            The default value for points outside the atlas. The default is 0.
+        d_type: np.dtype
+            data type of the labels (typically ids). The default is np.uint64 because the default
+        atlas is uint64.
+
+        Returns
+        -------
+        point_labels: array-like
+            The labels for each point. (shape = len(points))
+        """
         if annotation_file_path:
             atlas = clearmap_io.read(annotation_file_path)
         else:
@@ -601,10 +650,10 @@ class Annotation(object):
         xmax, ymax, zmax = self.atlas.shape
         within_atlas = (xs >= 0) & (xs < xmax) & (ys >= 0) & (ys < ymax) & (zs >= 0) & (zs < zmax)
 
-        # Create alist of labels (shape = len(coordinates)) which defaults to 'invalid' and where
+        # Create a list of labels (shape = len(coordinates)) which defaults to 'invalid' and where
         # coordinates within the atlas have the atlas value
-        cell_labels = np.full(xs.shape, invalid, dtype=np.uint64)  # FIXME: dtype=int in original
-        cell_labels[within_atlas] = atlas[xs[within_atlas], ys[within_atlas], zs[within_atlas]]
+        point_labels = np.full(xs.shape, invalid, dtype=d_type)
+        point_labels[within_atlas] = atlas[xs[within_atlas], ys[within_atlas], zs[within_atlas]]
 
         # convert cell labels to 'key'
         if key != 'id' or level is not None:
@@ -613,9 +662,9 @@ class Annotation(object):
                     raise ValueError(f'Label conversion for {annotation_file_path} is not implemented')
                 else:
                     warnings.warn(f'Label conversion for {annotation_file_path} may not be implemented')
-            cell_labels[within_atlas] = self.convert_label(cell_labels[within_atlas], key='id', value=key, level=level)
+            point_labels[within_atlas] = self.convert_label(point_labels[within_atlas], key='id', value=key, level=level)
 
-        return cell_labels
+        return point_labels
 
     def get_names_map(self):
         return dict(zip(self.ids, self.names))
