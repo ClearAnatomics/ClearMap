@@ -348,7 +348,7 @@ def patch_env(cfg_path, dest_path, use_cuda_torch=True, pip_mode=False, use_spyd
     if use_cuda_torch:
         if pip_mode:
             if platform.system().startswith('Linux'):
-                viable_versions = [Version(v) for v in ('11.8', '12.4', '12.6')]
+                viable_versions = [Version(v) for v in ('11.8', '12.4', '12.6', '12.8')]
                 actual_cuda = pytorch_v_mgr.cuda_version
                 for v in viable_versions[::-1]:
                     if actual_cuda <= v:
