@@ -153,6 +153,7 @@ class Asset:
         self._checksum = checksum
         self.extensions_to_directories = extensions_to_directories or {}
         self.status_manager = status_manager
+        self.use_sub_dir = False  # Modified on first probe
         # TODO: add list of parent assets with the parametrised function to generate them
 
     def __str__(self):
@@ -323,11 +324,19 @@ class Asset:
 
     @property
     def directory(self):
-        sub_directory = Path(self.base_directory or self.type_spec.directory)
-        if sub_directory.is_absolute():
-            return sub_directory
+        sub_dir = Path(self.type_spec.directory)
+        if sub_dir.is_absolute():
+            return sub_dir
         else:
-            return self.base_directory / sub_directory
+            if self.use_sub_dir:
+                return self.base_directory / sub_dir
+            else:
+                base_name = self.base_name + self.type_spec.default_extension  # default_extension to avoid recursion
+                if (self.base_directory / base_name).exists():  # compatibility with 3.0.0
+                    return self.base_directory
+                else:
+                    self.use_sub_dir = True
+                    return self.base_directory / sub_dir
 
     @property
     def file_name(self):
@@ -351,10 +360,11 @@ class Asset:
         pathlib.Path
             The path with the best extension.
         """
-        if str(self.file_name).startswith('/'):
-            return Path(self.file_name)
+        file_name = self.file_name  # minimize dynamic calls
+        if str(file_name).startswith('/'):
+            return Path(file_name)
         else:
-            return self.directory / self.file_name
+            return self.directory / file_name
 
     @property
     def existing_path(self):
@@ -500,6 +510,10 @@ class Asset:
             self._checksum = file_utils.checksum(self.existing_path, self.type_spec.checksum_algorithm)
         return self._checksum
 
+    @property
+    def size(self):
+        return self.path.stat().st_size
+
     def read(self, *args, **kwargs):
         return clearmap_io.read(self.existing_path, *args, **kwargs)
 
@@ -515,6 +529,10 @@ class Asset:
     def shape(self):
         if not self.is_expression:
             return clearmap_io.shape(self.existing_path)
+
+    def dtype(self):
+        if self.is_existing_source and not self.is_expression:
+            return clearmap_io.dtype(self.existing_path)
 
     def convert(self, new_extension, processes=None, verbose=False, **kwargs):
         if self.is_existing_source:
@@ -859,6 +877,9 @@ class AssetCollection:  # FIXME: fix how assets are retrieved
 
     def keys(self):
         return self.assets.keys()
+
+    def values(self):
+        return self.assets.values()
 
     def items(self):
         return self.assets.items()

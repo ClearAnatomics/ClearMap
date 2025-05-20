@@ -19,8 +19,8 @@ import multiprocessing
 import warnings
 from pathlib import Path
 
-from ClearMap.IO.assets_constants import EXTENSIONS, COMPRESSION_ALGORITHMS, CHECKSUM_ALGORITHMS, \
-    RESOURCE_TYPE_TO_FOLDER, DATA_CONTENT_TYPES
+from ClearMap.IO.assets_constants import (EXTENSIONS, COMPRESSION_ALGORITHMS, CHECKSUM_ALGORITHMS,
+                                          RESOURCE_TYPE_TO_FOLDER, DATA_CONTENT_TYPES)
 from ClearMap.Utils.tag_expression import Expression, TAG_START
 from ClearMap.Utils.utilities import validate_arg
 
@@ -113,14 +113,7 @@ class TypeSpec:
         self._basename = value
 
     def is_expression(self):
-        if isinstance(self._basename, Expression) and self._basename.tags:
-            return True
-        elif isinstance(self._basename, (str, Path)):
-            base_name = str(self._basename)
-            if not TAG_START in base_name:  # TO speedup
-                return False
-            return bool(Expression(base_name).tags)
-        raise ValueError(f'Invalid basename: {self._basename} with type {type(self._basename)}')
+        return Expression.is_expression(self._basename)  # FIXME: why not self.basename (prop)
 
     def get_sub_type(self, sub_type_name, extensions=None, file_format_category=None, expression=None):
         sub_type = self.sub_types.get(sub_type_name)

@@ -226,6 +226,28 @@ def get_free_temp_space():
     _, _, free = shutil.disk_usage(tempfile.gettempdir())
     return free
 
+def bytes_to_human(num):
+    """
+    Convert bytes to human-readable format.
+
+    Parameters
+    ----------
+    num : int
+        Number of bytes
+
+    Returns
+    -------
+    str
+        Human-readable format of the number of bytes
+    """
+    for unit in ['B', 'KB', 'MB', 'GB', 'TB', 'PB']:
+        if num < 1024:
+            return f"{num:.2f} {unit}"
+        num /= 1024
+    else:
+        warnings.warn(f'Unable to convert {num} bytes to human-readable format. ')
+        return f"{num:.2f} bytes"
+
 
 # FIXME: move to io and rename to smth similar to AssetSpec (without conflicting with the existing AssetSpec)
 class FilePath:
