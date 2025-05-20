@@ -1294,7 +1294,7 @@ class CellCounterTab(PostProcessingTab):
         self.wrap_plot(self.cell_detectors[channel].plot_cells_3d_scatter_w_atlas_colors, raw=raw)
 
     def __filter_cells(self, channel, is_last_step=True):
-        if self.sample_manager.get('cells', postfix='raw').exists:
+        if self.sample_manager.get('cells', channel=channel, asset_sub_type='raw').exists:
             detector = self.cell_detectors[channel]
             self.wrap_step('Filtering cells', detector.filter_cells, n_steps=2 + (1 - is_last_step),
                            abort_func=detector.stop_process, close_when_done=False)
