@@ -422,6 +422,8 @@ def find_existing_extension(path, extensions):  # FIXME: see if could use Glob
     for extension in extensions:
         if path.with_suffix(extension).exists():
             return extension
+    else:
+        return None
 
 
 def check_extensions(extensions):

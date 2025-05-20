@@ -37,7 +37,7 @@ from PyQt5 import QtGui
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget,
                              QPushButton, QSpinBox, QDoubleSpinBox, QComboBox,
                              QLineEdit, QMessageBox, QToolBox, QProgressBar, QLabel,
-                             QStyle, QAction)
+                             QStyle, QAction, QDockWidget)
 
 import qdarkstyle
 from qdarkstyle import DarkPalette
@@ -116,7 +116,7 @@ from ClearMap.gui.style import (DARK_BACKGROUND, PLOT_3D_BG, BTN_STYLE_SHEET,
 
 # Widgets import is quite slow
 from ClearMap.gui.widgets import (OrthoViewer, ProgressWatcher,
-                                  StructureSelector, PerfMonitor, ManipulateAssetsDialog)  # Perfmonitor needs plot_3d
+                                  StructureSelector, PerfMonitor, ManageAssetsWidget)  # Perfmonitor needs plot_3d
 update_pbar(app, progress_bar, 50)
 from ClearMap.gui.interfaces import BatchTab, PipelineTab
 from ClearMap.gui.preferences import PreferenceUi
@@ -783,7 +783,8 @@ class ClearMapGui(ClearMapGuiBase):
             warnings.warn(f'Sample params not set yet, skipping')
             return
 
-        missing_channels = set(sample_params.channels) - set(self.sample_manager.workspace.asset_collections.keys())
+        missing_channels = (set(sample_params.channels) -
+                            set(self.sample_manager.workspace.asset_collections.keys()))
         if missing_channels:
             warnings.warn(f'Channels {missing_channels} not found in workspace, skipping')
             self.finalise_tab_params()
@@ -972,11 +973,6 @@ class ClearMapGui(ClearMapGuiBase):
             if action.text() == "&Help":  # Skip if already exists
                 return
 
-        help_menu = self.menuBar().addMenu("&Help")
-        self.about_action = QAction("&About", self)
-        self.about_action.triggered.connect(self.display_about)
-        help_menu.addAction(self.about_action)
-
         workspace_menu = self.menuBar().addMenu("&Workspace")
 
         show_info_action = QAction("Show Info", self)
@@ -987,23 +983,38 @@ class ClearMapGui(ClearMapGuiBase):
         # add_asset_action.triggered.connect(self.add_asset)
         # workspace_menu.addAction(add_asset_action)
 
-        manipulate_assets_action = QAction("Manipulate Assets", self)
-        manipulate_assets_action.triggered.connect(self.manipulate_assets)
+        manipulate_assets_action = QAction("Manage Assets", self)
+        manipulate_assets_action.triggered.connect(self.manage_assets)
         workspace_menu.addAction(manipulate_assets_action)
+
+        help_menu = self.menuBar().addMenu("&Help")
+        self.about_action = QAction("&About", self)
+        self.about_action.triggered.connect(self.display_about)
+        help_menu.addAction(self.about_action)
 
 
     def show_workspace_info(self):
+        if self.sample_manager is None or self.sample_manager.workspace is None:
+            self.popup('No workspace found. Initialise sample before using this menu.')
+            return
         self.popup(f'Workspace: {self.src_folder}, '
                    f'{self.sample_manager.workspace.info()}')
 
     def add_asset(self):
         pass  # FIXME: implement
 
-    def manipulate_assets(self):
-        dlg = ManipulateAssetsDialog(self.src_folder, self.params['sample_info'],
-                                     sample_manager=self.sample_manager,
-                                     app=self)
-        dlg.exec_()
+    def manage_assets(self):
+        if self.sample_manager is None or self.sample_manager.workspace is None:
+            self.popup('No workspace found. Initialise sample before using this menu.')
+            return
+        self.assetsManagerWidget = ManageAssetsWidget(self.src_folder, self.params['Sample info'],
+                                                      sample_manager=self.sample_manager,
+                                                      app=self)
+        self.assetsManagerDock = QDockWidget("Workspace Manager", self)
+        self.assetsManagerDock.setWidget(self.assetsManagerWidget.widget)  # ⬅️ use .widget handle
+        self.addDockWidget(Qt.RightDockWidgetArea, self.assetsManagerDock)
+        # self.tabifyDockWidget(self.dataViewerDockWidget, self.assetsManagerDock)
+        # dlg.exec()
 
     def reset_loggers(self):
         self.logger = Printer(redirects=None if DEBUG else 'stdout')
@@ -1221,6 +1232,7 @@ class ClearMapGui(ClearMapGuiBase):
         update_pbar(self.app, progress_bar, 40)
         self.update_tabs()  # TODO: check if init or this
         update_pbar(self.app, progress_bar, 90)
+        self.manage_assets()
         splash.finish(self)
 
     def prompt_sample_id(self):

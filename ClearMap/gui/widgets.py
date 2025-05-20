@@ -11,6 +11,7 @@ import re
 import tempfile
 import functools
 import json
+from ast import literal_eval
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from math import floor
 from multiprocessing import cpu_count
@@ -31,12 +32,12 @@ from PyQt5.QtWidgets import (QWidget, QDialogButtonBox, QListWidget, QHBoxLayout
                              QPushButton, QVBoxLayout, QTableWidget, QTableWidgetItem,
                              QToolBox, QRadioButton, QTreeWidget, QTreeWidgetItem,
                              QTabWidget, QListWidgetItem, QFileDialog, QSpinBox, QDoubleSpinBox, QComboBox, QLineEdit,
-                             QMessageBox)
+                             QMessageBox, QAbstractItemView, QGroupBox)
 
 from ClearMap import Settings
 from ClearMap.IO.assets_constants import DATA_CONTENT_TYPES, EXTENSIONS
 from ClearMap.IO.metadata import pattern_finders_from_base_dir
-from ClearMap.Utils.utilities import gpu_params
+from ClearMap.Utils.utilities import gpu_params, bytes_to_human
 from ClearMap.Visualization import Plot3d as plot_3d
 from ClearMap.Visualization.Qt.widgets import Scatter3D
 from ClearMap.config.atlas import STRUCTURE_TREE_NAMES_MAP
@@ -48,8 +49,6 @@ __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
 __copyright__ = 'Copyright © 2022 by Charly Rousseau'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://github.com/ClearAnatomics/ClearMap'
-
-from ClearMap.gui.style import DARK_BACKGROUND, COMBOBOX_STYLE_SHEET
 
 
 class OrthoViewer(object):
@@ -467,12 +466,15 @@ class ProgressWatcher(QWidget):  # Inspired from https://stackoverflow.com/a/662
 
 # Adapted from https://stackoverflow.com/a/54917151 by https://stackoverflow.com/users/6622587/eyllanesc
 class TwoListSelection(QWidget):
+    itemSelectionChanged = pyqtSignal(str)
     """
     A widget that allows to select items from a list and move them to another list
     This is useful for selecting items from a list of available items and moving them to a list of selected items
     """
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, input_title=None, output_title=None):
         super().__init__(parent)
+        self._input_title  = input_title      # keep for setup
+        self._output_title = output_title
         self.__setup_layout()
         # self.app = app
 
@@ -480,16 +482,41 @@ class TwoListSelection(QWidget):
         """
         Setup the layout of the widget with the two columns for the lists and the buttons
         """
-        lay = QHBoxLayout(self)
+        lyt = QHBoxLayout(self)
         self.mInput = QListWidget()
-        self.mOuput = QListWidget()
+        self.mOutput = QListWidget()
+
+        # enable Ctrl-/Shift-selection
+        self.mInput.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.mOutput.setSelectionMode(QAbstractItemView.ExtendedSelection)
+
+        self.mInput.itemSelectionChanged.connect(functools.partial(self.on_selection_changed, self.mInput))
+        self.mOutput.itemSelectionChanged.connect(functools.partial(self.on_selection_changed, self.mOutput))
+
+        # --------------- wrap in group-boxes if titled ------------
+        if self._input_title:
+            box_in  = QGroupBox(self._input_title)
+            box_in.setLayout(QVBoxLayout())
+            box_in.layout().addWidget(self.mInput)
+            left_widget = box_in
+        else:
+            left_widget = self.mInput
+
+        if self._output_title:
+            box_out = QGroupBox(self._output_title)
+            box_out.setLayout(QVBoxLayout())
+            box_out.layout().addWidget(self.mOutput)
+            right_widget = box_out
+        else:
+            right_widget = self.mOutput
+
 
         move_btns, up_down_btns = self.__layout_buttons()
 
-        lay.addWidget(self.mInput)
-        lay.addLayout(move_btns)
-        lay.addWidget(self.mOuput)
-        lay.addLayout(up_down_btns)
+        lyt.addWidget(left_widget)
+        lyt.addLayout(move_btns)
+        lyt.addWidget(right_widget)
+        lyt.addLayout(up_down_btns)
 
         self.update_buttons_status()
         self.__connections()
@@ -520,19 +547,25 @@ class TwoListSelection(QWidget):
 
         return move_btns, up_down_btns
 
+    def on_selection_changed(self, list_widget):
+        sel = list_widget.selectedItems()      # list[QListWidgetItem]
+        if len(sel) == 1:                      # exactly one row picked
+            item = sel[0]
+            self.itemSelectionChanged.emit(item.text())
+
     @QtCore.pyqtSlot()
     def update_buttons_status(self):
-        self.mBtnUp.setDisabled(not bool(self.mOuput.selectedItems()) or self.mOuput.currentRow() == 0)
-        self.mBtnDown.setDisabled(not bool(self.mOuput.selectedItems()) or self.mOuput.currentRow() == (self.mOuput.count() -1))
-        self.mBtnMoveToAvailable.setDisabled(not bool(self.mInput.selectedItems()) or self.mOuput.currentRow() == 0)
-        self.mBtnMoveToSelected.setDisabled(not bool(self.mOuput.selectedItems()))
+        self.mBtnUp.setDisabled(not bool(self.mOutput.selectedItems()) or self.mOutput.currentRow() == 0)
+        self.mBtnDown.setDisabled(not bool(self.mOutput.selectedItems()) or self.mOutput.currentRow() == (self.mOutput.count() - 1))
+        self.mBtnMoveToAvailable.setDisabled(not bool(self.mInput.selectedItems()) or self.mOutput.currentRow() == 0)
+        self.mBtnMoveToSelected.setDisabled(not bool(self.mOutput.selectedItems()))
 
     def __connections(self):
         """
         Bind the buttons to their slots
         """
         self.mInput.itemSelectionChanged.connect(self.update_buttons_status)
-        self.mOuput.itemSelectionChanged.connect(self.update_buttons_status)
+        self.mOutput.itemSelectionChanged.connect(self.update_buttons_status)
         self.mBtnMoveToAvailable.clicked.connect(self.__on_mBtnMoveToAvailable_clicked)
         self.mBtnMoveToSelected.clicked.connect(self.__on_mBtnMoveToSelected_clicked)
         self.mButtonToAvailable.clicked.connect(self.__on_mButtonToAvailable_clicked)
@@ -542,35 +575,39 @@ class TwoListSelection(QWidget):
 
     @QtCore.pyqtSlot()
     def __on_mBtnMoveToAvailable_clicked(self):
-        self.mOuput.addItem(self.mInput.takeItem(self.mInput.currentRow()))
+        """move *all* selected rows from left → right"""
+        for it in reversed(self.mInput.selectedItems()):          # reversed keeps order
+            self.mOutput.addItem(self.mInput.takeItem(self.mInput.row(it)))
 
     @QtCore.pyqtSlot()
     def __on_mBtnMoveToSelected_clicked(self):
-        self.mInput.addItem(self.mOuput.takeItem(self.mOuput.currentRow()))
+        """move *all* selected rows from right → left"""
+        for it in reversed(self.mOutput.selectedItems()):
+            self.mInput.addItem(self.mOutput.takeItem(self.mOutput.row(it)))
 
     @QtCore.pyqtSlot()
     def __on_mButtonToAvailable_clicked(self):
-        while self.mOuput.count() > 0:
-            self.mInput.addItem(self.mOuput.takeItem(0))
+        while self.mOutput.count() > 0:
+            self.mInput.addItem(self.mOutput.takeItem(0))
 
     @QtCore.pyqtSlot()
     def __on_mButtonToSelected_clicked(self):
         while self.mInput.count() > 0:
-            self.mOuput.addItem(self.mInput.takeItem(0))
+            self.mOutput.addItem(self.mInput.takeItem(0))
 
     @QtCore.pyqtSlot()
     def __on_mBtnUp_clicked(self):
-        row = self.mOuput.currentRow()
-        currentItem = self.mOuput.takeItem(row)
-        self.mOuput.insertItem(row - 1, currentItem)
-        self.mOuput.setCurrentRow(row - 1)
+        row = self.mOutput.currentRow()
+        currentItem = self.mOutput.takeItem(row)
+        self.mOutput.insertItem(row - 1, currentItem)
+        self.mOutput.setCurrentRow(row - 1)
 
     @QtCore.pyqtSlot()
     def __on_mBtnDown_clicked(self):
-        row = self.mOuput.currentRow()
-        currentItem = self.mOuput.takeItem(row)
-        self.mOuput.insertItem(row + 1, currentItem)
-        self.mOuput.setCurrentRow(row + 1)
+        row = self.mOutput.currentRow()
+        currentItem = self.mOutput.takeItem(row)
+        self.mOutput.insertItem(row + 1, currentItem)
+        self.mOutput.setCurrentRow(row + 1)
 
     # The actual user functions
     def clear(self):
@@ -578,7 +615,16 @@ class TwoListSelection(QWidget):
         Clear the lists
         """
         self.mInput.clear()
-        self.mOuput.clear()
+        self.mOutput.clear()
+
+    def __add_item(self, widget: QListWidget, text, user_data=None):
+        """
+        Helps attach user_data.  *text* always becomes the visible label.
+        """
+        item = QListWidgetItem(str(text))
+        if user_data is not None:
+            item.setData(Qt.UserRole, user_data)
+        widget.addItem(item)
 
     def addAvailableItems(self, items):
         """
@@ -589,7 +635,11 @@ class TwoListSelection(QWidget):
         items: list(str)
             The list of items to add
         """
-        self.mInput.addItems(items)
+        for itm in items:
+            if isinstance(itm, (tuple, list)) and len(itm) == 2:
+                self.__add_item(self.mInput, itm[0], itm[1])
+            else:  # plain string
+                self.__add_item(self.mInput, itm)
 
     def setSelectedItems(self, items):
         """
@@ -599,10 +649,39 @@ class TwoListSelection(QWidget):
         items: list(str)
             The list of items to add
         """
-        self.mOuput.clear()
-        self.mOuput.addItems(items)
+        self.mOutput.clear()
+        for itm in items:
+            if isinstance(itm, (tuple, list)) and len(itm) == 2:
+                self.__add_item(self.mOutput, itm[0], itm[1])
+            else:
+                self.__add_item(self.mOutput, itm)
 
-    def get_left_elements(self):
+    def __get_elements(self, list_widget, with_data=False):
+        """
+        Get the list of items in the list
+
+        Parameters
+        ----------
+        list_widget: QListWidget
+            The list widget to get the items from
+        with_data: bool
+            If True, return the data associated with the items
+
+        Returns
+        -------
+        list(str)
+            The list of items in the list
+        """
+        r = []
+        for i in range(list_widget.count()):
+            it = list_widget.item(i)
+            if with_data:
+                r.append((it.text(), it.data(Qt.UserRole)))
+            else:
+                r.append(it.text())
+        return r
+
+    def get_left_elements(self, with_data=False):
         """
         Get the list of items in the left list (available items)
 
@@ -610,13 +689,9 @@ class TwoListSelection(QWidget):
         -------
         list(str)
         """
-        r = []
-        for i in range(self.mInput.count()):
-            it = self.mInput.item(i)
-            r.append(it.text())
-        return r
+        return self.__get_elements(self.mInput, with_data)
 
-    def get_right_elements(self):
+    def get_right_elements(self, with_data=False):
         """
         Get the list of items in the right list (selected items)
 
@@ -624,11 +699,7 @@ class TwoListSelection(QWidget):
         -------
         list(str)
         """
-        r = []
-        for i in range(self.mOuput.count()):
-            it = self.mOuput.item(i)
-            r.append(it.text())
-        return r
+        return self.__get_elements(self.mOutput, with_data)
 
 
 class CheckableListWidget(QWidget):
@@ -736,14 +807,14 @@ class DataFrameWidget(QWidget):  # TODO: optional format attribute with shape of
                     self.table.setItem(i, j, QTableWidgetItem(f'{v}'))
 
 
-class WizardDialog:
+class WizardWidget:
     """
     A base class for a complex dialogs designed with QT creator and exported as ui files.
     It is meant to be subclassed. The subclass should implement the `setup` and `connect_buttons` methods
     This class needs a src_folder, a ui_name, a ui_title. The ui names and titles are used to build
     a dialog from the ui file of the same name and parametrise the dialog
     """
-    def __init__(self, ui_name, ui_title, src_folder="", params=None, app=None, size=None):
+    def __init__(self, ui_name, ui_title, src_folder="", params=None, app=None, size=None, patch_parent_class='QDialog'):
         """
         Initialize the dialog
 
@@ -766,7 +837,7 @@ class WizardDialog:
         self.params = params
         self.app = app or QtWidgets.QApplication.instance()
 
-        dlg = create_clearmap_widget(f'{ui_name}.ui', patch_parent_class='QDialog', window_title=ui_title)
+        dlg = create_clearmap_widget(ui_name, patch_parent_class=patch_parent_class, window_title=ui_title)
 
         if size is not None:
             if size[0] is None:
@@ -783,6 +854,7 @@ class WizardDialog:
         self.__fix_btn_boxes_text()
         self.connect_buttons()
 
+    # Abstract
     def setup(self):
         """
         Setup the dialog after creation from the ui file.
@@ -837,58 +909,165 @@ class WizardDialog:
         """
         Execute the dialog
         """
-        self.dlg.exec()
+        if hasattr(self.dlg, "exec"):  # QDialog
+            self.dlg.exec()
+        else:  # plain QWidget / QDockWidget
+            self.dlg.show()
 
 
-class ManipulateAssetsDialog(WizardDialog):
+class ManageAssetsWidget(WizardWidget):
     # WARNING: need to check between asset type_name, basename and asset for mapping
     def __init__(self, src_folder, params, sample_manager, app=None):
-        self.assets = []  # TODO: exclude is_folder assets and not asset.exists
+        self.assets = {}  # TODO: exclude is_folder assets and not asset.exists
                           #     maybe exclude asset if asset.status == True
-        self.selected_assets = []
-        self.dlg.channelsComboBox.clear()
-        self.dlg.channelsComboBox.addItems(sample_manager.workspace.channels)
-        self.dlg.channelsComboBox.setCurrentIndex(0)
         self.sample_manager = sample_manager
         self.resampling_params = {'x_scale': 1, 'y_scale': 1, 'z_scale': 1,
                                   'x_shape': None, 'y_shape': None, 'z_shape': None,
                                   'x_resolution': None, 'y_resolution': None, 'z_resolution': None}
-        super().__init__('assets_manipulation', 'Assets manipulation wizard', src_folder, params, app, [600, None])
         self.ortho_viewer = OrthoViewer()
-        self.list_selection = TwoListSelection()
+        self.list_selection = TwoListSelection(input_title='Filtered assets:',
+                                               output_title='Selected assets:')
+
+        super().__init__('assets_manipulation', 'Assets management wizard',
+                         src_folder, params, app, [600, 1200], 'QWidget')
+
+        # self.dlg.setModal(False)
+        # self.dlg.show()
+        self.widget = self.dlg
+        self.__set_assets()
+
+    def setup(self):
+        self.dlg.channelsComboBox.clear()
+        chans = self.sample_manager.workspace.channels
+        chans = ['-'.join(c) if isinstance(c, tuple) else c for c in chans]
+        self.dlg.channelsComboBox.addItems(['Any'] + chans)
+        self.dlg.channelsComboBox.setCurrentIndex(0)
+
+        self.dlg.fileFormatCategoryComboBox.clear()
+        self.dlg.fileFormatCategoryComboBox.addItems(['Any'] + list(STRUCTURE_TREE_NAMES_MAP.keys()))
+        self.dlg.fileFormatCategoryComboBox.setCurrentIndex(0)
+
         self.dlg.listsLayout.addWidget(self.list_selection)
+
+    def connect_buttons(self):
+        # self.dlg.assetManipulationButtonBox.accepted.connect(self.__apply_changes)
+        # self.dlg.assetManipulationButtonBox.rejected.connect(self.dlg.close)
+
+        self.dlg.existingOnlyCheckBox.toggled.connect(self.__set_assets)
+        self.dlg.nameFilterPlainLineEdit.editingFinished.connect(self.__set_assets)
         self.dlg.channelsComboBox.currentTextChanged.connect(self.__set_assets)
+        self.dlg.fileFormatCategoryComboBox.currentTextChanged.connect(self.__set_assets)
+        self.dlg.sizeMinSpinBox.valueChanged.connect(self.__set_assets)
+        self.dlg.sizeMaxSpinBox.valueChanged.connect(self.__set_assets)
+        # self.dlg.filterByChannelCheckBox.toggled.connect(functools.partial(self.__set_assets, channel=None))
+        # self.dlg.fileFormatCategoryCheckBox.toggled.connect(functools.partial(self.__set_assets, channel=None))
 
-    def bind(self):
-        self.dlg.buttonBox.accepted.connect(self.__apply_changes)
-        self.dlg.buttonBox.rejected.connect(self.dlg.close)
-
-        selected_model = self.list_selection.mOuput.model()
-        selected_model.rowsInserted.connect(self.__update_assets)  # Update group when selection updated
-        selected_model.rowsRemoved.connect(self.__update_assets)  # Update group when selection updated
+        selected_model = self.list_selection.mOutput.model()
+        # selected_model.rowsInserted.connect(self.__update_assets)  # Update group when selection updated
+        # selected_model.rowsRemoved.connect(self.__update_assets)  # Update group when selection updated
 
         actions = ['compress', 'decompress', 'convert', 'plot',
                    'delete', 'resample', 'crop']
         for action_name in actions:
             btn = QPushButton(action_name.title(), self.dlg)
             btn.clicked.connect(functools.partial(self.action, action_name))
-            self.dlg.controlsLayout.addWidget(btn)
+            self.dlg.actionsVerticalLayout.addWidget(btn)
+
+        self.list_selection.itemSelectionChanged.connect(self.handle_selection_changed)
+
+    def handle_selection_changed(self, itm_text):
+        self.dlg.assetInfoTextBrowser.clear()
+        txt = ''
+        if itm_text:
+            asset = self.asset_types_to_assets([itm_text])[0]
+            if asset is not None:
+                txt += f'Channel: {asset.channel_spec.name}\n'
+                txt += f'Asset type: {asset.type_spec.name}\n'
+                txt += f'File: \n'
+                txt += f'    format: {asset.type_spec._file_format_category}\n'
+                txt += f'    path: {asset.path}\n'
+                if not asset.is_folder and asset.exists:
+                    txt += f'    size: {bytes_to_human(asset.size)}\n'
+                    txt += f'    extensions found: {asset.existing_extension}\n'
+                if asset.compressed_path.exists():
+                    txt += f'Compressed file:\n'
+                    txt += f'    path: {asset.compressed_path}\n'
+                    txt += f'    size: {bytes_to_human(asset.compressed_path.stat().st_size)}\n'
+                if asset.is_existing_source:
+                    txt += f'Source info:\n'
+                    txt += f'    shape: {asset.shape()}\n'
+                    txt += f'    dtype: {asset.as_source().dtype}\n'
+                if hasattr(asset.type_spec, 'description'):
+                    txt += f'Description: {asset.type_spec.description}\n'
+            self.dlg.assetInfoTextBrowser.append(txt)
 
     @property
     def channel(self):
         return self.dlg.channelsComboBox.currentText()
 
-    def __set_assets(self, channel):
+    def __set_assets(self, channel=None):
+        """
+        Filter assets and populate the list_selection widget with the filtered assets
+        This method is called when a filter criterion is changed
+
+        Parameters
+        ----------
+        channel
+
+        Returns
+        -------
+
+        """
         self.list_selection.clear()
-        self.assets = list(self.sample_manager.workspace.asset_collections[channel].keys())
-        self.list_selection.addAvailableItems([asset.base_name for asset in self.assets])
+        self.assets = {}
+        if self.channel == 'Any':
+            channels = self.sample_manager.workspace.channels  # All channels of WS, not only data ones
+        else:
+            if channel is None:
+                channel = self.channel
+                if channel == 'None':
+                    channel = None
+            channels = [channel]
 
-    def __update_assets(self):
-        self.assets = [asset for asset in self.sample_manager.assets if asset.base_name in self.list_selection.get_left_elements()]
-        self.selected_assets = [asset for asset in self.assets if asset.base_name in self.list_selection.get_right_elements()]
+        for channel in channels:
+            self.assets.update({(channel, asset_type): asset for asset_type, asset in
+                                self.sample_manager.workspace.asset_collections[channel].items()})
 
-    def asset_names_to_assets(self, asset_names):  #  TEST:
-        return [self.sample_manager.get(asset_name, channel=self.channel) for asset_name in asset_names]
+        if self.dlg.existingOnlyCheckBox.isChecked():
+            self.assets = {k: asset for k, asset in self.assets.items() if asset.exists}
+
+        if self.dlg.fileFormatCategoryComboBox.currentText() != 'Any':
+            selected_format = self.dlg.fileFormatCategoryComboBox.currentText()
+            self.assets = {k: asset for k, asset in self.assets.items() if
+                           asset.type_spec._file_format_category == selected_format}
+
+        if self.dlg.nameFilterPlainLineEdit.text():
+            name_filter = self.dlg.nameFilterPlainLineEdit.text()
+            self.assets = {k: asset for k, asset in self.assets.items() if
+                           name_filter in asset.type_spec.name}
+
+        size_min = self.dlg.sizeMinSpinBox.value()
+        size_max = self.dlg.sizeMaxSpinBox.value()
+
+        if size_min != 0 or size_max != 0:
+            self.assets = {k: asset for k, asset in self.assets.items() if
+                           asset.exists and
+                           (size_min == 0 or asset.size >= size_min) and
+                           (size_max == 0 or asset.size <= size_max)}
+
+        self.list_selection.addAvailableItems(list(self.assets.items()))
+
+    @property
+    def selected_assets(self):
+        return self.asset_types_to_assets(self.selected_asset_types)
+
+    @property
+    def selected_asset_types(self):
+        return self.list_selection.get_right_elements()
+
+    def asset_types_to_assets(self, asset_names):  #  TEST:
+        asset_names = [literal_eval(asset_keys) for asset_keys in asset_names]
+        return [self.sample_manager.get(asset_type, channel=channel) for channel, asset_type in asset_names]
 
     def action(self, action_name):
         """
@@ -900,9 +1079,28 @@ class ManipulateAssetsDialog(WizardDialog):
         action_name: str
             The name of the action to perform
         """
-        method = getattr(self.sample_manager, f'{action_name}_assets')
-        # WARNING: resample and crop will need extra dialog to get the parameters
-        method(self.asset_names_to_assets(self.selected_assets))
+        assets = self.selected_assets
+
+        params = {}
+        if action_name in ('decompress', 'convert', 'resample', 'crop'):
+            params = self.prompt_params(action_name)
+
+        if all([hasattr(asset, action_name) for asset in assets]):
+            if action_name == 'plot':  # FIXME: add menu for overlap, side by side ...
+                sources = [asset.path for asset in assets]
+                if all([asset.shape() == assets[0].shape for asset in assets]):
+                    sources = [sources]  # overlay
+                plot_3d.plot(sources, arrange=False, lut='grey')  # REFACTORING: in WS2 ?
+            for asset in assets:
+                getattr(asset, action_name)(**params)
+        else:
+            method = getattr(self.sample_manager, f'{action_name}_assets')
+            # WARNING: resample and crop will need extra dialog to get the parameters
+
+            if params:
+                method(assets, **params)
+            else:
+                method(assets)
 
     def prompt_params(self, action_name):
         """
@@ -932,12 +1130,14 @@ class ManipulateAssetsDialog(WizardDialog):
                 raise ValueError('No extension found in the selected assets')
             idx = option_dialog('Select the output format',
                                 'Convert the selected asset to the following format', extensions)
-            params['extension'] = extensions[idx]
+            params['new_extension'] = extensions[idx]
         elif action_name == 'resample':
             self.resample_dialog()
+            params = self.resampling_params
         elif action_name == 'crop':
             prompt_dialog('Crop', 'WARNING: all files will be cropped to the same region')
             self.crop_dialog()  # Use the OrthoViewer to select the crop region
+            params = self.ortho_viewer.params  # FIXME: check if correct
         return params
 
     def crop_dialog(self):
@@ -998,7 +1198,7 @@ class ManipulateAssetsDialog(WizardDialog):
 
 
 
-class PatternDialog(WizardDialog):
+class PatternDialog(WizardWidget):
     """
     A wizard dialog to help the user define file patterns for a set of image file paths
     The dialog scans the source folder to find patterns in the file names and suggests them to the user
@@ -1199,7 +1399,7 @@ class PatternDialog(WizardDialog):
         self.dlg.close()
 
 
-class SamplePickerDialog(WizardDialog):
+class SamplePickerDialog(WizardWidget):
     """
     A dialog to help the user pick the sample folders from a source folder.
     The dialog scans the source folder to find the sample folders based on the presence
@@ -1251,7 +1451,7 @@ class SamplePickerDialog(WizardDialog):
         self.dlg.buttonBox.accepted.connect(self.__apply_changes)
         self.dlg.buttonBox.rejected.connect(self.dlg.close)
 
-        selected_model = self.list_selection.mOuput.model()
+        selected_model = self.list_selection.mOutput.model()
         selected_model.rowsInserted.connect(self.__update_current_group_paths)  # Update group when selection updated
         selected_model.rowsRemoved.connect(self.__update_current_group_paths)  # Update group when selection updated
 
@@ -1375,7 +1575,7 @@ class Landmark:
         self.button.click()
 
 
-class LandmarksSelectorDialog(WizardDialog):  # TODO: bind qColorDialog to color buttons
+class LandmarksSelectorDialog(WizardWidget):  # TODO: bind qColorDialog to color buttons
     """
     A dialog to select landmarks in 3D space for registration
     The dialog allows to select landmarks in two views (fixed and moving)
@@ -1648,7 +1848,7 @@ class StructurePickerWidget(QTreeWidget):
                 raise ValueError(f'Unrecognised type {type(subtree)} for Tree: {subtree}')
 
 
-class StructureSelector(WizardDialog):
+class StructureSelector(WizardWidget):
     def __init__(self, app=None):
         super().__init__('structure_selector', 'Structure selector', app=app)
         self.structure_selected = self.picker_widget.itemClicked

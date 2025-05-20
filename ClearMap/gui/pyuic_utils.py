@@ -37,7 +37,7 @@ def loadUiType(uifile, from_imports=False, resource_suffix='_rc', import_from='.
     if patch_parent_class:
         winfo['baseclass'] = patch_parent_class
         cls_list = code_string.getvalue().splitlines()
-        class_import = 'from PyQt5.QtWidgets import {}'.format(patch_parent_class)
+        class_import = f'from PyQt5.QtWidgets import {patch_parent_class}'
         cls_list.insert(0, class_import)
         parent_name = None
         for i, ln in enumerate(cls_list):
@@ -45,6 +45,10 @@ def loadUiType(uifile, from_imports=False, resource_suffix='_rc', import_from='.
                 ln = ln.replace('object', patch_parent_class)
             elif 'setupUi' in ln:
                 parent_name = ln.split(',')[-1].strip(' ):')
+                if parent_name.lower() == 'dialog':
+                    raise ValueError('Parent class name "Dialog" is not allowed.'
+                                     'It would conflict with the Dialog class in PyQt5.'
+                                     ' Please use a different name.')
                 ln = '    def setupUi(self):'
             # elif parent_name is not None and ln.strip().startswith(parent_name):
             elif parent_name is not None:
