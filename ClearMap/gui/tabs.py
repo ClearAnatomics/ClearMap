@@ -108,7 +108,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from PyQt5.QtWidgets import QApplication, QLabel, QButtonGroup
+from PyQt5.QtWidgets import QApplication, QLabel, QButtonGroup, QFrame, QRadioButton, QHBoxLayout
 import pyqtgraph as pg
 from natsort import natsorted
 from pyqtgraph import PlotWidget
@@ -135,7 +135,8 @@ from ClearMap.gui.dialogs import option_dialog
 from ClearMap.gui.interfaces import GenericTab, PostProcessingTab, PreProcessingTab, BatchTab, PipelineTab
 from ClearMap.gui.widgets import (PatternDialog, DataFrameWidget, LandmarksSelectorDialog,
                                   CheckableListWidget, FileDropListWidget, ExtendableTabWidget)
-from ClearMap.gui.gui_utils import format_long_nb, np_to_qpixmap, replace_widget, unique_connect, get_widget
+from ClearMap.gui.gui_utils import format_long_nb, np_to_qpixmap, replace_widget, unique_connect, get_widget, \
+    create_clearmap_widget
 from ClearMap.gui.params import (VesselParams, SampleParameters, StitchingParams,
                                  CellMapParams, GroupAnalysisParams, BatchProcessingParams, RegistrationParams,
                                  TractMapParams, ColocalizationParams)
@@ -2079,15 +2080,18 @@ class GroupAnalysisProcessor:
         link_dataviewers_cursors(dvs)
         return dvs
 
-    def compute_p_vals(self, selected_comparisons, groups, wrapping_func, channels, advanced=False):
+    def compute_p_vals(self, selected_comparisons, groups, wrapping_func, channels,
+                       advanced=False, density_files_suffix=''):
         for pair in selected_comparisons:
             gp1_name, gp2_name = pair
             gp1, gp2 = [groups[gp_name] for gp_name in pair]
             for channel in channels:
-                _ = density_files_are_comparable(self.results_folder, gp1, gp2, channel)
+                _ = density_files_are_comparable(self.results_folder, gp1, gp2, channel,
+                                                 density_file_suffix=density_files_suffix)
             check_ids_are_unique(gp1, gp2)
             # compare_groups is automatically for each channel (loads the first sample to find the channels)
-            wrapping_func(compare_groups, self.results_folder, gp1_name, gp2_name, gp1, gp2, advanced=advanced)
+            wrapping_func(compare_groups, self.results_folder, gp1_name, gp2_name, gp1, gp2,
+                          advanced=advanced, density_files_suffix=density_files_suffix)
             self.progress_watcher.increment_main_progress()
 
     def run_plots(self, plot_function, selected_comparisons, plot_kw_args):
@@ -2125,7 +2129,11 @@ class GroupAnalysisTab(BatchTab):
         super().__init__(main_window, tab_idx)
         self.processor = GroupAnalysisProcessor(self.main_window.progress_watcher)
 
-        self.advanced_controls_names = ['computeSdAndEffectSizeCheckBox']
+        self.advanced_controls_names = [
+            'computeSdAndEffectSizeCheckBox',
+            'densitySuffixTextFilterLabel',
+            'densitySuffixTextFilterLineEdit'
+        ]
 
     def _set_channels_names(self):
         pass  # TODO: check if required
@@ -2199,7 +2207,8 @@ class GroupAnalysisTab(BatchTab):
             self.processor.compute_p_vals(self.params.selected_comparisons, self.params.groups,
                                           self.main_window.wrap_in_thread,
                                           channels=self.get_analysable_channels(),
-                                          advanced=self.params.compute_sd_and_effect_size)
+                                          advanced=self.params.compute_sd_and_effect_size,
+                                          density_files_suffix=self.params.density_suffix)
         except GroupStatsError as err:
             self.main_window.popup(str(err), base_msg='Cannot proceed with analysis')
         self.main_window.signal_process_finished()

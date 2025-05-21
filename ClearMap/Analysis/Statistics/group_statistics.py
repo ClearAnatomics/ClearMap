@@ -350,12 +350,12 @@ def get_colored_p_vals(p_vals, t_vals, significance, color_names):
                           negative_color=colors[color_names[1]])
 
 
-def dirs_to_density_files(directory, f_list, channel):
+def dirs_to_density_files(directory, f_list, channel, suffix=''):
     out = []
     for i, f_name in enumerate(f_list):
         f_name = make_abs(directory, f_name)
         if not is_density_file(f_name):
-            f_name = find_density_file(f_name, channel)
+            f_name = find_density_file(f_name, channel, suffix=suffix)
         out.append(f_name)
     return out
 
@@ -516,16 +516,16 @@ def make_summary(directory, gp1_name, gp2_name, gp1_dirs, gp2_dirs, channel=None
         total_df = generate_summary_table(aggregated_dfs)
 
         if output_path is None and save:
-            output_path = directory / f'{channel}_statistics_{gp1_name}_{gp2_name}.csv'  # FIXME: per channel
+            output_path = directory / f'{channel}_statistics_{gp1_name}_{gp2_name}.csv'
         if save:
             total_df.to_csv(output_path)
         dfs[channel_] = total_df
     return dfs
 
 
-def density_files_are_comparable(directory, gp1_dirs, gp2_dirs, channel):
-    gp1_f_list = dirs_to_density_files(directory, gp1_dirs, channel)  # FIXME: channel
-    gp2_f_list = dirs_to_density_files(directory, gp2_dirs, channel)  # FIXME: channel
+def density_files_are_comparable(directory, gp1_dirs, gp2_dirs, channel, density_files_suffix=''):
+    gp1_f_list = dirs_to_density_files(directory, gp1_dirs, channel, suffix=density_files_suffix)
+    gp2_f_list = dirs_to_density_files(directory, gp2_dirs, channel, suffix=density_files_suffix)
     all_files = gp1_f_list + gp2_f_list
     sizes = [os.path.getsize(f) for f in all_files]
     tolerance = 1024  # 1 KB
@@ -541,7 +541,8 @@ def density_files_are_comparable(directory, gp1_dirs, gp2_dirs, channel):
 
 
 # REFACTOR: move to separate module
-def compare_groups(directory, gp1_name, gp2_name, gp1_dirs, gp2_dirs, prefix='p_val_colors', advanced=True):
+def compare_groups(directory, gp1_name, gp2_name, gp1_dirs, gp2_dirs, prefix='p_val_colors',
+                   advanced=True, density_files_suffix=''):
     directory = Path(directory)
 
     sample_manager = SampleManager()
@@ -549,18 +550,24 @@ def compare_groups(directory, gp1_name, gp2_name, gp1_dirs, gp2_dirs, prefix='p_
     result = {}
     for channel in sample_manager.channels:
         # FIXME: counts is only for cell_map, make compatible with other pipelines
-        density_asset = sample_manager.get('density', channel=channel, asset_sub_type='counts', default=None)
+        asset_sub_type = 'counts' or density_files_suffix
+        density_asset = sample_manager.get('density', channel=channel, asset_sub_type=asset_sub_type,
+                                           default=None)
         if density_asset is None or not density_asset.exists:
             print(f'No density files found for channel {channel}, skipping')
             continue
 
-        gp1_f_list = dirs_to_density_files(directory, gp1_dirs, channel)
-        gp2_f_list = dirs_to_density_files(directory, gp2_dirs, channel)
+        gp1_f_list = dirs_to_density_files(directory, gp1_dirs, channel, density_files_suffix)
+        gp2_f_list = dirs_to_density_files(directory, gp2_dirs, channel, density_files_suffix)
 
-        gp1_stacked_voxelizations = stack_voxelizations(directory, gp1_f_list, channel=channel, suffix=gp1_name)
-        average_voxelization_groups(gp1_stacked_voxelizations, directory, gp1_name, channel=channel, compute_sd=advanced)
-        gp2_stacked_voxelizations = stack_voxelizations(directory, gp2_f_list, channel=channel, suffix=gp2_name)
-        average_voxelization_groups(gp2_stacked_voxelizations, directory, gp2_name, channel=channel, compute_sd=advanced)
+        gp1_stacked_voxelizations = stack_voxelizations(directory, gp1_f_list, channel=channel,
+                                                        suffix=f'{density_files_suffix}_{gp1_name}')
+        average_voxelization_groups(gp1_stacked_voxelizations, directory, f'{density_files_suffix}_{gp1_name}',
+                                    channel=channel, compute_sd=advanced)
+        gp2_stacked_voxelizations = stack_voxelizations(directory, gp2_f_list, channel=channel,
+                                                        suffix=f'{density_files_suffix}_{gp2_name}')
+        average_voxelization_groups(gp2_stacked_voxelizations, directory, f'{density_files_suffix}_{gp2_name}',
+                                    channel=channel, compute_sd=advanced)
 
         t_vals, p_vals = stats.ttest_ind(gp1_stacked_voxelizations, gp2_stacked_voxelizations, axis=3, equal_var=False)
         p_vals, t_vals = remove_p_val_nans(p_vals, t_vals)
@@ -569,7 +576,7 @@ def compare_groups(directory, gp1_name, gp2_name, gp1_dirs, gp2_dirs, prefix='p_
         colored_p_vals_01 = get_colored_p_vals(p_vals, t_vals, 0.01, ('green', 'blue'))
         colored_p_vals = np.maximum(colored_p_vals_05, colored_p_vals_01).astype(np.uint8)
 
-        output_f_name = f'{channel}_{prefix}_{gp1_name}_{gp2_name}.tif'
+        output_f_name = f'{channel}_{prefix}_{gp1_name}_{gp2_name}_{density_files_suffix}.tif'
         output_file_path = directory / output_f_name
         clearmap_io.write(output_file_path, colored_p_vals, photometric='rgb', imagej=True)
 
@@ -577,7 +584,7 @@ def compare_groups(directory, gp1_name, gp2_name, gp1_dirs, gp2_dirs, prefix='p_
             effect_size = np.abs(np.mean(gp1_stacked_voxelizations, axis=3).astype(int) -
                                  np.mean(gp2_stacked_voxelizations, axis=3).astype(int))
             effect_size = effect_size.astype(np.uint16)  # for imagej compatibility
-            output_f_name = f'{channel}_effect_size_{gp1_name}_{gp2_name}.tif'
+            output_f_name = f'{channel}_effect_size_{gp1_name}_{gp2_name}_{density_files_suffix}.tif'
             output_file_path = directory / output_f_name
             clearmap_io.write(output_file_path, effect_size, imagej=True)
 
