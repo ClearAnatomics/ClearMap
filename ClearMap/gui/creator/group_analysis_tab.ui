@@ -72,7 +72,6 @@
     <widget class="QToolBox" name="batchToolBox">
      <property name="font">
       <font>
-       <weight>75</weight>
        <bold>true</bold>
       </font>
      </property>
@@ -88,7 +87,7 @@
         <x>0</x>
         <y>0</y>
         <width>438</width>
-        <height>600</height>
+        <height>620</height>
        </rect>
       </property>
       <attribute name="label">
@@ -154,7 +153,7 @@
         <x>0</x>
         <y>0</y>
         <width>438</width>
-        <height>600</height>
+        <height>620</height>
        </rect>
       </property>
       <attribute name="label">
@@ -172,21 +171,31 @@
         <x>0</x>
         <y>0</y>
         <width>438</width>
-        <height>600</height>
+        <height>620</height>
        </rect>
       </property>
       <attribute name="label">
        <string>P Values</string>
       </attribute>
-      <layout class="QVBoxLayout" name="verticalLayout">
-       <item>
+      <layout class="QGridLayout" name="gridLayout_2">
+       <item row="0" column="0" colspan="2">
         <widget class="QCheckBox" name="computeSdAndEffectSizeCheckBox">
          <property name="text">
           <string>Compute SD and effect size</string>
          </property>
         </widget>
        </item>
-       <item>
+       <item row="1" column="0">
+        <widget class="QLabel" name="densitySuffixTextFilterLabel">
+         <property name="text">
+          <string>Density suffix</string>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="1">
+        <widget class="QLineEdit" name="densitySuffixTextFilterLineEdit"/>
+       </item>
+       <item row="2" column="1">
         <widget class="QPushButton" name="runPValsPushButton">
          <property name="toolTip">
           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Compute the p value maps for all the pairs of groups selected in the &lt;span style=&quot; font-style:italic;&quot;&gt;comparisons&lt;/span&gt; tab&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
@@ -196,7 +205,7 @@
          </property>
         </widget>
        </item>
-       <item>
+       <item row="3" column="1">
         <widget class="QPushButton" name="plotPValsPushButton">
          <property name="text">
           <string>Display</string>
@@ -211,7 +220,7 @@
         <x>0</x>
         <y>0</y>
         <width>438</width>
-        <height>600</height>
+        <height>620</height>
        </rect>
       </property>
       <attribute name="label">

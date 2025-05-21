@@ -1864,12 +1864,14 @@ class GroupAnalysisParams(BatchParameters):
     """
     # plot_channel: str
     compute_sd_and_effect_size: bool
+    density_suffix: str
 
     def __init__(self, tab, preferences=None):
         super().__init__(tab, preferences)
         self.params_dict = {
             # 'plot_channel': ParamLink(None, self.tab.plotChannelComboBox),
             'compute_sd_and_effect_size': ParamLink(None, self.tab.computeSdAndEffectSizeCheckBox),
+            'density_suffix': ParamLink(None, self.tab.densitySuffixTextFilterLineEdit)
         }
         self.plot_density_maps_buttons = []
         self.comparison_checkboxes = []
