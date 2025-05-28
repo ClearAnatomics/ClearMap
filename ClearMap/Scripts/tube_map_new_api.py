@@ -8,6 +8,7 @@ optionally, provide the atlas base name as second argument
 """
 import sys
 import os
+import shutil
 os.environ['TMP'] = '/data/maxime.boyer/1_tmp'
 
 # sys.path.insert(0, '/home/maxime.boyer/Documents/1_Projects/1_ClearMap/ClearMap/')
@@ -18,18 +19,16 @@ from ClearMap.processors.tube_map import BinaryVesselProcessor, VesselGraphProce
 
 
 def main(src_directory):
+    # shutil.copy(
+    #     '/network/iss/renier/projects/vasculature/pregnancy/processed/230411-vasculature-timepoint_idisco/230411-1/1_stitched.npy',
+    #     src_directory)
     sample_manager = SampleManager()
     sample_manager.setup(src_dir=src_directory)
 
     # stitcher = StitchingProcessor(sample_manager)
     # stitcher.setup()
-    # registration_processor = RegistrationProcessor(sample_manager)
-    # registration_processor.setup()
-
-    # structure_name = 'hypothalamus'
-    # stitched_asset = sample_manager.get('stitched', channel='vasc')
-    # stitched_asset.create_debug(slicing=None, status=structure_name)
-    # sample_manager.workspace.debug = structure_name
+    registration_processor = RegistrationProcessor(sample_manager)
+    registration_processor.setup()
 
     # stitch(stitcher)
     # stitcher.plot_stitching_results(mode='overlay')
