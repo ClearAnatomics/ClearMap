@@ -259,9 +259,6 @@ class BinaryVesselProcessor(TabProcessor):
         binarization_parameter = copy.deepcopy(vasculature.default_binarization_parameter)
         binarization_cfg = self.processing_config['binarization'][channel]
         binarization_parameter['clip']['clip_range'] = binarization_cfg['binarize']['clip_range']
-        # for step in binarization_parameter.keys():
-        #     if isinstance(binarization_parameter[step], dict): #and step!= 'clip':
-        #         binarization_parameter[step]['save'] = sink.parent / f"inter_{step}_{channel}.npy"
 
         deconvolve_threshold = binarization_cfg['binarize']['threshold']
         if deconvolve_threshold is not None:

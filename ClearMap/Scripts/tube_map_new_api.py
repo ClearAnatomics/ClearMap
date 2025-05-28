@@ -7,10 +7,6 @@ in the data folder and call this script with the folder as single argument
 optionally, provide the atlas base name as second argument
 """
 import sys
-import os
-os.environ['TMP'] = '/data/maxime.boyer/1_tmp'
-
-# sys.path.insert(0, '/home/maxime.boyer/Documents/1_Projects/1_ClearMap/ClearMap/')
 
 from ClearMap.Scripts.align_new_api import stitch, register, plot_registration_results
 from ClearMap.processors.sample_preparation import SampleManager, StitchingProcessor, RegistrationProcessor
@@ -21,29 +17,24 @@ def main(src_directory):
     sample_manager = SampleManager()
     sample_manager.setup(src_dir=src_directory)
 
-    # stitcher = StitchingProcessor(sample_manager)
-    # stitcher.setup()
-    # registration_processor = RegistrationProcessor(sample_manager)
-    # registration_processor.setup()
+    stitcher = StitchingProcessor(sample_manager)
+    stitcher.setup()
+    registration_processor = RegistrationProcessor(sample_manager)
+    registration_processor.setup()
 
-    # structure_name = 'hypothalamus'
-    # stitched_asset = sample_manager.get('stitched', channel='vasc')
-    # stitched_asset.create_debug(slicing=None, status=structure_name)
-    # sample_manager.workspace.debug = structure_name
+    stitch(stitcher)
+    stitcher.plot_stitching_results(mode='overlay')
 
-    # stitch(stitcher)
-    # stitcher.plot_stitching_results(mode='overlay')
-
-    # register(registration_processor)
-    # plot_registration_results(registration_processor, sample_manager.alignment_reference_channel)
+    register(registration_processor)
+    plot_registration_results(registration_processor, sample_manager.alignment_reference_channel)
 
     binary_vessel_processor = BinaryVesselProcessor(sample_manager)
 
-    for channel in sample_manager.get_channels_by_pipeline('TubeMap', as_list=True):  # ["vasc"]
+    for channel in sample_manager.get_channels_by_pipeline('TubeMap', as_list=True):
         binary_vessel_processor.binarize_channel(channel)
         binary_vessel_processor.smooth_channel(channel)
         binary_vessel_processor.fill_channel(channel)
-        #binary_vessel_processor.deep_fill_channel(channel)
+        binary_vessel_processor.deep_fill_channel(channel)
 
     binary_vessel_processor.combine_binary()
     # binary_vessel_processor.plot_combined(arrange=True)
