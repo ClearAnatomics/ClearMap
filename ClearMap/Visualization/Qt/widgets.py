@@ -24,7 +24,7 @@ class Scatter3D:
         self.__has_hemispheres = hemispheres is not None  # FIXME: this should be renamed to has_different_symbols
         self.half_slice_thickness = half_slice_thickness
         self.axis = 2
-        self.marker_size = marker_size
+        self.marker_size = max(2, marker_size)
 
         if isinstance(coordinates, pd.DataFrame):
             self.data = coordinates
