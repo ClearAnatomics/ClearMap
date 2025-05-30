@@ -30,7 +30,7 @@ def main(src_directory):
 
     binary_vessel_processor = BinaryVesselProcessor(sample_manager)
 
-    for channel in binary_vessel_processor.processing_config['channels'].keys():  # TODO: assert config has been updated
+    for channel in sample_manager.get_channels_by_pipeline('TubeMap', as_list=True):
         binary_vessel_processor.binarize_channel(channel)
         binary_vessel_processor.smooth_channel(channel)
         binary_vessel_processor.fill_channel(channel)

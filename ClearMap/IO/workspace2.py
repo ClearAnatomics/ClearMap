@@ -358,7 +358,7 @@ class Workspace2:  # REFACTOR: subclass dict
         else:
             matching_types = [k for k in self.asset_collections[channel].keys() if k.startswith(asset_type)]
         if len(matching_types) == 0:
-            raise KeyError(f'No asset of type {asset_type} found in workspace.')  # FIXME: ClearMapKeyError
+            raise KeyError(f'No asset of type "{asset_type}" found in workspace.')  # FIXME: ClearMapKeyError
         elif len(matching_types) == 1:
             asset = self.asset_collections[matching_types[0]]
         else:
