@@ -468,10 +468,8 @@ class VesselGraphProcessor(TabProcessor):
         self.steps = VesselGraphProcessorSteps(self.workspace)  # FIXME: handle skeleton
         self.setup(sample_manager, registration_processor)
         self.parent_channels = tuple([k for k in self.processing_config['binarization'].keys() if k != 'combined'])
-        arteries_channel = tuple([c for c, v in self.sample_config['channels'].items() if v['data_type'] == 'arteries'])
-        if len(arteries_channel) > 1:
-            raise ValueError('Multiple arteries channels found')
-        self.arteries_channel = arteries_channel[0] if arteries_channel  else ''
+        self.arteries_channel = self.sample_manager.get_channels_by_type('arteries', missing_action='ignore',
+                                                                         multiple_found_action='error')
 
     def __get_graph(self, step):
         if step not in self.__graphs:
@@ -653,7 +651,12 @@ class VesselGraphProcessor(TabProcessor):
 
     def _set_graph_artery_property(self, asset_type, asset_sub_type=None, suffix='', radius_shift=0):
         suffix = suffix or asset_type
-        source = self.get_path(asset_type, channel=self.parent_channels, asset_sub_type=asset_sub_type)
+        if not isinstance(asset_sub_type, (list, tuple)):
+            asset_sub_type = [asset_sub_type]
+        for sub_type in asset_sub_type:
+            source = self.get_path(asset_type, channel=self.arteries_channel, asset_sub_type=sub_type)
+            if source.exists():
+                break
         coordinates = self.graph_raw.vertex_coordinates()  # OPTIMISE: cache ?
         radii = self.graph_raw.vertex_radii() + radius_shift
         expression = measure_expression.measure_expression(source, coordinates, radii, method='max')  # WARNING: prange
@@ -662,7 +665,7 @@ class VesselGraphProcessor(TabProcessor):
 
     def _set_artery_binary(self):
         """Define if vertex is artery from binary labelling"""
-        self._set_graph_artery_property('binary', asset_sub_type='final')
+        self._set_graph_artery_property('binary', asset_sub_type=['filled', 'postprocessed'])
 
     def _set_arteriness(self):
         """'arteriness' from signal intensity"""
