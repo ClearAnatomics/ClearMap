@@ -318,7 +318,7 @@ def reduce_graph(graph, vertex_to_edge_mappings={'radii': np.max},  # FIXME: use
     non_degree_2_vertices_ids = np.where(g.vertex_degrees() != 2)[0]
     n_branch_points = len(non_degree_2_vertices_ids)
     degree_2_vertices_ids = np.where(g.vertex_degrees() == 2)[0]
-    n_non_branch_points = len(degree_2_vertices_ids)
+    n_non_branch_points = len(degree_2_vertices_ids)  # FIXME: n_degrees_2
 
     if verbose:
         timer.print_elapsed_time(
