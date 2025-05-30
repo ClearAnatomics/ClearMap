@@ -106,6 +106,8 @@ class BinaryVesselProcessorSteps(ProcessorSteps):
 
 
 class BinaryVesselProcessor(TabProcessor):
+    steps: dict[str: BinaryVesselProcessorSteps]
+
     def __init__(self, sample_manager=None):
         super().__init__()
         self.inputs_match = False
@@ -367,16 +369,16 @@ class BinaryVesselProcessor(TabProcessor):
         if len(self.channels_to_binarize()) > 1:
             sources = []
             for channel in self.channels_to_binarize():
-                src_path = self.get_path('binary', channel=channel, asset_sub_type='filled')
-                if src_path.exists():
-                    sources.append(src_path)
+                asset = self.steps[channel].get_asset(self.steps[channel].filled, step_back=True)
+                if asset.exists:
+                    sources.append(asset.path)
                 else:
-                    raise FileNotFoundError(f'File {src_path} not found')
+                    raise FileNotFoundError(f'File {asset.path} not found')
             block_processing.process(np.logical_or, sources, sink_asset.path,
                                      size_max=500, overlap=0, processes=None, verbose=True)
         else:  # We expect to have at least all_vessels_channel
             source = self.steps[self.all_vessels_channel].get_asset(self.steps[self.all_vessels_channel].filled,
-                                                                    step_back=True)
+                                                                    step_back=True).path
             clearmap_io.copy_file(source, sink_asset.path)
 
         self.post_process_binary_combined()
