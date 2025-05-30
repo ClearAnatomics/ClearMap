@@ -1093,22 +1093,22 @@ class Graph(grp.AnnotatedGraph):
         self._base.list_properties()
 
     def save(self, filename):
-        self._base.save(filename)
+        self._base.save(str(filename))
 
     def load(self, filename):
-        self._base = gt.load_graph(filename)
+        self._base = gt.load_graph(str(filename))
 
     def copy(self):
         return Graph(name=copy.copy(self.name), base=self.base.copy())
 
 
 def load(filename):
-    g = gt.load_graph(filename)
+    g = gt.load_graph(str(filename))
     return Graph(base=g)
 
 
 def save(filename, graph):
-    graph.save(filename)
+    graph.save(str(filename))
 
 
 ###############################################################################
