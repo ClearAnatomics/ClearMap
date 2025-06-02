@@ -385,7 +385,8 @@ class CellDetector(TabProcessor):
                 asset_properties['asset_type'] = 'atlas'
                 asset_properties['asset_sub_type'] = 'reference'
             else:
-                asset_properties['asset_type'] = 'resampled'
+                warnings.warn('Dataset not registered, cannot be plotted onto reference atlas. ')
+                return
 
         asset = self.get(**asset_properties)
         if not asset.exists or not self.df_path.exists:
