@@ -416,12 +416,15 @@ class CellDetector(TabProcessor):
         else:
             hemispheres = None
 
-        unique_ids = np.sort(np.unique(df['id']))
-        annotator = self.registration_processor.annotators[self.channel]
-        # color_map = {id_: annotator.find(id_, key='id')['rgb'] for id_ in unique_ids}
-        color_map = {id_: annotator.convert_label(id_, key='id', value='color_hex_triplet') for id_ in unique_ids}
-        color_map[0] = np.array(to_hex((1, 0, 0)))  # default to red
-        df['color'] = df['id'].map(color_map)
+        if 'id' in df.columns:
+            unique_ids = np.sort(np.unique(df['id']))
+            annotator = self.registration_processor.annotators[self.channel]
+            # color_map = {id_: annotator.find(id_, key='id')['rgb'] for id_ in unique_ids}
+            color_map = {id_: annotator.convert_label(id_, key='id', value='color_hex_triplet') for id_ in unique_ids}
+            color_map[0] = np.array(to_hex((1, 0, 0)))  # default to red
+            df['color'] = df['id'].map(color_map)
+        else:
+            df['color'] = to_hex((1, 0, 0))
 
         particle_size = self.processing_config['detection']['background_correction']['diameter'][0]
         dv.scatter_coords = Scatter3D(coordinates, colors=df['color'].to_list(),
