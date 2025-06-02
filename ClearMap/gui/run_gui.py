@@ -53,7 +53,7 @@ os.environ['CLEARMAP_GUI_HOSTED'] = "1"
 # Load directly to ensure not ClearMap module is loaded before fixing tmp folder
 machine_cfg = configobj.ConfigObj(os.path.expanduser('~/.clearmap/machine_params_v3_0.cfg'),
                                   unrepr=True, encoding='utf-8', indent_type='    ')
-tmp_folder = machine_cfg.get('temp_folder', None)
+tmp_folder = machine_cfg.get('temp_folder')
 if tmp_folder is not None:
     for var_name in ('TMP', 'TEMP', 'TMPDIR'):
         os.environ[var_name] = tmp_folder
