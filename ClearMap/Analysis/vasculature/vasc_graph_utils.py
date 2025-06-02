@@ -326,6 +326,7 @@ def parallel_get_vessels_lengths(graph, edge_coordinates_name='coordinates', cli
     """
     n_processes = min(n_processes, MAX_PROCS)
     vessels_coordinates = graph.edge_geometry(edge_coordinates_name)
+    if len(vessels_coordinates) < 1000: n_processes = 1  # Avoids overhead of parallel processing for small graphs
     if n_processes > 1:
         try:  # try parallel processing
             chunk_size = max(min_chunk_size, len(vessels_coordinates) // (2 * n_processes))
