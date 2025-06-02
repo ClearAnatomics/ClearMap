@@ -293,8 +293,8 @@ green "Done"
 
 # CONFIG
 clearmap_install_path=$(python -c "from ClearMap.config.update_config import CLEARMAP_DIR; print(CLEARMAP_DIR)")
-if [ "$clearmap_install_path" == "" ];then
-    echo "ERROR: could not get ClearMap install path"
+if [ "$clearmap_install_path" == "" ]; then
+    red "ERROR: could not get ClearMap install path"
     exit 1
 fi
 echo "ClearMap installed at \"$clearmap_install_path\""
