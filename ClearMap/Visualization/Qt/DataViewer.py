@@ -653,8 +653,6 @@ class DataViewer(QWidget):
 
         scale_x = self.source_range_x / (x_range[1] - x_range[0])
         scale_y = self.source_range_y / (y_range[1] - y_range[0])
-        # transform = self.view.viewTransform()
-        # scale_x, scale_y = transform.m11(), transform.m22()
         zoom_factor = (scale_x + scale_y) / 2.0
 
         scaled_size = round(self.scatter_coords.marker_size * zoom_factor)
@@ -667,14 +665,12 @@ class DataViewer(QWidget):
                                      **self.scatter_coords.get_draw_params(index))
             else:
                 self.scatter.setData(pos=pos, **DataViewer.DEFAULT_SCATTER_PARAMS.copy())  # TODO: check if copy required
-        try:  # FIXME: check why some markers trigger errors
-            if self.scatter_coords.half_slice_thickness is not None:
+        try:  # TODO: check why some markers trigger errors
+            if self.scatter_coords.half_slice_thickness is not None and self.scatter_coords.half_slice_thickness > 0:
                 marker_params = self.scatter_coords.get_all_data(index)
                 if marker_params['pos'].shape[0]:
                     marker_params['size'] *= zoom_factor
                     self.scatter.addPoints(brush=pg.mkBrush((0, 0, 0, 0)), **marker_params)
-                    # self.scatter.addPoints(symbol='o', brush=pg.mkBrush((0, 0, 0, 0)),
-                    #                        **marker_params)  # FIXME: scale size as function of zoom
         except KeyError as err:
             print(f'DataViewer error: {err}')
 
