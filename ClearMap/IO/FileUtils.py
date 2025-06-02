@@ -46,7 +46,7 @@ def is_file(filename):
     is_file : bool
         True if filename exists on disk and is not a directory.
     """
-    if not isinstance(filename, str):
+    if not isinstance(filename, (str, Path)):
         return False
 
     if os.path.isdir(filename):
@@ -227,6 +227,8 @@ def delete_file(filename):
     filename : str
         Filename to delete.
     """
+    if isinstance(filename, Path):
+        filename = str(filename)
     if is_file(filename):
         os.remove(filename)
 
