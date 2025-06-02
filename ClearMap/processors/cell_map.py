@@ -419,7 +419,7 @@ class CellDetector(TabProcessor):
         particle_size = self.processing_config['detection']['background_correction']['diameter'][0]
         dv.scatter_coords = Scatter3D(coordinates, colors=df['color'].to_list(),
                                       hemispheres=hemispheres, half_slice_thickness=0,
-                                      marker_size=particle_size // 5)
+                                      marker_size=max(3, particle_size // 2))
         dv.refresh()
         return [dv]
 
