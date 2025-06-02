@@ -185,15 +185,15 @@ class CellDetector(TabProcessor):
         -------
         coordinates, counts_file_path: np.array, str
         """
-        counts_file_path = self.get_path('density', channel=self.channel, asset_sub_type='counts')
-        clearmap_io.delete_file(counts_file_path)
+        counts_asset = self.get('density', channel=self.channel, asset_sub_type='counts')
+        counts_asset.delete(missing_ok=True)  # Remove previous counts file if exists
         self.set_watcher_step('Unweighted voxelisation')
-        voxelization.voxelize(coordinates, sink=counts_file_path, **voxelization_parameter)  # WARNING: prange
+        voxelization.voxelize(coordinates, sink=counts_asset.path, **voxelization_parameter)  # WARNING: prange
         self.update_watcher_main_progress()
         # uncrusted_coordinates = self.remove_crust(coordinates)  # WARNING: currently causing issues
         #         density_path = self.get_path('density', channel=self.channel, asset_sub_type='counts_wcrust')
         #         voxelization.voxelize(uncrusted_coordinates, sink=density_path, **voxelization_parameter)   # WARNING: prange
-        return coordinates, counts_file_path
+        return coordinates, counts_asset.path
 
     def voxelize_weighted(self, coordinates, source, voxelization_parameter):
         """
@@ -205,10 +205,11 @@ class CellDetector(TabProcessor):
         source: Source.Source
         voxelization_parameter: dict
         """
-        intensities_file_path = self.get_path('density', channel=self.channel, asset_sub_type='intensities')
+        intensities_asset = self.get('density', channel=self.channel, asset_sub_type='intensities')
+        intensities_asset.delete(missing_ok=True)  # Remove previous intensities file if exists
         intensities = source['source']
-        voxelization.voxelize(coordinates, sink=intensities_file_path, weights=intensities, **voxelization_parameter)   # WARNING: prange
-        return intensities_file_path
+        voxelization.voxelize(coordinates, sink=intensities_asset.path, weights=intensities, **voxelization_parameter)   # WARNING: prange
+        return intensities_asset.path
 
     def atlas_align(self):
         """Atlas alignment and annotation """
@@ -275,21 +276,21 @@ class CellDetector(TabProcessor):
         cell_detection_param['intensity_detection']['measure'] = ['source']
         cell_detection_param['shape_detection']['threshold'] = self.processing_config['detection']['shape_detection']['threshold']
         if tuning:
-            bkg_path = self.get_path('cells', channel=self.channel, asset_sub_type='bkg')
-            clearmap_io.delete_file(bkg_path)
-            cell_detection_param['background_correction']['save'] = bkg_path
+            bkg_asset = self.get('cells', channel=self.channel, asset_sub_type='bkg')
+            bkg_asset.delete(missing_ok=True)  # Remove previous background file if exists
+            cell_detection_param['background_correction']['save'] = str(bkg_asset.path)
 
-        shape_path = self.get_path('cells', channel=self.channel, asset_sub_type='shape')
+        shape_asset = self.get('cells', channel=self.channel, asset_sub_type='shape')
         if save_shape or tuning:
-            clearmap_io.delete_file(shape_path)
-            cell_detection_param['shape_detection']['save'] = shape_path
+            shape_asset.delete(missing_ok=True)
+            cell_detection_param['shape_detection']['save'] = str(shape_asset.path)
             # if save_as_binary_mask:
             # cell_detection_param['shape_detection']['save_dtype'] = 'bool'
 
         if save_maxima:
-            maxima_path = self.get_path('cells', channel=self.channel, asset_sub_type='maxima')
-            clearmap_io.delete_file(maxima_path)
-            cell_detection_param['maxima_detection']['save'] = maxima_path
+            maxima_asset = self.get('cells', channel=self.channel, asset_sub_type='maxima')
+            maxima_asset.delete(missing_ok=True)
+            cell_detection_param['maxima_detection']['save'] = str(maxima_asset.path)
 
         processing_parameter = copy.deepcopy(cell_detection.default_cell_detection_processing_parameter)
         processing_parameter.update(  # TODO: store as other dict and run .update(**self.extra_detection_params)
@@ -304,14 +305,14 @@ class CellDetector(TabProcessor):
         n_steps = self.get_n_blocks(self.get('stitched', channel=self.channel).shape()[2])
         self.prepare_watcher_for_substep(n_steps, self.cell_detection_re, 'Detecting cells')
         try:
-            dest_path = self.get_path('cells', channel=self.channel, asset_sub_type='raw')
-            clearmap_io.delete_file(dest_path)
-            cell_detection.detect_cells(self.get_path('stitched', channel=self.channel), dest_path,
+            dest_asset = self.get('cells', channel=self.channel, asset_sub_type='raw')
+            dest_asset.delete(missing_ok=True)
+            cell_detection.detect_cells(self.get_path('stitched', channel=self.channel), dest_asset.path,
                                         cell_detection_parameter=cell_detection_param,
                                         processing_parameter=processing_parameter,
                                         workspace=self.workspace)  # WARNING: prange inside multiprocess (including arrayprocessing and devolvepoints for vox)
-            if save_shape and save_as_binary_mask and clearmap_io.dtype(shape_path) != 'bool':
-                clearmap_io.write(shape_path, np.array(clearmap_io.read(shape_path).astype('bool')))
+            if save_shape and save_as_binary_mask and shape_asset.dtype() != 'bool':
+                shape_asset.write(np.array(shape_asset.read().astype('bool')))
         except BrokenProcessPool as err:
             print(f'Cell detection canceled, see: {err}')
             return
@@ -539,7 +540,6 @@ class CellDetector(TabProcessor):
                             'intensities': ['source', 'dog', 'background', 'size']}
         for sub_type, names in clearmap1_format.items():
             sink = self.get_path('cells', channel=self.channel, asset_sub_type=f'ClearMap1{sub_type}')
-            print(sub_type, sink)
             data = np.array(
                 [source[name] if name in source.dtype.names else np.full(source.shape[0], np.nan) for name in names]
             )
@@ -548,7 +548,7 @@ class CellDetector(TabProcessor):
 
     def convert_cm2_to_cm2_1_fmt(self):
         """Atlas alignment and annotation """
-        cells = np.load(self.get_path('cells', channel=self.channel))
+        cells = self.get('cells', channel=self.channel).read()
         df = pd.DataFrame({ax: cells[ax] for ax in 'xyz'})
         df['size'] = cells['size']
         df['source'] = cells['source']
