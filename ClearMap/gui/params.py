@@ -16,23 +16,26 @@ from typing import List
 import numpy as np
 
 from PyQt5.QtCore import Qt, pyqtSignal
-from PyQt5.QtWidgets import QInputDialog, QToolBox, QCheckBox, QPushButton, QLabel, QSlider, QHBoxLayout, QComboBox
+from PyQt5.QtWidgets import QInputDialog, QToolBox, QCheckBox, QPushButton, QLabel, QSlider, QHBoxLayout, QComboBox, \
+    QSpinBox, QLineEdit, QDoubleSpinBox, QGroupBox, QRadioButton, QVBoxLayout, QFrame, QButtonGroup
 
 from ClearMap.IO.assets_constants import CONTENT_TYPE_TO_PIPELINE
 from ClearMap.Utils.exceptions import ClearMapValueError
 from ClearMap.Utils.utilities import validate_orientation, snake_to_title, DEFAULT_ORIENTATION, get_item_recursive
 from ClearMap.config.atlas import ATLAS_NAMES_MAP
 
-from ClearMap.gui.gui_utils import create_clearmap_widget, clear_layout
+from ClearMap.gui.gui_utils import create_clearmap_widget, clear_layout, replace_widget
 from ClearMap.gui.dialogs import get_directory_dlg
 from ClearMap.gui.params_interfaces import (ParamLink, UiParameter, UiParameterCollection,
-                                            ChannelsUiParameterCollection, ChannelUiParameter)
+                                            ChannelsUiParameterCollection, ChannelUiParameter, LayoutUiParameter)
 
 __author__ = 'Charly Rousseau <charly.rousseau@icm-institute.org>'
 __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
 __copyright__ = 'Copyright © 2022 by Charly Rousseau'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://github.com/ClearAnatomics/ClearMap'
+
+from ClearMap.gui.widget_monkeypatch_callbacks import recursive_patch_compound_boxes
 
 from ClearMap.processors.sample_preparation import SampleManager
 
@@ -1438,6 +1441,8 @@ class VesselGraphParams(UiParameter):
     min_artery_size: int
     min_vein_size: int
 
+    filtersChanged = pyqtSignal()
+
     def __init__(self, tab):
         super().__init__(tab)
         self.params_dict = {
@@ -1478,9 +1483,188 @@ class VesselGraphParams(UiParameter):
                                        self.tab.minVeinSizeDoubleSpinBox)
         }
         self.connect()
+        self.filter_params = []
 
     def connect(self):
         self.connect_simple_widgets()
+
+    def add_graph_filter_params(self, widget, graph):
+        self.filter_params.append(GraphFilterParams(self, widget, graph))
+        self.filtersChanged.emit()
+
+
+class GraphFilterParams(UiParameter):  # FIXME: do we really pass the graph as argument or just the prop names/types ?
+    def __init__(self, main_params, widget, graph):
+        self.main_params = main_params
+        super().__init__(widget)#, filter_name)  # self.tab will be based on filter_name
+        self.index = int(widget.objectName().split('_')[-1])
+        self.layout = self.tab.parent().findChild(QVBoxLayout, 'filterParamsVerticalLayout')
+
+        self.graph = graph
+        self.update_properties()
+        self.connect()
+
+    def connect(self):
+        self.tab.vertexFilterRadioButton.toggled.connect(self.update_properties)
+
+    def update_properties(self):
+        if self.filter_type == 'vertex':
+            properties = self.graph._base.vertex_properties
+        else:
+            properties = self.graph._base.edge_properties
+        properties_names = list(properties.keys())  # Guarantee order
+        dtypes = [properties[prop_name].python_value_type() for prop_name in properties_names]
+        dtype_names = []
+        for dtype in dtypes:
+            if isinstance(dtype, tuple):
+                dtype_names.append([t.__name__ for t in dtype][-1])  # if List[type] -> type
+            else:
+                dtype_names.append(dtype.__name__)
+
+        self.tab.graphFilterPropertyNameComboBox.clear()
+        for prop_name, dtype in zip(properties_names + ['degrees'], dtype_names + ['int']):
+            self.tab.graphFilterPropertyNameComboBox.addItem(prop_name, userData=dtype)
+
+        self.handle_property_name_changed()  # Set default value for the first property
+
+        self.main_params.filtersChanged.emit()  # Notify that properties changed
+
+    @property
+    def cfg_subtree(self):
+        return []  # Not in cfg
+
+    @property
+    def filter_type(self):
+        return 'vertex' if self.tab.vertexFilterRadioButton.isChecked() else 'edge'
+
+    @property
+    def property_name(self):
+        return self.tab.graphFilterPropertyNameComboBox.currentText()
+
+    @property
+    def current_dtype(self):
+        return self.tab.graphFilterPropertyNameComboBox.currentData()
+
+    def get_default_property_value(self):
+        property_dtype = self.current_dtype
+        if property_dtype == 'bool':
+            return False
+        elif property_dtype in ('int', 'float'):
+            return 0
+        elif property_dtype == 'str':
+            return ''
+        else:
+            raise ClearMapValueError(f'Unknown property type: {property_dtype}')
+
+    def get_property_value(self):
+        property_dtype = self.current_dtype
+        value_widget = self.tab.graphFilterPropertyValueWidget
+        if property_dtype == 'bool':
+            return value_widget.isChecked()
+        elif property_dtype in ('int', 'float'):
+            return value_widget.getValue()
+            # return self.tab.graphFilterPropertyValueDoublet.getValue()
+        elif property_dtype == 'str':
+            return value_widget.text()
+        else:
+            raise ClearMapValueError(f'Unknown property type: {property_dtype}')
+
+    @property
+    def combine_operator_name(self):
+        """
+        Read the action from the following combine button
+        Returns
+        -------
+
+        """
+        p2 = self.layout.parent().parent()
+        and_button = p2.findChild(QRadioButton, f'filter_{self.index}_and_btn')
+        # or_button = p2.findChild(QRadioButton, f'filter_{self.index}_or_btn')
+        if not and_button:  # Last filter
+            return None
+        return 'and' if and_button.isChecked() else 'or'
+
+    def suffix(self):
+        suffix = f'{self.property_name}_{self.get_property_value()}'
+        combine_action = self.combine_operator_name
+        if combine_action is not None:
+            suffix += f'_{combine_action}'
+        return suffix
+
+    def cfg_to_ui(self):
+        self.reload()
+        super().cfg_to_ui()
+
+    def connect(self):
+        self.tab.graphFilterPropertyNameComboBox.currentTextChanged.connect(
+            self.handle_property_name_changed
+        )
+        self.connect_simple_widgets()
+
+    def handle_property_name_changed(self):
+        property_dtype = self.current_dtype
+        value = self.get_default_property_value()
+        controls_layout = self.tab.filterControlsGridLayout
+        if property_dtype == 'bool':
+            widget = QCheckBox(self.tab)
+            widget.setChecked(value)
+        elif property_dtype in ('int', 'float'):
+            if property_dtype == 'int':
+                widget_class = QSpinBox
+            else:
+                widget_class = QDoubleSpinBox
+            widget = self.__create_range_ctrl(widget_class, signed=False)  # FIXME: decide on signed
+
+            widget.setValue(value)
+        elif property_dtype == 'str':
+            widget = QLineEdit(self.tab)
+            widget.setText(value)
+        else:
+            raise ClearMapValueError(f'Unknown property type: {property_dtype}')
+        self.tab.graphFilterPropertyValueWidget = replace_widget(
+            self.tab.graphFilterPropertyValueWidget, widget, layout=controls_layout)
+
+        self.main_params.filtersChanged.emit()
+
+    def __create_range_ctrl(self, widget_class, signed=True):
+        """
+        Create a doublet control for a range of values, e.g. for min and max values.
+
+        .. warning::
+            QSpinBox takes only signed 32 bit integers (hence a range of -2**31 to 2**31-1)
+
+        Parameters
+        ----------
+        widget_class
+        signed
+
+        Returns
+        -------
+
+        """
+        range_abs = 2 ** 31
+        if signed:
+            range_min, range_max = -range_abs, range_abs - 1
+        else:
+            range_min, range_max = 0, range_abs - 1
+        widget = QFrame(self.tab)
+        widget.setObjectName('graphFilterPropertyValueDoublet')
+        frame_layout = QHBoxLayout(widget)
+        min_ctrl = widget_class(self.tab)
+        min_ctrl.setMaximumWidth(60)  # FIXME: resize to content instead
+        min_ctrl.setObjectName(f'graphFilterPropertyValueSpinBox_1')  # For doublet ctrl behaviour (needs sorting)
+        min_ctrl.setRange(range_min, range_max)
+        frame_layout.addWidget(min_ctrl)
+        lbl = QLabel(self.tab)
+        lbl.setText('to')
+        frame_layout.addWidget(lbl)
+        max_ctrl = widget_class(self.tab)
+        max_ctrl.setMaximumWidth(60)
+        max_ctrl.setObjectName(f'graphFilterPropertyValueSpinBox_2')  # For doublet ctrl behaviour (needs sorting)
+        max_ctrl.setRange(range_min, range_max)
+        frame_layout.addWidget(max_ctrl)
+        recursive_patch_compound_boxes(self.tab)
+        return widget
 
 
 class VesselVisualizationParams(UiParameter):
@@ -1508,10 +1692,7 @@ class VesselVisualizationParams(UiParameter):
             'graph_step': ParamLink(None, self.tab.graphSlicerStepComboBox, connect=False),
             'plot_type': ParamLink(None, self.tab.graphPlotTypeComboBox, connect=False),
             'voxelization_size': ParamLink(['voxelization', 'size'], self.tab.vasculatureVoxelizationRadiusTriplet),
-            'vertex_degrees': ParamLink(None, self.tab.vasculatureVoxelizationFilterDegreesSinglet, connect=False),
             'weight_by_radius': ParamLink(None, self.tab.voxelizationWeightByRadiusCheckBox, connect=False)
-            # 'filter_name': ParamLink(None, self.tab.voxelizationFitlerNameComboBox, connect=False),
-            # 'weight_name': ParamLink(None, self.tab.voxelizationWeightNameComboBox, connect=False),
         }
         self.structure_id = None
         self.cfg_subtree = ['visualization']

@@ -43,7 +43,7 @@
             </font>
            </property>
            <property name="currentIndex">
-            <number>0</number>
+            <number>3</number>
            </property>
            <widget class="QWidget" name="binarization">
             <property name="geometry">
@@ -61,7 +61,7 @@
              <item>
               <widget class="QToolBox" name="toolBox_26">
                <property name="currentIndex">
-                <number>1</number>
+                <number>0</number>
                </property>
                <widget class="QWidget" name="page_83">
                 <property name="geometry">
@@ -90,6 +90,9 @@
                  </property>
                  <item>
                   <widget class="QTabWidget" name="channelsParamsTabWidget">
+                   <property name="currentIndex">
+                    <number>1</number>
+                   </property>
                    <widget class="QWidget" name="tab">
                     <attribute name="title">
                      <string>Tab 1</string>
@@ -432,7 +435,7 @@
              </rect>
             </property>
             <attribute name="label">
-             <string>Arteries and veins tracing</string>
+             <string>Arteries and Veins Tracing</string>
             </attribute>
             <layout class="QVBoxLayout" name="verticalLayout">
              <item>
@@ -822,7 +825,7 @@
              </rect>
             </property>
             <attribute name="label">
-             <string>Graph Display</string>
+             <string>Graph Display and Analysis</string>
             </attribute>
             <layout class="QVBoxLayout" name="verticalLayout_7">
              <item>
@@ -835,8 +838,8 @@
                  <rect>
                   <x>0</x>
                   <y>0</y>
-                  <width>395</width>
-                  <height>329</height>
+                  <width>550</width>
+                  <height>704</height>
                  </rect>
                 </property>
                 <attribute name="label">
@@ -1147,89 +1150,17 @@
                  <string>Voxelization</string>
                 </attribute>
                 <layout class="QGridLayout" name="gridLayout_7">
-                 <item row="2" column="1">
-                  <widget class="QFrame" name="vasculatureVoxelizationFilterDegreesSinglet">
-                   <property name="enabled">
-                    <bool>true</bool>
-                   </property>
-                   <property name="frameShape">
-                    <enum>QFrame::StyledPanel</enum>
-                   </property>
-                   <property name="frameShadow">
-                    <enum>QFrame::Raised</enum>
-                   </property>
-                   <layout class="QHBoxLayout" name="horizontalLayout_375">
-                    <item>
-                     <widget class="QCheckBox" name="checkBox">
-                      <property name="text">
-                       <string/>
-                      </property>
-                     </widget>
-                    </item>
-                    <item>
-                     <widget class="QSpinBox" name="spinBox_266">
-                      <property name="enabled">
-                       <bool>false</bool>
-                      </property>
-                      <property name="suffix">
-                       <string>degree</string>
-                      </property>
-                      <property name="minimum">
-                       <number>0</number>
-                      </property>
-                      <property name="maximum">
-                       <number>99</number>
-                      </property>
-                     </widget>
-                    </item>
-                   </layout>
-                  </widget>
-                 </item>
-                 <item row="4" column="1">
-                  <widget class="QPushButton" name="voxelizeGraphPushButton">
+                 <item row="1" column="0">
+                  <widget class="QLabel" name="label_25">
                    <property name="text">
-                    <string>Voxelize</string>
-                   </property>
-                  </widget>
-                 </item>
-                 <item row="0" column="0">
-                  <widget class="QLabel" name="label_14">
-                   <property name="text">
-                    <string>voxel size</string>
-                   </property>
-                  </widget>
-                 </item>
-                 <item row="3" column="1">
-                  <spacer name="verticalSpacer_6">
-                   <property name="orientation">
-                    <enum>Qt::Vertical</enum>
-                   </property>
-                   <property name="sizeHint" stdset="0">
-                    <size>
-                     <width>20</width>
-                     <height>40</height>
-                    </size>
-                   </property>
-                  </spacer>
-                 </item>
-                 <item row="4" column="2">
-                  <widget class="QPushButton" name="plotGraphVoxelizationPushButton">
-                   <property name="text">
-                    <string>Plot voxelization</string>
-                   </property>
-                  </widget>
-                 </item>
-                 <item row="2" column="0">
-                  <widget class="QLabel" name="label_24">
-                   <property name="text">
-                    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Filter by&lt;/p&gt;&lt;p&gt;vertex degree&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Weight by &lt;/p&gt;&lt;p&gt;vertex radius&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                    </property>
                    <property name="textFormat">
                     <enum>Qt::RichText</enum>
                    </property>
                   </widget>
                  </item>
-                 <item row="0" column="1" colspan="2">
+                 <item row="3" column="1" colspan="2">
                   <widget class="QFrame" name="vasculatureVoxelizationRadiusTriplet">
                    <property name="frameShape">
                     <enum>QFrame::StyledPanel</enum>
@@ -1280,20 +1211,67 @@
                    </layout>
                   </widget>
                  </item>
-                 <item row="1" column="0">
-                  <widget class="QLabel" name="label_25">
-                   <property name="text">
-                    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Weight by &lt;/p&gt;&lt;p&gt;vertex radius&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-                   </property>
-                   <property name="textFormat">
-                    <enum>Qt::RichText</enum>
-                   </property>
-                  </widget>
-                 </item>
                  <item row="1" column="1">
                   <widget class="QCheckBox" name="voxelizationWeightByRadiusCheckBox">
                    <property name="text">
                     <string/>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="4" column="2">
+                  <widget class="QPushButton" name="plotGraphVoxelizationPushButton">
+                   <property name="text">
+                    <string>Plot voxelization</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="4" column="1">
+                  <widget class="QPushButton" name="voxelizeGraphPushButton">
+                   <property name="text">
+                    <string>Voxelize</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="2" column="0" colspan="3">
+                  <widget class="QGroupBox" name="groupBox_3">
+                   <property name="title">
+                    <string>Filters:</string>
+                   </property>
+                   <layout class="QGridLayout" name="gridLayout">
+                    <item row="0" column="0" colspan="3">
+                     <layout class="QVBoxLayout" name="filterParamsVerticalLayout"/>
+                    </item>
+                    <item row="1" column="0">
+                     <widget class="QPushButton" name="addFilterPushButton">
+                      <property name="text">
+                       <string>Add Filter</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="2" column="1">
+                     <widget class="QLabel" name="label">
+                      <property name="text">
+                       <string>File suffix:</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="2" column="2">
+                     <widget class="QLineEdit" name="fileSuffixLineEdit"/>
+                    </item>
+                    <item row="3" column="2">
+                     <widget class="QPushButton" name="applyFiltersPushButton">
+                      <property name="text">
+                       <string>Apply filters</string>
+                      </property>
+                     </widget>
+                    </item>
+                   </layout>
+                  </widget>
+                 </item>
+                 <item row="3" column="0">
+                  <widget class="QLabel" name="label_14">
+                   <property name="text">
+                    <string>voxel size</string>
                    </property>
                   </widget>
                  </item>
@@ -1378,22 +1356,5 @@
  <resources>
   <include location="icons.qrc"/>
  </resources>
- <connections>
-  <connection>
-   <sender>checkBox</sender>
-   <signal>toggled(bool)</signal>
-   <receiver>spinBox_266</receiver>
-   <slot>setEnabled(bool)</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>235</x>
-     <y>304</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>311</x>
-     <y>307</y>
-    </hint>
-   </hints>
-  </connection>
- </connections>
+ <connections/>
 </ui>
