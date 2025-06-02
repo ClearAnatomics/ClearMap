@@ -27,7 +27,7 @@ from ClearMap.config.atlas import ATLAS_NAMES_MAP
 from ClearMap.gui.gui_utils import create_clearmap_widget, clear_layout, replace_widget
 from ClearMap.gui.dialogs import get_directory_dlg
 from ClearMap.gui.params_interfaces import (ParamLink, UiParameter, UiParameterCollection,
-                                            ChannelsUiParameterCollection, ChannelUiParameter, LayoutUiParameter)
+                                            ChannelsUiParameterCollection, ChannelUiParameter)
 
 __author__ = 'Charly Rousseau <charly.rousseau@icm-institute.org>'
 __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
