@@ -43,6 +43,7 @@ from pathlib import Path
 import natsort
 import numpy as np
 
+from ClearMap.Analysis.Graphs.GraphGt import Graph
 from ClearMap.IO import IO as clearmap_io
 from ClearMap.IO import FileUtils as file_utils
 from ClearMap.IO.assets_constants import CONTENT_TYPE_TO_PIPELINE
@@ -518,7 +519,10 @@ class Asset:
         return clearmap_io.read(self.existing_path, *args, **kwargs)
 
     def write(self, data, *args, **kwargs):
-        clearmap_io.write(self.path, data, *args, **kwargs)
+        if isinstance(data, Graph):
+            data.save(self.path)
+        else:
+            clearmap_io.write(self.path, data, *args, **kwargs)
 
     def create(self, *args, **kwargs):
         clearmap_io.create(self.path, *args, **kwargs)
