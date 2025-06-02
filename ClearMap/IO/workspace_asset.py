@@ -462,7 +462,9 @@ class Asset:
         """
         return bool(file_utils.find_existing_extension(self.path, self.type_spec.extensions))
 
-    def delete(self):  # FIXME: add missing_ok -> then not existing_path but just path
+    def delete(self, missing_ok=False):
+        if missing_ok and not self.exists:
+            return
         os.remove(self.existing_path)
 
     @property
@@ -675,7 +677,9 @@ class ExpressionAsset(Asset):
         return file_utils.find_existing_extension(self.file_list[0],
                                                   self.type_spec.extensions)
 
-    def delete(self):
+    def delete(self, missing_ok=False):
+        if missing_ok and not self.exists:
+            return
         for f in self.file_list:
             os.remove(f)
 
