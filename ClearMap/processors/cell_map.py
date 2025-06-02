@@ -126,6 +126,11 @@ class CellDetector(TabProcessor):
                             arrange=arrange, parent=parent)
 
     def create_test_dataset(self, slicing, debug='debug'):
+        previous_status = self.workspace.debug
+        self.workspace.debug = debug
+        dbg_asset = self.get('stitched', channel=self.channel)
+        dbg_asset.delete(missing_ok=True)  # Remove previous debug asset if exists
+        self.workspace.debug = previous_status
         dbg_path = self.workspace.create_debug('stitched', channel=self.channel, slicing=slicing, debug=debug)
         self.update_watcher_main_progress()
         return dbg_path
