@@ -643,6 +643,8 @@ class DataViewer(QWidget):
 
 
     def plot_scatter_markers(self, ax, index):
+        if self.scatter_coords is None:
+            return
         self.scatter.clear()
         self.scatter_coords.axis = ax
         pos = self.scatter_coords.get_pos(index)
