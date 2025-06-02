@@ -1,4 +1,6 @@
+import inspect
 import multiprocessing
+import warnings
 from concurrent.futures import ProcessPoolExecutor
 from concurrent.futures.process import BrokenProcessPool
 
@@ -61,7 +63,7 @@ def edge_to_vertex_property(graph, edge_property, dtype=None):
     edge_property_data = edge_property if not isinstance(edge_property, str) else graph.edge_property(edge_property)
     edge_connectivity = graph.edge_connectivity()
     vertex_property_data = np.zeros(graph.n_vertices)
-    for i in range(edge_connectivity.shape[1]):
+    for i in range(edge_connectivity.shape[1]):  # For each vertex of each edge
         vertex_property_data[edge_connectivity[edge_property_data == 1, i]] = 1
     if dtype is not None:
         vertex_property_data = vertex_property_data.astype(dtype)
@@ -105,9 +107,16 @@ def vertex_to_edge_property(graph, graph_property, dtype=None, aggregation=np.lo
     start_vertices = vertex_prop[connectivity[:, 0]]
     end_vertices = vertex_prop[connectivity[:, 1]]
 
-    # FIXME: if logical, we need to pass several arrays to the function
+
     print(start_vertices, end_vertices)
-    edge_prop = aggregation(start_vertices, end_vertices)
+    sig = inspect.signature(aggregation)
+    if 'axis' in sig.parameters:  # for regular numpy functions, we pass the stacked arrays with the axis
+        edge_prop = aggregation(np.vstack([start_vertices, end_vertices]), axis=0)
+    elif isinstance(aggregation, np.ufunc) and aggregation.nin == 2:  # for logical operations, we pass 2 arrays
+        edge_prop = aggregation(start_vertices, end_vertices)
+    else:
+        warnings.warn(f'Unknown aggregation function {aggregation}, using np.vstack')
+        edge_prop = aggregation(np.vstack([start_vertices, end_vertices]))
 
     if dtype is not None:
         edge_prop = edge_prop.astype(dtype)
