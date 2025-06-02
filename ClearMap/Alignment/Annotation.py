@@ -610,7 +610,7 @@ class Annotation(object):
 
         """
         return self.label_points(points, annotation_file_path=self.hemispheres_file, key=key, level=level,
-                                 invalid=invalid, dtype=np.int32)  # We store a bool but historically 0 or 255 so
+                                 invalid=invalid, d_type=np.int32)  # We store a bool but historically 0 or 255 so
                                                                      # as int32_t to handle outside of brain as negative
 
     def label_points(self, points, annotation_file_path=None, key='id', level=None, invalid=0, d_type=np.uint64):
