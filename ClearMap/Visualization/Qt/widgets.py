@@ -25,6 +25,7 @@ class Scatter3D:
         self.half_slice_thickness = half_slice_thickness
         self.axis = 2
         self.marker_size = max(2, marker_size)
+        self.out_of_bounds_symbol = 'x'  # Symbol to use for out of bounds markers
 
         if isinstance(coordinates, pd.DataFrame):
             self.data = coordinates
@@ -48,7 +49,12 @@ class Scatter3D:
             self.__has_colours = colors is not None
 
             if hemispheres is not None:
-                self.symbol_map = {id_: self.symbols[i] for i, id_ in enumerate(np.unique(hemispheres))}
+                hemispheres_values = np.unique(hemispheres)
+                if -1 in hemispheres_values:  # If there are values outside of the hemispheres
+                    symbols = [self.out_of_bounds_symbol] + self.symbols
+                else:
+                    symbols = self.symbols
+                self.symbol_map = {id_: symbols[i] for i, id_ in enumerate(hemispheres_values)}
 
             # colors = colors if colors is None else np.array([QColor( * col.astype(int)) for col in colors]
             self.data = pd.DataFrame({
