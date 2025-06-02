@@ -108,13 +108,14 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from PyQt5.QtWidgets import QApplication, QLabel, QButtonGroup, QFrame, QRadioButton, QHBoxLayout
+from PyQt5.QtWidgets import QApplication, QLabel, QButtonGroup, QFrame, QRadioButton, QHBoxLayout, QGroupBox, QWidget
 import pyqtgraph as pg
 from natsort import natsorted
 from pyqtgraph import PlotWidget
 
 import mpld3
 
+from ClearMap.Analysis.Graphs.graph_filters import GraphFilter
 from ClearMap.IO.assets_constants import DATA_CONTENT_TYPES, EXTENSIONS
 from ClearMap.processors.colocalization import ColocalizationProcessor
 from ClearMap.processors.tract_map import TractMapProcessor
@@ -131,7 +132,7 @@ from ClearMap.Analysis.Statistics.group_statistics import make_summary, density_
     check_ids_are_unique
 from ClearMap.Utils.exceptions import ClearMapVRamException, GroupStatsError, MissingRequirementException
 
-from ClearMap.gui.dialogs import option_dialog
+from ClearMap.gui.dialogs import option_dialog, make_splash
 from ClearMap.gui.interfaces import GenericTab, PostProcessingTab, PreProcessingTab, BatchTab, PipelineTab
 from ClearMap.gui.widgets import (PatternDialog, DataFrameWidget, LandmarksSelectorDialog,
                                   CheckableListWidget, FileDropListWidget, ExtendableTabWidget)
@@ -1404,6 +1405,8 @@ class VasculatureTab(PostProcessingTab):
         self.ui.plotGraphChunkPushButton.clicked.connect(self.display_graph_chunk_from_cfg)
         self.ui.plotGraphClearPlotPushButton.clicked.connect(self.main_window.clear_plots)
 
+        self.ui.addFilterPushButton.clicked.connect(self.add_graph_filter)
+
         self.ui.voxelizeGraphPushButton.clicked.connect(self.voxelize)
         self.ui.plotGraphVoxelizationPushButton.clicked.connect(self.plot_voxelization)
         self.ui.runAllVasculaturePushButton.clicked.connect(self.run_all)
@@ -1453,6 +1456,55 @@ class VasculatureTab(PostProcessingTab):
         buttons_functions = [('binarizePushButton', self.binarize_channel)]
         for btn_name, func in buttons_functions:
             self._bind_btn(btn_name, func, channel, page_widget)
+
+    def add_graph_filter(self):
+        filters = []
+        layout = self.ui.filterParamsVerticalLayout
+        for i in range(layout.count()):
+            widg = layout.itemAt(i).widget()
+            if widg and widg.objectName().startswith('filter_'):
+                filters.append(widg)
+        filter_idx = len(filters)
+        if filters:
+            combine_widget = QFrame(self.ui)
+            and_radio_btn = QRadioButton(combine_widget)
+            and_radio_btn.setText('AND')
+            and_radio_btn.setObjectName(f'filter_{filter_idx}_and_btn')
+            and_radio_btn.setChecked(True)
+            or_radio_btn = QRadioButton(combine_widget)
+            or_radio_btn.setText('OR')
+            or_radio_btn.setObjectName(f'filter_{filter_idx}_or_btn')
+            button_group = QButtonGroup(combine_widget)
+            button_group.addButton(and_radio_btn)
+            button_group.addButton(or_radio_btn)
+            button_group.setObjectName(f'filter_{filter_idx}_combine')
+            combine_widget.setLayout(QHBoxLayout())
+            combine_widget.layout().addWidget(and_radio_btn)
+            combine_widget.layout().addWidget(or_radio_btn)
+            self.ui.filterParamsVerticalLayout.addWidget(combine_widget)
+        widget = create_clearmap_widget('graph_filter_params', 'QWidget')
+        widget.setObjectName(f'filter_{filter_idx}')
+        widget.groupBox.setTitle(f'Filter {filter_idx}')
+        self.ui.filterParamsVerticalLayout.addWidget(widget)
+
+        # FIXME: splash not shown
+        splash, pbar = make_splash(message=f'Loading graph ', font_size=25)
+        splash.show()
+        # update_pbar(self.app, progress_bar, 20)
+        graph = self.vessel_graph_processor.graph_annotated
+        splash.finish(self.main_window)
+        self.params.graph_params.add_graph_filter_params(widget, graph)
+        self.params.graph_params.filtersChanged.connect(self.update_file_suffix)
+
+    def update_file_suffix(self):
+        """
+        Update the file suffix for the filtered graph
+        """
+        filters = self.params.graph_params.filter_params
+        if not filters:
+            return
+        suffix = '_'.join([f'{filter.property_name}_{filter.get_property_value()}' for filter in filters])
+        self.ui.fileSuffixLineEdit.setText(suffix)
 
     def unload_temporary_graphs(self):
         """Unload the temporary vasculature graph objects to free up RAM"""
@@ -1623,8 +1675,15 @@ class VasculatureTab(PostProcessingTab):
         """Run the voxelization (density map) on the vasculature graph """
         voxelization_params = {
             'weight_by_radius': self.params.visualization_params.weight_by_radius,
-            'vertex_degrees': self.params.visualization_params.vertex_degrees
         }
+        if self.params.graph_params.filter_params:
+            voxelization_params['filters'] = [
+                GraphFilter(self.vessel_graph_processor.graph_annotated, filter_type=g_filter.filter_type,
+                            property_name=g_filter.property_name, property_value=g_filter.get_property_value())
+                for g_filter in self.params.graph_params.filter_params]
+            voxelization_params['operators'] = [g_filter.combine_operator_name
+                                                for g_filter in self.params.graph_params.filter_params if
+                                                g_filter.combine_operator_name is not None]  # skip first one
         self.wrap_step('Running voxelization', self.vessel_graph_processor.voxelize,
                        step_kw_args=voxelization_params)#, main_thread=True)
 

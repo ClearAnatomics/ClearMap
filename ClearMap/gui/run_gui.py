@@ -1011,7 +1011,7 @@ class ClearMapGui(ClearMapGuiBase):
                                                       sample_manager=self.sample_manager,
                                                       app=self)
         self.assetsManagerDock = QDockWidget("Workspace Manager", self)
-        self.assetsManagerDock.setWidget(self.assetsManagerWidget.widget)  # ⬅️ use .widget handle
+        self.assetsManagerDock.setWidget(self.assetsManagerWidget.widget)
         self.addDockWidget(Qt.RightDockWidgetArea, self.assetsManagerDock)
         # self.tabifyDockWidget(self.dataViewerDockWidget, self.assetsManagerDock)
         # dlg.exec()

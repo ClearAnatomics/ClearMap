@@ -976,6 +976,16 @@ class ManageAssetsWidget(WizardWidget):
         self.list_selection.itemSelectionChanged.connect(self.handle_selection_changed)
 
     def handle_selection_changed(self, itm_text):
+        """
+        Handle the selection change in the list_selection widget.
+        This will update the asset info text browser with the information of the selected asset
+
+        Parameters
+        ----------
+        itm_text: str
+            The text of the selected item in the list_selection widget.
+            This is a string representation of the asset type and channel, e.g. "(channel, asset_type)"
+        """
         self.dlg.assetInfoTextBrowser.clear()
         txt = ''
         if itm_text:

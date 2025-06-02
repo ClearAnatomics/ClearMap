@@ -17,6 +17,8 @@ import gc
 
 import numpy as np
 import pandas as pd
+
+from ClearMap.Analysis.Graphs.graph_filters import GraphFilter
 from ClearMap.IO.assets_specs import ChannelSpec
 from PyQt5.QtWidgets import QDialogButtonBox
 
@@ -817,6 +819,33 @@ class VesselGraphProcessor(TabProcessor):
         self.graph_annotated = self.graph_reduced.largest_component()
         self.save_graph('annotated')
 
+    def get_filter(self, graph_step, filter_type, property_name, value):
+        """
+        Get a filter object for the graph step
+
+        Parameters
+        ----------
+        graph_step: str
+            The graph step to filter (e.g. 'annotated', 'reduced')
+        filter_type: str
+            The type of filter to apply (e.g. 'vertex', 'edge')
+        property_name: str
+            The property name to filter on (e.g. 'artery', 'vein', 'radii')
+        value: int | float | bool | str | tuple
+            The value to filter by. Can be:
+                - int/float: exact match
+                - str: string match (e.g. 'artery', 'vein')
+                - bool: 'True' or 'False' for boolean properties
+                - tuple: range (min, max) for numerical properties. None means open ended range.
+
+        Returns
+        -------
+        GraphFilter
+            A filter object for the graph step
+        """
+        graph = self.__get_graph(graph_step)
+        return GraphFilter(graph, filter_type, property_name, value)
+
     # POST PROCESS
     @requires_graph('annotated')
     def _pre_filter_veins(self, vein_intensity_range_on_arteries_channel, min_vein_radius):
@@ -1005,17 +1034,31 @@ class VesselGraphProcessor(TabProcessor):
                                                     **voxelize_branch_parameter)  # WARNING: prange
 
     # @requires_graph('traced')
-    def voxelize(self, weight_by_radius=False, vertex_degrees=None):
+    def voxelize(self, weight_by_radius=False, vertex_degrees=None, filters=None, operators=None):
         try:
             graph = self.graph_traced
-        except FileNotFoundError:
+        except (KeyError, FileNotFoundError):
             graph = self.graph_annotated
         vertices = graph.vertex_property('coordinates_atlas')
         voxelize_branch_parameter = self.__get_branch_voxelization_params()
 
-        if vertex_degrees and vertex_degrees >= 1:
-            degrees = graph.vertex_degrees() == vertex_degrees
-            vertices = vertices[degrees]
+        if vertex_degrees:
+            if filters is None:
+                filters = []
+                operators = []
+            if not isinstance(vertex_degrees, (list, tuple)):
+                vertex_degrees = (vertex_degrees, vertex_degrees)
+            filters += [GraphFilter(graph, 'vertex', 'degree', vertex_degrees)]
+
+        if filters:
+            if len(operators) != len(filters) - 1:
+                raise ValueError("Number of operators must be len(filters) - 1")
+
+                # Start with the first atomic filter, then fold left
+            combined = filters[0]
+            for op_str, nxt in zip(operators, filters[1:]):
+                combined = combined.combine_with(nxt, op_str)
+            vertices = vertices[combined.as_mask('vertex')]
 
         if weight_by_radius:
             voxelize_branch_parameter.update(weights=graph.vertex_radii())
