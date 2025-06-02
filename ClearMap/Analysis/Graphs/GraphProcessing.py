@@ -395,8 +395,10 @@ def reduce_graph(graph, vertex_to_edge_mappings={'radii': np.max},  # FIXME: use
     # REDUCE GRAPH
 
     # redefine branch edges
-    reduced_graph = g.sub_graph(edge_filter=np.zeros(g.n_edges, dtype=bool))
-    reduced_graph.add_edge(edge_list)
+    reduced_graph = g.sub_graph(edge_filter=np.zeros(g.n_edges, dtype=bool))  # Delete all edges
+    reduced_graph.add_edge(edge_list) #  Add new edges
+    # FIXME: is it the same as g.__class__(edges=edge_list)
+    # reduced_grpah = g.empty_like()
 
     # determine edge ordering
     edge_order = reduced_graph.edge_indices()
