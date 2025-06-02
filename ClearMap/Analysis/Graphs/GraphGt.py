@@ -132,7 +132,12 @@ class Graph(grp.AnnotatedGraph):
         self._base.remove_vertex(vertex)
 
     def vertex_property(self, name, vertex=None, as_array=True):
-        v_prop = self._base.vertex_properties[name]
+        try:
+            v_prop = self._base.vertex_properties[name]
+        except KeyError as err:
+            raise KeyError(f'Graph has no vertex property with name {name}!'
+                           f'Possible vertex properties are: {self.vertex_properties};'
+                           f'{err}')
         if vertex is not None:
             return v_prop[self.vertex(vertex)]
         else:
