@@ -18,7 +18,7 @@ import numpy as np
 import scipy.ndimage.measurements as ndm
 import scipy.ndimage.filters as ndf
 
-import ClearMap.ImageProcessing.GreyReconstruction as gr
+import ClearMap.ImageProcessing.grey_reconstruction as gr
 
 import ClearMap.Utils.Timer as tmr
 import ClearMap.Utils.HierarchicalDict as hdict
