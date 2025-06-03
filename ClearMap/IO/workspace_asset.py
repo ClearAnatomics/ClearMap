@@ -191,7 +191,7 @@ class Asset:
             status = 'debug'  # Must be a string to build the path
         return status
 
-    def variant(self, sample_id=None, extension=None, version=None, expression=None):
+    def variant(self, sample_id=None, extension=None, version=None, expression=None, sub_type=None):
         """
         Returns a variant of the asset with the given sample_id, extension and version.
 
@@ -221,7 +221,15 @@ class Asset:
                 expression = Expression(str(self.with_extension(extension))) if self.is_expression else None
             else:
                 expression = self.expression
-        type_spec = deepcopy(self.type_spec)
+        if sub_type:
+            if isinstance(sub_type, str):
+                type_spec = self.type_spec.sub_types[sub_type]
+            elif isinstance(sub_type, TypeSpec):
+                type_spec = sub_type
+            else:
+                raise ValueError(f'sub_type must be a string or a TypeSpec, got "{type(sub_type)}".')
+        else:
+            type_spec = deepcopy(self.type_spec)
         if not self.is_expression and extension:
             type_spec.extensions = list(dict.fromkeys([extension] + self.type_spec.extensions))
         # WARNING: long list, should use keyword arguments
@@ -586,6 +594,18 @@ class Asset:
         source = self.as_source()
         self.status_manager.status = status
         return self.write(np.asarray(source[slicing], order='F'))
+
+    def all_sub_types(self):
+        """
+        Returns all sub types of the asset.
+
+        Returns
+        -------
+        list of str
+            The sub types of the asset.
+        """
+        all_assets = [self] + [self.variant(sub_type=sub_type) for sub_type in self.type_spec.sub_types]
+        return all_assets
 
 
 class ExpressionAsset(Asset):
