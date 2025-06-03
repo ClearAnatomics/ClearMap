@@ -260,9 +260,12 @@ class CellDetector(TabProcessor):
             'source': self.processing_config['cell_filtration']['thresholds']['intensity'],
             'size': self.processing_config['cell_filtration']['thresholds']['size']
         }
-        cell_detection.filter_cells(source=self.get_path('cells', channel=self.channel, asset_sub_type='raw'),
-                                    sink=self.get_path('cells', channel=self.channel, asset_sub_type='filtered'),
-                                    thresholds=thresholds)
+        src_path = self.get_path('cells', channel=self.channel, asset_sub_type='raw')
+        if not src_path.exists:
+            raise MissingRequirementException(f'Cell detection not run yet (no file found at "{src_path}"),'
+                                              f' cannot filter cells. Please run cell detection first.')
+        dest_path = self.get_path('cells', channel=self.channel, asset_sub_type='filtered')
+        cell_detection.filter_cells(source=src_path, sink=dest_path, thresholds=thresholds)
 
     def run_cell_detection(self, tuning=False, save_maxima=False, save_shape=False, save_as_binary_mask=False):
         self.reload_config()
