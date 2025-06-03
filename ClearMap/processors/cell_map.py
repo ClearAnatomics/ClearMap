@@ -313,7 +313,8 @@ class CellDetector(TabProcessor):
             cell_detection.detect_cells(self.get_path('stitched', channel=self.channel), dest_asset.path,
                                         cell_detection_parameter=cell_detection_param,
                                         processing_parameter=processing_parameter,
-                                        workspace=self.workspace)  # WARNING: prange inside multiprocess (including arrayprocessing and devolvepoints for vox)
+                                        workspace=self.workspace)  # WARNING: prange inside multiprocess
+                                                                   #  (including array processing and devolve points for vox)
             if save_shape and save_as_binary_mask and shape_asset.dtype() != 'bool':
                 shape_asset.write(np.array(shape_asset.read().astype('bool')))
         except BrokenProcessPool as err:
@@ -473,7 +474,9 @@ class CellDetector(TabProcessor):
         return plot_3d.plot_3d(self.get_path('stitched', channel=self.channel),
                                view=p, cmap=plot_3d.grays_alpha(alpha=1))
 
-    def remove_crust(self, coordinates, threshold=3):
+    def remove_crust(self, coordinates=None, threshold=3, return_mask=False):
+        if coordinates is None:
+            coordinates = self.get_coords('filtered', aligned=True)
         distance_to_surface = self.get('atlas', channel=self.channel, asset_sub_type='distance').read()
 
         # Convert coordinates to integer and insure they are within the distance_to_surface array bounds
@@ -487,7 +490,10 @@ class CellDetector(TabProcessor):
         dist_values = distance_to_surface[tuple(valid_coordinates.T)]
 
         uncrusted_coordinates = valid_coordinates[dist_values > threshold]
-        return uncrusted_coordinates
+        if return_mask:
+            return uncrusted_coordinates, distance_to_surface[tuple(int_coordinates.T)] > threshold
+        else:
+            return uncrusted_coordinates
 
     def preview_cell_detection(self, parent=None, arrange=True, sync=True):
         sources = [
