@@ -44,6 +44,7 @@ import natsort
 import numpy as np
 
 from ClearMap.Analysis.Graphs.GraphGt import Graph
+from ClearMap.Analysis.Graphs.GraphGt import load as load_graph
 from ClearMap.IO import IO as clearmap_io
 from ClearMap.IO import FileUtils as file_utils
 from ClearMap.IO.assets_constants import CONTENT_TYPE_TO_PIPELINE
@@ -526,7 +527,10 @@ class Asset:
         return self.path.stat().st_size
 
     def read(self, *args, **kwargs):
-        return clearmap_io.read(self.existing_path, *args, **kwargs)
+        if self.type_spec.extensions[0] == '.gt':
+            return load_graph(self.existing_path, *args, **kwargs)
+        else:
+            return clearmap_io.read(self.existing_path, *args, **kwargs)
 
     def write(self, data, *args, **kwargs):
         if isinstance(data, Graph):
