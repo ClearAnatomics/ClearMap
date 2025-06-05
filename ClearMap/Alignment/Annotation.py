@@ -10,19 +10,12 @@ Notes
   - The files containing annotation information is assumed to be in the path
     stored in :const:`atlas_path`, which defaults to the resource path 
     :const:`ClearMap.Settings.resources_path`.
-    
-  - The annotation file is assumed to be 'annotation_25_full.nrrd'
-    but can be set via :const:`default_annotation_file`.
 
-  - The mapping between labels and brain area information is assumed to be in 
-    the 'annotation.json' file but the location can be set
-    via :const:`default_label_file`.     
-      
 References
 ----------
   - `Allen Brain Atlas <https://mouse.brain-map.org/static/atlas>`_
 """
-__author__ = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
+__author__ = 'Christoph Kirst <christoph.kirst.ck@gmail.com>, Charly Rousseau <charly.rousseau@icm-institute.org>'
 __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__ = 'https://idisco.info'
