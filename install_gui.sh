@@ -187,20 +187,20 @@ else
 fi
 
 pip_mode="True"
-if [[ $USE_TORCH == "True" ]]; then
-    green "Installing pytorch through conda may be restricted due to the license of the nvidia channel.
-      If you prefer installing pytorch through pip, please select 'pip' below."
-    read -r -p "PyTorch can be installed using either conda or pip. \
-    Do you want to install PyTorch with conda (type y for conda, press Enter or n for pip)?" answer
-    case "$answer" in
-        [yY][eE][sS]|[yY])
-            pip_mode="False";
-            ;;
-        *)
-            pip_mode="True";
-            ;;
-    esac
-fi
+#if [[ $USE_TORCH == "True" ]]; then
+#    green "Installing pytorch through conda may be restricted due to the license of the nvidia channel.
+#      If you prefer installing pytorch through pip, please select 'pip' below."
+#    read -r -p "PyTorch can be installed using either conda or pip. \
+#    Do you want to install PyTorch with conda (type y for conda, press Enter or n for pip)?" answer
+#    case "$answer" in
+#        [yY][eE][sS]|[yY])
+#            pip_mode="False";
+#            ;;
+#        *)
+#            pip_mode="True";
+#            ;;
+#    esac
+#fi
 
 echo "  Getting env name"
 ENV_NAME=$(python -c "import os; from ClearMap.Utils.install_utils import EnvFileManager; \
