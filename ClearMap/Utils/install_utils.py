@@ -360,6 +360,7 @@ def patch_env(cfg_path, dest_path, use_cuda_torch=True, pip_mode=False, use_spyd
                 cuda_suffix = f"cu{str(actual_cuda).replace('.', '')}"
                 env_mgr.add_pip_option(f'--extra-index-url https://download.pytorch.org/whl/{cuda_suffix}')
             env_mgr.add_pip_dependency('torch')
+            env_mgr.add_pip_dependency('torchvision')
         else:
             # ensure that the nvidia channel is available
             env_mgr.add_channel('nvidia')
