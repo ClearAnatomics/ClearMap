@@ -7,6 +7,35 @@ if [ -z "$1" ]; then
     set -- -f ClearMap3.yml
 fi
 
+
+function red(){  #  From https://stackoverflow.com/a/57096493
+    echo -e "\x1B[31m $1 \x1B[0m"
+    if [ -n "${2}" ]; then
+        echo -e "\x1B[31m $($2) \x1B[0m"
+    fi
+}
+function green(){
+    echo -e "\x1B[32m $1 \x1B[0m"
+    if [ -n "${2}" ]; then
+        echo -e "\x1B[32m $($2) \x1B[0m"
+    fi
+}
+
+function yellow(){
+    echo -e "\x1B[33m $1 \x1B[0m"
+    if [ -n "${2}" ]; then
+      echo -e "\x1B[33m $($2) \x1B[0m"
+    fi
+}
+
+function green_n(){  # FIXME: parametrise above instead
+    echo -n -e "\x1B[32m $1 \x1B[0m"
+    if [ -n "${2}" ]; then
+        echo -n -e "\x1B[32m $($2) \x1B[0m"
+    fi
+}
+
+
 usage() {
   cat << EOF >&2
   Usage: $PROG_NAME [-h] [-f <env-file-path>] [-s]
@@ -57,35 +86,6 @@ if git rev-parse --is-inside-work-tree > /dev/null 2>&1; then
 else
     yellow "Not a git repository. Skipping commit number save."
 fi
-
-
-
-function red(){  #  From https://stackoverflow.com/a/57096493
-    echo -e "\x1B[31m $1 \x1B[0m"
-    if [ -n "${2}" ]; then
-        echo -e "\x1B[31m $($2) \x1B[0m"
-    fi
-}
-function green(){
-    echo -e "\x1B[32m $1 \x1B[0m"
-    if [ -n "${2}" ]; then
-        echo -e "\x1B[32m $($2) \x1B[0m"
-    fi
-}
-
-function yellow(){
-    echo -e "\x1B[33m $1 \x1B[0m"
-    if [ -n "${2}" ]; then
-      echo -e "\x1B[33m $($2) \x1B[0m"
-    fi
-}
-
-function green_n(){  # FIXME: parametrise above instead
-    echo -n -e "\x1B[32m $1 \x1B[0m"
-    if [ -n "${2}" ]; then
-        echo -n -e "\x1B[32m $($2) \x1B[0m"
-    fi
-}
 
 ########################################################################################################################
 
