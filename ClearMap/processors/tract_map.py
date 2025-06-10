@@ -1,5 +1,4 @@
 import functools
-import os
 import platform
 import shutil
 import tempfile
@@ -14,7 +13,7 @@ from matplotlib.colors import to_hex
 from ClearMap.IO import IO as cmp_io
 from ClearMap.Utils.exceptions import MissingRequirementException
 from ClearMap.Utils.utilities import sanitize_n_processes
-from ClearMap.processors.generic_tab_processor import TabProcessor
+from ClearMap.processors.generic_tab_processor import ChannelTabProcessor
 from ClearMap.Alignment import Elastix as elastix
 from ClearMap.Alignment.Resampling import resample_points
 from ClearMap.ParallelProcessing.DataProcessing import ArrayProcessing as array_processing
@@ -33,12 +32,11 @@ def label_points_wrapper(annotator, coords):
     return np.expand_dims(annotator.label_points(coords), axis=-1)  # Add empty dim to match shape of coords
 
 
-class TractMapProcessor(TabProcessor):
+class TractMapProcessor(ChannelTabProcessor):
     def __init__(self, sample_manager=None, channel=None, registration_processor=None):
         super().__init__()
         self.save_intermediate_binarization_results = True
         self.sample_config = None
-        self.processing_config = None
         self.machine_config = None
         self.sample_manager = None
         self.registration_processor = None
@@ -62,24 +60,10 @@ class TractMapProcessor(TabProcessor):
             configs = sample_manager.get_configs()
             self.sample_config = configs['sample']
             self.machine_config = configs['machine']
-            self.processing_config = self.sample_manager.config_loader.get_cfg('tract_map')['channels'][self.channel]
+            self._processing_config = self.sample_manager.config_loader.get_cfg('tract_map')
 
             self.set_progress_watcher(self.sample_manager.progress_watcher)
         self.registration_processor = registration_processor
-
-    # WARNING: required because we pass a section of the config to the processor, not the whole config
-    #   Maybe we should pass the whole config to the processor and let it handle the section (with self.channel)
-    #   make sure this works with other config backends.
-    def reload_config(self, max_iter=10):
-        p = self.processing_config
-        for i in range(max_iter):
-            if hasattr(p, 'reload'):
-                p.reload()
-                return
-            else:
-                p = p.parent
-        else:
-            raise ValueError(f'Could not find a reload method in the config, after {max_iter} iterations')
 
     def create_test_dataset(self, slicing):
         self.workspace.create_debug('stitched', channel=self.channel, slicing=slicing)
