@@ -155,5 +155,31 @@ class TabProcessor:
     #     pass
 
 
+class ChannelTabProcessor(TabProcessor):
+    """
+    Tab processor that is processing a single channel.
+
+    The config is expected to have a 'channels' section with the channel name as key.
+    The config is stored in the `_processing_config` attribute, and accessed through the `processing_config` property
+    which returns the section for the current channel.
+    """
+    def __init__(self):
+        super().__init__()
+        self._processing_config = None
+        self.channel = ''
+
+    @property
+    def processing_config(self):
+        return self._processing_config['channels'][self.channel]
+
+    @processing_config.setter
+    def processing_config(self, value):
+        raise ValueError('Processing config is a property and cannot be set directly. '
+                         'you should set the _processing_config attribute instead.')
+
+    def reload_config(self):
+        self._processing_config.reload()
+
+
 class CanceledProcessing(BrokenProcessPool):  # TODO: better inheritance
     pass

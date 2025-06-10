@@ -24,7 +24,6 @@ import re
 import platform
 import warnings
 from concurrent.futures.process import BrokenProcessPool
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -47,7 +46,7 @@ import ClearMap.ImageProcessing.Experts.Cells as cell_detection
 import ClearMap.Analysis.Measurements.Voxelization as voxelization
 from ClearMap.Utils.exceptions import MissingRequirementException
 from ClearMap.Utils.utilities import requires_assets, FilePath
-from ClearMap.processors.generic_tab_processor import TabProcessor
+from ClearMap.processors.generic_tab_processor import ChannelTabProcessor
 from ClearMap.Visualization.Qt.widgets import Scatter3D
 
 __author__ = 'Christoph Kirst <christoph.kirst.ck@gmail.com>, Charly Rousseau <charly.rousseau@icm-institute.org>'
@@ -60,11 +59,10 @@ __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 USE_BINARY_POINTS_FILE = not platform.system().lower().startswith('darwin')
 
 
-class CellDetector(TabProcessor):
+class CellDetector(ChannelTabProcessor):
     def __init__(self, sample_manager=None, channel=None, registration_processor=None):
         super().__init__()
         self.sample_config = None
-        self._processing_config = None
         self.machine_config = None
         self.sample_manager = None
         self.registration_processor = None
@@ -93,18 +91,8 @@ class CellDetector(TabProcessor):
         self.registration_processor = registration_processor
 
     @property
-    def processing_config(self):
-        return self._processing_config['channels'][self.channel]
-
-    @property
     def detected(self):
         return self.get('cells', channel=self.channel, asset_sub_type='raw').exists
-
-    # WARNING: required because we pass a section of the config to the processor, not the whole config
-    #   Maybe we should pass the whole config to the processor and let it handle the section (with self.channel)
-    #   make sure this works with other config backends.
-    def reload_config(self):
-        self._processing_config.reload()
 
     def post_process_cells(self):
         self.reload_config()
@@ -474,7 +462,7 @@ class CellDetector(TabProcessor):
         return plot_3d.plot_3d(self.get_path('stitched', channel=self.channel),
                                view=p, cmap=plot_3d.grays_alpha(alpha=1))
 
-    def remove_crust(self, coordinates=None, threshold=3, return_mask=False):
+    def remove_crust(self, coordinates=None, threshold=3, return_mask=False):  # TODO: Add inplace option
         if coordinates is None:
             coordinates = self.get_coords('filtered', aligned=True)
         distance_to_surface = self.get('atlas', channel=self.channel, asset_sub_type='distance').read()
