@@ -720,6 +720,13 @@ class ExpressionAsset(Asset):
         return self.all_tiles_exist
 
     @property
+    def size(self):
+        total_size = 0
+        for f in self.file_list:
+            total_size += Path(f).stat().st_size
+        return total_size
+
+    @property
     def all_tiles_exist(self):  # TODO: try with all known extensions # REFACTOR: rename more generic (all images)
         """
         Whether all tiles exist on disk
