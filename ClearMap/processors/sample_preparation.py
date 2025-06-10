@@ -652,6 +652,7 @@ class RegistrationProcessor(TabProcessor):
                     asset.delete()
 
     def get_fixed_moving_channels(self, channel):
+        self.config.reload()
         moving_channel = self.config['channels'][channel]['moving_channel']
         align_with = self.config['channels'][channel]['align_with']
         if align_with is None:
