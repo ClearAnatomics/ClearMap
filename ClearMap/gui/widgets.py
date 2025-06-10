@@ -1033,7 +1033,7 @@ class ManageAssetsWidget(WizardWidget):
         if self.channel == 'Any':
             channels = self.sample_manager.workspace.channels  # All channels of WS, not only data ones
         else:
-            if channel is None:
+            if not channel:
                 channel = self.channel
                 if channel == 'None':
                     channel = None
@@ -1059,7 +1059,7 @@ class ManageAssetsWidget(WizardWidget):
         size_min = self.dlg.sizeMinSpinBox.value()
         size_max = self.dlg.sizeMaxSpinBox.value()
 
-        if size_min != 0 or size_max != 0:
+        if size_max != 0:
             self.assets = {k: asset for k, asset in self.assets.items() if
                            asset.exists and
                            (size_min == 0 or asset.size >= size_min) and
