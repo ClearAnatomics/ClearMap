@@ -29,6 +29,7 @@ Mapping of resource types to the folder where they are stored.
 RESOURCE_TYPE_TO_FOLDER = {
     'logs': '',  # in main folder
     'config_snapshots': 'config_snapshots',  # TODO: use
+    'raw': '',  # in main folder
     'data': 'data',
     'processed': 'data',   # TODO: see if we split
     'results': 'analyzed',
@@ -75,7 +76,7 @@ based on the pipeline(s) relevant for that channel.
 CHANNELS_ASSETS_TYPES_CONFIG = {
     'raw': {
         'file_format_category': 'image',
-        'resource_type': 'data',
+        'resource_type': 'raw',
         'relevant_pipelines': ['all']
     },
     'stitched': {
