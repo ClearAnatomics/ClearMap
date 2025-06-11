@@ -20,8 +20,7 @@ import vispy
 import vispy.scene
 
 import ClearMap.Visualization.Vispy.Plot3d as p3d
-import ClearMap.Visualization.Vispy.GraphVisual as gvi
-
+from ClearMap.Visualization.Vispy import graph_visual
 import ClearMap.Visualization.Color as col
 
 ###############################################################################
@@ -52,7 +51,7 @@ def plot_graph_mesh(graph, view=None, coordinates=None, radii=None,
         The view of the plot.
     """
     # build visuals
-    GraphMesh = vispy.scene.visuals.create_visual_node(gvi.GraphMeshVisual)
+    GraphMesh = vispy.scene.visuals.create_visual_node(graph_visual.GraphMeshVisual)
 
     title = title if title is not None else 'plot_graph_mesh'
     view = p3d.initialize_view(view, title=title, depth_value=100000000,
@@ -91,7 +90,7 @@ def plot_graph_line(graph, view=None, coordinates=None,
         The view of the plot.
     """
     # build visuals
-    GraphLine = vispy.scene.visuals.create_visual_node(gvi.GraphLineVisual)
+    GraphLine = vispy.scene.visuals.create_visual_node(graph_visual.GraphLineVisual)
 
     title = title if title is not None else 'plot_graph_line'
     view = p3d.initialize_view(view, title=title, depth_value=100000000,
@@ -143,19 +142,21 @@ def plot_graph_edge_property(graph, edge_property, colormap=None, mesh=False,
 ###############################################################################
     
 def _test():
-    import numpy as np
-    import ClearMap.Analysis.Graphs.GraphProcessing as gp
-    import ClearMap.Visualization.Vispy.PlotGraph3d as pg3
     from importlib import reload
+    import numpy as np
+
+    from ClearMap.Analysis.graphs import graph_processing
+    import ClearMap.Visualization.Vispy.plot_graph_3d as pg3
+
     reload(pg3)
     # g = gr.load('/home/ckirst/Desktop/Vasculature/Analysis_2018_03_27/stitched_graph_transformed.gt')
     # g = gr.load('/home/ckirst/Science/Projects/WholeBrainClearing/Vasculature/Experiment/Graphs_2018_05/graph_reduced.gt')
 
-    g = gp.ggt.Graph(n_vertices=10)
+    g = graph_processing.ggt.Graph(n_vertices=10)
     g.add_edge(np.array([[7,8],[7,9],[1,2],[2,3],[3,1],[1,4],[4,5],[2,6],[6,7]]))
     g.set_vertex_coordinates(np.array([[10,10,10],[0,0,0],[1,1,1],[1,1,0],[5,0,0],[8,0,1],[0,7,1],[0,10,2],[0,12,3],[3,7,7]], dtype=float))
-    gc = gp.clean_graph(g)
-    gr = gp.reduce_graph(gc, edge_geometry=True, edge_geometry_vertex_properties=['coordinates'])
+    gc = graph_processing.clean_graph(g)
+    gr = graph_processing.reduce_graph(gc, edge_geometry=True, edge_geometry_vertex_properties=['coordinates'])
 
     edge_colors = np.random.rand(gr.n_edges, 4)
     edge_colors[:, 3] = 1.0

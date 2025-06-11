@@ -43,8 +43,8 @@ from pathlib import Path
 import natsort
 import numpy as np
 
-from ClearMap.Analysis.Graphs.GraphGt import Graph
-from ClearMap.Analysis.Graphs.GraphGt import load as load_graph
+from ClearMap.Analysis.graphs.graph_gt import Graph
+from ClearMap.Analysis.graphs.graph_gt import load as load_graph
 from ClearMap.IO import IO as clearmap_io
 from ClearMap.IO import FileUtils as file_utils
 from ClearMap.IO.assets_constants import CONTENT_TYPE_TO_PIPELINE

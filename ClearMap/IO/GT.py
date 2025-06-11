@@ -11,7 +11,7 @@ The module utilizes the gt writer/reader from graph_tool.
 
 See also
 --------
-:mod`ClearMap.Analysis.Graphs`
+:mod`ClearMap.Analysis.graphs`
 """
 __author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
 __license__   = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
@@ -20,7 +20,7 @@ __webpage__   = 'http://idisco.info'
 __download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 
 
-import ClearMap.Analysis.Graphs.GraphGt as ggt
+from ClearMap.Analysis.graphs import graph_gt
 
 import ClearMap.IO.Source as src
 
@@ -44,7 +44,7 @@ class Source(src.Source):
     """
     super(Source, self).__init__(name=name);
     
-    if isinstance(location, ggt.Graph):
+    if isinstance(location, graph_gt.Graph):
       graph = location;
       location = None;
     
@@ -281,14 +281,14 @@ def _graph(location, **kwargs):
     graph : Graph
       The graph as a Graph object.
     """
-    graph = ggt.load(location);
-    return graph;
+    graph = graph_gt.load(location)
+    return graph
   
 
 def _write(filename, graph, **args):
     """Write graph  to file.
     """
-    ggt.save(filename, graph)
+    graph_gt.save(filename, graph)
     return filename
 
 ###############################################################################
@@ -298,12 +298,12 @@ def _write(filename, graph, **args):
 def test():    
     """Test GT module"""
     import os
-    import ClearMap.Analysis.Graphs.GraphGt as ggt
+    from ClearMap.Analysis.graphs import graph_gt
     import ClearMap.IO.GT as gt
     
     location = 'test.gt';
     
-    g = ggt.Graph(n_vertices=10)
+    g = graph_gt.Graph(n_vertices=10)
  
     s = gt.Source(graph=g, location=location);
     s.shape = (1,2,3);

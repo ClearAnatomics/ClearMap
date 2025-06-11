@@ -16,15 +16,15 @@ __download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
 
 import numpy as np
 
-import ClearMap.Analysis.Graphs.type_conversions
+import ClearMap.Analysis.graphs.type_conversions
 import ClearMap.IO.IO as io
 
 import ClearMap.ImageProcessing.Topology.Topology3d as t3d
 
 import ClearMap.ParallelProcessing.DataProcessing.ArrayProcessing as ap
 
-import ClearMap.Analysis.Graphs.GraphGt as ggt
-from ClearMap.Analysis.Graphs.fast_graph_reduce import find_degree2_branches
+import ClearMap.Analysis.graphs.graph_gt as ggt
+from ClearMap.Analysis.graphs.fast_graph_reduce import find_degree2_branches
 
 import ClearMap.Utils.Timer as tmr
 
@@ -942,7 +942,7 @@ def trace_edge_label(graph, edge_label, condition, max_iterations = None, dilati
 def _test():
     import numpy as np
     import ClearMap.Tests.Files as tf
-    import ClearMap.Analysis.Graphs.GraphProcessing as gp
+    import ClearMap.Analysis.graphs.graph_processing as gp
     # reload(gp)
 
     skeleton = tf.source('skeleton')
@@ -996,7 +996,7 @@ def _test():
     # tracing
     import numpy as np
     import ClearMap.Visualization.Plot3d as p3d
-    import ClearMap.Analysis.Graphs.GraphProcessing as gp
+    import ClearMap.Analysis.graphs.graph_processing as gp
 
     g = gp.ggt.Graph(n_vertices=10)
     g.add_edge(np.array([[0, 1], [1, 2], [2, 3], [3, 4], [4, 0], [0, 5], [5, 6], [6, 7], [0, 8], [8, 9], [9, 0]]))
@@ -1026,7 +1026,7 @@ def _test():
     reload(gp)
 
     # edge tracing
-    import ClearMap.Analysis.Graphs.GraphGt as ggt
+    import ClearMap.Analysis.graphs.graph_gt as ggt
     edges = [[0, 1], [1, 2], [2, 3], [4, 5], [5, 6], [1, 7]]
     g = ggt.Graph(edges=edges)
 
@@ -1036,7 +1036,7 @@ def _test():
     label = np.zeros(len(edges), dtype=bool)
     label[1] = True
 
-    import ClearMap.Analysis.Graphs.GraphProcessing as gp
+    import ClearMap.Analysis.graphs.graph_processing as gp
 
     def condition(graph, edge):
         print(f'condition, edge={edge}')
@@ -1049,7 +1049,7 @@ def _test():
 
     import numpy as np
     import ClearMap.Tests.Files as tf
-    import ClearMap.Analysis.Graphs.GraphProcessing as gp
+    import ClearMap.Analysis.graphs.graph_processing as gp
 
     graph = gp.ggt.Graph(n_vertices=5)
     graph.add_edge([[0, 1], [0, 2], [0, 3], [2, 3], [2, 1], [0, 4]])
@@ -1058,7 +1058,7 @@ def _test():
     e, m = gp.expand_graph_length(graph, 'length', True)
 
     import graph_tool.draw as gd
-    from ClearMap.Analysis.Graphs import GraphGt
+    from ClearMap.Analysis.graphs import graph_gt
     pos = GraphGt.vertex_property_map_to_python(gd.sfdp_layout(e.base))
     import matplotlib.pyplot as plt
     plt.figure(1)

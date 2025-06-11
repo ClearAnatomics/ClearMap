@@ -65,8 +65,8 @@ import ClearMap.ImageProcessing.Skeletonization.SkeletonProcessing as skp
 import ClearMap.ImageProcessing.machine_learning.vessel_filling.vessel_filling as vf
 
 #analysis
-import ClearMap.Analysis.Graphs.GraphGt as grp
-import ClearMap.Analysis.Graphs.GraphProcessing as gp
+import ClearMap.Analysis.graphs.graph_gt as grp
+import ClearMap.Analysis.graphs.graph_processing as gp
 
 import ClearMap.Analysis.Measurements.MeasureExpression as me
 import ClearMap.Analysis.Measurements.MeasureRadius as mr

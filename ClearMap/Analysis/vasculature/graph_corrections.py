@@ -10,7 +10,7 @@ from ClearMap.Alignment import Annotation as annotation
 from ClearMap.Analysis.vasculature.vasc_graph_utils import remove_surface, vertex_filter_to_edge_filter
 
 print('Loading ClearMap modules, please wait ...')
-import ClearMap.Analysis.Graphs.GraphGt as ggt
+import ClearMap.Analysis.graphs.graph_gt as ggt
 
 CPU_COUNT = multiprocessing.cpu_count()
 

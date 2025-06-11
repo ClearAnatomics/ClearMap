@@ -19,8 +19,8 @@ import numpy as np
 
 import vispy.visuals as visuals
 
-import ClearMap.Analysis.Graphs.GraphRendering as gr  
 import ClearMap.Visualization.Color as col
+from ClearMap.Analysis.graphs.graph_rendering import mesh_tube_from_coordinates_and_radii
 
 
 ###############################################################################
@@ -120,10 +120,10 @@ class GraphMeshVisual(visuals.mesh.MeshVisual):
             connectivity = graph.edge_connectivity()
             edge_colors = (vertex_colors[connectivity[:, 0]] + vertex_colors[connectivity[:, 1]])/2.0
 
-        vertices, faces, vertex_colors = gr.mesh_tube_from_coordinates_and_radii(coordinates, radii, indices,
-                                                                                 n_tube_points=n_tube_points,
-                                                                                 edge_colors=edge_colors,
-                                                                                 processes=None)
+        vertices, faces, vertex_colors = mesh_tube_from_coordinates_and_radii(coordinates, radii, indices,
+                                                                              n_tube_points=n_tube_points,
+                                                                              edge_colors=edge_colors,
+                                                                              processes=None)
 
         visuals.mesh.MeshVisual.__init__(self, vertices, faces,
                                          color=color, vertex_colors=vertex_colors,
@@ -141,10 +141,12 @@ class GraphMeshVisual(visuals.mesh.MeshVisual):
 
 def _test():
     import numpy as np
+
     import vispy
-    import ClearMap.Analysis.Graphs.GraphGt as ggt
+
+    import ClearMap.Analysis.graphs.graph_gt as ggt
     import ClearMap.Visualization.Vispy.Plot3d as p3d
-    import ClearMap.Visualization.Vispy.GraphVisual as gv
+    import ClearMap.Visualization.Vispy.graph_visual as gv
     # reload(gv)
 
     g = ggt.Graph()

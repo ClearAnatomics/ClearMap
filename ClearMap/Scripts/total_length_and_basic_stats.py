@@ -11,9 +11,8 @@ from tqdm import tqdm
 
 import ClearMap.Settings as settings
 from ClearMap.Analysis.vasculature.vasc_graph_utils import remove_surface
-from ClearMap.IO import IO as clearmap_io
 from ClearMap.Alignment.Annotation import Annotation
-import ClearMap.Analysis.Graphs.GraphGt as ggt
+from ClearMap.Analysis.graphs import graph_gt
 from ClearMap.config.atlas import ATLAS_NAMES_MAP
 
 MAX_PROCS = 28  # Max number of processes to use for parallel processing
@@ -208,7 +207,7 @@ def plot_length(df, regions):
 def uncrust_graph(time_point, work_dir, samples):
     print(time_point, work_dir, samples)
     for sample_id in tqdm(samples):
-        graph = ggt.load(os.path.join(work_dir, f'{sample_id}_graph.gt'))
+        graph = graph_gt.load(os.path.join(work_dir, f'{sample_id}_graph.gt'))
         graph_uncrusted = remove_surface(graph, 2)
         graph_uncrusted.save(os.path.join(work_dir, f'{sample_id}_graph_uncrusted.gt'))
 
@@ -269,7 +268,7 @@ def compute_stats(samples_info, get_reg=False, regions=None, uncrust=False, coor
 
         for sample_index, sample_id in enumerate(tqdm(info['sample_ids'], unit='sample n')):
             try:
-                graph = ggt.load(os.path.join(info['work_dir'], f'{sample_id}_graph.gt'))
+                graph = graph_gt.load(os.path.join(info['work_dir'], f'{sample_id}_graph.gt'))
             except FileNotFoundError:
                 print('graph is missing !')
                 continue
@@ -318,7 +317,7 @@ if __name__ == '__main__':
                                        LAMBADA_ATLAS_BASE_DIR, LAMBADA_BASE_NAME, ADULT_ATLAS_PATH)
 
     if not GET_REG:
-        ref_brain_graph = ggt.load(REF_BRAIN_PATH)
+        ref_brain_graph = graph_gt.load(REF_BRAIN_PATH)
         default_annotator = Annotation(ATLAS_NAMES_MAP['ABA 2017 - adult mouse - 25µm']['base_name'],
                                        slicing=(slice(None), slice(None), slice(None)),
                                        orientation=(1, 2, 3),

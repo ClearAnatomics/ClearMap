@@ -18,7 +18,7 @@ import gc
 import numpy as np
 import pandas as pd
 
-from ClearMap.Analysis.Graphs.graph_filters import GraphFilter
+from ClearMap.Analysis.graphs.graph_filters import GraphFilter
 from ClearMap.IO.assets_specs import ChannelSpec
 from PyQt5.QtWidgets import QDialogButtonBox
 
@@ -39,13 +39,13 @@ import ClearMap.ImageProcessing.Binary.Filling as binary_filling
 
 import ClearMap.Analysis.Measurements.MeasureExpression as measure_expression
 import ClearMap.Analysis.Measurements.MeasureRadius as measure_radius
-import ClearMap.Analysis.Graphs.GraphProcessing as graph_processing
+from ClearMap.Analysis.graphs import graph_processing
 import ClearMap.Analysis.Measurements.Voxelization as voxelization
 
 import ClearMap.ParallelProcessing.BlockProcessing as block_processing
 
 from ClearMap.Visualization.Qt import Plot3d as q_p3d
-from ClearMap.Visualization.Vispy import PlotGraph3d as plot_graph_3d  # WARNING: vispy dependency
+from ClearMap.Visualization.Vispy import plot_graph_3d  # WARNING: vispy dependency
 
 from ClearMap.gui.dialogs import warning_popup
 from ClearMap.Utils.utilities import is_in_range, get_free_v_ram, clear_cuda_cache
