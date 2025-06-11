@@ -115,7 +115,7 @@ class Graph(grp.AnnotatedGraph):
         return int(vertex)
 
     def vertex_indices(self):
-        return np.array(self.vertices, dtype=int)  # FIXME: why not self.base.get_vertices() ?
+        return np.array(self.vertices, dtype=int)  # FIXME: why not self._base.get_vertices() ?
 
     def add_vertex(self, n_vertices=None, vertex=None):
         if n_vertices is not None:
