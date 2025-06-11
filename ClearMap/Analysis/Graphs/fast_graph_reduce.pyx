@@ -24,7 +24,6 @@ from libc.stdint cimport uint32_t, uint8_t
 
 from libcpp.vector cimport vector
 from libcpp.pair cimport pair
-#from libcpp.utility cimport pair
 
 # import numpy as np
 # cimport numpy as cnp
@@ -293,13 +292,13 @@ cpdef object find_degree2_branches(
     for i, edge_id in enumerate(end_edge_ids):  # We only loop over end edges (i.e. mixed deg2, non deg2)
         if (i % print_step) == 0:
             # print(f'\r{i}/{n_end_edges}', end='')
-            printf(b"\r%zu/%zu", i, n_end_edges)
+            printf(b"\r%zu/%zu", i+1, n_end_edges)
             # draw_progress_bar(i, num_edges)
         if not visited_edges[edge_id]:
             ret_code = trace_chain(edge_id, edges_array, vertex_degs, adjacency, visited_edges, result)
             if ret_code != 0:
                 printf(b"\nError %zu\n", ret_code)
                 return null_result
-    printf(<const char *> b"\n")  # End progress bar
+    printf(b"\r%zu/%zu\n", i+1, n_end_edges)  # End progress bar
 
     return result

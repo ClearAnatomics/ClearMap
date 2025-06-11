@@ -296,13 +296,117 @@ def _group_labels(array):
 # ## Graph reduction
 ###############################################################################
 
-def reduce_graph(graph, vertex_to_edge_mappings={'radii': np.max},  # FIXME: use global settings
+def drop_degree2_loops(graph):
+    """
+    Drop all loops in the graph that consist only of vertices with degree 2.
+
+    Parameters
+    ----------
+    graph: GraphGt.Graph
+
+    Returns
+    -------
+    GraphGt.Graph
+        The graph with all pure degree 2 loops removed.
+    """
+    # 1) mask & view
+    deg = graph.vertex_degrees()
+    deg2_mask = (deg == 2)
+    if not deg2_mask.any():
+        return graph
+
+    view = graph.sub_graph(vertex_filter=deg2_mask, view=True)
+
+    # 2) component labels + counts
+    comp_full, comp_counts = view.label_components(return_vertex_counts=True)
+    comp_full = np.asarray(comp_full)
+    comp_counts = np.array(comp_counts)
+
+    # 2) restrict to the deg-2 vertices only
+    # comp_map = comp_full[deg2_mask]
+
+    # 3) count edges per component from the view’s edge_connectivity
+    ec = view.edge_connectivity()
+    src = ec[:, 0]
+    comp_edge_counts = np.bincount(comp_full[src], minlength=len(comp_counts))
+
+    # 4) cycles = components where #edges == #vertices
+    cycle_ids = np.where(comp_edge_counts == comp_counts)[0]
+
+    # 5) boolean mask over view-vertices
+    comp_view = comp_full[view.vertex_indices()]
+    loop_mask = np.isin(comp_view, cycle_ids)
+
+    # 6) map back to original graph indices
+    orig_vids = view.vertex_indices()
+    to_remove = orig_vids[loop_mask]
+
+    # 7) build the keep mask for the original graph
+    v_keep = np.ones(graph.n_vertices, dtype=bool)
+    v_keep[to_remove] = False
+
+    print(f"Dropping {len(to_remove)} pure degree-2 loop vertices "
+          f"from {graph.n_vertices} total.")
+    return graph.sub_graph(vertex_filter=v_keep)
+
+
+def reduce_graph(graph, vertex_to_edge_mappings={'radii': np.max},  # FIXME: use global settings for defaults
                  edge_to_edge_mappings={'length': np.sum},
-                 edge_geometry=True, edge_length=None,
+                 edge_geometry=True, edge_length=False,
                  edge_geometry_vertex_properties=('coordinates', 'radii'),
                  edge_geometry_edge_properties=None,
-                 return_maps=False, verbose=False, print_period=250000):
-    """Reduce graph by replacing all vertices with degree two."""
+                 return_maps=False, drop_pure_degree_2_loops=True,
+                 verbose=False, print_period=250000):
+    """
+    Reduce graph by removing all vertices with degree two.
+    Whenever this is done, the edges are merged and properties are aggregated
+    The coordinates of the degree 2 vertices are stored in a shared graph property
+    called edge_geometry_coordinates. The new edge will only hold the start and end indexing
+    into that graph level array of coordinates for efficiency.
+
+    .. warning::
+        Currently, existing degree 2 loops are dropped inplace from the source graph.
+
+    Parameters
+    ----------
+    graph : GraphGt.Graph
+        The graph to reduce.  WARNING: currently, existing degree 2 loops are dropped inplace
+    vertex_to_edge_mappings : dict
+        A dictionary mapping vertex properties to edge properties. The keys are the vertex property names,
+        and the values are functions that aggregate the vertex properties to edge properties.
+    edge_to_edge_mappings : dict
+        A dictionary mapping edge properties to edge properties. The keys are the edge property names,
+        and the values are functions that aggregate the edge properties.
+    edge_geometry : bool  # FIXME: improve docstring
+        If True, compute edge geometry properties (coordinates, radii) for the reduced graph.
+    edge_length : bool
+        If True, compute the length of edges in the reduced graph.
+        Mapping defaults to np.sum, i.e. the length of the edge is the sum of the lengths of
+        the edges in the original graph.
+    edge_geometry_vertex_properties : tuple  # FIXME: improve docstring
+        A tuple of vertex property names to be used for edge geometry.
+        These properties will be aggregated and stored in the edge geometry.
+    edge_geometry_edge_properties : list  # FIXME: improve docstring
+        A list of edge property names to be used for edge geometry.
+        These properties will be aggregated and stored in the edge geometry.
+        If None, no edge properties are used for edge geometry.
+    return_maps : bool
+        If True, return mappings of vertex to vertex, edge to vertex, and edge to edge.
+        These mappings are useful for further processing of the reduced graph.
+    drop_pure_degree_2_loops : bool
+        If True, drop all pure degree 2 loops from the graph before reducing it.
+        This is useful to avoid issues with loops in the graph that would otherwise
+        lead to incorrect results.
+    verbose : bool
+        If True, print progress information during the reduction process.
+    print_period : int
+        The period in number of edges after which to print progress information in the chain finding step.
+
+    Returns
+    -------
+    reduced_graph : GraphGt.Graph
+        The reduced graph with degree 2 vertices removed and properties aggregated.
+    """
 
     if verbose:
         timer = tmr.Timer()
@@ -310,19 +414,20 @@ def reduce_graph(graph, vertex_to_edge_mappings={'radii': np.max},  # FIXME: use
         print('Graph reduction: initialized.')
 
     check_graph_is_reduce_compatible(graph)
-
     # copy graph
+    if drop_pure_degree_2_loops:
+        graph = drop_degree2_loops(graph)  # WARNING: modifies graph in place
     g = graph.copy()
 
     # find non-branching points, i.e. vertices with deg 2
     non_degree_2_vertices_ids = np.where(g.vertex_degrees() != 2)[0]
     n_branch_points = len(non_degree_2_vertices_ids)
     degree_2_vertices_ids = np.where(g.vertex_degrees() == 2)[0]
-    n_non_branch_points = len(degree_2_vertices_ids)  # FIXME: n_degrees_2
+    n_degree_2_vertices = len(degree_2_vertices_ids)
 
     if verbose:
         timer.print_elapsed_time(
-            f'Graph reduction: Found {n_branch_points} branching and {n_non_branch_points} non-branching nodes')
+            f'Graph reduction: Found {n_branch_points} branching and {n_degree_2_vertices} non-branching nodes')
         timer.reset()
 
     # mappings
@@ -369,9 +474,11 @@ def reduce_graph(graph, vertex_to_edge_mappings={'radii': np.max},  # FIXME: use
     if edge_geometry_vertex_properties is None:
         edge_geometry_vertex_properties = []
 
-    chains, edge_descriptors = find_chains(g)
+    chains, edge_descriptors = find_chains(g) #, return_endpoints_mask=True)  # FIXME: remove return_endpoints_mask=True
+    # check_chains(g, chains, degree_2_vertices_ids, non_degree_2_vertices_ids)
 
     edge_list = []
+    # for edges, vertices, _ in chains:  # FIXME: remove _ if not return_endpoints_mask
     for edges, vertices in chains:
         edges = [edge_descriptors[eid] for eid in edges]  # Convert edge id to edge object
         vertices_ids = [int(vv) for vv in vertices]  # FIXME: check if necessary
@@ -394,13 +501,10 @@ def reduce_graph(graph, vertex_to_edge_mappings={'radii': np.max},  # FIXME: use
 
     # REDUCE GRAPH
 
-    # redefine branch edges
+    # Create an empty graph with same properties as g
     reduced_graph = g.sub_graph(edge_filter=np.zeros(g.n_edges, dtype=bool))  # Delete all edges
     reduced_graph.add_edge(edge_list) #  Add new edges
-    # FIXME: is it the same as g.__class__(edges=edge_list)
-    # reduced_grpah = g.empty_like()
 
-    # determine edge ordering
     edge_order = reduced_graph.edge_indices()
 
     # remove degree 2 nodes
@@ -425,7 +529,7 @@ def reduce_graph(graph, vertex_to_edge_mappings={'radii': np.max},  # FIXME: use
     for k in vertex_to_edge.keys():
         reduced_graph.define_edge_property(k, np.array(vertex_lists[k])[edge_order])
 
-    if edge_geometry:   # Remap each edge property to the reduced graph (i.e. save as an edge_geometry as f'edge_{prop}' )
+    if edge_geometry:   # Remap each edge property to the reduced graph (i.e. save as f'edge_geometry_{prop}' )
         branch_indices = np.hstack(reduced_maps['edge_to_vertex'])
         # Create start and end indices for edge geometry
         indices = np.cumsum([0] + [len(m) for m in reduced_maps['edge_to_vertex']])  # Length of each branch
@@ -434,7 +538,9 @@ def reduce_graph(graph, vertex_to_edge_mappings={'radii': np.max},  # FIXME: use
         g.edge_geometry_indices_set = False  # FIXME: why
         reduced_graph.set_edge_geometry_vertex_properties(g, edge_geometry_vertex_properties, branch_indices, indices)
         g.edge_geometry_indices_set = True
-        reduced_graph.set_edge_geometry_edge_properties(g, edge_geometry_edge_properties, indices, reduced_maps['edge_to_edge'])
+
+        if edge_geometry_edge_properties:
+            reduced_graph.set_edge_geometry_edge_properties(g, edge_geometry_edge_properties, indices, reduced_maps['edge_to_edge'])
 
     if 'edge_to_edge' in reduced_maps.keys():
         reduced_maps['edge_to_edge'] = [[g.edge_index(e) for e in edge] for edge in reduced_maps['edge_to_edge']]
@@ -449,38 +555,140 @@ def reduce_graph(graph, vertex_to_edge_mappings={'radii': np.max},  # FIXME: use
         return reduced_graph
 
 
-def find_chains(g):
+def check_chains(graph, chains, degree_2_v_ids, non_degree_2_v_ids):
     """
-    Find chains (i.e. list of edges between vertices that are either branching points or end points) in a graph.
+    Check if the chains computation is correct by verifying that all degree 2 vertices are included in the chains
+    and that all non-degree 2 vertices are not included in the chains.
 
     Parameters
     ----------
-    g: Graph
-        The graph to process.
+    chains: list of list of edges
+        List of chains in the graph.
+    degree_2_v_ids: array-like
+        Array of vertex ids with degree 2.
+    non_degree_2_v_ids: array-like
+        Array of vertex ids with degree not equal to 2.
 
     Returns
     -------
-    chains: list of list of edges
-        List of chains in the graph.
+    bool
+        True if the computation is correct, False otherwise.
     """
-    connectivity_w_eid = g._base.get_edges(eprops=[g._base.edge_index]).astype(np.uint32)
+    degree_2_v_ids = np.unique(degree_2_v_ids)
+    non_degree_2_v_ids = np.unique(non_degree_2_v_ids)
+
+    d2_lists, end_lists = [], []
+
+    for _, chain_vs, end_point_mask in chains:
+        v_arr = np.asarray(chain_vs, dtype=int)
+        d2_lists.append(v_arr[~end_point_mask])  # internal degree-2 vertices
+        end_lists.append(v_arr[end_point_mask])  # real endpoints (deg ≠ 2)
+
+    d2s_ids_from_chains = np.unique(np.hstack(d2_lists))
+    non_d2s_ids_from_chains = np.unique(np.hstack(end_lists))
+
+    # chains_vertices = [c[1] for c in chains]
+    # non_d2s_ids_from_chains = (np.unique(np.hstack([(c[0], c[-1]) for c in chains_vertices]))).astype(int)  # first and last vertex of each chain
+    # d2s_ids_from_chains = (np.unique(np.hstack([c[1:-1] for c in chains_vertices]))).astype(int)  # all vertices except first and last
+
+    diff_d2s = set(degree_2_v_ids) ^ set(d2s_ids_from_chains)
+    assert len(diff_d2s) == 0, f'Degree 2 vertices not found in chains: {diff_d2s}'
+
+    assert np.all(d2s_ids_from_chains == degree_2_v_ids)
+    assert np.all(np.isin(non_degree_2_v_ids, non_d2s_ids_from_chains))  # all non-degree 2 from chains are in non_degree_2_v_ids
+
+
+def find_chains(graph, return_endpoints_mask=False):
+    """
+    Find chains (i.e. list of edges between vertices that are either branching points or end points) in a graph.
+
+    This is done in three steps and the results are combined:
+    - Compute chains between degree 2 vertices that are connected to non-degree 2 vertices.
+    - Add direct edges between non-degree 2 vertices.
+    - Add pure degree 2 loops that are not connected to any non-degree 2 vertices.
+    (if the graph is not fully connected, this will find isolated loops)
+
+    Parameters
+    ----------
+    graph: Graph
+        The graph to process.
+    return_endpoints_mask: bool
+        If True, return a mask indicating which vertices are endpoints of the chains.
+        This is particularly useful for debugging or further processing,
+        especially in large graphs and when there may be pure degree 2 loops.
+        where `endpoint_mask` is a 1-D ``bool`` np.NdArray aligned with
+        `vertex_ids`.  A value *True* means “this vertex is a real endpoint
+        (degree != 2)”, *False* means “internal degree-2 vertex”.
+        Default is *False*.
+
+    Returns
+    -------
+    chains : list
+        *Without mask* (default):
+            list of 2-tuples (edge_ids, vertex_ids)
+        *With mask* (return_endpoint_mask=True):
+            list of 3-tuples (edge_ids, vertex_ids, endpoint_mask)
+    """
+    # compute proper non_d2 --- d2...d2 --- non_d2 chains
+    connectivity_w_eid = graph._base.get_edges(eprops=[graph._base.edge_index]).astype(np.uint32)
     connectivity_w_eid = np.roll(connectivity_w_eid, 1, axis=1)  # move edge id to the first column
-    v1_degs = g._base.get_out_degrees(connectivity_w_eid[:, 1]).astype(np.uint8)
-    v2_degs = g._base.get_out_degrees(connectivity_w_eid[:, 2]).astype(np.uint8)
+
+    v1_degs = graph._base.get_out_degrees(connectivity_w_eid[:, 1]).astype(np.uint8)
+    v2_degs = graph._base.get_out_degrees(connectivity_w_eid[:, 2]).astype(np.uint8)
+
     end_branches = np.logical_xor(v1_degs == 2, v2_degs == 2)
     end_branches_idx = np.where(end_branches)[0]
     end_branch_ids = connectivity_w_eid[end_branches_idx, 0]
-    vertex_degs = g.vertex_degrees().astype(np.uint8)
-    chains = find_degree2_branches(np.ascontiguousarray(connectivity_w_eid),  # FIXME: Check if contiguous is necessary
-                                   end_branch_ids.astype(np.uint32),
-                                   vertex_degs)
-    edge_descriptors = list(g._base.edges())
-    direct_edges = connectivity_w_eid[np.logical_and(v1_degs != 2, v2_degs != 2)]
+
+    vertex_degs = graph.vertex_degrees().astype(np.uint8)
+    chains = find_degree2_branches(
+        np.ascontiguousarray(connectivity_w_eid),  # FIXME: Check if contiguous is necessary
+        end_branch_ids.astype(np.uint32),
+        vertex_degs,
+    )
+
+    edge_descriptors = list(graph._base.edges())
 
     # Add direct edges to chains to process together
-    for eid, v1, v2 in direct_edges:
-        chains.append(([eid], [v1, v2]))
-    return chains, edge_descriptors
+    direct_edges = connectivity_w_eid[(v1_degs != 2) & (v2_degs != 2)]
+    chains.extend(([eid], [v1, v2]) for eid, v1, v2 in direct_edges)
+
+    # Add pure degree2 loops
+    visited = np.zeros(graph.n_vertices, dtype=bool)
+    visited_vs_idx = np.concatenate([np.asarray(vs, dtype=int) for _, vs in chains])
+    visited[visited_vs_idx] = True
+
+    unvisited_deg2_v_idx = np.where(~visited & (vertex_degs == 2))[0]
+    if unvisited_deg2_v_idx:
+        print(f'Found {len(unvisited_deg2_v_idx)} degree 2 vertices not visited in chains. '
+              f'They will be processed as isolated loops.')
+    else:
+        raise ValueError('No degree 2 vertices found in the graph! '
+                            'This is unexpected, please check the graph structure.')
+    for v0 in unvisited_deg2_v_idx:
+        if visited[v0]:  # in case marked within this very loop
+            continue
+        vs, es, ends, _isolated = _graph_branch(graph.vertex(v0))
+
+        vs_idx = [int(v) for v in vs]
+        edges_idx = [graph.edge_index(e) for e in es]
+        chains.append((edges_idx, vs_idx))
+        visited[vs_idx] = True
+
+    if not visited.sum() == graph.n_vertices:
+        raise ValueError(f'Not all vertices were visited during chain finding! '
+                         f'{visited.sum()} / {graph.n_vertices} visited. '
+                         f'Unvisited vertices: {np.where(~visited)[0]}')
+
+
+    if return_endpoints_mask:
+        chains_out = []
+        for eids, vids in chains:
+            mask = (vertex_degs[vids] != 2)  # True endpoint
+            chains_out.append((eids, vids, mask))
+        return chains_out, edge_descriptors
+    else:
+        return chains, edge_descriptors
 
 
 def check_graph_is_reduce_compatible(graph):
