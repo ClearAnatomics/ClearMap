@@ -22,11 +22,11 @@ import graph_tool.topology as gtt
 import graph_tool.generation as gtg
 
 # fix graph tool saving / loading for very large arrays
-import ClearMap.Analysis.Graphs.Graph as grp
-from ClearMap.Analysis.Graphs.type_conversions import dtype_to_gtype, gtype_from_source, vertex_property_map_to_python, \
+import ClearMap.Analysis.graphs.graph as grp
+from ClearMap.Analysis.graphs.type_conversions import dtype_to_gtype, gtype_from_source, vertex_property_map_to_python, \
   edge_property_map_to_python, vertex_property_map_from_python, set_vertex_property_map, edge_property_map_from_python, \
   set_edge_property_map
-from ClearMap.Analysis.Graphs.utils import pickler, unpickler, edges_to_vertices
+from ClearMap.Analysis.graphs.utils import pickler, unpickler, edges_to_vertices
 
 from ClearMap.Utils.array_utils import remap_array_ranges
 
@@ -1126,7 +1126,7 @@ def save(filename, graph):
 
 def _test():
     import numpy as np
-    import ClearMap.Analysis.Graphs.GraphGt as ggt
+    import ClearMap.Analysis.graphs.graph_gt as ggt
 
     from importlib import reload
     reload(ggt)
@@ -1244,7 +1244,7 @@ def _test():
     # test large arrays in graphs
     import numpy as np
     import ClearMap.IO.IO as io
-    import ClearMap.Analysis.Graphs.GraphGt as ggt
+    import ClearMap.Analysis.graphs.graph_gt as ggt
     reload(ggt)
 
     g = ggt.Graph('test')
@@ -1258,7 +1258,7 @@ def _test():
 
     del g
     del x
-    import ClearMap.Analysis.Graphs.GraphGt as ggt
+    import ClearMap.Analysis.graphs.graph_gt as ggt
     f = ggt.load('test.gt')
     f.info()
     print(f.graph_property('test').shape)

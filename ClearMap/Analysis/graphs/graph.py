@@ -424,7 +424,7 @@ def save(filename, graph):
 ###############################################################################
 
 def _test():
-  import ClearMap.Analysis.Graphs.Graph as gr
+  import ClearMap.Analysis.graphs.graph as gr
   reload(gr)
   
   g = gr.Graph();

@@ -23,7 +23,7 @@ import igraph
 
 import ClearMap.IO.IO as clearmap_io
 import ClearMap.Alignment.Annotation as annotation
-import ClearMap.Analysis.Graphs.GraphGt as graph_gt
+from ClearMap.Analysis.graphs import graph_gt
 
 from ClearMap.Analysis.vasculature.flow.linear_system import LinearSystem
 

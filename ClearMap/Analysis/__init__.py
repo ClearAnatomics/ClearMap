@@ -15,7 +15,7 @@ Key modules are:
 Module                                 Description
 ====================================== ==================================================
 :mod:`~ClearMap.Analysis.Measurements` Measure expression or morphology, density maps.
-:mod:`~ClearMap.Analysis.Graphs`       Graph construction and analysis for large graphs.
+:mod:`~ClearMap.Analysis.graphs`       Graph construction and analysis for large graphs.
 :mod:`~ClearMap.Analysis.Statistics`   Statistical tools.
 ====================================== ==================================================
 

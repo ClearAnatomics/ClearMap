@@ -115,7 +115,7 @@ from pyqtgraph import PlotWidget
 
 import mpld3
 
-from ClearMap.Analysis.Graphs.graph_filters import GraphFilter
+from ClearMap.Analysis.graphs.graph_filters import GraphFilter
 from ClearMap.IO.assets_constants import DATA_CONTENT_TYPES, EXTENSIONS
 from ClearMap.processors.colocalization import ColocalizationProcessor
 from ClearMap.processors.tract_map import TractMapProcessor

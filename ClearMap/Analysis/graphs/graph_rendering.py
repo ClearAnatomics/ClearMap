@@ -329,7 +329,7 @@ def _interpolate_edge(coordinates, radii, n_points, smooth=5, order=2):
 def _test():
     import numpy as np
     import ClearMap.Tests.Files as tf
-    import ClearMap.Analysis.Graphs.GraphProcessing as gp
+    import ClearMap.Analysis.graphs.graph_processing as gp
     # reload(gp)
 
     skeleton = tf.source('skeleton')
@@ -357,7 +357,7 @@ def _test():
 
     radii = gr.edge_geometry('radii', as_list=False)
 
-    import ClearMap.Analysis.Graphs.GraphVisualization as gv
+    import ClearMap.Analysis.graphs.GraphVisualization as gv
     reload(gv)
 
     grid, grid_indices = gv.mesh_from_edge_geometry(coordinates=coordinates, radii=radii, indices=indices)
