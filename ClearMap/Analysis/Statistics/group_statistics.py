@@ -254,7 +254,11 @@ def stack_voxelizations(directory, f_list, suffix, channel=None):
             stacked_voxelizations = np.concatenate((stacked_voxelizations, img[:, :, :, np.newaxis]), axis=3)
     stacked_voxelizations = stacked_voxelizations.astype(np.float32)
     try:
-        clearmap_io.write(directory /f'{channel}_stacked_density_{suffix}.tif', stacked_voxelizations, bigtiff=True)
+        filename = f"{channel}_stacked_density"
+        if suffix and suffix != '':
+            filename += f"_{suffix}"
+        filename += ".tif"
+        clearmap_io.write(directory / filename, stacked_voxelizations, bigtiff=True)
     except ValueError:
         pass
     return stacked_voxelizations
@@ -262,9 +266,17 @@ def stack_voxelizations(directory, f_list, suffix, channel=None):
 
 def average_voxelization_groups(stacked_voxelizations, directory, suffix, channel='', compute_sd=False):
     avg_voxelization = np.mean(stacked_voxelizations, axis=3)
-    clearmap_io.write(directory / f'{channel}_avg_density_{suffix}.tif', avg_voxelization)
+    filename = f"{channel}_avg_density"
+    if suffix and suffix != '':
+        filename += f"_{suffix}"
+    filename += ".tif"
+    clearmap_io.write(directory / filename, avg_voxelization)
 
     if compute_sd:
+        filename = f"{channel}_sd_density"
+        if suffix and suffix != '':
+            filename += f"_{suffix}"
+        filename += ".tif"
         sd_voxelization = np.std(stacked_voxelizations, axis=3)
         clearmap_io.write(directory / f'{channel}_sd_density_{suffix}.tif', sd_voxelization)
 
@@ -516,7 +528,10 @@ def make_summary(directory, gp1_name, gp2_name, gp1_dirs, gp2_dirs, channel=None
         total_df = generate_summary_table(aggregated_dfs)
 
         if output_path is None and save:
-            output_path = directory / f'{channel}_statistics_{gp1_name}_{gp2_name}.csv'
+            if channel :
+                output_path = directory / f'{channel}_statistics_{gp1_name}_{gp2_name}.csv'
+            else :
+                output_path = directory / f'statistics_{gp1_name}_{gp2_name}.csv'
         if save:
             total_df.to_csv(output_path)
         dfs[channel_] = total_df
@@ -560,13 +575,20 @@ def compare_groups(directory, gp1_name, gp2_name, gp1_dirs, gp2_dirs, prefix='p_
         gp1_f_list = dirs_to_density_files(directory, gp1_dirs, channel, density_files_suffix)
         gp2_f_list = dirs_to_density_files(directory, gp2_dirs, channel, density_files_suffix)
 
+        if density_files_suffix and density_files_suffix != "" :
+            suffix_grp1 = f'{density_files_suffix}_{gp1_name}'
+            suffix_grp2 = f'{density_files_suffix}_{gp2_name}'
+        else :
+            suffix_grp1 = f'{gp1_name}'
+            suffix_grp2 = f'{gp2_name}'
+
         gp1_stacked_voxelizations = stack_voxelizations(directory, gp1_f_list, channel=channel,
-                                                        suffix=f'{density_files_suffix}_{gp1_name}')
-        average_voxelization_groups(gp1_stacked_voxelizations, directory, f'{density_files_suffix}_{gp1_name}',
+                                                        suffix=suffix_grp1)
+        average_voxelization_groups(gp1_stacked_voxelizations, directory, suffix_grp1,
                                     channel=channel, compute_sd=advanced)
         gp2_stacked_voxelizations = stack_voxelizations(directory, gp2_f_list, channel=channel,
-                                                        suffix=f'{density_files_suffix}_{gp2_name}')
-        average_voxelization_groups(gp2_stacked_voxelizations, directory, f'{density_files_suffix}_{gp2_name}',
+                                                        suffix=suffix_grp2)
+        average_voxelization_groups(gp2_stacked_voxelizations, directory, suffix_grp2,
                                     channel=channel, compute_sd=advanced)
 
         t_vals, p_vals = stats.ttest_ind(gp1_stacked_voxelizations, gp2_stacked_voxelizations, axis=3, equal_var=False)
@@ -575,8 +597,10 @@ def compare_groups(directory, gp1_name, gp2_name, gp1_dirs, gp2_dirs, prefix='p_
         colored_p_vals_05 = get_colored_p_vals(p_vals, t_vals, 0.05, ('red', 'green'))
         colored_p_vals_01 = get_colored_p_vals(p_vals, t_vals, 0.01, ('green', 'blue'))
         colored_p_vals = np.maximum(colored_p_vals_05, colored_p_vals_01).astype(np.uint8)
-
-        output_f_name = f'{channel}_{prefix}_{gp1_name}_{gp2_name}_{density_files_suffix}.tif'
+        if density_files_suffix == '' or density_files_suffix is None:
+            output_f_name = f'{channel}_{prefix}_{gp1_name}_{gp2_name}.tif'
+        else :
+            output_f_name = f'{channel}_{prefix}_{gp1_name}_{gp2_name}_{density_files_suffix}.tif'
         output_file_path = directory / output_f_name
         clearmap_io.write(output_file_path, colored_p_vals, photometric='rgb', imagej=True)
 

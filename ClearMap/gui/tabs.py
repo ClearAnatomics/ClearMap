@@ -2141,12 +2141,14 @@ class GroupAnalysisProcessor:
 
     def compute_p_vals(self, selected_comparisons, groups, wrapping_func, channels,
                        advanced=False, density_files_suffix=''):
+        if density_files_suffix is None :
+            density_files_suffix = ''
         for pair in selected_comparisons:
             gp1_name, gp2_name = pair
             gp1, gp2 = [groups[gp_name] for gp_name in pair]
             for channel in channels:
                 _ = density_files_are_comparable(self.results_folder, gp1, gp2, channel,
-                                                 density_file_suffix=density_files_suffix)
+                                                 density_files_suffix=density_files_suffix)
             check_ids_are_unique(gp1, gp2)
             # compare_groups is automatically for each channel (loads the first sample to find the channels)
             wrapping_func(compare_groups, self.results_folder, gp1_name, gp2_name, gp1, gp2,
