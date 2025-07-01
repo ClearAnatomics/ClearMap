@@ -674,7 +674,7 @@ def file_list(expression=None, file_list=None, sort=True, verbose=False):
 
     Arguments
     ---------
-    expression :str
+    expression :str | Path | te.Expression | None
         The regular expression the file names should match.
     sort : bool
         If True, sort files naturally.
