@@ -38,7 +38,7 @@ import ClearMap.ImageProcessing.Skeletonization.Skeletonization as skeletonizati
 import ClearMap.ImageProcessing.Binary.Filling as binary_filling
 
 import ClearMap.Analysis.Measurements.MeasureExpression as measure_expression
-import ClearMap.Analysis.Measurements.MeasureRadius as measure_radius
+import ClearMap.Analysis.Measurements.radius_measurements as measure_radius
 from ClearMap.Analysis.graphs import graph_processing
 import ClearMap.Analysis.Measurements.Voxelization as voxelization
 
@@ -646,10 +646,12 @@ class VesselGraphProcessor(TabProcessor):
     def _measure_radii(self):
         coordinates = self.graph_raw.vertex_coordinates()
         source = self.get_path('binary', channel=self.parent_channels, asset_sub_type='final')
+        spacing = np.array(self.sample_manager.get_channel_resolution(self.parent_channels[0]))
         radii, indices = measure_radius.measure_radius(source, coordinates,
                                                        value=0, fraction=None, max_radius=150,
-                                                       return_indices=True, default=-1)  # WARNING: prange
-        self.graph_raw.set_vertex_radii(radii)
+                                                       return_indices=True, default=-1, scale=spacing)  # WARNING: prange
+        self.graph_raw.define_vertex_property('radius_units', radii)
+        # TODO: call measure_radius with return_radii_as_scalar=False and store vectors
 
     def _set_graph_artery_property(self, asset_type, asset_sub_type=None, suffix='', radius_shift=0):
         suffix = suffix or asset_type
