@@ -1370,7 +1370,7 @@ class VasculatureTab(PostProcessingTab):
     def _set_channels_names(self):
         if self.params.config['is_default']:
             self.params.fix_default_config()
-        for channel in self.sample_manager.get_channels_by_pipeline('TubeMap'):  # TODO: see if shouldn't be handled by params instead
+        for channel in self.sample_manager.get_channels_by_pipeline('TubeMap', as_list=True):  # TODO: see if shouldn't be handled by params instead
             channel_type = self.sample_manager.get_channel_type(channel)
             if channel not in self.params.config['binarization'].keys():
                 self.params.patch_config_section(channel, channel_type)
@@ -1445,7 +1445,7 @@ class VasculatureTab(PostProcessingTab):
     #     pass
 
     def _get_channels(self):
-        return self.sample_manager.get_channels_by_pipeline('TubeMap')
+        return self.sample_manager.get_channels_by_pipeline('TubeMap', as_list=True)
 
     def _set_channel_config(self, channel):
         self.params[channel]._config = self.params.config
