@@ -680,7 +680,9 @@ class VesselGraphProcessor(TabProcessor):
             n_blocks = 100  # TBD:
             self.prepare_watcher_for_substep(n_blocks, self.build_graph_re, 'Building graph', True)
             self.steps.remove_next_steps_files(self.steps.graph_raw)
-            self.graph_raw = graph_processing.graph_from_skeleton(self.get_path('skeleton', channel=self.parent_channels),
+            skeleton_path = self.get_path('skeleton', channel=self.parent_channels)
+            spacing = self.sample_manager.get_channel_resolution(self.parent_channels[0])
+            self.graph_raw = graph_processing.graph_from_skeleton(skeleton_path, spacing=spacing, distance_unit='µm',
                                                                   verbose=True)  # WARNING: main thread (prange)
             self._measure_radii()  # WARNING: main thread (prange)
             if self.use_arteries_for_graph:  # TODO: do same for veins if exists

@@ -13,55 +13,86 @@ __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
 
+import functools
+import multiprocessing
+import warnings
+from typing import Dict, Callable, List, Sequence
 
 import numpy as np
 
-import ClearMap.Analysis.graphs.type_conversions
 import ClearMap.IO.IO as io
 
 import ClearMap.ImageProcessing.Topology.Topology3d as t3d
 
 import ClearMap.ParallelProcessing.DataProcessing.ArrayProcessing as ap
 
-import ClearMap.Analysis.graphs.graph_gt as ggt
 from ClearMap.Analysis.graphs.fast_graph_reduce import find_degree2_branches
+from ClearMap.Analysis.graphs import graph_gt
 
 import ClearMap.Utils.Timer as tmr
+from ClearMap.ParallelProcessing.DataProcessing.ArrayProcessing import initialize_sink
 
+
+def mean_vertex_coordinates(coordinates):  # REFACTORING: functools.partial(np.mean, axis=0)
+    return np.mean(coordinates, axis=0)
+
+DEFAULT_EDGE_TO_EDGE = {'length': np.sum}
+DEFAULT_VERTEX_TO_EDGE = {'radii': np.max}
+DEFAULT_VERTEX_TO_VERTEX = {
+    'coordinates': functools.partial(np.mean, axis=0),
+    'coordinates_units': functools.partial(np.mean, axis=0),
+    'length': np.sum,
+    'radii': np.max
+}
 
 ###############################################################################
 # ## Graphs from skeletons
 ###############################################################################
 
-def graph_from_skeleton(skeleton, points=None, radii=None, vertex_coordinates=True,
-                        check_border=True, delete_border=False, verbose=False):
-    """Converts a binary skeleton image to a graph-tool graph.
+def graph_from_skeleton(skeleton, points=None, radii=None, vertex_coordinates=True, spacing=None,
+                        distance_unit=None, check_border=True, delete_border=False, verbose=False):  # FIXME: add orientation
+    """
+    Converts a binary skeleton image to a graph-gt graph.
+
+    Note
+    ----
+    Edges are detected between neighbouring foreground pixels using 26-connectivity.
+
+    .. rubric:: Algorithm: Graph From Skeleton
+
+    1. Linearise the skeleton to create a list of 1D indices of the skeleton voxels.
+    2. Create a graph with the number of vertices equal to the number of skeleton points.
+    3. For each orientation (13 in total), calculate the offset 1D to the neighbouring voxel.
+    4. For each skeleton point, find its neighbours using the offset and add edges to the graph.
+    5. If `vertex_coordinates` is True, store the coordinates of the vertices in the graph. Also
+    stores the physical coordinates if `spacing` is provided.
+    6. If `radii` is provided, set the vertex radii in the graph.
 
     Arguments
     ---------
-    skeleton : array
+    skeleton: array
         Source with 2d/3d binary skeleton.
-    points : array
+    points: array
         List of skeleton points as 1d indices of flat skeleton array (optional to save processing time).
-    radii  : array
+    radii: array
         List of radii associated with each vertex.
     vertex_coordinates : bool
         If True, store coordinates of the vertices / edges.
-    check_border : bool
+    spacing: tuple
+        Voxel spacing in physical units (e.g. micrometers) for the coordinates.
+    distance_unit: str
+        Name of the distance unit for the graph, e.g. 'µm', 'micrometer', 'nanometer', etc.
+    check_border: bool
         If True, check if the border is empty. The algorithm requires this.
-    delete_border : bool
+    delete_border: bool
         If True, delete the border.
-    verbose : bool
+    verbose: bool
         If True, print progress information.
 
     Returns
     -------
     graph : Graph class
         The graph corresponding to the skeleton.
-
-    Note
-    ----
-    Edges are detected between neighbouring foreground pixels using 26-connectivity.
     """
     skeleton = io.as_source(skeleton)
 
@@ -78,48 +109,57 @@ def graph_from_skeleton(skeleton, points=None, radii=None, vertex_coordinates=Tr
         timer_all = tmr.Timer()
         print('Graph from skeleton calculation initialize.!')
 
+    # Create the list of indices of the skeleton voxels
     if points is None:
         points = ap.where(skeleton.reshape(-1, order='A')).array
-
         if verbose:
-            timer.print_elapsed_time('Point list generation')
-            timer.reset()
+            timer.print_elapsed_time('Point list generation', reset=True)
 
     # create graph
     n_vertices = points.shape[0]
-    g = ggt.Graph(n_vertices=n_vertices, directed=False)
+    g = graph_gt.Graph(n_vertices=n_vertices, directed=False)
     g.shape = skeleton.shape
-
     if verbose:
-        timer.print_elapsed_time('Graph initialized with %d vertices' % n_vertices)
-        timer.reset()
+        timer.print_elapsed_time(f'Graph initialized with {n_vertices} vertices', reset=True)
 
     # detect edges
-    edges_all = np.zeros((0, 2), dtype=int)
-    for i, o in enumerate(t3d.orientations()):
-        # calculate off set
-        offset = np.sum((np.hstack(np.where(o))-[1, 1, 1]) * skeleton.strides)
+    n_edges = 0
+    for i, ori in enumerate(t3d.orientations()):
+        # calculate offset
+        ori_coord = np.hstack(np.where(ori))  # coordinate in 3,3,3 cube where True
+        centered_ori_coord = (ori_coord - [1, 1, 1])  # center the coordinate to (0,0,0)
+        offset = np.sum(centered_ori_coord * skeleton.strides)  # compute 1D offset for that orientation
         edges = ap.neighbours(points, offset)
-        if len(edges) > 0:
-            edges_all = np.vstack([edges_all, edges])
-
+        if edges.shape[0]:
+            g.add_edge(edges)
+            n_edges += edges.shape[0]
         if verbose:
-            timer.print_elapsed_time('%d edges with orientation %d/13 found' % (edges.shape[0], i+1))
-            timer.reset()
-
-    if edges_all.shape[0] > 0:
-        g.add_edge(edges_all)
-
+            timer.print_elapsed_time(f'{edges.shape[0]} edges with orientation {i + 1}/13 found', reset=True)
     if verbose:
-        timer.print_elapsed_time('Added %d edges to graph' % (edges_all.shape[0]))
-        timer.reset()
+        timer.print_elapsed_time(f'Added {n_edges} edges to graph', reset=True)
 
     if vertex_coordinates:
-        vertex_coordinates = np.array(np.unravel_index(points, skeleton.shape, order=skeleton.order)).T
+        max_dim = max(skeleton.shape)
+        coord_dtype = np.uint16 if max_dim < 65536 else np.uint32
+
+        vertex_coordinates = np.array(
+            np.unravel_index(points, skeleton.shape, order=skeleton.order)
+        ).T.astype(coord_dtype)
         g.set_vertex_coordinates(vertex_coordinates)
+        # optional physical coordinates (anisotropy-aware)
+        if spacing is not None:  # Add unit and resolution information as graph properties
+            spacing = np.asarray(spacing, dtype=np.float32)
+            coords_phys = vertex_coordinates.astype(np.float32) * spacing[None, :]
+            g.define_vertex_property('coordinates_units', coords_phys)
+            g.define_graph_property('spacing', spacing)
 
     if radii is not None:
-        g.set_vertex_radius(radii)
+        g.set_vertex_radius(None, radii)
+
+    if distance_unit is not None:
+        g.define_graph_property('distance_unit', distance_unit)
+
+    # FIXME: add orientation property
 
     if verbose:
         timer_all.print_elapsed_time('Skeleton to Graph')
@@ -767,7 +807,7 @@ def expand_graph_length(graph, length='length', return_edge_mapping=False):
     # construct graph
     new_edges = edge_lengths > 1  # edges to create
     n_vertices = graph.n_vertices + int(np.sum(vertex_lengths - 2))
-    g = ggt.Graph(n_vertices=n_vertices)
+    g = graph_gt.Graph(n_vertices=n_vertices)
 
     # construct edges
     offset = graph.n_vertices
@@ -943,6 +983,7 @@ def _test():
     import numpy as np
     import ClearMap.Tests.Files as tf
     import ClearMap.Analysis.graphs.graph_processing as gp
+    from ClearMap.Analysis.graphs import graph_gt
     # reload(gp)
 
     skeleton = tf.source('skeleton')
@@ -968,7 +1009,7 @@ def _test():
     l = gr.edge_geometry_lengths()
     print(l)
 
-    g = gp.ggt.Graph(n_vertices=10)
+    g = graph_gt.Graph(n_vertices=10)
     g.add_edge(np.array([[7, 8], [7, 9], [1, 2], [2, 3], [3, 1], [1, 4], [4, 5], [2, 6], [6, 7]]))
     g.set_vertex_coordinates(np.array([
         [10, 10, 10], [0, 0, 0], [1, 1, 1], [1, 1, 0], [5, 0, 0],
@@ -996,9 +1037,10 @@ def _test():
     # tracing
     import numpy as np
     import ClearMap.Visualization.Plot3d as p3d
+    from ClearMap.Analysis.graphs import graph_gt
     import ClearMap.Analysis.graphs.graph_processing as gp
 
-    g = gp.ggt.Graph(n_vertices=10)
+    g = graph_gt.Graph(n_vertices=10)
     g.add_edge(np.array([[0, 1], [1, 2], [2, 3], [3, 4], [4, 0], [0, 5], [5, 6], [6, 7], [0, 8], [8, 9], [9, 0]]))
     g.set_vertex_coordinates(np.array([
         [0, 0, 0], [1, 0, 0], [2, 0, 0], [2, 2, 0], [0, 1, 0],
@@ -1026,9 +1068,9 @@ def _test():
     reload(gp)
 
     # edge tracing
-    import ClearMap.Analysis.graphs.graph_gt as ggt
+    from ClearMap.Analysis.graphs import graph_gt
     edges = [[0, 1], [1, 2], [2, 3], [4, 5], [5, 6], [1, 7]]
-    g = ggt.Graph(edges=edges)
+    g = graph_gt.Graph(edges=edges)
 
     _, _ = g.edge_graph(return_edge_map=True)
 
@@ -1051,7 +1093,7 @@ def _test():
     import ClearMap.Tests.Files as tf
     import ClearMap.Analysis.graphs.graph_processing as gp
 
-    graph = gp.ggt.Graph(n_vertices=5)
+    graph = graph_gt.Graph(n_vertices=5)
     graph.add_edge([[0, 1], [0, 2], [0, 3], [2, 3], [2, 1], [0, 4]])
     graph.add_edge_property('length', np.array([0, 1, 2, 3, 4, 5]) + 2)
 
@@ -1059,7 +1101,7 @@ def _test():
 
     import graph_tool.draw as gd
     from ClearMap.Analysis.graphs import graph_gt
-    pos = GraphGt.vertex_property_map_to_python(gd.sfdp_layout(e.base))
+    pos = graph_gt.vertex_property_map_to_python(gd.sfdp_layout(e.base))
     import matplotlib.pyplot as plt
     plt.figure(1)
     plt.clf()
