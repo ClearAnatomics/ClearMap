@@ -5,10 +5,10 @@ Graph filters for ClearMap
 artery = GraphFilter(g, 'vertex', 'is_artery', True)
 small  = GraphFilter(g, 'vertex', 'radius',    (0, 4))
 vein   = GraphFilter(g, 'vertex', 'is_vein',   True)
-some_edge_prop = GraphFilter(g, 'edge', 'some_edge_prop', True)
+some_edge_prop_filter = GraphFilter(g, 'edge', 'some_edge_prop', True)
 
 # Boolean equation:  (artery & small) | ~(vein)
-cap_network = (artery & small) | ~vein & some_edge_prop
+cap_network = (artery & small) | ~vein & some_edge_prop_filter
 
 mask = cap_network.as_mask('vertex')   # one property read per leaf; single traversal
 """
