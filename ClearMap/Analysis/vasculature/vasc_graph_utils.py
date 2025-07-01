@@ -387,8 +387,13 @@ def graph_gt_to_igraph(src_graph):
     """
     Convert graph from GraphGt to igraph format
 
-    .. warning:: This only transfers the properties 'radius', 'diameter' and 'nkind'. nkind is the integer value
-        representing the type of vessel (see the n_kinds dictionary for the possible values)
+
+    .. warning::
+        This only transfers the properties 'radius', 'diameter' and 'nkind'.
+
+    .. note::
+        nkind is the integer value representing the type of vessel
+        (see the n_kinds dictionary for the possible values)
 
     Parameters
     ----------
