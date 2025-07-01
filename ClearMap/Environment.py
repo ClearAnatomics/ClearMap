@@ -69,7 +69,7 @@ import ClearMap.Analysis.graphs.graph_gt as grp
 import ClearMap.Analysis.graphs.graph_processing as gp
 
 import ClearMap.Analysis.Measurements.MeasureExpression as me
-import ClearMap.Analysis.Measurements.MeasureRadius as mr
+import ClearMap.Analysis.Measurements.radius_measurements as mr
 import ClearMap.Analysis.Measurements.Voxelization as vox
 
 # experts

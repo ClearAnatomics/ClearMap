@@ -345,6 +345,22 @@ class SampleManager(TabProcessor):
         if asset.exists:
             asset.delete()
 
+    def get_channel_resolution(self, channel):
+        """
+        Get the resolution of the channel as defined in the sample config.
+
+        Parameters
+        ----------
+        channel : str
+            The channel to get the resolution for
+
+        Returns
+        -------
+        tuple(float, float, float)
+            The resolution of the channel in (x, y, z) format
+        """
+        return tuple(self.config['channels'][channel]['resolution'])
+
     def stitched_shape(self, channel):
         asset = self.get('stitched', channel=channel, sample_id=self.prefix)
         if asset.exists:
