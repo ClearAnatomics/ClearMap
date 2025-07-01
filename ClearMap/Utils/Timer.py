@@ -79,7 +79,7 @@ class Timer(object):
     else:
       return t - self.time;
   
-  def print_elapsed_time(self, head = None, beep = False):
+  def print_elapsed_time(self, head=None, beep=False, reset=False):
     """Print elapsed time.
     
     Arguments
@@ -88,10 +88,14 @@ class Timer(object):
       Prefix to the timing string.
     beep : bool
       If True, beep in addition to print the time.
+    reset : bool
+      If True, reset the timer after printing.
     """    
     print(self.elapsed_time(head=head), flush=True)
     if beep:
       snd.beep()
+    if reset:
+      self.reset()
   
   def format_time(self, t):
     """Format time to string.
