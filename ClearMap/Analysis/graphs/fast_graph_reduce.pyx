@@ -19,14 +19,19 @@ The logic is as follows:
     Once you exit, you have a maximal chain from v2 to a new non-degree-2 vertex.
 
 """
+import warnings
+
+from cython.parallel import prange, parallel
+
+import numpy as np
+cimport numpy as cnp
+
 from libc.stdio cimport printf
 from libc.stdint cimport uint32_t, uint8_t
 
 from libcpp.vector cimport vector
 from libcpp.pair cimport pair
 
-# import numpy as np
-# cimport numpy as cnp
 
 ctypedef uint32_t index_t
 ctypedef vector[index_t] index_vector_t
@@ -42,6 +47,39 @@ ctypedef pair[index_t, vertex_t] adj_entry_t  # (edge ID, neighbour vertex)
 ctypedef uint8_t degree_t
 ctypedef vector[degree_t] degree_vector_t
 
+ctypedef fused source_t:
+    cnp.uint8_t
+    cnp.uint16_t
+    cnp.uint32_t
+    cnp.uint64_t
+    cnp.int8_t
+    cnp.int16_t
+    cnp.int32_t
+    cnp.int64_t
+    cnp.float32_t
+    cnp.float64_t
+
+
+ctypedef fused sink_t:
+    cnp.uint8_t
+    cnp.uint16_t
+    cnp.uint32_t
+    cnp.uint64_t
+    cnp.int8_t
+    cnp.int16_t
+    cnp.int32_t
+    cnp.int64_t
+    cnp.float32_t
+    cnp.float64_t
+
+
+ctypedef fused graphtool_scalar_t:
+    double  # float64  (and promoted float32)
+    long long  # int64 / uint64
+    int  # int32
+    unsigned char  # bool_
+
+
 # ctypedef np.uint32_t np_vertex_t
 # ctypedef np.uint8_t np_degree_t
 # ctypedef np.uint32_t[::1] np_vertex_array_t
@@ -52,8 +90,6 @@ ctypedef vector[degree_t] degree_vector_t
 # cdef degree_t UN_INITIALIZED_DEGREE = 0xFF  # Replaces literal (type_max(degree_t) if unsigned, use -1 if signed
 cdef index_t INVALID_IDX = <index_t> -1  # cast -1 to uint to wrap around to max  # Replaces literal (type_max(index_t) if unsigned, use -1 if signed
 cdef size_t OK = 0, INVALID_EDGE = 1, INVALID_DEGREE_2 = 2
-
-
 
 # # Import C++ std::array
 # cdef extern from "<array>" namespace "std":
@@ -170,9 +206,9 @@ cdef void to_python(
         py_edges.append(edge_ids[full_edges[i]])  # FIXME: unsure about this
         # py_edges.append(full_edges[i])  # TODO: replace by this if pure index
 
-    cdef list py_verts = []
+    cdef cnp.ndarray[cnp.uint64_t, ndim=1] py_verts = np.zeros(full_verts.size(), dtype=np.uint64)
     for j in range(full_verts.size()):
-        py_verts.append(full_verts[j])
+        py_verts[j] = full_verts[j]
 
     cdef tuple chain_info = (py_edges, py_verts)
     result.append(chain_info)
@@ -302,3 +338,136 @@ cpdef object find_degree2_branches(
     printf(b"\r%zu/%zu\n", i+1, n_end_edges)  # End progress bar
 
     return result
+
+
+cdef enum REDUCER:
+    RED_MIN = 0
+    RED_MAX = 1
+    RED_SUM = 2
+    RED_MEAN = 3
+
+ctypedef unsigned long long  uint64 # For offsets, to avoid overflow issues with large arrays
+
+# helper to map Python function or name -> enum
+cdef int get_reducer_enum(object reducer_fn):
+    cdef str name = reducer_fn.__name__
+    if name == 'amin' or name == 'min':
+        return RED_MIN
+    elif name == 'amax' or name == 'max':
+        return RED_MAX
+    elif name == 'sum':
+        return RED_SUM
+    elif name == 'mean':
+        return RED_MEAN
+    else:
+        return -1    # signal “unknown Python reducer”
+
+
+cdef inline sink_t c_min(source_t[:] src, sink_t[:] sink, uint64[:] idxs, uint64 start, uint64 end)  nogil except +:
+    """Compute the minimum of src over indices in idxs[start:end]."""
+    cdef Py_ssize_t j
+    cdef uint64 idx
+    cdef sink_t acc
+    # initialize with first element
+    idx = idxs[start]
+    acc = <sink_t>src[idx]
+    for j in range(start + 1, end):
+        idx = idxs[j]
+        if src[idx] < acc:
+            acc = <sink_t>src[idx]
+    return <sink_t>acc
+
+cdef inline sink_t c_max(source_t[:] src, sink_t[:] sink, uint64[:] idxs, uint64 start, uint64 end)  nogil except +:
+    """Compute the maximum of src over indices in idxs[start:end]."""
+    cdef Py_ssize_t j
+    cdef uint64 idx
+    cdef sink_t acc
+    # initialize with first element
+    idx = idxs[start]
+    acc = <sink_t>src[idx]
+    for j in range(start + 1, end):
+        idx = idxs[j]
+        if src[idx] > acc:
+            acc = <sink_t>src[idx]
+    return <sink_t>acc
+
+cdef inline double c_sum(source_t[:] src, sink_t[:] sink, uint64[:] idxs, uint64 start, uint64 end)  nogil except +:
+    """Compute the sum of src over indices in idxs[start:end]."""
+    cdef Py_ssize_t j
+    cdef double acc = 0  # FIXME: float and force casting to source_t
+    for j in range(start, end):
+        acc = acc + <double>src[idxs[j]]
+    return acc
+
+cdef inline sink_t c_mean(source_t[:] src, sink_t[:] sink, uint64[:] idxs, uint64 start, uint64 end)  nogil except +:
+    """Compute the mean of src over indices in idxs[start:end]."""
+    cdef uint64 length = end - start
+    if length <= 0:
+        return 0
+    cdef double total = c_sum(src, sink, idxs, start, end)
+    return <sink_t>(total / length)
+
+
+cpdef bint cy_reduce(source_t[:] source, sink_t[:] sink, uint64[:] idx_stack, uint64[:] offsets,
+                            object reducer_fn, int num_threads=10):
+    """
+    Parallel reducer over ragged slices of *arr*:
+
+    Parameters
+    ----------
+    source: np.ndarray
+        The array to reduce.
+    idx_stack: np.ndarray
+        The index stack that defines the slices.
+    offsets: np.ndarray
+        The offsets that define the slices in *idx_stack*.
+    reducer_fn: callable
+        The function to apply to each slice.
+        Must be a numpy function that can release the GIL, e.g. np.sum, np.mean, np.max, np.min.
+    num_threads: int
+        The number of threads to use for parallel reduction (in the case of standard Cython reducers).
+
+
+    .. warning::
+        if reduction function is sum, sink must be of type float64
+
+
+    Note
+    ----
+    slice i  ==  arr[idx_stack[offsets[i]:offsets[i+1]]]
+
+    Returns
+    -------
+    bool
+        True if the reduction was successful, False if an unknown reducer function was provided.
+    """
+    cdef:
+        Py_ssize_t n_chain = offsets.shape[0] - 1
+        Py_ssize_t i
+        uint64 start, end
+        int function_code = get_reducer_enum(reducer_fn)
+
+    # if function_code == RED_SUM:
+    #     if sink.format != 'd':  # FIXME: check if this is correct
+    #         raise ValueError(f"Sink array must be of type 'd' (float64) for sum reduction, got {sink.format}.")
+
+    if function_code == -1:  # use Python reducer
+        warnings.warn(f'Unknown reducer function {reducer_fn}. Using Python fallback.'
+                      f'This is typically significantly slower', UserWarning)
+        return False
+    else:
+        with nogil, parallel(num_threads=num_threads):
+            for i in prange(n_chain, schedule='static'):
+                start = offsets[i]
+                end = offsets[i + 1]
+                if function_code == RED_SUM:  # Sum needs upcasting to float
+                    sink[i] = <sink_t>c_sum(source, sink, idx_stack, start, end)
+                elif function_code == RED_MEAN:  # Mean needs upcasting to float
+                    sink[i] = c_mean(source, sink, idx_stack, start, end)
+                elif function_code == RED_MIN:  # Min needs upcasting to source_t
+                    sink[i] = c_min(source, sink, idx_stack, start, end)
+                elif function_code == RED_MAX:  # Max needs upcasting to source_t
+                    sink[i] = c_max(source, sink, idx_stack, start, end)
+                else:  # Unknown function code, use Python fallback
+                    return False
+        return True
