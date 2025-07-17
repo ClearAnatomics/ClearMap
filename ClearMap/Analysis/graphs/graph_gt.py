@@ -51,6 +51,7 @@ class Graph(grp.AnnotatedGraph):
                  vertex_labels=None, edge_labels=None, annotation=None,
                  base=None, edge_geometry_type='graph'):
 
+        self.path = ''
         if base is None:
             base = gt.Graph(directed=directed)
             self.base = base
@@ -1105,15 +1106,21 @@ class Graph(grp.AnnotatedGraph):
         self._base.save(str(filename))
 
     def load(self, filename):
-        self._base = gt.load_graph(str(filename))
+        self.path = str(filename)
+        self._base = gt.load_graph(self.path)
 
-    def copy(self):
-        return Graph(name=copy.copy(self.name), base=self.base.copy())
+    def copy(self, from_disk=False, path=''):
+        if from_disk:
+            return load(path if path else self.path)
+        else:
+            return Graph(name=copy.copy(self.name), base=self.base.copy())
 
 
 def load(filename):
     g = gt.load_graph(str(filename))
-    return Graph(base=g)
+    graph = Graph(base=g)
+    graph.path = str(filename)
+    return graph
 
 
 def save(filename, graph):
