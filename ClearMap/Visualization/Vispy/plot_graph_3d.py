@@ -126,7 +126,7 @@ def plot_graph_nodes(graph, view=None, coordinates=None,
 
 def plot_graph_mesh(graph, view=None, coordinates=None, radii=None,
                     color=None, vertex_colors=None, edge_colors=None,
-                    n_tube_points=8, default_radius=1,
+                    n_tube_points=8, default_radius=1.0,
                     mode='triangles', shading='smooth',
                     show=True, bg_color='white',
                     center_view=True, title=None, **kwargs):
@@ -178,7 +178,7 @@ def plot_graph_line(graph, view=None, coordinates=None,
     title : str or None
         Window title.
     view : view or None
-       Add plot to this view. if given.
+       Add plot to this view if supplied
 
     Returns
     -------
@@ -203,6 +203,7 @@ def plot_graph_line(graph, view=None, coordinates=None,
         view.camera.center = np.mean(graph.vertex_coordinates(), axis=0)
 
     return p
+# FIXME: add alpha argument
 
 
 def plot_graph_edge_property(graph, edge_property, colormap=None, mesh=False,
