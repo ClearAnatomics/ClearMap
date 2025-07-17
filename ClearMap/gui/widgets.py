@@ -1098,7 +1098,7 @@ class ManageAssetsWidget(WizardWidget):
         if all([hasattr(asset, action_name) for asset in assets]):
             if action_name == 'plot':  # FIXME: add menu for overlap, side by side ...
                 sources = [asset.path for asset in assets]
-                if all([asset.shape() == assets[0].shape for asset in assets]):
+                if all([asset.shape() == assets[0].shape() for asset in assets]):
                     sources = [sources]  # overlay
                 plot_3d.plot(sources, arrange=False, lut='grey')  # REFACTORING: in WS2 ?
             for asset in assets:
