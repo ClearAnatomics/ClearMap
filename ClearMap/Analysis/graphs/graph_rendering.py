@@ -118,7 +118,11 @@ def mesh_tube_from_coordinates_and_radii(coordinates, radii, indices, n_tube_poi
     n_indices = np.hstack([[0], n_indices])
 
     if edge_colors is not None:
-        colors = [len(v) * [c] for v, c in zip(vertices, edge_colors)]
+        # colors = [len(v) * [c] for v, c in zip(vertices, edge_colors)]
+        edge_colors = np.array(edge_colors)
+        if edge_colors.size in (3, 4):
+            edge_colors = [edge_colors] * len(vertices)
+        colors = [np.tile(c, [len(v), 1]) for v, c in zip(vertices, edge_colors)]  # TODO: check we always want this broadcasting
         colors = np.concatenate(colors)
     else:
         colors = None
