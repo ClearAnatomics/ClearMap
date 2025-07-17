@@ -13,6 +13,7 @@ ctypedef fused source_t:
     int
     long
     float
+    np.int16_t
     np.int32_t
     np.int64_t
     np.uint8_t  # used for bool
