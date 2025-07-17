@@ -162,8 +162,8 @@ def _mesh(coordinates, radii, n_tube_points=15, dtype='uint32'):
 
 def _frenet_frames(coordinates):
     """Calculates and returns the tangents, normals and binormals for a chain of coordinates."""
-    # n_points = len(coordinates)
-    # epsilon = 0.0001
+    n_points = len(coordinates)
+    epsilon = 0.0001
 
     # compute tangent vectors for each segment
     tangents = np.roll(coordinates, -1, axis=0) - np.roll(coordinates, 1, axis=0)
@@ -179,16 +179,16 @@ def _frenet_frames(coordinates):
 
     vec = np.cross(tangents[0], normal)
 
-    normals = np.zeros((npoints, 3))
+    normals = np.zeros((n_points, 3))
     normals[0] = np.cross(tangents[0], vec)
 
     # compute change along trajectory
-    # theta = np.arccos(np.clip(np.sum(tangents[:-1] * tangents[1:], axis=1), -1, 1))
+    theta = np.arccos(np.clip(np.sum(tangents[:-1] * tangents[1:], axis=1), -1, 1))
     vec = np.cross(tangents[:-1], tangents[1:])
     nrm = np.linalg.norm(vec, axis=1)
 
     # compute normal and binormal vectors along the path
-    for i in range(npoints-1):
+    for i in range(n_points-1):
         normals[i+1] = normals[i]
 
         if nrm[i] > epsilon:
