@@ -244,6 +244,31 @@ def plot_graph_vertex_property(graph, vertex_property, colormap=None, bg_color='
 
     return plot_graph_nodes(graph, vertex_colors=vertex_colors, bg_color=bg_color, show=show, **kwargs)
 
+
+
+def plot_graph_edge_geometry_property(graph, property_or_name, reduction_fn=None, colormap='viridis',
+                                      mesh=False, alpha=1, view=None, **kwargs):
+    if reduction_fn is None:
+        raise NotImplementedError(
+            'Plotting edge geometry values directly is not implemented yet. A reduction function must be '
+            'provided to reduce edge geometry labels first. For example, use np.mean or np.max.')
+    if isinstance(property_or_name, str) and property_or_name in graph.edge_geometry_properties:
+        edge_geom_labels = graph.edge_geometry(property_or_name, as_list=True)
+    else:
+        raise NotImplementedError(f'Passing edge geometry property as a list or array is not implemented yet. ')
+
+    colormap = get_colormap(colormap)
+
+    # Reduce edge geometry labels (ints required for modulo operation)
+    edge_geom_labels = np.array([reduction_fn(lbls) for lbls in edge_geom_labels], dtype=int)
+    # Compute the colors applied to the REDUCED edges from the reduction of edge geometry labels.
+    edge_colors = colormap(edge_geom_labels % colormap.N)
+    edge_colors[..., 3] = alpha
+
+    plot_fn = plot_graph_mesh if mesh else plot_graph_line
+
+    plot_fn(graph, edge_colors=edge_colors, view=view, **kwargs)
+
 ###############################################################################
 # ## Tests
 ###############################################################################
