@@ -18,6 +18,7 @@ __copyright__ = 'Copyright (c) 2017 by Christoph Kirst, The Rockefeller Universi
 import numpy as np
 
 import vispy.visuals as visuals
+from vispy.geometry import create_sphere
 
 import ClearMap.Visualization.Color as col
 from ClearMap.Analysis.graphs.graph_rendering import mesh_tube_from_coordinates_and_radii
@@ -93,7 +94,7 @@ class GraphMeshVisual(visuals.mesh.MeshVisual):
         if color is None and vertex_colors is None:
             color = default_color
 
-        if graph.has_edge_geometry():
+        if graph.has_edge_geometry(coordinates if coordinates is not None else 'coordinates'):
             name = coordinates if coordinates is not None else 'coordinates'
             coordinates, indices = graph.edge_geometry(name=name, return_indices=True, as_list=False)
 
@@ -116,7 +117,7 @@ class GraphMeshVisual(visuals.mesh.MeshVisual):
             n_edges = graph.n_edges
             indices = np.array([2*np.arange(0, n_edges), 2*np.arange(1, n_edges+1)]).T
 
-        if vertex_colors is not None:
+        if vertex_colors is not None:    # then, edges take as colors the average of their vertices colours
             connectivity = graph.edge_connectivity()
             edge_colors = (vertex_colors[connectivity[:, 0]] + vertex_colors[connectivity[:, 1]])/2.0
 
@@ -133,6 +134,133 @@ class GraphMeshVisual(visuals.mesh.MeshVisual):
         print(f'No radii found in the graph, using uniform radii = {default_radius}!')
         radii = np.full(coordinates.shape[0], default_radius)
         return radii
+
+
+class GraphSphereVisual(visuals.mesh.MeshVisual):
+    """
+    Render each vertex (or geometry sample-point) of a graph as a shaded 3-D
+    sphere.
+
+    Parameters
+    ----------
+    graph : Graph
+        The graph to visualise.
+    coordinates : str | None
+        Name of the (vertex- or geometry-)property that stores XYZ positions.
+    radii : str | 1-d array | None
+        Property name or explicit per-point radii.  Falls back to
+        ``graph.vertex_radii()`` or *default_radius*.
+    n_sphere_points : int
+        Number of longitudinal subdivisions (≥ 4).  Latitudinal subdivisions
+        are chosen automatically to give a roughly regular mesh.
+    default_radius : float
+        Uniform radius to use when no radii are stored.
+    color, vertex_colors : colour spec or array
+        Global or per-vertex colours (same semantics as the other visuals).
+    use_geometry : bool
+        If *True* plot every edge-geometry sample-point instead of the plain
+        vertex set.
+    mode, shading : str
+        Passed straight to ``vispy.visuals.MeshVisual``.
+    """
+
+    def __init__(self, graph,
+                 coordinates=None, radii=None,
+                 n_sphere_points=8, default_radius=1,
+                 color=None, vertex_colors=None,
+                 use_geometry=False,
+                 mode='triangles', shading='smooth'):
+
+        # -------------------------------------------------------------
+        # ---  Collect coordinates ------------------------------------
+        # -------------------------------------------------------------
+        name = coordinates if coordinates is not None else 'coordinates'
+        if use_geometry and graph.has_edge_geometry(name):
+            coords = graph.edge_geometry(name=name, as_list=False)
+        else:
+            coords = graph.vertex_property(name)  # falls back to vertex_coordinates()
+
+        coords = np.asarray(coords, dtype=float)
+        n_points = coords.shape[0]
+
+        # -------------------------------------------------------------
+        # ---  Collect radii -----------------------------------------
+        # -------------------------------------------------------------
+        if radii is None:
+            try:                     # vertices
+                radii = graph.vertex_radii() if not use_geometry else graph.edge_geometry(name='radii', as_list=False)
+            except Exception:  # FIXME: too broad
+                radii = None
+
+        if isinstance(radii, str):   # property name
+            radii = graph.vertex_property(radii) \
+                    if not use_geometry else graph.edge_geometry(name=radii, as_list=False)
+
+        if radii is None:
+            radii = np.full(n_points, default_radius, dtype=float)
+        else:
+            radii = np.asarray(radii, dtype=float)
+            if radii.size != n_points:          # broadcast scalar or 1-value list
+                if radii.size == 1:
+                    radii = np.full(n_points, float(radii.squeeze()))
+                else:
+                    raise ValueError('Length of *radii* must match number of points.')
+
+        # -------------------------------------------------------------
+        # ---  Generate one unit sphere mesh --------------------------
+        # -------------------------------------------------------------
+        rows = max(4, int(n_sphere_points))
+        cols = rows * 2                      # decent aspect ratio
+        md = create_sphere(rows=rows, cols=cols, radius=1.0)
+        sph_verts = md.get_vertices()
+        sph_faces = md.get_faces()
+        n_template_verts = sph_verts.shape[0]
+        n_template_faces = sph_faces.shape[0]
+
+        # -------------------------------------------------------------
+        # ---  Replicate & transform template for every centre --------
+        # -------------------------------------------------------------
+        # vertices
+        verts = np.repeat(sph_verts[np.newaxis, :, :], n_points, axis=0)
+        verts *= radii[:, np.newaxis, np.newaxis]
+        verts += coords[:, np.newaxis, :]
+        verts = verts.reshape(-1, 3)
+
+        # faces (need index offset per sphere)
+        offsets = np.arange(n_points, dtype=int) * n_template_verts
+        faces = sph_faces[np.newaxis, :, :] + offsets[:, np.newaxis, np.newaxis]
+        faces = faces.reshape(-1, 3)
+
+        # -------------------------------------------------------------
+        # ---  Handle colours ----------------------------------------
+        # -------------------------------------------------------------
+        if vertex_colors is not None:
+            # explicit per-point colours ------------------------------------------------
+            if not isinstance(vertex_colors, np.ndarray):
+                vertex_colors = col.color(vertex_colors, alpha=True)
+
+            if vertex_colors.ndim == 1:                # single RGBA colour for *all* points
+                vertex_colors = np.tile(vertex_colors, (n_points, 1))
+            elif vertex_colors.shape[0] != n_points:   # sanity check
+                raise ValueError('vertex_colors must have one entry per point.')
+
+            # replicate colour of each point to all vertices of its sphere
+            vcols = np.repeat(vertex_colors, n_template_verts, axis=0).astype(float)
+            color_kw = dict(vertex_colors=vcols, color=None)
+        else:
+            # uniform colour ------------------------------------------------------------
+            if color is None:
+                color = default_color
+            color_kw = dict(color=col.color(color, alpha=True), vertex_colors=None)
+
+        # -------------------------------------------------------------
+        # ---  Initialise parent MeshVisual ---------------------------
+        # -------------------------------------------------------------
+        visuals.mesh.MeshVisual.__init__(self,
+                                         verts, faces,
+                                         shading=shading,
+                                         mode=mode,
+                                         **color_kw)
 
 
 ###############################################################################
