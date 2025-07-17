@@ -228,7 +228,7 @@ def interpolate_edge_geometry(graph, smooth = 5, order = 2,
                               points_per_pixel = 0.5, 
                               processes = None, verbose = False):
     """Smooth center lines and radii of the edge geometry."""
-    if not graph.has_edge_geometry():
+    if not graph.has_edge_geometry('coordinates'):
         raise ValueError('Graph has no edge geometry!')
 
     coordinates, indices = graph.edge_geometry('coordinates', return_indices=True, as_list=False)
