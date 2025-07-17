@@ -207,11 +207,14 @@ def plot_graph_line(graph, view=None, coordinates=None,
 
 
 def plot_graph_edge_property(graph, edge_property, colormap=None, mesh=False,
-                             percentiles=None, clip=None, normalize=None,
+                             percentiles=None, clip=None, normalize=None, cycle_colors=False,
                              bg_color='white', show=True, **kwargs):
     if isinstance(edge_property, str) and edge_property in graph.edge_properties:
         edge_property = graph.edge_property(edge_property)
-    edge_colors = np.array(edge_property, dtype=float)
+    if cycle_colors:
+        edge_colors = np.array(edge_property, dtype=int)
+    else:
+        edge_colors = np.array(edge_property, dtype=float)  #  Prop needs to be [0,1] for colormap to work
 
     if percentiles is not None:
         clip = np.percentile(edge_colors, percentiles)
@@ -224,9 +227,12 @@ def plot_graph_edge_property(graph, edge_property, colormap=None, mesh=False,
         edge_colors -= np.min(edge_colors)
         edge_colors /= np.max(edge_colors)
 
-    if colormap is None:
-        colormap = col.color_map('viridis')
-    edge_colors = colormap(edge_colors)
+    colormap = get_colormap(colormap)
+
+    if cycle_colors:
+        edge_colors = colormap(edge_colors % colormap.N)
+    else:
+        edge_colors = colormap(edge_colors)
 
     if mesh:
         return plot_graph_mesh(graph, edge_colors=edge_colors, bg_color=bg_color, show=show, **kwargs)
@@ -240,9 +246,8 @@ def plot_graph_vertex_property(graph, vertex_property, colormap=None, bg_color='
     # vertex_colors = np.array(vertex_property, dtype=float)
     vertex_colors = np.array(vertex_property, dtype=int)
 
-    colormap = get_colormap(colormap)
-
-    return plot_graph_nodes(graph, vertex_colors=vertex_colors, bg_color=bg_color, show=show, **kwargs)
+    return plot_graph_nodes(graph, vertex_colors=vertex_colors, bg_color=bg_color,
+                            colormap=colormap, show=show, **kwargs)
 
 
 
