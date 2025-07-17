@@ -22,27 +22,60 @@ import numpy as np
 
 import ClearMap.IO.IO as io
 
-import ClearMap.ImageProcessing.Topology.Topology3d as t3d
-
 import ClearMap.ParallelProcessing.DataProcessing.ArrayProcessing as ap
-
-from ClearMap.Analysis.graphs.fast_graph_reduce import find_degree2_branches
-from ClearMap.Analysis.graphs import graph_gt
-
+import ClearMap.ImageProcessing.Topology.Topology3d as t3d
 import ClearMap.Utils.Timer as tmr
-from ClearMap.ParallelProcessing.DataProcessing.ArrayProcessing import initialize_sink
+
+from ClearMap.Analysis.graphs import graph_gt
+from ClearMap.Analysis.graphs.fast_graph_reduce import find_degree2_branches, cy_reduce
+
+SENTINEL = -1
 
 
-def mean_vertex_coordinates(coordinates):  # REFACTORING: functools.partial(np.mean, axis=0)
+def mean_vertex_coordinates(coordinates):
     return np.mean(coordinates, axis=0)
 
-DEFAULT_EDGE_TO_EDGE = {'length': np.sum}
-DEFAULT_VERTEX_TO_EDGE = {'radii': np.max}
+
+def medoid_vertex_coordinates(coordinates):
+    """
+    Compute the vertex coordinates as the median of the coordinates.
+    This gives a vertex **on the grid** that is closest to the median of the coordinates.
+
+    .. note::
+        The vertex may not be one of the original coordinates, but it is guaranteed to be
+        a valid vertex coordinate in the graph.
+
+    Parameters
+    ----------
+    coordinates
+
+    Returns
+    -------
+
+    """
+    k = coordinates.shape[0] // 2
+    median = np.array([
+        np.partition(coordinates[:, i], k)[k]
+        for i in range(3)
+    ])
+    return median
+
+
+DEFAULT_EDGE_TO_EDGE = {
+    'length': np.sum,
+    'chain_id': np.mean   # We use mean as a sanity check (float outputs would be a tell-tale sign of a bug)
+}
+DEFAULT_VERTEX_TO_EDGE = {
+    'radii': np.max
+}
 DEFAULT_VERTEX_TO_VERTEX = {
     'coordinates': functools.partial(np.mean, axis=0),
     'coordinates_units': functools.partial(np.mean, axis=0),
     'length': np.sum,
-    'radii': np.max
+    'radii': np.max,
+    # 'chain_id': functools.partial(np.quantile, 0.5, method='nearest', axis=0),
+    'chain_id': np.mean,
+    '_vertex_id_': np.min
 }
 
 ###############################################################################
