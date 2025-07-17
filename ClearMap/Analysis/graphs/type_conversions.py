@@ -16,6 +16,7 @@ def dtype_to_gtype(dtype):
         'float32': 'double',
         'int64': 'int64_t',
         'int32': 'int32_t',
+        'int16': 'int16_t',
         'uint64': 'int64_t',
         'uint32': 'int64_t'
     }
