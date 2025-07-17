@@ -18,6 +18,7 @@ import numpy as np
 
 import vispy
 import vispy.scene
+from matplotlib import pyplot as plt
 
 import ClearMap.Visualization.Vispy.Plot3d as p3d
 from ClearMap.Visualization.Vispy import graph_visual
@@ -26,6 +27,101 @@ import ClearMap.Visualization.Color as col
 ###############################################################################
 # ## Plotting
 ###############################################################################
+
+
+def get_colormap(colormap):
+    if colormap is None:
+        colormap = col.colormap('viridis')
+    elif isinstance(colormap, str):
+        if colormap in plt.colormaps():
+            colormap = plt.get_cmap(colormap)
+        else:
+            colormap = col.colormap(colormap)
+    return colormap
+
+
+def plot_graph_nodes(graph, view=None, coordinates=None,
+                     radii=None,
+                     color=None, vertex_colors=None, colormap='Set1',
+                     n_sphere_points=8, default_radius=1,
+                     use_geometry=False,
+                     mode='triangles', shading='smooth',
+                     show=True, bg_color='white',
+                     center_view=True, title=None, **kwargs):
+    """
+    Plot vertices (or geometry sample points) of a graph as 3-D balls.
+
+    Parameters
+    ----------
+    graph : Graph
+        The graph to plot.
+    view : vispy.scene.widgets.ViewBox | None
+        Existing view to which the visual is appended (a new one is created
+        when *None*).
+    coordinates : str | None
+        Name of the vertex-property that stores coordinates.
+    radii : str | 1-d array | None
+        Vertex property or explicit radii array.  Falls back to
+        ``graph.vertex_radii()`` or *default_radius*.
+    color, vertex_colors : array-like or color spec
+        Global or per-vertex colour(s).  Same semantics as the other helpers.
+    n_sphere_points : int
+        Subdivisions per sphere (≥4).
+    default_radius : float
+        Uniform radius if none are stored in the graph.
+    use_geometry : bool
+        If *True* the function plots every sample point contained in an
+        edge-geometry instead of the plain vertex set.
+    mode, shading : str
+        Rendering options forwarded to the underlying MeshVisual.
+    show : bool
+        Whether to show the canvas immediately when a new one is created.
+    bg_color : str | tuple
+        Canvas background colour.
+    center_view : bool
+        If *True* centres the camera on the mean vertex coordinate.
+    title : str | None
+        Window title when a new canvas is created.
+    **kwargs
+        Forwarded to :class:`GraphSphereVisual`.
+
+    Returns
+    -------
+    BallVisual
+        The created visual (handy for subsequent manipulation).
+    """
+    if vertex_colors is not None:
+        vertex_colors = vertex_colors.astype(int)
+    # -------------------------------------------------------------------------
+    # Build the Visual-Node class
+    # -------------------------------------------------------------------------
+    GraphSphere = vispy.scene.visuals.create_visual_node(graph_visual.GraphSphereVisual)
+
+    # -------------------------------------------------------------------------
+    # Canvas / View initialisation
+    # -------------------------------------------------------------------------
+    title = 'plot_graph_nodes' if title is None else title
+    view = p3d.initialize_view(view, title=title, depth_value=100000000, fov=100, distance=0,
+                               elevation=0, azimuth=0, show=show, bg_color=bg_color)
+
+    colormap = get_colormap(colormap)
+    vertex_colors = colormap(vertex_colors % colormap.N)
+
+    # -------------------------------------------------------------------------
+    # Instantiate the visual
+    # -------------------------------------------------------------------------
+    p = GraphSphere(graph, parent=view.scene, coordinates=coordinates, radii=radii,
+                    color=color, vertex_colors=vertex_colors,
+                    n_sphere_points=n_sphere_points, default_radius=default_radius,
+                    use_geometry=use_geometry, mode=mode, shading=shading, **kwargs)
+
+    # -------------------------------------------------------------------------
+    # Optional camera centring
+    # -------------------------------------------------------------------------
+    if center_view:
+        view.camera.center = np.mean(graph.vertex_coordinates(), axis=0)
+
+    return p
 
 
 def plot_graph_mesh(graph, view=None, coordinates=None, radii=None,
@@ -136,6 +232,16 @@ def plot_graph_edge_property(graph, edge_property, colormap=None, mesh=False,
     else:
         return plot_graph_line(graph, edge_colors=edge_colors, bg_color=bg_color, show=show, **kwargs)
 
+
+def plot_graph_vertex_property(graph, vertex_property, colormap=None, bg_color='white', show=True, **kwargs):
+    if isinstance(vertex_property, str) and vertex_property in graph.vertex_properties:
+        vertex_property = graph.vertex_property(vertex_property)
+    # vertex_colors = np.array(vertex_property, dtype=float)
+    vertex_colors = np.array(vertex_property, dtype=int)
+
+    colormap = get_colormap(colormap)
+
+    return plot_graph_nodes(graph, vertex_colors=vertex_colors, bg_color=bg_color, show=show, **kwargs)
 
 ###############################################################################
 # ## Tests
