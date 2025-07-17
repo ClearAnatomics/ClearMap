@@ -123,7 +123,7 @@ def remove_auto_loops(graph, min_length=None, reduction_compatible=True):
     connectivity = graph.edge_connectivity()
     auto_loops_mask = ((connectivity[:, 0] - connectivity[:, 1]) == 0)
     if min_length is None:
-        bad_length_mask = np.zeros(graph.n_edges, dtype=bool)
+        bad_length_mask = np.ones(graph.n_edges, dtype=bool)
     else:
         lengths = graph.edge_property('length')
         bad_length_mask = lengths < min_length
