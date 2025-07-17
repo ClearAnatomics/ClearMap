@@ -162,7 +162,7 @@ class BinaryVesselProcessor(TabProcessor):
 
             compound_channel = tuple(self.channels_to_binarize())
             if compound_channel not in self.workspace.asset_collections.keys():  # FIXME: could be string version
-                sample_id = self.sample_manager.config['sample_id']
+                sample_id = self.sample_manager.config['sample_id'] if self.sample_config['use_id_as_prefix'] else None
                 self.workspace.add_channel(ChannelSpec(compound_channel, 'compound'), sample_id=sample_id)
                 self.workspace.add_pipeline('TubeMap', compound_channel, sample_id=sample_id)
 
@@ -475,7 +475,7 @@ class VesselGraphProcessor(TabProcessor):
 
     def __get_graph(self, step):
         if step not in self.__graphs:
-            raise ValueError(f'Unknown graph step {step}')
+            raise ValueError(f'Unknown graph step "{step}"')
         g = self.__graphs[step]
         if g is None:
             g = self.get('graph', channel=self.parent_channels, asset_sub_type=step).read()
@@ -484,7 +484,7 @@ class VesselGraphProcessor(TabProcessor):
 
     def __set_graph(self, step, graph):
         if step not in self.__graphs:
-            raise ValueError(f'Unknown graph step {step}')
+            raise ValueError(f'Unknown graph step "{step}"')
         self.__graphs[step] = graph
 
     def save_graph(self, base_name):
@@ -1149,8 +1149,8 @@ class VesselGraphProcessor(TabProcessor):
         if graph_step in self.steps.existing_steps:
             graph = getattr(self, f'graph_{graph_step}')
         else:
-            raise ValueError(f'graph step {graph_step} not recognised, '
-                             f'available steps are {self.steps.existing_steps}')
+            raise ValueError(f'graph step "{graph_step}" not recognised, '
+                             f'available steps are "{self.steps.existing_steps}"')
         graph_chunk = graph.sub_slice(chunk_range)
         title = f'{graph_step.title()} Graph'
         annotator = self.registration_processor.annotators[self.parent_channels[0]]
