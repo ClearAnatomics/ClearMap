@@ -858,8 +858,13 @@ class Graph(grp.AnnotatedGraph):
         else:
             g = gt.Graph(gv, prune=True)
             g = Graph(base=g)
-            g.prune_edge_geometry()
+            if g.n_edges and self.has_edge_geometry():
+                g.prune_edge_geometry()
+            else:
+                g.remove_edge_geometry()  # Drop geometries (to be readded) if we filter all edges (typically for reduc)
+                # TODO: see if we keep the egeom props but with shape([n], 0)
             return g
+
 
     def view(self, vertex_filter=None, edge_filter=None):
         return gt.GraphView(self.base, vfilt=vertex_filter, efilt=edge_filter)
