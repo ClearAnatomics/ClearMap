@@ -133,11 +133,26 @@ class Graph(grp.AnnotatedGraph):
         self._base.remove_vertex(vertex)
 
     def vertex_property(self, name, vertex=None, as_array=True):
+        """
+
+        .. warning::
+            This risks creating a copy of the vertex property map if `as_array` is True.
+
+        Parameters
+        ----------
+        name
+        vertex
+        as_array
+
+        Returns
+        -------
+
+        """
         try:
             v_prop = self._base.vertex_properties[name]
         except KeyError as err:
-            raise KeyError(f'Graph has no vertex property with name {name}!'
-                           f'Possible vertex properties are: {self.vertex_properties};'
+            raise KeyError(f'Graph has no vertex property with name "{name}" '
+                           f'Possible vertex properties are: {list(self.vertex_properties)};'
                            f'{err}')
         if vertex is not None:
             return v_prop[self.vertex(vertex)]
@@ -249,7 +264,7 @@ class Graph(grp.AnnotatedGraph):
     def edge_iterator(self):
         return self._base.edges()
 
-    def edge_connectivity(self):
+    def edge_connectivity(self):  # PERFORMANCE: see if better to cache property and invalidate when edeges added or removed
         return self._base.get_edges()[:, :2]
 
     def edge_property(self, name, edge=None, as_array=True):
@@ -334,7 +349,7 @@ class Graph(grp.AnnotatedGraph):
 
     def set_graph_property(self, name, source):
         if name not in self.graph_properties:
-            raise ValueError(f'Graph has no property named {name}!')
+            raise ValueError(f'Graph has no property named "{name}"')
         if source is not None:
             self._base.graph_properties[name] = source
 
@@ -491,6 +506,7 @@ class Graph(grp.AnnotatedGraph):
         return properties
 
     def has_edge_geometry(self, name='coordinates'):
+        # FIXME: should probably check for indices too
         return self.edge_geometry_property_name(name=name) in self.edge_geometry_property_names
 
     # edge geometry stored at each edge
@@ -652,7 +668,7 @@ class Graph(grp.AnnotatedGraph):
         for prop_name in self.edge_geometry_property_names:
             prop = self.graph_property(prop_name)
             shape_new = (n,) + prop.shape[1:]
-            prop_new = np.zeros(shape_new, prop.dtype)
+            prop_new = np.zeros(shape_new, dtype=prop.dtype)  # init empty, will then be filled with remapped values
             prop_new = remap_array_ranges(prop, prop_new, indices, indices_new)
             self.set_graph_property(prop_name, prop_new)
 
@@ -663,23 +679,28 @@ class Graph(grp.AnnotatedGraph):
             return self._edge_geometry_edge(name=name, edge=edge, return_indices=return_indices, as_list=as_list, reshape=reshape, ndim=ndim)
 
     def set_edge_geometry(self, name, values, indices=None, edge=None):
+        """
+        Set the given edge geometry property for the graph.
+
+        .. warning::
+            edge is not supported for 'graph' edge geometry type.
+
+        Parameters
+        ----------
+        name: str
+            The name of the original vertex or edge property to set as edge geometry
+            As an edge_geometry property, the name will be prefixed (typically with 'edge_geometry_').
+        values: List or np.ndarray
+            The values to set as edge geometry.
+        indices: np.ndarray
+            How to slice the values to map to edges.
+        edge: gt.Edge or int, optional
+            The edge to set the geometry for. If None, the geometry is set for all edges.
+            If the edge_geometry_type is 'graph', this parameter is not supported.
+        """
         if self.edge_geometry_type == 'graph':
-            # if coordinates is not None:
-            #     self._set_edge_geometry_graph('coordinates', coordinates, indices=indices, edge=edge)
-            #     if indices is not None:
-            #         indices = None
-            # if radii is not None:
-            #     self._set_edge_geometry_graph('radii', radii, indices=indices, edge=edge)
-            #     if indices is not None:
-            #         indices = None
-            # if values is not None:
             self._set_edge_geometry_graph(name, values, indices=indices, edge=edge)
         else:
-            # if coordinates is not None:
-            #     self._set_edge_geometry_edge('coordinates', coordinates, indices=indices, edge=edge)
-            # if radii is not None:
-            #     self._set_edge_geometry_edge('radii', radii, indices=indices, edge=edge)
-            # if values is not None:
             self._set_edge_geometry_edge(name, values, indices=indices, edge=edge)
 
     def remove_edge_geometry(self, name=None):
