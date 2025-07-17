@@ -82,24 +82,125 @@ DEFAULT_VERTEX_TO_VERTEX = {
 # ## Graphs from skeletons
 ###############################################################################
 
-def graph_from_skeleton(skeleton, points=None, radii=None, vertex_coordinates=True, spacing=None,
-                        distance_unit=None, check_border=True, delete_border=False, verbose=False):  # FIXME: add orientation
+def neighbours(indices: np.ndarray, offset: int) -> np.ndarray:  # TODO: check if remove
     """
-    Converts a binary skeleton image to a graph-gt graph.
+    indices  – sorted 1-D array of flat voxel indices (int64)
+    offset   – neighbour offset in *elements* (signed)
+    returns  – (m,2) array with vertex-index pairs
+    """
+    shifted = indices + offset                      # still sorted
+    pos     = np.searchsorted(indices, shifted)     # batched binary search
+    # pos is where the shifted indices would be inserted in the original array
 
-    Note
-    ----
-    Edges are detected between neighbouring foreground pixels using 26-connectivity.
+    valid = pos < indices.size  # step 1: in_bounds mask
+    mask = np.zeros_like(valid, dtype=bool)
+    # mask = indices[pos] == shifted i.e. there is an element at the shifted position
+    mask[valid] = indices[pos[valid]] == shifted[valid]
 
-    .. rubric:: Algorithm: Graph From Skeleton
+    src = np.nonzero(mask)[0].astype(np.int64)
+    dst = pos[mask].astype(np.int64)
+    return np.vstack((src, dst)).T
 
-    1. Linearise the skeleton to create a list of 1D indices of the skeleton voxels.
-    2. Create a graph with the number of vertices equal to the number of skeleton points.
-    3. For each orientation (13 in total), calculate the offset 1D to the neighbouring voxel.
-    4. For each skeleton point, find its neighbours using the offset and add edges to the graph.
-    5. If `vertex_coordinates` is True, store the coordinates of the vertices in the graph. Also
-    stores the physical coordinates if `spacing` is provided.
-    6. If `radii` is provided, set the vertex radii in the graph.
+
+def annotate_edge_lengths(graph: graph_gt.Graph, coord_prop, resolution=None):
+    """
+    Compute the length property for edges in a graph based on the voxel
+    coordinates and the resolution of the voxels.
+
+    Parameters
+    ----------
+    graph: graph_tool.Graph
+    coord_prop: VertexPropertyMap
+        Array of shape (N,3)   voxel indices (⟨x,y,z⟩)
+        Array of shape (N,3)   voxel indices (⟨x,y,z⟩)
+    resolution: tuple(float, float, float) | None
+                size of one voxel along each axis. If None, the value is retrieved from the graph's
+
+    .. warning::
+        Because this uses adjacent connectivity, it can only be used for graphs
+        before reduction, i.e. before `reduce_graph` is called.
+        Also, coord_prop must be integer-valued, i.e. voxel indices.
+
+
+    Notes
+    -----
+    * Works because every edge links *adjacent* voxels → only 26 displacement vectors.
+    * Complexity: **O(|E|)** but with *only* cheap integer arithmetics + one final lookup.
+    """
+    resolution = resolution or graph.graph_property('spacing')
+
+    src_vertices, target_vertices = np.hsplit(graph.edge_connectivity(), 2)  # TODO: check indexing
+    src_vertices = src_vertices.squeeze()
+    target_vertices = target_vertices.squeeze()
+
+    # coord_prop.a flattens, so reshape:
+    if isinstance(coord_prop, np.ndarray):
+        coords = coord_prop.reshape((-1, 3)).astype(int)
+    else:
+        coords = coord_prop.a.reshape((-1, 3)).astype(int)
+
+    # convert -1, 0, +1 displacement to lookup index
+    diff = coords[target_vertices] - coords[src_vertices]  # triplets of values -1, 0, +1 (in each dimension)
+
+    # Use the trick below if speed is a constraint
+    # Convert to index in [0,26] for the distance lookup table using base 3
+    # idx = (diff[:, 0] + 1) * 9 + (diff[:, 1] + 1) * 3 + (diff[:, 2] + 1)
+    # return distance_table[idx]
+
+    res = np.asarray(resolution, dtype=np.float64)
+    distance_table = get_distance_map_27(res).reshape(3, 3, 3)
+    # shifted by 1 to get [0-2] indices for each axis
+
+    if diff.max() > 1 or diff.min() < -1:
+        raise ValueError(f'Coordinates must be integer-valued voxel indices in the range [-1, 1] for each axis.'
+                         f'Found values outside this range: {diff.min()} to {diff.max()}. '
+                         f'This graph may have been reduced or the coordinates are not voxel indices.'
+                         f'Please use `annotate_edge_lengths` before reducing the graph.')
+
+    xs = diff[:, 0] + 1
+    ys = diff[:, 1] + 1
+    zs = diff[:, 2] + 1
+    return distance_table[xs, ys, zs]
+
+
+def get_distance_map_27(resolution):
+    """
+    Create a distance lookup table for the 26 possible displacements in 3D.
+    Uses the resolution to convert voxel displacements to physical distances.
+
+    Parameters
+    ----------
+    resolution: tuple(float, float, float)
+        Size of one voxel along each axis (x, y, z).
+
+    Returns
+    -------
+    distance_table: np.ndarray
+        A 1D array of shape (27,) containing the distances for each of the 26
+        possible displacements in 3D, plus one entry for the zero displacement.
+    """
+    # index mapping:   idx = (dx+1)*9 + (dy+1)*3 + (dz+1)
+    # produces 3-digit base-3 number in ⟦0,26⟧
+    distance_table = np.empty(27, dtype=np.float64)  # Float64 to avoid overflow when summing
+    k = 0
+    for dx in (-1, 0, 1):
+        for dy in (-1, 0, 1):
+            for dz in (-1, 0, 1):
+                # physical displacement
+                d_xyz = resolution * np.array([dx, dy, dz], dtype=np.float64)
+                distance_table[k] = np.linalg.norm(d_xyz)
+                k += 1
+    return distance_table
+
+
+def graph_from_skeleton(skeleton, points=None, radii=None, vertex_coordinates=True, compute_edge_length=True,
+                        check_border=True, delete_border=False, spacing=None, verbose=False):
+    """
+    Converts a binary skeleton image to a graph-tool graph.
+
+
+    .. note::
+        Edges are detected between neighbouring foreground pixels using 26-connectivity.
 
     Arguments
     ---------
