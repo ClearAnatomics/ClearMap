@@ -50,7 +50,7 @@ class Timer:
         """Reset the timer"""
         self.time = time.time()
 
-    def elapsed_time(self, head = None, as_string = True):
+    def elapsed_time(self, head=None, as_string=True):
         """
         Calculate elapsed time and return as formated string
 
