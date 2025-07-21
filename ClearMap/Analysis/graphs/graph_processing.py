@@ -335,109 +335,163 @@ def graph_to_skeleton(graph, sink=None, dtype=bool, values=True):
 # ## Graph CleanUp
 ###############################################################################
 
-def mean_vertex_coordinates(coordinates):
-    return np.mean(coordinates, axis=0)
 
-
-def clean_graph(graph, remove_self_loops=True, remove_isolated_vertices=True,
-                vertex_mappings={'coordinates' : mean_vertex_coordinates,
-                                 'radii'       : np.max},
-                verbose=False):
+def clean_graph(graph: graph_gt.Graph, remove_self_loops: bool = True, remove_isolated_vertices: bool = True,
+                vertex_mappings: dict[str, Callable] | None = None, verbose: bool = False) -> graph_gt.Graph:
     """
     Remove all cliques to get pure branch structure of a graph.
+
+    A clique is a cluster of vertices, defined as a connected component of branch points
+
+    .. warning::
+
+        This function is meant to be used on graphs **before** reduction, in
+        which case clusters of branch points are **immediately adjacent** to each other.
+
+    .. note::
+
+        cliques are replaced by a single vertex connecting to all non-clique neighbours
+        The center coordinate is used as the coordinate for that vertex.
+        The vertex properties are reduced using the provided `vertex_mappings` functions.
+        The edge properties are not reduced. The length edge property is computed as the
+        length of the edge connecting the clique center to its neighbours.
+
 
     Arguments
     ---------
     graph : Graph
-      The graph to clean up.
+        The graph to clean up.
+    remove_self_loops: bool
+        If True, remove self-loops from the graph.
+    remove_isolated_vertices: bool
+        If True, remove isolated vertices from the graph.
+    vertex_mappings : dict[str, Callable] | None
+        Dictionary of reduction functions to apply to vertex properties within cliques.
     verbose : bool
-      If True, prin progress information.
+        If True, prin progress information.
 
     Returns
     -------
     graph : Graph
-      A graph removed of all cliques.
-
-    Note
-    ----
-    cliques are replaced by a single vertex connecting to all non-clique neighbours
-    The center coordinate is used for that vertex as the coordinate.
+        A graph removed of all cliques.
     """
+    if vertex_mappings is None:
+        vertex_mappings = DEFAULT_VERTEX_TO_VERTEX
+    vertex_mappings = {name: fn for name, fn in vertex_mappings.items() if name in graph.vertex_properties}
 
     if verbose:
         timer = tmr.Timer()
         timer_all = tmr.Timer()
+    else:
+        timer = None
 
     # find branch points
     n_vertices = graph.n_vertices
-    degrees = graph.vertex_degrees()
-
-    branches = degrees >= 3
-    n_branch_points = branches.sum()
+    branch_mask = graph.vertex_degrees() >= 3
+    n_branch_points = branch_mask.sum()
 
     if verbose:
-        timer.print_elapsed_time('Graph cleaning: found %d branch points among %d vertices' % (n_branch_points, n_vertices))
-        timer.reset()
+        timer.print_elapsed_time(f'Graph cleaning: found {n_branch_points:,} branch points '
+                                 f'among {n_vertices:,} vertices', reset=True)
 
     if n_branch_points == 0:
         return graph.copy()
 
     # detect 'cliques', i.e. connected components of branch points
-    gb = graph.sub_graph(vertex_filter=branches, view=True)
-    components, counts = gb.label_components(return_vertex_counts=True)
+    # First we remove non-branch points from the graph, so that the graph
+    # now becomes disjoint between clusters of branch points which we can now label.
+    gb = graph.sub_graph(vertex_filter=branch_mask, view=True)
+    component_ids, component_sizes = gb.label_components(return_vertex_counts=True)
 
     # note: graph_tools components of a view is a property map of the full graph
-    components[branches] += 1
+    component_ids[branch_mask] += 1 # shift so non-branch = 0
 
     # group components
-    components = _group_labels(components)
+    # note: remove the indices of the non branch nodes (0 label)
+    component_ids = _group_labels(component_ids)[1:]
 
-    # note: graph_tools components of a view is a property map of the full graph
-    # note: remove the indices of the non branch nodes
-    components = components[1:]
-
-    clique_ids = np.where(counts > 1)[0]
+    clique_ids = np.where(component_sizes > 1)[0]  # clusters (>1) of degree > 2 vertices
     n_cliques = len(clique_ids)
 
     if verbose:
-        timer.print_elapsed_time('Graph cleaning: detected %d cliques of branch points' % n_cliques)
-        timer.reset()
+        timer.print_elapsed_time(f'Graph cleaning: detected {n_cliques} cliques of branch points', reset=True)
 
-    # remove cliques
+    if n_cliques == 0:
+        return graph.copy()
+
+    # Create temp graph with clique vertices + new vertex for each clique
+    # g = graph.copy(from_disk=True)  # WARNING: trick to avoid runaway memory usage
     g = graph.copy()
     g.add_vertex(n_cliques)
 
-    # mappings
-    properties = {}
-    mappings = {}
-    for k in vertex_mappings.keys():
-        if k in graph.vertex_properties:
-            mappings[k] = vertex_mappings[k]
-            properties[k] = graph.vertex_property(k)
-
     vertex_filter = np.ones(n_vertices + n_cliques, dtype=bool)
-    for i, ci in enumerate(clique_ids):
-        vi = n_vertices + i
-        cc = components[ci]
+    coords = g.vertex_coordinates()
+    center_vertices = np.arange(n_vertices, n_vertices + n_cliques, dtype=np.intp)
+    neighbours = {}
+    for clk_id in clique_ids:
+        clique_vertices = component_ids[clk_id]
+        neighbours[clk_id] = get_clique_neighbours(graph, clique_vertices)
 
-        # remove clique vertices
-        vertex_filter[cc] = False
+    def _prop_to_buffer(prop_map, n_rows):
+        """return an empty (n_rows, …) array whose tail shape matches one value"""
+        sample = prop_map[0]  # any vertex will do
+        return np.empty((n_rows, *(sample.shape)), dtype=(sample.dtype))
 
-        # get neighbours
-        neighbours = np.hstack([graph.vertex_neighbours(c) for c in cc])
-        neighbours = np.setdiff1d(np.unique(neighbours), cc)
+    n_new_edges = sum(neighbours[clik_id].shape[0] for clik_id in clique_ids)
+    new_edges = np.empty((n_new_edges, 2), dtype=np.intp)
+    if 'length' in g.edge_properties:
+        new_lengths = np.zeros((n_new_edges,), dtype=np.float64)
+    new_vertices_props = {name: _prop_to_buffer(graph.vertex_property(name), n_cliques) for name in vertex_mappings}
+    edge_counter = 0
+    for i, clik_id in enumerate(clique_ids):
+        center_vertex = center_vertices[i]  # new vertex for the clique
+        clique_vertices = component_ids[clik_id]  # TODO check if cached list of arrays faster
+        vertex_filter[clique_vertices] = False # Schedule clique vertices for removal
+        current_neighbours = neighbours[clik_id]
+        if current_neighbours.size == 0:  # unconnected clique
+            vertex_filter[center_vertex] = False  # Remove altogether
+            continue
 
         # connect to new node
-        g.add_edge([[n, vi] for n in neighbours])
+        edges_to_clique_neighbours = [[n, center_vertex] for n in current_neighbours]
+        new_edges[edge_counter: edge_counter + len(edges_to_clique_neighbours)] = edges_to_clique_neighbours
 
-        # map properties
-        for k in mappings.keys():
-            g.set_vertex_property(k, mappings[k](properties[k][cc]), vertex=vi)
+        # Existing median coordinate of the clique vertices
+        # center_coord = np.quantile(coords[clique_vertices], 0.5, method='nearest', axis=0)
+        center_coord = medoid_vertex_coordinates(coords[clique_vertices])
+        if 'length' in g.edge_properties:
+            edge_lengths = np.linalg.norm(coords[current_neighbours] - center_coord, axis=1)
+            new_lengths[edge_counter: edge_counter + len(edges_to_clique_neighbours)] = edge_lengths
+
+        edge_counter += len(edges_to_clique_neighbours)
+
+        # map vertex properties
+        for prop_name, reduce_fn in vertex_mappings.items():
+            if prop_name == 'coordinates':  # Already calculated above
+                val = center_coord
+            else:
+                prop = graph.vertex_property(prop_name)
+                val = reduce_fn(prop[clique_vertices])
+            # g.set_vertex_property(prop_name, val, vertex=center_vertex)
+            new_vertices_props[prop_name][i] = val  # Store for later
 
         if verbose and i+1 % 10000 == 0:
             timer.print_elapsed_time(f'Graph cleaning: reducing {i + 1} / {n_cliques}')
 
-    # generate new graph
+    # map vertex properties to new vertices
+    for prop_name in vertex_mappings.keys():
+        prop = g.vertex_property(prop_name)  # OPTIMISE: see if we could do in-place using vertex_property_map instead
+        prop[n_vertices:] = new_vertices_props[prop_name]  # Add for all the cliques at once
+        g.set_vertex_property(prop_name, prop)
+
+    # Add new edges and map e_props
+    if 'length' in g.edge_properties:
+        length_prop = g.edge_property('length')
+    g.add_edge(new_edges)
+    if 'length' in g.edge_properties:
+        g.set_edge_property('length', np.hstack([length_prop, new_lengths]))
+
+    # Remove vertices belonging to cliques
     g = g.sub_graph(vertex_filter=vertex_filter)
 
     if remove_self_loops:
@@ -445,25 +499,32 @@ def clean_graph(graph, remove_self_loops=True, remove_isolated_vertices=True,
 
     if verbose:
         timer.print_elapsed_time(
-          f'Graph cleaning: removed {n_cliques} cliques of branch points from {graph.n_vertices}'
-          f' to {g.n_vertices} nodes and {graph.n_edges} to {g.n_edges} edges')
-        timer.reset()
+            f'Graph cleaning: removed {n_cliques} cliques of branch points from {graph.n_vertices:,} vertices'
+            f' to {g.n_vertices:,} nodes and {graph.n_edges:,} to {g.n_edges:,} edges', reset=True)
 
     # remove isolated vertices
     if remove_isolated_vertices:
-        non_isolated = g.vertex_degrees() > 0
-        g = g.sub_graph(vertex_filter=non_isolated)
-
-        if verbose:
-            timer.print_elapsed_time(f'Graph cleaning: Removed {np.logical_not(non_isolated).sum()} isolated nodes')
-            timer.reset()
-
-        del non_isolated
+        g = _remove_isolated_vertices(g, timer, verbose)  # REFACTORING: part of graph_gt.Graph
 
     if verbose:
         timer_all.print_elapsed_time(
-          f'Graph cleaning: cleaned graph has {g.n_vertices} nodes and {g.n_edges} edges')
+            f'Graph cleaning: cleaned graph has {g.n_vertices} nodes and {g.n_edges} edges')
 
+    return g
+
+
+def get_clique_neighbours(graph, clique_vertices):
+    neighbours = np.hstack([graph.vertex_neighbours(c) for c in clique_vertices])  # Clique + neighbours
+    neighbours = np.setdiff1d(np.unique(neighbours), clique_vertices)  # Remove clique vertices (-> neighbours only)
+    return neighbours
+
+
+def _remove_isolated_vertices(g, timer, verbose):
+    non_isolated = g.vertex_degrees() > 0
+    g = g.sub_graph(vertex_filter=non_isolated)
+    if verbose:
+        timer.print_elapsed_time(f'Graph cleaning: Removed {np.logical_not(non_isolated).sum()} isolated nodes',
+                                 reset=True)
     return g
 
 
@@ -472,8 +533,8 @@ def _group_labels(array):
     idx = np.argsort(array)
     arr = array[idx]
     dif = np.diff(arr)
-    res = np.split(idx, np.where(dif > 0)[0]+1)
-    return res
+    groups = np.split(idx, np.where(dif > 0)[0]+1)
+    return groups
 
 
 ###############################################################################
