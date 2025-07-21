@@ -1154,7 +1154,29 @@ class Graph(grp.AnnotatedGraph):
         if from_disk:
             return load(path if path else self.path)
         else:
-            return Graph(name=copy.copy(self.name), base=self.base.copy())
+            if self.n_edges <= LARGE_GRAPH_N_EDGES_THRESHOLD:  # Small graph, copy properties
+                return Graph(name=copy.copy(self.name), base=gt.Graph(self.base))
+
+            else:  # RAM runs away on direct copy of edge_properties for large graphs
+                bare_view = gt.GraphView( self._base, skip_properties=True, skip_vfilt=True, skip_efilt=True)
+                # topological copy, no properties
+                new_base = gt.Graph(bare_view, prune=(False, False, True))  # keep all V/E
+                # vertex properties
+                for name, p in self._base.vp.items():
+                    new_base.vp[name] = new_base.copy_property(p, g=self._base)
+
+                # graph properties
+                for name, p in self._base.gp.items():
+                    q = new_base.new_graph_property(p.value_type())
+                    q[new_base] = p[self._base]
+                    new_base.gp[name] = q
+
+                # edge properties
+                for name, p in self._base.ep.items():
+                    q = new_base.new_edge_property(p.value_type())
+                    q.fa = p.fa.copy()  # one contiguous memcpy
+                    new_base.ep[name] = q
+                return Graph(name=copy.copy(self.name), base=new_base)
 
 
 def load(filename):
