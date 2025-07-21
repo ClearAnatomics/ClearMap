@@ -579,29 +579,244 @@ def drop_degree2_loops(graph):
     cycle_ids = np.where(comp_edge_counts == comp_counts)[0]
 
     # 5) boolean mask over view-vertices
-    comp_view = comp_full[view.vertex_indices()]
+    comp_view = comp_full[view._base.get_vertices()]  # WARNING: implementation specific
     loop_mask = np.isin(comp_view, cycle_ids)
 
     # 6) map back to original graph indices
-    orig_vids = view.vertex_indices()
+    orig_vids = view._base.get_vertices()  # WARNING: implementation specific
     to_remove = orig_vids[loop_mask]
 
     # 7) build the keep mask for the original graph
     v_keep = np.ones(graph.n_vertices, dtype=bool)
     v_keep[to_remove] = False
 
-    print(f"Dropping {len(to_remove)} pure degree-2 loop vertices "
-          f"from {graph.n_vertices} total.")
+    print(f"Dropping {len(to_remove)} pure degree-2 loop vertices from {graph.n_vertices} total.")
     return graph.sub_graph(vertex_filter=v_keep)
 
 
-def reduce_graph(graph, vertex_to_edge_mappings={'radii': np.max},  # FIXME: use global settings for defaults
-                 edge_to_edge_mappings={'length': np.sum},
-                 edge_geometry=True, edge_length=False,
-                 edge_geometry_vertex_properties=('coordinates', 'radii'),
-                 edge_geometry_edge_properties=None,
+class PropertyAggregator:
+    ALLOWED_KINDS = ('edge', 'vertex', 'edge_geometry')
+    """
+    Collect & aggregate graph-tool properties while you walk chains.
+
+    Parameters
+    ----------
+    graph: GraphGt.Graph
+        The working copy of the graph (`g` in reduce_graph).
+    mapping: Dict[str, Callable]
+        Keys are property names (e.g. "length"), values are aggregation
+        functions (e.g. np.sum, np.max …).
+    kind: str
+        "edge"  → aggregating edge properties
+        "vertex"→ aggregating vertex properties
+    """
+    def __init__(self, graph: graph_gt.Graph, mapping: Dict[str, Callable], kind: str = "edge"):
+        self.offsets = None  # offsets for the chains, (i.e., cumsum of chain lengths -> start/end indices)
+        if kind not in self.ALLOWED_KINDS:
+            raise ValueError(f"kind must be in {self.ALLOWED_KINDS}")
+
+        self.src_graph = graph
+        self.kind  = kind
+        self.chain_indices: list[np.ndarray] = []  # collects indices of chains
+        self.chain_edges_direction: list[np.ndarray] = []  # collection of boolean arrays indicating the need to reverse an edge direction in the chain
+
+        self.properties:            Dict[str, np.ndarray] = {}
+        self.aggregation_functions: Dict[str, Callable] = {}
+        self.aggregated_properties: Dict[str, List] = {}
+
+        base = (graph.edge_properties if kind == 'edge' else
+                graph.vertex_properties if kind == 'vertex' else
+                graph.edge_geometry_property_names)
+
+        for key, func in mapping.items():
+            if key in base:  # Ensure the property exists in the graph
+                if self.kind == "edge":
+                    prop = graph.edge_property_map(key).a
+                elif self.kind == "vertex":
+                    prop = graph.vertex_property_map(key).a
+                else:  # edge_geometry
+                    prop = graph.edge_geometry_property(key)  # FIXME: this one is not dynamic
+                self.properties[key] = prop
+                self.aggregation_functions[key] = func
+                self.aggregated_properties[key] = []
+            else:
+                warnings.warn(f'Property "{key}" not found in graph {self.kind} properties. Skipping aggregation.')
+
+    def __str__(self):
+        return f"PropertyAggregator(kind={self.kind}, properties={list(self.properties.keys())})"
+
+    @property
+    def property_names(self):
+        return list(self.properties.keys())
+
+    @functools.cached_property
+    def edge_connectivity(self) -> np.ndarray:
+        return self.src_graph.edge_connectivity()
+
+    def accumulate(self, indices: Sequence[int]) -> None:
+        """
+        Append the result of aggregating (applying the specified function)
+        a chain of vertices or edges to the aggregator.
+
+        indices : list/array of edge IDs (kind="edge")
+                  or vertex IDs (kind="vertex") that form one chain.
+        """
+        self.chain_indices.append(np.asarray(indices, dtype=np.intp))
+
+        # if self.kind == 'edge':
+        edge_orders = self.edge_connectivity[indices]
+        sorted_vertices = np.sort(edge_orders, axis=1)
+        diffs       = edge_orders[:, 1] - edge_orders[:, 0]
+        first_sign  = np.sign(diffs[0])  # +, - (or 0 for self-loops)
+        need_flip   = np.sign(diffs) != first_sign
+        is_not_loop = np.all(sorted_vertices[0, :] != sorted_vertices[-1, :])
+        need_flip = need_flip & is_not_loop  # no flip for self-loops
+        if self.kind == 'edge'and len(need_flip) > 0:
+            need_flip = np.hstack([need_flip, need_flip[-1]])  # FIXME: dirty trick for edge/vertex geometry length mismatch
+        self.chain_edges_direction.append(need_flip)
+
+    def aggregate(self) -> None:  # FIXME: document (especially cython vs numpy)
+        if not self.chain_indices:
+            raise ValueError("No chains have been accumulated. Call accumulate() first.")
+
+        idx_stack = np.concatenate(self.chain_indices).astype(np.uint64)           # 1-D
+        offsets = np.cumsum([0] + [len(x) for x in self.chain_indices]).astype(np.uint64)
+        self.offsets = offsets
+
+        n_procs = multiprocessing.cpu_count() - 2
+
+        for prop_name, arr in self.properties.items():
+            reduction_fn = self.aggregation_functions[prop_name]
+
+            out_dtype = np.float64 if reduction_fn is np.sum else arr.dtype
+
+            mapped = np.zeros(len(self.chain_indices), dtype=out_dtype)  # pre-allocate output array
+            success = cy_reduce(arr, mapped, idx_stack=idx_stack, offsets=offsets, reducer_fn=reduction_fn,
+                                num_threads=n_procs)
+            if not success:  # default to pure Python if Cython fails
+                starts = offsets[:-1]
+                ends = offsets[1:]
+                mapped = np.array([reduction_fn(arr[idx_stack[s:e]]) for s, e in zip(starts, ends)], dtype=out_dtype)
+            self.aggregated_properties[prop_name] = mapped
+
+    # def reorder_indices(self, edge_order: np.ndarray) -> None:
+    #     self.chain_indices = (np.asarray(self.chain_indices, dtype=object)[edge_order]).tolist()
+    #     # PERFORMANCE: see if we can skip to_list if we amend stacked_indices() later
+
+    def get_indices_and_ranges(self, reduced_edge_order) -> (np.ndarray, np.ndarray):
+        """
+        Return a 1D array of all accumulated indices, concatenated from all chains.
+        and the start and end indices for each chain as a 2D array.
+        """
+        start_idx = self.offsets[:-1]
+        end_idx = self.offsets[1:]
+        edge_geom_ranges = np.array([start_idx, end_idx]).T  # how to chunk edge_agg.chain_indices
+        edge_geom_ranges = edge_geom_ranges[reduced_edge_order]  # Reorder chains according to the new edge order
+        return np.hstack(self.chain_indices), edge_geom_ranges  # WARNING: reorder only slicing, not array itself
+
+    def apply(self, reduced_graph: graph_gt.Graph, reduced_edge_order: np.ndarray) -> None:
+        """
+        Attach the aggregated values as edge properties on `graph`.
+
+        .. note::
+            This method is typically called once after `reduce_graph` has
+            finished processing the chains and before returning the reduced graph.
+
+        Parameters
+        ----------
+
+        reduced_graph : GraphGt.Graph
+            The graph to which the aggregated properties will be added.
+            This is typically the reduced graph returned by `reduce_graph`.
+        reduced_edge_order : np.ndarray
+            The *new* edge order, i.e. the order in which edges are stored in the reduced graph.
+        """
+        # Handle existing edge geometry properties  # FIXME: only if self.kind == "edge" + should be part of other instance with != kind
+        if self.src_graph.has_edge_geometry() and self.src_graph.edge_geometry_type == "graph":
+            if self.kind == 'edge' and not reduced_graph.has_edge_geometry():
+                # FIXME: src_ranges from the new grpah because we drop the reduced edges ????
+                src_ranges = self.src_graph.edge_geometry_indices()  # (E_orig, 2)
+
+                # Reorder the edges according to the reduced edge order
+                chains = [self.chain_indices[i] for i in reduced_edge_order]
+                flip_masks = [self.chain_edges_direction[i] for i in reduced_edge_order]
+
+                # Build the take index (ordered list of *each* index in the chains concatenated)
+                take_idx: List[int] = []
+                new_ranges = np.full((len(chains), 2), SENTINEL, dtype=np.intp)
+                for i, (edges, flips) in enumerate(zip(chains, flip_masks)):
+                    current_start = len(take_idx)
+                    for j, (e_id, flip) in enumerate(zip(edges, flips)):
+                        start_idx, end_idx = src_ranges[e_id]  # old [start, end]
+                        # Build the whole itemwise index for the chain
+                        idx = range(start_idx, end_idx, 1)
+                        if flip:
+                            idx = idx[::-1]
+
+                        if j > 0 and take_idx[-1] == idx[0]:  # Avoid duplicates
+                            idx = idx[1:]
+
+                        take_idx.extend(idx)
+
+                    new_ranges[i] = (current_start, len(take_idx))
+
+                reduced_graph.define_edge_geometry_indices_graph(new_ranges)
+                take_idx = np.fromiter(take_idx, dtype=np.intp)
+                # Reorder the edge_geometry properties according to the new edge order
+                for name in self.src_graph.edge_geometry_property_names:
+                    arr = self.src_graph.graph_property(name)
+                    new_arr = arr.take(take_idx, axis=0)
+                    reduced_graph.define_graph_property(name, new_arr)
+
+                # TODO: remove (debugging)
+                edge_geom_labels = reduced_graph.edge_geometry('edge_chain_id', as_list=True)
+                print('')
+            else:  # Handle the case where edge geometry is already defined (after edges have been reduced)
+                pass  # FIXME: implement case where edge_geometry_vertex_property are defined separately
+                # new_ranges = reduced_graph.edge_geometry_indices()
+                # take_idx = np.concatenate([np.arange(start, end) for start, end in new_ranges])
+
+        # Handle "regular" aggregated properties
+        for prop_name, values in self.aggregated_properties.items():
+            reordered_values = values[reduced_edge_order]  # Reorder according to the edge order
+            reduced_graph.define_edge_property(prop_name, reordered_values)
+
+
+def __drop_former_degree_2_nodes(graph, reduced_graph, non_degree_2_vertices_ids, return_maps):
+    """remove former degree 2 nodes (now isolated vertices)"""
+    v_to_v_map = None
+    if return_maps:
+        reduced_graph.add_vertex_property('_vertex_id_', graph.vertex_indices())
+    v_filter = np.zeros(graph.n_vertices, dtype=bool)
+    v_filter[non_degree_2_vertices_ids] = True
+    reduced_graph = reduced_graph.sub_graph(vertex_filter=v_filter)
+    if return_maps:
+        v_to_v_map = reduced_graph.vertex_property('_vertex_id_')
+        reduced_graph.remove_vertex_property('_vertex_id_')
+    return reduced_graph, v_to_v_map
+
+
+def add_chain_id(graph, prop_kind):
+    # Store int as float as a sentinel for mean
+    if prop_kind == 'edge':
+        graph.define_edge_property('chain_id', np.full(graph.n_edges, -1, dtype=np.int64))
+        prop = graph.edge_property_map('chain_id').a
+    elif prop_kind == 'vertex':
+        graph.define_vertex_property('chain_id', np.full(graph.n_vertices, -1, dtype=np.int64))
+        prop = graph.vertex_property_map('chain_id').a
+    else:
+        raise ValueError(f'Unknown property kind "{prop_kind}". Expected "edge" or "vertex".')
+    return prop
+
+
+def reduce_graph(graph, vertex_to_edge_mappings=None,
+                 edge_to_edge_mappings=None,
+                 compute_edge_length=False,
+                 compute_edge_geometry=True,
+                 edge_geometry_vertex_properties=('coordinates', 'radii', 'chain_id', '_vertex_id_'),
+                 edge_geometry_edge_properties=('chain_id', ),
                  return_maps=False, drop_pure_degree_2_loops=True,
-                 verbose=False, print_period=250000):
+                 verbose=False, label_branches=False, save_modified_graph_path=''):
     """
     Reduce graph by removing all vertices with degree two.
     Whenever this is done, the edges are merged and properties are aggregated
@@ -614,44 +829,57 @@ def reduce_graph(graph, vertex_to_edge_mappings={'radii': np.max},  # FIXME: use
 
     Parameters
     ----------
-    graph : GraphGt.Graph
+    graph: GraphGt.Graph
         The graph to reduce.  WARNING: currently, existing degree 2 loops are dropped inplace
-    vertex_to_edge_mappings : dict
+    vertex_to_edge_mappings: dict | None
         A dictionary mapping vertex properties to edge properties. The keys are the vertex property names,
         and the values are functions that aggregate the vertex properties to edge properties.
-    edge_to_edge_mappings : dict
+        Defaults to `DEFAULT_VERTEX_TO_EDGE`
+        Supply an empty dictionary to disable vertex to edge mappings.
+    edge_to_edge_mappings: dict | None
         A dictionary mapping edge properties to edge properties. The keys are the edge property names,
         and the values are functions that aggregate the edge properties.
-    edge_geometry : bool  # FIXME: improve docstring
-        If True, compute edge geometry properties (coordinates, radii) for the reduced graph.
-    edge_length : bool
+        Defaults to `DEFAULT_EDGE_TO_EDGE`
+        Supply an empty dictionary to disable edge to edge mappings.
+    compute_edge_length: bool
         If True, compute the length of edges in the reduced graph.
         Mapping defaults to np.sum, i.e. the length of the edge is the sum of the lengths of
         the edges in the original graph.
-    edge_geometry_vertex_properties : tuple  # FIXME: improve docstring
-        A tuple of vertex property names to be used for edge geometry.
-        These properties will be aggregated and stored in the edge geometry.
-    edge_geometry_edge_properties : list  # FIXME: improve docstring
-        A list of edge property names to be used for edge geometry.
-        These properties will be aggregated and stored in the edge geometry.
+    compute_edge_geometry: bool
+        If True, compute edge geometry properties for the reduced graph, i.e.
+        store the aggregated selected vertex (see `edge_geometry_vertex_properties`) and
+        edge properties (see `edge_geometry_edge_properties`) in the edge geometry.
+    edge_geometry_vertex_properties: tuple | list | None
+        A tuple of vertex property names that will be aggregated and
+        stored in the edge geometry.
+        If None, no vertex properties are used for edge geometry.
+        Ignored if `compute_edge_geometry` is False.
+    edge_geometry_edge_properties: tuple | list | None
+        A list of edge property names that will be aggregated and
+        stored in the edge geometry.
         If None, no edge properties are used for edge geometry.
-    return_maps : bool
+        Ignored if `compute_edge_geometry` is False.
+    return_maps: bool
         If True, return mappings of vertex to vertex, edge to vertex, and edge to edge.
         These mappings are useful for further processing of the reduced graph.
-    drop_pure_degree_2_loops : bool
+    drop_pure_degree_2_loops: bool
         If True, drop all pure degree 2 loops from the graph before reducing it.
         This is useful to avoid issues with loops in the graph that would otherwise
         lead to incorrect results.
-    verbose : bool
+    save_modified_graph_path: str | PathLike
+        If provided, save the original graph after modification (without degree 2 loops and after
+        branch labelling) to this path.
+    label_branches: bool
+        If True, label the branches in the graph with a unique chain ID.
+    verbose: bool
         If True, print progress information during the reduction process.
-    print_period : int
-        The period in number of edges after which to print progress information in the chain finding step.
 
     Returns
     -------
     reduced_graph : GraphGt.Graph
         The reduced graph with degree 2 vertices removed and properties aggregated.
     """
+    save_modified_graph_path = str(save_modified_graph_path)  # So we can check if empty string
 
     if verbose:
         timer = tmr.Timer()
@@ -659,145 +887,104 @@ def reduce_graph(graph, vertex_to_edge_mappings={'radii': np.max},  # FIXME: use
         print('Graph reduction: initialized.')
 
     check_graph_is_reduce_compatible(graph)
-    # copy graph
+
     if drop_pure_degree_2_loops:
         graph = drop_degree2_loops(graph)  # WARNING: modifies graph in place
-    g = graph.copy()
 
-    # find non-branching points, i.e. vertices with deg 2
-    non_degree_2_vertices_ids = np.where(g.vertex_degrees() != 2)[0]
-    n_branch_points = len(non_degree_2_vertices_ids)
-    degree_2_vertices_ids = np.where(g.vertex_degrees() == 2)[0]
-    n_degree_2_vertices = len(degree_2_vertices_ids)
+    # Find potential chains starting points
+    non_degree_2_vertices_ids = np.where(graph.vertex_degrees() != 2)[0]
 
-    if verbose:
-        timer.print_elapsed_time(
-            f'Graph reduction: Found {n_branch_points} branching and {n_degree_2_vertices} non-branching nodes')
-        timer.reset()
+    if verbose: print_graph_info(graph, timer, non_degree_2_vertices_ids)
 
-    # mappings
-    edge_to_edge_mappings = edge_to_edge_mappings or {}
-    vertex_to_edge_mappings = vertex_to_edge_mappings or {}
+    # Setup mappings
+    vertex_to_edge_mappings = vertex_to_edge_mappings if vertex_to_edge_mappings is not None else DEFAULT_VERTEX_TO_EDGE
+    edge_to_edge_mappings = edge_to_edge_mappings if edge_to_edge_mappings is not None else DEFAULT_EDGE_TO_EDGE
+    edge_geometry_vertex_properties = edge_geometry_vertex_properties or []
+    edge_geometry_edge_properties = edge_geometry_edge_properties or []
+    reduced_maps = {k: [] for k in ('vertex_to_vertex', 'edge_to_vertex', 'edge_to_edge')}  # TODO: see if part of egeom aggregators
 
-    if edge_length:
+    if compute_edge_length or edge_to_edge_mappings['length']:
+        if 'length' not in graph.edge_properties:
+            warnings.warn(f'Reducing a graph without preexisting edge lengths is now deprecated. '
+                          f'Please ensure you use "compute_edge_length=True" in skeleton_to_graph() '
+                          f'before running clean_graph and reduce_graph.',)
         edge_to_edge_mappings['length'] = edge_to_edge_mappings.get('length', np.sum)
-        if 'length' not in g.edge_properties:
-            g.add_edge_property('length', np.ones(g.n_edges, dtype=float))
 
-    edge_to_edge = {}
-    edge_properties = {}
-    edge_lists = {}
-    for k in edge_to_edge_mappings.keys():
-        if k in g.edge_properties:
-            edge_to_edge[k] = edge_to_edge_mappings[k]
-            edge_properties[k] = g.edge_property_map(k)
-            edge_lists[k] = []
+    if label_branches:
+        chain_id_prop_arr = add_chain_id(graph, prop_kind='edge')
+        chain_id_vertex_prop_arr = add_chain_id(graph, prop_kind='vertex')
 
-    vertex_to_edge = {}
-    vertex_properties = {}
-    vertex_lists = {}
-    for k in vertex_to_edge_mappings.keys():
-        if k in g.vertex_properties:
-            vertex_to_edge[k] = vertex_to_edge_mappings[k]
-            vertex_properties[k] = g.vertex_property_map(k)
-            vertex_lists[k] = []
+    vertex_agg = PropertyAggregator(graph, vertex_to_edge_mappings, kind="vertex")
+    edge_agg = PropertyAggregator(graph, edge_to_edge_mappings, kind="edge")
+    # vertex_geometry_agg =
+    # edge_geometry_agg =
 
-    # edge geometry
-    reduced_maps = {}
-    if edge_geometry:
-        reduced_maps['edge_to_vertex'] = []
+    chains, _ = find_chains(graph) #, return_endpoints_mask=True);  check_chains(g, chains, degree_2_vertices_ids, non_degree_2_vertices_ids)
 
-    if return_maps:
-        reduced_maps['vertex_to_vertex'] = []
-        reduced_maps['edge_to_edge'] = []
+    direct_edges = []  # Only the direct edges between non-degree 2 vertices
 
-    if edge_geometry_edge_properties is None:
-        edge_geometry_edge_properties = []
-    else:
-        reduced_maps['edge_to_edge'] = []
+    edge_old_to_new = np.full(graph.n_edges, -1, dtype=np.intp)
+    for chain_id, (edges, vertices) in enumerate(chains):
+        edge_old_to_new[edges] = chain_id  # Map old edge id to new edge id
+        if label_branches:
+            chain_id_prop_arr[edges] = chain_id  # Assign chain id to edges
+            chain_id_vertex_prop_arr[vertices] = chain_id
 
-    if edge_geometry_vertex_properties is None:
-        edge_geometry_vertex_properties = []
-
-    chains, edge_descriptors = find_chains(g) #, return_endpoints_mask=True)  # FIXME: remove return_endpoints_mask=True
-    # check_chains(g, chains, degree_2_vertices_ids, non_degree_2_vertices_ids)
-
-    edge_list = []
-    # for edges, vertices, _ in chains:  # FIXME: remove _ if not return_endpoints_mask
-    for edges, vertices in chains:
-        edges = [edge_descriptors[eid] for eid in edges]  # Convert edge id to edge object
-        vertices_ids = [int(vv) for vv in vertices]  # FIXME: check if necessary
-
-        edge_list.append([int(ep) for ep in [vertices[0], vertices[-1]]])  # we just need between branch_points to be considered end points
+        direct_edges.append([vertices[0], vertices[-1]])
 
         # mappings
-        for k in edge_to_edge.keys():
-            ep = edge_properties[k]
-            edge_lists[k].append(edge_to_edge[k]([ep[e] for e in edges]))
-        for k in vertex_to_edge.keys():
-            v_prop = vertex_properties[k]
-            vertex_lists[k].append(vertex_to_edge[k]([v_prop[vv] for vv in vertices]))
+        vertex_agg.accumulate(vertices)  # TODO: check if vertices or vertices_ids should be used
+        edge_agg.accumulate(edges)
 
-        if 'edge_to_vertex' in reduced_maps.keys():
-            reduced_maps['edge_to_vertex'].append(vertices_ids)
+    if save_modified_graph_path: graph.save(save_modified_graph_path)
 
-        if 'edge_to_edge' in reduced_maps.keys():
-            reduced_maps['edge_to_edge'].append(edges)
+    # Reduce each property to (typically) a single value per chain
+    vertex_agg.aggregate()
+    edge_agg.aggregate()
 
-    # REDUCE GRAPH
+    # Create a copy with all vertices and properties, but no edges
+    reduced_graph = graph.sub_graph(edge_filter=np.zeros(graph.n_edges, dtype=bool))  # Delete all edges but keep vertices and properties
+    reduced_graph.add_edge(direct_edges) #  Add new direct edges
+    # edge_order = edge_old_to_new[reduced_graph.edge_indices()]  # Reorder edges according to the new edge ids
+    edge_order = reduced_graph.edge_indices()  # Reorder edges according to the new edge ids
 
-    # Create an empty graph with same properties as g
-    reduced_graph = g.sub_graph(edge_filter=np.zeros(g.n_edges, dtype=bool))  # Delete all edges
-    reduced_graph.add_edge(edge_list) #  Add new edges
+    reduced_graph, v_to_v_map = __drop_former_degree_2_nodes(graph, reduced_graph, non_degree_2_vertices_ids, return_maps)
+    if return_maps: reduced_maps['vertex_to_vertex'] = v_to_v_map
 
-    edge_order = reduced_graph.edge_indices()
+    # Add edge properties
+    edge_agg.apply(reduced_graph, edge_order)  # Will also apply the edge geometry properties if they exist
+    vertex_agg.apply(reduced_graph, edge_order)
 
-    # remove degree 2 nodes
-    if 'vertex_to_vertex' in reduced_maps.keys():
-        reduced_graph.add_vertex_property('_vertex_id_', graph.vertex_indices())
-    v_filter = np.zeros(g.n_vertices, dtype=bool)
-    v_filter[non_degree_2_vertices_ids] = True
-    reduced_graph = reduced_graph.sub_graph(vertex_filter=v_filter)
-    if 'vertex_to_vertex' in reduced_maps.keys():
-        reduced_maps['vertex_to_vertex'] = reduced_graph.vertex_property('_vertex_id_')
-        reduced_graph.remove_vertex_property('_vertex_id_')
+    # Concatenate edge_geometry_properties to a graph property and keep ranges as edge geometry indices (edge property)
+    if compute_edge_geometry:   # Remap each vertex or edge property to the reduced graph (i.e., save as f'edge_geometry_{prop}' )
+        branch_indices, edge_geom_ranges = vertex_agg.get_indices_and_ranges(edge_order)
 
-    # maps
-    if 'edge_to_vertex' in reduced_maps.keys():
-        reduced_maps['edge_to_vertex'] = np.array(reduced_maps['edge_to_vertex'], dtype=object)[edge_order]
-    if 'edge_to_edge' in reduced_maps.keys():
-        reduced_maps['edge_to_edge'] = np.array(reduced_maps['edge_to_edge'], dtype=object)[edge_order]
-
-    # add edge properties
-    for k in edge_to_edge.keys():
-        reduced_graph.define_edge_property(k, np.array(edge_lists[k])[edge_order])
-    for k in vertex_to_edge.keys():
-        reduced_graph.define_edge_property(k, np.array(vertex_lists[k])[edge_order])
-
-    if edge_geometry:   # Remap each edge property to the reduced graph (i.e. save as f'edge_geometry_{prop}' )
-        branch_indices = np.hstack(reduced_maps['edge_to_vertex'])
-        # Create start and end indices for edge geometry
-        indices = np.cumsum([0] + [len(m) for m in reduced_maps['edge_to_vertex']])  # Length of each branch
-        indices = np.array([indices[:-1], indices[1:]]).T
-
-        g.edge_geometry_indices_set = False  # FIXME: why
-        reduced_graph.set_edge_geometry_vertex_properties(g, edge_geometry_vertex_properties, branch_indices, indices)
-        g.edge_geometry_indices_set = True
-
+        reduced_graph.set_edge_geometry_vertex_properties(graph, edge_geometry_vertex_properties,  # FIXME: pass aggregator
+                                                          branch_indices, edge_geom_ranges)
         if edge_geometry_edge_properties:
-            reduced_graph.set_edge_geometry_edge_properties(g, edge_geometry_edge_properties, indices, reduced_maps['edge_to_edge'])
+            reduced_graph.set_edge_geometry_edge_properties(graph, edge_geometry_edge_properties,  # FIXME: pass aggregator
+                                                            edge_geom_ranges, edge_agg.chain_indices)
 
-    if 'edge_to_edge' in reduced_maps.keys():
-        reduced_maps['edge_to_edge'] = [[g.edge_index(e) for e in edge] for edge in reduced_maps['edge_to_edge']]
+    if return_maps: reduced_maps['edge_to_edge'] = edge_agg.chain_indices
 
     if verbose:
-        timer_all.print_elapsed_time(f'Graph reduction: Graph reduced from {graph.n_vertices} to {reduced_graph.n_vertices} nodes'
-                                     f' and {graph.n_edges} to {reduced_graph.n_edges} edges')
+        timer_all.print_elapsed_time(f'Graph reduction: Graph reduced '
+                                     f'from {graph.n_vertices} to {reduced_graph.n_vertices} nodes '
+                                     f'and {graph.n_edges} to {reduced_graph.n_edges} edges')
 
     if return_maps:
-        return reduced_graph, (reduced_maps[k] for k in ('vertex_to_vertex', 'edge_to_vertex', 'edge_to_edge'))
+        return reduced_graph, list(reduced_maps.values())  # We rely on insertion order of the dict
     else:
         return reduced_graph
+
+
+def print_graph_info(graph, timer, non_degree_2_vertices_ids):
+    n_branch_points = len(non_degree_2_vertices_ids)
+    degree_2_vertices_ids = np.where(graph.vertex_degrees() == 2)[0]
+    n_degree_2_vertices = len(degree_2_vertices_ids)
+    timer.print_elapsed_time(
+        f'Graph reduction: Found {n_branch_points} branching and {n_degree_2_vertices} non-branching nodes')
+    timer.reset()
 
 
 def check_chains(graph, chains, degree_2_v_ids, non_degree_2_v_ids):
@@ -892,30 +1079,27 @@ def find_chains(graph, return_endpoints_mask=False):
         vertex_degs,
     )
 
-    edge_descriptors = list(graph._base.edges())
+    edge_descriptors = np.array(list(graph._base.edges()), dtype=object)
 
     # Add direct edges to chains to process together
     direct_edges = connectivity_w_eid[(v1_degs != 2) & (v2_degs != 2)]
-    chains.extend(([eid], [v1, v2]) for eid, v1, v2 in direct_edges)
+    chains.extend(([eid], np.array([v1, v2], dtype=int)) for eid, v1, v2 in direct_edges)
 
     # Add pure degree2 loops
     visited = np.zeros(graph.n_vertices, dtype=bool)
-    visited_vs_idx = np.concatenate([np.asarray(vs, dtype=int) for _, vs in chains])
+    visited_vs_idx = np.hstack([vs for _, vs in chains], dtype=int)
     visited[visited_vs_idx] = True
 
     unvisited_deg2_v_idx = np.where(~visited & (vertex_degs == 2))[0]
-    if unvisited_deg2_v_idx:
+    if unvisited_deg2_v_idx.size:
         print(f'Found {len(unvisited_deg2_v_idx)} degree 2 vertices not visited in chains. '
               f'They will be processed as isolated loops.')
-    else:
-        raise ValueError('No degree 2 vertices found in the graph! '
-                            'This is unexpected, please check the graph structure.')
     for v0 in unvisited_deg2_v_idx:
         if visited[v0]:  # in case marked within this very loop
             continue
         vs, es, ends, _isolated = _graph_branch(graph.vertex(v0))
 
-        vs_idx = [int(v) for v in vs]
+        vs_idx = np.array(vs, dtype=int)
         edges_idx = [graph.edge_index(e) for e in es]
         chains.append((edges_idx, vs_idx))
         visited[vs_idx] = True
@@ -938,9 +1122,10 @@ def find_chains(graph, return_endpoints_mask=False):
 
 def check_graph_is_reduce_compatible(graph):
     # ensure conditions for processing step are fulfilled
+    v_idx = graph._base.get_vertices()
     if graph.is_view:
         raise ValueError('Cannot process on graph view, prune graph before graph reduction.')
-    if not np.all(np.diff(graph.vertex_indices()) == 1) or int(graph.vertex_iterator().next()) != 0:
+    if v_idx[0] != 0 or not np.all(np.diff(v_idx) == 1):
         raise ValueError('Graph vertices not ordered!')
 
 
@@ -1226,7 +1411,7 @@ def _test():
     gc = gp.clean_graph(g, verbose=True)
     p3d.plot_graph_line(gc)
 
-    gr = gp.reduce_graph(gc, edge_geometry=True, verbose=True)
+    gr = gp.reduce_graph(gc, compute_edge_geometry=True, verbose=True)
     # gr.set_edge_geometry(0.1*np.ones(gr.edge_geometry(as_list=False).shape[0]), 'radii')
 
 

@@ -732,7 +732,7 @@ class VesselGraphProcessor(TabProcessor):
                 'artery_raw': np.max})  # TODO: do same for veins if exists
             edge_geometry_vertex_properties.extend(['artery_binary', 'artery_raw'])
         self.steps.remove_next_steps_files(self.steps.graph_reduced)
-        self.graph_reduced = graph_processing.reduce_graph(self.graph_cleaned, edge_length=True,
+        self.graph_reduced = graph_processing.reduce_graph(self.graph_cleaned, compute_edge_length=True,
                                                            edge_to_edge_mappings=edge_to_edge_mappings,
                                                            vertex_to_edge_mappings=vertex_to_edge_mappings,
                                                            edge_geometry_vertex_properties=edge_geometry_vertex_properties,

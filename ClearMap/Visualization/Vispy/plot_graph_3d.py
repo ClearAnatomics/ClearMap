@@ -293,7 +293,7 @@ def _test():
     g.add_edge(np.array([[7,8],[7,9],[1,2],[2,3],[3,1],[1,4],[4,5],[2,6],[6,7]]))
     g.set_vertex_coordinates(np.array([[10,10,10],[0,0,0],[1,1,1],[1,1,0],[5,0,0],[8,0,1],[0,7,1],[0,10,2],[0,12,3],[3,7,7]], dtype=float))
     gc = graph_processing.clean_graph(g)
-    gr = graph_processing.reduce_graph(gc, edge_geometry=True, edge_geometry_vertex_properties=['coordinates'])
+    gr = graph_processing.reduce_graph(gc, compute_edge_geometry=True, edge_geometry_vertex_properties=['coordinates'])
 
     edge_colors = np.random.rand(gr.n_edges, 4)
     edge_colors[:, 3] = 1.0
