@@ -13,6 +13,7 @@ __webpage__ = 'https://idisco.info'
 __download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
 
 import copy
+import numbers
 
 import numpy as np
 
@@ -30,6 +31,7 @@ from ClearMap.Analysis.graphs.utils import pickler, unpickler, edges_to_vertices
 
 from ClearMap.Utils.array_utils import remap_array_ranges
 
+LARGE_GRAPH_N_EDGES_THRESHOLD = 10 ** 7
 
 gt.gt_io.clean_picklers()
 gt.gt_io.libgraph_tool_core.set_pickler(pickler)
@@ -607,13 +609,29 @@ class Graph(grp.AnnotatedGraph):
         if isinstance(values, list):
             if indices is None:
                 indices = np.cumsum([len(v) for v in values])
-                indices = np.array([np.hstack([[0], indices[:-1]]), indices], dtype=int).T
-            values = np.vstack(values)
-        if indices is not None:
-            name_indices = self._edge_geometry_indices_name_graph()
-            self.define_edge_property(name_indices, indices, dtype='vector<int64_t>')
-        name = self.edge_geometry_property_name(name)
-        self.define_graph_property(name, values, dtype='object')
+                indices = np.array([np.hstack([[0], indices[:-1]]), indices], dtype=int).T.astype(np.int64)
+
+            first_val = values[0]
+            # flatten the list of arrays so that it is a single array (indexed by the indices)
+            if first_val.ndim == 1:  # if the first value is a 1D array, we assume all values are 1D arrays
+                values = np.concatenate(values)
+            else: # if the first value is a 2D array, we assume all values are 2D arrays
+                values = np.vstack(values)
+        # if values.ndim == 1:  # if the values are a 1D array, we assume they are scalars
+        #     prop_dtype = f'vector<{gtype_from_source(values)}>'  # Store as *vector* to store as a single cpp array
+        if values.ndim <= 2:  # can't store 2d as vector, so store as object (pickled np.ndarray)
+            prop_dtype = 'object'  # Store as *object* to store as a single ndarray
+        else:
+            raise ValueError(f'Edge geometry values must be 1D or 2D arrays, got {values.ndim}D array!')
+        if indices is not None:  # FIXME: see if we should update the indices in case exists but mismatched
+            self.define_edge_geometry_indices_graph(indices)
+        egp_name = self.edge_geometry_property_name(name)
+        self.define_graph_property(egp_name, values, dtype=prop_dtype)
+
+    def define_edge_geometry_indices_graph(self, indices):
+        name_indices = self._edge_geometry_indices_name_graph()
+        # if name_indices not in self.edge_properties:  # Set if missing
+        self.define_edge_property(name_indices, indices, dtype='vector<int64_t>')
 
     def _remove_edge_geometry_graph(self, name):
         name = self.edge_geometry_property_name(name)
@@ -733,25 +751,50 @@ class Graph(grp.AnnotatedGraph):
 
     def set_edge_geometry_vertex_properties(self, original_graph, edge_geometry_vertex_properties,
                                             branch_indices, indices):
-        indices_use = indices  # only use indices for first property, the rest uses the same indices
+        """
+        Set the edge geometry properties from the vertex properties of the original graph.
+
+        .. note::
+            The property is processed only if it exists in the original graph and is not
+            already set as an edge geometry property in the current graph.
+
+        Parameters
+        ----------
+        original_graph
+        edge_geometry_vertex_properties
+        branch_indices
+        indices
+
+        Returns
+        -------
+
+        """
         for v_prop_name in edge_geometry_vertex_properties:
             if v_prop_name in original_graph.vertex_properties:
+                # If already exists
+                if self.edge_geometry_property_name(v_prop_name) in self.edge_geometry_property_names:
+                    continue  # Skip if already set, it will be handled by the edge aggregation
                 v_prop = original_graph.vertex_property(v_prop_name)[branch_indices]
+                self.set_edge_geometry(name=v_prop_name, values=v_prop, indices=indices)
 
-                self.set_edge_geometry(name=v_prop_name, values=v_prop, indices=indices_use)
-                indices_use = None
-
-    def set_edge_geometry_edge_properties(self, original_graph, edge_geometry_edge_properties,
-                                          indices, edge_to_edge_map):
-        indices_use = indices  # only use indices for first property, the rest uses the same indices
+    def set_edge_geometry_edge_properties(self, original_graph, edge_geometry_edge_properties, indices, edge_to_edge_map):
+        first_edge = edge_to_edge_map[0][0]
         for e_prop_name in edge_geometry_edge_properties:
             if e_prop_name in original_graph.edge_properties:
+                # If already exists
+                if self.edge_geometry_property_name(f'edge_{e_prop_name}') in self.edge_geometry_property_names:
+                    continue  # Skip if already set, it will be handled by the edge aggregation
                 values = original_graph.edge_property_map(e_prop_name)
                 # there is one fewer edge than vertices in each reduced edge !
-                values = [[values[e] for e in edges + [edges[-1]]] for edges in edge_to_edge_map]
+                if isinstance(first_edge, gt.Edge):
+                    values = [[values[e] for e in edges + [edges[-1]]] for edges in edge_to_edge_map]
+                elif isinstance(first_edge, (numbers.Integral, numbers.Real)):
+                    values = values.fa
+                    values = [values[np.append(edges, edges[-1])] for edges in edge_to_edge_map]
+                else:
+                    raise ValueError(f'Edge type "{type(first_edge)}" not supported for edge geometry!')
                 # it seems that we repeat the last edge to have the same number of edges as vertices ?
-                self.set_edge_geometry(name=f'edge_{e_prop_name}', values=values, indices=indices_use)
-                indices_use = None
+                self.set_edge_geometry(name=f'edge_{e_prop_name}', values=values, indices=indices)
 
     def edge_geometry_indices(self):
         if self.edge_geometry_type == 'graph':
