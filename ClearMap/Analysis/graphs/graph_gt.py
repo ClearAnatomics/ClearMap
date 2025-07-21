@@ -641,11 +641,26 @@ class Graph(grp.AnnotatedGraph):
         indices_new = np.array([np.hstack([0, indices_new[:-1]]), indices_new]).T
         self._set_edge_geometry_indices_graph(indices_new)
 
-        self._reduce_edge_geometry_properties(indices, indices_new)
+        self._remap_edge_geometry_properties(indices, indices_new)
 
-    def _reduce_edge_geometry_properties(self, indices, indices_new):
+    def remap_edge_geometry_properties(self, new_indices):
         """
-        Remap all properties in self.edge_geometry_properties to the new indices
+        Remap all properties in self.edge_geometry_properties (edge_geometry_<>) to the new indices i.e.,
+         copy every edge-geometry_<> array so old ranges → new ranges
+
+        Parameters
+        ----------
+        new_indices : np.ndarray
+            The new indices to remap the edge geometry properties to.
+        """
+        indices = self._edge_geometry_indices_graph()
+        self._set_edge_geometry_indices_graph(new_indices)
+        self._remap_edge_geometry_properties(indices, new_indices)
+
+    def _remap_edge_geometry_properties(self, indices, indices_new):
+        """
+        Remap all properties in self.edge_geometry_properties (edge_geometry_<>) to
+         the new indices i.e., copy every edge-geometry_<> array so old ranges → new ranges
 
         For example, if for the edge_geometry_coordinates, which has a shape of
         (n_voxels, 3), the indices would be (n_edges, 2) and the indices_new would be
