@@ -102,7 +102,7 @@ def neighbours(indices: np.ndarray, offset: int) -> np.ndarray:  # TODO: check i
     return np.vstack((src, dst)).T
 
 
-def annotate_edge_lengths(graph: graph_gt.Graph, coord_prop, resolution=None):
+def annotate_edge_lengths(graph: graph_gt.Graph, coord_prop, spacing=None):
     """
     Compute the length property for edges in a graph based on the voxel
     coordinates and the resolution of the voxels.
@@ -113,8 +113,9 @@ def annotate_edge_lengths(graph: graph_gt.Graph, coord_prop, resolution=None):
     coord_prop: VertexPropertyMap
         Array of shape (N,3)   voxel indices (⟨x,y,z⟩)
         Array of shape (N,3)   voxel indices (⟨x,y,z⟩)
-    resolution: tuple(float, float, float) | None
-                size of one voxel along each axis. If None, the value is retrieved from the graph's
+    spacing: tuple(float, float, float) | None
+        Voxel pitch along each axis. If None, the value is retrieved from the graph's
+        `spacing` property.
 
     .. warning::
         Because this uses adjacent connectivity, it can only be used for graphs
@@ -127,7 +128,7 @@ def annotate_edge_lengths(graph: graph_gt.Graph, coord_prop, resolution=None):
     * Works because every edge links *adjacent* voxels → only 26 displacement vectors.
     * Complexity: **O(|E|)** but with *only* cheap integer arithmetics + one final lookup.
     """
-    resolution = resolution or graph.graph_property('spacing')
+    spacing = spacing if spacing is not None else graph.graph_property('spacing')
 
     src_vertices, target_vertices = np.hsplit(graph.edge_connectivity(), 2)  # TODO: check indexing
     src_vertices = src_vertices.squeeze()
@@ -141,22 +142,21 @@ def annotate_edge_lengths(graph: graph_gt.Graph, coord_prop, resolution=None):
 
     # convert -1, 0, +1 displacement to lookup index
     diff = coords[target_vertices] - coords[src_vertices]  # triplets of values -1, 0, +1 (in each dimension)
-
-    # Use the trick below if speed is a constraint
-    # Convert to index in [0,26] for the distance lookup table using base 3
-    # idx = (diff[:, 0] + 1) * 9 + (diff[:, 1] + 1) * 3 + (diff[:, 2] + 1)
-    # return distance_table[idx]
-
-    res = np.asarray(resolution, dtype=np.float64)
-    distance_table = get_distance_map_27(res).reshape(3, 3, 3)
-    # shifted by 1 to get [0-2] indices for each axis
-
     if diff.max() > 1 or diff.min() < -1:
         raise ValueError(f'Coordinates must be integer-valued voxel indices in the range [-1, 1] for each axis.'
                          f'Found values outside this range: {diff.min()} to {diff.max()}. '
                          f'This graph may have been reduced or the coordinates are not voxel indices.'
                          f'Please use `annotate_edge_lengths` before reducing the graph.')
 
+    # Use the trick below if speed is a constraint
+    # Convert to index in [0,26] for the distance lookup table using base 3
+    # idx = (diff[:, 0] + 1) * 9 + (diff[:, 1] + 1) * 3 + (diff[:, 2] + 1)
+    # return distance_table[idx]
+
+    res = np.asarray(spacing, dtype=np.float64)
+    distance_table = get_distance_map_27(res).reshape(3, 3, 3)
+
+    # shifted by 1 to get [0-2] indices for each axis
     xs = diff[:, 0] + 1
     ys = diff[:, 1] + 1
     zs = diff[:, 2] + 1
@@ -193,7 +193,7 @@ def get_distance_map_27(resolution):
     return distance_table
 
 
-def graph_from_skeleton(skeleton, points=None, radii=None, vertex_coordinates=True, compute_edge_length=True,
+def graph_from_skeleton(skeleton, points=None, radii=None, compute_vertex_coordinates=True, compute_edge_length=True,
                         check_border=True, delete_border=False, spacing=None, verbose=False):
     """
     Converts a binary skeleton image to a graph-tool graph.
@@ -210,16 +210,17 @@ def graph_from_skeleton(skeleton, points=None, radii=None, vertex_coordinates=Tr
         List of skeleton points as 1d indices of flat skeleton array (optional to save processing time).
     radii: array
         List of radii associated with each vertex.
-    vertex_coordinates : bool
+    compute_vertex_coordinates: bool
         If True, store coordinates of the vertices / edges.
-    spacing: tuple
-        Voxel spacing in physical units (e.g. micrometers) for the coordinates.
-    distance_unit: str
-        Name of the distance unit for the graph, e.g. 'µm', 'micrometer', 'nanometer', etc.
+    compute_edge_length: bool
+        If True, compute the length of each edge based on the vertex coordinates.
+        If spacing is also provided, the length is computed in physical units.
     check_border: bool
         If True, check if the border is empty. The algorithm requires this.
     delete_border: bool
-        If True, delete the border.
+        If True, delete the border (`check_border` is ignored in this case).
+    spacing: array
+        Spacing of the voxels in the skeleton in physical units (e.g. micrometers) in each dimension.
     verbose: bool
         If True, print progress information.
 
@@ -228,7 +229,12 @@ def graph_from_skeleton(skeleton, points=None, radii=None, vertex_coordinates=Tr
     graph : Graph class
         The graph corresponding to the skeleton.
     """
+    if compute_edge_length and not compute_vertex_coordinates:
+        raise ValueError('Activating `compute_edge_length` requires `vertex_coordinates` to be True!')
+
     skeleton = io.as_source(skeleton)
+    if skeleton.dtype not in ('bool', np.uint8):
+        raise TypeError('The skeleton array needs to be a boolean array!')
 
     if delete_border:
         skeleton = t3d.delete_border(skeleton)
@@ -241,59 +247,63 @@ def graph_from_skeleton(skeleton, points=None, radii=None, vertex_coordinates=Tr
     if verbose:
         timer = tmr.Timer()
         timer_all = tmr.Timer()
-        print('Graph from skeleton calculation initialize.!')
+        print('Graph from skeleton calculation initialized.!')
 
-    # Create the list of indices of the skeleton voxels
     if points is None:
-        points = ap.where(skeleton.reshape(-1, order='A')).array
-        if verbose:
-            timer.print_elapsed_time('Point list generation', reset=True)
+        # points = ap.where(skeleton.reshape(-1, order='A')).array  # FIXME: put back to ap.where
+        points = np.where(skeleton.reshape(-1, order='A'))[0]
+
+        if verbose: timer.print_elapsed_time('Point list generation', reset=True)
 
     # create graph
     n_vertices = points.shape[0]
     g = graph_gt.Graph(n_vertices=n_vertices, directed=False)
+    if spacing:
+        spacing = np.asarray(spacing, dtype=np.float64)
+        g.add_graph_property('spacing', spacing)
     g.shape = skeleton.shape
-    if verbose:
-        timer.print_elapsed_time(f'Graph initialized with {n_vertices} vertices', reset=True)
 
-    # detect edges
-    n_edges = 0
-    for i, ori in enumerate(t3d.orientations()):
-        # calculate offset
-        ori_coord = np.hstack(np.where(ori))  # coordinate in 3,3,3 cube where True
-        centered_ori_coord = (ori_coord - [1, 1, 1])  # center the coordinate to (0,0,0)
-        offset = np.sum(centered_ori_coord * skeleton.strides)  # compute 1D offset for that orientation
-        edges = ap.neighbours(points, offset)
-        if edges.shape[0]:
-            g.add_edge(edges)
-            n_edges += edges.shape[0]
+    if verbose: timer.print_elapsed_time(f'Graph initialized with {n_vertices:,} vertices', reset=True)
+
+    # ######################### detect edges #########################
+    edges_all = np.zeros((0, 2), dtype=int)  # TODO: list and stack later
+    for i, o in enumerate(t3d.orientations()):
+        offset = np.sum((np.hstack(np.where(o)) - [1, 1, 1]) * skeleton.strides)
+        # edges = ap.neighbours(points, offset)
+        edges = neighbours(points, offset)
+        if len(edges) > 0:
+            edges_all = np.vstack([edges_all, edges])
+
         if verbose:
-            timer.print_elapsed_time(f'{edges.shape[0]} edges with orientation {i + 1}/13 found', reset=True)
-    if verbose:
-        timer.print_elapsed_time(f'Added {n_edges} edges to graph', reset=True)
+            timer.print_elapsed_time(f'{edges.shape[0]:,} edges with orientation {i + 1}/13 found', reset=True)
 
-    if vertex_coordinates:
-        max_dim = max(skeleton.shape)
-        coord_dtype = np.uint16 if max_dim < 65536 else np.uint32
+    if edges_all.shape[0] > 0:
+        g.add_edge(edges_all)
 
-        vertex_coordinates = np.array(
-            np.unravel_index(points, skeleton.shape, order=skeleton.order)
-        ).T.astype(coord_dtype)
-        g.set_vertex_coordinates(vertex_coordinates)
-        # optional physical coordinates (anisotropy-aware)
-        if spacing is not None:  # Add unit and resolution information as graph properties
-            spacing = np.asarray(spacing, dtype=np.float32)
-            coords_phys = vertex_coordinates.astype(np.float32) * spacing[None, :]
+    if verbose: timer.print_elapsed_time(f'Added {edges_all.shape[0]:,} edges to graph', reset=True)
+
+    # ################## Compute additional properties ##################
+
+    if compute_vertex_coordinates:
+        vertex_coordinates = np.array(np.unravel_index(points, skeleton.shape, order=skeleton.order)).T
+
+        coords_dtype = np.int16   #  unsigned ints not handled by graph-tool
+        if vertex_coordinates.max() > np.iinfo(np.int16).max:
+            coords_dtype = np.int32
+        vertex_coordinates = vertex_coordinates.astype(coords_dtype)
+        g.set_vertex_coordinates(vertex_coordinates, dtype=coords_dtype)
+
+        if spacing is not None:
+            # Upcast to float because result is in physical units
+            coords_phys = vertex_coordinates.astype(np.float32) * spacing[None, :]  # None broadcasts spacing to (1, 3)
             g.define_vertex_property('coordinates_units', coords_phys)
-            g.define_graph_property('spacing', spacing)
 
     if radii is not None:
-        g.set_vertex_radius(None, radii)
+        g.set_vertex_radius(radii)
 
-    if distance_unit is not None:
-        g.define_graph_property('distance_unit', distance_unit)
-
-    # FIXME: add orientation property
+    if compute_edge_length:
+        edge_lengths = annotate_edge_lengths(g, g.vertex_coordinates(), spacing=spacing)
+        g.define_edge_property('length', edge_lengths)
 
     if verbose:
         timer_all.print_elapsed_time('Skeleton to Graph')
