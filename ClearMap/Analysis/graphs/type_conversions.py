@@ -28,7 +28,7 @@ def dtype_to_gtype(dtype):
 
 def ndim_to_gtype(ndim, gtype):
     """Convert a scalar gtype to a vector one if necessary."""
-    if len(gtype) >= 6 and gtype[:6] == 'vector':
+    if gtype.startswith('vector'):
         return gtype
     if ndim == 2:
         gtype = "vector<%s>" % gtype
