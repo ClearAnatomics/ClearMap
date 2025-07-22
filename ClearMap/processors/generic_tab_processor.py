@@ -45,6 +45,25 @@ class ProcessorSteps:
                 asset.path.unlink(missing_ok=True)
 
     def get_asset(self, step, step_back=False, n_before=0):
+        """
+        Get the asset corresponding to the step name, optionally picking the nth previous step if `n_before` is set.
+        If the asset does not exist, it will try to get the previous step if `step_back` is True.
+
+        Parameters
+        ----------
+        step: str
+            Name of the step to get the asset for.
+        step_back: bool
+            If True, will try to get the previous step's asset if the current step's asset does not exist.
+        n_before: int
+            If set, will return the asset of the nth previous step instead of the current step.
+            Useful when you want to get the asset source to the current step for example.
+
+        Returns
+        -------
+        Asset
+            The asset corresponding to the step name.
+        """
         if n_before:
             step = self.steps[self.steps.index(step) - n_before]
         asset = self.asset_from_step_name(step)
