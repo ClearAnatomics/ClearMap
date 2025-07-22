@@ -179,7 +179,7 @@ def index_from_binary(source, sink = None, method = 'shared', dtype = 'uint32', 
       if method == 'shared':
         _, sink_buffer, sink_shape, sink_strides = ap.initialize_sink(sink=None, as_1d=True, shape=source_shape, dtype=buffer_dtype, order=source_order,  return_shape=True, return_strides=True);
       else:
-        location = tempfile.mktemp() + '.npy';
+        location = tempfile.mktemp(suffix='.npy')
         _, sink_buffer, sink_shape, sink_strides = ap.initialize_sink(sink=location, as_1d=True, shape=tuple(source_shape), dtype=buffer_dtype, order=source_order,  return_shape=True, return_strides=True);
         delete_files.append(location);
     
