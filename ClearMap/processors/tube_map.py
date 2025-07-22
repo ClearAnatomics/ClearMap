@@ -75,7 +75,7 @@ class VesselGraphProcessorSteps(ProcessorSteps):
         return self.graph_raw, self.graph_cleaned, self.graph_reduced, self.graph_annotated  # TODO: add traced
 
     def asset_from_step_name(self, step):
-        return self.workspace.get('graph', asset_sub_type=step)
+        return self.workspace.get('graph', channel=self.channel, asset_sub_type=step)
 
 
 class BinaryVesselProcessorSteps(ProcessorSteps):
@@ -470,6 +470,7 @@ class VesselGraphProcessor(TabProcessor):
         self.steps = VesselGraphProcessorSteps(self.workspace)  # FIXME: handle skeleton
         self.setup(sample_manager, registration_processor)
         self.parent_channels = tuple([k for k in self.processing_config['binarization'].keys() if k != 'combined'])
+        self.steps.channel = self.parent_channels
         self.arteries_channel = self.sample_manager.get_channels_by_type('arteries', missing_action='ignore',
                                                                          multiple_found_action='error')
 
@@ -557,6 +558,7 @@ class VesselGraphProcessor(TabProcessor):
             self.set_progress_watcher(self.sample_manager.progress_watcher)
 
             self.parent_channels = tuple([k for k in self.processing_config['binarization'].keys() if k != 'combined'])
+            self.steps.channel = self.parent_channels
 
             if self.parent_channels not in self.workspace.asset_collections.keys():
                 sample_id = self.sample_manager.config['sample_id']
