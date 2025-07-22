@@ -14,6 +14,7 @@ import functools
 import platform
 import warnings
 import gc
+from concurrent.futures import ProcessPoolExecutor
 
 import numpy as np
 import pandas as pd
@@ -341,6 +342,7 @@ class BinaryVesselProcessor(TabProcessor):
             overlap = self.processing_config['binarization'][channel]['deep_fill']['overlap']
         if resample_factor is None:
             resample_factor = self.processing_config['binarization'][channel]['deep_fill']['resample_factor']
+
         if not get_free_v_ram() > REQUIRED_V_RAM:
             btn = warning_popup(f'Insufficient VRAM',
                                 f'You do not have enough free memory on your graphics card to '
@@ -384,8 +386,9 @@ class BinaryVesselProcessor(TabProcessor):
             clearmap_io.copy_file(source, sink_asset.path)
 
         self.post_process_binary_combined()
-        sink_asset.compress()
-
+        if self.processing_config['binarization']['combined'].get('compress'):
+            with ProcessPoolExecutor(max_workers=1) as executor:  # Send to separate process to avoid blocking
+                executor.submit(sink_asset.compress, algorithm='bz2')
 
     def post_process_binary_combined(self):
         """Postprocess the combined binary image (typically smooth and fill)"""
