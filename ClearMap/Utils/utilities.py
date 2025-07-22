@@ -378,10 +378,25 @@ def validate_orientation(orientation, channel, raise_error=True):
 
 
 def sanitize_n_processes(processes):
-    if processes < 0:
-        processes = multiprocessing.cpu_count() + processes
-    processes = max(processes, 1)
-    return processes
+    if processes is None:
+        processes = multiprocessing.cpu_count()
+    elif isinstance(processes, str):
+        warnings.warn(f'Using a string to specify the number of processes is deprecated. '
+                      f'Please use an integer (positive or negative) or None.', DeprecationWarning)
+        if processes.lower() == 'serial':
+            processes = 1
+        elif processes.lower() == '!serial':
+            processes = multiprocessing.cpu_count() - 1
+        else:
+            raise ValueError(f'Unknown string value for processes: {processes}. '
+                             f'Use None, "serial" or an integer.')
+    if isinstance(processes, int):
+        if processes < 0:
+            processes = multiprocessing.cpu_count() - processes
+        processes = max(1, processes)
+        return processes
+    else:
+        raise ValueError(f'Processes must be an integer or None, got {processes} of type {type(processes)}')
 
 
 def get_ok_n_ok_symbols():

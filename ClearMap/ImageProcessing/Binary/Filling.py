@@ -24,6 +24,7 @@ pyximport.install(setup_args={"include_dirs": [np.get_include(), os.path.dirname
 from . import FillingCode as code
 
 import ClearMap.IO.IO as io
+from ClearMap.Utils.utilities import sanitize_n_processes
 import ClearMap.Utils.Timer as tmr
 
 
@@ -70,15 +71,8 @@ def fill(source, sink=None, seeds=None, processes=None, verbose=False):
     if source_flat.dtype == bool:
         source_flat = source_flat.view(dtype='uint8')
 
-    if processes is None:
-        processes = mp.cpu_count()
-    elif isinstance(processes, str):
-        if processes == 'serial':
-            processes = 1
-        else:
-            processes = mp.cpu_count()
-    if not isinstance(processes, int):
-        raise ValueError(f'Processes must be one of None, int or "serial", got {processes}')
+    processes = sanitize_n_processes(processes)
+
     if verbose:
         print(f'\tBinary filling: Using {processes} processes', flush=True)
         print('\tBinary filling: temporary arrays created', flush=True)
