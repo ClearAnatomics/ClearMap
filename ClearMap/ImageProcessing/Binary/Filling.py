@@ -37,10 +37,10 @@ def fill(source, sink=None, seeds=None, processes=None, verbose=False):
 
     Arguments
     ---------
-    source : array
+    source: np.ndarray
         Input source.
-    sink : array or None
-        If None, a new array is allocated.
+    sink: np.ndarray or None
+        If None, a new array is allocated in memory.
     seeds : array or None
         An array of seed points for the fill operation.
         If None, the border indices of the source are used as seeds.

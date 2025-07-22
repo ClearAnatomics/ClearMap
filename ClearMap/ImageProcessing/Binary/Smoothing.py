@@ -373,10 +373,15 @@ def smooth_by_configuration_block(source, iterations = 1, verbose = False):
   return np.asarray(smoothed, dtype=bool)
 
 
-def smooth_by_configuration(source, sink = None, iterations = 1, 
-                            processing_parameter = None,
-                            processes = None, verbose = False):
-  """Smooth a binary source using the local configuration around each pixel.
+def smooth_by_configuration(source, sink=None, iterations=1, processing_parameter=None,
+                            processes=None, verbose=False):
+  """
+  Smooth a binary source using the local configuration around each pixel.
+
+  Note
+  ----
+  The algorithm is based on a topological smoothing operation defined by adding
+  or removing foreground pixels based on the local topology of the binary array.
   
   Arguments
   ---------
@@ -397,12 +402,7 @@ def smooth_by_configuration(source, sink = None, iterations = 1,
   Returns
   -------
   smoothed : array or Source
-    Thre smoothed binary array.
-
-  Note
-  ----
-  The algorithm is based on a topological smoothing operation defined by adding
-  or removing forground pixels based on the local topology of the binary array.
+    The smoothed binary array.
   """
   if verbose:
     print('Binary smoothing: initialized!')
