@@ -20,6 +20,7 @@ from configobj import ConfigObj
 
 from ClearMap.IO.assets_constants import CONTENT_TYPE_TO_PIPELINE
 from ClearMap.Utils.exceptions import MissingRequirementException, ClearMapAssetError, ParamsOrientationError
+from ClearMap.Utils.tag_expression import Expression
 from ClearMap.gui.gui_utils import surface_project, setup_mini_brain
 
 matplotlib.use('Qt5Agg')
@@ -1220,7 +1221,10 @@ class StitchingProcessor(TabProcessor):
                 self.get('raw', channel=channel).file_list[0], rigid_cfg).as_source()
         extension = '.npy' if self.sample_manager.use_npy(channel) else None  # TODO: optional requires
         raw_expr = str(self.get_path('raw', channel=channel, extension=extension))
-        layout = stitching_wobbly.WobblyLayout(expression=raw_expr, tile_axes=('X', 'Y'), overlaps=overlaps)
+        tag_names = tuple(sorted(Expression(raw_expr).tag_names()))  # sort alphabetically to ensure consistent order
+        # Drop irrelevant axes if e.g. scanning only rows or columns
+        overlaps = [overlap for name, overlap in zip(('X', 'Y'), overlaps) if name in tag_names]
+        layout = stitching_wobbly.WobblyLayout(expression=raw_expr, tile_axes=tag_names, overlaps=overlaps)
         return layout
 
     @property
