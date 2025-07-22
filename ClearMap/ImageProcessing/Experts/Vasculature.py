@@ -860,17 +860,17 @@ def clip(source, clip_range=(300, 60000), norm=MAX_BIN, dtype=DTYPE):
 
     clipped = np.array(source[:], dtype=float)
 
-    low = clipped < clip_low
-    clipped[low] = clip_low
+    low_mask = clipped < clip_low
+    clipped[low_mask] = clip_low
 
-    high = clipped >= clip_high
-    clipped[high] = clip_high
+    high_mask = clipped >= clip_high
+    clipped[high_mask] = clip_high
 
-    mask = np.logical_not(np.logical_or(low, high))
+    mask = np.logical_not(np.logical_or(low_mask, high_mask))
     clipped -= clip_low
     clipped *= float(norm-1) / (clip_high - clip_low)
     clipped = np.asarray(clipped, dtype=dtype)
-    return clipped, mask, high, low
+    return clipped, mask, high_mask, low_mask
 
 
 def deconvolve(source, binarized, sigma=10):
