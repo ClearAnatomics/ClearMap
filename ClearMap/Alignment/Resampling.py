@@ -612,7 +612,7 @@ def resample(original, resampled=None,
             if method == 'shared':
                 resampled_data = io.sma.create(shape, dtype=dtype, order=order, as_source=True)
             else:
-                location = tempfile.mktemp() + '.npy'
+                location = tempfile.mktemp(suffix='.npy')
                 resampled_data = io.mmp.create(location, shape=shape, dtype=dtype, order=order, as_source=True)
                 delete_files.append(location)
 
