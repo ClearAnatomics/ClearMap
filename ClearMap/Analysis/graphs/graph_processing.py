@@ -515,7 +515,7 @@ def clean_graph(graph: graph_gt.Graph, remove_self_loops: bool = True, remove_is
 
 def get_clique_neighbours(graph, clique_vertices):
     neighbours = np.hstack([graph.vertex_neighbours(c) for c in clique_vertices])  # Clique + neighbours
-    neighbours = np.setdiff1d(np.unique(neighbours), clique_vertices)  # Remove clique vertices (-> neighbours only)
+    neighbours = np.setdiff1d(np.unique(neighbours), clique_vertices, assume_unique=True)  # Remove clique vertices (-> neighbours only)
     return neighbours
 
 
@@ -734,7 +734,7 @@ class PropertyAggregator:
         # Handle existing edge geometry properties  # FIXME: only if self.kind == "edge" + should be part of other instance with != kind
         if self.src_graph.has_edge_geometry() and self.src_graph.edge_geometry_type == "graph":
             if self.kind == 'edge' and not reduced_graph.has_edge_geometry():
-                # FIXME: src_ranges from the new grpah because we drop the reduced edges ????
+                # FIXME: src_ranges from the new graph because we drop the reduced edges ????
                 src_ranges = self.src_graph.edge_geometry_indices()  # (E_orig, 2)
 
                 # Reorder the edges according to the reduced edge order
@@ -959,10 +959,10 @@ def reduce_graph(graph, vertex_to_edge_mappings=None,
     if compute_edge_geometry:   # Remap each vertex or edge property to the reduced graph (i.e., save as f'edge_geometry_{prop}' )
         branch_indices, edge_geom_ranges = vertex_agg.get_indices_and_ranges(edge_order)
 
-        reduced_graph.set_edge_geometry_vertex_properties(graph, edge_geometry_vertex_properties,  # FIXME: pass aggregator
+        reduced_graph.set_edge_geometry_vertex_properties(graph, edge_geometry_vertex_properties,  # REFACTOR: pass aggregator
                                                           branch_indices, edge_geom_ranges)
         if edge_geometry_edge_properties:
-            reduced_graph.set_edge_geometry_edge_properties(graph, edge_geometry_edge_properties,  # FIXME: pass aggregator
+            reduced_graph.set_edge_geometry_edge_properties(graph, edge_geometry_edge_properties,  # REFACTOR: pass aggregator
                                                             edge_geom_ranges, edge_agg.chain_indices)
 
     if return_maps: reduced_maps['edge_to_edge'] = edge_agg.chain_indices
