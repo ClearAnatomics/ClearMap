@@ -84,14 +84,16 @@ class BinaryVesselProcessorSteps(ProcessorSteps):
         super().__init__(workspace, channel=channel, sub_step=sub_step)
         self.stitched = 'stitched'
         self.binary = 'binary'
-        self.postprocessed = 'postprocessed'
+        # self.postprocessed = 'postprocessed'
+        self.smoothed = 'smoothed'
+        self.deep_filled = 'deep_filled'
         self.filled = 'filled'
         self.combined = 'combined'
         self.final = 'final'
 
     @property
     def steps(self):
-        return self.stitched, self.binary, self.postprocessed, self.filled, self.combined, self.final
+        return self.stitched, self.binary, self.smoothed, self.deep_filled, self.filled, self.combined, self.final
 
     def asset_from_step_name(self, step):  # FIXME: split step and substep
         if step in (self.stitched, self.binary):
@@ -114,7 +116,9 @@ class BinaryVesselProcessor(TabProcessor):
     def __init__(self, sample_manager=None):
         super().__init__()
         self.inputs_match = False
-        self.postprocessing_tmp_params = None
+
+        # asset parameters for the postprocessing step that was run last
+        self.postprocessing_last_step = {}  # {'ch0': {'source': None, 'temp_path': '', 'keep': True}}
         self.sample_config = None
         self.processing_config = None
         self.machine_config = None
@@ -238,11 +242,11 @@ class BinaryVesselProcessor(TabProcessor):
 
     @setup_channel_operation
     def smooth_channel(self, channel):
-        self.smooth(channel)  # TODO: update watcher
+        self._smooth(channel)  # TODO: update watcher
 
     @setup_channel_operation
     def fill_channel(self, channel):  # WARNING: should run from main thread
-        self.fill(channel)  # TODO: update watcher
+        self._fill(channel)  # TODO: update watcher
 
     @setup_channel_operation
     def deep_fill_channel(self, channel):  # n_blocks because of decorator
@@ -291,60 +295,66 @@ class BinaryVesselProcessor(TabProcessor):
                          arrange=arrange, lut=self.machine_config['default_lut'], parent=parent)
         return dvs
 
-    def smooth(self, channel):
+    def __get_post_processing_source(self, channel, step):
+        if channel not in self.postprocessing_last_step:
+            self.postprocessing_last_step[channel] = {'source': None, 'temp_path': '', 'keep': True}
+        src = self.postprocessing_last_step[channel]['source']
+        previous_step_path = (self.steps[channel].get_asset(step, step_back=True, n_before=1)).path
+        return src or previous_step_path  #  self.get_path('binary', channel=channel)
+
+    def _smooth(self, channel):
         binarization_cfg = self.processing_config['binarization'][channel]
-        run_smoothing = binarization_cfg['smooth']['run']
-        run_filling = binarization_cfg['binary_fill']['run']
+        if not binarization_cfg['smooth']['run']:
+            return
 
-        self.steps[channel].remove_next_steps_files(self.steps[channel].postprocessed)  # TODO: do we keep ?
+        self.steps[channel].remove_next_steps_files(self.steps[channel].smoothed)
 
-        source = self.workspace.source('binary', channel=channel)
-        sink = self.get_path('binary', channel=channel, asset_sub_type='postprocessed')
+        source = self.__get_post_processing_source(channel, 'smoothed')
+        sink = self.get_path('binary', channel=channel, asset_sub_type='smoothed')
         sink = initialize_sink(sink, shape=source.shape, dtype=source.dtype, order=source.order, return_buffer=False)
 
-        params = copy.deepcopy(vasculature.default_postprocessing_processing_parameter)
-        params.update(size_max=50)
-
-        postprocessing_parameter = copy.deepcopy(vasculature.default_postprocessing_parameter)
-        if not run_smoothing:
-            postprocessing_parameter.update(smooth=False)
-        postprocessing_parameter.update(fill=run_filling)
-
-        fill_source, tmp_f_path, save = vasculature.apply_smoothing(source, sink, params, postprocessing_parameter,
-                                                                    processes=None, verbose=True)
-        self.postprocessing_tmp_params = {'fill_source': fill_source, 'tmp_path': tmp_f_path, 'save': save}
-
-        # vasculature.postprocess(source, sink, processing_parameter=params,
-        #                         postprocessing_parameter=postprocessing_parameter,
-        #                         processes=None, verbose=True)  # WARNING: prange if filling
-
-    def fill(self, channel):
-        binarization_cfg = self.processing_config['binarization'][channel]
-        run_smoothing = binarization_cfg['smooth']['run']
-        sink = self.get_path('binary', channel=channel, asset_sub_type='postprocessed')
-        if not run_smoothing and os.path.exists(sink):  # FIXME: cannot assume, should prompt (or use separate files)
-            source = sink  # We assume the smoothing ran previously, hence source is previous postprocessed
+        if binarization_cfg['smooth']['run']:
+            smoothing_parameters = copy.deepcopy(vasculature.default_postprocessing_parameter['smooth'])
         else:
-            if self.postprocessing_tmp_params is not None:
-                source = self.postprocessing_tmp_params['fill_source']
-            else:
-                source = self.get_path('binary', channel=channel, asset_sub_type='postprocessed')
+            smoothing_parameters = {}
+
+        perf_params = copy.deepcopy(vasculature.default_postprocessing_processing_parameter)
+        perf_params.update(size_max=50)
+        smoothed, tmp_f_path = vasculature.apply_smoothing(source, sink, smoothing_parameters, perf_params,
+                                                           processes=None, verbose=True)
+
+        self.postprocessing_last_step[channel] = {'source': smoothed, 'temp_path': tmp_f_path,
+                                                  'keep': smoothing_parameters.get('save', False)}
+
+    def _fill(self, channel):
+        if not self.processing_config['binarization'][channel]['binary_fill']['run']:
+            return
+        source = self.__get_post_processing_source(channel, 'filled')
+        sink = self.get_path('binary', channel=channel, asset_sub_type='filled')
+
+        self.steps[channel].remove_next_steps_files(self.steps[channel].filled)
 
         source = clearmap_io.as_source(source)
         sink = initialize_sink(sink, shape=source.shape, dtype=source.dtype, order=source.order, return_buffer=False)
 
         binary_filling.fill(source, sink=sink, processes=None, verbose=True)  # WARNING: prange if filling
-        if run_smoothing and not self.postprocessing_tmp_params['save']:
-            clearmap_io.delete_file(self.postprocessing_tmp_params['tmp_path'])
+        if self.postprocessing_last_step[channel]['tmp_path'] and not self.postprocessing_last_step[channel]['keep']:
+            clearmap_io.delete_file(self.postprocessing_last_step[channel]['tmp_path'])
+
+        self.postprocessing_last_step[channel] = {'source': sink, 'temp_path': '', 'keep': False}
 
     def __deep_fill_channel(self, channel, size_max=None, overlap=None, resample_factor=None):
+        binary_cfg = self.processing_config['binarization'][channel]
+        if not binary_cfg['deep_fill']['run']:
+            return
+
         REQUIRED_V_RAM = 22000  # TODO: put in config at top of module
         if size_max is None:
-            size_max = self.processing_config['binarization'][channel]['deep_fill']['size_max']
+            size_max = binary_cfg['deep_fill']['size_max']
         if overlap is None:
-            overlap = self.processing_config['binarization'][channel]['deep_fill']['overlap']
+            overlap = binary_cfg['deep_fill']['overlap']
         if resample_factor is None:
-            resample_factor = self.processing_config['binarization'][channel]['deep_fill']['resample_factor']
+            resample_factor = binary_cfg['deep_fill']['resample_factor']
 
         if not get_free_v_ram() > REQUIRED_V_RAM:
             btn = warning_popup(f'Insufficient VRAM',
@@ -356,10 +366,11 @@ class BinaryVesselProcessor(TabProcessor):
             elif btn == QDialogButtonBox.Retry:
                 self.__deep_fill_channel(channel, size_max, overlap, resample_factor)
 
-        self.steps[channel].remove_next_steps_files(self.steps[channel].filled)
+        self.steps[channel].remove_next_steps_files(self.steps[channel].deep_filled)
 
-        source = self.get_path('binary', channel=channel, asset_sub_type='postprocessed')
-        sink = self.get_path('binary', channel=channel, asset_sub_type='filled')
+        # TODO: check how source casts to bool
+        source = self.__get_post_processing_source(channel, 'deep_filled')
+        sink = self.get_path('binary', channel=channel, asset_sub_type='deep_filled')
 
         processing_parameter = copy.deepcopy(vessel_filling.default_fill_vessels_processing_parameter)
         processing_parameter.update(size_max=size_max, size_min='fixed', axes='all', overlap=overlap)
@@ -369,6 +380,8 @@ class BinaryVesselProcessor(TabProcessor):
         gc.collect()
         clear_cuda_cache()
 
+        self.postprocessing_last_step[channel] = {'source': sink, 'temp_path': '', 'keep': False}
+
     def combine_binary(self):
         """Merge the binary images of the different vascular network components into a single mask"""
         # FIXME: probably missing the call to workspace.add_channel(self.channels_to_binarize())
@@ -376,11 +389,14 @@ class BinaryVesselProcessor(TabProcessor):
         if len(self.channels_to_binarize()) > 1:
             sources = []
             for channel in self.channels_to_binarize():
-                asset = self.steps[channel].get_asset(self.steps[channel].filled, step_back=True)
-                if asset.exists:
-                    sources.append(asset.path)
+                if self.postprocessing_last_step[channel]['source']:
+                    sources.append(self.postprocessing_last_step[channel]['source'])
                 else:
-                    raise FileNotFoundError(f'File {asset.path} not found')
+                    asset = self.steps[channel].get_asset(self.steps[channel].filled, step_back=True)
+                    if asset.exists:
+                        sources.append(asset.path)
+                    else:
+                        raise FileNotFoundError(f'File {asset.path} not found')
             block_processing.process(np.logical_or, sources, sink_asset.path,
                                      size_max=500, overlap=0, processes=None, verbose=True)
         else:  # We expect to have at least all_vessels_channel

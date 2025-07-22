@@ -164,7 +164,7 @@ CHANNELS_ASSETS_TYPES_CONFIG = {
         'resource_type': 'results',
         'relevant_pipelines': ['TubeMap', 'AxonMap', 'TractMap'],
         'sub_types': ['status',
-                      'postprocessed', 'filled', 'combined', 'final',  # TubeMap
+                      'smoothed', 'filled', 'deep_filled', 'postprocessed', 'combined', 'final',  # TubeMap
                       'vesselize', 'median', 'pixels_raw',
                       'coordinates_transformed', 'coordinates_raw', 'labels']  # TractMap
     },

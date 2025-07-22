@@ -1547,11 +1547,11 @@ class VasculatureTab(PostProcessingTab):
                            step_args=[channel], abort_func=self.binary_vessel_processor.stop_process)
             self.wrap_step('Vessel binarization', self.binary_vessel_processor.smooth_channel,
                            step_args=[channel], abort_func=self.binary_vessel_processor.stop_process)
+            self.wrap_step('Vessel binarization', self.binary_vessel_processor.deep_fill_channel,
+                           step_args=[channel], abort_func=self.binary_vessel_processor.stop_process)
             self.wrap_step('Vessel binarization', self.binary_vessel_processor.fill_channel,
                            step_args=[channel], abort_func=self.binary_vessel_processor.stop_process,
                            main_thread=True)  # WARNING: The parallel cython loops inside cannot run from child thread
-            self.wrap_step('Vessel binarization', self.binary_vessel_processor.deep_fill_channel,
-                           step_args=[channel], abort_func=self.binary_vessel_processor.stop_process)
         except ClearMapVRamException as err:
             if stop_on_error:
                 raise err
