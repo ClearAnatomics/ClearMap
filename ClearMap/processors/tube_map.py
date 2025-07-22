@@ -271,6 +271,9 @@ class BinaryVesselProcessor(TabProcessor):
 
         processing_parameter = copy.deepcopy(vasculature.default_binarization_processing_parameter)
         processing_parameter.update(processes=self.machine_config['n_processes_binarization'],
+                                    overlap=self.machine_config['detection_chunk_overlap'],
+                                    size_max=self.machine_config['detection_chunk_size_max'],
+                                    size_min=self.machine_config['detection_chunk_size_min'],
                                     as_memory=True, verbose=True)
 
         vasculature.binarize(source, sink,
