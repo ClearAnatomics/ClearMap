@@ -430,7 +430,7 @@ def clean_graph(graph: graph_gt.Graph, remove_self_loops: bool = True, remove_is
     neighbours = {}
     for clk_id in clique_ids:
         clique_vertices = component_ids[clk_id]
-        neighbours[clk_id] = get_clique_neighbours(graph, clique_vertices)
+        neighbours[clk_id] = get_clique_neighbours_set(graph, clique_vertices)
 
     def _prop_to_buffer(prop_map, n_rows):
         """return an empty (n_rows, …) array whose tail shape matches one value"""
@@ -514,9 +514,18 @@ def clean_graph(graph: graph_gt.Graph, remove_self_loops: bool = True, remove_is
 
 
 def get_clique_neighbours(graph, clique_vertices):
-    neighbours = np.hstack([graph.vertex_neighbours(c) for c in clique_vertices])  # Clique + neighbours
+    neighbours = np.hstack([graph.vertex_neighbours(v) for v in clique_vertices])  # Clique + neighbours
     neighbours = np.setdiff1d(np.unique(neighbours), clique_vertices, assume_unique=True)  # Remove clique vertices (-> neighbours only)
     return neighbours
+
+
+def get_clique_neighbours_set(g, clique_vertices):
+    s_clique = set(clique_vertices)
+    s_neigh   = set(np.concatenate([g.vertex_neighbours(v) for v in clique_vertices]).flatten())  # Clique + neighbours
+    # for v in clique_vertices:
+    #     s_neigh.update(g.vertex_neighbours(v))
+    s_neigh.difference_update(s_clique)
+    return np.fromiter(s_neigh, dtype=int)
 
 
 def _remove_isolated_vertices(g, timer, verbose):
@@ -767,10 +776,6 @@ class PropertyAggregator:
                     arr = self.src_graph.graph_property(name)
                     new_arr = arr.take(take_idx, axis=0)
                     reduced_graph.define_graph_property(name, new_arr)
-
-                # TODO: remove (debugging)
-                edge_geom_labels = reduced_graph.edge_geometry('edge_chain_id', as_list=True)
-                print('')
             else:  # Handle the case where edge geometry is already defined (after edges have been reduced)
                 pass  # FIXME: implement case where edge_geometry_vertex_property are defined separately
                 # new_ranges = reduced_graph.edge_geometry_indices()
