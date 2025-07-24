@@ -104,8 +104,13 @@ def plot_graph_nodes(graph, view=None, coordinates=None,
     view = p3d.initialize_view(view, title=title, depth_value=100000000, fov=100, distance=0,
                                elevation=0, azimuth=0, show=show, bg_color=bg_color)
 
-    colormap = get_colormap(colormap)
-    vertex_colors = colormap(vertex_colors % colormap.N)
+
+    if vertex_colors is None:
+        vertex_colors = np.repeat(([0.6, 0.6, 0.6, 1.0], ), graph.n_vertices, axis=0)
+
+    if vertex_colors.ndim == 1:
+        colormap = get_colormap(colormap)
+        vertex_colors = colormap(vertex_colors % colormap.N)
 
     # -------------------------------------------------------------------------
     # Instantiate the visual
