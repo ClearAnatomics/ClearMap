@@ -678,7 +678,7 @@ class PropertyAggregator:
     def edge_connectivity(self) -> np.ndarray:
         return self.src_graph.edge_connectivity()
 
-    def accumulate(self, indices: Sequence[int]) -> None:
+    def accumulate(self, indices: Sequence[int]) -> None:  # OPTIMISATION: this is the slowest part of reduce_graph
         """
         Append the result of aggregating (applying the specified function)
         a chain of vertices or edges to the aggregator.
@@ -696,11 +696,20 @@ class PropertyAggregator:
         need_flip   = np.sign(diffs) != first_sign
         is_not_loop = np.all(sorted_vertices[0, :] != sorted_vertices[-1, :])
         need_flip = need_flip & is_not_loop  # no flip for self-loops
-        if self.kind == 'edge'and len(need_flip) > 0:
-            need_flip = np.hstack([need_flip, need_flip[-1]])  # FIXME: dirty trick for edge/vertex geometry length mismatch
+        if self.kind == 'edge'and len(need_flip) > 0:  # FIXME: dirty trick for edge/vertex geometry length mismatch
+            need_flip = np.hstack([need_flip, need_flip[-1]])  #  FIXME: could remove if split vertex/edge geometry
         self.chain_edges_direction.append(need_flip)
 
-    def aggregate(self) -> None:  # FIXME: document (especially cython vs numpy)
+    def aggregate(self) -> None:
+        """
+        Aggregate the accumulated chains by applying the specified reduction functions
+
+        .. note::
+
+            For *simple* reduction functions (np.sum, np.mean, np.min, np.max), this
+            is implemented in parallel using Cython for performance.
+            Otherwise, this will fall back to a pure Python/numpy implementation.
+        """
         if not self.chain_indices:
             raise ValueError("No chains have been accumulated. Call accumulate() first.")
 
@@ -724,10 +733,6 @@ class PropertyAggregator:
                 mapped = np.array([reduction_fn(arr[idx_stack[s:e]]) for s, e in zip(starts, ends)], dtype=out_dtype)
             self.aggregated_properties[prop_name] = mapped
 
-    # def reorder_indices(self, edge_order: np.ndarray) -> None:
-    #     self.chain_indices = (np.asarray(self.chain_indices, dtype=object)[edge_order]).tolist()
-    #     # PERFORMANCE: see if we can skip to_list if we amend stacked_indices() later
-
     def get_indices_and_ranges(self, reduced_edge_order) -> (np.ndarray, np.ndarray):
         """
         Return a 1D array of all accumulated indices, concatenated from all chains.
@@ -742,6 +747,8 @@ class PropertyAggregator:
     def apply(self, reduced_graph: graph_gt.Graph, reduced_edge_order: np.ndarray) -> None:
         """
         Attach the aggregated values as edge properties on `graph`.
+        In cases where self.src_graph has edge geometry, this will also reduce
+        this geometry and the edge_geometry_indices.
 
         .. note::
             This method is typically called once after `reduce_graph` has
