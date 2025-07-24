@@ -118,7 +118,7 @@ class Graph(grp.AnnotatedGraph):
         return int(vertex)
 
     def vertex_indices(self):
-        return np.array(self.vertices, dtype=int)  # FIXME: why not self._base.get_vertices() ?
+        return  self._base.get_vertices()
 
     def add_vertex(self, n_vertices=None, vertex=None):
         if n_vertices is not None:
@@ -246,8 +246,8 @@ class Graph(grp.AnnotatedGraph):
         return self._base.edge_index[self.edge(edge)]
 
     def edge_indices(self):  # TODO: explain what this does
-        p = self.base.edge_index
-        return np.array([p[e] for e in self.edge_iterator()], dtype=int)
+        table = self._base.get_edges(eprops=[self._base.edge_index])
+        return table[:, 2]
 
     def add_edge(self, edge):
         if isinstance(edge, tuple):
