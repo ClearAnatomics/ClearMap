@@ -273,8 +273,15 @@ class Graph(grp.AnnotatedGraph):
     def edge_iterator(self):
         return self._base.edges()
 
-    def edge_connectivity(self):  # PERFORMANCE: see if better to cache property and invalidate when edeges added or removed
-        return self._base.get_edges()[:, :2]
+    def edge_connectivity(self, order='src_vertex'):  # PERFORMANCE: see if better to cache property and invalidate when edeges added or removed
+        if order == 'src_vertex':
+            return self._base.get_edges()[:, :2]
+        elif order == 'eid':
+            table = self._base.get_edges([self._base.edge_index])
+            # Sort by the eid (third column) → insertion / ID order
+            return table[np.argsort(table[:, 2])][:, :2]
+        else:
+            raise NotImplementedError(f'Invalid edge connectivity order "{order}"! ')
 
     def edge_property(self, name, edge=None, as_array=True):
         e_prop = self._base.edge_properties[name]
