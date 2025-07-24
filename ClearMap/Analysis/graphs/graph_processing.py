@@ -758,12 +758,12 @@ class PropertyAggregator:
                     for j, (e_id, flip) in enumerate(zip(edges, flips)):
                         start_idx, end_idx = src_ranges[e_id]  # old [start, end]
                         # Build the whole itemwise index for the chain
-                        idx = range(start_idx, end_idx, 1)
+                        idx = list(range(start_idx, end_idx, 1))
                         if flip:
                             idx = idx[::-1]
 
-                        if j > 0 and take_idx[-1] == idx[0]:  # Avoid duplicates
-                            idx = idx[1:]
+                        if j > 0: #  deduplicate the joining vertices
+                            idx = idx[1:]   #WARNING: remove last 2 if edge_geometry_edge not edge_geometry_vertex
 
                         take_idx.extend(idx)
 
