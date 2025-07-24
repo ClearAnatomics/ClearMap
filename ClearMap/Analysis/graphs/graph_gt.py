@@ -236,6 +236,10 @@ class Graph(grp.AnnotatedGraph):
             return self._base.edge(*edge)
         elif isinstance(edge, int):
             return gtu.find_edge(self._base, self._base.edge_index, edge)[0]
+        elif isinstance(edge, list) and len(edge) == 2:
+            return self.edge(tuple(edge))
+        elif isinstance(edge, np.ndarray) and edge.shape == (2,):
+            return self.edge(tuple(edge))
         else:
             raise ValueError(f'Edge specification {edge} is not valid!')
 
