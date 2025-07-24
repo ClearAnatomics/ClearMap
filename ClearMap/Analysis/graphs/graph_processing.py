@@ -69,8 +69,8 @@ DEFAULT_VERTEX_TO_EDGE = {
     'radii': np.max
 }
 DEFAULT_VERTEX_TO_VERTEX = {
-    'coordinates': functools.partial(np.mean, axis=0),
-    'coordinates_units': functools.partial(np.mean, axis=0),
+    'coordinates': medoid_vertex_coordinates,
+    'coordinates_units': mean_vertex_coordinates,
     'length': np.sum,
     'radii': np.max,
     # 'chain_id': functools.partial(np.quantile, 0.5, method='nearest', axis=0),
