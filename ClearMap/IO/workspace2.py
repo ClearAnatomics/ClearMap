@@ -203,10 +203,7 @@ class Workspace2:  # REFACTOR: subclass dict
         if pipeline_name not in CONTENT_TYPE_TO_PIPELINE.values():
             raise ClearMapWorkspaceError(f'Pipeline {pipeline_name} does not exist in the workspace.')
 
-        if 'sample_id' in kwargs:
-            sample_id = kwargs.pop('sample_id')
-        else:
-            sample_id = self.get('raw', channel_id).sample_id
+        sample_id = kwargs.get('sample_id', self.get('raw', channel_id).sample_id)
         channel_spec = self.asset_collections[channel_id].channel_spec
         for name, spec in CHANNEL_ASSETS_TYPES.items():
             if pipeline_name in spec.relevant_pipelines:
