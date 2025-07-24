@@ -488,7 +488,7 @@ class VesselGraphProcessor(TabProcessor):
         self.machine_config = {}
         self.sample_manager = sample_manager
         self.registration_processor = registration_processor
-        self.workspace = None
+        self.workspace = None  # set in setup
         self.steps = VesselGraphProcessorSteps(self.workspace)  # FIXME: handle skeleton
         self.setup(sample_manager, registration_processor)
         self.parent_channels = tuple([k for k in self.processing_config['binarization'].keys() if k != 'combined'])
@@ -583,7 +583,7 @@ class VesselGraphProcessor(TabProcessor):
             self.steps.channel = self.parent_channels
 
             if self.parent_channels not in self.workspace.asset_collections.keys():
-                sample_id = self.sample_manager.config['sample_id']
+                sample_id = self.sample_manager.config['sample_id'] if self.sample_config['use_id_as_prefix'] else None
                 self.workspace.add_channel(ChannelSpec(self.parent_channels, 'compound'), sample_id=sample_id)
                 self.workspace.add_pipeline('TubeMap', self.parent_channels, sample_id=sample_id)
 
@@ -696,7 +696,7 @@ class VesselGraphProcessor(TabProcessor):
         self._set_graph_artery_property('binary', asset_sub_type=['filled', 'postprocessed'])
 
     def _set_arteriness(self):
-        """'arteriness' from signal intensity"""
+        """assign 'arteriness' from signal intensity"""
         self._set_graph_artery_property('stitched', suffix='raw', radius_shift=10)
 
     def _build_graph_from_skeleton(self):  # TODO: split for requirements
