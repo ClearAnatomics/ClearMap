@@ -267,6 +267,9 @@ class Graph(grp.AnnotatedGraph):
     def edges(self):
         return list(self._base.edges())
 
+    def get_edges(self, eprops=[]):
+        return self._base.get_edges(eprops=eprops)
+
     def edge_iterator(self):
         return self._base.edges()
 
