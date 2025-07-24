@@ -102,7 +102,7 @@ def neighbours(indices: np.ndarray, offset: int) -> np.ndarray:  # TODO: check i
     return np.vstack((src, dst)).T
 
 
-def annotate_edge_lengths(graph: graph_gt.Graph, coord_prop, spacing=None):
+def annotate_edge_lengths(graph: graph_gt.Graph, coord_prop=None, edges=None, spacing=None):
     """
     Compute the length property for edges in a graph based on the voxel
     coordinates and the resolution of the voxels.
@@ -110,8 +110,8 @@ def annotate_edge_lengths(graph: graph_gt.Graph, coord_prop, spacing=None):
     Parameters
     ----------
     graph: graph_tool.Graph
-    coord_prop: VertexPropertyMap
-        Array of shape (N,3)   voxel indices (⟨x,y,z⟩)
+        The source graph to annotate.
+    coord_prop: VertexPropertyMap | np.ndarray
         Array of shape (N,3)   voxel indices (⟨x,y,z⟩)
     spacing: tuple(float, float, float) | None
         Voxel pitch along each axis. If None, the value is retrieved from the graph's
@@ -130,15 +130,20 @@ def annotate_edge_lengths(graph: graph_gt.Graph, coord_prop, spacing=None):
     """
     spacing = spacing if spacing is not None else graph.graph_property('spacing')
 
-    src_vertices, target_vertices = np.hsplit(graph.edge_connectivity(), 2)  # TODO: check indexing
+    if edges is None:
+        edges = graph.edge_connectivity(order='eid')  # get edges as (src, target) pairs ordered by edge insertion
+
+    src_vertices, target_vertices = np.hsplit(edges, 2)  # TODO: check indexing
     src_vertices = src_vertices.squeeze()
     target_vertices = target_vertices.squeeze()
 
-    # coord_prop.a flattens, so reshape:
+    if coord_prop is None:
+        coord_prop = graph.vertex_coordinates()
+
     if isinstance(coord_prop, np.ndarray):
-        coords = coord_prop.reshape((-1, 3)).astype(int)
+        coords = coord_prop
     else:
-        coords = coord_prop.a.reshape((-1, 3)).astype(int)
+        coords = coord_prop.a.reshape((-1, 3)).astype(int)      # coord_prop.a flattens, so reshape:  TODO: test
 
     # convert -1, 0, +1 displacement to lookup index
     diff = coords[target_vertices] - coords[src_vertices]  # triplets of values -1, 0, +1 (in each dimension)
@@ -160,7 +165,8 @@ def annotate_edge_lengths(graph: graph_gt.Graph, coord_prop, spacing=None):
     xs = diff[:, 0] + 1
     ys = diff[:, 1] + 1
     zs = diff[:, 2] + 1
-    return distance_table[xs, ys, zs]
+    edge_lengths = distance_table[xs, ys, zs]
+    return edge_lengths
 
 
 def get_distance_map_27(resolution):
@@ -296,14 +302,14 @@ def graph_from_skeleton(skeleton, points=None, radii=None, compute_vertex_coordi
         if spacing is not None:
             # Upcast to float because result is in physical units
             coords_phys = vertex_coordinates.astype(np.float32) * spacing[None, :]  # None broadcasts spacing to (1, 3)
-            g.define_vertex_property('coordinates_units', coords_phys)
+            g.define_vertex_property('coordinates_units', coords_phys, dtype=np.float32)
 
     if radii is not None:
         g.set_vertex_radius(radii)
 
     if compute_edge_length:
-        edge_lengths = annotate_edge_lengths(g, g.vertex_coordinates(), spacing=spacing)
-        g.define_edge_property('length', edge_lengths)
+        edge_lengths = annotate_edge_lengths(g, spacing=spacing)
+        g.define_edge_property('length', edge_lengths, dtype=np.float64)
 
     if verbose:
         timer_all.print_elapsed_time('Skeleton to Graph')
@@ -426,6 +432,10 @@ def clean_graph(graph: graph_gt.Graph, remove_self_loops: bool = True, remove_is
 
     vertex_filter = np.ones(n_vertices + n_cliques, dtype=bool)
     coords = g.vertex_coordinates()
+    use_units = 'coordinates_units' in g.vertex_properties
+    if use_units:
+        coords_units = g.vertex_property('coordinates_units')
+        spacing = np.array(g.graph_property('spacing'), dtype=np.float64)
     center_vertices = np.arange(n_vertices, n_vertices + n_cliques, dtype=np.intp)
     neighbours = {}
     for clk_id in clique_ids:
@@ -456,11 +466,14 @@ def clean_graph(graph: graph_gt.Graph, remove_self_loops: bool = True, remove_is
         edges_to_clique_neighbours = [[n, center_vertex] for n in current_neighbours]
         new_edges[edge_counter: edge_counter + len(edges_to_clique_neighbours)] = edges_to_clique_neighbours
 
-        # Existing median coordinate of the clique vertices
-        # center_coord = np.quantile(coords[clique_vertices], 0.5, method='nearest', axis=0)
-        center_coord = medoid_vertex_coordinates(coords[clique_vertices])
+        center_coord = vertex_mappings['coordinates'](coords[clique_vertices])
+        if use_units:
+            center_coord_units = center_coord * spacing
         if 'length' in g.edge_properties:
-            edge_lengths = np.linalg.norm(coords[current_neighbours] - center_coord, axis=1)
+            if use_units:
+                edge_lengths = np.linalg.norm(coords_units[current_neighbours] - center_coord_units, axis=1)
+            else:
+                edge_lengths = np.linalg.norm(coords[current_neighbours] - center_coord, axis=1)
             new_lengths[edge_counter: edge_counter + len(edges_to_clique_neighbours)] = edge_lengths
 
         edge_counter += len(edges_to_clique_neighbours)
@@ -469,6 +482,8 @@ def clean_graph(graph: graph_gt.Graph, remove_self_loops: bool = True, remove_is
         for prop_name, reduce_fn in vertex_mappings.items():
             if prop_name == 'coordinates':  # Already calculated above
                 val = center_coord
+            elif prop_name == 'coordinates_units':
+                val = center_coord_units
             else:
                 prop = graph.vertex_property(prop_name)
                 val = reduce_fn(prop[clique_vertices])
@@ -485,11 +500,12 @@ def clean_graph(graph: graph_gt.Graph, remove_self_loops: bool = True, remove_is
         g.set_vertex_property(prop_name, prop)
 
     # Add new edges and map e_props
-    if 'length' in g.edge_properties:
-        length_prop = g.edge_property('length')
+    original_edge_count  = g.n_edges
     g.add_edge(new_edges)
     if 'length' in g.edge_properties:
-        g.set_edge_property('length', np.hstack([length_prop, new_lengths]))
+        length_prop = g.edge_property('length')
+        length_prop[original_edge_count:] = new_lengths
+        g.set_edge_property('length', length_prop)
 
     # Remove vertices belonging to cliques
     g = g.sub_graph(vertex_filter=vertex_filter)
