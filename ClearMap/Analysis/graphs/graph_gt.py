@@ -1211,7 +1211,7 @@ class Graph(grp.AnnotatedGraph):
         if from_disk:
             return load(path if path else self.path)
         else:
-            if self.n_edges <= LARGE_GRAPH_N_EDGES_THRESHOLD:  # Small graph, copy properties
+            if (len(list(self.edge_properties)) > 0) and self.n_edges <= LARGE_GRAPH_N_EDGES_THRESHOLD:  # Small graph, copy properties
                 return Graph(name=copy.copy(self.name), base=gt.Graph(self.base))
 
             else:  # RAM runs away on direct copy of edge_properties for large graphs
@@ -1229,9 +1229,15 @@ class Graph(grp.AnnotatedGraph):
                     new_base.gp[name] = q
 
                 # edge properties
+                edge_order = self.edge_indices()
                 for name, p in self._base.ep.items():
                     q = new_base.new_edge_property(p.value_type())
-                    q.fa = p.fa.copy()  # one contiguous memcpy
+                    if p.fa is not None:
+                        q.fa = p.fa.copy()  # one contiguous memcpy
+                        q.a = q.a[edge_order]  # FIXME: check if this is correct, it should be!
+                    else:
+                        prop_arr = self.edge_property(name)  # Get the numpy array directly
+                        set_edge_property_map(q, prop_arr)
                     new_base.ep[name] = q
                 return Graph(name=copy.copy(self.name), base=new_base)
 
