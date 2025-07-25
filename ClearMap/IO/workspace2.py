@@ -258,6 +258,7 @@ class Workspace2:  # REFACTOR: subclass dict
             extension=None, version=None,
             status=None, debug=None,
             prefix=None, postfix=None,
+            suffix='',
             default='closest'):
         """
         Get the asset of the given type. If no exact match is found, try to find the closest match.
@@ -290,6 +291,9 @@ class Workspace2:  # REFACTOR: subclass dict
             The postfix of the asset name. (typically the asset subtype)
             .. deprecated:: 3.0.0
                 Use the asset_sub_type argument instead.
+        suffix: str
+            The suffix of the asset name. This is to be used for assets where the subtype is
+            dynamic.
 
         Returns
         -------
@@ -315,7 +319,7 @@ class Workspace2:  # REFACTOR: subclass dict
         if status:
             self.debug = status
 
-        if asset_sub_type:
+        if asset_sub_type and not suffix:
             asset_type += f'_{asset_sub_type}'
         if channel not in self.asset_collections and isinstance(channel, tuple):
             channel = ('-'.join(channel)).lower()  # Try string version if tuple version not found
@@ -329,7 +333,10 @@ class Workspace2:  # REFACTOR: subclass dict
             else:
                 return default
         if sample_id or extension or version:  # FIXME: subdirectory
-            asset = asset.variant(sample_id, extension, version)
+            if suffix:
+                asset = asset.variant(sample_id, asset_sub_type, extension, version, sub_type=suffix)
+            else:
+                asset = asset.variant(sample_id, extension, version)
         return asset
 
     def get_closest_matching_asset(self, asset_type, channel=None):  # FIXME: compound keys

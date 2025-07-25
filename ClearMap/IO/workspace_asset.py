@@ -34,6 +34,7 @@ __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
+import copy
 import os
 import warnings
 from copy import deepcopy
@@ -48,7 +49,7 @@ from ClearMap.Analysis.graphs.graph_gt import load as load_graph
 from ClearMap.IO import IO as clearmap_io
 from ClearMap.IO import FileUtils as file_utils
 from ClearMap.IO.assets_constants import CONTENT_TYPE_TO_PIPELINE
-from ClearMap.IO.assets_specs import TypeSpec, ChannelSpec, StateManager
+from ClearMap.IO.assets_specs import TypeSpec, ChannelSpec, StateManager, SubTypeSpec
 from ClearMap.Utils.tag_expression import Expression
 from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
 from ClearMap.Utils.exceptions import ClearMapAssetError, AssetNotFoundError
@@ -198,12 +199,19 @@ class Asset:
 
         Parameters
         ----------
-        sample_id : str
+        sample_id: str
             The sample id to use.
-        extension : str
+        extension: str
             The extension to use.
-        version : int
+        version: int
             The version to use.
+        expression: str or Expression or None
+            An optional expression to use instead of the default file name.
+        sub_type: str or TypeSpec
+            The sub type of the asset. This is used to create a variant of the asset with
+             a different type specification.
+            If a string, it should be a valid sub type name in the type specification.
+            If a TypeSpec, it will be used as the type specification for the variant.
 
         Returns
         -------
@@ -224,7 +232,22 @@ class Asset:
                 expression = self.expression
         if sub_type:
             if isinstance(sub_type, str):
-                type_spec = self.type_spec.sub_types[sub_type]
+                type_spec = self.type_spec.sub_types.get(sub_type)
+                if not type_spec:  # Not part of standard sub_types
+                    if self.type_spec.sub_types:
+                        warnings.warn(f'The sub type "{sub_type}" is not defined. It will be created dynamically'
+                                      f'but we cannot guarantee that it will be correct.')
+                        template_sub_type_spec = list(self.type_spec.sub_types.values())[0]
+                        new_type_spec = SubTypeSpec(
+                            resource_type=template_sub_type_spec.resource_type,
+                            type_name=f'{self.type_spec.name}_{sub_type}',
+                            file_format_category=template_sub_type_spec.file_format_category,
+                            relevant_pipelines=self.type_spec.relevant_pipelines,
+                        )
+                        self.type_spec.sub_types[sub_type] = new_type_spec
+                    else:
+                        raise ValueError(f'sub_type "{sub_type}" not found in {self.type_spec.sub_types.keys()}'
+                                         f'and this type has no sub_types defined to copy.')
             elif isinstance(sub_type, TypeSpec):
                 type_spec = sub_type
             else:
