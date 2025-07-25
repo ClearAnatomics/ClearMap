@@ -1,8 +1,6 @@
 import time
 from pathlib import Path
 
-import cProfile as profile
-
 import numpy as np
 from matplotlib import pyplot as plt
 from vispy import app
@@ -87,13 +85,8 @@ def main(skel_path):
 
     # graph_raw = graph_gt.load(base_dir / 'test_graph.gt')
 
-    prof = profile.Profile()
-    prof.enable()
     start_t = time.time()
     graph_raw = graph_processing.graph_from_skeleton(skel_path, spacing=(1.625, 1.625, 2.5), verbose=True)
-    prof.disable()
-    prof.dump_stats(base_dir / 'test_graph_from_skeleton.prof')
-
 
     title = 'test_graph_reduced'
     bg_color = 'grey'
@@ -105,11 +98,7 @@ def main(skel_path):
     # graph_raw.save(base_dir / 'test_graph.gt')
     # graph_raw = graph_gt.load(base_dir / 'test_graph.gt')
 
-    prof = profile.Profile()
-    prof.enable()
     cleaned_graph = graph_processing.clean_graph(graph_raw, verbose=True)
-    prof.disable()
-    prof.dump_stats(base_dir / 'test_graph_clean.prof')
     #
     # cleaned_graph.save(base_dir / 'test_graph_cleaned.gt')
 
@@ -120,8 +109,6 @@ def main(skel_path):
     vertex_to_edge_mappings = {'radii': np.max}
     # edge_to_edge_mappings = {'length': np.sum}
 
-    prof = profile.Profile()
-    prof.enable()
     graph_reduced = graph_processing.reduce_graph(cleaned_graph, compute_edge_length=True,
                                                   edge_to_edge_mappings=None,
                                                   vertex_to_edge_mappings=vertex_to_edge_mappings,
@@ -131,8 +118,6 @@ def main(skel_path):
                                                   save_modified_graph_path=base_dir / 'test_graph_cleaned.gt')
     print(f'Pipeline took {time.time() - start_t:.2f} seconds.')
     # print_graph_lengths(graph_reduced)
-    prof.disable()
-    prof.dump_stats(base_dir / 'test_graph_reduce.prof')
 
     graph_reduced.save(base_dir / 'test_graph_reduced.gt')
 
