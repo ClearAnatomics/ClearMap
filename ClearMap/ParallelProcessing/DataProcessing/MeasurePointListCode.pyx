@@ -18,6 +18,7 @@ cimport cython
 from cython.parallel import prange, parallel
 
 ctypedef fused source_t:
+  np.int16
   np.int32_t
   np.int64_t
   np.uint8_t
@@ -28,6 +29,7 @@ ctypedef fused source_t:
   np.float64_t
 
 ctypedef fused sink_t:
+  np.int16
   np.int32_t
   np.int64_t
   np.uint8_t
@@ -38,6 +40,7 @@ ctypedef fused sink_t:
   np.float64_t
   
 ctypedef fused point_t:
+  np.int16
   np.int32_t
   np.int64_t
   np.uint8_t
