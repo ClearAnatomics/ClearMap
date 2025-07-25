@@ -603,7 +603,7 @@ class RegistrationProcessor(TabProcessor):
         for channel in self.config['channels']:
             if self.config['channels'][channel]['align_with'] is None:
                 continue
-            if self.config['channels'][channel]['moving_channel'] in (None, 'intrinsically aligned'):
+            if self.config['channels'][channel]['moving_channel'] in (None, 'intrinsically_aligned'):
                 continue
             for asset_type in ('fixed_landmarks', 'moving_landmarks', 'aligned'):
                 try:
@@ -787,7 +787,7 @@ class RegistrationProcessor(TabProcessor):
     def align_channel(self, channel):
         self.config.reload()
         fixed_channel, moving_channel = self.get_fixed_moving_channels(channel)
-        if moving_channel is None or moving_channel == 'intrinsically aligned':
+        if moving_channel is None or moving_channel == 'intrinsically_aligned':
             return
         channel_cfg = self.config['channels'][channel]
         run_bspline = any(['bspline' in channel_cfg['params_files']])

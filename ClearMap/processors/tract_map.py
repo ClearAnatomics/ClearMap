@@ -239,7 +239,7 @@ class TractMapProcessor(ChannelTabProcessor):
 
         results_directories = []
         for channel in self.get_registration_sequence_channels(stop_channel=target_channel):
-            if self.registration_processor.config['channels'][channel]['moving_channel'] in (None, 'intrinsically aligned'):
+            if self.registration_processor.config['channels'][channel]['moving_channel'] in (None, 'intrinsically_aligned'):
                 continue
             else:
                 result_dir = self.registration_processor.get_elx_asset('aligned', channel=channel).path.parent

@@ -788,7 +788,7 @@ class RegistrationTab(PreProcessingTab):
         page_widget.alignWithComboBox.clear()
         page_widget.alignWithComboBox.addItems([None, 'atlas'] + other_channels)
         page_widget.movingChannelComboBox.clear()
-        page_widget.movingChannelComboBox.addItems([None, 'atlas', 'intrinsically aligned'] + other_channels + [channel])
+        page_widget.movingChannelComboBox.addItems([None, 'atlas', 'intrinsically_aligned'] + other_channels + [channel])
         channel_dtype = self.sample_manager.config['channels'][channel]['data_type']
         print(f'Configuring alignment partners for {channel=}, {channel_dtype=}, {partner_channel=}')
         if not partner_channel or partner_channel == channel:
@@ -836,9 +836,9 @@ class RegistrationTab(PreProcessingTab):
             self.wrap_step('Setting up atlas', self.setup_atlas, n_steps=1, save_cfg=False, nested=False)  # TODO: abort_func=self.aligner.stop_process
 
     # def handle_layout_channel_changed(self, channel, layout_channel):
-    #    """To select automatically "intrinsically aligned" if 2 channels have same stitching layout"""
+    #    """To select automatically "intrinsically_aligned" if 2 channels have same stitching layout"""
     #     self.params[channel].align_with = layout_channel
-    #     self.params[channel].moving_channel = 'intrinsically aligned'
+    #     self.params[channel].moving_channel = 'intrinsically_aligned'
     #     self.params[channel].cfg_to_ui()  # Update the UI to reflect the changes
 
     def set_progress_watcher(self, watcher):
