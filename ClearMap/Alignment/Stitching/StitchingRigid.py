@@ -2278,10 +2278,10 @@ def _initialize_tiles_from_expression(expression, tile_axes = None, tile_shape =
     tile_axes = tag_names;
   for n in tile_axes:
     if not n in tag_names:
-      raise ValueError('The expression does not have the named pattern %s' % n);
+      raise ValueError(f'The {expression=} does not have the named pattern {n}');
   for n in tag_names:
     if not n in tile_axes:
-      raise ValueError('The expression has the named pattern %s that is not in tile_axes=%r' % (n, tile_axes));
+      raise ValueError(f'The {expression=} has the named pattern {n} that is not in tile_axes={tile_axes}');
   #print tile_axes, tag_names
   
   
