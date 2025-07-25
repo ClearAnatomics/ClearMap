@@ -200,12 +200,13 @@ def get_distance_map_27(resolution):
 
 
 def graph_from_skeleton(skeleton, points=None, radii=None, compute_vertex_coordinates=True, compute_edge_length=True,
-                        check_border=True, delete_border=False, spacing=None, verbose=False):
+                        check_border=True, delete_border=False, spacing=None, physical_units='', verbose=False):
     """
     Converts a binary skeleton image to a graph-tool graph.
 
 
     .. note::
+
         Edges are detected between neighbouring foreground pixels using 26-connectivity.
 
     Arguments
@@ -227,6 +228,8 @@ def graph_from_skeleton(skeleton, points=None, radii=None, compute_vertex_coordi
         If True, delete the border (`check_border` is ignored in this case).
     spacing: array
         Spacing of the voxels in the skeleton in physical units (e.g. micrometers) in each dimension.
+    physical_units: str
+        Description of the physical units of the spacing, e.g. 'micrometers', 'µm'...
     verbose: bool
         If True, print progress information.
 
@@ -267,6 +270,8 @@ def graph_from_skeleton(skeleton, points=None, radii=None, compute_vertex_coordi
     if spacing:
         spacing = np.asarray(spacing, dtype=np.float64)
         g.add_graph_property('spacing', spacing)
+    if physical_units:
+        g.add_graph_property('physical_units', physical_units)
     g.shape = skeleton.shape
 
     if verbose: timer.print_elapsed_time(f'Graph initialized with {n_vertices:,} vertices', reset=True)
