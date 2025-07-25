@@ -2146,7 +2146,7 @@ class GroupAnalysisProcessor:
             gp1, gp2 = [groups[gp_name] for gp_name in pair]
             for channel in channels:
                 _ = density_files_are_comparable(self.results_folder, gp1, gp2, channel,
-                                                 density_file_suffix=density_files_suffix)
+                                                 density_files_suffix=density_files_suffix)
             check_ids_are_unique(gp1, gp2)
             # compare_groups is automatically for each channel (loads the first sample to find the channels)
             wrapping_func(compare_groups, self.results_folder, gp1_name, gp2_name, gp1, gp2,
@@ -2168,13 +2168,14 @@ class GroupAnalysisProcessor:
             dvs.append(browser)
         return dvs
 
-    def plot_density_maps(self, group_folders, channel, parent=None):
+    def plot_density_maps(self, group_folders, channel, density_suffix, parent=None):
         density_map_paths = []
         titles = []
         for folder in group_folders:
             sample_manager = SampleManager()
             sample_manager.setup(src_dir=folder)
-            map_path = sample_manager.get('density', channel=channel, asset_sub_type='counts').path
+            map_path = sample_manager.get('density', channel=channel,
+                                          suffix=density_suffix).path
             density_map_paths.append(map_path)  # TODO: make work for tubemap too
             titles.append(sample_manager.config['sample_id'])
         luts = ['flame'] * len(density_map_paths)
@@ -2224,7 +2225,7 @@ class GroupAnalysisTab(BatchTab):
                 self.params.plot_density_maps_buttons[i].clicked.connect(
                     functools.partial(self.plot_density_maps, gp))
 
-    def get_analysable_channels(self):
+    def get_analysable_channels(self):  # FIXME: move to params
         """
         List the channels that have density maps available for analysis
 
@@ -2240,8 +2241,9 @@ class GroupAnalysisTab(BatchTab):
         sample_manager.setup(src_dir=self.params.get_all_paths()[0][0])
 
         analysable_channels = []
-        for channel in sample_manager.channels:
-            asset = sample_manager.get('density', channel=channel, asset_sub_type='counts', default=None)
+        for channel in sample_manager.channels:  # FIXME:
+            asset = sample_manager.get('density', channel=channel,
+                                       suffix=self.params.density_suffix, default=None)
             if asset is not None and asset.exists:
                 analysable_channels.append(channel)
         return analysable_channels
@@ -2253,6 +2255,7 @@ class GroupAnalysisTab(BatchTab):
         self.main_window.clear_plots()  # TODO: use wrap_plot
         dvs = self.processor.plot_density_maps(self.params.groups[group_name],
                                                channel=self.params.plot_channel,
+                                               density_suffix=self.params.density_suffix,
                                                parent=self.main_window.centralWidget())
         self.main_window.setup_plots(dvs)
 
