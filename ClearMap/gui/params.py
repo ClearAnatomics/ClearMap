@@ -2116,9 +2116,13 @@ class GroupAnalysisParams(BatchParameters):
         sample_folders_paths = self.get_all_paths()
         if sample_folders_paths:
             sample_manager.setup(src_dir=sample_folders_paths[0][0])  # gp 0, sample 0
-            plot_channel_combobox.addItems(sample_manager.channels_to_detect)
+            channels = sample_manager.channels_to_detect  # CellMap
+            if not channels:
+                channels = sample_manager.get_channels_by_pipeline('TubeMap', as_list=True)  # FIXME: a bit dirty, more explicit
+
+            plot_channel_combobox.addItems(channels)
             self.tab.comparisonsVerticalLayout.addWidget(plot_channel_combobox)
-            self.plot_channel = sample_manager.channels_to_detect[0]
+            self.plot_channel = channels[0]
             plot_channel_combobox.currentTextChanged.connect(self.handle_plot_channel_changed)
         self.plot_channel_combobox = plot_channel_combobox
 
