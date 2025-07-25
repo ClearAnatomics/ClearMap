@@ -723,10 +723,7 @@ class VesselGraphProcessor(TabProcessor):
         -------
 
         """
-        vertex_mappings = {
-            'coordinates': graph_processing.mean_vertex_coordinates,
-            'radii': np.max
-        }
+        vertex_mappings = copy.copy(graph_processing.DEFAULT_VERTEX_TO_VERTEX)
         if self.use_arteries_for_graph:
             vertex_mappings.update({
                 'artery_binary': np.max,
@@ -747,20 +744,20 @@ class VesselGraphProcessor(TabProcessor):
         def vote(expression):
             return np.sum(expression) >= len(expression) / 1.5
 
-        vertex_to_edge_mappings = vertex_to_edge_mappings or {'radii': np.max}
-        edge_to_edge_mappings = edge_to_edge_mappings or {'length': np.sum}
-        edge_geometry_vertex_properties = ['coordinates', 'radii']
+        vertex_to_edge_mappings = vertex_to_edge_mappings or graph_processing.DEFAULT_VERTEX_TO_EDGE
+        edge_to_edge_mappings = edge_to_edge_mappings
+        edge_geometry_vertex_properties = ['coordinates', 'coordinates_units', 'radii', 'length', 'chain_id', '_vertex_id_']
         if self.use_arteries_for_graph:
             vertex_to_edge_mappings.update({
                 'artery_binary': vote,
                 'artery_raw': np.max})  # TODO: do same for veins if exists
             edge_geometry_vertex_properties.extend(['artery_binary', 'artery_raw'])
         self.steps.remove_next_steps_files(self.steps.graph_reduced)
-        self.graph_reduced = graph_processing.reduce_graph(self.graph_cleaned, compute_edge_length=True,
-                                                           edge_to_edge_mappings=edge_to_edge_mappings,
+        self.graph_reduced = graph_processing.reduce_graph(self.graph_cleaned,
                                                            vertex_to_edge_mappings=vertex_to_edge_mappings,
+                                                           edge_to_edge_mappings=edge_to_edge_mappings,
+                                                           compute_edge_length=True,
                                                            edge_geometry_vertex_properties=edge_geometry_vertex_properties,
-                                                           edge_geometry_edge_properties=None,
                                                            return_maps=False, verbose=True)
         self.save_graph('reduced')
 
