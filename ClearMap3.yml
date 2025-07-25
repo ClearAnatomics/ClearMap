@@ -56,6 +56,7 @@ dependencies:
   - lxml < 5.2  # lxml 5.2 breaks napari
   - pip
   - pip:
+    - itk==5.4.3  # Later seems to bug with numpy >= 1.24 (bool->bool_)
     - itk-elastix
 #    - --extra-index-url https://download.pytorch.org/whl/{cuda_suffix}')
 #    - torch
