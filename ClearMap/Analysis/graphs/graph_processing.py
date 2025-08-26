@@ -427,13 +427,12 @@ def clean_graph(graph: graph_gt.Graph, remove_self_loops: bool = True, remove_is
     n_cliques = len(clique_ids)
 
     if verbose:
-        timer.print_elapsed_time(f'Graph cleaning: detected {n_cliques} cliques of branch points', reset=True)
+        timer.print_elapsed_time(f'Graph cleaning: detected {n_cliques:,} cliques of branch points', reset=True)
 
     if n_cliques == 0:
         return graph.copy()
 
     # Create temp graph with clique vertices + new vertex for each clique
-    # g = graph.copy(from_disk=True)  # WARNING: trick to avoid runaway memory usage
     g = graph.copy()
     g.add_vertex(n_cliques)
 
@@ -504,7 +503,7 @@ def clean_graph(graph: graph_gt.Graph, remove_self_loops: bool = True, remove_is
             new_vertices_props[prop_name][i] = val  # Store for later
 
         if verbose and i+1 % 10000 == 0:
-            timer.print_elapsed_time(f'Graph cleaning: reducing {i + 1} / {n_cliques}')
+            timer.print_elapsed_time(f'Graph cleaning: reducing {i + 1:,} / {n_cliques:,}')
 
     # map vertex properties to new vertices
     for prop_name in vertex_mappings.keys():
@@ -537,7 +536,8 @@ def clean_graph(graph: graph_gt.Graph, remove_self_loops: bool = True, remove_is
 
     if verbose:
         timer_all.print_elapsed_time(
-            f'Graph cleaning: cleaned graph has {g.n_vertices} nodes and {g.n_edges} edges')
+            f'Graph cleaning: cleaned graph has {g.n_vertices:,} nodes and {g.n_edges:,} edges')
+
     return g
 
 
