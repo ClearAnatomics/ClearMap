@@ -65,3 +65,6 @@ Documentation.zip
 
 # Custom scripts
 ClearMap/custom_scripts
+
+ClearMap/config/commit_info.py
+tmp_env_file.yml
