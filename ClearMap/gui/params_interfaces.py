@@ -353,10 +353,6 @@ class UiParameter(QObject):
         """Connect GUI slots here"""
         pass
 
-    def fix_cfg_file(self, f_path):
-        """Fix the file if it was copied from defaults, tailor to current sample"""
-        pass
-
     def read_configs(self, cfg_path: Path | str):
         cfg_path = Path(cfg_path)
         if not cfg_path.exists():
@@ -608,10 +604,6 @@ class UiParameterCollection(QObject):
         self.write_config()
         self.channelsChanged.emit(channels_before, channels_after)
         return popped_channel
-
-    def fix_cfg_file(self, f_path):
-        """Fix the file if it was copied from defaults, tailor to current sample"""
-        pass
 
     @property
     def version(self):

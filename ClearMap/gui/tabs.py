@@ -82,10 +82,9 @@ Typical calling sequence is:
     - calls `tab.set_pre_processors` for PostProcessingTab instances
     - calls `tab.__set_params`
     - calls `tab._read_configs`
-    - calls `tab._fix_config` if loaded from defaults
     - calls `tab.setup_workers`
     - calls `tab._create_channels`
-    - calls `tab._load_config_to_gui`  (called after fix_config except for BatchTab)
+    - calls `tab._load_config_to_gui`
     - calls `tab._bind_params_signals`
 
 - `tab.finalise_workers_setup`  # Only for PostProcessingTab
@@ -98,12 +97,14 @@ other controls are handled by the `params` object) and the processing steps.
 
 ====================
 """
+from __future__ import annotations
 
 import functools
 import itertools
 import warnings
 from copy import deepcopy
 from pathlib import Path
+from typing import List, Type, Callable, Dict, Any, Iterable
 
 import numpy as np
 import pandas as pd

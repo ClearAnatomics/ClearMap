@@ -184,8 +184,6 @@ class SampleParameters(UiParameterCollection):  # FIXME: why is this not a Chann
     def params(self):
         return [self.shared_sample_params] + list(self.channel_params.values())
 
-    # def fix_cfg_file(self, f_path):
-
     def cfg_to_ui(self):
         self.shared_sample_params.cfg_to_ui()
         for channel in self.config['channels'].keys():
@@ -297,21 +295,6 @@ class SharedSampleParams(UiParameter):
         self.reload()
         super().cfg_to_ui()
 
-    def fix_cfg_file(self, f_path):  # REFACTOR: seems wrong to pass f_path just for that usage
-        f_path = Path(f_path)
-        self.config['base_directory'] = f_path.parent  # WARNING: needs to be self.config
-                                                                 #  to be sure that we are up to date
-                                                                 #  (otherwise write but potentially no reload)
-        if not self.sample_id:
-            sample_id, ok = QInputDialog.getText(self.tab, 'Warning: missing ID',
-                                                 '<b>Missing sample ID</b><br>Please input below')
-            self.sample_id = sample_id
-            if not ok:
-                raise ValueError('Missing sample ID')
-        self.config['sample_id'] = self.sample_id
-        self.config['use_id_as_prefix'] = self.use_id_as_prefix
-        self.config.write()
-
     # Sample params
     # @property
     # def sample_id(self):
@@ -361,9 +344,6 @@ class StitchingParams(ChannelsUiParameterCollection):
 
     def compute_layout(self, channel):
         return self[channel].compute_layout()
-
-    def fix_cfg_file(self, f_path):
-        pass
 
     def get_channels_to_run(self):
         return [channel for channel in self.keys() if self[channel].run]  # FIXME: do not bind run
@@ -1339,9 +1319,6 @@ class VesselParams(ChannelsUiParameterCollection):
         else:
             self.config['binarization'][channel_name] = self._default_arteries_section
         self.config.write()
-
-    def fix_cfg_file(self, f_path):
-        pass
 
 
 class VesselBinarizationParams(ChannelUiParameter):

@@ -176,7 +176,7 @@ class GenericTab(GenericUi):
         raise NotImplementedError(f"Method _bind not implemented in {self.__class__.__name__}")
 
     # @final
-    def set_params(self, sample_params=None, cfg_path='', loaded_from_defaults=False):  # REFACTOR: rename to initialise or similar
+    def set_params(self, sample_params=None, cfg_path=''):  # REFACTOR: rename to initialise or similar
         """Set the params object which links the UI and the configuration file"""
         if sample_params:
             self.sample_params = sample_params  # REFACTORING: consider using sample_manager
@@ -184,13 +184,10 @@ class GenericTab(GenericUi):
             self.set_pre_processors()
         self._set_params()
         self._read_configs(cfg_path)
-        if loaded_from_defaults:
-            self._fix_config()
 
         self.params_set = True
 
-        if not loaded_from_defaults:  #FIXME: check if needs to be called later for sample too
-            self.finalise_set_params()  # FIXME: check if better to pass loaded_from_defaults or inspect channel names
+        self.finalise_set_params()
 
     @final
     def finalise_set_params(self):
@@ -364,10 +361,6 @@ class GenericTab(GenericUi):
             The path to the configuration file
         """
         self.params.read_configs(cfg_path)
-
-    def _fix_config(self):  # TODO: check if could make part of self.params may not be possible since not set
-        """Amend the config for the tabs that required live patching the config"""
-        self.params.fix_cfg_file(self.params.config_path)
 
     def handle_advanced_checked(self):
         """Activate the *advanced* mode which will display more controls"""
@@ -713,7 +706,7 @@ class PostProcessingTab(PipelineTab):
 
     def set_pre_processors(self, stitcher=None, aligner=None):
         """
-        Associate the pre-processors to the current tab
+        Associate the pre-pipeline_orchestrators to the current tab
 
         Parameters
         ----------
@@ -811,7 +804,6 @@ class BatchTab(GenericTab):
                 default_cfg_file_path = self.config_loader.get_default_path('batch')
                 copyfile(default_cfg_file_path, cfg_path)
                 self.set_params(cfg_path=cfg_path)
-                self.params.fix_cfg_file(cfg_path)
             except FileNotFoundError as err:
                 self.main_window.print_error_msg(f'Could not locate file for "batch"')
                 raise err
