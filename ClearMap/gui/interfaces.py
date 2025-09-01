@@ -18,7 +18,7 @@ from PyQt5.QtWidgets import QWhatsThis, QToolButton, QWidget
 from ClearMap.Utils.exceptions import MissingRequirementException, PlotGraphError
 from ClearMap.Utils.utilities import title_to_snake
 from ClearMap.Visualization.Qt.DataViewer import DataViewer
-from ClearMap.config.config_loader import ConfigLoader
+from ClearMap.config.config_handler import ConfigHandler
 from ClearMap.gui.dialogs import get_directory_dlg
 from ClearMap.gui.gui_utils import create_clearmap_widget, replace_widget
 from ClearMap.gui.widget_monkeypatch_callbacks import recursive_patch_widgets
@@ -696,8 +696,8 @@ class PreProcessingTab(PipelineTab):
 
 class PostProcessingTab(PipelineTab):
     """
-    Interface to all the tab managers in charge of post processing the data (e.e. typically detecting relevant info in the data).
-    One particularity of a post processing tab manager is that it includes the corresponding pre processor.
+    Interface to all the tab managers in charge of post-processing the data (e.e. typically detecting relevant info in the data).
+    One particularity of a post-processing tab manager is that it includes the corresponding pre processor.
     A tab manager includes a tab widget, the associated parameters
     and potentially a processor object which handles the computations.
     """
@@ -800,7 +800,7 @@ class BatchTab(GenericTab):
     def setup_results_folder(self):
         results_folder = Path(get_directory_dlg(self.main_window.preference_editor.params.start_folder,
                                            'Select the folder where results will be written'))
-        self.config_loader = ConfigLoader(results_folder)
+        self.config_loader = ConfigHandler(results_folder)
         self.main_window.logger.set_file(results_folder / 'info.log')  # WARNING: set logs to global results folder
         self.main_window.error_logger.set_file(results_folder / 'errors.html')
         self.main_window.progress_watcher.log_path = self.main_window.logger.file.name

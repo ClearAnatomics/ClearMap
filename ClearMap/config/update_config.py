@@ -13,8 +13,8 @@ import inspect
 import shutil
 from pathlib import Path
 
-from ClearMap.config.config_loader import (ConfigLoader, get_alternatives, CONFIG_NAMES,
-                                           get_cfg_reader_function, clearmap_version)
+from ClearMap.config.config_handler import (ConfigHandler, get_alternatives, CONFIG_NAMES,
+                                            get_cfg_reader_function, clearmap_version)
 
 
 CFG_DIR = Path(inspect.getfile(inspect.currentframe())).resolve().parent
@@ -22,23 +22,23 @@ CLEARMAP_DIR = str(CFG_DIR.parent.parent)  # used by shell script
 
 
 def update_default_config():
-    loader = ConfigLoader('~/.clearmap')
+    loader = ConfigHandler('~/.clearmap')
     for cfg_name in CONFIG_NAMES:
         if cfg_name == 'alignment' and clearmap_version >= '3.0.0':
             continue
         default_cfg_path = loader.get_default_path(cfg_name, must_exist=True, from_package=True)
         cfg_paths = [loader.get_default_path(alternative, must_exist=False, from_package=False)
                      for alternative in get_alternatives(cfg_name)]
-        existing_paths = [os.path.exists(p) for p in cfg_paths]
+        existing_paths = [p.exists() for p in cfg_paths]
         if not any(existing_paths):  # missing then copy
             print(f'Creating missing default config for {cfg_name}')
             shutil.copy(default_cfg_path, cfg_paths[0])
         else:  # if present merge
             cfg_path = cfg_paths[existing_paths.index(True)]
 
-            read_cfg = get_cfg_reader_function(cfg_path)
-            cfg = read_cfg(cfg_path)
-            default_cfg = read_cfg(default_cfg_path)
+            cfg_reader_fn = get_cfg_reader_function(cfg_path)
+            cfg = cfg_reader_fn(cfg_path)
+            default_cfg = cfg_reader_fn(default_cfg_path)
             print(f'Merging {cfg_name}')
             merge_config(default_cfg, cfg)
 

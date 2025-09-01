@@ -64,8 +64,8 @@ from ClearMap.IO.MMP import Source as MemmapSource
 from ClearMap.Utils.exceptions import ClearMapValueError
 
 try:
-    from ClearMap.config.config_loader import ConfigLoader
-    machine_cfg = ConfigLoader.get_cfg_from_path(ConfigLoader.get_default_path('machine'))
+    from ClearMap.config.config_handler import ConfigHandler
+    machine_cfg = ConfigHandler.get_cfg_from_path(ConfigHandler.get_default_path('machine'))
     tmp_folder = machine_cfg.get('temp_folder', None)
     if tmp_folder is not None:
         for var_name in ('TMP', 'TEMP', 'TMPDIR'):

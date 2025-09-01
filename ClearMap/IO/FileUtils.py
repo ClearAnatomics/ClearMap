@@ -255,6 +255,17 @@ def copy_file(source, sink):
     return sink
 
 
+def atomic_replace(tmp: Path, dst: Path) -> None:
+    """
+    Atomically replace dst with tmp.
+    tmp must already exist on the same filesystem as dst.
+    """
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    with tmp.open("rb") as f:   # open read-only
+        os.fsync(f.fileno())
+    os.replace(tmp, dst)
+
+
 def uncompress(file_path, extension='zip', check=True, verbose=False):
     """
     Unzips a file only if:

@@ -12,7 +12,7 @@ from PyQt5.QtWidgets import QApplication, QDialog
 
 from ClearMap.IO.assets_constants import CHANNELS_ASSETS_TYPES_CONFIG
 from ClearMap.Utils.tag_expression import Expression
-from ClearMap.config.config_loader import ConfigLoader, get_configobj_cfg
+from ClearMap.config.config_handler import ConfigHandler, get_configobj_cfg
 
 from ClearMap.gui.dialogs import RenameChannelsDialog, VerifyRenamingDialog, get_directory_dlg
 
@@ -42,9 +42,9 @@ def convert_sample_config_2_1_0_to_3_0_0(v1_path, v2_path=''):
         return config_v1.get(key, default_cfg[key])
 
     try:
-        default_cfg = ConfigLoader.get_cfg_from_path(ConfigLoader.get_default_path('sample', from_package=False))
+        default_cfg = ConfigHandler.get_cfg_from_path(ConfigHandler.get_default_path('sample', from_package=False))
     except FileExistsError:
-        default_cfg = ConfigLoader.get_cfg_from_path(ConfigLoader.get_default_path('sample', from_package=True))
+        default_cfg = ConfigHandler.get_cfg_from_path(ConfigHandler.get_default_path('sample', from_package=True))
 
     # Copy general parameters
     config_v2['clearmap_version'] = '3.0.0'
@@ -200,7 +200,7 @@ def convert(cfg_path, backup=False, overwrite=False):
         shutil.copyfile(cfg_path, cfg_path.with_suffix('.bak'))
 
     if config_type != 'sample':  # We already have a sample config for v3
-        config_loader = ConfigLoader(Path(cfg_path).parent)
+        config_loader = ConfigHandler(Path(cfg_path).parent)
         sample_cfg_path = config_loader.get_cfg_path('sample', must_exist=False)
         if os.path.exists(sample_cfg_path):  # FIXME: Make sure v3 sample config exists
             sample_cfg = config_loader.get_cfg_from_path(sample_cfg_path)
@@ -239,7 +239,7 @@ def convert_v2_1_to_v3_0(main_folder='', create_app=True):
         return
 
     # Initialize ConfigLoader
-    cfg_loader = ConfigLoader(main_folder)
+    cfg_loader = ConfigHandler(main_folder)
 
     # Get paths to the configuration files
     # FIXME: vasculature, batch, group_analysis
@@ -250,7 +250,7 @@ def convert_v2_1_to_v3_0(main_folder='', create_app=True):
     v3_sample_cfg_path = convert(sample_cfg_path, backup=True, overwrite=True)
 
     # Create SampleManager
-    sample_cfg = ConfigLoader.get_cfg_from_path(v3_sample_cfg_path)
+    sample_cfg = ConfigHandler.get_cfg_from_path(v3_sample_cfg_path)
     use_id_as_prefix = sample_cfg['use_id_as_prefix']
     sample_id = sample_cfg['sample_id']
 
@@ -353,15 +353,16 @@ def convert_v2_1_to_v3_0(main_folder='', create_app=True):
         os.rename(main_folder / old_name, main_folder / new_name)
 
 
-def convert_versions(previous_version: str, new_verison: str, main_folder: str = '', create_app: bool = True):
-    if previous_version == '2.1.0' and new_verison == '3.0.0':
+def convert_versions(previous_version: str, new_version: str, main_folder: str | Path = '', create_app: bool = True):
+    main_folder = str(main_folder)
+    if previous_version == '2.1.0' and new_version == '3.0.0':
         try:
             convert_v2_1_to_v3_0(main_folder, create_app=create_app)
         except Exception as err:
             warnings.warn(f'Error converting {main_folder}: {err}')
             return
     else:
-        raise NotImplementedError(f'Conversion from {previous_version} to {new_verison} is not supported yet.')
+        raise NotImplementedError(f'Conversion from {previous_version} to {new_version} is not supported yet.')
 
 
 def test():

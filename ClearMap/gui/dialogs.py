@@ -16,7 +16,7 @@ from PyQt5.QtWidgets import (QFileDialog, QMessageBox, QLabel, QDialogButtonBox,
                              QInputDialog, QFormLayout, QLineEdit, QScrollArea, QGroupBox, QCheckBox,
                              QComboBox)
 
-from ClearMap.config.config_loader import clean_path, ConfigLoader
+from ClearMap.config.config_handler import clean_path, ConfigHandler
 from ClearMap.gui.gui_utils import UI_FOLDER, create_clearmap_widget
 
 __author__ = 'Charly Rousseau <charly.rousseau@icm-institute.org>'
@@ -25,7 +25,7 @@ __copyright__ = 'Copyright © 2022 by Charly Rousseau'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
-cfg_loader = ConfigLoader('')
+cfg_loader = ConfigHandler('')
 DISPLAY_CONFIG = cfg_loader.get_cfg('display')
 
 

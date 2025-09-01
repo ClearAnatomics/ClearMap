@@ -4,7 +4,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Iterable
 
-from ClearMap.config.config_loader import ConfigHandler
+from ClearMap.config.config_handler import ConfigHandler
 
 
 class SnapshotManager:

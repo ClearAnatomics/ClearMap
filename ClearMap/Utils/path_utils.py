@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 
 from ClearMap.IO.assets_constants import EXTENSIONS
-from ClearMap.config.config_loader import ConfigLoader
+from ClearMap.config.config_handler import ConfigHandler
 
 
 def is_feather(f):
@@ -100,5 +100,5 @@ def dir_to_sample_id(folder):
     -------
 
     """
-    cfg_loader = ConfigLoader(folder)
+    cfg_loader = ConfigHandler(folder)
     return cfg_loader.get_cfg('sample')['sample_id']

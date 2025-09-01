@@ -23,7 +23,7 @@ except ImportError:
     graph_gt = False
 from ClearMap.pipeline_orchestrators.cell_map import CellDetector
 from ClearMap.pipeline_orchestrators.sample_preparation import  SampleManager, init_sample_manager_and_processors
-from ClearMap.config.config_loader import get_configs, ConfigHandler
+from ClearMap.config.config_handler import get_configs, ConfigHandler
 from ClearMap.IO import IO as clearmap_io
 
 __author__ = 'Charly Rousseau <charly.rousseau@icm-institute.org>'

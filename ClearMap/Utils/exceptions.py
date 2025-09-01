@@ -58,9 +58,23 @@ class MissingRequirementException(ClearMapException):
     pass
 
 
-class ConfigNotFoundError(ClearMapException):
+class ClearMapConfigError(ClearMapException):
+    """
+    Exception raised when there is an error with the configuration
+    """
+    pass
+
+
+class ConfigNotFoundError(ClearMapConfigError):
     """
     Exception raised when a configuration file is not found
+    """
+    pass
+
+
+class ConfigParsingError(ClearMapConfigError):
+    """
+    Exception raised when there is an error parsing a configuration file
     """
     pass
 

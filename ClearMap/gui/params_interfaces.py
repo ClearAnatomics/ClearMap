@@ -13,7 +13,7 @@ from PyQt5.QtWidgets import QCheckBox, QLabel, QLineEdit, QSpinBox, QFrame, QCom
     QGroupBox, QWidget, QListWidget, QDoubleSpinBox
 
 from ClearMap.config import convert_config_versions
-from ClearMap.config.config_loader import ConfigLoader
+from ClearMap.config.config_handler import ConfigHandler
 from ClearMap.Utils.utilities import set_item_recursive, get_item_recursive
 from ClearMap.Utils.exceptions import ConfigNotFoundError, ClearMapValueError
 from ClearMap.gui.widgets import ExtendableTabWidget, FileDropListWidget
@@ -357,27 +357,27 @@ class UiParameter(QObject):
         """Fix the file if it was copied from defaults, tailor to current sample"""
         pass
 
-    def read_configs(self, cfg_path):
+    def read_configs(self, cfg_path: Path | str):
         cfg_path = Path(cfg_path)
         if not cfg_path.exists():
-            cfg_path = ConfigLoader.get_cfg_path(cfg_path, allow_previous_versions=True)
+            cfg_path = ConfigHandler.get_cfg_path(cfg_path, allow_previous_versions=True)
 
-        self._config = ConfigLoader.get_cfg_from_path(cfg_path)
+        self._config = ConfigHandler.get_cfg_from_path(cfg_path)
         if not self._config:
             raise ConfigNotFoundError
 
         if Version(self._config.get('clearmap_version', '2.1.0')) < CLEARMAP_VERSION:
             cfg_path = convert_config_versions.convert(cfg_path, backup=True, overwrite=True)
 
-        cfg_name = ConfigLoader.strip_version_suffix(cfg_path.stem)
+        cfg_name = ConfigHandler.strip_version_suffix(cfg_path.stem)
         try:
-            self._default_config = ConfigLoader.get_cfg_from_path(ConfigLoader.get_default_path(cfg_name))
+            self._default_config = ConfigHandler.get_cfg_from_path(ConfigHandler.get_default_path(cfg_name))
         except FileNotFoundError:
-            from ClearMap.config import config_loader
+            from ClearMap.config import config_handler
             warnings.warn(f'No file found for {cfg_name} in clearmap configuration directory,'
                           f' using package default instead (from "{Path(config_loader.__file__).parent.absolute()}").'
                           f'Please consider copying the default file to the clearmap configuration directory.')
-            self._default_config = ConfigLoader.get_cfg_from_path(ConfigLoader.get_default_path(cfg_name, from_package=True))
+            self._default_config = ConfigHandler.get_cfg_from_path(ConfigHandler.get_default_path(cfg_name, from_package=True))
 
     @property
     def config_path(self):
@@ -468,12 +468,12 @@ class UiParameter(QObject):
         except KeyError:
             if self._default_config is None:
                 try:
-                    cfg_name = ConfigLoader.strip_version_suffix(self.get_config_base_name())
-                    self._default_config = ConfigLoader.get_cfg_from_path(ConfigLoader.get_default_path(cfg_name))
+                    cfg_name = ConfigHandler.strip_version_suffix(self.get_config_base_name())
+                    self._default_config = ConfigHandler.get_cfg_from_path(ConfigHandler.get_default_path(cfg_name))
                 except FileNotFoundError:
                     try:
-                        self._default_config = ConfigLoader.get_cfg_from_path(
-                            ConfigLoader.get_default_path(cfg_name, from_package=True))
+                        self._default_config = ConfigHandler.get_cfg_from_path(
+                            ConfigHandler.get_default_path(cfg_name, from_package=True))
                     except FileNotFoundError:
                         raise ConfigNotFoundError(f'Default config not set for {self.__class__.__name__}. '
                                                   f'Regular config path is {self._config.filename}')
@@ -629,7 +629,7 @@ class UiParameterCollection(QObject):
             cfg_path = Path(cfg.filename)
         else:
             cfg_path = Path(cfg_path)
-            self.config = ConfigLoader.get_cfg_from_path(cfg_path)
+            self.config = ConfigHandler.get_cfg_from_path(cfg_path)
             if not self.config:
                 raise ConfigNotFoundError(f'Config file not found: {cfg_path}')
 
@@ -638,18 +638,18 @@ class UiParameterCollection(QObject):
 
             self.config.reload()
 
-        cfg_name = ConfigLoader.strip_version_suffix(cfg_path.stem)
+        cfg_name = ConfigHandler.strip_version_suffix(cfg_path.stem)
         try:
-            default_path = Path(ConfigLoader.get_default_path(cfg_name))
+            default_path = ConfigHandler.get_default_path(cfg_name)
         except FileNotFoundError:
-            from ClearMap.config import config_loader
+            from ClearMap.config import config_handler
             warnings.warn(f'No file found for {cfg_name} in clearmap configuration directory,'
                           f' using package default instead (from "{Path(config_loader.__file__).parent.absolute()}").'
                           f'Please consider copying the default file to the clearmap configuration directory.')
-            default_path = Path(ConfigLoader.get_default_path(cfg_name, from_package=True))
+            default_path = ConfigHandler.get_default_path(cfg_name, from_package=True)
         if not default_path.exists():
             raise ConfigNotFoundError(f'Default config file not found: {default_path}')
-        self._default_config = ConfigLoader.get_cfg_from_path(default_path)
+        self._default_config = ConfigHandler.get_cfg_from_path(default_path)
         for param in self.params:  # FIXME: ensure that we do that when adding channels + add here if any found
             if isinstance(param, UiParameterCollection):
                 param.read_configs(cfg=self.config)

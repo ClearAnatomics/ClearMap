@@ -49,7 +49,7 @@ import ClearMap.Alignment.Stitching.StitchingRigid as stitching_rigid
 # noinspection PyPep8Naming
 import ClearMap.Alignment.Stitching.StitchingWobbly as stitching_wobbly
 from ClearMap.IO.metadata import define_auto_stitching_params, define_auto_resolution
-from ClearMap.config.config_loader import get_configs, ConfigHandler, CLEARMAP_CFG_DIR
+from ClearMap.config.config_handler import get_configs, ConfigHandler, CLEARMAP_CFG_DIR
 from ClearMap.config.update_config import update_default_config
 from ClearMap.IO.assets_specs import TypeSpec, ChannelSpec
 from ClearMap.IO.workspace2 import Workspace2
