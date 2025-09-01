@@ -17,6 +17,7 @@ from collections import deque
 from concurrent.futures import ProcessPoolExecutor
 from functools import reduce
 from operator import getitem
+from types import MappingProxyType
 
 import numpy as np
 import psutil
@@ -173,6 +174,39 @@ def set_item_recursive(dictionary, keys_list, val, fix_missing_keys=True):
     if fix_missing_keys:
         add_keys(dictionary, keys_list[:-1])  # Fix missing keys recursively
     get_item_recursive(dictionary, keys_list[:-1])[keys_list[-1]] = val
+
+
+def deep_freeze(obj) -> object | MappingProxyType:
+    """
+    Recursively make a data structure immutable (freeze it).
+    Only works for dict, list, set, tuple and scalars (str/int/float/None/...).
+
+    .. note::
+        This is faster than deepcopy and more explicit because
+        if we try to modify a frozen object, we get an error immediately.
+
+    Parameters
+    ----------
+    obj: object
+        Typically a nested dict like a config
+
+    Returns
+    -------
+    object | MappingProxyType
+        An immutable version of the input object
+    """
+    if isinstance(obj, dict):
+        # freeze children first, then wrap the dict so callers cannot mutate it
+        frozen = {k: deep_freeze(v) for k, v in obj.items()}
+        return MappingProxyType(frozen)
+    elif isinstance(obj, list):
+        return tuple(deep_freeze(x) for x in obj)
+    elif isinstance(obj, set):
+        return frozenset(deep_freeze(x) for x in obj)
+    elif isinstance(obj, tuple):
+        return tuple(deep_freeze(x) for x in obj)
+    # scalars (str/int/float/None/...) pass through because in python they are already immutable
+    return obj
 
 
 def requires_assets(asset_specs):
