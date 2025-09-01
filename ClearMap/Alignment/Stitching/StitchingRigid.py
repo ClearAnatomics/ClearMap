@@ -56,7 +56,7 @@ from ClearMap.Alignment.Stitching.layout_graph_utils import (get_connected_compo
 from ClearMap.Utils.utilities import CancelableProcessPoolExecutor
 
 
-class Region(object):
+class Region:
   """Class to handle rectangular regions storing positional information."""
   
   #__slots__ = ('_position', '_shape');  
@@ -767,7 +767,7 @@ def _source_string(self):
 ########################################################################################
 
 #TODO: really need this base class ?
-class AlignmentBase(object):
+class AlignmentBase:
   """Base class to handle alignments between two adjacent sources."""
   #note: could make this a source like object with data and plot routines
   

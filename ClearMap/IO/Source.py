@@ -22,7 +22,7 @@ from ClearMap.Utils.Formatting import ensure
 ### Source base class
 ###############################################################################
 
-class Source(object):
+class Source:
   """Base abstract source class."""
   
   #__slots__ = ();

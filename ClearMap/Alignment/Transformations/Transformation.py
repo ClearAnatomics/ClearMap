@@ -18,7 +18,7 @@ import numpy as np
 
 # Base class
 
-class TransformationBase(object):
+class TransformationBase:
     """Base class for transformations of data, points and shapes."""
 
     ttype=None

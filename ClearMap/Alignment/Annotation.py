@@ -119,7 +119,7 @@ Note
 """
 
 
-class Label(object):
+class Label:
     """Class holding information of an individual Atlas label."""
 
     def __init__(self, data, children=None, parent=None, level=0):
@@ -187,7 +187,7 @@ class Label(object):
         return self.__str__(indent=indent, with_children=False)
 
 
-class Annotation(object):
+class Annotation:
     """Class that holds information of the annotated regions."""
 
     def __init__(self, atlas_base_name, slicing, orientation, label_source, target_directory=None, extra_label=None):

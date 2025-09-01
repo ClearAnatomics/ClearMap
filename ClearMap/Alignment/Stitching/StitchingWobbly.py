@@ -941,7 +941,7 @@ class WobblyLayout(strg.TiledLayout):
 ###############################################################################
 
 
-class Verbose(object):
+class Verbose:
   flags = {
     'save'   : 0b010,
     'figure' : 0b100

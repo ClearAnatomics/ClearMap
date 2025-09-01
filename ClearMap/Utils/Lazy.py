@@ -12,7 +12,7 @@ __webpage__   = 'http://idisco.info'
 __download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 
 
-class lazyattr(object):
+class lazyattr:
   """Attribute whose value is computed on first access."""
   
   __slots__ = ('func',)

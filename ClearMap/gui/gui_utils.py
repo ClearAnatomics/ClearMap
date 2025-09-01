@@ -150,7 +150,7 @@ def format_long_nb(nb):
     return out
 
 
-class TmpDebug(object):  # FIXME: move as part of workspace
+class TmpDebug:  # FIXME: move as part of workspace
     def __init__(self, workspace):
         self.workspace = workspace
 

@@ -20,7 +20,7 @@ import numpy as np
 ### Base graph class
 ###############################################################################
 
-class Graph(object):
+class Graph:
   """Abstract base Graph class.
   
   All graph interfaces should inherit from the class.

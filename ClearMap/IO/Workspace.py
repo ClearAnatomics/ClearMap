@@ -375,7 +375,7 @@ def file_name(f_type, dirtype=None, ws_type=None, directory=None, default_direct
 # Workspace
 ###############################################################################
 
-class Workspace(object):
+class Workspace:
     """Class to organize files."""
   
     def __init__(self, ws_type=None, directory=None, prefix=None, postfix=None, debug=None,

@@ -51,7 +51,7 @@ __webpage__ = 'https://idisco.info'
 __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
 
-class OrthoViewer(object):
+class OrthoViewer:
     """
     Orthogonal viewer for 3D images
 
