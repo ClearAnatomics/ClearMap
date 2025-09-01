@@ -28,8 +28,8 @@ from ClearMap.Utils.exceptions import GroupStatsError
 from ClearMap.Utils.path_utils import is_density_file, find_density_file, find_cells_df, dir_to_sample_id
 from ClearMap.Utils.utilities import make_abs
 from ClearMap.config.atlas import ATLAS_NAMES_MAP
-from ClearMap.config.config_loader import ConfigLoader
-from ClearMap.processors.sample_preparation import init_sample_manager_and_processors, SampleManager, \
+from ClearMap.config.config_handler import ConfigHandler
+from ClearMap.pipeline_orchestrators.sample_preparation import init_sample_manager_and_processors, SampleManager, \
     RegistrationProcessor
 
 colors = {  # REFACTOR: move to visualisation module
@@ -670,7 +670,7 @@ def compare_groups(directory, gp1_name, gp2_name, gp1_dirs, gp2_dirs, prefix='p_
 def check_ids_are_unique(gp1, gp2):
     ids = []
     for gp_dir in gp1 + gp2:
-        loader = ConfigLoader(gp_dir)
+        loader = ConfigHandler(gp_dir)
         ids.append(loader.get_cfg('sample')['sample_id'])
     if len(ids) != len(set(ids)):
         raise GroupStatsError('Analysis impossible, some IDs are not unique. please check and start again')

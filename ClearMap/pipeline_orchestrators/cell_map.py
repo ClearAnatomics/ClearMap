@@ -17,13 +17,14 @@ e.g. to analyze immediate early gene expression data from iDISCO+ cleared tissue
   iDISCO+ and ClearMap: A Pipeline for Cell Detection, Registration, and 
   Mapping in Intact Samples Using Light Sheet Microscopy.
 """
-
+from __future__ import annotations
 
 import copy
 import re
 import platform
 import warnings
 from concurrent.futures.process import BrokenProcessPool
+from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -44,9 +45,10 @@ import ClearMap.Alignment.Resampling as resampling
 import ClearMap.ImageProcessing.Experts.Cells as cell_detection
 # noinspection PyPep8Naming
 import ClearMap.Analysis.Measurements.Voxelization as voxelization
+from ClearMap.IO.workspace2 import Workspace2
 from ClearMap.Utils.exceptions import MissingRequirementException
 from ClearMap.Utils.utilities import requires_assets, FilePath
-from ClearMap.processors.generic_tab_processor import ChannelTabProcessor
+from ClearMap.pipeline_orchestrators.generic_tab_processor import ChannelTabProcessor
 from ClearMap.Visualization.Qt.widgets import Scatter3D
 
 __author__ = 'Christoph Kirst <christoph.kirst.ck@gmail.com>, Charly Rousseau <charly.rousseau@icm-institute.org>'
@@ -55,19 +57,23 @@ __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
+from ClearMap.pipeline_orchestrators.sample_preparation import SampleManager, RegistrationProcessor
 
 USE_BINARY_POINTS_FILE = not platform.system().lower().startswith('darwin')
 
 
 class CellDetector(ChannelTabProcessor):
+
+    processing_name = 'cell_map'
+
     def __init__(self, sample_manager=None, channel=None, registration_processor=None):
         super().__init__()
+        self.sample_manager: Optional[SampleManager] = None
         self.sample_config = None
         self.machine_config = None
-        self.sample_manager = None
-        self.registration_processor = None
-        self.workspace = None
-        self.channel = None
+        self.registration_processor: Optional[RegistrationProcessor] = None
+        self.workspace: Optional[Workspace2] = None
+        self.channel: Optional[str] = None
         self.cell_detection_re = ('Processing block',
                                   re.compile(r'.*?Processing block \d+/\d+.*?\selapsed time:\s\d+:\d+:\d+\.\d+'))
         if channel is None:
@@ -84,8 +90,6 @@ class CellDetector(ChannelTabProcessor):
             configs = sample_manager.get_configs()
             self.sample_config = configs['sample']  
             self.machine_config = configs['machine']
-            # FIXME: potential issue of config duplication if several instances are called
-            self._processing_config = self.sample_manager.config_loader.get_cfg('cell_map')
 
             self.set_progress_watcher(self.sample_manager.progress_watcher)
         self.registration_processor = registration_processor
@@ -125,7 +129,7 @@ class CellDetector(ChannelTabProcessor):
 
     def get_voxelization_params(self, sub_step=''):
         voxelization_parameter = {
-            'radius': self.processing_config['voxelization']['radii'],
+            'radius': self.config['voxelization']['radii'],
             'verbose': True
         }
         if self.workspace.debug:  # Path will use debug
@@ -246,8 +250,8 @@ class CellDetector(ChannelTabProcessor):
     def filter_cells(self):
         self.reload_config()
         thresholds = {
-            'source': self.processing_config['cell_filtration']['thresholds']['intensity'],
-            'size': self.processing_config['cell_filtration']['thresholds']['size']
+            'source': self.config['cell_filtration']['thresholds']['intensity'],
+            'size': self.config['cell_filtration']['thresholds']['size']
         }
         src_path = self.get_path('cells', channel=self.channel, asset_sub_type='raw')
         if not src_path.exists:
@@ -262,11 +266,11 @@ class CellDetector(ChannelTabProcessor):
 
         cell_detection_param = copy.deepcopy(cell_detection.default_cell_detection_parameter)
         cell_detection_param['illumination_correction'] = None  # WARNING: illumination or illumination_correction
-        cell_detection_param['background_correction']['shape'] = self.processing_config['detection']['background_correction']['diameter']
-        cell_detection_param['maxima_detection']['shape'] = self.processing_config['detection']['maxima_detection']['shape']
-        cell_detection_param['maxima_detection']['h_max'] = self.processing_config['detection']['maxima_detection']['h_max']
+        cell_detection_param['background_correction']['shape'] = self.config['detection']['background_correction']['diameter']
+        cell_detection_param['maxima_detection']['shape'] = self.config['detection']['maxima_detection']['shape']
+        cell_detection_param['maxima_detection']['h_max'] = self.config['detection']['maxima_detection']['h_max']
         cell_detection_param['intensity_detection']['measure'] = ['source']
-        cell_detection_param['shape_detection']['threshold'] = self.processing_config['detection']['shape_detection']['threshold']
+        cell_detection_param['shape_detection']['threshold'] = self.config['detection']['shape_detection']['threshold']
         if tuning:
             bkg_asset = self.get('cells', channel=self.channel, asset_sub_type='bkg')
             bkg_asset.delete(missing_ok=True)  # Remove previous background file if exists
@@ -431,7 +435,7 @@ class CellDetector(ChannelTabProcessor):
         else:
             df['color'] = to_hex((1, 0, 0))
 
-        particle_size = self.processing_config['detection']['background_correction']['diameter'][0]
+        particle_size = self.config['detection']['background_correction']['diameter'][0]
         dv.scatter_coords = Scatter3D(coordinates, colors=df['color'].to_list(),
                                       hemispheres=hemispheres, half_slice_thickness=0,
                                       marker_size=max(3, particle_size // 2))

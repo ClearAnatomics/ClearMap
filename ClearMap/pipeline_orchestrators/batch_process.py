@@ -17,13 +17,13 @@ from skimage.transform import rescale
 from tqdm import tqdm
 
 try:
-    from ClearMap.processors.tube_map import BinaryVesselProcessor, VesselGraphProcessor
+    from ClearMap.pipeline_orchestrators.tube_map import BinaryVesselProcessor, VesselGraphProcessor
     graph_gt = True
 except ImportError:
     graph_gt = False
-from ClearMap.processors.cell_map import CellDetector
-from ClearMap.processors.sample_preparation import  SampleManager, init_sample_manager_and_processors
-from ClearMap.config.config_loader import get_configs, ConfigLoader
+from ClearMap.pipeline_orchestrators.cell_map import CellDetector
+from ClearMap.pipeline_orchestrators.sample_preparation import  SampleManager, init_sample_manager_and_processors
+from ClearMap.config.config_loader import get_configs, ConfigHandler
 from ClearMap.IO import IO as clearmap_io
 
 __author__ = 'Charly Rousseau <charly.rousseau@icm-institute.org>'
@@ -45,7 +45,7 @@ def process_sample(configs, align=False, cells=False, vasc=False):
     if cells:
         for channel in sample_manager.config_loader.get_cfg('cell_map')['channels'].keys():
             cell_detector = CellDetector(sample_manager, channel=channel, registration_processor=registration_processor)
-            cell_detector.processing_config.reload()
+            cell_detector.config.reload()
             cell_detector.run_cell_detection()
             cell_detector.post_process_cells()
             cell_detector.voxelize()
@@ -70,7 +70,7 @@ class BatchProcessor:
     def process_folders(self):
         paths = [p for ps in self.params.get_all_paths() for p in ps]  # flatten list
         for folder in tqdm(paths, desc='Processing sample ', unit='brain'):
-            cfg_loader = ConfigLoader(folder)
+            cfg_loader = ConfigHandler(folder)
             configs = get_configs(cfg_loader.get_cfg_path('sample'), cfg_loader.get_cfg_path('processing'))  # FIXME
             process_sample(configs,  align=self.params.align, cells=self.params.count_cells,
                            vasc=self.params.run_vaculature)
@@ -79,7 +79,7 @@ class BatchProcessor:
 
 def process_folders(folders, align=False, cells=False, vasc=False):
     for folder in tqdm(folders, desc='Processing sample ', unit='brain'):
-        cfg_loader = ConfigLoader(folder)
+        cfg_loader = ConfigHandler(folder)
         configs = get_configs(cfg_loader.get_cfg_path('sample'), cfg_loader.get_cfg_path('processing'))  # FIXME:
         process_sample(configs, align=align, cells=cells, vasc=vasc)
 
@@ -103,17 +103,18 @@ def voxelize_sample(configs, align=False, cells=False, vasc=False, voxelization_
     if cells:
         for channel in sample_manager.config_loader.get_cfg('cell_map')['channels'].keys():
             cell_detector = CellDetector(sample_manager, channel=channel, registration_processor=registration_processor)
-            cell_detector.processing_config.reload()
+            cell_detector.config.reload()
             # cell_detector.atlas_align()
             # cell_detector.export_collapsed_stats()
-            cell_detector.processing_config['voxelization']['radii'] = voxelization_radius
-            cell_detector.processing_config.write()
+            cell_detector.config['voxelization']['radii'] = voxelization_radius
+            cell_detector.config.write()  # FIXME: config write
             cell_detector.voxelize()
 
 
 def voxelize_folders(folders, align=False, cells=True, vasc=False):
     for folder in tqdm(folders, desc='Processing sample ', unit='brain'):
-        cfg_loader = ConfigLoader(folder)
+        cfg_loader = ConfigHandler(folder)
+        # FIXME: replace by ConfigCoordinator
         configs = get_configs(cfg_loader.get_cfg_path('sample'), cfg_loader.get_cfg_path('processing'))  # FIXME:
         voxelize_sample(configs, align=align, cells=cells, vasc=vasc)
 
@@ -122,7 +123,7 @@ def convert_to_cm_2_1(folder, atlas_base_name='ABA_25um'):
     res = init_sample_manager_and_processors(folder)
     sample_manager = res['sample_manager']
     registration_processor = res['registration_processor']
-    cell_detection_config = sample_manager.config_loader.get_cfg('cell_map')
+    cell_detection_config = sample_manager.config_loader.get_cfg('cell_map')  # FIXME: replace by ConfigCoordinator
 
     for channel in cell_detection_config['channels'].keys():
         cell_detector = CellDetector(sample_manager, channel=channel, registration_processor=registration_processor)
@@ -133,7 +134,7 @@ def realign(folder, atlas_base_name='ABA_25um'):
     res = init_sample_manager_and_processors(folder)
     sample_manager = res['sample_manager']
     registration_processor = res['registration_processor']
-    cell_detection_config = sample_manager.config_loader.get_cfg('cell_map')
+    cell_detection_config = sample_manager.config_loader.get_cfg('cell_map')  # FIXME: replace by ConfigCoordinator
 
     for channel in cell_detection_config['channels'].keys():
         cell_detector = CellDetector(sample_manager, channel=channel, registration_processor=registration_processor)

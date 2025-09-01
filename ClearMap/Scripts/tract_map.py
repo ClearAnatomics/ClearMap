@@ -1,8 +1,8 @@
 import sys
 
-from ClearMap.processors.sample_preparation import SampleManager, StitchingProcessor, RegistrationProcessor
+from ClearMap.pipeline_orchestrators.sample_preparation import SampleManager, StitchingProcessor, RegistrationProcessor
 from ClearMap.Scripts.align_new_api import stitch, register, plot_registration_results
-from ClearMap.processors.tract_map import TractMapProcessor
+from ClearMap.pipeline_orchestrators.tract_map import TractMapProcessor
 
 
 def main(src_directory):

@@ -9,8 +9,8 @@ optionally, provide the atlas base name as second argument
 import sys
 
 from ClearMap.Scripts.align_new_api import stitch, register, plot_registration_results
-from ClearMap.processors.sample_preparation import SampleManager, StitchingProcessor, RegistrationProcessor
-from ClearMap.processors.tube_map import BinaryVesselProcessor, VesselGraphProcessor
+from ClearMap.pipeline_orchestrators.sample_preparation import SampleManager, StitchingProcessor, RegistrationProcessor
+from ClearMap.pipeline_orchestrators.tube_map import BinaryVesselProcessor, VesselGraphProcessor
 
 
 def main(src_directory):

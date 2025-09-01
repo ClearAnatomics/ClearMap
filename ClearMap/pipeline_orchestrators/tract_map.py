@@ -13,7 +13,7 @@ from matplotlib.colors import to_hex
 from ClearMap.IO import IO as cmp_io
 from ClearMap.Utils.exceptions import MissingRequirementException
 from ClearMap.Utils.utilities import sanitize_n_processes
-from ClearMap.processors.generic_tab_processor import ChannelTabProcessor
+from ClearMap.pipeline_orchestrators.generic_tab_processor import ChannelTabProcessor
 from ClearMap.Alignment import Elastix as elastix
 from ClearMap.Alignment.Resampling import resample_points
 from ClearMap.ParallelProcessing.DataProcessing import ArrayProcessing as array_processing
@@ -33,6 +33,9 @@ def label_points_wrapper(annotator, coords):
 
 
 class TractMapProcessor(ChannelTabProcessor):
+
+    processing_name = 'tract_map'
+
     def __init__(self, sample_manager=None, channel=None, registration_processor=None):
         super().__init__()
         self.save_intermediate_binarization_results = True
@@ -60,7 +63,6 @@ class TractMapProcessor(ChannelTabProcessor):
             configs = sample_manager.get_configs()
             self.sample_config = configs['sample']
             self.machine_config = configs['machine']
-            self._processing_config = self.sample_manager.config_loader.get_cfg('tract_map')
 
             self.set_progress_watcher(self.sample_manager.progress_watcher)
         self.registration_processor = registration_processor
@@ -80,7 +82,7 @@ class TractMapProcessor(ChannelTabProcessor):
         return tuple(clip_vals)  # e.g. (low, high)
 
     def _compute_uniques(self):
-        sampling = self.processing_config['binarization']['decimation_ratio']
+        sampling = self.config['binarization']['decimation_ratio']
         if self.uniques is None or sampling != self.sampling:
             self.sampling = sampling
             print('Computing histogram, this may take some time')
@@ -147,7 +149,7 @@ class TractMapProcessor(ChannelTabProcessor):
         binarization_parameter['adaptive'] = None
 
         processing_parameter = vasculature.default_binarization_processing_parameter.copy()
-        processing_parameter.update(processes=self.processing_config['parallel_params']['n_processes_binarization'],
+        processing_parameter.update(processes=self.config['parallel_params']['n_processes_binarization'],
                                     as_memory=False,
                                     verbose=True)
 
@@ -165,7 +167,7 @@ class TractMapProcessor(ChannelTabProcessor):
             output_asset.delete()
         if as_memmap:
             return array_processing.where(mask, output_asset.path,
-                                          processes=self.processing_config['parallel_params']['n_processes_where'],
+                                          processes=self.config['parallel_params']['n_processes_where'],
                                           verbose=True)
             self.update_watcher_main_progress()
             print('TractMap coordinates extraction finished')
@@ -226,7 +228,7 @@ class TractMapProcessor(ChannelTabProcessor):
         transformed_coords = array_processing.initialize_sink(coordinates_transformed_path,
             dtype='float64', shape=coords.shape, return_buffer=False
         )
-        perf_params = self.processing_config['parallel_params']
+        perf_params = self.config['parallel_params']
 
         target_channel = 'atlas'  # FIXME: add control for target channel
         status_bcp = self.workspace.debug
@@ -297,7 +299,7 @@ class TractMapProcessor(ChannelTabProcessor):
             annotator = manager.Annotation(self.registration_processor.annotators[self.channel])
             labeling_fn = functools.partial(label_points_wrapper, annotator)
             labeling_fn.__name__ = 'label_points'  # for block_processing prints
-            perf_params = self.processing_config['parallel_params']
+            perf_params = self.config['parallel_params']
             block_processing.process(labeling_fn, coordinates_transformed, labels,
                                      axes=[0], processes=perf_params['n_processes_label'],
                                      size_min=perf_params['min_point_list_size'],
@@ -312,7 +314,7 @@ class TractMapProcessor(ChannelTabProcessor):
         coords_asset = self.get('binary', asset_sub_type='pixels_raw', channel=self.channel)
         coordinates = coords_asset.as_source()
         for i in range(3):
-            shift = self.processing_config['test_set_slicing'][f'dim_{i}'][0]
+            shift = self.config['test_set_slicing'][f'dim_{i}'][0]
             coordinates[:, i] += shift
         cmp_io.write(coords_asset.path, coordinates)
         print('TractMap coordinates shifted')
@@ -321,7 +323,7 @@ class TractMapProcessor(ChannelTabProcessor):
         self.workspace.debug = tuning
         self.reload_config()
 
-        self.binarize(*self.processing_config['binarization']['clip_range'])
+        self.binarize(*self.config['binarization']['clip_range'])
         self.mask_to_coordinates(as_memmap=USE_BINARY_POINTS_FILE)
 
         if tuning:
@@ -336,7 +338,7 @@ class TractMapProcessor(ChannelTabProcessor):
         self.workspace.debug = False
 
     def export_df(self, asset_sub_type=None):
-        ratio = self.processing_config['display']['decimation_ratio']
+        ratio = self.config['display']['decimation_ratio']
         decimated_coordinates_raw = self.get(
             'binary', channel=self.channel, asset_sub_type='pixels_raw').as_source()[::ratio, :]
 
@@ -373,7 +375,7 @@ class TractMapProcessor(ChannelTabProcessor):
             dtype=None,
             weights=None,
             method='sphere',
-            radius=self.processing_config['voxelization']['radii'],
+            radius=self.config['voxelization']['radii'],
             kernel=None,
             processes=None,
             verbose=True

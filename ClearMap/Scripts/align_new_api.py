@@ -1,7 +1,7 @@
 
 from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
 from ClearMap.Visualization.Qt.utils import link_dataviewers_cursors
-from ClearMap.processors.sample_preparation import StitchingProcessor, RegistrationProcessor
+from ClearMap.pipeline_orchestrators.sample_preparation import StitchingProcessor, RegistrationProcessor
 
 
 def plot_registration_results(aligner: RegistrationProcessor, channel: str, composite: bool = False):

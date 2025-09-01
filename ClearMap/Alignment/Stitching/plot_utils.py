@@ -5,7 +5,7 @@ from matplotlib import pyplot as plt
 
 sys.path.insert(0, os.path.abspath('.'))
 
-from ClearMap.processors.sample_preparation import SampleManager, StitchingProcessor
+from ClearMap.pipeline_orchestrators.sample_preparation import SampleManager, StitchingProcessor
 import ClearMap.Alignment.Stitching.StitchingRigid as stitching_rigid
 
 

@@ -117,8 +117,8 @@ import mpld3
 
 from ClearMap.Analysis.graphs.graph_filters import GraphFilter
 from ClearMap.IO.assets_constants import DATA_CONTENT_TYPES, EXTENSIONS
-from ClearMap.processors.colocalization import ColocalizationProcessor
-from ClearMap.processors.tract_map import TractMapProcessor
+from ClearMap.pipeline_orchestrators.colocalization import ColocalizationProcessor
+from ClearMap.pipeline_orchestrators.tract_map import TractMapProcessor
 
 app = QApplication.instance()
 if app is not None and app.applicationName() == 'ClearMap':
@@ -145,11 +145,11 @@ from ClearMap.Visualization.Matplotlib.PlotUtils import plot_sample_stats_histog
 from ClearMap.Visualization.Qt.utils import link_dataviewers_cursors
 from ClearMap.Visualization.Qt import Plot3d as plot_3d
 
-from ClearMap.processors.sample_preparation import (SampleManager, StitchingProcessor,
-                                                    RegistrationProcessor, init_sample_manager_and_processors)
-from ClearMap.processors.cell_map import CellDetector
-from ClearMap.processors.tube_map import BinaryVesselProcessor, VesselGraphProcessor
-from ClearMap.processors.batch_process import BatchProcessor
+from ClearMap.pipeline_orchestrators.sample_preparation import (SampleManager, StitchingProcessor,
+                                                                RegistrationProcessor, init_sample_manager_and_processors)
+from ClearMap.pipeline_orchestrators.cell_map import CellDetector
+from ClearMap.pipeline_orchestrators.tube_map import BinaryVesselProcessor, VesselGraphProcessor
+from ClearMap.pipeline_orchestrators.batch_process import BatchProcessor
 
 __author__ = 'Charly Rousseau <charly.rousseau@icm-institute.org>'
 __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
@@ -282,7 +282,7 @@ class SampleInfoTab(GenericTab):
 
     def update_workspace(self, old_name='', new_name=''):  # Necessary intermediate because at the beginning sample_manager is not set
         self.rename_channels(old_name, new_name)  # Includes call to sample_manager.update_workspace
-        self._setup_workers()  # Load the stitching and registration processors
+        self._setup_workers()  # Load the stitching and registration pipeline_orchestrators
         # WARNING: not ideal to reload all.
         #  Should have option to reload only the workers if already setup (and not new exp)
         # Update other configs.

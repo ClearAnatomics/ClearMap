@@ -5,12 +5,15 @@ sample_preparation
 This is the part that is common to both pipelines to process the raw images.
 It includes file conversion, stitching and registration
 """
+from __future__ import annotations
+
 import os
 import platform
 import re
 import warnings
 from concurrent.futures.process import BrokenProcessPool
 from pathlib import Path
+from typing import Optional, Dict, TypedDict
 
 import numpy as np
 
@@ -22,13 +25,14 @@ from ClearMap.IO.assets_constants import CONTENT_TYPE_TO_PIPELINE
 from ClearMap.Utils.exceptions import MissingRequirementException, ClearMapAssetError, ParamsOrientationError
 from ClearMap.Utils.tag_expression import Expression
 from ClearMap.gui.gui_utils import surface_project, setup_mini_brain
+from ClearMap.gui.widgets import ProgressWatcher
 
 matplotlib.use('Qt5Agg')
 
 import ClearMap.Settings as settings
 from ClearMap.Utils.utilities import check_stopped, runs_on_ui, validate_orientation, DEFAULT_ORIENTATION
 from ClearMap.config.atlas import ATLAS_NAMES_MAP
-from ClearMap.processors.generic_tab_processor import TabProcessor, CanceledProcessing
+from ClearMap.pipeline_orchestrators.generic_tab_processor import TabProcessor, CanceledProcessing
 # noinspection PyPep8Naming
 import ClearMap.Alignment.Elastix as elastix
 # noinspection PyPep8Naming
@@ -45,7 +49,7 @@ import ClearMap.Alignment.Stitching.StitchingRigid as stitching_rigid
 # noinspection PyPep8Naming
 import ClearMap.Alignment.Stitching.StitchingWobbly as stitching_wobbly
 from ClearMap.IO.metadata import define_auto_stitching_params, define_auto_resolution
-from ClearMap.config.config_loader import get_configs, ConfigLoader, CLEARMAP_CFG_DIR
+from ClearMap.config.config_loader import get_configs, ConfigHandler, CLEARMAP_CFG_DIR
 from ClearMap.config.update_config import update_default_config
 from ClearMap.IO.assets_specs import TypeSpec, ChannelSpec
 from ClearMap.IO.workspace2 import Workspace2
@@ -67,11 +71,11 @@ class SampleManager(TabProcessor):
     Provide utility methods for checking sample properties.
 
     """
+    processing_name = 'sample'
     def __init__(self):
         super().__init__()
-        self.config_loader = None
-        self.src_directory = None
-        self.config = {}
+        self.config_loader: Optional[ConfigHandler] = None
+        self.src_directory: Optional[str | Path] = None
         self.stitching_cfg = {}
         self.registration_cfg = {}
 
@@ -106,7 +110,7 @@ class SampleManager(TabProcessor):
             else:
                 if self.src_directory is None:
                     raise ValueError('Source directory not set and required to load configs with names only')
-        self.config_loader = ConfigLoader(self.src_directory)
+        self.config_loader = ConfigHandler(self.src_directory)
 
         # Load the configs
         cfgs = list(cfgs)
@@ -194,6 +198,9 @@ class SampleManager(TabProcessor):
     @property
     def channels(self):
         return list(self.config['channels'].keys())
+
+    def data_type(self, channel: str) -> str:
+        return self.config['channels'][channel]['data_type']
 
     @property
     def data_types(self):
@@ -495,7 +502,7 @@ class SampleManager(TabProcessor):
         )
 
     def load_configs_from_dir(self):
-        cfg_loader = ConfigLoader(self.src_directory)
+        cfg_loader = ConfigHandler(self.src_directory)
         return [cfg_loader.get_cfg(name, must_exist) for name, must_exist in
                 (('machine', True), ('sample', True), ('stitching', False), ('registration', False))]
 
@@ -561,6 +568,15 @@ class SampleManager(TabProcessor):
                                 processes=processes, verbose=verbose, **kwargs)
 
 
+class MiniBrain(TypedDict):
+    """
+    A downscaled brain for quick visualization
+    It includes the downscaled image and the scaling factors
+    """
+    scaling: tuple[float, float, float]
+    array: np.ndarray
+
+
 class RegistrationProcessor(TabProcessor):
     """
     This class is used to manage the registration process
@@ -568,25 +584,24 @@ class RegistrationProcessor(TabProcessor):
     Manage atlas setup and transformations.
     Handle registration configurations.
     """
+    processing_name = 'registration'
     def __init__(self, sample_manager):
         super().__init__()
-        self.sample_manager = sample_manager
-        self.config = {}
-        self.annotators = {}
-        self.mini_brains = {}  # 1 for each channel
-        self.progress_watcher = None  # FIXME:
+        self.sample_manager: SampleManager = sample_manager
+        self.annotators: Dict[Annotation] = {}
+        self.mini_brains: Dict[MiniBrain] = {}  # 1 for each channel
+        self.progress_watcher: Optional[ProgressWatcher] = None  # FIXME:
         self.__bspline_registration_re = re.compile(r"\d+\s-?\d+\.\d+\s\d+\.\d+\s\d+\.\d+\s\d+\.\d+")
         self.__affine_registration_re = re.compile(r"\d+\s-\d+\.\d+\s\d+\.\d+\s\d+\.\d+\s\d+\.\d+\s\d+\.\d+")
         self.__resample_re = ('Resampling: resampling',
                               re.compile(r".*?Resampling:\sresampling\saxes\s.+\s?,\sslice\s.+\s/\s\d+"))
 
-        self.setup_complete = False
+        self.setup_complete: bool = False
 
     def setup(self, sample_manager=None):
         self.sample_manager = sample_manager if sample_manager else self.sample_manager
         if not self.sample_manager.registration_cfg:
             raise ValueError('Registration config not set in sample manager')
-        self.config = self.sample_manager.registration_cfg
         self.machine_config = self.sample_manager.machine_config
         if self.sample_manager.setup_complete:
             self.workspace = self.sample_manager.workspace
@@ -1006,11 +1021,11 @@ class StitchingProcessor(TabProcessor):
     Handle image stitching operations.
     Manage stitching configurations and processes.
     """
+    processing_name = 'stitching'
     def __init__(self, sample_manager):
         super().__init__()
-        self.sample_manager = sample_manager
-        self.config = {}  # REFACTOR: only cfg
-        self.progress_watcher = None  # FIXME:
+        self.sample_manager: SampleManager = sample_manager
+        self.progress_watcher: Optional[ProgressWatcher] = None
         self.__wobbly_stitching_place_re = 'done constructing constraints for component'
         self.__wobbly_stitching_align_lyt_re = ('Alignment: Wobbly alignment',
                                                 re.compile(r"Alignment:\sWobbly alignment \(\d+, \d+\)->\(\d+, \d+\) "
@@ -1026,7 +1041,6 @@ class StitchingProcessor(TabProcessor):
         self.sample_manager = sample_manager if sample_manager else self.sample_manager
         if not self.sample_manager.stitching_cfg:
             raise ValueError('Stitching config not set in sample manager')
-        self.config = self.sample_manager.stitching_cfg
         self.machine_config = self.sample_manager.machine_config
         self.workspace = self.sample_manager.workspace
         if convert_tiles:
@@ -1126,7 +1140,7 @@ class StitchingProcessor(TabProcessor):
             # squash Z axis  # REFACTOR: find better way
             asset.expression = exp.string().replace('_xyz-Table Z<Z,4>', '')  # overwrite expression
             self.sample_manager.config['channels'][channel]['path'] = asset.expression
-            self.sample_manager.config.write()
+            self.sample_manager.config.write()  # FIXME: config write
 
     def copy_or_stack(self, channel):
         """
@@ -1139,7 +1153,6 @@ class StitchingProcessor(TabProcessor):
         """
         clearmap_io.convert(self.get_path('raw', channel=channel),
                             self.get_path('stitched', channel=channel))
-
 
     def stitch(self):
         if self.stopped:

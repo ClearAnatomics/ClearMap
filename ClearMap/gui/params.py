@@ -37,7 +37,7 @@ __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
 from ClearMap.gui.widget_monkeypatch_callbacks import recursive_patch_compound_boxes
 
-from ClearMap.processors.sample_preparation import SampleManager
+from ClearMap.pipeline_orchestrators.sample_preparation import SampleManager
 
 
 class SampleChannelParameters(ChannelUiParameter):

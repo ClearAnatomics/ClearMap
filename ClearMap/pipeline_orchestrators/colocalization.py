@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 import math
+from typing import List, Optional
 
 import numpy as np
 import pandas as pd
@@ -10,34 +13,37 @@ from ClearMap.Analysis.Measurements import Voxelization as voxelization
 from ClearMap.Analysis.colocalization.channel import Channel as ColocalizationChannel
 from ClearMap.IO.assets_specs import ChannelSpec
 from ClearMap.IO import IO as cmp_io
+from ClearMap.IO.workspace2 import Workspace2
 from ClearMap.Utils.exceptions import ClearMapValueError
 from ClearMap.Utils.utilities import sanitize_n_processes
 from ClearMap.Visualization.Qt.widgets import Scatter3D
-from ClearMap.processors.generic_tab_processor import ChannelTabProcessor
+from ClearMap.pipeline_orchestrators.generic_tab_processor import CompoundChannelTabProcessor
 
 from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
+from ClearMap.pipeline_orchestrators.sample_preparation import RegistrationProcessor
 
 
-class ColocalizationProcessor(ChannelTabProcessor):
+class ColocalizationProcessor(CompoundChannelTabProcessor):
     colocalization_channels: dict[ColocalizationChannel]
+    processing_name = 'colocalization'
 
     def __init__(self, sample_manager=None, channels=None):
         super().__init__()
-        self.filtered_table = None
+        self.filtered_table: Optional[pd.DataFrame] = None
         self.sample_config = None
         self.machine_config = None
         self.sample_manager = None
-        self.registration_processor = None
-        self.workspace = None
+        self.registration_processor: Optional[RegistrationProcessor] = None
+        self.workspace: Workspace2 | None = None
         if channels is None:
             raise ClearMapValueError(f'No channels specified. Please provide a pair of channels to compare. '
                                      f'They must match the ones in the sample_params file.')
         if len(channels) != 2:
             raise ClearMapValueError(f'Please provide exactly two channels to compare. '
                                      f'They must match the ones in the sample_params file.')
-        self.channels = channels
-        self.colocalization_channels = {}  # The objects that compute the colocalization from the colocalization package
-        self.setup_finalised = False
+        self.channels: List[str] = channels
+        self.colocalization_channels: dict[str, ColocalizationChannel] = {}  # The objects that compute the colocalization from the colocalization package
+        self.setup_finalised: bool = False
         self.setup(sample_manager, channels)
 
     def setup(self, sample_manager, channel_names):
@@ -49,8 +55,6 @@ class ColocalizationProcessor(ChannelTabProcessor):
             configs = sample_manager.get_configs()
             self.sample_config = configs['sample']
             self.machine_config = configs['machine']
-            # FIXME: potential issue of config duplication if several instances
-            self._processing_config = self.sample_manager.config_loader.get_cfg('colocalization')
 
             if self.channels not in self.workspace.asset_collections.keys():
                 # FIXME: ugly. should be handled by add_pipeline with missing_ok=True
@@ -65,12 +69,6 @@ class ColocalizationProcessor(ChannelTabProcessor):
             self.set_progress_watcher(self.sample_manager.progress_watcher)
 
             self.finalise_setup()
-
-    @property
-    def processing_config(self):
-        # Override for compound channels
-        channel_str = '-'.join(self.channels).lower()
-        return self._processing_config['channels'][channel_str]
 
     def finalise_setup(self):
         if self.setup_finalised:
@@ -95,8 +93,8 @@ class ColocalizationProcessor(ChannelTabProcessor):
     def compute_colocalization(self, channel_a, channel_b):
         self.reload_config()
         # voxel_blob_diameter will also be used to compute the overlap
-        voxel_blob_diameter = self.processing_config['comparison']['particle_diameter']
-        n_processes = sanitize_n_processes(self.processing_config['performance']['n_processes'])
+        voxel_blob_diameter = self.config['comparison']['particle_diameter']
+        n_processes = sanitize_n_processes(self.config['performance']['n_processes'])
 
         report = self.colocalization_channels[channel_a].compare(self.colocalization_channels[channel_b],
                                                                  blob_diameter=voxel_blob_diameter,
@@ -150,7 +148,7 @@ class ColocalizationProcessor(ChannelTabProcessor):
         dv.view.addItem(scatter)
         dv.scatter = scatter
         dv.scatter_coords = Scatter3D(scatter_df, half_slice_thickness=3,
-                                      marker_size=self.processing_config['comparison']['particle_diameter']//2)
+                                      marker_size=self.config['comparison']['particle_diameter'] // 2)
         dv.refresh()
 
         return [dv]
@@ -158,7 +156,7 @@ class ColocalizationProcessor(ChannelTabProcessor):
     def filter_table(self, channel_a, channel_b):  # TODO: add options for which criteria ?/
         report = pd.read_feather(self.get_path('colocalization', channel=(channel_a, channel_b),
                                                asset_sub_type='report'))  # TODO: see if we cache
-        maximum_distance = self.processing_config['analysis']['max_particle_distance']
+        maximum_distance = self.config['analysis']['max_particle_distance']
         within_distance_mask = report['closest blob distance'].values < maximum_distance
         chan_a = self.colocalization_channels[channel_a]
         channel_a_particle_coordinates = report.loc[within_distance_mask, [f'center of bounding box {ax}'
@@ -183,7 +181,7 @@ class ColocalizationProcessor(ChannelTabProcessor):
 
     def get_voxelization_params(self, channel_a, channel_b):
         voxelization_parameter = {
-            'radius': self.processing_config['voxelization']['radii'],
+            'radius': self.config['voxelization']['radii'],
             'verbose': True
         }
         if self.workspace.debug:  # Path will use debug
