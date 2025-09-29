@@ -21,6 +21,7 @@ import graph_tool as gt
 import graph_tool.util as gtu
 import graph_tool.topology as gtt
 import graph_tool.generation as gtg
+import warnings
 
 # fix graph tool saving / loading for very large arrays
 import ClearMap.Analysis.graphs.graph as grp
@@ -1241,12 +1242,17 @@ class Graph(grp.AnnotatedGraph):
                     new_base.ep[name] = q
                 return Graph(name=copy.copy(self.name), base=new_base)
 
+    @staticmethod
+    def load(filename):
+        g = gt.load_graph(str(filename))
+        graph = Graph(base=g)
+        graph.path = str(filename)
+        return graph
+
 
 def load(filename):
-    g = gt.load_graph(str(filename))
-    graph = Graph(base=g)
-    graph.path = str(filename)
-    return graph
+    warnings.warn("Use Graph.load() instead of load()", DeprecationWarning)
+    return Graph.load(filename)
 
 
 def save(filename, graph):
