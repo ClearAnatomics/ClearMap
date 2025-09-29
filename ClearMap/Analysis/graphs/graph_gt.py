@@ -1264,7 +1264,7 @@ class Graph(grp.AnnotatedGraph):
 
     @staticmethod
     def load(filename, ignore_vp=None, ignore_ep=None,
-                ignore_gp=None, exclude_edge_geometry=False):            
+                ignore_gp=None):            
         g = gt.load_graph(str(filename), ignore_vp=ignore_vp, ignore_ep=ignore_ep, ignore_gp=ignore_gp)
         graph = Graph(base=g)
         graph.path = str(filename)
