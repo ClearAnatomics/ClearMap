@@ -1269,6 +1269,51 @@ class Graph(grp.AnnotatedGraph):
         graph = Graph(base=g)
         graph.path = str(filename)
         return graph
+    
+    @staticmethod
+    def partial_load(filename, exclude_edge_geometry_properties=False, include_dict={}, exclude_dict={}, include=[], exclude=[]):
+        """
+        Partially load a graph from a file, allowing for inclusion and exclusion of specific properties.
+
+        Five options are available, in order of precedence:
+            1. exclude_geometry_properties: If True, all edge geometry properties (those starting with 'edge_geometry_') are excluded.
+            2. include_dict: A dictionary specifying which properties to include for each scope ('vertex', 'edge', 'graph').
+            3. exclude_dict: A dictionary specifying which properties to exclude for each scope ('vertex', 'edge', 'graph').
+            4. include: A list of property names to include across all scopes.
+            5. exclude: A list of property names to exclude across all scopes.
+        
+        Note: To know which properties are available in the file, use Graph.scan_gt_properties(filename, as_dict=True).
+        """
+
+        props = Graph.scan_gt_properties(filename, as_dict=True)
+
+        if exclude_edge_geometry_properties:
+            props["graph"] = [p for p in props["graph"] if p.startswith('edge_geometry_')]
+            return Graph.load(filename, ignore_gp=props["graph"])
+        
+        if include_dict:
+            ignore_vp = [p for p in props["vertex"] if p not in include_dict.get("vertex", [])]
+            ignore_ep = [p for p in props["edge"] if p not in include_dict.get("edge", [])]
+            ignore_gp = [p for p in props["graph"] if p not in include_dict.get("graph", [])]
+            return Graph.load(filename, ignore_vp=ignore_vp, ignore_ep=ignore_ep, ignore_gp=ignore_gp)
+        
+        if exclude_dict:
+            ignore_vp = [p for p in props["vertex"] if p in exclude_dict.get("vertex", [])]
+            ignore_ep = [p for p in props["edge"] if p in exclude_dict.get("edge", [])]
+            ignore_gp = [p for p in props["graph"] if p in exclude_dict.get("graph", [])]
+            return Graph.load(filename, ignore_vp=ignore_vp, ignore_ep=ignore_ep, ignore_gp=ignore_gp)
+        
+        if include:
+            ignore_vp = [p for p in props["vertex"] if p not in include]
+            ignore_ep = [p for p in props["edge"] if p not in include]
+            ignore_gp = [p for p in props["graph"] if p not in include]
+            return Graph.load(filename, ignore_vp=ignore_vp, ignore_ep=ignore_ep, ignore_gp=ignore_gp)
+        
+        if exclude:
+            ignore_vp = [p for p in props["vertex"] if p in exclude]
+            ignore_ep = [p for p in props["edge"] if p in exclude]
+            ignore_gp = [p for p in props["graph"] if p in exclude]
+            return Graph.load(filename, ignore_vp=ignore_vp, ignore_ep=ignore_ep, ignore_gp=ignore_gp)
 
 
 def load(filename):
