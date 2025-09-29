@@ -28,7 +28,7 @@ import ClearMap.Analysis.graphs.graph as grp
 from ClearMap.Analysis.graphs.type_conversions import dtype_to_gtype, gtype_from_source, vertex_property_map_to_python, \
   edge_property_map_to_python, vertex_property_map_from_python, set_vertex_property_map, edge_property_map_from_python, \
   set_edge_property_map
-from ClearMap.Analysis.graphs.utils import pickler, unpickler, edges_to_vertices
+from ClearMap.Analysis.graphs.utils import pickler, unpickler, edges_to_vertices, scan_gt_props
 
 from ClearMap.Utils.array_utils import remap_array_ranges
 
@@ -1243,8 +1243,29 @@ class Graph(grp.AnnotatedGraph):
                 return Graph(name=copy.copy(self.name), base=new_base)
 
     @staticmethod
-    def load(filename):
-        g = gt.load_graph(str(filename))
+    def scan_gt_properties(filename: str, as_dict: bool = False):
+        """
+        Scan the graph-tool file for its properties without loading the entire graph.
+        filename : str
+            The path to the graph-tool file.
+        as_dict : bool
+            If True, return a dictionary of property names. If False, return a list of tuples (scope, name, dtype).
+        """
+        
+        props = scan_gt_props(filename)
+        if as_dict:
+            out = {
+                "vertex": [name for scope, name, _ in props if scope == 'vertex'],
+                "edge": [name for scope, name, _ in props if scope == 'edge'],
+                "graph": [name for scope, name, _ in props if scope == 'graph'],
+            }
+            return out
+        return props
+
+    @staticmethod
+    def load(filename, ignore_vp=None, ignore_ep=None,
+                ignore_gp=None, exclude_edge_geometry=False):            
+        g = gt.load_graph(str(filename), ignore_vp=ignore_vp, ignore_ep=ignore_ep, ignore_gp=ignore_gp)
         graph = Graph(base=g)
         graph.path = str(filename)
         return graph
