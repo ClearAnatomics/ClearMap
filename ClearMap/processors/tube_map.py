@@ -40,7 +40,7 @@ import ClearMap.ImageProcessing.Binary.Filling as binary_filling
 
 import ClearMap.Analysis.Measurements.MeasureExpression as measure_expression
 import ClearMap.Analysis.Measurements.radius_measurements as measure_radius
-from ClearMap.Analysis.graphs import graph_processing
+from ClearMap.Analysis.graphs import graph_processing, graph
 import ClearMap.Analysis.Measurements.Voxelization as voxelization
 
 import ClearMap.ParallelProcessing.BlockProcessing as block_processing
@@ -687,6 +687,7 @@ class VesselGraphProcessor(TabProcessor):
                 break
         coordinates = self.graph_raw.vertex_coordinates()  # OPTIMISE: cache ?
         radii = self.graph_raw.vertex_radii() + radius_shift
+        # FIXME: radii may be in units. Convert if physical units
         expression = measure_expression.measure_expression(source, coordinates, radii, method='max')  # WARNING: prange
         prop = expression if asset_type == 'binary' else np.asarray(expression.array, dtype=float)  # TODO: do as f(source.dtype)
         self.graph_raw.define_vertex_property(f'artery_{suffix}', prop)
@@ -746,7 +747,8 @@ class VesselGraphProcessor(TabProcessor):
 
         vertex_to_edge_mappings = vertex_to_edge_mappings or graph_processing.DEFAULT_VERTEX_TO_EDGE
         edge_to_edge_mappings = edge_to_edge_mappings
-        edge_geometry_vertex_properties = ['coordinates', 'coordinates_units', 'radii', 'length', 'chain_id', '_vertex_id_']
+        edge_geometry_vertex_properties = ['coordinates', 'coordinates_units', 'radii', 'radius_units',
+                                           'length', 'chain_id', '_vertex_id_']
         if self.use_arteries_for_graph:
             vertex_to_edge_mappings.update({
                 'artery_binary': vote,
@@ -798,10 +800,12 @@ class VesselGraphProcessor(TabProcessor):
                 resampled_shape=self.resampled_shape)
             return radii * np.mean(resample_factor)
 
-        self.graph_reduced.transform_properties(transformation=scaling,
-                                                vertex_properties={'radii': 'radii_atlas'},
-                                                edge_properties={'radii': 'radii_atlas'},
-                                                edge_geometry_properties={'radii': 'radii_atlas'})
+        from_name = 'radius_units' if 'radius_units' in list(self.graph_reduced.vertex_properties) else 'radii'
+        to_name = f'{from_name}_atlas'
+        mapping = {from_name: to_name}
+
+        self.graph_reduced.transform_properties(transformation=scaling, vertex_properties=mapping,
+                                                edge_properties=mapping, edge_geometry_properties=mapping)
 
     def _annotate(self):
         """Atlas annotation of the graph (i.e. add property 'region' to vertices)"""
@@ -886,7 +890,7 @@ class VesselGraphProcessor(TabProcessor):
         ----------
         vein_intensity_range_on_arteries_channel : (tuple)
             Above max (second val) on artery channel, this is an artery
-        min_vein_radius: (int)
+        min_vein_radius: (float)
 
         Returns
         -------

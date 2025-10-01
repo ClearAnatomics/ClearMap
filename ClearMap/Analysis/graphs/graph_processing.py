@@ -66,13 +66,15 @@ DEFAULT_EDGE_TO_EDGE = {
     'chain_id': np.mean   # We use mean as a sanity check (float outputs would be a tell-tale sign of a bug)
 }
 DEFAULT_VERTEX_TO_EDGE = {
-    'radii': np.max
+    'radii': np.max,
+    'radius_units': np.max
 }
 DEFAULT_VERTEX_TO_VERTEX = {
     'coordinates': medoid_vertex_coordinates,
     'coordinates_units': mean_vertex_coordinates,
     'length': np.sum,
     'radii': np.max,
+    'radius_units': np.max,
     # 'chain_id': functools.partial(np.quantile, 0.5, method='nearest', axis=0),
     'chain_id': np.mean,
     '_vertex_id_': np.min
@@ -530,7 +532,6 @@ def clean_graph(graph: graph_gt.Graph, remove_self_loops: bool = True, remove_is
     if verbose:
         timer_all.print_elapsed_time(
             f'Graph cleaning: cleaned graph has {g.n_vertices} nodes and {g.n_edges} edges')
-
     return g
 
 

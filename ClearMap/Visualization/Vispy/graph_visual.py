@@ -100,7 +100,8 @@ class GraphMeshVisual(visuals.mesh.MeshVisual):
 
             # calculate mesh
             try:
-                name = radii if radii is not None else 'radii'
+                radius_name = 'radius_units' if 'radius_units' in graph.edge_geometry_properties else 'radii'
+                name = radii if radii is not None else radius_name
                 radii = graph.edge_geometry(name=name, return_indices=False, as_list=False)
             except:  # FIXME: broad
                 radii = self.use_default_radii(coordinates, default_radius)
@@ -188,7 +189,8 @@ class GraphSphereVisual(visuals.mesh.MeshVisual):
         # -------------------------------------------------------------
         if radii is None:
             try:                     # vertices
-                radii = graph.vertex_radii() if not use_geometry else graph.edge_geometry(name='radii', as_list=False)
+                radius_name = 'radius_units' if 'radius_units' in graph.edge_geometry_properties else 'radii'
+                radii = graph.vertex_property(radius_name) if not use_geometry else graph.edge_geometry(name=radius_name, as_list=False)
             except Exception:  # FIXME: too broad
                 radii = None
 
