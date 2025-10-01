@@ -655,7 +655,7 @@ class PropertyAggregator:
         self.aggregation_functions: Dict[str, Callable] = {}
         self.aggregated_properties: Dict[str, List] = {}
 
-        base = (graph.edge_properties if kind == 'edge' else
+        base = list(graph.edge_properties if kind == 'edge' else
                 graph.vertex_properties if kind == 'vertex' else
                 graph.edge_geometry_property_names)
 
