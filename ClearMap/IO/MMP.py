@@ -342,7 +342,13 @@ def _memmap(location = None, shape = None, dtype = None, order = None, mode = No
 
     if mode != 'w+' and fu.is_file(location):
       try:
-        array = np.lib.format.open_memmap(location)
+        if mode:
+            array = np.lib.format.open_memmap(location, mode=mode)
+        else:
+            try:
+                array = np.lib.format.open_memmap(location)
+            except PermissionError:
+                array = np.lib.format.open_memmap(location, mode='r')  # If permission denied, try to force read
       except ValueError as err:
         print(f'Error reading memmap file with {location=}, {shape=}, {dtype=}, {mode=}; {err}')
 

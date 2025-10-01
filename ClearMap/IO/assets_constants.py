@@ -177,7 +177,7 @@ CHANNELS_ASSETS_TYPES_CONFIG = {
         'file_format_category': 'graph',
         'resource_type': 'graphs',
         'relevant_pipelines': ['TubeMap', 'AxonMap'],
-        'sub_types': ['raw', 'cleaned', 'reduced', 'annotated']
+        'sub_types': ['raw', 'cleaned', 'reduced', 'annotated', 'updated']
     },
 }
 
