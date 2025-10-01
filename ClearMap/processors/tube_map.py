@@ -339,8 +339,8 @@ class BinaryVesselProcessor(TabProcessor):
         sink = initialize_sink(sink, shape=source.shape, dtype=source.dtype, order=source.order, return_buffer=False)
 
         binary_filling.fill(source, sink=sink, processes=None, verbose=True)  # WARNING: prange if filling
-        if self.postprocessing_last_step[channel]['tmp_path'] and not self.postprocessing_last_step[channel]['keep']:
-            clearmap_io.delete_file(self.postprocessing_last_step[channel]['tmp_path'])
+        if self.postprocessing_last_step[channel]['temp_path'] and not self.postprocessing_last_step[channel]['keep']:
+            clearmap_io.delete_file(self.postprocessing_last_step[channel]['temp_path'])
 
         self.postprocessing_last_step[channel] = {'source': sink, 'temp_path': '', 'keep': False}
 
