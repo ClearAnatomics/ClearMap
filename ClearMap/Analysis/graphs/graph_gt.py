@@ -21,13 +21,14 @@ import graph_tool as gt
 import graph_tool.util as gtu
 import graph_tool.topology as gtt
 import graph_tool.generation as gtg
+import warnings
 
 # fix graph tool saving / loading for very large arrays
 import ClearMap.Analysis.graphs.graph as grp
 from ClearMap.Analysis.graphs.type_conversions import dtype_to_gtype, gtype_from_source, vertex_property_map_to_python, \
   edge_property_map_to_python, vertex_property_map_from_python, set_vertex_property_map, edge_property_map_from_python, \
   set_edge_property_map
-from ClearMap.Analysis.graphs.utils import pickler, unpickler, edges_to_vertices
+from ClearMap.Analysis.graphs.utils import pickler, unpickler, edges_to_vertices, scan_gt_props
 
 from ClearMap.Utils.array_utils import remap_array_ranges
 
@@ -1241,12 +1242,83 @@ class Graph(grp.AnnotatedGraph):
                     new_base.ep[name] = q
                 return Graph(name=copy.copy(self.name), base=new_base)
 
+    @staticmethod
+    def scan_gt_properties(filename: str, as_dict: bool = False):
+        """
+        Scan the graph-tool file for its properties without loading the entire graph.
+        filename : str
+            The path to the graph-tool file.
+        as_dict : bool
+            If True, return a dictionary of property names. If False, return a list of tuples (scope, name, dtype).
+        """
+        
+        props = scan_gt_props(filename)
+        if as_dict:
+            out = {
+                "vertex": [name for scope, name, _ in props if scope == 'vertex'],
+                "edge": [name for scope, name, _ in props if scope == 'edge'],
+                "graph": [name for scope, name, _ in props if scope == 'graph'],
+            }
+            return out
+        return props
+
+    @classmethod
+    def load(cls, filename, ignore_vp=None, ignore_ep=None,
+                ignore_gp=None):            
+        g = gt.load_graph(str(filename), ignore_vp=ignore_vp, ignore_ep=ignore_ep, ignore_gp=ignore_gp)
+        graph = cls(base=g)
+        graph.path = str(filename)
+        return graph
+    
+    @classmethod
+    def partial_load(cls, filename, exclude_edge_geometry_properties=False, include_dict={}, exclude_dict={}, include=[], exclude=[]):
+        """
+        Partially load a graph from a file, allowing for inclusion and exclusion of specific properties.
+
+        Five options are available, in order of precedence:
+            1. exclude_geometry_properties: If True, all edge geometry properties (those starting with 'edge_geometry_') are excluded.
+            2. include_dict: A dictionary specifying which properties to include for each scope ('vertex', 'edge', 'graph').
+            3. exclude_dict: A dictionary specifying which properties to exclude for each scope ('vertex', 'edge', 'graph').
+            4. include: A list of property names to include across all scopes.
+            5. exclude: A list of property names to exclude across all scopes.
+        
+        Note: To know which properties are available in the file, use Graph.scan_gt_properties(filename, as_dict=True).
+        """
+
+        props = cls.scan_gt_properties(filename, as_dict=True)
+
+        if exclude_edge_geometry_properties:
+            props["graph"] = [p for p in props["graph"] if p.startswith('edge_geometry_')]
+            return cls.load(filename, ignore_gp=props["graph"])
+
+        if include_dict:
+            ignore_vp = [p for p in props["vertex"] if p not in include_dict.get("vertex", [])]
+            ignore_ep = [p for p in props["edge"] if p not in include_dict.get("edge", [])]
+            ignore_gp = [p for p in props["graph"] if p not in include_dict.get("graph", [])]
+            return cls.load(filename, ignore_vp=ignore_vp, ignore_ep=ignore_ep, ignore_gp=ignore_gp)
+        
+        if exclude_dict:
+            ignore_vp = [p for p in props["vertex"] if p in exclude_dict.get("vertex", [])]
+            ignore_ep = [p for p in props["edge"] if p in exclude_dict.get("edge", [])]
+            ignore_gp = [p for p in props["graph"] if p in exclude_dict.get("graph", [])]
+            return cls.load(filename, ignore_vp=ignore_vp, ignore_ep=ignore_ep, ignore_gp=ignore_gp)
+        
+        if include:
+            ignore_vp = [p for p in props["vertex"] if p not in include]
+            ignore_ep = [p for p in props["edge"] if p not in include]
+            ignore_gp = [p for p in props["graph"] if p not in include]
+            return cls.load(filename, ignore_vp=ignore_vp, ignore_ep=ignore_ep, ignore_gp=ignore_gp)
+        
+        if exclude:
+            ignore_vp = [p for p in props["vertex"] if p in exclude]
+            ignore_ep = [p for p in props["edge"] if p in exclude]
+            ignore_gp = [p for p in props["graph"] if p in exclude]
+            return cls.load(filename, ignore_vp=ignore_vp, ignore_ep=ignore_ep, ignore_gp=ignore_gp)
+
 
 def load(filename):
-    g = gt.load_graph(str(filename))
-    graph = Graph(base=g)
-    graph.path = str(filename)
-    return graph
+    warnings.warn("Use Graph.load() instead of load()", DeprecationWarning)
+    return Graph.load(filename)
 
 
 def save(filename, graph):
