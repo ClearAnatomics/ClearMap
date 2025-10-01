@@ -310,6 +310,7 @@ class BinaryVesselProcessor(TabProcessor):
         self.steps[channel].remove_next_steps_files(self.steps[channel].smoothed)
 
         source = self.__get_post_processing_source(channel, 'smoothed')
+        source = clearmap_io.as_source(source)
         sink = self.get_path('binary', channel=channel, asset_sub_type='smoothed')
         sink = initialize_sink(sink, shape=source.shape, dtype=source.dtype, order=source.order, return_buffer=False)
 
