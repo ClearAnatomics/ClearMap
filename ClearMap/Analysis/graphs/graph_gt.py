@@ -6,14 +6,18 @@ GraphGt
 Module provides basic Graph interface to the
 `graph_tool <https://graph-tool.skewed.de>`_ library.
 """
+from __future__ import annotations
+
 __author__ = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
 __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
 
+
 import copy
 import numbers
+from typing import Optional, Iterable, Dict
 
 import numpy as np
 
@@ -47,6 +51,7 @@ class Graph(grp.AnnotatedGraph):
     This is an interface from ClearMap graphs to graph_tool.
     """
     DEFAULT_N_DIMS = 3
+    SCOPES = ("vertex", "edge", "graph")
 
     def __init__(self, name=None, n_vertices=None, edges=None, directed=None,
                  vertex_coordinates=None, vertex_radii=None,
@@ -1259,15 +1264,17 @@ class Graph(grp.AnnotatedGraph):
         return props
 
     @classmethod
-    def load(cls, filename, ignore_vp=None, ignore_ep=None,
-                ignore_gp=None):            
+    def load(cls, filename, ignore_vp=None, ignore_ep=None, ignore_gp=None):
         g = gt.load_graph(str(filename), ignore_vp=ignore_vp, ignore_ep=ignore_ep, ignore_gp=ignore_gp)
         graph = cls(base=g)
         graph.path = str(filename)
         return graph
     
     @classmethod
-    def partial_load(cls, filename, exclude_edge_geometry_properties=False, include_dict={}, exclude_dict={}, include=[], exclude=[]):
+    def partial_load(cls, filename: str, *, exclude_edge_geometry_properties: bool = False,
+                     include_dict: Optional[Dict[str, Iterable[str]]] = None,
+                     exclude_dict: Optional[Dict[str, Iterable[str]]] = None,
+                     include: Optional[Iterable[str]] = None, exclude: Optional[Iterable[str]] = None):
         """
         Partially load a graph from a file, allowing for inclusion and exclusion of specific properties.
 
@@ -1280,36 +1287,45 @@ class Graph(grp.AnnotatedGraph):
         
         Note: To know which properties are available in the file, use Graph.scan_gt_properties(filename, as_dict=True).
         """
-
         props = cls.scan_gt_properties(filename, as_dict=True)
+        props_sets = {s: set(props.get(s, ())) for s in cls.SCOPES}
+
+        def _as_scope_map(x):
+            """
+            Normalize iterable-or-dict into {scope: set(...)}. Makes
+            it easy to broadcast to all include/exclude options, whether supplied
+            as dict or iterable.
+            - dict: per-scope values
+            - iterable: applies to all scopes
+            - strings are treated as a single value, not an iterable of chars
+            """
+            if isinstance(x, dict):
+                return {scope: set(x.get(scope, ())) for scope in cls.SCOPES}
+            if isinstance(x, str):  # Because strings are iterable
+                return {scope: {x} for scope in cls.SCOPES}
+            return {scope: set(x) for scope in cls.SCOPES}
 
         if exclude_edge_geometry_properties:
             props["graph"] = [p for p in props["graph"] if p.startswith('edge_geometry_')]
             return cls.load(filename, ignore_gp=props["graph"])
+        elif include_dict:
+            allow = _as_scope_map(include_dict)
+            ignore = {s: props_sets[s] - allow[s] for s in cls.SCOPES}
+        elif exclude_dict:
+            block = _as_scope_map(exclude_dict)
+            ignore = {s: props_sets[s] & block[s] for s in cls.SCOPES}
+        elif include:
+            allow = _as_scope_map(include)
+            ignore = {s: props_sets[s] - allow[s] for s in cls.SCOPES}
+        elif exclude:
+            block = _as_scope_map(exclude)
+            ignore = {s: props_sets[s] & block[s] for s in cls.SCOPES}
+        else:
+            return cls.load(filename)
 
-        if include_dict:
-            ignore_vp = [p for p in props["vertex"] if p not in include_dict.get("vertex", [])]
-            ignore_ep = [p for p in props["edge"] if p not in include_dict.get("edge", [])]
-            ignore_gp = [p for p in props["graph"] if p not in include_dict.get("graph", [])]
-            return cls.load(filename, ignore_vp=ignore_vp, ignore_ep=ignore_ep, ignore_gp=ignore_gp)
-        
-        if exclude_dict:
-            ignore_vp = [p for p in props["vertex"] if p in exclude_dict.get("vertex", [])]
-            ignore_ep = [p for p in props["edge"] if p in exclude_dict.get("edge", [])]
-            ignore_gp = [p for p in props["graph"] if p in exclude_dict.get("graph", [])]
-            return cls.load(filename, ignore_vp=ignore_vp, ignore_ep=ignore_ep, ignore_gp=ignore_gp)
-        
-        if include:
-            ignore_vp = [p for p in props["vertex"] if p not in include]
-            ignore_ep = [p for p in props["edge"] if p not in include]
-            ignore_gp = [p for p in props["graph"] if p not in include]
-            return cls.load(filename, ignore_vp=ignore_vp, ignore_ep=ignore_ep, ignore_gp=ignore_gp)
-        
-        if exclude:
-            ignore_vp = [p for p in props["vertex"] if p in exclude]
-            ignore_ep = [p for p in props["edge"] if p in exclude]
-            ignore_gp = [p for p in props["graph"] if p in exclude]
-            return cls.load(filename, ignore_vp=ignore_vp, ignore_ep=ignore_ep, ignore_gp=ignore_gp)
+        ignore = {scope: list(v) for scope, v in ignore.items()}
+
+        return cls.load(filename, ignore_vp=ignore['vertex'], ignore_ep=ignore['edge'], ignore_gp=ignore['graph'])
 
 
 def load(filename):
