@@ -6,6 +6,8 @@ The main user function is `degree1_verification`, which performs inference on th
 and updates the graph in place with predictions based on a pre-trained model.
 """
 
+# FIXME: this is not a processor. It does not follow the processor API. Convert or move to another location.
+
 import numpy as np
 import pandas as pd
 
