@@ -459,31 +459,37 @@ def clean_graph(graph: graph_gt.Graph, remove_self_loops: bool = True, remove_is
     if 'length' in g.edge_properties:
         new_lengths = np.zeros((n_new_edges,), dtype=np.float64)
     new_vertices_props = {name: _prop_to_buffer(graph.vertex_property(name), n_cliques) for name in vertex_mappings}
+
+    v_prop_arrays = {}  # Cache since graph..vertex_property is not a simple lookup (recreates np.array)
+    for prop_name in vertex_mappings:
+        v_prop_arrays[prop_name] = graph.vertex_property(prop_name, as_array=True, is_scalar=False)
+
     edge_counter = 0
     for i, clik_id in enumerate(clique_ids):
         center_vertex = center_vertices[i]  # new vertex for the clique
-        clique_vertices = component_ids[clik_id]  # TODO check if cached list of arrays faster
-        vertex_filter[clique_vertices] = False # Schedule clique vertices for removal
+        clique_vertices = component_ids[clik_id]
         current_neighbours = neighbours[clik_id]
-        if current_neighbours.size == 0:  # unconnected clique
-            vertex_filter[center_vertex] = False  # Remove altogether
+        vertex_filter[clique_vertices] = False # Schedule clique vertices for removal
+        if current_neighbours.size == 0:  # unconnected clique: Remove and skip
+            vertex_filter[center_vertex] = False
             continue
 
         # connect to new node
         edges_to_clique_neighbours = [[n, center_vertex] for n in current_neighbours]
-        new_edges[edge_counter: edge_counter + len(edges_to_clique_neighbours)] = edges_to_clique_neighbours
+        n_neighbour_edges = len(edges_to_clique_neighbours)
+        new_edges[edge_counter: edge_counter + n_neighbour_edges] = edges_to_clique_neighbours
 
         center_coord = vertex_mappings['coordinates'](coords[clique_vertices])
         if use_units:
-            center_coord_units = center_coord * spacing
+            center_coord_units = center_coord * spacing  # Faster than mapping (average)
         if 'length' in g.edge_properties:
             if use_units:
                 edge_lengths = np.linalg.norm(coords_units[current_neighbours] - center_coord_units, axis=1)
             else:
                 edge_lengths = np.linalg.norm(coords[current_neighbours] - center_coord, axis=1)
-            new_lengths[edge_counter: edge_counter + len(edges_to_clique_neighbours)] = edge_lengths
+            new_lengths[edge_counter: edge_counter + n_neighbour_edges] = edge_lengths
 
-        edge_counter += len(edges_to_clique_neighbours)
+        edge_counter += n_neighbour_edges  # Update after last usage (new_length still uses previous cycle value)
 
         # map vertex properties
         for prop_name, reduce_fn in vertex_mappings.items():
@@ -492,7 +498,7 @@ def clean_graph(graph: graph_gt.Graph, remove_self_loops: bool = True, remove_is
             elif prop_name == 'coordinates_units':
                 val = center_coord_units
             else:
-                prop = graph.vertex_property(prop_name)
+                prop = v_prop_arrays[prop_name]  # Very fast because simple lookup
                 val = reduce_fn(prop[clique_vertices])
             # g.set_vertex_property(prop_name, val, vertex=center_vertex)
             new_vertices_props[prop_name][i] = val  # Store for later
