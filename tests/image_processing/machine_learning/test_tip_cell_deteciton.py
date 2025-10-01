@@ -1,5 +1,4 @@
 import sys
-from pathlib import Path
 
 from ClearMap.processors.sample_preparation import SampleManager
 from ClearMap.processors.degree1_inference_processor import degree1_verification
