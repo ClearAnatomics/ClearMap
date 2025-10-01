@@ -1204,10 +1204,6 @@ class Graph(grp.AnnotatedGraph):
     def save(self, filename):
         self._base.save(str(filename))
 
-    def load(self, filename):
-        self.path = str(filename)
-        self._base = gt.load_graph(self.path)
-
     def copy(self, from_disk=False, path=''):
         if from_disk:
             return load(path if path else self.path)
