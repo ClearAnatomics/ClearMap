@@ -37,13 +37,32 @@ def is_density_file(f_name):
     return f_name.endswith('density_counts.tif')  # FIXME add menu for alternatives
 
 
-def find_density_file(target_dir, channel, suffix=''):
+def find_density_file(target_dir, channel, suffix='', debug=False):
     target_dir = Path(target_dir)
     extensions = [ext[1:] for ext in EXTENSIONS['image']]
-    pattern = f'{channel}_density*{suffix}.'
+    pattern = ''
+    if debug:
+        pattern = f'debug_.'
+    if suffix is None or suffix == '':
+        pattern = pattern.join(f'*{channel}_density*.')
+    else :
+        pattern = pattern.join(f'*{channel}_density*{suffix}.')
     files = []
     for ext in extensions:
-        files.extend(target_dir.glob(pattern + ext))
+        all_files = list(target_dir.glob(pattern + ext))
+
+        if len(all_files) > 1:
+            debug_files = [f for f in all_files if 'debug' in f.name]
+            non_debug_files = [f for f in all_files if 'debug' not in f.name]
+
+            if debug:
+                selected_files = debug_files
+            else:
+                selected_files = non_debug_files
+        else:
+            selected_files = all_files
+        files.extend(selected_files)
+
     return files[0] if files else None
     # return find_file(target_dir, is_density_file, 'density')
 

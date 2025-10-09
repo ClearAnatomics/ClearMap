@@ -2141,6 +2141,8 @@ class GroupAnalysisProcessor:
 
     def compute_p_vals(self, selected_comparisons, groups, wrapping_func, channels,
                        advanced=False, density_files_suffix=''):
+        if density_files_suffix is None :
+            density_files_suffix = ''
         for pair in selected_comparisons:
             gp1_name, gp2_name = pair
             gp1, gp2 = [groups[gp_name] for gp_name in pair]
