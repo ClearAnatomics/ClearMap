@@ -130,7 +130,7 @@ def estimate_q_values(pvalues, m = None, pi0 = None, verbose = False, low_memory
   else:
     # evaluate pi0 for different lambdas
     pi0 = []
-    lam = scipy.arange(0, 0.90, 0.01)
+    lam = numpy.arange(0, 0.90, 0.01)
     counts = scipy.array([(pvalues > i).sum() for i in lam])
       
     for l in range(len(lam)):
