@@ -577,6 +577,9 @@ class Asset:
 
     def convert(self, new_extension, processes=None, verbose=False, **kwargs):
         if self.is_existing_source:
+            if not new_extension.startswith('.'):
+                warnings.warn(f'New extension "{new_extension}" should start with a dot. Adding it automatically.')
+                new_extension = f'.{new_extension}'
             clearmap_io.convert(self.existing_path, self.with_extension(new_extension),
                                 processes=processes, verbose=verbose, **kwargs)
 
@@ -920,7 +923,7 @@ class AssetCollection:  # FIXME: fix how assets are retrieved
             raise KeyError(f'Asset "{item}" not found in collection with "{self.sample_id=}"'
                            f'{self.base_directory=}, {self.channel_spec=}')
 
-    def get(self, item, default=None):
+    def get(self, item: str, default=None):
         try:
             return self.assets[item]
         except KeyError:
