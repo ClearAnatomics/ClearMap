@@ -36,7 +36,6 @@ and parallelization techniques.
     The current version of this module deals only with 3d images.
     See shape_detection.label_pixels_from_centers commented version for a 2d version.
 """
-
 from __future__ import annotations
 
 import os
@@ -65,7 +64,7 @@ from ClearMap.Utils.exceptions import ClearMapValueError
 
 try:
     from ClearMap.config.config_handler import ConfigHandler
-    machine_cfg = ConfigHandler.get_cfg_from_path(ConfigHandler.get_default_path('machine'))
+    machine_cfg = ConfigHandler.get_cfg_from_path(ConfigHandler.get_global_path('machine'))
     tmp_folder = machine_cfg.get('temp_folder', None)
     if tmp_folder is not None:
         for var_name in ('TMP', 'TEMP', 'TMPDIR'):

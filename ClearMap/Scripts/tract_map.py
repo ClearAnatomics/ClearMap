@@ -1,6 +1,8 @@
 import sys
 
-from ClearMap.pipeline_orchestrators.sample_preparation import SampleManager, StitchingProcessor, RegistrationProcessor
+from ClearMap.pipeline_orchestrators.sample_info_management import SampleManager
+from ClearMap.pipeline_orchestrators.stitching_orchestrator import StitchingProcessor
+from ClearMap.pipeline_orchestrators.registration_orchestrator import RegistrationProcessor
 from ClearMap.Scripts.align_new_api import stitch, register, plot_registration_results
 from ClearMap.pipeline_orchestrators.tract_map import TractMapProcessor
 
@@ -27,7 +29,7 @@ def main(src_directory):
 
     for channel in tract_map_config.keys():
         tract_processor = TractMapProcessor(sample_manager, channel=channel,
-                                          registration_processor=registration_processor)
+                                            registration_processor=registration_processor)
 
         print('Starting Tract mapping')
         tract_processor.reload_config()

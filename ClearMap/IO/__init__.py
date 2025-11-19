@@ -13,10 +13,10 @@ The :mod:`~ClearMap.IO.IO` module is the main module organizing all the IO
 functionailty.
 
 >>> import numpy as np
->>> import ClearMap.IO.IO as io
->>> x = np.random.rand(30,40,50);
->>> s = io.as_source(x);
->>> print(s);
+>>> import ClearMap.IO.IO as cmp_io
+>>> x = np.random.rand(30,40,50)
+>>> s = cmp_io.as_source(x)
+>>> print(s)
 Numpy-Source(30, 40, 50)[float64]|C|
 
 The first tuple is the shape of the array, the next list contains the datype 
@@ -57,10 +57,10 @@ All sources can be made virtual, containing only pointers to data in order
 to use them in parallel processing via the `as_virtual` function.
 """
 __author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
-__license__   = 'GPLv3 - GNU General Pulic License v3 (see LICENSE.txt)'
+__license__   = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
-__webpage__   = 'http://idisco.info'
-__download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
+__webpage__   = 'https://idisco.info'
+__download__  = 'https://www.github.com/ChristophKirst/ClearMap2'
 
 
 #from ClearMap.IO.IO import *

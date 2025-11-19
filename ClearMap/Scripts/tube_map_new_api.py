@@ -9,7 +9,9 @@ optionally, provide the atlas base name as second argument
 import sys
 
 from ClearMap.Scripts.align_new_api import stitch, register, plot_registration_results
-from ClearMap.pipeline_orchestrators.sample_preparation import SampleManager, StitchingProcessor, RegistrationProcessor
+from ClearMap.pipeline_orchestrators.sample_info_management import SampleManager
+from ClearMap.pipeline_orchestrators.stitching_orchestrator import StitchingProcessor
+from ClearMap.pipeline_orchestrators.registration_orchestrator import RegistrationProcessor
 from ClearMap.pipeline_orchestrators.tube_map import BinaryVesselProcessor, VesselGraphProcessor
 
 
@@ -39,7 +41,7 @@ def main(src_directory):
     binary_vessel_processor.combine_binary()
     # binary_vessel_processor.plot_combined(arrange=True)
 
-    vessel_graph_processor = VesselGraphProcessor(sample_manager, registration_processor)
+    vessel_graph_processor = VesselGraphProcessor(sample_manager, registration_processor=registration_processor)
     vessel_graph_processor.pre_process()
     # TODO: slice
     vessel_graph_processor.post_process()

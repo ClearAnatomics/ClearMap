@@ -8,7 +8,9 @@ optionally, provide the atlas base name as second argument
 """
 import sys
 
-from ClearMap.pipeline_orchestrators.sample_preparation import SampleManager, StitchingProcessor,  RegistrationProcessor
+from ClearMap.pipeline_orchestrators.sample_info_management import SampleManager
+from ClearMap.pipeline_orchestrators.stitching_orchestrator import StitchingProcessor
+from ClearMap.pipeline_orchestrators.registration_orchestrator import RegistrationProcessor
 from ClearMap.Scripts.align_new_api import plot_registration_results, register, stitch
 from ClearMap.pipeline_orchestrators.cell_map import CellDetector
 

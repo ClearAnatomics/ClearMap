@@ -5,15 +5,15 @@ from matplotlib import pyplot as plt
 
 sys.path.insert(0, os.path.abspath('.'))
 
-from ClearMap.pipeline_orchestrators.sample_preparation import SampleManager, StitchingProcessor
+from ClearMap.pipeline_orchestrators.sample_info_management import SampleManager
+from ClearMap.pipeline_orchestrators.stitching_orchestrator import StitchingProcessor
 import ClearMap.Alignment.Stitching.StitchingRigid as stitching_rigid
 
 
 
 def plot_all_layouts(folder):
-    sample_manager = SampleManager()
-    sample_manager.setup(src_dir=folder)
-    stitcher = StitchingProcessor(sample_manager)
+    sample_manager = SampleManager(src_dir=folder)  # FIXME: ConfigCoordinator
+    stitcher = StitchingProcessor(sample_manager)  # FIXME: ConfigCoordinator
     for postfix in ('aligned_axis', 'aligned', 'placed'):
         layout = stitching_rigid.load_layout(sample_manager.get_path('layout', postfix=postfix))
         overlay = stitcher.overlay_layout_plane(layout)
