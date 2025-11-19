@@ -2,7 +2,9 @@ import glob
 import os
 import re
 from copy import deepcopy
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Dict, List, Optional
 
 import pandas as pd
 
@@ -24,8 +26,10 @@ class MetadataError(Exception):
 class NotAnOmeFile(Exception):
     pass
 
+Pathlike = str | Path
 
-def _get_ome_dict_tifffile(img_path):  # WARNING: works only with recent versions of tifffile not 0.15.1
+
+def _get_ome_dict_tifffile(img_path: Pathlike):  # WARNING: works only with recent versions of tifffile not 0.15.1
     if not tifffile.TiffFile(img_path).is_ome:
         raise NotAnOmeFile(f"File {img_path} is not a valid ome.tif file")
     ome_metadata = tifffile.tiffcomment(img_path)
@@ -33,7 +37,8 @@ def _get_ome_dict_tifffile(img_path):  # WARNING: works only with recent version
     return ome_dict
 
 
-def _get_ome_dict_pil(img_path):
+def _get_ome_dict_pil(img_path: Pathlike):
+    img_path = str(img_path)
     not_an_ome_msg = f"File {img_path} is not a valid ome.tif file"
     if not img_path.endswith('.ome.tif'):  # Weak but can't rely on tifffile
         raise NotAnOmeFile(not_an_ome_msg)
@@ -137,20 +142,24 @@ def define_auto_resolution(img_path, cfg_res):
 
     return out_res
 
+############################################### TILE PATTERNS DISCOVERY ##############################################
 
-def get_file_path(cfg, path_name):
-    return os.path.join(get_base_dir(cfg), cfg['src_paths'][path_name])
-
-
-def get_base_dir(cfg):
-    return os.path.expanduser(cfg['base_directory'])
-
-
-##################################################################################################################
+@dataclass(frozen=True)
+class ChannelPatternSpec:
+    name: str                 # channel name from the UI
+    data_type: str            # selected content type
+    extension: str            # e.g. ".ome.tif" (normalized to str)
+    pattern_relpath: str      # pattern string relative to src_folder
 
 
-def get_tiles_list_from_sample_folder(src_dir: Path, min_file_number=10, tile_extensions=['.ome.tif', '.ome.npy']):
-    data_dirs = {}
+def _as_list(x):
+    return x if isinstance(x, list) else [x]
+
+
+def get_tiles_list_from_sample_folder(src_dir: Path, min_file_number: int = 10,
+                                      tile_extensions: List[str] = ['.ome.tif', '.ome.npy']) -> Dict[Path, List[Path]]:
+    tile_extensions = _as_list(tile_extensions)
+    data_dirs: Dict[Path, List[Path]] = {}
     for f_name in sorted(src_dir.iterdir()):
         f_path = src_dir / f_name
         if f_path.is_dir():
@@ -162,17 +171,16 @@ def get_tiles_list_from_sample_folder(src_dir: Path, min_file_number=10, tile_ex
     return data_dirs
 
 
-def extract_channel_number(pattern_str):
+def extract_channel_number(pattern_str: str) -> Optional[int]:
     match = re.search(r'(?:_)?[cC](\d{1,2})\b', pattern_str)
     if match:
         return int(match.group(1))
     return None
 
 
-def pattern_finders_from_base_dir(src_dir, min_file_number=10, tile_extension=['.ome.tif', '.ome.npy']):
+def pattern_finders_from_base_dir(src_dir: Pathlike, min_file_number: int = 10,
+                                  tile_extension: List[str] = ['.ome.tif', '.ome.npy']) -> List["PatternFinder"]:
     src_dir = Path(src_dir)
-    if not isinstance(tile_extension, (tuple, list)):
-        tile_extension = [tile_extension]
     data_dirs = get_tiles_list_from_sample_folder(src_dir, min_file_number=min_file_number,
                                                   tile_extensions=tile_extension)
     finders = []
@@ -221,6 +229,18 @@ class Pattern(Expression):
             if 'C' not in self.tag_names():
                 self.set_channel_tag_name()
         return super().string(values)
+
+    def relative_string(self, base_dir: Path) -> str:
+        """Return the pattern string relative to base_dir."""
+        return str(Path(self.string()).relative_to(base_dir))
+
+    def assign_axes_from_combo(self, axis_names: list[str]) -> None:
+        """axis_names is a list like ['Z','Y','X'] mapped to existing tag slots."""
+        if len(axis_names) != self.n_tags():
+            raise ValueError('Axis list length must match number of tags')
+        if 'C' in axis_names:
+            raise NotImplementedError(f'Channel splitting is not implemented yet, cannot split axis nb{axis_names.index("C")}')
+        self.set_axes_names(axis_names)
 
     def set_axis_name(self, axis_index, new_name):
         self.tags[axis_index].name = new_name
@@ -436,3 +456,19 @@ class PatternFinder:  # TODO: from_df class_method
             pattern += first_row[i] if (df[col] == first_row[i]).all() else '?'  # ? if not all letters are the same in the column
         # FIXME: skips some spaces x and ]
         return Pattern(pattern)
+
+    def to_channel_config(self, *, data_type: str, extension: str, base_dir: Path) -> dict:
+        """
+        Returns a minimal config subtree for this channel.
+        """
+        # ensure channel tag is set if needed
+        _ = self.pattern.string()  # ensures internal state
+        return {
+            'data_type': data_type,
+            'extension': extension,
+            'path': self.pattern.relative_string(base_dir),
+            'resolution': [1, 1, 1],
+            'orientation': (0, 0, 0),
+            'comments': '',
+            'slicing': {'x': None, 'y': None, 'z': None}
+        }
