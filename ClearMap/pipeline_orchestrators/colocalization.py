@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import math
 from typing import List, Optional
 
@@ -12,61 +10,61 @@ import pyqtgraph as pg
 from ClearMap.Analysis.Measurements import Voxelization as voxelization
 from ClearMap.Analysis.colocalization.channel import Channel as ColocalizationChannel
 from ClearMap.IO.assets_specs import ChannelSpec
-from ClearMap.IO import IO as cmp_io
 from ClearMap.IO.workspace2 import Workspace2
 from ClearMap.Utils.exceptions import ClearMapValueError
 from ClearMap.Utils.utilities import sanitize_n_processes
 from ClearMap.Visualization.Qt.widgets import Scatter3D
-from ClearMap.pipeline_orchestrators.generic_tab_processor import CompoundChannelTabProcessor
+from ClearMap.config.config_coordinator import ConfigCoordinator
+from ClearMap.pipeline_orchestrators.generic_orchestrators import CompoundChannelPipelineOrchestrator
 
 from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
-from ClearMap.pipeline_orchestrators.sample_preparation import RegistrationProcessor
+from ClearMap.pipeline_orchestrators.sample_info_management import SampleManager
+from ClearMap.pipeline_orchestrators.registration_orchestrator import RegistrationProcessor
 
 
-class ColocalizationProcessor(CompoundChannelTabProcessor):
+class ColocalizationProcessor(CompoundChannelPipelineOrchestrator):
     colocalization_channels: dict[ColocalizationChannel]
-    processing_name = 'colocalization'
+    config_name = 'colocalization'
 
-    def __init__(self, sample_manager=None, channels=None):
-        super().__init__()
-        self.filtered_table: Optional[pd.DataFrame] = None
-        self.sample_config = None
-        self.machine_config = None
-        self.sample_manager = None
-        self.registration_processor: Optional[RegistrationProcessor] = None
+    def __init__(self, sample_manager: Optional[SampleManager] = None,
+                 config_coordinator: Optional[ConfigCoordinator] = None,
+                 channels : Optional[List[str]] = None,
+                 registration_processor: Optional[RegistrationProcessor] = None):
+        super().__init__(config_coordinator)
+        self.sample_manager = sample_manager
+        self.channels: List[str] = channels
+        self.registration_processor: Optional[RegistrationProcessor] = registration_processor
         self.workspace: Workspace2 | None = None
+
+        self.filtered_table: Optional[pd.DataFrame] = None
         if channels is None:
             raise ClearMapValueError(f'No channels specified. Please provide a pair of channels to compare. '
                                      f'They must match the ones in the sample_params file.')
         if len(channels) != 2:
             raise ClearMapValueError(f'Please provide exactly two channels to compare. '
                                      f'They must match the ones in the sample_params file.')
-        self.channels: List[str] = channels
         self.colocalization_channels: dict[str, ColocalizationChannel] = {}  # The objects that compute the colocalization from the colocalization package
         self.setup_finalised: bool = False
-        self.setup(sample_manager, channels)
+        self.setup(sample_manager, channels, registration_processor)
 
-    def setup(self, sample_manager, channel_names):
+    def setup(self, sample_manager: Optional[SampleManager], channel_names: List[str],
+              registration_processor: Optional[RegistrationProcessor] = None):
         self.channels = channel_names
-        self.sample_config = None
+        if registration_processor is not None:
+            self.registration_processor = registration_processor
         if sample_manager is not None:
             self.sample_manager = sample_manager
             self.workspace = sample_manager.workspace
-            configs = sample_manager.get_configs()
-            self.sample_config = configs['sample']
-            self.machine_config = configs['machine']
 
             if self.channels not in self.workspace.asset_collections.keys():
                 # FIXME: ugly. should be handled by add_pipeline with missing_ok=True
-                sample_id = self.sample_manager.config['sample_id']
+                sample_id = self.sample_manager.sample_id
                 self.workspace.add_channel(ChannelSpec(self.channels, 'colocalization'),
                                            sample_id=sample_id)
                 self.workspace.add_channel(ChannelSpec(self.channels[::-1], 'colocalization'),
                                            sample_id=sample_id)
                 self.workspace.add_pipeline('Colocalization', self.channels, sample_id=sample_id)
                 self.workspace.add_pipeline('Colocalization', self.channels[::-1], sample_id=sample_id)
-
-            self.set_progress_watcher(self.sample_manager.progress_watcher)
 
             self.finalise_setup()
 
@@ -75,7 +73,7 @@ class ColocalizationProcessor(CompoundChannelTabProcessor):
             return
         finalised_channels = {chan: False for chan in self.channels}
         for channel in self.channels:
-            resolution = self.sample_manager.config['channels'][channel]['resolution']
+            resolution = self.sample_manager.get_channel_resolution(channel)
             try:
                 self.colocalization_channels[channel] = ColocalizationChannel(
                     self.get('cells', channel=channel, asset_sub_type='shape').existing_path,
@@ -91,7 +89,6 @@ class ColocalizationProcessor(CompoundChannelTabProcessor):
         return pd.read_feather(self.get_path('cells', channel=channel))
 
     def compute_colocalization(self, channel_a, channel_b):
-        self.reload_config()
         # voxel_blob_diameter will also be used to compute the overlap
         voxel_blob_diameter = self.config['comparison']['particle_diameter']
         n_processes = sanitize_n_processes(self.config['performance']['n_processes'])
@@ -175,7 +172,6 @@ class ColocalizationProcessor(CompoundChannelTabProcessor):
         pass
 
     def voxelize_filtered_table(self, channel_a, channel_b):
-        self.reload_config()
         coordinates, voxelization_parameter = self.get_voxelization_params(channel_a, channel_b)
         _ = self.voxelize_unweighted(channel_a, channel_b, coordinates, voxelization_parameter)
 
@@ -216,14 +212,12 @@ class ColocalizationProcessor(CompoundChannelTabProcessor):
         -------
         coordinates, counts_file_path: np.array, str
         """
-        counts_file_path = self.get_path('density', channel=(channel_a, channel_b), asset_sub_type='counts')
-        cmp_io.delete_file(counts_file_path)
+        counts_asset = self.get('density', channel=(channel_a, channel_b), asset_sub_type='counts')
+        counts_asset.delete(missing_ok=True)
         self.set_watcher_step('Unweighted voxelisation')
-        voxelization.voxelize(coordinates, sink=counts_file_path, **voxelization_parameter)  # WARNING: prange
+        voxelization.voxelize(coordinates, sink=counts_asset.path, **voxelization_parameter)  # WARNING: prange
         self.update_watcher_main_progress()
         # uncrusted_coordinates = self.remove_crust(coordinates)  # WARNING: currently causing issues
         #         density_path = self.get_path('density', channel=self.channel, asset_sub_type='counts_wcrust')
         #         voxelization.voxelize(uncrusted_coordinates, sink=density_path, **voxelization_parameter)   # WARNING: prange
-        return coordinates, counts_file_path
-
-
+        return coordinates, counts_asset.path

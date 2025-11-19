@@ -2,8 +2,10 @@ import functools
 import platform
 import shutil
 import tempfile
+import warnings
 from multiprocessing.managers import BaseManager
 from pathlib import Path
+from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -11,9 +13,11 @@ import pyqtgraph as pg
 from matplotlib.colors import to_hex
 
 from ClearMap.IO import IO as cmp_io
+from ClearMap.IO.workspace2 import Workspace2
 from ClearMap.Utils.exceptions import MissingRequirementException
 from ClearMap.Utils.utilities import sanitize_n_processes
-from ClearMap.pipeline_orchestrators.generic_tab_processor import ChannelTabProcessor
+from ClearMap.config.config_coordinator import ConfigCoordinator
+from ClearMap.pipeline_orchestrators.generic_orchestrators import ChannelPipelineOrchestrator
 from ClearMap.Alignment import Elastix as elastix
 from ClearMap.Alignment.Resampling import resample_points
 from ClearMap.ParallelProcessing.DataProcessing import ArrayProcessing as array_processing
@@ -23,6 +27,7 @@ from ClearMap.Analysis.Measurements.Voxelization import voxelize
 
 from ClearMap.Visualization.Qt.widgets import Scatter3D
 from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
+from ClearMap.pipeline_orchestrators.sample_info_management import SampleManager
 
 USE_BINARY_POINTS_FILE = not platform.system().lower().startswith('darwin')  # i.e. binary is available in elastix
 
@@ -32,19 +37,19 @@ def label_points_wrapper(annotator, coords):
     return np.expand_dims(annotator.label_points(coords), axis=-1)  # Add empty dim to match shape of coords
 
 
-class TractMapProcessor(ChannelTabProcessor):
+class TractMapProcessor(ChannelPipelineOrchestrator):
 
-    processing_name = 'tract_map'
+    config_name = 'tract_map'
 
-    def __init__(self, sample_manager=None, channel=None, registration_processor=None):
-        super().__init__()
+    def __init__(self, sample_manager: Optional[SampleManager] = None,
+                 config_coordinator: Optional[ConfigCoordinator] = None,
+                 channel: str = '', registration_processor=None):
+        super().__init__(config_coordinator)
+        self.sample_manager = sample_manager
+        self.registration_processor = registration_processor
+        self.channel = channel
+        self.workspace: Optional[Workspace2] = None
         self.save_intermediate_binarization_results = True
-        self.sample_config = None
-        self.machine_config = None
-        self.sample_manager = None
-        self.registration_processor = None
-        self.workspace = None
-        self.channel = None
         self.uniques = None
         self.uniq_counts = None
         self.sampling = 1
@@ -55,24 +60,23 @@ class TractMapProcessor(ChannelTabProcessor):
         self.setup(sample_manager, channel, registration_processor)
 
     def setup(self, sample_manager, channel_name, registration_processor):
-        self.channel = channel_name
-        self.sample_config = None
-        if sample_manager is not None:
-            self.sample_manager = sample_manager
-            self.workspace = sample_manager.workspace
-            configs = sample_manager.get_configs()
-            self.sample_config = configs['sample']
-            self.machine_config = configs['machine']
+        self.sample_manager = sample_manager if sample_manager else self.sample_manager
 
-            self.set_progress_watcher(self.sample_manager.progress_watcher)
+        self.channel = channel_name
         self.registration_processor = registration_processor
+
+        if self.sample_manager.setup_complete:
+            self.workspace = sample_manager.workspace
+            self.setup_complete = True
+        else:
+            self.setup_complete = False
+            warnings.warn(f'SampleManager not set up yet. Setting TractMapProcessor up defered.')
 
     def create_test_dataset(self, slicing):
         self.workspace.create_debug('stitched', channel=self.channel, slicing=slicing)
         self.update_watcher_main_progress()
 
     def compute_clip_range(self, pixel_percents=(70, 99.999)):
-        self.reload_config()
         self._compute_uniques()
         percents = np.asarray(pixel_percents, dtype=float)
         target_idx = np.rint(percents / 100.0 * (self._n_pixels - 1)).astype(int)
@@ -111,7 +115,6 @@ class TractMapProcessor(ChannelTabProcessor):
         list[float]
             [low_percentile, high_percentile]
         """
-        self.reload_config()
         self._compute_uniques()
         # For each intensity, count how many pixels are ≤ that value ----
         # With side='right' we include pixels that are exactly equal to the queried intensity
@@ -175,14 +178,8 @@ class TractMapProcessor(ChannelTabProcessor):
             raise NotImplementedError('Output to file not implemented yet')
 
     def get_registration_sequence_channels(self, stop_channel='atlas'):
-        out = [self.channel]
-        registration_cfg = self.registration_processor.config['channels']
-        while True:
-            next_channel = registration_cfg[out[-1]]['align_with']
-            if next_channel in (None, stop_channel):
-                break
-            out.append(next_channel)
-        return out
+        return (self.registration_processor.
+                get_registration_sequence_channels(self.channel, stop_channel))
 
     @staticmethod
     def transformation(coords, source_shape, resampled_shape, results_directories):
@@ -241,7 +238,7 @@ class TractMapProcessor(ChannelTabProcessor):
 
         results_directories = []
         for channel in self.get_registration_sequence_channels(stop_channel=target_channel):
-            if self.registration_processor.config['channels'][channel]['moving_channel'] in (None, 'intrinsically_aligned'):
+            if self.registration_config['channels'][channel]['moving_channel'] in (None, 'intrinsically_aligned'):
                 continue
             else:
                 result_dir = self.registration_processor.get_elx_asset('aligned', channel=channel).path.parent
@@ -321,7 +318,6 @@ class TractMapProcessor(ChannelTabProcessor):
 
     def run_pipeline(self, tuning=False):
         self.workspace.debug = tuning
-        self.reload_config()
 
         self.binarize(*self.config['binarization']['clip_range'])
         self.mask_to_coordinates(as_memmap=USE_BINARY_POINTS_FILE)

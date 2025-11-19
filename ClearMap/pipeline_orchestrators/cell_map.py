@@ -48,7 +48,8 @@ import ClearMap.Analysis.Measurements.Voxelization as voxelization
 from ClearMap.IO.workspace2 import Workspace2
 from ClearMap.Utils.exceptions import MissingRequirementException
 from ClearMap.Utils.utilities import requires_assets, FilePath
-from ClearMap.pipeline_orchestrators.generic_tab_processor import ChannelTabProcessor
+from ClearMap.config.config_coordinator import ConfigCoordinator
+from ClearMap.pipeline_orchestrators.generic_orchestrators import ChannelPipelineOrchestrator
 from ClearMap.Visualization.Qt.widgets import Scatter3D
 
 __author__ = 'Christoph Kirst <christoph.kirst.ck@gmail.com>, Charly Rousseau <charly.rousseau@icm-institute.org>'
@@ -57,62 +58,75 @@ __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
-from ClearMap.pipeline_orchestrators.sample_preparation import SampleManager, RegistrationProcessor
+from ClearMap.pipeline_orchestrators.sample_info_management import SampleManager
+from ClearMap.pipeline_orchestrators.registration_orchestrator import RegistrationProcessor
 
 USE_BINARY_POINTS_FILE = not platform.system().lower().startswith('darwin')
 
 
-class CellDetector(ChannelTabProcessor):
+class CellDetector(ChannelPipelineOrchestrator):
 
-    processing_name = 'cell_map'
+    config_name = 'cell_map'
 
-    def __init__(self, sample_manager=None, channel=None, registration_processor=None):
-        super().__init__()
+    def __init__(self, sample_manager: SampleManager = None, config_coordinator: ConfigCoordinator = None,
+                 channel=None, registration_processor=None):
+        super().__init__(config_coordinator)
         self.sample_manager: Optional[SampleManager] = None
-        self.sample_config = None
-        self.machine_config = None
+        self.channel: Optional[str] = None
         self.registration_processor: Optional[RegistrationProcessor] = None
         self.workspace: Optional[Workspace2] = None
-        self.channel: Optional[str] = None
         self.cell_detection_re = ('Processing block',
                                   re.compile(r'.*?Processing block \d+/\d+.*?\selapsed time:\s\d+:\d+:\d+\.\d+'))
         if channel is None:
             raise ValueError(f'No channel specified. Please provide a channel name '
-                             f'that matches the one in the sample_params file.')
+                             f'that matches one in the sample_params file.')
         self.setup(sample_manager, channel, registration_processor)
 
     def setup(self, sample_manager, channel_name, registration_processor):
+        self.sample_manager = sample_manager if sample_manager else self.sample_manager
         self.channel = channel_name
-        self.sample_config = None
-        if sample_manager is not None:
-            self.sample_manager = sample_manager
-            self.workspace = sample_manager.workspace
-            configs = sample_manager.get_configs()
-            self.sample_config = configs['sample']  
-            self.machine_config = configs['machine']
-
-            self.set_progress_watcher(self.sample_manager.progress_watcher)
         self.registration_processor = registration_processor
+        if self.sample_manager.setup_complete:
+            self.workspace = sample_manager.workspace
+            self.setup_complete = True
+        else:
+            self.setup_complete = False
+            warnings.warn('SampleManager not setup, CellDetector setup incomplete')
 
     @property
     def detected(self):
         return self.get('cells', channel=self.channel, asset_sub_type='raw').exists
 
     def post_process_cells(self):
-        self.reload_config()
         self.filter_cells()
         self.atlas_align()
         self.export_collapsed_stats()
 
+    def set_voxelization_radii(self, voxelization_radii):
+        if not isinstance(voxelization_radii, (list, tuple, np.ndarray)):
+            raise ValueError('voxelization_radius must be a list, tuple or numpy array')
+        if len(voxelization_radii) != 3:
+            raise ValueError('voxelization_radius must have three elements (x,y,z)')
+        if self.config is None:
+            raise ValueError('CellDetector not properly initialized')
+        self.patch_channel({'voxelization': {'radii': list(voxelization_radii)}})
+
     def voxelize(self, sub_step=''):
-        self.reload_config()
+        """
+        Unweighted voxelization (i.e. cell counts)
+        This will draw a sphere of radius r around each cell and increment the voxel values.
+
+        Parameters
+        ----------
+        sub_step: str
+            If specified, will use the coordinates from the specified sub_step (e.g. 'aligned')
+        """
         coordinates, cells, voxelization_parameter = self.get_voxelization_params(sub_step=sub_step)
-        # %% Unweighted
         _ = self.voxelize_unweighted(coordinates, voxelization_parameter)
 
     @requires_assets([FilePath('density', postfix='counts')])
     def plot_voxelized_counts(self, arrange=True, parent=None):
-        scale = self.registration_processor.config['channels'][self.channel]['resampled_resolution']
+        scale = self.channel_cfg_view('registration')['resampled_resolution']
         return plot_3d.plot(self.get_path('density', channel=self.channel, asset_sub_type='counts'),
                             scale=scale, title='Cell density (voxelized)', lut='flame',
                             arrange=arrange, parent=parent)
@@ -200,8 +214,7 @@ class CellDetector(ChannelTabProcessor):
         intensities_asset = self.get('density', channel=self.channel, asset_sub_type='intensities')
         intensities_asset.delete(missing_ok=True)  # Remove previous intensities file if exists
         intensities = source['source']
-        voxelization.voxelize(coordinates, sink=intensities_asset.path, weights=intensities, 
-                              **voxelization_parameter)   # WARNING: prange
+        voxelization.voxelize(coordinates, sink=intensities_asset.path, weights=intensities, **voxelization_parameter)   # WARNING: prange
         return intensities_asset.path
 
     def atlas_align(self):
@@ -214,8 +227,8 @@ class CellDetector(ChannelTabProcessor):
         if self.registration_processor.was_registered:  # FIXME: check if should be registered and raise error
             coordinates_transformed = self.transform_coordinates(coordinates)
             annotator = self.registration_processor.annotators[self.channel]
-            channel_cfg = self.registration_processor.config['channels'][self.sample_manager.alignment_reference_channel]
-            atlas_resolution = channel_cfg['resampled_resolution']
+            ref_channel_cfg = self.get_alignment_ref_channel_reg_cfg()
+            atlas_resolution = ref_channel_cfg['resampled_resolution']
             extra_columns = annotator.get_columns(coordinates_transformed, atlas_resolution)  # OPTIMISE: parallel
             df = pd.concat([df, extra_columns], axis=1)
         else:
@@ -239,8 +252,9 @@ class CellDetector(ChannelTabProcessor):
             resampled_shape=resampled_shape)
 
         if self.registration_processor.was_registered:
+            reg_cfg = self.registration_config['channels']
             for i, channel in enumerate(self.get_registration_sequence_channels(stop_channel=target_channel)):
-                if self.registration_processor.config['channels'][channel]['moving_channel'] in (None, 'intrinsically_aligned'):
+                if reg_cfg[channel]['moving_channel'] in (None, 'intrinsically_aligned'):
                     continue
                 results_dir = self.get_path('aligned', channel=channel).parent
                 coords = elastix.transform_points(coords, transform_directory=results_dir, binary=USE_BINARY_POINTS_FILE)
@@ -248,7 +262,6 @@ class CellDetector(ChannelTabProcessor):
         return coords
 
     def filter_cells(self):
-        self.reload_config()
         thresholds = {
             'source': self.config['cell_filtration']['thresholds']['intensity'],
             'size': self.config['cell_filtration']['thresholds']['size']
@@ -261,7 +274,6 @@ class CellDetector(ChannelTabProcessor):
         cell_detection.filter_cells(source=src_path, sink=dest_path, thresholds=thresholds)
 
     def run_cell_detection(self, tuning=False, save_maxima=False, save_shape=False, save_as_binary_mask=False):
-        self.reload_config()
         self.workspace.debug = tuning  # TODO: use context manager
 
         cell_detection_param = copy.deepcopy(cell_detection.default_cell_detection_parameter)
@@ -347,7 +359,7 @@ class CellDetector(ChannelTabProcessor):
             tmp['Hemisphere'] = first['hemisphere']
             tmp['Structure volume'] = first['volume']
             tmp['Cell counts'] = grouped.count()['name']
-            tmp['Average cell size'] = grouped.mean()['size']
+            tmp['Average cell size'] = grouped['size'].mean()['size']
 
             collapsed = pd.concat((collapsed, tmp))
 
@@ -359,7 +371,7 @@ class CellDetector(ChannelTabProcessor):
             df_mock = pd.DataFrame({'Hemisphere': [0, 255], 'mock': ''})
             tmp = tmp.merge(df_mock, on='mock').drop(columns='mock')
             vol_map = annotator.get_lateralised_volume_map(
-                self.registration_processor.config['channels'][self.sample_manager.alignment_reference_channel]['resampled_resolution'],
+                self.get_alignment_ref_channel_reg_cfg()['resampled_resolution'],
                 self.get_path('atlas', channel=self.channel, asset_sub_type='hemispheres')
             )
             tmp['Structure volume'] = tmp.set_index(['Structure ID', 'Hemisphere']).index.map(vol_map.get)
@@ -372,18 +384,6 @@ class CellDetector(ChannelTabProcessor):
 
         csv_file_path = self.get_path('cells', channel=self.channel, asset_sub_type='stats', extension='.csv')
         collapsed.to_csv(csv_file_path, index=False)
-
-    def plot_cells(self):  # For non GUI
-        source = self.workspace.source('cells', postfix='raw')
-        plt.figure(1)
-        plt.clf()
-        names = source.dtype.names
-        nx, ny = plot_3d.subplot_tiling(len(names))
-        for i, name in enumerate(names):
-            plt.subplot(nx, ny, i + 1)
-            plt.hist(source[name])
-            plt.title(name)
-        plt.tight_layout()
 
     def plot_cells_3d_scatter_w_atlas_colors(self, raw=False, parent=None):
         asset_properties = {'channel': self.channel}
@@ -586,8 +586,7 @@ class CellDetector(ChannelTabProcessor):
         id_map = {lbl: annotator.find(lbl, key='order')['id'] for lbl in unique_labels}
 
         atlas = self.get('atlas', channel=self.channel, asset_sub_type='annotation').read()
-        atlas_scale = self.registration_processor.config['channels'][self.sample_manager.alignment_reference_channel]['resampled_resolution']
-        atlas_scale = np.prod(atlas_scale)
+        atlas_scale = np.prod(self.get_alignment_ref_channel_reg_cfg['resampled_resolution'])
         volumes = {_id: (atlas == _id).sum() * atlas_scale for _id in
                    id_map.values()}  # Volumes need a lookup on ID since the atlas is in ID space
 
@@ -599,11 +598,5 @@ class CellDetector(ChannelTabProcessor):
         df.to_feather(self.get_path('cells', channel=self.channel, extension='.feather'))
 
     def get_registration_sequence_channels(self, stop_channel='atlas'):
-        out = [self.channel]
-        registration_cfg = self.registration_processor.config['channels']
-        while True:
-            next_channel = registration_cfg[out[-1]]['align_with']
-            if next_channel in (None, stop_channel):
-                break
-            out.append(next_channel)
-        return out
+        return (self.registration_processor.
+                get_registration_sequence_channels(self.channel, stop_channel))
