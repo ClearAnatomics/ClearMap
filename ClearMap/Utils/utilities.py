@@ -5,6 +5,7 @@ utilities
 
 Various utilities that do not have a specific category
 """
+import inspect
 import multiprocessing
 import os
 import re
@@ -15,9 +16,11 @@ import tempfile
 import warnings
 from collections import deque
 from concurrent.futures import ProcessPoolExecutor
+from copy import deepcopy
 from functools import reduce
 from operator import getitem
 from types import MappingProxyType
+from typing import Dict, Any, List
 
 import numpy as np
 import psutil
@@ -127,14 +130,67 @@ def is_iterable(obj):
 
 
 def title_to_snake(string):
-    out = re.sub('(?!^)([A-Z]+)', r'_\1', string).lower()
-    out = out.replace(' ', '_')
-    return out
+    """
+        Convert a human/TitleCase/mixed string into canonical snake_case.
+
+        Rules:
+        - Inserts underscores at CamelCase boundaries (e.g., "TubeMap" -> "tube_map").
+        - Keeps acronyms together (e.g., "HTTPServer" -> "http_server", "ROI3D" -> "roi3d").
+        - Normalizes spaces, hyphens, slashes, and other punctuation to single underscores.
+        - Collapses multiple underscores and trims leading/trailing underscores.
+        - Lowercases the final result.
+
+        Parameters
+        ----------
+        s : str
+            Input string (e.g., tab title, pipeline name, or file-ish label).
+
+        Returns
+        -------
+        str
+            Snake_case version of the input. Empty string if input is None/empty.
+
+        Examples
+        --------
+        >>> title_to_snake("TubeMap")
+        'tube_map'
+        >>> title_to_snake("Sample Info")
+        'sample_info'
+        >>> title_to_snake("Tract-Map")
+        'tract_map'
+        >>> title_to_snake("ROI3D")
+        'roi3_d'  # FIXME: ideally 'roi3d' but hard to do robustly
+        >>> title_to_snake("HTTPServerError")
+        'http_server_error'
+        """
+    if not string:
+        return ''
+
+    string = string.strip()
+
+    # Insert underscore between:
+    # 1) a lowercase/digit and an uppercase letter: "version2File" -> "version2_File"
+    string = re.sub(r'([a-z0-9])([A-Z])', r'\1_\2', string)
+
+    # 2) acronym and the next CamelCase word: "HTTPServer" -> "HTTP_Server"
+    #    (one or more capitals) followed by (Capital + lowercase)
+    string = re.sub(r'([A-Z]+)([A-Z][a-z])', r'\1_\2', string)
+
+    # Normalize any non-alphanumeric runs to underscores (keeps underscores too)
+    string = re.sub(r'[^0-9A-Za-z]+', '_', string)
+
+    # Collapse repeated underscores and trim
+    string = re.sub(r'_+', '_', string).strip('_')
+
+    return string.lower()
+    # out = re.sub('(?!^)([A-Z]+)', r'_\1', string).lower()
+    # out = out.replace(' ', '_')
+    # return out
 
 def snake_to_title(string):
     return string.replace('_', ' ').title()
 
-
+# FIXME: move these functions to config or io utils
 def backup_file(file_path):  # REFACTOR: put in workspace or IO
     base_path, ext = os.path.splitext(file_path)
     new_path = base_path + '.bcp' + ext
@@ -162,6 +218,23 @@ def get_item_recursive(container, keys):
         raise err
 
 
+def try_get_item_recursive(container, keys, default=Ellipsis):
+    try:
+        return get_item_recursive(container, keys)
+    except (TypeError, KeyError):
+        if default is Ellipsis:
+            raise
+        return default
+
+
+def has_item_recursive(container, keys) -> bool:
+    try:
+        get_item_recursive(container, keys)
+        return True
+    except (TypeError, KeyError):
+        return False
+
+
 def set_item_recursive(dictionary, keys_list, val, fix_missing_keys=True):
     def add_keys(d, keys):
         if not keys:
@@ -169,11 +242,23 @@ def set_item_recursive(dictionary, keys_list, val, fix_missing_keys=True):
         if keys[0] not in d.keys():
             d[keys[0]] = {}
         if keys[1:]:  # if keys left
+            if not isinstance(d[keys[0]], dict):
+                # Avoid creating a sub-dict if there is already a non-dict value there
+                raise TypeError(f"Non-dict at {keys[0]} while descending {keys}")
             add_keys(d[keys[0]], keys[1:])
 
     if fix_missing_keys:
         add_keys(dictionary, keys_list[:-1])  # Fix missing keys recursively
+    else: # ensure the path exists and is all dicts
+        cur = dictionary
+        for k in keys_list[:-1]:
+            cur = cur[k]  # KeyError if missing
+            if not isinstance(cur, dict):
+                raise TypeError(f"Non-dict at {k} while descending {keys_list}")
+
+    # Since we ensured it exists and is a dict, write to var will modify in place
     get_item_recursive(dictionary, keys_list[:-1])[keys_list[-1]] = val
+    return dictionary  # Return the modified dictionary for chaining
 
 
 def deep_freeze(obj) -> object | MappingProxyType:
@@ -207,6 +292,94 @@ def deep_freeze(obj) -> object | MappingProxyType:
         return tuple(deep_freeze(x) for x in obj)
     # scalars (str/int/float/None/...) pass through because in python they are already immutable
     return obj
+
+
+class _DELETE:
+    """
+    Singleton object to indicate deletion in deep merges.
+    Because of ClearMap's extensive use of multi-processing and pickling,
+    this class ensures that the DELETE object keeps its identity across
+    deep copies and pickling.
+    """
+    __slots__ = ()
+    def __repr__(self) -> str:
+        return "<DELETE>"
+
+    # keep identity across deepcopy
+    def __deepcopy__(self, memo):
+        return self
+
+    # keep identity across pickle / multiprocessing
+    def __reduce__(self):
+        return _get_delete_singleton, ()
+
+def _get_delete_singleton():
+    return DELETE
+
+DELETE = _DELETE()
+
+class _REPLACE:
+    """Replace the destination value at this key with the provided payload."""
+    __slots__ = ('payload',)
+    def __init__(self, payload):
+        self.payload = payload
+
+    def __repr__(self):
+        return f"<REPLACE {type(self.payload).__name__}>"
+
+    # keep identity across deepcopy
+    def __deepcopy__(self, memo):
+        return _REPLACE(deepcopy(self.payload))
+
+    # keep identity across pickle / multiprocessing
+    def __reduce__(self):
+        return _make_replace, (self.payload,)
+
+def _make_replace(payload):
+    return _REPLACE(payload)
+
+def REPLACE(value):
+    return _REPLACE(value)
+
+
+def deep_merge(dst: Dict[str, Any], src: Dict[str, Any]) -> Dict[str, Any]:
+    for k, v in src.items():
+        if v is DELETE:
+            dst.pop(k, None)
+            continue
+
+        if isinstance(v, _REPLACE):
+            dst[k] = deepcopy(v.payload)
+            continue
+
+        if isinstance(v, dict):
+            sub = dst.get(k)
+            if not isinstance(sub, dict):
+                sub = {}
+            dst[k] = deep_merge(sub, v)  # nested replacement
+        else:
+            dst[k] = deepcopy(v)
+    return dst
+
+
+def _ensure_list(obj) -> list:
+    if obj is None:
+        return []
+    if isinstance(obj, list):
+        return obj
+    return [obj]
+
+def _dedupe_preserve_order(seq, key=lambda x: x):
+    seen = set()
+    out = []
+    for x in seq:
+        k = key(x)
+        if k in seen:
+            continue
+        seen.add(k)
+        out.append(x)
+    return out
+
 
 
 def requires_assets(asset_specs):
@@ -449,3 +622,47 @@ def get_ok_n_ok_symbols():
         return '✓', '✗'
     except (UnicodeEncodeError, TypeError):
         return '[OK]', '[FAIL]'
+
+
+def infer_origin_from_caller() -> str:
+    """
+    Infer an **origin** string from the caller's module, class and function name.
+    This is typically the method that is mutating the config.
+
+    Returns
+    -------
+    str
+        The inferred origin string in the format "module.class.function" or "module.function" if
+    """
+    frame = inspect.stack()[1]
+    mod = frame.frame.f_globals.get('__name__', '')
+    func = frame.function
+    cls = type(frame.frame.f_locals['self']).__name__ if 'self' in frame.frame.f_locals else ''
+    origin = f"{mod}.{cls + '.' if cls else ''}{func}"
+    return origin
+
+
+def trim_or_pad(lst: List, target_len: int, pad_value=0):
+    """
+    Strip or pad a list to a target length.
+
+    Parameters
+    ----------
+    lst: list
+        The list to strip or pad
+    target_len: int
+        The target length
+    pad_value: any
+        The value to use for padding
+
+    Returns
+    -------
+    list
+        The stripped or padded list
+    """
+    if len(lst) > target_len:
+        return lst[:target_len]
+    elif len(lst) < target_len:
+        return lst + [pad_value] * (target_len - len(lst))
+    else:
+        return lst
