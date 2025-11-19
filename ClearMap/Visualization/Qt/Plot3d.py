@@ -15,7 +15,9 @@ __webpage__ = 'https://idisco.info'
 __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
 import itertools
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Optional, Tuple, List, Sequence, TypeAlias, Union, Any
 
 import numpy as np
 import pyqtgraph as pg
@@ -23,6 +25,8 @@ import functools as ft
 
 from PyQt5.QtCore import QRect
 from PyQt5.QtWidgets import QApplication
+
+from ClearMap.Utils.utilities import runs_on_spyder
 
 import ClearMap.Visualization.Qt.DataViewer as dv
 import ClearMap.Visualization.Qt.utils as qtu
@@ -32,7 +36,63 @@ import ClearMap.Visualization.Qt.utils as qtu
 ############################################################################################################
 
 # TODO: figure / windows handler to update data in existing windows
-from ClearMap.Utils.utilities import runs_on_spyder
+
+
+SourceLike: TypeAlias = Union[str, Path, np.ndarray, "ClearMap.IO.source.Source"]
+SourceType: TypeAlias = Union[SourceLike, Sequence[SourceLike], Sequence[Sequence[SourceLike]]]
+
+Lut: TypeAlias = Optional[str]
+# Per-panel min/max: either a single (low, high) or a list of these for overlays
+MinMax: TypeAlias = Optional[Union[Tuple[float, float], List[Tuple[float, float]]]]
+# Per-panel max-projection flags: either a single int or per-overlay list
+MaxProj: TypeAlias = Optional[Union[int, List[int]]]
+
+
+@dataclass
+class PlotPanel:
+    """
+    One window in multi_plot.
+    images: Any that Plot3d already accepts:
+      Path | str | np.ndarray | Source | List[Any] | List[List[Any]] (overlays)
+    """
+    images: SourceType
+    title: Optional[str] = None
+    lut: Lut = None
+    min_max: MinMax = None  # potentially nested to match overlays
+    max_projection: MaxProj = None
+
+
+def multi_plot_from_panels(panels: Sequence[PlotPanel], *, axis: int | None = None,
+                           scale: Tuple[float, float, float] | None = None,
+                           invert_y: bool = True, arrange: bool = True, sync: bool = True,
+                           screen: int | None = None, to_front: bool = True, parent=None):
+    """
+    Thin wrapper that converts a list of Panels into a call to multi_plot().
+    (same Path->str normalization as Plot3d.plot()).
+    """
+    sources: List[SourceType]   = []
+    titles:  List[Optional[str]]   = []
+    luts:    List[Lut]   = []
+    min_maxes:    List[MinMax]   = []
+    max_projs:    List[MaxProj]   = []
+
+    def _normalize_paths(obj: Any):
+        if isinstance(obj, Path):
+            return str(obj)
+        if isinstance(obj, (list, tuple)):
+            return [ _normalize_paths(x) for x in obj ]
+        return obj
+
+    for p in panels:
+        sources.append(_normalize_paths(p.images))
+        titles.append(p.title)
+        luts.append(p.lut)
+        min_maxes.append(p.min_max)
+        max_projs.append(p.max_projection)
+
+    return multi_plot(sources, axis=axis, scale=scale, title=titles, invert_y=invert_y,
+                      min_max=min_maxes, max_projection=max_projs, arrange=arrange, screen=screen,
+                      lut=luts, parent=parent, sync=sync, to_front=to_front)
 
 
 def plot(source, axis=None, scale=None, title=None, invert_y=True, min_max=None, screen=None,
