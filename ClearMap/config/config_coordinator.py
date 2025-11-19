@@ -1,75 +1,213 @@
 from __future__ import annotations
 
+import warnings
 from contextlib import contextmanager
+from pathlib import Path
 from threading import RLock
 from types import MappingProxyType
-from typing import Dict, Any, Optional, Callable, Iterable, Mapping
+from typing import Dict, Any, Optional, Iterable, Mapping, List, TYPE_CHECKING
 from copy import deepcopy
 
-from ClearMap.Utils.event_bus import EventBus
+from ClearMap.Utils.event_bus import EventBus, BusSubscriberMixin
+from ClearMap.Utils.utilities import infer_origin_from_caller, deep_merge
+
+from . import config_adjusters
+from .config_adjusters import Phase, ConfigKeys, run_adjusters
+from .config_handler import ALTERNATIVES_REG
+from .config_repository import ConfigRepository
+from .defaults_provider import DefaultsProvider, get_defaults_provider
+from .validators import validate_all, SectionValidators
+from ..Utils.events import CfgChanged, ChannelRenamed, ChannelsChanged
+
+if TYPE_CHECKING:
+    from ClearMap.pipeline_orchestrators.sample_info_management import SampleManager
 
 
-def _deep_merge(dst: Dict[str, Any], src: Dict[str, Any]) -> Dict[str, Any]:
-    for k, v in src.items():
-        if isinstance(v, dict) and isinstance(dst.get(k), dict):
-            _deep_merge(dst[k], v)  # type: ignore[index]
+INSTALL_CFG_DIR = Path(__file__).parent
+CURRENT_SCHEMAS_DIR = INSTALL_CFG_DIR / 'schemas' / 'v3.1'
+
+
+def _patch_to_config_keys_sets(patch: Dict[str, Any]) -> List[ConfigKeys]:
+    out: List[ConfigKeys] = []
+    def rec(node, prefix: List[str]):
+        if isinstance(node, dict):
+            if not node:  # empty dict still means the prefix changed
+                if prefix:
+                    out.append(tuple(prefix))
+            for k, v in node.items():
+                rec(v, prefix + [k])
         else:
-            dst[k] = deepcopy(v)
-    return dst
+            if prefix:
+                out.append(tuple(prefix))
+    rec(patch, [])
+    # de-duplicate and keep coarse granularity
+    return sorted(set(out))
 
 
-class ConfigCoordinator:
+class ConfigCoordinator(BusSubscriberMixin):
     """
-    In-memory working model + pipeline:
-      apply(patch) -> materialize() -> validate() -> commit_all(repo)
+    Coordinates the app’s working configuration as one cohesive unit.
+
+    Primitives
+    ----------
+    apply(patch):      merge patch into working model (no validation, no IO)
+    adjust_config(...):  run adjusters to derive config; merge their patch (no validation, no IO)
+    validate():        run validators; raise if invalid (no IO)
+    commit():          write working config to disk atomically
+
+    One-shots
+    ---------
+    submit_patch(patch, ...): apply → [adjust_config(filtered)] → [validate] → [commit]
+    submit(...):               [adjust_config(full)] → [validate] → [commit]
+
+    Notes
+    -----
+    - Adjusters are pure/idempotent; calling adjust_config multiple times is safe.
+    - Validators must not mutate the model.
+    - Tabs/controllers should not write files; all persistence flows through commit().
     """
-    def __init__(self, *, validators=None,
-                 bus: Optional[EventBus] = None,
-                 materializers: Optional[Iterable[Callable[[Dict[str, Dict]], Dict[str, Any]]]] = None) -> None:
+    def __init__(self, *, config_repo: ConfigRepository, bus: EventBus,
+                 schemas_dir: Path | None = None,
+                 defaults_provider: Optional[DefaultsProvider] = None) -> None:
+        super().__init__(bus)
         self.working: Dict[str, Dict[str, Any]] = {}  # name -> cfg dict
         self._rev = 0
-        self._validators = validators
-        self._bus = bus
-        self._materializers = list(materializers) if materializers else []
+
+        if schemas_dir is None:
+            schemas_dir = CURRENT_SCHEMAS_DIR
+        self._schemas_dir = schemas_dir
+
+        self._config_repo = config_repo
+        if defaults_provider is None:
+            defaults_provider = get_defaults_provider()
+        self.defaults_provider: Optional[DefaultsProvider] = defaults_provider
 
         self._lock = RLock()
 
-    def set_event_bus(self, bus) -> None:
-        """Wire/replace the event bus after construction."""
-        self._bus = bus
+        self._section_validators = SectionValidators(self._schemas_dir)
 
-    # RO interface
+    @classmethod
+    def from_folder(cls, folder: Path, known_names: Optional[Iterable[str]], auto_load: bool = False,
+                    **kwargs) -> "ConfigCoordinator":
+        if not known_names:
+            known_names = ALTERNATIVES_REG.canonical_config_names
+        repo = ConfigRepository(base_dir=folder, known_names=known_names)
+        bus = EventBus()
+        coord = cls(config_repo=repo, bus=bus, schemas_dir=CURRENT_SCHEMAS_DIR)
+        if auto_load:
+            coord.load_all()
+        return coord
+
+    def set_defaults_provider(self, provider) -> None:
+        """Wire/replace the defaults provider after construction."""
+        self.defaults_provider = provider
+        config_adjusters.set_defaults_provider(provider)
+
+    def seed_missing_from_defaults(self, *, tabs_only: bool = True) -> None:
+        """
+        For any known section missing in the working model, seed from DefaultsProvider.
+        Call this after load_all() when creating a new experiment.
+        """
+        if not self.defaults_provider:
+            return
+        canonical_names = ALTERNATIVES_REG.canonical_config_names
+        known = [n for n in canonical_names if (not tabs_only or ALTERNATIVES_REG.is_local_file(n))]
+        with self.__edit_session(origin="seed_defaults", validate=False) as w:
+            for sec in known:
+                if sec not in w or not w[sec]:
+                    d = self.defaults_provider.get(sec)
+                    if d:
+                        w[sec] = d
+
+    def config_exists(self, name: str) -> bool:
+        return self.path_for(name, must_exist=False).exists()
+
+    def set_base_dir(self, base_dir: Path) -> None:
+        new_base = Path(base_dir).expanduser().resolve()
+        old_base = self._config_repo.base_dir()
+        if old_base is not None and new_base == old_base:
+            return
+        self._config_repo.set_base_dir(new_base)
+        self.reset_working()
+
+    def reset_working(self) -> None:
+        """Clear the in-memory working config."""
+        with self._lock:
+            self.working = {}
+            self._rev = 0
+
+    @property
+    def base_dir(self) -> Path:
+        return self._config_repo.base_dir()
+
+    def path_for(self, name: str, *, must_exist: bool = False) -> Path:
+        return self._config_repo.path_for(name, must_exist=must_exist)
+
+    def config_exists_any(self, name: str) -> bool:
+        return self._config_repo.exists_any(name)
+
+    def ensure_present(self, name: str) -> Path | None:
+        return self._config_repo.ensure_present(name)
+
+    def load(self, name: str) -> Dict[str, Any]:
+        with self._lock:
+            data = self._config_repo.load(name)
+            self.working[name] = deepcopy(data)
+            return deepcopy(data)
+
+    def load_all(self) -> Dict[str, Dict[str, Any]]:
+        self.reset_working()
+        with self._lock:
+            data = self._config_repo.load_all()
+            for name, cfg in data.items():
+                self.working[name] = deepcopy(cfg)
+            return deepcopy(data)
+
+    def clone_from(self, template_dir: str | Path, dest_dir: str | Path) -> None:
+        """
+        Clone the entire working config from another coordinator.
+        """
+        self._config_repo.clone_from(Path(template_dir), Path(dest_dir))
+
+    def copy_from_defaults(self, dest_dir: str | Path) -> None:
+        """
+        Copy all default configs to dest_dir.
+        """
+        self._config_repo.copy_from_defaults(Path(dest_dir))
+
     @property
     def rev(self) -> int:
-        return self._rev
+        with self._lock:
+            return self._rev
 
     def view(self) -> Mapping[str, Mapping[str, Any]]:
         """Return an immutable view of the current working config."""
-        return MappingProxyType(self.working)
+        with self._lock:
+            return MappingProxyType(self.working)
 
-    def get(self, name: str) -> Optional[Mapping[str, Any]]:
-        sect = self.working.get(name)
-        return MappingProxyType(sect) if isinstance(sect, dict) else None
-
-    def set_working(self, name: str, cfg: Dict[str, Any]) -> None:
-        self.working[name] = deepcopy(cfg)
-
-    def get_config(self, name: str) -> Optional[Dict[str, Any]]:
-        return self.working.get(name)
-
+    # WARNING: avoid calling in loops because of deepcopy
     def get_config_view(self, cfg_name: str = '') -> Dict[str, Any]:
         """
-        Read-only dict for UI. We expose a {name -> cfg} mapping.
-        (If you prefer a merged 'global' view, adapt params accordingly.)
+        Read-only dict for UI using a deep copy of the current working config
+        (or a single section if cfg_name is given).
         """
-        if cfg_name:
-            sect = self.working.get(cfg_name)
-            return deepcopy(sect) if isinstance(sect, dict) else {}
+        with self._lock:  # Avoid mid-edit reads
+            if cfg_name:
+                section = self.working.get(cfg_name)
+                return deepcopy(section) if isinstance(section, dict) else {}
+            else:
+                return deepcopy(self.working)
+
+    @property
+    def current_channels(self):
+        chans_cfg = self.working.get('sample', {}).get('channels', [])
+        if isinstance(chans_cfg, dict):
+            return list(chans_cfg.keys())
         else:
-            return deepcopy(self.working)
+            return chans_cfg
 
     @contextmanager
-    def edit_session(self, *, origin: str = "", validate: bool = True):
+    def __edit_session(self, *, origin: str = "", validate: bool = True):
         """
         Yield a mutable copy of the current working config
         on exit, validate+commit.
@@ -93,14 +231,12 @@ class ConfigCoordinator:
             working_copy = deepcopy(self.working)
             yield working_copy  # mutations happen here
 
-            if validate and self._validators:
-                self._validators.validate_all(working_copy)  # raise on error
+            if validate:
+                self.validate(working_copy)
 
             # commit (single source of truth)
             self.working = working_copy
             self._rev += 1
-            if self._bus:
-                self._bus.publish("config_changed", {"origin": origin, "rev": self._rev})
 
     def _merge_patch(self, working_cfg: Dict[str, Dict[str, Any]], patch: Dict[str, Any]) -> None:
         """
@@ -114,39 +250,217 @@ class ConfigCoordinator:
         patch
         """
         targeted = False
-        for name in list(self.working.keys()):
+        for name in list(working_cfg.keys()):
             if name in patch and isinstance(patch[name], dict):
-                _deep_merge(working_cfg[name], patch[name])
+                deep_merge(working_cfg[name], patch[name])
                 targeted = True
         if not targeted:
+            raise NotImplementedError(f'Global patches are not supported in this version.')
             # Merge into a default 'global' config (create if missing)
-            _deep_merge(working_cfg.setdefault('global', {}), patch)
+            deep_merge(working_cfg.setdefault('global', {}), patch)
 
-    def apply(self, patch: Dict[str, Any]) -> None:  # WARNING: why no validate here?
+    def _apply(self, patch: Dict[str, Any]) -> None:  # WARNING: why no validate here?
         """
         Apply a patch possibly targeting multiple files.
         Policy: top-level keys select target configs if they exist in working;
         otherwise, apply into a special 'global' config.
         """
-        with self.edit_session(origin=patch['origin'], validate=False) as working_cfg:
+        origin = patch.pop('origin', None)
+        if not origin:
+            origin = infer_origin_from_caller()
+        with self.__edit_session(origin=origin, validate=False) as working_cfg:
             self._merge_patch(working_cfg, patch)
 
-    def materialize(self) -> None:
+    # def apply_section(self, name: str, patch: Dict[str, Any]) -> None:
+    #     """
+    #     Apply a patch to a single named config section.
+    #     """
+    #     origin = patch.pop('origin', None)
+    #     if not origin:
+    #         origin = infer_origin_from_caller()
+    #     with self.__edit_session(origin=origin, validate=False) as working_cfg:
+    #         if name not in working_cfg:
+    #             working_cfg[name] = {}
+    #         if isinstance(working_cfg[name], dict):
+    #             deep_merge(working_cfg[name], patch)
+    #         else:
+    #             raise ValueError(f'Cannot apply patch to non-dict config section \'{name}\'')
+
+    def _extract_channel_renames(self, patch: dict) -> tuple[dict, dict[str, str]]:
         """
-        Call pure materializers with the entire working set.
-        Each materializer returns a dict patch (possibly multi-file); merge it.
+        Recursively remove any {"$rename": {"channels": {...}}} blocks from `patch`,
+        and return (cleaned_patch, rename_map).
         """
-        with self.edit_session(origin="materialize", validate=False) as working_cfg:
-            for mat in self._materializers:
-                patch = mat(self.get_config_view())  # pass a copy
-                if not patch:
-                    continue
+        patch = deepcopy(patch)
+        rename_map: dict[str, str] = {}
+
+        def rec(node):
+            if not isinstance(node, dict):
+                return
+            # pull and remove this level's $rename
+            r = node.pop("$rename", None)
+            if isinstance(r, dict):
+                ch_map = r.get("channels")
+                if isinstance(ch_map, dict):
+                    rename_map.update({str(k): str(v) for k, v in ch_map.items() if k and v and k != v})
+            # continue recursion
+            for v in node.values():
+                rec(v)
+
+        rec(patch)
+        return patch, rename_map
+
+    def submit_patch(self, patch: dict, *, sample_manager: SampleManager, do_run_adjusters: bool = True,
+                     validate: bool = True, commit: bool = True, origin: str | None = "ui",
+                     phase=Phase.PRE_VALIDATE) -> None:
+        """
+        Apply `patch` to the working config, then optionally adjust_config (adjusters
+        filtered by the patch's changed keys), validate, and commit.
+
+        Equivalent to:
+            self.apply(patch, origin=origin)
+            if run_adjusters: self.adjust_config(changed_keys=_patch_to_config_keys_sets(patch), sample_manager=sample_manager)
+            if validate:    self.validate()
+            if commit:      self.commit()
+        """
+        if not patch:
+            return
+
+        if not commit:
+            warnings.warn(f'ConfigCoordinator.submit_patch called with commit=False; '
+                          f'working model updated in-memory, but no events were emitted and'
+                          f' nothing was written to disk. Call commit() later to persist '
+                          f'and emit CfgChanged.', RuntimeWarning, stacklevel=2)
+        if origin:
+            patch = dict(patch)  # copy to avoid mutating caller's dict
+            patch['origin'] = origin
+
+        channels_before = self.current_channels
+
+        # Swap $rename directives to channels in patch and extract map for SampleManager
+        clean_patch, rename_map = self._extract_channel_renames(patch)
+
+        with self.__edit_session(origin=origin, validate=False) as working_cfg:
+            self._merge_patch(working_cfg, clean_patch)
+            changed_keys = _patch_to_config_keys_sets(clean_patch)
+            if do_run_adjusters:
+                patch2 = self.adjust_config(sample_manager=sample_manager, phase=phase,
+                                            pipelines=None, changed_keys=changed_keys, apply=False)
+                if patch2:
+                    self._merge_patch(working_cfg, patch2)
+
+        if validate:
+            self.validate()
+
+        if commit:
+            changed_sections = {k[0] for k in changed_keys if k}
+            self.commit(sections=list(changed_sections))
+
+            self.publish(CfgChanged(changed_keys=tuple(".".join(k) for k in changed_keys)))
+
+            channels_after = self.current_channels
+            if set(channels_before) != set(channels_after):
+                self.publish(ChannelsChanged(before=channels_before, after=channels_after))
+
+            for old, new in rename_map.items():
+                self.publish(ChannelRenamed(old=old, new=new))
+
+    def submit(self, *, sample_manager, do_run_adjusters: bool = True,
+               validate: bool = True, commit: bool = True, phase=Phase.PRE_VALIDATE) -> None:
+        """
+        Run adjusters on the current working config (unfiltered), then optionally
+        validate and commit. Use this when you haven't just applied a new patch.
+        """
+        channels_before = self.current_channels
+
+        applied_patch = {}
+        if do_run_adjusters:
+            applied_patch = self.adjust_config(sample_manager=sample_manager, changed_keys=None,
+                                               phase=phase, pipelines=None, apply=True)
+        if validate:
+            self.validate()
+        if commit:
+            self.commit()
+
+            channels_after = self.current_channels
+            if set(channels_before) != set(channels_after):
+                self.publish(ChannelsChanged(before=channels_before, after=channels_after))
+
+            changed_keys = _patch_to_config_keys_sets(applied_patch)
+            self.publish(CfgChanged(changed_keys=tuple(".".join(k) for k in changed_keys)))
+
+    def adjust_config(self, *, sample_manager, phase: Phase = Phase.PRE_VALIDATE,
+                      pipelines: Optional[Iterable[str]] = None,
+                      changed_keys: Optional[Iterable[ConfigKeys]] = None,
+                      apply: bool=True) -> Dict[str, Any]:
+        """
+        Run all config adjusters on the current working config,
+        optionally filtered by changed_keys and pipelines.
+        A global patch dict is returned.
+        If `apply` is True (default), the patch is merged into the working config.
+
+        Parameters
+        ----------
+        sample_manager
+        phase
+        pipelines
+        changed_keys
+        apply
+
+        Returns
+        -------
+
+        """
+        view = self.get_config_view()
+        patch = run_adjusters(view=view, sample_manager=sample_manager, phase=phase,
+                              pipelines=pipelines, changed_keys=changed_keys)
+        if apply and patch:
+            with self.__edit_session(origin="adjusters", validate=False) as working_cfg:
                 self._merge_patch(working_cfg, patch)
+        return patch
 
-    def validate(self) -> None:
-        if self._validators:
-            self._validators.validate_all(self.working)
+    def validate(self, working_copy=None) -> None:
+        """
+        Ensure the current working config is valid.
+        Raises if not valid.
+        """
+        if working_copy is None:
+            working_copy = self.working
+        validate_all(working_copy, sections_validators=self._section_validators,
+                     schemas_dir=self._schemas_dir)  # Just in case
 
-    def commit_all(self, repo) -> None:
-        for name, cfg in self.working.items():
-            repo.commit(name, cfg)
+    def commit(self, sections: list[str] | None = None) -> None:
+        """
+        Persist working configs to disk. If `sections` is given, only those
+        sections are written; otherwise all are.
+        """
+        to_write = sections or list(self.working.keys())
+        for name in to_write:
+            cfg = self.working.get(name)
+            if cfg is None:
+                continue
+            self._config_repo.commit(name, cfg)
+
+    def snapshot_to(self, target_dir: Path | str) -> Path:
+        """
+        Write each working cfg into target_dir
+
+        Parameters
+        ----------
+        target_dir: Path | str
+            The target directory where to write the snapshot.
+            Existing files will be overwritten.
+
+        Returns
+        -------
+        The target directory path.
+        """
+        target_dir = Path(target_dir)
+        target_dir.mkdir(parents=True, exist_ok=True)
+        orig = self.base_dir
+        try:
+            self.set_base_dir(target_dir)
+            self.commit()
+        finally:
+            self.set_base_dir(orig)
+        return target_dir
