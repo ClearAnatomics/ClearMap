@@ -84,7 +84,7 @@ DEFAULT_VERTEX_TO_VERTEX = {
 # ## Graphs from skeletons
 ###############################################################################
 
-def neighbours(indices: np.ndarray, offset: int) -> np.ndarray:  # TODO: check if remove
+def neighbours(indices: np.ndarray, offset: int) -> np.ndarray:
     """
     indices  – sorted 1-D array of flat voxel indices (int64)
     offset   – neighbour offset in *elements* (signed)

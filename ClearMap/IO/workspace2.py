@@ -14,10 +14,13 @@ The workspace is now also fully stateful.
 
 The "debug" mode is now a context manager that supports different contexts and is not restricted to debug mode.
 """
+from __future__ import annotations
+
 import os
 import warnings
 from copy import deepcopy
 from pathlib import Path
+from typing import List, Iterator, Sequence, Optional
 
 import numpy as np
 
@@ -25,7 +28,7 @@ from ClearMap.IO.assets_constants import CONTENT_TYPE_TO_PIPELINE, CHANNELS_ASSE
 from ClearMap.IO.assets_specs import ChannelSpec, TypeSpec, StateManager
 from ClearMap.IO.workspace_asset import Asset, AssetCollection
 from ClearMap.Utils.exceptions import AssetNotFoundError, ClearMapWorkspaceError, ClearMapAssetError, \
-    MissingChannelError
+    MissingChannelError, MissingAssetError
 from ClearMap.Utils.utilities import substitute_deprecated_arg, handle_deprecated_args, get_ok_n_ok_symbols
 
 
@@ -103,6 +106,43 @@ class Workspace2:  # REFACTOR: subclass dict
                 out += f'{brackets[0]}{v}{brackets[1]}'
         return out
 
+    def __contains__(self, channel: str) -> bool:
+        return channel in self.asset_collections
+
+    def __len__(self) -> int:
+        """
+        Number of channels in the workspace (excluding global None).
+        Returns
+        -------
+        int
+            The number of channels in the workspace.
+        """
+        return sum(1 for k in self.asset_collections.keys() if k is not None)
+
+    def __iter__(self) -> Iterator[str]:
+        """
+        Iterate non global channel names in the workspace.
+        Returns
+        -------
+        Iterator[str]
+            An iterator over the channel names in the workspace.
+        """
+        return (k for k in self.asset_collections.keys() if k is not None)
+
+    def items(self):
+        return self.asset_collections.items()
+
+    def __getitem__(self, key):
+        """
+        ws[channel] -> AssetCollection
+        """
+        return self.asset_collections[key]
+
+    def raw(self, channel: str):
+        """Convenience: return the raw Asset for a channel, or None."""
+        assets_collection = self.asset_collections.get(channel)
+        return None if assets_collection is None else assets_collection.get('raw')
+
     @property
     def debug(self):
         return self.status_manager.status
@@ -136,6 +176,26 @@ class Workspace2:  # REFACTOR: subclass dict
     def channels(self):
         return list(self.asset_collections.keys())
 
+    def ensure_default_channel(self, allowed_channels: List[str], default_channel: str):
+        if default_channel and (not self.default_channel or self.default_channel not in allowed_channels):
+            self.default_channel = default_channel
+
+    def prune_missing_channels(self, desired_channels: List[str]):
+        desired_channels = set(desired_channels)
+        for channel in self.channels:
+            if channel is None:  # Keep global assets
+                continue
+            elif channel not in desired_channels:
+                channel_spec = self[channel].channel_spec
+                if channel_spec.is_simple_channel():  # Simple channels -> direct removal
+                    self.asset_collections.pop(channel)
+                elif channel_spec.is_compound():  # Compound channels -> check components
+                    channels = channel if isinstance(channel, (list, tuple)) else channel.split('-')
+                    has_obsolete_components = any([c not in desired_channels for c in channels])
+                    if has_obsolete_components:
+                        self.asset_collections.pop(channel)
+
+
     def add_raw_data(self, file_path, channel_id=None,
                      data_content_type=None, sample_id=None):
         """
@@ -161,7 +221,7 @@ class Workspace2:  # REFACTOR: subclass dict
         else:
             raise ClearMapWorkspaceError('A raw dataset cannot be added without a'
                                          ' channel_id and a data_content_type.')
-        if channel_id in self.asset_collections.keys():
+        if channel_id in self:
             raise ClearMapWorkspaceError(f'Channel {channel_id} already exists in the workspace.'
                                          f'Use update_raw_data explicitly instead.')
         self.asset_collections[channel_id] = (
@@ -182,10 +242,18 @@ class Workspace2:  # REFACTOR: subclass dict
             if any(p in pipelines for p in spec.relevant_pipelines):
                 self.create_asset(spec, channel_spec, sample_id=sample_id)
 
+    def update_raw_path(self, channel, expression):
+        old_asset = self.raw(channel)
+        if not old_asset:
+            raise MissingChannelError(f'Channel "{channel}" does not exist in the workspace.'
+                                      f'Use add_raw_data to create a new channel.')
+        if old_asset.expression != expression:
+            self.asset_collections[channel]['raw'] = old_asset.variant(expression=expression)
+
     def add_channel(self, channel_spec, sample_id=''):
         self.asset_collections[channel_spec.name] = AssetCollection(self.directory, sample_id, channel_spec)
 
-    def add_pipeline(self, pipeline_name, channel_id=None, **kwargs):
+    def add_pipeline(self, pipeline_name: str, channel_id: Optional[str | Sequence[str]] = None, **kwargs):
         """
         Add a pipeline to the workspace. This implies creating the corresponding assets
         for the given channel and pipeline.
@@ -194,10 +262,10 @@ class Workspace2:  # REFACTOR: subclass dict
         ----------
         pipeline_name: str
             The name of the pipeline to add.
-        channel_id: str | None
+        channel_id: str | Sequence[str] | None
             The channel id to use for the asset.
         """
-        if channel_id not in self.asset_collections:
+        if channel_id not in self:
             raise MissingChannelError(f'Channel "{channel_id}" does not exist in the workspace.'
                                       f'Use add_raw_data to create a new channel.')
         if pipeline_name not in CONTENT_TYPE_TO_PIPELINE.values():
@@ -207,7 +275,7 @@ class Workspace2:  # REFACTOR: subclass dict
             sample_id = kwargs.pop('sample_id')
         else:
             sample_id = self.get('raw', channel_id).sample_id
-        channel_spec = self.asset_collections[channel_id].channel_spec
+        channel_spec = self[channel_id].channel_spec
         for name, spec in CHANNEL_ASSETS_TYPES.items():
             if pipeline_name in spec.relevant_pipelines:
                 self.create_asset(spec, channel_spec, sample_id=sample_id)
@@ -224,9 +292,9 @@ class Workspace2:  # REFACTOR: subclass dict
             The asset to add.
         """
         channel = asset.channel_spec.name if asset.channel_spec is not None else None
-        if channel not in self.asset_collections:
+        if channel not in self:
             self.asset_collections[channel] = AssetCollection(self.directory, self.sample_id, asset.channel_spec)
-        self.asset_collections[channel].add_asset(asset=asset)
+        self[channel].add_asset(asset=asset)
 
     def create_asset(self, type_spec, channel_spec=None, sample_id=None):
         """
@@ -252,6 +320,15 @@ class Workspace2:  # REFACTOR: subclass dict
                       status_manager=self.status_manager)
         self.add_asset(asset)
         return asset
+
+    def rename_channel(self, old_name, new_name):
+        if old_name in self:
+            asset_collection = self.asset_collections.pop(old_name)
+            asset_collection.channel_spec.name = new_name
+            self.asset_collections[new_name] = asset_collection
+            name_map = {old_name: new_name}
+            # REFACTOR: that should be automatic on the ChannelSpec level
+            ChannelSpec.channel_names[:] = [name_map.get(n, n) for n in ChannelSpec.channel_names]
 
     def get(self, asset_type, channel='current',
             asset_sub_type=None, sample_id=None,
@@ -321,11 +398,17 @@ class Workspace2:  # REFACTOR: subclass dict
 
         if asset_sub_type and not suffix:
             asset_type += f'_{asset_sub_type}'
-        if channel not in self.asset_collections and isinstance(channel, tuple):
+        if channel not in self and isinstance(channel, tuple):
             channel = ('-'.join(channel)).lower()  # Try string version if tuple version not found
 
-        if asset_type in self.asset_collections[channel]:
-            asset = self.asset_collections[channel][asset_type]
+        if channel not in self:
+            if default == 'closest':
+                raise MissingAssetError(f'Unknown channel "{channel}". Available channels: {list(self.channels)}')
+            else:
+                channel = self.default_channel
+
+        if asset_type in self[channel]:
+            asset = self[channel][asset_type]
         else: # asset is somehow None
             if default == 'closest':
                 warnings.warn('No exact match found. Using partial matching from start.')
@@ -359,18 +442,19 @@ class Workspace2:  # REFACTOR: subclass dict
         -------
         Asset object
         """
-        if '*' in asset_type or '?' in asset_type:
+        if '*' in asset_type or '?' in asset_type:  # Regex style matching
             import fnmatch
-            matching_types = [k for k in self.asset_collections[channel].keys() if fnmatch.fnmatch(k, asset_type)]
-        else:
-            matching_types = [k for k in self.asset_collections[channel].keys() if k.startswith(asset_type)]
+            matching_types = [k for k in self[channel].keys() if fnmatch.fnmatch(k, asset_type)]
+        else:  # Prefix style matching
+            matching_types = [k for k in self[channel].keys() if k.startswith(asset_type)]
+
         if len(matching_types) == 0:
-            raise KeyError(f'No asset of type "{asset_type}" found in workspace.')  # FIXME: ClearMapKeyError
+            raise MissingAssetError(f'No asset of type "{asset_type}" found in workspace.')
         elif len(matching_types) == 1:
-            asset = self.asset_collections[matching_types[0]]
+            asset = self[channel][matching_types[0]]
         else:
-            raise AssetNotFoundError(f'Multiple assets of type {asset_type} found in workspace '
-                                     f'({matching_types}). Could not pick one.')
+            raise ClearMapWorkspaceError(f'Multiple assets of type {asset_type} found in workspace '
+                                         f'({matching_types}). Could not pick one.')
         return asset
 
     @handle_deprecated_args({'prefix': 'sample_id', 'postfix': 'asset_sub_type'})
@@ -490,7 +574,7 @@ class Workspace2:  # REFACTOR: subclass dict
         len_f_type = max([len(k) for k in CHANNELS_ASSETS_TYPES_CONFIG.keys()])
         header = f'  [{{:{len_dirtype}}}] {{:{len_f_type}}}'
 
-        for channel, assets_collection in self.asset_collections.items():
+        for channel, assets_collection in self.items():
             out += f'  Channel: {channel}\n'
             for asset_type, asset in assets_collection.items():
                 asset.header = header
