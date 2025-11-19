@@ -256,6 +256,12 @@ class ChannelSpec:
     def channel_number_to_name(cls, channel_number):
         return cls.channel_names[channel_number]
 
+    def is_simple_channel(self):
+        return self.content_type not in (None, 'undefined', 'no-pipeline', 'compound')
+
+    def is_compound(self):
+        return self.content_type == 'compound'
+
 
 class StateManager:
     """
