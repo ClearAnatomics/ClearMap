@@ -32,8 +32,6 @@ def main(src_directory):
                                             registration_processor=registration_processor)
 
         print('Starting Tract mapping')
-        tract_processor.reload_config()
-
         tract_processor.mask_to_coordinates(as_memmap=True)
         tract_processor.parallel_transform()
         tract_processor.label()
