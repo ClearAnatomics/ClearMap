@@ -7,7 +7,7 @@ from matplotlib.colors import to_hex
 from PyQt5.QtGui import QColor
 import pyqtgraph as pg
 
-from ClearMap.gui.gui_utils import pseudo_random_rgb_array
+from ClearMap.gui.gui_utils_images import pseudo_random_rgb_array
 
 
 def is_valid_hex_color(s):
