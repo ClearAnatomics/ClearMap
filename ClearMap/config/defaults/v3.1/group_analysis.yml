@@ -1,0 +1,9 @@
+clearmap_schema: 3
+clearmap_version: "3.0.0"
+
+pipeline: "CellMap"
+
+paths:
+    results_folder: ""
+groups: {}
+comparisons: {}

@@ -1,0 +1,32 @@
+clearmap_schema: 3
+clearmap_version: "3.0.0"
+
+templates:
+  layout:   # its own layout -> has rigid/wobbly
+    use_npy: true
+    run: true
+    layout_channel: "${channel}"
+    use_existing_layout: false
+    rigid:
+      skip: false
+      overlap_x: "auto"
+      overlap_y: "auto"
+      projection_thickness: ["auto", "auto", null]
+      max_shifts_x: [-30, 30]
+      max_shifts_y: [-30, 30]
+      max_shifts_z: [-20, 20]
+      background_level: 0
+      background_pixels: 100
+    wobbly:
+      skip: false
+      max_shifts_x: [-30, 30]
+      max_shifts_y: [-15, 15]
+      max_shifts_z: [0, 0]
+      stack_valid_range: [200, null]
+      stack_pixel_size: null
+      slice_valid_range: [200, 20000]
+      slice_pixel_size: 1500
+  derived:  # external layout -> minimal profile
+    use_npy: true
+    run: true
+    layout_channel: "${reference}"         # placeholder

@@ -1,0 +1,23 @@
+clearmap_schema: 3
+clearmap_version: "3.0.0"
+
+verbose: true
+atlas:
+  id: "ABA 2017 - adult mouse - 25µm"
+  structure_tree_id: "ABA json 2022"
+  align_files_folder: "Alignment"
+templates:
+  autofluorescence:
+    resample: true
+    resampled_resolution: [25, 25, 25]
+    align_with: "${reference}"   # atlas (constant)
+    moving_channel: "${reference}"   # atlas (constant)
+    params_files: ["align_affine.txt", "align_bspline.txt"]
+    landmarks_weights: [0, 0]
+  regular:
+    resample: true
+    resampled_resolution: [25, 25, 25]
+    align_with: "${reference}"
+    moving_channel: "${reference}"
+    params_files: ["align_affine.txt"]
+    landmarks_weights: [0]

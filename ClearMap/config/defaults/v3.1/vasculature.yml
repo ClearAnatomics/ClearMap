@@ -1,0 +1,64 @@
+clearmap_schema: 3
+clearmap_version: "3.0.0"
+
+binarization:
+  vessels:
+    binarize:
+      run: true
+      clip_range: [350, 1000]
+      threshold: null
+    smooth:
+      run: true
+    binary_fill:
+      run: true
+    deep_fill:
+      run: true
+      size_max: 500
+      overlap: 50
+      resample_factor: 1
+  large_vessels:  # same params for arteries and veins
+    binarize:
+      run: true
+      clip_range: [1000, 8000]
+      threshold: 450
+    smooth:
+      run: true
+    binary_fill:
+      run: true
+    deep_fill:
+      run: true
+      size_max: 1000
+      overlap: 100
+      resample_factor: 2
+  combined:
+    binary_fill: true
+    compress: false
+graph_construction:
+  skeletonize: true
+  build: true
+  clean: true
+  reduce: true
+  transform: true
+  annotate: true
+  use_arteries: true
+vessel_type_postprocessing:
+  pre_filtering:
+    vein_intensity_range_on_arteries_ch: [0, 2500]
+    restrictive_vein_radius: 6
+    permissive_vein_radius: 6.5
+    final_vein_radius: 5
+    arteries_min_radius: 2
+  tracing:
+    max_arteries_iterations: 5
+    max_veins_iterations: 5
+  capillaries_removal:
+    min_artery_size: 30
+    min_vein_size: 30
+visualization:
+  voxelization:
+    size: [15, 15, 15]
+  slicing:
+    dim_0: [0, 200]
+    dim_1: [0, 300]
+    dim_2: [0, 400]
+  display: {}

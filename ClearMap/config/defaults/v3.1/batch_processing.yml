@@ -1,0 +1,7 @@
+clearmap_schema: 3
+clearmap_version: "3.0.0"
+
+paths:
+    results_folder: ''
+groups: {}
+#comparisons: {}
