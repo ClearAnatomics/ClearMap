@@ -1,119 +1,189 @@
 from __future__ import annotations
+from typing import TYPE_CHECKING, Any, Callable, Tuple, Dict, Union, Optional
 
-from typing import List, Type
+from .tabs_interfaces import GenericTab, PreProcessingTab, PostProcessingTab, BatchTab
 
-from .interfaces import PreProcessingTab, BatchTab, GenericTab, PostProcessingTab
-from .tabs import (
-    SampleInfoTab,
-    StitchingTab, RegistrationTab,
-    GroupAnalysisTab, BatchProcessingTab,
-    ColocalizationTab,
-    DATA_TYPE_TO_TAB_CLASS
-)
-from ..pipeline_orchestrators.sample_preparation import SampleManager
+if TYPE_CHECKING:
+    from ClearMap.pipeline_orchestrators.sample_info_management import SampleManager
 
-
-# Ensure a certain order for key tabs (anchors). Others will be sorted around them.
-# The order here is from left to right in the UI.
-TAB_ORDER = [
-    SampleInfoTab,             # GenericTab
-    StitchingTab,              # PreProcessingTab
-    RegistrationTab,           # PreProcessingTab
-    # <other tabs inserted dynamically here>
-    ColocalizationTab,          # PostProcesingTab
-    GroupAnalysisTab,           # BatchTab
-    BatchProcessingTab,         # BatchTab
-]
-
-_ORDER_INDEX = {cls: i for i, cls in enumerate(TAB_ORDER)}
-
-
-BUCKET_ORDER = {
-    SampleInfoTab: 0,                             # handled by anchor, but keep for completeness
-    PreProcessingTab: 1,                          # all other pre tabs
-    PostProcessingTab: 2,                         # all other post tabs
-    ColocalizationTab: 2,                         # also post (anchored above)
-    GroupAnalysisTab: 3, BatchProcessingTab: 3,   # utilities
-    BatchTab: 3,
-    GenericTab: 99,                               # fallback
+# Coarse (abstract) hierarchy group: 1..99 (0 and 100 reserved for absolute 1st and last)
+BASE_GROUP: Dict[type[GenericTab], int] = {
+    PreProcessingTab: 10,
+    PostProcessingTab: 20,
+    BatchTab:         30,
+    GenericTab:       90,  # fallback
 }
-def _bucket_index(cls: Type[GenericTab]) -> int:
-    # find the most specific matching base class from BUCKET_ORDER
-    for base, idx in BUCKET_ORDER.items():
-        if issubclass(cls, base):
-            return idx
-    return 99
 
-def _order_key(cls: Type[GenericTab]) -> tuple[int, int, str]:
+# Within-group score for concrete classes: 0..100
+CONCRETE_TIER: Dict[Union[str, type[GenericTab]], int] = {
+    'StitchingTab': 30,
+    'RegistrationTab': 35,
+    'ColocalizationTab': 80,
+}
+
+# Optional hard guards
+ABSOLUTE_FIRST: set[Union[str, type[GenericTab]]] = {'SampleInfoTab'}
+ABSOLUTE_LAST:  set[Union[str, type[GenericTab]]] = set()
+
+DEFAULT_WITHIN = 50    # if a concrete class isn’t in CONCRETE_TIER
+FALLBACK_GROUP = 90    # if no base in BASE_GROUP matches
+
+def _clamp(v: int, lo: int, hi: int) -> int:
+    return max(lo, min(hi, int(v)))
+
+def _abs_priority(cls: type[GenericTab]) -> int | None:
+    """Return 0 for absolute-first, 100 for absolute-last, or None for normal."""
+    name = cls.__name__
+    if name in ABSOLUTE_FIRST or cls in ABSOLUTE_FIRST:
+        return 0
+    if name in ABSOLUTE_LAST or cls in ABSOLUTE_LAST:
+        return 100
+    return None
+
+def _resolve_group(cls: type[GenericTab]) -> int:
+    for base in cls.__mro__[1:]:
+        if base is object:
+            break
+        g = BASE_GROUP.get(base)
+        if g is not None:
+            return _clamp(g, 1, 99)
+    return FALLBACK_GROUP
+
+def _resolve_within(cls: type[GenericTab]) -> int:
+    # concrete-class-specific within-group score (by name or class), else default
+    priority = CONCRETE_TIER.get(cls, CONCRETE_TIER.get(cls.__name__))
+    if priority is not None:
+        return _clamp(priority, 0, 100)
+    return DEFAULT_WITHIN
+
+def _computed_score(cls: type[GenericTab]) -> float:
+    group = _resolve_group(cls)
+    within = _resolve_within(cls)
+    return float(group) + (within / 100.0)
+
+def global_score(cls: type[GenericTab]) -> float:
     """
-    Sort tab classes with a two-tier key:
-        - primary: explicit TAB_ORDER index (anchors first),
-        - secondary: bucket precedence (pre before post before utilities),
-        - tertiary: stable tie-breaker (class name) so it’s deterministic.
-
-    Parameters
-    ----------
-    cls: Type[GenericTab]
-        The tab class to evaluate.
-
-    Returns
-    -------
-    tuple[int, int, str]
-        The sorting key.
+    Absolute priorities override computed scores.
+    0 = hard first, 100 = hard last, otherwise group+within/100.
     """
-    anchor = _ORDER_INDEX.get(cls, 10_000)     # huge number if not anchored
-    bucket = _bucket_index(cls)
-    return anchor, bucket, cls.__name__
+    abs_p = _abs_priority(cls)
+    if abs_p is not None:
+        return float(abs_p)
+    return _computed_score(cls)
+
+def _order_key(cls: type[GenericTab]) -> Tuple[float, str]:
+    """
+    Sort by:
+      1) global score (absolute priority or computed)
+      2) name for deterministic tiebreak.
+    """
+    return global_score(cls), cls.__name__
 
 
-class TabRegistry:
+class TabRegistry:  # FIXME: ensure that colocalization tab existence is triggered when needed
     """
     Computes the set of tabs to display based on the current config view and sample state.
     """
 
     def __init__(self) -> None:
-        # base tabs always present
-        self._base = [SampleInfoTab]
-        self._preprocessing_tabs = [StitchingTab, RegistrationTab]
-        self._batch_tabs = [GroupAnalysisTab, BatchProcessingTab]
+        # Start with declared keys and no loaded classes yet.
+        self._tabs: dict[str, type[GenericTab] | None] = {
+            'SampleInfoTab': None,
+            'StitchingTab': None,
+            'RegistrationTab': None,
+            'GroupAnalysisTab': None,
+            'BatchProcessingTab': None,
+            'ColocalizationTab': None,
+        }
+        self._DATA_TYPE_TO_TAB_CLASS: dict[Any, type[GenericTab]] | None = None
 
-    def valid_tabs(self, sample_manager: SampleManager) -> List[Type]:
+    def __get_tabs(self, *tab_names: str) -> list[type[GenericTab]]:
+        self._ensure_loaded(*tab_names)
+        return [self._tabs[name] for name in tab_names if self._tabs[name] is not None]
+
+    @property
+    def _base_tabs(self):
+        return self.__get_tabs('SampleInfoTab')
+
+    @property
+    def _compound_tabs(self):
+        return self.__get_tabs('ColocalizationTab')
+
+    @property
+    def _batch_tabs(self):
+        return self.__get_tabs('GroupAnalysisTab', 'BatchProcessingTab')
+
+    @property
+    def _preprocessing_tabs(self):
+        return self.__get_tabs('StitchingTab', 'RegistrationTab')
+
+    # ── Lazy import + caching ──────────────────────────────────────────
+    def _ensure_loaded(self, *names: str) -> None:
         """
-        Decide which tab classes should exist.
-
-        .. warning::
-
-            sample_manager is required to determine per-channel and compound tabs.
-            It's config should be up-to-date with `view`.
+        Import and cache requested tabs by name if not already loaded.
+        If called with no names, loads all known tabs.
         """
-        classes: list[Type[GenericTab]] = self._base + self._preprocessing_tabs
+        to_load = [nm for nm in (names or self._tabs.keys()) if self._tabs[nm] is None]
+        if not to_load and self._DATA_TYPE_TO_TAB_CLASS is not None:
+            return
 
-        # Add per-channel tabs
+        from . import tabs  # heavy import, done once
+
+        for cls_name in to_load:
+            try:
+                self._tabs[cls_name] = getattr(tabs, cls_name)
+            except AttributeError:
+                raise RuntimeError(f'Tab class {cls_name} not found in .tabs module')
+
+        if self._DATA_TYPE_TO_TAB_CLASS is None:
+            self._DATA_TYPE_TO_TAB_CLASS = getattr(tabs, 'DATA_TYPE_TO_TAB_CLASS')
+
+    @staticmethod
+    def _append_if(acc: list[type[GenericTab]], tab_cls: Optional[type[GenericTab]], sample_manager: SampleManager) -> None:
+        if tab_cls and (tab_cls not in acc) and tab_cls.requirements_fulfilled(sample_manager):
+            acc.append(tab_cls)
+
+    @classmethod
+    def _filter_by_requirements(cls, candidates: list[type[GenericTab]], sample_manager: SampleManager, *,
+                                extra_requires: Callable[[Any], bool] | None = None,
+                                existing: list[type[GenericTab]] | None = None) -> list[type[GenericTab]]:
+        extra_ok = extra_requires(sample_manager) if extra_requires is not None else True
+        existing_set = set(existing or [])
+        return [tab_cls for tab_cls in candidates
+                if (tab_cls not in existing_set) and tab_cls.requirements_fulfilled(sample_manager) and extra_ok
+                ]
+
+    def valid_tabs(self, sample_manager: "SampleManager") -> list[type[GenericTab]]:
+        # self._ensure_loaded()  # lazy load on first real use
+
+        required: list[type[GenericTab]] = self._base_tabs
+
+        # regular pipeline tabs
         for ch in sample_manager.channels:
-            cls = DATA_TYPE_TO_TAB_CLASS.get(sample_manager.data_type(ch))
-            if cls and cls not in classes:
-                classes.append(cls)
+            data_cls = self._DATA_TYPE_TO_TAB_CLASS.get(sample_manager.data_type(ch))
+            self._append_if(required, data_cls, sample_manager)
 
-        self._handle_compound_tabs(classes, sample_manager)
+        # preprocessing
+        for tab_cls in self._preprocessing_tabs:  # As soon as we have a sample
+            self._append_if(required, tab_cls, sample_manager)
 
-        classes += self._batch_tabs
+        # Compound tabs (e.g., colocalization)
+        def coloc_compatible(sm: "SampleManager") -> bool:
+            return sm.is_colocalization_compatible
 
-        # De-duplicate while preserving order
-        ordered = self._sort_tabs(classes)
-        return ordered
+        required += self._filter_by_requirements(self._compound_tabs, sample_manager,
+                                                 extra_requires=coloc_compatible, existing=required)
 
-    def _sort_tabs(self, classes):
-        seen = set()
+        # Batch tabs
+        required += self._filter_by_requirements(self._batch_tabs, sample_manager, existing=required)
+
+        return self._sort_tabs(required)
+
+    def _sort_tabs(self, classes: list[type[GenericTab]]) -> list[type[GenericTab]]:
+        """Deduplicate and sort using global_score() helper."""
         ordered = []
         for c in classes:
-            if c not in seen:
-                seen.add(c)
+            if c not in ordered:
                 ordered.append(c)
         ordered.sort(key=_order_key)
         return ordered
-
-    def _handle_compound_tabs(self, classes: List[Type], sample_manager: SampleManager) -> None:
-        """Add compound tabs (e.g., colocalization) when applicable"""
-        if getattr(sample_manager, "is_colocalization_compatible", False):
-            if ColocalizationTab not in classes:
-                classes.append(ColocalizationTab)
