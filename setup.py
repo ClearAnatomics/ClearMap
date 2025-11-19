@@ -134,14 +134,14 @@ packages = find_packages(exclude=('doc', 'tests*', 'pickle_python_2', 'deprecate
                                   'ClearMap.External.geodesic_distance'))
 setup(
     name='ClearMap',
-    version='3.0.0',
+    version='3.1.0',
     description='3D cell counting and vasculature analysis for lightsheet microscopy',
     install_requires=requirements,
     packages=packages,
     ext_modules=ext_modules,
     entry_points={
         'gui_scripts': [
-            'clearmap-ui = ClearMap.gui.run_gui:entry_point'
+            'clearmap-ui = ClearMap.gui.app:entry_point'
         ],
         'console_scripts': [
             'cell_map = ClearMap.Scripts.cell_map_new_api:main',
@@ -153,16 +153,18 @@ setup(
     author='Christoph Kirst, Sophie Skriabine, Charly Rousseau, Etienne Doumazane',
     author_email='',
     include_package_data=True,
-    package_data={'ClearMap.config': ['*.cfg'],
-                  'ClearMap.gui': ['creator/*.ui',
-                                   'creator/*.qrc',
-                                   'creator/graphics_resources/*.png',
-                                   'creator/graphics_resources/*.jpg',
-                                   'creator/graphics_resources/*.svg',
-                                   'creator/icons/*.png',
-                                   'creator/icons/*.jpg',
-                                   'creator/icons/*.svg',
-                                   ]},
+    package_data={
+        'ClearMap.config': ['*.cfg'],
+        'ClearMap.gui': [
+            'creator/*.ui',
+            'creator/*.qrc',
+            'creator/graphics_resources/*.png',
+            'creator/graphics_resources/*.jpg',
+            'creator/graphics_resources/*.svg',
+            'creator/icons/*.png',
+            'creator/icons/*.jpg',
+            'creator/icons/*.svg',
+        ]},
     data_files=data_files,
     zip_safe=False
 )
