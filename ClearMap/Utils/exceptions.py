@@ -120,6 +120,12 @@ class MissingChannelError(ClearMapWorkspaceError):
     """
     pass
 
+class MissingAssetError(ClearMapWorkspaceError, KeyError):
+    """
+    Exception raised when an asset is missing from the workspace
+    """
+    pass
+
 
 class ClearMapAssetError(ClearMapWorkspaceError):
     """
