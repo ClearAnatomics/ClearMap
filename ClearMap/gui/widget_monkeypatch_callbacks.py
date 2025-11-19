@@ -20,98 +20,107 @@ __webpage__ = 'https://idisco.info'
 __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
 
-def is_disableable(instance):
-    return has_prop(instance, 'disabledValue') and not has_prop(instance, 'individuallyDisableable')
+def _get_list_box_value(instance):
+    """
+    Get the value(s) of the spin box(es) in the instance.
+    Individual sentinel values (-1) are left as is for the caller to interpret
+    (e.g. as meaning 'auto' or 'None' depending on the context)
+    If the control is entirely disabled (box unchecked), None is returned
 
+    Parameters
+    ----------
+    instance: QFrame
+        The instance of the compound box to get the value(s) from
 
-def minus_1_to_disabled(instance, vals):
-    for i, val in enumerate(vals):
-        if val == -1:
-            vals[i] = eval(instance.property('disabledValue'))
-    return vals
-
-
-def disabled_to_minus_1(instance, vals):
-    if vals is None:
-        return
-    vals = list(vals)
-    for i, val in enumerate(vals):
-        if val is None or val in ('auto', 'None', instance.property('disabledValue')):
-            vals[i] = -1
-    return vals
-
-
-def has_prop(instance, prop_name):
-    return prop_name in instance.dynamicPropertyNames()
-
-
-def get_value(instance):
-    values = []
+    Returns
+    -------
+    int, float, list or None
+        The value(s) of the spin box(es) or None if the box is disabled
+    """
     if not instance.controlsEnabled():
-        disabled_value = instance.property('disabledValue')
-        if disabled_value is None:  # FIXME: check whether this case exists
-            return
-        else:
-            return eval(disabled_value)
-    sorted_spin_boxes = get_sorted_spin_boxes(instance)
-    for spin_box in sorted_spin_boxes:
-        values.append(spin_box.value())
-    if is_disableable(instance) or has_prop(instance, 'individuallyDisableable'):
-        values = minus_1_to_disabled(instance, values)
-    if len(values) == 1:  # Singlet
-        return values[0]
-    else:
-        return values
+        return None
+    values = [spin.value() for spin in _get_sorted_spin_boxes(instance)]
+
+    return values[0] if len(values) == 1 else values  # return single value for singlet
 
 
-def set_value(instance, values):
-    if values is None or values == 'auto':
+def _set_list_box_value(instance, values):
+    """
+    Set the value(s) of the spin box(es) in the instance
+    values are expected to have been set to None if the box is disabled or
+    to the sentinel value -1 if the box is disableable but not all are None
+    (i.e. at least one value is not None)
+
+    Parameters
+    ----------
+    instance: QFrame
+        The instance of the compound box to set the value(s) for
+    values: Iterable, int, float or None
+        The value(s) to set. If None, the box is disabled.
+    """
+    if values is None:
         instance.disableControls()
+        return
+    elif isinstance(values, (list, tuple)) and len(values) != len(_get_sorted_spin_boxes(instance)):
+        raise ValueError(f'Expected {len(_get_sorted_spin_boxes(instance))} values, got {len(values)}')
     else:
-        if not isinstance(values, Iterable):
+        if not isinstance(values, Iterable) or isinstance(values, str):
             values = [values]
-        if all([v is None for v in values]) or all([v == 'auto' for v in values]):
-            instance.disableControls()
-            return
+
         instance.enableControls()
-        if is_disableable(instance) or has_prop(instance, 'individuallyDisableable'):
-            values = disabled_to_minus_1(instance, values)
-        sorted_spin_boxes = get_sorted_spin_boxes(instance)
-        for val, spin_box in zip(values, sorted_spin_boxes):
-            spin_box.setValue(val)
+        spins = _get_sorted_spin_boxes(instance)
+
+        for i, (val, spin_box) in enumerate(zip(values, spins)):
+            spin_box.blockSignals(i != len(values) - 1)  # block signals except for last to avoid multiple calls
+            if isinstance(spin_box, QSpinBox):
+                spin_box.setValue(int(val))
+            elif isinstance(spin_box, QDoubleSpinBox):
+                spin_box.setValue(float(val))
+            spin_box.blockSignals(False)
 
 
-def get_sorted_spin_boxes(instance):
+def _get_sorted_spin_boxes(instance):
+    cached = getattr(instance, "_cm_sorted_spin_boxes", None)
+    if cached is not None:
+        return cached
+
     indices = []
-    spin_boxes = instance.findChildren(QSpinBox)
-    if not spin_boxes:  # probably double
-        spin_boxes = instance.findChildren(QDoubleSpinBox)
+    spin_boxes = instance.findChildren(QSpinBox) or instance.findChildren(QDoubleSpinBox)
     for spin_box in spin_boxes:
-        try:
+        try:  # Sort by integer following the last underscore in the objectName
             indices.append(int(spin_box.objectName().split('_')[-1]))
         except ValueError:
             raise ValueError(f'Could not extract index from "{spin_box.objectName()}" in "{instance.objectName()}"')
     sorted_spin_boxes = [box for _, box in sorted(zip(indices, spin_boxes))]
+    instance._cm_sorted_spin_boxes = sorted_spin_boxes  # cache the result
     return sorted_spin_boxes
 
 
-def connect_value_changed(instance, callback):
-    spin_boxes = get_sorted_spin_boxes(instance)
+def _connect_value_changed(instance, callback):
+    spin_boxes = _get_sorted_spin_boxes(instance)
     for bx in spin_boxes:
-        bx.valueChanged.connect(callback)
-    chk_bx = get_check_box(instance)
+        # bx.valueChanged.connect(callback)
+        bx.setKeyboardTracking(False)
+        bx.editingFinished.connect(callback)
+    chk_bx = _get_check_box(instance)
     if chk_bx is not None:
-        chk_bx.stateChanged.connect(callback)
+        chk_bx.toggled.connect(callback)
 
 
-def connect_text_changed(instance, callback):
-    get_text_edit(instance).textChanged.connect(callback)
-    get_check_box(instance).stateChanged.connect(callback)
+def _connect_text_changed(instance, callback):
+    _get_text_edit(instance).textChanged.connect(callback)
+    chk = _get_check_box(instance)
+    if chk is not None:
+        chk.toggled.connect(callback)
 
 
-def controls_enabled(instance):
+def _controls_enabled(instance):
+    chk = _get_check_box(instance)
+    if chk is not None:
+        return chk.isChecked()
+    # No checkbox, check if the contained control(s) are enabled
     if instance.findChildren(QSpinBox) or instance.findChildren(QDoubleSpinBox):
-        spin_boxes = get_sorted_spin_boxes(instance)
+        spin_boxes = _get_sorted_spin_boxes(instance)
         return spin_boxes[0].isEnabled()
     elif instance.findChildren(QLineEdit):
         return instance.findChildren(QLineEdit)[0].isEnabled()
@@ -121,41 +130,36 @@ def controls_enabled(instance):
         raise NotImplementedError(f'Control type "{instance}" is not yet supported')
 
 
-def get_check_box(instance):
+def _get_check_box(instance):
     check_boxes = instance.findChildren(QCheckBox)
-    if not check_boxes:
-        return
-    else:
-        return check_boxes[0]
+    return check_boxes[0] if check_boxes else None
 
 
-def enable_controls(instance):
+def _enable_controls(instance):
     check_box = instance.getCheckBox()
     if check_box:
         check_box.setChecked(True)
 
 
-def disable_controls(instance):
+def _disable_controls(instance):
     check_box = instance.getCheckBox()
     if check_box:
         check_box.setChecked(False)
 
 
-def get_text_edit(instance):
-    children = instance.findChildren(QLineEdit)
-    if not children:
-        children = instance.findChildren(QPlainTextEdit)
-    if not children:
-        children = instance.findChildren(QTextEdit)
-    return children[0]
+def _get_text_edit(instance):
+    for cls in (QLineEdit, QPlainTextEdit, QTextEdit):
+        children = instance.findChildren(cls)
+        if children:
+            return children[0]
 
 
-def set_text(instance, txt):
+def _set_text(instance, txt):
     if txt is None or txt == 'auto' or txt == '':
         instance.disableControls()
     else:
         instance.enableControls()
-        text_edit = get_text_edit(instance)
+        text_edit = _get_text_edit(instance)
         if isinstance(text_edit, QLineEdit):
             text_edit.setText(txt)
         elif isinstance(text_edit, QPlainTextEdit):
@@ -164,48 +168,40 @@ def set_text(instance, txt):
             raise ValueError(f'Expected QLineEdit or QPlainTextEdit, got "{type(text_edit)}"')
 
 
-def get_text(instance):
+def _get_text(instance):
     if instance.controlsEnabled():
-        text_edit = get_text_edit(instance)
+        text_edit = _get_text_edit(instance)
         if isinstance(text_edit, QLineEdit):
             return text_edit.text()
         elif isinstance(text_edit, QPlainTextEdit):
             return text_edit.toPlainText()
         else:
             raise ValueError(f'Expected QLineEdit or QPlainTextEdit, got "{type(text_edit)}"')
-    else:
-        disabled_value = instance.property('disabledValue')
-        if disabled_value == 'None':
-            return None
-        elif disabled_value == 'auto':
-            return disabled_value
-        elif disabled_value == "[auto, auto]":
-            return ['auto', 'auto']
-        else:
-            raise ValueError(f'Unsupported value for disabledValue: "{disabled_value}"')
+    else:  # Disabled, return disabled value
+        return None
 
 
-def connect_apply(instance, func):
+def _connect_apply(instance, func):
     instance.button(QDialogButtonBox.Apply).clicked.connect(func)
 
 
-def connect_close(instance, func):
+def _connect_close(instance, func):
     instance.button(QDialogButtonBox.Close).clicked.connect(func)
 
 
-def connect_open(instance, func):
+def _connect_open(instance, func):
     instance.button(QDialogButtonBox.Open).clicked.connect(func)
 
 
-def connect_save(instance, func):
+def _connect_save(instance, func):
     instance.button(QDialogButtonBox.Save).clicked.connect(func)
 
 
-def connect_ok(instance, func):
+def _connect_ok(instance, func):
     instance.button(QDialogButtonBox.Ok).clicked.connect(func)
 
 
-def connect_cancel(instance, func):
+def _connect_cancel(instance, func):
     instance.button(QDialogButtonBox.Cancel).clicked.connect(func)
 
 
@@ -233,18 +229,18 @@ def recursive_patch_compound_boxes(parent):
         if not is_compound_box(bx_name):
             continue
 
-        bx.controlsEnabled = types.MethodType(controls_enabled, bx)
-        bx.getCheckBox = types.MethodType(get_check_box, bx)
-        bx.enableControls = types.MethodType(enable_controls, bx)
-        bx.disableControls = types.MethodType(disable_controls, bx)
+        bx.controlsEnabled = types.MethodType(_controls_enabled, bx)
+        bx.getCheckBox = types.MethodType(_get_check_box, bx)
+        bx.enableControls = types.MethodType(_enable_controls, bx)
+        bx.disableControls = types.MethodType(_disable_controls, bx)
         if is_list_box(bx_name):
-            bx.getValue = types.MethodType(get_value, bx)
-            bx.setValue = types.MethodType(set_value, bx)
-            bx.valueChangedConnect = types.MethodType(connect_value_changed, bx)
+            bx.getValue = types.MethodType(_get_list_box_value, bx)
+            bx.setValue = types.MethodType(_set_list_box_value, bx)
+            bx.valueChangedConnect = types.MethodType(_connect_value_changed, bx)
         elif is_optional_box(bx_name):
-            bx.setText = types.MethodType(set_text, bx)
-            bx.text = types.MethodType(get_text, bx)
-            bx.textChangedConnect = types.MethodType(connect_text_changed, bx)
+            bx.setText = types.MethodType(_set_text, bx)
+            bx.text = types.MethodType(_get_text, bx)
+            bx.textChangedConnect = types.MethodType(_connect_text_changed, bx)
         else:
             print(f'Skipping box "{bx_name}", type not recognised')
 
@@ -294,12 +290,12 @@ def recursive_patch_button_boxes(parent):
         The main widget to start the recursive search
     """
     for bx in parent.findChildren(QDialogButtonBox):
-        bx.connectApply = types.MethodType(connect_apply, bx)
-        bx.connectClose = types.MethodType(connect_close, bx)
-        bx.connectSave = types.MethodType(connect_save, bx)
-        bx.connectOpen = types.MethodType(connect_open, bx)
-        bx.connectOk = types.MethodType(connect_ok, bx)
-        bx.connectCancel = types.MethodType(connect_cancel, bx)
+        bx.connectApply = types.MethodType(_connect_apply, bx)
+        bx.connectClose = types.MethodType(_connect_close, bx)
+        bx.connectSave = types.MethodType(_connect_save, bx)
+        bx.connectOpen = types.MethodType(_connect_open, bx)
+        bx.connectOk = types.MethodType(_connect_ok, bx)
+        bx.connectCancel = types.MethodType(_connect_cancel, bx)
 
 
 def fix_btn_boxes_text(widget):
