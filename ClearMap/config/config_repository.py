@@ -1,13 +1,8 @@
-from __future__ import annotations
-
 import shutil
 from pathlib import Path
-from typing import Dict, Any, Iterable
+from typing import Dict, Any, Iterable, Optional, List
 
-import configobj
-
-from ClearMap.IO.FileUtils import atomic_replace
-from config_handler import ConfigHandler
+from ClearMap.config.config_handler import ConfigHandler, ALTERNATIVES_REG
 
 
 def _to_native_dict(obj) -> Any:
@@ -28,22 +23,50 @@ class ConfigRepository:
     - load/commit per file; load_all/commit_all across known names
     """
 
-    def __init__(self, *, base_dir: Path, known_names: Iterable[str]):  # FIXME: get known_names from ConfigLoader ?
-        self._loader = ConfigHandler(base_dir)
+    def __init__(self, *, base_dir: Optional[Path] = None, known_names: Optional[Iterable[str]] = None,
+                 config_groups: Optional[List[List[str]]] = None) -> None:
+        if base_dir is None:
+            base_dir = Path.cwd()
+        if known_names is not None:
+            pass  # keep
+        elif known_names is None and config_groups is not None:
+            known_names = [names[0] for names in config_groups]
+        else:
+            known_names = ALTERNATIVES_REG.canonical_config_names
+        self._config_handler = ConfigHandler(base_dir)
         self._known_names = list(known_names)
 
+    def list_sections(self):
+        return list(self._known_names)
+
     def set_base_dir(self, base_dir: Path) -> None:
-        self._loader.src_dir = base_dir
+        self._config_handler.src_dir = base_dir
 
     def base_dir(self) -> Path:
-        return self._loader.src_dir
+        return self._config_handler.src_dir
 
     def path_for(self, name: str, *, must_exist: bool = False) -> Path:
         """
         Resolve path for a logical config name, support alternative names and
         extensions ordered by preference (in ConfigLoader).
         """
-        return Path(self._loader.get_cfg_path(name, must_exist=must_exist))
+        # REFACTOR: check if this shouldn't be in ConfigHandler directly
+        name = ConfigHandler.normalise_cfg_name(name)
+
+        if must_exist:
+            # "Where is the current source file?"
+            if ConfigHandler.is_global(name):
+                path = ConfigHandler.get_global_path(name, must_exist=True)
+                return Path(path)
+            elif ConfigHandler.is_local(name):
+                return self._config_handler.get_cfg_path(name, must_exist=True)
+            else:
+                # Legacy/odd names: fall back to defaults location
+                path = ConfigHandler.get_default_path(name, must_exist=True)
+                return Path(path)
+        else:
+            # "Where should we write this config *now*?"
+            return ConfigHandler.resolve_write_path(name, base_dir=self.base_dir())
 
     @staticmethod
     def default_path_for(name: str, *, must_exist: bool = True) -> Path:
@@ -52,17 +75,30 @@ class ConfigRepository:
         """
         return Path(ConfigHandler.get_default_path(name, must_exist=must_exist))
 
+    def exists_any(self, name: str) -> bool:
+        """
+        Return True if a config file for 'name' exists in the experiment folder,
+        considering all alternative names/extensions and legacy layouts.
+        """
+        loader = ConfigHandler(self.base_dir())
+        try:
+            # will raise if nothing can be found under any alternative
+            loader.get_cfg_path(name, must_exist=True)
+            return True
+        except FileNotFoundError:
+            return False
+
     def load(self, name: str) -> Dict[str, Any]:
         """
         Return a plain dict for this logical config. (or empty dict if missing).
         """
         try:
-            cfg_obj = self._loader.get_cfg(name, must_exist=False)
+            cfg = self._config_handler.get_cfg(name, must_exist=False)
         except FileNotFoundError:
-            cfg_obj = None
-        if cfg_obj is None:
+            cfg = None
+        if cfg is None:
             return {}
-        return _to_native_dict(cfg_obj)
+        return _to_native_dict(cfg)
 
     def load_all(self) -> Dict[str, Dict[str, Any]]:
         return {name: self.load(name) for name in self._known_names}
@@ -70,29 +106,14 @@ class ConfigRepository:
     def commit(self, name: str, cfg: Dict[str, Any]) -> None:
         """
         Atomically write the given dict to the resolved path.
-        Uses ConfigObj for .cfg/.ini; JSON/YAML adapters could be added similarly.  # FIXME: this should use ConfigLoader instead
+        Uses ConfigHandler's dump() to dispatch to the right format.
+        The write is atomic: first to a temp file, then rename.
+        2nd step (rename) is atomic on most OS/FS.
+        1st step (write to temp) is not atomic, but should not leave a
+        partial file behind (unless disk full or similar).
         """
         path = self.path_for(name, must_exist=False)
-        ext = path.suffix.lower()
-        tmp = path.with_suffix(path.suffix + ".tmp")
-        tmp.parent.mkdir(parents=True, exist_ok=True)
-
-        if ext in (".cfg", ".ini"):
-            # Write via ConfigObj to preserve its formatting expectations
-            cfg_obj = configobj.ConfigObj(encoding="UTF8", indent_type="    ", unrepr=True)  # FIXME: no direct ConfigObj here
-            cfg_obj.filename = str(tmp)
-            # Replace content
-            cfg_obj.clear()
-            for k, v in cfg.items():
-                cfg_obj[k] = v
-            cfg_obj.write()
-        else:
-            # Fallback: simple JSON (extend if you add YAML/JSON support)
-            import json
-            with tmp.open("w", encoding="utf-8") as f:
-                json.dump(cfg, f, indent=2)
-
-        atomic_replace(tmp, path)
+        self._config_handler.dump(path=path, data=cfg)
 
     def clone_from(self, template_dir: Path, dest_dir: Path) -> None:
         """
@@ -127,9 +148,9 @@ class ConfigRepository:
             shutil.copy2(default_src, dest_path)
 
             # reset sample_id to 'undefined' in the copied sample config
-            if name == "sample":
+            if name == 'sample':
                 cfg = self.load(name)
-                cfg['sample_id'] = 'undefined'
+                cfg["sample_id"] = 'undefined'
                 self.commit(name, cfg)
 
     def ensure_present(self, name: str) -> Path | None:  # FIXME: use this to refactor above code
