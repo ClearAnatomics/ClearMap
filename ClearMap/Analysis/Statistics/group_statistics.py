@@ -12,31 +12,64 @@ __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
-import math
 import os
+import math
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Optional
 
 import numpy as np
 import pandas as pd
 from scipy import stats
 
-import ClearMap.Analysis.Statistics.StatisticalTests as clearmap_stat_tests
+
 from ClearMap.Alignment.utils import get_all_region_ids
-from ClearMap.Analysis.Statistics import MultipleComparisonCorrection as clearmap_FDR
 from ClearMap.IO import IO as clearmap_io
 from ClearMap.Utils.exceptions import GroupStatsError
-from ClearMap.Utils.path_utils import is_density_file, find_density_file, find_cells_df, dir_to_sample_id
+from ClearMap.Utils.path_utils import is_density_file, find_density_file, find_cells_df
 from ClearMap.Utils.utilities import make_abs
 from ClearMap.config.atlas import ATLAS_NAMES_MAP
 from ClearMap.config.config_handler import ConfigHandler
-from ClearMap.pipeline_orchestrators.sample_preparation import init_sample_manager_and_processors, SampleManager, \
-    RegistrationProcessor
+from ClearMap.pipeline_orchestrators.sample_info_management import SampleManager
+from ClearMap.pipeline_orchestrators.utils import init_sample_manager_and_processors
+from ClearMap.pipeline_orchestrators.registration_orchestrator import RegistrationProcessor
+
+import ClearMap.Analysis.Statistics.StatisticalTests as clearmap_stat_tests
+from ClearMap.Analysis.Statistics import MultipleComparisonCorrection as clearmap_FDR
 
 colors = {  # REFACTOR: move to visualisation module
     'red': [255, 0, 0],
     'green': [0, 255, 0],
     'blue': [0, 0, 255]
 }
+
+
+@dataclass(frozen=True)
+class PValueAssets:
+    p_vals: Path
+    gp1_avg: Path
+    gp1_sd: Optional[Path]
+    gp2_avg: Path
+    gp2_sd: Optional[Path]
+    effect_size: Optional[Path]
+
+
+def p_val_assets_for_pair(results_dir: Path, channel: str, gp1: str, gp2: str) -> PValueAssets:
+    pvals = results_dir / f"{channel}_p_val_colors_{gp1}_{gp2}.tif"
+    eff   = results_dir / f"{channel}_effect_size_{gp1}_{gp2}.tif"
+
+    gp1_avg = results_dir / f"{channel}_avg_density_{gp1}.tif"
+    gp1_sd  = results_dir / f"{channel}_sd_density_{gp1}.tif"
+    gp2_avg = results_dir / f"{channel}_avg_density_{gp2}.tif"
+    gp2_sd  = results_dir / f"{channel}_sd_density_{gp2}.tif"
+
+    def _opt(p: Path) -> Optional[Path]:
+        return p if p.exists() else None
+
+    return PValueAssets(p_vals=pvals,
+                        gp1_avg=gp1_avg, gp1_sd=_opt(gp1_sd),
+                        gp2_avg=gp2_avg, gp2_sd=_opt(gp2_sd),
+                        effect_size=_opt(eff))
 
 
 def t_test_voxelization(group1, group2, signed=False, remove_nan=True, p_cutoff=None):
@@ -523,7 +556,7 @@ def make_summary(directory, gp1_name, gp2_name, gp1_dirs, gp2_dirs, channel=None
     return dfs
 
 
-def density_files_are_comparable(directory, gp1_dirs, gp2_dirs, channel, density_files_suffix=''):
+def density_files_are_comparable(directory, *, gp1_dirs, gp2_dirs, channel, density_files_suffix=''):
     gp1_f_list = dirs_to_density_files(directory, gp1_dirs, channel, suffix=density_files_suffix)
     gp2_f_list = dirs_to_density_files(directory, gp2_dirs, channel, suffix=density_files_suffix)
     all_files = gp1_f_list + gp2_f_list
@@ -545,7 +578,7 @@ def compare_groups(directory, gp1_name, gp2_name, gp1_dirs, gp2_dirs, prefix='p_
                    advanced=True, density_files_suffix=''):
     directory = Path(directory)
 
-    sample_manager = SampleManager()
+    sample_manager = SampleManager()  # FIXME: missing coordinator. maybge pass the manager
     sample_manager.setup(src_dir=directory / gp1_dirs[0])
     result = {}
     for channel in sample_manager.channels:
@@ -674,3 +707,50 @@ def check_ids_are_unique(gp1, gp2):
         ids.append(loader.get_cfg('sample')['sample_id'])
     if len(ids) != len(set(ids)):
         raise GroupStatsError('Analysis impossible, some IDs are not unique. please check and start again')
+
+
+@dataclass
+class LoadedPValueResults:
+    gp1_avg: np.ndarray
+    gp1_sd: Optional[np.ndarray]
+    gp2_avg: np.ndarray
+    gp2_sd: Optional[np.ndarray]
+    p_vals: np.ndarray
+    effect_size: Optional[np.ndarray]
+
+    @property
+    def has_sd(self) -> bool:
+        return (self.gp1_sd is not None) and (self.gp2_sd is not None)
+
+    @property
+    def has_effect(self) -> bool:
+        return self.effect_size is not None
+
+    @property
+    def gp1_imgs(self):
+        return [self.gp1_avg, self.gp1_sd] if self.has_sd else self.gp1_avg
+
+    @property
+    def gp2_imgs(self):
+        return [self.gp2_avg, self.gp2_sd] if self.has_sd else self.gp2_avg
+
+    @property
+    def stats_imgs(self):
+        return [self.p_vals, self.effect_size] if self.has_effect else self.p_vals
+
+
+def dir_to_sample_id(folder):
+    """
+    Get the sample ID from a directory
+
+    Parameters
+    ----------
+    folder : str
+        The directory to check
+
+    Returns
+    -------
+
+    """
+    cfg_loader = ConfigHandler(folder)
+    return cfg_loader.get_cfg('sample')['sample_id']
