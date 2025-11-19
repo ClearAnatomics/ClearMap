@@ -1,0 +1,75 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://clearmap.org/schemas/v3/stitching"
+
+type: object
+
+properties:
+  clearmap_schema: { type: integer }
+  clearmap_version: { type: string }
+
+  channels:
+    type: object
+    # channel keys must match channelName
+    propertyNames:
+      $ref: "./typedefs.schema.yaml#/$defs/channelName"
+
+    # each channel’s stitching config
+    additionalProperties:
+      type: object
+      properties:
+        use_npy: { type: boolean }
+        run:     { type: boolean }
+        # “derived” channels point to a provider channel; “layout” channels point to themselves.
+        layout_channel:
+          anyOf:
+            - {$ref: "./typedefs.schema.yaml#/$defs/channelName"}
+            - {type: "string", const: "undefined"}
+            - {type: "null"}
+
+        # Optional properties (only for layout channels)
+        use_existing_layout: { type: boolean }
+
+        rigid:
+          type: "object"
+          properties:
+            skip: { type: boolean }
+            overlap_x:
+              anyOf:
+                - { type: "integer" }
+                - { type: "string", const: "auto" }
+            overlap_y:
+              anyOf:
+                - { type: "integer" }
+                - { type: "string", const: "auto" }
+
+            # ["auto" | number | null] x 3
+            projection_thickness:
+              $ref: "./typedefs.schema.yaml#/$defs/thicknessTripleAutoNull"
+
+            # integer pairs
+            max_shifts_x: { $ref: "./typedefs.schema.yaml#/$defs/intPair" }
+            max_shifts_y: { $ref: "./typedefs.schema.yaml#/$defs/intPair" }
+            max_shifts_z: { $ref: "./typedefs.schema.yaml#/$defs/intPair" }
+
+            background_level:  { type: "number", minimum: 0 }
+            background_pixels: { type: "integer", minimum: 0 }
+          additionalProperties: true
+
+        wobbly:
+          type: "object"
+          properties:
+            skip: { type: boolean }
+            max_shifts_x: { $ref: "./typedefs.schema.yaml#/$defs/intPair" }
+            max_shifts_y: { $ref: "./typedefs.schema.yaml#/$defs/intPair" }
+            max_shifts_z: { $ref: "./typedefs.schema.yaml#/$defs/intPair" }
+
+            # [low, high] with nulls allowed at either end
+            stack_valid_range: { $ref: "./typedefs.schema.yaml#/$defs/intPairNullable" }
+            stack_pixel_size:  { type: ["number", "null"], minimum: 0 }
+            slice_valid_range: { $ref: "./typedefs.schema.yaml#/$defs/intPairNullable" }
+            slice_pixel_size:  { type: ["integer", "null"], minimum: 0 }
+          additionalProperties: true
+
+      required: [use_npy, run, layout_channel]
+
+additionalProperties: true

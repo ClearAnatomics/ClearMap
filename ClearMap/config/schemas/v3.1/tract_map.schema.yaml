@@ -1,0 +1,69 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://clearmap.org/schemas/v3/tract_map"
+
+type: object
+additionalProperties: true
+properties:
+  clearmap_schema:   { type: integer }
+  clearmap_version:  { type: string }
+
+  channels:
+    type: object
+    propertyNames: {$ref: "./typedefs.schema.yaml#/$defs/channelName"}
+
+    # per-channel spec
+    additionalProperties:
+      type: object
+      additionalProperties: true
+      properties:
+        binarization:
+          type: object
+          additionalProperties: true
+          properties:
+            # strictly integer >= 1 (and not boolean)
+            decimation_ratio: { $ref: "./typedefs.schema.yaml#/$defs/positiveInteger" }
+            percentage_range: { $ref: "./typedefs.schema.yaml#/$defs/numberPairPositive" }
+            clip_range: { $ref: "./typedefs.schema.yaml#/$defs/integerPairNonNegative" }
+
+        test_set_slicing:
+          type: object
+          additionalProperties: true
+          properties:
+            dim_0: { $ref: "./typedefs.schema.yaml#/$defs/integerPairNonNegative" }
+            dim_1: { $ref: "./typedefs.schema.yaml#/$defs/integerPairNonNegative" }
+            dim_2: { $ref: "./typedefs.schema.yaml#/$defs/integerPairNonNegative" }
+
+        display:
+          type: object
+          additionalProperties: true
+          properties:
+            decimation_ratio: { $ref: "./typedefs.schema.yaml#/$defs/positiveInteger" }
+
+        voxelization:
+          type: object
+          additionalProperties: true
+          properties:
+            radii: { $ref: "./typedefs.schema.yaml#/$defs/numberTriplePositive" }
+
+        steps:
+          type: object
+          additionalProperties: true
+          properties:
+            binarize:               { type: boolean }
+            extract_coordinates:    { type: boolean }
+            transform_coordinates:  { type: boolean }
+            label_coordinates:      { type: boolean }
+            voxelize:               { type: boolean }
+            export_df:              { type: boolean }
+
+        parallel_params:
+          type: object
+          additionalProperties: true
+          properties:
+            min_point_list_size: { $ref: "./typedefs.schema.yaml#/$defs/positiveInteger" }
+            max_point_list_size: { $ref: "./typedefs.schema.yaml#/$defs/positiveInteger" }
+            n_processes_binarization:   { $ref: "./typedefs.schema.yaml#/$defs/nProcessesType" }
+            n_processes_resampling:     { $ref: "./typedefs.schema.yaml#/$defs/nProcessesType" }
+            n_processes_where:          { $ref: "./typedefs.schema.yaml#/$defs/nProcessesType" }
+            n_processes_transform:      { $ref: "./typedefs.schema.yaml#/$defs/nProcessesType" }
+            n_processes_label:          { $ref: "./typedefs.schema.yaml#/$defs/nProcessesType" }

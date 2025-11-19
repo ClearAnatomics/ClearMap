@@ -1,0 +1,68 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://clearmap.org/schemas/v3/sample"
+
+type: object
+required: ["clearmap_schema", "clearmap_version",
+           "base_directory", "sample_id",
+           "use_id_as_prefix", "default_tile_extension",
+           "channels"]
+
+properties:
+  clearmap_schema: { type: integer }
+  clearmap_version: { type: string }
+  base_directory:   { type: string }
+  sample_id:        { type: string }
+  use_id_as_prefix: { type: boolean }
+
+  default_tile_extension:
+    type: array
+    items:
+      $ref: "./typedefs.schema.yaml#/$defs/extensionString"
+    minItems: 1
+    uniqueItems: true
+
+  comments:         { type: string }
+
+  channels:
+    type: object
+
+    propertyNames:  # keys name must comply with channelName
+      $ref: "./typedefs.schema.yaml#/$defs/channelName"
+
+    # One schema applied to every channel value
+    additionalProperties:
+      type: object
+      required: ["data_type", "extension", "path",
+                 "resolution", "orientation"]
+      properties:
+        data_type:
+          $ref: "./typedefs.schema.yaml#/$defs/imageContentType"
+
+        extension:
+          $ref: "./typedefs.schema.yaml#/$defs/extensionString"
+
+        path: { type: string }
+
+        resolution:
+          type: array
+          items: { type: number, exclusiveMinimum: 0 }
+          minItems: 3
+          maxItems: 3
+
+        # Accept either a strict triple (±1, ±2, ±3) or the special [0,0,0] “unset”.
+        orientation:
+          $ref: "./typedefs.schema.yaml#/$defs/orientationTripleOrUnset"
+
+        comments: { type: string }
+
+        slicing:
+          type: object
+          properties:
+            x: { type: ["array","null"], items: { type: ["integer","null"] }, minItems: 2, maxItems: 2 }
+            y: { type: ["array","null"], items: { type: ["integer","null"] }, minItems: 2, maxItems: 2 }
+            z: { type: ["array","null"], items: { type: ["integer","null"] }, minItems: 2, maxItems: 2 }
+          additionalProperties: true
+
+      additionalProperties: true
+
+additionalProperties: true

@@ -1,0 +1,33 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://clearmap.org/schemas/v3/machine"
+
+type: object
+additionalProperties: false
+
+properties:
+  clearmap_schema:  { type: integer }
+  clearmap_version: { type: string }
+
+  verbosity: { type: string, enum: ["trace","debug","info","warn","error"] }
+
+  n_processes_file_conv:      { $ref: "./typedefs.schema.yaml#/$defs/nProcessesType" }
+  n_processes_stitching:      { $ref: "./typedefs.schema.yaml#/$defs/nProcessesType" }
+  n_processes_resampling:     { $ref: "./typedefs.schema.yaml#/$defs/nProcessesType" }
+  n_processes_cell_detection: { $ref: "./typedefs.schema.yaml#/$defs/nProcessesType" }
+  n_processes_binarization:   { $ref: "./typedefs.schema.yaml#/$defs/nProcessesType" }
+
+  detection_chunk_size_min: { $ref: "./typedefs.schema.yaml#/$defs/positiveInteger" }
+  detection_chunk_size_max: { $ref: "./typedefs.schema.yaml#/$defs/positiveInteger" }
+  detection_chunk_overlap:  { $ref: "./typedefs.schema.yaml#/$defs/nonNegativeInteger" }
+
+  start_folder:       { type: string }
+  temp_folder:        { type: ["string", "null"] }
+  start_full_screen:  { type: boolean }
+
+  default_lut:     { type: string }
+  three_d_plot_bg: { type: string }
+  font_size:       { $ref: "./typedefs.schema.yaml#/$defs/positiveInteger" }
+
+  pattern_finder_min_n_files: { $ref: "./typedefs.schema.yaml#/$defs/positiveInteger" }
+
+  elastix_path: { type: ["string", "null"] }

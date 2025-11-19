@@ -1,0 +1,31 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://clearmap.org/schemas/v3/batch_processing"
+
+type: object
+additionalProperties: true
+properties:
+  clearmap_schema:   { type: integer }
+  clearmap_version:  { type: string }
+
+  paths:
+    type: object
+    additionalProperties: true
+    properties:
+      results_folder: { type: "string" }
+
+  groups:
+    type: object
+    # For the moment, group names must follow same rules as channel names
+    propertyNames: { $ref: "./typedefs.schema.yaml#/$defs/channelName" }
+    additionalProperties:
+      type: array
+      items: { type: string }  # list of samples (strings)
+
+#  comparisons:
+#    type: array # array of arrays (tuples) of group names
+#    items: # 2-element tuples [group_1, group_2]
+#      type: array
+#      items: { $ref: "./typedefs.schema.yaml#/$defs/channelName" }
+#      minItems: 2
+#      maxItems: 2
+#      uniqueItems: true  # ["A","B"] and ["B","A"] are different

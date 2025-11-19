@@ -1,0 +1,80 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://clearmap.org/schemas/v3/cell_map"
+
+type: object
+additionalProperties: true
+
+properties:
+  clearmap_schema: { type: integer }
+  clearmap_version: { type: string }
+
+  channels:
+    type: object
+
+    # constrain channel KEYS
+    propertyNames: { $ref: "./typedefs.schema.yaml#/$defs/channelName" }
+
+    # schema applied to every channel
+    additionalProperties:
+      type: object
+      additionalProperties: true
+      properties:
+        detection:
+          type: object
+          additionalProperties: true
+          properties:
+            colocalization_compatible: { type: boolean }
+
+            background_correction:
+              type: object
+              additionalProperties: true
+              properties:
+                diameter: { $ref: "./typedefs.schema.yaml#/$defs/numberPairPositive" }
+
+            maxima_detection:
+              type: object
+              additionalProperties: true
+              properties:
+                shape: { type: integer }
+                h_max: { type: [number, "null"] }
+
+            shape_detection:
+              type: object
+              additionalProperties: true
+              properties:
+                threshold: { type: number }
+                shape_type: { type: string }
+
+            test_set_slicing:
+              type: object
+              additionalProperties: true
+              properties:
+                dim_0: { $ref: "./typedefs.schema.yaml#/$defs/intPair" }
+                dim_1: { $ref: "./typedefs.schema.yaml#/$defs/intPair" }
+                dim_2: { $ref: "./typedefs.schema.yaml#/$defs/intPair" }
+
+        cell_filtration:
+          type: object
+          additionalProperties: true
+          properties:
+            thresholds:
+              type: object
+              additionalProperties: true
+              properties:
+                size: { $ref: "./typedefs.schema.yaml#/$defs/intPair" }
+                intensity:
+                  anyOf:
+                    - { $ref: "./typedefs.schema.yaml#/$defs/integerPairNonNegative" }
+                    - { type: "null" }
+
+        voxelization:
+          type: object
+          additionalProperties: true
+          properties:
+            radii: { $ref: "./typedefs.schema.yaml#/$defs/numberTriplePositive" }
+
+        run:
+          type: object
+          additionalProperties: true
+          properties:
+            plot_when_finished: { type: boolean }

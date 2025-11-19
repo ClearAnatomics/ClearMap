@@ -1,0 +1,51 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://clearmap.org/schemas/v3/preferences_display.schema.yaml"
+
+title: "ClearMap GUI display preferences"
+description: "Resolution-dependent GUI font sizes and names."
+
+type: object
+additionalProperties: false
+
+properties:
+  clearmap_schema:
+    type: integer
+    const: 3
+
+  clearmap_version:
+    type: string
+    description: "Semantic version of ClearMap that wrote this config."
+    pattern: '^[0-9]+\.[0-9]+\.[0-9]+$'
+
+  sd:
+    $ref: "#/$defs/fontBlock"
+
+  hd:
+    $ref: "#/$defs/fontBlock"
+
+  "4k":
+    $ref: "#/$defs/fontBlock"
+
+required:
+  - clearmap_schema
+  - clearmap_version
+  - sd
+  - hd
+  - "4k"
+
+$defs:
+  fontBlock:
+    type: object
+    additionalProperties: false
+    properties:
+      font_size:
+        $ref: "https://clearmap.org/schemas/v3/typedefs#/$defs/positiveInteger"
+      splash_font_size:
+        $ref: "https://clearmap.org/schemas/v3/typedefs#/$defs/positiveInteger"
+      font_name:
+        type: string
+        minLength: 1
+    required:
+      - font_size
+      - splash_font_size
+      - font_name

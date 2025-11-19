@@ -1,0 +1,39 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://clearmap.org/schemas/v3/colocalization"
+
+type: object
+additionalProperties: true
+properties:
+  clearmap_schema: { type: integer }
+  clearmap_version: { type: string }
+
+  channels:
+    type: object
+    propertyNames: { $ref: "./typedefs.schema.yaml#/$defs/compoundChannelName" }
+    additionalProperties:
+      type: object
+      additionalProperties: true
+      properties:
+        comparison:
+          type: object
+          additionalProperties: true
+          properties:
+            particle_diameter: { $ref: "./typedefs.schema.yaml#/$defs/positiveNumber" }
+        analysis:
+          type: object
+          additionalProperties: true
+          properties:
+            max_particle_distance:          { type: number, minimum: 0 }
+            relative_overlap_threshold:     { type: number, minimum: 0, maximum: 1 }
+            voxel_number_overlap_threshold: { type: integer, minimum: 0 }
+        voxelization:
+          type: object
+          additionalProperties: true
+          properties:
+            radii: { $ref: "./typedefs.schema.yaml#/$defs/numberTriplePositive" }
+        performance:
+          type: object
+          additionalProperties: true
+          properties:
+            # -1 → “all but one”, null → “all”
+            n_processes: { $ref: "./typedefs.schema.yaml#/$defs/nProcessesType" }

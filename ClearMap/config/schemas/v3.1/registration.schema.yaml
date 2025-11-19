@@ -1,0 +1,59 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://clearmap.org/schemas/v3/registration"
+
+type: object
+
+properties:
+  clearmap_schema: { type: integer }
+  clearmap_version: { type: string }
+  verbose: { type: boolean }
+
+  atlas:
+    type: ["object", "null"]
+    properties:
+      id: { type: string }
+      structure_tree_id: { type: string }
+      align_files_folder: { type: string }
+    additionalProperties: true
+
+  channels:
+    type: object
+    # channel keys must match channelName
+    propertyNames: {$ref: "./typedefs.schema.yaml#/$defs/channelName"}
+
+    # each channel’s config
+    additionalProperties:
+      type: object
+      properties:
+        resample: { type: boolean }
+
+        resampled_resolution:
+          anyOf:
+            - { $ref: "./typedefs.schema.yaml#/$defs/resolutionTriplePositive" } # [x,y,z] > 0
+            - { type: "null" }
+
+        # may point to "atlas" or another channel (or be null)
+        align_with:
+          anyOf:
+            - { $ref: "./typedefs.schema.yaml#/$defs/channelName" }
+            - { type: "string", const: "atlas" }
+            - { type: "null" }
+
+        # may be "intrinsically_aligned" or another channel (or null)
+        moving_channel:
+          anyOf:
+            - { $ref: "./typedefs.schema.yaml#/$defs/channelName" }
+            - { type: "string", enum: ["atlas", "intrinsically_aligned", "self", "other"] }
+            - { type: "null" }
+
+        params_files:
+          type: ["array"]
+          items: { type: "string" }
+
+        landmarks_weights:
+          type: ["array"]
+          items: { type: "number" }
+
+      additionalProperties: true
+
+additionalProperties: true

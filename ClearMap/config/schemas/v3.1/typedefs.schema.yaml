@@ -1,0 +1,142 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://clearmap.org/schemas/v3/typedefs"
+
+$defs:
+  extensionString:
+    type: string
+    pattern: '^\.[A-Za-z0-9][A-Za-z0-9._-]*$'
+
+  channelName:
+    type: string
+    pattern: '^[A-Za-z0-9_]+$'
+
+  compoundChannelName:
+    type: string
+    pattern: '^[A-Za-z0-9_]+(?:-[A-Za-z0-9_]+)+$'
+
+  imageContentType:
+    anyOf:
+      - type: string
+        enum: []  # define from code @ runtime
+      - type: "null"
+
+
+  positiveNumber: { type: number, exclusiveMinimum: 0 }
+
+  strictInteger:
+    allOf:
+      - { type: integer }
+      - { not: { type: boolean } }
+
+  nonNegativeInteger:
+    allOf:
+      - { $ref: "#/$defs/strictInteger" }
+      - { minimum: 0 }
+
+  positiveInteger:
+    allOf:
+      - { $ref: "#/$defs/strictInteger" }
+      - { minimum: 1 }
+
+  nProcessesType:
+    anyOf:
+      - { type: "integer", minimum: -1 }  # -1 means "all but one"
+      - { type: "null" }                  # null means "all"
+
+  # [x, y, z] > 0
+  resolutionTriplePositive:
+    description: "3-tuple of positive numbers (x,y,z) in microns"
+    type: array
+    minItems: 3
+    maxItems: 3
+    items: { $ref: "#/$defs/positiveNumber" }
+
+  numberPairPositive:
+    description: "Two positive numbers [a, b]"
+    type: array
+    items: { $ref: "#/$defs/positiveNumber" }
+    minItems: 2
+    maxItems: 2
+
+  numberTriplePositive:
+    description: "Three positive numbers [x, y, z]"
+    type: array
+    items: { $ref: "#/$defs/positiveNumber" }
+    minItems: 3
+    maxItems: 3
+
+  # integer pair [low, high]
+  intPair:
+    description: "Pair of integers [low, high]"
+    type: array
+    minItems: 2
+    maxItems: 2
+    items: { $ref: "#/$defs/strictInteger" }
+
+  integerPairPositive:
+    description: "Pair of positive integers [low, high]"
+    type: array
+    minItems: 2
+    maxItems: 2
+    items: { $ref: "#/$defs/positiveInteger" }
+
+  integerPairNonNegative:
+    description: "Pair of non-negative integers [low, high]"
+    type: array
+    minItems: 2
+    maxItems: 2
+    items: { $ref: "#/$defs/nonNegativeInteger" }
+
+  # integer pair where each element may be null
+  intPairNullable:
+    description: "Pair of integers [low, high] with optional nulls"
+    type: array
+    minItems: 2
+    maxItems: 2
+    items: { type: ["integer", "null"] }
+
+  # Strict triple: exactly one of ±1, ±2, ±3 (no zeros)
+  orientationTripleStrict:
+    type: array
+    minItems: 3
+    maxItems: 3
+    items: { type: integer, enum: [-3,-2,-1,1,2,3] }
+    allOf:
+      - contains: { enum: [1,-1] }  # exactly one ±1
+        minContains: 1
+        maxContains: 1
+      - contains: { enum: [2,-2] }  # exactly one ±2
+        minContains: 1
+        maxContains: 1
+      - contains: { enum: [3,-3] }  # exactly one ±3
+        minContains: 1
+        maxContains: 1
+
+  # Exactly [0,0,0] — “unset”
+  orientationZero:
+    type: array
+    minItems: 3
+    maxItems: 3
+    items: { const: 0 }
+
+  # Union variants you can $ref from section schemas:
+  orientationTripleOrUnset:
+    anyOf:
+      - { $ref: "#/$defs/orientationTripleStrict" }
+      - { $ref: "#/$defs/orientationZero" }
+
+  orientationTripleOrNullOrUnset:
+    anyOf:
+      - { $ref: "#/$defs/orientationTripleStrict" }
+      - { $ref: "#/$defs/orientationZero" }
+      - { type: "null" }
+
+  thicknessTripleAutoNull:
+    type: ["array","null"]
+    minItems: 3
+    maxItems: 3
+    items:
+      anyOf:
+        - { type: "number", minimum: 0 }
+        - { type: "string", const: "auto" }
+        - { type: "null" }

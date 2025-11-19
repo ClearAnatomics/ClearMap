@@ -1,0 +1,106 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://clearmap.org/schemas/v3/vasculature"
+
+type: object
+additionalProperties: true
+properties:
+  clearmap_schema: { type: integer }
+  clearmap_version: { type: string }
+
+  binarization:
+    type: object
+    # Keys are typically vessels|arteries|veins|combined — (open but values are validated below)
+    additionalProperties:
+      anyOf:
+        # Spec A: full pipeline spec (vessels/arteries like)
+        - type: object
+          additionalProperties: true
+          properties:
+            binarize:
+              type: object
+              additionalProperties: true
+              properties:
+                run: { type: boolean }
+                # FIXME: check if values can take None/null
+                clip_range: { $ref: "./typedefs.schema.yaml#/$defs/numberPairPositive" }
+                threshold: { type: [number, "null"] }
+            smooth:
+              type: object
+              additionalProperties: true
+              properties: { run: { type: boolean } }
+            binary_fill:
+              type: object
+              additionalProperties: true
+              properties: { run: { type: boolean } }
+            deep_fill:
+              type: object
+              additionalProperties: true
+              properties:
+                run: { type: boolean }
+                size_max: { type: integer, minimum: 0 }
+                overlap: { type: integer, minimum: 0 }
+                resample_factor: { type: number, exclusiveMinimum: 0 }
+        # Spec B: combined/simple flags
+        - type: object
+          additionalProperties: true
+          properties:
+            binary_fill: { type: boolean }
+            compress:    { type: boolean }
+
+  graph_construction:
+    type: object
+    additionalProperties: true
+    properties:
+      skeletonize:  { type: boolean }
+      build:        { type: boolean }
+      clean:        { type: boolean }
+      reduce:       { type: boolean }
+      transform:    { type: boolean }
+      annotate:     { type: boolean }
+      use_arteries: { type: boolean }
+
+  vessel_type_postprocessing:
+    type: object
+    additionalProperties: true
+    properties:
+      pre_filtering:
+        type: object
+        additionalProperties: true
+        properties:
+          vein_intensity_range_on_arteries_ch: { $ref: "./typedefs.schema.yaml#/$defs/intPair" }
+          restrictive_vein_radius: { $ref: "./typedefs.schema.yaml#/$defs/positiveNumber" }
+          permissive_vein_radius:  { $ref: "./typedefs.schema.yaml#/$defs/positiveNumber" }
+          final_vein_radius:       { $ref: "./typedefs.schema.yaml#/$defs/positiveNumber" }
+          arteries_min_radius:     { $ref: "./typedefs.schema.yaml#/$defs/positiveNumber" }
+      tracing:
+        type: object
+        additionalProperties: true
+        properties:
+          max_arteries_iterations: { $ref: "./typedefs.schema.yaml#/$defs/positiveInteger" }
+          max_veins_iterations:    { $ref: "./typedefs.schema.yaml#/$defs/positiveInteger" }
+      capillaries_removal:
+        type: object
+        additionalProperties: true
+        properties:
+          min_artery_size: { $ref: "./typedefs.schema.yaml#/$defs/positiveNumber" }
+          min_vein_size:   { $ref: "./typedefs.schema.yaml#/$defs/positiveNumber" }
+
+  visualization:
+    type: object
+    additionalProperties: true
+    properties:
+      voxelization:
+        type: object
+        additionalProperties: true
+        properties:
+          size: { $ref: "./typedefs.schema.yaml#/$defs/numberTriplePositive" }
+      slicing:
+        type: object
+        additionalProperties: true
+        properties:
+          dim_0: { $ref: "./typedefs.schema.yaml#/$defs/intPair" }
+          dim_1: { $ref: "./typedefs.schema.yaml#/$defs/intPair" }
+          dim_2: { $ref: "./typedefs.schema.yaml#/$defs/intPair" }
+      display:
+        type: object
+        additionalProperties: true
