@@ -1,28 +1,45 @@
 """
 This module contains the interfaces to the different tabs and dialogs in the ClearMap GUI.
 """
-import functools
+from __future__ import annotations
+
 import os
-import pathlib
+import functools
 import warnings
-
+from dataclasses import dataclass
 from pathlib import Path
-from shutil import copyfile
-
-from abc import abstractmethod
-from typing import final
+from contextlib import contextmanager
+from typing import final, List, Optional, Callable, Any, Dict, Tuple, TYPE_CHECKING
 
 import numpy as np
-from PyQt5.QtWidgets import QWhatsThis, QToolButton, QWidget
+from PyQt5.QtWidgets import QWhatsThis, QWidget
 
+from ClearMap.Utils.event_bus import BusSubscriberMixin
 from ClearMap.Utils.exceptions import MissingRequirementException, PlotGraphError
 from ClearMap.Utils.utilities import title_to_snake
-from ClearMap.Visualization.Qt.DataViewer import DataViewer
 from ClearMap.config.config_handler import ConfigHandler
-from ClearMap.gui.dialogs import get_directory_dlg
-from ClearMap.gui.gui_utils import create_clearmap_widget, replace_widget
-from ClearMap.gui.widget_monkeypatch_callbacks import recursive_patch_widgets
-from ClearMap.gui.widgets import ExtendableTabWidget, SamplePickerDialog
+
+from .dialog_helpers import get_directory_dlg
+from .gui_utils_base import create_clearmap_widget, replace_widget
+from .widgets import ExtendableTabWidget, SamplePickerDialog
+if TYPE_CHECKING:
+    from PyQt5.QtWidgets import QMainWindow, QToolButton
+    from ClearMap.pipeline_orchestrators.sample_info_management import SampleManager
+    from ClearMap.pipeline_orchestrators.generic_orchestrators import PipelineOrchestrator
+    from .app import ClearMapApp
+    from .params_interfaces import UiParameter, UiParameterCollection
+    from .params_mixins import OrthoviewerSlicingMixin
+    from .params import SampleParameters
+    from .experiment_controller import ExperimentController, AnalysisGroupController
+
+
+
+PathLike = str | Path
+
+
+def channel_is_compound(channel) -> bool:
+    return (isinstance(channel, str) and '-' in channel) or \
+        (isinstance(channel, (tuple, list)))
 
 
 class GenericUi:
@@ -31,7 +48,7 @@ class GenericUi:
     of GenericTab and GenericDialog, themselves interfaces
     """
     # FIXME: seems to be called several times
-    def __init__(self, main_window, ui_file_name, name, widget_class_name):
+    def __init__(self, main_window: QMainWindow, ui_file_name: str, name: str, widget_class_name: str):
         """
 
         Parameters
@@ -41,17 +58,18 @@ class GenericUi:
         ui_file_name: str
         widget_class_name: str
         """
-        self.main_window = main_window
-        self.name = name
-        self.ui_file_name = ui_file_name
-        self.widget_class_name = widget_class_name
-        self.ui = None
-        self.params = None
-        self.progress_watcher = self.main_window.progress_watcher
+        self.main_window: QMainWindow = main_window
+        self.name: str = name
+        self.ui_file_name: str = ui_file_name
+        self.widget_class_name: str = widget_class_name
+        self.ui: Optional[QWidget] = None
+        self.params: Optional[UiParameter | UiParameterCollection] = None
+
+    def _load_dot_ui(self):
+        return create_clearmap_widget(self.ui_file_name, patch_parent_class=self.widget_class_name)
 
     def _init_ui(self):
-        self.ui = create_clearmap_widget(f'{self.ui_file_name}.ui', patch_parent_class=self.widget_class_name)
-        recursive_patch_widgets(self.ui)
+        self.ui = self._load_dot_ui()
 
     # @abstractmethod
     def setup(self):
@@ -66,9 +84,6 @@ class GenericUi:
     def _load_config_to_gui(self):
         """Set every control on the UI to the value in the params object"""
         self.params.cfg_to_ui()
-
-    def set_progress_watcher(self, watcher):
-        pass
 
 
 class GenericDialog(GenericUi):
@@ -87,44 +102,79 @@ class GenericDialog(GenericUi):
         raise NotImplementedError()
 
 # TODO: SubTab needs a parent widget, tab and main_window
-class GenericTab(GenericUi):
+
+
+@dataclass
+class TabRequirements:
+    needs_workspace: bool = False   # requires an experiment folder + workspace
+    needs_channels: bool = False    # requires sample channels known/materialized
+
+
+class GenericTab(GenericUi, BusSubscriberMixin):
     """
     The interface to all tab managers.
     A tab manager includes a tab widget, the associated parameters and
     an optional processor object which handles the computations.
     """
-    processing_type = None  # Not a pipeline tab by default
+    requirements = TabRequirements(needs_workspace=False, needs_channels=False)  # Think SampleInfoTab
 
-    def __init__(self, main_window, ui_file_name, tab_idx, name=''):
+    processing_type: Optional[str] = None  # Not a pipeline tab by default
+    channels_ui_name: str = ''  # The name of the ui file to create the channel tabs
+    with_add_btn: bool = False  # Whether to add the add channel (+) button to the channels tab
+
+    def __init__(self, main_window: ClearMapApp, ui_file_name: str, tab_idx: int, name: str = ''):
         """
 
         Parameters
         ----------
-        main_window: ClearMapGui
+        main_window: ClearMapApp
         ui_file_name: str
         tab_idx: int
         name: str
         """
         name = name or self.get_tab_name()
         super().__init__(main_window, ui_file_name, name, 'QTabWidget')
+        # REFACTORING: avoid direct access to a private attribute
+        BusSubscriberMixin.__init__(self, bus=main_window.experiment_controller._bus)
+        self.tab_idx = tab_idx
+
+        self.params = None
+        self.sample_manager = None
 
         self.inited = False
         self.setup_complete = False
         self.params_set = False
-        self.params_finalised = False
 
-        self.sample_manager = None
-        self.sample_params = None
-
-        # Channels
-        self.channels_ui_name = ''  # The name of the ui file to create the channel tabs
-        self.with_add_btn = False  # Whether to add the add channel (+) button to the channels tab
-
-        self.tab_idx = tab_idx
+        self.advanced_controls_names = []
 
         self.minimum_width = 200  # REFACTOR:
 
-        self.advanced_controls_names = []
+        self._selected_once = False  # Whether the tab has been selected once
+
+    @classmethod
+    def requirements_fulfilled(cls, sample_manager) -> bool:
+        """Whether this tab may be shown for the current sample_manager state."""
+        reqs = cls.requirements
+        workspace_ready = sample_manager is not None and sample_manager.workspace is not None
+        ch_ready = workspace_ready and sample_manager.channels  #  or sample_manager.stitchable_channels
+        return (workspace_ready or not reqs.needs_workspace) and (ch_ready or not reqs.needs_channels)
+
+    def on_selected(self):
+        """Called when this tab is selected; override in subclasses if needed."""
+        pass
+
+    @final
+    def notify_selected(self):
+        """
+        Notify that the tab has been selected (i.e. clicked on).
+        It will also store that the tab has been selected at least once
+        """
+        try:
+            self.on_selected()
+            self._selected_once = True
+        except Exception as e:
+            # optional logging
+            print(f"[{self.name}] on_selected error: {e}")
 
     @classmethod
     def get_tab_name(cls):
@@ -145,10 +195,13 @@ class GenericTab(GenericUi):
         if self.inited:
             return
         super()._init_ui()
-        self.ui.setMinimumWidth(self.minimum_width)
-        if self.main_window.tabWidget.tabText(self.tab_idx) == self.name:
-            self.main_window.tabWidget.removeTab(self.tab_idx)  # remove if same tab
-        self.main_window.tabWidget.insertTab(self.tab_idx, self.ui, self.name.title())
+        if hasattr(self.ui, 'setMinimumWidth'):
+            self.ui.setMinimumWidth(self.minimum_width)
+        tab_widget = getattr(self.main_window.tabWidget, 'tabWidget', None)
+        if tab_widget and all([hasattr(tab_widget, attr) for attr in ('tabText', 'removeTab', 'insertTab')]):
+            if tab_widget.tabText(self.tab_idx) == self.name:
+                tab_widget.removeTab(self.tab_idx)  # remove if same tab
+            tab_widget.insertTab(self.tab_idx, self.ui, self.name.title())
         if hasattr(self.ui, 'advancedCheckBox'):
             self.set_advanced_controls_visibility(False)
             self.ui.advancedCheckBox.stateChanged.connect(self.handle_advanced_checked)
@@ -175,38 +228,6 @@ class GenericTab(GenericUi):
         """
         raise NotImplementedError(f"Method _bind not implemented in {self.__class__.__name__}")
 
-    # @final
-    def set_params(self, sample_params=None, cfg_path=''):  # REFACTOR: rename to initialise or similar
-        """Set the params object which links the UI and the configuration file"""
-        if sample_params:
-            self.sample_params = sample_params  # REFACTORING: consider using sample_manager
-        if isinstance(self, PostProcessingTab):
-            self.set_pre_processors()
-        self._set_params()
-        self._read_configs(cfg_path)
-
-        self.params_set = True
-
-        self.finalise_set_params()
-
-    @final
-    def finalise_set_params(self):
-        if not self.params_set:
-            warnings.warn(f'Params not set for {self.__class__}. Call set_params before finalise_set_params')
-            return
-        self._setup_workers()
-        self._set_channels_names()
-        self._create_channels()  # Creates missing channels. FIXME: What about existing but renamed ones?
-        self._load_config_to_gui()
-        self._bind_params_signals()
-        self.handle_advanced_checked()  # in case channel.qtControl in advanced_controls_names
-        self.params_finalised = True
-
-    @abstractmethod
-    def _set_channels_names(self):
-        """Set the names of the channels based on the sample manager and data types"""
-        pass
-
     # @abstractmethod
     def _set_params(self):
         """Set the params object which links the UI and the configuration file"""
@@ -221,6 +242,33 @@ class GenericTab(GenericUi):
     def _get_channels(self):
         return []  # Default to no channels when implementing a tab without channels
 
+    def _setup_workers(self):
+        """Set up the optional workers (which handle the computations) associated with this tab"""
+        pass
+
+    def finalise_workers_setup(self):
+        """Finalise the setup of the workers. Typically called when the tab is selected"""
+        pass
+
+    # @final   # FIXME: never set
+    def set_params(self, sample_params: Optional[SampleParameters] = None):  # REFACTOR: rename to initialise or similar
+        """Set the params object which links the UI and the configuration file"""
+        self._set_params()
+        self.params_set = True
+        if self.params._get_view is not None:
+            self.finalise_set_params()
+
+    @final
+    def finalise_set_params(self):
+        if not self.params_set:
+            warnings.warn(f'Params not set for {self.__class__}. Call set_params before finalise_set_params')
+            return
+        self._setup_workers()
+        self._create_channels()  # Creates missing channels. FIXME: What about existing but renamed ones?
+        self._load_config_to_gui()
+        self._bind_params_signals()
+        self.handle_advanced_checked()  # in case channel.QtControl in advanced_controls_names
+
     def _create_channels(self):
         if not hasattr(self.ui, 'channelsParamsTabWidget'):
             return
@@ -231,19 +279,11 @@ class GenericTab(GenericUi):
             if channel not in self.ui.channelsParamsTabWidget.get_channels_names():
                 self.add_channel_tab(channel)
 
-    def _setup_workers(self):
-        """Setup the optional workers (which handle the computations) associated with this tab"""
-        pass
-
-    def finalise_workers_setup(self):
-        """Finalise the setup of the workers. Typically called when the tab is selected"""
-        pass
-
-    def get_channel_ui(self, channel):
+    def get_channel_ui(self, channel: str):
         """ Get the UI widget for a specific channel """
         return self.ui.channelsParamsTabWidget.get_channel_widget(channel)
 
-    def _swap_channels_tab_widget(self, with_add_btn=False):
+    def _swap_channels_tab_widget(self, with_add_btn: bool = False):
         """
         Substitute the placeholder channel tab widget by the dynamic one
 
@@ -252,7 +292,8 @@ class GenericTab(GenericUi):
         with_add_btn: bool
             Whether to add the add channel button
         """
-        if not hasattr(self.ui, 'channelsParamsTabWidget'):
+        if (not hasattr(self.ui, 'channelsParamsTabWidget') or
+                not hasattr(self.ui, 'channelsParamsTabWidgetLayout')):
             print(f'No channel tab widget found for {self.name}, skipping swap')
             return
         if not isinstance(self.ui.channelsParamsTabWidget, ExtendableTabWidget):
@@ -262,10 +303,10 @@ class GenericTab(GenericUi):
                                                              layout)
 
     # @final
-    def add_channel_tab(self, channel=''):
+    def add_channel_tab(self, channel: str = ''):
         """
         Add a tab for a specific channel.
-        This should then call the connect_channel method to setup the tab bindings.
+        This should then call the connect_channel method to set up the tab bindings.
 
         .. hint::
             This method is meant to be used for tab with channels. To use it
@@ -278,25 +319,52 @@ class GenericTab(GenericUi):
                           f'ensure that your tab has a channelsParamsTabWidget attribute and set '
                           f'channels_ui_name to the name of the UI file for the channel tabs.')
             return
-        channel, page_widget = self._init_channel_ui(channel)
+        channel, page_widget, created = self._get_or_init_channel_ui(channel)
+        # FIXME: bug in StitchingTab when add_channel calls reconcile_children_from_view ->
+        #   this triggers the creation of new channel params that don't have UI yet
         if channel not in self.params.keys():
-            channel_is_compound = False
-            if isinstance(channel, str) and '-' in channel:
-                channel_is_compound = True
-            elif isinstance(channel, (tuple, list)):
-                channel_is_compound = True
-            if isinstance(self, PipelineTab) and not channel_is_compound:
-                # WARNING: ConfigObj Section does not support get() method
-                d_type = self.sample_params.config['channels'][channel]['data_type']  # FIXME: do we want the loaded or the disk params
-                self.params.add_channel(channel, d_type)
-            else:
-                self.params.add_channel(channel)
-        self._set_channel_config(channel)
-        self._setup_channel(page_widget, channel)
-        self._bind_channel(page_widget, channel)
-        self._connect_children_whats_this(page_widget)
+            self._create_channel_params(channel)
+            self._setup_channel(page_widget, channel)
+            self._bind_channel(page_widget, channel)
+            self._connect_children_whats_this(page_widget)
+            self._on_channel_added(channel)
+        else:
+            if created:
+                self.params[channel].teardown()
+                self._setup_channel(page_widget, channel)
+                self._bind_channel(page_widget, channel)
+                self._connect_children_whats_this(page_widget)
+                self._on_channel_added(channel)
 
-    def _init_channel_ui(self, channel: str = '') -> (str, QWidget):
+    def _create_channel_params(self, channel):
+        if isinstance(self, PipelineTab) and not channel_is_compound(channel):
+            # WARNING: ConfigObj Section does not support get() method
+            d_type = self.sample_manager.data_type(channel)
+            self.params.add_channel(channel, d_type)
+        else:
+            self.params.add_channel(channel)
+
+    def _on_channel_added(self, channel: str):
+        """Child class should implement this to trigger
+        any action needed when a channel is added"""
+        pass
+
+    def remove_channel_tab(self, channel: str):
+        """Wrapper so removal always triggers the hook."""
+        try:
+            if hasattr(self, 'params') and hasattr(self.params, 'pop'):
+                self.params.pop(channel)
+            else:  # Fallback only to ensure we do through the proper params teardown
+                if hasattr(self.ui, 'channelsParamsTabWidget'):
+                    self.ui.channelsParamsTabWidget.remove_channel_widget(channel)
+        finally:
+            self._on_channel_removed(channel)
+
+    def _on_channel_removed(self, channel_name: str) -> None:
+        """Child classes should implement this to trigger cleanup actions after a channel is removed"""
+        pass
+
+    def _get_or_init_channel_ui(self, channel: str = '') -> Tuple[str, QWidget]:
         """
         Initialise the UI for a specific channel.
         This only creates the UI widget and adds it to the tab widget.
@@ -312,26 +380,16 @@ class GenericTab(GenericUi):
         tuple
             The channel name and the page widget
         """
-        page_widget = create_clearmap_widget(self.channels_ui_name, patch_parent_class='QWidget')
-        channel = self.ui.channelsParamsTabWidget.add_channel_widget(page_widget, name=channel)
-        return channel, page_widget
+        tab_widget = self.ui.channelsParamsTabWidget
+        page = tab_widget.get_channel_widget(channel)
+        if page:
+            return channel, page, False
+        else:
+            page_widget = create_clearmap_widget(self.channels_ui_name, patch_parent_class='QWidget')
+            channel = tab_widget.add_channel_widget(page_widget, name=channel)
+            return channel, page_widget, True
 
-    def _set_channel_config(self, channel):
-        """
-        Set the configuration for the channel
-
-        .. note::
-            Implement this method in the subclass if you want to force the same instance of config
-            between the channel_params and the processor
-
-        Parameters
-        ----------
-        channel: str
-            The name of the channel
-        """
-        pass
-
-    def _bind_channel(self, page_widget, channel):
+    def _bind_channel(self, page_widget: QWidget, channel: str):
         """
         Bind the signal/slots of the UI elements for `channel` which are not
         automatically set through the params object attribute
@@ -341,7 +399,7 @@ class GenericTab(GenericUi):
         """
         pass
 
-    def _setup_channel(self, page_widget, channel):
+    def _setup_channel(self, page_widget: QWidget, channel: str):
         """
         Perform additional setup for the channel (before binding)
         For example set default values or populate lists
@@ -351,22 +409,13 @@ class GenericTab(GenericUi):
         """
         pass
 
-    def _read_configs(self, cfg_path):  # REFACTOR: parse_configs
-        """
-        Read the configuration file associated with the params from the filesystem
-
-        Parameters
-        ----------
-        cfg_path: str
-            The path to the configuration file
-        """
-        self.params.read_configs(cfg_path)
-
     def handle_advanced_checked(self):
         """Activate the *advanced* mode which will display more controls"""
+        if not hasattr(self.ui, 'advancedCheckBox'):  # e.g. BatchProcessingTab ATM
+            return
         self.set_advanced_controls_visibility(self.ui.advancedCheckBox.isChecked())
 
-    def set_advanced_controls_visibility(self, visible):
+    def set_advanced_controls_visibility(self, visible: bool):
         """
         Set the visibility of the advanced controls
 
@@ -375,10 +424,11 @@ class GenericTab(GenericUi):
         visible : bool
             Whether to show the advanced controls
         """
+        if not self.params:  # Tab not yet initialised
+            return
+
         for ctrl_name in self.advanced_controls_names:
             if ctrl_name.startswith('channel.'):
-                if not self.params:  # Tab not yet initialised
-                    return
                 _, ctrl_name = ctrl_name.split('.')
                 if not hasattr(self.ui, 'channelsParamsTabWidget'):  # Channels not set yet
                     warnings.warn(f'Could not find channel tab widget for {self.name}')
@@ -397,7 +447,7 @@ class GenericTab(GenericUi):
         """Disable this tab (UI element)"""
         self.ui.setEnabled(False)
 
-    def step_exists(self, step_name, file_list):
+    def step_exists(self, step_name: str, file_list: List[PathLike] | PathLike) -> bool:
         """
         Check that prerequisite step step_name has been run and produced
         the outputs in file_list
@@ -414,7 +464,7 @@ class GenericTab(GenericUi):
         bool
             Whether the step has been run
         """
-        if isinstance(file_list, (str, pathlib.Path)):
+        if isinstance(file_list, (str, Path)):
             file_list = [file_list]
         for f_path in file_list:
             if not os.path.exists(f_path):
@@ -423,7 +473,7 @@ class GenericTab(GenericUi):
                 return False
         return True
 
-    def connect_whats_this_btn(self, info_btn, whats_this_ctrl):
+    def connect_whats_this_btn(self, info_btn: QToolButton, whats_this_ctrl: QWidget):
         """
         Utility function to bind the info button to the display of
         the detailed *whatsThis* message associated with the control
@@ -439,7 +489,7 @@ class GenericTab(GenericUi):
             QWhatsThis.showText(widget.pos(), widget.whatsThis(), widget)
         info_btn.clicked.connect(lambda: show_whats_this(whats_this_ctrl))
 
-    def _connect_children_whats_this(self, parent=None):
+    def _connect_children_whats_this(self, parent: Optional[QWidget] = None):  # TODO: make tests safe
         """
         Connect all the what's this buttons of the widgets `parent` to the corresponding labels
 
@@ -461,8 +511,9 @@ class GenericTab(GenericUi):
                     raise ValueError(f'Could not find unique widget for "{base_name}" in "{parent.objectName()}",'
                                      f' got {[(w.objectName(), w) for w in widgets]}')
 
-    def wrap_step(self, task_name, func, step_args=None, step_kw_args=None, n_steps=1, abort_func=None, save_cfg=True,
-                  nested=True, close_when_done=True, main_thread=False):  # FIXME: saving config should be default
+    def wrap_step(self, task_name: str, func: Callable, step_args: Optional[List[Any]]=None,
+                  step_kw_args: Optional[Dict[str, Any]] = None, n_steps: int = 1, abort_func: Optional[Callable] = None,
+                  save_cfg: bool =True, nested:bool = True, close_when_done: bool =True, main_thread: bool = False):
         """
         This function aims to start a new thread for the function being wrapped to ensure that
         the UI remains responsive (unless main_thread is set to True).
@@ -496,8 +547,6 @@ class GenericTab(GenericUi):
         step_args = step_args or []
         step_kw_args = step_kw_args or {}
 
-        if save_cfg:
-            self.params.ui_to_cfg()
         if task_name:
             n_steps = n_steps if nested else 0
             self.main_window.make_progress_dialog(task_name, n_steps=n_steps, abort=abort_func)
@@ -515,14 +564,14 @@ class GenericTab(GenericUi):
             if self.sample_manager is not None and self.sample_manager.workspace is not None:  # WARNING: hacky
                 self.sample_manager.workspace.executor = None  # FIXME: do not pass workspace but semaphore instead
             if close_when_done:
-                self.progress_watcher.finish()
+                self.main_window.progress_watcher.finish()
             else:
                 # FIXME: message different if exception
-                msg = f'{self.progress_watcher.main_step_name} finished'
+                msg = f'{self.main_window.progress_watcher.main_step_name} finished'
                 self.main_window.print_status_msg(msg)
                 self.main_window.log_progress(f'    : {msg}')
 
-    def wrap_plot(self, plot_function, *args, **kwargs):
+    def wrap_plot(self, plot_function: Callable, *args, **kwargs):
         """
         Wrapper to plot a graph and display it in the main window.
         It also handles MissingRequirementException and PlotGraphError
@@ -556,16 +605,108 @@ class GenericTab(GenericUi):
             self.main_window.setup_plots(dvs, titles)
         else:
             self.main_window.setup_plots(dvs)
-        return [widg for widg in dvs if isinstance(widg, DataViewer)]
+        from ClearMap.Visualization.Qt.DataViewer import DataViewer
+        return [widget for widget in dvs if isinstance(widget, DataViewer)]
 
 
-class PipelineTab(GenericTab):
+class ExperimentTab(GenericTab):
+    def __init__(self, main_window: QMainWindow, ui_file_name: str, tab_idx: int, name: str = ''):
+        super().__init__(main_window, ui_file_name, tab_idx, name)
+        self.sample_manager: Optional[SampleManager] = None
+        self.sample_params: Optional[SampleParameters] = None
+        self.exp_controller: Optional[ExperimentController] = None
+
+    def set_controller(self, controller: ExperimentController):
+        self.exp_controller = controller
+
+    def setup_sample_manager(self, sample_manager: SampleManager):
+        self.sample_manager = sample_manager
+
+    def set_params(self, sample_params: Optional[SampleParameters] = None):  # FIXME: never set
+        if sample_params:
+            self.sample_params = sample_params  # REFACTORING: consider using sample_manager
+        super().set_params()
+
+    def reconcile_channel_pages(self, desired_channels: List[str]):
+        """
+        Update the configuration for the channels and the associated page widgets
+
+        Parameters
+        ----------
+        desired_channels: list[str]
+            The list of channels that should be present
+        """
+        if not self.params or not hasattr(self.ui, 'channelsParamsTabWidget'):  # If not setup or tab without channels
+            return
+
+        tab_widget = self.ui.channelsParamsTabWidget
+        # ordered list
+        desired_channels = list(dict.fromkeys(desired_channels))  # dedupe, keep order
+
+        # remove obsolete pages
+        obsolete_channels = [c for c in tab_widget.get_channels_names() if c not in desired_channels]
+        for ch in obsolete_channels:
+            # self.remove_channel_tab(ch)
+            self.params.pop(ch)
+            self._on_channel_removed(ch)
+
+        # add missing pages (in desired order)
+        for ch in desired_channels:
+            if ch not in tab_widget.get_channels_names():
+                self.add_channel_tab(ch)  # will call _setup_channel/_bind_channel
+                # setup workers ?
+                # params.add_channel(ch) ??
+
+        self._after_channels_reconciled(desired_channels)
+        self._setup_workers()
+
+    def _after_channels_reconciled(self, desired_channels: list[str]) -> None:
+        """
+        Triggered at the end of channel reconciliation between UI and cfg
+        Child classes should implement this method to e.g. populate lists or ComboBoxes
+        that depend on the list of channels
+        """
+        pass
+
+    def _setup_workers(self):
+        """
+        Setup the optional workers (which handle the computations) associated with this tab
+
+        .. warning::
+            This method must be implemented in the subclasses of PipelineTab
+
+        .. note::
+            is required for
+                create_channels  (to get list of channels)
+                bind_params_signals
+        """
+        pass
+
+
+class GroupTab(GenericTab):
+    processing_type = 'group'
+    def __init__(self, main_window: QMainWindow, ui_file_name: str, tab_idx: int, name: str = ''):
+        super().__init__(main_window, ui_file_name, tab_idx, name)
+        self.config_handler: Optional[ConfigHandler] = None
+        self.group_controller: Optional[AnalysisGroupController] = None
+
+    def set_controller(self, controller: AnalysisGroupController):
+        self.group_controller = controller
+
+
+
+class PipelineTab(ExperimentTab):
+    requirements = TabRequirements(needs_workspace=True, needs_channels=True)
+
     processing_type = ''
-    def __init__(self, main_window, ui_file_name, tab_idx, name=''):
+    pipeline_name: str = ''  # Must be set in subclass
+    workers_are_global: bool = False  # Whether the workers are shared between channels
+    _workers_sub_steps: Optional[Tuple[str]] = None  # The sub-steps to create workers for (if any)
+
+    def __init__(self, main_window: QMainWindow, ui_file_name: str, tab_idx: int, name: str = ''):
         super().__init__(main_window, ui_file_name, tab_idx, name)
         self.sample_params = None
         self.sample_manager = None  # REFACTORING: check if redundant
-        self.relevant_data_types = []
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
@@ -574,74 +715,18 @@ class PipelineTab(GenericTab):
                 f"Class '{cls.__name__}' must override 'processing_type' with a string value."
             )
 
-    def filter_relevant_channels(self, channels, must_exist=True):
-        if channels is None:
-            return
-        if must_exist:
-            new_channels = [c for c in channels if self.relevant_data_types == 'all' or
-                            self.sample_params[c].data_type in self.relevant_data_types]
-        else:
-            new_channels = [c for c in channels if
-                            self.relevant_data_types == 'all' or
-                            c not in self.sample_params or
-                            self.sample_params[c].data_type in self.relevant_data_types]
-        return new_channels
+    def _iter_substeps(self) -> tuple[str | None, ...]:
+        return self._workers_sub_steps or (None,)
 
-    def set_relevant_data_types(self, data_types_dict):
+    def _workers_channel_keys(self) -> list:
         """
-        Set the relevant data types for this tab
-
-        Parameters
-        ----------
-        data_types_dict: dict
-            The dictionary of data types
+        Worker keys handed to ExperimentController.reconcile_workers:
+          - global workers: [None]
+          - per-channel/per-pair: list from _get_channels()
         """
-        self.relevant_data_types = list(set([k for k, v in data_types_dict.items() if v == self.__class__]))
+        return [None] if self.workers_are_global else list(self._get_channels())
 
-    def update_channels(self, former_channels=None, new_channels=None):
-        """
-        Update the configuration for the channels and the associated widgets
-
-        Parameters
-        ----------
-        former_channels: List[str] | None
-            The current list of channels
-        new_channels: List[str] | None
-            The updated list of channels
-        """
-        print(f'Updating channels for {self.name} from {former_channels} to {new_channels}')
-        if not self.params:
-            return
-        if not former_channels and not new_channels:  # FIXME: we need to calculate former channels
-            new_channels = self._get_channels()
-            if not former_channels:
-                former_channels = self.ui.channelsParamsTabWidget.get_channels_names()
-                former_channels = [c if '-' not in c else tuple(c.split('-'))
-                                   for c in former_channels]  # Cast compound channels as tuples
-                # FIXME: this might break if users have '-' in their channel names
-                #  solution: prohibit '-' in channel names
-
-        former_channels_set = set(former_channels or [])
-        new_channels_set = set(new_channels or [])
-        if former_channels_set == new_channels_set:
-            return
-        if removed_channels := former_channels_set - new_channels_set:
-            for ch in removed_channels:
-                self.params.pop(ch)
-                # FIXME: try block to avoid error when channel not found
-                self.ui.channelsParamsTabWidget.remove_channel_widget(ch)
-        if added_channels := new_channels_set - former_channels_set:
-            for ch in added_channels:
-                try:
-                    self._setup_workers()  # FIXME: called in too many places
-                except KeyError:
-                    pass
-                self.add_channel_tab(ch)
-                self._setup_workers()
-                self.params.add_channel(ch)
-        # if new_channels is a superset of former_channels, we can just add the new channels
-
-    def setup_sample_manager(self, sample_manager):
+    def setup_sample_manager(self, sample_manager: SampleManager):
         """
         Associate the sample_manager to the current tab
 
@@ -652,77 +737,92 @@ class PipelineTab(GenericTab):
         """
         self.sample_manager = sample_manager
 
-    def _bind_btn(self, btn_name, func, channel=None, page_widget=None, **kwargs):
+    def _bind_btn(self, btn_name: str, func: Callable, channel: Optional[str] = None,
+                  page_widget: Optional[QWidget] = None, **kwargs):
         if channel:
             getattr(page_widget, btn_name).clicked.connect(functools.partial(func, channel, **kwargs))
         else:
             getattr(self.ui, btn_name).clicked.connect(func)
 
     # @abstractmethod
-    def _setup_workers(self):
-        """
-        Setup the optional workers (which handle the computations) associated with this tab
-
-        .. warning::
-            This method must be implemented in the subclasses of PipelineTab
-
-        .. note::
-            calls
-                sample_params.ui_to_cfg in PreProcessingTab
-                params.ui_to_cfg in PostProcessingTab  # TODO: check why
-            is required for
-                create_channels  (to get list of channels)
-                bind_params_signals
-        """
-        pass
 
 
 class PreProcessingTab(PipelineTab):
     processing_type = 'pre'
-    def __init__(self, main_window, ui_file_name, tab_idx, name=''):
+    workers_are_global = True
+
+    def __init__(self, main_window: QMainWindow, ui_file_name: str, tab_idx: int, name: str = ''):
         super().__init__(main_window, ui_file_name, tab_idx, name)
+
+    @property
+    def worker(self):
+        return self.exp_controller.get_worker(self.pipeline_name)
 
     # @abstractmethod
     def _setup_workers(self):
-        pass
+        if self.sample_manager.setup_complete:
+            worker = self.worker
+            if worker is not None:  # e.g. not SampleInfoTab
+                self.wrap_step('Setting up worker', worker.setup_if_needed, n_steps=1,
+                               save_cfg=False, nested=False)
 
 
 class PostProcessingTab(PipelineTab):
     """
     Interface to all the tab managers in charge of post-processing the data (e.e. typically detecting relevant info in the data).
-    One particularity of a post-processing tab manager is that it includes the corresponding pre processor.
+    One particularity of a post-processing tab manager is that it includes the corresponding pre-processor.
     A tab manager includes a tab widget, the associated parameters
     and potentially a processor object which handles the computations.
     """
     processing_type = 'post'
-    def __init__(self, main_window, ui_file_name, tab_idx, name=''):
+
+    def __init__(self, main_window: QMainWindow, ui_file_name: str, tab_idx: int, name: str = ''):
         super().__init__(main_window, ui_file_name, tab_idx, name)
-        self.stitcher = None
-        self.aligner = None
 
-    # @abstractmethod
     def _setup_workers(self):
-        pass
+        if not self.sample_manager.setup_complete:
+            self.main_window.print_warning_msg("SampleManager not initialised")
+            return
+        desired_channels = self._workers_channel_keys()
+        for substep in self._iter_substeps():
+            workers = self.exp_controller.reconcile_workers(
+                self.pipeline_name,
+                desired_channels=desired_channels,
+                substep=substep,
+                keep_global=self.workers_are_global
+            )
+            for w in workers.values():
+                w.setup_if_needed()
 
-    def set_pre_processors(self, stitcher=None, aligner=None):
-        """
-        Associate the pre-pipeline_orchestrators to the current tab
+    def get_worker(self, channel: Optional[str | Tuple[str, str]] = None,
+                   substep: Optional[str] = None) -> PipelineOrchestrator:
+        if substep and substep not in self._iter_substeps():
+            raise ValueError(f'Sub-step {substep} not in {self._workers_sub_steps}')
+        elif not substep and self._workers_sub_steps:
+            raise ValueError(f'Sub-step must be specified, available: {self._workers_sub_steps}')
+        if self.workers_are_global:
+            channel = None
+        return self.exp_controller.get_worker(self.pipeline_name, channel=channel, substep=substep)
 
-        Parameters
-        ----------
-        stitcher : Stitcher
-            The object that handles the stitching of the sample data
-        aligner : Aligner
-            The object that handles the alignment of the sample data
-        """
-        if stitcher:
-            self.stitcher = stitcher
-        if aligner:
-            self.aligner = aligner
-        else:
-            self.aligner = self.main_window.tab_managers['registration'].aligner
+    @contextmanager
+    def debug_mode(self, channel: str, debug_status: str | bool):
+        worker = self.get_worker(channel)
+        status_backup = worker.workspace.debug
+        try:
+            worker.workspace.debug = debug_status
+            yield
+        finally:
+            worker.workspace.debug = status_backup
 
-    def plot_slicer(self, slicer_prefix, tab, params, channel):
+    def create_tuning_sample(self, channel):
+        """Create an array from a subset of the sample to perform tests on """
+        worker = self.get_worker(channel)
+        if not hasattr(worker, 'create_test_dataset'):
+            return
+        self.wrap_step('Creating tuning sample', worker.create_test_dataset,
+                       step_kw_args={'slicing': self.params[channel].slicing}, nested=False)
+
+    def plot_slicer(self, slicer_prefix: str, tab: QWidget, params: OrthoviewerSlicingMixin, channel: str):
         """
         Display the ortho-slicer to pick a subset of 3D data.
         This is typically used to create a small  dataset to evaluate parameters
@@ -762,8 +862,8 @@ class PostProcessingTab(PipelineTab):
             getattr(tab, f'{slicer_prefix}{axis}RangeMax').setMaximum(round(ax_max))
 
 
-class BatchTab(GenericTab):
-    def __init__(self,  main_window, tab_idx):
+class BatchTab(GroupTab):
+    def __init__(self,  main_window: QMainWindow, tab_idx: int):
         super().__init__(main_window, title_to_snake(self.__class__.__name__), tab_idx)
         self.processing_type = 'batch'
         self.config_loader = None
@@ -786,37 +886,25 @@ class BatchTab(GenericTab):
 
         """
         self.ui.resultsFolderPushButton.clicked.connect(self.setup_results_folder)
-
         self.ui.folderPickerHelperPushButton.clicked.connect(self.create_wizard)
         self.ui.batchToolBox.setCurrentIndex(0)
 
     def setup_results_folder(self):
-        results_folder = Path(get_directory_dlg(self.main_window.preference_editor.params.start_folder,
-                                           'Select the folder where results will be written'))
-        self.config_loader = ConfigHandler(results_folder)
+        results_folder = get_directory_dlg(self.main_window.preference_editor.params.start_folder,
+                                           'Select the folder where results will be written')
+        if not results_folder:
+            return
+        else:
+            results_folder = Path(results_folder)
+
         self.main_window.logger.set_file(results_folder / 'info.log')  # WARNING: set logs to global results folder
         self.main_window.error_logger.set_file(results_folder / 'errors.html')
         self.main_window.progress_watcher.log_path = self.main_window.logger.file.name
 
-        cfg_path = self.config_loader.get_cfg_path('batch', must_exist=False)
-        if not cfg_path.exists():
-            try:
-                default_cfg_file_path = self.config_loader.get_default_path('batch')
-                copyfile(default_cfg_file_path, cfg_path)
-                self.set_params(cfg_path=cfg_path)
-            except FileNotFoundError as err:
-                self.main_window.print_error_msg(f'Could not locate file for "batch"')
-                raise err
-        else:
-            self.set_params(cfg_path=cfg_path)
-
-        self.params.read_configs(cfg_path)
-
-        self._load_config_to_gui()  # FIXME: second call to add group
+        self.set_params()
         self.params.results_folder = str(results_folder)
-        self.params.ui_to_cfg()
+        self._load_config_to_gui()
         self._setup_workers()
 
     def create_wizard(self):
-        self.params.ui_to_cfg()
         return SamplePickerDialog(self.params.results_folder, self.params)  # FIXME: check if results_folder or make both equal with self.params.src_folder
