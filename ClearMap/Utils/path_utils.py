@@ -5,7 +5,6 @@ import os
 from pathlib import Path
 
 from ClearMap.IO.assets_constants import EXTENSIONS
-from ClearMap.config.config_handler import ConfigHandler
 
 
 def is_feather(f):
@@ -87,18 +86,29 @@ def find_file(target_dir, check_func, file_type_name):
         raise RuntimeError(f'No {file_type_name} file found in {target_dir}')
 
 
-def dir_to_sample_id(folder):
+def clean_path(path: str | Path) -> str:
+    """Expand user (~) and normalize path."""
+    return os.path.normpath(os.path.expanduser(str(path)))
+
+
+def de_duplicate_path(root: Path, sub_dir) -> Path:
     """
-    Get the sample ID from a directory
+    Remove sub_dir from root if root already ends with sub_dir
 
     Parameters
     ----------
-    folder : str
-        The directory to check
+    root: Path
+        The root path
+    sub_dir: Path
+        The sub directory to check
 
     Returns
     -------
-
+    Path
+        The cleaned sub directory
     """
-    cfg_loader = ConfigHandler(folder)
-    return cfg_loader.get_cfg('sample')['sample_id']
+    if sub_dir != Path():
+        sub_dir_parts = sub_dir.parts
+        if root.parts[-len(sub_dir_parts):] == sub_dir_parts:
+            sub_dir = Path()
+    return sub_dir
