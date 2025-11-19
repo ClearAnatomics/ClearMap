@@ -18,6 +18,7 @@ __download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
 import copy
 import numbers
 from typing import Optional, Iterable, Dict
+from pathlib import Path
 
 import numpy as np
 
@@ -454,7 +455,7 @@ class Graph(grp.AnnotatedGraph):
 
     def vertex_radii(self, vertex=None):  # FIXME: hacky to have 2 return options (hides)
         if 'radii' in self.vertex_properties:
-        return self.vertex_property('radii', vertex=vertex)
+            return self.vertex_property('radii', vertex=vertex)
         else:
             return self.vertex_properties('radius_units', vertex=vertex)
 
@@ -1212,6 +1213,47 @@ class Graph(grp.AnnotatedGraph):
     def save(self, filename):
         self._base.save(str(filename))
 
+    def export_vertex_properties(self, output_path: str | Path, v_props: list[str] | None = None):
+        """
+        Export vertex properties as a pandas DataFrame.
+        The export format will be determined by the file extension.
+
+        Parameters
+        ----------
+        v_props: list of str
+            The vertex properties to export.
+        output_path: str | Path
+            The output file path.
+        """
+        output_path = str(output_path)
+        if v_props is None:
+            v_props = list(self._base.vertex_properties)
+
+        data = {'vertex_id': self.vertex_indices()}
+        for prop_name in  v_props:
+            prop_array = self.vertex_property(prop_name)
+            if prop_array.ndim == 1:  # Scalar property
+                data[prop_name] = prop_array
+            else:  # Vector property
+                if 'coordinates' in prop_name:  # We know how to name these
+                    coord_type = prop_name.replace('coordinates', '').strip('_')
+                    coord_prefix = coord_type + "_" if coord_type else ""
+                    for i, axis in enumerate('xyz'):
+                        data[f'{coord_prefix}{axis}'] = prop_array[:, i]
+                else:  # Generic names
+                    for i in range(prop_array.shape[1]):
+                        data[f'{prop_name}_dim{i}'] = prop_array[:, i]
+
+        import pandas as pd
+        df = pd.DataFrame(data)
+        extension = Path(output_path).suffix
+        if extension == '.csv':
+            df.to_csv(output_path, index=False)
+        elif extension in ('.feather', '.fthr'):
+            df.to_feather(output_path)
+        else:
+            raise NotImplementedError(f'Export format {Path(output_path).suffix} is not yet supported!')
+
     def copy(self, from_disk=False, path=''):
         if from_disk:
             return load(path if path else self.path)
@@ -1255,7 +1297,7 @@ class Graph(grp.AnnotatedGraph):
         as_dict : bool
             If True, return a dictionary of property names. If False, return a list of tuples (scope, name, dtype).
         """
-        
+
         props = scan_gt_props(filename)
         if as_dict:
             out = {
