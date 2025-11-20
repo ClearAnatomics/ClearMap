@@ -125,9 +125,7 @@ if TYPE_CHECKING:
                                        TabsUpdated,  ChannelsSnapshot, ChannelDefaultsChanged)
 
     from ClearMap.config.update_config import update_default_config
-    from ClearMap.config.config_coordinator import ConfigCoordinator
-    from ClearMap.config.config_repository import ConfigRepository
-    from ClearMap.config.defaults_provider import get_defaults_provider, SCHEMAS_DIR
+    from ClearMap.config.config_coordinator import make_cfg_coordinator_factory
     from ClearMap.config.config_handler import ConfigHandler, CLEARMAP_CFG_DIR, ALTERNATIVES_REG
 
     from ClearMap.gui.gui_utils_images import get_current_res
@@ -1303,19 +1301,6 @@ def _make_bootstrap_dir() -> Path:
     session = root / "clearmap_bootstrap" / f"session_{os.getpid()}"
     session.mkdir(parents=True, exist_ok=True)
     return session
-
-
-def make_cfg_coordinator_factory(bus):
-    def factory(base_dir, config_groups=None):
-        cfg_repo = ConfigRepository(base_dir=base_dir)
-        defaults_provider = get_defaults_provider()
-        return ConfigCoordinator(
-            config_repo=cfg_repo,
-            bus=bus,
-            schemas_dir=SCHEMAS_DIR,
-            defaults_provider=defaults_provider,
-        )
-    return factory
 
 
 def build_business_objects(bus: EventBus):

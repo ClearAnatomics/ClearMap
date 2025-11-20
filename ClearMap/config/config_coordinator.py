@@ -9,15 +9,15 @@ from typing import Dict, Any, Optional, Iterable, Mapping, List, TYPE_CHECKING
 from copy import deepcopy
 
 from ClearMap.Utils.event_bus import EventBus, BusSubscriberMixin
+from ClearMap.Utils.events import CfgChanged, ChannelRenamed, ChannelsChanged
 from ClearMap.Utils.utilities import infer_origin_from_caller, deep_merge
 
 from . import config_adjusters
 from .config_adjusters import Phase, ConfigKeys, run_adjusters
 from .config_handler import ALTERNATIVES_REG
 from .config_repository import ConfigRepository
-from .defaults_provider import DefaultsProvider, get_defaults_provider
+from .defaults_provider import DefaultsProvider, get_defaults_provider, SCHEMAS_DIR
 from .validators import validate_all, SectionValidators
-from ..Utils.events import CfgChanged, ChannelRenamed, ChannelsChanged
 
 if TYPE_CHECKING:
     from ClearMap.pipeline_orchestrators.sample_info_management import SampleManager
@@ -464,3 +464,16 @@ class ConfigCoordinator(BusSubscriberMixin):
         finally:
             self.set_base_dir(orig)
         return target_dir
+
+
+def make_cfg_coordinator_factory(bus):
+    def factory(base_dir, config_groups=None):
+        cfg_repo = ConfigRepository(base_dir=base_dir)
+        defaults_provider = get_defaults_provider()
+        return ConfigCoordinator(
+            config_repo=cfg_repo,
+            bus=bus,
+            schemas_dir=SCHEMAS_DIR,
+            defaults_provider=defaults_provider,
+        )
+    return factory
