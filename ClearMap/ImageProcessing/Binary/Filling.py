@@ -8,7 +8,7 @@ __author__ = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
 __license__ = 'GPLv3 - GNU General Pulic License v3 (see LICENSE.txt)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__ = 'https://idisco.info'
-__download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
+__download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
 import os
 import gc
@@ -24,6 +24,7 @@ pyximport.install(setup_args={"include_dirs": [np.get_include(), os.path.dirname
 from . import FillingCode as code
 
 import ClearMap.IO.IO as io
+from ClearMap.Utils.utilities import sanitize_n_processes
 import ClearMap.Utils.Timer as tmr
 
 
@@ -36,10 +37,10 @@ def fill(source, sink=None, seeds=None, processes=None, verbose=False):
 
     Arguments
     ---------
-    source : array
+    source: np.ndarray
         Input source.
-    sink : array or None
-        If None, a new array is allocated.
+    sink: np.ndarray or None
+        If None, a new array is allocated in memory.
     seeds : array or None
         An array of seed points for the fill operation.
         If None, the border indices of the source are used as seeds.
@@ -70,15 +71,8 @@ def fill(source, sink=None, seeds=None, processes=None, verbose=False):
     if source_flat.dtype == bool:
         source_flat = source_flat.view(dtype='uint8')
 
-    if processes is None:
-        processes = mp.cpu_count()
-    elif isinstance(processes, str):
-        if processes == 'serial':
-            processes = 1
-        else:
-            processes = mp.cpu_count()
-    if not isinstance(processes, int):
-        raise ValueError(f'Processes must be one of None, int or "serial", got {processes}')
+    processes = sanitize_n_processes(processes)
+
     if verbose:
         print(f'\tBinary filling: Using {processes} processes', flush=True)
         print('\tBinary filling: temporary arrays created', flush=True)

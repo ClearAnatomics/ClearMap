@@ -14,12 +14,13 @@ __author__ = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
 __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__ = 'https://idisco.info'
-__download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
+__download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
 
 import importlib
 import functools
 import math
+import os.path
 import pathlib
 import multiprocessing as mp
 import warnings
@@ -99,6 +100,9 @@ def source_to_module(source_):
     type : module
         The module that handles the IO of the source.
     """
+    if isinstance(source_, pathlib.Path):
+        source_ = str(source_)
+
     if isinstance(source_, src.Source):
         return importlib.import_module(source_.__module__)
     elif isinstance(source_, (str, te.Expression)):
@@ -128,6 +132,8 @@ def location_to_module(location_):
     module : module
         The module that handles the IO of the source specified by its location.
     """
+    if isinstance(location_, pathlib.Path):
+        location_ = str(location_)
     if fl.is_file_list(location_):
         return fl
     else:
@@ -148,6 +154,9 @@ def filename_to_module(filename):
     module : module
        The module that handles the IO of the file.
     """
+    if isinstance(filename, pathlib.Path):
+        filename = str(filename)
+
     ext = fu.file_extension(filename)
 
     mod = file_extension_to_module.get(ext, None)
@@ -159,7 +168,7 @@ def filename_to_module(filename):
 ##############################################################################
 # ## IO Interface
 ##############################################################################
-
+# FIXME: add support for Assets
 
 # read write interface: specialized modules can assume the following
 # read(source, slicing=None, **kwargs)
@@ -184,6 +193,9 @@ def is_source(source_, exists=True):
     is_source : bool
        True if source is a valid source.
     """
+    if isinstance(source_, pathlib.Path):
+        source_ = str(source_)
+
     if isinstance(source_, src.Source):
         if exists:
             return source_.exists()
@@ -218,6 +230,9 @@ def as_source(source_, slicing=None, *args, **kwargs):
     source : Source class
         The source class.
     """
+    if isinstance(source_, pathlib.Path):
+        source_ = str(source_)
+
     if not isinstance(source_, src.Source):
         mod = source_to_module(source_)
         source_ = mod.Source(source_, *args, **kwargs)
@@ -365,6 +380,9 @@ def memory(source_):
     memory : str or None
         The memory type of the source.
     """
+    if isinstance(source_, pathlib.Path):
+        source_ = str(source_)
+
     if sma.is_shared(source_):
         return 'shared'
 
@@ -423,7 +441,7 @@ def read(source_, *args, **kwargs):
 
     Arguments
     ---------
-    source_ : str, array, Source class
+    source_ : str, pathlib.Path, array, Source class
        The source to read the data from.
 
     Returns
@@ -443,7 +461,7 @@ def write(sink, data, *args, **kwargs):
 
     Arguments
     ---------
-    sink : str, array, Source class
+    sink : str, pathlib.Path, array, Source class
         The source to write data to.
     data : array
         The data to write to the sink.
@@ -467,7 +485,7 @@ def create(source_, *args, **kwargs):
 
     Arguments
     ---------
-    source_ : str, array, Source class
+    source_ : str, pathlib.Path, array, Source class
         The source to write data to.
 
     Returns
@@ -481,8 +499,8 @@ def create(source_, *args, **kwargs):
     return mod.create(source_, *args, **kwargs)
 
 
-def initialize(source_=None, shape=None, dtype=None, order=None, location=None,
-               memory=None, like=None, hint=None, **kwargs):
+def initialize(source_=None, shape_=None, dtype_=None, order_=None, location_=None,
+               memory_=None, like=None, hint=None, **kwargs):
     """
     Initialize a source with specified properties.
 
@@ -495,23 +513,23 @@ def initialize(source_=None, shape=None, dtype=None, order=None, location=None,
     ---------
     source_ : str, array, Source class
         The source to write data to.
-    shape : tuple or None
+    shape_ : tuple or None
         The desired shape of the source.
         If None, inferred from existing file or from the like parameter.
         If not None and source has a valid shape shapes are tested to match.
-    dtype : type, str or None
+    dtype_ : type, str or None
         The desired dtype of the source.
         If None, inferred from existing file or from the like parameter.
         If not None and source has a valid dtype the types are tested to match.
-    order : 'C', 'F' or None
+    order_ : 'C', 'F' or None
         The desired order of the source.
         If None, inferred from existing file or from the like parameter.
         If not None and source has a valid order the orders are tested to match.
-    location : str or None
+    location_ : str or None
         The desired location of the source.
         If None, inferred from existing file or from the like parameter.
         If not None and source has a valid location the locations need to match.
-    memory : 'shared' or None
+    memory_ : 'shared' or None
         The memory type of the source. If 'shared' a shared array is created.
     like : str, array or Source class
         Infer the source parameter from this source.
@@ -526,30 +544,42 @@ def initialize(source_=None, shape=None, dtype=None, order=None, location=None,
     """
     if isinstance(source_, pathlib.Path):
         source_ = str(source_)
-    if isinstance(source_, (str, te.Expression)):
-        location = source_
+
+    if isinstance(source_, (str, te.Expression)):  # If the source is a path (location)
+        location_ = source_
         source_ = None
 
     if like is not None:
-        shape, dtype, order = _from_like(like, shape, dtype, order)
+        shape_, dtype_, order_ = _from_like(like, shape_, dtype_, order_)
 
     if source_ is None:
-        if location is None:
-            shape, dtype, order = _from_hint(hint, shape, dtype, order)
-            if memory in ['shared', 'automatic']:
-                return sma.create(shape=shape, dtype=dtype, order=order, **kwargs)
-            else:
-                return npy.create(shape=shape, dtype=dtype, order=order)
-        else:
+        if location_ is not None:  # No source but a path
             try:
-                source_ = as_source(location)
-            except FileNotFoundError:  # TODO: see if nore exceptions are needed
+                source_ = as_source(location_)  # First, attempt to read the source
+            except (FileNotFoundError, ValueError) as err:  # No file found, then create # TODO: see if nore exceptions are needed
+                if isinstance(err, ValueError):
+                    if not str(err).startswith('Cannot create memmap without shape at location'):
+                        raise err
                 try:
-                    shape, dtype, order = _from_hint(hint, shape, dtype, order)
-                    mod = location_to_module(location)
-                    return mod.create(location=location, shape=shape, dtype=dtype, order=order, **kwargs)
+                    if os.path.exists(location_):
+                        parsed_shape = shape(source_)
+                        parsed_dtype = dtype(source_)
+                        parsed_order = order(source_)
+                        if not (parsed_shape == shape_ and parsed_dtype == dtype_ and parsed_order == order_):
+                            raise ValueError(f'Cannot create source at location {location_} with '
+                                             f'shape {shape_}, dtype {dtype_}, order {order_}; '
+                                             f'file exists with shape {parsed_shape}, dtype {parsed_dtype}, order {parsed_order}')
+                    shape_, dtype_, order_ = _from_hint(hint, shape_, dtype_, order_)
+                    mod = location_to_module(location_)
+                    return mod.create(location=location_, shape=shape_, dtype=dtype_, order=order_, **kwargs)
                 except Exception as error:
-                    raise ValueError(f'Cannot initialize source for location {location}; {error}')
+                    raise ValueError(f'Cannot initialize source for location {location_}; {error}')
+        else:  # No source and no path, create an array in memory, regular or shared
+            shape_, dtype_, order_ = _from_hint(hint, shape_, dtype_, order_)
+            if memory_ in ['shared', 'automatic']:
+                return sma.create(shape=shape_, dtype=dtype_, order=order_, **kwargs)
+            else:
+                return npy.create(shape=shape_, dtype=dtype_, order=order_)
 
     if isinstance(source_, np.ndarray):
         source_ = as_source(source_)
@@ -563,9 +593,9 @@ def initialize(source_=None, shape=None, dtype=None, order=None, location=None,
         if current_vars.get(attr) is not None and current_vars[attr] != getattr(source_, attr, None):
             raise IncompatibleSource(source_, attr, current_vars)
 
-    if location is not None and abspath(location) != abspath(source_.location):
+    if location_ is not None and abspath(location_) != abspath(source_.location):
         raise IncompatibleSource(source_, 'location', current_vars)
-    if memory == 'shared' and not sma.is_shared(source_):
+    if memory_ == 'shared' and not sma.is_shared(source_):
         raise ValueError(f'Incompatible memory type, the source {source_} is not shared!')
 
     return source_
@@ -630,7 +660,7 @@ def initialize_buffer(source_, shape=None, dtype=None, order=None, location=None
     ----
     The buffer is created if it does not exist.
     """
-    source_ = initialize(source_, shape=shape, dtype=dtype, order=order, location=location, memory=memory, **kwargs)
+    source_ = initialize(source_, shape_=shape, dtype_=dtype, order_=order, location_=location, memory_=memory, **kwargs)
     return source_.as_buffer()
 
 
@@ -644,7 +674,7 @@ def file_list(expression=None, file_list=None, sort=True, verbose=False):
 
     Arguments
     ---------
-    expression :str
+    expression :str | Path | te.Expression | None
         The regular expression the file names should match.
     sort : bool
         If True, sort files naturally.
@@ -695,6 +725,9 @@ def get_value(source_, value_type):  # REFACTOR: should be moved to io_utils or 
     value: number
         The value of the data type.
     """
+    if isinstance(source_, pathlib.Path):
+        source_ = str(source_)
+
     if value_type not in ['min', 'max']:
         raise ValueError(f'Unknown value type {value_type}, accepted arguments are "min" and "max"!')
 
@@ -768,6 +801,8 @@ def convert(source_, sink, processes=None, verbose=False, **kwargs):
     sink : sink specification
         The sink or list of sinks.
     """
+    if isinstance(sink, pathlib.Path):
+        sink = str(sink)
     source_ = as_source(source_)
     if verbose:
         print(f'converting {source_} -> {sink}')
@@ -800,6 +835,8 @@ def convert_files(filenames, extension=None, path=None, processes=None, verbose=
     filenames : list of str
         The new file names.
     """
+    if extension.startswith('.'):  # FIXME: downstream code should handle extension with or without dot
+        extension = extension[1:]
     if not isinstance(filenames, (tuple, list)):
         filenames = [filenames]
     if len(filenames) == 0:
@@ -807,8 +844,8 @@ def convert_files(filenames, extension=None, path=None, processes=None, verbose=
     n_files = len(filenames)
 
     if path is not None:
-        filenames = [fu.join(path, fu.split(f)[1]) for f in filenames]
-    sinks = ['.'.join(f.split('.')[:-1] + [extension]) for f in filenames]
+        filenames = [fu.join(path, fu.split(f)[1]) for f in filenames]  # TODO: replace with pathlib
+    sinks = [str(pathlib.Path(f).with_suffix('.'+extension)) for f in filenames]
 
     if verbose:
         timer = tmr.Timer()
@@ -824,9 +861,10 @@ def convert_files(filenames, extension=None, path=None, processes=None, verbose=
         [_convert(source_, sink, i) for i, source_, sink in zip(range(n_files), filenames, sinks)]
     else:
         with CancelableProcessPoolExecutor(processes) as executor:
-            executor.map(_convert, filenames, sinks, range(n_files))
+            results = executor.map(_convert, filenames, sinks, range(n_files))
             if workspace is not None:
                 workspace.executor = executor
+            _ = list(results)  # to catch exceptions
         if workspace is not None:
             workspace.executor = None
 
@@ -846,7 +884,7 @@ def _convert_files(source_, sink, fid, n_files, extension, verbose, verify=False
         raise ValueError(f"Cannot determine module for extension {extension}!")
     mod.write(sink, source_)
     if verify:
-        src_mean = source_.mean()
+        src_mean = source_.array.mean()
         sink_mean = mod.read(sink).mean()
         if not math.isclose(src_mean, sink_mean, rel_tol=1e-5):
             raise RuntimeError(f"Conversion of {source_} to {sink} failed, means differ")

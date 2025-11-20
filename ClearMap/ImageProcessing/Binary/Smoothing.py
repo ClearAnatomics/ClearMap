@@ -14,7 +14,7 @@ __author__ = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
 __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__ = 'https://idisco.info'
-__download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
+__download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
 import os
 import functools
@@ -297,6 +297,9 @@ def generate_lookup_table(function = index_to_smoothing, verbose = True, process
     #  lut = executor.map(function, range(2**27));
     pool = mp.Pool(mp.cpu_count())
     lut = pool.map(function, range(2**27), chunksize=2**27//8//mp.cpu_count())
+    pool.close()
+    pool.join()
+    lut = list(lut)
 
   return np.array(lut, dtype = bool)
 
@@ -370,10 +373,15 @@ def smooth_by_configuration_block(source, iterations = 1, verbose = False):
   return np.asarray(smoothed, dtype=bool)
 
 
-def smooth_by_configuration(source, sink = None, iterations = 1, 
-                            processing_parameter = None,
-                            processes = None, verbose = False):
-  """Smooth a binary source using the local configuration around each pixel.
+def smooth_by_configuration(source, sink=None, iterations=1, processing_parameter=None,
+                            processes=None, verbose=False):
+  """
+  Smooth a binary source using the local configuration around each pixel.
+
+  Note
+  ----
+  The algorithm is based on a topological smoothing operation defined by adding
+  or removing foreground pixels based on the local topology of the binary array.
   
   Arguments
   ---------
@@ -394,12 +402,7 @@ def smooth_by_configuration(source, sink = None, iterations = 1,
   Returns
   -------
   smoothed : array or Source
-    Thre smoothed binary array.
-
-  Note
-  ----
-  The algorithm is based on a topological smoothing operation defined by adding
-  or removing forground pixels based on the local topology of the binary array.
+    The smoothed binary array.
   """
   if verbose:
     print('Binary smoothing: initialized!')
@@ -411,7 +414,7 @@ def smooth_by_configuration(source, sink = None, iterations = 1,
   
   #initialize sources and sinks
   source = io.as_source(source)
-  sink   = io.initialize(sink, shape=source.shape, dtype=bool, order=source.order)
+  sink   = io.initialize(sink, shape_=source.shape, dtype_=bool, order_=source.order)
 
   #block processing parameter
   block_processing_parameter = dict(axes = bp.block_axes(source), 

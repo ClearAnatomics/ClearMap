@@ -238,7 +238,8 @@ def generate_lookup_table(function = match_index, verbose = True):
   """Generates lookup table for templates"""
    
   pool = mp.Pool(mp.cpu_count());
-  lut = pool.map(function, range(2**26),chunksize=2**26/8/mp.cpu_count());
+  lut = pool.map(function, range(2**26),chunksize=2**26/8/mp.cpu_count())
+  lut = list(lut)
   
   return np.array(lut, dtype = bool);
 

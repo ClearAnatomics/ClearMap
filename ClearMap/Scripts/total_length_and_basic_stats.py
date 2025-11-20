@@ -11,10 +11,9 @@ from tqdm import tqdm
 
 import ClearMap.Settings as settings
 from ClearMap.Analysis.vasculature.vasc_graph_utils import remove_surface
-from ClearMap.IO import IO as clearmap_io
-import ClearMap.Alignment.Annotation as annotation
-import ClearMap.Analysis.Graphs.GraphGt as ggt
-
+from ClearMap.Alignment.Annotation import Annotation
+from ClearMap.Analysis.graphs import graph_gt
+from ClearMap.config.atlas import ATLAS_NAMES_MAP
 
 MAX_PROCS = 28  # Max number of processes to use for parallel processing
 MIN_CHUNK_SIZE = 5
@@ -44,50 +43,50 @@ SAMPLES_INFO = {
 # ######################################################################################################################
 
 
-def get_regions_from_atlas(atlas_path):  # FIXME: add volume
-    uniq_ids = np.unique(clearmap_io.read(atlas_path))[1:]  # exclude universe
-    regions = {id_: {'name': annotation.find(id_, key='id')['name'],
-                     'level': annotation.find(id_, key='id')['level'],
-                     'color': annotation.convert_label(id_, key='id', value='rgba')}
+def get_regions_from_atlas(annotator):  # FIXME: add volume
+    uniq_ids = np.unique(annotator.atlas)[1:]  # exclude universe
+    regions = {id_: {'name': annotator.find(id_, key='id')['name'],
+                     'level': annotator.find(id_, key='id')['level'],
+                     'color': annotator.convert_label(id_, key='id', value='rgba')}
                for id_ in uniq_ids}
     return regions
 
 
-def get_regions_from_graph(graph):
+def get_regions_from_graph(graph, annotator):
     uniq_ids = np.unique(graph.vertex_annotation())[1:]  # exclude universe
-    regions = {id_: {'name': annotation.find(id_, key='id')['name'],
-                     'level': annotation.find(id_, key='id')['level'],
-                     'color': annotation.convert_label(id_, key='id', value='rgba')}
+    regions = {id_: {'name': annotator.find(id_, key='id')['name'],
+                     'level': annotator.find(id_, key='id')['level'],
+                     'color': annotator.convert_label(id_, key='id', value='rgba')}
                for id_ in uniq_ids}
     return regions
 
 
-def get_regions_auto(graph):
+def get_regions_auto(graph, annotator):
     order, level = (0, 0)
 
     # I think this fuses the structures that are at a level below the one specified
     vertex_filter = np.zeros(graph.n_vertices)
-    label_leveled = annotation.convert_label(graph.vertex_annotation(), key='id', value='id', level=level)
+    label_leveled = annotator.convert_label(graph.vertex_annotation(), key='id', value='id', level=level)
     vertex_filter[label_leveled == order] = 1
     graph = graph.sub_graph(vertex_filter=vertex_filter)
 
-    return graph, get_regions_from_graph(graph)
+    return graph, get_regions_from_graph(graph, annotator)
 
 
-def extract_annotated_region(graph, id_, region, state='id', return_graph=True):
-    # print(state, region['level'], id_, annotation.find(id_, key='id')['name'])
+def extract_annotated_region(graph, annotator, id_, region, state='id', return_graph=True):
+    # print(state, region['level'], id_, annotator.find(id_, key='id')['name'])
 
     label = graph.vertex_annotation()
 
     if state == 'order':
         print('order')
-        label_leveled = annotation.convert_label(label, key='order', value='order', level=region['level'])
-        order = annotation.find(id_, key='id')['order']
+        label_leveled = annotator.convert_label(label, key='order', value='order', level=region['level'])
+        order = annotator.find(id_, key='id')['order']
         vertex_filter = label_leveled == order
     else:
         try:
             label[label < 0] = 0
-            label_leveled = annotation.convert_label(label, key='id', value='id', level=region['level'])
+            label_leveled = annotator.convert_label(label, key='id', value='id', level=region['level'])
             vertex_filter = label_leveled == id_
         except KeyError:
             print('could not extract region')
@@ -150,7 +149,7 @@ def get_edge_annotations(graph):
         with ProcessPoolExecutor(MAX_PROCS) as executor:
             results = executor.map(vote_annotation, annotation_chunks, chunksize=n_chunks_per_core)
         results = list(results)
-        results = np.array(results)
+        _ = np.array(results)
     except BrokenProcessPool:  # Go single threaded
         annotations = np.array([vote_annotation(chunk) for chunk in annotation_chunks])
     return annotations
@@ -208,7 +207,7 @@ def plot_length(df, regions):
 def uncrust_graph(time_point, work_dir, samples):
     print(time_point, work_dir, samples)
     for sample_id in tqdm(samples):
-        graph = ggt.load(os.path.join(work_dir, f'{sample_id}_graph.gt'))
+        graph = graph_gt.load(os.path.join(work_dir, f'{sample_id}_graph.gt'))
         graph_uncrusted = remove_surface(graph, 2)
         graph_uncrusted.save(os.path.join(work_dir, f'{sample_id}_graph_uncrusted.gt'))
 
@@ -253,14 +252,23 @@ def compute_stats(samples_info, get_reg=False, regions=None, uncrust=False, coor
         if uncrust:
             uncrust_graph(time_point, info['work_dir'], info['sample_ids'])  # TODO: check order w/ Elisa
 
-        annotation.initialize(label_file=JSON_PATH, extra_label=None, annotation_file=(info['atlas_path']))  # WARNING: always extra_label=None
-
         stage = "dev" if time_point_int in DEV_TIME_POINTS else "adult"
+        if stage == 'dev':  # LAMBADA
+            atlas_base_name = ATLAS_NAMES_MAP[f'LAMBADA - {time_point} - 25µm']['base_name']
+        else:
+            atlas_base_name = ATLAS_NAMES_MAP['ABA 2017 - adult mouse - 25µm']['base_name']
+
+        # FIXME: specify slicing and orientation
+        annotator = Annotation(atlas_base_name, slicing, orientation,
+                               label_source='ABA json 2022',
+                               target_directory=None, extra_label=None)
+        # FIXME: pass annotator to subfunctions
+
         print(f'Processing {stage} brain')
 
         for sample_index, sample_id in enumerate(tqdm(info['sample_ids'], unit='sample n')):
             try:
-                graph = ggt.load(os.path.join(info['work_dir'], f'{sample_id}_graph.gt'))
+                graph = graph_gt.load(os.path.join(info['work_dir'], f'{sample_id}_graph.gt'))
             except FileNotFoundError:
                 print('graph is missing !')
                 continue
@@ -269,14 +277,14 @@ def compute_stats(samples_info, get_reg=False, regions=None, uncrust=False, coor
             if (regions is None or get_reg) and sample_index == 0:
                 # graph, regions = get_regions_auto(graph)  # TODO: check why graph is returned
                 # regions = get_regions_from_graph(graph)
-                regions = get_regions_from_atlas(info['atlas_path'])
+                regions = get_regions_from_atlas(annotator)
             # print(f'IDs: {regions.keys()}')
 
             for id_, region in (region_pbar := tqdm(regions.items(), position=0, leave=True, colour='green', ncols=120)):  # Get stat for each region
                 region_pbar.set_postfix_str(f'region: {region["name"]}')
 
                 try:
-                    region_graph = extract_annotated_region(graph, id_, region)
+                    region_graph = extract_annotated_region(graph, annotator, id_, region)
                 except IndexError:  # No index for subgraph
                     print(f'Skipping empty region {region["name"]}')
                     continue
@@ -309,8 +317,12 @@ if __name__ == '__main__':
                                        LAMBADA_ATLAS_BASE_DIR, LAMBADA_BASE_NAME, ADULT_ATLAS_PATH)
 
     if not GET_REG:
-        ref_brain_graph = ggt.load(REF_BRAIN_PATH)
-        regions = get_regions_from_graph(ref_brain_graph)
+        ref_brain_graph = graph_gt.load(REF_BRAIN_PATH)
+        default_annotator = Annotation(ATLAS_NAMES_MAP['ABA 2017 - adult mouse - 25µm']['base_name'],
+                                       slicing=(slice(None), slice(None), slice(None)),
+                                       orientation=(1, 2, 3),
+                                       label_source='ABA json 2022')
+        regions = get_regions_from_graph(ref_brain_graph, default_annotator)
     else:
         regions = None
     df = compute_stats(SAMPLES_INFO, get_reg=GET_REG, regions=regions, coordinates_type='coordinates_atlas')

@@ -1,6 +1,9 @@
 {
     "files": ["mainwindow.ui",
-              "sample_tab.ui","alignment_tab.ui","cell_map_tab.ui","vasculature_tab.ui",
+              "sample_tab.ui",
+              "alignment_tab.ui", 'stitching_params.ui",
+              "cell_map_tab.ui",
+              "vasculature_tab.ui",
               "group_analysis_tab.ui","batch_processing_tab.ui",
               "image_group_ctrls.ui","sample_group_controls.ui",
               "preferences_editor.ui",

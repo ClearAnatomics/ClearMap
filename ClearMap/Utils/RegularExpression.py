@@ -6,7 +6,7 @@ RegularExpression
 Module providing routines to check and convert between regular and file 
 expressions. 
 
-Utility module fused by :mod:`ClearMap.Utils.TagExpression`.
+Utility module fused by :mod:`ClearMap.Utils.tag_expression`.
 """
 __author__    = 'Christoph Kirst <ckirst@rockefeller.edu>'
 __license__   = 'MIT License <http://www.opensource.org/licenses/mit-license.php>'

@@ -10,7 +10,7 @@ __author__ = 'Christoph Kirst <christoph.kirst.ck@gmail.com>, Charly Rousseau <c
 __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__ = 'https://idisco.info'
-__download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
+__download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
 import warnings
 from functools import cached_property
@@ -124,7 +124,7 @@ class Source(AbstractSource):
 
     @property
     def array(self, processes=None):
-        array = self._tif.asarray(maxworkers=processes)
+        array = self._tif.asarray(maxworkers=processes, squeeze=True)
         return self.to_clearmap_order(array)
 
     @cached_property
@@ -325,13 +325,27 @@ class BaseMetadataParser:
 
     def parse_order(self):
         self.info['order'] = self.pixels_metadata.get('DimensionOrder', None)
+        if not self.info['order']:
+            warnings.warn(f'No dimension order found in tif metadata! Assuming "XYZ" order.')
+            self.info['order'] = 'XYZ'
 
     def parse_shape(self):
         self.update_info('shape', tuple([f'Size{d}' for d in self.info['order']]),
                          self.pixels_metadata, int)
         # Remove empty dimensions
-        if self.info['shape'] is not None and [d for d in self.info['shape'] if d != 1] != self.source.shape:
-            order = [d for s, d in zip(self.info['shape'], self.info['order']) if s > 1]
+        if self.info['shape'] is not None and [d for d in self.info['shape'] if d != 1] != self.source.shape:   # Trim empty dimensions
+            shape_dict = {d: s for s, d in zip(self.info['shape'], self.info['order']) if s > 1}
+            shape = list(shape_dict.values())
+            order = list(shape_dict.keys())
+            extra_axes = 'TCZ'  # Remove any extra dimensions (with shape 1), by priority
+            i = 0
+            while len(shape) > len(self.source.shape) and i < len(extra_axes):  # Remove while too many dimensions
+                axis = extra_axes[i]
+                if axis in order:
+                    axis_idx = order.index(axis)
+                    shape.pop(axis_idx)
+                    order.pop(axis_idx)
+                i += 1
             self.info['order'] = order
             self.info['shape'] = self.source.shape
 
@@ -364,14 +378,14 @@ class BaseMetadataParser:
             self.info['description'] = self.metadata.get('Image', {}).get('Description', None)
 
     def parse_tile_configuration(self):
-        warnings.warn(f"Tile configuration parsing is not available for {self.__class__}, skipping!")
+        warnings.warn(f"Tile configuration parsing is not available for {self.__class__.__name__}, skipping!")
 
     def parse_overlap(self):
-        warnings.warn(f"Overlap parsing is not available for {self.__class__}, skipping!")
+        warnings.warn(f"Overlap parsing is not available for {self.__class__.__name__}, skipping!")
 
     @cached_property
     def pixels_metadata(self):
-        raise NotImplementedError("Subclasses should implement this method")
+        raise NotImplementedError(f"Method missing in {self.__class__.__name__}. Subclasses should implement this method")
 
 
 class OMEMetadataParser(BaseMetadataParser):
@@ -424,7 +438,7 @@ class ImageJMetadataParser(BaseMetadataParser):
     def parse_info_field(self):
         parsed_info = {}
         try:
-            md_info = self.metadata['Info'].split('\n')
+            md_info = [ln.strip() for ln in self.metadata['Info'].split('\n')]
         except KeyError:
             warnings.warn(f'No Info metadata found in tif file {self.source._tif.filename}!'
                           f'Metadata: {self.metadata}')
@@ -433,8 +447,21 @@ class ImageJMetadataParser(BaseMetadataParser):
         if md_info[0].startswith('NRRD'):  # FIXME: just get pixel metadata
             self.__parse_nrrd(md_info, parsed_info)
         else:
-            raise ValueError(f'Unknown metadata type {self.source._metadata_type} and format: {md_info[0]};'
-                             f' info: {md_info}')
+            info = {ln.split('=', 1)[0].strip(): ln.split('=', 1)[1].strip() for ln in md_info if '=' in ln}
+            if 'DimensionOrder' in info:
+                order = info['DimensionOrder']
+                parsed_info['shape'] = [int(info[f'Size{d}']) for d in order]
+                # Remove empty dimensions
+                parsed_info['order'] = ''.join(d for s, d in zip(parsed_info['shape'], order) if s != 1)
+                parsed_info['shape'] = tuple(dim for dim in parsed_info['shape'] if dim != 1)
+            elif 'ImageDescription' in md_info[0] and 'shape' in md_info[0]:
+                parsed_info['order'] = 'xyz'
+                warnings.warn(f'Order not found, assuming {"xyz"}')
+                desc = eval(md_info[0].replace('ImageDescription:', '').strip())  # WARNING: dangerous
+                parsed_info['shape'] = desc['shape']
+            else:
+                raise ValueError(f'Unknown metadata type {self.source._metadata_type} and format: {md_info[0]};'
+                                 f' info: {md_info}')
         return parsed_info
 
     def __parse_nrrd(self, md_info, parsed_info):
@@ -471,10 +498,19 @@ class ClearMapMetadataParser(BaseMetadataParser):
         super().parse_order()
         if self.info['order'] is None:
             warnings.warn('WARNING: No dimension order found in tif metadata! Assuming "XYZTC" order.')
-            self.info['order'] = ''.join([d for d in 'XYZTC'
-                                          if f'Size{d}' in self.pixels_metadata.keys()])
+            self.info['order'] = ''.join([d for d in 'XYZTC' if f'Size{d}' in self.pixels_metadata.keys()])
             if not self.info['order']:
                 self.info['order'] = 'XYZ'
+
+    @cached_property
+    def pixels_metadata(self):  # TODO: We could also guesstimate the z based on the shape (smallest dim) with a warning
+        if isinstance(self.metadata, tuple):
+            return self.metadata[0].get('Pixels', {})
+        elif isinstance(self.metadata, dict):
+            return self.metadata.get('Pixels', {})
+        else:
+            raise ValueError(f'Unknown metadata type {self.source._metadata_type} and format: {self.metadata};'
+                             f' info: {self.metadata}')
 
 
 ###############################################################################
@@ -614,6 +650,9 @@ def map_axes(source_order, dest_order, ndim=None):
         dest_order = ''.join(dest_order)
     source_order = source_order.upper()
     dest_order = dest_order.upper()
+    if len(source_order) == len(dest_order) and len(source_order) < ndim:
+        source_order += 'C'
+        dest_order += 'C'
 
     if 'C' in source_order and 'C' not in dest_order:
         warnings.warn('Color channel is present in source order but not explicitly in destination order, '
@@ -630,6 +669,12 @@ def map_axes(source_order, dest_order, ndim=None):
             dest_order = dest_order.replace(dim, '')
 
     if len(source_order) != len(dest_order):
+        # if (len(dest_order) == len(source_order) + 1) and 'z' in dest_order.lower():
+            # dest_order = ''.join([ax for ax in dest_order if ax.lower() != 'z'])
+            # if ndim > len(dest_order):
+                # raise ValueError(f'Cannot remap because data has more dimensions than specified in mapping')
+            # warnings.warn(f'Extra Z axis found in dest_order. Stripped')
+        # else:
         raise ValueError(f'Source and destination order must have the same number of axes.'
                          f' Source order: {source_order}, Destination order: {dest_order}')
 
@@ -654,7 +699,11 @@ def transpose_array(array, source_order, dest_order):
     The transposed array
     """
     transposition = map_axes(source_order, dest_order, ndim=array.ndim)
-    return np.transpose(array, transposition)
+    try:
+        return np.transpose(array, transposition)
+    except ValueError as err:
+        raise ValueError(f'Error with transposition of array with {array.shape} shape, and dtype {array.dtype} '
+                         f'{source_order=}, {dest_order=}, {transposition=}; {err}')
 
 
 def tif_to_clearmap_order(array, array_order='XYZ'):

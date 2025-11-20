@@ -10,47 +10,83 @@ __author__ = 'Charly Rousseau <charly.rousseau@icm-institute.org>'
 __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
 __copyright__ = 'Copyright © 2022 by Charly Rousseau'
 __webpage__ = 'https://idisco.info'
-__download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
+__download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
 import math
 import os
 import sys
+import tempfile
+import time
+import warnings
 from datetime import datetime
 
 from multiprocessing.pool import ThreadPool
+from pathlib import Path
 from shutil import copyfile
-import traceback
-import types
+from statistics import mode
+from types import NoneType
 
+import configobj
 from importlib_metadata import version
 
-from ClearMap.config.update_config import update_default_config
-from PyQt5 import QtGui
+# WARNING: Necessary for QCoreApplication creation
+from PyQt5.QtWebEngineWidgets import QWebEngineView  # noqa: F401
+
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QPalette, QColor
-from PyQt5.QtWebEngineWidgets import QWebEngineView  # WARNING: must be imported before app creation
-from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QSpinBox, QDoubleSpinBox, QFrame, \
-    QDialogButtonBox, QComboBox, QLineEdit, QStyle, QWidget, QMessageBox, QToolBox, QProgressBar, QLabel, QAction
+from PyQt5 import QtGui
+from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget,
+                             QPushButton, QSpinBox, QDoubleSpinBox, QComboBox,
+                             QLineEdit, QMessageBox, QToolBox, QProgressBar, QLabel,
+                             QStyle, QAction, QDockWidget)
+
+import qdarkstyle
 from qdarkstyle import DarkPalette
+
+HARD_DEFAULT_FONT_SIZE = 11
+
+DEBUG = False
+
 
 os.environ['CLEARMAP_GUI_HOSTED'] = "1"
 # ########################################### SPLASH SCREEN ###########################################################
-from ClearMap.gui.dialogs import make_splash, update_pbar, make_simple_progress_dialog, option_dialog
+
+# Load directly to ensure not ClearMap module is loaded before fixing tmp folder
+machine_cfg = configobj.ConfigObj(os.path.expanduser('~/.clearmap/machine_params_v3_0.cfg'),
+                                  unrepr=True, encoding='utf-8', indent_type='    ')
+tmp_folder = machine_cfg.get('temp_folder')
+if tmp_folder is not None:
+    for var_name in ('TMP', 'TEMP', 'TMPDIR'):
+        os.environ[var_name] = tmp_folder
+    tempfile.tempdir = tmp_folder  # Force refresh of tempdir
+
+DEBUG = machine_cfg['verbosity'] in ('trace', 'debug')
+
+CLEARMAP_VERSION = version('ClearMap')
+from ClearMap.config.config_loader import ConfigLoader, CLEARMAP_CFG_DIR
+
+from ClearMap.Alignment.Stitching import layout_graph_utils  # noqa: F401 # WARNING: first because otherwise, breaks with pytorch
+
+from ClearMap.gui.about import AboutInfo
+from ClearMap.gui.dialogs import make_splash, update_pbar, make_simple_progress_dialog, option_dialog, input_dialog, \
+    AboutDialog
 
 # To show splash before slow imports
 ICONS_FOLDER = 'ClearMap/gui/creator/icons/'   # REFACTOR: use qrc
 
 app = QApplication([])
+# Attempt to force appearance
 app.setApplicationName('ClearMap')
 app.setApplicationDisplayName('ClearMap')
-app.setApplicationVersion('2.1')
+app.setApplicationVersion(CLEARMAP_VERSION)
 palette = app.palette()  # WARNING: necessary because QWhatsThis does not follow stylesheets
-palette.setColor(QPalette.ColorRole.ToolTipBase, QColor(DarkPalette.COLOR_BACKGROUND_2))
-palette.setColor(QPalette.ColorRole.ToolTipText, QColor(DarkPalette.COLOR_TEXT_2))
-app.setPalette(palette)
+palette.setColor(QtGui.QPalette.ColorRole.ToolTipBase, QtGui.QColor(DarkPalette.COLOR_BACKGROUND_2))
+palette.setColor(QtGui.QPalette.ColorRole.ToolTipText, QtGui.QColor(DarkPalette.COLOR_TEXT_2))
+app.setPalette(palette)  # noqa
 
 
-from ClearMap.gui.gui_utils import get_current_res, UI_FOLDER, clear_layout
+from ClearMap.config.update_config import update_default_config
+from ClearMap.gui.widget_monkeypatch_callbacks import recursive_patch_widgets
+from ClearMap.gui.gui_utils import get_current_res, UI_FOLDER, clear_layout, delete_widget
 
 CURRENT_RES = get_current_res(app)
 
@@ -60,62 +96,45 @@ update_pbar(app, progress_bar, 10)
 
 # ############################################  SLOW IMPORTS #########################################################
 
-import pygments
-import pygments.styles
-from pygments.lexers.python import PythonTracebackLexer  # noqa
-from pygments.formatters.html import HtmlFormatter
-
-import qdarkstyle
-
 import pyqtgraph as pg
 
 import torch
 
 update_pbar(app, progress_bar, 20)
-from ClearMap.Utils.utilities import title_to_snake
+from ClearMap.Utils.utilities import title_to_snake, snake_to_title
 from ClearMap.gui.gui_logging import Printer
-from ClearMap.config.config_loader import ConfigLoader, CLEARMAP_CFG_DIR
-from ClearMap.Utils.exceptions import ConfigNotFoundError
+from ClearMap.Utils.exceptions import ConfigNotFoundError, ClearMapIoException
 from ClearMap.gui.params_interfaces import UiParameter, UiParameterCollection
-from ClearMap.gui.widget_monkeypatch_callbacks import get_value, set_value, controls_enabled, get_check_box, \
-    enable_controls, disable_controls, set_text, get_text, connect_apply, connect_close, connect_save, connect_open, \
-    connect_ok, connect_cancel, connect_value_changed, connect_text_changed
+
 update_pbar(app, progress_bar, 40)
 from ClearMap.gui.pyuic_utils import loadUiType
 from ClearMap.gui.dialogs import get_directory_dlg, warning_popup, make_nested_progress_dialog, DISPLAY_CONFIG
 from ClearMap.gui.gui_utils import html_to_ansi, html_to_plain_text, compute_grid
-from ClearMap.gui.style import DARK_BACKGROUND, PLOT_3D_BG, \
-    BTN_STYLE_SHEET, TOOLTIP_STYLE_SHEET, COMBOBOX_STYLE_SHEET, WARNING_YELLOW
+from ClearMap.gui.style import (DARK_BACKGROUND, PLOT_3D_BG, BTN_STYLE_SHEET,
+                                TOOLTIP_STYLE_SHEET, COMBOBOX_STYLE_SHEET,
+                                HIGHLIGHTED_BTN_STYLE)
 
-from ClearMap.gui.widgets import OrthoViewer, ProgressWatcher, setup_mini_brain, StructureSelector, \
-    PerfMonitor  # needs plot_3d
-update_pbar(app, progress_bar, 60)
-from ClearMap.gui.tabs import SampleTab, AlignmentTab, CellCounterTab, VasculatureTab, GroupAnalysisTab, \
-    BatchProcessingTab
+# Widgets import is quite slow
+from ClearMap.gui.widgets import (OrthoViewer, ProgressWatcher,
+                                  StructureSelector, PerfMonitor, ManageAssetsWidget)  # Perfmonitor needs plot_3d
+update_pbar(app, progress_bar, 50)
+from ClearMap.gui.interfaces import BatchTab, PipelineTab
 from ClearMap.gui.preferences import PreferenceUi
+from ClearMap.processors.sample_preparation import SampleManager
+update_pbar(app, progress_bar, 70)
+from ClearMap.gui.tabs import (SampleInfoTab, StitchingTab, RegistrationTab, GroupAnalysisTab, BatchProcessingTab,
+                               DATA_TYPE_TO_TAB_CLASS, CellCounterTab, ColocalizationTab)
 
-update_pbar(app, progress_bar, 80)
+update_pbar(app, progress_bar, 90)
 
 pg.setConfigOption('background', PLOT_3D_BG)
-
-
-CLEARMAP_VERSION = version('ClearMap2')
-tmp_folder = ConfigLoader.get_cfg_from_path(ConfigLoader.get_default_path('machine')).get('tmp_folder', None)
-if tmp_folder is not None:
-    for var_name in ('TMP', 'TEMP', 'TMPDIR'):
-        os.environ[var_name] = tmp_folder
-
 
 # TODO
 """
 Handle reset detected correctly
 Fix qrc resources (ui files should not be coded by path)
-Test and check that works with secondary channel
 Delete intermediate files
 Ensure all machine config params are in the preferences UI
-
-Previews:
-    - Add rigid alignment : plane in middle of stack from each column + stitch with different colours
 
     
 Analysis:
@@ -147,11 +166,13 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         self.progress_dialog = None
         self.progress_watcher = ProgressWatcher()
 
-        self.cpu_bar = QProgressBar()
-        self.single_thread_bar = QProgressBar()
-        self.ram_bar = QProgressBar()
-        self.gpu_bar = QProgressBar()
-        self.vram_bar = QProgressBar()
+        self.default_font_size = self.compute_default_font_size()
+
+        self.cpu_bar = QProgressBar()  # noqa
+        self.single_thread_bar = QProgressBar() # noqa
+        self.ram_bar = QProgressBar() # noqa
+        self.gpu_bar = QProgressBar() # noqa
+        self.vram_bar = QProgressBar() # noqa
 
         if torch.cuda.is_available():
             gpu_period = 500
@@ -178,7 +199,8 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
 
         Returns
         -------
-
+        QWidget
+            The child widget matching the name and type
         """
         if parent is None:
             parent = self
@@ -198,11 +220,9 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         ----------
         msg : str
             The message to be printed
-
-        Returns
-        -------
-
         """
+        if isinstance(msg, Exception):
+            msg = str(msg)
         self.__print_status_msg(msg, 'red')
 
     def print_warning_msg(self, msg):
@@ -213,10 +233,6 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         ----------
         msg : str
             The message to be printed
-
-        Returns
-        -------
-
         """
         self.__print_status_msg(msg, 'yellow')
 
@@ -228,30 +244,8 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         ----------
         msg : str
             The message to be printed
-
-        Returns
-        -------
-
         """
         self.__print_status_msg(msg, 'green')
-
-    def fix_btn_boxes_text(self):
-        """
-        Rewrite the text on top of QDialogButtonBox(es) based on the
-        dynamic properties 'applyText', 'okText' and 'openText' defined
-        in the ui files in QtCreator
-
-        Returns
-        -------
-
-        """
-        for btn_box in self.findChildren(QDialogButtonBox):
-            if btn_box.property('applyText'):
-                btn_box.button(QDialogButtonBox.Apply).setText(btn_box.property('applyText'))
-            if btn_box.property('okText'):
-                btn_box.button(QDialogButtonBox.Ok).setText(btn_box.property('okText'))
-            if btn_box.property('openText'):
-                btn_box.button(QDialogButtonBox.Open).setText(btn_box.property('openText'))
 
     def set_font_size(self, target_font_size=DISPLAY_CONFIG[CURRENT_RES]['font_size']):
         """
@@ -265,71 +259,67 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         ----------
         target_font_size : int
             The main font size
-
-        Returns
-        -------
-
         """
-        font_sizes = self.__get_font_sizes()
-        if len(font_sizes) > 4:  # WARNING: Hacky
-            font_sizes = font_sizes[:4]
-        small, regular, big, huge = font_sizes
-        if target_font_size == regular:
-            return
+        self.default_font_size = self.compute_default_font_size()  # or self.compute_default_font_size_mean()
+        min_font_size = 1  # Define a minimum font size to avoid negative or zero font sizes
 
-        font_swap = {
-            'small': target_font_size - 3,
-            'regular': target_font_size,
-            'big': target_font_size + 2,
-            'huge': target_font_size + 10
-        }
+        scaling_factor = target_font_size / self.default_font_size
 
         for widget in self.findChildren(QWidget):
-            font = widget.property("font")
-            try:
-                font.setPointSize(font_swap[widget.property('font_size_name')])
-            except KeyError:
-                print(f'Skipping widget {widget.objectName()}')
-            widget.setFont(font)
+            font = widget.font()  #  font = widget.property("font")
+            current_size = font.pointSize()
+            if current_size > 0:  # Ensure the font size is valid
+                # Calculate the new font size relative to the target font size
+                new_size = int(current_size * scaling_factor)
+                # Ensure the new font size is not less than the minimum font size
+                font.setPointSize(max(new_size, min_font_size))
+                widget.setFont(font)
 
     def set_font(self):
         for widget in self.findChildren(QWidget):
             font = widget.property("font")
             try:
-                font.setFamily(self.preference_editor.params.font_family)  # FIXME: part of child class
+                font.setFamily(self.preference_editor.params.font_family)  # REFACTOR: part of child class
             except KeyError:
                 print(f'Skipping widget {widget.objectName()}')
             widget.setFont(font)
+
+    def compute_default_font_size(self):
+        """
+        Gets the most represented font size in the program. This is the default font size
+
+        Returns
+        -------
+        int
+            The default font size
+        """
+        font_sizes = [widget.font().pointSize() for widget in self.findChildren(QWidget) if widget.font().pointSize() > 0]
+        if font_sizes:
+            return mode(font_sizes)
+        return HARD_DEFAULT_FONT_SIZE  # Fallback to a default value if no valid font sizes are found
 
     def fix_sizes(self):
         # self.set_font_size()
         self.tabWidget.setMinimumWidth(200)
         self.tabWidget.setMinimumHeight(600)
+        dock_width = round(self.width() * 4/5)
+        self.resizeDocks([self.graphDock], [dock_width], Qt.Horizontal)
 
     def fix_styles(self):
-        """
-        The meta function calling all the style functions
-        Returns
-        -------
-
-        """
-        self.fix_btn_boxes_text()
+        """The meta function calling all the style functions"""
         self.setStyleSheet(BTN_STYLE_SHEET)  # Makes it look qdarkstyle
         # self.fix_btns_stylesheet()
         self.fix_widgets_backgrounds()
         self.fix_sizes()
         self.fix_tooltips_stylesheet()
 
+        btn = self.tab_managers['sample_info'].ui.launchPatternWizardPushButton
+        btn.setStyleSheet(HIGHLIGHTED_BTN_STYLE)
+
     def fix_tooltips_stylesheet(self):
         for widg in self.findChildren(QWidget):
             if hasattr(widg, 'toolTip') and widg.toolTip():
                 widg.setStyleSheet(TOOLTIP_STYLE_SHEET)
-
-    def __get_font_sizes(self):
-        point_sizes = set()
-        for widg in self.findChildren(QWidget):
-            point_sizes.add(widg.property("font").pointSize())
-        return sorted(point_sizes)
 
     def fix_btns_stylesheet(self):
         for btn in self.findChildren(QPushButton):
@@ -345,20 +335,21 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
     def popup(self, msg, base_msg='Missing configuration file', print_warning=True):
         """
         Display a warning popup message which the user has to dismiss by clicking OK
-        Optionaly, a warning is also printed to the logs
+        Optionally, a warning is also printed to the logs
 
         Parameters
         ----------
         msg : str
             The more detailed text to display
         base_msg : str
-            The auick description of the problem
+            The quick description of the problem
         print_warning : bool
             Whether to also print msg to logs
 
         Returns
         -------
-
+        QMessageBox
+            The popup message box
         """
         if print_warning:
             self.print_warning_msg(html_to_plain_text(msg))
@@ -379,10 +370,6 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         ----------
         name : str
             The objectName of the graph widget we are looking for
-
-        Returns
-        -------
-
         """
         return [g for g in self.graphs if g.objectName() == name][0]
 
@@ -390,10 +377,6 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         """
         Remove all plots currently displayed in the DataViewer area of the interface
         The underlying widgets are also scheduled for garbage collection
-
-        Returns
-        -------
-
         """
         clear_layout(self.graphLayout)
         self.graphs = []
@@ -407,13 +390,10 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         Parameters
         ----------
         dvs : List[DataViewer]
-            The list of DataViewer (or any other QWidget derived object) to add the the display grid
+            The list of DataViewer (or any other QWidget derived object) to add
+            to the display grid
         graph_names: None or List[str]
             Optional The names attached to the graphs for later reference
-
-        Returns
-        -------
-
         """
         if graph_names is None:
             graph_names = [f'graph_{i}' for i in range(len(dvs))]
@@ -449,99 +429,20 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
     def setup_icons(self):
         """
         Patch the icons of the program
-        Returns
-        -------
-
         """
         self._reload_icon = self.style().standardIcon(QStyle.SP_BrowserReload)
-
-    def patch_compound_boxes(self):
-        """
-        Since it is difficult to create real custom widgets in PyQt which can be used in QtCreator,
-        we chose a different approach based on the dynamic nature of Python.
-        We define new compound types (e.g. checkable text edit or triplets of values) based on
-        dynamic properties and the objectNames in QtCreator and then patch the behaviour of these
-        widgets in this method
-
-        Returns
-        -------
-
-        """
-        for bx in self.findChildren(QFrame):
-            bx_name = bx.objectName().lower()
-            if bx_name.startswith('triplet') or bx_name.endswith('let') or \
-                    bx_name.endswith('optionallineedit') or bx_name.endswith('optionalplaintextedit'):
-                bx.controlsEnabled = types.MethodType(controls_enabled, bx)
-                bx.getCheckBox = types.MethodType(get_check_box, bx)
-                bx.enableControls = types.MethodType(enable_controls, bx)
-                bx.disableControls = types.MethodType(disable_controls, bx)
-                if bx_name.startswith('triplet') or bx_name.endswith('let'):  # singlet double triplet
-                    bx.getValue = types.MethodType(get_value, bx)
-                    bx.setValue = types.MethodType(set_value, bx)
-                    bx.valueChangedConnect = types.MethodType(connect_value_changed, bx)
-                elif bx_name.endswith('optionallineedit') or bx_name.endswith('optionalplaintextedit'):
-                    bx.setText = types.MethodType(set_text, bx)
-                    bx.text = types.MethodType(get_text, bx)
-                    bx.textChangedConnect = types.MethodType(connect_text_changed, bx)
-                else:
-                    print(f'Skipping box "{bx_name}", type not recognised')
-
-    def patch_button_boxes(self, parent=None):
-        """
-        To shorten the syntax, QDialogButtonBoxes are patched by this method
-        so that e.g.
-        bx.connectApply(f) replaces bx.button(QDialogButtonBox.Apply).clicked.connect(f)
-
-        Parameters
-        ----------
-        parent
-
-        Returns
-        -------
-
-        """
-        if parent is None:
-            parent = self
-        for bx in parent.findChildren(QDialogButtonBox):
-            bx.connectApply = types.MethodType(connect_apply, bx)
-            bx.connectClose = types.MethodType(connect_close, bx)
-            bx.connectSave = types.MethodType(connect_save, bx)
-            bx.connectOpen = types.MethodType(connect_open, bx)
-            bx.connectOk = types.MethodType(connect_ok, bx)
-            bx.connectCancel = types.MethodType(connect_cancel, bx)
 
     def patch_tool_boxes(self):
         """
         Sets all toolboxes to the first item on startup regardless of the last closed state o
         f the ui file in QtCreator
-
-        Returns
-        -------
-
         """
         for tb in self.findChildren(QToolBox):
             tb.setCurrentIndex(0)
 
-    def patch_font_size_name(self):
-        font_names = {
-            9: 'small',
-            10: 'small',
-            11: 'regular',
-            12: 'regular',
-            13: 'regular',
-            14: 'big',
-            22: 'huge'
-        }
-        for widget in self.findChildren(QWidget):
-            font = widget.property('font')
-            font_size_name = font_names[font.pointSize()]
-            widget.setProperty('font_size_name', font_size_name)
-
     def monkey_patch(self):
-        self.patch_compound_boxes()
-        self.patch_button_boxes()
+        recursive_patch_widgets(self)
         self.patch_tool_boxes()
-        self.patch_font_size_name()
         # self.fix_styles()
 
     @staticmethod
@@ -568,10 +469,6 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
             The function to trigger when the abort button is clicked
         parent : QWidget
             The parent widget to the dialog
-
-        Returns
-        -------
-
         """
         if n_steps:
             n_steps += 1  # To avoid range shrinking because starting from 1 not 0
@@ -638,10 +535,6 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         ----------
         msg : str
             The message to display
-
-        Returns
-        -------
-
         """
         if not any([kw in msg.lower() for kw in ('idle', 'done', 'finish')]):
             msg += ' finished'
@@ -660,10 +553,6 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         ----------
         step_name : str
             The new step name
-
-        Returns
-        -------
-
         """
         self.log_process_start(step_name)
         try:
@@ -681,10 +570,6 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         ----------
         step_name : str
             The new step name
-
-        Returns
-        -------
-
         """
         if self.progress_dialog is not None:
             self.progress_dialog.subProgressLabel.setText(step_name)
@@ -697,10 +582,6 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         ----------
         msg : str
             The message to log
-
-        Returns
-        -------
-
         """
         self.print_status_msg(msg)
         self.log_progress(msg)
@@ -712,14 +593,11 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
     def save_cfg(self):
         """
         Take a snapshot of all the configuration at that instant.
-        The config files will be save to a subfolder with the datetime in the name
-        Returns
-        -------
-
+        The config files will be saved to a subfolder with the datetime in the name
         """
-        cfg_folder = os.path.join(self.src_folder, 'config_snapshots', datetime.now().strftime('%y%m%d_%H_%M_%S'))
+        cfg_folder = os.path.join(self.src_folder, 'config_snapshots', datetime.now().strftime('%y%m%d_%H_%M_%S'))  # REFACTOR: use pathlib
         os.makedirs(cfg_folder, exist_ok=True)
-        for param in self.params:
+        for param in self.params.values():
             if isinstance(param, UiParameterCollection):
                 cfg = param.config
             elif isinstance(param, UiParameter):
@@ -731,12 +609,7 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
                 cfg.write(outfile=file_obj)
 
     def setup_monitoring_bars(self):
-        """
-        Create the performance monitoring bars in the status bar
-        Returns
-        -------
-
-        """
+        """Create the performance monitoring bars in the status bar"""
         for label, bar in zip(('CPU', None, 'RAM', 'GPU', 'VRAM'),
                               (self.cpu_bar, self.single_thread_bar, self.ram_bar, self.gpu_bar, self.vram_bar)):
             if label is not None:
@@ -760,10 +633,6 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
             The CPU usage percent to display
         ram_percent : int
             The RAM usage percent to display
-
-        Returns
-        -------
-
         """
         self.cpu_bar.setValue(cpu_percent)
         self.single_thread_bar.setValue(thread_percent)
@@ -779,10 +648,6 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
             The GPU usage percent to display
         v_ram_percent : int
             The Graphics RAM usage percent to display
-
-        Returns
-        -------
-
         """
         self.gpu_bar.setValue(gpu_percent)
         self.vram_bar.setValue(v_ram_percent)
@@ -793,115 +658,304 @@ class ClearMapGui(ClearMapGuiBase):
     The Main class of the GUI. This class focuses on the real business logic of the application.
     This represents the main window which has instances of the different
     tabs derived from GenericTab (the tab_managers), which correspond to different steps of the program.
-    Each tab_manager composed of a processor, a widget and a UiParameter or UiParameterCollection object.
+    Each tab_manager composed of a sample_manager, an optional pipeline object (e.g. Stitcher),
+     a widget and a UiParameter or UiParameterCollection object.
     """
     def __init__(self):
         super().__init__()
+        self.setupUi(self)
+        self.setWindowIcon(QtGui.QIcon(os.path.join(ICONS_FOLDER, 'logo_cyber.png')))
+
         self.config_loader = ConfigLoader('')
         self.ortho_viewer = OrthoViewer()
 
-        self.sample_tab_mgr = SampleTab(self, tab_idx=0)
-        self.alignment_tab_mgr = AlignmentTab(self, tab_idx=1)
-        self.cells_tab_mgr = CellCounterTab(self, tab_idx=2)
-        self.vasculature_tab_mgr = VasculatureTab(self, tab_idx=3)
-        self.group_analysis_tab_mgr = GroupAnalysisTab(self, tab_idx=4)
-        self.batch_tab_mgr = BatchProcessingTab(self, tab_idx=5)
+        # Tabs
+        self.sample_manager = None  # SampleManager()
+        self.tab_managers = {}
+        self._init_sample_tab_mgr()
 
-        self.sample_tab_mgr.mini_brain_scaling, self.sample_tab_mgr.mini_brain = setup_mini_brain()
-
+        # Menu actions
         self.preference_editor = PreferenceUi(self)
-        self.structure_selector = StructureSelector(app=self)
-
-        self.setWindowIcon(QtGui.QIcon(os.path.join(ICONS_FOLDER, 'logo_cyber.png')))
-
-        self.setupUi(self)
-        self.amend_ui()
-
-        self.setup_monitoring_bars()
-
         self.actionPreferences.triggered.connect(self.preference_editor.open)
+        self.structure_selector = StructureSelector(app=self)
         self.actionStructureSelector.triggered.connect(self.structure_selector.show)
 
-        # self.actionPreferences.triggered.connect(self.raise_warning)
-
-        self.app = QApplication.instance()
+        self.amend_ui()
+        self.setup_monitoring_bars()
+        self.app = QApplication.instance() # noqa
 
         if not os.path.exists(CLEARMAP_CFG_DIR):
             update_default_config()
 
     def __len__(self):
-        return len(self.tab_mgrs)
+        return len(self.tab_managers)
 
     def __getitem__(self, item):
-        return self.tab_mgrs[item]
+        return self.tab_managers[item]
 
     def reset(self):
         self.config_loader = ConfigLoader('')
         self.ortho_viewer = OrthoViewer()
 
-        self.sample_tab_mgr = SampleTab(self, tab_idx=0)
-        self.alignment_tab_mgr = AlignmentTab(self, tab_idx=1)
-        self.cells_tab_mgr = CellCounterTab(self, tab_idx=2)
-        self.vasculature_tab_mgr = VasculatureTab(self, tab_idx=3)
-        self.group_analysis_tab_mgr = GroupAnalysisTab(self, tab_idx=4)
-        self.batch_tab_mgr = BatchProcessingTab(self, tab_idx=5)
-
-        self.sample_tab_mgr.mini_brain_scaling, self.sample_tab_mgr.mini_brain = setup_mini_brain()
-
-        for tab in self.tab_mgrs:
-            tab.params = None
+        self._init_sample_tab_mgr()
 
         self.amend_ui()
 
-    @property
-    def tab_mgrs(self):
-        tabs = [self.sample_tab_mgr, self.alignment_tab_mgr]
-        if self.cells_tab_mgr.ui is None or self.cells_tab_mgr.ui.isEnabled():
-            tabs.append(self.cells_tab_mgr)
-        if self.vasculature_tab_mgr.ui is None or self.vasculature_tab_mgr.ui.isEnabled():
-            tabs.append(self.vasculature_tab_mgr)
-        # #self.group_analysis_tab_mgr
-        return tabs
+    def _reset_tab_manager(self):
+        for tab in self.tab_managers.values():
+            tab.params = None
+        self.tab_managers.clear()
+        for tab in self.tabWidget.findChildren(QWidget):
+            if tab.objectName().endswith('_tab'):
+                delete_widget(tab, self.verticalLayout)
 
-    @property
-    def params(self):
-        return [tab.params for tab in self.tab_mgrs]
+    def reset_pipeline_tabs(self):
+        for name in ('stitching', 'registration'):  # FIXME: see why not postprocessing tabs too
+            if tab:=self.tab_managers.get(name):
+                tab.sample_manager = self.sample_manager
+                # FIXME: check if the cfg passed here is a proper singleton
+                tab.set_params(self.tab_managers['sample_info'].params, self.config_loader.get_cfg(name))
 
-    @property
-    def src_folder(self):
-        return self.sample_tab_mgr.src_folder
+    def finalise_tab_params(self):   # WARNING: run only after all tabs have been added
+        self.__add_post_processing_tabs()  # If e.g. workspace.update
+        tabs = list(self.tab_managers.values())  # Avoid iterable resize during loop
+        for tab in tabs:
+            if not tab.params_finalised:  # FIXME: check if we really want this when we update the workspace with different channel names
+                tab.finalise_set_params()
 
-    @src_folder.setter
-    def src_folder(self, src_folder):
-        # FIXME: avoid if not src_folder or src_folder == os.curdir:
-        #     src_folder = tempfile.TemporaryDirectory()
-        self.logger.set_file(os.path.join(src_folder, 'info.log'))
-        self.progress_watcher.log_path = self.logger.file.name
-        self.error_logger.set_file(os.path.join(src_folder, 'errors.html'))
-        self.progress_logger.set_file(os.path.join(src_folder, 'progress.log'))
-        self.sample_tab_mgr.src_folder = src_folder
+        # Finalise second order tabs that might have been added
+        new_tabs = list(set(self.tab_managers.values()) - set(tabs))
+        if new_tabs:
+            for tab in new_tabs:
+                if not tab.params_finalised:
+                    tab.finalise_set_params()
+        if self.has_tab(CellCounterTab):
+            tab = self.tab_managers['cell_counter']
+            if len(tab.params.channels_to_detect) > 1:
+                if not self.has_tab(ColocalizationTab):
+                    tab = self.add_tab(ColocalizationTab, sample_manager=self.sample_manager, set_params=True)
+                    tab.finalise_set_params()
 
-    def display_about(self):
-        about_msg = f'You are running ClearMap version {CLEARMAP_VERSION}'
-        self.popup(about_msg, 'About ClearMap GUI', print_warning=False)
+    def has_tab(self, tab_cls):
+        return any([isinstance(tab, tab_cls) for tab in self.tab_managers.values()])
 
-    def amend_ui(self):
+    def _init_sample_tab_mgr(self):
         """
-        Setup the loggers and all the post instantiation fixes to the UI
+        Clears all existing tabs and creates a new SampleInfoTab and group tabs.
+        Typically called at the start of the program or when a new sample is loaded
+        """
+        print('Initialising sample tab manager')
+        self._reset_tab_manager()
+        self.sample_manager = SampleManager()
+        self.add_tab(SampleInfoTab, sample_manager=self.sample_manager)
+        for tab_class in (GroupAnalysisTab, BatchProcessingTab):
+            self.add_tab(tab_class)
+        self.finalise_tab_params()
+        self.tabWidget.tabBarClicked.connect(self.handle_tab_click)
+        self.tabWidget.setCurrentIndex(0)
 
+    def update_tabs(self, former_channels=None, new_channels=None):
+        """ Initialises the pipeline tabs: Stitching, Registration, cell... based on sample"""
+
+        # Add stitching (always) and registration tabs
+        # if self.sample_manager.stitchable_channels:
+        if not self.has_tab(StitchingTab):
+            self.add_tab(StitchingTab, sample_manager=self.sample_manager, set_params=True)
+        stitching_cfg = self.tab_managers['stitching'].params.config
+        self.sample_manager.load_processors_config(stitching_config=stitching_cfg)
+
+        # stitching_tab = self.tab_managers.get('stitching', None)
+        # stitching_params = getattr(stitching_tab, 'params', None)
+        # stitching_cfg = getattr(stitching_params, 'config', None)
+        if not self.has_tab(RegistrationTab):
+            self.add_tab(RegistrationTab, sample_manager=self.sample_manager, set_params=True)  # WARNING: Always needed to allow setting None for atlas
+        reg_cfg = self.tab_managers['registration'].params.config
+
+        # WARNING: We need a first call to load_processors_config before checking the stitchable_channels (otherwise empty)
+        self.sample_manager.load_processors_config(stitching_cfg, reg_cfg)
+
+        # Add post processing tabs
+        self.__add_post_processing_tabs()
+
+        # Remove unnecessary tabs
+        sample_params = self.params.get('Sample info')
+        if sample_params is None:
+            warnings.warn(f'Sample params not set yet, skipping')
+            return
+
+        missing_channels = (set(sample_params.channels) -
+                            set(self.sample_manager.workspace.asset_collections.keys()))
+        if missing_channels:
+            warnings.warn(f'Channels {missing_channels} not found in workspace, skipping')
+            self.finalise_tab_params()
+            return
+
+        valid_tab_classes = self.__get_valid_tabs(sample_params)
+
+        tab_names = list(self.tab_managers.keys())
+        tabs = list(self.tab_managers.values())
+        for tab_name, tab in zip(tab_names, tabs):
+            if isinstance(tab, PipelineTab):
+                if not isinstance(tab, valid_tab_classes):
+                    # if no data_type justifies the pipelines in pipelines, remove the tab
+                    self.tab_managers.pop(tab_name)
+                    continue
+
+                new_channels = tab.filter_relevant_channels(new_channels)
+                former_channels = tab.filter_relevant_channels(former_channels, must_exist=False)
+
+                tab.update_channels(former_channels, new_channels)
+                time.sleep(2)  # FIXME: we shouldn't need this
+
+        # FIXME: tabs kept even if no channels     are selected
+        self.finalise_tab_params()
+
+    def __get_valid_tabs(self, sample_params):
+        valid_tab_classes = [DATA_TYPE_TO_TAB_CLASS[sample_params[channel].data_type]
+                             for channel in sample_params.channels]
+        valid_tab_classes = [c for c in valid_tab_classes if c is not None]
+        valid_tab_classes += [NoneType]
+        # valid_tab_classes = [c for c in valid_tab_classes if c is not None]
+        # has_tiled_channel = any([self.sample_manager.get('raw', channel=channel).is_tiled for
+        #                          channel in sample_params.channels])
+        # if has_tiled_channel:
+        valid_tab_classes.append(StitchingTab)
+        valid_tab_classes.append(RegistrationTab)
+        # Add compound type tabs to valid_tab_classes (e.g. colocalization)
+        if self.sample_manager.is_colocalization_compatible:
+            valid_tab_classes += [ColocalizationTab]
+        return tuple(set(valid_tab_classes))  # TODO: see way to preserve order if it matters
+
+    def __add_post_processing_tabs(self):
+        """
+        Adds or removes postprocessing tabs as required by sample configuration
         Returns
         -------
 
         """
-        self.setup_loggers()
+        sample_params = getattr(self.tab_managers['sample_info'], 'params', {})
+        if not sample_params:
+            warnings.warn(f'Sample params not set yet, skipping')
+            return
 
-        helpMenu = self.menuBar().addMenu("&Help")
-        self.aboutAction = QAction("&About", self)
-        self.aboutAction.triggered.connect(self.display_about)
-        helpMenu.addAction(self.aboutAction)
+        # Add missing tabs
+        for channel_param in sample_params.values():
+            data_content_type = channel_param.data_type
+            cls = DATA_TYPE_TO_TAB_CLASS.get(data_content_type)
+            if not cls:
+                warnings.warn(f'No tab class found for data_type: {data_content_type}')
+                continue  # Skip if no tab for that data type
+            if not self.has_tab(cls):
+                self.add_tab(cls, sample_manager=self.sample_manager, set_params=True)
+
+    def add_tab(self, manager_class, tab_name='', set_params=False, **kwargs):
+        """
+        Add a new tab to the GUI
+
+        Parameters
+        ----------
+        manager_class : class
+            The class of the tab manager to instantiate
+        tab_name : str
+            The name of the tab. If not given, will be the class name in snake case
+        set_params: bool
+            Whether to set the parameters of the tab from the config file immediately after creation
+        kwargs : dict
+            The keyword arguments to pass to the manager class constructor
+        """
+        if not tab_name:
+            tab_name = manager_class.get_tab_name()
+        tab_manager_name = title_to_snake(tab_name)
+
+        tab_idx = self._get_tab_index(tab_name, tab_class=manager_class, increment=True)
+        tab = manager_class(self, tab_idx=tab_idx, **kwargs)
+        self.tab_managers[tab_manager_name] = tab
+        tab.setup()
+        self.tabWidget.setTabText(tab.tab_idx, tab.name)
+        if set_params:
+            cfg_name = title_to_snake(manager_class.get_tab_name())
+            loaded_from_defaults, cfg_path = self.__get_cfg_path(cfg_name)
+            if cfg_path is not None:
+                tab.set_params(self.tab_managers['sample_info'].params, cfg_path, loaded_from_defaults)
+        return tab
+
+    def _get_tab_index(self, tab_name, tab_class=None, increment=False):
+        """
+        Get the index of a tab in the tabWidget.
+        If the tab does not exist and increment is True, get the index that it should have when added.
+
+        Parameters
+        ----------
+        tab_name: str
+            The name of the tab
+        tab_class: GenericTab
+            Optional, provide if increment is True. The class of the tab
+        increment: bool
+            Whether to increment the index if the tab does not exist
+
+        Returns
+        -------
+        int
+            The index of the tab in the tabWidget
+        """
+        tab_index = next((i for i in range(self.tabWidget.count()) if self.tabWidget.tabText(i) == tab_name), None)
+        if tab_index is None and increment:
+            tab_index = self.tabWidget.count()
+            if not issubclass(tab_class, BatchTab):  # Insert before batch tabs
+                tab_index -= len([t for t in self.tab_managers.values() if isinstance(t, BatchTab)])
+        return tab_index
+
+    @property
+    def params(self):
+        return {tab.name: tab.params for tab in self.tab_managers.values()}
+
+    @property
+    def src_folder(self):
+        return self.tab_managers['sample_info'].src_folder
+
+    @src_folder.setter
+    def src_folder(self, src_folder):
+        if not src_folder:
+            return
+        src_folder = Path(src_folder)
+        if src_folder == Path('.').absolute():
+            return  # Do not write log files in the current folder
+        self.logger.set_file(src_folder / 'info.log')
+        self.progress_watcher.log_path = self.logger.file.name
+        self.error_logger.set_file(src_folder / 'errors.html')
+        self.progress_logger.set_file(src_folder / 'progress.log')
+        self.tab_managers['sample_info'].src_folder = str(src_folder)
+        # FIXME: self.sample_manager.src_folder = src_folder or something
+        # self.reset_loggers()
+        self.reset_pipeline_tabs()
+
+    def display_about(self):  # TODO: get authors list from separate file or documentation
+        info = AboutInfo(
+            software_name=f'You are running ClearMap version {CLEARMAP_VERSION}',
+            version=CLEARMAP_VERSION,
+            authors=["Christoph Kirst", "Charly Rousseau", "Sophie Skriabine", "the ClearMap team"],
+            github_url="https://github.com/ClearAnatomics/ClearMap.git",
+            documentation_url="https://clearanatomics.github.io/ClearMapDocumentation/",
+            website_url="https://idisco.info/",
+            license_info="Released under the GNU GPLv3 License."
+        )
+        try:
+            from ClearMap.config import commit_info # noqa
+            info.commit_info = (f' from commit {commit_info.commit_hash}, {commit_info.commit_date},'
+                                f' branch {commit_info.branch}')
+        except ImportError:
+            pass
+        dialog = AboutDialog(info)
+        dialog.exec_()
+
+
+    def amend_ui(self):
+        """Setup the loggers and all the post instantiation fixes to the UI"""
+        self.reset_loggers()
+
+        self.setup_menus()
 
         self.setup_icons()
-        self.setup_tabs()
         self.preference_editor.setup(self.config_loader.get_cfg('display')[CURRENT_RES]['font_size'])
 
         self.monkey_patch()
@@ -914,24 +968,59 @@ class ClearMapGui(ClearMapGuiBase):
 
         self.print_status_msg('Idle, waiting for input')
 
-    def setup_loggers(self):
-        self.logger = Printer(redirects='stdout')
+    def setup_menus(self):
+        for action in self.menuBar().actions():
+            if action.text() == "&Help":  # Skip if already exists
+                return
+
+        workspace_menu = self.menuBar().addMenu("&Workspace")
+
+        show_info_action = QAction("Show Info", self)
+        show_info_action.triggered.connect(self.show_workspace_info)
+        workspace_menu.addAction(show_info_action)
+
+        # add_asset_action = QAction("Add Asset", self)
+        # add_asset_action.triggered.connect(self.add_asset)
+        # workspace_menu.addAction(add_asset_action)
+
+        manipulate_assets_action = QAction("Manage Assets", self)
+        manipulate_assets_action.triggered.connect(self.manage_assets)
+        workspace_menu.addAction(manipulate_assets_action)
+
+        help_menu = self.menuBar().addMenu("&Help")
+        self.about_action = QAction("&About", self)
+        self.about_action.triggered.connect(self.display_about)
+        help_menu.addAction(self.about_action)
+
+
+    def show_workspace_info(self):
+        if self.sample_manager is None or self.sample_manager.workspace is None:
+            self.popup('No workspace found. Initialise sample before using this menu.')
+            return
+        self.popup(f'Workspace: {self.src_folder}, '
+                   f'{self.sample_manager.workspace.info()}')
+
+    def add_asset(self):
+        pass  # FIXME: implement
+
+    def manage_assets(self):
+        if self.sample_manager is None or self.sample_manager.workspace is None:
+            self.popup('No workspace found. Initialise sample before using this menu.')
+            return
+        self.assetsManagerWidget = ManageAssetsWidget(self.src_folder, self.params['Sample info'],
+                                                      sample_manager=self.sample_manager,
+                                                      app=self)
+        self.assetsManagerDock = QDockWidget("Workspace Manager", self)
+        self.assetsManagerDock.setWidget(self.assetsManagerWidget.widget)
+        self.addDockWidget(Qt.RightDockWidgetArea, self.assetsManagerDock)
+        # self.tabifyDockWidget(self.dataViewerDockWidget, self.assetsManagerDock)
+        # dlg.exec()
+
+    def reset_loggers(self):
+        self.logger = Printer(redirects=None if DEBUG else 'stdout')
         self.logger.text_updated.connect(self.textBrowser.append)
-        self.error_logger = Printer(color='red', logger_type='error', redirects='stderr')
+        self.error_logger = Printer(color='red', logger_type='error', redirects=None if DEBUG else 'stderr')
         self.error_logger.text_updated.connect(self.textBrowser.append)
-
-    def setup_tabs(self):
-        """
-        Connect the main tabBar and setup all its tab managers
-
-        Returns
-        -------
-
-        """
-        for tab in self.tab_mgrs:
-            tab.setup()
-        self.tabWidget.tabBarClicked.connect(self.handle_tab_click)
-        self.tabWidget.setCurrentIndex(0)
 
     def reload_prefs(self):
         self.set_font_size(self.preference_editor.params.font_size)
@@ -942,17 +1031,14 @@ class ClearMapGui(ClearMapGuiBase):
 
         Parameters
         ----------
-        nested
-
-        Returns
-        -------
-
+        nested: bool
+            Whether to set the progress watcher of the tab managers to a nested progress watcher
         """
         if nested:
-            for tab in self.tab_mgrs:
+            for tab in self.tab_managers.values():
                 tab.set_progress_watcher(self.progress_watcher)
         else:
-            self.alignment_tab_mgr.preprocessor.set_progress_watcher(self.progress_watcher)
+            self.sample_manager.set_progress_watcher(self.progress_watcher)
 
     def handle_tab_click(self, tab_index):
         """
@@ -960,49 +1046,43 @@ class ClearMapGui(ClearMapGuiBase):
 
         Parameters
         ----------
-        tab_index
-
-        Returns
-        -------
-
+        tab_index: int
+            The index of the tab clicked
         """
-        all_tabs = [self.sample_tab_mgr, self.alignment_tab_mgr, self.cells_tab_mgr, self.vasculature_tab_mgr,
-                    self.group_analysis_tab_mgr, self.batch_tab_mgr]
-        if 0 < tab_index < 4 and self.alignment_tab_mgr.preprocessor.workspace is None:
-            self.popup('WARNING', 'Workspace not initialised, '
-                                  'cannot proceed to alignment')
+        if not self.sample_manager.setup_complete and 0 < tab_index < self._get_tab_index('Group analysis', increment=False):
+            self.popup('WARNING', 'Workspace not initialised, cannot proceed to alignment')
             self.tabWidget.setCurrentIndex(0)
-        processor_setup_functions = {
-            2: self.cells_tab_mgr.setup_cell_detector,
-            3: self.vasculature_tab_mgr.setup_vessel_processors
-        }
-        if tab_index in (2, 3):
-            if all_tabs[tab_index] is None or not all_tabs[tab_index].ui.isEnabled():
+
+        # FIXME: might be simpler to use the same string for the tab name and the manager name
+        manager_tab_name = title_to_snake(self.tabWidget.tabText(tab_index))
+        tab = self.tab_managers[manager_tab_name]
+        if tab.processing_type == 'post':
+            if not tab.ui.isEnabled():
                 return
-            if self.alignment_tab_mgr.preprocessor.was_registered:
-                processor_setup_functions[tab_index]()
+            if self.sample_manager.needs_registering():
+                if self.popup('WARNING', 'Alignment not performed, please run first') == QMessageBox.Ok:
+                    self.select_tab('registration')
+                else:
+                    return
             else:
-                # TODO: use result
-                self.popup('WARNING', 'Alignment not performed, please run first') == QMessageBox.Ok
-                self.tabWidget.setCurrentIndex(1)  # WARNING: does not work
-        elif tab_index == 4 and not self.group_analysis_tab_mgr.initialised:
-            cfg_name = title_to_snake(self.group_analysis_tab_mgr.name)
-            try:
-                self.group_analysis_tab_mgr.setup()
-                self.group_analysis_tab_mgr.set_params()
-            except ConfigNotFoundError:
-                self.conf_load_error_msg(cfg_name)
-            except FileNotFoundError:  # message already printed, just stop
-                return
-        elif tab_index == 5 and not self.batch_tab_mgr.initialised:
-            cfg_name = title_to_snake(self.batch_tab_mgr.name)
-            try:
-                self.batch_tab_mgr.setup()
-                self.batch_tab_mgr.set_params()
-            except ConfigNotFoundError:
-                self.conf_load_error_msg(cfg_name)
-            except FileNotFoundError:  # message already printed, just stop
-                return
+                tab.finalise_workers_setup()
+        elif tab.processing_type == 'batch':
+            if not tab.initialised:
+                cfg_name = title_to_snake(tab.name)
+                try:
+                    tab.setup()
+                    # FIXME: accepts path only ensure singleton
+                    tab.set_params(self.tab_managers['sample_info'].params,
+                                   self.config_loader.get_cfg_path(cfg_name))
+                    # FIXME: loading config will never work because exp not set for batch
+                except ConfigNotFoundError:
+                    self.conf_load_error_msg(cfg_name)
+                except FileNotFoundError as err:  # message already printed, just stop
+                    return
+
+    def select_tab(self, tab_name):  # WARNING: does not work
+        tab_name_to_idx = {tab_name: self.tabWidget.indexOf(tab.ui) for tab_name, tab in self.tab_managers.items()}
+        self.tabWidget.setCurrentIndex(tab_name_to_idx[tab_name])
 
     def conf_load_error_msg(self, conf_name):
         """
@@ -1012,13 +1092,8 @@ class ClearMapGui(ClearMapGuiBase):
         ----------
         conf_name : str
             The name of the config to load (without *params* and extension)
-
-        Returns
-        -------
-
         """
-        conf_name = conf_name.replace('_', ' ').title()
-        self.print_error_msg(f'Loading {conf_name} config file failed')
+        self.print_error_msg(f'Loading {snake_to_title(conf_name)} config file failed')
 
     def assert_src_folder_set(self):
         if not self.src_folder:
@@ -1041,39 +1116,49 @@ class ClearMapGui(ClearMapGuiBase):
 
         Returns
         -------
+        bool, str
             was_copied, cfg_path
             The first value indicates whether the file was copied from the defaults
             and may need amending
         """
-        if config_loader is None:
-            config_loader = self.config_loader
+        config_loader = config_loader or self.config_loader
         cfg_path = config_loader.get_cfg_path(cfg_name, must_exist=False)
         was_copied = False
-        if cfg_name in ('cell_map', 'vasculature', 'tube_map'):
-            pipeline_name = title_to_snake(self.alignment_tab_mgr.params.pipeline_name)
-            is_cell_map = pipeline_name == 'cell_map' and cfg_name == 'cell_map'
-            is_tube_map = pipeline_name == 'tube_map' and cfg_name in ('tube_map', 'vasculature')
-            is_irrelevant_tab = not(pipeline_name == 'both' or is_tube_map or is_cell_map)
-            if is_irrelevant_tab:
-                return False, None
-        if not self.file_exists(cfg_path):  # REFACTOR: extract self.create_cfg_from_defaults
+        # TODO: do as function of PostProcessingTab
+        relevant_pipelines = [title_to_snake(p) for p in self.sample_manager.relevant_pipelines]
+        # REFACTORING: extract synonyms
+        if 'tube_map' in relevant_pipelines:
+            relevant_pipelines += ['vasculature']
+        if 'cell_map' in relevant_pipelines:
+            relevant_pipelines += ['cell_counter']
+        if (cfg_name in ('cell_map', 'cell_counter', 'vasculature', 'tube_map', 'tract_map') and
+                cfg_name not in relevant_pipelines):
+            return False, None
+        if not self.file_exists(cfg_path):
             try:
-                default_cfg_file_path = config_loader.get_default_path(cfg_name)
-            except FileNotFoundError as err:
-                self.print_error_msg(f'Could not locate file for "{cfg_name}"')
-                raise err
-            base_msg, msg = self.create_missing_file_msg(cfg_name.title().replace('_', ''),
-                                                         cfg_path, default_cfg_file_path)
-            do_copy = self.popup(msg) == QMessageBox.Ok
-            if do_copy:
-                if not os.path.exists(os.path.dirname(cfg_path)):
-                    os.mkdir(os.path.dirname(cfg_path))
-                copyfile(default_cfg_file_path, cfg_path)
-                was_copied = True
-            else:
-                self.error_logger.write(self.error_logger.colourise(base_msg, force=True))
-                raise FileNotFoundError(html_to_ansi(base_msg))
+                was_copied = self.__create_config_from_default(config_loader, cfg_name, cfg_path)
+            except ClearMapIoException as err:  # Loading skipped
+                return False, None
         return was_copied, cfg_path
+
+    def __create_config_from_default(self, config_loader, cfg_name, cfg_path):
+        try:
+            default_cfg_file_path = config_loader.get_default_path(cfg_name)
+        except FileNotFoundError as err:
+            self.print_error_msg(f'Could not locate file for "{cfg_name}"')
+            raise err
+
+        # base_msg, msg = self.create_missing_file_msg(cfg_name.title().replace('_', ''),
+        #                                              cfg_path, default_cfg_file_path)
+        # if self.popup(msg) == QMessageBox.Ok:  # copy default config
+        if True:
+            if not cfg_path.parent.exists():
+                os.mkdir(cfg_path.parent)
+            copyfile(default_cfg_file_path, cfg_path)
+            return True
+        else:
+            self.error_logger.write(self.error_logger.colourise(base_msg, force=True))
+            raise ClearMapIoException(html_to_ansi(base_msg))
 
     def clone(self):
         folder = get_directory_dlg(self.preference_editor.params.start_folder,
@@ -1081,7 +1166,7 @@ class ClearMapGui(ClearMapGuiBase):
         if not folder:
             return
         src_config_loader = ConfigLoader(folder)
-        for tab in self.tab_mgrs:
+        for tab in self.tab_managers.values():
             cfg_name = title_to_snake(tab.name)
             try:
                 src_cfg_path = src_config_loader.get_cfg_path(cfg_name, must_exist=True)
@@ -1091,123 +1176,97 @@ class ClearMapGui(ClearMapGuiBase):
             copyfile(src_cfg_path, cfg_path)
 
     def load_default_cfg(self):
-        for tab in self.tab_mgrs:
+        for tab in self.tab_managers.values():
             cfg_name = title_to_snake(tab.name)
+            if cfg_name == 'sample_info':
+                cfg_name = 'sample'  # WARNING: a bit hacky
             try:
                 src_cfg_path = self.config_loader.get_default_path(cfg_name)
             except FileNotFoundError:
                 pass #FIXME: deal with this
             cfg_path = self.config_loader.get_cfg_path(cfg_name, must_exist=False)
-            copyfile(src_cfg_path, cfg_path)
+            if not cfg_path.exists():
+                copyfile(src_cfg_path, cfg_path)
 
-    def load_config_and_setup_ui(self):
-        """
-        Read (potentially from defaults), fix and load the config for each tab manager
-        into the GUI
-
-        Returns
-        -------
-
-        """
-        self.print_status_msg('Parsing configuration')
-        self.assert_src_folder_set()
-
-        error = False
-        for tab in self.tab_mgrs:
-            cfg_name = title_to_snake(tab.name)
-            try:
-                # Load tab config
-                loaded_from_defaults, cfg_path = self.__get_cfg_path(cfg_name)
-                # Disable skipped tabs
-                if cfg_path is None:
-                    tab.disable()
-                    continue
-
-                self.set_tab_params(tab)
-                tab.read_configs(cfg_path)
-                # patch config if loaded from defaults or sample ID if it was set
-                if loaded_from_defaults or (cfg_name == 'sample' and self.sample_tab_mgr.get_sample_id()):
-                    tab.fix_config()  # TODO: see if this should be moved
-
-                tab.load_config_to_gui()
-                tab.setup_workers()
-            except ConfigNotFoundError:
-                self.conf_load_error_msg(cfg_name)
-                error = True
-            except FileNotFoundError:  # message already printed, just stop without crashing
-                return
-
-        if not error:
-            self.print_status_msg('Config loaded')
-        self.sample_tab_mgr.plot_mini_brain()
-
-    def set_tab_params(self, tab):
-        """
-        Set the tab manager parameters (which bind the file configuration and the
-        GUI widgets values) depending on the type of processor associated with the tab
-
-        Parameters
-        ----------
-        tab : GenericTab
-            The tab manager to setup
-        """
+    def get_params(self, tab):
         processing_type = tab.processing_type
-        if processing_type in (None, 'batch'):
-            tab.set_params()
-        elif processing_type == 'pre':
-            tab.set_params(self.sample_tab_mgr.params)
+        tab_names = []
+        if processing_type == 'pre':  # TODO: clean this up
+            tab_names.append('sample_info')
         elif processing_type == 'post':
-            tab.set_params(self.sample_tab_mgr.params, self.alignment_tab_mgr.params)
-            tab.setup_preproc(self.alignment_tab_mgr.preprocessor)
+            tab_names.extend(['stitching', 'registration'])
         else:
             raise ValueError(f'Processing type should be one of "pre", "post", "batch" or None,'
                              f' got "{processing_type}"')
+        params = [self.tab_managers[t].params for t in tab_names]
+        return params
 
     def prompt_experiment_folder(self):
-        """
-        Prompt the user for the main experiment data folder and set it
-
-        Returns
-        -------
-
-        """
+        """Prompt the user for the main experiment data folder and set it"""
         folder = get_directory_dlg(self.preference_editor.params.start_folder)
-        if folder and folder != self.src_folder:
+        if not folder:
+            return
+        # if folder and folder != self.src_folder:
+        if folder and folder != self.tab_managers['sample_info'].src_folder:
             self.reset()
         self._set_src_folder(folder)
 
     def _set_src_folder(self, src_folder):
         self.src_folder = src_folder
         self.config_loader.src_dir = src_folder
-        self._load_sample_id()
+        sample_cfg_path = self._load_sample_id()
+        sample_version = ConfigLoader.get_cfg_from_path(sample_cfg_path)['clearmap_version']
+        if sample_version != CLEARMAP_VERSION:
+            from ClearMap.config.convert_config_versions import convert_versions
+            option_idx = option_dialog('Old version detected',
+                                       f'An old version of ClearMap was detecte, do you want to: ',
+                                       [f'Upgrade to {CLEARMAP_VERSION}', 'Abort'])
+            if option_idx == 1:
+                return
+            elif option_idx == 0:
+                convert_versions(sample_version, CLEARMAP_VERSION, src_folder)
+        splash, pbar = make_splash(message=f'Loading sample {Path(sample_cfg_path).parent.name}', font_size=25)
+        splash.show()
+        update_pbar(self.app, progress_bar, 20)
+        self.tab_managers['sample_info'].set_params(None, sample_cfg_path, False)
+        update_pbar(self.app, progress_bar, 40)
+        self.update_tabs()  # TODO: check if init or this
+        update_pbar(self.app, progress_bar, 90)
+        self.manage_assets()
+        splash.finish(self)
+
+    def prompt_sample_id(self):
+        """
+        Prompt the user for the sample ID and save it in the sample_params.cfg
+        """
+        sample_id = input_dialog('Enter the sample ID', 'No sample ID found. '
+                                                        'A sample ID is required to load the config'
+                                                        'Please enter the sample ID before proceeding')
+        if sample_id:
+            self.tab_managers['sample_info'].params.shared_sample_params.sample_id = sample_id
+            self.tab_managers['sample_info'].params.write()
 
     def _load_sample_id(self):
         """
         Load the sample ID from the sample_params.cfg if it exists. Otherwise,
         default to empty string
-        Returns
-        -------
-
         """
         sample_cfg_path = self.config_loader.get_cfg_path('sample', must_exist=False)
-        if not self.file_exists(sample_cfg_path):
-            option_idx = option_dialog('New experiment', 'This seems to be a new experiment. Do you want to: ',
-                                       ['Clone existing config', 'Load default config', 'Cancel'])
-            if option_idx == 0:
-                self.clone()
-            elif option_idx == 1:
-                self.load_default_cfg()
-            elif option_idx == 2:
-                self.src_folder = ''
-                self.config_loader.src_dir = ''
-                return
+        if not sample_cfg_path.exists():
+            match option_dialog('New experiment', 'This seems to be a new experiment. Do you want to: ',
+                                ['Clone existing config', 'Load default config', 'Cancel']):
+                case 0:
+                    self.clone()
+                case 1:
+                    self.load_default_cfg()
+                case 2:
+                    self.src_folder = ''
+                    self.config_loader.src_dir = ''
+                    return
         cfg = self.config_loader.get_cfg_from_path(sample_cfg_path)
-        sample_id = cfg['sample_id']
-        use_id_as_prefix = cfg['use_id_as_prefix']
-        if sample_id == 'undefined':
-            sample_id = ''
-        self.sample_tab_mgr.display_sample_id(sample_id)
-        self.sample_tab_mgr.display_use_id_as_prefix(use_id_as_prefix)
+        cfg['sample_id'] = cfg['sample_id'] if cfg['sample_id'] != 'undefined' else ''
+        cfg.write()
+        return cfg.filename
 
 
 def create_main_window(app, centered=True):
@@ -1224,24 +1283,11 @@ def main(app, splash):
     clearmap_main_win = create_main_window(app)
     app.setStyleSheet(qdarkstyle.load_stylesheet(qt_api='pyqt5'))
 
-    def except_hook(exc_type, exc_value, exc_tb):
-        lexer = PythonTracebackLexer()
-        default_style = 'native'
-        style = 'nord-darker' if 'nord-darker' in pygments.styles.get_all_styles() else default_style
-        formatter = HtmlFormatter(full=True, style=style, lineos='table', wrapcode=True, noclasses=True)
-        formatter.style.background_color = DarkPalette.COLOR_BACKGROUND_1
-        raw_traceback = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
-        formatted_traceback = pygments.highlight(raw_traceback, lexer, formatter)
-        clearmap_main_win.error_logger.write(formatted_traceback)
-        if isinstance(exc_type(), Warning):
-            clearmap_main_win.error_logger.write(f'<strong><p style="color:{WARNING_YELLOW}">'
-                                                 f'THIS IS A WARNING AND CAN NORMALLY BE SAFELY IGNORED</p></strong>')
-
     clearmap_main_win.show()
     clearmap_main_win.fix_styles()
     splash.finish(clearmap_main_win)
     if clearmap_main_win.preference_editor.params.verbosity != 'trace':  # WARNING: will disable progress bars
-        sys.excepthook = except_hook
+        clearmap_main_win.error_logger.setup_except_hook()
     sys.exit(app.exec())
 
 

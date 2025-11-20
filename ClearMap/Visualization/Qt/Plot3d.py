@@ -12,9 +12,10 @@ __author__ = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
 __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__ = 'https://idisco.info'
-__download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
+__download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
 import itertools
+from pathlib import Path
 
 import numpy as np
 import pyqtgraph as pg
@@ -41,7 +42,7 @@ def plot(source, axis=None, scale=None, title=None, invert_y=True, min_max=None,
 
     Arguments
     ---------
-    source : Source, list or dict
+    source : Source, pathlib.Path, list or dict
         The source to plot. If a list is given several synchronized windows are
         generated. If an element in the list is a list of sources those are
         overlayed in different colors in that window.
@@ -64,17 +65,24 @@ def plot(source, axis=None, scale=None, title=None, invert_y=True, min_max=None,
     plot : DataViewer
       A data viewer class.
     """
-
     if not isinstance(source, (list, tuple)):
         source = [source]
-    m_plot = multi_plot(source, axis=axis, scale=scale, title=title, invert_y=invert_y,
-                        min_max=min_max, max_projection=max_projection, screen=screen, arrange=arrange, lut=lut, to_front=to_front,
-                        parent=parent, sync=sync)
+    if isinstance(source, tuple):
+        source = list(source)
+
+    for i, src in enumerate(source):
+        if isinstance(src, Path):
+            source[i] = str(src)
+
+    data_viewers = multi_plot(source, axis=axis, scale=scale, title=title, invert_y=invert_y,
+                              min_max=min_max, max_projection=max_projection, screen=screen,
+                              arrange=arrange, lut=lut, to_front=to_front,
+                              parent=parent, sync=sync)
     if not runs_on_spyder():
         inst = QApplication.instance()
         # if inst is not None:
         #   inst.exec_()
-    return m_plot
+    return data_viewers
 
 
 def multi_plot(sources, axis=None, scale=None, title=None, invert_y=True, min_max=None,

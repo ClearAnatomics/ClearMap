@@ -12,7 +12,7 @@ __author__ = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
 __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE)'
 __copyright__ = 'Copyright © 2023 by Christoph Kirst'
 __webpage__ = 'https://idisco.info'
-__download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
+__download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
 import os
 import tempfile
@@ -606,13 +606,13 @@ def resample(original, resampled=None,
     if new_path is not None:
         delete_files.append(new_path)
     for step, axes, shape in zip(range(n_steps), axes_order, shape_order):
-        if step == n_steps - 1 and orientation is None:
-            resampled_data = io.initialize(source=resampled, shape=resampled_shape, dtype=dtype, as_source=True)
+        if step == n_steps - 1 and orientation is None:  # Create final resampled file for last step
+            resampled_data = io.initialize(resampled, shape_=resampled_shape, dtype_=dtype, as_source=True)
         else:
             if method == 'shared':
                 resampled_data = io.sma.create(shape, dtype=dtype, order=order, as_source=True)
             else:
-                location = tempfile.mktemp() + '.npy'
+                location = tempfile.mktemp(suffix='.npy')
                 resampled_data = io.mmp.create(location, shape=shape, dtype=dtype, order=order, as_source=True)
                 delete_files.append(location)
 
@@ -635,9 +635,10 @@ def resample(original, resampled=None,
             # ThreadPool because of documented cv2 instability w/ multiprocessing. Is this still true ?
             with ThreadPoolExecutor(processes) as executor:
                 chunk_size = len(indices) // (processes * 3)  # REFACTOR: explain calculation
-                executor.map(_resample, indices, chunksize=chunk_size)  # default chunk_size is 1 (too small)
+                results = executor.map(_resample, indices, chunksize=chunk_size)  # default chunk_size is 1 (too small)
                 if workspace is not None:
                     workspace.executor = executor
+                _ = list(results)
 
         last = resampled_data
 

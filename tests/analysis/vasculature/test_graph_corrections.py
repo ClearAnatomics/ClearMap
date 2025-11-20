@@ -3,7 +3,7 @@ import pytest
 
 import numpy as np
 
-from ClearMap.Analysis.Graphs import GraphGt
+from ClearMap.Analysis.graphs import graph_gt
 from ClearMap.Analysis.vasculature.graph_corrections import remove_spurious_branches, join_neighbouring_degrees_1
 from ClearMap.Analysis.vasculature.graph_corrections import remove_auto_loops
 

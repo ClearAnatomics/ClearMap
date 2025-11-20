@@ -27,7 +27,7 @@ class AffineTransformation(TransformationBase):
 
     def to_dict(self) -> dict:
         dictionary = super().to_dict()
-        dictionary.update(M=self.m, b=self.b)
+        dictionary.update(m=self.m, b=self.b)
         return dictionary
 
     def __repr__(self):

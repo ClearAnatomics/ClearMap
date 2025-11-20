@@ -13,7 +13,7 @@ __author__ = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
 __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__ = 'https://idisco.info'
-__download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
+__download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
 import copy
 import warnings
@@ -21,6 +21,7 @@ import warnings
 import itertools as itt
 import functools as ft
 import inspect as insp
+from pathlib import Path
 
 import numpy as np
 import multiprocessing as mp
@@ -1430,51 +1431,83 @@ class Layout(SourceRegion, src.AbstractSource):
     self.change_sources(sources);
 
   
-  def replace_source_location(self, match, replace, method = 'expression'):
+  def replace_source_location(self, match, replace, method='expression'):
     """Change the sources to point to a new location.
       
     Arguments
     ---------
-    match : str or Expression
+    match : str or list[str] or Expression
       Expression of source names to match and substitute.
-    replace : str or Expression
+    replace : str or list[str] or Expression
       Expression to replace source names with.
+    method: str
+      Replacement method to interpret the match and replace arguments as
+        - list (default if match, and replace are list[str])
+        - expressions ("expression") or just
+        - raw strings to replace ("replace").
+        - 'infer' will parse the expression of the current locations,
+        set it as match and revert to expression
       
     Note
     ----
     This function is useful to stitch other color channels of imagining data
     using the same alignments.
     """
-    
-    if method == 'expression':
-      locations = [s.location for s in self._sources];
+    initial_locations = [s.location for s in self.sources]
+
+    if match is None or method == 'infer':
+      from ClearMap.IO.metadata import PatternFinder
+      df = PatternFinder.file_list_to_df(initial_locations)
+      pattern = PatternFinder.pattern_from_df(df)
+      axes = te.Expression(replace).tag_names()
+      pattern.set_axes_names(axes)
+      match = str(pattern)
+      method = 'expression'
+
+    if isinstance(match, list) and isinstance(replace, list):
+      if len(match) != len(replace):
+        raise ValueError('Match and replace lists length do not match')
+      for i, pair in enumerate(zip(match, replace)):
+        old, new = pair
+        loc = self.sources[i].location
+        if loc != old:
+          raise ValueError(f"Source nb {i} does not match pattern {old}")
+        self.sources[i].location = new
+    elif method == 'expression':
+      locations = [s.location for s in self._sources]
       for l in locations:
         if not isinstance(l, str):
-          raise RuntimeError('The layout contains sources without locations!');
+          raise RuntimeError('The layout contains sources without locations!')
       
-      ##change location expressions
-      #locations = [l.replace(match, replace) for l in locations];
+      # change location expressions
+      # locations = [l.replace(match, replace) for l in locations]
       
-      e_match = te.Expression(match);
-      e_replace = te.Expression(replace);
-      for s,l in zip(self.sources, locations):
-        values = e_match.values(l);
-        s.location = l.replace(e_match.string(values), e_replace.string(values));
-      
+      e_match = te.Expression(match)
+      e_replace = te.Expression(replace)
+      for s, l in zip(self.sources, locations):
+        values = e_match.values(l)
+        if values:
+          s.location = l.replace(e_match.string(values), e_replace.string(values))
+        else:
+          raise ValueError(f'The pattern {match} does not match any of the {locations=}')
     elif method == 'replace':
-      #get locations
-      locations = [s.location for s in self._sources];
+      # get locations
+      locations = [s.location for s in self._sources]
       for l in locations:
         if not isinstance(l, str):
-          raise RuntimeError('The layout contains sources without locations!');
+          raise RuntimeError('The layout contains sources without locations!')
       
-      #change location expressions
-      locations = [l.replace(match, replace) for l in locations];
+      # change location expressions
+      locations = [l.replace(match, replace) for l in locations]
   
-      for s,l in zip(self.sources, locations):
-        s.location = l;
+      for s, l in zip(self.sources, locations):
+        s.location = l
     else:
-      raise ValueError('Method %r not valid!' % method);
+      raise ValueError('Method %r not valid!' % method)
+
+    final_locations = [s.location for s in self.sources]
+    if initial_locations == final_locations:
+      raise ValueError('No source locations were replaced')
   
   
   def sort_sources_by_position(self):
@@ -2245,10 +2278,10 @@ def _initialize_tiles_from_expression(expression, tile_axes = None, tile_shape =
     tile_axes = tag_names;
   for n in tile_axes:
     if not n in tag_names:
-      raise ValueError('The expression does not have the named pattern %s' % n);
+      raise ValueError(f'The {expression=} does not have the named pattern {n}');
   for n in tag_names:
     if not n in tile_axes:
-      raise ValueError('The expression has the named pattern %s that is not in tile_axes=%r' % (n, tile_axes));
+      raise ValueError(f'The {expression=} has the named pattern {n} that is not in tile_axes={tile_axes}');
   #print tile_axes, tag_names
   
   
@@ -4155,7 +4188,7 @@ def stitch_by_function(layout, sink = None, function = np.max):
   position, shape, regions = layout.embedding();
   
   # stitch image
-  if 'axis' in insp.getargspec(np.max).args:
+  if 'axis' in insp.getfullargspec(np.max).args:
     function = ft.partial(function, axis = 0);
   
   if sink is None:
@@ -4220,7 +4253,7 @@ def stitch_by_function_with_weights(layout, sink = None, function = np.sum, weig
   position, shape, regions = layout.embedding();
   
   # stitch image
-  if 'axis' in insp.getargspec(function).args:
+  if 'axis' in insp.getfullargspec(function).args:
     function = ft.partial(function, axis = 0);
   
   if sink is None:

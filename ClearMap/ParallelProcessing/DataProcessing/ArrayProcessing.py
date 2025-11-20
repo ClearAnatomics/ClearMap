@@ -17,7 +17,7 @@ __author__ = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
 __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__   = 'https://idisco.info'
-__download__  = 'https://www.github.com/ChristophKirst/ClearMap2'
+__download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
 import os
 import numpy as np
@@ -241,7 +241,7 @@ def where(source, sink=None, blocks=None, cutoff=None, processes=None, verbose=F
     if ndim == 1:
       sums = code.block_sums_1d(source_buffer, blocks=blocks, processes=processes)
     elif ndim == 2:
-      sums = code.block_sums21d(source_buffer, blocks=blocks, processes=processes)
+      sums = code.block_sums_2d(source_buffer, blocks=blocks, processes=processes)
     else:
       sums = code.block_sums_3d(source_buffer, blocks=blocks, processes=processes)
 
@@ -666,7 +666,7 @@ def initialize_sink(sink=None, shape=None, dtype=None, order=None, memory=None, 
     Element strides of the source. 
   """
        
-  sink = io.initialize(sink, shape=shape, dtype=dtype, order=order, memory=memory, location=location, mode=mode,
+  sink = io.initialize(sink, shape_=shape, dtype_=dtype, order_=order, memory_=memory, location_=location, mode=mode,
                        like=source, as_source=True)
 
   result = (sink,)

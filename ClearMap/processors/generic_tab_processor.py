@@ -7,17 +7,20 @@ import sys
 import warnings
 from concurrent.futures.process import BrokenProcessPool
 
+from ClearMap.Utils.utilities import handle_deprecated_args
+
 
 class ProcessorSteps:
-    def __init__(self, workspace, postfix=''):
-        self.postfix = postfix
+    def __init__(self, workspace, channel='', sub_step=''):
+        self.channel = channel
+        self.sub_step = sub_step
         self.workspace = workspace
 
     @property
     def steps(self):
         raise NotImplementedError
 
-    def path_from_step_name(self, step_name):
+    def asset_from_step_name(self, step_name):
         raise NotImplementedError
 
     @property
@@ -32,25 +35,44 @@ class ProcessorSteps:
         return self.steps[self.steps.index(step_name)+1:]
 
     def step_exists(self, step_name):
-        return os.path.exists(self.path_from_step_name(step_name))
+        return self.asset_from_step_name(step_name).exists
 
     def remove_next_steps_files(self, target_step_name):
         for step_name in self.get_next_steps(target_step_name):
-            f_path = self.path_from_step_name(step_name)
-            if os.path.exists(f_path):
-                warnings.warn(f"WARNING: Remove previous step {step_name}, file {f_path}")
-                os.remove(f_path)
+            asset = self.asset_from_step_name(step_name)
+            if asset.exists:
+                warnings.warn(f"WARNING: Remove previous step {step_name}, file {asset.path}")
+                asset.path.unlink(missing_ok=True)
 
-    def path(self, step, step_back=False, n_before=0):
+    def get_asset(self, step, step_back=False, n_before=0):
+        """
+        Get the asset corresponding to the step name, optionally picking the nth previous step if `n_before` is set.
+        If the asset does not exist, it will try to get the previous step if `step_back` is True.
+
+        Parameters
+        ----------
+        step: str
+            Name of the step to get the asset for.
+        step_back: bool
+            If True, will try to get the previous step's asset if the current step's asset does not exist.
+        n_before: int
+            If set, will return the asset of the nth previous step instead of the current step.
+            Useful when you want to get the asset source to the current step for example.
+
+        Returns
+        -------
+        Asset
+            The asset corresponding to the step name.
+        """
         if n_before:
             step = self.steps[self.steps.index(step) - n_before]
-        f_path = self.path_from_step_name(step)
-        if not os.path.exists(f_path):
+        asset = self.asset_from_step_name(step)
+        if not asset.exists:
             if step_back:  # FIXME: steps back only once ??
-                f_path = self.path(self.steps[self.steps.index(step) - 1])
+                asset = self.get_asset(self.steps[self.steps.index(step) - 1])
             else:
-                raise IndexError(f'Could not find path "{f_path}" and not allowed to step back')
-        return f_path
+                raise IndexError(f'Could not find path "{asset}" and not allowed to step back')
+        return asset
 
 
 class TabProcessor:
@@ -59,6 +81,35 @@ class TabProcessor:
         self.progress_watcher = None
         self.workspace = None
         self.machine_config = {}
+
+    @handle_deprecated_args(
+        {'postfix': 'asset_sub_type',
+         'prefix': 'sample_id'}
+    )
+    def get(self, asset_type, channel='current',
+            asset_sub_type=None, **kwargs):   # channel and asset_sub_type defined for completion
+        asset = self.workspace.get(asset_type, channel=channel, asset_sub_type=asset_sub_type, **kwargs)
+        return asset
+
+    def get_path(self, asset_type, channel='current',
+            asset_sub_type=None, **kwargs):   # channel and asset_sub_type defined for completion
+        return self.get(asset_type, channel=channel, asset_sub_type=asset_sub_type, **kwargs).path
+
+    def filename(self, *args, **kwargs):  # WARNING: deprecated
+        """
+        A shortcut to get the filename from the workspace
+
+        Parameters
+        ----------
+        args
+        kwargs
+
+        Returns
+        -------
+        str
+            The filename
+        """
+        return self.workspace.filename(*args, **kwargs)
 
     def set_progress_watcher(self, watcher):
         self.progress_watcher = watcher
@@ -98,16 +149,16 @@ class TabProcessor:
 
     def stop_process(self):  # REFACTOR: put in parent class ??
         self.stopped = True
-        if hasattr(self.workspace, 'executor') and self.workspace.executor is not None:
+        if executor := getattr(self.workspace, 'executor', None):
             if sys.version_info[:2] >= (3, 9):
                 print('Canceling process')
-                self.workspace.executor.shutdown(cancel_futures=True)  # The new clean version
+                executor.shutdown(cancel_futures=True)  # The new clean version
             else:
-                self.workspace.executor.immediate_shutdown()  # Dirty but we have no choice in python < 3.9
+                executor.immediate_shutdown()  # Dirty but we have no choice in python < 3.9
             self.workspace.executor = None
             # raise BrokenProcessPool
-        elif hasattr(self.workspace, 'process') and self.workspace.process is not None:
-            self.workspace.process.terminate()
+        elif process := getattr(self.workspace, 'process', None):
+            process.terminate()
             # self.workspace.process.wait()
             self.workspace.process = None
             raise CanceledProcessing
@@ -121,6 +172,32 @@ class TabProcessor:
 
     # def setup(self):
     #     pass
+
+
+class ChannelTabProcessor(TabProcessor):
+    """
+    Tab processor that is processing a single channel.
+
+    The config is expected to have a 'channels' section with the channel name as key.
+    The config is stored in the `_processing_config` attribute, and accessed through the `processing_config` property
+    which returns the section for the current channel.
+    """
+    def __init__(self):
+        super().__init__()
+        self._processing_config = None
+        self.channel = ''
+
+    @property
+    def processing_config(self):
+        return self._processing_config['channels'][self.channel]
+
+    @processing_config.setter
+    def processing_config(self, value):
+        raise ValueError('Processing config is a property and cannot be set directly. '
+                         'you should set the _processing_config attribute instead.')
+
+    def reload_config(self):
+        self._processing_config.reload()
 
 
 class CanceledProcessing(BrokenProcessPool):  # TODO: better inheritance

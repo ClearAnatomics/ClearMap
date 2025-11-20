@@ -10,7 +10,21 @@ class ClearMapException(Exception):
     pass
 
 
-class ClearMapIoException(ClearMapException):
+class ClearMapValueError(ClearMapException, ValueError):
+    """
+    Base exception for all exceptions related to value errors
+    """
+    pass
+
+
+class ClearMapRuntimeError(ClearMapException, RuntimeError):
+    """
+    Base exception for all exceptions related to runtime errors
+    """
+    pass
+
+
+class ClearMapIoException(ClearMapException, IOError):
     """
     Base exception for all exceptions related to input/output operations
     """
@@ -77,3 +91,38 @@ class GroupStatsError(ClearMapException):
     Exception raised when there is an error with the group statistics
     """
     pass
+
+
+class ClearMapWorkspaceError(ClearMapException):
+    """
+    Exception raised when there is an error with the workspace
+    """
+    pass
+
+
+class MissingChannelError(ClearMapWorkspaceError):
+    """
+    Exception raised when a channel is missing
+    """
+    pass
+
+
+class ClearMapAssetError(ClearMapWorkspaceError):
+    """
+    Exception raised when there is an error with the asset
+    """
+    pass
+
+
+class AssetNotFoundError(ClearMapAssetError, FileNotFoundError):
+    """
+    Exception raised when an asset is not found
+    """
+    pass
+
+
+class ParamsOrientationError(ClearMapValueError):
+    def __init__(self, message, channel):
+        # self.message = message
+        self.channel = channel
+        super().__init__(message)

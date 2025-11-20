@@ -6,20 +6,27 @@ gui_utils
 Various utility functions specific to the graphical interface
 """
 
-import inspect
 import os
 from math import sqrt, ceil
+import inspect
 
 import warnings
 
 import matplotlib
 import numpy as np
 import skimage.io
+
 from PyQt5 import QtGui
 from PyQt5.QtGui import QColor
+from PyQt5.QtWidgets import QLayout
 from matplotlib.colors import hsv_to_rgb
+from skimage import transform as sk_transform
+
+from ClearMap import Settings
+from ClearMap.IO import TIF
 
 from ClearMap.gui.pyuic_utils import loadUiType
+from ClearMap.gui.widget_monkeypatch_callbacks import recursive_patch_widgets
 
 warnings.filterwarnings('ignore', category=RuntimeWarning, module='ClearMap.gui.gui_utils')  # For surface_project
 
@@ -27,7 +34,7 @@ __author__ = 'Charly Rousseau <charly.rousseau@icm-institute.org>'
 __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
 __copyright__ = 'Copyright © 2022 by Charly Rousseau'
 __webpage__ = 'https://idisco.info'
-__download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
+__download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
 
 UI_FOLDER = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
@@ -116,7 +123,25 @@ def surface_project(img):
     return mask, proj
 
 
-def format_long_nb_to_str(nb):
+def format_long_nb(nb):
+    """
+    Formats a long number by inserting apostrophes every three digits for better readability.
+
+    Parameters
+    ----------
+    nb : int
+        The number to be formatted.
+
+    Returns
+    -------
+    str
+        The formatted number as a string with apostrophes inserted every three digits.
+
+    Examples
+    --------
+    >>> format_long_nb(123456789)
+    "123'456'789"
+    """
     out = ''
     for idx, c in enumerate(str(nb)[::-1]):
         tick = "'" if (idx and not idx % 3) else ""
@@ -154,12 +179,15 @@ def get_current_res(app):
 
 
 def create_clearmap_widget(ui_name, patch_parent_class, window_title=None):
+    if not ui_name.endswith('.ui'):
+        ui_name += '.ui'
     widget_class, _ = loadUiType(os.path.join(UI_FOLDER, 'creator', ui_name), from_imports=True,
                                  import_from='ClearMap.gui.creator', patch_parent_class=patch_parent_class)
     widget = widget_class()
     if window_title is not None:
         widget.setWindowTitle(window_title)
     widget.setupUi()
+    recursive_patch_widgets(widget)
     return widget
 
 
@@ -178,7 +206,7 @@ def get_random_color():
     return QColor(*np.random.randint(0, 255, 3))
 
 
-def get_pseudo_random_color():
+def get_pseudo_random_color(format='rgb'):
     """
     Return a pseudo random colour. The hue is random but
     The saturation and the value are kept in the upper half interval
@@ -191,8 +219,14 @@ def get_pseudo_random_color():
     hsv = (rand_gen.uniform(0, 1),
            rand_gen.uniform(0.5, 1),
            rand_gen.uniform(0.5, 1))
-    rgb = hsv_to_rgb(hsv)
-    return rgb
+    if format == 'hsv':
+        return hsv
+    elif format == 'rgb':
+        return hsv_to_rgb(hsv)
+    elif format == 'qcolor':
+        return QColor(*[int(c * 255) for c in hsv_to_rgb(hsv)])
+    else:
+        raise ValueError(f'Unknown format "{format}"')
 
 
 def is_dark(color):
@@ -226,5 +260,116 @@ def clear_layout(layout):
         item = layout.takeAt(i)
         if item is not None:
             widg = item.widget()
-            widg.setParent(None)
-            widg.deleteLater()
+            if widg is not None:
+                widg.setParent(None)
+                widg.deleteLater()
+
+def find_parent_layout(widget):
+    parent = widget.parent()
+    while parent is not None:
+        if isinstance(parent, QLayout):
+            return parent
+        parent = parent.parent()
+    return None
+
+def delete_widget(widget, layout=None):
+    if layout is None:
+        layout = find_parent_layout(widget)
+    layout.removeWidget(widget)
+    widget.setParent(None)
+    widget.deleteLater()
+
+
+def get_widget(layout, key='', widget_type=None, index=0):
+    """
+    Retrieve the widget (label or control) based on the key and index.
+
+    Parameters:
+    layout (QLayout): The layout containing the widgets.
+    key (str): The key to search for in the widget's objectName.
+    index (int): The index to specify whether to get the first (0) or second (1) occurrence.
+
+    Returns:
+    QWidget: The widget that matches the key and index.
+    """
+    if not key and not widget_type:
+        raise ValueError('Either key or widget_type must be specified')
+    count = 0
+    for i in range(layout.count()):
+        widget = layout.itemAt(i).widget()
+        if widget:
+            if (key and key in widget.objectName() or
+                    widget_type and isinstance(widget, widget_type)):
+                if count == index:
+                    return widget, count
+                count += 1
+    return None, count
+
+
+def replace_widget(old_widget, new_widget, layout=None):
+    """
+    Replace a widget in a layout. If no layout is provided, the parent layout of the old widget is used
+    The old widget is deleted.
+
+    Parameters
+    ----------
+    old_widget: QWidget
+        The widget to replace
+    new_widget: QWidget
+        The new widget to insert
+    layout: QLayout | None
+        The layout in which to replace the widget. If None, the parent layout of the old widget is used
+
+    Returns
+    -------
+    QWidget
+        The new widget
+    """
+    if layout is None:
+        layout = find_parent_layout(old_widget)
+    layout.replaceWidget(old_widget, new_widget)
+    old_widget.setParent(None)
+    old_widget.deleteLater()
+    return new_widget
+
+
+def disconnect_widget_signal(widget_signal, max_iter=10):
+    for i in range(max_iter):
+        try:
+            widget_signal.disconnect()
+        except TypeError:  # i.e. not connected
+            return
+    raise ValueError(f'Could not disconnect signal after {max_iter} iterations')
+
+
+def unique_connect(signal, slot, max_disconnect_iter=10):
+    """
+    Connect a signal to a slot, disconnecting any previous connection
+
+    Parameters
+    ----------
+    signal: pyqtSignal
+        The signal to connect
+    slot: callable
+        The slot to connect
+    """
+    disconnect_widget_signal(signal, max_iter=max_disconnect_iter)
+    signal.connect(slot)
+
+
+def setup_mini_brain(atlas_base_name, mini_brain_scaling=(5, 5, 5)):  # TODO: scaling in prefs
+    """
+    Create a downsampled version of the Allen Brain Atlas for the mini brain widget
+
+    Parameters
+    ----------
+    mini_brain_scaling : tuple(int, int, int)
+        The scaling factors for the mini brain. Default is (5, 5, 5)
+
+    Returns
+    -------
+    tuple(scale, downsampled_array)
+    """
+    atlas_path = os.path.join(Settings.atlas_folder, f'{atlas_base_name}_annotation.tif')
+    arr = TIF.Source(atlas_path).array
+    return mini_brain_scaling, sk_transform.downscale_local_mean(arr, mini_brain_scaling)

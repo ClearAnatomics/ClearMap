@@ -5,6 +5,8 @@ install_utils
 
 Utilities module with minimal dependencies (standard library only) for installation
 """
+import os.path
+import re
 import sys
 import platform
 import subprocess
@@ -23,7 +25,29 @@ __author__ = 'Charly Rousseau <charly.rousseau@icm-institute.org>'
 __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
 __copyright__ = 'Copyright (c) 2022 by Charly Rousseau'
 __webpage__ = 'https://idisco.info'
-__download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
+__download__ = 'https://github.com/ClearAnatomics/ClearMap'
+
+
+class CondaPackage:
+    split_pattern = re.compile(r'^(?P<name>[\w\.\-]+)(?P<version>[\s=><,]+[\d\.\*]+)?(?:\s*(?P<comment>\#.*))?$')
+
+    def __init__(self, line: str):
+        self.line = line
+
+    @property
+    def name(self):
+        match = self.split_pattern.match(self.line.strip())
+        return match.group('name') if match else ''
+
+    @property
+    def version(self):
+        match = self.split_pattern.match(self.line.strip())
+        return match.group('version').strip() if match and match.group('version') else ''
+
+    @property
+    def comment(self):
+        match = self.split_pattern.match(self.line.strip())
+        return match.group('comment') if match and match.group('comment') else ''
 
 
 class EnvFileManager:
@@ -47,8 +71,11 @@ class EnvFileManager:
         return self.cfg['name']
 
     def get_package_version(self, package_name):
-        lines = [ln for ln in self.cfg['dependencies'] if isinstance(ln, str) and ln.startswith(package_name)]
-        return lines[0].split('=')[-1]
+        for dep in self.cfg['dependencies']:
+            if isinstance(dep, str) and dep.startswith(package_name):
+                pkg = CondaPackage(dep)
+                if pkg.name == package_name:
+                    return pkg.version
 
     def write(self):
         dest_path = self.dest_path if self.dest_path else self.cfg_path
@@ -70,8 +97,8 @@ class EnvFileManager:
         """
         patched_dependencies = []
         for dep in self.cfg['dependencies']:
-            if isinstance(dep, str) and dep.startswith(package_name):
-                version_str = (f'{comparison_operator}{pkg_version}') if pkg_version else ''
+            if isinstance(dep, str) and CondaPackage(dep).name == package_name:
+                version_str = f'{comparison_operator}{pkg_version}' if pkg_version else ''
                 patched_dependencies.append(f'{package_name}{version_str}')
             else:
                 patched_dependencies.append(dep)
@@ -83,13 +110,50 @@ class EnvFileManager:
         patched_dependencies = []
         for dep in self.cfg['dependencies']:
             if isinstance(dep, str):
-                if not dep.startswith(package_name):
+                pkg = CondaPackage(dep)
+                if not pkg.name == package_name:
                     patched_dependencies.append(dep)
             else:
                 patched_dependencies.append(dep)
 
         self.cfg['dependencies'] = patched_dependencies
         self.write()
+
+    def remove_dependencies(self, package_names):
+        patched_dependencies = []
+        for dep in self.cfg['dependencies']:
+            if isinstance(dep, str):
+                if not any(CondaPackage(dep).name == pkg for pkg in package_names):
+                    patched_dependencies.append(dep)
+            else:
+                patched_dependencies.append(dep)
+        self.cfg['dependencies'] = patched_dependencies
+        self.write()
+
+    def add_pip_option(self, option):
+        if 'pip' in self.cfg['dependencies']:
+            try:
+                pip_section = [d for d in self.cfg['dependencies'] if isinstance(d, dict) and 'pip' in d.keys()][0]
+                pip_section['pip'].append(option)
+            except IndexError:
+                self.cfg['dependencies'].append({'pip': [option]})
+        else:
+            self.add_dependency('pip')
+            self.cfg['dependencies'].append({'pip': [option]})
+        self.write()
+
+    def add_pip_dependency(self, package_name):
+        if 'pip' in self.cfg['dependencies']:
+            try:
+                pip_section = [d for d in self.cfg['dependencies'] if isinstance(d, dict) and 'pip' in d.keys()][0]
+                pip_section['pip'].append(package_name)
+            except IndexError:
+                self.cfg['dependencies'].append({'pip': [package_name]})
+        else:
+            self.add_dependency('pip')
+            self.cfg['dependencies'].append({'pip': [package_name]})
+        self.write()
+
 
     def patch_env_var(self, var_name, var_val):
         if 'variables' in self.cfg.keys():
@@ -102,6 +166,13 @@ class EnvFileManager:
         version_str = f"={pkg_version}" if pkg_version else ""
         self.cfg['dependencies'].append(f'{package_name}{version_str}')
         self.write()
+
+    def remove_channel(self, channel_name):
+        self.cfg['channels'] = [c for c in self.cfg['channels'] if c != channel_name]
+
+    def add_channel(self, channel_name):
+        if channel_name not in self.cfg['channels']:
+            self.cfg['channels'].append(channel_name)
 
 
 class CondaParser:
@@ -234,35 +305,88 @@ class PytorchVersionManager:  # TODO: inherit from condaparser ??
         return [e.replace('cuda', '') for e in build.split('_') if 'cuda' in e][0]
 
 
-def patch_env(cfg_path, dest_path, use_cuda_torch=True, use_spyder=False, tmp_dir=None):
+def patch_env(cfg_path, dest_path, use_cuda_torch=True, pip_mode=False, use_spyder=False, tmp_dir=None):
+    """
+    Patch the environment file to match the desired configuration. This is mostly to
+    get a working pytorch installation with the correct cuda version.
+
+    Parameters
+    ----------
+    cfg_path
+    dest_path : str
+        If evaluates to False, the cfg_path is overwritten
+    use_cuda_torch : bool
+        If True, install pytorch with cuda support
+    pip_mode : bool
+        If True, install pytorch with pip (since the nvidia channel is now considered a paid channel)
+    use_spyder
+    tmp_dir
+
+    Returns
+    -------
+
+    """
     env_mgr = EnvFileManager(cfg_path, dest_path)
 
     if platform.system().lower().startswith('darwin'):
         if platform.processor().lower().startswith('x86'):
             env_mgr.add_dependency('nomkl')  # MacOS includes "accelerate" and does not need Intel MKL on Intel CPU
             env_mgr.patch_env_var('KMP_DUPLICATE_LIB_OK', 'TRUE')  # FIXME: find cleaner fix
-        env_mgr.patch_environment_package_line('pyqt', '5.13', comparison_operator='<=')  # REFACTOR: get from other env file instead
+
+        if env_mgr.python_version.startswith('3.9'):
+            env_mgr.patch_environment_package_line('pyqt', '5.13', comparison_operator='<=')
+        elif env_mgr.python_version.startswith('3.11'):
+            env_mgr.patch_environment_package_line('pyqt', '5.15', comparison_operator='=')
 
     pytorch_v_mgr = PytorchVersionManager(cfg_path, env_mgr.python_version, env_mgr.get_package_version('pytorch'))
+    if pip_mode:
+        # remove the nvidia channel if it is present
+        for chan in ('nvidia', 'pytorch'):
+            env_mgr.remove_channel(chan)
+        env_mgr.remove_dependencies(('pytorch', 'pytorch-cuda', 'mkl', 'cudatoolkit'))
+
     if use_cuda_torch:
-        if Version(pytorch_v_mgr.pytorch_version) >= Version('2.0'):
-            pytorch_cuda_version = pytorch_v_mgr.match_pytorch_to_cuda()
-            env_mgr.add_dependency('pytorch-cuda', pkg_version=pytorch_cuda_version)
-            env_mgr.remove_dependency('cudatoolkit')
+        if pip_mode:
+            if platform.system().startswith('Linux'):
+                viable_versions = [Version(v) for v in ('11.8', '12.4', '12.6', '12.8')]
+                actual_cuda = pytorch_v_mgr.cuda_version
+                for v in viable_versions[::-1]:
+                    if actual_cuda <= v:
+                        actual_cuda = v
+                        break
+                else:
+                    raise ValueError(f'No matching CUDA version found for {pytorch_v_mgr.pytorch_version} for PyTorch.'
+                                     f'options are {viable_versions}.')
+                cuda_suffix = f"cu{str(actual_cuda).replace('.', '')}"
+                env_mgr.add_pip_option(f'--extra-index-url https://download.pytorch.org/whl/{cuda_suffix}')
+            env_mgr.add_pip_dependency('torch')
+            env_mgr.add_pip_dependency('torchvision')
         else:
-            torch_pkg = pytorch_v_mgr.match_pytorch_to_toolkit()
+            # ensure that the nvidia channel is available
+            env_mgr.add_channel('nvidia')
+            if Version(pytorch_v_mgr.pytorch_version) >= Version('2.0'):
+                pytorch_cuda_version = pytorch_v_mgr.match_pytorch_to_cuda()
+                env_mgr.add_dependency('pytorch-cuda', pkg_version=pytorch_cuda_version)
+                env_mgr.remove_dependency('cudatoolkit')
+            else:
+                torch_pkg = pytorch_v_mgr.match_pytorch_to_toolkit()
+                torch_v_string = f"{torch_pkg['version']}={torch_pkg['build']}"
+                env_mgr.patch_environment_package_line('pytorch', torch_v_string)
+
+                toolkit_v_tuple = pytorch_v_mgr.toolkit_version_from_torch_pkg(torch_pkg)
+                toolkit_v_string = f"{toolkit_v_tuple[0]}.{toolkit_v_tuple[1]}"
+                env_mgr.patch_environment_package_line('cudatoolkit', toolkit_v_string)
+    else:
+        if pip_mode:
+            if platform.system().startswith('Linux'):
+                env_mgr.add_pip_option(f'--extra-index-url https://download.pytorch.org/whl/cpu')
+            env_mgr.add_pip_dependency('torch')
+        else:
+            torch_pkg = pytorch_v_mgr.get_pytorch_cpu_info()[-1]
             torch_v_string = f"{torch_pkg['version']}={torch_pkg['build']}"
             env_mgr.patch_environment_package_line('pytorch', torch_v_string)
 
-            toolkit_v_tuple = pytorch_v_mgr.toolkit_version_from_torch_pkg(torch_pkg)
-            toolkit_v_string = f"{toolkit_v_tuple[0]}.{toolkit_v_tuple[1]}"
-            env_mgr.patch_environment_package_line('cudatoolkit', toolkit_v_string)
-    else:
-        torch_pkg = pytorch_v_mgr.get_pytorch_cpu_info()[-1]
-        torch_v_string = f"{torch_pkg['version']}={torch_pkg['build']}"
-        env_mgr.patch_environment_package_line('pytorch', torch_v_string)
-
-        env_mgr.remove_dependency('cudatoolkit')
+            env_mgr.remove_dependency('cudatoolkit')
 
     if use_spyder:
         env_mgr.add_dependency('spyder-kernels', pkg_version='2.4')
@@ -270,6 +394,14 @@ def patch_env(cfg_path, dest_path, use_cuda_torch=True, use_spyder=False, tmp_di
     if tmp_dir not in ('/tmp', '/tmp/'):
         print(f'Patching tmp_dir to {tmp_dir}')
         env_mgr.patch_env_var('TMP', tmp_dir)
+
+
+def set_elastix_path(elastix_path):
+    import configobj  # Local import to avoid dependency of whole module on configobj
+    machine_params_path = os.path.expanduser('~/.clearmap/machine_params_v3_0.cfg')
+    cfg = configobj.ConfigObj(machine_params_path, encoding="UTF8", indent_type='    ', unrepr=True, file_error=True)
+    cfg['elastix_path'] = elastix_path
+    cfg.write()
 
 
 if __name__ == '__main__':

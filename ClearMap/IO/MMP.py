@@ -14,8 +14,9 @@ __author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
 __license__   = 'GPLv3 - GNU General Pulic License v3 (see LICENSE.txt)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__   = 'http://idisco.info'
-__download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
+__download__  = 'https://github.com/ClearAnatomics/ClearMap'
 
+import pathlib
 
 import numpy as np
 
@@ -327,7 +328,9 @@ def _memmap(location = None, shape = None, dtype = None, order = None, mode = No
   Note
   ----
   By default memmaps are initialized as fortran contiguous if order is None.
-  """  
+  """
+  if isinstance(location, pathlib.Path):
+    location = str(location)
   #print location, shape, dtype, order, mode, array
   if isinstance(location, np.memmap):
     array = location
@@ -338,7 +341,17 @@ def _memmap(location = None, shape = None, dtype = None, order = None, mode = No
       raise ValueError('Cannot create memmap without a location!')
 
     if mode != 'w+' and fu.is_file(location):
-      array = np.lib.format.open_memmap(location)
+      try:
+        if mode:
+            array = np.lib.format.open_memmap(location, mode=mode)
+        else:
+            try:
+                array = np.lib.format.open_memmap(location)
+            except PermissionError:
+                array = np.lib.format.open_memmap(location, mode='r')  # If permission denied, try to force read
+      except ValueError as err:
+        print(f'Error reading memmap file with {location=}, {shape=}, {dtype=}, {mode=}; {err}')
+
 
   if array is None:
     if shape is None:

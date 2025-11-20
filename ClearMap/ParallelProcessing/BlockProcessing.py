@@ -234,7 +234,7 @@ def process(function, source, sink = None,
   elif function_type == 'array':
     func = ft.partial(process_block_source, function=function, as_memory=as_memory, as_array=True, verbose=verbose, **kwargs)
   else:
-    raise ValueError("function type %r not 'array', 'source', 'block' or None!")
+    raise ValueError(f"function type {function_type} not 'array', 'source', 'block' or None!")
 
   if not isinstance(processes, int) and processes != "serial":
     processes = mp.cpu_count()

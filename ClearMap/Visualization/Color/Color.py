@@ -51,39 +51,38 @@ def color(arg, alpha = None, as_int = False, int_type = int):
     RBG or RGBA values for the colors.
   """  
   if isinstance(arg, (list, tuple, np.ndarray)):
-    carray = np.asarray(arg);
+    carray = np.asarray(arg)
     if alpha is None and carray.shape[-1] == 4:
-        alpha = True;
+        alpha = True
     if carray.ndim > 1:
-      return np.array([color(c, alpha=alpha, as_int=as_int, int_type=int_type) for c in arg]);
-  
-  try:
-    c = vpc.Color(arg);
-    if alpha is False or alpha is None:
-      c = c.rgb;
-    else:
-      c = c.rgba;
-      if alpha is not True:
-        c[-1] = alpha;
-    if as_int:
-      c = np.asarray(255 * c, dtype = int_type);
-    return c;
-  except:
-    pass;
-  
-  try:
-    if alpha is False or alpha is None:
-      c = mpl.colors.to_rgb(arg);
-    else:
-      c = mpl.colors.to_rgba(arg);
-      if alpha is not True:
-        c[-1] = alpha;
-    if as_int:
-      c = np.asarray(255 * c, dtype = int_type);
-    return c;
-  except:
-    raise RuntimeError('Color %r not a valid color specification!' % arg);
+      return np.array([color(c, alpha=alpha, as_int=as_int, int_type=int_type) for c in arg])
 
+  try:
+    c = vpc.Color(arg)
+    if alpha is False or alpha is None:
+      c = c.rgb
+    else:
+      c = c.rgba
+      if alpha is not True:
+        c[-1] = alpha
+    if as_int:
+      c = np.asarray(255 * c, dtype = int_type)
+    return c
+  except:
+    pass
+
+  try:
+    if alpha is False or alpha is None:
+      c = mpl.colors.to_rgb(arg)
+    else:
+      c = mpl.colors.to_rgba(arg)
+      if alpha is not True:
+        c[-1] = alpha
+    if as_int:
+      c = np.asarray(255 * c, dtype = int_type)
+    return c
+  except:
+    raise RuntimeError('Color %r not a valid color specification!' % arg)
 
 
 def hex_to_rgb(color, alpha = None, as_int = False):
@@ -106,29 +105,28 @@ def hex_to_rgb(color, alpha = None, as_int = False):
   """
   
   if not isinstance(color, str) or len(color) not in [6,7,8,9]:
-    raise ValueError('Color argument expected to be a valid hex string, found %r!' % color);
-  
-  c = color.lstrip('#');  
+    raise ValueError('Color argument expected to be a valid hex string, found %r!' % color)
+
+  c = color.lstrip('#')
   if len(c) == 8:
-    c = [int(c[i:i+2], 16) for i in (0, 2 ,4, 6)];
-    rgb = c[:-1];
-    a = c[-1];
+    c = [int(c[i:i+2], 16) for i in (0, 2 ,4, 6)]
+    rgb = c[:-1]
+    a = c[-1]
   else:
-    rgb = [int(c[i:i+2], 16) for i in (0, 2 ,4)];
-    a = 255;
-  
+    rgb = [int(c[i:i+2], 16) for i in (0, 2 ,4)]
+    a = 255
+
   if not as_int:
-    rgb = np.array(rgb, dtype = float);
-    rgb = rgb / 255;
-    a = float(a) / 255;
-  
+    rgb = np.array(rgb, dtype = float)
+    rgb = rgb / 255
+    a = float(a) / 255
+
   if alpha is None:
-    return rgb;
+    return rgb
   elif alpha is True:
-    return np.hstack((rgb,a));
+    return np.hstack((rgb,a))
   else:
-    return np.hstack((rgb,alpha));
-  
+    return np.hstack((rgb,alpha))
 
 
 def rgb_to_hex(rgb, alpha = None, as_int = False):
@@ -150,30 +148,30 @@ def rgb_to_hex(rgb, alpha = None, as_int = False):
   """
   
   if not hasattr(rgb, '__len__') or len(rgb) not in [3,4]:
-    raise ValueError('Color argument expected to be a valid rgb or rgba tuple, found %r!' % rgb);
-    
+    raise ValueError('Color argument expected to be a valid rgb or rgba tuple, found %r!' % rgb)
+
   if len(rgb) == 3:
-    r,g,b = rgb;
+    r,g,b = rgb
     if as_int:
-      a = 255;
+      a = 255
     else:
-      a = 1.0;
+      a = 1.0
   else:
-    r,g,b,a = rgb;
-  
+    r,g,b,a = rgb
+
   if not as_int:
-    r,g,b,a = [int(255*x) for x in (r,g,b,a)];
-  
+    r,g,b,a = [int(255*x) for x in (r,g,b,a)]
+
   if alpha is None:
-    return '#%02x%02x%02x' % (r, g, b);
+    return '#%02x%02x%02x' % (r, g, b)
   elif alpha is True:
-    return '#%02x%02x%02x%02x' % (r, g, b, a);
+    return '#%02x%02x%02x%02x' % (r, g, b, a)
   else:
     if as_int:
-      a = alpha;
+      a = alpha
     else:
-      a = int(255*alpha);
-    return '#%02x%02x%02x%02x' % (r, g, b, a);
+      a = int(255*alpha)
+    return '#%02x%02x%02x%02x' % (r, g, b, a)
 
 
 ###############################################################################
@@ -202,126 +200,127 @@ def colormap(cmap = None, alpha = True, as_int = False, int_type = int):
   
   # default color map
   if cmap is None:
-    return colormap('gray');
-  
+    return colormap('gray')
+
   # linearly interpolated color maps
   if isinstance(cmap, (list, tuple, np.ndarray)):
-    cols = [color(a) for a in cmap];
-    cmap = vpc.Colormap(cols, interpolation = 'linear');
-    return colormap(cmap, alpha = alpha, as_int = as_int);
-  
+    cols = [color(a) for a in cmap]
+    cmap = vpc.Colormap(cols, interpolation = 'linear')
+    return colormap(cmap, alpha = alpha, as_int = as_int)
+
   # vispy color maps
   cmps = vpc.get_colormaps()
   if isinstance(cmap, str) and cmap in cmps.keys():
-    cmap = vpc.colormap.get_colormap(cmap);
-    
+    cmap = vpc.colormap.get_colormap(cmap)
+
   if isinstance(cmap, vp.color.BaseColormap):
     if alpha is False or alpha is None:
       if as_int:
         def cm(x):
-          return np.array(255*cmap.map(np.array(x))[:,:3], dtype = int_type);
+          return np.array(255*cmap.map(np.array(x))[:,:3], dtype = int_type)
       else:
         def cm(x):
-          return cmap.map(np.array(x))[:,:3];
-    
+          return cmap.map(np.array(x))[:,:3]
+
     elif alpha is True:
       if as_int:   
         def cm(x):
-          return np.array(255*cmap.map(np.array(x)), dtype = int_type);
+          return np.array(255*cmap.map(np.array(x)), dtype = int_type)
       else:
         def cm(x):
-          return cmap.map(np.array(x));
-    
+          return cmap.map(np.array(x))
+
     else:
       if as_int:
         def cm(x):
-          c = np.array(255 * cmap.map(np.array(x)), dtype = int_type);  
-          c[:,-1] = alpha;
-          return c;
+          c = np.array(255 * cmap.map(np.array(x)), dtype = int_type)
+          c[:,-1] = alpha
+          return c
       else:
         def cm(x):
-          c = cmap.map(np.array(x));  
-          c[:,-1] = alpha;
-          return c;   
-    
+          c = cmap.map(np.array(x))
+          c[:,-1] = alpha
+          return c
+
     return cm
   
   # matplotlib color maps
-  if isinstance(cmap, str) and cmap in plt.cm.cmap_d.keys():
-    cmap = plt.get_cmap(cmap);
+
+  if isinstance(cmap, str) and cmap in plt.colormaps:
+    cmap = plt.colormaps[cmap]
     
   if isinstance(cmap, str) and cmap in colormaps:
-    cmap = colormaps[cmap];
-    
+    cmap = colormaps[cmap]
+
   if isinstance(cmap, mpl.colors.Colormap):
     if alpha is False or alpha is None:
       if as_int:
         def cm(x):
-          return np.array(255*cmap(np.array(x))[:,:3], dtype = int_type);     
+          return np.array(255*cmap(np.array(x))[:,:3], dtype = int_type)
       else:
         def cm(x):
-          return cmap(np.array(x))[:,:3];
-    
+          return cmap(np.array(x))[:,:3]
+
     elif alpha is True:
       if as_int:
         def cm(x):
-          return np.array(255 * cmap(np.array(x)), dtype = int_type);
+          return np.array(255 * cmap(np.array(x)), dtype = int_type)
       else:
         def cm(x):
-          return cmap(np.array(x));
-    
+          return cmap(np.array(x))
+
     else:
       if as_int:
         def cm(x):
-          c = np.array(255*cmap(np.array(x)), dtype = int_type);  
-          c[:,-1] = alpha;
-          return c;
+          c = np.array(255*cmap(np.array(x)), dtype = int_type)
+          c[:,-1] = alpha
+          return c
       else:
         def cm(x):
-          c = cmap(np.array(x));  
-          c[:,-1] = alpha;
-          return c;
-    
+          c = cmap(np.array(x))
+          c[:,-1] = alpha
+          return c
+
     return cm
   
   # custom color maps
   if cmap in ['boys', 'orientation', orientation_to_boys, orientation_to_rgb]:  
     if cmap == 'boys':
-      cmap = orientation_to_boys;
+      cmap = orientation_to_boys
     elif cmap == 'orientation':
-      cmap = orientation_to_rgb;
-   
+      cmap = orientation_to_rgb
+
     if alpha is False or alpha is None:
       if as_int:
         def cm(x):
-          return np.array(255*cmap(np.array(x)), dtype = int);     
+          return np.array(255*cmap(np.array(x)), dtype = int)
       else:
         def cm(x):
-          return cmap(np.array(x))[:,:3];
-    
+          return cmap(np.array(x))[:,:3]
+
     elif alpha is True:
       if as_int:
         def cm(x):
-          return np.array(255 * cmap(np.array(x)), dtype = int);
+          return np.array(255 * cmap(np.array(x)), dtype = int)
       else:
         def cm(x):
-          return cmap(np.array(x));
-    
+          return cmap(np.array(x))
+
     else:
       if as_int:
         def cm(x):
-          c = np.array(255*cmap(np.array(x)), dtype = int);  
-          c[:,-1] = alpha;
-          return c;
+          c = np.array(255*cmap(np.array(x)), dtype = int)
+          c[:,-1] = alpha
+          return c
       else:
         def cm(x):
-          c = cmap(np.array(x));  
-          c[:,-1] = alpha;
-          return c;
-  
+          c = cmap(np.array(x))
+          c[:,-1] = alpha
+          return c
+
   else:
-    raise RuntimeError('Colormap specification %r is invalid!' % cmap);
-  
+    raise RuntimeError('Colormap specification %r is invalid!' % cmap)
+
 
 color_map = colormap
 
@@ -360,8 +359,8 @@ def orientation_to_boys(orientations, alpha = None, as_int = False, normalize = 
     return (na * np.cos(nd * np.pi / 180.0))
 
   def ss(na, nd):
-    return na * np.sin(nd * np.pi / 180.0);
-  
+    return na * np.sin(nd * np.pi / 180.0)
+
   x = orientations[...,0]
   y = orientations[...,1]
   z = orientations[...,2]
@@ -459,26 +458,26 @@ def orientation_to_boys(orientations, alpha = None, as_int = False, normalize = 
   trl_z = -2.1899
 
   if alpha is None or alpha is False:
-    C = np.zeros((3,) + x.shape);
+    C = np.zeros((3,) + x.shape)
   elif alpha is True:
-    C = np.ones((4,) + x.shape);
+    C = np.ones((4,) + x.shape)
   else:
-    C = np.ones((4,) + x.shape);
-    C[3] = 1.0;
+    C = np.ones((4,) + x.shape)
+    C[3] = 1.0
 
   C[0] = 0.9 * np.abs(((X - trl_x) / w_x)) + 0.05
   C[1] = 0.9 * np.abs(((Y - trl_y) / w_y)) + 0.05
   C[2] = 0.9 * np.abs(((Z - trl_z) / w_z)) + 0.05
   
-  ids = np.logical_and(x == 0, np.logical_and(y == 0, z == 0));
-  C[:,ids] = 0;
-  
-  C = np.moveaxis(C, 0, -1);
-  
-  if as_int:
-    C = np.array(255 * C, dtype = int);
+  ids = np.logical_and(x == 0, np.logical_and(y == 0, z == 0))
+  C[:,ids] = 0
 
-  return C;
+  C = np.moveaxis(C, 0, -1)
+
+  if as_int:
+    C = np.array(255 * C, dtype = int)
+
+  return C
 
 
 def orientation_to_rgb(orientation, alpha = None, as_int = False):
@@ -503,23 +502,22 @@ def orientation_to_rgb(orientation, alpha = None, as_int = False):
   This color map is not continuous.
   """
 
-  rgb = np.asarray(orientation, dtype = float);
-  rgb = np.abs(rgb.T / np.linalg.norm(rgb, axis = 1)).T;
+  rgb = np.asarray(orientation, dtype = float)
+  rgb = np.abs(rgb.T / np.linalg.norm(rgb, axis = 1)).T
 
   if alpha is None or alpha is False:
     if as_int:
-      return np.array(255*rgb, dtype = int);
+      return np.array(255*rgb, dtype = int)
     else:
-      return rgb;
+      return rgb
   else:
     if alpha is True:
-      alpha = 1.0;
-    rgb = np.concatenate([rgb, alpha * np.ones((len(rgb),1))], axis = 1);
+      alpha = 1.0
+    rgb = np.concatenate([rgb, alpha * np.ones((len(rgb),1))], axis = 1)
     if as_int:
-      return np.array(255*rgb, dtype = int);
+      return np.array(255*rgb, dtype = int)
     else:
-      return rgb;
-
+      return rgb
 
 
 _twilight_data = [
@@ -1032,11 +1030,9 @@ _twilight_data = [
     [0.88485138159908572, 0.84908426422893801,  0.87828235285372469],
     [0.88525897972630474, 0.84955892810989209,  0.88088414794024839],
     [0.88554714811952384, 0.84987174283631584,  0.88336206121170946],
-    [0.88571155122845646, 0.85002186115856315,  0.88572538990087124]];
+    [0.88571155122845646, 0.85002186115856315,  0.88572538990087124]]
 
-
-colormaps = {name : mpc.ListedColormap(data, name=name) for name, data in (('twilight', _twilight_data),)};
-
+colormaps = {name : mpc.ListedColormap(data, name=name) for name, data in (('twilight', _twilight_data),)}
 
 
 ###############################################################################
@@ -1045,15 +1041,16 @@ colormaps = {name : mpc.ListedColormap(data, name=name) for name, data in (('twi
 
 
 def lighter(arg, fraction = 0.3):
-  col = color(arg);
-  delta = np.ones(3) - col[...,:3];
-  col[...,:3] = col[...,:3] + fraction * delta;
-  return col;
+  col = color(arg)
+  delta = np.ones(3) - col[...,:3]
+  col[...,:3] = col[...,:3] + fraction * delta
+  return col
+
 
 def darker(arg, fraction = 0.3):
-  col = color(arg);
-  col[...,:3] = col[...,:3] * fraction;
-  return col;
+  col = color(arg)
+  col[...,:3] = col[...,:3] * fraction
+  return col
 
 
 def rgb_LUT():
@@ -1084,7 +1081,7 @@ def rgb_to_LUT(rgb):
   index : array
     The indices of the rgb values in the full rgb LUT.
   """
-  r,g,b = rgb.T;
+  r,g,b = rgb.T
   return 256**2 * r + 256 * g + b
 
 
@@ -1106,11 +1103,11 @@ def write_LUT(filename, colors):
   
   with open(filename, 'w') as f:
     for c in colors:
-      f.write(('%d' % c[0]).rjust(4) +  ('%d' % c[1]).rjust(5) + ('%d' % c[2]).rjust(5));
-      f.write('\n');
-    f.close();
-    
-  return filename;
+      f.write(('%d' % c[0]).rjust(4) +  ('%d' % c[1]).rjust(5) + ('%d' % c[2]).rjust(5))
+      f.write('\n')
+    f.close()
+
+  return filename
 
 
 def write_PAL(filename, colors):
@@ -1131,11 +1128,11 @@ def write_PAL(filename, colors):
   
   with open(filename, 'w') as f:
     for c in colors:
-      f.write(('%3.3f' % c[0]).rjust(10) +  ('%3.3f' % c[1]).rjust(11) + ('%3.3f' % c[2]).rjust(11));
-      f.write('\n');
-    f.close();
-    
-  return filename;  
+      f.write(('%3.3f' % c[0]).rjust(10) +  ('%3.3f' % c[1]).rjust(11) + ('%3.3f' % c[2]).rjust(11))
+      f.write('\n')
+    f.close()
+
+  return filename
 
 
 def rand_cmap(n_labels, map_type='bright', first_color_black=True, last_color_black=False, cmap_name='Paired'):
@@ -1238,8 +1235,8 @@ def gray_image_to_rgb(image, color_name, pseudo_z_score=False, normalize=False, 
 def _test():
   import ClearMap.Visualization.Color as col
   from importlib import reload
-  reload(col);
-  
+  reload(col)
+
   col.hex_to_rgb('FFFFFF')
   
   

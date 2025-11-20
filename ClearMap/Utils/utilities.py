@@ -5,12 +5,15 @@ utilities
 
 Various utilities that do not have a specific category
 """
+import multiprocessing
 import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import warnings
+from collections import deque
 from concurrent.futures import ProcessPoolExecutor
 from functools import reduce
 from operator import getitem
@@ -22,12 +25,18 @@ __author__ = 'Charly Rousseau <charly.rousseau@icm-institute.org>'
 __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
 __copyright__ = 'Copyright © 2022 by Charly Rousseau'
 __webpage__ = 'https://idisco.info'
-__download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
+__download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
 import functools
 
+from configobj import ConfigObj
+
 from ClearMap.Utils.tag_expression import Expression
-from ClearMap.Utils.exceptions import MissingRequirementException, SmiError
+from ClearMap.Utils.exceptions import MissingRequirementException, SmiError, ParamsOrientationError
+
+
+DEFAULT_ORIENTATION = (0, 0, 0)
+
 
 colors = {
     "WHITE": '\033[1;37m',
@@ -117,7 +126,12 @@ def is_iterable(obj):
 
 
 def title_to_snake(string):
-    return re.sub('(?!^)([A-Z]+)', r'_\1', string).lower()
+    out = re.sub('(?!^)([A-Z]+)', r'_\1', string).lower()
+    out = out.replace(' ', '_')
+    return out
+
+def snake_to_title(string):
+    return string.replace('_', ' ').title()
 
 
 def backup_file(file_path):  # REFACTOR: put in workspace or IO
@@ -136,7 +150,15 @@ def make_abs(directory, file_name):
 
 
 def get_item_recursive(container, keys):
-    return reduce(getitem, keys, container)
+    try:
+        return reduce(getitem, keys, container)
+    except (TypeError, KeyError) as err:
+        err_type = type(err).__name__
+        err_msg = f'{err_type} attempting to read "{keys}"'
+        if isinstance(container, ConfigObj):
+            err_msg += f' path: {container.filename}'
+        print(f'{err_msg} from "{container}"')
+        raise err
 
 
 def set_item_recursive(dictionary, keys_list, val, fix_missing_keys=True):
@@ -153,16 +175,35 @@ def set_item_recursive(dictionary, keys_list, val, fix_missing_keys=True):
     get_item_recursive(dictionary, keys_list[:-1])[keys_list[-1]] = val
 
 
-def requires_files(file_paths):
+def requires_assets(asset_specs):
+    """
+    Decorator to check if the required files exist before running the function.
+    For the case of channel, it can be extracted (in this order) from
+    - the kwargs
+    - the FilePath object
+    - the instance to which the wrapped function belongs
+
+    Parameters
+    ----------
+    asset_specs: List[FilePath]
+        List of FilePath objects
+    """
     def decorator(func):
         def wraps(*args, **kwargs):
             instance = args[0]
             workspace = instance.workspace
-            for f_p in file_paths:
-                f_path = workspace.filename(f_p.base, prefix=f_p.prefix, postfix=f_p.postfix, extension=f_p.extension)
+            for f_p in asset_specs:
+                channel = kwargs.get('channel')  # Get directly from the kwargs
+                if channel is None:
+                    if hasattr(f_p, 'channel'):  # Get from FilePath object
+                        channel = f_p.channel
+                    else:  # Get the global value from the instance
+                        channel = getattr(instance, 'channel', None)
+                f_path = workspace.filename(f_p.base, channel=channel, sample_id=f_p.prefix, asset_sub_type=f_p.postfix,
+                                            extension=f_p.extension)
                 msg = f'{type(instance).__name__}.{func.__name__} missing path: "{f_path}"'
                 if Expression(f_path).tags:
-                    file_list = workspace.file_list(f_p.base, prefix=f_p.prefix, postfix=f_p.postfix,
+                    file_list = workspace.file_list(f_p.base, sample_id=f_p.prefix, asset_sub_type=f_p.postfix,
                                                     extension=f_p.extension)
                     if not file_list:
                         raise MissingRequirementException(msg + ' Pattern but no file')
@@ -185,17 +226,39 @@ def get_free_temp_space():
     _, _, free = shutil.disk_usage(tempfile.gettempdir())
     return free
 
+def bytes_to_human(num):
+    """
+    Convert bytes to human-readable format.
 
-# FIXME: move to io
+    Parameters
+    ----------
+    num : int
+        Number of bytes
+
+    Returns
+    -------
+    str
+        Human-readable format of the number of bytes
+    """
+    for unit in ['B', 'KB', 'MB', 'GB', 'TB', 'PB']:
+        if num < 1024:
+            return f"{num:.2f} {unit}"
+        num /= 1024
+    else:
+        warnings.warn(f'Unable to convert {num} bytes to human-readable format. ')
+        return f"{num:.2f} bytes"
+
+
+# FIXME: move to io and rename to smth similar to AssetSpec (without conflicting with the existing AssetSpec)
 class FilePath:
-    def __init__(self, base, prefix=None, postfix=None, extension=None):
+    def __init__(self, base, prefix=None, postfix=None, extension=None, asset_sub_type=None):
         self.base = base
         self.prefix = prefix
-        self.postfix = postfix
+        self.postfix = asset_sub_type or postfix
         self.extension = extension
 
 
-def handle_deprecated_args(deprecated_args_map):
+def handle_deprecated_args(deprecated_args_map):  # FIXME: add a version_changed argument
     """
     Decorator to handle deprecated arguments by renaming them.
     It takes a dictionary and renames old arguments to new ones.
@@ -220,3 +283,135 @@ def handle_deprecated_args(deprecated_args_map):
             return func(*args, **kwargs)
         return wrapper
     return decorator
+
+
+def substitute_deprecated_arg(old_arg, new_arg, old_arg_name, new_arg_name):
+    if new_arg is not None:
+        raise ValueError(f'Cannot use both {old_arg_name} and {new_arg_name} arguments.')
+    else:
+        warnings.warn(f'The {old_arg_name} argument is deprecated. Use {new_arg_name} instead.',
+                      DeprecationWarning, stacklevel=2)
+        return old_arg
+
+
+def validate_arg(arg_name, value, valid_values):
+    """
+    Check if the value is in the list of valid values and raise a ValueError if not.
+
+    Parameters
+    ----------
+    arg_name
+    value
+    valid_values
+
+    Returns
+    -------
+    value if it is in the list of valid values,
+    otherwise raises a ValueError
+    """
+    if value not in valid_values:
+        raise ValueError(f'Unknown {arg_name} "{value}". '
+                         f'Supported values are "{valid_values}".')
+    return value
+
+
+def clear_cuda_cache():
+    import torch
+    torch.cuda.empty_cache()
+
+
+# def topological_sort(graph, in_degree):
+#     queue = deque([node for node in in_degree if in_degree[node] == 0])
+#     sorted_list = []
+#
+#     while queue:
+#         node = queue.popleft()
+#         sorted_list.append(node)
+#
+#         for neighbor in graph[node]:
+#             in_degree[neighbor] -= 1
+#             if in_degree[neighbor] == 0:
+#                 queue.append(neighbor)
+#
+#     if len(sorted_list) != len(in_degree):
+#         raise ValueError("Cycle detected in channel dependencies")
+#
+#     return sorted_list
+
+
+def check_stopped(func):
+    """
+    Decorator to check if the object is stopped (self.stopped) before running the function.
+    If the object is stopped, the function returns immediately.
+    The force argument can be used to force the function to run even if the object is stopped
+    and reset the stopped flag.
+    """
+    def wrapper(self, *args, _force=False, **kwargs):
+        if _force:
+            self.stopped = False
+        if self.stopped:
+            return
+        return func(self, *args, **kwargs)
+    return wrapper
+
+
+def validate_orientation(orientation, channel, raise_error=True):
+    """
+    Check that the orientation does not have redundant axes
+
+    Parameters
+    ----------
+    orientation: tuple(int)
+        The orientation to check
+    """
+    defined_axes = [abs(e) for e in orientation if e != 0]
+    if len(defined_axes) != len(set(defined_axes)):
+        if raise_error:
+            raise ParamsOrientationError(f'Number of different defined axes in {orientation} is'
+                                         f'{len(set(defined_axes))}. Defined axes cannot be duplicated. '
+                                         f'Please amend duplicate axes.', channel=channel)
+        else:
+            warnings.warn(f'Invalid orientation {orientation} for {channel},'
+                          f' using default {DEFAULT_ORIENTATION}')
+            return DEFAULT_ORIENTATION
+    return orientation
+
+
+def sanitize_n_processes(processes):
+    if processes is None:
+        processes = multiprocessing.cpu_count()
+    elif isinstance(processes, str):
+        warnings.warn(f'Using a string to specify the number of processes is deprecated. '
+                      f'Please use an integer (positive or negative) or None.', DeprecationWarning)
+        if processes.lower() == 'serial':
+            processes = 1
+        elif processes.lower() == '!serial':
+            processes = multiprocessing.cpu_count() - 1
+        else:
+            raise ValueError(f'Unknown string value for processes: {processes}. '
+                             f'Use None, "serial" or an integer.')
+    if isinstance(processes, int):
+        if processes < 0:
+            processes = multiprocessing.cpu_count() - processes
+        processes = max(1, processes)
+        return processes
+    else:
+        raise ValueError(f'Processes must be an integer or None, got {processes} of type {type(processes)}')
+
+
+def get_ok_n_ok_symbols():
+    """
+    1) Detect whether we can print✓/✗ in this terminal
+    2) otherwise, use [OK]/[FAIL] instead
+
+    Returns
+    -------
+    tuple
+        ok_symbol, fail_symbol
+    """
+    enc = sys.stdout.encoding or ''
+    try:
+        '✓'.encode(enc)
+        return '✓', '✗'
+    except (UnicodeEncodeError, TypeError):
+        return '[OK]', '[FAIL]'

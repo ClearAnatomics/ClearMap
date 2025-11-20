@@ -1,4 +1,6 @@
+import inspect
 import multiprocessing
+import warnings
 from concurrent.futures import ProcessPoolExecutor
 from concurrent.futures.process import BrokenProcessPool
 
@@ -61,18 +63,16 @@ def edge_to_vertex_property(graph, edge_property, dtype=None):
     edge_property_data = edge_property if not isinstance(edge_property, str) else graph.edge_property(edge_property)
     edge_connectivity = graph.edge_connectivity()
     vertex_property_data = np.zeros(graph.n_vertices)
-    for i in range(edge_connectivity.shape[1]):
+    for i in range(edge_connectivity.shape[1]):  # For each vertex of each edge
         vertex_property_data[edge_connectivity[edge_property_data == 1, i]] = 1
     if dtype is not None:
         vertex_property_data = vertex_property_data.astype(dtype)
     return vertex_property_data
 
 
-def vertex_to_edge_property(graph, graph_property):
+def vertex_to_edge_property(graph, graph_property, dtype=None, aggregation=np.logical_and):
     """
     Converts graph_property from vertex to edge property
-
-    .. warning:: This function only works for binary properties
 
     Parameters
     ----------
@@ -80,6 +80,10 @@ def vertex_to_edge_property(graph, graph_property):
         The graph to convert the property from
     graph_property : str or np.array
         The name of the vertex property to convert or the vertex property itself
+    dtype : type | str | None
+        The type to cast the property to. If None, no casting is done. If 'int', the property is cast to int
+    aggregation : function | str
+        The aggregation function to use. Can be a function or one of 'mean', 'sum', 'max', 'min'
 
     Returns
     -------
@@ -87,8 +91,81 @@ def vertex_to_edge_property(graph, graph_property):
     """
     vertex_prop = graph.vertex_property(graph_property) if isinstance(graph_property, str) else graph_property
     connectivity = graph.edge_connectivity()
-    edge_prop = np.logical_and(vertex_prop[connectivity[:, 0]], vertex_prop[connectivity[:, 1]])
+
+    if isinstance(aggregation, str):
+        if aggregation == 'mean':
+            aggregation = np.mean
+        elif aggregation == 'sum':
+            aggregation = np.sum
+        elif aggregation == 'max':
+            aggregation = np.maximum
+        elif aggregation == 'min':
+            aggregation = np.minimum
+        else:
+            raise ValueError(f'Unknown aggregation function {aggregation}')
+
+    start_vertices = vertex_prop[connectivity[:, 0]]
+    end_vertices = vertex_prop[connectivity[:, 1]]
+
+
+    print(start_vertices, end_vertices)
+    sig = inspect.signature(aggregation)
+    if 'axis' in sig.parameters:  # for regular numpy functions, we pass the stacked arrays with the axis
+        edge_prop = aggregation(np.vstack([start_vertices, end_vertices]), axis=0)
+    elif isinstance(aggregation, np.ufunc) and aggregation.nin == 2:  # for logical operations, we pass 2 arrays
+        edge_prop = aggregation(start_vertices, end_vertices)
+    else:
+        warnings.warn(f'Unknown aggregation function {aggregation}, using np.vstack')
+        edge_prop = aggregation(np.vstack([start_vertices, end_vertices]))
+
+    if dtype is not None:
+        edge_prop = edge_prop.astype(dtype)
     return edge_prop
+
+
+def edge_filter_to_vertex_filter(graph,
+                                 edge_mask: np.ndarray,
+                                 require_all: bool = False) -> np.ndarray:
+    """
+    Convert an edge mask to a vertex mask, NumPy-style but readable.
+
+    Parameters
+    ----------
+    graph       : Graph-tool wrapper (needs .edge_connectivity(), .n_vertices)
+    edge_mask   : 1-D bool array, length == graph.n_edges
+    require_all : False → vertex is True if **any** incident edge is True
+                  True  → vertex is True only if **every** incident edge is True
+                           (isolated vertices always False)
+
+    Returns
+    -------
+    vertex_mask : 1-D bool array, length == graph.n_vertices
+    """
+    if edge_mask.dtype != bool:
+        raise ValueError("edge_mask must be boolean")
+
+    con = graph.edge_connectivity()      # shape (E, 2), dtype=int
+    n_vertices  = graph.n_vertices
+
+
+    if not require_all:    # ANY mode
+        v_mask = np.zeros(n_vertices, dtype=bool)
+        v_mask[con[edge_mask, 0]] = True   # vertices at edge start
+        v_mask[con[edge_mask, 1]] = True   # vertices at edge end
+        return v_mask
+    else: #  ALL mode
+        # total degree of every vertex
+        total_deg = np.zeros(n_vertices, dtype=np.int32)
+        np.add.at(total_deg, con[:, 0], 1)  # add 1 for the *start* vertex of every edge
+        np.add.at(total_deg, con[:, 1], 1)  # add 1 for the *end* vertex of every edge
+
+        # degree contributed by *True* edges
+        true_deg = np.zeros(n_vertices, dtype=np.int32)
+        np.add.at(true_deg, con[edge_mask, 0], 1)  # add 1 for start-vertices of True edges
+        np.add.at(true_deg, con[edge_mask, 1], 1)  # add 1 for end-vertices of True edges
+
+        # A vertex passes if it is not isolated *and* all its edges were True
+        return (total_deg > 0) & (true_deg == total_deg)
 
 
 def vertex_filter_to_edge_filter(graph, vertex_filter, operator=np.logical_and):
@@ -249,6 +326,7 @@ def parallel_get_vessels_lengths(graph, edge_coordinates_name='coordinates', cli
     """
     n_processes = min(n_processes, MAX_PROCS)
     vessels_coordinates = graph.edge_geometry(edge_coordinates_name)
+    if len(vessels_coordinates) < 1000: n_processes = 1  # Avoids overhead of parallel processing for small graphs
     if n_processes > 1:
         try:  # try parallel processing
             chunk_size = max(min_chunk_size, len(vessels_coordinates) // (2 * n_processes))
@@ -309,8 +387,13 @@ def graph_gt_to_igraph(src_graph):
     """
     Convert graph from GraphGt to igraph format
 
-    .. warning:: This only transfers the properties 'radius', 'diameter' and 'nkind'. nkind is the integer value
-        representing the type of vessel (see the n_kinds dictionary for the possible values)
+
+    .. warning::
+        This only transfers the properties 'radius', 'diameter' and 'nkind'.
+
+    .. note::
+        nkind is the integer value representing the type of vessel
+        (see the n_kinds dictionary for the possible values)
 
     Parameters
     ----------

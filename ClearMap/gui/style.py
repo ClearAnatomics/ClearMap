@@ -10,7 +10,7 @@ __author__ = 'Charly Rousseau <charly.rousseau@icm-institute.org>'
 __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
 __copyright__ = 'Copyright © 2022 by Charly Rousseau'
 __webpage__ = 'https://idisco.info'
-__download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
+__download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
 from qdarkstyle import DarkPalette
 
@@ -19,6 +19,7 @@ WARNING_YELLOW = '#FADF11'
 DARK_BACKGROUND = '#282D2F'
 VERY_LIGHT_BACKGROUND = '#727A7E'
 PLOT_3D_BG = '#1A1D1E'
+HIGHLIGHTED_BTN_BG = '#4A90E2'  # '#654975
 BTN_STYLE_SHEET = f"""
 QPushButton {{
     background-color: {DarkPalette.COLOR_BACKGROUND_5};
@@ -27,6 +28,11 @@ QPushButton {{
     border-radius: 4px;
     padding: 2px;
 }}"""
+
+HIGHLIGHTED_BTN_STYLE = f"""
+    background-color: {HIGHLIGHTED_BTN_BG};
+    color: white;
+"""
 
 TOOLTIP_STYLE_SHEET = f"""
 QToolTip {{

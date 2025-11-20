@@ -148,7 +148,7 @@ class Source(src.Source):
   
   ### Parallel processing
   def as_virtual(self):
-    #TODO: convert to shared memory array ? -> needs to be implmented to make block processing work for in memory  numpay arrays !
+    #TODO: convert to shared memory array ? -> needs to be implemented to make block processing work for in memory  numpy arrays !
     return self;
     
   def as_real(self):

@@ -45,8 +45,9 @@ if os_name.startswith('linux'):
     if '-flarge-source-files' in out:  # Add only if supported by the compiler
         DEFAULT_COMPILE_ARGS += ['-flarge-source-files']
 
-if len(sys.argv) > 2:
-    USE_OPENMP = sys.argv[2].lower() in ('use_openmp', 'true')
+
+if '--no-openmp' in sys.argv:
+    USE_OPENMP = False
 else:
     if os_name.startswith('linux') or os_name.startswith('windows'):
         USE_OPENMP = True
@@ -88,6 +89,11 @@ if os_name.startswith('windows'):
 else:
     extra_link_args = extra_args
 
+print(f'Building extensions with {N_PROCS} processes, '
+      f'using OpenMP: {USE_OPENMP}, '
+      f'libraries: {DEFAULT_LIBRARIES}, ',
+      f'compile args: {DEFAULT_COMPILE_ARGS + extra_args},'
+      f'link args: {DEFAULT_LINK_ARGS + extra_args}')
 extensions = []
 for ext_path in extension_paths:
     extension = Extension(
@@ -124,10 +130,11 @@ for p in data_dirs:
     data_files.extend([(k, v) for k, v in find_data_files(p).items()])
 data_files.extend([('', ['start_gui.sh'])])
 
-packages = find_packages(exclude=('doc', 'tests*', 'pickle_python_2', 'deprecated'))
+packages = find_packages(exclude=('doc', 'tests*', 'pickle_python_2', 'deprecated', 'ClearMap.External.elastix',
+                                  'ClearMap.External.geodesic_distance'))
 setup(
-    name='ClearMap2',
-    version='2.1.3',
+    name='ClearMap',
+    version='3.0.0',
     description='3D cell counting and vasculature analysis for lightsheet microscopy',
     install_requires=requirements,
     packages=packages,

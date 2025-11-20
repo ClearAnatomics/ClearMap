@@ -5,7 +5,7 @@ FileList
 
 Module to handle sources distributed over a list of files.
 
-File lists ar specified using a :mod:`~ClearMap.Utils.TagExpression`.
+File lists ar specified using a :mod:`~ClearMap.Utils.tag_expression`.
 """
 __author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
 __license__   = 'GPLv3 - GNU General Pulic License v3 (see LICENSE.txt)'
@@ -14,6 +14,7 @@ __webpage__   = 'http://idisco.info'
 __download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 
 import os
+import pathlib
 import re
 import glob
 import traceback
@@ -255,7 +256,7 @@ class Source(src.VirtualSource):
     
     shape = self.shape;
     ndim = self.ndim;
-    ndim_list = e.ntags();
+    ndim_list = e.n_tags();
     
     slicing = slc.unpack_slicing(slicing, ndim);
     
@@ -333,7 +334,8 @@ class Source(src.VirtualSource):
         func(f,i);
     else:
       with concurrent.futures.ThreadPoolExecutor(processes) as executor:
-        executor.map(func, fl, slicing_list_indices);
+        results = executor.map(func, fl, slicing_list_indices)
+      _ = list(results)
     
     data = data[slicing_keep_dims_to_final];
     
@@ -345,7 +347,7 @@ class Source(src.VirtualSource):
     
     shape = self.shape;
     ndim = self.ndim;
-    ndim_list = e.ntags();
+    ndim_list = e.n_tags();
     
     slicing = slc.unpack_slicing(slicing, ndim);
     
@@ -400,12 +402,12 @@ class Source(src.VirtualSource):
         func(f,i);
     else:
       with concurrent.futures.ThreadPoolExecutor(processes) as executor:
-        executor.map(func, fl, indices);
-  
+        results = executor.map(func, fl, indices)
+      _ = list(results)
+
   @property
   def array(self):
-    return self._getitem__(slice(None));
-  
+    return self.__getitem__(slice(None));
   
   
   def __str__(self):
@@ -617,7 +619,7 @@ def is_file_list(expression, exists = False, tag_names = None, n_tags = -1, verb
     If True, check if at least one file exists.
   tag_names :  list of str or None
     List of tag names expected to be present in the expression.
-  n_Tags : int or None
+  n_tags : int or None
     Number of tags to expect.
   verbose : bool
     If True, print reason why the epxression does not represent the desired file list.
@@ -649,13 +651,13 @@ def is_file_list(expression, exists = False, tag_names = None, n_tags = -1, verb
   if tag_names is not None or n_tags is not None:
     t = te.Expression(expression) if not isinstance(expression, te.Expression) else expression;                   
     if n_tags is not None:
-      if n_tags < 0 and -n_tags > t.ntags():
+      if n_tags < 0 and -n_tags > t.n_tags():
         if verbose:
-          warnings.warn('Expression has not required number %d of tags, but %d!' % (n_tags, t.ntags()));
+          warnings.warn('Expression has not required number %d of tags, but %d!' % (n_tags, t.n_tags()));
         return False;
-      elif n_tags >=0 and n_tags != t.ntags():
+      elif n_tags >=0 and n_tags != t.n_tags():
         if verbose:
-          warnings.warn('Expression has not required number %d of tags, but %d!' % (n_tags, t.ntags()));
+          warnings.warn('Expression has not required number %d of tags, but %d!' % (n_tags, t.n_tags()));
         return False;
 
     if tag_names is not None:
@@ -694,7 +696,7 @@ def ndim(expression = None, file_list = None):
   if len(file_list) == 0:
     raise ValueError('Cannot determine dimension of the file list %r without files.!' % expression);  
   
-  return io.ndim(file_list[0]) + expression.ntags();
+  return io.ndim(file_list[0]) + expression.n_tags();
 
 
 #TODO: arbitrary axes mixing file and list dimensions
@@ -888,15 +890,18 @@ def _file_list(expression = None, file_list = None, sort = True, verbose = False
   """
   if isinstance(file_list, list):
     return file_list;
+
+  if isinstance(expression, pathlib.Path):
+    expression = str(expression)
   
   if isinstance(expression, te.Expression):
-    fl = glob.glob(expression.glob());
+    fl = expression.glob()
   elif fu.is_directory(expression):
     expression = fu.join(expression, '*');
     fl = glob.glob(expression);
   else:
     e = te.Expression(expression);
-    fl = glob.glob(e.glob());
+    fl = e.glob()
   
   if verbose and len(fl) == 0:
     warnings.warn('No files found matching %s !' % expression);
