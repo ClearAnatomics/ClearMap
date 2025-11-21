@@ -227,6 +227,18 @@ class ConfigAlternativesRegistry:
         """
         return [names[0] for names in (self._pipeline_groups + self._group_groups + self._global_groups)]
 
+    @cached_property
+    def canonical_pipeline_config_names(self):
+        """
+        Get the canonical configuration names for pipeline sections.
+
+        Returns
+        -------
+        list[str]
+            A list of canonical configuration names for pipeline sections.
+        """
+        return [names[0] for names in self._pipeline_groups]
+
     def to_canonical(self, cfg_name):
         return self.get_alternatives(cfg_name)[0]
 
