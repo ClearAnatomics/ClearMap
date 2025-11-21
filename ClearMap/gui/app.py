@@ -167,7 +167,7 @@ SLOW_IMPORTS = [
 
 
     ImportTask.from_imports('ClearMap.config.update_config', 'update_default_config'),
-    ImportTask.from_imports('ClearMap.config.config_coordinator', 'ConfigCoordinator'),
+    ImportTask.from_imports('ClearMap.config.config_coordinator', 'ConfigCoordinator', 'make_cfg_coordinator_factory'),
     ImportTask.from_imports('ClearMap.config.config_repository', 'ConfigRepository'),
     ImportTask.from_imports('ClearMap.config.defaults_provider', 'get_defaults_provider', 'SCHEMAS_DIR'),
     ImportTask.from_imports('ClearMap.config.config_handler', 'ConfigHandler', 'CLEARMAP_CFG_DIR', 'ALTERNATIVES_REG'),
