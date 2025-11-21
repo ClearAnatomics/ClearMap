@@ -21,6 +21,7 @@ import tempfile
 from functools import cached_property
 from typing import Optional, TypedDict, Any, Dict, TypeAlias
 
+from ClearMap.config.config_handler import ConfigHandler
 from importlib_metadata import version as _pkg_version
 
 from PyQt5.QtWidgets import QFileDialog, QMessageBox, QInputDialog
@@ -52,14 +53,11 @@ class MachineConfig:
 
     @staticmethod
     def machine_cfg_path() -> pathlib.Path:
-        major, minor = MachineConfig._version.split(".")[:2]
-        file_name = f'machine_params_v{major}_{minor}.yml'
-        return (pathlib.Path.home() / '.clearmap' / file_name).expanduser()
+        return ConfigHandler.get_global_path('machine', must_exist=False)
 
     @staticmethod
     def _package_machine_cfg_path() -> pathlib.Path:
-        major, minor = MachineConfig._version.split(".")[:2]
-        return (pathlib.Path(__file__).parent / 'defaults' / f'v{major}.{minor}' / f'machine.yml').expanduser()
+        return ConfigHandler.get_default_path('machine', must_exist=True, from_package=True)
 
     def _ensure_cfg_exists(self) -> pathlib.Path:
         """Write the packaged default machine config to the user folder."""
