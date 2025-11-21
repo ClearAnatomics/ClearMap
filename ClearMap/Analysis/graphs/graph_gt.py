@@ -454,7 +454,7 @@ class Graph(grp.AnnotatedGraph):
 
     def vertex_radii(self, vertex=None):  # FIXME: hacky to have 2 return options (hides)
         if 'radii' in self.vertex_properties:
-        return self.vertex_property('radii', vertex=vertex)
+            return self.vertex_property('radii', vertex=vertex)
         else:
             return self.vertex_properties('radius_units', vertex=vertex)
 
