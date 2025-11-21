@@ -154,7 +154,12 @@ setup(
     author_email='',
     include_package_data=True,
     package_data={
-        'ClearMap.config': ['*.cfg'],
+        'ClearMap.config': [
+            '*.cfg',
+            'defaults/*/*.yml',
+            'schemas/*/*.yaml',
+            'defaults/*/*.cfg',
+        ],
         'ClearMap.gui': [
             'creator/*.ui',
             'creator/*.qrc',
