@@ -363,6 +363,7 @@ class ExperimentController(BusSubscriberMixin):
             self.cfg_coordinator.clone_from(template_dir, dest)
         else:
             self.cfg_coordinator.copy_from_defaults(dest)
+        self.sample_manager.setup(dest)
         self.boot_open(dest)
 
     def clone_from(self, template_dir: Path, dest_dir: Path) -> None:

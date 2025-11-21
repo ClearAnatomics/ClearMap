@@ -68,14 +68,13 @@ class SampleManager(OrchestratorBase):
             self.cfg_coordinator.load_all()
 
             self.update_workspace()
-            print(self.workspace.info())
-            self.setup_complete = not self.incomplete_channels
+            self.setup_complete = (not self.incomplete_channels) and bool(self.config)
 
     def _on_cfg_changed(self, evt: CfgChanged) -> None:
         # Only reconcile when sample/channels subtree changed.
         if not evt.changed_keys:
             return
-        channels_changed = any(k.startswith("sample.channels") or k == "sample" for k in evt.changed_keys)
+        channels_changed = any(k.startswith('sample.channels') or k == 'sample' for k in evt.changed_keys)
         if channels_changed:
             self.update_workspace()
 
@@ -104,6 +103,11 @@ class SampleManager(OrchestratorBase):
                 self.workspace.rename_channel(old_name, new_name)
 
     def update_workspace(self):
+        if not self.config or 'channels' not in self.config:
+            # Nothing to do yet (cannot even create workspace) — config not loaded or new experiment
+            self.incomplete_channels = []
+            return
+
         self._ensure_workspace()
 
         self.incomplete_channels = []
@@ -151,7 +155,10 @@ class SampleManager(OrchestratorBase):
 
     @property
     def channels(self) -> list[str]:
-        return list(self.config['channels'].keys())
+        cfg = self.config
+        if not cfg or 'channels' not in cfg:
+            return []
+        return list(cfg['channels'].keys())
 
     @property
     def renamed_channels(self) -> dict[str, str]:
