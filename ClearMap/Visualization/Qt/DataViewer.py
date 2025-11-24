@@ -13,6 +13,8 @@ Note
 ----
 This viewer is based on the pyqtgraph package.
 """
+from __future__ import annotations
+
 __author__ = 'Christoph Kirst <christoph.kirst.ck@gmail.com>, Charly Rousseau <charly.rousseau@icm-institute.org>'
 __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
@@ -21,18 +23,18 @@ __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
 import time
 import functools as ft
+from datetime import datetime
 
 import numpy as np
 
 import pyqtgraph as pg
 from PyQt5 import QtWidgets
 from PyQt5.QtCore import QEvent, QRect, QSize, pyqtSignal, Qt
-from PyQt5.QtGui import QPainter
-from PyQt5.QtWidgets import QWidget, QRadioButton, QLabel, QSplitter, QApplication, QSizePolicy, QPushButton, QCheckBox, \
-  QGraphicsPathItem, QGridLayout, QLineEdit, QScrollArea
+from PyQt5.QtGui import QPainter, QIcon
+from PyQt5.QtWidgets import (QWidget, QRadioButton, QLabel, QSplitter, QApplication, QSizePolicy, QPushButton,
+                             QCheckBox,  QGraphicsPathItem, QGridLayout, QLineEdit, QScrollArea, QFileDialog)
 
 from ClearMap.Utils.utilities import runs_on_spyder
-from ClearMap.Utils.array_utils import dtype_range
 from ClearMap.IO.IO import as_source
 from ClearMap.IO.Source import Source
 from ClearMap.Visualization.Qt.data_viewer_luts import LUT, HighLowLUT
@@ -263,6 +265,17 @@ class DataViewer(QWidget):
         self.source_label_scroll.setWidget(self.source_label)
 
         axis_tools_layout.addWidget(self.source_label_scroll, 0, 9)
+
+        self.screenshot_btn = QPushButton('📸')
+        icon = QIcon.fromTheme('camera-photo')
+        if not icon.isNull():
+            self.screenshot_btn.setIcon(icon)
+            self.screenshot_btn.setIconSize(QSize(20, 20))
+
+        self.screenshot_btn.setToolTip('Save screenshot')
+        self.screenshot_btn.setMaximumWidth(34)
+        self.screenshot_btn.clicked.connect(self.save_screenshot)
+        axis_tools_layout.addWidget(self.screenshot_btn, 0, 10)
 
         self.graphicsView.scene().sigMouseMoved.connect(self.updateLabelFromMouseMove)
 
@@ -869,6 +882,36 @@ class DataViewer(QWidget):
     def padded_shape(self, shape):
         pad_size = max(3, len(shape))
         return (shape + (1,) * pad_size)[:pad_size]
+
+    def save_screenshot(self, *_):
+        """
+        Save a PNG/JPEG/TIFF screenshot of the current viewer.
+        By default, captures just the central image area (graphicsView).
+        Switch to `self.grab()` below if you want the whole window (incl. LUTs).
+        """
+        # Grab the rendered view (image + overlays)
+        # TODO: full/image_only combobox to select between self.graphicsView.grab() and self.grab() for full window
+        pixmap = self.graphicsView.grab()
+
+        # Build a friendly default name with title, slice index, timestamp
+        try:
+            title = self.windowTitle() or "DataViewer"
+        except Exception:
+            title = "DataViewer"
+        for forbidden_char in ['<', '>', ':', '"', '/', '\\', '|', '?', '*', ' ']:
+            title = title.replace(forbidden_char, "_")
+        z = str(int(self.source_index[self.scroll_axis])).zfill(4)
+        now = datetime.now().strftime("%Y%m%d_%H%M%S")
+        suggested = f"{title}_z{z}_{now}.png"
+
+        dest_path, _ = QFileDialog.getSaveFileName(self, 'Save screenshot', suggested,
+                                                   'PNG (*.png);;JPEG (*.jpg *.jpeg);;TIFF (*.tif *.tiff)')
+        if not dest_path:
+            return
+
+        ok = pixmap.save(dest_path)
+        if not ok:
+            pixmap.save(dest_path, 'PNG')
 
     # def __cast_bools(self):
     #     for i, s in enumerate(self.sources):
