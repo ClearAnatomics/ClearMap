@@ -116,12 +116,11 @@ from ClearMap.Visualization.Qt import Plot3d as plot_3d
 
 from ClearMap.Utils.exceptions import ClearMapVRamException, GroupStatsError, MissingRequirementException
 from ClearMap.Utils.events import ChannelsChanged, UiConvertToClearMapFormat, UiRequestPlotMiniBrain, \
-    UiRequestPlotAtlas, UiChannelRenamed, UiOrientationChanged, UiCropChanged, ChannelDefaultsChanged, \
+    UiRequestPlotAtlas, UiOrientationChanged, UiCropChanged, ChannelDefaultsChanged, \
     UiRequestLandmarksDialog, UiAlignWithChanged, UiVesselGraphFiltersChanged, RegistrationStatusChanged, \
     UiBatchResultsFolderChanged, UiBatchGroupsChanged, UiChannelsChanged
 
 from .dialog_helpers import option_dialog, make_splash
-from .params_interfaces import ParamLink
 from .tabs_interfaces import PostProcessingTab, PreProcessingTab, BatchTab, ExperimentTab
 from .widgets import (PatternDialog, DataFrameWidget, LandmarksSelectorDialog,
                       CheckableListWidget, FileDropListWidget, ExtendableTabWidget, ensure_inline_histogram,
