@@ -26,6 +26,8 @@ __copyright__ = 'Copyright © 2022 by Charly Rousseau'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
+from ClearMap.gui.gui_utils_base import unique_connect
+
 print('Starting base imports...', flush=True)
 import os
 import sys
@@ -785,9 +787,15 @@ class ClearMapApp(ClearMapAppBase):
         """
         print('Initialising sample tab manager')
 
-        self.tabWidget.tabBarClicked.connect(self.handle_tab_click)
-        self.tabWidget.currentChanged.connect(self.handle_tab_click)
-        self.select_tab('Sample info')  # select first tab
+        sample_tab = self.select_tab('Sample info')  # select first tab
+        tbs = sample_tab.findChildren(QToolBox)
+        if not tbs:
+            return
+        else:
+            tbs[0].setCurrentIndex(0)
+
+        unique_connect(self.tabWidget.tabBarClicked, self.handle_tab_click)
+        unique_connect(self.tabWidget.currentChanged, self.handle_tab_click)
 
     @property
     def src_folder(self) -> str:
@@ -941,11 +949,12 @@ class ClearMapApp(ClearMapAppBase):
             # bounce back to Sample tab
             self.select_tab('Sample info')
 
-    def select_tab(self, tab_name: str):
+    def select_tab(self, tab_name: str) -> QWidget | None:
         for i in range(self.tabWidget.count()):
             if self.tabWidget.tabText(i) == tab_name:
                 self.tabWidget.setCurrentIndex(i)
-                return
+                return self.tabWidget.widget(i)
+        return None
 
     def conf_load_error_msg(self, conf_name):
         """
@@ -1105,6 +1114,7 @@ class GuiController(BusSubscriberMixin):
     def start(self, app_: ClearMapApp, centered: bool = True):
         self.window = self._build_main_window()
         self._install_or_update_tabs()
+        self.window._init_sample_tab_mgr()  # Not great to call from outside but... needs to happen after install_or_update_tabs
         self._post_show_setup(app_, centered)
         self.window.show()
         self.window.fix_styles()
