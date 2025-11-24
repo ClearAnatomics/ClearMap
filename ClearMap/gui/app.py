@@ -875,9 +875,15 @@ class ClearMapApp(ClearMapAppBase):
         self.print_status_msg('Idle, waiting for input')
 
     def setup_menus(self):
-        for action in self.menuBar().actions():
-            if action.text() == "&Help":  # Skip if already exists
-                return
+        menu_names = [action.text() for action in self.menuBar().actions()]
+        if "&Help" in menu_names:  # Not the first call
+            return
+
+        file_action = [action for action in self.menuBar().actions() if action.text() == 'File'][0]
+        file_menu = file_action.menu()
+        open_act = QAction("&Open Experiment Folder…", self)
+        open_act.triggered.connect(self.prompt_experiment_folder)
+        file_menu.addAction(open_act)
 
         workspace_menu = self.menuBar().addMenu('&Workspace')
 
