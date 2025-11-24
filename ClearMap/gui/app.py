@@ -721,9 +721,14 @@ class ClearMapApp(ClearMapAppBase):
         self.about_action = QAction('&About', self)
         self.preference_editor = PreferenceUi(self)
         self.actionPreferences.triggered.connect(self.preference_editor.open)
-        self.structure_selector = cmp_widgets.StructureSelector(app=self)
+
         self.assetsManagerWidget: Optional[cmp_widgets.ManageAssetsWidget] = None
         self.assetsManagerDock = QDockWidget("Workspace Manager", self)
+        self.assetsManagerDock.setAllowedAreas(Qt.RightDockWidgetArea)
+        self.assetsManagerDock.setFloating(False)
+        self.addDockWidget(Qt.RightDockWidgetArea, self.assetsManagerDock)
+
+        self.structure_selector = cmp_widgets.StructureSelector(app=self)
         self.actionStructureSelector.triggered.connect(self.structure_selector.show)
 
         self.amend_ui()
@@ -920,7 +925,6 @@ class ClearMapApp(ClearMapAppBase):
         self.assetsManagerWidget = cmp_widgets.ManageAssetsWidget(
             self.src_folder, sample_cfg, sample_manager=self.sample_manager, app=self)
         self.assetsManagerDock.setWidget(self.assetsManagerWidget.widget)
-        self.addDockWidget(Qt.RightDockWidgetArea, self.assetsManagerDock)
         # self.tabifyDockWidget(self.dataViewerDockWidget, self.assetsManagerDock)
         # dlg.exec()
 
