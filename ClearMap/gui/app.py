@@ -755,6 +755,7 @@ class ClearMapApp(ClearMapAppBase):
         for tab in tabs:  # WARNING: not duplicate with GuiController ?
             tab.setup()  # build the QWidget  (idempotent)
             self.tabWidget.addTab(tab.ui, tab.name)  # We read but the tab is just the ref to the old if exists
+        self.fix_styles()
 
     def get_tab_widget(self, tab_title):
         """
@@ -1106,6 +1107,8 @@ class GuiController(BusSubscriberMixin):
         self._install_or_update_tabs()
         self._post_show_setup(app_, centered)
         self.window.show()
+        self.window.fix_styles()
+        app_.processEvents()
 
     def begin_hydration(self):
         self._needs_full_refresh = False
