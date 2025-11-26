@@ -48,7 +48,7 @@ properties:
           items: { type: number, exclusiveMinimum: 0 }
           minItems: 3
           maxItems: 3
-          
+
         wavelength:
           type: ["number","null"]
           exclusiveMinimum: 0

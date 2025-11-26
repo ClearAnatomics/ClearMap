@@ -207,13 +207,14 @@ def cleanup(binary_img: np.ndarray, df: pd.DataFrame, coord_names: List[str], as
     else:
         labels, _ = ndi.label(binary_img)
     coords = df[coord_names]
+    # FIXME: to memmap as well (shape can be computed as coords.shape[0], dtype uint64)
     relevant_labels = np.array(labels[*coords.values.transpose()])
     compressed_labels = np.where(np.isin(labels, relevant_labels), labels, 0)
     if as_memmap:
         label_file_path.unlink()
     del labels
 
-    compressed_labels = contiguous_labels(compressed_labels)
+    compressed_labels = contiguous_labels(compressed_labels)  # Can't compute shape so no memmap here
     compressed_labels = compress_dtype(compressed_labels, signed=False)
     if as_memmap:
         compressed_labels_path = Path(tempfile.gettempdir()) / f'{uuid.uuid4()}.npy'
