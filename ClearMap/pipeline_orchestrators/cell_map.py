@@ -124,7 +124,7 @@ class CellDetector(ChannelPipelineOrchestrator):
         coordinates, cells, voxelization_parameter = self.get_voxelization_params(sub_step=sub_step)
         _ = self.voxelize_unweighted(coordinates, voxelization_parameter)
 
-    @requires_assets([FilePath('density', postfix='counts')])
+    @requires_assets([FilePath('density', asset_sub_type='counts')])
     def plot_voxelized_counts(self, arrange=True, parent=None):
         scale = self.channel_cfg_view('registration')['resampled_resolution']
         return plot_3d.plot(self.get_path('density', channel=self.channel, asset_sub_type='counts'),

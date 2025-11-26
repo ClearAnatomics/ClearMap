@@ -15,7 +15,7 @@ def plot_all_layouts(folder):
     sample_manager = SampleManager(src_dir=folder)  # FIXME: ConfigCoordinator
     stitcher = StitchingProcessor(sample_manager)  # FIXME: ConfigCoordinator
     for postfix in ('aligned_axis', 'aligned', 'placed'):
-        layout = stitching_rigid.load_layout(sample_manager.get_path('layout', postfix=postfix))
+        layout = stitching_rigid.load_layout(sample_manager.get_path('layout', asset_sub_type=postfix))
         overlay = stitcher.overlay_layout_plane(layout)
         plt.imshow(overlay)
         plt.show()
