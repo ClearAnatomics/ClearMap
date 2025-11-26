@@ -48,6 +48,10 @@ properties:
           items: { type: number, exclusiveMinimum: 0 }
           minItems: 3
           maxItems: 3
+          
+        wavelength:
+          type: ["number","null"]
+          exclusiveMinimum: 0
 
         # Accept either a strict triple (±1, ±2, ±3) or the special [0,0,0] “unset”.
         orientation:

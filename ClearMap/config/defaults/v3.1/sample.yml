@@ -9,15 +9,16 @@ default_tile_extension: [".ome.tif", ".ome.npy"]
 comments: ""
 
 channel_template:
-  data_type: "undefined"
-  extension: ".ome.tif"
-  path: ""
-  resolution: [0, 0, 0]
   orientation: [1, 2, 3]
-  comments: ""
+  data_type: "undefined"
+  resolution: [0, 0, 0]
+  wavelength: null
   slicing:
     x: null
     y: null
     z: null
+  extension: ".ome.tif"
+  path: ""
+  comments: ""
 
 channels: {}  # required for first hydration

@@ -50,6 +50,7 @@ class SampleChannelParameters(ChannelUiParameter):
     extension: str
     path: str
     resolution: List[float]
+    wavelength: Optional[int]
     comments: str
     slice_x: List[int]
     slice_y: List[int]
@@ -64,6 +65,8 @@ class SampleChannelParameters(ChannelUiParameter):
             'extension': ParamLink(['extension'], self.tab.extensionComboBox),
             'path': ParamLink(['path'], self.tab.pathPlainTextEdit),
             'resolution': ParamLink(['resolution'], self.tab.resolutionTriplet),
+            'wavelength': ParamLink(['wavelength'], self.tab.wavelengthSpinBox,
+                                    disabled_value=None, ui_sentinel=-1, enforce_sentinel_min=True),
             'comments': ParamLink(['comments'], self.tab.commentsPlainTextEdit),
             'slice_x': ParamLink(['slicing', 'x'], self.tab.sliceXDoublet,
                                  notify_apply=self._publish_crop_changed),
