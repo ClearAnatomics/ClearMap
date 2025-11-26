@@ -315,6 +315,18 @@ if [[ "$OSTYPE" != "linux-gnu"* ]]; then
     fi
 fi
 
+chmod u+x "$clearmap_install_path/ClearMap/External/elastix/build/bin/"* || exit 1
+
+# Configure environment to amend LD_LIBRARY_PATH to point to custom Elastix binary shipped with ClearMap
+if  [[ "$OSTYPE" == "linux-gnu"* ]]; then
+    lib_path_name="LD_LIBRARY_PATH"
+elif [[ "$OSTYPE" == "darwin"* ]]; then
+    lib_path_name="DYLD_LIBRARY_PATH"
+fi
+conda env config vars set "$lib_path_name=$clearmap_install_path/ClearMap/External/elastix/build/bin/:$LD_LIBRARY_PATH" || exit 1
+
+# FIXME: not for MaxOS
+
 # Create Linux desktop menus
 echo "Do you want to create a desktop menu entry.
 Skip this if you are not running on linux or
@@ -351,18 +363,6 @@ StartupNotify=true"
         green "Skipping menu entry";
         ;;
 esac
-
-chmod u+x "$clearmap_install_path/ClearMap/External/elastix/build/bin/"* || exit 1
-
-# Configure environment to amend LD_LIBRARY_PATH to point to custom Elastix binary shipped with ClearMap
-if  [[ "$OSTYPE" == "linux-gnu"* ]]; then
-    lib_path_name="LD_LIBRARY_PATH"
-elif [[ "$OSTYPE" == "darwin"* ]]; then
-    lib_path_name="DYLD_LIBRARY_PATH"
-fi
-conda env config vars set "$lib_path_name=$clearmap_install_path/ClearMap/External/elastix/build/bin/:$LD_LIBRARY_PATH" || exit 1
-
-# FIXME: not for MaxOS
 
 green "
 $ENV_NAME installed
