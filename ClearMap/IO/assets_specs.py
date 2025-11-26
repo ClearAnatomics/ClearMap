@@ -211,6 +211,9 @@ class SubTypeSpec(TypeSpec):
         return self.name.split('_')[0]
 
 
+ChannelId = str | tuple[str, ...]
+
+
 class ChannelSpec:
     """
     A specification for a channel. Not a concrete asset.
@@ -218,10 +221,10 @@ class ChannelSpec:
 
     Attributes
     ----------
-    name: str | List[str]
+    name: ChannelId
         The name of the channel. (Typically the name of the labeling, e.g.
         cfos, dapi, autofluorescence, gfp ...)
-        If a list, the channel is a composite of the channels in the list.
+        If a tuple, the channel is a composite of the channels in the tuple.
     content_type: str
         The type of content in the channel.
         E.g. 'nuclei', 'cells', 'vessels'...
@@ -230,25 +233,40 @@ class ChannelSpec:
     """
     channel_names = []
 
-    def __init__(self, channel_name: str | list[str], content_type: str, channel_number: int | None = None):
+    def __init__(self, channel: ChannelId, content_type: str, channel_number: int | None = None):
         """
         A specification for a channel. Not a concrete asset.
 
         Parameters
         ----------
-        channel_name: str | List[str]
+        channel: ChannelId
             The name of the channel. (Typically the name of the labeling, e.g.
             cfos, dapi, autofluorescence, gfp ...)
-            If a list, the channel is a composite of the channels in the list.
+            If a tuple, the channel is a composite of the channels in the tuple
         content_type: str
             The type of content in the channel.
             E.g. 'nuclei', 'cells', 'vessels'...
         channel_number: int
             The number of the channel.
         """
-        if channel_name not in ChannelSpec.channel_names:
-            ChannelSpec.channel_names.append(channel_name)
-        self.name = channel_name
+        is_tuple = isinstance(channel, tuple)
+
+        # Enforce consistency between structure and content_type
+        if not is_tuple and content_type == 'compound':
+            if '-' in channel:
+                channel = tuple(channel.split('-'))
+            else:
+                raise ValueError(
+                    f"content_type='compound' requires a compound ChannelId (tuple), "
+                    f"got atomic {channel!r}"
+                )
+
+        if isinstance(channel, str) and '-' in channel:
+            channel = tuple(channel.split('-'))
+
+        if channel not in ChannelSpec.channel_names:
+            ChannelSpec.channel_names.append(channel)
+        self.name = channel
         self.content_type = validate_arg('data content type', content_type, DATA_CONTENT_TYPES)
         self.number = len(ChannelSpec.channel_names) - 1 if channel_number is None else channel_number
 
@@ -257,10 +275,13 @@ class ChannelSpec:
         return cls.channel_names[channel_number]
 
     def is_simple_channel(self):
+        return not self.is_compound()
+
+    def has_pipeline(self):
         return self.content_type not in (None, 'undefined', 'no-pipeline', 'compound')
 
     def is_compound(self):
-        return self.content_type == 'compound'
+        return isinstance(self.name, tuple)
 
 
 class StateManager:

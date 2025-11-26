@@ -399,7 +399,7 @@ class RegistrationProcessor(PipelineOrchestrator):
     def __setup_source_atlas(self, atlas_base_name):
         default_annotator = Annotation(atlas_base_name, None, None, label_source='ABA json 2022')
         # TODO: use workspace instead
-        channel_spec = ChannelSpec(channel_name='atlas', content_type='atlas')
+        channel_spec = ChannelSpec(channel='atlas', content_type='atlas')
         self.create_atlas_asset(default_annotator, channel_spec)
 
     def create_atlas_asset(self, annotator, channel_spec):  # FIXME: ensure that uses atlas subfolder from asset_constants
