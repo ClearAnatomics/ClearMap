@@ -47,24 +47,18 @@ class ColocalizationProcessor(CompoundChannelPipelineOrchestrator):
         self.setup_finalised: bool = False
         self.setup(sample_manager, channels, registration_processor)
 
-    def setup(self, sample_manager: Optional[SampleManager], channel_names: List[str],
+    def setup(self, sample_manager: Optional[SampleManager], channel_names: tuple[str],
               registration_processor: Optional[RegistrationProcessor] = None):
-        self.channels = channel_names
+        self.channels = tuple(channel_names)
         if registration_processor is not None:
             self.registration_processor = registration_processor
         if sample_manager is not None:
             self.sample_manager = sample_manager
             self.workspace = sample_manager.workspace
 
-            if self.channels not in self.workspace.asset_collections.keys():
-                # FIXME: ugly. should be handled by add_pipeline with missing_ok=True
-                sample_id = self.sample_manager.sample_id
-                self.workspace.add_channel(ChannelSpec(self.channels, 'colocalization'),
-                                           sample_id=sample_id)
-                self.workspace.add_channel(ChannelSpec(self.channels[::-1], 'colocalization'),
-                                           sample_id=sample_id)
-                self.workspace.add_pipeline('Colocalization', self.channels, sample_id=sample_id)
-                self.workspace.add_pipeline('Colocalization', self.channels[::-1], sample_id=sample_id)
+            sample_id = self.sample_manager.sample_id
+            self.workspace.ensure_pipeline('Colocalization', channel_id=self.channels, sample_id=sample_id,
+                                           permute_channels=True, create_channel=True)
 
             self.finalise_setup()
 

@@ -25,7 +25,7 @@ from typing import List, Iterator, Sequence, Optional
 import numpy as np
 
 from ClearMap.IO.assets_constants import CONTENT_TYPE_TO_PIPELINE, CHANNELS_ASSETS_TYPES_CONFIG, RESOURCE_TYPE_TO_FOLDER
-from ClearMap.IO.assets_specs import ChannelSpec, TypeSpec, StateManager
+from ClearMap.IO.assets_specs import ChannelSpec, TypeSpec, StateManager, ChannelId
 from ClearMap.IO.workspace_asset import Asset, AssetCollection
 from ClearMap.Utils.exceptions import AssetNotFoundError, ClearMapWorkspaceError, ClearMapAssetError, \
     MissingChannelError, MissingAssetError
@@ -106,7 +106,7 @@ class Workspace2:  # REFACTOR: subclass dict
                 out += f'{brackets[0]}{v}{brackets[1]}'
         return out
 
-    def __contains__(self, channel: str) -> bool:
+    def __contains__(self, channel: ChannelId) -> bool:
         return channel in self.asset_collections
 
     def __len__(self) -> int:
@@ -119,7 +119,7 @@ class Workspace2:  # REFACTOR: subclass dict
         """
         return sum(1 for k in self.asset_collections.keys() if k is not None)
 
-    def __iter__(self) -> Iterator[str]:
+    def __iter__(self) -> Iterator[ChannelId]:
         """
         Iterate non global channel names in the workspace.
         Returns
@@ -173,7 +173,7 @@ class Workspace2:  # REFACTOR: subclass dict
         return self.get(asset_type, channel=channel, **kwargs).create_debug(slicing, debug)
 
     @property
-    def channels(self):
+    def channels(self):  # FIXME: check if we should exclude None
         return list(self.asset_collections.keys())
 
     def ensure_default_channel(self, allowed_channels: List[str], default_channel: str):
@@ -190,7 +190,7 @@ class Workspace2:  # REFACTOR: subclass dict
                 if channel_spec.is_simple_channel():  # Simple channels -> direct removal
                     self.asset_collections.pop(channel)
                 elif channel_spec.is_compound():  # Compound channels -> check components
-                    channels = channel if isinstance(channel, (list, tuple)) else channel.split('-')
+                    channels = channel.split('-') if isinstance(channel, str) else channel
                     has_obsolete_components = any([c not in desired_channels for c in channels])
                     if has_obsolete_components:
                         self.asset_collections.pop(channel)
@@ -250,7 +250,68 @@ class Workspace2:  # REFACTOR: subclass dict
         if old_asset.expression != expression:
             self.asset_collections[channel]['raw'] = old_asset.variant(expression=expression)
 
-    def add_channel(self, channel_spec, sample_id=''):
+    def _normalize_channel(self, channel: ChannelId) -> ChannelId:
+        # Convert list -> tuple, leave str/tuple intact
+        if isinstance(channel, list):
+            return tuple(channel)
+        return channel
+
+    def _is_compound(self, channel: ChannelId) -> bool:
+        return isinstance(channel, tuple) and len(channel) > 1
+
+    def _permute_channels(self, channel: ChannelId) -> ChannelId:
+        if not self._is_compound(channel):
+            raise NotImplementedError(f'Channel permutation is only implemented for compound channels.')
+            return channel
+        return tuple(reversed(channel))
+
+    def ensure_channel(self, channel_id: ChannelId, channel_content_type: str,
+                       sample_id: str, permute_channels: bool):
+        channel = self._normalize_channel(channel_id)
+        sample_id = sample_id or self.sample_id
+        created = []
+
+        def _ensure_one(ch):
+            if ch not in self.asset_collections:
+                spec = ChannelSpec(ch, channel_content_type)
+                self._add_channel(spec, sample_id=sample_id)
+                return spec
+            return self[ch].channel_spec
+
+        # forward
+        created.append(_ensure_one(channel))
+
+        # optionally inverted
+        if permute_channels:
+            inv = self._permute_channels(channel)
+            if inv != channel:
+                created.append(_ensure_one(inv))
+
+        return created
+
+    def ensure_pipeline(self, pipeline_name: str, channel_id: ChannelId, sample_id: str,
+                        permute_channels: bool=False, create_channel: bool=False, channel_content_type: Optional[str] = None):
+        channel_id = self._normalize_channel(channel_id)  # FIXME: are we sure about that?
+        sample_id = sample_id or self.sample_id
+
+        if create_channel:
+            if channel_content_type is None:
+                raise ValueError("channel_content_type required when create_channel=True")
+            self.ensure_channel(channel_id, channel_content_type,
+                                sample_id=sample_id,
+                                permute_channels=permute_channels)
+
+        self.add_pipeline(pipeline_name, channel_id, sample_id=sample_id)
+        if permute_channels:
+            inv = self._permute_channels(channel_id)
+            if inv != channel_id:
+                if inv not in self:
+                    raise MissingChannelError(f'Channel "{inv}" does not exist in the workspace.'
+                                              f'If you want to implicitly create it, set create_channel=True.')
+                self.add_pipeline(pipeline_name, inv, sample_id=sample_id)
+
+
+    def _add_channel(self, channel_spec, sample_id=''):
         self.asset_collections[channel_spec.name] = AssetCollection(self.directory, sample_id, channel_spec)
 
     def add_pipeline(self, pipeline_name: str, channel_id: Optional[str | Sequence[str]] = None, **kwargs):
@@ -399,6 +460,7 @@ class Workspace2:  # REFACTOR: subclass dict
         if asset_sub_type and not suffix:
             asset_type += f'_{asset_sub_type}'
         if channel not in self and isinstance(channel, tuple):
+            warnings.warn(f'Channel {channel} not found as tuple, trying string version.')
             channel = ('-'.join(channel)).lower()  # Try string version if tuple version not found
 
         if channel not in self:

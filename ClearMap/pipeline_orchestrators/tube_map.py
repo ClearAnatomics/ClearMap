@@ -167,10 +167,9 @@ class BinaryVesselProcessor(PipelineOrchestrator):
                     self.steps[channel_name] = BinaryVesselProcessorSteps(self.workspace, channel=channel_name)
 
             compound_channel = tuple(self.channels_to_binarize())
-            if compound_channel not in self.workspace.asset_collections.keys():  # FIXME: could be string version
-                sample_id = self.sample_manager.prefix
-                self.workspace.add_channel(ChannelSpec(compound_channel, 'compound'), sample_id=sample_id)
-                self.workspace.add_pipeline('TubeMap', compound_channel, sample_id=sample_id)
+            sample_id = self.sample_manager.prefix
+            self.workspace.ensure_pipeline('TubeMap', compound_channel, sample_id=sample_id,
+                                           create_channel=True)
 
     def assert_input_shapes_match(self):
         """
@@ -517,10 +516,9 @@ class VesselGraphProcessor(PipelineOrchestrator):
             self.parent_channels = tuple([k for k in self.config['binarization'].keys() if k != 'combined'])
             self.steps.channel = self.parent_channels
 
-            if self.parent_channels not in self.workspace.asset_collections.keys():
-                sample_id = self.sample_manager.prefix
-                self.workspace.add_channel(ChannelSpec(self.parent_channels, 'compound'), sample_id=sample_id)
-                self.workspace.add_pipeline('TubeMap', self.parent_channels, sample_id=sample_id)
+            sample_id = self.sample_manager.prefix
+            self.workspace.ensure_pipeline('TubeMap', self.parent_channels,
+                                           sample_id=sample_id, create_channel=True)
 
     def __get_graph(self, step):
         if step not in self.__graphs:
