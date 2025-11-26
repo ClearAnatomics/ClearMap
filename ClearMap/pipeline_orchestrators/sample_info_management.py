@@ -6,6 +6,7 @@ This is the part that pertains to the metadata and configuration of a sample.
 It manages the sample-level configurations and properties, handles configurations related to the sample,
 and provides utility methods for checking sample properties.
 """
+import re
 import warnings
 from pathlib import Path
 from typing import Optional, Callable, List, Dict, TYPE_CHECKING
@@ -169,6 +170,15 @@ class SampleManager(OrchestratorBase):
 
     def clear_renamed_channels(self) -> None:
         self._renamed_channels = {}
+
+    def infer_channel_index_from_name(self, path: Path | str) -> int | None:
+        """
+        Extracts Cxx from typical microscopy filenames, e.g. *_C00.ome.tif -> 0
+        Returns None if no Cxx is found.
+        """
+        path = Path(path)
+        match = re.search(r"[Cc](\d{2})", path.name)
+        return int(match.group(1)) if match else None
 
     def data_type(self, channel: str) -> str:
         return self.config['channels'][channel]['data_type']

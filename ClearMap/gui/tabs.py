@@ -84,6 +84,7 @@ __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
 import functools
 import itertools
+import re
 import warnings
 
 from pathlib import Path
@@ -91,6 +92,7 @@ from typing import List, Optional, TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
+from ClearMap.Utils.tag_expression import Expression
 
 from PyQt5.QtWidgets import QButtonGroup, QWidget
 import pyqtgraph as pg
@@ -120,7 +122,7 @@ from ClearMap.Utils.events import ChannelsChanged, UiConvertToClearMapFormat, Ui
     UiRequestLandmarksDialog, UiAlignWithChanged, UiVesselGraphFiltersChanged, RegistrationStatusChanged, \
     UiBatchResultsFolderChanged, UiBatchGroupsChanged, UiChannelsChanged
 
-from .dialog_helpers import option_dialog, make_splash
+from .dialog_helpers import option_dialog, make_splash, prompt_dialog
 from .tabs_interfaces import PostProcessingTab, PreProcessingTab, BatchTab, ExperimentTab
 from .widgets import (PatternDialog, DataFrameWidget, LandmarksSelectorDialog,
                       CheckableListWidget, FileDropListWidget, ExtendableTabWidget, ensure_inline_histogram,
@@ -130,6 +132,7 @@ from .gui_utils_base import (format_long_nb, replace_widget,  add_missing_combob
 from .gui_utils_images import np_to_qpixmap
 from .params import (VesselParams, SampleParameters, StitchingParams, CellMapParams, GroupAnalysisParams,
                      BatchProcessingParams, RegistrationParams, TractMapParams, ColocalizationParams)
+from ClearMap.IO.metadata import parse_ome_info
 
 if TYPE_CHECKING:
     from ClearMap.gui.experiment_controller import AnalysisGroupController
@@ -333,8 +336,16 @@ class SampleInfoTab(ExperimentTab):
         for ch in obsolete_channels:
             self.remove_channel(ch)
 
+        # SORT BY CHANNEL INDEX if possible to match order in .ome xml
+        def _maybe_channel_index(spec: "ChannelPatternSpec") -> int | None:
+            # try to extract from pattern like C00 / _C01 / channel-02 etc.
+            m = re.search(r"[Cc](\d{2})", spec.pattern_relpath)
+            return int(m.group(1)) if m else None
+
+        specs_sorted = sorted(specs, key=lambda s: (_maybe_channel_index(s) is None, _maybe_channel_index(s) or 1000))
+
         # Add / update channels
-        for pattern_spec in specs:
+        for i, pattern_spec in enumerate(specs_sorted):
             if pattern_spec.name not in self.params:
                 self.params.request_add_channel(pattern_spec.name)
                 self.add_channel_tab(pattern_spec.name)
@@ -344,7 +355,17 @@ class SampleInfoTab(ExperimentTab):
             p.data_type = pattern_spec.data_type
             p.extension = pattern_spec.extension  # WARNING: Will do successive modifications. Check if we should batch update
 
-        self.exp_controller.install_or_update_tabs()
+            # If we have a pattern, we can stitch:
+
+            exp = Expression(pattern_spec.pattern_relpath)
+            first_tile = exp.string(values={axis: 0 for axis in pattern_spec.axes})  # Ideally, pick min(axis) for each
+            ome_info = parse_ome_info(Path(self.src_folder) / first_tile)
+            if 'resolution' in ome_info and ome_info['resolution'] is not None:
+                p.resolution = ome_info['resolution']
+            if 'channels_excitation' in ome_info and ome_info['channels_excitation'] is not None:
+                p.wavelength = ome_info['channels_excitation'][i]
+
+        self.publish(UiChannelsChanged(before=existing_channels, after=desired_channels))
 
     def plot_mini_brain(self, event: UiRequestPlotMiniBrain):
         """
@@ -403,6 +424,18 @@ class StitchingTab(PreProcessingTab):
         self.advanced_controls_names = [
             'channel.useNpyCheckBox',
         ]
+
+    def on_selected(self):
+        self.update_plotable_channels()
+        chans = self._get_channels()
+        sample_view = self.main_window.experiment_controller.get_config_view('sample')['channels']
+        for chan in chans:
+            if sample_view[chan]['extension'] == '.ome.tif':
+                if prompt_dialog('Create layout from OME metadata',
+                                 f'Channel {chan} uses .ome.tif files. '
+                                 f'Creating the layout from OME metadata is faster. '
+                                 f'Do you want to create the layout now ?'):
+                    self.worker.create_layout_from_ome(channel=chan)
 
     def _load_config_to_gui(self):
         desired = self._get_channels()
@@ -565,7 +598,7 @@ class StitchingTab(PreProcessingTab):
         if choice == 'cancel':
             return
         n_steps = self.worker.n_rigid_steps_to_run
-        self.wrap_step('Stitching', self.worker.stitch_channel_rigid,
+        self.wrap_step('Stitching', self.worker.align_channel_rigid,
                        step_args=[channel], step_kw_args={'_force': True},
                        n_steps=n_steps, abort_func=self.worker.stop_process)
         overlay = [pg.image(self.worker.plot_layout(channel=channel, asset_sub_type=asset_sub_type))]
@@ -589,7 +622,7 @@ class StitchingTab(PreProcessingTab):
                 kwargs = {'n_steps': n_steps, 'abort_func': self.worker.stop_process, 'close_when_done': False}
                 try:
                     if channel == cfg.shared.layout_channel and not cfg.shared.use_existing_layout:  # Used as reference
-                        self.wrap_step('Stitching', self.worker.stitch_channel_rigid,
+                        self.wrap_step('Stitching', self.worker.align_channel_rigid,
                                        step_args=[channel], step_kw_args={'_force': True}, **kwargs)
                         self.wrap_step(task_name='', func=self.worker.stitch_channel_wobbly, step_args=[channel],
                                        step_kw_args={'_force': cfg.stitching_rigid.skip}, **kwargs)

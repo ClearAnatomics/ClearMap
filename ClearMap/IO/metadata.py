@@ -1,20 +1,19 @@
-import glob
 import os
 import re
+from collections import defaultdict
 from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 
 import pandas as pd
 
 import tifffile
 from PIL import Image
 from natsort import natsorted
-from tqdm import tqdm
+from tifffile import TiffFile
 
-from ClearMap.IO.Workspace import Workspace
-from ClearMap.IO import IO as clearmap_io
+from ClearMap.IO.TIF import OMEMetadataParser
 from ClearMap.Utils.tag_expression import Expression
 
 
@@ -141,6 +140,17 @@ def define_auto_resolution(img_path, cfg_res):
             out_res[i] = parsed_res[i]
 
     return out_res
+
+
+def parse_ome_info(img_path: Path) -> Dict[str, Any]:
+    # Ask only for what we need; 'stitching' will consult/produce tile_configuration
+    if not img_path.exists():
+        raise FileNotFoundError(f'File {img_path} not found for OME metadata parsing')
+    if not str(img_path).endswith('ome.tif'):
+        raise NotAnOmeFile(f'File {img_path} is not an OME-TIFF file')
+    from ClearMap.IO.TIF import Source as TifSource
+    src = TifSource(img_path)
+    return src.metadata(info=['resolution', 'channels_excitation', 'tile_configuration', 'stitching'])
 
 ############################################### TILE PATTERNS DISCOVERY ##############################################
 

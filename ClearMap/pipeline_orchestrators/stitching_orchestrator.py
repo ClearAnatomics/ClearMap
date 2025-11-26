@@ -8,8 +8,9 @@ from typing import Optional
 import numpy as np
 
 from ClearMap.Alignment.Stitching import StitchingRigid as stitching_rigid, StitchingWobbly as stitching_wobbly
+from ClearMap.Alignment.Stitching.StitchingWobbly import WobblyLayout
 from ClearMap.IO import IO as clearmap_io
-from ClearMap.IO.metadata import define_auto_stitching_params
+from ClearMap.IO.metadata import define_auto_stitching_params, parse_ome_info
 from ClearMap.Utils.exceptions import MissingRequirementException
 from ClearMap.Utils.tag_expression import Expression
 from ClearMap.Utils.utilities import check_stopped
@@ -124,17 +125,89 @@ class StitchingProcessor(PipelineOrchestrator):
             raise ValueError(f"Unreachable or extra channels found: {unassigned}")
         return forest
 
+    def _pick_overlap_px(self, stitching: dict) -> tuple[int, int] | None:
+        """Prefer declared overlap (px); else derived; return ints if both axes present."""
+        ov = (stitching or {}).get('overlap_px') or {}
+        dec = ov.get('declared') or (None, None)
+        der = ov.get('derived') or (None, None)
+        ox = dec[0] if dec[0] is not None else der[0]
+        oy = dec[1] if dec[1] is not None else der[1]
+        if ox is None or oy is None:
+            return None
+        return int(round(ox)), int(round(oy))
+
+    def create_layout_from_ome(self, channel: str) -> None:
+        """
+        Build and persist a real WobblyLayout for 'channel' from OME TileConfiguration.
+        Marks the channel as 'use_existing_layout' so rigid placement can be skipped.
+        """
+        raw_asset = self.get('raw', channel=channel, prefix=self.sample_manager.prefix, extension='.tif')
+        if not raw_asset.file_list:
+            raise FileNotFoundError(f"No tiles found for channel '{channel}'")
+
+        first_tif = Path(raw_asset.file_list[0])
+        ome_info = parse_ome_info(first_tif)
+
+        # Map this channel to OME TileConfiguration channel index
+        ch_idx = self.sample_manager.infer_channel_index_from_name(first_tif)
+        tile_cfg = ome_info.get('tile_configuration') or {}
+        if ch_idx not in tile_cfg:
+            raise ValueError(f"Cannot map channel '{channel}' to OME TileConfiguration channel index; "
+                             f"available: {sorted(tile_cfg.keys())}")
+
+        mapping = tile_cfg[ch_idx]  # {(ix, iy): {'filename', 'relative_x', 'relative_y', ...}}
+        if not mapping:
+            raise ValueError(f"Empty TileConfiguration for channel index {ch_idx}")
+
+        # Grid size from indices (unzip)
+        keys_sorted = sorted(mapping.keys())
+        xs, ys = zip(*keys_sorted)  # safe because mapping is not empty
+        nx, ny = max(xs) + 1, max(ys) + 1
+
+        # Basename -> full path (all tiles for this channel)
+        basename_to_full = {Path(p).name: Path(p) for p in raw_asset.file_list}
+
+        # Build sources/tile_positions/positions in row-major (ix,iy) order
+        sources = []
+        tile_positions = []
+        positions = []  # (x, y, z=0)
+        for (ix, iy) in keys_sorted:
+            rec = mapping[(ix, iy)]
+            base = rec['filename']
+            sources.append(str(basename_to_full[base]))
+            tile_positions.append((ix, iy))
+            positions.append((float(rec['relative_x']), float(rec['relative_y']), 0.0))  # z=0 for 2D tiling
+
+        # Overlap in pixels (int,int) or None
+        overlaps_px = self._pick_overlap_px(ome_info.get('stitching'))
+
+        # Real WobblyLayout
+        lyt = WobblyLayout(sources=sources, tile_shape=(nx, ny), tile_positions=tile_positions,
+                           positions=positions, overlaps=overlaps_px, axis=2)  # Axis = which axis "wobbles"
+        lyt.lower_to_origin()  # Just in case
+
+        placed_asset_path = self.get_path('layout', channel=channel, asset_sub_type='placed')
+        lyt.save(str(placed_asset_path))
+
+        self.cfg_coordinator.submit_patch({'stitching': {'channels': {channel: {'use_existing_layout': True}}}},
+                                          sample_manager=self.sample_manager)
+
     def stack_columns(self, channel):
         asset = self.get('raw', channel=channel, prefix=self.sample_manager.prefix)
         exp = asset.expression
+
+        x_min, x_max = exp.tag_range('X')
+        y_min, y_max = exp.tag_range('Y')
+
+        z_expression = '_xyz-Table Z<Z,4>'    # REFACTOR: brittle, find better way
         if exp.n_tags() >= 3:
-            for y in range(exp.tag_max('Y')):
-                for x in range(exp.tag_max('X')):
+            for y in range(y_min, y_max + 1):
+                for x in range(x_min, x_max + 1):
                     column_expression = exp.string(values={'X': x, 'Y': y})
-                    dest = column_expression.replace('_xyz-Table Z<Z,4>', '')  # REFACTOR: find better way
+                    dest = column_expression.replace(z_expression, '')
                     clearmap_io.convert(column_expression, dest)
-            # squash Z axis  # REFACTOR: find better way
-            asset.expression = exp.string().replace('_xyz-Table Z<Z,4>', '')  # overwrite expression
+            # squash Z axis
+            asset.expression = exp.string().replace(z_expression, '')  # overwrite expression
             self.sample_manager.set_channel_expression(channel, asset.expression)
 
     def copy_or_stack(self, channel):
@@ -158,11 +231,26 @@ class StitchingProcessor(PipelineOrchestrator):
             for channel in stitching_tree:
                 self.stack_columns(channel)  # If x/y/z, stack first
                 channel_cfg = self.config['channels'][channel]
+
+                has_layout = self.get('layout', channel=channel, asset_sub_type='placed').exists
+                if channel_cfg.get('use_existing_layout'):
+                    if not has_layout:
+                        raise MissingRequirementException(f'Channel {channel} set to use existing layout,'
+                                                          f' but no layout found')
+                    self._stitch_layout_wobbly(channel)
+                    if self.stopped: return
+                    continue
+
                 if channel == channel_cfg['layout_channel']:
                     if not channel_cfg['rigid']['skip']:
-                        self.stitch_channel_rigid(channel)
+                        self.align_channel_rigid(channel)
+                    if self.stopped: return
                     if not channel_cfg['wobbly']['skip']:
                         self.stitch_channel_wobbly(channel)
+                    else:
+                        self.place_layout_rigid(channel)
+                        if self.stopped: return
+                        self._stitch_layout_wobbly(channel)
                 else:
                     self._stitch_layout_wobbly(channel)
 
@@ -179,7 +267,7 @@ class StitchingProcessor(PipelineOrchestrator):
 
     # @check_stopped
     # @requires_assets([FilePath('raw')])
-    def stitch_channel_rigid(self, channel, _force=False):
+    def align_channel_rigid(self, channel, _force=False):
         if not self.sample_manager.check_has_all_tiles(channel):
             if self.sample_manager.use_npy(channel):
                 self.convert_tiles_channel(channel)
@@ -216,8 +304,15 @@ class StitchingProcessor(PipelineOrchestrator):
         layout.place(method='optimization', min_quality=-np.inf, lower_to_origin=True, verbose=True)
         self.update_watcher_main_progress()
 
-        stitching_rigid.save_layout(self.filename('layout', channel=channel,
-                                                  asset_sub_type='aligned_axis'),
+        stitching_rigid.save_layout(self.get_path('layout', channel=channel, asset_sub_type='aligned_axis'),
+                                    layout)
+
+    def place_layout_rigid(self, channel):
+        layout = stitching_rigid.load_layout(self.get_path('layout', channel=channel,
+                                                          asset_sub_type='aligned_axis'))
+        layout.place(method='optimization', min_quality=-np.inf, lower_to_origin=True, verbose=True)
+
+        stitching_rigid.save_layout(self.get_path('layout', channel=channel, asset_sub_type='aligned'),
                                     layout)
 
     # @requires_assets([FilePath('raw')])  # TODO: optional requires npy + requires that channel is kwarg
@@ -299,7 +394,8 @@ class StitchingProcessor(PipelineOrchestrator):
 
     def _stitch_layout_wobbly(self, channel):
         layout_channel = self.config['channels'][channel]['layout_channel']
-        layout = stitching_rigid.load_layout(self.get_path('layout', channel=layout_channel, postfix='placed'))
+        layout = stitching_rigid.load_layout(self.get_path('layout', channel=layout_channel,
+                                                           asset_sub_type='placed'))
 
         try:
             ref_asset = self.get('raw', channel=self.sample_manager.alignment_reference_channel)
@@ -309,15 +405,7 @@ class StitchingProcessor(PipelineOrchestrator):
         self.prepare_watcher_for_substep(n_slices, self.__wobbly_stitching_stitch_re,
                                          'Stitch layout wobbly', True)
         try:
-            layout_channel_asset = self.get('raw', channel=layout_channel)
-            channel_asset = self.get('raw', channel=channel)
-            if layout_channel != channel:
-                layout_extension = Path(layout.sources[0].location).suffix  # Use the actual extension that was used
-                if self.sample_manager.use_npy(channel):  # FIXME: check if we need to copy layout first
-                    channel_pattern = channel_asset.with_extension(extension='.npy')
-                else:
-                    channel_pattern = channel_asset.path
-                layout.replace_source_location(None, str(channel_pattern), method='infer')
+            self._replace_layout_sources(layout, channel, layout_channel)
             n_processes = self.machine_config['n_processes_stitching']
             stitching_wobbly.stitch_layout(layout,
                                            sink=str(self.get_path('stitched', channel=channel)),
@@ -328,6 +416,19 @@ class StitchingProcessor(PipelineOrchestrator):
             return
 
         self.update_watcher_main_progress()
+
+    def _replace_layout_sources(self, layout, channel, layout_channel):
+        if channel == layout_channel:
+            return
+        # layout_channel_asset = self.get('raw', channel=layout_channel)
+        channel_asset = self.get('raw', channel=channel)
+        if layout_channel != channel:
+            # layout_extension = Path(layout.sources[0].location).suffix  # Use the actual extension that was used
+            if self.sample_manager.use_npy(channel):  # FIXME: check if we need to copy layout first
+                channel_pattern = channel_asset.with_extension(extension='.npy')
+            else:
+                channel_pattern = channel_asset.path
+            layout.replace_source_location(None, str(channel_pattern), method='infer')
 
     @check_stopped
     def stitch_channel_wobbly(self, channel, _force=False):  # Warning, will stitch channel on its own

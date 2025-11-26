@@ -48,7 +48,7 @@ def stitch(stitcher: StitchingProcessor):  # FIXME: part of stitcher object
             if config['use_npy'] and not sample_manager.has_npy(channel):
                     stitcher.convert_tiles()
             if channel == config['layout_channel']:
-                stitcher.stitch_channel_rigid(channel, _force=True)
+                stitcher.align_channel_rigid(channel, _force=True)
                 stitcher.stitch_channel_wobbly(channel, _force=True)  # TODO: check if force
             else:
                 stitcher._stitch_layout_wobbly(channel)
