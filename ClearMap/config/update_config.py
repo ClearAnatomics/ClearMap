@@ -36,7 +36,7 @@ def update_default_config():  # FIXME: add carry over of previous version settin
         else:  # if config for **this** version is already present -> merge
             user_default_cfg = ConfigHandler.get_cfg_from_path(user_path)
 
-            print(f'Merging {cfg_name}')
+            print(f'Merging "{cfg_name}" config section')
             merge_config(package_default_cfg, user_default_cfg)
 
 
