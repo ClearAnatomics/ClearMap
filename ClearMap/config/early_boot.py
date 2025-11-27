@@ -86,7 +86,7 @@ class MachineConfig:
         tempfile.tempdir = path_str  # critical: must happen before anything else uses tempfile
 
     def prompt_tmp_folder(self):
-        ensure_qapp()
+        app = ensure_qapp()
 
         # Plan A, proper folder using QT directory dialog
         tmp_folder = QFileDialog.getExistingDirectory(
