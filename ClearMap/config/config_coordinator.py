@@ -86,6 +86,10 @@ class ConfigCoordinator(BusSubscriberMixin):
 
         self._section_validators = SectionValidators(self._schemas_dir)
 
+    @property
+    def workspace_config_path(self):
+        return self._config_repo.base_dir() / 'workspace.yml'
+
     @classmethod
     def from_folder(cls, folder: Path, known_names: Optional[Iterable[str]], auto_load: bool = False,
                     **kwargs) -> "ConfigCoordinator":
