@@ -348,6 +348,84 @@ class Workspace2:  # REFACTOR: subclass dict
         if old_asset.expression != expression:
             self.asset_collections[channel]['raw'] = old_asset.variant(expression=expression)
 
+    def sync_resource_type_to_folder(self, desired: dict | None, *, migrate: bool = False,
+                                     dry_run: bool = False, ) -> dict[str, tuple[Path, Path]]:
+        """
+        Synchronize this workspace's resource_type_to_folder with the new `desired` layout.
+        - If no new mapping or identical -> no-op.
+        - If mappings differ:
+            * Build a plan of directory moves (per resource_type).
+            * If `migrate=False` and any source dir exists, raise.
+            * If `dry_run=True`, return the plan but don't touch disk.
+            * Otherwise, rename/move the folders and update the mapping.
+
+        Returns
+        -------
+        dict[resource_type, (old_dir, new_dir)]
+            The directory-level migration plan (executed or planned).
+        """
+        if desired is None:
+            return {}
+
+        current = self.resource_type_to_folder
+        # Fast path: exact same object
+        if current is desired:
+            return {}
+        elif current == desired:  # If equality, ensure identity
+            self.resource_type_to_folder = desired
+            for ts in self.asset_types.values():
+                ts.resource_type_to_folder = self.resource_type_to_folder
+            return {}
+
+        root = Path(self.directory)
+
+        # Compute changes per resource_type
+        changed: dict[str, tuple[Path, Path]] = {}
+        for rtype, old_folder in current.items():
+            new_folder = desired.get(rtype, old_folder)
+            if old_folder != new_folder:
+                changed[rtype] = (root / old_folder, root / new_folder)
+
+        if dry_run:
+            return changed
+
+        any_source_exists = any(old_dir.exists() and old_dir != new_dir
+                                for (old_dir, new_dir) in changed.values())
+
+        if any_source_exists and not migrate:
+            raise ClearMapWorkspaceError('Changing resource_type_to_folder would affect existing on-disk folders. '
+                                         'Call sync_resource_type_to_folder(..., migrate=True) or dry_run=True to inspect the plan.')
+
+        # Migrate
+        for rtype, (old_dir, new_dir) in changed.items():
+            if not old_dir.exists() or old_dir == new_dir:
+                continue
+
+            new_dir.parent.mkdir(parents=True, exist_ok=True)
+
+            if not new_dir.exists():  # Just rename
+                old_dir.rename(new_dir)
+            else:  # Merge w error on name conflicts
+                for child in old_dir.iterdir():
+                    target = new_dir / child.name
+                    if target.exists():
+                        raise ClearMapWorkspaceError(f'Cannot migrate folder layout for resource_type={rtype}: '
+                                                     f'target already exists: {target}')
+                    child.rename(target)
+                try:
+                    old_dir.rmdir()  # Remove if now empty
+                except OSError:
+                    pass
+
+        # Now update mapping and rewire TypeSpecs to the workspace dict
+        current.clear()
+        current.update(desired)
+        for ts in self.asset_types.values():
+            # make sure all TypeSpecs point to the live mapping
+            ts.resource_type_to_folder = current
+
+        return changed
+
     def _normalize_channel(self, channel: ChannelId) -> ChannelId:
         # Convert list -> tuple, leave str/tuple intact
         if isinstance(channel, list):
