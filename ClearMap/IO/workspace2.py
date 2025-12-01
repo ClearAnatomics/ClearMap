@@ -155,6 +155,87 @@ class Workspace2:  # REFACTOR: subclass dict
         """
         return self.asset_collections[key]
 
+    def _iter_channel_specs(self) -> list[ChannelSpec]:
+        specs = []
+        for ch_id, col in self.asset_collections.items():
+            if ch_id is None:
+                continue
+            if col.channel_spec not in specs:
+                specs.append(col.channel_spec)
+        return specs
+
+    def to_dict(self) -> dict:
+        """
+        Serialize the logical structure of the workspace:
+        - workspace metadata (directory, sample_id)
+        - resource_type -> folder layout
+        - asset type specs (including subfolders)
+        - channels (names, content_type, number)
+        """
+
+        # Only top-level types, or all? For readability, I’d include all, it’s still small.
+        asset_types_dict = {name: spec.to_dict()
+                            for name, spec in self.asset_types.items()}
+
+        channels_dict = [ch.to_dict() for ch in self._iter_channel_specs()]
+
+        return {
+            'schema': 'clearmap_workspace_v2',
+            'directory': str(self.directory),
+            'sample_id': self.sample_id,
+            'default_channel': getattr(self, 'default_channel', None),
+            'resource_type_to_folder': dict(self.resource_type_to_folder),
+            'asset_types': asset_types_dict,
+            'channels': channels_dict,
+        }
+
+    def to_yaml(self, path: str | Path):
+        import yaml
+        path = Path(path)
+        with path.open('w', encoding='utf-8') as f:
+            yaml.safe_dump(self.to_dict(), f, sort_keys=False)
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "Workspace2":
+        """
+        Rebuild a workspace *layout* from a dict produced by to_dict().
+        """
+        schema = data.get('schema')
+        if schema not in (None, SCHEMA_V_STR):
+            raise ValueError(f"Unsupported workspace schema {schema}")
+
+        types_cfg = data.get('asset_types')
+
+        # Create instance with injected layout, but we’ll overwrite asset_types after
+        ws = cls(
+            directory=data['directory'],
+            sample_id=data.get('sample_id'),
+            default_channel=data.get('default_channel'),
+            resource_type_to_folder=(data.get('resource_type_to_folder')),
+            assets_types_config=types_cfg,
+        )
+
+        # Re-hydrate asset types from the dict (using same layout)
+        ws.asset_types = {
+            name: TypeSpec.from_dict(spec_dict)
+            for name, spec_dict in types_cfg.items()
+        }
+
+        # Recreate channels
+        for ch_data in data.get('channels', []):
+            ch_spec = ChannelSpec.from_dict(ch_data)
+            ws._add_channel(ch_spec, sample_id=ws.sample_id)
+
+        return ws
+
+    @classmethod
+    def from_yaml(cls, path: str | Path) -> "Workspace2":
+        import yaml
+        path = Path(path)
+        with path.open('r', encoding='utf-8') as f:
+            data = yaml.safe_load(f)
+        return cls.from_dict(data)
+
     def raw(self, channel: str):
         """Convenience: return the raw Asset for a channel, or None."""
         assets_collection = self.asset_collections.get(channel)
@@ -624,12 +705,14 @@ class Workspace2:  # REFACTOR: subclass dict
 
     def load(self, file_path):
         """Loads the workspace configuration from disk"""
+        warnings.warn(f'The load method is deprecated. Use Workspace2.from_yaml or Workspace2.from_dict instead.')
         d = np.load(file_path)[0]
         self.__dict__.update(d)
 
     def save(self, file_path):
         """Saves the workspace configuration to disk"""
         # prevent np to add .npy to a .workspace file
+        warnings.warn(f'The save method is deprecated. Use Workspace2.to_yaml or Workspace2.to_dict instead.')
         with open(file_path, "wb") as fid:
             np.save(fid, [self.__dict__])
 
