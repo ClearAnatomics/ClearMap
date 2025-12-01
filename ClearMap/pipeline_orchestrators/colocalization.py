@@ -7,19 +7,20 @@ import pandas as pd
 from matplotlib.colors import to_hex
 import pyqtgraph as pg
 
-from ClearMap.Analysis.Measurements import Voxelization as voxelization
-from ClearMap.Analysis.colocalization.channel import Channel as ColocalizationChannel
-from ClearMap.IO.assets_specs import ChannelSpec
 from ClearMap.IO.workspace2 import Workspace2
 from ClearMap.Utils.exceptions import ClearMapValueError
 from ClearMap.Utils.utilities import sanitize_n_processes
-from ClearMap.Visualization.Qt.widgets import Scatter3D
 from ClearMap.config.config_coordinator import ConfigCoordinator
-from ClearMap.pipeline_orchestrators.generic_orchestrators import CompoundChannelPipelineOrchestrator
 
-from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
+from ClearMap.Analysis.Measurements import Voxelization as voxelization
+from ClearMap.Analysis.colocalization.channel import Channel as ColocalizationChannel
+
+from ClearMap.pipeline_orchestrators.generic_orchestrators import CompoundChannelPipelineOrchestrator
 from ClearMap.pipeline_orchestrators.sample_info_management import SampleManager
 from ClearMap.pipeline_orchestrators.registration_orchestrator import RegistrationProcessor
+
+from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
+from ClearMap.Visualization.Qt.widgets import Scatter3D
 
 
 class ColocalizationProcessor(CompoundChannelPipelineOrchestrator):
