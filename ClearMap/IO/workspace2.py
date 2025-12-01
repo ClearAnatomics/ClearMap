@@ -27,12 +27,19 @@ import numpy as np
 from ClearMap.IO.assets_constants import CONTENT_TYPE_TO_PIPELINE, CHANNELS_ASSETS_TYPES_CONFIG, RESOURCE_TYPE_TO_FOLDER
 from ClearMap.IO.assets_specs import ChannelSpec, TypeSpec, StateManager, ChannelId
 from ClearMap.IO.workspace_asset import Asset, AssetCollection
-from ClearMap.Utils.exceptions import AssetNotFoundError, ClearMapWorkspaceError, ClearMapAssetError, \
-    MissingChannelError, MissingAssetError
+from ClearMap.Utils.exceptions import (ClearMapWorkspaceError, ClearMapAssetError, MissingChannelError,
+                                       MissingAssetError)
 from ClearMap.Utils.utilities import substitute_deprecated_arg, handle_deprecated_args, get_ok_n_ok_symbols
 
+SCHEMA_V_STR = 'clearmap_workspace_v2'
 
-def create_assets_types_config(type_spec_dict):
+
+def _build_asset_types(type_spec_dict: dict, resource_type_to_folder: dict) -> dict[str, TypeSpec]:
+    """
+    Convert the config dict (CHANNELS_ASSETS_TYPES_CONFIG) into
+    concrete TypeSpec objects, using the given resource_type_to_folder
+    mapping and auto-creating flattened subtypes.
+    """
     assets_types_config = {}
     for name, spec in type_spec_dict.items():
         instance = TypeSpec(resource_type=spec.get('resource_type'),
@@ -40,20 +47,21 @@ def create_assets_types_config(type_spec_dict):
                             sub_types=spec.get('sub_types'),
                             basename=spec.get('basename', ''),
                             file_format_category=spec.get('file_format_category'),
+                            resource_type_to_folder=resource_type_to_folder,
                             relevant_pipelines=spec.get('relevant_pipelines'),
+                            sub_folder=spec.get('sub_folder'),
+                            compression_algorithms=spec.get('compression_algorithms'),
+                            checksum_algorithm=spec.get('checksum_algorithm'),
                             extensions=spec.get('extensions'))
         assets_types_config[name] = instance
 
     subtypes = {}
     for name, spec in assets_types_config.items():
-        for subtype in spec.sub_types.keys():  # Create subtypes
-            if f'{name}_{subtype}' not in assets_types_config:
-                subtypes[f'{name}_{subtype}'] = spec.get_sub_type(subtype)
+        for st_name in spec.sub_types.keys():  # Create subtypes
+            key = f'{name}_{st_name}'
+            if key not in assets_types_config:
+                subtypes[key] = spec.get_sub_type(st_name)
     return {**assets_types_config, **subtypes}
-
-
-CHANNEL_ASSETS_TYPES = create_assets_types_config(CHANNELS_ASSETS_TYPES_CONFIG)
-
 
 
 class Workspace2:  # REFACTOR: subclass dict
@@ -81,9 +89,18 @@ class Workspace2:  # REFACTOR: subclass dict
     status_manager: ClearMap.IO.assets_specs.StateManager
         A context manager to handle the workspace state (e.g. debug mode).
     """
-    def __init__(self, directory, default_channel=None, sample_id=None):
-        self.directory = directory
+    def __init__(self, directory: str | Path, default_channel: str | None = None, sample_id: str | None = None,
+                 resource_type_to_folder: dict | None = None, assets_types_config: dict | None = None):
+        self.directory = str(directory)  # TODO: support pathlib.Path?
         self.sample_id = sample_id
+
+        self.resource_type_to_folder = deepcopy(RESOURCE_TYPE_TO_FOLDER)
+        if resource_type_to_folder:
+            self.resource_type_to_folder.update(resource_type_to_folder)
+
+        raw_config = deepcopy(assets_types_config or CHANNELS_ASSETS_TYPES_CONFIG)
+        self.asset_types = _build_asset_types(raw_config, self.resource_type_to_folder)
+
         self.asset_collections = {
             None: AssetCollection(self.directory, self.sample_id, None)  # Global assets
         }
@@ -226,7 +243,7 @@ class Workspace2:  # REFACTOR: subclass dict
                                          f'Use update_raw_data explicitly instead.')
         self.asset_collections[channel_id] = (
             AssetCollection(self.directory, sample_id, channel_spec))
-        raw_asset = Asset(self.directory, deepcopy(CHANNEL_ASSETS_TYPES['raw']),
+        raw_asset = Asset(self.directory, deepcopy(self.asset_types['raw']),
                           channel_spec,
                           expression=file_path, sample_id=sample_id,
                           status_manager=self.status_manager)
@@ -238,7 +255,7 @@ class Workspace2:  # REFACTOR: subclass dict
         # FIXME: this shouldn't be the case for just stacking
         pipelines.append('stitching')  # WARNING: We need the "stitched" asset even for file conversion
 
-        for name, spec in CHANNEL_ASSETS_TYPES.items():
+        for name, spec in self.asset_types.items():
             if any(p in pipelines for p in spec.relevant_pipelines):
                 self.create_asset(spec, channel_spec, sample_id=sample_id)
 
@@ -337,7 +354,7 @@ class Workspace2:  # REFACTOR: subclass dict
         else:
             sample_id = self.get('raw', channel_id).sample_id
         channel_spec = self[channel_id].channel_spec
-        for name, spec in CHANNEL_ASSETS_TYPES.items():
+        for name, spec in self.asset_types.items():
             if pipeline_name in spec.relevant_pipelines:
                 self.create_asset(spec, channel_spec, sample_id=sample_id)
 
@@ -627,13 +644,13 @@ class Workspace2:  # REFACTOR: subclass dict
 
         ok_symbol, n_ok_symbol = get_ok_n_ok_symbols()
 
-        len_dirtype = max([len(k) for k in RESOURCE_TYPE_TO_FOLDER.keys()])
-        for resource_type, folder in RESOURCE_TYPE_TO_FOLDER.items():
+        len_dirtype = max([len(k) for k in self.resource_type_to_folder.keys()])
+        for resource_type, folder in self.resource_type_to_folder.items():
             out += f'  [{resource_type : >{len_dirtype}}]: {folder}\n'
 
         out += 'assets:\n'
 
-        len_f_type = max([len(k) for k in CHANNELS_ASSETS_TYPES_CONFIG.keys()])
+        len_f_type = max([len(k) for k in self.asset_types.keys()])
         header = f'  [{{:{len_dirtype}}}] {{:{len_f_type}}}'
 
         for channel, assets_collection in self.items():
