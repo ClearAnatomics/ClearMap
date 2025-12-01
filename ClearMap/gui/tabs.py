@@ -94,7 +94,7 @@ import numpy as np
 import pandas as pd
 from ClearMap.Utils.tag_expression import Expression
 
-from PyQt5.QtWidgets import QButtonGroup, QWidget
+from PyQt5.QtWidgets import QButtonGroup, QWidget, QDialog
 import pyqtgraph as pg
 from natsort import natsorted
 
@@ -116,13 +116,15 @@ from ClearMap.Visualization.Matplotlib.PlotUtils import plot_sample_stats_histog
 from ClearMap.Visualization.Qt.utils import link_dataviewers_cursors
 from ClearMap.Visualization.Qt import Plot3d as plot_3d
 
-from ClearMap.Utils.exceptions import ClearMapVRamException, GroupStatsError, MissingRequirementException
+from ClearMap.Utils.exceptions import ClearMapVRamException, GroupStatsError, MissingRequirementException, \
+    ClearMapWorkspaceError
 from ClearMap.Utils.events import ChannelsChanged, UiConvertToClearMapFormat, UiRequestPlotMiniBrain, \
     UiRequestPlotAtlas, UiOrientationChanged, UiCropChanged, ChannelDefaultsChanged, \
     UiRequestLandmarksDialog, UiAlignWithChanged, UiVesselGraphFiltersChanged, RegistrationStatusChanged, \
     UiBatchResultsFolderChanged, UiBatchGroupsChanged, UiChannelsChanged
 
 from .dialog_helpers import option_dialog, make_splash, prompt_dialog
+from .dialogs import ResourceTypeToFolderDialog
 from .tabs_interfaces import PostProcessingTab, PreProcessingTab, BatchTab, ExperimentTab
 from .widgets import (PatternDialog, DataFrameWidget, LandmarksSelectorDialog,
                       CheckableListWidget, FileDropListWidget, ExtendableTabWidget, ensure_inline_histogram,
@@ -219,14 +221,16 @@ class SampleInfoTab(ExperimentTab):
         Bind the signal/slots of the UI elements which are not
         automatically set through the params object attribute
         """
-        self.ui.channelsParamsTabWidget.addTabClicked.connect(self.add_channel_tab)
+        ui = self.ui
+        ui.channelsParamsTabWidget.addTabClicked.connect(self.add_channel_tab)
 
-        self.ui.srcFolderBtn.clicked.connect(self.main_window.prompt_experiment_folder)
+        ui.srcFolderBtn.clicked.connect(self.main_window.prompt_experiment_folder)
 
-        self.ui.launchPatternWizardPushButton.clicked.connect(self.launch_pattern_wizard)
-        self.ui.updateWorkspacePushButton.clicked.connect(self.sample_manager.update_workspace)
+        ui.launchPatternWizardPushButton.clicked.connect(self.launch_pattern_wizard)
+        ui.updateWorkspacePushButton.clicked.connect(self.sample_manager.update_workspace)
 
-        self.ui.removeCurrentChannelToolButton.clicked.connect(self.remove_current_channel)
+        ui.removeCurrentChannelToolButton.clicked.connect(self.remove_current_channel)
+        ui.editWorkspaceFoldersPushButton.clicked.connect(self.edit_workspace_folders)
 
     def _bind_channel(self, page_widget, channel):
         """
@@ -318,6 +322,38 @@ class SampleInfoTab(ExperimentTab):
             specs = dlg.get_results()
             self._apply_pattern_specs(specs)
         self.detached = False
+
+    def edit_workspace_folders(self):
+        """
+        Open a dialog to edit workspace.resource_type_to_folder and
+        propagate changes via SampleManager.set_resource_type_to_folder().
+        """
+        if self.sample_manager is None:
+            self.main_window.popup('Sample manager not available.')
+            return
+
+        if self.sample_manager.workspace is None:
+            self.main_window.popup('Workspace not initialised yet.')
+            return
+
+        current = dict(self.sample_manager.workspace.resource_type_to_folder)
+
+        dlg = ResourceTypeToFolderDialog(current, parent=self.main_window)
+        if dlg.exec_() != QDialog.Accepted:
+            return  # user cancelled
+
+        new_mapping, migrate = dlg.result()
+
+        try:
+            plan = self.sample_manager.set_resource_type_to_folder(new_mapping, migrate=migrate, dry_run=False)
+        except ClearMapWorkspaceError as e:
+            self.main_window.popup(str(e))
+            return
+
+        status = 'updated' if plan else 'unchanged'
+        self.main_window.print_status_msg(f'Workspace folder layout {status}.')
+
+        print(self.sample_manager.workspace.info())
 
     def _apply_pattern_specs(self, specs: list["ChannelPatternSpec"]):
         """

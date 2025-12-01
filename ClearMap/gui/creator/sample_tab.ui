@@ -37,7 +37,7 @@
       </font>
      </property>
      <property name="currentIndex">
-      <number>1</number>
+      <number>0</number>
      </property>
      <widget class="QWidget" name="samplePage">
       <property name="geometry">
@@ -204,6 +204,44 @@
           <string/>
          </property>
         </widget>
+       </item>
+       <item row="4" column="0">
+        <widget class="QPushButton" name="editWorkspaceFoldersPushButton">
+         <property name="font">
+          <font>
+           <bold>true</bold>
+          </font>
+         </property>
+         <property name="toolTip">
+          <string>Select the sample forlder.</string>
+         </property>
+         <property name="whatsThis">
+          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Select the sample folder.&lt;/p&gt;&lt;p&gt;This should be the main folder of the sample, not the subfolder containing e.g. the raw data as all files will be read from and saved to this folder.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+         </property>
+         <property name="text">
+          <string>🛠️ Edit workspace folders</string>
+         </property>
+         <property name="icon">
+          <iconset theme="folder">
+           <normaloff>.</normaloff>.</iconset>
+         </property>
+         <property name="shortcut">
+          <string>Ctrl+O</string>
+         </property>
+        </widget>
+       </item>
+       <item row="5" column="0">
+        <spacer name="verticalSpacer">
+         <property name="orientation">
+          <enum>Qt::Vertical</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>20</width>
+           <height>40</height>
+          </size>
+         </property>
+        </spacer>
        </item>
       </layout>
      </widget>

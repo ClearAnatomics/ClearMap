@@ -132,3 +132,66 @@ class VerifyRenamingDialog(QDialog):
 
     def get_selected_files(self):
         return self.selected_files
+
+
+class ResourceTypeToFolderDialog(QDialog):
+    """
+    Simple (k: v) editor for resource_type_to_folder.
+
+    - Left column: resource_type (read-only label).
+    - Right column: editable folder (relative path, may be empty '').
+    - Optional: checkbox to decide whether to migrate existing folders.
+    """
+    def __init__(self, mapping: dict[str, str], parent=None):
+        super().__init__(parent)
+        self.setWindowTitle('Workspace resource sub-folders')
+        self.setModal(True)
+
+        self._rows: dict[str, QLineEdit] = {}
+
+        main_layout = QVBoxLayout(self)
+
+        info = QLabel('Configure where each resource type is stored, relative to the workspace directory.\n'
+                      'Leave empty to keep files in the main experiment folder.')
+        info.setWordWrap(True)
+        main_layout.addWidget(info)
+
+        form = QFormLayout()
+        for rtype, folder in mapping.items():
+            label = QLabel(rtype)
+            label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+
+            edit = QLineEdit(str(folder or ''))
+            edit.setPlaceholderText('<root>')
+            form.addRow(label, edit)
+            self._rows[rtype] = edit
+
+        main_layout.addLayout(form)
+
+        # Whether to migrate existing folders on disk
+        self.migrate_checkbox = QCheckBox('Move existing data into new folders (migrate on disk)')
+        self.migrate_checkbox.setChecked(False)
+        main_layout.addWidget(self.migrate_checkbox)
+
+        # Standard buttons
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        main_layout.addWidget(buttons)
+
+    def result_mapping(self) -> dict[str, str]:
+        """
+        Return the edited mapping {resource_type: folder_rel_path}.
+        """
+        out: dict[str, str] = {}
+        for rtype, edit in self._edits.items():
+            val = edit.text().strip()
+            out[rtype] = val
+        return out
+
+    def result(self) -> tuple[dict[str, str], bool]:
+        """
+        Convenience: (mapping, migrate_flag).
+        """
+        return self.result_mapping(), self.migrate_checkbox.isChecked()
+
