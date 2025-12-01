@@ -29,8 +29,9 @@ class TypeSpec:
     A specification for a type of asset. Not a concrete asset.
     This has all the information for a step in the pipeline regardless of the channel.
     """
-    def __init__(self, resource_type: str | None = None, type_name: str | None = None,
-                 sub_types: list[str] | dict | None = None, basename: str = '', file_format_category: str | None = None,
+    def __init__(self, *, resource_type: str | None = None, type_name: str | None = None,
+                 sub_types: list[str] | dict | None = None, basename: str = '',
+                 sub_folder: str = '', file_format_category: str | None = None, resource_type_to_folder: dict | None = None,
                  relevant_pipelines: list[str] | None = None, compression_algorithms: list[str] | None = None,
                  checksum_algorithm: str | None = None, extensions: list[str] | None = None):
         """
@@ -74,7 +75,8 @@ class TypeSpec:
             basename = Expression(str(basename))
         self.basename = basename or type_name
         self.name = type_name
-        if resource_type and resource_type not in RESOURCE_TYPE_TO_FOLDER:
+        self.resource_type_to_folder = resource_type_to_folder or RESOURCE_TYPE_TO_FOLDER
+        if resource_type and resource_type not in self.resource_type_to_folder:
             raise ValueError(f'Unknown resource type: {resource_type}')
         self.resource_type = resource_type
         self.relevant_pipelines = relevant_pipelines or []
@@ -83,6 +85,7 @@ class TypeSpec:
         else:
             sub_types = sub_types or {}
         self.sub_types = sub_types
+        self.sub_folder = sub_folder
 
         self._file_format_category = file_format_category
         if extensions:
@@ -138,6 +141,7 @@ class TypeSpec:
         if extensions is None and file_format_category is not None:
             extensions = EXTENSIONS[file_format_category]
         sub_type = SubTypeSpec(resource_type=self.resource_type,
+                               resource_type_to_folder=self.resource_type_to_folder,
                                relevant_pipelines=self.relevant_pipelines,
                                type_name=f'{self.name}_{sub_type_name}',
                                basename=expression or self.basename,
@@ -172,10 +176,12 @@ class TypeSpec:
         str
             The directory where the asset should be stored.
         """
+        if self.sub_folder:  # Explicit sub_folder has priority
+            return self.sub_folder
         if self.resource_type == '':  # Experiment root dir if empty
             return ''
         else:
-            return RESOURCE_TYPE_TO_FOLDER[self.resource_type or self.name]  # If None, defaults to self.name
+            return self.resource_type_to_folder[self.resource_type or self.name]  # If None, defaults to self.name
 
     @property
     def default_extension(self):
@@ -188,6 +194,42 @@ class TypeSpec:
             The default extension for this asset.
         """
         return self.extensions[0] if self.extensions else ''
+
+    def to_dict(self):
+        return {
+            'resource_type': self.resource_type,
+            'resource_type_to_folder': self.resource_type_to_folder,
+            'type_name': self.name,
+            'sub_types': {k: (v.to_dict() if v is not None else None)
+                          for k, v in self.sub_types.items()},
+            'basename': str(self.basename),
+            'file_format_category': self._file_format_category,
+            'sub_folder': self.sub_folder,
+            'relevant_pipelines': self.relevant_pipelines,
+            'compression_algorithms': self.compression_algorithms,
+            'checksum_algorithm': self.checksum_algorithm,
+            'extensions': self.extensions
+        }
+
+    @classmethod
+    def from_dict(cls, data):
+        sub_types = data.get('sub_types')
+        if sub_types:
+            sub_types = {k: (TypeSpec.from_dict(v) if v is not None else None)
+                         for k, v in sub_types.items()}
+        return cls(
+            resource_type=data.get('resource_type'),
+            resource_type_to_folder=data.get('resource_type_to_folder'),
+            type_name=data.get('type_name'),
+            sub_types=sub_types,
+            basename=data.get('basename', ''),
+            file_format_category=data.get('file_format_category'),
+            sub_folder=data.get('sub_folder', ''),
+            relevant_pipelines=data.get('relevant_pipelines'),
+            compression_algorithms=data.get('compression_algorithms'),
+            checksum_algorithm=data.get('checksum_algorithm'),
+            extensions=data.get('extensions')
+        )
 
 
 class SubTypeSpec(TypeSpec):
@@ -209,6 +251,15 @@ class SubTypeSpec(TypeSpec):
     @property
     def main_type(self):
         return self.name.split('_')[0]
+
+    # def to_dict(self):
+    #     out = super().to_dict()
+    #     out['main_type'] = self.main_type
+    #     return out
+    #
+    # @classmethod
+    # def from_dict(cls, data):
+    #     return super().from_dict(data)
 
 
 ChannelId = str | tuple[str, ...]
@@ -282,6 +333,21 @@ class ChannelSpec:
 
     def is_compound(self):
         return isinstance(self.name, tuple)
+
+    def to_dict(self):
+        return {
+            'name': self.name,
+            'content_type': self.content_type,
+            'number': self.number
+        }
+
+    @classmethod
+    def from_dict(cls, data):
+        return cls(
+            channel=data['name'],
+            content_type=data['content_type'],
+            channel_number=data['number']
+        )
 
 
 class StateManager:
