@@ -53,6 +53,8 @@ class SampleManager(OrchestratorBase):
         self.subscribe(ChannelRenamed, self._on_channel_renamed)
         self.subscribe(CfgChanged, self._on_cfg_changed)
 
+        self.resource_type_to_folder: Optional[dict] = None
+
         self.setup(src_dir=src_dir)
 
     def setup(self, src_dir: Optional[Path | str] = None):
@@ -67,6 +69,12 @@ class SampleManager(OrchestratorBase):
         if src_dir is not None:
             self.cfg_coordinator.set_base_dir(src_dir)
             self.cfg_coordinator.load_all()
+
+            workspace_path = self.cfg_coordinator.workspace_config_path
+            if workspace_path.exists():
+                workspace = Workspace2.from_yaml(workspace_path)
+                self.workspace = workspace
+                self.resource_type_to_folder = workspace.resource_type_to_folder
 
             self.update_workspace()
             self.setup_complete = (not self.incomplete_channels) and bool(self.config)
@@ -135,12 +143,59 @@ class SampleManager(OrchestratorBase):
 
         print(self.workspace.info())
 
+        self.save_workspace()
+
+    def save_workspace(self):
+        workspace_cfg_path = self.cfg_coordinator.workspace_config_path
+        if workspace_cfg_path.suffix in {'.yml', '.yaml'}:
+            self.workspace.to_yaml(workspace_cfg_path)
+        else:
+            # legacy fallback
+            self.workspace.save(workspace_cfg_path)
+
     def _ensure_workspace(self):
         if self.workspace is None:
             first_channel = self.channels[0] if self.channels else None
-            self.workspace = Workspace2(self.cfg_coordinator.base_dir,
-                                        sample_id=self.prefix,
-                                        default_channel=first_channel)
+            workspace_cfg_path = self.cfg_coordinator.workspace_config_path
+            if workspace_cfg_path.exists():
+                if workspace_cfg_path.suffix in {'.yml', '.yaml'}:
+                    self.workspace = Workspace2.from_yaml(workspace_cfg_path)
+                else:  # legacy fallback
+                    self.workspace = Workspace2.load(workspace_cfg_path)
+            else:
+                self.workspace = Workspace2(self.cfg_coordinator.base_dir,
+                                            sample_id=self.prefix,
+                                            default_channel=first_channel,
+                                            resource_type_to_folder=self.resource_type_to_folder)
+            self.resource_type_to_folder = self.workspace.resource_type_to_folder
+
+    def set_resource_type_to_folder(self, new_mapping: dict, *,
+                                    migrate: bool = False, dry_run: bool = False) -> dict[str, tuple[Path, Path]]:
+        """
+        Update the workspace's resource_type_to_folder layout.
+
+        - If dry_run=True:
+            * compute and return the migration plan,
+            * DO NOT move files,
+            * DO NOT change workspace or persist anything.
+
+        - If dry_run=False:
+            * apply layout to the workspace (optionally migrating),
+            * update SampleManager.resource_type_to_folder,
+            * persist the workspace.
+        """
+        self._ensure_workspace()
+
+        plan = self.workspace.sync_resource_type_to_folder(new_mapping, migrate=migrate, dry_run=dry_run)
+
+        if not dry_run:
+            # Keep SM in sync with Workspace2
+            self.resource_type_to_folder = self.workspace.resource_type_to_folder
+
+            # Persist new layout + types/channels snapshot
+            self.save_workspace()
+
+        return plan
 
     @property
     def prefix(self) -> Optional[str]:
