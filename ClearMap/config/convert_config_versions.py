@@ -16,6 +16,7 @@ from PyQt5.QtWidgets import QApplication, QDialog
 
 from ClearMap.IO.assets_constants import CHANNELS_ASSETS_TYPES_CONFIG
 from ClearMap.Utils.tag_expression import Expression
+from ClearMap.Utils.utilities import try_get_item_recursive, set_item_recursive, has_item_recursive, DELETE, deep_merge
 from ClearMap.config.config_handler import ConfigHandler, ALTERNATIVES_REG
 
 from ClearMap.gui.dialogs import RenameChannelsDialog, VerifyRenamingDialog
@@ -598,16 +599,45 @@ def convert_2_1_to_3_0(main_folder='', create_app=True):
     upgrader.run()
 
 
-def make_generic_3_0_to_3_1_converter(config_type: str):
+def migrate_vasculature_performance_v3_0_to_v3_1(
+    old_cfg: dict,
+    merged: dict,
+    default_cfg: dict,
+):
+    mappings = [
+        (['binarization', 'vessels', 'deep_fill'],
+         ['performance', 'binarization', 'vessels', 'deep_fill', 'block_processing']),
+        (['binarization', 'arteries', 'deep_fill'],
+         ['performance', 'binarization', 'large_vessels', 'deep_fill', 'block_processing']),
+    ]
+
+    for old_path, new_path in mappings:
+        # --- migrate values ---
+        if has_item_recursive(old_cfg, old_path):
+            size_max = try_get_item_recursive(old_cfg, old_path + ['size_max'], None)
+            overlap  = try_get_item_recursive(old_cfg, old_path + ['overlap'], None)
+
+            if size_max is not None:
+                set_item_recursive(merged, new_path + ['size_max'], size_max)
+
+            if overlap is not None:
+                set_item_recursive(merged, new_path + ['overlap'], overlap)
+
+        # --- delete legacy keys from merged ---
+        set_item_recursive(merged, old_path + ['size_max'], DELETE)
+        set_item_recursive(merged, old_path + ['overlap'], DELETE)
+
+
+
+def make_generic_3_0_to_3_1_converter(config_type: str,
+                                      migration_func: Callable[[dict, dict, dict], None] | None = None):
     """
     Factory for trivial 3.0 → 3.1 converters, for both experiment and global configs.
 
     - Uses ALTERNATIVES_REG to decide whether to register as experiment or global.
-    - Copies all fields as-is.
+    - Calls `migration_func` if provided
     - Writes to .yml (if no explicit v2_path is given).
-    - Sets clearmap_schema = 3 and clearmap_version = '3.1.0'.
     """
-
     # Normalize the name and decide scope once at import time
     canonical = ALTERNATIVES_REG.to_canonical(config_type)
     is_global = ALTERNATIVES_REG.is_global_cfg(canonical)
@@ -621,7 +651,6 @@ def make_generic_3_0_to_3_1_converter(config_type: str):
 
         if not v2_path:
             v2_path = ConfigHandler.resolve_write_path(canonical, base_dir=v1_path.parent)
-
         v2_path = Path(v2_path).expanduser().resolve()
 
         cfg_v1 = read_cfg(v1_path)
@@ -630,11 +659,24 @@ def make_generic_3_0_to_3_1_converter(config_type: str):
         for key in list(cfg_v2.keys()):
             del cfg_v2[key]
 
+        try:
+            default_cfg = ConfigHandler.get_default_cfg(canonical)
+        except Exception:
+            default_cfg = {}
+
+        merged = deepcopy(default_cfg)
+
+        deep_merge(merged, cfg_v1)
+
+        if migration_func is not None:  # Optional (and section specific)
+            migration_func(cfg_v1, merged, default_cfg)
+
         # COPY (shallow copy of top-level keys is enough;
         #       nested sections stay as config-like objects.)
-        for key in cfg_v1:
-            cfg_v2[key] = cfg_v1[key]
+        for key in merged.keys():
+            cfg_v2[key] = merged[key]
 
+        # Update metadata
         cfg_v2['clearmap_schema'] = 3
         cfg_v2['clearmap_version'] = '3.1.0'
 
@@ -644,13 +686,16 @@ def make_generic_3_0_to_3_1_converter(config_type: str):
     return _convert_3_0_to_3_1
 
 
+
 convert_sample_3_0_to_3_1 = make_generic_3_0_to_3_1_converter('sample')
 convert_stitching_3_0_to_3_1 = make_generic_3_0_to_3_1_converter('stitching')
 convert_registration_3_0_to_3_1 = make_generic_3_0_to_3_1_converter('registration')
 convert_cell_map_3_0_to_3_1 = make_generic_3_0_to_3_1_converter('cell_map')
 convert_tract_map_3_0_to_3_1 = make_generic_3_0_to_3_1_converter('tract_map')
 convert_colocalization_3_0_to_3_1 = make_generic_3_0_to_3_1_converter('colocalization')
-convert_vasculature_3_0_to_3_1 = make_generic_3_0_to_3_1_converter('vasculature')
+# convert_vasculature_3_0_to_3_1 = make_generic_3_0_to_3_1_converter('vasculature')
+convert_vasculature_3_0_to_3_1   = make_generic_3_0_to_3_1_converter(
+    'vasculature', migration_func=migrate_vasculature_performance_v3_0_to_v3_1)
 convert_batch_3_0_to_3_1 = make_generic_3_0_to_3_1_converter('batch_processing')
 convert_group_analysis_3_0_to_3_1 = make_generic_3_0_to_3_1_converter('group_analysis')
 
