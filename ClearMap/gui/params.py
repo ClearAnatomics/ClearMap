@@ -1505,14 +1505,14 @@ class VesselVisualizationParams(UiParameter, OrthoviewerSlicingMixin):
 
 class PreferencesParams(UiParameter):
     verbosity: str
-    n_processes_file_conv: int
-    n_processes_resampling: int
-    n_processes_stitching: int
-    n_processes_cell_detection: int
-    n_processes_binarization: int
-    chunk_size_min: int
-    chunk_size_max: int
-    chunk_size_overlap: int
+    # n_processes_file_conv: int
+    # n_processes_resampling: int
+    # n_processes_stitching: int
+    # n_processes_cell_detection: int
+    # n_processes_binarization: int
+    # chunk_size_min: int
+    # chunk_size_max: int
+    # chunk_size_overlap: int
     start_folder: str
     start_full_screen: bool
     lut: str
@@ -1540,27 +1540,27 @@ class PreferencesParams(UiParameter):
             "three_d_plot_bg": ParamLink(
                 ["three_d_plot_bg"], self.tab.threeDPlotsBackgroundComboBox,
                 cast_to_ui=self.str_to_capitalize, cast_from_ui=self.str_to_lower, default="#000000"),
-            "n_processes_file_conv": ParamLink(
-                ["n_processes_file_conv"], self.tab.nProcessesFileConversionSpinBox,
-                cast_to_ui=self.sanitize_nones, cast_from_ui=self.sanitize_neg_one),
-            "n_processes_resampling": ParamLink(
-                ["n_processes_resampling"], self.tab.nProcessesResamplingSpinBox,
-                cast_to_ui=self.sanitize_nones, cast_from_ui=self.sanitize_neg_one),
-            "n_processes_stitching": ParamLink(
-                ["n_processes_stitching"], self.tab.nProcessesStitchingSpinBox,
-                cast_to_ui=self.sanitize_nones, cast_from_ui=self.sanitize_neg_one),
-            "n_processes_cell_detection": ParamLink(
-                ["n_processes_cell_detection"], self.tab.nProcessesCellDetectionSpinBox,
-                cast_to_ui=self.sanitize_nones, cast_from_ui=self.sanitize_neg_one),
-            "n_processes_binarization": ParamLink(
-                ["n_processes_binarization"], self.tab.nProcessesBinarizationSpinBox,
-                cast_to_ui=self.sanitize_nones, cast_from_ui=self.sanitize_neg_one),
-            "chunk_size_min": ParamLink(
-                ["detection_chunk_size_min"], self.tab.chunkSizeMinSpinBox),
-            "chunk_size_max": ParamLink(
-                ["detection_chunk_size_max"], self.tab.chunkSizeMaxSpinBox),
-            "chunk_size_overlap": ParamLink(
-                ["detection_chunk_overlap"], self.tab.chunkSizeOverlapSpinBox),
+            # "n_processes_file_conv": ParamLink(
+            #     ["n_processes_file_conv"], self.tab.nProcessesFileConversionSpinBox,
+            #     cast_to_ui=self.sanitize_nones, cast_from_ui=self.sanitize_neg_one),
+            # "n_processes_resampling": ParamLink(
+            #     ["n_processes_resampling"], self.tab.nProcessesResamplingSpinBox,
+            #     cast_to_ui=self.sanitize_nones, cast_from_ui=self.sanitize_neg_one),
+            # "n_processes_stitching": ParamLink(
+            #     ["n_processes_stitching"], self.tab.nProcessesStitchingSpinBox,
+            #     cast_to_ui=self.sanitize_nones, cast_from_ui=self.sanitize_neg_one),
+            # "n_processes_cell_detection": ParamLink(
+            #     ["n_processes_cell_detection"], self.tab.nProcessesCellDetectionSpinBox,
+            #     cast_to_ui=self.sanitize_nones, cast_from_ui=self.sanitize_neg_one),
+            # "n_processes_binarization": ParamLink(
+            #     ["n_processes_binarization"], self.tab.nProcessesBinarizationSpinBox,
+            #     cast_to_ui=self.sanitize_nones, cast_from_ui=self.sanitize_neg_one),
+            # "chunk_size_min": ParamLink(
+            #     ["detection_chunk_size_min"], self.tab.chunkSizeMinSpinBox),
+            # "chunk_size_max": ParamLink(
+            #     ["detection_chunk_size_max"], self.tab.chunkSizeMaxSpinBox),
+            # "chunk_size_overlap": ParamLink(
+            #     ["detection_chunk_overlap"], self.tab.chunkSizeOverlapSpinBox),
             # --- UI prefs ---
             "start_folder": ParamLink(
                 ["start_folder"], self.tab.startFolderLineEdit,

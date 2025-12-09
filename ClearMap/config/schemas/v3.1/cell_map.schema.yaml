@@ -36,14 +36,14 @@ properties:
               additionalProperties: true
               properties:
                 shape: { type: integer }
-                h_max: { type: [number, "null"] }
+                h_max: { type: ["number", "null"] }
 
             shape_detection:
               type: object
               additionalProperties: true
               properties:
-                threshold: { type: number }
-                shape_type: { type: string }
+                threshold:  { type: "number" }
+                shape_type: { type: "string" }
 
             test_set_slicing:
               type: object
@@ -78,3 +78,18 @@ properties:
           additionalProperties: true
           properties:
             plot_when_finished: { type: boolean }
+
+  performance:
+    type: object
+    additionalProperties: true
+    properties:
+      channel:
+        type: object
+        additionalProperties: true
+        properties:
+          detection:
+            type: object
+            additionalProperties: true
+            properties:
+              block_processing:
+                $ref: "./typedefs.schema.yaml#/$defs/blockProcessing"

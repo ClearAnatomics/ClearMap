@@ -11,5 +11,6 @@ templates:
       voxel_number_overlap_threshold: 0
     voxelization:
       radii: [5, 5, 5]
-    performance:
-      n_processes: -1    # -1: all but one; None: all
+
+performance:
+  n_processes: -1    # -1: all but one; None: all

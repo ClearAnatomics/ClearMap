@@ -13,8 +13,6 @@ binarization:
       run: true
     deep_fill:
       run: true
-      size_max: 500
-      overlap: 50
       resample_factor: 1
   large_vessels:  # same params for arteries and veins
     binarize:
@@ -27,8 +25,6 @@ binarization:
       run: true
     deep_fill:
       run: true
-      size_max: 1000
-      overlap: 100
       resample_factor: 2
   combined:
     binary_fill: true
@@ -62,3 +58,54 @@ visualization:
     dim_1: [0, 300]
     dim_2: [0, 400]
   display: {}
+
+performance:
+  binarization:
+    vessels:
+      binarize:
+        block_processing:
+          n_processes: 10
+          size_min: 10
+          size_max: 16
+          overlap: 5
+      smooth:
+        block_processing:
+          n_processes: -1
+          size_min: null
+          size_max: 50
+          overlap: null
+      binary_fill:
+        n_processes: -1
+      deep_fill:
+        block_processing:
+          n_processes: 1
+          size_min: null
+          size_max: 500
+          overlap: 50
+    large_vessels:
+      binarize:
+        block_processing:
+          n_processes: 10
+          size_min: 10
+          size_max: 16
+          overlap: 5
+      smooth:
+        block_processing:
+          n_processes: -1
+          size_min: null
+          size_max: 50
+          overlap: null
+      binary_fill:
+        n_processes: -1
+      deep_fill:
+        block_processing:
+          n_processes: 1
+          size_min: null
+          size_max: 1000
+          overlap: 100
+  combine:
+    block_processing:
+      n_processes: -1
+      size_min: null
+      size_max: 500
+      overlap: 0

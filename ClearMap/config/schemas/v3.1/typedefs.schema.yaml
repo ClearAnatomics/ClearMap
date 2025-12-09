@@ -140,3 +140,19 @@ $defs:
         - { type: "number", minimum: 0 }
         - { type: "string", const: "auto" }
         - { type: "null" }
+
+  blockProcessing:
+    description: "Common block-processing parameters for parallel processing"
+    type: object
+    additionalProperties: true
+    properties:
+      n_processes:
+        $ref: "#/$defs/nProcessesType"
+      size_min:
+        anyOf:
+          - { $ref: "#/$defs/nonNegativeInteger" }  # scalar >= 0
+          - { type: "null" }                        # allow 'null' as in your YAML
+      size_max:
+        $ref: "#/$defs/nonNegativeInteger"
+      overlap:
+        $ref: "#/$defs/nonNegativeInteger"

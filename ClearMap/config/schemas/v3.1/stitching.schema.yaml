@@ -72,4 +72,21 @@ properties:
 
       required: [use_npy, run, layout_channel]
 
+  performance:
+    type: object
+    additionalProperties: true
+    properties:
+      file_conversion:
+        type: object
+        additionalProperties: true
+        properties:
+          n_processes:
+            $ref: "./typedefs.schema.yaml#/$defs/nProcessesType"
+      stitching:
+        type: object
+        additionalProperties: true
+        properties:
+          n_processes:
+            $ref: "./typedefs.schema.yaml#/$defs/nProcessesType"
+
 additionalProperties: true

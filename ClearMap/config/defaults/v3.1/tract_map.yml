@@ -22,11 +22,21 @@ templates:
       label_coordinates: true
       voxelize: true
       export_df: true
-    parallel_params:
-      min_point_list_size: 1000000
-      max_point_list_size: 10000000
-      n_processes_binarization: 15
-      n_processes_resampling: 15
-      n_processes_where: 23
-      n_processes_transform: 23
-      n_processes_label: 23
+
+performance:
+  binarization:
+    n_processes: 15
+  where:
+    n_processes: 23      # mask_to_coordinates
+  transform:
+    block_processing:
+      n_processes: 23
+      size_min: 1000000    # min_point_list_size
+      size_max: 10000000   # max_point_list_size
+      overlap: null        # unused
+  label:
+    block_processing:
+      n_processes: 23
+      size_min: 1000000    # min_point_list_size
+      size_max: 10000000   # max_point_list_size
+      overlap: null        # unused

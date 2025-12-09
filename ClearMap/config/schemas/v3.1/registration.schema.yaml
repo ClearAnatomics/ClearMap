@@ -56,4 +56,15 @@ properties:
 
       additionalProperties: true
 
+  performance:
+    type: object
+    additionalProperties: true
+    properties:
+      resampling:
+        type: object
+        additionalProperties: true
+        properties:
+          n_processes:
+            $ref: "./typedefs.schema.yaml#/$defs/nProcessesType"
+
 additionalProperties: true

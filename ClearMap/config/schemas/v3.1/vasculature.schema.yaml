@@ -3,6 +3,7 @@ $id: "https://clearmap.org/schemas/v3/vasculature"
 
 type: object
 additionalProperties: true
+
 properties:
   clearmap_schema: { type: integer }
   clearmap_version: { type: string }
@@ -21,9 +22,8 @@ properties:
               additionalProperties: true
               properties:
                 run: { type: boolean }
-                # FIXME: check if values can take None/null
                 clip_range: { $ref: "./typedefs.schema.yaml#/$defs/numberPairPositive" }
-                threshold: { type: [number, "null"] }
+                threshold: { type: ["number", "null"] }
             smooth:
               type: object
               additionalProperties: true
@@ -37,8 +37,6 @@ properties:
               additionalProperties: true
               properties:
                 run: { type: boolean }
-                size_max: { type: integer, minimum: 0 }
-                overlap: { type: integer, minimum: 0 }
                 resample_factor: { type: number, exclusiveMinimum: 0 }
         # Spec B: combined/simple flags
         - type: object
@@ -104,3 +102,33 @@ properties:
       display:
         type: object
         additionalProperties: true
+
+  performance:
+    type: object
+    additionalProperties: true
+    properties:
+      binarization:
+        type: object
+        additionalProperties: true
+        properties:
+          vessels:
+            type: object
+            additionalProperties: true
+            properties:
+              deep_fill:
+                type: object
+                additionalProperties: true
+                properties:
+                  block_processing:
+                    $ref: "./typedefs.schema.yaml#/$defs/blockProcessing"
+
+          large_vessels:
+            type: object
+            additionalProperties: true
+            properties:
+              deep_fill:
+                type: object
+                additionalProperties: true
+                properties:
+                  block_processing:
+                    $ref: "./typedefs.schema.yaml#/$defs/blockProcessing"

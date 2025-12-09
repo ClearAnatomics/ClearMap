@@ -23,7 +23,6 @@ import numpy as np
 import pandas as pd
 
 from ClearMap.Analysis.graphs.graph_filters import GraphFilter
-from ClearMap.IO.assets_specs import ChannelSpec
 from PyQt5.QtWidgets import QDialogButtonBox
 
 from ClearMap.IO.workspace2 import Workspace2
@@ -54,7 +53,7 @@ from ClearMap.Visualization.Qt import Plot3d as q_p3d
 from ClearMap.Visualization.Vispy import plot_graph_3d  # WARNING: vispy dependency
 
 from ClearMap.gui.dialog_helpers import warning_popup
-from ClearMap.Utils.utilities import is_in_range, get_free_v_ram, clear_cuda_cache
+from ClearMap.Utils.utilities import is_in_range, get_free_v_ram, clear_cuda_cache, sanitize_n_processes
 
 __author__ = ('Christoph Kirst <christoph.kirst.ck@gmail.com>,'
               ' Sophie Skriabine <sophie.skriabine@icm-institute.org>,'
@@ -277,11 +276,11 @@ class BinaryVesselProcessor(PipelineOrchestrator):
             binarization_parameter.update(equalize=None, vesselize=None)
 
         processing_parameter = copy.deepcopy(vasculature.default_binarization_processing_parameter)
-        processing_parameter.update(processes=self.machine_config['n_processes_binarization'],
-                                    overlap=self.machine_config['detection_chunk_overlap'],
-                                    size_max=self.machine_config['detection_chunk_size_max'],
-                                    size_min=self.machine_config['detection_chunk_size_min'],
-                                    as_memory=True, verbose=True)
+        block_params = self.config['performance']['binarization'][channel]['binarize']['block_processing']
+        processing_parameter.update(
+            processes=sanitize_n_processes(block_params['n_processes']),
+            size_min=block_params['size_min'], size_max=block_params['size_max'],
+            overlap=block_params['overlap'], as_memory=True, verbose=True)
 
         vasculature.binarize(source, sink,
                              binarization_parameter=binarization_parameter,
@@ -322,10 +321,12 @@ class BinaryVesselProcessor(PipelineOrchestrator):
         else:
             smoothing_parameters = {}
 
+        perf_cfg = self.config['performance']['binarization'][channel]['smooth']['block_processing']
         perf_params = copy.deepcopy(vasculature.default_postprocessing_processing_parameter)
-        perf_params.update(size_max=50)
+        perf_params.update(size_max=perf_cfg['size_max'])
         smoothed, tmp_f_path = vasculature.apply_smoothing(source, sink, smoothing_parameters, perf_params,
-                                                           processes=None, verbose=True)
+                                                           processes=sanitize_n_processes(perf_cfg['n_processes']),
+                                                           verbose=True)
 
         self.postprocessing_last_step[channel] = {'source': smoothed, 'temp_path': tmp_f_path,
                                                   'keep': smoothing_parameters.get('save', False)}
@@ -341,7 +342,9 @@ class BinaryVesselProcessor(PipelineOrchestrator):
         source = clearmap_io.as_source(source)
         sink = initialize_sink(sink, shape=source.shape, dtype=source.dtype, order=source.order, return_buffer=False)
 
-        binary_filling.fill(source, sink=sink, processes=None, verbose=True)  # WARNING: prange if filling
+        perf_cfg = self.config['performance']['binarization'][channel]['binary_fill']
+        binary_filling.fill(source, sink=sink, processes=sanitize_n_processes(perf_cfg['n_processes']),
+                            verbose=True)  # WARNING: prange if filling
         if self.postprocessing_last_step[channel]['temp_path'] and not self.postprocessing_last_step[channel]['keep']:
             clearmap_io.delete_file(self.postprocessing_last_step[channel]['temp_path'])
 
@@ -352,11 +355,12 @@ class BinaryVesselProcessor(PipelineOrchestrator):
         if not binary_cfg['deep_fill']['run']:
             return
 
+        perf_params = self.config['performance']['binarization'][channel]['deep_fill']['block_processing']
         REQUIRED_V_RAM = 22000  # FIXME: put in config or at top of module
         if size_max is None:
-            size_max = binary_cfg['deep_fill']['size_max']
+            size_max = perf_params['size_max']
         if overlap is None:
-            overlap = binary_cfg['deep_fill']['overlap']
+            overlap = perf_params['overlap']
         if resample_factor is None:
             resample_factor = binary_cfg['deep_fill']['resample_factor']
 
@@ -403,8 +407,10 @@ class BinaryVesselProcessor(PipelineOrchestrator):
                         sources.append(asset.path)
                     else:
                         raise FileNotFoundError(f'File {asset.path} not found')
+            perf_params = self.config['performance']['combine']['block_processing']
             block_processing.process(np.logical_or, sources, sink_asset.path,
-                                     size_max=500, overlap=0, processes=None, verbose=True)
+                                     size_max=perf_params['size_max'], overlap=perf_params['overlap'],
+                                     processes=sanitize_n_processes(perf_params['n_processes']), verbose=True)
         else:  # We expect to have at least all_vessels_channel
             source = self.steps[self.all_vessels_channel].get_asset(self.steps[self.all_vessels_channel].filled,
                                                                     step_back=True).path
@@ -425,7 +431,7 @@ class BinaryVesselProcessor(PipelineOrchestrator):
             postprocessing_processing_parameter['size_max'] = 50
             vasculature.postprocess(source, sink, postprocessing_parameter=postprocessing_parameter,
                                     processing_parameter=postprocessing_processing_parameter,
-                                    processes=None, verbose=True)
+                                    processes=None, verbose=True)  # FIXME: n_processes in config?
         else:
             clearmap_io.copy_file(source, sink)  # FIXME: could be a symlink
 

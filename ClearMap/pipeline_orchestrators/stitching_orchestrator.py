@@ -67,11 +67,11 @@ class StitchingProcessor(PipelineOrchestrator):
     def convert_tiles_channel(self, channel, _force=False):
         if self.config['channels'][channel].get('use_npy', False) or _force:
             asset = self.get('raw', channel=channel, prefix=self.sample_manager.prefix)
+            n_procs = self.config['performance']['file_conversion']['n_processes']
             file_list = asset.file_list
             if not file_list or Path(file_list[0]).suffix == '.tif':
                 try:
-                    asset.convert('.npy', processes=self.machine_config['n_processes_file_conv'],
-                                  workspace=self.workspace, verbose=self.verbose)
+                    asset.convert('.npy', processes=n_procs, workspace=self.workspace, verbose=self.verbose)
                 except BrokenProcessPool:
                     print(f'File conversion of {channel} to numpy canceled')
                     return
@@ -291,12 +291,12 @@ class StitchingProcessor(PipelineOrchestrator):
             background_params = (rigid_cfg['background_level'],
                                  rigid_cfg['background_pixels'])
         max_shifts = [rigid_cfg[f'max_shifts_{ax}'] for ax in 'xyz']
+        n_procs = self.config['performance']['stitching']['n_processes']
         self.prepare_watcher_for_substep(len(layout.alignments), self.__rigid_stitching_align_re, 'Align layout rigid')
         try:
             stitching_rigid.align_layout_rigid_mip(layout, depth=projection_thickness, max_shifts=max_shifts,
                                                    ranges=[None, None, None], background=background_params,
-                                                   clip=25000, processes=self.machine_config['n_processes_stitching'],
-                                                   workspace=self.workspace, verbose=True)
+                                                   clip=25000, processes=n_procs, workspace=self.workspace, verbose=True)
         except BrokenProcessPool:
             print('Stitching canceled')
             self.stopped = True  # FIXME: see if appropriate solution
@@ -359,7 +359,7 @@ class StitchingProcessor(PipelineOrchestrator):
         n_pairs = len(layout.alignments)
         self.prepare_watcher_for_substep(n_pairs, self.__wobbly_stitching_align_lyt_re, 'Align layout wobbly')
         try:
-            n_processes = self.machine_config['n_processes_stitching']
+            n_processes = self.config['performance']['stitching']['n_processes']
             stitching_wobbly.align_layout(layout, axis_range=(None, None, 3), max_shifts=max_shifts, axis_mip=None,
                                           stack_validation_params=stack_validation_params,
                                           prepare=dict(method='normalization', clip=None, normalize=True),
@@ -376,7 +376,7 @@ class StitchingProcessor(PipelineOrchestrator):
         self.prepare_watcher_for_substep(len(layout.alignments) // 2,  # WARNING: bad estimation
                                          self.__wobbly_stitching_place_re, 'Place layout wobbly')
         try:
-            n_processes = self.machine_config['n_processes_stitching']
+            n_processes = self.config['performance']['stitching']['n_processes']
             if platform.system().lower().startswith('darwin'):  # No parallel on MacOS
                 n_processes = 1
             stitching_wobbly.place_layout(layout, min_quality=-np.inf,
@@ -406,7 +406,7 @@ class StitchingProcessor(PipelineOrchestrator):
                                          'Stitch layout wobbly', True)
         try:
             self._replace_layout_sources(layout, channel, layout_channel)
-            n_processes = self.machine_config['n_processes_stitching']
+            n_processes = self.config['performance']['stitching']['n_processes']
             stitching_wobbly.stitch_layout(layout,
                                            sink=str(self.get_path('stitched', channel=channel)),
                                            method='interpolation',

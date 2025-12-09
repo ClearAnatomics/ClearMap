@@ -21,3 +21,7 @@ templates:
     moving_channel: "${reference}"
     params_files: ["align_affine.txt"]
     landmarks_weights: [0]
+
+performance:
+  resampling:
+    n_processes: -1    # -1: all but one; None: all

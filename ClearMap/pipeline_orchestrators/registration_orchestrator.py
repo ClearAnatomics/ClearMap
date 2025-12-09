@@ -290,7 +290,7 @@ class RegistrationProcessor(PipelineOrchestrator):
         if resampled_asset.exists:
             raise FileExistsError(f'Resampled asset ({resampled_asset}) already exists')
         default_resample_parameter = {
-            'processes': self.machine_config['n_processes_resampling'],
+            'processes': self.config['performance']['resampling']['n_processes'],
             'verbose': self.config['verbose']
         }  # WARNING: duplicate (use method ??)
         source_asset = self.get('stitched', channel=channel, default=None)

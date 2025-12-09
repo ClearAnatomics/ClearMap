@@ -3,6 +3,7 @@ $id: "https://clearmap.org/schemas/v3/tract_map"
 
 type: object
 additionalProperties: true
+
 properties:
   clearmap_schema:   { type: integer }
   clearmap_version:  { type: string }
@@ -56,14 +57,30 @@ properties:
             voxelize:               { type: boolean }
             export_df:              { type: boolean }
 
-        parallel_params:
-          type: object
-          additionalProperties: true
-          properties:
-            min_point_list_size: { $ref: "./typedefs.schema.yaml#/$defs/positiveInteger" }
-            max_point_list_size: { $ref: "./typedefs.schema.yaml#/$defs/positiveInteger" }
-            n_processes_binarization:   { $ref: "./typedefs.schema.yaml#/$defs/nProcessesType" }
-            n_processes_resampling:     { $ref: "./typedefs.schema.yaml#/$defs/nProcessesType" }
-            n_processes_where:          { $ref: "./typedefs.schema.yaml#/$defs/nProcessesType" }
-            n_processes_transform:      { $ref: "./typedefs.schema.yaml#/$defs/nProcessesType" }
-            n_processes_label:          { $ref: "./typedefs.schema.yaml#/$defs/nProcessesType" }
+  performance:
+    type: object
+    additionalProperties: true
+    properties:
+      binarization:
+        type: object
+        additionalProperties: true
+        properties:
+          n_processes: { $ref: "./typedefs.schema.yaml#/$defs/nProcessesType" }
+
+      where:
+        type: object
+        additionalProperties: true
+        properties:
+          n_processes: { $ref: "./typedefs.schema.yaml#/$defs/nProcessesType" }
+
+      transform:
+        type: object
+        additionalProperties: true
+        properties:
+          block_processing: { $ref: "./typedefs.schema.yaml#/$defs/blockProcessing" }
+
+      label:
+        type: object
+        additionalProperties: true
+        properties:
+          block_processing: { $ref: "./typedefs.schema.yaml#/$defs/blockProcessing" }

@@ -86,7 +86,8 @@ class ColocalizationProcessor(CompoundChannelPipelineOrchestrator):
     def compute_colocalization(self, channel_a, channel_b):
         # voxel_blob_diameter will also be used to compute the overlap
         voxel_blob_diameter = self.config['comparison']['particle_diameter']
-        n_processes = sanitize_n_processes(self.config['performance']['n_processes'])
+        perf_cfg = self.cfg_coordinator.get_config_view(self.config_name)['performance']
+        n_processes = sanitize_n_processes(perf_cfg['n_processes'])
 
         report = self.colocalization_channels[channel_a].compare(self.colocalization_channels[channel_b],
                                                                  blob_diameter=voxel_blob_diameter,

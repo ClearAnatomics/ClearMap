@@ -24,3 +24,12 @@ templates:
       radii: [5, 5, 5]
     run:
       plot_when_finished: false
+
+performance:
+  channel:
+    detection:
+      block_processing:
+        n_processes: 10
+        size_min: 10
+        size_max: 16
+        overlap: 5

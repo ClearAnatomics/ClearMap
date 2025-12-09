@@ -47,7 +47,7 @@ import ClearMap.ImageProcessing.Experts.Cells as cell_detection
 import ClearMap.Analysis.Measurements.Voxelization as voxelization
 from ClearMap.IO.workspace2 import Workspace2
 from ClearMap.Utils.exceptions import MissingRequirementException
-from ClearMap.Utils.utilities import requires_assets, FilePath
+from ClearMap.Utils.utilities import requires_assets, FilePath, sanitize_n_processes
 from ClearMap.config.config_coordinator import ConfigCoordinator
 from ClearMap.pipeline_orchestrators.generic_orchestrators import ChannelPipelineOrchestrator
 from ClearMap.Visualization.Qt.widgets import Scatter3D
@@ -300,14 +300,13 @@ class CellDetector(ChannelPipelineOrchestrator):
             maxima_asset.delete(missing_ok=True)
             cell_detection_param['maxima_detection']['save'] = str(maxima_asset.path)
 
+        raw_cfg = self.cfg_coordinator.get_config_view(self.config_name)
+        block_params = raw_cfg['performance'][self.channel]['detection_blocks']['block_processing']
         processing_parameter = copy.deepcopy(cell_detection.default_cell_detection_processing_parameter)
-        processing_parameter.update(  # TODO: store as other dict and run .update(**self.extra_detection_params)
-            processes=self.machine_config['n_processes_cell_detection'],
-            size_min=self.machine_config['detection_chunk_size_min'],
-            size_max=self.machine_config['detection_chunk_size_max'],
-            overlap=self.machine_config['detection_chunk_overlap'],
-            verbose=True
-        )
+        # TODO: store as other dict and run .update(**self.extra_detection_params)
+        processing_parameter.update(processes=sanitize_n_processes(block_params['n_processes']),
+                                    size_min=block_params['size_min'], size_max=block_params['size_max'],
+                                    overlap=block_params['overlap'], verbose=True)
 
         # TODO: round to processors
         n_steps = self.get_n_blocks(self.get('stitched', channel=self.channel).shape()[2])
@@ -532,8 +531,10 @@ class CellDetector(ChannelPipelineOrchestrator):
         return plot_3d.plot(density_path, arrange=arrange)
 
     def get_n_blocks(self, dim_size):
-        blk_size = self.machine_config['detection_chunk_size_max']
-        overlap = self.machine_config['detection_chunk_overlap']
+        raw_cfg = self.cfg_coordinator.get_config_view(self.config_name)
+        perf_params = raw_cfg['performance'][self.channel]['detection']['block_processing']
+        blk_size = perf_params['size_max']
+        overlap = perf_params['overlap']
         n_blocks = int(np.ceil((dim_size - blk_size) / (blk_size - overlap) + 1))
         return n_blocks
 
@@ -550,8 +551,8 @@ class CellDetector(ChannelPipelineOrchestrator):
         .. deprecated:: 2.1
             Use :func:`atlas_align` and `export_collapsed_stats` instead.
         """
-        warnings.warn("export_to_clearmap1_fmt is deprecated and will be removed in future versions;"
-                      "please use the new formats from atlas_align and export_collapsed_stats", DeprecationWarning, 2)
+        warnings.warn('Method "export_to_clearmap1_fmt" is deprecated and will be removed in future versions;'
+                      'please use the new formats from atlas_align and export_collapsed_stats', DeprecationWarning, 2)
         source = self.get('cells', channel=self.channel).as_source()
         clearmap1_format = {'points': ['x', 'y', 'z'],
                             'points_transformed': ['xt', 'yt', 'zt'],

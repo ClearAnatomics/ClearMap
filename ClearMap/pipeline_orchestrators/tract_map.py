@@ -151,10 +151,10 @@ class TractMapProcessor(ChannelPipelineOrchestrator):
         binarization_parameter['deconvolve'] = None
         binarization_parameter['adaptive'] = None
 
+        perf_cfg = self.cfg_coordinator.get_config_view(self.config_name)['performance']
         processing_parameter = vasculature.default_binarization_processing_parameter.copy()
-        processing_parameter.update(processes=self.config['parallel_params']['n_processes_binarization'],
-                                    as_memory=False,
-                                    verbose=True)
+        processing_parameter.update(processes=sanitize_n_processes(perf_cfg['binarization']['n_processes']),
+                                    as_memory=False, verbose=True)
 
         vasculature.binarize(self.get_path('stitched', channel=self.channel),
                       self.get_path('binary', channel=self.channel),
@@ -169,8 +169,9 @@ class TractMapProcessor(ChannelPipelineOrchestrator):
         if output_asset.exists:
             output_asset.delete()
         if as_memmap:
+            perf_cfg = self.cfg_coordinator.get_config_view(self.config_name)['performance']
             return array_processing.where(mask, output_asset.path,
-                                          processes=self.config['parallel_params']['n_processes_where'],
+                                          processes=sanitize_n_processes(perf_cfg['where']['n_processes']),
                                           verbose=True)
             self.update_watcher_main_progress()
             print('TractMap coordinates extraction finished')
@@ -225,7 +226,6 @@ class TractMapProcessor(ChannelPipelineOrchestrator):
         transformed_coords = array_processing.initialize_sink(coordinates_transformed_path,
             dtype='float64', shape=coords.shape, return_buffer=False
         )
-        perf_params = self.config['parallel_params']
 
         target_channel = 'atlas'  # FIXME: add control for target channel
         status_bcp = self.workspace.debug
@@ -258,15 +258,18 @@ class TractMapProcessor(ChannelPipelineOrchestrator):
                                     )
         transfo.__name__ = 'parallel_transform'
 
+        perf_cfg = self.cfg_coordinator.get_config_view(self.config_name)['performance']['transform']['block_processing']
         processes = sanitize_n_processes(processes)
+        if processes != 1:  # explicit single thread
+            processes = sanitize_n_processes(perf_cfg['n_processes'])  # FIXME: decide
 
         if processes == 1:
             transformed_coords[:, :] = transfo(coords)
         else:
             block_processing.process(transfo, coords, transformed_coords,
-                                     axes=[0], processes=perf_params['n_processes_transform'],
-                                     size_min=perf_params['min_point_list_size'],
-                                     size_max=perf_params['max_point_list_size'],
+                                     axes=[0], processes=processes,
+                                     size_min=perf_cfg['size_min'],
+                                     size_max=perf_cfg['size_max'],
                                      verbose=True)
         self.update_watcher_main_progress()
         print('TractMap coordinates transformed')
@@ -296,11 +299,10 @@ class TractMapProcessor(ChannelPipelineOrchestrator):
             annotator = manager.Annotation(self.registration_processor.annotators[self.channel])
             labeling_fn = functools.partial(label_points_wrapper, annotator)
             labeling_fn.__name__ = 'label_points'  # for block_processing prints
-            perf_params = self.config['parallel_params']
+            perf_cfg = self.cfg_coordinator.get_config_view(self.config_name)['performance']['label']['block_processing']
             block_processing.process(labeling_fn, coordinates_transformed, labels,
-                                     axes=[0], processes=perf_params['n_processes_label'],
-                                     size_min=perf_params['min_point_list_size'],
-                                     size_max=perf_params['max_point_list_size'],
+                                     axes=[0], processes=sanitize_n_processes(perf_cfg['n_processes']),
+                                     size_min=perf_cfg['size_min'], size_max=perf_cfg['size_max'],
                                      verbose=True)
         self.update_watcher_main_progress()
         print('TractMap coordinates labeled')

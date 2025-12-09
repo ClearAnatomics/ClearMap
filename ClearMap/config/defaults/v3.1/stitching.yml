@@ -30,3 +30,9 @@ templates:
     use_npy: true
     run: true
     layout_channel: "${reference}"         # placeholder
+
+performance:
+  file_conversion:
+    n_processes: -1    # -1: all but one; None: all
+  stitching:
+    n_processes: -1    # -1: all but one; None: all

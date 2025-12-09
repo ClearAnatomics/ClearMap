@@ -3,6 +3,7 @@ $id: "https://clearmap.org/schemas/v3/colocalization"
 
 type: object
 additionalProperties: true
+
 properties:
   clearmap_schema: { type: integer }
   clearmap_version: { type: string }
@@ -23,17 +24,17 @@ properties:
           type: object
           additionalProperties: true
           properties:
-            max_particle_distance:          { type: number, minimum: 0 }
-            relative_overlap_threshold:     { type: number, minimum: 0, maximum: 1 }
-            voxel_number_overlap_threshold: { type: integer, minimum: 0 }
+            max_particle_distance:          { type: "number", minimum: 0 }
+            relative_overlap_threshold:     { type: "number", minimum: 0, maximum: 1 }
+            voxel_number_overlap_threshold: { type: "integer", minimum: 0 }
         voxelization:
           type: object
           additionalProperties: true
           properties:
             radii: { $ref: "./typedefs.schema.yaml#/$defs/numberTriplePositive" }
-        performance:
-          type: object
-          additionalProperties: true
-          properties:
-            # -1 → “all but one”, null → “all”
-            n_processes: { $ref: "./typedefs.schema.yaml#/$defs/nProcessesType" }
+
+  performance:
+    type: object
+    additionalProperties: true
+    properties:
+      n_processes: { $ref: "./typedefs.schema.yaml#/$defs/nProcessesType" }
