@@ -105,8 +105,23 @@ print('Creating splash screen...', flush=True)
 from ClearMap.Alignment.Stitching import layout_graph_utils  # noqa: F401
 
 from ClearMap.gui import dialog_helpers as dlg_helpers
-splash, progress_bar = ClearMap.gui.dialog_helpers.make_splash()  # Use default resolution for this early version
+
+splash, progress_bar = ClearMap.gui.dialog_helpers.make_splash(text_zone=30)  # Use default resolution for this early version
 splash.show()
+
+def overlay_splash_message(msg: str) -> None:
+    print(msg, flush=True)
+
+    font = QtGui.QFont()
+    font.setPointSize(16)
+    font.setBold(True)
+    font.setStyleHint(QtGui.QFont.SansSerif)
+    splash.setFont(font)
+
+    color = QtGui.QColor(255, 255, 255, 180)
+    splash.showMessage(msg, Qt.AlignLeft | Qt.AlignBottom, color)
+    app.processEvents()
+
 app.processEvents()
 
 # ############################################  SLOW IMPORTS #########################################################
@@ -193,7 +208,7 @@ SLOW_IMPORTS = [
 ]
 
 print('Starting heavy imports...', flush=True)
-run_staged_imports(SLOW_IMPORTS, on_message=lambda m: splash.showMessage(m),
+run_staged_imports(SLOW_IMPORTS, on_message=overlay_splash_message, #lambda m: splash.showMessage(m),
                    on_progress=lambda p: ClearMap.gui.dialog_helpers.update_pbar(app, progress_bar, p),
                    target_namespace=globals())
 

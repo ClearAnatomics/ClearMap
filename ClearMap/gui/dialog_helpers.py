@@ -132,7 +132,7 @@ def make_simple_progress_dialog(title='Processing', overall_maximum=100, sub_pro
     return dlg
 
 
-def make_splash(img_source=None, bar_max=100, message=None, res='hd', font_size=60):
+def make_splash(img_source=None, bar_max=100, message=None, res='hd', font_size=60, text_zone=0):
     if img_source is None:
         img_source = os.path.join(UI_FOLDER, 'creator', 'graphics_resources', 'splash.png')
     splash_pix = QPixmap(img_source)  # .scaled(848, 480)
@@ -142,7 +142,7 @@ def make_splash(img_source=None, bar_max=100, message=None, res='hd', font_size=
     painter.setRenderHint(QPainter.Antialiasing)
 
     # Set up the font for the overlay text.
-    font = QFont("Arial", font_size, QFont.Bold)  # FIXME: put settting in config
+    font = QFont("Arial", font_size, QFont.Bold)  # FIXME: put setting in config
     painter.setFont(font)
     metrics = QFontMetrics(font)
 
@@ -175,13 +175,27 @@ def make_splash(img_source=None, bar_max=100, message=None, res='hd', font_size=
 
     splash = QSplashScreen(splash_pix, Qt.WindowStaysOnTopHint)
     splash.setMask(splash_pix.mask())
+
     progress_bar = QProgressBar(splash)
     progress_bar.setTextVisible(True)
     progress_bar.setFont(QFont('Arial', DISPLAY_CONFIG[res]['splash_font_size'], QFont.Bold))
     progress_bar.setFormat("Loading... \t\t%p%")
     progress_bar.setMaximum(bar_max)
+
     margin = 50
-    progress_bar.setGeometry(margin, splash_pix.height() - margin, splash_pix.width() - 2 * margin, 20)
+    bar_height = 20
+
+    if text_zone < 0:  # Clip
+        text_zone = 0
+
+    # If text_zone > 0, reserve that many pixels at the very bottom of the splash
+    # for the semi-transparent "Importing ..." messages; move the bar up accordingly.
+    bar_y = splash_pix.height() - margin - text_zone
+    # Ensure we don't send the bar off the top if someone sets a silly text_zone.
+    bar_y = max(margin, bar_y)
+
+    progress_bar.setGeometry(margin, bar_y, splash_pix.width() - 2 * margin, bar_height)
+
     return splash, progress_bar
 
 
