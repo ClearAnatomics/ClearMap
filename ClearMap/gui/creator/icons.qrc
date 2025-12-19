@@ -7,5 +7,7 @@
         <file>icons/search.svg</file>
         <file>icons/magic_wand.svg</file>
         <file>icons/folder_open.svg</file>
+        <file>icons/single_brain.png</file>
+        <file>icons/mice_cohort.png</file>
     </qresource>
 </RCC>

@@ -17,6 +17,7 @@ import os
 import pathlib
 import platform
 import shutil
+import subprocess
 import tempfile
 from functools import cached_property
 from typing import Optional, TypedDict, Any, Dict, TypeAlias
@@ -298,6 +299,11 @@ def first_boot(*, allow_prompt: bool = True) -> BootResult:
 
     major, minor = mc._version.split('.')[:2]
     version_tag = f'v{major}_{minor}'
+
+    # FIXME: avoid regenerating every time, check timestamps instead
+    subprocess.run(['pyrcc5', 'ClearMap/gui/creator/icons.qrc', '-o', 'ClearMap/gui/creator/icons_rc.py'])
+    import ClearMap.gui.creator.icons_rc  # noqa: F401
+
     is_first_run = _is_first_run(version_tag)
 
     # WARNING: imported after patch_tmp to avoid issues with setting tempdir
