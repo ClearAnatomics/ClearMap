@@ -12,6 +12,7 @@ from typing import Mapping, Any, Optional, List, Final, Callable, TYPE_CHECKING,
 from ClearMap.IO.workspace2 import Workspace2
 from ClearMap.IO.workspace_asset import Asset
 from ClearMap.Utils.event_bus import BusSubscriberMixin
+from ClearMap.Utils.exceptions import ClearMapRuntimeError
 from ClearMap.Utils.utilities import handle_deprecated_args, deep_freeze, infer_origin_from_caller
 if TYPE_CHECKING:
     from ClearMap.config.config_coordinator import ConfigCoordinator
@@ -106,10 +107,10 @@ class OrchestratorBase(BusSubscriberMixin):
          'prefix': 'sample_id'}
     )
     def get(self, asset_type, channel='current', asset_sub_type=None, **kwargs):   # channel and asset_sub_type defined for completion
-        if not self.workspace:
-            raise ValueError(f'Cannot call {self.__class__.__name__}.get without a workspace. '
-                             f'Please ensure it is assigned by calling {self.__class__.__name__}.setup() '
-                             f'with a valid sample manager first.')
+        if self.workspace is None:
+            raise ClearMapRuntimeError(f'Cannot call {self.__class__.__name__}.get without a workspace. '
+                                       f'Please ensure it is assigned by calling {self.__class__.__name__}.setup() '
+                                       f'with a valid sample manager first.')
         asset = self.workspace.get(asset_type, channel=channel, asset_sub_type=asset_sub_type, **kwargs)
         return asset
 
