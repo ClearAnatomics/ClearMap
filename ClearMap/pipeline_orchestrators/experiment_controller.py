@@ -40,12 +40,14 @@ Design Notes
   ones are built on first access.
 """
 from collections import defaultdict
+from enum import Enum
 from pathlib import Path
 from typing import Callable, Dict, Iterable, Optional, Tuple, Any, Union
 
 from ClearMap.Utils.event_bus import EventBus, BusSubscriberMixin
 from ClearMap.Utils.events import WorkspaceChanged, UiChannelRenamed, UiChannelsChanged
 from ClearMap.config.config_coordinator import ConfigCoordinator
+from ClearMap.config.config_handler import ALTERNATIVES_REG
 from ClearMap.config.defaults_provider import DefaultsProvider
 from ClearMap.pipeline_orchestrators.group_orchestrators import DensityGroupAnalysisOrchestrator
 from ClearMap.pipeline_orchestrators.processor_launcher import ProcessorLauncher
@@ -58,6 +60,11 @@ ChannelKey = Optional[Union[str, Tuple[str, ...]]]  # str | (str,...) | None
 RealChannelKey = Union[str, Tuple[str, ...]]  # str | (str,...) (skip None)
 FactoryKey = Tuple[str, Optional[str]]           # (pipeline, substep)
 WorkerKey  = Tuple[ChannelKey, Optional[str]]    # (channel_key, substep)
+
+
+class AppMode(Enum):
+    EXPERIMENT = 'experiment'  # single sample
+    GROUP      = 'group'  # cohort / study
 
 
 def swap_old_channel(ch_key: ChannelKey, old_chan: RealChannelKey, new_chan: RealChannelKey) -> ChannelKey:
@@ -336,6 +343,7 @@ class ExperimentController(BusSubscriberMixin):
         try:
             self.set_experiment_dir(exp_dir)
             print(f'Opening experiment at {self._exp_dir}')
+            self._refresh_relevant_sections()
 
             self.cfg_coordinator.load_all()
 
@@ -511,6 +519,7 @@ class ExperimentController(BusSubscriberMixin):
         """
         Handle add/remove; seed/drop per-channel sections, purge artifacts, then publish.
         """
+        self._refresh_relevant_sections()
         self.reconcile_workers_after_channel_change(before=evt.before, after=evt.after)
 
     def channel_snapshot(self):
@@ -580,6 +589,30 @@ class ExperimentController(BusSubscriberMixin):
         Do not expose repository paths here—UI shouldn’t hit disk.
         """
         return self.cfg_coordinator.get_config_view()
+
+    def infer_required_sections(self) -> set[str]:
+        """
+        Given this controller’s SampleManager (single-sample view),
+        compute which config sections should exist for this experiment.
+        """
+        sections: set[str] = {"sample"}  # always
+
+        pipelines = self.sample_manager.infer_pipelines()
+
+        for p in pipelines:
+            # e.g. "TractMap" → "tract_map", "CellMap" → "cell_map", etc.
+            sec = ALTERNATIVES_REG.pipeline_to_section_name(p)
+            if sec:
+                sections.add(sec)
+
+        return sections
+
+    def _refresh_relevant_sections(self) -> None:
+        sections = self.infer_required_sections()
+        self.cfg_coordinator.set_active_sections(sections)
+
+        # Seed defaults only for active sections
+        self.cfg_coordinator.seed_missing_from_defaults(tabs_only=True)
 
 
 ####################### Multi experiment controller ###########################
@@ -662,3 +695,7 @@ class AnalysisGroupController:
             analysis_worker.set_thread_wrapper(self._thread_wrapper)
         self._analysis_worker = analysis_worker
         return analysis_worker
+
+    # FIXME: check this
+    def infer_required_sections(self) -> set[str]:
+        return {'group_analysis', 'batch_processing'}
