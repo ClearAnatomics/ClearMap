@@ -819,7 +819,7 @@ def convert_files(filenames, extension=None, path=None, processes=None, verbose=
 
     Arguments
     ---------
-    filenames : list of str
+    filenames : list of str | list of pathlib.Path
         The filenames to convert
     extension : str
         The new file format extension.
