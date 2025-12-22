@@ -13,7 +13,7 @@ import numpy as np
 
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtWidgets import (QToolBox, QCheckBox, QLabel, QHBoxLayout, QVBoxLayout,
-                             QSpinBox, QLineEdit, QDoubleSpinBox, QRadioButton, QFrame)
+                             QSpinBox, QLineEdit, QDoubleSpinBox, QRadioButton, QFrame, QWidget)
 
 from ClearMap.config.atlas import ATLAS_NAMES_MAP
 from ClearMap.Utils.exceptions import ClearMapValueError
@@ -40,6 +40,65 @@ __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
 __copyright__ = 'Copyright © 2022 by Charly Rousseau'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://github.com/ClearAnatomics/ClearMap'
+
+
+class NProcessesParams(UiParameter):
+    """
+    Minimal helper for performance.<step>.n_processes
+    """
+    n_processes: int
+
+    def __init__(self, tab, *, cfg_path: list[str],
+                 event_bus: EventBus, get_view=None, apply_patch=None):
+        self.cfg_path = list(cfg_path)
+        super().__init__(tab, event_bus=event_bus,
+                         get_view=get_view, apply_patch=apply_patch)
+
+    def build_params_dict(self):
+        return {'n_processes': ParamLink(self.cfg_path, self.tab.nProcessesSpinBox),}
+
+    @property
+    def cfg_subtree(self):
+        # parent: e.g. ['tract_map', 'performance', 'binarization']
+        return self.cfg_path[:-1]
+
+
+class BlockProcessingParams(UiParameter):
+    """
+    Generic block-processing parameters (n_processes + size_min / size_max / overlap).
+
+    You can attach this to any 'block_processing' subtree by passing cfg_prefix.
+    tab is expected to be the BlockProcessingParamsWidget for that step.
+    """
+
+    n_processes: int
+    size_min: int | None
+    size_max: int | None
+    overlap: int | None
+
+    def __init__(self, tab, *, cfg_prefix: list[str],
+                 event_bus: EventBus, get_view=None, apply_patch=None):
+        self.cfg_prefix = list(cfg_prefix)
+        super().__init__(tab, event_bus=event_bus, get_view=get_view, apply_patch=apply_patch)
+
+
+    def build_params_dict(self):
+        def path(*tail):
+            return self.cfg_prefix + list(tail)
+
+        return {
+            'n_processes': ParamLink(path('n_processes'), self.tab.nProcessesSpinBox),
+            'size_min': ParamLink(path('size_min'), self.tab.sizeMinSpinBox,
+                                  disabled_value=None, ui_sentinel=-1, enforce_sentinel_min=True),
+            'size_max': ParamLink(path('size_max'), self.tab.sizeMaxSpinBox,
+                                  disabled_value=None, ui_sentinel=-1, enforce_sentinel_min=True),
+            'overlap': ParamLink(path('overlap'), self.tab.overlapSpinBox,
+                                 disabled_value=None, ui_sentinel=-1, enforce_sentinel_min=True),
+        }
+
+    @property
+    def cfg_subtree(self):
+        return self.cfg_prefix[:-1]
 
 
 class SampleChannelParameters(ChannelUiParameter):
@@ -874,10 +933,12 @@ class CellMapParams(ChannelsUiParameterCollection):
     def __init__(self, tab, sample_params, *, event_bus: EventBus, get_view=None, apply_patch=None):
         super().__init__(tab, pipeline_name='CellMap', event_bus=event_bus, get_view=get_view, apply_patch=apply_patch)
         self.sample_params = sample_params
+        self._perf_params: dict[str, ChannelCellMapPerformanceParams] = {}
+
 
     @property
     def params(self):
-        return self.values()
+        return list(self.values()) + list(self._perf_params.values())
 
     def add_channel(self, channel_name, data_type=None):
         if channel_name not in self.keys():
@@ -886,6 +947,25 @@ class CellMapParams(ChannelsUiParameterCollection):
             self[channel_name] = ChannelCellMapParams(self.tab, channel_name, main_params=self,
                                                       event_bus=self._bus, dtype=dtype,
                                                       get_view=self._get_view, apply_patch=self._apply_patch)
+
+    def add_perf_channel(self, channel_name: str):#, page_widget: QWidget):
+        """
+        Called from the tab once the channel UI page exists.
+        """
+        if channel_name in self._perf_params:
+            return
+        self._perf_params[channel_name] = ChannelCellMapPerformanceParams(
+            self.tab, channel_name, event_bus=self._bus,
+            get_view=self._get_view, apply_patch=self._apply_patch)
+
+    def pop(self, channel_name: str):
+        # tear down both algo + perf params
+        if channel_name in self:
+            self[channel_name].teardown()
+            super().pop(channel_name)
+        if channel_name in self._perf_params:
+            self._perf_params[channel_name].teardown()
+            del self._perf_params[channel_name]
 
 
 class ChannelCellMapParams(ChannelUiParameter, OrthoviewerSlicingMixin):
@@ -978,14 +1058,42 @@ class ChannelCellMapParams(ChannelUiParameter, OrthoviewerSlicingMixin):
         return out
 
 
+class ChannelCellMapPerformanceParams(ChannelUiParameter):
+    """
+    Links per-channel detection.block_processing performance to the UI widget.
+    """
+
+    n_processes: int
+    size_min: int
+    size_max: int
+    overlap: int | None
+
+    def build_params_dict(self):
+        bp = self.tab.detectionBlockProcessingWidget  # we’ll attach this attr in _setup_channel
+        return {
+            'n_processes': ParamLink(['detection', 'block_processing', 'n_processes'], bp._nproc_widget),
+            'size_min': ParamLink(['detection', 'block_processing', 'size_min'], bp._size_min_spin),
+            'size_max': ParamLink(['detection', 'block_processing', 'size_max'], bp._size_max_spin),
+            'overlap': ParamLink(['detection', 'block_processing', 'overlap'],
+                                 bp._overlap_spin, disabled_value=None, ui_sentinel=-1, enforce_sentinel_min=True),
+        }
+
+    @property
+    def cfg_subtree(self):
+        # Root for this channel’s perf; ParamLinks are already fully qualified, so this is mostly for helpers
+        return ['cell_map', 'performance', self.name]
+
+
 class TractMapParams(ChannelsUiParameterCollection):
     def __init__(self, tab, sample_params, *, event_bus: EventBus, get_view=None, apply_patch=None):
         super().__init__(tab, pipeline_name='TractMap', event_bus=event_bus, get_view=get_view, apply_patch=apply_patch)
         self.sample_params = sample_params
+        self.performance_params = TractMapPerformanceParams(tab, event_bus=event_bus,
+                                                            get_view=get_view, apply_patch=apply_patch)
 
     @property
     def params(self):
-        return self.values()
+        return list(self.values()) + [self.performance_params]
 
     def add_channel(self, channel_name, data_type=None):
         if channel_name not in self.channels:
@@ -1009,14 +1117,6 @@ class ChannelTractMapParams(ChannelUiParameter, OrthoviewerSlicingMixin):
     label_coordinates: bool
     voxelize: bool
     export_df: bool
-    # [[[parallel_params]]]
-    # min_point_list_size = 1000000
-    # max_point_list_size = 10000000
-    # n_processes_binarization = 15
-    # n_processes_resampling = 15
-    # n_processes_where = 23
-    # n_processes_transform = 23
-    # n_processes_label = 23
 
     def __init__(self, tab, channel, *, main_params, event_bus: EventBus, get_view=None, apply_patch=None):
         super().__init__(tab, channel, event_bus=event_bus, get_view=get_view, apply_patch=apply_patch)
@@ -1050,6 +1150,45 @@ class ChannelTractMapParams(ChannelUiParameter, OrthoviewerSlicingMixin):
 
     def connect(self):
         self.connect_simple_widgets()
+
+class TractMapPerformanceParams(UiParameter):
+    """
+    tract_map.performance.<section> → performanceGroupBox widgets.
+    Shared (not per-channel) in v3.1.
+    """
+    cfg_subtree = ['tract_map', 'performance']
+
+    def build_params_dict(self):
+        t = self.tab  # shorthand
+        return {
+            # binarization.performance
+            'binarization_n_processes': ParamLink(['performance', 'binarization', 'n_processes'],
+                                                  t.binarizationPerf),
+
+            # where.performance
+            'where_n_processes': ParamLink(['performance', 'where', 'n_processes'],
+                                           t.wherePerf),
+
+            # transform.block_processing
+            'transform_size_min': ParamLink(['performance', 'transform', 'block_processing', 'size_min'],
+                                            t.transformBlock._size_min_spin),
+            'transform_size_max': ParamLink(['performance', 'transform', 'block_processing', 'size_max'],
+                                            t.transformBlock._size_max_spin),
+            'transform_overlap': ParamLink(['performance', 'transform', 'block_processing', 'overlap'],
+                                           t.transformBlock._overlap_spin),
+            'transform_n_processes': ParamLink(['performance', 'transform', 'block_processing', 'n_processes'],
+                                               t.transformBlock._nproc_widget),
+
+            # label.block_processing
+            'label_size_min': ParamLink(['performance', 'label', 'block_processing', 'size_min'],
+                                        t.labelBlock._size_min_spin),
+            'label_size_max': ParamLink(['performance', 'label', 'block_processing', 'size_max'],
+                                        t.labelBlock._size_max_spin),
+            'label_overlap': ParamLink(['performance', 'label', 'block_processing', 'overlap'],
+                                       t.labelBlock._overlap_spin),
+            'label_n_processes': ParamLink(['performance', 'label', 'block_processing', 'n_processes'],
+                t.labelBlock._nproc_widget),
+        }
 
 
 class ColocalizationParams(ChannelsUiParameterCollection):
@@ -1504,15 +1643,7 @@ class VesselVisualizationParams(UiParameter, OrthoviewerSlicingMixin):
 
 
 class PreferencesParams(UiParameter):
-    verbosity: str
-    # n_processes_file_conv: int
-    # n_processes_resampling: int
-    # n_processes_stitching: int
-    # n_processes_cell_detection: int
-    # n_processes_binarization: int
-    # chunk_size_min: int
-    # chunk_size_max: int
-    # chunk_size_overlap: int
+    verbosity: str  # == loglevel
     start_folder: str
     start_full_screen: bool
     lut: str

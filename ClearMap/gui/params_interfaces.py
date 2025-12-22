@@ -1,7 +1,6 @@
 import ast
 import functools
 import traceback
-import sip
 import warnings
 from abc import ABC, abstractmethod
 from typing import List, Any, Callable, Mapping, Optional, Dict, Type, Tuple, Sequence, Union
@@ -9,6 +8,7 @@ from typing import List, Any, Callable, Mapping, Optional, Dict, Type, Tuple, Se
 from importlib_metadata import version
 from packaging.version import Version
 
+from PyQt5 import sip
 from PyQt5.QtWidgets import (QCheckBox, QLabel, QLineEdit, QSpinBox, QFrame,
                              QComboBox, QPlainTextEdit, QTextEdit, QGroupBox,
                              QWidget, QListWidget, QDoubleSpinBox)
@@ -20,7 +20,8 @@ from ClearMap.Utils.utilities import set_item_recursive, get_item_recursive, DEL
 from ClearMap.Utils.exceptions import ConfigNotFoundError, ClearMapValueError
 from ClearMap.config.config_handler import ALTERNATIVES_REG
 from ClearMap.gui.gui_utils_base import disconnect_widget_signal
-from ClearMap.gui.widgets import ExtendableTabWidget, FileDropListWidget, LandmarksWeightsPanel, GroupsWidgetAdapter
+from ClearMap.gui.widgets import ExtendableTabWidget, FileDropListWidget, LandmarksWeightsPanel, GroupsWidgetAdapter, \
+    NProcessesWidget
 
 CLEARMAP_VERSION = Version(version('ClearMap'))
 DEBUG_PAINT_GUARD = True   # FIXME: base on machine params log_level
@@ -68,10 +69,10 @@ class ParamLink:
         The list of keys to access the value in the config file
         If None, the attribute is not present in the config file and
         will not be connected
-    widget: QWidget
+    _widget: QWidget
         The GUI widget to be connected to the config file
-    attr_name: str
-        The name of the attribute in the class
+    object_name: str
+
     default: Any
         The default value to be used if the value is not found in the config file
     connect: function | bool
@@ -93,7 +94,7 @@ class ParamLink:
                  extra_connect: Optional[Callable[[QWidget, Callable[[], None]], Callable | None]] = None,
                  missing_ok: bool = False,
                  present_if: Optional[Callable[[dict], bool]] = None,
-                 disabled_value=None, ui_sentinel=None, enforce_sentinel_min=False,):
+                 disabled_value: Any =None, ui_sentinel: Any =None, enforce_sentinel_min=False,):
         if keys is None:
             connect = False
         self.keys: List[str] = keys
@@ -777,6 +778,26 @@ WIDGET_OPS.register(
     connector=lambda w, cb: w.connect(cb),
 )
 
+
+def n_proc_getter(widget: NProcessesWidget):
+    val = widget.value()
+    return val
+
+
+def n_proc_setter(widget: NProcessesWidget, value):
+    widget.setValue(int(value))
+
+
+def n_proc_connector(widget: NProcessesWidget, cb):
+    def _slot(_val: int):
+        cb()
+    widget.valueChanged.connect(_slot)
+    return lambda: disconnect_widget_signal(widget.valueChanged, slot=_slot)
+
+
+WIDGET_OPS.register(NProcessesWidget, getter=n_proc_getter,
+                    setter=n_proc_setter, connector=n_proc_connector)
+
 class UiParameter(BusSubscriberMixin):
     """
     This is a class to link the GUI widgets to the config file.
@@ -919,9 +940,8 @@ class UiParameter(BusSubscriberMixin):
     def connect_simple_widgets(self):
         for k in self.params_dict.keys():
             link = self.params_dict[k]
-            if isinstance(link, ParamLink) and link.has_connect_function():
-                self.__connect_widget(k)
-            elif self.is_simple_attr(k) and link.connect and not hasattr(self, f'handle_{k}_changed'):
+            if (isinstance(link, ParamLink) and link.has_connect_function()) or \
+                (self.is_simple_attr(k) and link.connect and not hasattr(self, f'handle_{k}_changed')):
                 self.__connect_widget(k)
 
     def __connect_widget(self, key):

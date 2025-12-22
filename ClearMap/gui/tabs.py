@@ -128,7 +128,7 @@ from .dialogs import ResourceTypeToFolderDialog
 from .tabs_interfaces import PostProcessingTab, PreProcessingTab, BatchTab, ExperimentTab
 from .widgets import (PatternDialog, DataFrameWidget, LandmarksSelectorDialog,
                       CheckableListWidget, FileDropListWidget, ExtendableTabWidget, ensure_inline_histogram,
-                      GraphFilterList)
+                      GraphFilterList, NProcessesWidget, BlockProcessingWidget)
 from .gui_utils_base import (format_long_nb, replace_widget,  add_missing_combobox_items,
                              populate_combobox)
 from .gui_utils_images import np_to_qpixmap
@@ -950,7 +950,8 @@ class CellCounterTab(PostProcessingTab):
 
         self.advanced_controls_names = [
             'channel.detectionShapeGroupBox',
-            'channel.hMaxSinglet'
+            'channel.hMaxSinglet',
+            'channel.cellMapPerformanceGroupBox',
         ]
 
     def on_selected(self):
@@ -973,6 +974,34 @@ class CellCounterTab(PostProcessingTab):
 
     def _get_channels(self):
         return self.params.relevant_channels
+
+    def _setup_channel(self, page_widget: QWidget, channel: str):
+        """
+        Called once per channel page, before binding.
+        Here we replace the placeholder with our BlockProcessingWidget.
+        """
+        # Replace detectionPerfPlaceholder with a real BlockProcessingWidget
+        bp_widget = BlockProcessingWidget(parent=page_widget)
+        page_widget.detectionBlockProcessingWidget = replace_widget(
+            page_widget.detectionPerfPlaceholder, bp_widget,
+            layout=page_widget.cellDetectionPerfVerticalLayout
+        )
+
+    def _on_channel_added(self, channel: str):
+        """
+        This is called at the end of add_channel_tab.
+        At this point:
+          - channel UI page exists
+          - main CellMapParams knows the channel
+        """
+        page_widget = self.get_channel_ui(channel)
+        if page_widget is None:
+            return
+        # Make sure the BlockProcessingWidget exists for this page
+        if not hasattr(page_widget, 'detectionBlockProcessingWidget'):
+            self._setup_channel(page_widget, channel)
+
+        self.params.add_perf_channel(channel)
 
     def _bind_channel(self, page_widget, channel):
         """
@@ -1214,13 +1243,36 @@ class TractMapTab(PostProcessingTab):
         super().__init__(main_window, 'tract_map_tab', tab_idx)
         self.sample_manager = sample_manager
 
-        # self.advanced_controls_names = ['channel.tractMapAdvancedGroupBox']
+        self.advanced_controls_names = [# 'channel.tractMapAdvancedGroupBox'
+            'channel.performanceGroupBox',
+        ]
 
     def _bind(self):
-        pass
+        self._build_performance_ui()
 
     def _bind_params_signals(self):
         pass
+
+    def _build_performance_ui(self):
+        gb = self.ui.performanceGroupBox
+        layout = gb.verticalLayout()
+
+        # --- binarization: just n_processes ---
+        # TODO: check self.binarizationPerf or self.ui.binarizationPerf
+        self.binarizationPerf = NProcessesWidget(gb, label="Binarization n_processes")
+        layout.addWidget(self.binarizationPerf)
+
+        # --- where: just n_processes ---
+        self.wherePerf = NProcessesWidget(gb, label="Where n_processes")
+        layout.addWidget(self.wherePerf)
+
+        # --- transform: full block_processing ---
+        self.transformBlock = BlockProcessingWidget(gb, title="Transform block processing")
+        layout.addWidget(self.transformBlock)
+
+        # --- label: full block_processing ---
+        self.labelBlock = BlockProcessingWidget(gb, title="Label block processing")
+        layout.addWidget(self.labelBlock)
 
     def _set_params(self):
         self.params = TractMapParams(self.ui, self.sample_params, event_bus=self._bus,

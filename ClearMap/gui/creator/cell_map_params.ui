@@ -40,7 +40,7 @@
       </font>
      </property>
      <property name="currentIndex">
-      <number>1</number>
+      <number>4</number>
      </property>
      <widget class="QWidget" name="page">
       <property name="geometry">
@@ -48,7 +48,7 @@
         <x>0</x>
         <y>0</y>
         <width>640</width>
-        <height>450</height>
+        <height>420</height>
        </rect>
       </property>
       <attribute name="label">
@@ -70,7 +70,7 @@
        <item>
         <widget class="QToolBox" name="toolBox_2">
          <property name="currentIndex">
-          <number>0</number>
+          <number>1</number>
          </property>
          <widget class="QWidget" name="page_3">
           <property name="geometry">
@@ -78,7 +78,7 @@
             <x>0</x>
             <y>0</y>
             <width>640</width>
-            <height>390</height>
+            <height>365</height>
            </rect>
           </property>
           <attribute name="label">
@@ -218,8 +218,8 @@
            <rect>
             <x>0</x>
             <y>0</y>
-            <width>373</width>
-            <height>276</height>
+            <width>640</width>
+            <height>360</height>
            </rect>
           </property>
           <attribute name="label">
@@ -236,7 +236,7 @@
                <number>0</number>
               </property>
               <property name="topMargin">
-               <number>0</number>
+               <number>5</number>
               </property>
               <property name="rightMargin">
                <number>0</number>
@@ -260,6 +260,21 @@
                  <enum>QFrame::Raised</enum>
                 </property>
                 <layout class="QHBoxLayout" name="horizontalLayout_5">
+                 <property name="spacing">
+                  <number>2</number>
+                 </property>
+                 <property name="leftMargin">
+                  <number>2</number>
+                 </property>
+                 <property name="topMargin">
+                  <number>2</number>
+                 </property>
+                 <property name="rightMargin">
+                  <number>2</number>
+                 </property>
+                 <property name="bottomMargin">
+                  <number>2</number>
+                 </property>
                  <item>
                   <widget class="QLabel" name="label_4">
                    <property name="text">
@@ -316,6 +331,21 @@
                  <enum>QFrame::Raised</enum>
                 </property>
                 <layout class="QHBoxLayout" name="horizontalLayout_6">
+                 <property name="spacing">
+                  <number>2</number>
+                 </property>
+                 <property name="leftMargin">
+                  <number>2</number>
+                 </property>
+                 <property name="topMargin">
+                  <number>2</number>
+                 </property>
+                 <property name="rightMargin">
+                  <number>2</number>
+                 </property>
+                 <property name="bottomMargin">
+                  <number>2</number>
+                 </property>
                  <item>
                   <widget class="QLabel" name="label_10">
                    <property name="text">
@@ -372,6 +402,21 @@
                  <enum>QFrame::Raised</enum>
                 </property>
                 <layout class="QHBoxLayout" name="horizontalLayout_8">
+                 <property name="spacing">
+                  <number>2</number>
+                 </property>
+                 <property name="leftMargin">
+                  <number>2</number>
+                 </property>
+                 <property name="topMargin">
+                  <number>2</number>
+                 </property>
+                 <property name="rightMargin">
+                  <number>2</number>
+                 </property>
+                 <property name="bottomMargin">
+                  <number>2</number>
+                 </property>
                  <item>
                   <widget class="QLabel" name="label_13">
                    <property name="text">
@@ -452,7 +497,7 @@
         <x>0</x>
         <y>0</y>
         <width>640</width>
-        <height>450</height>
+        <height>420</height>
        </rect>
       </property>
       <attribute name="label">
@@ -654,7 +699,7 @@
         <x>0</x>
         <y>0</y>
         <width>640</width>
-        <height>450</height>
+        <height>420</height>
        </rect>
       </property>
       <attribute name="label">
@@ -721,7 +766,7 @@
         <x>0</x>
         <y>0</y>
         <width>640</width>
-        <height>450</height>
+        <height>420</height>
        </rect>
       </property>
       <attribute name="label">
@@ -846,7 +891,7 @@
         <x>0</x>
         <y>0</y>
         <width>640</width>
-        <height>450</height>
+        <height>420</height>
        </rect>
       </property>
       <attribute name="label">
@@ -885,6 +930,38 @@
        </item>
       </layout>
      </widget>
+    </widget>
+   </item>
+   <item>
+    <widget class="QGroupBox" name="cellMapPerformanceGroupBox">
+     <property name="font">
+      <font>
+       <bold>true</bold>
+      </font>
+     </property>
+     <property name="title">
+      <string>Performance parameters</string>
+     </property>
+     <layout class="QVBoxLayout" name="cellDetectionPerfVerticalLayout">
+      <property name="spacing">
+       <number>5</number>
+      </property>
+      <property name="leftMargin">
+       <number>0</number>
+      </property>
+      <property name="topMargin">
+       <number>5</number>
+      </property>
+      <property name="rightMargin">
+       <number>0</number>
+      </property>
+      <property name="bottomMargin">
+       <number>0</number>
+      </property>
+      <item>
+       <widget class="QWidget" name="detectionPerfPlaceholder" native="true"/>
+      </item>
+     </layout>
     </widget>
    </item>
   </layout>
