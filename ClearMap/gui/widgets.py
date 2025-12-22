@@ -48,9 +48,9 @@ from ClearMap.Visualization import Plot3d as plot_3d
 from ClearMap.Visualization.Qt.widgets import Scatter3D
 from ClearMap.config.atlas import STRUCTURE_TREE_NAMES_MAP
 
-from . import dialog_helpers as dlg_help
-from .gui_utils_base import create_clearmap_widget, compute_grid, get_widget, delete_widget, clear_layout
-from .gui_utils_images import get_pseudo_random_color, is_dark
+from ClearMap.gui import dialog_helpers as dlg_help
+from ClearMap.gui.gui_utils_base import create_clearmap_widget, compute_grid, get_widget, delete_widget, clear_layout
+from ClearMap.gui.gui_utils_images import get_pseudo_random_color, is_dark
 
 USER_NAME = getpass.getuser()
 
