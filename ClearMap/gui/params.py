@@ -118,12 +118,16 @@ class SampleChannelParameters(ChannelUiParameter):
     def __init__(self, tab, channel_name, *, event_bus: EventBus, get_view=None, apply_patch=None):
         super().__init__(tab, channel_name, event_bus=event_bus, name_widget_name='nameLineEdit',
                          get_view=get_view, apply_patch=apply_patch)
-        self.params_dict = {
+
+    def build_params_dict(self):
+        return {
             'geometry_settings_from': ParamLink(None, self.tab.sampleChannelGeometryChannelComboBox),
             'data_type': ParamLink(['data_type'], self.tab.dataTypeComboBox),
             'extension': ParamLink(['extension'], self.tab.extensionComboBox),
             'path': ParamLink(['path'], self.tab.pathPlainTextEdit),
-            'resolution': ParamLink(['resolution'], self.tab.resolutionTriplet),
+            'resolution': VectorLink(['resolution'], self.tab.resolutionTriplet,
+                                     disable_globally=False, disabled_value=None, ui_sentinel=-1,
+                                     enforce_sentinel_min=True),
             'wavelength': ParamLink(['wavelength'], self.tab.wavelengthSpinBox,
                                     disabled_value=None, ui_sentinel=-1, enforce_sentinel_min=True),
             'comments': ParamLink(['comments'], self.tab.commentsPlainTextEdit),
@@ -135,7 +139,6 @@ class SampleChannelParameters(ChannelUiParameter):
                                  notify_apply=self._publish_crop_changed),
             'orientation': ['orientation']  #  Last in case of validation issues
         }
-        self.connect()
 
     def _publish_crop_changed(self, _=None):
         self.publish(UiCropChanged(channel_name=self.name, slice_x=self.slice_x,
@@ -168,7 +171,6 @@ class SampleChannelParameters(ChannelUiParameter):
         self.tab.orientXSpinBox.valueChanged.connect(self.handle_orientation_changed)  # REFACTOR: push to paramslink instead
         self.tab.orientYSpinBox.valueChanged.connect(self.handle_orientation_changed)
         self.tab.orientZSpinBox.valueChanged.connect(self.handle_orientation_changed)
-        self.connect_simple_widgets()
 
     @property
     def orientation(self):
@@ -207,8 +209,8 @@ class SampleParameters(ChannelsUiParameterCollection):
 
     cfg_subtree = ['sample']
 
-    def __init__(self, tab, src_folder=None, *, event_bus: EventBus, get_view=None, apply_patch=None):
-        self.shared_sample_params = SharedSampleParams(tab, src_folder=src_folder, event_bus=event_bus,
+    def __init__(self, tab, *, event_bus: EventBus, get_view=None, apply_patch=None):
+        self.shared_sample_params = SharedSampleParams(tab, event_bus=event_bus,
                                                        get_view=get_view, apply_patch=apply_patch)
         self._last_channels: Optional[List[str]] = None
         super().__init__(tab, pipeline_name='Sample', event_bus=event_bus, get_view=get_view, apply_patch=apply_patch)
@@ -360,28 +362,24 @@ class SharedSampleParams(UiParameter):
     default_tile_extension : str
         The extension of the tile files
     """
+    src_folder: str
     sample_id: str
     use_id_as_prefix: bool
     default_tile_extension: str
 
     cfg_subtree = ['sample']
 
-    def __init__(self, tab, *, src_folder=None, event_bus: EventBus, get_view=None, apply_patch=None):
-        super().__init__(tab, event_bus=event_bus, get_view=get_view, apply_patch=apply_patch)
-        self.params_dict = {
+    def build_params_dict(self):
+        return {
             'sample_id': ParamLink(['sample_id'], self.tab.sampleIdTxt),
             'use_id_as_prefix': ParamLink(['use_id_as_prefix'], self.tab.useIdAsPrefixCheckBox),
             'default_tile_extension': ParamLink(['default_tile_extension'], self.tab.defaultTileExtensionLineEdit),
+            'src_folder': ParamLink(keys=None, widget=self.tab.srcFolderTxt, default=''),
         }
-        self.src_folder = src_folder
-        self.connect()
 
     @property
     def channels(self):
         return list(self.view['channels'].keys())
-
-    def connect(self):
-        self.connect_simple_widgets()
 
 
 class StitchingParams(ChannelsUiParameterCollection):
@@ -560,9 +558,8 @@ class GeneralChannelStitchingParams(ChannelUiParameter):
     layout_channel: str
     use_existing_layout: bool
 
-    def __init__(self, tab, channel_name, *, event_bus: EventBus, get_view=None, apply_patch=None):
-        super().__init__(tab, channel_name, event_bus=event_bus, get_view=get_view, apply_patch=apply_patch)
-        self.params_dict = {
+    def build_params_dict(self):
+        return {
             'use_npy': ParamLink(['use_npy'], self.tab.useNpyCheckBox),
             # 'run': ParamLink(['run'], self.tab.runCheckBox),
             'run': ['run'],
@@ -572,16 +569,15 @@ class GeneralChannelStitchingParams(ChannelUiParameter):
                     UiLayoutChannelChanged(channel_name=self.name,
                                            layout_channel=self.layout_channel)),
                 # extra_connect=self.refresh_layout_channel_items,
-                cast_to_ui=lambda v: v or "",   # show empty when unset
-                cast_from_ui = lambda s: None if (s in ("", "undefined")) else s  ),  #TEST:
+                cast_to_ui=lambda v: v or '',   # show empty when unset
+                cast_from_ui = lambda s: None if (s in ('', 'undefined')) else s  ),  #TEST:
             'use_existing_layout': ParamLink(
                 ['use_existing_layout'], self.tab.useExistingLayoutCheckBox, default=False,
                 missing_ok=True,  # WARNING: only if self.layout_channel != self.name
                 present_if=self._existing_layout_relevant,
-            notify_apply=lambda: self.publish(
+                notify_apply=lambda: self.publish(
                     UiUseExistingLayoutChanged(channel_name=self.name, use_existing=self.use_existing_layout)))
         }
-        self.connect()
 
     def _existing_layout_relevant(self, v: dict) -> bool:
         return v.get('stitching', {}).get('layout_channel') == self.name
@@ -600,9 +596,6 @@ class GeneralChannelStitchingParams(ChannelUiParameter):
     @property
     def cfg_subtree(self):
         return ['stitching', 'channels', self.name]    # REFACTOR: section name from config_handler
-
-    def connect(self):
-        self.connect_simple_widgets()
 
     def refresh_layout_channel_items(self):
         """Populate and keep in sync the layoutChannelComboBox items."""
@@ -630,9 +623,8 @@ class RigidChannelStitchingParams(ChannelUiParameter):
     background_level: int
     background_pixels: int
 
-    def __init__(self, tab, channel_name, *, event_bus: EventBus, get_view=None, apply_patch=None):
-        super().__init__(tab, channel_name, event_bus=event_bus, get_view=get_view, apply_patch=apply_patch)
-        self.params_dict = {
+    def build_params_dict(self):
+        return {
             'skip': ParamLink(['skip'], self.tab.rigidParamsGroupBox,
                               cast_to_ui=invert, cast_from_ui=invert),
             'x_overlap': VectorLink(['overlap_x'], self.tab.xOverlapSinglet,
@@ -651,10 +643,6 @@ class RigidChannelStitchingParams(ChannelUiParameter):
             'background_level': ParamLink(['background_level'], self.tab.rigidBackgroundLevel),
             'background_pixels': ParamLink(['background_pixels'], self.tab.rigidBackgroundPixels)
         }
-        self.connect()
-
-    def connect(self):
-        self.connect_simple_widgets()
 
     @property
     def cfg_subtree(self):
@@ -677,9 +665,8 @@ class WobblyChannelStitchingParams(ChannelUiParameter):
     slice_valid_range: List[int]
     slice_pixel_size: int  | None
 
-    def __init__(self, tab, channel_name, *, event_bus: EventBus, get_view=None, apply_patch=None):
-        super().__init__(tab, channel_name, event_bus=event_bus, get_view=get_view, apply_patch=apply_patch)
-        self.params_dict = {
+    def build_params_dict(self):
+        return {
             'skip': ParamLink(['skip'], self.tab.wobblyParamsGroupBox,
                               cast_to_ui=invert, cast_from_ui=invert),
             'max_shifts_x': ParamLink(['max_shifts_x'], self.tab.wobblyMaxShiftsXDoublet),
@@ -690,10 +677,6 @@ class WobblyChannelStitchingParams(ChannelUiParameter):
             'slice_valid_range': VectorLink(['slice_valid_range'], self.tab.wobblySliceRangeDoublet),
             'slice_pixel_size': VectorLink(['slice_pixel_size'], self.tab.wobblySlicePixelSizeSinglet)
         }
-        self.connect()
-
-    def connect(self):
-        self.connect_simple_widgets()
 
     @property
     def cfg_subtree(self):
@@ -713,7 +696,11 @@ class ChannelRegistrationParams(ChannelUiParameter):
         super().__init__(tab, channel_name, event_bus=event_bus, get_view=get_view, apply_patch=apply_patch)
         self.tab.landmarksWeightsPanel = LandmarksWeightsPanel(self.tab)
         self.tab.landmarksWeightsLayout.addWidget(self.tab.landmarksWeightsPanel)
-        self.params_dict = {
+
+        self.handle_params_files_changed()  # Initial setup
+
+    def build_params_dict(self):
+        return {
             'resample': ParamLink(['resample'], self.tab.resampleCheckBox),
             'resampled_resolution': ParamLink(['resampled_resolution'], self.tab.resampleResolutionTriplet),
             'align_with': ParamLink(['align_with'], self.tab.alignWithComboBox,
@@ -727,8 +714,6 @@ class ChannelRegistrationParams(ChannelUiParameter):
                                       object_name='paramsFilesListWidget', scope_root=self.tab),
             # 'landmarks_weights': ['landmarks_weights'],
         }
-        self.connect()
-        self.handle_params_files_changed()  # Initial setup
 
     @property
     def cfg_subtree(self):
@@ -744,7 +729,6 @@ class ChannelRegistrationParams(ChannelUiParameter):
         return [k for k, v in params_to_weights.items() if v > 0]
 
     def connect(self):
-        self.connect_simple_widgets()
         if hasattr(self.tab.paramsFilesListWidget, 'itemsChanged'):
             self.tab.paramsFilesListWidget.itemsChanged.connect(self.handle_params_files_changed)
         if hasattr(self.tab, 'landmarksWeightsPanel'):
@@ -827,13 +811,11 @@ class ChannelRegistrationParams(ChannelUiParameter):
 
 
 class SharedRegistrationParams(UiParameter):
-    def __init__(self, tab, *, event_bus: EventBus, get_view=None, apply_patch=None):
-        super().__init__(tab, event_bus=event_bus, get_view=get_view, apply_patch=apply_patch)
-        self.params_dict = {
+    def build_params_dict(self):
+        return {
             'plot_channel': ParamLink(None, self.tab.plotChannelComboBox),
             'plot_composite': ParamLink(None, self.tab.plotCompositeCheckBox),
         }
-        self.connect()
 
 
 class RegistrationParams(ChannelsUiParameterCollection):  # TEST: does not seem to follow tab click
@@ -874,26 +856,30 @@ class AtlasParams(UiParameter):
     atlas_folder: str
 
     def __init__(self, tab, *, event_bus: EventBus, get_view=None, apply_patch=None):
+        self.atlas_info = ATLAS_NAMES_MAP
+        self.cfg_subtree = ['registration', 'atlas']  # REFACTOR: section name from config_handler
         super().__init__(tab, event_bus=event_bus, get_view=get_view, apply_patch=apply_patch)
-        self.params_dict = {
-            'atlas_id': ['id'],
-            'structure_tree_id':
-                ParamLink(['structure_tree_id'], self.tab.structureTreeIdComboBox,
-                          notify_apply=lambda: self.publish(
-                              UiAtlasStructureTreeIdChanged(tree_id=self.structure_tree_id))),
+        self.update_atlas_resolution()  # WARNING: after connect
+
+    def build_params_dict(self):
+        return {
+            'atlas_id': ParamLink(['id'], self.tab.atlasIdComboBox,
+                                  extra_connect=lambda w, cb: (
+                                      w.currentTextChanged.connect(lambda _t: self.update_atlas_resolution()),
+                                      lambda: None,  # provide a real disconnector if you have one
+                                  )[1], notify_apply=self.notify_atlas_id_changed, ),
+            'structure_tree_id': ParamLink(['structure_tree_id'], self.tab.structureTreeIdComboBox,
+                                           notify_apply=lambda: self.publish(UiAtlasStructureTreeIdChanged(
+                                               tree_id=self.structure_tree_id))),
             'atlas_folder': ParamLink(['align_files_folder'], self.tab.atlasFolderPath, connect=False),
             'atlas_resolution': ParamLink(None, self.tab.atlasResolutionTriplet),  # TODO: check if we bind to cfg here
         }
-        self.atlas_info = ATLAS_NAMES_MAP
-        self.cfg_subtree = ['registration', 'atlas']  # REFACTOR: section name from config_handler
-        self.connect()
-        # WARNING: after connect
-        self.tab.atlasResolutionTriplet.setValue([self.atlas_info[self.atlas_id]['resolution']] * 3)
 
     def connect(self):
         self.tab.atlasResolutionTriplet.valueChangedConnect(self.handle_atlas_resolution_changed)  # TODO: replace with label
-        self.tab.atlasIdComboBox.currentTextChanged.connect(self.handle_atlas_id_changed)
-        self.connect_simple_widgets()
+
+    def update_atlas_resolution(self):
+        self.tab.atlasResolutionTriplet.setValue([self.atlas_info[self.atlas_id]['resolution']] * 3)
 
     @property
     def atlas_base_name(self):
@@ -912,20 +898,7 @@ class AtlasParams(UiParameter):
                                self.atlas_resolution)
         self._apply_patch(patch)
 
-    @property
-    def atlas_id(self):
-        return self.tab.atlasIdComboBox.currentText()
-
-    @atlas_id.setter
-    @param_setter
-    def atlas_id(self, value):
-        self.tab.atlasIdComboBox.setCurrentText(value)
-
-    @param_handler
-    def handle_atlas_id_changed(self):
-        self._update_value(['id'], self.atlas_id)
-        resolution = [self.atlas_info[self.atlas_id]['resolution']] * 3
-        self.tab.atlasResolutionTriplet.setValue(resolution)
+    def notify_atlas_id_changed(self):  # it's not directly the handler
         self.publish(UiAtlasIdChanged(atlas_base_name=self.atlas_base_name))
 
 
@@ -992,7 +965,12 @@ class ChannelCellMapParams(ChannelUiParameter, OrthoviewerSlicingMixin):
     def __init__(self, tab, channel, *, main_params, event_bus: EventBus, dtype=np.uint16,
                  get_view=None, apply_patch=None):
         super().__init__(tab, channel, event_bus=event_bus, get_view=get_view, apply_patch=apply_patch)
-        self.params_dict = {
+        self.main_params = main_params
+        self.dtype = dtype
+        self.advanced_controls = [self.tab.detectionShapeGroupBox]
+
+    def build_params_dict(self):
+        return {
             'background_correction_diameter':
                 ParamLink(['detection', 'background_correction', 'diameter'], self.tab.backgroundCorrectionDiameter,
                           cast_to_ui = lambda v: (v[0] if isinstance(v, (list, tuple)) and len(v) else v),
@@ -1024,10 +1002,6 @@ class ChannelCellMapParams(ChannelUiParameter, OrthoviewerSlicingMixin):
             'n_detected_cells': ParamLink(None, self.tab.nDetectedCellsLabel),
             'n_filtered_cells': ParamLink(None, self.tab.nDetectedCellsAfterFilterLabel),
         }
-        self.main_params = main_params
-        self.dtype = dtype
-        self.advanced_controls = [self.tab.detectionShapeGroupBox]
-        self.connect()
 
     @param_handler  # FIXME: check
     def handle_advanced_state_changed(self, state):
@@ -1048,7 +1022,6 @@ class ChannelCellMapParams(ChannelUiParameter, OrthoviewerSlicingMixin):
 
     def connect(self):
         self.tab.runCellMapColocalizationCompatibleCheckBox.stateChanged.connect(self.handle_colocalization_compatible_changed)
-        self.connect_simple_widgets()  # |TODO: automatise in parent class
 
     def cast_max_from_ui(self, cfg_vals):
         """After sentinel mapping back to tokens (None/'auto'), push upper to dtype.max."""
@@ -1120,7 +1093,10 @@ class ChannelTractMapParams(ChannelUiParameter, OrthoviewerSlicingMixin):
 
     def __init__(self, tab, channel, *, main_params, event_bus: EventBus, get_view=None, apply_patch=None):
         super().__init__(tab, channel, event_bus=event_bus, get_view=get_view, apply_patch=apply_patch)
-        self.params_dict = {
+        self.main_params = main_params
+
+    def build_params_dict(self):
+        return {
             'clipping_decimation_ratio': ParamLink(['binarization', 'decimation_ratio'], self.tab.clippingDecimationRatioSpinBox),
             'clipping_percents': ParamLink(['binarization', 'percentage_range'],
                                            self.tab.clippingPixelsPercentDoublet,
@@ -1141,15 +1117,11 @@ class ChannelTractMapParams(ChannelUiParameter, OrthoviewerSlicingMixin):
             'voxelize': ParamLink(['steps', 'voxelize'], self.tab.voxelizeCheckBox),
             'export_df': ParamLink(['steps', 'export_df'], self.tab.exportDfCheckBox),
         }
-        self.main_params = main_params
-        self.connect()
 
     @property
     def cfg_subtree(self):
         return ['tract_map', 'channels', self.name]  # REFACTOR: section name from config_handler
 
-    def connect(self):
-        self.connect_simple_widgets()
 
 class TractMapPerformanceParams(UiParameter):
     """
@@ -1222,7 +1194,10 @@ class ChannelColocalizationParams(ChannelUiParameter):
 
     def __init__(self, tab, channel, *, main_params, event_bus: EventBus, get_view=None, apply_patch=None):
         super().__init__(tab, channel, event_bus=event_bus, get_view=get_view, apply_patch=apply_patch)
-        self.params_dict = {
+        self.main_params = main_params
+
+    def build_params_dict(self):
+        return {
             'particle_diameter': ParamLink(['comparison', 'particle_diameter'],
                                            self.tab.colocalizationDiameterSpinBox),
             'n_processes': ParamLink(['performance', 'n_processes'], self.tab.colocalizationNProcessesSpinBox),
@@ -1233,15 +1208,10 @@ class ChannelColocalizationParams(ChannelUiParameter):
             'voxel_number_overlap_threshold': ParamLink(['analysis', 'voxel_number_overlap_threshold'],
                                                         self.tab.colocalizationAbsoluteOverlapThresholdSpinBox),
         }
-        self.main_params = main_params
-        self.connect()
 
     @property
     def cfg_subtree(self):
         return ['colocalization', 'channels', self.name]   # REFACTOR: section name from config_handler
-
-    def connect(self):
-        self.connect_simple_widgets()
 
 
 class SharedVesselBinarizationParams(UiParameter):
@@ -1251,18 +1221,14 @@ class SharedVesselBinarizationParams(UiParameter):
     plot_channel_1: str
     plot_channel_2: str
 
-    def __init__(self, tab, *, event_bus: EventBus, get_view=None, apply_patch=None):
-        super().__init__(tab, event_bus=event_bus, get_view=get_view, apply_patch=apply_patch)
-        self.params_dict = {
+    def build_params_dict(self):
+        return {
             'fill_combined': ParamLink(['combined', 'binary_fill'], self.tab.binarizationConbineBinaryFillingCheckBox),
             'plot_step_1': ParamLink(None, self.tab.binarizationPlotStep1ComboBox),
             'plot_step_2': ParamLink(None, self.tab.binarizationPlotStep2ComboBox),
             'plot_channel_1': ParamLink(None, self.tab.binarizationPlotChannel1ComboBox),
             'plot_channel_2': ParamLink(None, self.tab.binarizationPlotChannel2ComboBox),
         }
-
-    def connect(self):
-        self.connect_simple_widgets()
 
 
 class VesselParams(ChannelsUiParameterCollection):
@@ -1310,9 +1276,8 @@ class VesselBinarizationParams(ChannelUiParameter):
     run_binary_filling: bool
     run_deep_filling: bool
 
-    def __init__(self, tab, channel_name, *, event_bus: EventBus, get_view=None, apply_patch=None):
-        super().__init__(tab, channel_name, event_bus=event_bus, get_view=get_view, apply_patch=apply_patch)
-        self.params_dict = {
+    def build_params_dict(self):
+        return {
             # FIXME: add tabs to UI with matching control names
             'run_binarization': ParamLink(['binarize', 'run'], self.tab.runBinarizationCheckBox),
             'binarization_clip_range': ParamLink(['binarize', 'clip_range'], self.tab.binarizationClipRangeDoublet),
@@ -1329,14 +1294,10 @@ class VesselBinarizationParams(ChannelUiParameter):
             'run_deep_filling': ParamLink(['deep_fill', 'run'], self.tab.binarizationDeepFillingCheckBox),
         }
         # self.tab.binarizationControlsGroupBox.setTitle(channel_name)
-        self.connect()
 
     @property
     def cfg_subtree(self):
         return ['vasculature', 'binarization', self.name]   # REFACTOR: section name from config_handler
-
-    def connect(self):
-        self.connect_simple_widgets()
 
     @property
     def n_steps(self):
@@ -1369,7 +1330,10 @@ class VesselGraphParams(UiParameter):
 
     def __init__(self, tab, *, event_bus: EventBus, get_view=None, apply_patch=None):
         super().__init__(tab, event_bus=event_bus, get_view=get_view, apply_patch=apply_patch)
-        self.params_dict = {
+        self.filter_params = []
+
+    def build_params_dict(self):
+        return {
             'skeletonize': ParamLink(['graph_construction', 'skeletonize'], self.tab.buildGraphSkeletonizeCheckBox),
             'build': ParamLink(['graph_construction', 'build'], self.tab.buildGraphBuildCheckBox),
             'clean': ParamLink(['graph_construction', 'clean'], self.tab.buildGraphCleanCheckBox),
@@ -1406,11 +1370,6 @@ class VesselGraphParams(UiParameter):
             'min_vein_size': ParamLink(['vessel_type_postprocessing', 'capillaries_removal', 'min_vein_size'],
                                        self.tab.minVeinSizeDoubleSpinBox)
         }
-        self.connect()
-        self.filter_params = []
-
-    def connect(self):
-        self.connect_simple_widgets()
 
     def add_graph_filter_params(self, widget, graph):
         self.filter_params.append(GraphFilterParams(main_params=self, widget=widget,
@@ -1448,10 +1407,7 @@ class GraphFilterParams(UiParameter):  # FIXME: do we really pass the graph as a
 
     def connect(self):
         self.tab.vertexFilterRadioButton.toggled.connect(self.update_properties)
-        self.tab.graphFilterPropertyNameComboBox.currentTextChanged.connect(
-            self.handle_property_name_changed
-        )
-        self.connect_simple_widgets()
+        self.tab.graphFilterPropertyNameComboBox.currentTextChanged.connect(self.handle_property_name_changed)
 
     def update_properties(self):
         if self.filter_type == 'vertex':
@@ -1617,8 +1573,13 @@ class VesselVisualizationParams(UiParameter, OrthoviewerSlicingMixin):
     pipeline = 'TubeMap'
 
     def __init__(self, tab, *, sample_params=None, event_bus: EventBus, get_view=None, apply_patch=None):
+        self.cfg_subtree = ['vasculature', 'visualization']  # REFACTOR: section name from config_handler
         super().__init__(tab, event_bus=event_bus, get_view=get_view, apply_patch=apply_patch)
-        self.params_dict = {  # TODO: if 99.9 % source put to 100% (None)
+        self.structure_id = None
+        self.sample_params = sample_params
+
+    def build_params_dict(self):
+        return {  # TODO: if 99.9 % source put to 100% (None)
             'crop_x_min': ParamLink(['slicing', 'dim_0', 0], self.tab.graphConstructionSlicerXRangeMin),
             'crop_x_max': ParamLink(['slicing', 'dim_0', 1], self.tab.graphConstructionSlicerXRangeMax),
             'crop_y_min': ParamLink(['slicing', 'dim_1', 0], self.tab.graphConstructionSlicerYRangeMin),
@@ -1630,13 +1591,6 @@ class VesselVisualizationParams(UiParameter, OrthoviewerSlicingMixin):
             'voxelization_size': ParamLink(['voxelization', 'size'], self.tab.vasculatureVoxelizationRadiusTriplet),
             'weight_by_radius': ParamLink(None, self.tab.voxelizationWeightByRadiusCheckBox, connect=False)
         }
-        self.structure_id = None
-        self.cfg_subtree = ['vasculature', 'visualization']  # REFACTOR: section name from config_handler
-        self.sample_params = sample_params
-        self.connect()
-
-    def connect(self):
-        self.connect_simple_widgets()
 
     def set_structure_id(self, structure_widget):
         self.structure_id = int(structure_widget.text(1))
@@ -1653,51 +1607,21 @@ class PreferencesParams(UiParameter):
 
     cfg_subtree = ['machine']
 
-    def __init__(self, tab, *, event_bus: EventBus, get_view=None, apply_patch=None):
-        super().__init__(tab, event_bus=event_bus, get_view=get_view, apply_patch=apply_patch)
-        self.params_dict = {
-            # --- general ---
-            "verbosity": ParamLink(
-                ["verbosity"], self.tab.verbosityComboBox,
-                cast_to_ui=self.str_to_capitalize, cast_from_ui=self.str_to_lower, default="info"),
-            "lut": ParamLink(
-                ["default_lut"], self.tab.lutComboBox,
-                cast_to_ui=self.str_to_capitalize, cast_from_ui=self.str_to_lower, default="viridis"),
-            "font_size": ParamLink(
-                ["font_size"], self.tab.fontSizeSpinBox,),
-            "pattern_finder_min_n_files": ParamLink(
-                ["pattern_finder_min_n_files"], self.tab.patternFinderMinFilesSpinBox,
-                default=2),
-            "three_d_plot_bg": ParamLink(
-                ["three_d_plot_bg"], self.tab.threeDPlotsBackgroundComboBox,
-                cast_to_ui=self.str_to_capitalize, cast_from_ui=self.str_to_lower, default="#000000"),
-            # "n_processes_file_conv": ParamLink(
-            #     ["n_processes_file_conv"], self.tab.nProcessesFileConversionSpinBox,
-            #     cast_to_ui=self.sanitize_nones, cast_from_ui=self.sanitize_neg_one),
-            # "n_processes_resampling": ParamLink(
-            #     ["n_processes_resampling"], self.tab.nProcessesResamplingSpinBox,
-            #     cast_to_ui=self.sanitize_nones, cast_from_ui=self.sanitize_neg_one),
-            # "n_processes_stitching": ParamLink(
-            #     ["n_processes_stitching"], self.tab.nProcessesStitchingSpinBox,
-            #     cast_to_ui=self.sanitize_nones, cast_from_ui=self.sanitize_neg_one),
-            # "n_processes_cell_detection": ParamLink(
-            #     ["n_processes_cell_detection"], self.tab.nProcessesCellDetectionSpinBox,
-            #     cast_to_ui=self.sanitize_nones, cast_from_ui=self.sanitize_neg_one),
-            # "n_processes_binarization": ParamLink(
-            #     ["n_processes_binarization"], self.tab.nProcessesBinarizationSpinBox,
-            #     cast_to_ui=self.sanitize_nones, cast_from_ui=self.sanitize_neg_one),
-            # "chunk_size_min": ParamLink(
-            #     ["detection_chunk_size_min"], self.tab.chunkSizeMinSpinBox),
-            # "chunk_size_max": ParamLink(
-            #     ["detection_chunk_size_max"], self.tab.chunkSizeMaxSpinBox),
-            # "chunk_size_overlap": ParamLink(
-            #     ["detection_chunk_overlap"], self.tab.chunkSizeOverlapSpinBox),
-            # --- UI prefs ---
-            "start_folder": ParamLink(
-                ["start_folder"], self.tab.startFolderLineEdit,
-                cast_to_ui=self.sanitize_path_read, cast_from_ui=self.sanitize_path_write),
-            "start_full_screen": ParamLink(
-                ["start_full_screen"], self.tab.startFullScreenCheckBox)
+    def build_params_dict(self):
+        return {
+            "verbosity": ParamLink(["verbosity"], self.tab.verbosityComboBox,
+                                   cast_to_ui=self.str_to_capitalize, cast_from_ui=self.str_to_lower, default="info"),
+            "lut": ParamLink(["default_lut"], self.tab.lutComboBox,
+                             cast_to_ui=self.str_to_capitalize, cast_from_ui=self.str_to_lower, default="viridis"),
+            "font_size": ParamLink(["font_size"], self.tab.fontSizeSpinBox,),
+            "pattern_finder_min_n_files": ParamLink(["pattern_finder_min_n_files"],
+                                                    self.tab.patternFinderMinFilesSpinBox, default=2),
+            "three_d_plot_bg": ParamLink(["three_d_plot_bg"], self.tab.threeDPlotsBackgroundComboBox,
+                                         cast_to_ui=self.str_to_capitalize, cast_from_ui=self.str_to_lower,
+                                         default="#000000"),
+            "start_folder": ParamLink(["start_folder"], self.tab.startFolderLineEdit,
+                                      cast_to_ui=self.sanitize_path_read, cast_from_ui=self.sanitize_path_write),
+            "start_full_screen": ParamLink(["start_full_screen"], self.tab.startFullScreenCheckBox)
         }
 
 
@@ -1726,25 +1650,19 @@ class BatchParameters(UiParameter):
             remove_btn=self.tab.removeGroupPushButton,
             start_folder_getter=lambda: (self.preferences.start_folder if self.preferences else "")
         )
-        self.params_dict = {
-            'results_folder': ParamLink(
-                ['paths', 'results_folder'], self.tab.resultsFolderLineEdit,
-                notify_apply=lambda: self.publish(UiBatchResultsFolderChanged(self.results_folder))
-                ),
+        self.params_dict = {  # FIXME: make work with UiParameter auto mechanism
+            'results_folder': ParamLink(['paths', 'results_folder'], self.tab.resultsFolderLineEdit,
+                                        notify_apply=lambda: self.publish(UiBatchResultsFolderChanged(self.results_folder))),
             'groups': ParamLink(['groups'], self.groups_adapter,
-                notify_apply=lambda: self.publish(UiBatchGroupsChanged(self.groups))
-            )
+                                notify_apply=lambda: self.publish(UiBatchGroupsChanged(self.groups)))
         }
-        self.connect()
+        self.connect_simple_widgets()
 
     def cfg_to_ui(self):
         self.groups = self.view['groups']
         results_folder = self.view['paths'].get('results_folder', '')
         if results_folder:
             self.results_folder = results_folder
-
-    def connect(self):
-        self.connect_simple_widgets()
 
     def remove_current_group(self):  # FIXME: not bound
         idx, removed_name = self.groups_adapter.remove_current_page()
@@ -1790,7 +1708,7 @@ class GroupAnalysisParams(BatchParameters):
 
     def __init__(self, tab, *, event_bus: EventBus, preferences=None, get_view=None, apply_patch=None):
         super().__init__(tab, preferences=preferences, event_bus=event_bus, get_view=get_view, apply_patch=apply_patch)
-        self.params_dict.update({
+        self.extend_params_dict({
             # 'plot_channel': ParamLink(None, self.tab.plotChannelComboBox),
             'compute_sd_and_effect_size': ParamLink(None, self.tab.computeSdAndEffectSizeCheckBox),
             'density_suffix': ParamLink(None, self.tab.densitySuffixTextFilterLineEdit),
@@ -1876,7 +1794,7 @@ class BatchProcessingParams(BatchParameters):
 
     def __init__(self, tab, *, event_bus: EventBus, preferences=None, get_view=None, apply_patch=None):
         super().__init__(tab, preferences=preferences, event_bus=event_bus, get_view=get_view, apply_patch=apply_patch)
-        self.params_dict.update({
+        self.extend_params_dict({
             'align': ParamLink(None, self.tab.batchAlignCheckBox),
             'count_cells': ParamLink(None, self.tab.batchCountCellsCheckBox),
             'run_vasculature': ParamLink(None, self.tab.batchVasculatureCheckBox)

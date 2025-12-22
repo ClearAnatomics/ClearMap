@@ -830,25 +830,41 @@ class UiParameter(BusSubscriberMixin):
         whole config file.
     """
     def __init__(self, tab: QWidget, *, event_bus: EventBus,
-                 params_dict: Optional[Dict[str, ParamLink | List[str]]] = None,
                  get_view: Optional[Callable[[], Mapping[str, Any]]] = None,
                  apply_patch: Optional[Callable[[dict], None]] = None):
         super().__init__(event_bus)
-        params_dict = params_dict if params_dict is not None else {}
         if tab is None:
             raise ValueError('Tab widget cannot be None')
         self.tab: QWidget = tab
-        self.params_dict: Dict[str, ParamLink | List[str]] = params_dict
 
         self.advanced_controls: List[QWidget] = []
 
         self._get_view: Callable[[], Mapping[str, Any]] | None = get_view
         self._apply_patch: Callable[[dict], None] | None = apply_patch
-        self._cfg_subtree: List[str] = []
+        self._cfg_subtree = getattr(self, "_cfg_subtree", [])  # FIXME: pass as arg to ctor?
         self._painting = False  # True when updating the UI from the config file
         self.widget_ops = WIDGET_OPS
-        if self.params_dict:
-            self.connect()
+
+        self._connected_param_keys: set[str] = set()
+        self.params_dict = self.build_params_dict()
+        self._validate_params_dict()
+        self.connect()  # User overridable hook
+        self.connect_simple_widgets()
+        self.post_connect()
+
+    def build_params_dict(self) -> dict:
+        raise NotImplementedError
+
+    def connect(self):
+        pass
+
+    def post_connect(self):
+        pass
+
+    def _validate_params_dict(self):
+        for k, v in self.params_dict.items():
+            if isinstance(v, ParamLink) and v.widget is None:
+                raise RuntimeError(f"{self.__class__.__name__}: ParamLink {k} has no widget")
 
     def teardown(self):
         for link in self.params_dict.values():
@@ -945,6 +961,8 @@ class UiParameter(BusSubscriberMixin):
                 self.__connect_widget(k)
 
     def __connect_widget(self, key):
+        if key in self._connected_param_keys:
+            return  # ensure idempotency
         param_link = self.params_dict[key]
         widget = param_link.widget
         callback = param_link.connect
@@ -955,6 +973,26 @@ class UiParameter(BusSubscriberMixin):
         if callable(getattr(param_link, 'extra_connect', None)):
             extra_disconnector = param_link.extra_connect(widget, callback)
             param_link.add_disconnector(extra_disconnector)
+
+        self._connected_param_keys.add(key)
+
+    def extend_params_dict(self, extra_param_links: dict[str, ParamLink | list], *, connect_new: bool = True):
+        """
+        Extend the params_dict with new entries after creation (and potenitally after initaial connexion)
+
+        Parameters
+        ----------
+        extra_param_links: dict[str, ParamLink | list]
+            The new entries to add to the params_dict
+        connect_new:
+
+        Returns
+        -------
+
+        """
+        self.params_dict.update(extra_param_links)
+        if connect_new:
+            self.connect_simple_widgets()  # (idempotent)
 
     def handle_widget_changed(self, *_, attr_name='', **__):
         """
