@@ -81,10 +81,6 @@ def validate_sections_with_jsonschema(config: Mapping[str, Mapping[str, Any]], s
     ----------
     config
     sv
-
-    Returns
-    -------
-
     """
 
     messages: list[str] = []

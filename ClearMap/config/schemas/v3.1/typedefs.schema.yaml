@@ -153,6 +153,10 @@ $defs:
           - { $ref: "#/$defs/nonNegativeInteger" }  # scalar >= 0
           - { type: "null" }                        # allow 'null' as in your YAML
       size_max:
-        $ref: "#/$defs/nonNegativeInteger"
+        anyOf:
+          - { $ref: "#/$defs/nonNegativeInteger" }  # scalar >= 0
+          - { type: "null" }                        # allow 'null' as in your YAML
       overlap:
-        $ref: "#/$defs/nonNegativeInteger"
+        anyOf:
+          - { $ref: "#/$defs/nonNegativeInteger" }  # scalar >= 0
+          - { type: "null" }                        # allow 'null' as in your YAML
