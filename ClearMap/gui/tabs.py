@@ -371,15 +371,23 @@ class SampleInfoTab(ExperimentTab):
             p = self.params[pattern_spec.name]
             p.path = pattern_spec.pattern_relpath
             p.data_type = pattern_spec.data_type
-            p.extension = pattern_spec.extension  # WARNING: Will do successive modifications. Check if we should batch update
+            if isinstance(pattern_spec.extension, (list, tuple)):  # REFACTOR: find more elegant handling here
+                warnings.warn('Multiple extensions found, picking the first one.')
+                p.extension = pattern_spec.extension[0]
+            else:
+                p.extension = pattern_spec.extension  # WARNING: Will do successive modifications. Check if we should batch update
 
             # If we have a pattern, we can stitch:
-
             exp = Expression(pattern_spec.pattern_relpath)
-            first_tile = exp.string(values={axis: 0 for axis in pattern_spec.axes})  # Ideally, pick min(axis) for each
+            axes = exp.tag_names()  # e.g. ['Z', 'Y', 'X'] or similar
+            first_tile = exp.string(values={axis: 0 for axis in axes})  # Ideally, pick min(axis) for each
             ome_info = parse_ome_info(Path(self.src_folder) / first_tile)
             if 'resolution' in ome_info and ome_info['resolution'] is not None:
-                p.resolution = ome_info['resolution']
+                res = ome_info['resolution']
+                if (isinstance(res, (list, tuple))
+                    and len(res) == 3
+                    and all(v in (1, 2, 3) for v in res)):
+                    p.resolution = ome_info['resolution']
             if 'channels_excitation' in ome_info and ome_info['channels_excitation'] is not None:
                 p.wavelength = ome_info['channels_excitation'][i]
 
