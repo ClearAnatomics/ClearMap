@@ -126,15 +126,18 @@ class SampleManager(OrchestratorBase):
             if not raw_path:
                 self.incomplete_channels.append(channel)
             else:
+                data_content_type = cfg['data_type']
                 if channel in self.workspace:  # exists -> update
                     self.workspace.update_raw_path(channel, expression=raw_path)
+                    if data_content_type and data_content_type in CONTENT_TYPE_TO_PIPELINE:  # WARNING: no 'compound' here
+                        channel_spec = self.workspace[channel].channel_spec
+                        self.workspace.update_pipeline_assets(channel_spec, data_content_type, sample_id=self.prefix)
                 else:  # new channel -> add
-                    content_type = cfg['data_type']
-                    if content_type == 'undefined':  # Difference with None is intention
+                    if data_content_type == 'undefined':  # Difference with None is intention
                         self.incomplete_channels.append(channel)
                         continue
                     self.workspace.add_raw_data(file_path=raw_path, channel_id=channel,
-                                                data_content_type=content_type, sample_id=self.prefix)
+                                                data_content_type=data_content_type, sample_id=self.prefix)
 
         # Prune channels that are not in the config anymore
         self.workspace.prune_missing_channels(self.channels)
@@ -301,7 +304,7 @@ class SampleManager(OrchestratorBase):
         # noinspection PyTypeChecker
         if channel is None:
             return bool(self.stitchable_channels)
-        return self.get('raw', channel=channel, sample_id=self.prefix).n_tiles > 1
+        return self.get('raw', channel=channel, sample_id=self.prefix).n_tiles_present > 1
 
     def check_has_all_tiles(self, channel: str) -> bool:
         """

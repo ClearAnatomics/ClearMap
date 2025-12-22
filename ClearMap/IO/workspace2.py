@@ -172,8 +172,6 @@ class Workspace2:  # REFACTOR: subclass dict
         - asset type specs (including subfolders)
         - channels (names, content_type, number)
         """
-
-        # Only top-level types, or all? For readability, I’d include all, it’s still small.
         asset_types_dict = {name: spec.to_dict()
                             for name, spec in self.asset_types.items()}
 
@@ -275,7 +273,7 @@ class Workspace2:  # REFACTOR: subclass dict
         return list(self.asset_collections.keys())
 
     def ensure_default_channel(self, allowed_channels: List[str], default_channel: str):
-        if default_channel and (not self.default_channel or self.default_channel not in allowed_channels):
+        if default_channel and (not hasattr(self, 'default_channel') or self.default_channel not in allowed_channels):
             self.default_channel = default_channel
 
     def prune_missing_channels(self, desired_channels: List[str]):
@@ -330,10 +328,13 @@ class Workspace2:  # REFACTOR: subclass dict
                           status_manager=self.status_manager)
         self.add_asset(raw_asset)
 
+        self.update_pipeline_assets(channel_spec, data_content_type, sample_id)
+
+    def update_pipeline_assets(self, channel_spec: ChannelSpec, data_content_type: str | None,
+                               sample_id: str | None):
         pipelines = [CONTENT_TYPE_TO_PIPELINE[data_content_type]]
         # if raw_asset.is_expression:
 
-        # FIXME: this shouldn't be the case for just stacking
         pipelines.append('stitching')  # WARNING: We need the "stitched" asset even for file conversion
 
         for name, spec in self.asset_types.items():
@@ -341,10 +342,39 @@ class Workspace2:  # REFACTOR: subclass dict
                 self.create_asset(spec, channel_spec, sample_id=sample_id)
 
     def update_raw_path(self, channel, expression):
-        old_asset = self.raw(channel)
-        if not old_asset:
-            raise MissingChannelError(f'Channel "{channel}" does not exist in the workspace.'
+        """
+        Ensure that a 'raw' asset exists for `channel` and has the given expression.
+
+        Cases
+        -----
+        - Channel absent from asset_collections:
+            -> raise MissingChannelError (caller should use add_raw_data)
+        - Channel present but no raw asset:
+            -> create a raw asset for the existing ChannelSpec
+        - Channel present and raw asset exists:
+            -> update its expression if it changed
+        """
+        if channel not in self.asset_collections:  # Missing completely
+            raise MissingChannelError(f'Channel "{channel}" does not exist in the workspace. '
                                       f'Use add_raw_data to create a new channel.')
+
+        old_asset = self.raw(channel)
+
+        # Case 1: logical channel exists but no raw asset yet (e.g. after loading from YAML)
+        if old_asset is None:
+            collection = self[channel]
+            channel_spec = collection.channel_spec
+            if channel_spec is None:
+                raise MissingChannelError(f'Channel "{channel}" has no channel_spec in the workspace. '
+                                          f'Cannot create raw asset automatically.')
+
+            raw_type_spec = deepcopy(self.asset_types['raw'])
+            raw_asset = Asset(self.directory, raw_type_spec, channel_spec, expression=expression,
+                              sample_id=self.sample_id, status_manager=self.status_manager)
+            self.add_asset(raw_asset)
+            return
+
+        # Case 2: raw asset already exists → just update the expression if needed
         if old_asset.expression != expression:
             self.asset_collections[channel]['raw'] = old_asset.variant(expression=expression)
 
@@ -874,7 +904,7 @@ def test_asset_creation():
     print(ws.asset_collections)
     raw_asset = ws.get('raw', 'cfos')
     if raw_asset.is_tiled:
-        print(raw_asset.file_list[:min(raw_asset.n_tiles, 10)])
+        print(raw_asset.file_list[:min(raw_asset.n_files_present, 10)])
     assert raw_asset.channel_spec.name == 'cfos'
     assert raw_asset.expression.string() == raw_expr, print(f'Expressions do not match: {raw_asset.expression} != {raw_expr}')
 
