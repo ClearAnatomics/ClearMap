@@ -197,6 +197,11 @@ class Source(AbstractSource):
         md = getattr(self._tif, self._metadata_type) or {}
         if self._tif.is_ome:
             md = tifffile.xml2dict(md).get('OME', {})
+        if not isinstance(md, dict):
+            if isinstance(md, (list, tuple)) and len(md) == 1:
+                md = md[0] if md else {}
+            else:
+                raise ValueError(f'Unexpected metadata format in tif file {self.location}: {type(md)}')
         return md
 
     def metadata(self, info=('shape', 'resolution', 'overlap')):
@@ -310,6 +315,7 @@ class BaseMetadataParser:
 
     def parse(self):
         sequence = [
+            'order',  # First because used by shape and resolution
             'shape',  # calls parse_pixel_metadata() (order + shape)
             'resolution',
             'overlap',
@@ -323,10 +329,20 @@ class BaseMetadataParser:
         # legacy aliases (so requesting 'shape' still calls parse_pixel_metadata)
         special = {'shape': self.parse_pixel_metadata}
 
-        for key in sequence:
+        for key in sequence:  # FIXME: handle dependency chains
             if key in self.info:
-                fn = special.get(key) or getattr(self, f'parse_{key}', None)
-                fn()
+                fn = special.get(key) or getattr(self, f'parse_{key}')
+                if fn is not None:
+                    fn()
+            # else:
+            #     fn = getattr(self, f'parse_{key}', None)
+            #     if fn:
+            #         print(f'Warning: key not found in info_categories: {key}.'
+            #               f'Trying to force call parse_{key} anyway.')
+            #         try:
+            #             fn()
+            #         except KeyError as err:
+            #             print(f'Warning: could not parse {key}: {err}')
 
     def update_info(self, name, keys, mdict, astype):
         value = []
@@ -379,21 +395,68 @@ class BaseMetadataParser:
         self.parse_shape()
 
     def parse_resolution(self):
-        self.info['resolution'] = tuple(float(self.pixels_metadata[f'PhysicalSize{dim}'])
-                                        for dim in self.info['order'] if dim in 'XYZ')
+        axes = [ ax for ax in self.info['order'] if ax in 'XYZ' ]
+        self.info['resolution'] = tuple(float(self.pixels_metadata[f'PhysicalSize{ax}']) for ax in axes)
 
     def parse_date(self):
-        self.info['date'] = self.metadata.get('Image', {}).get('CreationDate', None)
+        img_meta = self.metadata.get('Image', {})
+        self.info['date'] = img_meta.get('CreationDate', None)
 
     def parse_description(self):
+        # if self.source.pages_mode:
+        #     desc = self.source._tif.pages[0].description
+        # else:
+        #     desc = self.source.series.description
+        # if desc:
+        #     self.info['description'] = desc
+        # else:
+        #     self.info['description'] = self.metadata.get('Image', {}).get('Description', None)
+        desc = None
+
+        # Choose a representative page
+        page = None
+        tif = self.source._tif
+
         if self.source.pages_mode:
-            desc = self.source._tif.pages[0].description
+            # For OME or true pages-mode, page 0 is usually authoritative
+            if tif.pages:
+                page = tif.pages[0]
         else:
-            desc = self.source.series.description
-        if desc:
-            self.info['description'] = desc
-        else:
-            self.info['description'] = self.metadata.get('Image', {}).get('Description', None)
+            # For shaped / ImageJ / ClearMap series, try the series pages first
+            try:
+                series = self.source.series
+            except Exception:
+                series = None
+
+            if series is not None:
+                # tifffile.TiffPageSeries typically has .pages and/or .keyframe
+                if hasattr(series, "keyframe") and series.keyframe is not None:
+                    page = series.keyframe
+                elif hasattr(series, "pages") and series.pages:
+                    page = series.pages[0]
+
+            # Fallback: global first page
+            if page is None and tif.pages:
+                page = tif.pages[0]
+
+        # Try description from the chosen page
+        if page is not None:
+            if hasattr(page, "description") and page.description:
+                desc = page.description
+            # Some tifffile versions expose description via tags only
+            elif hasattr(page, "tags") and "ImageDescription" in page.tags:
+                try:
+                    desc = page.tags["ImageDescription"].value
+                except Exception:
+                    pass
+
+        # Fallback to high-level metadata dict (OME/ImageJ)
+        if not desc:
+            desc = (self.metadata
+                    .get("Image", {})
+                    .get("Description", None))
+
+        self.info["description"] = desc
 
     def parse_tile_configuration(self):
         warnings.warn(f"Tile configuration parsing is not available for {self.__class__.__name__}, skipping!")
@@ -679,6 +742,25 @@ class ImageJMetadataParser(BaseMetadataParser):
             raise ValueError(f'Unknown metadata type {self.source._metadata_type} and format: {md_info[0]};'
                              f' info: {md_info}')
 
+    def parse_resolution(self):
+        # ImageJ often has unit/spacing but not PhysicalSizeX/Y
+        if 'PhysicalSizeX' in self.pixels_metadata:
+            super().parse_resolution()
+            return
+
+        # Optional: salvage Z from ImageJ 'spacing'
+        order = self.info.get('order') or self.pixels_metadata.get('DimensionOrder') or 'XYZ'
+        axes = [ax for ax in order if ax in 'XYZ']
+
+        z = self.metadata.get('spacing', None)
+        if z is not None and 'Z' in axes: # Only fill Z; keep XY unknown rather than inventing values
+            res = []
+            for ax in axes:
+                res.append(float(z) if ax == 'Z' else None)
+            self.info['resolution'] = tuple(res)
+        else:
+            self.info['resolution'] = None
+
 
 class ClearMapMetadataParser(BaseMetadataParser):
     """
@@ -688,6 +770,12 @@ class ClearMapMetadataParser(BaseMetadataParser):
     files which might lack some of the metadata fields but where the axes
     order is bound to be 'XYZ'.
     """
+    def parse_resolution(self):
+        if 'PhysicalSizeX' in self.pixels_metadata:
+            super().parse_resolution()
+        else:
+            self.info['resolution'] = None
+
     def parse_order(self):
         # parsed_info = self.metadata[0]  # FIXME: check, which is best
         super().parse_order()
