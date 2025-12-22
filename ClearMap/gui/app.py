@@ -27,6 +27,7 @@ __webpage__ = 'https://idisco.info'
 __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
 from ClearMap.gui.gui_utils_base import unique_connect
+from ClearMap.gui.widgets import ClickableFrame
 
 print('Starting base imports...', flush=True)
 import os
@@ -54,7 +55,7 @@ from PyQt5.QtGui import QGuiApplication
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QPushButton, QSpinBox, QDoubleSpinBox,
                              QComboBox, QLineEdit, QMessageBox, QToolBox, QProgressBar, QLabel,
-                             QStyle, QAction, QDockWidget)
+                             QStyle, QAction, QDockWidget, QStackedWidget)
 
 import qdarkstyle
 from qdarkstyle import DarkPalette
@@ -148,7 +149,8 @@ if TYPE_CHECKING:
     from ClearMap.gui.gui_utils_images import get_current_res
     from ClearMap.gui.tab_registry import TabRegistry
     from ClearMap.gui.widget_monkeypatch_callbacks import recursive_patch_widgets
-    from ClearMap.gui.experiment_controller import ExperimentController, AnalysisGroupController
+    from ClearMap.pipeline_orchestrators.experiment_controller import ExperimentController, AnalysisGroupController, \
+        AppMode
     from ClearMap.gui.tabs_interfaces import GenericTab, ExperimentTab, GroupTab
     from ClearMap.gui.preferences import PreferenceUi
     from ClearMap.gui.gui_logging import Printer
@@ -192,8 +194,6 @@ SLOW_IMPORTS = [
     ImportTask.from_imports('ClearMap.gui.gui_utils_images', 'get_current_res'),
     ImportTask.from_imports('ClearMap.gui.tab_registry', 'TabRegistry'),
     ImportTask.from_imports('ClearMap.gui.widget_monkeypatch_callbacks', 'recursive_patch_widgets'),
-    ImportTask.from_imports('ClearMap.gui.experiment_controller',
-                            'ExperimentController', 'AnalysisGroupController'),
     ImportTask.from_imports('ClearMap.gui.tabs_interfaces', 'GenericTab', 'ExperimentTab', 'GroupTab'),
     ImportTask.from_imports('ClearMap.gui.preferences', 'PreferenceUi'),
     ImportTask.from_imports('ClearMap.gui.gui_logging', 'Printer'),
@@ -204,6 +204,8 @@ SLOW_IMPORTS = [
     ImportTask.from_imports('ClearMap.gui.about', 'AboutInfo'),
 
     ImportTask.from_imports('ClearMap.pipeline_orchestrators.sample_info_management', 'SampleManager'),
+    ImportTask.from_imports('ClearMap.pipeline_orchestrators.experiment_controller',
+                            'ExperimentController', 'AnalysisGroupController', 'AppMode'),
 
 ]
 
@@ -225,7 +227,8 @@ ABOUT_INFO = AboutInfo(software_name=f'You are running ClearMap version {CLEARMA
 HARD_DEFAULT_FONT_SIZE = 11
 
 Ui_ClearMapGui, _ = loadUiType(os.path.join(base_utils.UI_FOLDER, 'creator', 'mainwindow.ui'), from_imports=True,
-                               import_from='ClearMap.gui.creator', patch_parent_class=False)
+                               import_from='ClearMap.gui.creator', patch_parent_class=False,
+                               customWidgets={"ClickableFrame": ClickableFrame})
 
 
 class ClearMapAppBase(QMainWindow, Ui_ClearMapGui):
@@ -730,6 +733,9 @@ class ClearMapApp(ClearMapAppBase):
         self.config_loader = ConfigHandler('')
         self.ortho_viewer = cmp_widgets.OrthoViewer()
 
+        self.experimentModePushButton.clicked.connect(self._select_experiment_mode)
+        self.batchModePushButton.clicked.connect(self._select_group_mode)
+
         self._init_sample_tab_mgr()
 
         # Menu actions
@@ -763,6 +769,14 @@ class ClearMapApp(ClearMapAppBase):
         self._init_sample_tab_mgr()
 
         self.amend_ui()
+
+    def _select_experiment_mode(self):
+        self.gui_controller.set_mode(AppMode.EXPERIMENT)
+        self.centralStack.setCurrentIndex(1)  # tabs page
+
+    def _select_group_mode(self):
+        self.gui_controller.set_mode(AppMode.GROUP)
+        self.centralStack.setCurrentIndex(1)  # tabs page
 
     @property
     def sample_manager(self):
@@ -911,7 +925,8 @@ class ClearMapApp(ClearMapAppBase):
         show_info_action.triggered.connect(self.show_workspace_info)
         workspace_menu.addAction(show_info_action)
 
-        # add_asset_action = QAction("Add Asset", self)  # FIXME: enable when implemented
+        # FIXME: enable when implemented
+        # add_asset_action = QAction("Add Asset", self)
         # add_asset_action.triggered.connect(self.add_asset)
         # workspace_menu.addAction(add_asset_action)
 
@@ -1119,12 +1134,15 @@ class GuiController(BusSubscriberMixin):
     def __init__(self, bus: EventBus, experiment, tab_registry: TabRegistry,
                  group_controller: AnalysisGroupController):
         super().__init__(bus)
-        self.experiment_controller = experiment
-        self.tabs_registry = tab_registry  # stays a UI concern
+        self.experiment_controller: ExperimentController = experiment
+        self.tabs_registry: TabRegistry = tab_registry  # stays a UI concern
 
-        self.group_controller = group_controller
+        self.group_controller: AnalysisGroupController = group_controller
 
-        self.sample_manager = experiment.sample_manager
+        self.sample_manager: SampleManager = experiment.sample_manager
+
+        self.mode: AppMode = AppMode.EXPERIMENT  # Exp as default
+
         self._tabs: List[GenericTab] = []  # instances
         self.window: QMainWindow | None = None
 
@@ -1144,6 +1162,14 @@ class GuiController(BusSubscriberMixin):
         self.window.show()
         self.window.fix_styles()
         app_.processEvents()
+
+    def set_mode(self, mode: AppMode):
+        if mode == self.mode:
+            return
+        self.mode = mode
+        # refresh tabs to reflect mode change
+        self._install_or_update_tabs()
+        self._tabs_initialized = True
 
     def begin_hydration(self):
         self._needs_full_refresh = False
@@ -1218,12 +1244,14 @@ class GuiController(BusSubscriberMixin):
         self._tabs = self._build_tabs_from_registry()
         self.publish(TabsUpdated(titles=[t.name for t in self._tabs], tabs=self._tabs))
 
-        names, partners = self.experiment_controller.channel_snapshot()
-        self.publish(ChannelsSnapshot(names=names))
-        self.publish(ChannelDefaultsChanged(partners=partners))
+        if self.mode == AppMode.EXPERIMENT:
+            names, partners = self.experiment_controller.channel_snapshot()
+            self.publish(ChannelsSnapshot(names=names))
+            self.publish(ChannelDefaultsChanged(partners=partners))
 
     def _build_tabs_from_registry(self) -> list[Any]:
-        valid_tab_classes = self.tabs_registry.valid_tabs(self.sample_manager)
+        valid_tab_classes = self.tabs_registry.valid_tabs(mode=self.mode, sample_manager=self.sample_manager,
+                                                          group_controller=self.group_controller)
         print(f'Valid tabs: {[cls.__name__ for cls in valid_tab_classes]}')
 
         new_tabs = []

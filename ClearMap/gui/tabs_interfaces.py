@@ -30,7 +30,7 @@ if TYPE_CHECKING:
     from .params_interfaces import UiParameter, UiParameterCollection
     from .params_mixins import OrthoviewerSlicingMixin
     from .params import SampleParameters
-    from .experiment_controller import ExperimentController, AnalysisGroupController
+    from ClearMap.pipeline_orchestrators.experiment_controller import ExperimentController, AnalysisGroupController
 
 
 
@@ -646,8 +646,7 @@ class ExperimentTab(GenericTab):
         # remove obsolete pages
         obsolete_channels = [c for c in tab_widget.get_channels_names() if c not in desired_channels]
         for ch in obsolete_channels:
-            # self.remove_channel_tab(ch)
-            self.params.pop(ch)
+            self.params.pop(ch)  # self.remove_channel_tab(ch) should be implicit in pop
             self._on_channel_removed(ch)
 
         # add missing pages (in desired order)

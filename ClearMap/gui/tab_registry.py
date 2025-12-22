@@ -1,6 +1,7 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Callable, Tuple, Dict, Union, Optional
 
+from ClearMap.pipeline_orchestrators.experiment_controller import AnalysisGroupController, AppMode
 from .tabs_interfaces import GenericTab, PreProcessingTab, PostProcessingTab, BatchTab
 
 if TYPE_CHECKING:
@@ -153,29 +154,43 @@ class TabRegistry:  # FIXME: ensure that colocalization tab existence is trigger
                 if (tab_cls not in existing_set) and tab_cls.requirements_fulfilled(sample_manager) and extra_ok
                 ]
 
-    def valid_tabs(self, sample_manager: "SampleManager") -> list[type[GenericTab]]:
+    def valid_tabs(self, mode: AppMode, sample_manager: "SampleManager",
+                   group_controller: "Optional[AnalysisGroupController]" = None) -> list[type[GenericTab]]:
         # self._ensure_loaded()  # lazy load on first real use
 
-        required: list[type[GenericTab]] = self._base_tabs
+        if mode == AppMode.EXPERIMENT:
+            return self._valid_experiment_tabs(sample_manager)
+        else:
+            return self._valid_group_tabs(group_controller)
 
-        # regular pipeline tabs
+    def _valid_experiment_tabs(self, sample_manager: "SampleManager") -> list[type[GenericTab]]:
+        required: list[type[GenericTab]] = self._base_tabs  # SampleInfoTab
+
+        # Regular pipeline tabs (per data_type)
         for ch in sample_manager.channels:
             data_cls = self._DATA_TYPE_TO_TAB_CLASS.get(sample_manager.data_type(ch))
             self._append_if(required, data_cls, sample_manager)
 
-        # preprocessing
-        for tab_cls in self._preprocessing_tabs:  # As soon as we have a sample
+        # Preprocessing tabs (as soon as we have a sample)
+        for tab_cls in self._preprocessing_tabs:
             self._append_if(required, tab_cls, sample_manager)
 
-        # Compound tabs (e.g., colocalization)
+        # Compound tabs (e.g. colocalization)
         def coloc_compatible(sm: "SampleManager") -> bool:
             return sm.is_colocalization_compatible
 
         required += self._filter_by_requirements(self._compound_tabs, sample_manager,
                                                  extra_requires=coloc_compatible, existing=required)
 
+        return self._sort_tabs(required)
+
+    def _valid_group_tabs(self, group_controller: "AnalysisGroupController | None") -> list[type[GenericTab]]:
+        required: list[type[GenericTab]] = []
+
         # Batch tabs
-        required += self._filter_by_requirements(self._batch_tabs, sample_manager, existing=required)
+        for tab_cls in self._batch_tabs:  # GroupAnalysisTab, BatchProcessingTab
+            if tab_cls not in required:
+                required.append(tab_cls)
 
         return self._sort_tabs(required)
 

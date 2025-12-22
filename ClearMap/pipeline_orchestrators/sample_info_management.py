@@ -560,6 +560,34 @@ class SampleManager(OrchestratorBase):
             error_label=pipeline_name
         )
 
+    def infer_pipelines(self) -> set[str]:
+        """
+        Infer active *per-sample* pipelines based purely on this sample’s channels / types.
+        Does not know/care about group/batch.
+        """
+        pipelines: set[str] = set()
+
+        # 1) channel content types → pipelines
+        for ch in self.channels:
+            ct = self.data_type(ch)
+            p = CONTENT_TYPE_TO_PIPELINE.get(ct)
+            if p:
+                pipelines.add(p)
+
+        # 2) stitching: as soon as any tiled/pattern channel exists
+        if self.stitchable_channels:
+            pipelines.add('stitching')
+
+        # 3) registration: if registration is actually meaningful
+        # FIXME: check if we have an atlas or something
+        pipelines.add('registration')
+
+        # 4) compound/co-loc
+        if self.is_colocalization_compatible:
+            pipelines.add('Colocalization')
+
+        return pipelines
+
     def asset_names_to_assets(self, asset_names: List[str], channel: Optional[str] = None,
                               sample_id: Optional[str] = None) -> List["WorkspaceAsset"]:
         return [self.workspace.get(asset_name) for asset_name in asset_names]

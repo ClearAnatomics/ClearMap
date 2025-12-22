@@ -36,9 +36,9 @@ from PyQt5.QtGui import QColor, QIcon
 from PyQt5.QtWidgets import (QWidget, QDialogButtonBox, QListWidget, QListWidgetItem,
                              QLayout, QHBoxLayout, QVBoxLayout, QGridLayout,
                              QPushButton, QTableWidget, QTableWidgetItem, QToolBox, QRadioButton,
-                             QTreeWidget, QTreeWidgetItem, QTabWidget,  QFileDialog,
-                             QAbstractItemView, QGroupBox, QButtonGroup, QLabel, QSlider,  QFrame,
-                             QCheckBox, QComboBox)
+                             QTreeWidget, QTreeWidgetItem, QTabWidget, QFileDialog,
+                             QAbstractItemView, QGroupBox, QButtonGroup, QLabel, QSlider, QFrame,
+                             QCheckBox, QComboBox, QSpinBox)
 
 from ClearMap import Settings
 from ClearMap.IO.assets_constants import DATA_CONTENT_TYPES
@@ -2590,3 +2590,10 @@ class GroupsWidgetAdapter(QWidget):
 
     def __gp_name(self, name, idx):
         return name or f"Group {idx + 1}"
+
+class ClickableFrame(QFrame):
+    clicked = pyqtSignal()
+
+    def mousePressEvent(self, event):
+        self.clicked.emit()
+        super().mousePressEvent(event)
