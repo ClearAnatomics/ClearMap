@@ -150,7 +150,17 @@ def parse_ome_info(img_path: Path) -> Dict[str, Any]:
         raise NotAnOmeFile(f'File {img_path} is not an OME-TIFF file')
     from ClearMap.IO.TIF import Source as TifSource
     src = TifSource(img_path)
-    return src.metadata(info=['resolution', 'channels_excitation', 'tile_configuration', 'stitching'])
+    return src.metadata(info=[
+        'order',  # First because used by shape and resolution
+        'shape',  # calls parse_pixel_metadata() (order + shape)
+        'resolution',
+        'overlap',
+        'description',
+        'tile_configuration',
+        'date',
+        'channels_excitation',
+        'stitching'
+    ])
 
 ############################################### TILE PATTERNS DISCOVERY ##############################################
 
