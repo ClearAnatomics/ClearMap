@@ -226,7 +226,7 @@
            <normaloff>.</normaloff>.</iconset>
          </property>
          <property name="shortcut">
-          <string>Ctrl+O</string>
+          <string>Ctrl+W</string>
          </property>
         </widget>
        </item>
