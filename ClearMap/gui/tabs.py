@@ -831,15 +831,36 @@ class RegistrationTab(PreProcessingTab):
         align_with = event.align_with
         if align_with == channel:
             raise ValueError(f'Cannot align {channel=} with itself')  # FIXME: popup instead of crashing whole app (QT anyway)
-        elif align_with is None:
+        if align_with is None:
             # Remove registration pipeline from channel
-            pass
-        else:
-            if self.sample_manager.setup_complete:
-                self.sample_manager.workspace.add_pipeline('registration', channel_id=channel)
-                self.worker.parametrize_assets()
-            else:
-                warnings.warn('Workspace not setup, cannot add registration pipeline')
+            return
+
+        sample_mgr = self.sample_manager
+        workspace = sample_mgr.workspace
+        if not sample_mgr.setup_complete:
+            warnings.warn('Workspace not setup, cannot add registration pipeline')
+            return
+
+        if channel in workspace:
+            workspace.ensure_pipeline('registration', channel_id=channel,
+                                      sample_id=sample_mgr.prefix, create_channel=False)
+        else:  # Try from sample config
+            try:
+                content_type = sample_mgr.data_type(channel)
+            except KeyError:
+                warnings.warn(
+                    f'Channel "{channel}" not found in sample config; cannot create registration pipeline')
+                return
+
+            if not content_type or content_type == 'undefined':
+                warnings.warn(f'Channel "{channel}" has undefined data_type; '
+                              f'cannot create registration pipeline before data_type is set.')
+                return
+
+            # Create logical channel + registration assets in workspace
+            workspace.ensure_pipeline('registration', channel_id=channel, sample_id=sample_mgr.prefix,
+                                      create_channel=True, channel_content_type=content_type)
+        self.worker.parametrize_assets()
 
     def resample_channel(self, channel):
         self.main_window.make_progress_dialog('Registering', n_steps=2, abort=self.worker.stop_process,
