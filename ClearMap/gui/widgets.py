@@ -948,9 +948,9 @@ class WizardWidget:
         Execute the dialog
         """
         if hasattr(self.dlg, "exec"):  # QDialog
-            self.dlg.exec()
+            return self.dlg.exec()
         else:  # plain QWidget / QDockWidget
-            self.dlg.show()
+            return self.dlg.show()
 
 
 class ManageAssetsWidget(WizardWidget):
