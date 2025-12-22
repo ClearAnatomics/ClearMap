@@ -212,11 +212,8 @@ def _config_keys_overlap(changed_keys: Optional[Iterable[ConfigKeysLike]],
     return False
 
 
-def run_adjusters(*,
-                  view: ConfigView,
-                  sample_manager: SampleManagerProtocol,  # REQUIRED
-                  phase: Phase = Phase.PRE_VALIDATE,
-                  pipelines: Optional[Iterable[str]] = None,
+def run_adjusters(*, view: ConfigView, sample_manager: SampleManagerProtocol, phase: Phase = Phase.PRE_VALIDATE,
+                  active_sections: Optional[Iterable[str]] = None,
                   changed_keys: Optional[Iterable[ConfigKeys]] = None) -> ConfigPatch:
     """
     Select adjusters matching the phase/pipelines/keys and run them
@@ -226,7 +223,7 @@ def run_adjusters(*,
     if not steps_order:
         return {}
 
-    pipes_set = set(pipelines) if pipelines else None
+    pipes_set = set(active_sections) if active_sections else None
     patch: ConfigPatch = {}
     working_view = deepcopy(dict(view))  # mutable to update as we go
 

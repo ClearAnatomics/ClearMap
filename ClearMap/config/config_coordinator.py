@@ -14,7 +14,7 @@ from ClearMap.Utils.utilities import infer_origin_from_caller, deep_merge
 
 from . import config_adjusters
 from .config_adjusters import Phase, ConfigKeys, run_adjusters
-from .config_handler import ALTERNATIVES_REG
+from .config_handler import ALTERNATIVES_REG, ConfigHandler
 from .config_repository import ConfigRepository
 from .defaults_provider import DefaultsProvider, get_defaults_provider, SCHEMAS_DIR
 from .validators import validate_all, SectionValidators
@@ -85,6 +85,13 @@ class ConfigCoordinator(BusSubscriberMixin):
         self._lock = RLock()
 
         self._section_validators = SectionValidators(self._schemas_dir)
+        self._active_sections: set[str] = set()
+
+    @property
+    def _allowed_sections(self):
+        if not self._active_sections:
+            return set(ALTERNATIVES_REG.canonical_config_names)  # TODO: chekc if this is the right fallback
+        return set(self._active_sections) | set(ALTERNATIVES_REG.canonical_global_config_names)
 
     @property
     def workspace_config_path(self):
@@ -107,6 +114,33 @@ class ConfigCoordinator(BusSubscriberMixin):
         self.defaults_provider = provider
         config_adjusters.set_defaults_provider(provider)
 
+    def set_active_sections(self, sections: Optional[Iterable[str]]) -> None:
+        """
+        Declare which *local* config sections are in play for this experiment.
+        Global sections (machine, display, etc.) stay untouched.
+
+        This method:
+          - Prunes self.working to only keep active+global sections.
+          - Updates the repo so future load_all()/copy_from_defaults()
+            only touch those sections (plus globals).
+        """
+        if sections is None:  # None -> all active -> no filtering
+            self._active_sections = set()
+            return
+
+        active = {ConfigHandler.normalise_cfg_name(s) for s in sections}
+        self._active_sections = active
+
+        repo_sections = list(active) + ALTERNATIVES_REG.canonical_global_config_names
+        self._config_repo.set_sections(repo_sections)
+
+        # Prune working config
+        keep = set(repo_sections)
+        with self._lock:
+            self.working = {name: cfg for name, cfg in self.working.items()
+                            if name in keep}
+            self._rev += 1
+
     def seed_missing_from_defaults(self, *, tabs_only: bool = True) -> None:
         """
         For any known section missing in the working model, seed from DefaultsProvider.
@@ -114,14 +148,17 @@ class ConfigCoordinator(BusSubscriberMixin):
         """
         if not self.defaults_provider:
             return
-        canonical_names = ALTERNATIVES_REG.canonical_config_names
-        known = [n for n in canonical_names if (not tabs_only or ALTERNATIVES_REG.is_local_file(n))]
-        with self.__edit_session(origin="seed_defaults", validate=False) as w:
+        known = self._config_repo.list_sections()
+
+        if tabs_only:
+            known = [n for n in known if ALTERNATIVES_REG.is_local_file(n)]
+
+        with self.__edit_session(origin="seed_defaults", validate=False) as wkng:
             for sec in known:
-                if sec not in w or not w[sec]:
-                    d = self.defaults_provider.get(sec)
-                    if d:
-                        w[sec] = d
+                if sec not in wkng or not wkng[sec]:
+                    dflt = self.defaults_provider.get(sec)
+                    if dflt:
+                        wkng[sec] = dflt
 
     def config_exists(self, name: str) -> bool:
         return self.path_for(name, must_exist=False).exists()
@@ -242,7 +279,8 @@ class ConfigCoordinator(BusSubscriberMixin):
             self.working = working_copy
             self._rev += 1
 
-    def _merge_patch(self, working_cfg: Dict[str, Dict[str, Any]], patch: Dict[str, Any]) -> None:
+    def _merge_patch(self, working_cfg: Dict[str, Dict[str, Any]], patch: Dict[str, Any], *,
+                     allowed_sections: Optional[set[str]] = None) -> None:
         """
         Merge a patch dict into the working config.
         If any top-level key matches a known file name, direct merge into that.
@@ -253,13 +291,24 @@ class ConfigCoordinator(BusSubscriberMixin):
         working_cfg
         patch
         """
+        extra_sections = set(patch.keys()) - (allowed_sections or set()) - {'origin'}
+        if extra_sections:
+            warnings.warn(f'Applying patch with keys outside active sections: {extra_sections}',
+                          RuntimeWarning, stacklevel=2)
         targeted = False
-        for name in list(working_cfg.keys()):
-            if name in patch and isinstance(patch[name], dict):
-                deep_merge(working_cfg[name], patch[name])
+        for name, subpatch in patch.items():
+            if name == "origin":
+                continue
+            if allowed_sections is not None and name not in allowed_sections:
+                continue
+            if isinstance(subpatch, dict):
+                if name not in working_cfg or not isinstance(working_cfg.get(name), dict):
+                    working_cfg[name] = {}
+                deep_merge(working_cfg[name], subpatch)
                 targeted = True
         if not targeted:
-            raise NotImplementedError(f'Global patches are not supported in this version.')
+            return  # No-op if no targeted sections found
+            # raise NotImplementedError(f'Global patches are not supported in this version.')
             # Merge into a default 'global' config (create if missing)
             deep_merge(working_cfg.setdefault('global', {}), patch)
 
@@ -269,11 +318,14 @@ class ConfigCoordinator(BusSubscriberMixin):
         Policy: top-level keys select target configs if they exist in working;
         otherwise, apply into a special 'global' config.
         """
-        origin = patch.pop('origin', None)
-        if not origin:
-            origin = infer_origin_from_caller()
+        origin = patch.pop('origin', None) or infer_origin_from_caller()
+
+        allowed = self._allowed_sections
+        extra = set(patch.keys()) - allowed - {'origin'}
+        if extra:
+            warnings.warn(f'Applying patch with keys outside active sections: {extra}', RuntimeWarning, stacklevel=2)
         with self.__edit_session(origin=origin, validate=False) as working_cfg:
-            self._merge_patch(working_cfg, patch)
+            self._merge_patch(working_cfg, patch, allowed_sections=allowed)
 
     # def apply_section(self, name: str, patch: Dict[str, Any]) -> None:
     #     """
@@ -344,14 +396,18 @@ class ConfigCoordinator(BusSubscriberMixin):
         # Swap $rename directives to channels in patch and extract map for SampleManager
         clean_patch, rename_map = self._extract_channel_renames(patch)
 
+        allowed = self._allowed_sections
         with self.__edit_session(origin=origin, validate=False) as working_cfg:
-            self._merge_patch(working_cfg, clean_patch)
+            self._merge_patch(working_cfg, clean_patch, allowed_sections=allowed)
             changed_keys = _patch_to_config_keys_sets(clean_patch)
             if do_run_adjusters:
-                patch2 = self.adjust_config(sample_manager=sample_manager, phase=phase,
-                                            pipelines=None, changed_keys=changed_keys, apply=False)
+                patch2 = self.adjust_config(sample_manager=sample_manager, phase=phase, view=working_cfg,
+                                            active_sections=None, changed_keys=changed_keys, apply=False)
                 if patch2:
-                    self._merge_patch(working_cfg, patch2)
+                    self._merge_patch(working_cfg, patch2, allowed_sections=allowed)
+                    changed_keys.extend(_patch_to_config_keys_sets(patch2))
+
+        changed_keys = sorted(set(changed_keys))  # Deduplicate
 
         if validate:
             self.validate()
@@ -380,7 +436,7 @@ class ConfigCoordinator(BusSubscriberMixin):
         applied_patch = {}
         if do_run_adjusters:
             applied_patch = self.adjust_config(sample_manager=sample_manager, changed_keys=None,
-                                               phase=phase, pipelines=None, apply=True)
+                                               phase=phase, active_sections=None, apply=True)
         if validate:
             self.validate()
         if commit:
@@ -394,8 +450,9 @@ class ConfigCoordinator(BusSubscriberMixin):
             self.publish(CfgChanged(changed_keys=tuple(".".join(k) for k in changed_keys)))
 
     def adjust_config(self, *, sample_manager, phase: Phase = Phase.PRE_VALIDATE,
-                      pipelines: Optional[Iterable[str]] = None,
+                      active_sections: Optional[Iterable[str]] = None,
                       changed_keys: Optional[Iterable[ConfigKeys]] = None,
+                      view: Optional[Mapping[str, Any]] = None,
                       apply: bool=True) -> Dict[str, Any]:
         """
         Run all config adjusters on the current working config,
@@ -407,7 +464,7 @@ class ConfigCoordinator(BusSubscriberMixin):
         ----------
         sample_manager
         phase
-        pipelines
+        active_sections
         changed_keys
         apply
 
@@ -415,12 +472,17 @@ class ConfigCoordinator(BusSubscriberMixin):
         -------
 
         """
-        view = self.get_config_view()
-        patch = run_adjusters(view=view, sample_manager=sample_manager, phase=phase,
-                              pipelines=pipelines, changed_keys=changed_keys)
+        if view is None:
+            view = self.get_config_view()
+        active_sections = set(active_sections) if active_sections is not None else set(self._active_sections)
+        active_sections = active_sections | set(ALTERNATIVES_REG.canonical_global_config_names)
+        patch = run_adjusters(view=view, sample_manager=sample_manager, phase=phase, active_sections=active_sections,
+                              changed_keys=changed_keys)
+        if patch:
+            patch = {k: v for k, v in patch.items() if k in active_sections}
         if apply and patch:
             with self.__edit_session(origin="adjusters", validate=False) as working_cfg:
-                self._merge_patch(working_cfg, patch)
+                self._merge_patch(working_cfg, patch, allowed_sections=active_sections)
         return patch
 
     def validate(self, working_copy=None) -> None:

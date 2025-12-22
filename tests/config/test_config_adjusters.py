@@ -319,37 +319,37 @@ def _inject_defaults_provider():
         set_defaults_provider(old)
 
 def _adjust_stitching(view, sm):
-    return run_adjusters(view=view, sample_manager=sm, phase=Phase.PRE_VALIDATE, pipelines=("stitching",))
+    return run_adjusters(view=view, sample_manager=sm, phase=Phase.PRE_VALIDATE, active_sections=("stitching",))
 
 def _adjust_registration(view, sm):
-    return run_adjusters(view=view, sample_manager=sm, phase=Phase.PRE_VALIDATE, pipelines=("registration",))
+    return run_adjusters(view=view, sample_manager=sm, phase=Phase.PRE_VALIDATE, active_sections=("registration",))
 
 def _adjust_cell_map(view, sm):
-    return run_adjusters(view=view, sample_manager=sm, phase=Phase.PRE_VALIDATE, pipelines=("cell_map",))
+    return run_adjusters(view=view, sample_manager=sm, phase=Phase.PRE_VALIDATE, active_sections=("cell_map",))
 
 def _adjust_coloc(view, sm):
-    return run_adjusters(view=view, sample_manager=sm, phase=Phase.PRE_VALIDATE, pipelines=("colocalization",))
+    return run_adjusters(view=view, sample_manager=sm, phase=Phase.PRE_VALIDATE, active_sections=("colocalization",))
 
 def _adjust_vasc(view, sm):
-    return run_adjusters(view=view, sample_manager=sm, phase=Phase.PRE_VALIDATE, pipelines=("vasculature",))
+    return run_adjusters(view=view, sample_manager=sm, phase=Phase.PRE_VALIDATE, active_sections=("vasculature",))
 
 def _adjust_groups(view, sm):
-    return run_adjusters(view=view, sample_manager=sm, phase=Phase.PRE_VALIDATE, pipelines=("group_analysis",))
+    return run_adjusters(view=view, sample_manager=sm, phase=Phase.PRE_VALIDATE, active_sections=("group_analysis",))
 
 def _adjust_batch(view, sm):
-    return run_adjusters(view=view, sample_manager=sm, phase=Phase.PRE_VALIDATE, pipelines=("batch_processing",))
+    return run_adjusters(view=view, sample_manager=sm, phase=Phase.PRE_VALIDATE, active_sections=("batch_processing",))
 
 def _adjust_machine(view, sm):
-    return run_adjusters(view=view, sample_manager=sm, phase=Phase.PRE_VALIDATE, pipelines=("machine",))
+    return run_adjusters(view=view, sample_manager=sm, phase=Phase.PRE_VALIDATE, active_sections=("machine",))
 
 def _adjust_display(view, sm):
-    return run_adjusters(view=view, sample_manager=sm, phase=Phase.PRE_VALIDATE, pipelines=("display",))
+    return run_adjusters(view=view, sample_manager=sm, phase=Phase.PRE_VALIDATE, active_sections=("display",))
 
 
 def test_populate_sample_channel_defaults_fills_missing():
     sm = _FakeSampleManager(["Ch488"])
     view = {"sample": {"channels": {"Ch488": {"data_type": "nuclei"}}}}
-    patch = run_adjusters(view=view, sample_manager=sm, phase=Phase.PRE_VALIDATE, pipelines=None)
+    patch = run_adjusters(view=view, sample_manager=sm, phase=Phase.PRE_VALIDATE, active_sections=None)
     patch = apply_patch(view, patch)
     filled = patch["sample"]["channels"]["Ch488"]
     assert filled["orientation"] == [0, 0, 0]
@@ -463,7 +463,7 @@ def test_vasculature_apply_renames():
     patch = _adjust_vasc(view, sm)  # reconcile will also seed section keys
     # run rename step explicitly too (same phase/pipeline)
     view1 = apply_patch(view, patch)
-    patch2 = run_adjusters(view=view1, sample_manager=sm, phase=Phase.PRE_VALIDATE, pipelines=("vasculature",))
+    patch2 = run_adjusters(view=view1, sample_manager=sm, phase=Phase.PRE_VALIDATE, active_sections=("vasculature",))
     merged = apply_patch(view1, patch2)
     chs = merged["vasculature"]["binarization"]
     assert "V1" not in chs and "V2" in chs

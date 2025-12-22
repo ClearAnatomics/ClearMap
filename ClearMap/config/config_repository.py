@@ -36,8 +36,15 @@ class ConfigRepository:
         self._config_handler = ConfigHandler(base_dir)
         self._known_names = list(known_names)
 
-    def list_sections(self):
+    def list_sections(self) -> list[str]:
         return list(self._known_names)
+
+    def set_sections(self, names: Iterable[str]) -> None:
+        """
+        Restrict the repository to these logical config names.
+        Caller is responsible for including any globals it needs.
+        """
+        self._known_names = [ConfigHandler.normalise_cfg_name(n) for n in names]
 
     def set_base_dir(self, base_dir: Path) -> None:
         self._config_handler.src_dir = base_dir
