@@ -72,6 +72,8 @@ def _rename_channel_key(sec_dict: Dict[str, Any], old: str, new: str) -> None:
 def _deep_merge_missing(dst: Dict[str, Any], src: Dict[str, Any]) -> None:
     """Fill only missing keys in dst from src (recursive)."""
     for k, v in src.items():
+        if k == "templates":
+            continue
         if k not in dst:
             dst[k] = deepcopy(v)
         elif isinstance(dst[k], dict) and isinstance(v, dict):
@@ -94,6 +96,160 @@ def _swap_placeholders(obj, *, channel: str, reference: Optional[str] = None) ->
     if isinstance(obj, dict):
         return {k: _swap_placeholders(v, channel=channel, reference=reference) for k, v in obj.items()}
     return obj
+
+
+TemplateForKey = Callable[[str], Optional[dict]]
+KeyTransform    = Callable[[str], str]  # usually identity
+
+
+def _ensure_path_dict(root: dict, path: tuple[str, ...]) -> dict:
+    node = root
+    for p in path:
+        if not isinstance(node.get(p), dict):
+            node[p] = {}
+        node = node[p]
+    return node
+
+
+def _merge_missing(dst: dict[str, Any], src: dict[str, Any]) -> bool:
+    """
+    Mutate `dst` by filling only missing keys from `src`.
+    Return True iff `dst` changed.
+    """
+    before = deepcopy(dst)
+    _deep_merge_missing(dst, src)
+    return dst != before
+
+
+def _identity_fn(k):
+    return k
+
+
+def get_nested(root: Any, path: tuple[str, ...], default: Any = None) -> Any:
+    """
+    Safe nested dict traversal. Returns `default` if:
+      - any intermediate is not a dict
+      - a key is missing
+    """
+    node = root
+    for p in path:
+        if not isinstance(node, dict):
+            return default
+        node = node.get(p, default)
+    return node
+
+
+def make_literal_channel_template_provider(defaults_cfg: dict[str, Any], template_path: tuple[str, ...], *,
+                                           reference: str | None) -> TemplateForKey:
+    """
+    For defaults where the template is stored at a fixed path
+    (e.g. ("performance","channel"))or ("templates","channel")
+    and must be expanded per actual channel name.
+
+    Parameters
+    ----------
+    defaults_cfg: dict[str, Any]
+        Defaults config section containing the template at `template_path`.
+    template_path: tuple[str, ...]
+        Path within defaults_cfg to the template dict.
+    reference: str | None
+        Reference channel name to expand ${reference} placeholders.
+
+    Returns
+    -------
+
+    """
+    tpl = get_nested(defaults_cfg, template_path)
+    tpl = tpl if isinstance(tpl, dict) else None
+
+    def template_for(ch: str) -> Optional[dict[str, Any]]:
+        if tpl is None:
+            return None
+        return _swap_placeholders(tpl, channel=ch, reference=reference)
+
+    return template_for
+
+
+def make_typed_template_provider(defaults_cfg: dict[str, Any], templates_root_path: tuple[str, ...], *,
+                                 reference: str | None) -> TemplateForKey:
+    """
+    For defaults where templates are keyed by a type (layout/derived, autofluorescence/regular,
+    vessels/large_vessels, etc.), and you will call it with the type key.
+
+    Parameters
+    ----------
+    defaults_cfg:
+    templates_root_path:
+        a common root path e.g. ("templates",) or ("binarization",)
+    reference
+
+    Returns
+    -------
+
+    """
+    templates_root = get_nested(defaults_cfg, templates_root_path)
+    templates_root = templates_root if isinstance(templates_root, dict) else None
+
+    def template_for(type_key: str) -> Optional[dict[str, Any]]:
+        if templates_root is None:
+            return None
+        tpl = templates_root.get(type_key)
+        if not isinstance(tpl, dict):
+            return None
+        # We still allow placeholder expansion in typed templates (stitching/registration)
+        return _swap_placeholders(tpl, channel=type_key, reference=reference)
+
+    return template_for
+
+
+
+
+
+def instantiate_entries_from_templates(*, target_root: dict, target_parent_path: tuple[str, ...], keys: list[str],
+                                       template_for: TemplateForKey, key_transform: KeyTransform = _identity_fn,
+                                       merge_missing_only: bool = True, remove_keys: set[str] = frozenset(),
+                                       ensure_static: Optional[dict[str, Any]] = None) -> bool:
+    """
+    Ensure target_root[target_parent_path][key_transform(k)] exists for each k in `keys`,
+    using template_for(k) as the base template.
+
+    - If entry missing: create deepcopy(template)
+    - If entry exists: fill missing keys from template (or overwrite if merge_missing_only=False)
+    - Optionally remove unwanted keys (e.g. lingering template keys) from the target parent
+    - Optionally ensure static entries (like 'combined') exist / are filled missing-only
+    """
+    parent = _ensure_path_dict(target_root, target_parent_path)
+    changed = False
+
+    if ensure_static:
+        for k, tpl in ensure_static.items():
+            if k not in parent:  # Add missing
+                parent[k] = deepcopy(tpl); changed = True
+            elif isinstance(parent.get(k), dict) and isinstance(tpl, dict):  # Merge existing
+                changed = changed or _merge_missing(parent[k], tpl)
+
+    for k in keys:  # Dynamic entries
+        out_k = key_transform(k)
+        tpl = template_for(k)
+        if not isinstance(tpl, dict) or not tpl:
+            continue
+
+        entry = parent.get(out_k)
+        if not isinstance(entry, dict):  # Add missing
+            parent[out_k] = deepcopy(tpl); changed = True
+        else:  # Merge existing
+            if merge_missing_only:
+                changed = changed or _merge_missing(entry, tpl)
+            else:
+                if entry != tpl:
+                    parent[out_k] = deepcopy(tpl); changed = True
+
+    for k in remove_keys:
+        if k in parent:
+            parent.pop(k, None); changed = True
+
+    return changed
+
 
 ################################# ENGINE ##################################
 
@@ -294,6 +450,249 @@ def populate_sample_channel_defaults(view: ConfigView, sm: SampleManagerProtocol
         sample['channels'] = channels
         return {'sample': sample}
     return {}
+
+
+def populate_cell_map_defaults(working_cell_map: dict[str, Any], defaults_cell_map: dict[str, Any], *,
+                               channels: list[str], reference: str | None = None) -> bool:
+    changed = False
+
+    # channels
+    tpl_provider = make_literal_channel_template_provider(defaults_cell_map, ("templates", "channel"), reference=reference)
+    changed = changed or instantiate_entries_from_templates(target_root=working_cell_map,
+                                                            target_parent_path=("channels",),
+                                                            keys=channels, template_for=tpl_provider)
+
+    # performance.<channel> from performance.channel
+    perf_tpl_provider = make_literal_channel_template_provider(defaults_cell_map, ("performance", "channel"),
+                                                      reference=reference)
+    changed = changed or instantiate_entries_from_templates(target_root=working_cell_map, target_parent_path=("performance",),
+                                                            keys=channels, template_for=perf_tpl_provider,
+                                                            remove_keys=frozenset({'channel'}))
+
+    return changed
+
+
+# FIXME: does not handle all (perf only)
+def populate_stitching_defaults(working_stitching: dict[str, Any], defaults_stitching: dict[str, Any]) -> bool:
+    changed = False
+
+    perf_defaults = get_nested(defaults_stitching, ("performance",))
+    if isinstance(perf_defaults, dict):
+        perf = working_stitching.get("performance")
+        if not isinstance(perf, dict):
+            working_stitching["performance"] = deepcopy(perf_defaults)
+            changed = True
+        else:
+            changed = changed or _merge_missing(perf, perf_defaults)
+
+    # Optional: remove templates from live config if they ever leaked in
+    # (Personally I'd keep templates only in defaults, not in working config.)
+    return changed
+
+
+# FIXME: almost identical to stitching and does not handle all (perf only)
+def populate_registration_defaults(working_registration: dict[str, Any], defaults_registration: dict[str, Any]) -> bool:
+    changed = False
+
+    # top-level non-template keys missing-only
+    changed = changed or _merge_missing(working_registration, {
+        k: deepcopy(v) for k, v in (defaults_registration or {}).items()
+        if k not in ("templates",)  # keep templates out of working config if desired
+    })
+
+    # performance
+    perf_defaults = get_nested(defaults_registration, ("performance",))
+    if isinstance(perf_defaults, dict):
+        perf = working_registration.get("performance")
+        if not isinstance(perf, dict):
+            working_registration["performance"] = deepcopy(perf_defaults)
+            changed = True
+        else:
+            changed = changed or _merge_missing(perf, perf_defaults)
+
+    return changed
+
+
+def populate_vasculature_defaults(working_vasc: dict[str, Any], defaults_vasc: dict[str, Any], *,
+                                  channels: list[str], channel_type_for: Callable[[str], str]) -> bool:
+    changed = False
+
+    # 0) ensure top-level blocks exist missing-only
+    for block in ("graph_construction", "vessel_type_postprocessing", "visualization"):
+        d = get_nested(defaults_vasc, (block,))
+        if isinstance(d, dict):
+            cur = working_vasc.get(block)
+            if not isinstance(cur, dict):
+                working_vasc[block] = deepcopy(d)
+                changed = True
+            else:
+                changed = changed or _merge_missing(cur, d)
+
+    # 1) binarization.<channel> from binarization.<type> + ensure "combined"
+    binary_defaults_root = get_nested(defaults_vasc, ("binarization",))
+    combined_tpl = get_nested(defaults_vasc, ("binarization", "combined"))
+    ensure_static = {"combined": deepcopy(combined_tpl)} if isinstance(combined_tpl, dict) else None
+
+    def bin_template_for(actual_channel: str) -> Optional[dict[str, Any]]:
+        if not isinstance(binary_defaults_root, dict):
+            return None
+        t = channel_type_for(actual_channel)  # "vessels" or "large_vessels"
+        tpl = binary_defaults_root.get(t)
+        return deepcopy(tpl) if isinstance(tpl, dict) else None
+
+    changed = changed or instantiate_entries_from_templates(
+        target_root=working_vasc,
+        target_parent_path=("binarization",),
+        keys=channels,
+        template_for=bin_template_for,
+        ensure_static=ensure_static,
+        # You may choose to remove the type keys if they leaked into working config:
+        remove_keys=frozenset({"vessels", "large_vessels"}),  # optional; see note below
+    )
+
+    # 2) performance.binarization.<channel> from performance.binarization.<type>
+    perf_bin_root = get_nested(defaults_vasc, ("performance", "binarization"))
+    def perf_template_for(actual_channel: str) -> Optional[dict[str, Any]]:
+        if not isinstance(perf_bin_root, dict):
+            return None
+        t = channel_type_for(actual_channel)
+        tpl = perf_bin_root.get(t)
+        return deepcopy(tpl) if isinstance(tpl, dict) else None
+
+    changed = changed or instantiate_entries_from_templates(
+        target_root=working_vasc,
+        target_parent_path=("performance", "binarization"),
+        keys=channels,
+        template_for=perf_template_for,
+        remove_keys=frozenset({"vessels", "large_vessels"}),  # optional
+    )
+
+    # 3) performance.combine is not per-channel: fill missing-only
+    combine_tpl = get_nested(defaults_vasc, ("performance", "combine"))
+    if isinstance(combine_tpl, dict):
+        perf = _ensure_path_dict(working_vasc, ("performance",))
+        cur = perf.get("combine")
+        if not isinstance(cur, dict):
+            perf["combine"] = deepcopy(combine_tpl)
+            changed = True
+        else:
+            changed = changed or _merge_missing(cur, combine_tpl)
+
+    return changed
+
+
+@adjuster(
+    step=Step.POPULATE_DEFAULTS,
+    phase=Phase.PRE_VALIDATE,
+    pipelines=None,
+    # Run whenever channels change OR any section itself changes.
+    # You can narrow/expand this later, but this is a safe start.
+    keys=(
+        "sample.channels",
+        "cell_map",
+        "stitching",
+        "registration",
+        "vasculature",
+    ),
+    order=50,
+)
+def populate_defaults(view: ConfigView, sm: SampleManagerProtocol) -> ConfigPatch:
+    """
+    Single entry point to populate missing config keys from defaults across sections.
+
+    Policy:
+      - never overwrite user values
+      - never copy "templates" blocks into working config (they stay in defaults)
+      - handle both:
+          * literal channel templates: defaults.templates.channel, defaults.performance.channel
+          * typed templates: defaults.templates.<type> and defaults.performance.<...>.<type>
+          * non-channel performance blocks (stitching/registration)
+          * vasculature special structure (channel-type keyed defaults expanded to actual channels)
+    """
+    patch: ConfigPatch = {}
+
+    def update_section(name: str, updated: dict[str, Any]) -> None:
+        if updated != (view.get(name) or {}):
+            patch[name] = updated
+
+    # Resolve defaults once
+    defaults_cache: dict[str, dict[str, Any]] = {}
+
+    def defaults_for(section: str) -> dict[str, Any]:
+        if section not in defaults_cache:
+            defaults_cache[section] = DEFAULTS_PROVIDER.get(section) or {}
+        return defaults_cache[section]
+
+    # Helper: missing-only merge of top-level keys, excluding templates
+    def merge_section_missing_only(section_cfg: dict[str, Any], defaults_cfg: dict[str, Any]) -> bool:
+        before = deepcopy(section_cfg)
+        _deep_merge_missing(section_cfg, {k: v for k, v in defaults_cfg.items() if k != "templates"})
+        return section_cfg != before
+
+    # ---- sample (already exists as its own adjuster in your file)
+    # You can leave populate_sample_channel_defaults as-is, or fold it in here.
+    # I’ll leave it separate to avoid changing semantics.
+
+    # ---- cell_map
+    cell_map = deepcopy(view.get("cell_map") or {})
+    d_cell_map = defaults_for("cell_map")
+    changed = merge_section_missing_only(cell_map, d_cell_map)
+
+    # channels relevant to cell_map (pipeline name in your SM is "CellMap")
+    cell_map_channels = sm.get_channels_by_pipeline("CellMap", as_list=True) or []
+    ref = sm.alignment_reference_channel  # or None
+
+    if cell_map_channels:
+        changed = changed or populate_cell_map_defaults(cell_map, d_cell_map, channels=cell_map_channels,
+                                                        reference=ref)
+
+    if changed:
+        update_section("cell_map", cell_map)
+
+    # ---- stitching
+    stitching = deepcopy(view.get("stitching") or {})
+    d_stitching = defaults_for("stitching")
+    changed = merge_section_missing_only(stitching, d_stitching)
+    changed = changed or populate_stitching_defaults(stitching, d_stitching)
+    if changed:
+        update_section("stitching", stitching)
+
+    # ---- registration
+    registration = deepcopy(view.get("registration") or {})
+    d_registration = defaults_for("registration")
+    changed = merge_section_missing_only(registration, d_registration)
+    changed = changed or populate_registration_defaults(registration, d_registration)
+    if changed:
+        update_section("registration", registration)
+
+    # ---- vasculature
+    vasc = deepcopy(view.get("vasculature") or {})
+    d_vasc = defaults_for("vasculature")
+    changed = merge_section_missing_only(vasc, d_vasc)
+
+    vasc_channels = sm.get_channels_by_pipeline("TubeMap", as_list=True) or []
+
+    def vasc_type_for(ch: str) -> str:
+        # You already use sm.data_type(ch) == "vessels" else large_vessels.
+        # This returns the *defaults* type keys.
+        return "vessels" if sm.data_type(ch) == "vessels" else "large_vessels"
+
+    if vasc_channels:
+        changed = changed or populate_vasculature_defaults(vasc, d_vasc, channels=vasc_channels,
+                                                           channel_type_for=vasc_type_for)
+
+    if changed:
+        update_section("vasculature", vasc)
+
+    # # ---- machine/display: pure missing-only merge
+    # for sec in ("machine", "display"):
+    #     cur = deepcopy(view.get(sec) or {})
+    #     d = defaults_for(sec)
+    #     if merge_section_missing_only(cur, d):
+    #         update_section(sec, cur)
+
+    return patch
+
 
 
 # ############ Global rename triggered by SampleManager ############
