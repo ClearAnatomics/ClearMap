@@ -2591,6 +2591,136 @@ class GroupsWidgetAdapter(QWidget):
     def __gp_name(self, name, idx):
         return name or f"Group {idx + 1}"
 
+
+class NProcessesWidget(QWidget):
+    """
+    Simple 'n_processes' widget: label + spinbox.
+
+    Exposes value()/setValue() and valueChanged signal so it can be used
+    transparently by ParamLink.
+    """
+    valueChanged = pyqtSignal(int)
+
+    def __init__(self, parent=None, label: str = "n_processes"):
+        super().__init__(parent)
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+
+        self._label = QLabel(label, self)
+        self._spin = QSpinBox(self)
+        self._spin.setMinimum(1)
+        # Slightly conservative default; user can override in Designer or from code
+        self._spin.setMaximum(max(1, cpu_count()))
+
+        layout.addWidget(self._label)
+        layout.addWidget(self._spin)
+
+        self._spin.valueChanged[int].connect(self._on_spin_changed)
+
+    # API compatible with QSpinBox / ParamLink
+    def value(self) -> int:
+        return self._spin.value()
+
+    def setValue(self, v: int):
+        self._spin.setValue(int(v))
+
+    def _on_spin_changed(self, v: int):
+        print("NProcessesWidget changed:", v)
+        self.valueChanged.emit(v)
+
+    def setRange(self, minimum: int, maximum: int):
+        self._spin.setRange(minimum, maximum)
+
+    def setMinimum(self, minimum: int):
+        self._spin.setMinimum(minimum)
+
+    def setMaximum(self, maximum: int):
+        self._spin.setMaximum(maximum)
+
+
+class BlockProcessingWidget(QGroupBox):
+    """
+    Reusable UI for block_processing parameters:
+      - size_min
+      - size_max
+      - overlap
+      - n_processes
+
+    The internal controls are spinboxes. We expose properties with
+    value()/setValue() style methods to play nice with ParamLink.
+    """
+
+    def __init__(self, parent=None, title: str = 'Block processing',
+                 with_overlap: bool = True, default_min: int = 1_000_000, default_max: int = 10_000_000):
+        super().__init__(title, parent)
+
+        self._layout = QVBoxLayout(self)
+        # n_processes
+        self._nproc_widget = NProcessesWidget(self, label='n_processes')
+        self._layout.addWidget(self._nproc_widget)
+
+        grid = QGridLayout()
+        self._layout.addLayout(grid)
+
+        # size_min
+        self._size_min_spin = QSpinBox(self)
+        self._size_min_spin.setRange(1, 2**31 - 1)
+        self._size_min_spin.setValue(default_min)
+        grid.addWidget(QLabel('size_min'), 0, 0)
+        grid.addWidget(self._size_min_spin, 0, 1)
+
+        # size_max
+        self._size_max_spin = QSpinBox(self)
+        self._size_max_spin.setRange(1, 2**31 - 1)
+        self._size_max_spin.setValue(default_max)
+        grid.addWidget(QLabel('size_max'), 1, 0)
+        grid.addWidget(self._size_max_spin, 1, 1)
+
+        # overlap (optional)
+        self._overlap_spin = None
+        if with_overlap:
+            self._overlap_spin = QSpinBox(self)
+            self._overlap_spin.setRange(0, 2**31 - 1)
+            self._overlap_spin.setValue(0)
+            grid.addWidget(QLabel('overlap'), 2, 0)
+            grid.addWidget(self._overlap_spin, 2, 1)
+
+    @property
+    def n_processes(self) -> int:
+        return self._nproc_widget.value()
+
+    @n_processes.setter
+    def n_processes(self, v: int):
+        self._nproc_widget.setValue(int(v))
+
+    @property
+    def size_min(self) -> int:
+        return self._size_min_spin.value()
+
+    @size_min.setter
+    def size_min(self, v: int):
+        self._size_min_spin.setValue(int(v))
+
+    @property
+    def size_max(self) -> int:
+        return self._size_max_spin.value()
+
+    @size_max.setter
+    def size_max(self, v: int):
+        self._size_max_spin.setValue(int(v))
+
+    @property
+    def overlap(self) -> int | None:
+        if self._overlap_spin is None:
+            return None
+        return self._overlap_spin.value()
+
+    @overlap.setter
+    def overlap(self, v: int | None):
+        if self._overlap_spin is not None and v is not None:
+            self._overlap_spin.setValue(int(v))
+
+
 class ClickableFrame(QFrame):
     clicked = pyqtSignal()
 
