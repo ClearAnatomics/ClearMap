@@ -417,7 +417,13 @@ class StitchingParams(ChannelsUiParameterCollection):
             self.reconcile_children_from_view()  # ensure param object created
 
     def reconcile_children_from_view(self, *_):
-        desired_channels = tuple(self.view['channels'])  # FIXME: config not hydrated. still has templates
+        """Ensure we have one ChannelStitchingParams per stitching.channels entry."""
+        cfg = self.view or {}
+        channels_cfg = cfg.get('channels') or {}
+        desired_channels = tuple(channels_cfg.keys())
+
+        if not desired_channels:  # likely still in early hydration
+            return
         # add if missing
         self.create_missing_channels_from_view(desired_channels)
         self.prune_obsolete_channels(desired_channels)
