@@ -494,7 +494,10 @@ class StitchingTab(PreProcessingTab):
 
     def _on_bus_channels_changed(self, event: ChannelsChanged):
         """update the run list (preserve checks if possible)"""
-        self.reconcile_channel_pages(event.after)
+        stitchable = set(self._get_channels())
+        desired = [c for c in event.after if c in stitchable]
+        self.reconcile_channel_pages(desired)  # WARNING: do not rely on event.after here
+                                               #   because stitching tab may fewer channels than sample tab
 
     def _after_channels_reconciled(self, desired_channels: list[str]) -> None:
         self._refresh_ui()
