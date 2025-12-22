@@ -121,7 +121,7 @@ from ClearMap.Utils.exceptions import ClearMapVRamException, GroupStatsError, Mi
 from ClearMap.Utils.events import ChannelsChanged, UiConvertToClearMapFormat, UiRequestPlotMiniBrain, \
     UiRequestPlotAtlas, UiOrientationChanged, UiCropChanged, ChannelDefaultsChanged, \
     UiRequestLandmarksDialog, UiAlignWithChanged, UiVesselGraphFiltersChanged, RegistrationStatusChanged, \
-    UiBatchResultsFolderChanged, UiBatchGroupsChanged, UiChannelsChanged
+    UiBatchResultsFolderChanged, UiBatchGroupsChanged, UiChannelsChanged, WorkspaceChanged
 
 from .dialog_helpers import option_dialog, make_splash, prompt_dialog
 from .dialogs import ResourceTypeToFolderDialog
@@ -137,8 +137,8 @@ from .params import (VesselParams, SampleParameters, StitchingParams, CellMapPar
 from ClearMap.IO.metadata import parse_ome_info
 
 if TYPE_CHECKING:
-    from ClearMap.gui.experiment_controller import AnalysisGroupController
-
+    from ClearMap.pipeline_orchestrators.experiment_controller import AnalysisGroupController
+    from ClearMap.IO.metadata import ChannelPatternSpec
 
 
 def ui_plot(status_msg: str):
@@ -193,10 +193,9 @@ class SampleInfoTab(ExperimentTab):
                                #   the wizard
 
     def _set_params(self):
-        self.params = SampleParameters(self.ui, self.main_window.src_folder,
-                                       event_bus=self._bus,
-                                       get_view=self.main_window.experiment_controller.get_config_view,
-                                       apply_patch=self.main_window.experiment_controller.apply_ui_patch)
+        exp_ctrl = self.main_window.experiment_controller
+        self.params = SampleParameters(self.ui, event_bus=self._bus,
+                                       get_view=exp_ctrl.get_config_view, apply_patch=exp_ctrl.apply_ui_patch)
 
     def _bind_params_signals(self):
         self.subscribe(UiConvertToClearMapFormat, self.convert_to_clearmap_format)
@@ -209,12 +208,18 @@ class SampleInfoTab(ExperimentTab):
         self.subscribe(ChannelsChanged, self._on_bus_channels_changed)
         self.subscribe(UiChannelsChanged, self._on_bus_channels_changed)
 
+        self.subscribe(WorkspaceChanged, self._on_workspace_changed)
+
     def _get_channels(self):
         return self.sample_manager.channels
 
     # Pipeline tabs use ChannelsChanged because cfg based but here display
     def _on_bus_channels_changed(self, event: UiChannelsChanged | ChannelsChanged):
         self.reconcile_channel_pages(event.after)
+
+    def _on_workspace_changed(self, event: WorkspaceChanged):
+        if getattr(self, "params"):
+            self.params.shared_sample_params.src_folder = event.exp_dir
 
     def _bind(self):
         """
@@ -271,37 +276,11 @@ class SampleInfoTab(ExperimentTab):
 
     @property
     def src_folder(self):
-        return self.ui.srcFolderTxt.text()
+        return self.main_window.src_folder
 
-    @src_folder.setter
-    def src_folder(self, folder):
-        self.ui.srcFolderTxt.setText(folder)
-
-    def display_sample_id(self, sample_id):
-        """
-        Display the sample ID to the corresponding UI widget
-        Parameters
-        ----------
-        sample_id : str
-            The unique ID for that sample
-        """
-        self.ui.sampleIdTxt.setText(sample_id)
-
-    def display_use_id_as_prefix(self, use_id):
-        """
-        Displays whether to use the ID as prefix in the corresponding
-        widget of the UI
-
-        Parameters
-        ----------
-        use_id : bool
-            Whether to se the sample ID as prefix in the file names
-        """
-        self.ui.useIdAsPrefixCheckBox.setChecked(use_id)
-
-    def get_sample_id(self):
-        """Get the sample ID from the GUI widget"""
-        return self.ui.sampleIdTxt.text()
+    # @src_folder.setter
+    # def src_folder(self, folder):
+    #     self.exp_controller.exp_dir = folder
 
     def go_to_orientation(self):
         """Jump to the sample orientation (space info) tab"""
@@ -315,6 +294,9 @@ class SampleInfoTab(ExperimentTab):
         representing the digits for the different axes.
         """
         self.detached = True
+        if not str(self.src_folder):
+            self.main_window.popup('Please select a source folder first.')
+            return
         dlg = PatternDialog(self.src_folder, self.params,
                             min_file_number=self.main_window.preference_editor.params.pattern_finder_min_n_files,
                             tile_extension=self.params.shared_sample_params.default_tile_extension)
