@@ -872,7 +872,7 @@ class RegistrationTab(PreProcessingTab):
                 asset = self.worker.get('stitched', channel=channel)
                 if not asset.exists:
                     asset = self.worker.get('raw', channel=channel)
-                    if asset.is_tiled and not asset.all_tiles_exist:
+                    if asset.is_tiled and not asset.is_complete:
                         self.main_window.progress_watcher.finish()
                         self.main_window.print_status_msg(f'Registration skipped because of missing tiles'
                                                           f'for channel {channel}')
