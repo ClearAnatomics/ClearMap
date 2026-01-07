@@ -17,7 +17,8 @@ from ClearMap.IO.metadata import define_auto_resolution
 from ClearMap.Utils.events import ChannelRenamed, UiAtlasIdChanged, UiAtlasStructureTreeIdChanged, \
     RegistrationStatusChanged
 from ClearMap.Utils.exceptions import ClearMapAssetError, ParamsOrientationError
-from ClearMap.Utils.utilities import runs_on_ui, check_stopped, DEFAULT_ORIENTATION, validate_orientation
+from ClearMap.Utils.utilities import runs_on_ui, check_stopped, DEFAULT_ORIENTATION, validate_orientation, \
+    sanitize_n_processes
 from ClearMap.Visualization import Plot3d as q_plot_3d
 from ClearMap.config.atlas import ATLAS_NAMES_MAP
 from ClearMap.config.config_coordinator import ConfigCoordinator
@@ -290,7 +291,7 @@ class RegistrationProcessor(PipelineOrchestrator):
         if resampled_asset.exists:
             raise FileExistsError(f'Resampled asset ({resampled_asset}) already exists')
         default_resample_parameter = {
-            'processes': self.config['performance']['resampling']['n_processes'],
+            'processes': sanitize_n_processes(self.config['performance']['resampling']['n_processes']),
             'verbose': self.config['verbose']
         }  # WARNING: duplicate (use method ??)
         source_asset = self.get('stitched', channel=channel, default=None)

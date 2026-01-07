@@ -13,7 +13,7 @@ from ClearMap.IO import IO as clearmap_io
 from ClearMap.IO.metadata import define_auto_stitching_params, parse_ome_info
 from ClearMap.Utils.exceptions import MissingRequirementException
 from ClearMap.Utils.tag_expression import Expression
-from ClearMap.Utils.utilities import check_stopped
+from ClearMap.Utils.utilities import check_stopped, sanitize_n_processes
 from ClearMap.Visualization.Color.Color import gray_image_to_rgb
 from ClearMap.Visualization.Qt import Plot3d as plot_3d
 from ClearMap.config.config_coordinator import ConfigCoordinator
@@ -68,6 +68,7 @@ class StitchingProcessor(PipelineOrchestrator):
         if self.config['channels'][channel].get('use_npy', False) or _force:
             asset = self.get('raw', channel=channel, prefix=self.sample_manager.prefix)
             n_procs = self.config['performance']['file_conversion']['n_processes']
+            n_procs = sanitize_n_processes(n_procs)
             file_list = asset.file_list
             if not file_list or Path(file_list[0]).suffix == '.tif':
                 try:
@@ -292,6 +293,7 @@ class StitchingProcessor(PipelineOrchestrator):
                                  rigid_cfg['background_pixels'])
         max_shifts = [rigid_cfg[f'max_shifts_{ax}'] for ax in 'xyz']
         n_procs = self.config['performance']['stitching']['n_processes']
+        n_procs = sanitize_n_processes(n_procs)
         self.prepare_watcher_for_substep(len(layout.alignments), self.__rigid_stitching_align_re, 'Align layout rigid')
         try:
             stitching_rigid.align_layout_rigid_mip(layout, depth=projection_thickness, max_shifts=max_shifts,
@@ -360,6 +362,7 @@ class StitchingProcessor(PipelineOrchestrator):
         self.prepare_watcher_for_substep(n_pairs, self.__wobbly_stitching_align_lyt_re, 'Align layout wobbly')
         try:
             n_processes = self.config['performance']['stitching']['n_processes']
+            n_processes = sanitize_n_processes(n_processes)
             stitching_wobbly.align_layout(layout, axis_range=(None, None, 3), max_shifts=max_shifts, axis_mip=None,
                                           stack_validation_params=stack_validation_params,
                                           prepare=dict(method='normalization', clip=None, normalize=True),
@@ -379,6 +382,7 @@ class StitchingProcessor(PipelineOrchestrator):
             n_processes = self.config['performance']['stitching']['n_processes']
             if platform.system().lower().startswith('darwin'):  # No parallel on MacOS
                 n_processes = 1
+            n_processes = sanitize_n_processes(n_processes)
             stitching_wobbly.place_layout(layout, min_quality=-np.inf,
                                           method='optimization',
                                           smooth=dict(method='window', window='bartlett', window_length=100,
@@ -407,6 +411,7 @@ class StitchingProcessor(PipelineOrchestrator):
         try:
             self._replace_layout_sources(layout, channel, layout_channel)
             n_processes = self.config['performance']['stitching']['n_processes']
+            n_processes = sanitize_n_processes(n_processes)
             stitching_wobbly.stitch_layout(layout,
                                            sink=str(self.get_path('stitched', channel=channel)),
                                            method='interpolation',
