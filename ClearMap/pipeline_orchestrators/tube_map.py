@@ -165,10 +165,10 @@ class BinaryVesselProcessor(PipelineOrchestrator):
                 if channel_name:
                     self.steps[channel_name] = BinaryVesselProcessorSteps(self.workspace, channel=channel_name)
 
-            compound_channel = tuple(self.channels_to_binarize())
+            compound_channel = tuple(self.channels_to_binarize())  # FIXME: old keys not cleared
             sample_id = self.sample_manager.prefix
             self.workspace.ensure_pipeline('TubeMap', compound_channel, sample_id=sample_id,
-                                           create_channel=True)
+                                           channel_content_type='compound', create_channel=True)
 
     def assert_input_shapes_match(self):
         """
@@ -427,10 +427,10 @@ class BinaryVesselProcessor(PipelineOrchestrator):
         sink = self.get_path('binary', self.channels_to_binarize(), asset_sub_type='final')
         if self.config['binarization']['combined']['binary_fill']:
             postprocessing_parameter = copy.deepcopy(vasculature.default_postprocessing_parameter)
-            postprocessing_processing_parameter = copy.deepcopy(vasculature.default_postprocessing_processing_parameter)
-            postprocessing_processing_parameter['size_max'] = 50
+            block_params = copy.deepcopy(vasculature.default_postprocessing_processing_parameter)
+            block_params['size_max'] = 50
             vasculature.postprocess(source, sink, postprocessing_parameter=postprocessing_parameter,
-                                    processing_parameter=postprocessing_processing_parameter,
+                                    processing_parameter=block_params,
                                     processes=None, verbose=True)  # FIXME: n_processes in config?
         else:
             clearmap_io.copy_file(source, sink)  # FIXME: could be a symlink
@@ -523,7 +523,7 @@ class VesselGraphProcessor(PipelineOrchestrator):
             self.steps.channel = self.parent_channels
 
             sample_id = self.sample_manager.prefix
-            self.workspace.ensure_pipeline('TubeMap', self.parent_channels,
+            self.workspace.ensure_pipeline('TubeMap', self.parent_channels, channel_content_type='compound',
                                            sample_id=sample_id, create_channel=True)
 
     def __get_graph(self, step):
