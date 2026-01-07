@@ -1070,11 +1070,26 @@ class AssetCollection:  # FIXME: fix how assets are retrieved
             If dict, it should have the keys 'channel_name' and 'content_type'.
         """
         self.base_directory = base_directory
+        self._sample_id = None
         self.sample_id = sample_id
         if isinstance(channel_spec, dict):
             channel_spec = ChannelSpec(**channel_spec)
         self.channel_spec = channel_spec
         self.assets = {}
+
+    @property
+    def sample_id(self):
+        return self._sample_id
+
+    @sample_id.setter
+    def sample_id(self, value):
+        # if not isinstance(value, str):
+        #     raise ClearMapAssetError(f'sample_id must be a string. Got "{type(value)}" instead.')
+        if self._sample_id is not None and self._sample_id != value:
+            for asset in self.assets.values():
+                asset.sample_id = value
+
+        self._sample_id = value
 
     def __getitem__(self, item):
         try:

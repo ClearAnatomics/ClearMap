@@ -76,6 +76,9 @@ class SampleManager(OrchestratorBase):
                 self.workspace = workspace
                 self.resource_type_to_folder = workspace.resource_type_to_folder
 
+            # REFACTOR: Make this more robust by triggering upon self.prefix change
+            if self.prefix is not None and self.workspace.sample_id != self.prefix:
+                self.workspace.set_sample_id(self.config['sample_id'])
             self.update_workspace()
             self.setup_complete = (not self.incomplete_channels) and bool(self.config)
 

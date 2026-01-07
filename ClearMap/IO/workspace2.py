@@ -234,6 +234,12 @@ class Workspace2:  # REFACTOR: subclass dict
             data = yaml.safe_load(f)
         return cls.from_dict(data)
 
+    def set_sample_id(self, sample_id: str):
+        """Set the sample id for the workspace and all its asset collections."""
+        self.sample_id = sample_id
+        for collection in self.asset_collections.values():
+            collection.sample_id = sample_id
+
     def raw(self, channel: str):
         """Convenience: return the raw Asset for a channel, or None."""
         assets_collection = self.asset_collections.get(channel)
