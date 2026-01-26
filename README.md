@@ -1,4 +1,4 @@
-ClearMap 2.1
+ClearMap 3.1
 ============
 
 [![DOI](https://zenodo.org/badge/256322811.svg)](https://zenodo.org/badge/latestdoi/256322811)
@@ -24,24 +24,17 @@ ClearMap 2.1
 *ClearMap* is a toolbox for the analysis and registration of volumetric
 data from cleared tissues.
 
-> :new: This is the new 2.1 version of ClearMap which includes a Graphical User Interface.
-> To use it, make sure that the *install_gui.sh* script is executable and run it by 
-> opening a terminal in the ClearMap2 folder and typing ./run_gui.sh. 
+> :new: This is the new 3.1 version of ClearMap.
 
-## 2.1.0 what's new
-  * [x] Graphical user interface with many helper widgets
-  * [x] Redesigned code with config based parameters to replace the scripts
-  * [x] Atlas alignment improvements:
-    * [x] Updated Allen atlas files (no more "No Label")
-    * [x] Support for more atlases
-    * [x] Support for hemispheres information
-    * [x] Landmarks based registration
-  * [x] Batch mode for processing or analysis
-  * [x] New plots to visualise detected cells
-  * [x] Various bug fixes
+## 3.1.0 what's new
+  * [x] New pipeline: TractMap for tracts mapping
+  * [x] Added colocalization analysis
+  * [x] Dynamic channels for flexible analysis
+  * [x] Refractoring for better readability and pipeline customization 
+  * [x] New config management
 
 \
-\
+
 *ClearMap's* tool box includes 
 
 ## [Wobbly-Stitcher](https://christophkirst.github.io/ClearMap2Documentation/html/wobblystitcher.html) <a href="https://christophkirst.github.io/ClearMap2Documentation/html/TubeMap.html#Stitching"> <img src="https://christophkirst.github.io/ClearMap2Documentation/images/WobblyStitcher.jpg" alt="WobblyStitcher" width="150" align="right" vspace = "5"/></a>
@@ -55,6 +48,10 @@ Extract vasculature and other tubular networks from TB data.
 ## [CellMap](https://christophkirst.github.io/ClearMap2Documentation/html/cellmap.html) <a href="https://christophkirst.github.io/ClearMap2Documentation/html/CellMap.html"> <img src="https://christophkirst.github.io/ClearMap2Documentation/images/CellMap_raw_bw.gif" alt="WobblyStitcher" width="150" align="right" vspace = "5"/></a>
 
 Extract neuronal activity marker and cell shapes.
+
+## [TractMap]
+
+Extract fiber tracts structures (e.g. axons or myelin).
 
 
 ## Background and Applications
@@ -91,8 +88,17 @@ or structures.
 [Installation](https://christophkirst.github.io/ClearMap2Documentation/html/installation.html)
 ==============================================================================================
 
-Please refer to our [documentation](https://christophkirst.github.io/ClearMap2Documentation)
-on how to [install](https://christophkirst.github.io/ClearMap2Documentation/html/installation.html) ClearMap.
+Please refer to our [documentation](https://clearanatomics.github.io/ClearMapDocumentation/overview.html)
+on how to [install](https://clearanatomics.github.io/ClearMapDocumentation/installation.html) ClearMap.
+
+Quick installation guide:
+```
+git clone https://github.com/ClearAnatomics/ClearMap.git
+cd ClearMap3
+git switch v3.1.x
+chmod u+x install_gui.sh
+./install_gui.sh -f ClearMap3.yml
+```
 
 [Tutorials](https://christophkirst.github.io/ClearMap2Documentation/html/usage.html)
 ====================================================================================
@@ -109,7 +115,7 @@ avaialbe as [jupyer](https://jupyter.org/) notebooks:
 [Documentation](https://christophkirst.github.io/ClearMap2Documentation)
 ========================================================================
 
-ClearMap comes with a full [documentation](https://christophkirst.github.io/ClearMap2Documentation).
+ClearMap comes with a full [documentation](https://clearanatomics.github.io/ClearMapDocumentation/overview.html).
 
 For experimental protocols also refer to [idisco.info](http:://idisco.info)
 
@@ -186,8 +192,9 @@ with group analysis scripts contributed by [Sophie Skriabine](https://github.com
 The deep vessel filling network was designed and created by [Sophie Skriabine](https://github.com/skriabineSop) 
 and integrated to ClearMap by [Christoph Kirst](https://profiles.ucsf.edu/christoph.kirst).
 
-The documentation was written by [Christoph Kirst](https://profiles.ucsf.edu/christoph.kirst).
-and [Nicolas Renier](https://www.renier-lab.com/nicolasrenier).
+The documentation was written by [Christoph Kirst](https://profiles.ucsf.edu/christoph.kirst),
+[Nicolas Renier](https://www.renier-lab.com/nicolasrenier),
+Daniela Domingues, Gabriele Lienhard and Louise Mathe. 
 
 Contributions are very welcome.
 
@@ -202,14 +209,18 @@ For other options contact the author Christoph Kirst
 
 Copyright © 2020 by Christoph Kirst
 
+
 Versions
 ========
+
+VERSION 3.0
+-----------
+  * Dynamic channels
 
 VERSION 2.1
 -----------
   * Rewrite of the upper layers of software based on configuration files.
   * Graphical user interface.
-
 
 VERSION 2.0
 -----------
