@@ -2625,7 +2625,7 @@ class NProcessesWidget(QWidget):
         self._spin.setValue(int(v))
 
     def _on_spin_changed(self, v: int):
-        print("NProcessesWidget changed:", v)
+        # print("NProcessesWidget changed:", v)
         self.valueChanged.emit(v)
 
     def setRange(self, minimum: int, maximum: int):
