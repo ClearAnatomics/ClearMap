@@ -92,6 +92,8 @@ from typing import List, Optional, TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
+from PyQt5.QtCore import QSignalBlocker
+
 from ClearMap.Utils.tag_expression import Expression
 
 from PyQt5.QtWidgets import QButtonGroup, QWidget, QDialog
@@ -755,8 +757,11 @@ class RegistrationTab(PreProcessingTab):
         partner_channel = self.worker.get_align_with(channel)
         moving_channel = self.worker.get_moving_channel(channel)
 
-        page_widget.alignWithComboBox.setCurrentText(partner_channel)
-        page_widget.movingChannelComboBox.setCurrentText(moving_channel)
+        # Guards to avoid triggering adjusters too often  # FIXME: check these are not overly harsh: TEST
+        with QSignalBlocker(page_widget.alignWithComboBox):
+            page_widget.alignWithComboBox.setCurrentText(partner_channel)
+        with QSignalBlocker(page_widget.movingChannelComboBox):
+            page_widget.movingChannelComboBox.setCurrentText(moving_channel)
 
     def _bind_params_signals(self):
         self.subscribe(UiRequestLandmarksDialog, self.launch_landmarks_dialog)
