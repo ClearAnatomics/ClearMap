@@ -180,7 +180,9 @@ class BinaryVesselProcessor(PipelineOrchestrator):
             if not, check again in the run/binarize method
         """
         try:
-            shapes = [self.workspace.get('stitched', channel=c).shape() for c in self.channels_to_binarize()]
+            channels_to_binarize = self.channels_to_binarize()
+            assets_to_binarize = [self.workspace.get('stitched', channel=c) for c in channels_to_binarize]
+            shapes = [asset.shape() for asset in assets_to_binarize]
         except FileNotFoundError:
             warnings.warn('Stitched images not found. Cannot check shapes.')
             return
@@ -203,7 +205,7 @@ class BinaryVesselProcessor(PipelineOrchestrator):
             raise ValueError('Channels to binarize have different shapes. This is not supported yet.')
 
     def channels_to_binarize(self):
-        return tuple([c for c in self.config['binarization'].keys() if c != 'combined'])
+        return self.sample_manager.get_channels_by_pipeline('TubeMap', as_list=True)
 
     def __get_n_blocks(self, channel):
         # TODO: use actual processing params to get real n blocks
@@ -218,7 +220,7 @@ class BinaryVesselProcessor(PipelineOrchestrator):
     def setup_channel_operation(operation):
         @functools.wraps(operation)
         def wrapper(self, channel, *args, **kwargs):
-            cfg = self.config['binarization']
+            cfg = self.config['binarization']['single_channels']
             operation_type = operation.__name__.replace('_channel', '')
             operations = list(cfg[channel].keys())
             if operation_type == 'deep_fill':
@@ -257,7 +259,7 @@ class BinaryVesselProcessor(PipelineOrchestrator):
         postfix str
             empty for raw
         """
-        binarization_cfg = self.config['binarization'][channel]
+        binarization_cfg = self.config['binarization']['single_channels'][channel]
         if not binarization_cfg['binarize']['run']:
             return
         self.steps[channel].remove_next_steps_files(self.steps[channel].binary)
@@ -266,7 +268,6 @@ class BinaryVesselProcessor(PipelineOrchestrator):
         sink = self.get_path('binary', channel=channel)
 
         binarization_parameter = copy.deepcopy(vasculature.default_binarization_parameter)
-        binarization_cfg = self.config['binarization'][channel]
         binarization_parameter['clip']['clip_range'] = binarization_cfg['binarize']['clip_range']
         deconvolve_threshold = binarization_cfg['binarize']['threshold']
         if deconvolve_threshold is not None:
@@ -276,7 +277,8 @@ class BinaryVesselProcessor(PipelineOrchestrator):
             binarization_parameter.update(equalize=None, vesselize=None)
 
         processing_parameter = copy.deepcopy(vasculature.default_binarization_processing_parameter)
-        block_params = self.config['performance']['binarization'][channel]['binarize']['block_processing']
+        channel_perf = self.config['performance']['binarization']['single_channels'][channel]
+        block_params = channel_perf['binarize']['block_processing']
         processing_parameter.update(
             processes=sanitize_n_processes(block_params['n_processes']),
             size_min=block_params['size_min'], size_max=block_params['size_max'],
@@ -305,7 +307,7 @@ class BinaryVesselProcessor(PipelineOrchestrator):
         return src or previous_step_path  #  self.get_path('binary', channel=channel)
 
     def _smooth(self, channel):
-        binarization_cfg = self.config['binarization'][channel]
+        binarization_cfg = self.config['binarization']['single_channels'][channel]
         if not binarization_cfg['smooth']['run']:
             return
 
@@ -321,7 +323,8 @@ class BinaryVesselProcessor(PipelineOrchestrator):
         else:
             smoothing_parameters = {}
 
-        perf_cfg = self.config['performance']['binarization'][channel]['smooth']['block_processing']
+        channel_perf = self.config['performance']['binarization']['single_channels'][channel]
+        perf_cfg = channel_perf['smooth']['block_processing']
         perf_params = copy.deepcopy(vasculature.default_postprocessing_processing_parameter)
         perf_params.update(size_max=perf_cfg['size_max'])
         smoothed, tmp_f_path = vasculature.apply_smoothing(source, sink, smoothing_parameters, perf_params,
@@ -332,7 +335,7 @@ class BinaryVesselProcessor(PipelineOrchestrator):
                                                   'keep': smoothing_parameters.get('save', False)}
 
     def _fill(self, channel):
-        if not self.config['binarization'][channel]['binary_fill']['run']:
+        if not self.config['binarization']['single_channels'][channel]['binary_fill']['run']:
             return
         source = self.__get_post_processing_source(channel, 'filled')
         sink = self.get_path('binary', channel=channel, asset_sub_type='filled')
@@ -342,7 +345,7 @@ class BinaryVesselProcessor(PipelineOrchestrator):
         source = clearmap_io.as_source(source)
         sink = initialize_sink(sink, shape=source.shape, dtype=source.dtype, order=source.order, return_buffer=False)
 
-        perf_cfg = self.config['performance']['binarization'][channel]['binary_fill']
+        perf_cfg = self.config['performance']['binarization']['single_channels'][channel]['binary_fill']
         binary_filling.fill(source, sink=sink, processes=sanitize_n_processes(perf_cfg['n_processes']),
                             verbose=True)  # WARNING: prange if filling
         if self.postprocessing_last_step[channel]['temp_path'] and not self.postprocessing_last_step[channel]['keep']:
@@ -351,11 +354,11 @@ class BinaryVesselProcessor(PipelineOrchestrator):
         self.postprocessing_last_step[channel] = {'source': sink, 'temp_path': '', 'keep': False}
 
     def __deep_fill_channel(self, channel, size_max=None, overlap=None, resample_factor=None):
-        binary_cfg = self.config['binarization'][channel]
+        binary_cfg = self.config['binarization']['single_channels'][channel]
         if not binary_cfg['deep_fill']['run']:
             return
 
-        perf_params = self.config['performance']['binarization'][channel]['deep_fill']['block_processing']
+        perf_params = self.config['performance']['binarization']['single_channels'][channel]['deep_fill']['block_processing']
         REQUIRED_V_RAM = 22000  # FIXME: put in config or at top of module
         if size_max is None:
             size_max = perf_params['size_max']
@@ -447,7 +450,7 @@ class BinaryVesselProcessor(PipelineOrchestrator):
     def plot_combined(self, parent=None, arrange=False):  # TODO: final or not option
         all_vessels = self.steps[self.all_vessels_channel].get_asset(self.steps[self.all_vessels_channel].filled, step_back=True)
         combined = self.get_path('binary', channel=self.channels_to_binarize(), asset_sub_type='combined')
-        if self.config['binarization'][self.arteries_channel]['binarize']['run']:
+        if self.config['binarization']['single_channels'][self.arteries_channel]['binarize']['run']:
             arteries_filled = self.get_path('binary', channel=self.arteries_channel, asset_sub_type='filled')
             dvs = q_p3d.plot([all_vessels, arteries_filled, combined], title=['all vessels', 'arteries', 'combined'],
                              arrange=arrange, lut=self.machine_config['default_lut'], parent=parent)
@@ -507,7 +510,7 @@ class VesselGraphProcessor(PipelineOrchestrator):
         self.branch_density = None
         self.steps: VesselGraphProcessorSteps = VesselGraphProcessorSteps(self.workspace)  # FIXME: handle skeleton
         self.setup(sample_manager, registration_processor)
-        self.parent_channels = tuple([k for k in self.config['binarization'].keys() if k != 'combined'])
+        self.parent_channels = tuple(self.config['binarization']['single_channels'].keys())
         self.steps.channel = self.parent_channels
         self.arteries_channel = self.sample_manager.get_channels_by_type('arteries', missing_action='ignore',
                                                                          multiple_found_action='error')
@@ -519,7 +522,7 @@ class VesselGraphProcessor(PipelineOrchestrator):
             self.workspace = self.sample_manager.workspace
             self.steps.workspace = self.workspace
 
-            self.parent_channels = tuple([k for k in self.config['binarization'].keys() if k != 'combined'])
+            self.parent_channels = tuple(self.config['binarization']['single_channels'].keys())
             self.steps.channel = self.parent_channels
 
             sample_id = self.sample_manager.prefix

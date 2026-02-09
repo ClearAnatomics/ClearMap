@@ -15,6 +15,9 @@ import numpy as np
 
 from ClearMap.IO.assets_constants import CONTENT_TYPE_TO_PIPELINE
 from ClearMap.Utils.events import ChannelRenamed, CfgChanged
+from ..config.compound_keys import PairKey
+from ..config.config_handler import ALTERNATIVES_REG
+
 if TYPE_CHECKING:
     from ClearMap.config.config_coordinator import ConfigCoordinator
 
@@ -68,7 +71,8 @@ class SampleManager(OrchestratorBase):
         """
         if src_dir is not None:
             self.cfg_coordinator.set_base_dir(src_dir)
-            self.cfg_coordinator.load_all()
+            # FIXME: add to set_base_dir ?
+            self.cfg_coordinator.load('sample')  # need to load at least sample config to know pipelines
 
             workspace_path = self.cfg_coordinator.workspace_config_path
             if workspace_path.exists():
@@ -80,7 +84,27 @@ class SampleManager(OrchestratorBase):
             if self.prefix is not None and self.workspace.sample_id != self.prefix:
                 self.workspace.set_sample_id(self.config['sample_id'])
             self.update_workspace()
+
+            sections = self.compute_required_sections()
+            self.cfg_coordinator.load_all(sections)
+
             self.setup_complete = (not self.incomplete_channels) and bool(self.config)
+
+    def compute_required_sections(self) -> set[str]:
+        """
+        Given this controller’s SampleManager (single-sample view),
+        compute which config sections should exist for this experiment.
+        """
+        sections: set[str] = {'sample'}  # always  # TODO: check if ordered
+
+        pipelines = self.compute_relevant_pipelines()
+
+        for p in pipelines:
+            sec = ALTERNATIVES_REG.pipeline_to_section_name(p)
+            if sec:
+                sections.add(sec)
+
+        return sections
 
     def _on_cfg_changed(self, evt: CfgChanged) -> None:
         # Only reconcile when sample/channels subtree changed.
@@ -255,6 +279,26 @@ class SampleManager(OrchestratorBase):
     @property
     def is_colocalization_compatible(self) -> bool:
         return len(self.channels_to_detect) > 1
+
+    def colocalization_pairs(self) -> list[tuple[str, str]]:
+        if not self.is_colocalization_compatible:
+            return []
+        src = self.channels_to_detect
+        seen = set()
+        deduped: list[str] = []
+        for ch in src:
+            if ch not in seen:
+                deduped.append(ch)
+                seen.add(ch)
+
+        out: list[tuple[str, str]] = []
+        for i in range(len(deduped)):
+            for j in range(i + 1, len(deduped)):
+                out.append((deduped[i], deduped[j]))  # preserve order from channels_to_detect
+        return out
+
+    def colocalization_pair_keys(self, *, oriented: bool) -> list[str]:
+        return [str(PairKey(a, b, oriented=oriented)) for a, b in self.colocalization_pairs()]
 
     @property
     def relevant_pipelines(self) -> list[str]:
@@ -555,18 +599,26 @@ class SampleManager(OrchestratorBase):
         ValueError
             If an unknown action (missing_action or multiple_found_action) is specified
         """
+        if pipeline_name == 'stitching':
+            chs = self.stitchable_channels
+            return chs if as_list or len(chs) != 1 else chs[0]
         if pipeline_name not in CONTENT_TYPE_TO_PIPELINE.values():
             raise ValueError(f'Unknown pipeline name {pipeline_name}. '
                              f'Options are: {list(CONTENT_TYPE_TO_PIPELINE.values())}')
         return self.get_channels_by_condition(
             condition=lambda cfg: CONTENT_TYPE_TO_PIPELINE[cfg['data_type']] == pipeline_name,
-            missing_action=missing_action,
-            multiple_found_action=multiple_found_action,
-            as_list=as_list,
-            error_label=pipeline_name
+            missing_action=missing_action, multiple_found_action=multiple_found_action,
+            as_list=as_list, error_label=pipeline_name
         )
 
-    def infer_pipelines(self) -> set[str]:
+    # TODO: check if we really need instance_kind here
+    def get_instance_keys_by_pipeline(self, pipeline_name: str, *, instance_kind: str,
+                                      oriented: bool = False) -> list[str]:
+        if pipeline_name.lower() == 'colocalization' and instance_kind == 'pairs':
+            return self.colocalization_pair_keys(oriented=oriented)
+        raise ValueError(f'Unsupported pipeline/instance kind combination: {pipeline_name}/{instance_kind}')
+
+    def compute_relevant_pipelines(self) -> set[str]:
         """
         Infer active *per-sample* pipelines based purely on this sample’s channels / types.
         Does not know/care about group/batch.

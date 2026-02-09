@@ -2,7 +2,7 @@ clearmap_schema: 3
 clearmap_version: "3.1.0"
 
 templates:
-  layout:   # its own layout -> has rigid/wobbly
+  layout_template:   # its own layout -> has rigid/wobbly
     use_npy: true
     run: true
     layout_channel: "${channel}"
@@ -26,7 +26,7 @@ templates:
       stack_pixel_size: null
       slice_valid_range: [200, 20000]
       slice_pixel_size: 1500
-  derived:  # external layout -> minimal profile
+  derived_template:  # external layout -> minimal profile
     use_npy: true
     run: true
     layout_channel: "${reference}"         # placeholder

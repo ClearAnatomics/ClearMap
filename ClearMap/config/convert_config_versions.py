@@ -606,9 +606,9 @@ def migrate_vasculature_performance_v3_0_to_v3_1(
 ):
     mappings = [
         (['binarization', 'vessels', 'deep_fill'],
-         ['performance', 'binarization', 'vessels', 'deep_fill', 'block_processing']),
+         ['performance', 'binarization', 'channels', 'vessels', 'deep_fill', 'block_processing']),
         (['binarization', 'arteries', 'deep_fill'],
-         ['performance', 'binarization', 'large_vessels', 'deep_fill', 'block_processing']),
+         ['performance', 'binarization', 'channels', 'large_vessels', 'deep_fill', 'block_processing']),
     ]
 
     for old_path, new_path in mappings:

@@ -2,30 +2,31 @@ clearmap_schema: 3
 clearmap_version: "3.1.0"
 
 binarization:
-  vessels:
-    binarize:
-      run: true
-      clip_range: [350, 1000]
-      threshold: null
-    smooth:
-      run: true
-    binary_fill:
-      run: true
-    deep_fill:
-      run: true
-      resample_factor: 1
-  large_vessels:  # same params for arteries and veins
-    binarize:
-      run: true
-      clip_range: [1000, 8000]
-      threshold: 450
-    smooth:
-      run: true
-    binary_fill:
-      run: true
-    deep_fill:
-      run: true
-      resample_factor: 2
+  templates:
+    vessels_template:
+      binarize:
+        run: true
+        clip_range: [350, 1000]
+        threshold: null
+      smooth:
+        run: true
+      binary_fill:
+        run: true
+      deep_fill:
+        run: true
+        resample_factor: 1
+    large_vessels_template:  # same params for arteries and veins
+      binarize:
+        run: true
+        clip_range: [1000, 8000]
+        threshold: 450
+      smooth:
+        run: true
+      binary_fill:
+        run: true
+      deep_fill:
+        run: true
+        resample_factor: 2
   combined:
     binary_fill: true
     compress: false
@@ -61,48 +62,49 @@ visualization:
 
 performance:
   binarization:
-    vessels:
-      binarize:
-        block_processing:
-          n_processes: 10
-          size_min: 10
-          size_max: 16
-          overlap: 5
-      smooth:
-        block_processing:
+    templates:
+      vessels_template:
+        binarize:
+          block_processing:
+            n_processes: 10
+            size_min: 10
+            size_max: 16
+            overlap: 5
+        smooth:
+          block_processing:
+            n_processes: -1
+            size_min: null
+            size_max: 50
+            overlap: null
+        binary_fill:
           n_processes: -1
-          size_min: null
-          size_max: 50
-          overlap: null
-      binary_fill:
-        n_processes: -1
-      deep_fill:
-        block_processing:
-          n_processes: 1
-          size_min: null
-          size_max: 500
-          overlap: 50
-    large_vessels:
-      binarize:
-        block_processing:
-          n_processes: 10
-          size_min: 10
-          size_max: 16
-          overlap: 5
-      smooth:
-        block_processing:
+        deep_fill:
+          block_processing:
+            n_processes: 1
+            size_min: null
+            size_max: 500
+            overlap: 50
+      large_vessels_template:
+        binarize:
+          block_processing:
+            n_processes: 10
+            size_min: 10
+            size_max: 16
+            overlap: 5
+        smooth:
+          block_processing:
+            n_processes: -1
+            size_min: null
+            size_max: 50
+            overlap: null
+        binary_fill:
           n_processes: -1
-          size_min: null
-          size_max: 50
-          overlap: null
-      binary_fill:
-        n_processes: -1
-      deep_fill:
-        block_processing:
-          n_processes: 1
-          size_min: null
-          size_max: 1000
-          overlap: 100
+        deep_fill:
+          block_processing:
+            n_processes: 1
+            size_min: null
+            size_max: 1000
+            overlap: 100
   combine:
     block_processing:
       n_processes: -1

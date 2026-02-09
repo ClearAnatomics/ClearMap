@@ -1060,7 +1060,7 @@ class ChannelCellMapPerformanceParams(ChannelUiParameter):
     @property
     def cfg_subtree(self):
         # Root for this channel’s perf; ParamLinks are already fully qualified, so this is mostly for helpers
-        return ['cell_map', 'performance', self.name]
+        return ['cell_map', 'performance', 'channels', self.name]
 
 
 class TractMapParams(ChannelsUiParameterCollection):
