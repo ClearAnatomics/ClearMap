@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 app
 ===
@@ -18,7 +19,6 @@ The main file for the GUI that contains the entry point to start the software
     Auto modes:
         - Run all
 """
-from __future__ import annotations
 
 __author__ = 'Charly Rousseau <charly.rousseau@icm-institute.org>'
 __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
@@ -39,7 +39,7 @@ import tempfile
 import warnings
 from copy import deepcopy
 
-from typing import TYPE_CHECKING, Optional, Callable, List, Dict, Type, Any, Iterable, Tuple
+from typing import Optional, Callable, List, Dict, Type, Any, Iterable, Tuple
 import atexit
 from multiprocessing.pool import ThreadPool
 from pathlib import Path
@@ -55,7 +55,7 @@ from PyQt5.QtGui import QGuiApplication
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QPushButton, QSpinBox, QDoubleSpinBox,
                              QComboBox, QLineEdit, QMessageBox, QToolBox, QProgressBar, QLabel,
-                             QStyle, QAction, QDockWidget, QStackedWidget)
+                             QStyle, QAction, QDockWidget)
 
 import qdarkstyle
 from qdarkstyle import DarkPalette
@@ -95,7 +95,8 @@ except Exception:
     pass   #  some graphical envs complain but never mind
 
 # Resolve icon from installed package REFACTOR: use qrc
-GUI_FOLDER = Path(__file__).resolve().parent
+here = Path(__file__).resolve()
+GUI_FOLDER = here.parent
 ICONS_FOLDER = GUI_FOLDER / 'creator' / 'icons'
 CLEARMAP_ICON = QtGui.QIcon(str(ICONS_FOLDER / 'logo_cyber.png'))
 app.setWindowIcon(CLEARMAP_ICON)
@@ -125,94 +126,54 @@ def overlay_splash_message(msg: str) -> None:
 
 app.processEvents()
 
-# ############################################  SLOW IMPORTS #########################################################
-
-# WARNING: these are not the actual imports, just for the linter / IDE to know about them
-#   Actual imports are done using the pretty_imports module to be able to show the splash screen
-if TYPE_CHECKING:
-    import pyqtgraph as pg
-    import torch
-
-    from ClearMap.Visualization.Qt.DataViewer import DataViewer
-
-    from ClearMap.Alignment.Stitching import layout_graph_utils  # noqa: F401 # WARNING: first because otherwise, breaks with pytorch
-
-    from ClearMap.Utils.utilities import title_to_snake, snake_to_title, deep_merge
-    from ClearMap.Utils.event_bus import EventBus, BusSubscriberMixin
-    from ClearMap.Utils.events import (CfgChanged, UiRequestRefreshTabs, UiTabActivated, TabActivationResult,
-                                       TabsUpdated,  ChannelsSnapshot, ChannelDefaultsChanged)
-
-    from ClearMap.config.update_config import update_default_config
-    from ClearMap.config.config_coordinator import make_cfg_coordinator_factory
-    from ClearMap.config.config_handler import ConfigHandler, CLEARMAP_CFG_DIR, ALTERNATIVES_REG
-
-    from ClearMap.gui.gui_utils_images import get_current_res
-    from ClearMap.gui.tab_registry import TabRegistry
-    from ClearMap.gui.widget_monkeypatch_callbacks import recursive_patch_widgets
-    from ClearMap.pipeline_orchestrators.experiment_controller import ExperimentController, AnalysisGroupController, \
-        AppMode
-    from ClearMap.gui.tabs_interfaces import GenericTab, ExperimentTab, GroupTab
-    from ClearMap.gui.preferences import PreferenceUi
-    from ClearMap.gui.gui_logging import Printer
-    from ClearMap.gui.pyuic_utils import loadUiType
-    # Widgets import is quite slow  # Perfmonitor needs plot_3d
-    from ClearMap.gui import widgets as cmp_widgets
-    from ClearMap.gui import style
-    from ClearMap.gui import dialogs as dlgs
-    from ClearMap.gui.about import AboutInfo
-
-    from ClearMap.pipeline_orchestrators.sample_info_management import SampleManager
-
-"""
-These are the actual import instructions that will be executed in stages
-The aim is to provide feedback to the user during the potentially long
-import phase of the application
-"""
-from ClearMap.gui.pretty_imports import run_staged_imports, ImportTask
+from ClearMap.gui.pretty_imports import run_staged_imports, discover_import_tasks
 app.processEvents()
-SLOW_IMPORTS = [
-    ImportTask.module_only('pyqtgraph', as_name='pg'),
-    ImportTask.module_only('torch', as_name='torch'),
+SLOW_IMPORTS = discover_import_tasks(__file__)
+print('Staged imports:')
+if not SLOW_IMPORTS:
+    print(f'No slow imports detected. This is probably a bug, '
+          f'check the discover_import_tasks function and the import tasks in this file')
 
-    ImportTask.from_imports('ClearMap.Visualization.Qt.DataViewer', 'DataViewer'),
-
-    ImportTask.from_imports('ClearMap.Alignment.Stitching', 'layout_graph_utils'),
-
-    ImportTask.from_imports('ClearMap.Utils.utilities', 'title_to_snake', 'snake_to_title'),
-    ImportTask.from_imports('ClearMap.Utils.event_bus', 'EventBus', 'BusSubscriberMixin'),
-    ImportTask.from_imports('ClearMap.Utils.events', 'CfgChanged', 'UiRequestRefreshTabs',
-                                                            'UiTabActivated', 'TabActivationResult',
-                                                            'TabsUpdated', 'ChannelsSnapshot', 'ChannelDefaultsChanged'),
-
-
-    ImportTask.from_imports('ClearMap.config.update_config', 'update_default_config'),
-    ImportTask.from_imports('ClearMap.config.config_coordinator', 'ConfigCoordinator', 'make_cfg_coordinator_factory'),
-    ImportTask.from_imports('ClearMap.config.config_repository', 'ConfigRepository'),
-    ImportTask.from_imports('ClearMap.config.defaults_provider', 'get_defaults_provider', 'SCHEMAS_DIR'),
-    ImportTask.from_imports('ClearMap.config.config_handler', 'ConfigHandler', 'CLEARMAP_CFG_DIR', 'ALTERNATIVES_REG'),
-
-    ImportTask.from_imports('ClearMap.gui.gui_utils_images', 'get_current_res'),
-    ImportTask.from_imports('ClearMap.gui.tab_registry', 'TabRegistry'),
-    ImportTask.from_imports('ClearMap.gui.widget_monkeypatch_callbacks', 'recursive_patch_widgets'),
-    ImportTask.from_imports('ClearMap.gui.tabs_interfaces', 'GenericTab', 'ExperimentTab', 'GroupTab'),
-    ImportTask.from_imports('ClearMap.gui.preferences', 'PreferenceUi'),
-    ImportTask.from_imports('ClearMap.gui.gui_logging', 'Printer'),
-    ImportTask.from_imports('ClearMap.gui.pyuic_utils', 'loadUiType'),
-    ImportTask.module_only('ClearMap.gui.style', as_name='style'),
-    ImportTask.module_only('ClearMap.gui.widgets', as_name='cmp_widgets'),
-    ImportTask.module_only('ClearMap.gui.dialogs', as_name='dlgs'),
-    ImportTask.from_imports('ClearMap.gui.about', 'AboutInfo'),
-
-    ImportTask.from_imports('ClearMap.pipeline_orchestrators.sample_info_management', 'SampleManager'),
-    ImportTask.from_imports('ClearMap.pipeline_orchestrators.experiment_controller',
-                            'ExperimentController', 'AnalysisGroupController', 'AppMode'),
-
-]
 
 print('Starting heavy imports...', flush=True)
 run_staged_imports(SLOW_IMPORTS, on_message=overlay_splash_message, #lambda m: splash.showMessage(m),
                    on_progress=lambda p: ClearMap.gui.dialog_helpers.update_pbar(app, progress_bar, p),
                    target_namespace=globals())
+
+#  WARNING: the following lines serves as a marker for the `discover_import_tasks` scanner, do not alter or delete it
+### SLOW IMPORTS ###
+import pyqtgraph as pg
+import torch
+
+from ClearMap.Visualization.Qt.DataViewer import DataViewer
+
+from ClearMap.Alignment.Stitching import layout_graph_utils  # noqa: F401 # WARNING: first because otherwise, breaks with pytorch
+
+from ClearMap.Utils.utilities import title_to_snake, snake_to_title, deep_merge
+from ClearMap.Utils.event_bus import EventBus, BusSubscriberMixin
+from ClearMap.Utils.events import (CfgChanged, UiRequestRefreshTabs, UiTabActivated, TabActivationResult,
+                                   TabsUpdated,  ChannelsSnapshot, ChannelDefaultsChanged)
+
+from ClearMap.config.update_config import update_default_config
+from ClearMap.config.config_coordinator import make_cfg_coordinator_factory
+from ClearMap.config.config_handler import ConfigHandler, CLEARMAP_CFG_DIR, ALTERNATIVES_REG
+
+from ClearMap.gui.gui_utils_images import get_current_res
+from ClearMap.gui.tab_registry import TabRegistry
+from ClearMap.gui.widget_monkeypatch_callbacks import recursive_patch_widgets
+from ClearMap.pipeline_orchestrators.experiment_controller import ExperimentController, AnalysisGroupController, \
+    AppMode
+from ClearMap.gui.tabs_interfaces import GenericTab, ExperimentTab, GroupTab
+from ClearMap.gui.preferences import PreferenceUi
+from ClearMap.gui.gui_logging import Printer
+from ClearMap.gui.pyuic_utils import loadUiType
+from ClearMap.gui import widgets as cmp_widgets
+from ClearMap.gui import style
+from ClearMap.gui import dialogs as dlgs
+from ClearMap.gui.about import AboutInfo
+
+from ClearMap.pipeline_orchestrators.sample_info_management import SampleManager
+### END SLOW IMPORTS ###
 
 CURRENT_RES = get_current_res(app)
 
