@@ -24,7 +24,6 @@ import re
 import platform
 import warnings
 from concurrent.futures.process import BrokenProcessPool
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -47,7 +46,7 @@ import ClearMap.ImageProcessing.Experts.Cells as cell_detection
 import ClearMap.Analysis.Measurements.Voxelization as voxelization
 from ClearMap.Utils.exceptions import MissingRequirementException
 from ClearMap.Utils.utilities import requires_assets, FilePath
-from ClearMap.processors.generic_tab_processor import TabProcessor
+from ClearMap.processors.generic_tab_processor import ChannelTabProcessor
 from ClearMap.Visualization.Qt.widgets import Scatter3D
 
 __author__ = 'Christoph Kirst <christoph.kirst.ck@gmail.com>, Charly Rousseau <charly.rousseau@icm-institute.org>'
@@ -60,11 +59,10 @@ __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 USE_BINARY_POINTS_FILE = not platform.system().lower().startswith('darwin')
 
 
-class CellDetector(TabProcessor):
+class CellDetector(ChannelTabProcessor):
     def __init__(self, sample_manager=None, channel=None, registration_processor=None):
         super().__init__()
         self.sample_config = None
-        self.processing_config = None
         self.machine_config = None
         self.sample_manager = None
         self.registration_processor = None
@@ -87,7 +85,7 @@ class CellDetector(TabProcessor):
             self.sample_config = configs['sample']
             self.machine_config = configs['machine']
             # FIXME: potential issue of config duplication if several instances are called
-            self.processing_config = self.sample_manager.config_loader.get_cfg('cell_map')['channels'][self.channel]
+            self._processing_config = self.sample_manager.config_loader.get_cfg('cell_map')
 
             self.set_progress_watcher(self.sample_manager.progress_watcher)
         self.registration_processor = registration_processor
@@ -95,20 +93,6 @@ class CellDetector(TabProcessor):
     @property
     def detected(self):
         return self.get('cells', channel=self.channel, asset_sub_type='raw').exists
-
-    # WARNING: required because we pass a section of the config to the processor, not the whole config
-    #   Maybe we should pass the whole config to the processor and let it handle the section (with self.channel)
-    #   make sure this works with other config backends.
-    def reload_config(self, max_iter=10):
-        p = self.processing_config
-        for i in range(max_iter):
-            if hasattr(p, 'reload'):
-                p.reload()
-                return
-            else:
-                p = p.parent
-        else:
-            raise ValueError(f'Could not find a reload method in the config, after {max_iter} iterations')
 
     def post_process_cells(self):
         self.reload_config()
@@ -130,6 +114,11 @@ class CellDetector(TabProcessor):
                             arrange=arrange, parent=parent)
 
     def create_test_dataset(self, slicing, debug='debug'):
+        previous_status = self.workspace.debug
+        self.workspace.debug = debug
+        dbg_asset = self.get('stitched', channel=self.channel)
+        dbg_asset.delete(missing_ok=True)  # Remove previous debug asset if exists
+        self.workspace.debug = previous_status
         dbg_path = self.workspace.create_debug('stitched', channel=self.channel, slicing=slicing, debug=debug)
         self.update_watcher_main_progress()
         return dbg_path
@@ -184,15 +173,15 @@ class CellDetector(TabProcessor):
         -------
         coordinates, counts_file_path: np.array, str
         """
-        counts_file_path = self.get_path('density', channel=self.channel, asset_sub_type='counts')
-        clearmap_io.delete_file(counts_file_path)
+        counts_asset = self.get('density', channel=self.channel, asset_sub_type='counts')
+        counts_asset.delete(missing_ok=True)  # Remove previous counts file if exists
         self.set_watcher_step('Unweighted voxelisation')
-        voxelization.voxelize(coordinates, sink=counts_file_path, **voxelization_parameter)  # WARNING: prange
+        voxelization.voxelize(coordinates, sink=counts_asset.path, **voxelization_parameter)  # WARNING: prange
         self.update_watcher_main_progress()
         # uncrusted_coordinates = self.remove_crust(coordinates)  # WARNING: currently causing issues
         #         density_path = self.get_path('density', channel=self.channel, asset_sub_type='counts_wcrust')
         #         voxelization.voxelize(uncrusted_coordinates, sink=density_path, **voxelization_parameter)   # WARNING: prange
-        return coordinates, counts_file_path
+        return coordinates, counts_asset.path
 
     def voxelize_weighted(self, coordinates, source, voxelization_parameter):
         """
@@ -204,10 +193,11 @@ class CellDetector(TabProcessor):
         source: Source.Source
         voxelization_parameter: dict
         """
-        intensities_file_path = self.get_path('density', channel=self.channel, asset_sub_type='intensities')
+        intensities_asset = self.get('density', channel=self.channel, asset_sub_type='intensities')
+        intensities_asset.delete(missing_ok=True)  # Remove previous intensities file if exists
         intensities = source['source']
-        voxelization.voxelize(coordinates, sink=intensities_file_path, weights=intensities, **voxelization_parameter)   # WARNING: prange
-        return intensities_file_path
+        voxelization.voxelize(coordinates, sink=intensities_asset.path, weights=intensities, **voxelization_parameter)   # WARNING: prange
+        return intensities_asset.path
 
     def atlas_align(self):
         """Atlas alignment and annotation """
@@ -245,7 +235,7 @@ class CellDetector(TabProcessor):
 
         if self.registration_processor.was_registered:
             for i, channel in enumerate(self.get_registration_sequence_channels(stop_channel=target_channel)):
-                if self.registration_processor.config['channels'][channel]['moving_channel'] in (None, 'intrinsically aligned'):
+                if self.registration_processor.config['channels'][channel]['moving_channel'] in (None, 'intrinsically_aligned'):
                     continue
                 results_dir = self.get_path('aligned', channel=channel).parent
                 coords = elastix.transform_points(coords, transform_directory=results_dir, binary=USE_BINARY_POINTS_FILE)
@@ -258,9 +248,12 @@ class CellDetector(TabProcessor):
             'source': self.processing_config['cell_filtration']['thresholds']['intensity'],
             'size': self.processing_config['cell_filtration']['thresholds']['size']
         }
-        cell_detection.filter_cells(source=self.get_path('cells', channel=self.channel, asset_sub_type='raw'),
-                                    sink=self.get_path('cells', channel=self.channel, asset_sub_type='filtered'),
-                                    thresholds=thresholds)
+        src_path = self.get_path('cells', channel=self.channel, asset_sub_type='raw')
+        if not src_path.exists:
+            raise MissingRequirementException(f'Cell detection not run yet (no file found at "{src_path}"),'
+                                              f' cannot filter cells. Please run cell detection first.')
+        dest_path = self.get_path('cells', channel=self.channel, asset_sub_type='filtered')
+        cell_detection.filter_cells(source=src_path, sink=dest_path, thresholds=thresholds)
 
     def run_cell_detection(self, tuning=False, save_maxima=False, save_shape=False, save_as_binary_mask=False):
         self.reload_config()
@@ -270,24 +263,25 @@ class CellDetector(TabProcessor):
         cell_detection_param['illumination_correction'] = None  # WARNING: illumination or illumination_correction
         cell_detection_param['background_correction']['shape'] = self.processing_config['detection']['background_correction']['diameter']
         cell_detection_param['maxima_detection']['shape'] = self.processing_config['detection']['maxima_detection']['shape']
+        cell_detection_param['maxima_detection']['h_max'] = self.processing_config['detection']['maxima_detection']['h_max']
         cell_detection_param['intensity_detection']['measure'] = ['source']
         cell_detection_param['shape_detection']['threshold'] = self.processing_config['detection']['shape_detection']['threshold']
         if tuning:
-            bkg_path = self.get_path('cells', channel=self.channel, asset_sub_type='bkg')
-            clearmap_io.delete_file(bkg_path)
-            cell_detection_param['background_correction']['save'] = bkg_path
+            bkg_asset = self.get('cells', channel=self.channel, asset_sub_type='bkg')
+            bkg_asset.delete(missing_ok=True)  # Remove previous background file if exists
+            cell_detection_param['background_correction']['save'] = str(bkg_asset.path)
 
-        shape_path = self.get_path('cells', channel=self.channel, asset_sub_type='shape')
+        shape_asset = self.get('cells', channel=self.channel, asset_sub_type='shape')
         if save_shape or tuning:
-            clearmap_io.delete_file(shape_path)
-            cell_detection_param['shape_detection']['save'] = shape_path
+            shape_asset.delete(missing_ok=True)
+            cell_detection_param['shape_detection']['save'] = str(shape_asset.path)
             # if save_as_binary_mask:
             # cell_detection_param['shape_detection']['save_dtype'] = 'bool'
 
         if save_maxima:
-            maxima_path = self.get_path('cells', channel=self.channel, asset_sub_type='maxima')
-            clearmap_io.delete_file(maxima_path)
-            cell_detection_param['maxima_detection']['save'] = maxima_path
+            maxima_asset = self.get('cells', channel=self.channel, asset_sub_type='maxima')
+            maxima_asset.delete(missing_ok=True)
+            cell_detection_param['maxima_detection']['save'] = str(maxima_asset.path)
 
         processing_parameter = copy.deepcopy(cell_detection.default_cell_detection_processing_parameter)
         processing_parameter.update(  # TODO: store as other dict and run .update(**self.extra_detection_params)
@@ -302,14 +296,15 @@ class CellDetector(TabProcessor):
         n_steps = self.get_n_blocks(self.get('stitched', channel=self.channel).shape()[2])
         self.prepare_watcher_for_substep(n_steps, self.cell_detection_re, 'Detecting cells')
         try:
-            dest_path = self.get_path('cells', channel=self.channel, asset_sub_type='raw')
-            clearmap_io.delete_file(dest_path)
-            cell_detection.detect_cells(self.get_path('stitched', channel=self.channel), dest_path,
+            dest_asset = self.get('cells', channel=self.channel, asset_sub_type='raw')
+            dest_asset.delete(missing_ok=True)
+            cell_detection.detect_cells(self.get_path('stitched', channel=self.channel), dest_asset.path,
                                         cell_detection_parameter=cell_detection_param,
                                         processing_parameter=processing_parameter,
-                                        workspace=self.workspace)  # WARNING: prange inside multiprocess (including arrayprocessing and devolvepoints for vox)
-            if save_shape and save_as_binary_mask and clearmap_io.dtype(shape_path) != 'bool':
-                clearmap_io.write(shape_path, np.array(clearmap_io.read(shape_path).astype('bool')))
+                                        workspace=self.workspace)  # WARNING: prange inside multiprocess
+                                                                   #  (including array processing and devolve points for vox)
+            if save_shape and save_as_binary_mask and shape_asset.dtype() != 'bool':
+                shape_asset.write(np.array(shape_asset.read().astype('bool')))
         except BrokenProcessPool as err:
             print(f'Cell detection canceled, see: {err}')
             return
@@ -382,7 +377,8 @@ class CellDetector(TabProcessor):
                 asset_properties['asset_type'] = 'atlas'
                 asset_properties['asset_sub_type'] = 'reference'
             else:
-                asset_properties['asset_type'] = 'resampled'
+                warnings.warn('Dataset not registered, cannot be plotted onto reference atlas. ')
+                return
 
         asset = self.get(**asset_properties)
         if not asset.exists or not self.df_path.exists:
@@ -412,14 +408,20 @@ class CellDetector(TabProcessor):
         else:
             hemispheres = None
 
-        unique_ids = np.sort(np.unique(df['id']))
-        annotator = self.registration_processor.annotators[self.channel]
-        # color_map = {id_: annotator.find(id_, key='id')['rgb'] for id_ in unique_ids}
-        color_map = {id_: annotator.convert_label(id_, key='id', value='color_hex_triplet') for id_ in unique_ids}
-        color_map[0] = np.array(to_hex((1, 0, 0)))  # default to red
-        df['color'] = df['id'].map(color_map)
+        if 'id' in df.columns:
+            unique_ids = np.sort(np.unique(df['id']))
+            annotator = self.registration_processor.annotators[self.channel]
+            # color_map = {id_: annotator.find(id_, key='id')['rgb'] for id_ in unique_ids}
+            color_map = {id_: annotator.convert_label(id_, key='id', value='color_hex_triplet') for id_ in unique_ids}
+            color_map[0] = np.array(to_hex((1, 0, 0)))  # default to red
+            df['color'] = df['id'].map(color_map)
+        else:
+            df['color'] = to_hex((1, 0, 0))
+
+        particle_size = self.processing_config['detection']['background_correction']['diameter'][0]
         dv.scatter_coords = Scatter3D(coordinates, colors=df['color'].to_list(),
-                                      hemispheres=hemispheres, half_slice_thickness=0)
+                                      hemispheres=hemispheres, half_slice_thickness=0,
+                                      marker_size=max(3, particle_size // 2))
         dv.refresh()
         return [dv]
 
@@ -460,7 +462,9 @@ class CellDetector(TabProcessor):
         return plot_3d.plot_3d(self.get_path('stitched', channel=self.channel),
                                view=p, cmap=plot_3d.grays_alpha(alpha=1))
 
-    def remove_crust(self, coordinates, threshold=3):
+    def remove_crust(self, coordinates=None, threshold=3, return_mask=False):  # TODO: Add inplace option
+        if coordinates is None:
+            coordinates = self.get_coords('filtered', aligned=True)
         distance_to_surface = self.get('atlas', channel=self.channel, asset_sub_type='distance').read()
 
         # Convert coordinates to integer and insure they are within the distance_to_surface array bounds
@@ -474,7 +478,10 @@ class CellDetector(TabProcessor):
         dist_values = distance_to_surface[tuple(valid_coordinates.T)]
 
         uncrusted_coordinates = valid_coordinates[dist_values > threshold]
-        return uncrusted_coordinates
+        if return_mask:
+            return uncrusted_coordinates, distance_to_surface[tuple(int_coordinates.T)] > threshold
+        else:
+            return uncrusted_coordinates
 
     def preview_cell_detection(self, parent=None, arrange=True, sync=True):
         sources = [
@@ -534,7 +541,6 @@ class CellDetector(TabProcessor):
                             'intensities': ['source', 'dog', 'background', 'size']}
         for sub_type, names in clearmap1_format.items():
             sink = self.get_path('cells', channel=self.channel, asset_sub_type=f'ClearMap1{sub_type}')
-            print(sub_type, sink)
             data = np.array(
                 [source[name] if name in source.dtype.names else np.full(source.shape[0], np.nan) for name in names]
             )
@@ -543,7 +549,7 @@ class CellDetector(TabProcessor):
 
     def convert_cm2_to_cm2_1_fmt(self):
         """Atlas alignment and annotation """
-        cells = np.load(self.get_path('cells', channel=self.channel))
+        cells = self.get('cells', channel=self.channel).read()
         df = pd.DataFrame({ax: cells[ax] for ax in 'xyz'})
         df['size'] = cells['size']
         df['source'] = cells['source']

@@ -28,7 +28,7 @@ def main(src_directory):
     register(registration_processor)
     plot_registration_results(registration_processor, sample_manager.alignment_reference_channel)
 
-    cell_detection_config = sample_manager.config_loader.get_cfg('cell_map')
+    cell_detection_config = sample_manager.config_loader.get_cfg('cell_map')['channels']
     if 'example' in cell_detection_config:
         print('Channels not yet configured in cell_map_params.cfg. Aborting.')
         return

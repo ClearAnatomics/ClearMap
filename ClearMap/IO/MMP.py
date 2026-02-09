@@ -341,7 +341,17 @@ def _memmap(location = None, shape = None, dtype = None, order = None, mode = No
       raise ValueError('Cannot create memmap without a location!')
 
     if mode != 'w+' and fu.is_file(location):
-      array = np.lib.format.open_memmap(location)
+      try:
+        if mode:
+            array = np.lib.format.open_memmap(location, mode=mode)
+        else:
+            try:
+                array = np.lib.format.open_memmap(location)
+            except PermissionError:
+                array = np.lib.format.open_memmap(location, mode='r')  # If permission denied, try to force read
+      except ValueError as err:
+        print(f'Error reading memmap file with {location=}, {shape=}, {dtype=}, {mode=}; {err}')
+
 
   if array is None:
     if shape is None:

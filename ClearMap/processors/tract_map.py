@@ -1,5 +1,4 @@
 import functools
-import os
 import platform
 import shutil
 import tempfile
@@ -14,7 +13,7 @@ from matplotlib.colors import to_hex
 from ClearMap.IO import IO as cmp_io
 from ClearMap.Utils.exceptions import MissingRequirementException
 from ClearMap.Utils.utilities import sanitize_n_processes
-from ClearMap.processors.generic_tab_processor import TabProcessor
+from ClearMap.processors.generic_tab_processor import ChannelTabProcessor
 from ClearMap.Alignment import Elastix as elastix
 from ClearMap.Alignment.Resampling import resample_points
 from ClearMap.ParallelProcessing.DataProcessing import ArrayProcessing as array_processing
@@ -33,17 +32,19 @@ def label_points_wrapper(annotator, coords):
     return np.expand_dims(annotator.label_points(coords), axis=-1)  # Add empty dim to match shape of coords
 
 
-class TractMapProcessor(TabProcessor):
+class TractMapProcessor(ChannelTabProcessor):
     def __init__(self, sample_manager=None, channel=None, registration_processor=None):
         super().__init__()
         self.save_intermediate_binarization_results = True
         self.sample_config = None
-        self.processing_config = None
         self.machine_config = None
         self.sample_manager = None
         self.registration_processor = None
         self.workspace = None
         self.channel = None
+        self.uniques = None
+        self.uniq_counts = None
+        self.sampling = 1
 
         if channel is None:
             raise ValueError(f'No channel specified. Please provide a channel name '
@@ -59,40 +60,70 @@ class TractMapProcessor(TabProcessor):
             configs = sample_manager.get_configs()
             self.sample_config = configs['sample']
             self.machine_config = configs['machine']
-            self.processing_config = self.sample_manager.config_loader.get_cfg('tract_map')['channels'][self.channel]
+            self._processing_config = self.sample_manager.config_loader.get_cfg('tract_map')
 
             self.set_progress_watcher(self.sample_manager.progress_watcher)
         self.registration_processor = registration_processor
-
-    # WARNING: required because we pass a section of the config to the processor, not the whole config
-    #   Maybe we should pass the whole config to the processor and let it handle the section (with self.channel)
-    #   make sure this works with other config backends.
-    def reload_config(self, max_iter=10):
-        p = self.processing_config
-        for i in range(max_iter):
-            if hasattr(p, 'reload'):
-                p.reload()
-                return
-            else:
-                p = p.parent
-        else:
-            raise ValueError(f'Could not find a reload method in the config, after {max_iter} iterations')
 
     def create_test_dataset(self, slicing):
         self.workspace.create_debug('stitched', channel=self.channel, slicing=slicing)
         self.update_watcher_main_progress()
 
-    def compute_clip_range(self, array_path, pixel_percents=(0.7, 0.99999)):  # TODO: display in UI and set in params
-        array = cmp_io.read(array_path)
-        print(f'{array.shape=}, {array.size=}')
-        # Sample every 10th pixel in each dimension, to have a smaller array to compute the quantiles
-        ratio = self.processing_config['detection']['decimation_ratio']
-        decimated_array = array[::ratio, ::ratio, ::ratio]
+    def compute_clip_range(self, pixel_percents=(70, 99.999)):
+        self.reload_config()
+        self._compute_uniques()
+        percents = np.asarray(pixel_percents, dtype=float)
+        target_idx = np.rint(percents / 100.0 * (self._n_pixels - 1)).astype(int)
 
-        min_quantile, max_quantile = [np.quantile(decimated_array, p) for p in pixel_percents]
-        print(f'Intensity values that contain {pixel_percents} percents respectively '
-              f'of the pixels: {min_quantile=}, {max_quantile=}')
-        return min_quantile, max_quantile  # TODO: add display in UI
+        clip_vals = self.uniques[np.searchsorted(self._cum_counts, target_idx, side="left")]
+
+        return tuple(clip_vals)  # e.g. (low, high)
+
+    def _compute_uniques(self):
+        sampling = self.processing_config['binarization']['decimation_ratio']
+        if self.uniques is None or sampling != self.sampling:
+            self.sampling = sampling
+            print('Computing histogram, this may take some time')
+            array = self.get('stitched', channel=self.channel).as_source()
+            uniques, counts = np.unique(array[::sampling, ::sampling, ::sampling], return_counts=True)
+            self.uniques = uniques
+            self.uniq_counts = counts
+
+            self._cum_counts = np.cumsum(self.uniq_counts)
+            self._n_pixels = int(self._cum_counts[-1])
+            print('Done')
+
+    def intensities_to_percentiles(self, low_intensity, high_intensity):
+        """
+        Convert two intensity thresholds to their percentile ranks (0‒100],
+        using the same *nearest-rank* convention as `compute_clip_range`.
+
+        Parameters
+        ----------
+        low_intensity, high_intensity : scalar
+            Intensity values (e.g. grey levels) whose positions in the global
+            histogram are required.
+
+        Returns
+        -------
+        list[float]
+            [low_percentile, high_percentile]
+        """
+        self.reload_config()
+        self._compute_uniques()
+        # For each intensity, count how many pixels are ≤ that value ----
+        # With side='right' we include pixels that are exactly equal to the queried intensity
+        # idx of the last ≤ value
+        idx = np.searchsorted(self.uniques, (low_intensity, high_intensity), side='right') - 1
+
+        # Handle values below the smallest unique (idx == -1 → 0 pixels)
+        idx = np.clip(idx, -1, self._cum_counts.size - 1)
+
+        # Number of pixels ≤ each threshold
+        counts = np.where(idx >= 0, self._cum_counts[idx], 0)
+
+        percentiles = counts * 100.0 / self._n_pixels
+        return percentiles.tolist()
 
     def binarize(self, clip_low, clip_high):
         binarization_parameter = vasculature.default_binarization_parameter.copy()
@@ -167,13 +198,15 @@ class TractMapProcessor(TabProcessor):
 
 
                 # Copy the params files to avoid a race condition because they get edited by each process
-                file_names = results_dir.glob('TransformParameters.*.txt')
+                file_names = list(results_dir.glob('TransformParameters.*.txt'))
                 if not file_names:
                     raise FileNotFoundError(f'No parameter files found in {results_dir}')
                 # print(f'Copying {file_names} to {temp_params_dir}')
                 for f_name in file_names:
+                    f_name = Path(f_name).relative_to(results_dir)
                     f_path = results_dir / f_name
-                    shutil.copy(f_path, temp_params_dir)
+                    dest_path = Path(temp_params_dir) / f_name
+                    shutil.copyfile(f_path, dest_path)
 
                 coords = elastix.transform_points(
                     coords, sink=None,
@@ -182,8 +215,7 @@ class TractMapProcessor(TabProcessor):
                     temp_file=temp_file.name,
                     binary=True, indices=False)
 
-                tmp_f_path = Path(temp_file.name)
-            tmp_f_path.unlink(missing_ok=True)
+                Path(temp_file.name).unlink(missing_ok=True)
 
         return coords
 
@@ -207,10 +239,14 @@ class TractMapProcessor(TabProcessor):
 
         results_directories = []
         for channel in self.get_registration_sequence_channels(stop_channel=target_channel):
-            if self.registration_processor.config['channels'][channel]['moving_channel'] in (None, 'intrinsically aligned'):
+            if self.registration_processor.config['channels'][channel]['moving_channel'] in (None, 'intrinsically_aligned'):
                 continue
             else:
-                results_directories.append(self.get_path('aligned', channel=channel).parent)
+                result_dir = self.registration_processor.get_elx_asset('aligned', channel=channel).path.parent
+                if not result_dir.exists():
+                    raise MissingRequirementException(f'Elastix result directory {result_dir} for {channel=} not found.'
+                                                      f'Please run the registration first.')
+                results_directories.append(result_dir)
 
         debug_bcp = self.workspace.debug
         self.workspace.debug = False
@@ -348,6 +384,33 @@ class TractMapProcessor(TabProcessor):
         )
         self.update_watcher_main_progress()
         print('TractMap voxelization finished')
+
+    def plot_binarization_levels(self, low_spin_box, high_spin_box):  # TODO: default=None and create dialog if missing
+        asset = self.get('stitched', channel=self.channel)
+        if not asset.exists:  # FIXME: could compute
+            raise MissingRequirementException(f'plot_binarization_levels missing file: {asset} {asset.path} not found')
+
+        dv = q_plot_3d.plot(asset.path, title=f'Binarization levels', arrange=False)[0]
+        dv._add_hi_lo_lut(low_spin_box, high_spin_box)
+        return [dv]
+        # dvs = q_plot_3d.plot([[asset.path, asset.path]], title=f'Binarization levels', arrange=False)
+        # dvs[0]._add_hi_lo_lut(low_spin_box, high_spin_box)
+        # return dvs
+
+    def plot_binary(self, debug=False):
+        ws_debug_backup = self.workspace.debug
+        self.workspace.debug = debug
+        binary_asset = self.get('binary', channel=self.channel)
+        if not binary_asset.exists:
+            raise MissingRequirementException(f'plot_binary missing file: {binary_asset.path} not found')
+        stitched_asset = self.get('stitched', channel=self.channel)
+        if stitched_asset.exists:
+            to_plot = [[binary_asset.path, stitched_asset.path]]
+        else:
+            to_plot = binary_asset.path
+        dv = q_plot_3d.plot(to_plot, title=f'Binary mask', arrange=False)[0]
+        self.workspace.debug = ws_debug_backup
+        return [dv]
 
     def plot_tracts_3d_scatter_w_atlas_colors(self, raw=False, coordinates_from_debug=False, plot_onto_debug=False, parent=None):
         asset_properties = {'channel': self.channel}

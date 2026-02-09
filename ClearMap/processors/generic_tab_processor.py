@@ -20,7 +20,7 @@ class ProcessorSteps:
     def steps(self):
         raise NotImplementedError
 
-    def path_from_step_name(self, step_name):
+    def asset_from_step_name(self, step_name):
         raise NotImplementedError
 
     @property
@@ -35,25 +35,44 @@ class ProcessorSteps:
         return self.steps[self.steps.index(step_name)+1:]
 
     def step_exists(self, step_name):
-        return os.path.exists(self.path_from_step_name(step_name))
+        return self.asset_from_step_name(step_name).exists
 
     def remove_next_steps_files(self, target_step_name):
         for step_name in self.get_next_steps(target_step_name):
-            f_path = self.path_from_step_name(step_name)
-            if os.path.exists(f_path):
-                warnings.warn(f"WARNING: Remove previous step {step_name}, file {f_path}")
-                os.remove(f_path)
+            asset = self.asset_from_step_name(step_name)
+            if asset.exists:
+                warnings.warn(f"WARNING: Remove previous step {step_name}, file {asset.path}")
+                asset.path.unlink(missing_ok=True)
 
-    def path(self, step, step_back=False, n_before=0):
+    def get_asset(self, step, step_back=False, n_before=0):
+        """
+        Get the asset corresponding to the step name, optionally picking the nth previous step if `n_before` is set.
+        If the asset does not exist, it will try to get the previous step if `step_back` is True.
+
+        Parameters
+        ----------
+        step: str
+            Name of the step to get the asset for.
+        step_back: bool
+            If True, will try to get the previous step's asset if the current step's asset does not exist.
+        n_before: int
+            If set, will return the asset of the nth previous step instead of the current step.
+            Useful when you want to get the asset source to the current step for example.
+
+        Returns
+        -------
+        Asset
+            The asset corresponding to the step name.
+        """
         if n_before:
             step = self.steps[self.steps.index(step) - n_before]
-        f_path = self.path_from_step_name(step)
-        if not os.path.exists(f_path):
+        asset = self.asset_from_step_name(step)
+        if not asset.exists:
             if step_back:  # FIXME: steps back only once ??
-                f_path = self.path(self.steps[self.steps.index(step) - 1])
+                asset = self.get_asset(self.steps[self.steps.index(step) - 1])
             else:
-                raise IndexError(f'Could not find path "{f_path}" and not allowed to step back')
-        return f_path
+                raise IndexError(f'Could not find path "{asset}" and not allowed to step back')
+        return asset
 
 
 class TabProcessor:
@@ -153,6 +172,32 @@ class TabProcessor:
 
     # def setup(self):
     #     pass
+
+
+class ChannelTabProcessor(TabProcessor):
+    """
+    Tab processor that is processing a single channel.
+
+    The config is expected to have a 'channels' section with the channel name as key.
+    The config is stored in the `_processing_config` attribute, and accessed through the `processing_config` property
+    which returns the section for the current channel.
+    """
+    def __init__(self):
+        super().__init__()
+        self._processing_config = None
+        self.channel = ''
+
+    @property
+    def processing_config(self):
+        return self._processing_config['channels'][self.channel]
+
+    @processing_config.setter
+    def processing_config(self, value):
+        raise ValueError('Processing config is a property and cannot be set directly. '
+                         'you should set the _processing_config attribute instead.')
+
+    def reload_config(self):
+        self._processing_config.reload()
 
 
 class CanceledProcessing(BrokenProcessPool):  # TODO: better inheritance

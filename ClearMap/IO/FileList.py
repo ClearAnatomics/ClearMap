@@ -334,7 +334,8 @@ class Source(src.VirtualSource):
         func(f,i);
     else:
       with concurrent.futures.ThreadPoolExecutor(processes) as executor:
-        executor.map(func, fl, slicing_list_indices);
+        results = executor.map(func, fl, slicing_list_indices)
+      _ = list(results)
     
     data = data[slicing_keep_dims_to_final];
     
@@ -401,12 +402,12 @@ class Source(src.VirtualSource):
         func(f,i);
     else:
       with concurrent.futures.ThreadPoolExecutor(processes) as executor:
-        executor.map(func, fl, indices);
-  
+        results = executor.map(func, fl, indices)
+      _ = list(results)
+
   @property
   def array(self):
     return self.__getitem__(slice(None));
-  
   
   
   def __str__(self):

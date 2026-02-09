@@ -34,6 +34,7 @@ __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
+import copy
 import os
 import warnings
 from copy import deepcopy
@@ -43,10 +44,12 @@ from pathlib import Path
 import natsort
 import numpy as np
 
+from ClearMap.Analysis.graphs.graph_gt import Graph
+from ClearMap.Analysis.graphs.graph_gt import load as load_graph
 from ClearMap.IO import IO as clearmap_io
 from ClearMap.IO import FileUtils as file_utils
 from ClearMap.IO.assets_constants import CONTENT_TYPE_TO_PIPELINE
-from ClearMap.IO.assets_specs import TypeSpec, ChannelSpec, StateManager
+from ClearMap.IO.assets_specs import TypeSpec, ChannelSpec, StateManager, SubTypeSpec
 from ClearMap.Utils.tag_expression import Expression
 from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
 from ClearMap.Utils.exceptions import ClearMapAssetError, AssetNotFoundError
@@ -153,6 +156,7 @@ class Asset:
         self._checksum = checksum
         self.extensions_to_directories = extensions_to_directories or {}
         self.status_manager = status_manager
+        self.use_sub_dir = False  # Modified on first probe
         # TODO: add list of parent assets with the parametrised function to generate them
 
     def __str__(self):
@@ -189,18 +193,25 @@ class Asset:
             status = 'debug'  # Must be a string to build the path
         return status
 
-    def variant(self, sample_id=None, extension=None, version=None, expression=None):
+    def variant(self, sample_id=None, extension=None, version=None, expression=None, sub_type=None):
         """
         Returns a variant of the asset with the given sample_id, extension and version.
 
         Parameters
         ----------
-        sample_id : str
+        sample_id: str
             The sample id to use.
-        extension : str
+        extension: str
             The extension to use.
-        version : int
+        version: int
             The version to use.
+        expression: str or Expression or None
+            An optional expression to use instead of the default file name.
+        sub_type: str or TypeSpec
+            The sub type of the asset. This is used to create a variant of the asset with
+             a different type specification.
+            If a string, it should be a valid sub type name in the type specification.
+            If a TypeSpec, it will be used as the type specification for the variant.
 
         Returns
         -------
@@ -219,7 +230,30 @@ class Asset:
                 expression = Expression(str(self.with_extension(extension))) if self.is_expression else None
             else:
                 expression = self.expression
-        type_spec = deepcopy(self.type_spec)
+        if sub_type:
+            if isinstance(sub_type, str):
+                type_spec = self.type_spec.sub_types.get(sub_type)
+                if not type_spec:  # Not part of standard sub_types
+                    if self.type_spec.sub_types:
+                        warnings.warn(f'The sub type "{sub_type}" is not defined. It will be created dynamically'
+                                      f'but we cannot guarantee that it will be correct.')
+                        template_sub_type_spec = list(self.type_spec.sub_types.values())[0]
+                        new_type_spec = SubTypeSpec(
+                            resource_type=template_sub_type_spec.resource_type,
+                            type_name=f'{self.type_spec.name}_{sub_type}',
+                            file_format_category=template_sub_type_spec.file_format_category,
+                            relevant_pipelines=self.type_spec.relevant_pipelines,
+                        )
+                        self.type_spec.sub_types[sub_type] = new_type_spec
+                    else:
+                        raise ValueError(f'sub_type "{sub_type}" not found in {self.type_spec.sub_types.keys()}'
+                                         f'and this type has no sub_types defined to copy.')
+            elif isinstance(sub_type, TypeSpec):
+                type_spec = sub_type
+            else:
+                raise ValueError(f'sub_type must be a string or a TypeSpec, got "{type(sub_type)}".')
+        else:
+            type_spec = deepcopy(self.type_spec)
         if not self.is_expression and extension:
             type_spec.extensions = list(dict.fromkeys([extension] + self.type_spec.extensions))
         # WARNING: long list, should use keyword arguments
@@ -256,11 +290,13 @@ class Asset:
                                          f'Expression should be parameterized first.')
             else:
                 name = self.type_spec.basename.string()
+        elif self.type_spec.name == 'raw':  # Use literal for raw because it does not follow ClearMap normalization
+            name = self.expression.string()
         else:  # Otherwise, build the name
             name = ''
             for part in self.name_parts:
-                if isinstance(part, list):  # channel could be a list for compound assets
-                    part = '_'.join(part)
+                if isinstance(part, (list, tuple)):  # channel could be a tuple for compound assets
+                    part = '-'.join(part)
                 if Expression(part).tags:
                     part = Expression(part)  # FIXME: substitute None width tags
                     values = {}
@@ -321,11 +357,19 @@ class Asset:
 
     @property
     def directory(self):
-        sub_directory = Path(self.base_directory or self.type_spec.directory)
-        if sub_directory.is_absolute():
-            return sub_directory
+        sub_dir = Path(self.type_spec.directory)
+        if sub_dir.is_absolute():
+            return sub_dir
         else:
-            return self.base_directory / sub_directory
+            if self.use_sub_dir:
+                return self.base_directory / sub_dir
+            else:
+                base_name = self.base_name + self.type_spec.default_extension  # default_extension to avoid recursion
+                if (self.base_directory / base_name).exists():  # compatibility with 3.0.0
+                    return self.base_directory
+                else:
+                    self.use_sub_dir = True
+                    return self.base_directory / sub_dir
 
     @property
     def file_name(self):
@@ -349,10 +393,11 @@ class Asset:
         pathlib.Path
             The path with the best extension.
         """
-        if str(self.file_name).startswith('/'):
-            return Path(self.file_name)
+        file_name = self.file_name  # minimize dynamic calls
+        if str(file_name).startswith('/'):
+            return Path(file_name)
         else:
-            return self.directory / self.file_name
+            return self.directory / file_name
 
     @property
     def existing_path(self):
@@ -449,7 +494,9 @@ class Asset:
         """
         return bool(file_utils.find_existing_extension(self.path, self.type_spec.extensions))
 
-    def delete(self):
+    def delete(self, missing_ok=False):
+        if missing_ok and not self.exists:
+            return
         os.remove(self.existing_path)
 
     @property
@@ -498,11 +545,21 @@ class Asset:
             self._checksum = file_utils.checksum(self.existing_path, self.type_spec.checksum_algorithm)
         return self._checksum
 
+    @property
+    def size(self):
+        return self.path.stat().st_size
+
     def read(self, *args, **kwargs):
-        return clearmap_io.read(self.existing_path, *args, **kwargs)
+        if self.type_spec.extensions[0] == '.gt':
+            return load_graph(self.existing_path, *args, **kwargs)
+        else:
+            return clearmap_io.read(self.existing_path, *args, **kwargs)
 
     def write(self, data, *args, **kwargs):
-        clearmap_io.write(self.path, data, *args, **kwargs)
+        if isinstance(data, Graph):
+            data.save(self.path)
+        else:
+            clearmap_io.write(self.path, data, *args, **kwargs)
 
     def create(self, *args, **kwargs):
         clearmap_io.create(self.path, *args, **kwargs)
@@ -513,6 +570,10 @@ class Asset:
     def shape(self):
         if not self.is_expression:
             return clearmap_io.shape(self.existing_path)
+
+    def dtype(self):
+        if self.is_existing_source and not self.is_expression:
+            return clearmap_io.dtype(self.existing_path)
 
     def convert(self, new_extension, processes=None, verbose=False, **kwargs):
         if self.is_existing_source:
@@ -560,6 +621,18 @@ class Asset:
         source = self.as_source()
         self.status_manager.status = status
         return self.write(np.asarray(source[slicing], order='F'))
+
+    def all_sub_types(self):
+        """
+        Returns all sub types of the asset.
+
+        Returns
+        -------
+        list of str
+            The sub types of the asset.
+        """
+        all_assets = [self] + [self.variant(sub_type=sub_type) for sub_type in self.type_spec.sub_types]
+        return all_assets
 
 
 class ExpressionAsset(Asset):
@@ -651,7 +724,9 @@ class ExpressionAsset(Asset):
         return file_utils.find_existing_extension(self.file_list[0],
                                                   self.type_spec.extensions)
 
-    def delete(self):
+    def delete(self, missing_ok=False):
+        if missing_ok and not self.exists:
+            return
         for f in self.file_list:
             os.remove(f)
 
@@ -668,6 +743,13 @@ class ExpressionAsset(Asset):
         return self.all_tiles_exist
 
     @property
+    def size(self):
+        total_size = 0
+        for f in self.file_list:
+            total_size += Path(f).stat().st_size
+        return total_size
+
+    @property
     def all_tiles_exist(self):  # TODO: try with all known extensions # REFACTOR: rename more generic (all images)
         """
         Whether all tiles exist on disk
@@ -679,6 +761,7 @@ class ExpressionAsset(Asset):
         """
         # noinspection PyTypeChecker
         if not self.file_list:
+            warnings.warn(f'No tiles found for channel {self.base_name} with expression {self.expression}')
             return False
         return len(self.file_list) == self.n_tiles
 
@@ -856,6 +939,9 @@ class AssetCollection:  # FIXME: fix how assets are retrieved
 
     def keys(self):
         return self.assets.keys()
+
+    def values(self):
+        return self.assets.values()
 
     def items(self):
         return self.assets.items()

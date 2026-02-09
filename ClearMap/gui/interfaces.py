@@ -283,9 +283,14 @@ class GenericTab(GenericUi):
             return
         channel, page_widget = self._init_channel_ui(channel)
         if channel not in self.params.keys():
-            if isinstance(self, PipelineTab):
-                chan_params = self.sample_params.config['channels'][channel]  # FIXME: do we want the loaded or the disk params
-                d_type = getattr(chan_params, 'data_type', None)
+            channel_is_compound = False
+            if isinstance(channel, str) and '-' in channel:
+                channel_is_compound = True
+            elif isinstance(channel, (tuple, list)):
+                channel_is_compound = True
+            if isinstance(self, PipelineTab) and not channel_is_compound:
+                # WARNING: ConfigObj Section does not support get() method
+                d_type = self.sample_params.config['channels'][channel]['data_type']  # FIXME: do we want the loaded or the disk params
                 self.params.add_channel(channel, d_type)
             else:
                 self.params.add_channel(channel)
@@ -618,6 +623,10 @@ class PipelineTab(GenericTab):
             new_channels = self._get_channels()
             if not former_channels:
                 former_channels = self.ui.channelsParamsTabWidget.get_channels_names()
+                former_channels = [c if '-' not in c else tuple(c.split('-'))
+                                   for c in former_channels]  # Cast compound channels as tuples
+                # FIXME: this might break if users have '-' in their channel names
+                #  solution: prohibit '-' in channel names
 
         former_channels_set = set(former_channels or [])
         new_channels_set = set(new_channels or [])
@@ -638,8 +647,6 @@ class PipelineTab(GenericTab):
                 self._setup_workers()
                 self.params.add_channel(ch)
         # if new_channels is a superset of former_channels, we can just add the new channels
-
-
 
     def setup_sample_manager(self, sample_manager):
         """

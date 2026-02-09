@@ -183,7 +183,8 @@ def rescale_channel(folder, atlas_base_name=None, dest_resolution=(3, 3, 6), n_c
             rescale_f(f_path)
     else:
         with ThreadPoolExecutor(n_cpus) as executor:
-            executor.map(rescale_f, file_list, chunksize=chunk_size)
+            results = executor.map(rescale_f, file_list, chunksize=chunk_size)
+        _ = list(results)
 
     sample_manager.config['channels'][channel]['resolution'] = list(dest_resolution)
     sample_manager.config.write()

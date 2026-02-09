@@ -3,11 +3,38 @@
 PROG_NAME=$0
 
 BASEDIR=$(dirname "$0")
-if [ "$1" == "" ]; then
-    ENV_FILE_PATH="ClearMapUi39.yml"
-else
-    ENV_FILE_PATH=$1
+if [ -z "$1" ]; then
+    set -- -f ClearMap3.yml
 fi
+
+
+function red(){  #  From https://stackoverflow.com/a/57096493
+    echo -e "\x1B[31m $1 \x1B[0m"
+    if [ -n "${2}" ]; then
+        echo -e "\x1B[31m $($2) \x1B[0m"
+    fi
+}
+function green(){
+    echo -e "\x1B[32m $1 \x1B[0m"
+    if [ -n "${2}" ]; then
+        echo -e "\x1B[32m $($2) \x1B[0m"
+    fi
+}
+
+function yellow(){
+    echo -e "\x1B[33m $1 \x1B[0m"
+    if [ -n "${2}" ]; then
+      echo -e "\x1B[33m $($2) \x1B[0m"
+    fi
+}
+
+function green_n(){  # FIXME: parametrise above instead
+    echo -n -e "\x1B[32m $1 \x1B[0m"
+    if [ -n "${2}" ]; then
+        echo -n -e "\x1B[32m $($2) \x1B[0m"
+    fi
+}
+
 
 usage() {
   cat << EOF >&2
@@ -59,35 +86,6 @@ if git rev-parse --is-inside-work-tree > /dev/null 2>&1; then
 else
     yellow "Not a git repository. Skipping commit number save."
 fi
-
-
-
-function red(){  #  From https://stackoverflow.com/a/57096493
-    echo -e "\x1B[31m $1 \x1B[0m"
-    if [ -n "${2}" ]; then
-        echo -e "\x1B[31m $($2) \x1B[0m"
-    fi
-}
-function green(){
-    echo -e "\x1B[32m $1 \x1B[0m"
-    if [ -n "${2}" ]; then
-        echo -e "\x1B[32m $($2) \x1B[0m"
-    fi
-}
-
-function yellow(){
-    echo -e "\x1B[33m $1 \x1B[0m"
-    if [ -n "${2}" ]; then
-      echo -e "\x1B[33m $($2) \x1B[0m"
-    fi
-}
-
-function green_n(){  # FIXME: parametrise above instead
-    echo -n -e "\x1B[32m $1 \x1B[0m"
-    if [ -n "${2}" ]; then
-        echo -n -e "\x1B[32m $($2) \x1B[0m"
-    fi
-}
 
 ########################################################################################################################
 
@@ -189,19 +187,20 @@ else
 fi
 
 pip_mode="True"
-if [[ $USE_TORCH == "True" ]]; then
-    green "Installing pytorch through conda may be restricted due to the license of the nvidia channel.
-      If you prefer installing pytorch through pip, please select 'pip' below."
-    read -r -p "Do you wish to install pytorch through conda (y/[n])?" answer
-    case "$answer" in
-        [yY][eE][sS]|[yY])
-            pip_mode="False";
-            ;;
-        *)
-            pip_mode="True";
-            ;;
-    esac
-fi
+#if [[ $USE_TORCH == "True" ]]; then
+#    green "Installing pytorch through conda may be restricted due to the license of the nvidia channel.
+#      If you prefer installing pytorch through pip, please select 'pip' below."
+#    read -r -p "PyTorch can be installed using either conda or pip. \
+#    Do you want to install PyTorch with conda (type y for conda, press Enter or n for pip)?" answer
+#    case "$answer" in
+#        [yY][eE][sS]|[yY])
+#            pip_mode="False";
+#            ;;
+#        *)
+#            pip_mode="True";
+#            ;;
+#    esac
+#fi
 
 echo "  Getting env name"
 ENV_NAME=$(python -c "import os; from ClearMap.Utils.install_utils import EnvFileManager; \
@@ -269,29 +268,52 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
     fi
 fi
 # Install ClearMap
-echo "Installing"
+green "Installing"
 python "setup.py" install || exit 1
-echo "Done"
+green "Done"
 
+echo
+echo "========================="
+echo
 # Create config folder if missing
+green "Checking if ClearMap configuration directory exists at \"$config_folder\""
 if [ ! -d "$config_folder" ]; then
-   mkdir "$config_folder" || exit 1
+    yellow "Config folder missing, creating it"
+    mkdir "$config_folder" || exit 1
 fi
 
 # Install or update ClearMap config
 srcdir=$(pwd)
 cd "$HOME" || exit 1 # Exit source folder to import from installed version
+green "Installing or updating ClearMap config"
 python -m ClearMap.config.update_config  || exit 1
+green "Done"
 
 # TODO: Prompt for environment variables (elastix ...) to be set in env activate
 
 # CONFIG
 clearmap_install_path=$(python -c "from ClearMap.config.update_config import CLEARMAP_DIR; print(CLEARMAP_DIR)")
-if [ "$clearmap_install_path" == "" ];then
-    echo "ERROR: could not get ClearMap install path"
+if [ "$clearmap_install_path" == "" ]; then
+    red "ERROR: could not get ClearMap install path"
     exit 1
 fi
 echo "ClearMap installed at \"$clearmap_install_path\""
+
+if [[ "$OSTYPE" != "linux-gnu"* ]]; then
+    echo "Binary file support on your platform is currently not available
+    Please specify the path to the elastix binary"
+    read -r -p "Path to elastix binary: " elastix_path
+    if [ ! -d "$elastix_path" ]; then
+        red "Path to elastix binary not found"
+        exit 1
+    else
+        conda activate "$ENV_NAME" || exit 1
+        python -c "$prep_python \
+        import ClearMap; \
+        from ClearMap.Utils.install_utils import set_elastix_path; \
+        set_elastix_path('$elastix_path')" || exit 1
+    fi
+fi
 
 # Create Linux desktop menus
 echo "Do you want to create a desktop menu entry.

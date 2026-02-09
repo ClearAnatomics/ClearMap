@@ -23,7 +23,7 @@ import igraph
 
 import ClearMap.IO.IO as clearmap_io
 import ClearMap.Alignment.Annotation as annotation
-import ClearMap.Analysis.Graphs.GraphGt as graph_gt
+from ClearMap.Analysis.graphs import graph_gt
 
 from ClearMap.Analysis.vasculature.flow.linear_system import LinearSystem
 
@@ -123,7 +123,7 @@ def compute_flow_f_schmid(work_dir, graph, cont, graph_name='correcteduniverse',
     Compute the flow and velocity of the graph using the method published in
     Schmid F. et al. https://doi.org/10.1371/journal.pcbi.1005392
 
-    First, make an igraph version of the graph with the necassary properties
+    First, make an igraph version of the graph with the necessary properties
     Then add:
     - length (computed from the geometry of the edges)
     - boundary_cap (True if edge is a boundary capillary)

@@ -16,14 +16,15 @@ from typing import List
 import numpy as np
 
 from PyQt5.QtCore import Qt, pyqtSignal
-from PyQt5.QtWidgets import QInputDialog, QToolBox, QCheckBox, QPushButton, QLabel, QSlider, QHBoxLayout, QComboBox
+from PyQt5.QtWidgets import QInputDialog, QToolBox, QCheckBox, QPushButton, QLabel, QSlider, QHBoxLayout, QComboBox, \
+    QSpinBox, QLineEdit, QDoubleSpinBox, QGroupBox, QRadioButton, QVBoxLayout, QFrame, QButtonGroup
 
 from ClearMap.IO.assets_constants import CONTENT_TYPE_TO_PIPELINE
 from ClearMap.Utils.exceptions import ClearMapValueError
-from ClearMap.Utils.utilities import validate_orientation, snake_to_title, DEFAULT_ORIENTATION
+from ClearMap.Utils.utilities import validate_orientation, snake_to_title, DEFAULT_ORIENTATION, get_item_recursive
 from ClearMap.config.atlas import ATLAS_NAMES_MAP
 
-from ClearMap.gui.gui_utils import create_clearmap_widget, clear_layout
+from ClearMap.gui.gui_utils import create_clearmap_widget, clear_layout, replace_widget
 from ClearMap.gui.dialogs import get_directory_dlg
 from ClearMap.gui.params_interfaces import (ParamLink, UiParameter, UiParameterCollection,
                                             ChannelsUiParameterCollection, ChannelUiParameter)
@@ -34,13 +35,15 @@ __copyright__ = 'Copyright © 2022 by Charly Rousseau'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
+from ClearMap.gui.widget_monkeypatch_callbacks import recursive_patch_compound_boxes
+
 from ClearMap.processors.sample_preparation import SampleManager
 
 
 class SampleChannelParameters(ChannelUiParameter):
     nameChanged = pyqtSignal(str, str)
     orientationChanged = pyqtSignal(str, tuple)
-    cropChanged = pyqtSignal(str, list, list, list)
+    cropChanged = pyqtSignal(str, object, object, object)  #  object because list or None
 
     geometry_settings_from: str
     data_type: str
@@ -91,6 +94,10 @@ class SampleChannelParameters(ChannelUiParameter):
         self.tab.orientXSpinBox.valueChanged.connect(self.handle_orientation_changed)  # REFACTOR: push to paramslinki instead
         self.tab.orientYSpinBox.valueChanged.connect(self.handle_orientation_changed)
         self.tab.orientZSpinBox.valueChanged.connect(self.handle_orientation_changed)
+        # FIXME: why do we need to connect the doublets since they are ParamLinks ?
+        self.tab.sliceXDoublet.valueChangedConnect(self.handle_slice_x_changed)
+        self.tab.sliceYDoublet.valueChangedConnect(self.handle_slice_y_changed)
+        self.tab.sliceZDoublet.valueChangedConnect(self.handle_slice_z_changed)
         self.connect_simple_widgets()
 
     @property
@@ -135,12 +142,13 @@ class SampleParameters(UiParameterCollection):  # FIXME: why is this not a Chann
     """
     Class that links the sample params file to the UI
     """
+    convertToClearMapFormat = pyqtSignal(str)
     plotMiniBrain = pyqtSignal(int)    # Bind by number because name may change
     plotAtlas = pyqtSignal(int)    # Bind by number because name may change
     channelNameChanged = pyqtSignal(str, str)
     channelsChanged = pyqtSignal(list, list)
     orientationChanged = pyqtSignal(str, tuple)
-    cropChanged = pyqtSignal(str, list, list, list)
+    cropChanged = pyqtSignal(str, object, object, object)  # object because list or None
 
     def __init__(self, tab, src_folder=None):
         self.shared_sample_params = SharedSampleParams(tab, src_folder=src_folder)
@@ -192,6 +200,8 @@ class SampleParameters(UiParameterCollection):  # FIXME: why is this not a Chann
                 self.config['channels'][channel_name] = deepcopy(self.default_channel_config())
             channel_params = SampleChannelParameters(self.tab, channel_name)
             channel_params.nameChanged.connect(self.handle_channel_name_changed)
+            channel_params.tab.convertToClearMapPushButton.clicked.connect(
+                functools.partial(self.convertToClearMapFormat.emit, channel_name))
             channel_params.orientationChanged.connect(self.handle_orientation_changed)
             channel_params.cropChanged.connect(self.handle_slice_changed)
 
@@ -335,6 +345,7 @@ class StitchingParams(ChannelsUiParameterCollection):
             if channel_name not in self.config['channels']:
                 self.config['channels'][channel_name] = deepcopy(self.__extra_channel)
                 self.config['channels'][channel_name]['layout_channel'] = self.channels[0]
+                self.config.write()
             self[channel_name] = ChannelStitchingParams(self.tab, channel_name, config=self.config)
 
     def fix_default_config(self, channel_name):
@@ -343,6 +354,7 @@ class StitchingParams(ChannelsUiParameterCollection):
         self.config['channels'] = {}
         self.config['channels'][channel_name] = default_section
         self.config['channels'][channel_name]['layout_channel'] = channel_name
+        self.config.write()
 
     def handle_layout_channel_changed(self, channel, layout_channel):
         self.layoutChannelChanged.emit(channel, layout_channel)
@@ -371,6 +383,7 @@ class ChannelStitchingParams(UiParameterCollection):
     def __init__(self, tab, channel, config):
         super().__init__(tab)
         self.name = channel
+        self.ready = False
         self.shared = GeneralChannelStitchingParams(tab, channel)
         self.stitching_rigid = None
         self.stitching_wobbly = None
@@ -686,6 +699,8 @@ class ChannelRegistrationParams(ChannelUiParameter):  # FIXME: add signal for al
         clear_layout(self.tab.landmarksWeightsLayout)
 
         new_params_files = [snake_to_title(p.split('.')[0]) for p in self.tab.paramsFilesListWidget.get_items_text()]
+        if len(new_params_files) > len(self.config['landmarks_weights']):
+            self.config['landmarks_weights'] += [0] * (len(new_params_files) - len(self.config['landmarks_weights']))
         self._value_labels = []
         for idx, param in enumerate(new_params_files):
             label = QLabel(param)
@@ -898,6 +913,7 @@ class CellMapParams(ChannelsUiParameterCollection):
 class ChannelCellMapParams(ChannelUiParameter):
     background_correction_diameter: List[int]
     maxima_shape: int
+    h_max: int | None
     detection_threshold: int
     cell_filter_size: List[int]
     cell_filter_intensity: List[int]
@@ -923,6 +939,8 @@ class ChannelCellMapParams(ChannelUiParameter):
         self.params_dict = {
             'background_correction_diameter': ['detection', 'background_correction', 'diameter'],
             'maxima_shape': ParamLink(['detection', 'maxima_detection', 'shape'], self.tab.maximaShape),
+            'h_max': ParamLink(['detection', 'maxima_detection', 'h_max'], self.tab.hMaxSinglet,
+                               default=None, missing_ok=True),
             'detection_threshold': ParamLink(['detection', 'shape_detection', 'threshold'], self.tab.detectionThreshold),
             'cell_filter_size': ParamLink(['cell_filtration', 'thresholds', 'size'], self.tab.cellFilterThresholdSizeDoublet),
             'cell_filter_intensity': ParamLink(['cell_filtration', 'thresholds', 'intensity'],
@@ -1073,6 +1091,7 @@ class TractMapParams(ChannelsUiParameterCollection):
 
 class ChannelTractMapParams(ChannelUiParameter):
     clipping_decimation_ratio: int
+    clipping_percents: List[float]
     clip_range: List[int]
     crop_x_min: int
     crop_x_max: int  # TODO: if 99.9 % source put to 100% (None)
@@ -1101,6 +1120,9 @@ class ChannelTractMapParams(ChannelUiParameter):
         super().__init__(tab, channel)
         self.params_dict = {
             'clipping_decimation_ratio': ParamLink(['binarization', 'decimation_ratio'], self.tab.clippingDecimationRatioSpinBox),
+            'clipping_percents': ParamLink(['binarization', 'percentage_range'],
+                                           self.tab.clippingPixelsPercentDoublet,
+                                           default=[70, 99.999]),
             'clip_range': ParamLink(['binarization', 'clip_range'], self.tab.clipRangeDoublet),
             'crop_x_min': ParamLink(['test_set_slicing', 'dim_0', 0], self.tab.detectionSubsetXRangeMin),
             'crop_x_max': ParamLink(['test_set_slicing', 'dim_0', 1], self.tab.detectionSubsetXRangeMax),
@@ -1248,33 +1270,7 @@ class ChannelColocalizationParams(ChannelUiParameter):
         super().cfg_to_ui()
 
 
-class VesselParams(UiParameterCollection):
-    def __init__(self, tab, sample_params, stitching_params, registration_params):
-        super().__init__(tab)
-        # self.sample_params = sample_params  # TODO: check if required
-        # self.preprocessing_params = preprocessing_params  # TODO: check if required
-        self.binarization_params = VesselBinarizationParams(tab)
-        self.graph_params = VesselGraphParams(tab)
-        self.visualization_params = VesselVisualizationParams(tab, sample_params, stitching_params, registration_params)
-
-    @property
-    def params(self):
-        return self.binarization_params, self.graph_params, self.visualization_params
-
-
-class VesselBinarizationParams(UiParameter):  # FIXME: add channels
-    run_vessels_binarization: bool
-    vessels_binarization_clip_range: List[int]
-    vessels_binarization_threshold: int
-    smooth_vessels: bool
-    binary_fill_vessels: bool
-    fill_main_channel: bool
-    run_arteries_binarization: bool
-    arteries_binarization_clip_range: List[int]
-    arteries_binarization_threshold: int
-    smooth_arteries: bool
-    binary_fill_arteries: bool
-    fill_secondary_channel: bool
+class SharedVesselBinarizationParams(UiParameter):
     fill_combined: bool
     plot_step_1: str
     plot_step_2: str
@@ -1284,80 +1280,147 @@ class VesselBinarizationParams(UiParameter):  # FIXME: add channels
     def __init__(self, tab):
         super().__init__(tab)
         self.params_dict = {
-            'run_vessels_binarization': ParamLink(['vessels', 'binarize', 'run'], self.tab.runVesselsBinarizationCheckBox),
-            'vessels_binarization_clip_range': ParamLink(['vessels', 'binarize', 'clip_range'],
-                                                     self.tab.vesselsBinarizationClipRangeDoublet),
-            'vessels_binarization_threshold': ['vessels', 'binarize', 'threshold'],
-            'smooth_vessels': ParamLink(['vessels', 'smooth', 'run'], self.tab.vesselsBinarizationSmoothingCheckBox),
-            'binary_fill_vessels': ParamLink(['vessels', 'binary_fill', 'run'], self.tab.vesselsBinarizationBinaryFillingCheckBox),
-            'fill_main_channel': ParamLink(['vessels', 'deep_fill', 'run'], self.tab.binarizationVesselsDeepFillingCheckBox),
-            'run_arteries_binarization': ParamLink(['arteries', 'binarize', 'run'],
-                                                   self.tab.runArteriesBinarizationCheckBox),
-            'arteries_binarization_clip_range': ParamLink(['arteries', 'binarize', 'clip_range'],
-                                                          self.tab.arteriesBinarizationClipRangeDoublet),
-            'arteries_binarization_threshold': ['arteries', 'binarize', 'threshold'],
-            'smooth_arteries': ParamLink(['arteries', 'smooth', 'run'],
-                                         self.tab.arteriesBinarizationSmoothingCheckBox),
-            'binary_fill_arteries': ParamLink(['arteries', 'binary_fill', 'run'],
-                                              self.tab.arteriesBinarizationBinaryFillingCheckBox),
-            'fill_secondary_channel': ParamLink(['arteries', 'deep_fill', 'run'],
-                                                self.tab.binarizationArteriesDeepFillingCheckBox),
             'fill_combined': ParamLink(['combined', 'binary_fill'], self.tab.binarizationConbineBinaryFillingCheckBox),
             'plot_step_1': ParamLink(None, self.tab.binarizationPlotStep1ComboBox),
             'plot_step_2': ParamLink(None, self.tab.binarizationPlotStep2ComboBox),
             'plot_channel_1': ParamLink(None, self.tab.binarizationPlotChannel1ComboBox),
             'plot_channel_2': ParamLink(None, self.tab.binarizationPlotChannel2ComboBox),
-
         }
-        self.cfg_subtree = ['binarization']
-        self.connect()
 
     def connect(self):
-        self.tab.vesselsBinarizationThresholdSpinBox.valueChanged.connect(self.handle_vessels_binarization_threshold_changed)
-
-        self.tab.arteriesBinarizationThresholdSpinBox.valueChanged.connect(
-            self.handle_arteries_binarization_threshold_changed)
         self.connect_simple_widgets()
 
-    @property
-    def n_steps(self):
-        n_steps = self.run_vessels_binarization
-        n_steps += self.smooth_vessels or self.binary_fill_vessels
-        n_steps += self.fill_main_channel
-        n_steps += self.run_arteries_binarization
-        n_steps += self.smooth_arteries or self.binary_fill_arteries
-        n_steps += self.fill_secondary_channel
-        n_steps += self.fill_combined
-        return
 
-    def get_steps_and_channels(self):
+class VesselParams(ChannelsUiParameterCollection):
+
+    def __init__(self, tab, sample_params, stitching_params, registration_params):
+        super().__init__(tab)
+        # self.sample_params = sample_params  # TODO: check if required
+        # self.preprocessing_params = preprocessing_params  # TODO: check if required
+        self.shared_binarization_params = SharedVesselBinarizationParams(tab)
+        self.graph_params = VesselGraphParams(tab)
+        self.visualization_params = VesselVisualizationParams(tab, sample_params, stitching_params, registration_params)
+
+    @property
+    def params(self):
+        return list(self.values()) + [self.graph_params, self.visualization_params]
+
+    def get_selected_steps_and_channels(self):
         steps = (self.plot_step_1, self.plot_step_2)
         channels = (self.plot_channel_1, self.plot_channel_2)
         channels = [c for s, c in zip(steps, channels) if s is not None]
         steps = [s for s in steps if s is not None]
         return steps, channels
 
+    def add_channel(self, channel_name, data_type=None):
+        if channel_name in self.channels:
+            return
+        else:
+            if self.config['is_default']:
+                self.fix_default_config()
+            if channel_name not in self.config['binarization']:
+                self.patch_config_section(channel_name, data_type)
+            self[channel_name] = VesselBinarizationParams(self.tab, channel_name)
+
+            if data_type == 'arteries':
+                self.graph_params.use_arteries = True
+
+    def fix_default_config(self):
+        self._default_vessels_section = deepcopy(dict(self.config['binarization']['vessels']))
+        self._default_arteries_section = dict(self.config['binarization']['arteries'])
+        self._default_combined_section = dict(self.config['binarization']['combined'])
+        self.config['binarization'] = {'combined': self._default_combined_section}
+        self.config['is_default'] = False
+        self.config.write()
+
+    def patch_config_section(self, channel_name, data_type=None):
+        if data_type in ('vessels', None):
+            self.config['binarization']['vessels'] = self._default_vessels_section
+        else:
+            self.config['binarization'][channel_name] = self._default_arteries_section
+        self.config.write()
+
+    def fix_cfg_file(self, f_path):
+        pass
+
+
+class VesselBinarizationParams(ChannelUiParameter):
+    run_binarization: bool
+    binarization_clip_range: List[int]
+    binarization_threshold: int
+    run_smoothing: bool
+    run_binary_filling: bool
+    run_deep_filling: bool
+
+    def __init__(self, tab, channel_name):
+        super().__init__(tab, channel_name)
+        self.params_dict = {
+            # FIXME: add tabs to UI with matching control names
+            'run_binarization': ParamLink(['binarize', 'run'], self.tab.runBinarizationCheckBox),
+            'binarization_clip_range': ParamLink(['binarize', 'clip_range'], self.tab.binarizationClipRangeDoublet),
+            'binarization_threshold': ['binarize', 'threshold'],  # WARNING: handled below
+            'run_smoothing': ParamLink(['smooth', 'run'], self.tab.binarizationSmoothingCheckBox),
+            'run_binary_filling': ParamLink(['binary_fill', 'run'], self.tab.binarizationBinaryFillingCheckBox),
+            'run_deep_filling': ParamLink(['deep_fill', 'run'], self.tab.binarizationDeepFillingCheckBox),
+        }
+        # self.tab.binarizationControlsGroupBox.setTitle(channel_name)
+        self.connect()
+
+    # WARNING: we need to redefine this only because of the binarization key, should we use channels instead
+    # REFACTORING:
     @property
-    def vessels_binarization_threshold(self):
-        return self.sanitize_neg_one(self.tab.vesselsBinarizationThresholdSpinBox.value())
+    def default_config(self):
+        if self.cfg_subtree:
+            if self.name in self.cfg_subtree:
+                default_channel = self._default_config['binarization'].keys()[0]
+                default_sub_tree = self.cfg_subtree.copy()
+                default_sub_tree[default_sub_tree.index(self.name)] = default_channel
+                return get_item_recursive(self._default_config, default_sub_tree)
+            else:
+                try:
+                    return get_item_recursive(self._default_config, self.cfg_subtree)
+                except KeyError as err:
+                    if self.name in str(err):
+                        raise KeyError(f'Could not find channel {self.name} in default config file. '
+                                       f'config sub tree: {self.cfg_subtree}')
+        else:
+            return self._default_config
 
-    @vessels_binarization_threshold.setter
-    def vessels_binarization_threshold(self, value):
-        self.tab.vesselsBinarizationThresholdSpinBox.setValue(self.sanitize_nones(value))
-
-    def handle_vessels_binarization_threshold_changed(self):
-        self.config['vessels']['binarize']['threshold'] = self.vessels_binarization_threshold
+    def handle_name_changed(self, old_name, new_name):
+        if old_name != self._cached_name:
+            warnings.warn(f'Channel name changed from {old_name} to {new_name} but was not expected')
+        # private config because absolute path
+        # TODO: check if dict() is required
+        self._config['binarization'][self.name] = self._config['binarization'].pop(self._cached_name)
+        self._cached_name = self.name
+        # self.tab.binarizationControlsGroupBox.setTitle(new_name)
 
     @property
-    def arteries_binarization_threshold(self):
-        return self.sanitize_neg_one(self.tab.arteriesBinarizationThresholdSpinBox.value())
+    def cfg_subtree(self):
+        return ['binarization', self.name]
 
-    @arteries_binarization_threshold.setter
-    def arteries_binarization_threshold(self, value):
-        self.tab.arteriesBinarizationThresholdSpinBox.setValue(self.sanitize_nones(value))
+    def connect(self):
+        self.nameWidget.channelRenamed.connect(self.handle_name_changed)
+        self.tab.binarizationThresholdSpinBox.valueChanged.connect(self.handle_binarization_threshold_changed)
+        self.connect_simple_widgets()
 
-    def handle_arteries_binarization_threshold_changed(self):
-        self.config['arteries']['binarize']['threshold'] = self.arteries_binarization_threshold
+    @property
+    def n_steps(self):
+        n_steps = self.run_binarization
+        n_steps += self.run_smoothing or self.run_binary_filling
+        n_steps += self.run_deep_filling
+        return
+
+    @property
+    def binarization_threshold(self):
+        return self.sanitize_neg_one(self.tab.binarizationThresholdSpinBox.value())
+
+    @binarization_threshold.setter
+    def binarization_threshold(self, value):
+        self.tab.binarizationThresholdSpinBox.setValue(self.sanitize_nones(value))
+
+    def handle_binarization_threshold_changed(self):
+        self.config['binarize']['threshold'] = self.binarization_threshold
 
 
 class VesselGraphParams(UiParameter):
@@ -1378,6 +1441,8 @@ class VesselGraphParams(UiParameter):
     min_artery_size: int
     min_vein_size: int
 
+    filtersChanged = pyqtSignal()
+
     def __init__(self, tab):
         super().__init__(tab)
         self.params_dict = {
@@ -1387,30 +1452,219 @@ class VesselGraphParams(UiParameter):
             'reduce': ParamLink(['graph_construction', 'reduce'], self.tab.buildGraphReduceCheckBox),
             'transform': ParamLink(['graph_construction', 'transform'], self.tab.buildGraphTransformCheckBox),
             'annotate':  ParamLink(['graph_construction', 'annotate'], self.tab.buildGraphRegisterCheckBox),
-            'use_arteries': ParamLink(['graph_construction', 'use_arteries'], self.tab.buildGraphUseArteriesCheckBox),
-            'vein_intensity_range_on_arteries_channel': ParamLink(['vessel_type_postprocessing', 'pre_filtering', 'vein_intensity_range_on_arteries_ch'],
-                                                                  self.tab.veinIntensityRangeOnArteriesChannelDoublet),
-            'restrictive_min_vein_radius': ParamLink(['vessel_type_postprocessing', 'pre_filtering', 'restrictive_vein_radius'],
-                                                     self.tab.restrictiveMinVeinRadiusDoubleSpinBox),
-            'permissive_min_vein_radius': ParamLink(['vessel_type_postprocessing', 'pre_filtering', 'permissive_vein_radius'],
-                                                    self.tab.permissiveMinVeinRadiusDoubleSpinBox),
-            'final_min_vein_radius': ParamLink(['vessel_type_postprocessing', 'pre_filtering', 'final_vein_radius'],
-                                               self.tab.finalMinVeinRadiusDoubleSpinBox),
-            'arteries_min_radius': ParamLink(['vessel_type_postprocessing', 'pre_filtering', 'arteries_min_radius'],
-                                             self.tab.arteriesMinRadiusDoubleSpinBox),
-            'max_arteries_tracing_iterations': ParamLink(['vessel_type_postprocessing', 'tracing', 'max_arteries_iterations'],
-                                                         self.tab.maxArteriesTracingIterationsSpinBox),
-            'max_veins_tracing_iterations': ParamLink(['vessel_type_postprocessing', 'tracing', 'max_veins_iterations'],
-                                                      self.tab.maxVeinsTracingIterationsSpinBox),
-            'min_artery_size': ParamLink(['vessel_type_postprocessing', 'capillaries_removal', 'min_artery_size'],
-                                         self.tab.minArterySizeSpinBox),  # WARNING: not the same unit as below
+            'use_arteries': ParamLink(
+                ['graph_construction', 'use_arteries'],
+                self.tab.buildGraphUseArteriesCheckBox),
+            'vein_intensity_range_on_arteries_channel': ParamLink(
+                ['vessel_type_postprocessing', 'pre_filtering', 'vein_intensity_range_on_arteries_ch'],
+                self.tab.veinIntensityRangeOnArteriesChannelDoublet),
+            'restrictive_min_vein_radius': ParamLink(
+                ['vessel_type_postprocessing', 'pre_filtering', 'restrictive_vein_radius'],
+                self.tab.restrictiveMinVeinRadiusDoubleSpinBox),
+            'permissive_min_vein_radius': ParamLink(
+                ['vessel_type_postprocessing', 'pre_filtering', 'permissive_vein_radius'],
+                self.tab.permissiveMinVeinRadiusDoubleSpinBox),
+            'final_min_vein_radius': ParamLink(
+                ['vessel_type_postprocessing', 'pre_filtering', 'final_vein_radius'],
+                self.tab.finalMinVeinRadiusDoubleSpinBox),
+            'arteries_min_radius': ParamLink(
+                ['vessel_type_postprocessing', 'pre_filtering', 'arteries_min_radius'],
+                self.tab.arteriesMinRadiusDoubleSpinBox),
+            'max_arteries_tracing_iterations': ParamLink(
+                ['vessel_type_postprocessing', 'tracing', 'max_arteries_iterations'],
+                self.tab.maxArteriesTracingIterationsSpinBox),
+            'max_veins_tracing_iterations': ParamLink(
+                ['vessel_type_postprocessing', 'tracing', 'max_veins_iterations'],
+                self.tab.maxVeinsTracingIterationsSpinBox),
+            'min_artery_size': ParamLink(
+                ['vessel_type_postprocessing', 'capillaries_removal', 'min_artery_size'],
+                self.tab.minArterySizeSpinBox),  # WARNING: not the same unit as below
             'min_vein_size': ParamLink(['vessel_type_postprocessing', 'capillaries_removal', 'min_vein_size'],
                                        self.tab.minVeinSizeDoubleSpinBox)
         }
         self.connect()
+        self.filter_params = []
 
     def connect(self):
         self.connect_simple_widgets()
+
+    def add_graph_filter_params(self, widget, graph):
+        self.filter_params.append(GraphFilterParams(self, widget, graph))
+        self.filtersChanged.emit()
+
+
+class GraphFilterParams(UiParameter):  # FIXME: do we really pass the graph as argument or just the prop names/types ?
+    def __init__(self, main_params, widget, graph):
+        self.main_params = main_params
+        super().__init__(widget)#, filter_name)  # self.tab will be based on filter_name
+        self.index = int(widget.objectName().split('_')[-1])
+        self.layout = self.tab.parent().findChild(QVBoxLayout, 'filterParamsVerticalLayout')
+
+        self.graph = graph
+        self.update_properties()
+        self.connect()
+
+    def connect(self):
+        self.tab.vertexFilterRadioButton.toggled.connect(self.update_properties)
+
+    def update_properties(self):
+        if self.filter_type == 'vertex':
+            properties = self.graph._base.vertex_properties
+        else:
+            properties = self.graph._base.edge_properties
+        properties_names = list(properties.keys())  # Guarantee order
+        dtypes = [properties[prop_name].python_value_type() for prop_name in properties_names]
+        dtype_names = []
+        for dtype in dtypes:
+            if isinstance(dtype, tuple):
+                dtype_names.append([t.__name__ for t in dtype][-1])  # if List[type] -> type
+            else:
+                dtype_names.append(dtype.__name__)
+
+        self.tab.graphFilterPropertyNameComboBox.clear()
+        for prop_name, dtype in zip(properties_names + ['degrees'], dtype_names + ['int']):
+            self.tab.graphFilterPropertyNameComboBox.addItem(prop_name, userData=dtype)
+
+        self.handle_property_name_changed()  # Set default value for the first property
+
+        self.main_params.filtersChanged.emit()  # Notify that properties changed
+
+    @property
+    def cfg_subtree(self):
+        return []  # Not in cfg
+
+    @property
+    def filter_type(self):
+        return 'vertex' if self.tab.vertexFilterRadioButton.isChecked() else 'edge'
+
+    @property
+    def property_name(self):
+        return self.tab.graphFilterPropertyNameComboBox.currentText()
+
+    @property
+    def current_dtype(self):
+        return self.tab.graphFilterPropertyNameComboBox.currentData()
+
+    def get_default_property_value(self):
+        property_dtype = self.current_dtype
+        if property_dtype == 'bool':
+            return False
+        elif property_dtype in ('int', 'float'):
+            return 0
+        elif property_dtype == 'str':
+            return ''
+        else:
+            raise ClearMapValueError(f'Unknown property type: {property_dtype}')
+
+    def get_property_value(self):
+        property_dtype = self.current_dtype
+        value_widget = self.tab.graphFilterPropertyValueWidget
+        if property_dtype == 'bool':
+            return value_widget.isChecked()
+        elif property_dtype in ('int', 'float'):
+            return value_widget.getValue()
+            # return self.tab.graphFilterPropertyValueDoublet.getValue()
+        elif property_dtype == 'str':
+            return value_widget.text()
+        else:
+            raise ClearMapValueError(f'Unknown property type: {property_dtype}')
+
+    @property
+    def combine_operator_name(self):
+        """
+        Read the action from the following combine button
+        Returns
+        -------
+
+        """
+        p2 = self.layout.parent().parent()
+        and_button = p2.findChild(QRadioButton, f'filter_{self.index}_and_btn')
+        # or_button = p2.findChild(QRadioButton, f'filter_{self.index}_or_btn')
+        if not and_button:  # Last filter
+            return None
+        return 'and' if and_button.isChecked() else 'or'
+
+    def suffix(self):
+        suffix = f'{self.property_name}_{self.get_property_value()}'
+        combine_action = self.combine_operator_name
+        if combine_action is not None:
+            suffix += f'_{combine_action}'
+        return suffix
+
+    def cfg_to_ui(self):
+        self.reload()
+        super().cfg_to_ui()
+
+    def connect(self):
+        self.tab.graphFilterPropertyNameComboBox.currentTextChanged.connect(
+            self.handle_property_name_changed
+        )
+        self.connect_simple_widgets()
+
+    def handle_property_name_changed(self):
+        property_dtype = self.current_dtype
+        value = self.get_default_property_value()
+        controls_layout = self.tab.filterControlsGridLayout
+        if property_dtype == 'bool':
+            widget = QCheckBox(self.tab)
+            widget.setChecked(value)
+        elif property_dtype in ('int', 'float'):
+            if property_dtype == 'int':
+                widget_class = QSpinBox
+            else:
+                widget_class = QDoubleSpinBox
+            widget = self.__create_range_ctrl(widget_class, signed=False)  # FIXME: decide on signed
+
+            widget.setValue(value)
+        elif property_dtype == 'str':
+            widget = QLineEdit(self.tab)
+            widget.setText(value)
+        else:
+            raise ClearMapValueError(f'Unknown property type: {property_dtype}')
+        self.tab.graphFilterPropertyValueWidget = replace_widget(
+            self.tab.graphFilterPropertyValueWidget, widget, layout=controls_layout)
+
+        self.main_params.filtersChanged.emit()
+
+    def __create_range_ctrl(self, widget_class, signed=True):
+        """
+        Create a doublet control for a range of values, e.g. for min and max values.
+
+        .. warning::
+            QSpinBox takes only signed 32 bit integers (hence a range of -2**31 to 2**31-1)
+
+        Parameters
+        ----------
+        widget_class
+        signed
+
+        Returns
+        -------
+
+        """
+        range_abs = 2 ** 31
+        if signed:
+            range_min, range_max = -range_abs, range_abs - 1
+        else:
+            range_min, range_max = 0, range_abs - 1
+        widget = QFrame(self.tab)
+        widget.setObjectName('graphFilterPropertyValueDoublet')
+        frame_layout = QHBoxLayout(widget)
+        min_ctrl = widget_class(self.tab)
+        min_ctrl.setMaximumWidth(60)  # FIXME: resize to content instead
+        min_ctrl.setObjectName(f'graphFilterPropertyValueSpinBox_1')  # For doublet ctrl behaviour (needs sorting)
+        min_ctrl.setRange(range_min, range_max)
+        frame_layout.addWidget(min_ctrl)
+        lbl = QLabel(self.tab)
+        lbl.setText('to')
+        frame_layout.addWidget(lbl)
+        max_ctrl = widget_class(self.tab)
+        max_ctrl.setMaximumWidth(60)
+        max_ctrl.setObjectName(f'graphFilterPropertyValueSpinBox_2')  # For doublet ctrl behaviour (needs sorting)
+        max_ctrl.setRange(range_min, range_max)
+        frame_layout.addWidget(max_ctrl)
+        recursive_patch_compound_boxes(self.tab)
+        return widget
 
 
 class VesselVisualizationParams(UiParameter):
@@ -1438,10 +1692,7 @@ class VesselVisualizationParams(UiParameter):
             'graph_step': ParamLink(None, self.tab.graphSlicerStepComboBox, connect=False),
             'plot_type': ParamLink(None, self.tab.graphPlotTypeComboBox, connect=False),
             'voxelization_size': ParamLink(['voxelization', 'size'], self.tab.vasculatureVoxelizationRadiusTriplet),
-            'vertex_degrees': ParamLink(None, self.tab.vasculatureVoxelizationFilterDegreesSinglet, connect=False),
             'weight_by_radius': ParamLink(None, self.tab.voxelizationWeightByRadiusCheckBox, connect=False)
-            # 'filter_name': ParamLink(None, self.tab.voxelizationFitlerNameComboBox, connect=False),
-            # 'weight_name': ParamLink(None, self.tab.voxelizationWeightNameComboBox, connect=False),
         }
         self.structure_id = None
         self.cfg_subtree = ['visualization']
@@ -1458,10 +1709,10 @@ class VesselVisualizationParams(UiParameter):
 
     @property
     def ratios(self):
+        # First TubeMap channel since they should share resolution
         channel = [k for k, v in self.sample_params.items() if CONTENT_TYPE_TO_PIPELINE[v.data_type] == 'TubeMap'][0]
-        # First TubeMap channel
-        raw_res = np.array(self.main_params.sample_params[self.name].resolution)
-        resampled_res = np.array(self.main_params.registration_params[self.name].resampled_resolution)
+        raw_res = np.array(self.sample_params[channel].resolution)
+        resampled_res = np.array(self.registration_params[channel].resampled_resolution)
         ratios = resampled_res / raw_res  # to original
         return ratios
 
@@ -1625,6 +1876,8 @@ class BatchParameters(UiParameter):
         self.tab.sampleFoldersToolBox = QToolBox(parent=self.tab)
         self.tab.sampleFoldersPageLayout.addWidget(self.tab.sampleFoldersToolBox, 3, 0)
 
+        self.connect()
+
     def _ui_to_cfg(self):
         self.config['paths']['results_folder'] = self.results_folder
         self.config['groups'] = self.groups
@@ -1679,11 +1932,18 @@ class BatchParameters(UiParameter):
         self.connect_groups()
 
     def remove_group(self):
-        last_idx = self.n_groups - 1
-        widg = self.tab.sampleFoldersToolBox.widget(last_idx)
-        self.tab.sampleFoldersToolBox.removeItem(last_idx)
+        # last_idx = self.n_groups - 1  # remove current group instead
+        current_idx = self.tab.sampleFoldersToolBox.currentIndex()
+        group_name = self.group_names[current_idx]
+        widg = self.tab.sampleFoldersToolBox.widget(current_idx)
+        self.tab.sampleFoldersToolBox.removeItem(current_idx)
         widg.setParent(None)
         widg.deleteLater()
+        self.config['groups'].pop(group_name)
+        for k, v in self.config['comparisons'].items():
+            if group_name in v:
+                self.config['comparisons'].pop(k)
+        # TODO: check if we write config
 
     @property
     def n_groups(self):
@@ -1785,12 +2045,14 @@ class GroupAnalysisParams(BatchParameters):
     """
     # plot_channel: str
     compute_sd_and_effect_size: bool
+    density_suffix: str
 
     def __init__(self, tab, preferences=None):
         super().__init__(tab, preferences)
         self.params_dict = {
             # 'plot_channel': ParamLink(None, self.tab.plotChannelComboBox),
             'compute_sd_and_effect_size': ParamLink(None, self.tab.computeSdAndEffectSizeCheckBox),
+            'density_suffix': ParamLink(None, self.tab.densitySuffixTextFilterLineEdit)
         }
         self.plot_density_maps_buttons = []
         self.comparison_checkboxes = []
@@ -1854,9 +2116,13 @@ class GroupAnalysisParams(BatchParameters):
         sample_folders_paths = self.get_all_paths()
         if sample_folders_paths:
             sample_manager.setup(src_dir=sample_folders_paths[0][0])  # gp 0, sample 0
-            plot_channel_combobox.addItems(sample_manager.channels_to_detect)
+            channels = sample_manager.channels_to_detect  # CellMap
+            if not channels:
+                channels = sample_manager.get_channels_by_pipeline('TubeMap', as_list=True)  # FIXME: a bit dirty, more explicit
+
+            plot_channel_combobox.addItems(channels)
             self.tab.comparisonsVerticalLayout.addWidget(plot_channel_combobox)
-            self.plot_channel = sample_manager.channels_to_detect[0]
+            self.plot_channel = channels[0]
             plot_channel_combobox.currentTextChanged.connect(self.handle_plot_channel_changed)
         self.plot_channel_combobox = plot_channel_combobox
 

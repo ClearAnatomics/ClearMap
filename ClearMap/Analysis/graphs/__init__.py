@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Graphs
+graphs
 ======
 
 Provides classes and routines for the analysis of large graphs.

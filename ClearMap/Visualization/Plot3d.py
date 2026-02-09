@@ -21,7 +21,7 @@ __download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 ###############################################################################
 
 from ClearMap.Visualization.Vispy.Plot3d import *           #analysis:ignore
-from ClearMap.Visualization.Vispy.PlotGraph3d import *      #analysis:ignore
+from ClearMap.Visualization.Vispy.plot_graph_3d import *      #analysis:ignore
 
 
 ###############################################################################

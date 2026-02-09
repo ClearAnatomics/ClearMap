@@ -277,6 +277,33 @@ class UiParameter(QObject):
         except AttributeError:
             return default_value
 
+    @property
+    def config(self):
+        if self.cfg_subtree:
+            if self._config is None:
+                raise ValueError(f'Config not set for {self.__class__.__name__}')
+            return get_item_recursive(self._config, self.cfg_subtree)
+        else:
+            return self._config
+
+    @property
+    def default_config(self):
+        if self.cfg_subtree:
+            if self.name in self.cfg_subtree:
+                default_channel = self._default_config['channels'].keys()[0]
+                default_sub_tree = self.cfg_subtree.copy()
+                default_sub_tree[default_sub_tree.index(self.name)] = default_channel
+                return get_item_recursive(self._default_config, default_sub_tree)
+            else:
+                try:
+                    return get_item_recursive(self._default_config, self.cfg_subtree)
+                except KeyError as err:
+                    if self.name in str(err):
+                        raise KeyError(f'Could not find channel {self.name} in default config file. '
+                                       f'config sub tree: {self.cfg_subtree}')
+        else:
+            return self._default_config
+
     def connect_simple_widgets(self):
         for k in self.params_dict.keys():
             link = self.params_dict[k]
@@ -356,22 +383,6 @@ class UiParameter(QObject):
     def config_path(self):
         return self._config.filename
 
-    @property
-    def config(self):
-        if self.cfg_subtree:
-            if self._config is None:
-                raise ValueError(f'Config not set for {self.__class__.__name__}')
-            return get_item_recursive(self._config, self.cfg_subtree)
-        else:
-            return self._config
-
-    @property
-    def default_config(self):
-        if self.cfg_subtree:
-            return get_item_recursive(self._default_config, self.cfg_subtree)
-        else:
-            return self._default_config
-
     def write_config(self):
         self._config.write()
 
@@ -422,6 +433,19 @@ class UiParameter(QObject):
             if any_amended:
                 self.ui_to_cfg()  # Add the newly parsed field
 
+    def get_config_base_name(self, n_iter=5):
+        try:
+            return Path(self.config.filename).stem
+        except AttributeError:
+            cfg = self.config
+            for i in range(n_iter):
+                if hasattr(cfg, 'filename'):
+                    return Path(cfg.filename).stem
+                else:
+                    cfg = cfg.parent
+            else:
+                raise ValueError(f'Could not find config filename after {n_iter} iterations. '
+                                 f'Please set it manually or check the config file.')
 
     def _get_config_value(self, keys_list):
         """
@@ -444,7 +468,7 @@ class UiParameter(QObject):
         except KeyError:
             if self._default_config is None:
                 try:
-                    cfg_name = ConfigLoader.strip_version_suffix(self.config.filename.stem)
+                    cfg_name = ConfigLoader.strip_version_suffix(self.get_config_base_name())
                     self._default_config = ConfigLoader.get_cfg_from_path(ConfigLoader.get_default_path(cfg_name))
                 except FileNotFoundError:
                     try:

@@ -10,6 +10,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import warnings
 from collections import deque
@@ -225,6 +226,28 @@ def get_free_temp_space():
     _, _, free = shutil.disk_usage(tempfile.gettempdir())
     return free
 
+def bytes_to_human(num):
+    """
+    Convert bytes to human-readable format.
+
+    Parameters
+    ----------
+    num : int
+        Number of bytes
+
+    Returns
+    -------
+    str
+        Human-readable format of the number of bytes
+    """
+    for unit in ['B', 'KB', 'MB', 'GB', 'TB', 'PB']:
+        if num < 1024:
+            return f"{num:.2f} {unit}"
+        num /= 1024
+    else:
+        warnings.warn(f'Unable to convert {num} bytes to human-readable format. ')
+        return f"{num:.2f} bytes"
+
 
 # FIXME: move to io and rename to smth similar to AssetSpec (without conflicting with the existing AssetSpec)
 class FilePath:
@@ -355,7 +378,40 @@ def validate_orientation(orientation, channel, raise_error=True):
 
 
 def sanitize_n_processes(processes):
-    if processes < 0:
-        processes = multiprocessing.cpu_count() + processes
-    processes = max(processes, 1)
-    return processes
+    if processes is None:
+        processes = multiprocessing.cpu_count()
+    elif isinstance(processes, str):
+        warnings.warn(f'Using a string to specify the number of processes is deprecated. '
+                      f'Please use an integer (positive or negative) or None.', DeprecationWarning)
+        if processes.lower() == 'serial':
+            processes = 1
+        elif processes.lower() == '!serial':
+            processes = multiprocessing.cpu_count() - 1
+        else:
+            raise ValueError(f'Unknown string value for processes: {processes}. '
+                             f'Use None, "serial" or an integer.')
+    if isinstance(processes, int):
+        if processes < 0:
+            processes = multiprocessing.cpu_count() - processes
+        processes = max(1, processes)
+        return processes
+    else:
+        raise ValueError(f'Processes must be an integer or None, got {processes} of type {type(processes)}')
+
+
+def get_ok_n_ok_symbols():
+    """
+    1) Detect whether we can print✓/✗ in this terminal
+    2) otherwise, use [OK]/[FAIL] instead
+
+    Returns
+    -------
+    tuple
+        ok_symbol, fail_symbol
+    """
+    enc = sys.stdout.encoding or ''
+    try:
+        '✓'.encode(enc)
+        return '✓', '✗'
+    except (UnicodeEncodeError, TypeError):
+        return '[OK]', '[FAIL]'

@@ -15,7 +15,7 @@
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <item>
-    <layout class="QVBoxLayout" name="patternWizzardLayout">
+    <layout class="QVBoxLayout" name="patternWizardLayout">
      <item>
       <widget class="QDialogButtonBox" name="mainButtonBox">
        <property name="orientation">

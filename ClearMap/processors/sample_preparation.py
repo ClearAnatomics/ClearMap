@@ -20,6 +20,7 @@ from configobj import ConfigObj
 
 from ClearMap.IO.assets_constants import CONTENT_TYPE_TO_PIPELINE
 from ClearMap.Utils.exceptions import MissingRequirementException, ClearMapAssetError, ParamsOrientationError
+from ClearMap.Utils.tag_expression import Expression
 from ClearMap.gui.gui_utils import surface_project, setup_mini_brain
 
 matplotlib.use('Qt5Agg')
@@ -118,7 +119,7 @@ class SampleManager(TabProcessor):
             self.progress_watcher = watcher  # FIXME: in stitcher and registration too
 
         self.update_workspace()
-        self.workspace.info()
+        print(self.workspace.info())
         self.setup_complete = not self.incomplete_channels
 
     def load_processors_config(self, stitching_config=None, registration_config=None):
@@ -129,7 +130,7 @@ class SampleManager(TabProcessor):
             self.registration_cfg = registration_config
 
         self.update_workspace()
-        self.workspace.info()
+        print(self.workspace.info())
         self.setup_complete = not self.incomplete_channels
 
     def rename_channels(self, names_map):
@@ -176,7 +177,7 @@ class SampleManager(TabProcessor):
                         self.workspace.asset_collections[channel]['raw'] = old_asset.variant(expression=raw_path)
             else:
                 self.incomplete_channels.append(channel)
-        self.workspace.info()
+        print(self.workspace.info())
 
     @property
     def prefix(self):
@@ -200,7 +201,7 @@ class SampleManager(TabProcessor):
 
     @property
     def channels_to_detect(self):
-        return [c for c, v in self.config['channels'].items() if CONTENT_TYPE_TO_PIPELINE[v['data_type']] == 'CellMap']
+        return self.get_channels_by_pipeline('CellMap', as_list=True)
 
     @property
     def is_colocalization_compatible(self):
@@ -338,15 +339,28 @@ class SampleManager(TabProcessor):
 
     @property
     def alignment_reference_channel(self):
-        for channel, cfg in self.config['channels'].items():
-            if cfg['data_type'] == 'autofluorescence':
-                return channel
-        return
+        return self.get_channels_by_type('autofluorescence') or None
 
     def delete_resampled_files(self, channel):
         asset = self.get('resampled', channel=channel)
         if asset.exists:
             asset.delete()
+
+    def get_channel_resolution(self, channel):
+        """
+        Get the resolution of the channel as defined in the sample config.
+
+        Parameters
+        ----------
+        channel : str
+            The channel to get the resolution for
+
+        Returns
+        -------
+        tuple(float, float, float)
+            The resolution of the channel in (x, y, z) format
+        """
+        return tuple(self.config['channels'][channel]['resolution'])
 
     def stitched_shape(self, channel):
         asset = self.get('stitched', channel=channel, sample_id=self.prefix)
@@ -388,6 +402,97 @@ class SampleManager(TabProcessor):
                 else:
                     if not check_registered(channel):
                         return False
+
+    def get_channel_type(self, channel_name):
+        return self.config['channels'][channel_name]['data_type']
+
+    def get_channels_by_condition(self, condition, missing_action='ignore', multiple_found_action='ignore',
+                                  as_list=False, error_label='channel'):
+        filtered = [chan for chan, cfg in self.config['channels'].items() if condition(cfg)]
+        count = len(filtered)
+        if count == 0:
+            if missing_action == 'ignore':
+                return [] if as_list else ""
+            elif missing_action == 'warn':
+                warnings.warn(f'No {error_label} found')
+                return [] if as_list else ""
+            elif missing_action == 'raise':
+                raise KeyError(f'No {error_label} found')
+            else:
+                raise ValueError(f'Unknown missing action {missing_action}')
+        elif count > 1:
+            if multiple_found_action == 'ignore':
+                result = filtered
+            elif multiple_found_action == 'warn':
+                warnings.warn(f'Multiple {error_label}s found')
+                result = filtered
+            elif multiple_found_action == 'raise':
+                raise KeyError(f'Multiple {error_label}s found')
+            else:
+                raise ValueError(f'Unknown multiple found action {multiple_found_action}')
+        else:  # count == 1
+            result = filtered if as_list else filtered[0]
+        return result
+
+    def get_channels_by_type(self, channel_type, missing_action='warn', multiple_found_action='ignore', as_list=False):
+        """
+        Get the channel or list of channels that are of a given type.
+
+        Parameters
+        ----------
+        channel_type: str
+            Type of the channel as defined in asset_constants
+        missing_action: str
+            What to do in case the channel specified is not found. One of ['warn', 'raise', 'ignore']
+        multiple_found_action: str
+            What to do in case multiple matching channels are found. One of ['warn', 'raise', 'ignore']
+        as_list: bool
+            Whether to return the result as a list if a single channel is found.
+
+        Returns
+        -------
+        str | List[str]
+            The channel name or list of channels that match the type.
+        """
+        return self.get_channels_by_condition(
+            condition=lambda cfg: cfg['data_type'] == channel_type,
+            missing_action=missing_action,
+            multiple_found_action=multiple_found_action,
+            as_list=as_list,
+            error_label=channel_type
+        )
+
+    def get_channels_by_pipeline(self, pipeline_name, missing_action='ignore', multiple_found_action='ignore', as_list=False):
+        """
+        Get the channels that are relevant for a given pipeline
+
+        Parameters
+        ----------
+        pipeline_name : str
+            The name of the pipeline
+        missing_action : str
+            What to do if no channel is found
+            'ignore' : ignore and return empty list
+            'warn' : warn and return empty list
+            'raise' : raise an error
+        multiple_found_action : str
+            What to do if multiple channels are found
+            'ignore' : ignore and return all channels
+            'warn' : warn and return all channels
+            'raise' : raise an error
+
+        Returns
+        -------
+        List[str]
+            The channels that are relevant for the pipeline
+        """
+        return self.get_channels_by_condition(
+            condition=lambda cfg: CONTENT_TYPE_TO_PIPELINE[cfg['data_type']] == pipeline_name,
+            missing_action=missing_action,
+            multiple_found_action=multiple_found_action,
+            as_list=as_list,
+            error_label=pipeline_name
+        )
 
     def load_configs_from_dir(self):
         cfg_loader = ConfigLoader(self.src_directory)
@@ -498,7 +603,7 @@ class RegistrationProcessor(TabProcessor):
         for channel in self.config['channels']:
             if self.config['channels'][channel]['align_with'] is None:
                 continue
-            if self.config['channels'][channel]['moving_channel'] in (None, 'intrinsically aligned'):
+            if self.config['channels'][channel]['moving_channel'] in (None, 'intrinsically_aligned'):
                 continue
             for asset_type in ('fixed_landmarks', 'moving_landmarks', 'aligned'):
                 try:
@@ -564,6 +669,7 @@ class RegistrationProcessor(TabProcessor):
                     asset.delete()
 
     def get_fixed_moving_channels(self, channel):
+        self.config.reload()
         moving_channel = self.config['channels'][channel]['moving_channel']
         align_with = self.config['channels'][channel]['align_with']
         if align_with is None:
@@ -681,7 +787,7 @@ class RegistrationProcessor(TabProcessor):
     def align_channel(self, channel):
         self.config.reload()
         fixed_channel, moving_channel = self.get_fixed_moving_channels(channel)
-        if moving_channel is None or moving_channel == 'intrinsically aligned':
+        if moving_channel is None or moving_channel == 'intrinsically_aligned':
             return
         channel_cfg = self.config['channels'][channel]
         run_bspline = any(['bspline' in channel_cfg['params_files']])
@@ -1024,7 +1130,7 @@ class StitchingProcessor(TabProcessor):
 
     def copy_or_stack(self, channel):
         """
-        Copy or stack the channel data in case there is no X/Y tiling
+        Copy or stack or convert to npy the channel data in case there is no X/Y tiling
 
         Parameters
         ----------
@@ -1115,7 +1221,10 @@ class StitchingProcessor(TabProcessor):
                 self.get('raw', channel=channel).file_list[0], rigid_cfg).as_source()
         extension = '.npy' if self.sample_manager.use_npy(channel) else None  # TODO: optional requires
         raw_expr = str(self.get_path('raw', channel=channel, extension=extension))
-        layout = stitching_wobbly.WobblyLayout(expression=raw_expr, tile_axes=('X', 'Y'), overlaps=overlaps)
+        tag_names = tuple(sorted(Expression(raw_expr).tag_names()))  # sort alphabetically to ensure consistent order
+        # Drop irrelevant axes if e.g. scanning only rows or columns
+        overlaps = [overlap for name, overlap in zip(('X', 'Y'), overlaps) if name in tag_names]
+        layout = stitching_wobbly.WobblyLayout(expression=raw_expr, tile_axes=tag_names, overlaps=overlaps)
         return layout
 
     @property

@@ -274,9 +274,11 @@ def _test():
   sma.is_shared(array)
   
   pool = sma.mp.Pool(processes=4)
-  pp = pool.map(propagate, zip(range(n), [None] * n)); 
+  pp = pool.map(propagate, zip(range(n), [None] * n));
+  pp = list(pp)
   print(array)
 
   pool = sma.mp.Pool(processes=4)
   pp = pool.map(propagate_non_shared, zip(range(n), [None] * n)); #analysis:ignore
+  pp = list(pp)
   print(non_shared)

@@ -5,6 +5,7 @@ install_utils
 
 Utilities module with minimal dependencies (standard library only) for installation
 """
+import os.path
 import re
 import sys
 import platform
@@ -347,7 +348,7 @@ def patch_env(cfg_path, dest_path, use_cuda_torch=True, pip_mode=False, use_spyd
     if use_cuda_torch:
         if pip_mode:
             if platform.system().startswith('Linux'):
-                viable_versions = [Version(v) for v in ('11.8', '12.4', '12.6')]
+                viable_versions = [Version(v) for v in ('11.8', '12.4', '12.6', '12.8')]
                 actual_cuda = pytorch_v_mgr.cuda_version
                 for v in viable_versions[::-1]:
                     if actual_cuda <= v:
@@ -359,6 +360,7 @@ def patch_env(cfg_path, dest_path, use_cuda_torch=True, pip_mode=False, use_spyd
                 cuda_suffix = f"cu{str(actual_cuda).replace('.', '')}"
                 env_mgr.add_pip_option(f'--extra-index-url https://download.pytorch.org/whl/{cuda_suffix}')
             env_mgr.add_pip_dependency('torch')
+            env_mgr.add_pip_dependency('torchvision')
         else:
             # ensure that the nvidia channel is available
             env_mgr.add_channel('nvidia')
@@ -392,6 +394,14 @@ def patch_env(cfg_path, dest_path, use_cuda_torch=True, pip_mode=False, use_spyd
     if tmp_dir not in ('/tmp', '/tmp/'):
         print(f'Patching tmp_dir to {tmp_dir}')
         env_mgr.patch_env_var('TMP', tmp_dir)
+
+
+def set_elastix_path(elastix_path):
+    import configobj  # Local import to avoid dependency of whole module on configobj
+    machine_params_path = os.path.expanduser('~/.clearmap/machine_params_v3_0.cfg')
+    cfg = configobj.ConfigObj(machine_params_path, encoding="UTF8", indent_type='    ', unrepr=True, file_error=True)
+    cfg['elastix_path'] = elastix_path
+    cfg.write()
 
 
 if __name__ == '__main__':

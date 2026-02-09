@@ -6,13 +6,18 @@ GraphGt
 Module provides basic Graph interface to the
 `graph_tool <https://graph-tool.skewed.de>`_ library.
 """
+from __future__ import annotations
+
 __author__ = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
 __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
 
+
 import copy
+import numbers
+from typing import Optional, Iterable, Dict
 
 import numpy as np
 
@@ -20,16 +25,18 @@ import graph_tool as gt
 import graph_tool.util as gtu
 import graph_tool.topology as gtt
 import graph_tool.generation as gtg
+import warnings
 
 # fix graph tool saving / loading for very large arrays
-import ClearMap.Analysis.Graphs.Graph as grp
-from ClearMap.Analysis.Graphs.type_conversions import dtype_to_gtype, gtype_from_source, vertex_property_map_to_python, \
+import ClearMap.Analysis.graphs.graph as grp
+from ClearMap.Analysis.graphs.type_conversions import dtype_to_gtype, gtype_from_source, vertex_property_map_to_python, \
   edge_property_map_to_python, vertex_property_map_from_python, set_vertex_property_map, edge_property_map_from_python, \
   set_edge_property_map
-from ClearMap.Analysis.Graphs.utils import pickler, unpickler, edges_to_vertices
+from ClearMap.Analysis.graphs.utils import pickler, unpickler, edges_to_vertices, scan_gt_props
 
 from ClearMap.Utils.array_utils import remap_array_ranges
 
+LARGE_GRAPH_N_EDGES_THRESHOLD = 10 ** 7
 
 gt.gt_io.clean_picklers()
 gt.gt_io.libgraph_tool_core.set_pickler(pickler)
@@ -44,6 +51,7 @@ class Graph(grp.AnnotatedGraph):
     This is an interface from ClearMap graphs to graph_tool.
     """
     DEFAULT_N_DIMS = 3
+    SCOPES = ("vertex", "edge", "graph")
 
     def __init__(self, name=None, n_vertices=None, edges=None, directed=None,
                  vertex_coordinates=None, vertex_radii=None,
@@ -51,6 +59,7 @@ class Graph(grp.AnnotatedGraph):
                  vertex_labels=None, edge_labels=None, annotation=None,
                  base=None, edge_geometry_type='graph'):
 
+        self.path = ''
         if base is None:
             base = gt.Graph(directed=directed)
             self.base = base
@@ -115,7 +124,7 @@ class Graph(grp.AnnotatedGraph):
         return int(vertex)
 
     def vertex_indices(self):
-        return np.array(self.vertices, dtype=int)  # FIXME: why not self.base.get_vertices() ?
+        return  self._base.get_vertices()
 
     def add_vertex(self, n_vertices=None, vertex=None):
         if n_vertices is not None:
@@ -132,7 +141,27 @@ class Graph(grp.AnnotatedGraph):
         self._base.remove_vertex(vertex)
 
     def vertex_property(self, name, vertex=None, as_array=True):
-        v_prop = self._base.vertex_properties[name]
+        """
+
+        .. warning::
+            This risks creating a copy of the vertex property map if `as_array` is True.
+
+        Parameters
+        ----------
+        name
+        vertex
+        as_array
+
+        Returns
+        -------
+
+        """
+        try:
+            v_prop = self._base.vertex_properties[name]
+        except KeyError as err:
+            raise KeyError(f'Graph has no vertex property with name "{name}" '
+                           f'Possible vertex properties are: {list(self.vertex_properties)};'
+                           f'{err}')
         if vertex is not None:
             return v_prop[self.vertex(vertex)]
         else:
@@ -213,6 +242,10 @@ class Graph(grp.AnnotatedGraph):
             return self._base.edge(*edge)
         elif isinstance(edge, int):
             return gtu.find_edge(self._base, self._base.edge_index, edge)[0]
+        elif isinstance(edge, list) and len(edge) == 2:
+            return self.edge(tuple(edge))
+        elif isinstance(edge, np.ndarray) and edge.shape == (2,):
+            return self.edge(tuple(edge))
         else:
             raise ValueError(f'Edge specification {edge} is not valid!')
 
@@ -223,8 +256,8 @@ class Graph(grp.AnnotatedGraph):
         return self._base.edge_index[self.edge(edge)]
 
     def edge_indices(self):  # TODO: explain what this does
-        p = self.base.edge_index
-        return np.array([p[e] for e in self.edge_iterator()], dtype=int)
+        table = self._base.get_edges(eprops=[self._base.edge_index])
+        return table[:, 2]
 
     def add_edge(self, edge):
         if isinstance(edge, tuple):
@@ -240,11 +273,21 @@ class Graph(grp.AnnotatedGraph):
     def edges(self):
         return list(self._base.edges())
 
+    def get_edges(self, eprops=[]):
+        return self._base.get_edges(eprops=eprops)
+
     def edge_iterator(self):
         return self._base.edges()
 
-    def edge_connectivity(self):
-        return self._base.get_edges()[:, :2]
+    def edge_connectivity(self, order='src_vertex'):  # PERFORMANCE: see if better to cache property and invalidate when edeges added or removed
+        if order == 'src_vertex':
+            return self._base.get_edges()[:, :2]
+        elif order == 'eid':
+            table = self._base.get_edges([self._base.edge_index])
+            # Sort by the eid (third column) → insertion / ID order
+            return table[np.argsort(table[:, 2])][:, :2]
+        else:
+            raise NotImplementedError(f'Invalid edge connectivity order "{order}"! ')
 
     def edge_property(self, name, edge=None, as_array=True):
         e_prop = self._base.edge_properties[name]
@@ -328,7 +371,7 @@ class Graph(grp.AnnotatedGraph):
 
     def set_graph_property(self, name, source):
         if name not in self.graph_properties:
-            raise ValueError(f'Graph has no property named {name}!')
+            raise ValueError(f'Graph has no property named "{name}"')
         if source is not None:
             self._base.graph_properties[name] = source
 
@@ -409,8 +452,11 @@ class Graph(grp.AnnotatedGraph):
     def has_vertex_radii(self):
         return 'radii' in self.vertex_properties
 
-    def vertex_radii(self, vertex=None):
-        return self.vertex_property('radii', vertex=vertex)
+    def vertex_radii(self, vertex=None):  # FIXME: hacky to have 2 return options (hides)
+        if 'radii' in self.vertex_properties:
+            return self.vertex_property('radii', vertex=vertex)
+        else:
+            return self.vertex_properties('radius_units', vertex=vertex)
 
     def set_vertex_radii(self, radii, vertex=None):
         self.define_vertex_property('radii', radii, vertex=vertex)
@@ -485,6 +531,7 @@ class Graph(grp.AnnotatedGraph):
         return properties
 
     def has_edge_geometry(self, name='coordinates'):
+        # FIXME: should probably check for indices too
         return self.edge_geometry_property_name(name=name) in self.edge_geometry_property_names
 
     # edge geometry stored at each edge
@@ -585,13 +632,29 @@ class Graph(grp.AnnotatedGraph):
         if isinstance(values, list):
             if indices is None:
                 indices = np.cumsum([len(v) for v in values])
-                indices = np.array([np.hstack([[0], indices[:-1]]), indices], dtype=int).T
-            values = np.vstack(values)
-        if indices is not None:
-            name_indices = self._edge_geometry_indices_name_graph()
-            self.define_edge_property(name_indices, indices, dtype='vector<int64_t>')
-        name = self.edge_geometry_property_name(name)
-        self.define_graph_property(name, values, dtype='object')
+                indices = np.array([np.hstack([[0], indices[:-1]]), indices], dtype=int).T.astype(np.int64)
+
+            first_val = values[0]
+            # flatten the list of arrays so that it is a single array (indexed by the indices)
+            if first_val.ndim == 1:  # if the first value is a 1D array, we assume all values are 1D arrays
+                values = np.concatenate(values)
+            else: # if the first value is a 2D array, we assume all values are 2D arrays
+                values = np.vstack(values)
+        # if values.ndim == 1:  # if the values are a 1D array, we assume they are scalars
+        #     prop_dtype = f'vector<{gtype_from_source(values)}>'  # Store as *vector* to store as a single cpp array
+        if values.ndim <= 2:  # can't store 2d as vector, so store as object (pickled np.ndarray)
+            prop_dtype = 'object'  # Store as *object* to store as a single ndarray
+        else:
+            raise ValueError(f'Edge geometry values must be 1D or 2D arrays, got {values.ndim}D array!')
+        if indices is not None:  # FIXME: see if we should update the indices in case exists but mismatched
+            self.define_edge_geometry_indices_graph(indices)
+        egp_name = self.edge_geometry_property_name(name)
+        self.define_graph_property(egp_name, values, dtype=prop_dtype)
+
+    def define_edge_geometry_indices_graph(self, indices):
+        name_indices = self._edge_geometry_indices_name_graph()
+        # if name_indices not in self.edge_properties:  # Set if missing
+        self.define_edge_property(name_indices, indices, dtype='vector<int64_t>')
 
     def _remove_edge_geometry_graph(self, name):
         name = self.edge_geometry_property_name(name)
@@ -603,7 +666,11 @@ class Graph(grp.AnnotatedGraph):
         if name in self.edge_properties:
             self.remove_edge_property(name)
 
-    def resize_edge_geometry(self):
+    def prune_edge_geometry(self):
+        """
+        Remove the unused edge geometries from the graph.
+        This computes the new indices and remaps the edge geometry properties to the new indices.
+        """
         if not self.has_edge_geometry() or self.edge_geometry_type != 'graph':
             return
 
@@ -615,11 +682,26 @@ class Graph(grp.AnnotatedGraph):
         indices_new = np.array([np.hstack([0, indices_new[:-1]]), indices_new]).T
         self._set_edge_geometry_indices_graph(indices_new)
 
-        self._reduce_edge_geometry_properties(indices, indices_new)
+        self._remap_edge_geometry_properties(indices, indices_new)
 
-    def _reduce_edge_geometry_properties(self, indices, indices_new):
+    def remap_edge_geometry_properties(self, new_indices):
         """
-        Remap all properties in self.edge_geometry_properties to the new indices
+        Remap all properties in self.edge_geometry_properties (edge_geometry_<>) to the new indices i.e.,
+         copy every edge-geometry_<> array so old ranges → new ranges
+
+        Parameters
+        ----------
+        new_indices : np.ndarray
+            The new indices to remap the edge geometry properties to.
+        """
+        indices = self._edge_geometry_indices_graph()
+        self._set_edge_geometry_indices_graph(new_indices)
+        self._remap_edge_geometry_properties(indices, new_indices)
+
+    def _remap_edge_geometry_properties(self, indices, indices_new):
+        """
+        Remap all properties in self.edge_geometry_properties (edge_geometry_<>) to
+         the new indices i.e., copy every edge-geometry_<> array so old ranges → new ranges
 
         For example, if for the edge_geometry_coordinates, which has a shape of
         (n_voxels, 3), the indices would be (n_edges, 2) and the indices_new would be
@@ -642,7 +724,7 @@ class Graph(grp.AnnotatedGraph):
         for prop_name in self.edge_geometry_property_names:
             prop = self.graph_property(prop_name)
             shape_new = (n,) + prop.shape[1:]
-            prop_new = np.zeros(shape_new, prop.dtype)
+            prop_new = np.zeros(shape_new, dtype=prop.dtype)  # init empty, will then be filled with remapped values
             prop_new = remap_array_ranges(prop, prop_new, indices, indices_new)
             self.set_graph_property(prop_name, prop_new)
 
@@ -653,23 +735,28 @@ class Graph(grp.AnnotatedGraph):
             return self._edge_geometry_edge(name=name, edge=edge, return_indices=return_indices, as_list=as_list, reshape=reshape, ndim=ndim)
 
     def set_edge_geometry(self, name, values, indices=None, edge=None):
+        """
+        Set the given edge geometry property for the graph.
+
+        .. warning::
+            edge is not supported for 'graph' edge geometry type.
+
+        Parameters
+        ----------
+        name: str
+            The name of the original vertex or edge property to set as edge geometry
+            As an edge_geometry property, the name will be prefixed (typically with 'edge_geometry_').
+        values: List or np.ndarray
+            The values to set as edge geometry.
+        indices: np.ndarray
+            How to slice the values to map to edges.
+        edge: gt.Edge or int, optional
+            The edge to set the geometry for. If None, the geometry is set for all edges.
+            If the edge_geometry_type is 'graph', this parameter is not supported.
+        """
         if self.edge_geometry_type == 'graph':
-            # if coordinates is not None:
-            #     self._set_edge_geometry_graph('coordinates', coordinates, indices=indices, edge=edge)
-            #     if indices is not None:
-            #         indices = None
-            # if radii is not None:
-            #     self._set_edge_geometry_graph('radii', radii, indices=indices, edge=edge)
-            #     if indices is not None:
-            #         indices = None
-            # if values is not None:
             self._set_edge_geometry_graph(name, values, indices=indices, edge=edge)
         else:
-            # if coordinates is not None:
-            #     self._set_edge_geometry_edge('coordinates', coordinates, indices=indices, edge=edge)
-            # if radii is not None:
-            #     self._set_edge_geometry_edge('radii', radii, indices=indices, edge=edge)
-            # if values is not None:
             self._set_edge_geometry_edge(name, values, indices=indices, edge=edge)
 
     def remove_edge_geometry(self, name=None):
@@ -684,6 +771,53 @@ class Graph(grp.AnnotatedGraph):
                 self._remove_edge_geometry_graph(name=n)
             else:
                 self._remove_edge_geometry_edge(name=n)
+
+    def set_edge_geometry_vertex_properties(self, original_graph, edge_geometry_vertex_properties,
+                                            branch_indices, indices):
+        """
+        Set the edge geometry properties from the vertex properties of the original graph.
+
+        .. note::
+            The property is processed only if it exists in the original graph and is not
+            already set as an edge geometry property in the current graph.
+
+        Parameters
+        ----------
+        original_graph
+        edge_geometry_vertex_properties
+        branch_indices
+        indices
+
+        Returns
+        -------
+
+        """
+        for v_prop_name in edge_geometry_vertex_properties:
+            if v_prop_name in original_graph.vertex_properties:
+                # If already exists
+                if self.edge_geometry_property_name(v_prop_name) in self.edge_geometry_property_names:
+                    continue  # Skip if already set, it will be handled by the edge aggregation
+                v_prop = original_graph.vertex_property(v_prop_name)[branch_indices]
+                self.set_edge_geometry(name=v_prop_name, values=v_prop, indices=indices)
+
+    def set_edge_geometry_edge_properties(self, original_graph, edge_geometry_edge_properties, indices, edge_to_edge_map):
+        first_edge = edge_to_edge_map[0][0]
+        for e_prop_name in edge_geometry_edge_properties:
+            if e_prop_name in original_graph.edge_properties:
+                # If already exists
+                if self.edge_geometry_property_name(f'edge_{e_prop_name}') in self.edge_geometry_property_names:
+                    continue  # Skip if already set, it will be handled by the edge aggregation
+                values = original_graph.edge_property_map(e_prop_name)
+                # there is one fewer edge than vertices in each reduced edge !
+                if isinstance(first_edge, gt.Edge):
+                    values = [[values[e] for e in edges + [edges[-1]]] for edges in edge_to_edge_map]
+                elif isinstance(first_edge, (numbers.Integral, numbers.Real)):
+                    values = values.fa
+                    values = [values[np.append(edges, edges[-1])] for edges in edge_to_edge_map]
+                else:
+                    raise ValueError(f'Edge type "{type(first_edge)}" not supported for edge geometry!')
+                # it seems that we repeat the last edge to have the same number of edges as vertices ?
+                self.set_edge_geometry(name=f'edge_{e_prop_name}', values=values, indices=indices)
 
     def edge_geometry_indices(self):
         if self.edge_geometry_type == 'graph':
@@ -805,8 +939,13 @@ class Graph(grp.AnnotatedGraph):
         else:
             g = gt.Graph(gv, prune=True)
             g = Graph(base=g)
-            g.resize_edge_geometry()
+            if g.n_edges and self.has_edge_geometry():
+                g.prune_edge_geometry()
+            else:
+                g.remove_edge_geometry()  # Drop geometries (to be readded) if we filter all edges (typically for reduc)
+                # TODO: see if we keep the egeom props but with shape([n], 0)
             return g
+
 
     def view(self, vertex_filter=None, edge_filter=None):
         return gt.GraphView(self.base, vfilt=vertex_filter, efilt=edge_filter)
@@ -1071,22 +1210,134 @@ class Graph(grp.AnnotatedGraph):
         self._base.list_properties()
 
     def save(self, filename):
-        self._base.save(filename)
+        self._base.save(str(filename))
 
-    def load(self, filename):
-        self._base = gt.load_graph(filename)
+    def copy(self, from_disk=False, path=''):
+        if from_disk:
+            return load(path if path else self.path)
+        else:
+            if (len(list(self.edge_properties)) > 0) and self.n_edges <= LARGE_GRAPH_N_EDGES_THRESHOLD:  # Small graph, copy properties
+                return Graph(name=copy.copy(self.name), base=gt.Graph(self.base))
 
-    def copy(self):
-        return Graph(name=copy.copy(self.name), base=self.base.copy())
+            else:  # RAM runs away on direct copy of edge_properties for large graphs
+                bare_view = gt.GraphView( self._base, skip_properties=True, skip_vfilt=True, skip_efilt=True)
+                # topological copy, no properties
+                new_base = gt.Graph(bare_view, prune=(False, False, True))  # keep all V/E
+                # vertex properties
+                for name, p in self._base.vp.items():
+                    new_base.vp[name] = new_base.copy_property(p, g=self._base)
+
+                # graph properties
+                for name, p in self._base.gp.items():
+                    q = new_base.new_graph_property(p.value_type())
+                    q[new_base] = p[self._base]
+                    new_base.gp[name] = q
+
+                # edge properties
+                edge_order = self.edge_indices()
+                for name, p in self._base.ep.items():
+                    q = new_base.new_edge_property(p.value_type())
+                    if p.fa is not None:
+                        q.fa = p.fa.copy()  # one contiguous memcpy
+                        q.a = q.a[edge_order]  # FIXME: check if this is correct, it should be!
+                    else:
+                        prop_arr = self.edge_property(name)  # Get the numpy array directly
+                        set_edge_property_map(q, prop_arr)
+                    new_base.ep[name] = q
+                return Graph(name=copy.copy(self.name), base=new_base)
+
+    @staticmethod
+    def scan_gt_properties(filename: str, as_dict: bool = False):
+        """
+        Scan the graph-tool file for its properties without loading the entire graph.
+        filename : str
+            The path to the graph-tool file.
+        as_dict : bool
+            If True, return a dictionary of property names. If False, return a list of tuples (scope, name, dtype).
+        """
+        
+        props = scan_gt_props(filename)
+        if as_dict:
+            out = {
+                "vertex": [name for scope, name, _ in props if scope == 'vertex'],
+                "edge": [name for scope, name, _ in props if scope == 'edge'],
+                "graph": [name for scope, name, _ in props if scope == 'graph'],
+            }
+            return out
+        return props
+
+    @classmethod
+    def load(cls, filename, ignore_vp=None, ignore_ep=None, ignore_gp=None):
+        g = gt.load_graph(str(filename), ignore_vp=ignore_vp, ignore_ep=ignore_ep, ignore_gp=ignore_gp)
+        graph = cls(base=g)
+        graph.path = str(filename)
+        return graph
+    
+    @classmethod
+    def partial_load(cls, filename: str, *, exclude_edge_geometry_properties: bool = False,
+                     include_dict: Optional[Dict[str, Iterable[str]]] = None,
+                     exclude_dict: Optional[Dict[str, Iterable[str]]] = None,
+                     include: Optional[Iterable[str]] = None, exclude: Optional[Iterable[str]] = None):
+        """
+        Partially load a graph from a file, allowing for inclusion and exclusion of specific properties.
+
+        Five options are available, in order of precedence:
+            1. exclude_geometry_properties: If True, all edge geometry properties (those starting with 'edge_geometry_') are excluded.
+            2. include_dict: A dictionary specifying which properties to include for each scope ('vertex', 'edge', 'graph').
+            3. exclude_dict: A dictionary specifying which properties to exclude for each scope ('vertex', 'edge', 'graph').
+            4. include: A list of property names to include across all scopes.
+            5. exclude: A list of property names to exclude across all scopes.
+        
+        Note: To know which properties are available in the file, use Graph.scan_gt_properties(filename, as_dict=True).
+        """
+        props = cls.scan_gt_properties(filename, as_dict=True)
+        props_sets = {s: set(props.get(s, ())) for s in cls.SCOPES}
+
+        def _as_scope_map(x):
+            """
+            Normalize iterable-or-dict into {scope: set(...)}. Makes
+            it easy to broadcast to all include/exclude options, whether supplied
+            as dict or iterable.
+            - dict: per-scope values
+            - iterable: applies to all scopes
+            - strings are treated as a single value, not an iterable of chars
+            """
+            if isinstance(x, dict):
+                return {scope: set(x.get(scope, ())) for scope in cls.SCOPES}
+            if isinstance(x, str):  # Because strings are iterable
+                return {scope: {x} for scope in cls.SCOPES}
+            return {scope: set(x) for scope in cls.SCOPES}
+
+        if exclude_edge_geometry_properties:
+            props["graph"] = [p for p in props["graph"] if p.startswith('edge_geometry_')]
+            return cls.load(filename, ignore_gp=props["graph"])
+        elif include_dict:
+            allow = _as_scope_map(include_dict)
+            ignore = {s: props_sets[s] - allow[s] for s in cls.SCOPES}
+        elif exclude_dict:
+            block = _as_scope_map(exclude_dict)
+            ignore = {s: props_sets[s] & block[s] for s in cls.SCOPES}
+        elif include:
+            allow = _as_scope_map(include)
+            ignore = {s: props_sets[s] - allow[s] for s in cls.SCOPES}
+        elif exclude:
+            block = _as_scope_map(exclude)
+            ignore = {s: props_sets[s] & block[s] for s in cls.SCOPES}
+        else:
+            return cls.load(filename)
+
+        ignore = {scope: list(v) for scope, v in ignore.items()}
+
+        return cls.load(filename, ignore_vp=ignore['vertex'], ignore_ep=ignore['edge'], ignore_gp=ignore['graph'])
 
 
 def load(filename):
-    g = gt.load_graph(filename)
-    return Graph(base=g)
+    warnings.warn("Use Graph.load() instead of load()", DeprecationWarning)
+    return Graph.load(filename)
 
 
 def save(filename, graph):
-    graph.save(filename)
+    graph.save(str(filename))
 
 
 ###############################################################################
@@ -1095,7 +1346,7 @@ def save(filename, graph):
 
 def _test():
     import numpy as np
-    import ClearMap.Analysis.Graphs.GraphGt as ggt
+    import ClearMap.Analysis.graphs.graph_gt as ggt
 
     from importlib import reload
     reload(ggt)
@@ -1213,7 +1464,7 @@ def _test():
     # test large arrays in graphs
     import numpy as np
     import ClearMap.IO.IO as io
-    import ClearMap.Analysis.Graphs.GraphGt as ggt
+    import ClearMap.Analysis.graphs.graph_gt as ggt
     reload(ggt)
 
     g = ggt.Graph('test')
@@ -1227,7 +1478,7 @@ def _test():
 
     del g
     del x
-    import ClearMap.Analysis.Graphs.GraphGt as ggt
+    import ClearMap.Analysis.graphs.graph_gt as ggt
     f = ggt.load('test.gt')
     f.info()
     print(f.graph_property('test').shape)

@@ -26,7 +26,7 @@ from ClearMap.IO.assets_specs import ChannelSpec, TypeSpec, StateManager
 from ClearMap.IO.workspace_asset import Asset, AssetCollection
 from ClearMap.Utils.exceptions import AssetNotFoundError, ClearMapWorkspaceError, ClearMapAssetError, \
     MissingChannelError
-from ClearMap.Utils.utilities import substitute_deprecated_arg, handle_deprecated_args
+from ClearMap.Utils.utilities import substitute_deprecated_arg, handle_deprecated_args, get_ok_n_ok_symbols
 
 
 def create_assets_types_config(type_spec_dict):
@@ -258,6 +258,7 @@ class Workspace2:  # REFACTOR: subclass dict
             extension=None, version=None,
             status=None, debug=None,
             prefix=None, postfix=None,
+            suffix='',
             default='closest'):
         """
         Get the asset of the given type. If no exact match is found, try to find the closest match.
@@ -290,6 +291,9 @@ class Workspace2:  # REFACTOR: subclass dict
             The postfix of the asset name. (typically the asset subtype)
             .. deprecated:: 3.0.0
                 Use the asset_sub_type argument instead.
+        suffix: str
+            The suffix of the asset name. This is to be used for assets where the subtype is
+            dynamic.
 
         Returns
         -------
@@ -300,6 +304,9 @@ class Workspace2:  # REFACTOR: subclass dict
             channel = self.current_channel
         elif channel == 'default':
             channel = self.default_channel
+
+        if isinstance(channel, list):
+            channel = tuple(channel)  # Make sure it is hashable
 
         # Handle deprecated arguments  # FIXME: use decorator
         if debug is not None:
@@ -312,9 +319,9 @@ class Workspace2:  # REFACTOR: subclass dict
         if status:
             self.debug = status
 
-        if asset_sub_type:
+        if asset_sub_type and not suffix:
             asset_type += f'_{asset_sub_type}'
-        if channel not in self.asset_collections and isinstance(channel, (tuple, list)):
+        if channel not in self.asset_collections and isinstance(channel, tuple):
             channel = ('-'.join(channel)).lower()  # Try string version if tuple version not found
 
         if asset_type in self.asset_collections[channel]:
@@ -326,7 +333,10 @@ class Workspace2:  # REFACTOR: subclass dict
             else:
                 return default
         if sample_id or extension or version:  # FIXME: subdirectory
-            asset = asset.variant(sample_id, extension, version)
+            if suffix:
+                asset = asset.variant(sample_id, asset_sub_type, extension, version, sub_type=suffix)
+            else:
+                asset = asset.variant(sample_id, extension, version)
         return asset
 
     def get_closest_matching_asset(self, asset_type, channel=None):  # FIXME: compound keys
@@ -355,7 +365,7 @@ class Workspace2:  # REFACTOR: subclass dict
         else:
             matching_types = [k for k in self.asset_collections[channel].keys() if k.startswith(asset_type)]
         if len(matching_types) == 0:
-            raise KeyError(f'No asset of type {asset_type} found in workspace.')  # FIXME: ClearMapKeyError
+            raise KeyError(f'No asset of type "{asset_type}" found in workspace.')  # FIXME: ClearMapKeyError
         elif len(matching_types) == 1:
             asset = self.asset_collections[matching_types[0]]
         else:
@@ -469,6 +479,8 @@ class Workspace2:  # REFACTOR: subclass dict
         out = f'{self}\n'
         out += 'directories:\n'
 
+        ok_symbol, n_ok_symbol = get_ok_n_ok_symbols()
+
         len_dirtype = max([len(k) for k in RESOURCE_TYPE_TO_FOLDER.keys()])
         for resource_type, folder in RESOURCE_TYPE_TO_FOLDER.items():
             out += f'  [{resource_type : >{len_dirtype}}]: {folder}\n'
@@ -478,14 +490,21 @@ class Workspace2:  # REFACTOR: subclass dict
         len_f_type = max([len(k) for k in CHANNELS_ASSETS_TYPES_CONFIG.keys()])
         header = f'  [{{:{len_dirtype}}}] {{:{len_f_type}}}'
 
-        for channel, asset_group in self.asset_collections.items():
+        for channel, assets_collection in self.asset_collections.items():
             out += f'  Channel: {channel}\n'
-            for asset_type, asset in asset_group.items():
+            for asset_type, asset in assets_collection.items():
                 asset.header = header
+                symbol = ok_symbol if asset.exists else n_ok_symbol
+                out += f'    {symbol} {asset_type} ({asset.type_spec.resource_type}): '
                 try:
-                    out += f'{asset}'
+                    if asset.exists:
+                        out += f'{asset}\n'
+                    else:
+                        out += f'{asset.base_name} (not found)\n'
                 except ClearMapAssetError as e:
-                    out += f'{asset.type_spec.basename}'   # FIXME:
+                    out += f'{asset.type_spec.basename}\n'   # FIXME:
+
+        return out
 
 
 def test_context_manager():

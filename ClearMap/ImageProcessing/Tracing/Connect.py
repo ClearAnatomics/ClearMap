@@ -512,10 +512,11 @@ def addConnections(data, mask, skeleton, points, radius = 20,
       #for i,_ in enumerate(pool.imap_unordered(processSingleConnection, argdata)):
       #  if i % 100 == 0:
       #    timer.printElapsedTime('Iteration %d / %d' % (i + ranges[b], npts));
-      pool.map(processSingleConnection, argdata)
+      results = pool.map(processSingleConnection, argdata)
           
       pool.close();
       pool.join();
+      results = list(results)
     gc.collect();
   
   smm.free(data_hdl);

@@ -108,13 +108,14 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from PyQt5.QtWidgets import QApplication, QLabel, QButtonGroup
+from PyQt5.QtWidgets import QApplication, QLabel, QButtonGroup, QFrame, QRadioButton, QHBoxLayout, QGroupBox, QWidget
 import pyqtgraph as pg
 from natsort import natsorted
 from pyqtgraph import PlotWidget
 
 import mpld3
 
+from ClearMap.Analysis.graphs.graph_filters import GraphFilter
 from ClearMap.IO.assets_constants import DATA_CONTENT_TYPES, EXTENSIONS
 from ClearMap.processors.colocalization import ColocalizationProcessor
 from ClearMap.processors.tract_map import TractMapProcessor
@@ -131,11 +132,12 @@ from ClearMap.Analysis.Statistics.group_statistics import make_summary, density_
     check_ids_are_unique
 from ClearMap.Utils.exceptions import ClearMapVRamException, GroupStatsError, MissingRequirementException
 
-from ClearMap.gui.dialogs import option_dialog
+from ClearMap.gui.dialogs import option_dialog, make_splash
 from ClearMap.gui.interfaces import GenericTab, PostProcessingTab, PreProcessingTab, BatchTab, PipelineTab
 from ClearMap.gui.widgets import (PatternDialog, DataFrameWidget, LandmarksSelectorDialog,
                                   CheckableListWidget, FileDropListWidget, ExtendableTabWidget)
-from ClearMap.gui.gui_utils import format_long_nb, np_to_qpixmap, replace_widget, unique_connect, get_widget
+from ClearMap.gui.gui_utils import format_long_nb, np_to_qpixmap, replace_widget, unique_connect, get_widget, \
+    create_clearmap_widget
 from ClearMap.gui.params import (VesselParams, SampleParameters, StitchingParams,
                                  CellMapParams, GroupAnalysisParams, BatchProcessingParams, RegistrationParams,
                                  TractMapParams, ColocalizationParams)
@@ -170,7 +172,7 @@ class SampleInfoTab(GenericTab):
         self.with_add_btn = True
         self.names_map = []
         self.detached = False  # WARNING: To avoid calling update when channels are setup by
-                               #   the wizzard
+                               #   the wizard
 
     def _set_params(self):
         self.params = SampleParameters(self.ui, self.main_window.src_folder)
@@ -181,6 +183,7 @@ class SampleInfoTab(GenericTab):
         self.sample_manager.config = self.params.config  # WARNING: hacky way to force shared reference
 
     def _bind_params_signals(self):
+        self.params.convertToClearMapFormat.connect(self.convert_to_clearmap_format)
         self.params.plotMiniBrain.connect(self.plot_mini_brain)
         self.params.plotAtlas.connect(self.display_atlas)
         self.params.channelNameChanged.connect(self.update_workspace)
@@ -200,7 +203,7 @@ class SampleInfoTab(GenericTab):
 
         self.ui.srcFolderBtn.clicked.connect(self.main_window.prompt_experiment_folder)
 
-        self.ui.launchPatternWizzardPushButton.clicked.connect(self.launch_pattern_wizard)
+        self.ui.launchPatternWizardPushButton.clicked.connect(self.launch_pattern_wizard)
         self.ui.updateWorkspacePushButton.clicked.connect(self.update_workspace)
 
         self.ui.removeCurrentChannelToolButton.clicked.connect(self.remove_current_channel)
@@ -394,6 +397,16 @@ class SampleInfoTab(GenericTab):
                 warnings.warn('RegistrationProcessor not setup, cannot plot atlas. '
                               'Please call registration_tab.finalise_set_params() first')
 
+    def convert_to_clearmap_format(self, channel):
+        self.params.ui_to_cfg()
+        self.sample_manager.config.reload()
+        # channel = self.ui.channelsParamsTabWidget.current_channel()
+        stitching_processor = self.main_window.tab_managers['stitching'].stitcher
+        if self.sample_manager.is_tiled(channel):
+            stitching_processor.convert_tiles_channel(channel)
+        else:
+            stitching_processor.copy_or_stack(channel)
+
 
 class StitchingTab(PreProcessingTab):
     """
@@ -422,7 +435,6 @@ class StitchingTab(PreProcessingTab):
                             c not in self.sample_params or self.sample_manager.is_tiled(c)]
         return new_channels
 
-
     def _read_configs(self, cfg_path):
         if self.sample_manager.stitching_cfg:
             self.params.read_configs(cfg=self.sample_manager.stitching_cfg)
@@ -435,7 +447,9 @@ class StitchingTab(PreProcessingTab):
 
     def _set_channels_names(self):  # FIXME: move to stitcher
         stitchable_channels = self._get_channels()
-        # rename defaults
+        if not stitchable_channels:
+            return
+            # rename defaults
         if 'channel_x' in self.stitcher.config['channels'].keys():  # i.e. is default, otherwise already set
             first_channel = stitchable_channels[0]
             self.stitcher.config['channels'][first_channel] = self.stitcher.config['channels'].pop('channel_x')
@@ -629,6 +643,7 @@ class StitchingTab(PreProcessingTab):
     def run_stitching(self):
         """Run the actual stitching steps based on the values in the config file (set from the UI)."""
         self.params.ui_to_cfg()
+        self.stitcher.config.reload()
         for channel in self.sample_manager.channels:  # FIXME: check if should do and if done
             if not self.sample_manager.is_tiled(channel):  # BYPASS stitching, just copy or stack
                 self.wrap_step('Stitching', self.stitcher.copy_or_stack, step_args=[channel], )
@@ -688,6 +703,7 @@ class RegistrationTab(PreProcessingTab):
 
         self.advanced_controls_names = [
             'advancedAtlasSettingsGroupBox',
+            'channel.registrationRunResamplingPushButton',
             'channel.parameterFilesLabel',
             'channel.paramsFilesListWidget',
             'channel.addParamFilePushButton',
@@ -707,17 +723,18 @@ class RegistrationTab(PreProcessingTab):
 
     def _set_channels_names(self):
         if 'channel_x' in self.aligner.config['channels']:  # i.e. is default, otherwise already set
-            autofluo_config = deepcopy(self.aligner.config['channels'].get('autofluorescence'))  # FIXME: may not exist
-            data_channel_config = deepcopy(self.aligner.config['channels']['channel_x'])
+            autofluo_default_config = deepcopy(self.aligner.config['channels'].get('autofluorescence'))
+            data_channel_default_config = deepcopy(self.aligner.config['channels']['channel_x'])
+
             self.aligner.config['channels'] = {}
             reference_channel = self.sample_manager.alignment_reference_channel
-            data_channel_config['align_with'] = reference_channel
-            data_channel_config['moving_channel'] = reference_channel
+            data_channel_default_config['align_with'] = reference_channel
+            data_channel_default_config['moving_channel'] = reference_channel
             for channel in self.sample_manager.channels:
                 if self.sample_manager.config['channels'][channel]['data_type'] == 'autofluorescence':
-                        self.aligner.config['channels'][channel] = autofluo_config
+                        self.aligner.config['channels'][channel] = autofluo_default_config
                 else:
-                    self.aligner.config['channels'][channel] = data_channel_config
+                    self.aligner.config['channels'][channel] = data_channel_default_config
                 self.handle_align_with_changed(channel, self.aligner.config['channels'][channel]['align_with'])
             self.aligner.config.write()  # FIXME: ensure that aligner defined. Why not self.params.ui_to_cfg()
 
@@ -746,7 +763,7 @@ class RegistrationTab(PreProcessingTab):
         self.params.launchLandmarksDialog.connect(self.launch_landmarks_dialog)
         self._update_plotable_channels()
         for channel in self.aligner.config['channels']:
-            self.__update_channel_comboboxes(channel)
+            self.__update_channel_combo_boxes(channel)
 
     def _set_params(self):
         self.params = RegistrationParams(self.ui)
@@ -758,32 +775,37 @@ class RegistrationTab(PreProcessingTab):
         self.params[channel]._config = self.aligner.config
         self.params[channel].cfg_to_ui()  # Force it while the tab is active
 
-    def __update_channel_comboboxes(self, channel, page_widget=None):
-        if self.params[channel].align_with:
+    def __update_channel_combo_boxes(self, channel, page_widget=None):
+        if self.params[channel].align_with:  # FIXME: which is correct at given time point
             partner_channel = self.params[channel].align_with
+            moving_channel = self.params[channel].moving_channel
         else:
             partner_channel = self.aligner.config['channels'][channel]['align_with']
+            moving_channel = self.aligner.config['channels'][channel]['moving_channel']
         if page_widget is None:
             page_widget = self.ui.channelsParamsTabWidget.get_channel_widget(channel)
+        other_channels = list(set(self.aligner.channels_to_register()) - {channel})
         page_widget.alignWithComboBox.clear()
-        page_widget.alignWithComboBox.addItems([None, 'atlas'])
-        page_widget.alignWithComboBox.addItems(list(set(self.aligner.channels_to_register()) - {channel}))
+        page_widget.alignWithComboBox.addItems([None, 'atlas'] + other_channels)
         page_widget.movingChannelComboBox.clear()
-        page_widget.movingChannelComboBox.addItems([None, 'atlas', 'intrinsically aligned'])
-        page_widget.movingChannelComboBox.addItems(self.aligner.channels_to_register())
+        page_widget.movingChannelComboBox.addItems([None, 'atlas', 'intrinsically_aligned'] + other_channels + [channel])
         channel_dtype = self.sample_manager.config['channels'][channel]['data_type']
-        if not partner_channel:
+        print(f'Configuring alignment partners for {channel=}, {channel_dtype=}, {partner_channel=}')
+        if not partner_channel or partner_channel == channel:
             if channel_dtype == 'autofluorescence':
                 partner_channel = 'atlas'
+                moving_channel = 'atlas'
             elif channel_dtype:
                 partner_channel = self.sample_manager.alignment_reference_channel
+                moving_channel = self.sample_manager.alignment_reference_channel
             else:
+                warnings.warn(f'Skipping partner selection for {channel} because none was found')
                 return
         page_widget.alignWithComboBox.setCurrentText(partner_channel)
-        page_widget.movingChannelComboBox.setCurrentText(partner_channel)
+        page_widget.movingChannelComboBox.setCurrentText(moving_channel)
 
     def _setup_channel(self, page_widget, channel):
-        self.__update_channel_comboboxes(channel, page_widget)
+        self.__update_channel_combo_boxes(channel, page_widget)
         alignment_files = [page_widget.paramsFilesListWidget.item(i).text() for i in
                   range(page_widget.paramsFilesListWidget.count())]  # no shortcut for standard QListWidget
         page_widget.paramsFilesListWidget = replace_widget(page_widget.paramsFilesListWidget,
@@ -802,6 +824,9 @@ class RegistrationTab(PreProcessingTab):
         page_widget.paramsFilesListWidget.itemsChanged.connect(self.params[channel].handle_params_files_changed)
         self.params[channel].handle_params_files_changed()  # Force update
         self.params[channel].align_with_changed.connect(self.handle_align_with_changed)
+        page_widget.registrationRunResamplingPushButton.clicked.connect(
+            functools.partial(self.resample_channel, channel)
+        )
 
     def _setup_workers(self):
         self.sample_params.ui_to_cfg()
@@ -811,9 +836,9 @@ class RegistrationTab(PreProcessingTab):
             self.wrap_step('Setting up atlas', self.setup_atlas, n_steps=1, save_cfg=False, nested=False)  # TODO: abort_func=self.aligner.stop_process
 
     # def handle_layout_channel_changed(self, channel, layout_channel):
-    #    """To select automatically "intrinsically aligned" if 2 channels have same stitching layout"""
+    #    """To select automatically "intrinsically_aligned" if 2 channels have same stitching layout"""
     #     self.params[channel].align_with = layout_channel
-    #     self.params[channel].moving_channel = 'intrinsically aligned'
+    #     self.params[channel].moving_channel = 'intrinsically_aligned'
     #     self.params[channel].cfg_to_ui()  # Update the UI to reflect the changes
 
     def set_progress_watcher(self, watcher):
@@ -872,6 +897,17 @@ class RegistrationTab(PreProcessingTab):
                 self.aligner.parametrize_assets()
             else:
                 warnings.warn('Workspace not setup, cannot add registration pipeline')
+
+    def resample_channel(self, channel):
+        self.main_window.make_progress_dialog('Registering', n_steps=2, abort=self.aligner.stop_process,
+                                              parent=self.main_window)
+        self.setup_atlas()
+        self.main_window.progress_watcher.increment_main_progress()
+        self.sample_manager.delete_resampled_files(channel)
+        self.wrap_step(f'Resampling {channel} for registration', self.aligner.resample_channel,
+                       step_kw_args={'channel': channel, 'increment_main': False})
+        self.main_window.progress_watcher.finish()
+        self.main_window.print_status_msg(f'Channel {channel} resampled for registration')
 
     def run_registration(self):
         """
@@ -967,7 +1003,10 @@ class CellCounterTab(PostProcessingTab):
         self.cell_intensity_histogram = None
         self.cell_size_histogram = None
 
-        self.advanced_controls_names = ['channel.detectionShapeGroupBox']
+        self.advanced_controls_names = [
+            'channel.detectionShapeGroupBox',
+            'channel.hMaxSinglet'
+        ]
         self.set_relevant_data_types(DATA_TYPE_TO_TAB_CLASS)
 
     def _set_channels_names(self):
@@ -1199,7 +1238,8 @@ class CellCounterTab(PostProcessingTab):
         """
         detector = self.cell_detectors[channel]
         self.wrap_step('Cell detection preview', detector.run_cell_detection,
-                       step_kw_args={'tuning': True})
+                       step_kw_args={'tuning': True},
+                       abort_func=detector.stop_process)
         if detector.stopped:
             return
         try:
@@ -1256,7 +1296,7 @@ class CellCounterTab(PostProcessingTab):
         self.wrap_plot(self.cell_detectors[channel].plot_cells_3d_scatter_w_atlas_colors, raw=raw)
 
     def __filter_cells(self, channel, is_last_step=True):
-        if self.sample_manager.get('cells', postfix='raw').exists:
+        if self.sample_manager.get('cells', channel=channel, asset_sub_type='raw').exists:
             detector = self.cell_detectors[channel]
             self.wrap_step('Filtering cells', detector.filter_cells, n_steps=2 + (1 - is_last_step),
                            abort_func=detector.stop_process, close_when_done=False)
@@ -1322,18 +1362,18 @@ class VasculatureTab(PostProcessingTab):
         self.binary_vessel_processor = None
         self.vessel_graph_processor = None
 
+        self.channels_ui_name = 'vasculature_params'
+
         self.set_relevant_data_types(DATA_TYPE_TO_TAB_CLASS)
 
+    # FIXME: create channels here ??
     def _set_channels_names(self):
-        default_vessels_binarization_params = self.params.config['binarization'].pop('vessels', {})
-        default_arteries_binarization_params = self.params.config['binarization'].pop('arteries', {})
-        for channel in self.sample_manager.channels:
-            if self.sample_manager.config['channels'][channel]['data_type'] == 'vessels':
-                self.params.config['binarization'][channel] = default_vessels_binarization_params
-            elif self.sample_manager.config['channels'][channel]['data_type'] == 'arteries':
-                self.params.config['binarization'][channel] = default_arteries_binarization_params
-            elif self.sample_manager.config['channels'][channel]['data_type'] == 'veins':
-                self.params.config['binarization'][channel] = default_arteries_binarization_params
+        if self.params.config['is_default']:
+            self.params.fix_default_config()
+        for channel in self.sample_manager.get_channels_by_pipeline('TubeMap', as_list=True):  # TODO: see if shouldn't be handled by params instead
+            channel_type = self.sample_manager.get_channel_type(channel)
+            if channel not in self.params.config['binarization'].keys():
+                self.params.patch_config_section(channel, channel_type)
         self.params.config.write()
 
     def _bind(self):
@@ -1364,6 +1404,8 @@ class VasculatureTab(PostProcessingTab):
         self.ui.plotGraphPickRegionPushButton.clicked.connect(self.pick_region)
         self.ui.plotGraphChunkPushButton.clicked.connect(self.display_graph_chunk_from_cfg)
         self.ui.plotGraphClearPlotPushButton.clicked.connect(self.main_window.clear_plots)
+
+        self.ui.addFilterPushButton.clicked.connect(self.add_graph_filter)
 
         self.ui.voxelizeGraphPushButton.clicked.connect(self.voxelize)
         self.ui.plotGraphVoxelizationPushButton.clicked.connect(self.plot_voxelization)
@@ -1399,11 +1441,70 @@ class VasculatureTab(PostProcessingTab):
             self.binary_vessel_processor.setup(self.sample_manager)
             self.vessel_graph_processor.setup(self.sample_manager, self.aligner)
 
-            unique_connect(self.ui.binarizeVesselsPushButton.clicked,
-                           functools.partial(self.binarize_channel, channel=self.binary_vessel_processor.all_vessels_channel))
+    # def _bind_params_signals(self):
+    #     pass
 
-            unique_connect(self.ui.binarizeArteriesPushButton.clicked,
-                           functools.partial(self.binarize_channel, channel=self.binary_vessel_processor.arteries_channel))
+    def _get_channels(self):
+        return self.sample_manager.get_channels_by_pipeline('TubeMap', as_list=True)
+
+    def _set_channel_config(self, channel):
+        self.params[channel]._config = self.params.config
+        # FIXME: it seems config for that channel was not set, emtpy dict
+        self.params[channel].cfg_to_ui()  # Force it while the tab is active
+
+    def _bind_channel(self, page_widget, channel):
+        buttons_functions = [('binarizePushButton', self.binarize_channel)]
+        for btn_name, func in buttons_functions:
+            self._bind_btn(btn_name, func, channel, page_widget)
+
+    def add_graph_filter(self):
+        filters = []
+        layout = self.ui.filterParamsVerticalLayout
+        for i in range(layout.count()):
+            widg = layout.itemAt(i).widget()
+            if widg and widg.objectName().startswith('filter_'):
+                filters.append(widg)
+        filter_idx = len(filters)
+        if filters:
+            combine_widget = QFrame(self.ui)
+            and_radio_btn = QRadioButton(combine_widget)
+            and_radio_btn.setText('AND')
+            and_radio_btn.setObjectName(f'filter_{filter_idx}_and_btn')
+            and_radio_btn.setChecked(True)
+            or_radio_btn = QRadioButton(combine_widget)
+            or_radio_btn.setText('OR')
+            or_radio_btn.setObjectName(f'filter_{filter_idx}_or_btn')
+            button_group = QButtonGroup(combine_widget)
+            button_group.addButton(and_radio_btn)
+            button_group.addButton(or_radio_btn)
+            button_group.setObjectName(f'filter_{filter_idx}_combine')
+            combine_widget.setLayout(QHBoxLayout())
+            combine_widget.layout().addWidget(and_radio_btn)
+            combine_widget.layout().addWidget(or_radio_btn)
+            self.ui.filterParamsVerticalLayout.addWidget(combine_widget)
+        widget = create_clearmap_widget('graph_filter_params', 'QWidget')
+        widget.setObjectName(f'filter_{filter_idx}')
+        widget.groupBox.setTitle(f'Filter {filter_idx}')
+        self.ui.filterParamsVerticalLayout.addWidget(widget)
+
+        # FIXME: splash not shown
+        splash, pbar = make_splash(message=f'Loading graph ', font_size=25)
+        splash.show()
+        # update_pbar(self.app, progress_bar, 20)
+        graph = self.vessel_graph_processor.graph_annotated
+        splash.finish(self.main_window)
+        self.params.graph_params.add_graph_filter_params(widget, graph)
+        self.params.graph_params.filtersChanged.connect(self.update_file_suffix)
+
+    def update_file_suffix(self):
+        """
+        Update the file suffix for the filtered graph
+        """
+        filters = self.params.graph_params.filter_params
+        if not filters:
+            return
+        suffix = '_'.join([f'{filter.property_name}_{filter.get_property_value()}' for filter in filters])
+        self.ui.fileSuffixLineEdit.setText(suffix)
 
     def unload_temporary_graphs(self):
         """Unload the temporary vasculature graph objects to free up RAM"""
@@ -1446,11 +1547,11 @@ class VasculatureTab(PostProcessingTab):
                            step_args=[channel], abort_func=self.binary_vessel_processor.stop_process)
             self.wrap_step('Vessel binarization', self.binary_vessel_processor.smooth_channel,
                            step_args=[channel], abort_func=self.binary_vessel_processor.stop_process)
+            self.wrap_step('Vessel binarization', self.binary_vessel_processor.deep_fill_channel,
+                           step_args=[channel], abort_func=self.binary_vessel_processor.stop_process)
             self.wrap_step('Vessel binarization', self.binary_vessel_processor.fill_channel,
                            step_args=[channel], abort_func=self.binary_vessel_processor.stop_process,
                            main_thread=True)  # WARNING: The parallel cython loops inside cannot run from child thread
-            self.wrap_step('Vessel binarization', self.binary_vessel_processor.deep_fill_channel,
-                           step_args=[channel], abort_func=self.binary_vessel_processor.stop_process)
         except ClearMapVRamException as err:
             if stop_on_error:
                 raise err
@@ -1486,6 +1587,7 @@ class VasculatureTab(PostProcessingTab):
     def run_all(self):
         """Run the whole vasculature pipeline at once"""
         try:
+            # FIXME: ask binary_vessel_processor about channels
             self.binarize_channel(self.binary_vessel_processor.all_vessels_channel, stop_on_error=True)
             self.binarize_channel(self.binary_vessel_processor.arteries_channel, stop_on_error=True)
         except ClearMapVRamException:
@@ -1573,8 +1675,15 @@ class VasculatureTab(PostProcessingTab):
         """Run the voxelization (density map) on the vasculature graph """
         voxelization_params = {
             'weight_by_radius': self.params.visualization_params.weight_by_radius,
-            'vertex_degrees': self.params.visualization_params.vertex_degrees
         }
+        if self.params.graph_params.filter_params:
+            voxelization_params['filters'] = [
+                GraphFilter(self.vessel_graph_processor.graph_annotated, filter_type=g_filter.filter_type,
+                            property_name=g_filter.property_name, property_value=g_filter.get_property_value())
+                for g_filter in self.params.graph_params.filter_params]
+            voxelization_params['operators'] = [g_filter.combine_operator_name
+                                                for g_filter in self.params.graph_params.filter_params if
+                                                g_filter.combine_operator_name is not None]  # skip first one
         self.wrap_step('Running voxelization', self.vessel_graph_processor.voxelize,
                        step_kw_args=voxelization_params)#, main_thread=True)
 
@@ -1655,10 +1764,14 @@ class TractMapTab(PostProcessingTab):
 
     def _bind_channel(self, page_widget, channel):
         buttons_functions = [
+            ('tractMapComputeClippRangePushButton', self.compute_clipping_range),
+            ('tractMapComputePixelsPercentRangePushButton', self.intensities_to_percentiles),
+            ('tractMapPlotBinarizationThresholdsPushButton', self.plot_binarization_thresholds),
             ('tractMapPreviewTuningOpenPushButton', self.plot_debug_cropping_interface),
             ('tractMapPreviewTuningCropPushButton', self.create_tract_map_tuning_sample),
             ('tractMapPreviewPushButton', self.run_tuning_tract_map),
             ('runTractMapPushButton', self.run_tract_map),
+            ('tractMapPlotBinaryPushButton', self.plot_binary),
             ('tractMapPlotVoxelizationPushButton', self.plot_tract_map_results),
             ('tractMap3dScatterOnRefPushButton', functools.partial(self.plot_labeled_tracts_scatter, raw=False)),
             ('tractMap3dScatterOnStitchedPushButton', functools.partial(self.plot_labeled_tracts_scatter, raw=True)),
@@ -1763,6 +1876,35 @@ class TractMapTab(PostProcessingTab):
                        step_kw_args={'slicing': self.params[channel].slicing}, nested=False)
         self.sample_manager.workspace.debug = False  # FIXME
 
+    def compute_clipping_range(self, channel):
+        processor = self.tract_mappers[channel]
+        # TODO: use wrap_step but must include return
+        pixel_percents = self.params[channel].clipping_percents
+        self.params.ui_to_cfg()
+        low_intensity, high_intensity = processor.compute_clip_range(pixel_percents)
+        self.params[channel].clip_range = [low_intensity, high_intensity]
+
+    def intensities_to_percentiles(self, channel):
+        """
+        Convert the intensities to percentiles
+        """
+        processor = self.tract_mappers[channel]
+        low_intensity, high_intensity = self.params[channel].clip_range
+        self.params.ui_to_cfg()
+        low_percent, high_percent = processor.intensities_to_percentiles(low_intensity, high_intensity)
+        self.params[channel].clipping_percents = [low_percent, high_percent]
+
+    def plot_binary(self, channel):
+        page = self.ui.channelsParamsTabWidget.currentWidget()
+        debug = page.tractMapDebugCheckBox.isChecked()
+        self.wrap_plot(self.tract_mappers[channel].plot_binary, debug=debug)
+
+    def plot_binarization_thresholds(self, channel):
+        page = self.ui.channelsParamsTabWidget.currentWidget()
+        low_level_spin_box = page.binarizationThresholdsLowSpinBox_1
+        high_level_spin_box = page.binarizationThresholdsHighSpinBox_2
+        self.wrap_plot(self.tract_mappers[channel].plot_binarization_levels,
+                       low_level_spin_box, high_level_spin_box)
 
     def plot_tract_map_results(self, channel):
         self.wrap_plot(self.tract_mappers[channel].plot_voxelized_counts)
@@ -1770,8 +1912,9 @@ class TractMapTab(PostProcessingTab):
     def plot_labeled_tracts_scatter(self, channel, raw=False):
         self.main_window.clear_plots()
         tract_mapper = self.tract_mappers[channel]
-        coords_source_is_debug = self.ui.channelsParamsTabWidget.get_channel_widget(channel).tractMapDebugCheckBox.isChecked()
-        coords_target_is_debug = self.ui.channelsParamsTabWidget.get_channel_widget(channel).tractMapTargetDebugCheckBox.isChecked()
+        page = self.ui.channelsParamsTabWidget.get_channel_widget(channel)
+        coords_source_is_debug = page.tractMapDebugCheckBox.isChecked()
+        coords_target_is_debug = page.tractMapTargetDebugCheckBox.isChecked()
         self.wrap_plot(tract_mapper.plot_tracts_3d_scatter_w_atlas_colors, raw=raw,
                        coordinates_from_debug=coords_source_is_debug,
                        plot_onto_debug=coords_target_is_debug)
@@ -1996,15 +2139,18 @@ class GroupAnalysisProcessor:
         link_dataviewers_cursors(dvs)
         return dvs
 
-    def compute_p_vals(self, selected_comparisons, groups, wrapping_func, channels, advanced=False):
+    def compute_p_vals(self, selected_comparisons, groups, wrapping_func, channels,
+                       advanced=False, density_files_suffix=''):
         for pair in selected_comparisons:
             gp1_name, gp2_name = pair
             gp1, gp2 = [groups[gp_name] for gp_name in pair]
             for channel in channels:
-                _ = density_files_are_comparable(self.results_folder, gp1, gp2, channel)
+                _ = density_files_are_comparable(self.results_folder, gp1, gp2, channel,
+                                                 density_files_suffix=density_files_suffix)
             check_ids_are_unique(gp1, gp2)
             # compare_groups is automatically for each channel (loads the first sample to find the channels)
-            wrapping_func(compare_groups, self.results_folder, gp1_name, gp2_name, gp1, gp2, advanced=advanced)
+            wrapping_func(compare_groups, self.results_folder, gp1_name, gp2_name, gp1, gp2,
+                          advanced=advanced, density_files_suffix=density_files_suffix)
             self.progress_watcher.increment_main_progress()
 
     def run_plots(self, plot_function, selected_comparisons, plot_kw_args):
@@ -2022,13 +2168,14 @@ class GroupAnalysisProcessor:
             dvs.append(browser)
         return dvs
 
-    def plot_density_maps(self, group_folders, channel, parent=None):
+    def plot_density_maps(self, group_folders, channel, density_suffix, parent=None):
         density_map_paths = []
         titles = []
         for folder in group_folders:
             sample_manager = SampleManager()
             sample_manager.setup(src_dir=folder)
-            map_path = sample_manager.get('density', channel=channel, asset_sub_type='counts').path
+            map_path = sample_manager.get('density', channel=channel,
+                                          suffix=density_suffix).path
             density_map_paths.append(map_path)  # TODO: make work for tubemap too
             titles.append(sample_manager.config['sample_id'])
         luts = ['flame'] * len(density_map_paths)
@@ -2042,7 +2189,11 @@ class GroupAnalysisTab(BatchTab):
         super().__init__(main_window, tab_idx)
         self.processor = GroupAnalysisProcessor(self.main_window.progress_watcher)
 
-        self.advanced_controls_names = ['computeSdAndEffectSizeCheckBox']
+        self.advanced_controls_names = [
+            'computeSdAndEffectSizeCheckBox',
+            'densitySuffixTextFilterLabel',
+            'densitySuffixTextFilterLineEdit'
+        ]
 
     def _set_channels_names(self):
         pass  # TODO: check if required
@@ -2074,7 +2225,7 @@ class GroupAnalysisTab(BatchTab):
                 self.params.plot_density_maps_buttons[i].clicked.connect(
                     functools.partial(self.plot_density_maps, gp))
 
-    def get_analysable_channels(self):
+    def get_analysable_channels(self):  # FIXME: move to params
         """
         List the channels that have density maps available for analysis
 
@@ -2090,8 +2241,9 @@ class GroupAnalysisTab(BatchTab):
         sample_manager.setup(src_dir=self.params.get_all_paths()[0][0])
 
         analysable_channels = []
-        for channel in sample_manager.channels:
-            asset = sample_manager.get('density', channel=channel, asset_sub_type='counts', default=None)
+        for channel in sample_manager.channels:  # FIXME:
+            asset = sample_manager.get('density', channel=channel,
+                                       suffix=self.params.density_suffix, default=None)
             if asset is not None and asset.exists:
                 analysable_channels.append(channel)
         return analysable_channels
@@ -2103,6 +2255,7 @@ class GroupAnalysisTab(BatchTab):
         self.main_window.clear_plots()  # TODO: use wrap_plot
         dvs = self.processor.plot_density_maps(self.params.groups[group_name],
                                                channel=self.params.plot_channel,
+                                               density_suffix=self.params.density_suffix,
                                                parent=self.main_window.centralWidget())
         self.main_window.setup_plots(dvs)
 
@@ -2116,7 +2269,8 @@ class GroupAnalysisTab(BatchTab):
             self.processor.compute_p_vals(self.params.selected_comparisons, self.params.groups,
                                           self.main_window.wrap_in_thread,
                                           channels=self.get_analysable_channels(),
-                                          advanced=self.params.compute_sd_and_effect_size)
+                                          advanced=self.params.compute_sd_and_effect_size,
+                                          density_files_suffix=self.params.density_suffix)
         except GroupStatsError as err:
             self.main_window.popup(str(err), base_msg='Cannot proceed with analysis')
         self.main_window.signal_process_finished()

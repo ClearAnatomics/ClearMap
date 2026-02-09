@@ -109,6 +109,7 @@ def mesh_tube_from_coordinates_and_radii(coordinates, radii, indices, n_tube_poi
     smm.free(radii_hdl)
     smm.free(indices_hdl)
 
+    results = list(results)
     n_results = len(results)
 
     vertices = [np.reshape(r[0], (-1, 3)) for r in results]
@@ -117,7 +118,11 @@ def mesh_tube_from_coordinates_and_radii(coordinates, radii, indices, n_tube_poi
     n_indices = np.hstack([[0], n_indices])
 
     if edge_colors is not None:
-        colors = [len(v) * [c] for v, c in zip(vertices, edge_colors)]
+        # colors = [len(v) * [c] for v, c in zip(vertices, edge_colors)]
+        edge_colors = np.array(edge_colors)
+        if edge_colors.size in (3, 4):
+            edge_colors = [edge_colors] * len(vertices)
+        colors = [np.tile(c, [len(v), 1]) for v, c in zip(vertices, edge_colors)]  # TODO: check we always want this broadcasting
         colors = np.concatenate(colors)
     else:
         colors = None
@@ -161,8 +166,8 @@ def _mesh(coordinates, radii, n_tube_points=15, dtype='uint32'):
 
 def _frenet_frames(coordinates):
     """Calculates and returns the tangents, normals and binormals for a chain of coordinates."""
-    # n_points = len(coordinates)
-    # epsilon = 0.0001
+    n_points = len(coordinates)
+    epsilon = 0.0001
 
     # compute tangent vectors for each segment
     tangents = np.roll(coordinates, -1, axis=0) - np.roll(coordinates, 1, axis=0)
@@ -178,16 +183,16 @@ def _frenet_frames(coordinates):
 
     vec = np.cross(tangents[0], normal)
 
-    normals = np.zeros((npoints, 3))
+    normals = np.zeros((n_points, 3))
     normals[0] = np.cross(tangents[0], vec)
 
     # compute change along trajectory
-    # theta = np.arccos(np.clip(np.sum(tangents[:-1] * tangents[1:], axis=1), -1, 1))
+    theta = np.arccos(np.clip(np.sum(tangents[:-1] * tangents[1:], axis=1), -1, 1))
     vec = np.cross(tangents[:-1], tangents[1:])
     nrm = np.linalg.norm(vec, axis=1)
 
     # compute normal and binormal vectors along the path
-    for i in range(npoints-1):
+    for i in range(n_points-1):
         normals[i+1] = normals[i]
 
         if nrm[i] > epsilon:
@@ -223,7 +228,7 @@ def interpolate_edge_geometry(graph, smooth = 5, order = 2,
                               points_per_pixel = 0.5, 
                               processes = None, verbose = False):
     """Smooth center lines and radii of the edge geometry."""
-    if not graph.has_edge_geometry():
+    if not graph.has_edge_geometry('coordinates'):
         raise ValueError('Graph has no edge geometry!')
 
     coordinates, indices = graph.edge_geometry('coordinates', return_indices=True, as_list=False)
@@ -261,6 +266,8 @@ def interpolate_edge_geometry(graph, smooth = 5, order = 2,
     smm.free(coordinates_hdl)
     smm.free(radii_hdl)
     smm.free(indices_hdl)
+
+    results = list(results)
 
     # smm.free(coordinates_interp_hdl)
     # smm.free(radii_interp_hdl)
@@ -326,7 +333,7 @@ def _interpolate_edge(coordinates, radii, n_points, smooth=5, order=2):
 def _test():
     import numpy as np
     import ClearMap.Tests.Files as tf
-    import ClearMap.Analysis.Graphs.GraphProcessing as gp
+    import ClearMap.Analysis.graphs.graph_processing as gp
     # reload(gp)
 
     skeleton = tf.source('skeleton')
@@ -354,7 +361,7 @@ def _test():
 
     radii = gr.edge_geometry('radii', as_list=False)
 
-    import ClearMap.Analysis.Graphs.GraphVisualization as gv
+    import ClearMap.Analysis.graphs.GraphVisualization as gv
     reload(gv)
 
     grid, grid_indices = gv.mesh_from_edge_geometry(coordinates=coordinates, radii=radii, indices=indices)

@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>651</width>
-    <height>546</height>
+    <height>481</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -29,7 +29,7 @@
    <item>
     <widget class="QToolBox" name="toolBox">
      <property name="currentIndex">
-      <number>1</number>
+      <number>0</number>
      </property>
      <widget class="QWidget" name="pathPage">
       <property name="geometry">
@@ -37,7 +37,7 @@
         <x>0</x>
         <y>0</y>
         <width>651</width>
-        <height>486</height>
+        <height>421</height>
        </rect>
       </property>
       <attribute name="label">
@@ -81,7 +81,7 @@
          </property>
         </widget>
        </item>
-       <item row="3" column="1">
+       <item row="3" column="1" colspan="2">
         <widget class="QPlainTextEdit" name="pathPlainTextEdit"/>
        </item>
        <item row="4" column="0">
@@ -91,8 +91,29 @@
          </property>
         </widget>
        </item>
-       <item row="4" column="1">
+       <item row="4" column="1" colspan="2">
         <widget class="QPlainTextEdit" name="commentsPlainTextEdit"/>
+       </item>
+       <item row="5" column="1">
+        <widget class="QPushButton" name="convertToClearMapPushButton">
+         <property name="whatsThis">
+          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;This will convert your sample to be compatible with ClearMap. There are 4 options:&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:700;&quot;&gt;Tiled sample (with x/y pattern)&lt;/span&gt;&lt;/p&gt;&lt;p&gt;The tiles will be converted to numpy. &lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:700;&quot;&gt;Single numpy file &lt;/span&gt;&lt;/p&gt;&lt;p&gt;The file will be renamed. &lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:700;&quot;&gt;Single file of supported format &lt;/span&gt;&lt;/p&gt;&lt;p&gt;The file will be converted to numpy. &lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:700;&quot;&gt;List of files with Z pattern &lt;/span&gt;&lt;/p&gt;&lt;p&gt;The layers will be stacked into a single numpy file. &lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+         </property>
+         <property name="text">
+          <string>Convert to ClearMap format</string>
+         </property>
+        </widget>
+       </item>
+       <item row="5" column="2">
+        <widget class="QToolButton" name="convertToClearMapPushButtonInfoToolButton">
+         <property name="text">
+          <string>...</string>
+         </property>
+         <property name="icon">
+          <iconset resource="icons.qrc">
+           <normaloff>:/icons/icons/info.svg</normaloff>:/icons/icons/info.svg</iconset>
+         </property>
+        </widget>
        </item>
       </layout>
      </widget>
@@ -102,213 +123,21 @@
         <x>0</x>
         <y>0</y>
         <width>651</width>
-        <height>486</height>
+        <height>421</height>
        </rect>
       </property>
       <attribute name="label">
        <string>Geometry</string>
       </attribute>
       <layout class="QGridLayout" name="gridLayout_2">
-       <item row="1" column="0">
-        <widget class="QLabel" name="label_7">
-         <property name="toolTip">
-          <string>Resolution of the raw dataset. Uncheck to read from the metadata.</string>
-         </property>
-         <property name="text">
-          <string>Settings
- from</string>
-         </property>
-        </widget>
-       </item>
-       <item row="4" column="1" colspan="2">
-        <widget class="QFrame" name="miniBrainFrame">
-         <property name="toolTip">
-          <string>The orientation of the sample</string>
-         </property>
-         <property name="whatsThis">
-          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;This is a sketch of the sample as it was oriented during your scan.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-         </property>
-         <property name="frameShape">
-          <enum>QFrame::StyledPanel</enum>
-         </property>
-         <property name="frameShadow">
-          <enum>QFrame::Raised</enum>
-         </property>
-         <layout class="QVBoxLayout" name="verticalLayout_3">
-          <item>
-           <layout class="QHBoxLayout" name="miniBrainLayout">
-            <item alignment="Qt::AlignHCenter">
-             <widget class="QLabel" name="miniBrainLabel">
-              <property name="text">
-               <string/>
-              </property>
-             </widget>
-            </item>
-           </layout>
-          </item>
-         </layout>
-        </widget>
-       </item>
-       <item row="8" column="3">
-        <widget class="QToolButton" name="sampleCropZLblInfoToolButton">
+       <item row="6" column="3">
+        <widget class="QToolButton" name="sampleCropXLblInfoToolButton">
          <property name="text">
           <string>...</string>
          </property>
          <property name="icon">
           <iconset resource="icons.qrc">
            <normaloff>:/icons/icons/info.svg</normaloff>:/icons/icons/info.svg</iconset>
-         </property>
-        </widget>
-       </item>
-       <item row="7" column="3">
-        <widget class="QToolButton" name="sampleCropYLblInfoToolButton">
-         <property name="text">
-          <string>...</string>
-         </property>
-         <property name="icon">
-          <iconset resource="icons.qrc">
-           <normaloff>:/icons/icons/info.svg</normaloff>:/icons/icons/info.svg</iconset>
-         </property>
-        </widget>
-       </item>
-       <item row="8" column="1" colspan="2">
-        <widget class="QFrame" name="sliceZDoublet">
-         <property name="frameShape">
-          <enum>QFrame::StyledPanel</enum>
-         </property>
-         <property name="frameShadow">
-          <enum>QFrame::Raised</enum>
-         </property>
-         <property name="disabledValue" stdset="0">
-          <string>None</string>
-         </property>
-         <property name="individuallyDisableable" stdset="0">
-          <bool>false</bool>
-         </property>
-         <layout class="QHBoxLayout" name="horizontalLayout_7">
-          <item>
-           <widget class="QCheckBox" name="checkBox_3">
-            <property name="text">
-             <string/>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QSpinBox" name="spinBox_25">
-            <property name="enabled">
-             <bool>false</bool>
-            </property>
-            <property name="suffix">
-             <string>px</string>
-            </property>
-            <property name="maximum">
-             <number>65535</number>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QSpinBox" name="spinBox_26">
-            <property name="enabled">
-             <bool>false</bool>
-            </property>
-            <property name="suffix">
-             <string>px</string>
-            </property>
-            <property name="minimum">
-             <number>-1</number>
-            </property>
-            <property name="maximum">
-             <number>65535</number>
-            </property>
-           </widget>
-          </item>
-         </layout>
-        </widget>
-       </item>
-       <item row="7" column="0">
-        <widget class="QLabel" name="sampleCropYLbl">
-         <property name="toolTip">
-          <string>How the sample is cropped along Y</string>
-         </property>
-         <property name="whatsThis">
-          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;How to crop the atlas along Y to match the sample. &lt;span style=&quot; color:#729fcf;&quot;&gt;NOTE: Values in pixels.&lt;/span&gt; To select the appropriate values, open the atlas in the same orientation (in ClearMap/Resources/Atlas).&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-         </property>
-         <property name="text">
-          <string>Crop Y</string>
-         </property>
-        </widget>
-       </item>
-       <item row="6" column="1" colspan="2">
-        <widget class="QFrame" name="sliceXDoublet">
-         <property name="frameShape">
-          <enum>QFrame::StyledPanel</enum>
-         </property>
-         <property name="frameShadow">
-          <enum>QFrame::Raised</enum>
-         </property>
-         <property name="disabledValue" stdset="0">
-          <string>None</string>
-         </property>
-         <property name="individuallyDisableable" stdset="0">
-          <bool>false</bool>
-         </property>
-         <layout class="QHBoxLayout" name="horizontalLayout_2">
-          <item>
-           <widget class="QCheckBox" name="checkBox">
-            <property name="text">
-             <string/>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QSpinBox" name="spinBox_19">
-            <property name="enabled">
-             <bool>false</bool>
-            </property>
-            <property name="suffix">
-             <string>px</string>
-            </property>
-            <property name="maximum">
-             <number>65535</number>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QSpinBox" name="spinBox_20">
-            <property name="enabled">
-             <bool>false</bool>
-            </property>
-            <property name="suffix">
-             <string>px</string>
-            </property>
-            <property name="minimum">
-             <number>-1</number>
-            </property>
-            <property name="maximum">
-             <number>65535</number>
-            </property>
-           </widget>
-          </item>
-         </layout>
-        </widget>
-       </item>
-       <item row="6" column="0">
-        <widget class="QLabel" name="sampleCropXLbl">
-         <property name="toolTip">
-          <string>How the sample is cropped along X</string>
-         </property>
-         <property name="whatsThis">
-          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;How to crop the atlas along X to match the sample. &lt;span style=&quot; color:#729fcf;&quot;&gt;NOTE: Values in pixels.&lt;/span&gt; To select the appropriate values, open the atlas in the same orientation (in ClearMap/Resources/Atlas).&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-         </property>
-         <property name="text">
-          <string>Crop X</string>
-         </property>
-        </widget>
-       </item>
-       <item row="5" column="2">
-        <widget class="QPushButton" name="sampleViewAtlasPushButton">
-         <property name="text">
-          <string>View Atlas</string>
          </property>
         </widget>
        </item>
@@ -366,8 +195,8 @@
          </layout>
         </widget>
        </item>
-       <item row="6" column="3">
-        <widget class="QToolButton" name="sampleCropXLblInfoToolButton">
+       <item row="7" column="3">
+        <widget class="QToolButton" name="sampleCropYLblInfoToolButton">
          <property name="text">
           <string>...</string>
          </property>
@@ -375,6 +204,130 @@
           <iconset resource="icons.qrc">
            <normaloff>:/icons/icons/info.svg</normaloff>:/icons/icons/info.svg</iconset>
          </property>
+        </widget>
+       </item>
+       <item row="1" column="2">
+        <widget class="QPushButton" name="sampleChannelGeometryChannelCopyPushButton">
+         <property name="text">
+          <string>Copy</string>
+         </property>
+        </widget>
+       </item>
+       <item row="3" column="0">
+        <widget class="QLabel" name="sampleOrientationLbl">
+         <property name="toolTip">
+          <string>The orientation of the sample during acquisition</string>
+         </property>
+         <property name="whatsThis">
+          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The order in which are represented the X, Y and Z axes. &lt;/p&gt;&lt;p&gt;A &lt;span style=&quot; font-weight:700;&quot;&gt;negative value&lt;/span&gt; indicates an &lt;span style=&quot; font-weight:700;&quot;&gt;inversion&lt;/span&gt; of the axis direction.&lt;/p&gt;&lt;p&gt;The value 0 means this axis is undefined.&lt;/p&gt;&lt;p&gt;Orientation is invalid untill all axes are specified.&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:700;&quot;/&gt;&lt;span style=&quot; font-weight:700; color:#edd400;&quot;&gt;WARNING: do not select the same order for multiple axes.&lt;/span&gt;&lt;/p&gt;&lt;p&gt;Once selected, select &lt;span style=&quot; font-weight:700;&quot;&gt;update workspace&lt;/span&gt; and then,&lt;/p&gt;&lt;p&gt;click on the magnifying glass to view the result.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+         </property>
+         <property name="text">
+          <string>Orientation
+ (XYZ)</string>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="1" colspan="2">
+        <widget class="QFrame" name="resolutionTriplet">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Minimum" vsizetype="Preferred">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="frameShape">
+          <enum>QFrame::StyledPanel</enum>
+         </property>
+         <property name="frameShadow">
+          <enum>QFrame::Raised</enum>
+         </property>
+         <property name="disabledValue" stdset="0">
+          <string>'auto'</string>
+         </property>
+         <layout class="QHBoxLayout" name="horizontalLayout_4">
+          <property name="sizeConstraint">
+           <enum>QLayout::SetDefaultConstraint</enum>
+          </property>
+          <item>
+           <widget class="QCheckBox" name="checkBox_4">
+            <property name="text">
+             <string/>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QDoubleSpinBox" name="doubleSpinBox_1">
+            <property name="enabled">
+             <bool>false</bool>
+            </property>
+            <property name="decimals">
+             <number>3</number>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QDoubleSpinBox" name="doubleSpinBox_2">
+            <property name="enabled">
+             <bool>false</bool>
+            </property>
+            <property name="decimals">
+             <number>3</number>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QDoubleSpinBox" name="doubleSpinBox_3">
+            <property name="enabled">
+             <bool>false</bool>
+            </property>
+            <property name="decimals">
+             <number>3</number>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item row="6" column="0">
+        <widget class="QLabel" name="sampleCropXLbl">
+         <property name="toolTip">
+          <string>How the sample is cropped along X</string>
+         </property>
+         <property name="whatsThis">
+          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;How to crop the atlas along X to match the sample. &lt;span style=&quot; color:#729fcf;&quot;&gt;NOTE: Values in pixels.&lt;/span&gt; To select the appropriate values, open the atlas in the same orientation (in ClearMap/Resources/Atlas).&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+         </property>
+         <property name="text">
+          <string>Crop X</string>
+         </property>
+        </widget>
+       </item>
+       <item row="4" column="1" colspan="2">
+        <widget class="QFrame" name="miniBrainFrame">
+         <property name="toolTip">
+          <string>The orientation of the sample</string>
+         </property>
+         <property name="whatsThis">
+          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;This is a sketch of the sample as it was oriented during your scan.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+         </property>
+         <property name="frameShape">
+          <enum>QFrame::StyledPanel</enum>
+         </property>
+         <property name="frameShadow">
+          <enum>QFrame::Raised</enum>
+         </property>
+         <layout class="QVBoxLayout" name="verticalLayout_3">
+          <item>
+           <layout class="QHBoxLayout" name="miniBrainLayout">
+            <item alignment="Qt::AlignHCenter">
+             <widget class="QLabel" name="miniBrainLabel">
+              <property name="text">
+               <string/>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+         </layout>
         </widget>
        </item>
        <item row="9" column="1">
@@ -443,6 +396,153 @@
          </layout>
         </widget>
        </item>
+       <item row="2" column="0">
+        <widget class="QLabel" name="label_6">
+         <property name="toolTip">
+          <string>Resolution of the raw dataset. Uncheck to read from the metadata.</string>
+         </property>
+         <property name="text">
+          <string>Resolution</string>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="0">
+        <widget class="QLabel" name="label_7">
+         <property name="toolTip">
+          <string>Resolution of the raw dataset. Uncheck to read from the metadata.</string>
+         </property>
+         <property name="text">
+          <string>Settings
+ from</string>
+         </property>
+        </widget>
+       </item>
+       <item row="8" column="1" colspan="2">
+        <widget class="QFrame" name="sliceZDoublet">
+         <property name="frameShape">
+          <enum>QFrame::StyledPanel</enum>
+         </property>
+         <property name="frameShadow">
+          <enum>QFrame::Raised</enum>
+         </property>
+         <property name="disabledValue" stdset="0">
+          <string>None</string>
+         </property>
+         <property name="individuallyDisableable" stdset="0">
+          <bool>false</bool>
+         </property>
+         <layout class="QHBoxLayout" name="horizontalLayout_7">
+          <item>
+           <widget class="QCheckBox" name="checkBox_3">
+            <property name="text">
+             <string/>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QSpinBox" name="spinBox_25">
+            <property name="enabled">
+             <bool>false</bool>
+            </property>
+            <property name="suffix">
+             <string>px</string>
+            </property>
+            <property name="maximum">
+             <number>65535</number>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QSpinBox" name="spinBox_26">
+            <property name="enabled">
+             <bool>false</bool>
+            </property>
+            <property name="suffix">
+             <string>px</string>
+            </property>
+            <property name="minimum">
+             <number>-1</number>
+            </property>
+            <property name="maximum">
+             <number>65535</number>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item row="8" column="3">
+        <widget class="QToolButton" name="sampleCropZLblInfoToolButton">
+         <property name="text">
+          <string>...</string>
+         </property>
+         <property name="icon">
+          <iconset resource="icons.qrc">
+           <normaloff>:/icons/icons/info.svg</normaloff>:/icons/icons/info.svg</iconset>
+         </property>
+        </widget>
+       </item>
+       <item row="5" column="2">
+        <widget class="QPushButton" name="sampleViewAtlasPushButton">
+         <property name="text">
+          <string>View Atlas</string>
+         </property>
+        </widget>
+       </item>
+       <item row="6" column="1" colspan="2">
+        <widget class="QFrame" name="sliceXDoublet">
+         <property name="frameShape">
+          <enum>QFrame::StyledPanel</enum>
+         </property>
+         <property name="frameShadow">
+          <enum>QFrame::Raised</enum>
+         </property>
+         <property name="disabledValue" stdset="0">
+          <string>None</string>
+         </property>
+         <property name="individuallyDisableable" stdset="0">
+          <bool>false</bool>
+         </property>
+         <layout class="QHBoxLayout" name="horizontalLayout_2">
+          <item>
+           <widget class="QCheckBox" name="checkBox">
+            <property name="text">
+             <string/>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QSpinBox" name="spinBox_19">
+            <property name="enabled">
+             <bool>false</bool>
+            </property>
+            <property name="suffix">
+             <string>px</string>
+            </property>
+            <property name="maximum">
+             <number>65535</number>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QSpinBox" name="spinBox_20">
+            <property name="enabled">
+             <bool>false</bool>
+            </property>
+            <property name="suffix">
+             <string>px</string>
+            </property>
+            <property name="minimum">
+             <number>-1</number>
+            </property>
+            <property name="maximum">
+             <number>65535</number>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
        <item row="8" column="0">
         <widget class="QLabel" name="sampleCropZLbl">
          <property name="toolTip">
@@ -467,109 +567,30 @@
          </property>
         </widget>
        </item>
-       <item row="3" column="0">
-        <widget class="QLabel" name="sampleOrientationLbl">
+       <item row="7" column="0">
+        <widget class="QLabel" name="sampleCropYLbl">
          <property name="toolTip">
-          <string>The orientation of the sample during acquisition</string>
+          <string>How the sample is cropped along Y</string>
          </property>
          <property name="whatsThis">
-          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The order in which are represented the X, Y and Z axes. &lt;/p&gt;&lt;p&gt;A &lt;span style=&quot; font-weight:700;&quot;&gt;negative value&lt;/span&gt; indicates an &lt;span style=&quot; font-weight:700;&quot;&gt;inversion&lt;/span&gt; of the axis direction.&lt;/p&gt;&lt;p&gt;The value 0 means this axis is undefined.&lt;/p&gt;&lt;p&gt;Orientation is invalid untill all axes are specified.&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:700;&quot;/&gt;&lt;span style=&quot; font-weight:700; color:#edd400;&quot;&gt;WARNING: do not select the same order for multiple axes.&lt;/span&gt;&lt;/p&gt;&lt;p&gt;Once selected, select &lt;span style=&quot; font-weight:700;&quot;&gt;update workspace&lt;/span&gt; and then,&lt;/p&gt;&lt;p&gt;click on the magnifying glass to view the result.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;How to crop the atlas along Y to match the sample. &lt;span style=&quot; color:#729fcf;&quot;&gt;NOTE: Values in pixels.&lt;/span&gt; To select the appropriate values, open the atlas in the same orientation (in ClearMap/Resources/Atlas).&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
          </property>
          <property name="text">
-          <string>Orientation
- (XYZ)</string>
+          <string>Crop Y</string>
          </property>
         </widget>
        </item>
+       <item row="1" column="1">
+        <widget class="QComboBox" name="sampleChannelGeometryChannelComboBox"/>
+       </item>
        <item row="3" column="3">
-        <widget class="QToolButton" name="sampleOrientationInfoToolButton">
+        <widget class="QToolButton" name="sampleOrientationLblInfoToolButton">
          <property name="text">
           <string>...</string>
          </property>
          <property name="icon">
           <iconset resource="icons.qrc">
            <normaloff>:/icons/icons/info.svg</normaloff>:/icons/icons/info.svg</iconset>
-         </property>
-        </widget>
-       </item>
-       <item row="2" column="0">
-        <widget class="QLabel" name="label_6">
-         <property name="toolTip">
-          <string>Resolution of the raw dataset. Uncheck to read from the metadata.</string>
-         </property>
-         <property name="text">
-          <string>Resolution</string>
-         </property>
-        </widget>
-       </item>
-       <item row="2" column="1" colspan="2">
-        <widget class="QFrame" name="resolutionTriplet">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Minimum" vsizetype="Preferred">
-           <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
-         </property>
-         <property name="frameShape">
-          <enum>QFrame::StyledPanel</enum>
-         </property>
-         <property name="frameShadow">
-          <enum>QFrame::Raised</enum>
-         </property>
-         <property name="disabledValue" stdset="0">
-          <string>'auto'</string>
-         </property>
-         <layout class="QHBoxLayout" name="horizontalLayout_4">
-          <property name="sizeConstraint">
-           <enum>QLayout::SetDefaultConstraint</enum>
-          </property>
-          <item>
-           <widget class="QCheckBox" name="checkBox_4">
-            <property name="text">
-             <string/>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QDoubleSpinBox" name="doubleSpinBox_1">
-            <property name="enabled">
-             <bool>false</bool>
-            </property>
-            <property name="decimals">
-             <number>3</number>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QDoubleSpinBox" name="doubleSpinBox_2">
-            <property name="enabled">
-             <bool>false</bool>
-            </property>
-            <property name="decimals">
-             <number>3</number>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QDoubleSpinBox" name="doubleSpinBox_3">
-            <property name="enabled">
-             <bool>false</bool>
-            </property>
-            <property name="decimals">
-             <number>3</number>
-            </property>
-           </widget>
-          </item>
-         </layout>
-        </widget>
-       </item>
-       <item row="1" column="1">
-        <widget class="QComboBox" name="sampleChannelGeometryChannelComboBox"/>
-       </item>
-       <item row="1" column="2">
-        <widget class="QPushButton" name="sampleChannelGeometryChannelCopyPushButton">
-         <property name="text">
-          <string>Copy</string>
          </property>
         </widget>
        </item>

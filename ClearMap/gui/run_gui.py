@@ -26,6 +26,7 @@ from shutil import copyfile
 from statistics import mode
 from types import NoneType
 
+import configobj
 from importlib_metadata import version
 
 # WARNING: Necessary for QCoreApplication creation
@@ -36,7 +37,7 @@ from PyQt5 import QtGui
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget,
                              QPushButton, QSpinBox, QDoubleSpinBox, QComboBox,
                              QLineEdit, QMessageBox, QToolBox, QProgressBar, QLabel,
-                             QStyle, QAction)
+                             QStyle, QAction, QDockWidget)
 
 import qdarkstyle
 from qdarkstyle import DarkPalette
@@ -48,15 +49,20 @@ DEBUG = False
 
 os.environ['CLEARMAP_GUI_HOSTED'] = "1"
 # ########################################### SPLASH SCREEN ###########################################################
-CLEARMAP_VERSION = version('ClearMap')
-from ClearMap.config.config_loader import ConfigLoader, CLEARMAP_CFG_DIR
-machine_cfg = ConfigLoader.get_cfg_from_path(ConfigLoader.get_default_path('machine'))
-tmp_folder = machine_cfg.get('tmp_folder', None)
+
+# Load directly to ensure not ClearMap module is loaded before fixing tmp folder
+machine_cfg = configobj.ConfigObj(os.path.expanduser('~/.clearmap/machine_params_v3_0.cfg'),
+                                  unrepr=True, encoding='utf-8', indent_type='    ')
+tmp_folder = machine_cfg.get('temp_folder')
 if tmp_folder is not None:
     for var_name in ('TMP', 'TEMP', 'TMPDIR'):
         os.environ[var_name] = tmp_folder
-    tempfile.tempdir = None  # Force refresh of tempdir
+    tempfile.tempdir = tmp_folder  # Force refresh of tempdir
+
 DEBUG = machine_cfg['verbosity'] in ('trace', 'debug')
+
+CLEARMAP_VERSION = version('ClearMap')
+from ClearMap.config.config_loader import ConfigLoader, CLEARMAP_CFG_DIR
 
 from ClearMap.Alignment.Stitching import layout_graph_utils  # noqa: F401 # WARNING: first because otherwise, breaks with pytorch
 
@@ -110,7 +116,7 @@ from ClearMap.gui.style import (DARK_BACKGROUND, PLOT_3D_BG, BTN_STYLE_SHEET,
 
 # Widgets import is quite slow
 from ClearMap.gui.widgets import (OrthoViewer, ProgressWatcher,
-                                  StructureSelector, PerfMonitor, ManipulateAssetsDialog)  # Perfmonitor needs plot_3d
+                                  StructureSelector, PerfMonitor, ManageAssetsWidget)  # Perfmonitor needs plot_3d
 update_pbar(app, progress_bar, 50)
 from ClearMap.gui.interfaces import BatchTab, PipelineTab
 from ClearMap.gui.preferences import PreferenceUi
@@ -307,7 +313,7 @@ class ClearMapGuiBase(QMainWindow, Ui_ClearMapGui):
         self.fix_sizes()
         self.fix_tooltips_stylesheet()
 
-        btn = self.tab_managers['sample_info'].ui.launchPatternWizzardPushButton
+        btn = self.tab_managers['sample_info'].ui.launchPatternWizardPushButton
         btn.setStyleSheet(HIGHLIGHTED_BTN_STYLE)
 
     def fix_tooltips_stylesheet(self):
@@ -751,20 +757,21 @@ class ClearMapGui(ClearMapGuiBase):
     def update_tabs(self, former_channels=None, new_channels=None):
         """ Initialises the pipeline tabs: Stitching, Registration, cell... based on sample"""
 
-        # Add stitching (if required) and registration tabs
-        stitching_tab = self.tab_managers.get('stitching', None)
-        stitching_params = getattr(stitching_tab, 'params', None)
-        stitching_cfg = getattr(stitching_params, 'config', None)
+        # Add stitching (always) and registration tabs
+        # if self.sample_manager.stitchable_channels:
+        if not self.has_tab(StitchingTab):
+            self.add_tab(StitchingTab, sample_manager=self.sample_manager, set_params=True)
+        stitching_cfg = self.tab_managers['stitching'].params.config
+        self.sample_manager.load_processors_config(stitching_config=stitching_cfg)
+
+        # stitching_tab = self.tab_managers.get('stitching', None)
+        # stitching_params = getattr(stitching_tab, 'params', None)
+        # stitching_cfg = getattr(stitching_params, 'config', None)
         if not self.has_tab(RegistrationTab):
             self.add_tab(RegistrationTab, sample_manager=self.sample_manager, set_params=True)  # WARNING: Always needed to allow setting None for atlas
         reg_cfg = self.tab_managers['registration'].params.config
 
         # WARNING: We need a first call to load_processors_config before checking the stitchable_channels (otherwise empty)
-        self.sample_manager.load_processors_config(stitching_cfg, reg_cfg)
-        if self.sample_manager.stitchable_channels:
-            if not self.has_tab(StitchingTab):
-                self.add_tab(StitchingTab, sample_manager=self.sample_manager, set_params=True)
-            stitching_cfg = self.tab_managers['stitching'].params.config
         self.sample_manager.load_processors_config(stitching_cfg, reg_cfg)
 
         # Add post processing tabs
@@ -776,7 +783,8 @@ class ClearMapGui(ClearMapGuiBase):
             warnings.warn(f'Sample params not set yet, skipping')
             return
 
-        missing_channels = set(sample_params.channels) - set(self.sample_manager.workspace.asset_collections.keys())
+        missing_channels = (set(sample_params.channels) -
+                            set(self.sample_manager.workspace.asset_collections.keys()))
         if missing_channels:
             warnings.warn(f'Channels {missing_channels} not found in workspace, skipping')
             self.finalise_tab_params()
@@ -808,10 +816,10 @@ class ClearMapGui(ClearMapGuiBase):
         valid_tab_classes = [c for c in valid_tab_classes if c is not None]
         valid_tab_classes += [NoneType]
         # valid_tab_classes = [c for c in valid_tab_classes if c is not None]
-        has_tiled_channel = any([self.sample_manager.get('raw', channel=channel).is_tiled for
-                                 channel in sample_params.channels])
-        if has_tiled_channel:
-            valid_tab_classes.append(StitchingTab)
+        # has_tiled_channel = any([self.sample_manager.get('raw', channel=channel).is_tiled for
+        #                          channel in sample_params.channels])
+        # if has_tiled_channel:
+        valid_tab_classes.append(StitchingTab)
         valid_tab_classes.append(RegistrationTab)
         # Add compound type tabs to valid_tab_classes (e.g. colocalization)
         if self.sample_manager.is_colocalization_compatible:
@@ -965,11 +973,6 @@ class ClearMapGui(ClearMapGuiBase):
             if action.text() == "&Help":  # Skip if already exists
                 return
 
-        help_menu = self.menuBar().addMenu("&Help")
-        self.about_action = QAction("&About", self)
-        self.about_action.triggered.connect(self.display_about)
-        help_menu.addAction(self.about_action)
-
         workspace_menu = self.menuBar().addMenu("&Workspace")
 
         show_info_action = QAction("Show Info", self)
@@ -980,23 +983,38 @@ class ClearMapGui(ClearMapGuiBase):
         # add_asset_action.triggered.connect(self.add_asset)
         # workspace_menu.addAction(add_asset_action)
 
-        manipulate_assets_action = QAction("Manipulate Assets", self)
-        manipulate_assets_action.triggered.connect(self.manipulate_assets)
+        manipulate_assets_action = QAction("Manage Assets", self)
+        manipulate_assets_action.triggered.connect(self.manage_assets)
         workspace_menu.addAction(manipulate_assets_action)
+
+        help_menu = self.menuBar().addMenu("&Help")
+        self.about_action = QAction("&About", self)
+        self.about_action.triggered.connect(self.display_about)
+        help_menu.addAction(self.about_action)
 
 
     def show_workspace_info(self):
+        if self.sample_manager is None or self.sample_manager.workspace is None:
+            self.popup('No workspace found. Initialise sample before using this menu.')
+            return
         self.popup(f'Workspace: {self.src_folder}, '
                    f'{self.sample_manager.workspace.info()}')
 
     def add_asset(self):
         pass  # FIXME: implement
 
-    def manipulate_assets(self):
-        dlg = ManipulateAssetsDialog(self.src_folder, self.params['sample_info'],
-                                     sample_manager=self.sample_manager,
-                                     app=self)
-        dlg.exec_()
+    def manage_assets(self):
+        if self.sample_manager is None or self.sample_manager.workspace is None:
+            self.popup('No workspace found. Initialise sample before using this menu.')
+            return
+        self.assetsManagerWidget = ManageAssetsWidget(self.src_folder, self.params['Sample info'],
+                                                      sample_manager=self.sample_manager,
+                                                      app=self)
+        self.assetsManagerDock = QDockWidget("Workspace Manager", self)
+        self.assetsManagerDock.setWidget(self.assetsManagerWidget.widget)
+        self.addDockWidget(Qt.RightDockWidgetArea, self.assetsManagerDock)
+        # self.tabifyDockWidget(self.dataViewerDockWidget, self.assetsManagerDock)
+        # dlg.exec()
 
     def reset_loggers(self):
         self.logger = Printer(redirects=None if DEBUG else 'stdout')
@@ -1214,6 +1232,7 @@ class ClearMapGui(ClearMapGuiBase):
         update_pbar(self.app, progress_bar, 40)
         self.update_tabs()  # TODO: check if init or this
         update_pbar(self.app, progress_bar, 90)
+        self.manage_assets()
         splash.finish(self)
 
     def prompt_sample_id(self):

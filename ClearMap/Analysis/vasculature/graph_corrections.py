@@ -10,7 +10,7 @@ from ClearMap.Alignment import Annotation as annotation
 from ClearMap.Analysis.vasculature.vasc_graph_utils import remove_surface, vertex_filter_to_edge_filter
 
 print('Loading ClearMap modules, please wait ...')
-import ClearMap.Analysis.Graphs.GraphGt as ggt
+import ClearMap.Analysis.graphs.graph_gt as ggt
 
 CPU_COUNT = multiprocessing.cpu_count()
 
@@ -123,7 +123,7 @@ def remove_auto_loops(graph, min_length=None, reduction_compatible=True):
     connectivity = graph.edge_connectivity()
     auto_loops_mask = ((connectivity[:, 0] - connectivity[:, 1]) == 0)
     if min_length is None:
-        bad_length_mask = np.zeros(graph.n_edges, dtype=bool)
+        bad_length_mask = np.ones(graph.n_edges, dtype=bool)
     else:
         lengths = graph.edge_property('length')
         bad_length_mask = lengths < min_length

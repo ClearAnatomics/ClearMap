@@ -12,7 +12,7 @@ from tqdm import tqdm
 import graph_tool
 import graph_tool.inference as gti
 
-import ClearMap.Analysis.Graphs.GraphGt as ggt
+from ClearMap.Analysis.graphs import graph_gt
 import ClearMap.Alignment.Annotation as ano
 from ClearMap.Analysis.vasculature.general_functions import generalized_radial_planar_orientation, \
     compute_blood_flow, get_orientation_from_normal_to_surface_local, VESSEL_PERMEABILITY_CONSTANT
@@ -169,7 +169,7 @@ def compute_brain_params_per_region(work_dir, sample_name, regions, artery_min_r
     -------
 
     """
-    graph = ggt.load(os.path.join(work_dir, sample_name, f'{sample_name}_{sample_graph_suffix}.gt'))
+    graph = graph_gt.load(os.path.join(work_dir, sample_name, f'{sample_name}_{sample_graph_suffix}.gt'))
     graph = filter_graph_degrees(graph)
     set_artery_vein_if_missing(graph, artery_min_radius=artery_min_radius, vein_min_radius=vein_min_radius)
 
@@ -408,7 +408,7 @@ def fix_annotation(work_dir, groups, sample_graph_suffix):
     for gp_name, brains in groups.items():
         for brain_id in brains:
             graph_path = os.path.join(work_dir, brain_id, f'{brain_id}_{sample_graph_suffix}.gt')
-            graph = ggt.load(graph_path)
+            graph = graph_gt.load(graph_path)
             label = graph.vertex_annotation()
             label_corrected = ano.convert_label(label, 'order', 'id')
             graph.set_vertex_annotation(label_corrected)

@@ -32,9 +32,10 @@ from PyQt5.QtWidgets import QWidget, QRadioButton, QLabel, QSplitter, QApplicati
   QGraphicsPathItem, QGridLayout, QLineEdit, QScrollArea
 
 from ClearMap.Utils.utilities import runs_on_spyder
+from ClearMap.Utils.array_utils import dtype_range
 from ClearMap.IO.IO import as_source
 from ClearMap.IO.Source import Source
-from ClearMap.Visualization.Qt.data_viewer_luts import LUT
+from ClearMap.Visualization.Qt.data_viewer_luts import LUT, HighLowLUT
 
 pg.CONFIG_OPTIONS['useOpenGL'] = False  # set to False if trouble seeing data.
 
@@ -133,6 +134,7 @@ class DataViewer(QWidget):
         self.view = pg.ViewBox()
         self.view.setAspectLocked(True)
         self.view.invertY(invertY)
+        self.view.sigRangeChanged.connect(self.onRangeChanged)
 
         self.graphicsView = pg.GraphicsView()
         self.graphicsView.setObjectName("GraphicsView")
@@ -274,6 +276,7 @@ class DataViewer(QWidget):
         self.luts = [LUT(image=i, color=c) for i, c in zip(self.image_items, self.__get_colors(default_lut))]
 
         lut_layout = QtWidgets.QGridLayout()
+        self.lut_layout = lut_layout
 
         lut_layout.setContentsMargins(0, 0, 0, 0)
         for d, lut in enumerate(self.luts):
@@ -300,6 +303,23 @@ class DataViewer(QWidget):
         # self.change_orientations_threshold()
 
         self.show()
+
+    def _add_hi_lo_lut(self, low_threshold_spin_box, high_threshold_spin_box):
+        for sb in (low_threshold_spin_box, high_threshold_spin_box):
+            sb.setKeyboardTracking(False)
+        dtype_min, dtype_max = np.iinfo(self.sources[0].dtype).min, np.iinfo(self.sources[0].dtype).max
+        self.threshold_lut = HighLowLUT(view_box=self.view,
+                                        base_item=self.image_items[0],
+                                        hist_item=self.luts[0].lut,  # unwrap wrapper
+                                        low=low_threshold_spin_box.value(),
+                                        high=high_threshold_spin_box.value(),
+                                        dtype_min=dtype_min,
+                                        dtype_max=dtype_max)
+        low_threshold_spin_box.editingFinished.connect(lambda: self.threshold_lut.set_low(low_threshold_spin_box.value()))
+        high_threshold_spin_box.editingFinished.connect(lambda: self.threshold_lut.set_high(high_threshold_spin_box.value()))
+        # self.luts[0].setParent(None)  # Schedule for deletion
+        # self.luts[0] = self.threshold_lut  # replace
+        # self.lut_layout.addWidget(self.threshold_lut, 0, 0)  # FIXME: check if we keep it here
 
     @property
     def space_axes(self):
@@ -563,6 +583,10 @@ class DataViewer(QWidget):
         """
         self.sliceLine.setValue(self.sliceLine.value() + 1)
         self.sliceLine.setValue(self.sliceLine.value() - 1)
+        # if self.scatter is not None:
+        #     ax = self.scroll_axis
+        #     index = min(max(0, int(self.sliceLine.value())), self.source_shape[ax] - 1)
+        #     self.plot_scatter_markers(ax, index)
 
     def setSliceAxis(self, axis):
         # old_scroll_axis = self.scroll_axis
@@ -611,21 +635,27 @@ class DataViewer(QWidget):
         for s, mM in enumerate(min_max):
             self.luts[s].lut.region.setRegion(mM)
 
+    def onRangeChanged(self):
+        if self.scatter is not None:
+            ax = self.scroll_axis
+            index = min(max(0, int(self.sliceLine.value())), self.source_shape[ax] - 1)
+            self.plot_scatter_markers(ax, index)
+
+
     def plot_scatter_markers(self, ax, index):
+        if self.scatter_coords is None:
+            return
         self.scatter.clear()
         self.scatter_coords.axis = ax
         pos = self.scatter_coords.get_pos(index)
         x_range, y_range = self.view.viewRange()
         # Compute scale from the ratio between original and current view range
-        # TODO: link to     self.view.sigRangeChanged.connect(self.onRangeChanged) so it updates on zoom too
+
         scale_x = self.source_range_x / (x_range[1] - x_range[0])
         scale_y = self.source_range_y / (y_range[1] - y_range[0])
-        # transform = self.view.viewTransform()
-        # scale_x, scale_y = transform.m11(), transform.m22()
         zoom_factor = (scale_x + scale_y) / 2.0
 
-        base_size = 10.0  # FIXME: that should be part of self.scatter
-        scaled_size = base_size * zoom_factor
+        scaled_size = round(self.scatter_coords.marker_size * zoom_factor)
 
         if all(pos.shape):
             if self.scatter_coords.has_colours:
@@ -635,14 +665,12 @@ class DataViewer(QWidget):
                                      **self.scatter_coords.get_draw_params(index))
             else:
                 self.scatter.setData(pos=pos, **DataViewer.DEFAULT_SCATTER_PARAMS.copy())  # TODO: check if copy required
-        try:  # FIXME: check why some markers trigger errors
-            if self.scatter_coords.half_slice_thickness is not None:
+        try:  # TODO: check why some markers trigger errors
+            if self.scatter_coords.half_slice_thickness is not None and self.scatter_coords.half_slice_thickness > 0:
                 marker_params = self.scatter_coords.get_all_data(index)
                 if marker_params['pos'].shape[0]:
                     marker_params['size'] *= zoom_factor
                     self.scatter.addPoints(brush=pg.mkBrush((0, 0, 0, 0)), **marker_params)
-                    # self.scatter.addPoints(symbol='o', brush=pg.mkBrush((0, 0, 0, 0)),
-                    #                        **marker_params)  # FIXME: scale size as function of zoom
         except KeyError as err:
             print(f'DataViewer error: {err}')
 
@@ -792,9 +820,9 @@ class DataViewer(QWidget):
 
             px, py = np.zeros(x.shape[0] * 2), np.zeros(y.shape[0] * 2)
             l = 0.45
-            px[0::2] = x - l * vx;
+            px[0::2] = x - l * vx
             px[1::2] = x + l * vx
-            py[0::2] = y - l * vy;
+            py[0::2] = y - l * vy
             py[1::2] = y + l * vy
             path = pg.arrayToQPath(px, py, 'pairs')
 

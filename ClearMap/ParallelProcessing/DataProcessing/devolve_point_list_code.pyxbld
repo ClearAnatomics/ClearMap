@@ -5,7 +5,7 @@ def make_ext(modname, pyxfilename):
     import sys
     is_macos = sys.platform == 'darwin'
 
-    extra_compile_args = ['-O3', '-march=native', 'std=c++14']
+    extra_compile_args = ['-O3', '-march=native', '-std=c++14']
     extra_link_args = None
     if not is_macos:
         extra_compile_args += ['-fopenmp']

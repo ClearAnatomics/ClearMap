@@ -17,11 +17,10 @@ The specs passed to the asset are
 import ctypes
 import multiprocessing
 import warnings
-from pathlib import Path
 
-from ClearMap.IO.assets_constants import EXTENSIONS, COMPRESSION_ALGORITHMS, CHECKSUM_ALGORITHMS, \
-    RESOURCE_TYPE_TO_FOLDER, DATA_CONTENT_TYPES
-from ClearMap.Utils.tag_expression import Expression, TAG_START
+from ClearMap.IO.assets_constants import (EXTENSIONS, COMPRESSION_ALGORITHMS, CHECKSUM_ALGORITHMS,
+                                          RESOURCE_TYPE_TO_FOLDER, DATA_CONTENT_TYPES)
+from ClearMap.Utils.tag_expression import Expression
 from ClearMap.Utils.utilities import validate_arg
 
 
@@ -44,13 +43,6 @@ class TypeSpec:
             This is used to determine the directory where the file should be stored.
             If empty, the file is stored in the root directory.
             If None, same as type_name. (For folder assets)
-        file_format_category: str | None
-            The file_type used to map to the list of possible extensions
-            for the file. E.g. 'image', 'table', 'graph'...
-            If None, the asset is a folder.
-            **If extensions is not None, this is ignored.**
-        relevant_pipelines: List[str] | None
-            The list of pipelines that are relevant for this asset.
         type_name: str
             The name of the type.
             E.g. 'stitched', 'layout', 'background', 'resampled', 'cells', 'density', 'binary'...
@@ -62,6 +54,13 @@ class TypeSpec:
         basename: str
             The base name of the file. This is the name of the file without the extension and substep.
             It is linked to type_name but can be different. Leave empty if it is the same.
+        file_format_category: str | None
+            The file_type used to map to the list of possible extensions
+            for the file. E.g. 'image', 'table', 'graph'...
+            If None, the asset is a folder.
+            **If extensions is not None, this is ignored.**
+        relevant_pipelines: List[str] | None
+            The list of pipelines that are relevant for this asset.
         compression_algorithms: List[str]
             The list of possible compression algorithms for the file (ordered by preference).
         checksum_algorithm: str
@@ -113,14 +112,7 @@ class TypeSpec:
         self._basename = value
 
     def is_expression(self):
-        if isinstance(self._basename, Expression) and self._basename.tags:
-            return True
-        elif isinstance(self._basename, (str, Path)):
-            base_name = str(self._basename)
-            if not TAG_START in base_name:  # TO speedup
-                return False
-            return bool(Expression(base_name).tags)
-        raise ValueError(f'Invalid basename: {self._basename} with type {type(self._basename)}')
+        return Expression.is_expression(self._basename)  # FIXME: why not self.basename (prop)
 
     def get_sub_type(self, sub_type_name, extensions=None, file_format_category=None, expression=None):
         sub_type = self.sub_types.get(sub_type_name)

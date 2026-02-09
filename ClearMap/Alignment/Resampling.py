@@ -612,7 +612,7 @@ def resample(original, resampled=None,
             if method == 'shared':
                 resampled_data = io.sma.create(shape, dtype=dtype, order=order, as_source=True)
             else:
-                location = tempfile.mktemp() + '.npy'
+                location = tempfile.mktemp(suffix='.npy')
                 resampled_data = io.mmp.create(location, shape=shape, dtype=dtype, order=order, as_source=True)
                 delete_files.append(location)
 
@@ -635,10 +635,10 @@ def resample(original, resampled=None,
             # ThreadPool because of documented cv2 instability w/ multiprocessing. Is this still true ?
             with ThreadPoolExecutor(processes) as executor:
                 chunk_size = len(indices) // (processes * 3)  # REFACTOR: explain calculation
-                result = executor.map(_resample, indices, chunksize=chunk_size)  # default chunk_size is 1 (too small)
+                results = executor.map(_resample, indices, chunksize=chunk_size)  # default chunk_size is 1 (too small)
                 if workspace is not None:
                     workspace.executor = executor
-                result = list(result)
+                _ = list(results)
 
         last = resampled_data
 

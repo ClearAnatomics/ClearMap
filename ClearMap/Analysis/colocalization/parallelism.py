@@ -222,10 +222,12 @@ def local_report_body(df_0, df_1, block_0, block_1, coord_names, scale, verbose,
     sub_df_0 = df_0.iloc[valid_indices_0].reset_index()
     sub_df_1 = df_1.iloc[contained_indices_1].reset_index()
     channel_0 = channel.Channel(
-        block_0.array, sub_df_0[coord_names] - start_array, voxel_dims=scale, coord_names=coord_names,clean_image=True, already_clean=are_already_clean[0]
+        block_0.array, sub_df_0[coord_names] - start_array, voxel_dims=scale,
+        coord_names=coord_names, clean_image=True, already_clean=are_already_clean[0]
     )
     channel_1 = channel.Channel(
-        block_1.array, sub_df_1[coord_names] - start_array, voxel_dims=scale, coord_names=coord_names,clean_image=True, already_clean=are_already_clean[1]
+        block_1.array, sub_df_1[coord_names] - start_array, voxel_dims=scale,
+        coord_names=coord_names, clean_image=True, already_clean=are_already_clean[1]
     )
     if verbose:
         print(f"computing blobwise overlaps for {block_0}")
@@ -241,7 +243,7 @@ def local_report_body(df_0, df_1, block_0, block_1, coord_names, scale, verbose,
             "index of maximizing overlap blob": sub_df_1.iloc[max_overlaps_indices]["index"],
         },
     )
-    del channel_0
+    del channel_0, channel_1
 
     blobwise_overlap_df = blobwise_overlap_df.set_index(sub_df_0["index"])
     del sub_df_0
