@@ -8,8 +8,9 @@ from PyQt5.QtWidgets import QApplication
 from ClearMap.IO  import IO as clm_io
 from ClearMap.Visualization.Qt import Plot3d as plot_3d
 from ClearMap.Visualization.Qt.utils import link_dataviewers_cursors
-from ClearMap.Analysis.Statistics.group_statistics import compare_groups, density_files_are_comparable, \
-    check_ids_are_unique, PValueAssets, p_val_assets_for_pair, make_summary, LoadedPValueResults
+from ClearMap.Analysis.Statistics.group_statistics import (compare_groups, density_files_are_comparable,
+                                                           check_ids_are_unique, PValueAssets, p_val_assets_for_pair,
+                                                           make_summary, LoadedPValueResults)
 
 from .generic_orchestrators import GroupOrchestratorBase
 from ..Visualization.Qt.Plot3d import PlotPanel, multi_plot_from_panels
