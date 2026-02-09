@@ -26,7 +26,7 @@ import ClearMap.IO.IO as io
 
 import ClearMap.ParallelProcessing.DataProcessing.ArrayProcessing as ap
 
-import ClearMap.ParallelProcessing.DataProcessing.StatisticsPointListCode as code
+import ClearMap.ParallelProcessing.DataProcessing.statistics.StatisticsPointListCode as code
 
 ###############################################################################
 ### Voxelization
