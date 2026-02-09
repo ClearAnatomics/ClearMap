@@ -32,7 +32,9 @@ class ConfigRepository:
         elif known_names is None and config_groups is not None:
             known_names = [names[0] for names in config_groups]
         else:
-            known_names = ALTERNATIVES_REG.canonical_pipeline_config_names
+            # known_names = ALTERNATIVES_REG.canonical_pipeline_config_names
+            minimum_sections = ['sample'] + ALTERNATIVES_REG.canonical_global_config_names # Default to only strict minimum
+            known_names = [ConfigHandler.normalise_cfg_name(n) for n in minimum_sections]
         self._config_handler = ConfigHandler(base_dir)
         self._known_names = list(known_names)
 

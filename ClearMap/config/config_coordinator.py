@@ -13,10 +13,11 @@ from ClearMap.Utils.events import CfgChanged, ChannelRenamed, ChannelsChanged
 from ClearMap.Utils.utilities import infer_origin_from_caller, deep_merge
 
 from . import config_adjusters
-from .config_adjusters import Phase, ConfigKeys, run_adjusters
+from .config_adjusters.adjusters_api import Phase, ConfigKeys
+from .config_adjusters.engine import run_adjusters
 from .config_handler import ALTERNATIVES_REG, ConfigHandler
 from .config_repository import ConfigRepository
-from .defaults_provider import DefaultsProvider, get_defaults_provider, SCHEMAS_DIR
+from .defaults_provider import DefaultsProvider, get_defaults_provider, SCHEMAS_DIR, set_defaults_provider
 from .validators import validate_all, SectionValidators
 
 if TYPE_CHECKING:
@@ -112,7 +113,7 @@ class ConfigCoordinator(BusSubscriberMixin):
     def set_defaults_provider(self, provider) -> None:
         """Wire/replace the defaults provider after construction."""
         self.defaults_provider = provider
-        config_adjusters.set_defaults_provider(provider)
+        set_defaults_provider(provider)
 
     def set_active_sections(self, sections: Optional[Iterable[str]]) -> None:
         """
@@ -196,9 +197,11 @@ class ConfigCoordinator(BusSubscriberMixin):
             self.working[name] = deepcopy(data)
             return deepcopy(data)
 
-    def load_all(self) -> Dict[str, Dict[str, Any]]:
+    def load_all(self, sections=None) -> Dict[str, Dict[str, Any]]:
         self.reset_working()
         with self._lock:
+            if sections:
+                self.set_active_sections(sections)
             data = self._config_repo.load_all()
             for name, cfg in data.items():
                 self.working[name] = deepcopy(cfg)
@@ -297,7 +300,7 @@ class ConfigCoordinator(BusSubscriberMixin):
                           RuntimeWarning, stacklevel=2)
         targeted = False
         for name, subpatch in patch.items():
-            if name == "origin":
+            if name == 'origin':
                 continue
             if allowed_sections is not None and name not in allowed_sections:
                 continue
@@ -495,7 +498,7 @@ class ConfigCoordinator(BusSubscriberMixin):
         validate_all(working_copy, sections_validators=self._section_validators,
                      schemas_dir=self._schemas_dir)  # Just in case
 
-    def commit(self, sections: list[str] | None = None) -> None:
+    def commit(self, sections: Optional[List[str]] = None) -> None:
         """
         Persist working configs to disk. If `sections` is given, only those
         sections are written; otherwise all are.

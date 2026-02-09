@@ -3,10 +3,9 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Dict, Any, Optional, Iterable
 
-
 from .config_handler import ConfigHandler, INSTALL_CFG_DIR, ALTERNATIVES_REG
 from .validators.json_schema_utils import build_schema_registry_from_dir, load_yaml_schema, compile_validator
-from ..Settings import cfg_path
+
 
 JsonDict = Dict[str, Any]
 
@@ -22,6 +21,14 @@ def get_defaults_provider():
     else:
         DEFAULTS_PROVIDER = DefaultsProvider(schemas_dir=SCHEMAS_DIR)
         return DEFAULTS_PROVIDER
+
+# WARNING: for tests only
+def set_defaults_provider(provider):
+    global DEFAULTS_PROVIDER
+    old = DEFAULTS_PROVIDER
+    DEFAULTS_PROVIDER = provider
+    return old
+
 
 def _relax_schema_for_defaults(schema: dict) -> dict:
     """

@@ -552,7 +552,7 @@ class ExperimentController(BusSubscriberMixin):
         """
         if not patch:
             return
-        print(f'Applying UI patch keys: {list(patch.keys())}')
+        # print(f'Applying UI patch keys: {list(patch.keys())}')
         self.cfg_coordinator.submit_patch(patch, sample_manager=self.sample_manager,
                                           do_run_adjusters=True, validate=True, commit=True)
         # self.evt_bus.publish(ConfigChanged({"rev": self.cfg_coordinator._rev}))
@@ -590,25 +590,8 @@ class ExperimentController(BusSubscriberMixin):
         """
         return self.cfg_coordinator.get_config_view()
 
-    def infer_required_sections(self) -> set[str]:
-        """
-        Given this controller’s SampleManager (single-sample view),
-        compute which config sections should exist for this experiment.
-        """
-        sections: set[str] = {"sample"}  # always
-
-        pipelines = self.sample_manager.infer_pipelines()
-
-        for p in pipelines:
-            # e.g. "TractMap" → "tract_map", "CellMap" → "cell_map", etc.
-            sec = ALTERNATIVES_REG.pipeline_to_section_name(p)
-            if sec:
-                sections.add(sec)
-
-        return sections
-
     def _refresh_relevant_sections(self) -> None:
-        sections = self.infer_required_sections()
+        sections = self.sample_manager.compute_required_sections()
         self.cfg_coordinator.set_active_sections(sections)
 
         # Seed defaults only for active sections
