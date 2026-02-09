@@ -934,6 +934,33 @@ class Graph(grp.AnnotatedGraph):
 
     # ## Functionality
     def sub_graph(self, vertex_filter=None, edge_filter=None, view=False):
+        """
+        Construct a subgraph using graph-tool filtering, returning either a view or a pruned copy.
+
+        Parameters
+        ----------
+        vertex_filter: None | array-like | gt.PropertyMap
+            Vertex selection mask or property map. Commonly a 1-D boolean numpy array of length
+            `self.n_vertices`. True means “vertex is retained in the view”.
+        edge_filter: None | array-like | gt.PropertyMap
+            Edge selection mask or property map. Commonly a 1-D boolean numpy array of length
+            `self.n_edges`. True means “edge is retained in the view”.
+        view: bool
+            - If True: return a `Graph` wrapping a `gt.GraphView` (no pruning/copy).
+            - If False: materialize a pruned copy via `gt.Graph(gv, prune=True)`.
+
+        Returns
+        -------
+        Graph
+            A graph restricted by the provided filters.
+
+        Notes
+        -----
+        Edge geometry handling:
+        - If the resulting graph has edges and the source graph has edge geometry, `prune_edge_geometry()`
+          is called to compact edge-geometry arrays to the retained edge set.
+        - If the resulting graph has no edges, edge geometry is removed (`remove_edge_geometry()`).
+        """
         gv = gt.GraphView(self.base, vfilt=vertex_filter, efilt=edge_filter)
         if view:
             return Graph(base=gv)
@@ -1102,9 +1129,67 @@ class Graph(grp.AnnotatedGraph):
         return label
 
     # ## Geometric manipulation
-    def sub_slice(self, slicing, view=False, coordinates=None):
+    def sub_slice(self, slicing, view=False, coordinates=None, cut_edges='exclusive'):
+        """
+        Slice the graph by an axis-aligned spatial selection, with optional boundary-edge policy.
+
+        The slice is defined by applying `slicing` to per-vertex coordinates (by default the
+        'coordinates' vertex property). This produces an initial vertex mask `V0`.
+
+        Two boundary policies are supported via `cut_edges`:
+
+        - cut_edges='exclusive' (default; current behaviour):
+          Return the induced subgraph on V0 (i.e. retain an edge only if both endpoints are in V0).
+          Implementation: `sub_graph(vertex_filter=V0, ...)`.
+
+        - cut_edges='inclusive':
+          Retain an edge if at least one of its endpoints is in V0, based on `edge_connectivity()`.
+          Additionally expand the retained vertex set to include both endpoints of every retained edge.
+          Implementation:
+            * E_keep = (V0[src] | V0[dst])
+            * V_keep = V0 ∪ endpoints(E_keep)
+            * `sub_graph(vertex_filter=V_keep, edge_filter=E_keep, ...)`
+
+        Parameters
+        ----------
+        slicing:
+            A slicing spec accepted by `ClearMap.IO.IO.slc.unpack_slicing` (slices/ints per axis).
+        view: bool
+            If True, return a lightweight `gt.GraphView`-backed Graph wrapper.
+            If False, return a pruned copy (see `sub_graph`).
+        coordinates: None | str | np.ndarray
+            Coordinate source to slice against:
+            - None: uses `self.vertex_coordinates()`
+            - str: name of a vertex property to use
+            - np.ndarray: explicit (N, ndim) coordinates array
+        cut_edges: str
+            Boundary edge policy. One of: 'exclusive', 'inclusive'.
+
+        Returns
+        -------
+        Graph
+            The sliced graph (view or pruned copy). If edge geometry exists and edges are retained,
+            geometry is compacted via `prune_edge_geometry()` in `sub_graph`.
+        """
         valid = self.sub_slice_vertex_filter(slicing, coordinates=coordinates)
-        return self.sub_graph(vertex_filter=valid, view=view)
+
+        match cut_edges:
+            case 'exclusive':
+                return self.sub_graph(vertex_filter=valid, view=view)
+            case 'inclusive':
+                ec = self.edge_connectivity(order='src_vertex')
+                src = ec[:, 0]
+                dst = ec[:, 1]
+                e_keep = valid[src] | valid[dst]
+
+                # Expand vertex set: if an edge is kept, keep both its endpoints.
+                v_keep = valid.copy()
+                if e_keep.any():
+                    v_keep[np.unique(ec[e_keep].reshape(-1))] = True
+
+                return self.sub_graph(vertex_filter=v_keep, edge_filter=e_keep, view=view)
+            case _:
+                raise ValueError(f'cut_edges must be one of: "exclusive", "inclusive"; got {cut_edges!r}')
 
     def _slice_coordinates(self, coordinates, slicing, size):
         import ClearMap.IO.IO as io
