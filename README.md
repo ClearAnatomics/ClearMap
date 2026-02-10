@@ -27,6 +27,7 @@ data from cleared tissues.
 > :new: This is the new 3.1 version of ClearMap.
 
 ## 3.1.0 what's new
+  * [x] Multichannel support (3.0)
   * [x] New pipeline: TractMap for tracts mapping
   * [x] Added colocalization analysis
   * [x] Dynamic channels for flexible analysis
