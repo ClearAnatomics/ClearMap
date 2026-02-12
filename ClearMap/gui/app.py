@@ -161,6 +161,7 @@ from ClearMap.config.config_handler import ConfigHandler, CLEARMAP_CFG_DIR, ALTE
 from ClearMap.gui.gui_utils_images import get_current_res
 from ClearMap.gui.tab_registry import TabRegistry
 from ClearMap.gui.widget_monkeypatch_callbacks import recursive_patch_widgets
+from ClearMap.pipeline_orchestrators.sample_info_management import SampleManager
 from ClearMap.pipeline_orchestrators.experiment_controller import ExperimentController, AnalysisGroupController, \
     AppMode
 from ClearMap.gui.tabs_interfaces import GenericTab, ExperimentTab, GroupTab
@@ -171,8 +172,6 @@ from ClearMap.gui import widgets as cmp_widgets
 from ClearMap.gui import style
 from ClearMap.gui import dialogs as dlgs
 from ClearMap.gui.about import AboutInfo
-
-from ClearMap.pipeline_orchestrators.sample_info_management import SampleManager
 ### END SLOW IMPORTS ###
 
 CURRENT_RES = get_current_res(app)
@@ -270,7 +269,7 @@ class ClearMapAppBase(QMainWindow, Ui_ClearMapGui):
         """
         if isinstance(msg, Exception):
             msg = str(msg)
-        self.__print_status_msg(msg, 'red')
+        self.__print_status_msg(msg, '#ff5555')  # red from qdarkstyle palette
 
     def print_warning_msg(self, msg: str):
         """
@@ -816,11 +815,25 @@ class ClearMapApp(ClearMapAppBase):
         self.error_logger.set_file(src_folder / 'errors.html')
         self.progress_logger.set_file(src_folder / 'progress.log')
 
-    def reset_loggers(self):
+    def reset_loggers(self):# FIXME: redirect should be f(log_level)
         self.logger = Printer(redirects=None if DEBUG else 'stdout')
         self.logger.text_updated.connect(self.textBrowser.append)
         self.error_logger = Printer(color='red', logger_type='error', redirects=None if DEBUG else 'stderr')
         self.error_logger.text_updated.connect(self.textBrowser.append)
+        if DEBUG:
+            self.patch_warnings_color()
+
+    def patch_warnings_color(self):
+        YELLOW = "\033[33m"
+        RESET = "\033[0m"
+
+        def _showwarning(message, category, filename, lineno, file=None, line=None):
+            text = warnings.formatwarning(message, category, filename, lineno, line)
+            # Force to stdout so PyCharm doesn't apply stderr styling rules
+            sys.stdout.write(f"{YELLOW}{text}{RESET}")
+            sys.stdout.flush()
+
+        warnings.showwarning = _showwarning
 
     def display_about(self):  # TODO: get authors list from separate file or documentation
         info = deepcopy(ABOUT_INFO)
