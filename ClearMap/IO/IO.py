@@ -80,7 +80,13 @@ file_extension_to_module = {'npy': mmp,
 if gt_loaded:
     file_extension_to_module['gt'] = gt
     source_modules += [gt]
-"""Map between file extensions and modules that handle this file type."""        
+"""Map between file extensions and modules that handle this file type."""
+
+
+class AssetBase:
+    @property
+    def path(self):
+        raise NotImplementedError('AssetBase is an abstract class, cannot get path!')
 
 
 ###############################################################################
@@ -100,6 +106,8 @@ def source_to_module(source_):
     type : module
         The module that handles the IO of the source.
     """
+    if isinstance(source_, AssetBase):
+        source_ = source_.path
     if isinstance(source_, pathlib.Path):
         source_ = str(source_)
 

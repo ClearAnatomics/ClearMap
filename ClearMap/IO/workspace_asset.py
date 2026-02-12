@@ -34,7 +34,6 @@ __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
-import copy
 import os
 import warnings
 from copy import deepcopy
@@ -56,7 +55,7 @@ from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
 from ClearMap.Utils.exceptions import ClearMapAssetError, AssetNotFoundError
 
 
-class Asset:
+class Asset(clearmap_io.AssetBase):
     """
     An asset is a file or a folder that is part of a workspace.
 
