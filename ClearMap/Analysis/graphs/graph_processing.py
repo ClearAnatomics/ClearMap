@@ -461,7 +461,7 @@ def clean_graph(graph: graph_gt.Graph, remove_self_loops: bool = True, remove_is
 
     v_prop_arrays = {}  # Cache since graph..vertex_property is not a simple lookup (recreates np.array)
     for prop_name in vertex_mappings:
-        v_prop_arrays[prop_name] = graph.vertex_property(prop_name, as_array=True, is_scalar=False)
+        v_prop_arrays[prop_name] = graph.vertex_property(prop_name, as_array=True)  # FIXME: test , is_scalar=False)
 
     edge_counter = 0
     for i, clik_id in enumerate(clique_ids):
