@@ -1677,7 +1677,10 @@ class VasculatureTab(PostProcessingTab):
         self.wrap_step(tile, worker.skeletonize_and_build_graph, abort_func=worker.stop_process, main_thread=True)
         self.wrap_step(tile, worker.clean_graph, abort_func=worker.stop_process)
         self.wrap_step(tile, worker.reduce_graph, abort_func=worker.stop_process)
-        self.wrap_step(tile, worker.register, abort_func=worker.stop_process)
+        try:
+            self.wrap_step(tile, worker.register, abort_func=worker.stop_process)
+        except MissingRequirementException:
+            pass  # Already raise by wrap_step
 
     def plot_graph_type_processing_chunk_slicer(self):  # Refactor: rename
         """

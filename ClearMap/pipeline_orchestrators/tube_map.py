@@ -64,7 +64,7 @@ __webpage__ = 'https://idisco.info'
 __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
 from ClearMap.pipeline_orchestrators.sample_info_management import SampleManager
-from ClearMap.pipeline_orchestrators.registration_orchestrator import RegistrationProcessor
+from ClearMap.pipeline_orchestrators.registration_orchestrator import RegistrationProcessor, RegistrationStatus
 
 USE_BINARY_POINTS_FILE = not platform.system().lower().startswith('darwin')
 
@@ -674,6 +674,9 @@ class VesselGraphProcessor(PipelineOrchestrator):
 
     @reload_processing_config
     def register(self, graph_cfg=None):
+        if not self.registration_processor.was_registered:
+            raise MissingRequirementException('To register the graph, the underlying image needs to be registered.'
+                                              ' Please run registration first.')
         if graph_cfg['transform'] or graph_cfg['annotate']:
             self.__register()
 
