@@ -1894,9 +1894,8 @@ class GroupAnalysisTab(BatchTab):
         def _channels_provider(params):
             sample_folders_paths = params.get_all_paths()
             if sample_folders_paths:
-                sample_manager = SampleManager()  # FIXME: missing ConfigCoordinator
                 example_exp_dir = sample_folders_paths[0][0]  # gp 0, sample 0
-                sample_manager.setup(src_dir=example_exp_dir)
+                sample_manager = self.group_controller.get_sample_manager(example_exp_dir)
                 channels = sample_manager.get_channels_by_pipeline(
                     params.pipeline, as_list=True)
                 return channels
