@@ -650,6 +650,9 @@ class WidgetOps:
             old = widget.blockSignals(True)  # type: ignore[attr-defined]
             try:
                 setter_fn(widget, value)
+            except:
+                print(f"Error setting {value=} on widget {widget.objectName()}:")
+                raise
             finally:
                 widget.blockSignals(old)     # type: ignore[attr-defined]
         else:
@@ -1052,6 +1055,10 @@ class UiParameter(BusSubscriberMixin):
                         raise
                 # Update the UI
                 setattr(self, attr, val)  # comes after the cfg otherwise, key will be missing in the callback
+        except Exception as e:
+            print(f"Error in cfg_to_ui for {self.__class__.__name__}: "
+                  f"could not set {attr} with keys {keys_list} from view {view}. Exception: {e}")
+            raise
         finally:
             self._painting = False
 
