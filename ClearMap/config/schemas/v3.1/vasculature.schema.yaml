@@ -4,46 +4,97 @@ $id: "https://clearmap.org/schemas/v3/vasculature"
 type: object
 additionalProperties: true
 
+$defs:
+  # --- Shared: binarization pipeline (used by templates and instances) ---
+  binarizationPipeline:
+    type: object
+    additionalProperties: true
+    properties:
+      binarize:
+        type: object
+        additionalProperties: true
+        properties:
+          run: { type: boolean }
+          clip_range: { $ref: "./typedefs.schema.yaml#/$defs/numberPairPositive" }
+          threshold: { type: ["number", "null"] }
+      smooth:
+        type: object
+        additionalProperties: true
+        properties:
+          run: { type: boolean }
+      binary_fill:
+        type: object
+        additionalProperties: true
+        properties:
+          run: { type: boolean }
+      deep_fill:
+        type: object
+        additionalProperties: true
+        properties:
+          run: { type: boolean }
+          resample_factor: { type: number, exclusiveMinimum: 0 }
+
+  binarizationChannelsContainer:
+    type: object
+    additionalProperties:
+      $ref: "#/$defs/binarizationPipeline"
+
+  binarizationCombined:
+    type: object
+    additionalProperties: true
+    properties:
+      binary_fill: { type: boolean }
+      compress: { type: boolean }
+
+
+  # --- Performance: per-channel binarization perf pipeline ---
+  performanceBinarizationPipeline:
+    type: object
+    additionalProperties: true
+    properties:
+      binarize:
+        type: object
+        additionalProperties: true
+        properties:
+          block_processing: { $ref: "./typedefs.schema.yaml#/$defs/blockProcessing" }
+
+      smooth:
+        type: object
+        additionalProperties: true
+        properties:
+          block_processing: { $ref: "./typedefs.schema.yaml#/$defs/blockProcessing" }
+
+      binary_fill:
+        type: object
+        additionalProperties: true
+        properties:
+          n_processes: { type: integer }
+
+      deep_fill:
+        type: object
+        additionalProperties: true
+        properties:
+          block_processing: { $ref: "./typedefs.schema.yaml#/$defs/blockProcessing" }
+
+  performanceBinarizationChannelsContainer:
+    type: object
+    additionalProperties:
+      $ref: "#/$defs/performanceBinarizationPipeline"
+
 properties:
   clearmap_schema: { type: integer }
   clearmap_version: { type: string }
 
   binarization:
     type: object
-    # Keys are typically vessels|arteries|veins|combined — (open but values are validated below)
-    additionalProperties:
-      anyOf:
-        # Spec A: full pipeline spec (vessels/arteries like)
-        - type: object
-          additionalProperties: true
-          properties:
-            binarize:
-              type: object
-              additionalProperties: true
-              properties:
-                run: { type: boolean }
-                clip_range: { $ref: "./typedefs.schema.yaml#/$defs/numberPairPositive" }
-                threshold: { type: ["number", "null"] }
-            smooth:
-              type: object
-              additionalProperties: true
-              properties: { run: { type: boolean } }
-            binary_fill:
-              type: object
-              additionalProperties: true
-              properties: { run: { type: boolean } }
-            deep_fill:
-              type: object
-              additionalProperties: true
-              properties:
-                run: { type: boolean }
-                resample_factor: { type: number, exclusiveMinimum: 0 }
-        # Spec B: combined/simple flags
-        - type: object
-          additionalProperties: true
-          properties:
-            binary_fill: { type: boolean }
-            compress:    { type: boolean }
+    additionalProperties: true
+    properties:
+      templates:
+        $ref: "#/$defs/binarizationChannelsContainer"
+      single_channels:
+        $ref: "#/$defs/binarizationChannelsContainer"
+      combined:
+        $ref: "#/$defs/binarizationCombined"
 
   graph_construction:
     type: object
@@ -111,24 +162,16 @@ properties:
         type: object
         additionalProperties: true
         properties:
-          vessels_template:
-            type: object
-            additionalProperties: true
-            properties:
-              deep_fill:
-                type: object
-                additionalProperties: true
-                properties:
-                  block_processing:
-                    $ref: "./typedefs.schema.yaml#/$defs/blockProcessing"
+          # template/default perf shape
+          templates:
+            $ref: "#/$defs/performanceBinarizationChannelsContainer"
 
-          large_vessels_template:
+          # instance perf shape
+          single_channels:
+            $ref: "#/$defs/performanceBinarizationChannelsContainer"
+
+          combine:
             type: object
             additionalProperties: true
             properties:
-              deep_fill:
-                type: object
-                additionalProperties: true
-                properties:
-                  block_processing:
-                    $ref: "./typedefs.schema.yaml#/$defs/blockProcessing"
+              block_processing: { $ref: "./typedefs.schema.yaml#/$defs/blockProcessing" }
