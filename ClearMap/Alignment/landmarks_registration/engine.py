@@ -7,7 +7,7 @@ import numpy as np
 
 import itk
 
-from ClearMap.Alignment.landmarks_registration.registration_data import ITKImage
+from ClearMap.Alignment.landmarks_registration.registration_data import ITKImage, ensure_itk_warmed
 
 
 class ElastixPointFileManager:
@@ -234,6 +234,7 @@ class AlignmentTool:
                 'moving_point_set_file_name': self.point_manager.path(moving_points_filename)
             }
             reg_args.update(landmarks)
+        ensure_itk_warmed()
         pullback_image, self.transform_params = itk.elastix_registration_method(
             self.fixed_image.image,
             self.moving_image.image,
