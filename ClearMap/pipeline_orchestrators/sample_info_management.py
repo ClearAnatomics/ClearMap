@@ -460,7 +460,7 @@ class SampleManager(OrchestratorBase):
             return asset.shape()
 
     def needs_registering(self, registration_processor: "RegistrationProcessor") -> bool:
-        status = registration_processor.get_registration_status()
+        status = registration_processor.registration_status()
         from ClearMap.pipeline_orchestrators.registration_orchestrator import RegistrationStatus
         return status == RegistrationStatus.MISSING_OUTPUTS
 
