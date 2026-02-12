@@ -301,7 +301,7 @@ class CellDetector(ChannelPipelineOrchestrator):
             cell_detection_param['maxima_detection']['save'] = str(maxima_asset.path)
 
         raw_cfg = self.cfg_coordinator.get_config_view(self.config_name)
-        block_params = raw_cfg['performance'][self.channel]['detection']['block_processing']
+        block_params = raw_cfg['performance']['channels'][self.channel]['detection']['block_processing']
         processing_parameter = copy.deepcopy(cell_detection.default_cell_detection_processing_parameter)
         # TODO: store as other dict and run .update(**self.extra_detection_params)
         processing_parameter.update(processes=sanitize_n_processes(block_params['n_processes']),
@@ -532,7 +532,7 @@ class CellDetector(ChannelPipelineOrchestrator):
 
     def get_n_blocks(self, dim_size):
         raw_cfg = self.cfg_coordinator.get_config_view(self.config_name)
-        perf_params = raw_cfg['performance'][self.channel]['detection']['block_processing']
+        perf_params = raw_cfg['performance']['channels'][self.channel]['detection']['block_processing']
         blk_size = perf_params['size_max']
         overlap = perf_params['overlap']
         n_blocks = int(np.ceil((dim_size - blk_size) / (blk_size - overlap) + 1))
