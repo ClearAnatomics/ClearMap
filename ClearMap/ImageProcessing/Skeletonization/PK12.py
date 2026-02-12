@@ -525,7 +525,7 @@ def skeletonize_index(binary, points = None, steps = None, removals = False, rad
       timer_iter = tmr.Timer();
   
   
-    print(type(points), points.dtype, binary.dtype)
+    # print(type(points), points.dtype, binary.dtype)
     border = cpl.convolve_3d_indices_if_smaller_than(binary, t3d.n6, points, 6);
     borderpoints = points[border];
     #borderids    = np.nonzero(border)[0];
