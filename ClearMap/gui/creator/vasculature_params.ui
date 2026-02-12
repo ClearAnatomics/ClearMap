@@ -14,6 +14,49 @@
    <string>Form</string>
   </property>
   <layout class="QGridLayout" name="gridLayout">
+   <item row="3" column="1">
+    <widget class="QPushButton" name="binarizePushButton">
+     <property name="text">
+      <string>Run</string>
+     </property>
+    </widget>
+   </item>
+   <item row="2" column="0">
+    <layout class="QGridLayout" name="gridLayout_9">
+     <item row="1" column="0">
+      <widget class="QCheckBox" name="binarizationBinaryFillingCheckBox">
+       <property name="text">
+        <string>Binary filling</string>
+       </property>
+      </widget>
+     </item>
+     <item row="2" column="0">
+      <widget class="QCheckBox" name="binarizationDeepFillingCheckBox">
+       <property name="whatsThis">
+        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;In this step a trained convolutional deep network &lt;/p&gt;&lt;p&gt;is applied to fill the holes of hollow vessels in the &lt;/p&gt;&lt;p&gt;vasculature and arteries data.&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+       </property>
+       <property name="text">
+        <string>Deep filling</string>
+       </property>
+      </widget>
+     </item>
+     <item row="0" column="0">
+      <widget class="QCheckBox" name="binarizationSmoothingCheckBox">
+       <property name="text">
+        <string>Smooth</string>
+       </property>
+      </widget>
+     </item>
+     <item row="2" column="1">
+      <widget class="QToolButton" name="binarizationDeepFillingInfoToolButton">
+       <property name="icon">
+        <iconset>
+         <normaloff>:/icons/icons/info.svg</normaloff>:/icons/icons/info.svg</iconset>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </item>
    <item row="0" column="0">
     <widget class="QCheckBox" name="runBinarizationCheckBox">
      <property name="text">
@@ -123,47 +166,16 @@
      </layout>
     </widget>
    </item>
-   <item row="2" column="0">
-    <layout class="QGridLayout" name="gridLayout_9">
-     <item row="1" column="0">
-      <widget class="QCheckBox" name="binarizationBinaryFillingCheckBox">
-       <property name="text">
-        <string>Binary filling</string>
-       </property>
-      </widget>
-     </item>
-     <item row="2" column="0">
-      <widget class="QCheckBox" name="binarizationDeepFillingCheckBox">
-       <property name="whatsThis">
-        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;In this step a trained convolutional deep network &lt;/p&gt;&lt;p&gt;is applied to fill the holes of hollow vessels in the &lt;/p&gt;&lt;p&gt;vasculature and arteries data.&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-       </property>
-       <property name="text">
-        <string>Deep filling</string>
-       </property>
-      </widget>
-     </item>
-     <item row="0" column="0">
-      <widget class="QCheckBox" name="binarizationSmoothingCheckBox">
-       <property name="text">
-        <string>Smooth</string>
-       </property>
-      </widget>
-     </item>
-     <item row="2" column="1">
-      <widget class="QToolButton" name="binarizationDeepFillingInfoToolButton">
-       <property name="icon">
-        <iconset>
-         <normaloff>:/icons/icons/info.svg</normaloff>:/icons/icons/info.svg</iconset>
-       </property>
-      </widget>
-     </item>
-    </layout>
-   </item>
-   <item row="3" column="1">
-    <widget class="QPushButton" name="binarizePushButton">
-     <property name="text">
-      <string>Run</string>
+   <item row="4" column="0" colspan="2">
+    <widget class="QGroupBox" name="binarizationPerformanceGroupBox">
+     <property name="title">
+      <string>Block parameters</string>
      </property>
+     <layout class="QVBoxLayout" name="verticalLayout">
+      <item>
+       <widget class="QWidget" name="placeholderWidget" native="true"/>
+      </item>
+     </layout>
     </widget>
    </item>
   </layout>

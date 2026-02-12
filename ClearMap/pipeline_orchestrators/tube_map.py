@@ -410,7 +410,7 @@ class BinaryVesselProcessor(PipelineOrchestrator):
                         sources.append(asset.path)
                     else:
                         raise FileNotFoundError(f'File {asset.path} not found')
-            perf_params = self.config['performance']['combine']['block_processing']
+            perf_params = self.config['performance']['binarization']['combine']['block_processing']
             block_processing.process(np.logical_or, sources, sink_asset.path,
                                      size_max=perf_params['size_max'], overlap=perf_params['overlap'],
                                      processes=sanitize_n_processes(perf_params['n_processes']), verbose=True)

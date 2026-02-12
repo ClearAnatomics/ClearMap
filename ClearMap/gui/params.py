@@ -11,7 +11,7 @@ from typing import List, Optional, Callable
 
 import numpy as np
 
-from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtCore import Qt, QTimer, QSignalBlocker
 from PyQt5.QtWidgets import (QToolBox, QCheckBox, QLabel, QHBoxLayout, QVBoxLayout,
                              QSpinBox, QLineEdit, QDoubleSpinBox, QRadioButton, QFrame, QWidget)
 
@@ -933,6 +933,7 @@ class CellMapParams(ChannelsUiParameterCollection):
         """
         if channel_name in self._perf_params:
             return
+        # FIXME: do we need to create empty dict entry in cfg for perf params ?
         self._perf_params[channel_name] = ChannelCellMapPerformanceParams(
             self.tab, channel_name, event_bus=self._bus,
             get_view=self._get_view, apply_patch=self._apply_patch)
@@ -1236,6 +1237,14 @@ class SharedVesselBinarizationParams(UiParameter):
             'plot_channel_2': ParamLink(None, self.tab.binarizationPlotChannel2ComboBox),
         }
 
+    def set_plotable_channels(self, channels):
+        with QSignalBlocker(self.tab.binarizationPlotChannel1ComboBox):
+            self.tab.binarizationPlotChannel1ComboBox.clear()
+            self.tab.binarizationPlotChannel1ComboBox.addItems(channels)
+        with QSignalBlocker(self.tab.binarizationPlotChannel2ComboBox):
+            self.tab.binarizationPlotChannel2ComboBox.clear()
+            self.tab.binarizationPlotChannel2ComboBox.addItems(channels)
+
 
 class VesselParams(ChannelsUiParameterCollection):
 
@@ -1250,14 +1259,16 @@ class VesselParams(ChannelsUiParameterCollection):
         self.graph_params = VesselGraphParams(tab, event_bus=event_bus, get_view=get_view, apply_patch=apply_patch)
         self.visualization_params = VesselVisualizationParams(tab, sample_params=sample_params, event_bus=event_bus,
                                                                 get_view=get_view, apply_patch=apply_patch)
+        self._perf_params: dict[str, VesselBinarizationPerformanceParams] = {}
 
     @property
     def params(self):
-        return list(self.values()) + [self.graph_params, self.visualization_params]
+        return list(self.values()) + [self.graph_params, self.visualization_params] + list(self._perf_params.values())
 
     def get_selected_steps_and_channels(self):
-        steps = (self.plot_step_1, self.plot_step_2)
-        channels = (self.plot_channel_1, self.plot_channel_2)
+        shared_params = self.shared_binarization_params
+        steps = (shared_params.plot_step_1, shared_params.plot_step_2)
+        channels = (shared_params.plot_channel_1, shared_params.plot_channel_2)
         channels = [c for s, c in zip(steps, channels) if s is not None]
         steps = [s for s in steps if s is not None]
         return steps, channels
@@ -1266,12 +1277,35 @@ class VesselParams(ChannelsUiParameterCollection):
         if channel_name in self.channels:
             return
         else:
-            self._update_value(['binarization', channel_name], {})  # Will be materialized w/ defaults)
+            self._update_value(['binarization', 'single_channels', channel_name], {})  # Will be materialized w/ defaults)
             self[channel_name] = VesselBinarizationParams(self.tab, channel_name, event_bus=self._bus,
                                                             get_view=self._get_view, apply_patch=self._apply_patch)
 
             if data_type == 'arteries':
                 self.graph_params.use_arteries = True
+
+            self.shared_binarization_params.set_plotable_channels(self.channels)
+
+    def add_perf_channel(self, channel_name: str):
+        """
+        Called from the tab once the channel UI page exists.
+        """
+        if channel_name in self._perf_params:
+            return
+        # FIXME: do we need to create empty dict entry in cfg for perf params ?
+        self._perf_params[channel_name] = VesselBinarizationPerformanceParams(
+            self.tab, channel_name, event_bus=self._bus,
+            get_view=self._get_view, apply_patch=self._apply_patch)
+
+    def pop(self, channel_name: str):
+        # tear down both algo + perf params
+        if channel_name in self:
+            self[channel_name].teardown()
+            super().pop(channel_name)
+            self.shared_binarization_params.set_plotable_channels(self.channels)
+        if channel_name in self._perf_params:
+            self._perf_params[channel_name].teardown()
+            del self._perf_params[channel_name]
 
 
 class VesselBinarizationParams(ChannelUiParameter):
@@ -1303,7 +1337,7 @@ class VesselBinarizationParams(ChannelUiParameter):
 
     @property
     def cfg_subtree(self):
-        return ['vasculature', 'binarization', self.name]   # REFACTOR: section name from config_handler
+        return ['vasculature', 'binarization', 'single_channels', self.name]   # REFACTOR: section name from config_handler
 
     @property
     def n_steps(self):
@@ -1311,6 +1345,45 @@ class VesselBinarizationParams(ChannelUiParameter):
         n_steps += self.run_smoothing or self.run_binary_filling
         n_steps += self.run_deep_filling
         return n_steps
+
+class VesselBinarizationPerformanceParams(ChannelUiParameter):
+    n_processes: int
+    size_min: int
+    size_max: int
+    overlap: int | None
+
+    def build_params_dict(self):
+        binarize_bp = self.tab.binarizationBlockProcessingWidget
+        smooth_bp = self.tab.smoothingBlockProcessingWidget
+        binary_fill_n_processes_w = self.tab.binaryFillingNProcessesSpinBox
+        deep_fill_bp = self.tab.deepFillingBlockProcessingWidget
+        return {
+            'binarization_n_processes': ParamLink(['binarize', 'block_processing', 'n_processes'], binarize_bp._nproc_widget),
+            'binarization_size_min': ParamLink(['binarize', 'block_processing', 'size_min'], binarize_bp._size_min_spin,
+                                               disabled_value=None, ui_sentinel=-1, enforce_sentinel_min=True),
+            'binarization_size_max': ParamLink(['binarize', 'block_processing', 'size_max'], binarize_bp._size_max_spin),
+            'binarization_overlap': ParamLink(['binarize', 'block_processing', 'overlap'], binarize_bp._overlap_spin,
+                                              disabled_value=None, ui_sentinel=-1, enforce_sentinel_min=True),
+            'smooth_n_processes': ParamLink(['smooth', 'block_processing', 'n_processes'], smooth_bp._nproc_widget),
+            'smooth_size_min': ParamLink(['smooth', 'block_processing', 'size_min'], smooth_bp._size_min_spin,
+                                         disabled_value=None, ui_sentinel=-1, enforce_sentinel_min=True),
+            'smooth_size_max': ParamLink(['smooth', 'block_processing', 'size_max'], smooth_bp._size_max_spin),
+            'smooth_overlap': ParamLink(['smooth', 'block_processing', 'overlap'], smooth_bp._overlap_spin,
+                                        disabled_value=None, ui_sentinel=-1, enforce_sentinel_min=True),
+            'binary_fill_n_processes': ParamLink(['binary_fill', 'n_processes'], binary_fill_n_processes_w),
+            'deep_fill_n_processes': ParamLink(['deep_fill', 'block_processing', 'n_processes'], deep_fill_bp._nproc_widget),
+            'deep_fill_size_min': ParamLink(['deep_fill', 'block_processing', 'size_min'], deep_fill_bp._size_min_spin,
+                                            disabled_value=None, ui_sentinel=-1, enforce_sentinel_min=True),
+            'deep_fill_size_max': ParamLink(['deep_fill', 'block_processing', 'size_max'], deep_fill_bp._size_max_spin),
+            'deep_fill_overlap': ParamLink(['deep_fill', 'block_processing', 'overlap'], deep_fill_bp._overlap_spin,
+                                           disabled_value=None, ui_sentinel=-1, enforce_sentinel_min=True),
+        }
+
+    @property
+    def cfg_subtree(self):
+        # Root for this channel’s perf; ParamLinks are already fully qualified, so this is mostly for helpers
+        return ['vasculature', 'performance', 'single_channels', self.name]
+
 
 class VesselGraphParams(UiParameter):
     publishes = Publishes(UiVesselGraphFiltersChanged)

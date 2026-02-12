@@ -131,8 +131,8 @@ from .tabs_interfaces import PostProcessingTab, PreProcessingTab, BatchTab, Expe
 from .widgets import (PatternDialog, DataFrameWidget, LandmarksSelectorDialog,
                       CheckableListWidget, FileDropListWidget, ExtendableTabWidget, ensure_inline_histogram,
                       GraphFilterList, NProcessesWidget, BlockProcessingWidget)
-from .gui_utils_base import (format_long_nb, replace_widget,  add_missing_combobox_items,
-                             populate_combobox)
+from .gui_utils_base import (format_long_nb, replace_widget, add_missing_combobox_items,
+                             populate_combobox, delete_widget)
 from .gui_utils_images import np_to_qpixmap
 from .params import (VesselParams, SampleParameters, StitchingParams, CellMapParams, GroupAnalysisParams,
                      BatchProcessingParams, RegistrationParams, TractMapParams, ColocalizationParams)
@@ -1454,6 +1454,10 @@ class VasculatureTab(PostProcessingTab):
 
         self.sample_manager = sample_manager
 
+        self.advanced_controls_names = [
+            'channel.binarizationPerformanceGroupBox'
+        ]
+
     def _bind(self):
         """
         Bind the signal/slots of the UI elements which are not
@@ -1505,6 +1509,59 @@ class VasculatureTab(PostProcessingTab):
     def _bind_channel(self, page_widget, channel):
         for btn_name, func in [('binarizePushButton', self.binarize_channel)]:
             self._bind_btn(btn_name, func, channel, page_widget)
+
+    def _setup_channel(self, page_widget: QWidget, channel: str):
+        """
+        Per-channel setup (called after channel page UI exists, before binding).
+        We build the performance widgets for binarization steps here, so perf params can bind to them.
+        """
+        # Try to locate a sensible container; prefer a dedicated groupbox if the .ui has one.
+        gp_bx = getattr(page_widget, 'binarizationPerformanceGroupBox', None)
+        if gp_bx is None:
+            # TODO print error in app
+            return
+
+        # Idempotent setup
+        if hasattr(page_widget, 'binarizationBlockProcessingWidget'):
+            return
+
+        v_layout = gp_bx.layout()
+
+        def register_bp_widget(parent, title, layout):
+            widget = BlockProcessingWidget(parent, title=title)
+            layout.addWidget(widget)
+            return widget
+
+        # --- binarize: full block_processing ---
+        page_widget.binarizationBlockProcessingWidget = register_bp_widget(
+            gp_bx, title='Binarize block processing', layout=v_layout)
+
+        # --- smooth: full block_processing ---
+        page_widget.smoothingBlockProcessingWidget = register_bp_widget(
+            gp_bx, title='Smoothing block processing', layout=v_layout)
+
+        # --- binary_fill: ONLY n_processes ---
+        page_widget.binaryFillingNProcessesSpinBox = NProcessesWidget(gp_bx, label='Binary filling n_processes')
+        v_layout.addWidget(page_widget.binaryFillingNProcessesSpinBox)
+
+        # --- deep_fill: full block_processing ---
+        page_widget.deepFillingBlockProcessingWidget = register_bp_widget(
+            gp_bx, title='Deep filling block processing', layout=v_layout)
+
+        if hasattr(page_widget, 'placeholderWidget'):
+            delete_widget(page_widget.placeholderWidget)
+
+    def _on_channel_added(self, channel: str):
+        """
+        Hook invoked by add_channel_tab() once the page exists and has been setup/bound.
+        We create the perf params now.
+        """
+        page_widget = self.get_channel_ui(channel)
+        if page_widget is None:
+            return
+        if not hasattr(page_widget, 'binarizationBlockProcessingWidget'):
+            self._setup_channel(page_widget, channel)
+        self.params.add_perf_channel(channel)
 
     def add_graph_filter(self):
         filter_widget = self.filters_list_widget.add_filter_row()
