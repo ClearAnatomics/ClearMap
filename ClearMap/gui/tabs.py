@@ -1608,7 +1608,13 @@ class VasculatureTab(PostProcessingTab):
         worker: "BinaryVesselProcessor" = self.get_worker(substep='binary')
         worker.assert_input_shapes_match()
         if not worker.inputs_match:
-            self.main_window.print_status_msg(f'Cannot binarize because of shape mismatch between channels')
+            shapes = worker.inputs_shapes
+            if shapes == (None, None):
+                self.main_window.print_error_msg(f'Cannot binarize because input channels not found at'
+                                                 f'{[a.path for a in worker.assets_to_binarize()]}')
+            else:
+                self.main_window.print_error_msg(f'Cannot binarize because of shape mismatch between channels'
+                                                 f'Got {shapes[0]}vx and {shapes[1]}vx')
             return
         try:
             kwargs = {'step_args': [channel], 'abort_func': worker.stop_process}

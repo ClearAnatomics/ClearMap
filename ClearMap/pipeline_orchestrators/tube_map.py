@@ -17,7 +17,7 @@ import platform
 import warnings
 import gc
 from concurrent.futures import ProcessPoolExecutor
-from typing import Optional, Dict, Sequence
+from typing import Optional, Dict, Sequence, Any
 
 import numpy as np
 import pandas as pd
@@ -180,16 +180,24 @@ class BinaryVesselProcessor(PipelineOrchestrator):
             if not, check again in the run/binarize method
         """
         try:
-            channels_to_binarize = self.channels_to_binarize()
-            assets_to_binarize = [self.workspace.get('stitched', channel=c) for c in channels_to_binarize]
+            assets_to_binarize = self.assets_to_binarize()
             shapes = [asset.shape() for asset in assets_to_binarize]
         except FileNotFoundError:
             warnings.warn('Stitched images not found. Cannot check shapes.')
+            self.inputs_shapes = None, None
             return
         if not all([s == shapes[0] for s in shapes]):
+            self.inputs_match = False
+            self.inputs_shapes = shapes
             raise ValueError(f'Channels to binarize have different shapes. This is not supported yet.'
                              f'Got shapes: {shapes}')
         self.inputs_match = True  # WARNING: may need to be reset when changing channels to binarize
+        self.inputs_shapes = shapes
+
+    def assets_to_binarize(self) -> list[Any]:
+        channels_to_binarize = self.channels_to_binarize()
+        assets_to_binarize = [self.workspace.get('stitched', channel=c) for c in channels_to_binarize]
+        return assets_to_binarize
 
     def run(self):
         self.binarize()
