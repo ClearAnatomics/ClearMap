@@ -105,9 +105,9 @@ performance:
             size_min: null
             size_max: 1000
             overlap: 100
-  combine:
-    block_processing:
-      n_processes: -1
-      size_min: null
-      size_max: 500
-      overlap: 0
+    combine:
+      block_processing:
+        n_processes: -1
+        size_min: null
+        size_max: 500
+        overlap: 0
