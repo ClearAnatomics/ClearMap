@@ -678,13 +678,13 @@ class VesselGraphProcessor(PipelineOrchestrator):
             skeletonization.skeletonize(binary, sink=self.get_path('skeleton', channel=self.parent_channels),  # WARNING: prange
                                         delete_border=True, verbose=True)
 
-    def _measure_radii(self):
+    def _measure_radii(self):  # FIXME: do on the clean graph to avoid measuring cliques ?
         coordinates = self.graph_raw.vertex_coordinates()
         source = self.get_path('binary', channel=self.parent_channels, asset_sub_type='final')
         spacing = np.array(self.sample_manager.get_channel_resolution(self.parent_channels[0]))
-        radii, indices = measure_radius.measure_radius(source, coordinates,
-                                                       value=0, fraction=None, max_radius=150,
-                                                       return_indices=True, default=-1, scale=spacing)  # WARNING: prange
+        radii = measure_radius.measure_radius(source, coordinates,
+                                              value=0, fraction=None, max_radius=150,
+                                              return_indices=False, default=-1, scale=spacing)  # WARNING: prange
         self.graph_raw.define_vertex_property('radius_units', radii)
         # TODO: call measure_radius with return_radii_as_scalar=False and store vectors
 
