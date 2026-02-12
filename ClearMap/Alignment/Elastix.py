@@ -86,9 +86,10 @@ from ClearMap.Alignment.Transformations.Transformation import TransformationBase
 
 try:
     import itk
-    dir(itk)  #  force read
+    dir(itk)  #  WARNING: required for force read
     from ClearMap.Alignment.landmarks_registration.engine import AlignmentTool
-    from ClearMap.Alignment.landmarks_registration.registration_data import ITKImage
+    from ClearMap.Alignment.landmarks_registration.registration_data import ITKImage, ensure_itk_warmed
+
     itk_imported = True
 except ImportError:
     itk_imported = False
@@ -688,6 +689,7 @@ def align(fixed_image, moving_image, affine_parameter_file=None, bspline_paramet
                              moving_image=ITKImage(moving_image),
                              fixed_landmarks_name=fixed_landmarks_path.name,
                              moving_landmarks_name=moving_landmarks_path.name)
+        ensure_itk_warmed()
         for param_file in parameter_files:  # TODO: use option to combine the different transforms if no intermediate results are needed
             elx_params = ParameterObject.New()
             elx_params.AddParameterFile(str(param_file))
