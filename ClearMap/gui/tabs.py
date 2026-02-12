@@ -1642,11 +1642,10 @@ class VasculatureTab(PostProcessingTab):
         plot_side_by_side: bool
             Whether to plot the images side by side (True) or overlay them (False).
         """
-        steps, channels = self.params.binarization_params.get_selected_steps_and_channels()
+        steps, channels = self.params.get_selected_steps_and_channels()
         worker = self.get_worker(substep='binary')
-        self.wrap_plot(worker.plot_results,
-                       steps, channels=channels, side_by_side=plot_side_by_side,
-                       arrange=False, parent=self.main_window)
+        self.wrap_plot(worker.plot_results, steps, channels=channels,
+                       side_by_side=plot_side_by_side, arrange=False, parent=self.main_window)
 
     # ###########################  GRAPH  #############################
 
