@@ -331,14 +331,14 @@ def _memmap(location = None, shape = None, dtype = None, order = None, mode = No
   """
   if isinstance(location, pathlib.Path):
     location = str(location)
-  #print location, shape, dtype, order, mode, array
   if isinstance(location, np.memmap):
     array = location
     location = None
 
   if array is None:
     if not isinstance(location, str):
-      raise ValueError('Cannot create memmap without a location!')
+      raise ValueError('Cannot create memmap without a location! '
+                       f'Args: location={location}, shape={shape}, dtype={dtype}, order={order}, mode={mode}')
 
     if mode != 'w+' and fu.is_file(location):
       try:
@@ -355,7 +355,7 @@ def _memmap(location = None, shape = None, dtype = None, order = None, mode = No
 
   if array is None:
     if shape is None:
-      raise ValueError('Cannot create memmap without shape at location %r!' % location)
+      raise ValueError(f'Cannot create memmap without shape at location {location!r}!')
 
     mode = 'w+' if mode is None else mode
     fortran = order in ['F', None]  #default is 'F' for memmaps
@@ -395,7 +395,7 @@ def _memmap(location = None, shape = None, dtype = None, order = None, mode = No
     order = order if order is not None else npy.order(array)
 
     if shape != array.shape:
-      raise ValueError('Shape %r and array shape %r mismatch!' % (shape, array.shape))
+      raise ValueError(f'Shape {shape!r} and array shape {array.shape!r} mismatch!')
 
     fortran = order in ['F', None]  #default is 'F' for memmaps
     memmap = np.lib.format.open_memmap(location, mode='w+', shape=shape, dtype=dtype, fortran_order=fortran)
