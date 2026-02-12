@@ -18,7 +18,8 @@ def dtype_to_gtype(dtype):
         'int32': 'int32_t',
         'int16': 'int16_t',
         'uint64': 'int64_t',
-        'uint32': 'int64_t'
+        'uint32': 'int64_t',
+        'uint8': 'int16_t',
     }
     if name in alias:
         name = alias[name]
