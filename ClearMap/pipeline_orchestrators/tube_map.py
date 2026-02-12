@@ -449,9 +449,10 @@ class BinaryVesselProcessor(PipelineOrchestrator):
     def plot_vessel_filling_results(self, parent=None, channel='', arrange=False):
         channel = channel if channel else self.all_vessels_channel
         images = [(self.steps[self.all_vessels_channel].get_asset(
-            self.steps[self.all_vessels_channel].postprocessed, step_back=True)),
+            self.steps[self.all_vessels_channel].postprocessed, step_back=True).path),
                   (self.get_path('binary', channel=channel, asset_sub_type='filled'))]
-        titles = [os.path.basename(img) for img in images]
+        titles = [img.stem for img in images]
+        images = [str(img) for img in images]
         return q_p3d.plot(images, title=titles, arrange=arrange,
                           lut=self.machine_config['default_lut'], parent=parent)
 
@@ -471,8 +472,9 @@ class BinaryVesselProcessor(PipelineOrchestrator):
         if channels is None:
             channels = [self.all_vessels_channel, ]
         images = [self.steps[channels[i]].get_asset(steps[i], step_back=True) for i in range(len(steps))]
+        images = [img.path for img in images]
         for img in images:
-            if not img.exists():
+            if not img.exists:
                 raise MissingRequirementException(f'File {img} not found')
         titles = [os.path.basename(img) for img in images]
         if not side_by_side:  # overlay
