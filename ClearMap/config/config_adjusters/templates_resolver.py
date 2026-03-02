@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Dict, Mapping, Optional, Tuple
 
 from copy import deepcopy
@@ -84,7 +85,40 @@ class BindPolicy:
 # Resolver
 # ---------------------------------------------------------------------
 
-class TemplatesResolver:
+class TemplateResolverBase:
+    def __init__(self, *, defaults: DefaultsProvider, policy: BindPolicy = BindPolicy()) -> None:
+        self._defaults = defaults
+        self._policy = policy
+
+    @property
+    def defaults(self) -> DefaultsProvider:
+        return self._defaults
+
+    @property
+    def policy(self) -> BindPolicy:
+        return self._policy
+
+    # Static missing only
+    # FIXME: do we exclude templates here, or leave to caller?
+    def section_missing_only_defaults(self, section_name: str) -> Dict[str, Any]:
+        """
+        Returns the raw defaults dict for a section (caller performs missing-only merge).
+        If keep_templates_out_of_working_config is True, this function *does not* strip
+        templates here (because the correct strip scope is section-specific).
+        The adjuster can do template skipping in the deep-merge implementation.
+        """
+        d = self._defaults.get(section_name)
+        return deepcopy(d) if isinstance(d, dict) else {}
+
+
+class GroupTemplatesResolver(TemplateResolverBase):
+    def __init__(self, *, defaults: DefaultsProvider, group_base_dir: Optional[Path],
+                 policy: BindPolicy = BindPolicy()) -> None:
+        super().__init__(defaults=defaults, policy=policy)
+        self.group_base_dir = group_base_dir
+
+
+class ExperimentTemplatesResolver(TemplateResolverBase):
     """
     Binds defaults templates to a specific run context (sm + defaults) and offers
     *pure* template selection/expansion utilities.
@@ -129,9 +163,8 @@ class TemplatesResolver:
 
     def __init__(self, defaults: DefaultsProvider, sm: SampleManagerProtocol, *,
                  specs_registry: ContainerSpecRegistry, policy: BindPolicy = BindPolicy()) -> None:
-        self._defaults = defaults
+        super().__init__(defaults=defaults, policy=policy)
         self._sm = sm
-        self._policy = policy
         self._specs = specs_registry.by_template_kind()
 
         self._validate_template_binders()
@@ -176,16 +209,8 @@ class TemplatesResolver:
     #     return root, base
 
     @property
-    def defaults(self) -> DefaultsProvider:
-        return self._defaults
-
-    @property
     def sm(self) -> SampleManagerProtocol:
         return self._sm
-
-    @property
-    def policy(self) -> BindPolicy:
-        return self._policy
 
     def run_facts(self) -> RunFacts:
         return self._facts
@@ -367,35 +392,20 @@ class TemplatesResolver:
         tpl_chan_k = 'vessels_template' if self._sm.data_type(channel) == 'vessels' else 'large_vessels_template'
         return self._require_template_dict(section='vasculature', kind=TemplateKind.PERF, key=tpl_chan_k)
 
-    # -----------------------------------------------------------------
-    # Missing-only section blocks (non-channel)
-    # -----------------------------------------------------------------
-
-    # FIXME: do we exclude templates here, or leave to caller?
-    def section_missing_only_defaults(self, section_name: str) -> Dict[str, Any]:
-        """
-        Returns the raw defaults dict for a section (caller performs missing-only merge).
-        If keep_templates_out_of_working_config is True, this function *does not* strip
-        templates here (because the correct strip scope is section-specific).
-        The adjuster can do template skipping in the deep-merge implementation.
-        """
-        d = self._defaults.get(section_name)
-        return deepcopy(d) if isinstance(d, dict) else {}
-
 
 # ----------------- Runner-managed resolver instance -----------------
 
-_CURRENT_RESOLVER: Optional[TemplatesResolver] = None
+_CURRENT_RESOLVER: Optional[TemplateResolverBase] = None
 
 
-def set_current_resolver(resolver: TemplatesResolver) -> Optional[TemplatesResolver]:
+def set_current_resolver(resolver: TemplateResolverBase) -> Optional[TemplateResolverBase]:
     global _CURRENT_RESOLVER
     old = _CURRENT_RESOLVER
     _CURRENT_RESOLVER = resolver
     return old
 
 
-def get_current_resolver() -> TemplatesResolver:
+def get_current_resolver() -> TemplateResolverBase:
     if _CURRENT_RESOLVER is None:
-        raise RuntimeError('No TemplatesResolver has been installed for this run')
+        raise RuntimeError('No TemplateResolverBase derived class has been installed for this run')
     return _CURRENT_RESOLVER

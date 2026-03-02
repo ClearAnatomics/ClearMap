@@ -25,7 +25,7 @@ from ClearMap.config.config_adjusters.patch_ops import (_strip_template_like_key
                                                         _restrict_entry_to_template_keys,
                                                         _strip_template_like_keys_from_entry, merge_patches,
                                                         _raise_if_rename_map_collides, set_patch_at_path)
-from ClearMap.config.config_adjusters.resolver import get_current_resolver
+from ClearMap.config.config_adjusters.templates_resolver import get_current_resolver
 from ClearMap.config.config_adjusters.adjusters_api import Phase, Step, patch_adjuster, AdjusterKind
 from ClearMap.config.config_adjusters.policy_specs import (InstanceContainerSpec,
                                                            ContainerSpecRegistry, ContainerRole, ReconcileMode,

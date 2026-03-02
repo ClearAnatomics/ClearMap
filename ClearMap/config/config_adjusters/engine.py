@@ -88,7 +88,8 @@ from ClearMap.config.config_adjusters.type_hints import (ConfigKeys, ConfigView,
 from ClearMap.config.config_adjusters.dict_ops import is_under
 from ClearMap.config.config_adjusters.patch_ops import merge_patches, _iter_patch_paths, iter_patch_items
 from ClearMap.config.defaults_provider import get_defaults_provider
-from ClearMap.config.config_adjusters.resolver import BindPolicy, set_current_resolver, TemplatesResolver
+from ClearMap.config.config_adjusters.templates_resolver import (BindPolicy, set_current_resolver,
+                                                                 ExperimentTemplatesResolver, GroupTemplatesResolver)
 from ClearMap.config.config_adjusters.trace_logging import _get_path, Tracer, summarize_paths
 from ClearMap.config.config_adjusters.adjusters_api import (Phase, Step, AdjusterSpec, _REGISTRY,
                                                             _config_keys_overlap, AdjusterKind)
@@ -204,7 +205,7 @@ class AdjusterRunner:
         self._working_view = view
         self._global_patch = {}
 
-        self._install_resolver(sample_manager)
+        self._install_template_resolver(ctx)
 
         self._trace_run_header(steps_order)
 
@@ -221,8 +222,9 @@ class AdjusterRunner:
                 self.t("  [step_patch merge -> global patch]")
                 merge_patches(self._global_patch, step_patch)
 
-            if step == Step.APPLY_RENAMES:
-                self._install_resolver(sample_manager)
+            if step == Step.APPLY_RENAMES and ctx.scope == AdjusterScope.EXPERIMENT:
+                # Rename step can change facts, so resolver must be rebound.
+                self._install_template_resolver(ctx)
 
         if self.phase == Phase.PRE_VALIDATE:
             warn_config_smells(view=self._working_view, sm=sample_manager, instance_specs_reg=INSTANCE_SPECS_REGISTRY)
@@ -355,10 +357,19 @@ class AdjusterRunner:
 
     # ---------------- resolver lifecycle ----------------
 
-    def _install_resolver(self, sample_manager: SampleManagerProtocol) -> None:
-        set_current_resolver(
-            TemplatesResolver(get_defaults_provider(), sample_manager, specs_registry=INSTANCE_SPECS_REGISTRY,
-                              policy=self._resolver_policy))
+    def _install_template_resolver(self, ctx: AdjustmentContext) -> None:
+        if ctx.scope == AdjusterScope.EXPERIMENT:
+            if ctx.sample_manager is None:
+                raise ValueError("EXPERIMENT adjustment requires ctx.sample_manager to bind resolver")
+            tpl_resolver = ExperimentTemplatesResolver(get_defaults_provider(), sm=ctx.sample_manager,
+                                                       specs_registry=INSTANCE_SPECS_REGISTRY,
+                                                       policy=self._resolver_policy)
+        elif ctx.scope == AdjusterScope.GROUP:
+            tpl_resolver = GroupTemplatesResolver(get_defaults_provider(), group_base_dir=ctx.group_base_dir,
+                                                  policy=self._resolver_policy)
+        else:
+            raise ValueError(f"Unknown scope: {ctx.scope}")
+        set_current_resolver(tpl_resolver)
 
     # ---------------- tracing helpers ----------------
 
