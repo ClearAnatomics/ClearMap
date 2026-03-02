@@ -27,6 +27,9 @@ ClearMap2.egg-info/
 ClearMap.egg-info/
 conda_init.sh
 
+# compiled QT
+*_rc.py
+
 # pyc files
 *.pyc
 *.pyxc

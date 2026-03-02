@@ -166,7 +166,6 @@ class MachineConfig:
                 self._patch_temp_dir_env(str(p))
                 return str(p)
 
-
         # Plan B: environment variable
         raw_env = os.environ.get('CLEARMAP_TMP')
         if raw_env:
@@ -300,9 +299,19 @@ def first_boot(*, allow_prompt: bool = True) -> BootResult:
     major, minor = mc._version.split('.')[:2]
     version_tag = f'v{major}_{minor}'
 
-    # FIXME: avoid regenerating every time, check timestamps instead
-    subprocess.run(['pyrcc5', 'ClearMap/gui/creator/icons.qrc', '-o', 'ClearMap/gui/creator/icons_rc.py'])
+    # TODO: move into build instead
+    creator_folder = pathlib.Path(__file__).parent.parent / 'gui' / 'creator'
+    qrc_path = creator_folder / 'icons.qrc'
+    py_rc_path = creator_folder / 'icons_rc.py'
+    if not py_rc_path.exists() or qrc_path.stat().st_mtime > py_rc_path.stat().st_mtime:
+        subprocess.run(['pyrcc5', str(qrc_path), '-o', str(py_rc_path)], check=True)
     import ClearMap.gui.creator.icons_rc  # noqa: F401
+
+    graphics_resources_qrc_path = creator_folder / 'graphics_resources.qrc'
+    graphics_resources_py_rc_path = creator_folder / 'graphics_resources_rc.py'
+    if (not graphics_resources_py_rc_path.exists() or
+            graphics_resources_qrc_path.stat().st_mtime > graphics_resources_py_rc_path.stat().st_mtime):
+        subprocess.run(['pyrcc5', graphics_resources_qrc_path, '-o', graphics_resources_py_rc_path], check=True)
 
     is_first_run = _is_first_run(version_tag)
 
