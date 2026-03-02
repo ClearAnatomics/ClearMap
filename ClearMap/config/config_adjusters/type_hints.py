@@ -1,11 +1,30 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+from enum import Enum
+from pathlib import Path
 from typing import Mapping, Any, Dict, Tuple, Callable, Optional, Protocol, List
+
 
 ConfigView = Mapping[str, Any]
 ConfigPatch = Dict[str, Any]
 ConfigKeys = tuple[str, ...]
 ConfigKeysLike = str | ConfigKeys
+
+
+class AdjusterScope(Enum):
+    EXPERIMENT = 'experiment'  # Individual sample
+    GROUP = 'group'
+
+@dataclass(frozen=True, slots=True)
+class AdjustmentContext:
+    scope: AdjusterScope
+    # Experiment context
+    sample_manager: Optional[SampleManagerProtocol] = None
+    # Group context
+    group_base_dir: Optional[Path] = None
+
+    run_label: str = ""    # Optional: useful for tracing / provenance
 
 
 # REFACTOR: move to exceptions.py
@@ -47,5 +66,5 @@ class SampleManagerProtocol(Protocol):
     def compute_required_sections(self): ...
 
 
-AdjusterFn = Callable[[ConfigView, SampleManagerProtocol], ConfigPatch]
+AdjusterFn = Callable[[ConfigView, AdjustmentContext], ConfigPatch]
 KeysPath = Tuple[str, ...]

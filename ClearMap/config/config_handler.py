@@ -251,6 +251,18 @@ class ConfigAlternativesRegistry:
         """
         return [names[0] for names in self._pipeline_groups]
 
+    @cached_property
+    def canonical_group_config_names(self):  # FIXME: USE
+        """
+        Get the canonical configuration names for group sections.
+
+        Returns
+        -------
+        list[str]
+            A list of canonical configuration names for group sections.
+        """
+        return [names[0] for names in self._group_groups]
+
     def to_canonical(self, cfg_name):
         return self.get_alternatives(cfg_name)[0]
 

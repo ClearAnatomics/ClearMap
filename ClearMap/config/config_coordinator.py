@@ -12,8 +12,8 @@ from ClearMap.Utils.event_bus import EventBus, BusSubscriberMixin
 from ClearMap.Utils.events import CfgChanged, ChannelRenamed, ChannelsChanged
 from ClearMap.Utils.utilities import infer_origin_from_caller, deep_merge
 
-from . import config_adjusters
-from .config_adjusters.adjusters_api import Phase, ConfigKeys
+from .config_adjusters.type_hints import AdjustmentContext
+from .config_adjusters.adjusters_api import Phase, ConfigKeys, AdjusterScope
 from .config_adjusters.engine import run_adjusters
 from .config_handler import ALTERNATIVES_REG, ConfigHandler
 from .config_repository import ConfigRepository
@@ -68,17 +68,20 @@ class ConfigCoordinator(BusSubscriberMixin):
     - Tabs/controllers should not write files; all persistence flows through commit().
     """
     def __init__(self, *, config_repo: ConfigRepository, bus: EventBus,
+                 scope: AdjusterScope = AdjusterScope.EXPERIMENT,
                  schemas_dir: Path | None = None,
                  defaults_provider: Optional[DefaultsProvider] = None) -> None:
         super().__init__(bus)
         self.working: Dict[str, Dict[str, Any]] = {}  # name -> cfg dict
         self._rev = 0
 
+        self._config_repo = config_repo
+        self.scope = scope
+
         if schemas_dir is None:
             schemas_dir = CURRENT_SCHEMAS_DIR
         self._schemas_dir = schemas_dir
 
-        self._config_repo = config_repo
         if defaults_provider is None:
             defaults_provider = get_defaults_provider()
         self.defaults_provider: Optional[DefaultsProvider] = defaults_provider
@@ -99,8 +102,9 @@ class ConfigCoordinator(BusSubscriberMixin):
         return self._config_repo.base_dir() / 'workspace.yml'
 
     @classmethod
-    def from_folder(cls, folder: Path, known_names: Optional[Iterable[str]], auto_load: bool = False,
-                    **kwargs) -> "ConfigCoordinator":
+    def from_folder(cls, folder: Path, known_names: Optional[Iterable[str]], *,
+                    scope: AdjusterScope = AdjusterScope.EXPERIMENT,
+                    auto_load: bool = False, **kwargs) -> "ConfigCoordinator":
         if not known_names:
             known_names = ALTERNATIVES_REG.canonical_config_names
         repo = ConfigRepository(base_dir=folder, known_names=known_names)
@@ -369,7 +373,7 @@ class ConfigCoordinator(BusSubscriberMixin):
         rec(patch)
         return patch, rename_map
 
-    def submit_patch(self, patch: dict, *, sample_manager: SampleManager, do_run_adjusters: bool = True,
+    def submit_patch(self, patch: dict, *, sample_manager: Optional[SampleManager], do_run_adjusters: bool = True,
                      validate: bool = True, commit: bool = True, origin: str | None = "ui",
                      phase=Phase.PRE_VALIDATE) -> None:
         """
@@ -428,7 +432,7 @@ class ConfigCoordinator(BusSubscriberMixin):
             for old, new in rename_map.items():
                 self.publish(ChannelRenamed(old=old, new=new))
 
-    def submit(self, *, sample_manager, do_run_adjusters: bool = True,
+    def submit(self, *, sample_manager: Optional[SampleManager] = None, do_run_adjusters: bool = True,
                validate: bool = True, commit: bool = True, phase=Phase.PRE_VALIDATE) -> None:
         """
         Run adjusters on the current working config (unfiltered), then optionally
@@ -452,7 +456,8 @@ class ConfigCoordinator(BusSubscriberMixin):
             changed_keys = _patch_to_config_keys_sets(applied_patch)
             self.publish(CfgChanged(changed_keys=tuple(".".join(k) for k in changed_keys)))
 
-    def adjust_config(self, *, sample_manager, phase: Phase = Phase.PRE_VALIDATE,
+    def adjust_config(self, *, sample_manager: Optional[SampleManager] = None,
+                      phase: Phase = Phase.PRE_VALIDATE,
                       active_sections: Optional[Iterable[str]] = None,
                       changed_keys: Optional[Iterable[ConfigKeys]] = None,
                       view: Optional[Mapping[str, Any]] = None,
@@ -477,9 +482,13 @@ class ConfigCoordinator(BusSubscriberMixin):
         """
         if view is None:
             view = self.get_config_view()
+
         active_sections = set(active_sections) if active_sections is not None else set(self._active_sections)
         active_sections = active_sections | set(ALTERNATIVES_REG.canonical_global_config_names)
-        patch = run_adjusters(view=view, sample_manager=sample_manager, phase=phase, active_sections=active_sections,
+
+        ctx = self._build_context(sample_manager)
+
+        patch = run_adjusters(view=view, ctx=ctx, phase=phase, active_sections=active_sections,
                               changed_keys=changed_keys)
         if patch:
             patch = {k: v for k, v in patch.items() if k in active_sections}
@@ -487,6 +496,29 @@ class ConfigCoordinator(BusSubscriberMixin):
             with self.__edit_session(origin="adjusters", validate=False) as working_cfg:
                 self._merge_patch(working_cfg, patch, allowed_sections=active_sections)
         return patch
+
+    def _build_context(self, sample_manager) -> AdjustmentContext:
+        if self.scope == AdjusterScope.EXPERIMENT:
+            if sample_manager is None:
+                raise ValueError('EXPERIMENT coordinator requires a sample_manager')
+            ctx = AdjustmentContext(
+                scope=AdjusterScope.EXPERIMENT,
+                sample_manager=sample_manager,
+                group_base_dir=None,
+                run_label=str(self.base_dir),
+            )
+        elif self.scope == AdjusterScope.GROUP:
+            if sample_manager is not None:
+                raise ValueError('GROUP coordinator must not receive a sample_manager')
+            ctx = AdjustmentContext(
+                scope=AdjusterScope.GROUP,
+                sample_manager=None,
+                group_base_dir=self.base_dir,  # group base dir == repo base dir
+                run_label=str(self.base_dir),
+            )
+        else:
+            raise ValueError(f'Unknown coordinator scope: {self.scope}')
+        return ctx
 
     def validate(self, working_copy=None) -> None:
         """

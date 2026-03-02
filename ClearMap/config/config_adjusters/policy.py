@@ -17,7 +17,8 @@ from ClearMap.Utils.utilities import deep_merge, REPLACE, DELETE
 from ClearMap.config.compound_keys import PairKey
 
 from ClearMap.config.config_handler import ALTERNATIVES_REG
-from ClearMap.config.config_adjusters.type_hints import ConfigView, ConfigPatch, SampleManagerProtocol, KeysPath
+from ClearMap.config.config_adjusters.type_hints import (ConfigView, ConfigPatch, SampleManagerProtocol, KeysPath,
+                                                         AdjustmentContext)
 from ClearMap.config.config_adjusters.dict_ops import (merge_section_missing_only, normalize_json_compat,
                                                        normalise_dict, get_nested, deep_merge_missing, is_under)
 from ClearMap.config.config_adjusters.patch_ops import (_strip_template_like_keys_from_container,
@@ -135,10 +136,10 @@ STATIC_OWNED_KEYS = tuple((s,) for s in STATIC_SECTIONS)
 
 
 # ############ Global rename triggered by SampleManager ############
-@patch_adjuster(step=Step.APPLY_RENAMES, phase=Phase.PRE_VALIDATE,
+@patch_adjuster(step=Step.APPLY_RENAMES, phase=Phase.PRE_VALIDATE, requires_sample_manager=True,
                 watched_keys=None, kind=AdjusterKind.INSTANCE_OWNER,
                 owned_keys=RENAME_KEYS)
-def apply_channel_renames(view: ConfigView, sm: SampleManagerProtocol) -> ConfigPatch:
+def apply_channel_renames(view: ConfigView, ctx: AdjustmentContext) -> ConfigPatch:
     """
     Rename section channels
 
@@ -154,7 +155,7 @@ def apply_channel_renames(view: ConfigView, sm: SampleManagerProtocol) -> Config
     ConfigPatch
         Patch with renamed channels applied
     """
-    rename_map = sm.renamed_channels
+    rename_map = ctx.sample_manager.renamed_channels
     if not rename_map:
         return {}
 
@@ -189,10 +190,10 @@ def apply_channel_renames(view: ConfigView, sm: SampleManagerProtocol) -> Config
 
 
 # WARNING: this must not touch instance containers declared by InstanceContainerSpec
-@patch_adjuster(step=Step.ENSURE_STATIC_BLOCKS, phase=Phase.PRE_VALIDATE,
+@patch_adjuster(step=Step.ENSURE_STATIC_BLOCKS, phase=Phase.PRE_VALIDATE, requires_sample_manager=True,
                 watched_keys=STATIC_WATCHED_KEYS, owned_keys=STATIC_OWNED_KEYS,
                 kind=AdjusterKind.STATIC_FILLER, order=50)
-def ensure_required_static_blocks(view: ConfigView, sm: SampleManagerProtocol) -> ConfigPatch:
+def ensure_required_static_blocks(view: ConfigView, ctx: AdjustmentContext) -> ConfigPatch:
     """
     Missing-only fill of required static blocks from defaults.
 
@@ -203,8 +204,8 @@ def ensure_required_static_blocks(view: ConfigView, sm: SampleManagerProtocol) -
     resolver = get_current_resolver()
     patch: ConfigPatch = {}
 
-    # TODO: decide for batch sections
-    allowed_sections = sm.compute_required_sections() | set(ALTERNATIVES_REG.canonical_global_config_names)
+    # FIXME:: decide for batch sections
+    allowed_sections = ctx.sample_manager.compute_required_sections() | set(ALTERNATIVES_REG.canonical_global_config_names)
 
     for sec in STATIC_SECTIONS:
         if sec not in allowed_sections:
@@ -333,11 +334,11 @@ def reconcile_stitching_channels_step(*, stitching_section: dict[str, Any], sm: 
     return out, True
 
 
-@patch_adjuster(step=Step.CREATE_CHANNELS_RECONCILE, phase=Phase.PRE_VALIDATE,
+@patch_adjuster(step=Step.CREATE_CHANNELS_RECONCILE, phase=Phase.PRE_VALIDATE, requires_sample_manager=True,
                 watched_keys=('sample.channels', 'stitching.channels'),
                 owned_keys=('stitching.channels',),
                 kind=AdjusterKind.INSTANCE_OWNER, order=50)
-def reconcile_stitching_channels(view: ConfigView, sm: SampleManagerProtocol) -> ConfigPatch:
+def reconcile_stitching_channels(view: ConfigView, ctx: AdjustmentContext) -> ConfigPatch:
     """
     Single-writer for stitching.channels.
 
@@ -353,7 +354,8 @@ def reconcile_stitching_channels(view: ConfigView, sm: SampleManagerProtocol) ->
       {'stitching': {'channels': REPLACE(updated)}} when changed, else {}.
     """
     stitching_section = deepcopy(view.get('stitching') or {})
-    stitching_section, changed = reconcile_stitching_channels_step(stitching_section=stitching_section, sm=sm)
+    stitching_section, changed = reconcile_stitching_channels_step(stitching_section=stitching_section,
+                                                                   sm=ctx.sample_manager)
     return {'stitching': stitching_section} if changed else {}
 
 
@@ -508,15 +510,15 @@ def reconcile_instance_container(*, spec: InstanceContainerSpec,
 
 
 # WARNING: all but stitching (SPECIAL writer)
-@patch_adjuster(step=Step.CREATE_CHANNELS_RECONCILE, phase=Phase.PRE_VALIDATE,
+@patch_adjuster(step=Step.CREATE_CHANNELS_RECONCILE, phase=Phase.PRE_VALIDATE, requires_sample_manager=True,
                 watched_keys=('sample.channels',), kind=AdjusterKind.INSTANCE_OWNER,
                 owned_keys=GENERIC_INSTANCE_KEYS)
-def reconcile_generic_instance_containers(view: ConfigView, sm: SampleManagerProtocol) -> ConfigPatch:
+def reconcile_generic_instance_containers(view: ConfigView, ctx: AdjustmentContext) -> ConfigPatch:
     resolver = get_current_resolver()
     patch: ConfigPatch = {}
 
     for spec in INSTANCE_SPECS_REGISTRY.ordered_for_reconcile(kind=ReconcileKind.GENERIC):
-        p = reconcile_instance_container(spec=spec, view=view, sm=sm, resolver=resolver)
+        p = reconcile_instance_container(spec=spec, view=view, sm=ctx.sample_manager, resolver=resolver)
         if p:
             merge_patches(patch, p)
 
@@ -530,12 +532,13 @@ TEMPLATE_ROOT_KEYS = tuple(spec.abs_templates_path() for spec in INSTANCE_SPECS_
 @patch_adjuster(
     step=Step.ADJUST,               # keep it simple for the release
     phase=Phase.PRE_VALIDATE,
+    requires_sample_manager=False,
     watched_keys=None,              # must run regardless of changed_keys
     owned_keys=TEMPLATE_ROOT_KEYS,  # only allowed to touch canonical template roots
     kind=AdjusterKind.OTHER,
     order=10_000,                   # run late (after reconcile/materialize)
 )
-def sanitize_runtime_template_roots(view, sm) -> dict:
+def sanitize_runtime_template_roots(view, ctx: AdjustmentContext) -> dict:
     """
     A1 sanitizer: delete template reservoirs located at canonical defaults_templates_path
     derived from InstanceContainerSpec.

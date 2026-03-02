@@ -83,8 +83,7 @@ from types import MappingProxyType
 from typing import Optional, Tuple, Dict, Iterable, Callable, List, Any, Set
 
 from ClearMap.Utils.utilities import deep_merge, DELETE, _REPLACE
-from ClearMap.config.config_adjusters.type_hints import (ConfigKeys, ConfigView,
-                                                         SampleManagerProtocol, ConfigPatch)
+from ClearMap.config.config_adjusters.type_hints import ConfigKeys, ConfigView, AdjustmentContext, ConfigPatch
 from ClearMap.config.config_adjusters.dict_ops import is_under
 from ClearMap.config.config_adjusters.patch_ops import merge_patches, _iter_patch_paths, iter_patch_items
 from ClearMap.config.defaults_provider import get_defaults_provider
@@ -92,8 +91,10 @@ from ClearMap.config.config_adjusters.templates_resolver import (BindPolicy, set
                                                                  ExperimentTemplatesResolver, GroupTemplatesResolver)
 from ClearMap.config.config_adjusters.trace_logging import _get_path, Tracer, summarize_paths
 from ClearMap.config.config_adjusters.adjusters_api import (Phase, Step, AdjusterSpec, _REGISTRY,
-                                                            _config_keys_overlap, AdjusterKind)
+                                                            _config_keys_overlap, AdjusterKind,
+                                                            AdjusterScope)
 from ClearMap.config.config_adjusters.policy import INSTANCE_SPECS_REGISTRY, warn_config_smells
+import ClearMap.config.config_adjusters.group_adjusters  # noqa: F401 (register adjusters)
 
 
 PHASES_ORDER: Dict[Phase, Tuple[Step, ...]] = {
@@ -194,10 +195,11 @@ class AdjusterRunner:
 
     # ---------------- public API ----------------
 
-    def run(self, *, view: ConfigView, sample_manager: SampleManagerProtocol) -> ConfigPatch:
+    def run(self, *, view: ConfigView, ctx: AdjustmentContext) -> ConfigPatch:
         self._run_id = getattr(self, "_run_id", 0) + 1
-        self.t(f"[run_adjusters] id={self._run_id} phase={self.phase} "
+        self.t(f"[run_adjusters] id={self._run_id} phase={self.phase} scope={ctx.scope} "
                f"active={self.active_sections} changed_keys={self.changed_keys}")
+
         steps_order = PHASES_ORDER.get(self.phase, ())
         if not steps_order:
             return {}
@@ -209,13 +211,13 @@ class AdjusterRunner:
 
         self._trace_run_header(steps_order)
 
-        by_step = self._select_specs(steps_order)
+        by_step = self._select_specs(steps_order, scope=ctx.scope)
 
         for step in steps_order:
             step_specs = sorted(by_step.get(step, []), key=lambda s: (s.order, s.name))
-            step_patch = self._run_step(step=step, specs=step_specs, sample_manager=sample_manager)
+            step_patch = self._run_step(step=step, specs=step_specs, ctx=ctx)
 
-            if self.active_sections:   # clip to active sections
+            if self.active_sections:  # clip to active sections
                 step_patch = {k: v for k, v in step_patch.items() if k in self.active_sections}
 
             if step_patch:
@@ -226,17 +228,21 @@ class AdjusterRunner:
                 # Rename step can change facts, so resolver must be rebound.
                 self._install_template_resolver(ctx)
 
-        if self.phase == Phase.PRE_VALIDATE:
-            warn_config_smells(view=self._working_view, sm=sample_manager, instance_specs_reg=INSTANCE_SPECS_REGISTRY)
+        if self.phase == Phase.PRE_VALIDATE and ctx.scope == AdjusterScope.EXPERIMENT:
+            # Only makes sense with real experiment SM + instance specs
+            warn_config_smells(view=self._working_view, sm=ctx.sample_manager,
+                               instance_specs_reg=INSTANCE_SPECS_REGISTRY)
 
         return self._global_patch
 
     # ---------------- selection ----------------
 
-    def _select_specs(self, steps_order: Tuple["Step", ...]) -> Dict["Step", List["AdjusterSpec"]]:
+    def _select_specs(self, steps_order: Tuple["Step", ...], *, scope: AdjusterScope) -> Dict["Step", List["AdjusterSpec"]]:
         by_step: Dict["Step", List["AdjusterSpec"]] = {s: [] for s in steps_order}
 
         for spec in _REGISTRY:
+            if spec.scope != scope:
+                continue
             if spec.phase != self.phase:
                 continue
             if spec.step not in by_step:
@@ -261,7 +267,7 @@ class AdjusterRunner:
 
     # ---------------- execution ----------------
 
-    def _run_step(self, *, step: "Step", specs: List["AdjusterSpec"], sample_manager: SampleManagerProtocol) -> ConfigPatch:
+    def _run_step(self, *, step: "Step", specs: List["AdjusterSpec"], ctx: AdjustmentContext) -> ConfigPatch:
         step_patch: ConfigPatch = {}
 
         self.t(f"\n[step] {step} specs={len(specs)}")
@@ -270,7 +276,13 @@ class AdjusterRunner:
             self._trace_spec_header(spec)
             self._summarize_trace_nodes(self._working_view, label='working_view before')
 
-            res = spec.fn(self._working_view, sample_manager) or {}
+            if spec.requires_sample_manager:
+                if ctx.sample_manager is None:
+                    raise ValueError(f"{spec.name}: requires_sample_manager=True but ctx.sample_manager is None")
+                if ctx.scope != AdjusterScope.EXPERIMENT:
+                    raise ValueError(f"{spec.name}: requires_sample_manager=True but scope is {ctx.scope}")
+
+            res = spec.fn(self._working_view, ctx) or {}
             if not res:
                 self.t("    [result] empty")
             else:
@@ -285,7 +297,6 @@ class AdjusterRunner:
                 self._summarize_trace_nodes(self._working_view, label='working_view after')
 
         return step_patch
-
     def _merge_step_patch_with_downgrade_detection(self, step_patch: ConfigPatch, res: ConfigPatch) -> None:
         trace_paths = self.cfg.trace_paths or ()
         if not trace_paths:
@@ -393,7 +404,7 @@ class AdjusterRunner:
 
 RUNS = 0
 
-def run_adjusters(*, view: ConfigView, sample_manager: SampleManagerProtocol, phase: "Phase" = Phase.PRE_VALIDATE,
+def run_adjusters(*, view: ConfigView, ctx: AdjustmentContext, phase: "Phase" = Phase.PRE_VALIDATE,
                   active_sections: Optional[Iterable[str]] = None,
                   changed_keys: Optional[Iterable[ConfigKeys]] = None,
                   trace: bool = True, trace_paths: Optional[Iterable[str]] = None,
@@ -414,6 +425,6 @@ def run_adjusters(*, view: ConfigView, sample_manager: SampleManagerProtocol, ph
     )
     runner = AdjusterRunner(phase=phase, active_sections=active_sections, changed_keys=changed_keys, config=cfg,
                             schema_registry=schema_registry, )
-    with inject_sm_view(sample_manager, view=view):
-        result = runner.run(view=view, sample_manager=sample_manager)
+    with inject_sm_view(ctx.sample_manager, view=view):
+        result = runner.run(view=view, ctx=ctx)
     return result

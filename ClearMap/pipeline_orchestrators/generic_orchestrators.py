@@ -390,7 +390,7 @@ class GroupOrchestratorBase:
         if groups is not None:
             self.group_controller.set_groups(groups)
         if results_folder is not None:
-            self.group_controller.set_results_folder(results_folder)
+            self.group_controller.set_group_base_dir(results_folder)
 
         self.channel: Optional[str] = channel
 
@@ -411,7 +411,7 @@ class GroupOrchestratorBase:
 
     @property
     def results_folder(self) -> Path:
-        return self.group_controller.results_folder
+        return self.group_controller.group_base_dir
 
     def _any_sample_in(self, group_name: str) -> Path:
         g = self.groups.get(group_name, [])

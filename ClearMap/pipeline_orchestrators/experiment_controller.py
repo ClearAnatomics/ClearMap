@@ -615,7 +615,8 @@ class AnalysisGroupController:
 
         self._controllers: dict[Path, ExperimentController] = {}
         self._groups: dict[str, list[str]] = {}
-        self._results_folder: Path | None = None
+        self._group_base_dir: Path | None = None
+        self._group_cfg_coordinator = None  # type: Optional[ConfigCoordinator]
 
         self._analysis_worker: Optional["DensityGroupAnalysisOrchestrator"] = None
 
@@ -626,8 +627,13 @@ class AnalysisGroupController:
     def set_groups(self, groups: dict[str, list[str]]):
         self._groups = {k: [str(Path(p)) for p in v] for k, v in groups.items()}
 
-    def set_results_folder(self, results_folder: str | Path):
-        self._results_folder = Path(results_folder)
+    def set_group_base_dir(self, results_folder: str | Path):
+        self._group_base_dir = Path(results_folder).resolve()
+        if self._group_cfg_coordinator is None:
+            self._group_cfg_coordinator = self._cfg_coordinator_factory(base_dir=self._group_base_dir)
+            self._group_cfg_coordinator.set_active_sections(self.infer_required_sections())
+            self._group_cfg_coordinator.load_all()
+            self._group_cfg_coordinator.seed_missing_from_defaults(tabs_only=True)
 
     def set_progress_watcher(self, watcher):
         self._progress_watcher = watcher
@@ -640,10 +646,10 @@ class AnalysisGroupController:
         return self._groups
 
     @property
-    def results_folder(self) -> Path:
-        if self._results_folder is None:
+    def group_base_dir(self) -> Path:
+        if self._group_base_dir is None:
             raise ValueError("results_folder not set")
-        return self._results_folder
+        return self._group_base_dir
 
     def _get_or_create_exp_controller(self, sample_src_dir: str | Path) -> "ExperimentController":
         root = Path(sample_src_dir).resolve()
@@ -682,3 +688,19 @@ class AnalysisGroupController:
     # FIXME: check this
     def infer_required_sections(self) -> set[str]:
         return {'group_analysis', 'batch_processing'}
+
+    def get_config_view(self) -> dict[str, Any]:
+        if self._group_cfg_coordinator is None:
+            raise ValueError("Group config not initialised (results_folder not set?)")
+        return self._group_cfg_coordinator.get_config_view()
+
+    def apply_ui_patch(self, patch: dict[str, Any]) -> None:
+        if not patch:
+            return
+        if self._group_cfg_coordinator is None:
+            raise ValueError("Group config not initialised (results_folder not set?)")
+        # FIXME: adjusters will break without a SampleManager;
+        #  need to rethink this for group-level configs
+        self._group_cfg_coordinator.submit_patch(
+            patch, sample_manager=None,  # group scope: no SampleManager
+            do_run_adjusters=True, validate=True, commit=True)

@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional, Set, Tuple, Iterable, List, Callable
+from typing import Optional, Tuple, Iterable, List, Callable
 
-from ClearMap.config.config_adjusters.type_hints import AdjusterFn, ConfigKeys, ConfigKeysLike
+from ClearMap.config.config_adjusters.type_hints import (AdjusterFn, ConfigKeys, ConfigKeysLike,
+                                                         AdjusterScope)
 
 
 class Phase(str, Enum):
@@ -47,6 +48,8 @@ class AdjusterSpec:
     watched_keys: Optional[Tuple[ConfigKeys, ...]]    # run only if these prefixes match changed keys
     owned_keys: Optional[Tuple[ConfigKeys, ...]]  # which keys this adjuster may modify
     kind: AdjusterKind = AdjusterKind.OTHER
+    scope: AdjusterScope = AdjusterScope.EXPERIMENT
+    requires_sample_manager: bool = True
     order: int = 100  # lower runs first. Alphabetically if identical.
 
 
@@ -61,6 +64,8 @@ def to_config_keys_tuples(xs: Optional[Iterable[ConfigKeysLike]]) -> Optional[Tu
     return out or None  # empty -> None
 
 def patch_adjuster(*, step: Step | str, phase: Phase | str = Phase.PRE_VALIDATE,
+                   scope: AdjusterScope | str = AdjusterScope.EXPERIMENT,
+                   requires_sample_manager: bool = True,
                    watched_keys: Optional[Iterable[ConfigKeysLike]] = None,
                    owned_keys: Optional[Iterable[ConfigKeysLike]] = None,
                    kind: AdjusterKind | str = AdjusterKind.OTHER, order: int = 100) -> Callable[[AdjusterFn], AdjusterFn]:
@@ -98,7 +103,7 @@ def patch_adjuster(*, step: Step | str, phase: Phase | str = Phase.PRE_VALIDATE,
             AdjusterSpec(
                 name=fn.__name__, fn=fn, step=step, phase=phase,
                 watched_keys=to_config_keys_tuples(watched_keys), owned_keys=to_config_keys_tuples(owned_keys),
-                kind=kind, order=order))
+                kind=kind, scope=scope, requires_sample_manager=requires_sample_manager, order=order))
         return fn
     return _wrap
 
