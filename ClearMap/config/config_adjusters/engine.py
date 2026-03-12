@@ -425,6 +425,9 @@ def run_adjusters(*, view: ConfigView, ctx: AdjustmentContext, phase: "Phase" = 
     )
     runner = AdjusterRunner(phase=phase, active_sections=active_sections, changed_keys=changed_keys, config=cfg,
                             schema_registry=schema_registry, )
-    with inject_sm_view(ctx.sample_manager, view=view):
+    if ctx.scope == AdjusterScope.EXPERIMENT:
+        with inject_sm_view(ctx.sample_manager, view=view):
+            result = runner.run(view=view, ctx=ctx)
+    else:  # No monkey-patching needed for GROUP scope since group adjusters should not access sample_manager.config
         result = runner.run(view=view, ctx=ctx)
     return result
