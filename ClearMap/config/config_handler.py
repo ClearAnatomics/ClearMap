@@ -13,7 +13,7 @@ import warnings
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Callable, Optional, Any, Dict, List, Mapping
+from typing import Callable, Optional, Any, Dict, List, Mapping, Sequence, Tuple, Set
 from functools import cached_property
 
 import configobj
@@ -91,6 +91,8 @@ LEGACY_SECTIONS = [
     ['alignment', 'processing'],  # legacy names for stitching/registration tab
 ]
 
+
+_EXCLUDED_SAMPLE_SCAN_DIRS_DEFAULT: Tuple[str, ...] = ("configs_backup", "config_snapshots")
 
 class ConfigAlternativesRegistry:
     """
@@ -1202,3 +1204,46 @@ def get_cfg_reader_function(cfg_path: Path | str) -> Callable[[Path, bool], Opti
     ext = cfg_path.suffix.lower()
     read_cfg = ConfigHandler.loader_functions[ext]
     return read_cfg
+
+
+def scan_folder_for_experiments(folder: Path | str, *,
+                                exclude_dir_names: Sequence[str] = _EXCLUDED_SAMPLE_SCAN_DIRS_DEFAULT) -> Set[Path]:
+    """
+    Discover experiment folders under `folder` by scanning recursively for sample config files.
+
+    A folder is considered an experiment root if it contains a config file whose base name
+    matches one of the 'sample' alternatives and whose extension is supported by ConfigHandler.
+
+    Excludes any match located under directories listed in `exclude_dir_names`.
+    """
+    folder = Path(folder).expanduser().resolve()
+    if not folder.is_dir():
+        return set()
+
+    exclude_set = set(exclude_dir_names)
+    supported_exts = set(ConfigHandler.supported_exts)
+
+    sample_alts = ALTERNATIVES_REG.get_alternatives('sample')
+    sample_bases = {ConfigHandler.normalise_cfg_name(title_to_snake(x)) for x in sample_alts}
+    sample_bases.add('sample')
+
+    def is_excluded(p_: Path) -> bool:
+        return any(part in exclude_set for part in p_.parts)
+
+    def is_sample_cfg(p_: Path) -> bool:
+        if p_.suffix.lower() not in supported_exts:
+            return False
+
+        stem_norm = ConfigHandler.normalise_cfg_name(title_to_snake(p_.stem))
+
+        if stem_norm.startswith('default_'):
+            return False
+
+        return stem_norm in sample_bases
+
+    roots: Set[Path] = set()
+    for p in folder.rglob('*'):
+        if p.is_file() and not is_excluded(p) and is_sample_cfg(p):
+            roots.add(p.parent.resolve())
+
+    return roots
