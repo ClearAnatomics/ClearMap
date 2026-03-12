@@ -74,7 +74,7 @@ class DensityGroupAnalysisOrchestrator(GroupOrchestratorBase):
         return channels
 
     def _get_annotator(self, sample_dir: Path, channel: str):
-        reg = self.get_worker_for_sample(sample_dir, 'registration', channel=channel)
+        reg = self.get_worker_for_sample(sample_dir, 'registration', channel=None)
         reg.setup_if_needed()
         return reg.annotators[channel]
 
@@ -97,7 +97,7 @@ class DensityGroupAnalysisOrchestrator(GroupOrchestratorBase):
             assets = p_val_assets_for_pair(self.results_folder, channel, gp1, gp2)
             res = load_p_val_results(assets)
             sample_dir = self._any_sample_in(gp1)
-            annotator = self._get_annotator(sample_dir, channel)
+            annotator = self._get_annotator(sample_dir, channel=channel)
             colored_atlas = annotator.create_color_annotation()
 
             stats_title = f'P values {"and effect size" if res.has_effect else ""}'
