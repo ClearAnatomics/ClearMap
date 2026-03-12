@@ -689,9 +689,9 @@ class Workspace2:  # REFACTOR: subclass dict
                 asset = self.get_closest_matching_asset(asset_type, channel)
             else:
                 return default
-        if sample_id or extension or version:  # FIXME: subdirectory
+        if sample_id or extension or version or suffix:  # FIXME: subdirectory
             if suffix:
-                asset = asset.variant(sample_id, asset_sub_type, extension, version, sub_type=suffix)
+                asset = asset.variant(sample_id, asset_sub_type, extension, version, sub_type=suffix)  # FIXME: suffix should be different from asset_sub_type
             else:
                 asset = asset.variant(sample_id, extension, version)
         return asset
