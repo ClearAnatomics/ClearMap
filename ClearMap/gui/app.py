@@ -1,4 +1,9 @@
 from __future__ import annotations
+
+from packaging.version import Version
+
+from ClearMap.config.convert_config_versions import convert_versions
+
 """
 app
 ===
@@ -156,7 +161,8 @@ from ClearMap.Utils.events import (CfgChanged, UiRequestRefreshTabs, UiTabActiva
 
 from ClearMap.config.update_config import update_default_config
 from ClearMap.config.config_coordinator import make_cfg_coordinator_factory
-from ClearMap.config.config_handler import ConfigHandler, CLEARMAP_CFG_DIR, ALTERNATIVES_REG
+from ClearMap.config.config_handler import ConfigHandler, CLEARMAP_CFG_DIR, ALTERNATIVES_REG, \
+    scan_folder_for_experiments
 
 from ClearMap.gui.gui_utils_images import get_current_res
 from ClearMap.gui.tab_registry import TabRegistry
@@ -359,7 +365,10 @@ class ClearMapAppBase(QMainWindow, Ui_ClearMapGui):
         self.fix_sizes()
         self.fix_tooltips_stylesheet()
 
-        tab = self.get_tab_widget('Sample info')
+        try:
+            tab = self.get_tab_widget('Sample info')
+        except KeyError:  # FIXME: check that we are indeed in batch mode in that case
+            return
         children = tab.findChildren(QWidget)
         if not children:
             return  # tab not fully loaded yet
@@ -734,7 +743,49 @@ class ClearMapApp(ClearMapAppBase):
         self.gui_controller.set_mode(AppMode.EXPERIMENT)
         self.centralStack.setCurrentIndex(1)  # tabs page
 
+    def _read_exp_version(self, exp_dir: Path) -> Version | None:
+        loader = ConfigHandler(exp_dir)
+        sample_path = loader.get_cfg_path('sample', must_exist=False)
+        if not sample_path or not Path(sample_path).exists():
+            return None
+        cfg = ConfigHandler.get_cfg_from_path(sample_path)
+        v = cfg.get('clearmap_version')
+        return Version(str(v)) if v else None
+
     def _select_group_mode(self):
+        base = self.preference_editor.params.start_folder
+        group_dir = ClearMap.gui.dialog_helpers.get_directory_dlg(
+            base, title='Select cohort folder (contains experiment folders)')
+        if not group_dir:
+            return
+
+        group_dir = Path(group_dir).resolve()
+
+        exp_roots = scan_folder_for_experiments(group_dir)  # your new helper (roots set)
+
+        current = Version(str(self.app.applicationVersion()))  # or Version(CLEARMAP_VERSION)
+
+        outdated: list[tuple[Path, Version | None]] = []
+        for root in sorted(exp_roots):
+            v = self._read_exp_version(root)
+            if v is None or v < current:
+                outdated.append((root, v))
+
+        if outdated:
+            # prompt once
+            msg = f'{len(outdated)} experiments appear older than {current}. Upgrade now?'
+            if not ClearMap.gui.dialog_helpers.prompt_dialog('Upgrade experiments', msg):
+                return
+
+            for root, v in outdated:
+                prev = str(v) if v else '2.1'  # fallback to first numbered version
+                convert_versions(prev, str(current), exp_dir=root, create_app=False)
+
+        # 1) init group controller before tabs
+        self.gui_controller.group_controller.set_group_base_dir(group_dir)
+        self.setup_loggers(group_dir)
+        self.progress_watcher.log_path = self.logger.file.name
+        # 2) switch mode
         self.gui_controller.set_mode(AppMode.GROUP)
         self.centralStack.setCurrentIndex(1)  # tabs page
 
