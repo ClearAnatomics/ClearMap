@@ -567,14 +567,10 @@ class ConfigCoordinator(BusSubscriberMixin):
         return target_dir
 
 
-def make_cfg_coordinator_factory(bus):
-    def factory(base_dir, config_groups=None):
+def make_cfg_coordinator_factory(bus, scope=AdjusterScope.EXPERIMENT):
+    def factory(base_dir, config_groups=None, scope=scope):
         cfg_repo = ConfigRepository(base_dir=base_dir)
         defaults_provider = get_defaults_provider()
-        return ConfigCoordinator(
-            config_repo=cfg_repo,
-            bus=bus,
-            schemas_dir=SCHEMAS_DIR,
-            defaults_provider=defaults_provider,
-        )
+        return ConfigCoordinator(config_repo=cfg_repo, bus=bus, scope=scope,
+                                 schemas_dir=SCHEMAS_DIR, defaults_provider=defaults_provider)
     return factory
