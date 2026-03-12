@@ -110,7 +110,6 @@ from qdarkstyle import DarkPalette
 
 from ClearMap.config.atlas import ATLAS_NAMES_MAP, STRUCTURE_TREE_NAMES_MAP
 
-from ClearMap.pipeline_orchestrators.sample_info_management import SampleManager
 from ClearMap.pipeline_orchestrators.utils import init_sample_manager_and_processors
 from ClearMap.pipeline_orchestrators.batch_process import BatchProcessor
 
@@ -127,7 +126,7 @@ from ClearMap.Utils.events import ChannelsChanged, UiConvertToClearMapFormat, Ui
 
 from .dialog_helpers import option_dialog, make_splash, prompt_dialog
 from .dialogs import ResourceTypeToFolderDialog
-from .tabs_interfaces import PostProcessingTab, PreProcessingTab, BatchTab, ExperimentTab
+from .tabs_interfaces import PostProcessingTab, PreProcessingTab, BatchTab, ExperimentTab, GenericTab
 from .widgets import (PatternDialog, DataFrameWidget, LandmarksSelectorDialog,
                       CheckableListWidget, FileDropListWidget, ExtendableTabWidget, ensure_inline_histogram,
                       GraphFilterList, NProcessesWidget, BlockProcessingWidget)
@@ -143,19 +142,19 @@ if TYPE_CHECKING:
     from ClearMap.IO.metadata import ChannelPatternSpec
 
 
-def ui_plot(status_msg: str):
-    """Decorator for tab methods that return a list of QWidgets (data viewers)."""
-    def deco(fn):
-        @functools.wraps(fn)
-        def wrapper(self, *args, **kwargs):
-            self.main_window.print_status_msg(status_msg)
-            self.main_window.clear_plots()
-            dvs = fn(self, *args, **kwargs)  # expect list[QWidget] (or [] if none)
-            if dvs:
-                self.main_window.setup_plots(dvs)
-            return dvs
-        return wrapper
-    return deco
+# def ui_plot(status_msg: str):
+#     """Decorator for tab methods that return a list of QWidgets (data viewers)."""
+#     def deco(fn):
+#         @functools.wraps(fn)
+#         def wrapper(self, *args, **kwargs):
+#             self.main_window.print_status_msg(status_msg)
+#             self.main_window.clear_plots()
+#             dvs = fn(self, *args, **kwargs)  # expect list[QWidget] (or [] if none)
+#             if dvs:
+#                 self.main_window.setup_plots(dvs)
+#             return dvs
+#         return wrapper
+#     return deco
 
 
 def ui_task_progress(title_fn, steps_fn):
@@ -1426,8 +1425,9 @@ class TractMapTab(PostProcessingTab):
         self.wrap_plot(self.get_worker(channel).plot_binarization_levels,
                        low_level_spin_box, high_level_spin_box)
 
+    @GenericTab.ui_plot('Tract map voxelization')
     def plot_tract_map_results(self, channel):
-        self.wrap_plot(self.get_worker(channel).plot_voxelized_counts)
+        return self.get_worker(channel).plot_voxelized_counts()
 
     def plot_labeled_tracts_scatter(self, channel, raw=False):
         self.main_window.clear_plots()
@@ -1761,10 +1761,10 @@ class VasculatureTab(PostProcessingTab):
         self.wrap_step('Running voxelization', worker.voxelize,
                        step_kw_args=voxelization_params)#, main_thread=True)
 
+    @GenericTab.ui_plot('Plotting vasculature graph voxelization')
     def plot_voxelization(self):
         """Plot the density map """
-        self.wrap_plot(self.get_worker(substep='graph').plot_voxelization,
-                       self.main_window.centralWidget())
+        return self.get_worker(substep='graph').plot_voxelization(self.main_window.centralWidget())
 
     def save_stats(self):
         """Save the stats of the graph to a feather file"""
@@ -1945,12 +1945,11 @@ class GroupAnalysisTab(BatchTab):
         density_orchestrator = self.processor
         return density_orchestrator.find_analysable_channels(density_suffix=self.params.density_suffix)
 
-    @ui_plot('Plotting density maps')
+    @GenericTab.ui_plot('Plotting density maps')
     def plot_density_maps(self, group_name):
-        self.processor.plot_density_maps(self.params.groups[group_name],
-                                         channel=self.params.plot_channel,
-                                         density_suffix=self.params.density_suffix,
-                                         parent=self.main_window.centralWidget())
+        return self.processor.plot_density_maps(
+            self.params.groups[group_name], channel=self.params.plot_channel,
+            density_suffix=self.params.density_suffix, parent=self.main_window.centralWidget())
 
     def run_p_vals(self):
         self.main_window.print_status_msg('Computing p_val maps')
@@ -1972,10 +1971,11 @@ class GroupAnalysisTab(BatchTab):
         dvs = [DataFrameWidget(tables[self.params.plot_channel]).table for tables in tables_by_pair.values()]
         self.main_window.setup_plots(dvs)  # TODO: use wrap_plot
 
-    @ui_plot('Plotting p_val maps')
-    def plot_p_vals(self):
-        self.processor.plot_p_value_maps(comparisons=self.params.selected_comparisons,
-                                         channel=self.params.plot_channel, parent=self.main_window.centralWidget())
+    @GenericTab.ui_plot('Plotting p_val maps')
+    def plot_p_vals(self, *_, **__):
+        return self.processor.plot_p_value_maps(comparisons=self.params.selected_comparisons,
+                                                channel=self.params.plot_channel, suffix=self.params.density_suffix,
+                                                parent=self.main_window.centralWidget())
 
     def run_df_plots(self, plot_function, plot_kw_args):
         self.main_window.clear_plots()
@@ -1983,10 +1983,10 @@ class GroupAnalysisTab(BatchTab):
         self.main_window.setup_plots(dvs)
         return dvs
 
-    def plot_volcanoes(self):
+    def plot_volcanoes(self):  # TODO: check plot wraps
         self.run_df_plots(plot_volcano, {'group_names': None, 'p_cutoff': 0.05, 'show': False, 'save_path': ''})
 
-    def plot_histograms(self, fold_threshold=2):
+    def plot_histograms(self, fold_threshold=2):  # TODO: check plot wraps
         folder = Path(self.params.results_folder) / self.params.groups[self.params.group_names[0]][0] # FIXME: check if absolute
         processors = init_sample_manager_and_processors(folder)
         registration_processor = processors['registration_processor']

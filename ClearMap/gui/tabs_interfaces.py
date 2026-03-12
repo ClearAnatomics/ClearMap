@@ -571,14 +571,14 @@ class GenericTab(GenericUi, BusSubscriberMixin):
                 self.main_window.print_status_msg(msg)
                 self.main_window.log_progress(f'    : {msg}')
 
-    def wrap_plot(self, plot_function: Callable, *args, **kwargs):
+    def wrap_plot(self, plot_method: Callable, *args, **kwargs):
         """
         Wrapper to plot a graph and display it in the main window.
         It also handles MissingRequirementException and PlotGraphError
 
         Parameters
         ----------
-        plot_function: function
+        plot_method: function
             The function (or method) to plot the graph
         args: list
             The positional arguments to plot_function
@@ -592,13 +592,15 @@ class GenericTab(GenericUi, BusSubscriberMixin):
         """
         self.main_window.clear_plots()
         try:
-            dvs = plot_function(*args, **kwargs)
+            dvs = plot_method(self, *args, **kwargs)  # We need to pass `self` because method
         except MissingRequirementException as err:
-            self.main_window.print_error_msg(f'Missing {plot_function.__name__} files {str(err)}. '
+            self.main_window.print_error_msg(f'Missing {plot_method.__name__} files {str(err)}. '
                                              f'Please ensure previous steps are run first.')
             return []
         except PlotGraphError as err:
             self.main_window.popup(str(err), base_msg='PlotGraphError')
+            return []
+        if not dvs:
             return []
         if isinstance(dvs[0], list):
             dvs, titles = dvs
@@ -607,6 +609,35 @@ class GenericTab(GenericUi, BusSubscriberMixin):
             self.main_window.setup_plots(dvs)
         from ClearMap.Visualization.Qt.DataViewer import DataViewer
         return [widget for widget in dvs if isinstance(widget, DataViewer)]
+
+    @staticmethod
+    def ui_plot(status_msg: str = ''):
+        """
+        Decorator for tab methods that produce plot widgets.
+
+        Handles:
+        - status message display
+        - clearing previous plots
+        - MissingRequirementException / PlotGraphError
+        - (dvs, titles) tuple return pattern
+        - setup_plots() call
+        - filtering return to DataViewer instances only
+
+        Usage:
+            @GenericTab.ui_plot("Plotting p-values…")
+            def plot_p_vals(self, ...):
+                # pure plotting logic
+                return [widget1, widget2]
+        """
+
+        def deco(fn):
+            @functools.wraps(fn)
+            def wrapper(self, *args, **kwargs):
+                if status_msg:
+                    self.main_window.print_status_msg(status_msg)
+                return self.wrap_plot(fn, *args, **kwargs)
+            return wrapper
+        return deco
 
 
 class ExperimentTab(GenericTab):
