@@ -385,12 +385,10 @@ class GroupOrchestratorBase:
     """
 
     def __init__(self, *, group_controller: "AnalysisGroupController", groups: dict[str, list[str]] | None = None,
-                results_folder: str | Path | None = None, channel: Optional[str] = None):
+                channel: Optional[str] = None):
         self.group_controller = group_controller
         if groups is not None:
             self.group_controller.set_groups(groups)
-        if results_folder is not None:
-            self.group_controller.set_group_base_dir(results_folder)
 
         self.channel: Optional[str] = channel
 
