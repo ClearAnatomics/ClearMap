@@ -80,12 +80,15 @@ class DensityGroupAnalysisOrchestrator(GroupOrchestratorBase):
 
     # ---------- plots ----------
 
-    def plot_p_value_maps(self, comparisons: List[Pair], *, channel: str, parent=None):
+    def plot_p_value_maps(self, comparisons: List[Pair], *, channel: str, suffix: str, parent=None):
         results_folder = Path(self.results_folder)
 
         p_val_imgs = []
         for gp1, gp2 in comparisons:
-            p_path = results_folder / f'{channel}_p_val_colors_{gp1}_{gp2}.tif'
+            if suffix:
+                p_path = results_folder / f'{channel}_p_val_colors_{gp1}_{gp2}_{suffix}.tif'
+            else:
+                p_path = results_folder / f'{channel}_p_val_colors_{gp1}_{gp2}.tif'
             p_val_imgs.append(clm_io.read(p_path))
 
         if len(comparisons) > 1:
@@ -94,7 +97,7 @@ class DensityGroupAnalysisOrchestrator(GroupOrchestratorBase):
         else:  # If only one comparison, show more details (avg, sd, effect size, atlas)
             gp1, gp2 = comparisons[0]
 
-            assets = p_val_assets_for_pair(self.results_folder, channel, gp1, gp2)
+            assets = p_val_assets_for_pair(self.results_folder, channel, gp1, gp2, suffix)
             res = load_p_val_results(assets)
             sample_dir = self._any_sample_in(gp1)
             annotator = self._get_annotator(sample_dir, channel=channel)

@@ -30,7 +30,7 @@ from ClearMap.Utils.path_utils import is_density_file, find_density_file, find_c
 from ClearMap.Utils.utilities import make_abs
 from ClearMap.config.atlas import ATLAS_NAMES_MAP
 from ClearMap.config.config_handler import ConfigHandler
-from ClearMap.pipeline_orchestrators.sample_info_management import SampleManager
+from ClearMap.pipeline_orchestrators.sample_info_management import SampleManager, build_sample_manager
 from ClearMap.pipeline_orchestrators.utils import init_sample_manager_and_processors
 from ClearMap.pipeline_orchestrators.registration_orchestrator import RegistrationProcessor
 
@@ -54,14 +54,16 @@ class PValueAssets:
     effect_size: Optional[Path]
 
 
-def p_val_assets_for_pair(results_dir: Path, channel: str, gp1: str, gp2: str) -> PValueAssets:
-    pvals = results_dir / f"{channel}_p_val_colors_{gp1}_{gp2}.tif"
-    eff   = results_dir / f"{channel}_effect_size_{gp1}_{gp2}.tif"
+def p_val_assets_for_pair(results_dir: Path, channel: str, gp1: str, gp2: str, density_suffix: str = '') -> PValueAssets:
+    if density_suffix and not density_suffix.startswith('_'):
+        density_suffix = '_' + density_suffix
+    pvals = results_dir / f'{channel}_p_val_colors_{gp1}_{gp2}{density_suffix}.tif'
+    eff   = results_dir / f'{channel}_effect_size_{gp1}_{gp2}{density_suffix}.tif'
 
-    gp1_avg = results_dir / f"{channel}_avg_density_{gp1}.tif"
-    gp1_sd  = results_dir / f"{channel}_sd_density_{gp1}.tif"
-    gp2_avg = results_dir / f"{channel}_avg_density_{gp2}.tif"
-    gp2_sd  = results_dir / f"{channel}_sd_density_{gp2}.tif"
+    gp1_avg = results_dir / f'{channel}_avg_density{density_suffix}_{gp1}.tif'
+    gp1_sd  = results_dir / f'{channel}_sd_density_{gp1}{density_suffix}.tif'
+    gp2_avg = results_dir / f'{channel}_avg_density{density_suffix}_{gp2}.tif'
+    gp2_sd  = results_dir / f'{channel}_sd_density_{gp2}{density_suffix}.tif'
 
     def _opt(p: Path) -> Optional[Path]:
         return p if p.exists() else None
@@ -578,8 +580,8 @@ def compare_groups(directory, gp1_name, gp2_name, gp1_dirs, gp2_dirs, prefix='p_
                    advanced=True, density_files_suffix=''):
     directory = Path(directory)
 
-    sample_manager = SampleManager()  # FIXME: missing coordinator. maybge pass the manager
-    sample_manager.setup(src_dir=directory / gp1_dirs[0])
+    sample_manager = build_sample_manager(src_dir=directory / gp1_dirs[0])
+
     result = {}
     for channel in sample_manager.channels:
         # FIXME: counts is only for cell_map, make compatible with other pipelines
