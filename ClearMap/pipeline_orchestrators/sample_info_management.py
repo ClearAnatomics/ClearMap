@@ -6,7 +6,11 @@ This is the part that pertains to the metadata and configuration of a sample.
 It manages the sample-level configurations and properties, handles configurations related to the sample,
 and provides utility methods for checking sample properties.
 """
+import atexit
+import os
 import re
+import shutil
+import tempfile
 import warnings
 from pathlib import Path
 from typing import Optional, Callable, List, Dict, TYPE_CHECKING
@@ -15,11 +19,12 @@ import numpy as np
 
 from ClearMap.IO.assets_constants import CONTENT_TYPE_TO_PIPELINE
 from ClearMap.Utils.events import ChannelRenamed, CfgChanged
+from ..Utils.event_bus import EventBus
 from ..config.compound_keys import PairKey
 from ..config.config_handler import ALTERNATIVES_REG
 
-if TYPE_CHECKING:
-    from ClearMap.config.config_coordinator import ConfigCoordinator
+# if TYPE_CHECKING:
+from ClearMap.config.config_coordinator import ConfigCoordinator, make_cfg_coordinator_factory
 
 # noinspection PyPep8Naming
 import ClearMap.Alignment.Resampling as resampling
@@ -73,6 +78,11 @@ class SampleManager(OrchestratorBase):
             self.cfg_coordinator.set_base_dir(src_dir)
             # FIXME: add to set_base_dir ?
             self.cfg_coordinator.load('sample')  # need to load at least sample config to know pipelines
+            if not self.config:
+                if not src_dir.exists():
+                    raise FileNotFoundError(f'Specified source directory {src_dir} does not exist')
+                else:
+                    raise RuntimeError(f'Failed to load sample config from {src_dir}. Unknown error.')
 
             workspace_path = self.cfg_coordinator.workspace_config_path
             if workspace_path.exists():
@@ -708,3 +718,51 @@ class SampleManager(OrchestratorBase):
             resampling.resample(original=str(asset.path), resampled=resampled_path,
                                 **resampling_params, orientation=orientation,
                                 processes=processes, verbose=verbose, **kwargs)
+
+
+
+def _make_bootstrap_dir() -> Path:
+    """
+    Create a temporary directory for this session to hold config files
+    until the experiment folder is set by the user.
+    We prefer a user-configured temp if available (CLEARMAP_TMP env var)
+    otherwise use the system temp folder.
+    The folder is named "clearmap_bootstrap/session_<pid>" to avoid clashes
+    if multiple instances are running.
+    The folder is removed on exit if it stayed unused (i.e. still a bootstrap dir).
+    Returns
+    -------
+    Path
+        The path to the temporary bootstrap directory
+    """
+    root = Path(os.environ.get('CLEARMAP_TMP', tempfile.gettempdir()))
+    session = root / 'clearmap_bootstrap' / f'session_{os.getpid()}'
+    session.mkdir(parents=True, exist_ok=True)
+    return session
+
+
+def build_sample_manager(src_dir='', bus: Optional[EventBus] = None):
+    bootstrap_dir = _make_bootstrap_dir()
+
+    @atexit.register
+    def _cleanup_bootstrap():
+        try:
+            if bootstrap_dir.name.startswith('session_'):
+                shutil.rmtree(bootstrap_dir, ignore_errors=True)
+        except Exception:
+            pass
+
+    if bus is None:
+        bus = EventBus()
+
+    cfg_coordinator_factory = make_cfg_coordinator_factory(bus)
+    cfg_coordinator = cfg_coordinator_factory(bootstrap_dir,
+                                              config_groups=(ALTERNATIVES_REG._pipeline_groups, ALTERNATIVES_REG._global_groups))
+
+    cfg_coordinator.seed_missing_from_defaults(tabs_only=True)
+
+    sample_manager = SampleManager(config_coordinator=cfg_coordinator, src_dir=None)
+
+    if src_dir:
+        sample_manager.setup(src_dir)
+    return sample_manager
