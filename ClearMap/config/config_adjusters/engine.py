@@ -139,7 +139,7 @@ class RunnerConfig:
 def inject_sm_view(sm, *, view: dict, section_name: str = "sample"):
     """
     Temporarily make sm.config read from `view[section_name]` instead of the coordinator.
-    No method reimplementation: we swap the instance's class to a dynamic subclass
+    We swap the instance's class to a dynamic subclass
     that only overrides the `config` property.
     """
     base_cls = sm.__class__
@@ -376,7 +376,7 @@ class AdjusterRunner:
                                                        specs_registry=INSTANCE_SPECS_REGISTRY,
                                                        policy=self._resolver_policy)
         elif ctx.scope == AdjusterScope.GROUP:
-            tpl_resolver = GroupTemplatesResolver(get_defaults_provider(), group_base_dir=ctx.group_base_dir,
+            tpl_resolver = GroupTemplatesResolver(defaults=get_defaults_provider(), group_base_dir=ctx.group_base_dir,
                                                   policy=self._resolver_policy)
         else:
             raise ValueError(f"Unknown scope: {ctx.scope}")
