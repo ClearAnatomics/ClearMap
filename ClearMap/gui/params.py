@@ -1713,29 +1713,32 @@ class BatchParameters(UiParameter):
     cfg_subtree = None  # Must be set in subclass
 
     def __init__(self, tab, *, event_bus: EventBus, preferences=None, get_view=None, apply_patch=None):
-        super().__init__(tab, event_bus=event_bus, get_view=get_view, apply_patch=apply_patch)
+        # WARNING: set fields used by build_params_dict() BEFORE super().__init__()
         self.group_concatenator = ' vs '
         self.preferences = preferences
 
         # TODO: check if I need that ?
-        if not hasattr(self.tab, "sampleFoldersToolBox") or self.tab.sampleFoldersToolBox is None:
-            self.tab.sampleFoldersToolBox = QToolBox(parent=self.tab)
-            self.tab.sampleFoldersPageLayout.addWidget(self.tab.sampleFoldersToolBox, 3, 0)
+        if not hasattr(tab, 'sampleFoldersToolBox') or tab.sampleFoldersToolBox is None:
+            tab.sampleFoldersToolBox = QToolBox(parent=tab)
+            tab.sampleFoldersPageLayout.addWidget(tab.sampleFoldersToolBox, 3, 0)
 
         self.groups_adapter = GroupsWidgetAdapter(
-            toolbox=self.tab.sampleFoldersToolBox,
-            container_layout=self.tab.sampleFoldersPageLayout,
-            add_btn=self.tab.addGroupPushButton,
-            remove_btn=self.tab.removeGroupPushButton,
+            toolbox=tab.sampleFoldersToolBox,
+            container_layout=tab.sampleFoldersPageLayout,
+            add_btn=tab.addGroupPushButton,
+            remove_btn=tab.removeGroupPushButton,
             start_folder_getter=lambda: (self.preferences.start_folder if self.preferences else "")
         )
-        self.params_dict = {  # FIXME: make work with UiParameter auto mechanism
-            'results_folder': ParamLink(['paths', 'results_folder'], self.tab.resultsFolderLineEdit,
-                                        notify_apply=lambda: self.publish(UiBatchResultsFolderChanged(self.results_folder))),
-            'groups': ParamLink(['groups'], self.groups_adapter,
-                                notify_apply=lambda: self.publish(UiBatchGroupsChanged(self.groups)))
-        }
-        self.connect_simple_widgets()
+
+        super().__init__(tab, event_bus=event_bus, get_view=get_view, apply_patch=apply_patch)
+
+    # IMPORTANT: implement in subclass
+    def build_params_dict(self) -> dict:
+        return {'results_folder': ParamLink(['paths', 'results_folder'], self.tab.resultsFolderLineEdit,
+                                            notify_apply=lambda: self.publish(UiBatchResultsFolderChanged(self.results_folder))),
+                'groups': ParamLink(['groups'], self.groups_adapter,
+                                    notify_apply=lambda: self.publish(UiBatchGroupsChanged(self.groups)))
+                }
 
     def cfg_to_ui(self):
         self.groups = self.view['groups']
@@ -1818,8 +1821,9 @@ class GroupAnalysisParams(BatchParameters):
         self._rebuild_comparisons_core(preselected=persisted)
 
     def set_pipelines(self, pipelines: list[str]):
-        self.tab.batchPipelineNameComboBox.clear()
-        self.tab.batchPipelineNameComboBox.addItems(pipelines)
+        with QSignalBlocker(self.tab.batchPipelineNameComboBox):
+            self.tab.batchPipelineNameComboBox.clear()
+            self.tab.batchPipelineNameComboBox.addItems(pipelines)
 
     def _comparisons_dict(self) -> dict[str, list[str]]:
         comp_names = string.ascii_lowercase  # Just a,b,c,...,z
