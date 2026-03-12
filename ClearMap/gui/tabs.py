@@ -142,21 +142,6 @@ if TYPE_CHECKING:
     from ClearMap.IO.metadata import ChannelPatternSpec
 
 
-# def ui_plot(status_msg: str):
-#     """Decorator for tab methods that return a list of QWidgets (data viewers)."""
-#     def deco(fn):
-#         @functools.wraps(fn)
-#         def wrapper(self, *args, **kwargs):
-#             self.main_window.print_status_msg(status_msg)
-#             self.main_window.clear_plots()
-#             dvs = fn(self, *args, **kwargs)  # expect list[QWidget] (or [] if none)
-#             if dvs:
-#                 self.main_window.setup_plots(dvs)
-#             return dvs
-#         return wrapper
-#     return deco
-
-
 def ui_task_progress(title_fn, steps_fn):
     """
     Wraps a tab method that performs a task and updates the main progress.
@@ -1888,7 +1873,7 @@ class GroupAnalysisTab(BatchTab):
         self.params = GroupAnalysisParams(self.ui, preferences=self.main_window.preference_editor.params,
                                           event_bus=self._bus,
                                           get_view=self.group_controller.get_config_view,
-                                          apply_patch=self.group_controller.apply_ui_patch)
+                                          apply_patch=self.group_controller.apply_patch)
         self.params.set_pipelines(['CellMap', 'TractMap', 'TubeMap', 'Colocalization'])
 
         def _channels_provider(params):
@@ -1904,7 +1889,8 @@ class GroupAnalysisTab(BatchTab):
         self.params.set_channels_provider(functools.partial(_channels_provider, self.params))
         self.params.set_on_plot_group(self.plot_density_maps)
 
-        self.subscribe(UiBatchResultsFolderChanged, self.group_controller.set_group_base_dir)
+        # self.subscribe(UiBatchResultsFolderChanged, self.group_controller.set_group_base_dir)
+        # FIXME: UiBatchResultsFolderChanged should completely restart group mode
         self.subscribe(UiBatchGroupsChanged, self.handle_groups_changed)
 
     def handle_groups_changed(self, event: UiBatchGroupsChanged):
@@ -1916,7 +1902,7 @@ class GroupAnalysisTab(BatchTab):
 
     def _setup_workers(self):
         if self.params.results_folder is not None:
-            self.group_controller.set_group_base_dir(self.params.results_folder)
+            # self.group_controller.set_group_base_dir(self.params.results_folder)
             self.group_controller.set_groups(self.params.groups)
         self.group_controller.set_progress_watcher(self.main_window.progress_watcher)
         self.group_controller.set_thread_wrapper(self.main_window.wrap_in_thread)
@@ -2009,7 +1995,7 @@ class BatchProcessingTab(BatchTab):
         self.params = BatchProcessingParams(self.ui, preferences=self.main_window.preference_editor.params,
                                             event_bus=self._bus,
                                             get_view=self.group_controller.get_config_view,
-                                            apply_patch=self.group_controller.apply_ui_patch)
+                                            apply_patch=self.group_controller.apply_patch)
 
     def _setup_workers(self):
         self.processor.params = self.params

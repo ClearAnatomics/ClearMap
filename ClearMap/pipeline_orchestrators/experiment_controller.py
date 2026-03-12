@@ -46,6 +46,7 @@ from typing import Callable, Dict, Iterable, Optional, Tuple, Any, Union
 
 from ClearMap.Utils.event_bus import EventBus, BusSubscriberMixin
 from ClearMap.Utils.events import WorkspaceChanged, UiChannelRenamed, UiChannelsChanged
+from ClearMap.config.config_adjusters.type_hints import AdjusterScope
 from ClearMap.config.config_coordinator import ConfigCoordinator
 from ClearMap.config.config_handler import ALTERNATIVES_REG
 from ClearMap.config.defaults_provider import DefaultsProvider
@@ -276,7 +277,7 @@ class ExperimentController(BusSubscriberMixin):
         return self._exp_dir
 
     def set_experiment_dir(self, exp_dir: str | Path) -> None:
-        self._exp_dir = Path(exp_dir).resolve()
+        self._exp_dir = Path(exp_dir).expanduser().resolve()
         self.cfg_coordinator.set_base_dir(self._exp_dir)
         self.sample_manager.setup(exp_dir)
         self.publish(WorkspaceChanged(exp_dir=str(self._exp_dir)))
@@ -365,9 +366,9 @@ class ExperimentController(BusSubscriberMixin):
         """
         if not dest_dir:
             dest_dir = self._exp_dir  # FIXME: check this fallback
-        dest = Path(dest_dir).resolve()
+        dest = Path(dest_dir).expanduser().resolve()
         if template_dir:
-            template_dir = Path(template_dir).resolve()
+            template_dir = Path(template_dir).expanduser().resolve()
             self.cfg_coordinator.clone_from(template_dir, dest)
         else:
             self.cfg_coordinator.copy_from_defaults(dest)
@@ -416,11 +417,11 @@ class ExperimentController(BusSubscriberMixin):
             if scope == 'global':
                 if channel is not None:
                     raise ValueError(
-                        f'Pipeline "{pipeline}" is global (scope=global) but channel={channel!r} was requested.')
+                        f'Pipeline "{pipeline}" is global (scope=global) but {channel=} was requested.')
                 worker = factory(self.sample_manager, self.cfg_coordinator)
             elif scope in ('per_channel', 'per_pair'):
                 if channel is None:
-                    raise ValueError(f'Pipeline "{pipeline}" (scope={scope}) requires a channel key, got channel=None.')
+                    raise ValueError(f'Pipeline "{pipeline}" ({scope=}) requires a channel key, got channel=None.')
                 worker = factory(self.sample_manager, self.cfg_coordinator, channel)
             else:
                 raise ValueError(f'Unknown worker scope "{scope}" for pipeline "{pipeline}".')
@@ -609,12 +610,11 @@ class AnalysisGroupController:
         cfg_coordinator_factory: callable(base_dir: Path) -> ConfigCoordinator
         exp_controller_factory:  callable(sample_manager, cfg_coordinator, event_bus) -> ExperimentController
         """
-        self._cfg_coordinator_factory = cfg_coordinator_factory  # Built for each sample
+        self._cfg_coordinator_factory  = cfg_coordinator_factory  # Built for each sample
         self._exp_controller_factory   = exp_controller_factory  # Built for each sample
         self._bus = event_bus
 
         self._controllers: dict[Path, ExperimentController] = {}
-        self._groups: dict[str, list[str]] = {}
         self._group_base_dir: Path | None = None
         self._group_cfg_coordinator = None  # type: Optional[ConfigCoordinator]
 
@@ -623,14 +623,28 @@ class AnalysisGroupController:
         self._progress_watcher = None
         self._thread_wrapper   = None
 
+    @property
+    def group_cfg_coordinator(self):
+        if self._group_cfg_coordinator is None:
+            raise ValueError("Group config not initialised (results_folder not set?)")
+        return self._group_cfg_coordinator
+
     # ---------- external state ----------
     def set_groups(self, groups: dict[str, list[str]]):
-        self._groups = {k: [str(Path(p)) for p in v] for k, v in groups.items()}
+        normalised = {k: [str(Path(p)) for p in v] for k, v in groups.items()}
+        self.apply_patch({'group_analysis': {'groups': normalised}})
+        # FIXME: or ['batch_processing']? We need prefix=
+
+    @property
+    def groups(self) -> dict[str, list[str]]:
+        return self.get_config_view()['group_analysis']['groups']
+        # FIXME: or ['batch_processing']? We need prefix=
 
     def set_group_base_dir(self, results_folder: str | Path):
-        self._group_base_dir = Path(results_folder).resolve()
+        self._group_base_dir = Path(results_folder).expanduser().resolve()
         if self._group_cfg_coordinator is None:
-            self._group_cfg_coordinator = self._cfg_coordinator_factory(base_dir=self._group_base_dir)
+            self._group_cfg_coordinator = self._cfg_coordinator_factory(base_dir=self._group_base_dir,
+                                                                        scope=AdjusterScope.GROUP)
             self._group_cfg_coordinator.set_active_sections(self.infer_required_sections())
             self._group_cfg_coordinator.load_all()
             self._group_cfg_coordinator.seed_missing_from_defaults(tabs_only=True)
@@ -642,17 +656,13 @@ class AnalysisGroupController:
         self._thread_wrapper = wrapper
 
     @property
-    def groups(self) -> dict[str, list[str]]:
-        return self._groups
-
-    @property
     def group_base_dir(self) -> Path:
         if self._group_base_dir is None:
             raise ValueError("results_folder not set")
         return self._group_base_dir
 
     def _get_or_create_exp_controller(self, sample_src_dir: str | Path) -> "ExperimentController":
-        root = Path(sample_src_dir).resolve()
+        root = Path(sample_src_dir).expanduser().resolve()
 
         # Return if already cached
         if root in self._controllers:
@@ -690,17 +700,11 @@ class AnalysisGroupController:
         return {'group_analysis', 'batch_processing'}
 
     def get_config_view(self) -> dict[str, Any]:
-        if self._group_cfg_coordinator is None:
-            raise ValueError("Group config not initialised (results_folder not set?)")
-        return self._group_cfg_coordinator.get_config_view()
+        return self.group_cfg_coordinator.get_config_view()
 
-    def apply_ui_patch(self, patch: dict[str, Any]) -> None:
+    def apply_patch(self, patch: dict[str, Any]) -> None:
         if not patch:
             return
-        if self._group_cfg_coordinator is None:
-            raise ValueError("Group config not initialised (results_folder not set?)")
-        # FIXME: adjusters will break without a SampleManager;
-        #  need to rethink this for group-level configs
-        self._group_cfg_coordinator.submit_patch(
+        self.group_cfg_coordinator.submit_patch(
             patch, sample_manager=None,  # group scope: no SampleManager
             do_run_adjusters=True, validate=True, commit=True)
