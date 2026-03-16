@@ -1,0 +1,11 @@
+name: ClearMap3pip
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pip
+  - graph-tool<=2.45
+  - mkl<2024.1
+variables:
+  PYTHONNOUSERSITE: 1
+  TMPDIR: /data/tmp
