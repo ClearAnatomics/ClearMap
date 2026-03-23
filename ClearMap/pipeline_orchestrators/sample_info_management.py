@@ -13,7 +13,7 @@ import shutil
 import tempfile
 import warnings
 from pathlib import Path
-from typing import Optional, Callable, List, Dict, TYPE_CHECKING
+from typing import Optional, Callable, List, Dict
 
 import numpy as np
 
@@ -81,8 +81,8 @@ class SampleManager(OrchestratorBase):
             if not self.config:
                 if not src_dir.exists():
                     raise FileNotFoundError(f'Specified source directory {src_dir} does not exist')
-                else:
-                    raise RuntimeError(f'Failed to load sample config from {src_dir}. Unknown error.')
+                # else:
+                #     raise RuntimeError(f'Failed to load sample config from {src_dir}. Unknown error.')
 
             workspace_path = self.cfg_coordinator.workspace_config_path
             if workspace_path.exists():
