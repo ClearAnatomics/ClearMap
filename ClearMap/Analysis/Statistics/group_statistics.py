@@ -30,7 +30,7 @@ from ClearMap.Utils.path_utils import is_density_file, find_density_file, find_c
 from ClearMap.Utils.utilities import make_abs
 from ClearMap.config.atlas import ATLAS_NAMES_MAP
 from ClearMap.config.config_handler import ConfigHandler
-from ClearMap.pipeline_orchestrators.sample_info_management import SampleManager, build_sample_manager
+from ClearMap.pipeline_orchestrators.sample_info_management import build_sample_manager
 from ClearMap.pipeline_orchestrators.utils import init_sample_manager_and_processors
 from ClearMap.pipeline_orchestrators.registration_orchestrator import RegistrationProcessor
 
@@ -520,16 +520,14 @@ def make_summary(directory, gp1_name, gp2_name, gp1_dirs, gp2_dirs, channel=None
 
     dfs = {}
     if channel is None:
-        sample_manager = SampleManager()
-        sample_manager.setup(src_dir=directory / gp1_dirs[0])
+        sample_manager = build_sample_manager(src_dir=directory / gp1_dirs[0])
         channels = sample_manager.channels_to_detect
     else:
         channels = [channel]
 
     for channel_ in channels:
         # Use the first sample to get the annotator for the cohort
-        sample_manager = SampleManager()
-        sample_manager.setup(src_dir=directory / gp1_dirs[0])
+        sample_manager = build_sample_manager(src_dir=directory / gp1_dirs[0])
 
         aligner = RegistrationProcessor(sample_manager=sample_manager)
         aligner.setup()
