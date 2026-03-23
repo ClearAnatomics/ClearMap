@@ -40,6 +40,16 @@ __webpage__ = 'https://idisco.info'
 __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
 
+def adjuster_safe(fn):
+    """
+    No-op marker: 'this method tolerates incomplete channel configs'.
+    This is meant to label SampleManager methods that are used in config adjusters (SampleManagerProtocol)
+    and that can be safely called even if some channels have incomplete configs (e.g. missing path).
+    """
+    fn._adjuster_safe = True
+    return fn
+
+
 class SampleManager(OrchestratorBase):
     """
     This class is used to manage the sample information
@@ -101,6 +111,7 @@ class SampleManager(OrchestratorBase):
 
             self.setup_complete = (not self.incomplete_channels) and bool(self.config)
 
+    @adjuster_safe
     def compute_required_sections(self) -> set[str]:
         """
         Given this controller’s SampleManager (single-sample view),
@@ -160,18 +171,21 @@ class SampleManager(OrchestratorBase):
         self.incomplete_channels = []
         # Add or update channels in the workspace
         for channel, cfg in self.config['channels'].items():
-            raw_path = cfg['path']
-            if not raw_path:
+            if not isinstance(cfg, dict):
+                self.incomplete_channels.append(channel)
+                continue
+            raw_path = cfg.get('path', '')
+            data_content_type = cfg.get('data_type')
+            if not raw_path or not data_content_type:
                 self.incomplete_channels.append(channel)
             else:
-                data_content_type = cfg['data_type']
                 if channel in self.workspace:  # exists -> update
                     self.workspace.update_raw_path(channel, expression=raw_path)
-                    if data_content_type and data_content_type in CONTENT_TYPE_TO_PIPELINE:  # WARNING: no 'compound' here
+                    if data_content_type in CONTENT_TYPE_TO_PIPELINE:  # WARNING: no 'compound' here
                         channel_spec = self.workspace[channel].channel_spec
                         self.workspace.update_pipeline_assets(channel_spec, data_content_type, sample_id=self.prefix)
                 else:  # new channel -> add
-                    if data_content_type == 'undefined':  # Difference with None is intention
+                    if data_content_type == 'undefined':  # Difference with None is semantic (intention)
                         self.incomplete_channels.append(channel)
                         continue
                     self.workspace.add_raw_data(file_path=raw_path, channel_id=channel,
@@ -251,6 +265,7 @@ class SampleManager(OrchestratorBase):
         return self.config['sample_id'] if self.config['use_id_as_prefix'] else None
 
     @property
+    @adjuster_safe
     def channels(self) -> list[str]:
         cfg = self.config
         if not cfg or 'channels' not in cfg:
@@ -258,6 +273,7 @@ class SampleManager(OrchestratorBase):
         return list(cfg['channels'].keys())
 
     @property
+    @adjuster_safe
     def renamed_channels(self) -> dict[str, str]:
         return dict(self._renamed_channels)  # copy to discourage mutation
 
@@ -276,21 +292,25 @@ class SampleManager(OrchestratorBase):
         match = re.search(r"[Cc](\d{2})", path.name)
         return int(match.group(1)) if match else None
 
+    @adjuster_safe
     def data_type(self, channel: str) -> str:
-        return self.config['channels'][channel]['data_type']
+        return self.config.get('channels', {}).get(channel, {}).get('data_type', 'undefined')
 
     @property
     def data_types(self) -> list[str]:
-        return [channel_cfg['data_type'] for channel_cfg in self.config['channels'].values()]
+        return [self.data_type(ch) for ch in self.channels]
 
     @property
+    @adjuster_safe
     def channels_to_detect(self) -> list[str]:
         return self.get_channels_by_pipeline('CellMap', as_list=True)
 
     @property
+    @adjuster_safe
     def is_colocalization_compatible(self) -> bool:
         return len(self.channels_to_detect) > 1
 
+    @adjuster_safe
     def colocalization_pairs(self) -> list[tuple[str, str]]:
         if not self.is_colocalization_compatible:
             return []
@@ -308,6 +328,7 @@ class SampleManager(OrchestratorBase):
                 out.append((deduped[i], deduped[j]))  # preserve order from channels_to_detect
         return out
 
+    @adjuster_safe
     def colocalization_pair_keys(self, *, oriented: bool) -> list[str]:
         return [str(PairKey(a, b, oriented=oriented)) for a, b in self.colocalization_pairs()]
 
@@ -382,18 +403,23 @@ class SampleManager(OrchestratorBase):
         return self.get('raw', channel, extension=extension).exists
 
     @property
+    @adjuster_safe
     def stitchable_channels(self) -> list[str]:
         return self.get_stitchable_channels()
 
     def get_stitchable_channels(self) -> list[str]:
-        candidates = self.config['channels'].keys()
-        try:
-            assets = [self.get('raw', channel=c, sample_id=self.prefix) for c in candidates]
-        except KeyError:  #  raw data not yet set up
+        candidates = list((self.config.get('channels') or {}).keys())
+        stitchable = []
+        for c in candidates:
+            try:
+                asset = self.get('raw', channel=c, sample_id=self.prefix)
+                if asset.is_tiled:
+                    stitchable.append(c)
+            except KeyError:
+                continue  # channel not set up yet
+        if not stitchable:
             warnings.warn(f'Trying to get stitchable channels before raw data is set up')
-            return []
-        stitchable_channels = [c for c, asset in zip(candidates, assets) if asset.is_tiled]
-        return stitchable_channels
+        return stitchable
 
     def can_convert(self, channel: str) -> bool:
         asset = self.get('raw', channel=channel, sample_id=self.prefix)
@@ -428,8 +454,12 @@ class SampleManager(OrchestratorBase):
         return cfg['use_npy'] and str(asset.expression).endswith('.npy') or asset.variant(extension='.npy').exists
 
     @property
+    @adjuster_safe
     def alignment_reference_channel(self) -> Optional[str]:
-        return self.get_channels_by_type('autofluorescence') or None
+        try:
+            return self.get_channels_by_type('autofluorescence') or None
+        except KeyError:
+            return None
 
     def delete_resampled_files(self, channel: str):
         asset = self.get('resampled', channel=channel)
@@ -510,7 +540,16 @@ class SampleManager(OrchestratorBase):
         ValueError
             If an unknown action (missing_action or multiple_found_action) is specified
         """
-        filtered = [chan for chan, cfg in self.config['channels'].items() if condition(cfg)]
+        channels_cfg = self.config.get('channels') or {}
+        filtered = []
+        for chan, cfg in channels_cfg.items():
+            if not cfg:
+                continue  # skip channels with no config (e.g. from incomplete channel list)
+            try:
+                if condition(cfg):
+                    filtered.append(chan)
+            except KeyError:
+                continue  # incomplete channel config — skip silently
         count = len(filtered)
         if count == 0:
             match missing_action.lower():
@@ -538,6 +577,7 @@ class SampleManager(OrchestratorBase):
             result = filtered if as_list else filtered[0]
         return result
 
+    @adjuster_safe
     def get_channels_by_type(self, channel_type: str, missing_action: str = 'warn',
                              multiple_found_action: str ='ignore', as_list: bool = False) -> str | list[str]:
         """
@@ -568,13 +608,14 @@ class SampleManager(OrchestratorBase):
             If an unknown action (missing_action or multiple_found_action) is specified
         """
         return self.get_channels_by_condition(
-            condition=lambda cfg: cfg['data_type'] == channel_type,
+            condition=lambda cfg: cfg.get('data_type') == channel_type,
             missing_action=missing_action,
             multiple_found_action=multiple_found_action,
             as_list=as_list,
             error_label=channel_type
         )
 
+    @adjuster_safe
     def get_channels_by_pipeline(self, pipeline_name: str, missing_action: str = 'ignore',
                                  multiple_found_action: str ='ignore', as_list: bool = False) -> str | list[str]:
         """
@@ -617,7 +658,7 @@ class SampleManager(OrchestratorBase):
             raise ValueError(f'Unknown pipeline name {pipeline_name}. '
                              f'Options are: {list(CONTENT_TYPE_TO_PIPELINE.values())}')
         return self.get_channels_by_condition(
-            condition=lambda cfg: CONTENT_TYPE_TO_PIPELINE[cfg['data_type']] == pipeline_name,
+            condition=lambda cfg: CONTENT_TYPE_TO_PIPELINE.get(cfg.get('data_type')) == pipeline_name,
             missing_action=missing_action, multiple_found_action=multiple_found_action,
             as_list=as_list, error_label=pipeline_name
         )
@@ -767,3 +808,32 @@ def build_sample_manager(src_dir='', bus: Optional[EventBus] = None):
     if src_dir:
         sample_manager.setup(src_dir)
     return sample_manager
+
+
+def check_protocol_coverage(cls, protocol_cls):
+    """
+    Check if all the decorated methods of SampleManager (meant to be used in SampleManagerProtocol)
+    are present and decorated in the given class.
+
+    Raises TypeError if any protocol member lacks the marker.
+    """
+    # Python 3.12+ has __protocol_attrs__; fall back to __annotations__
+    names = getattr(protocol_cls, '__protocol_attrs__', None)
+    if names is None:
+        names = {n for n in dir(protocol_cls) if not n.startswith('_') and n not in dir(object)}
+
+    missing = []
+    for name in names:
+        raw = getattr(cls, name, None)
+        if raw is None:
+            missing.append(f'{name} (not found)')
+            continue
+        fn = raw.fget if isinstance(raw, property) else raw
+        if not getattr(fn, '_adjuster_safe', False):
+            missing.append(name)
+
+    if missing:
+        raise TypeError(f'{cls.__name__} protocol members missing @adjuster_safe: {missing}')
+
+
+check_protocol_coverage(SampleManager, SampleManagerProtocol)
