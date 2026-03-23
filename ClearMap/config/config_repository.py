@@ -148,6 +148,8 @@ class ConfigRepository:
         dest_dir = Path(dest_dir)
         dest_dir.mkdir(parents=True, exist_ok=True)
         for name in self._known_names:
+            if name in ALTERNATIVES_REG.canonical_global_config_names:
+                continue  # skip globals, which are not expected to be copied locally
             try:
                 default_src = self.default_path_for(name, must_exist=True)
             except FileNotFoundError:
