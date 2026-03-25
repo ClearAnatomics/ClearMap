@@ -1130,7 +1130,7 @@ class ClearMapApp(ClearMapAppBase):
            True  -> existing experiment, caller must call boot_open()
            False -> either:
                       - new experiment already bootstrapped & opened, or
-                      - user cancelled (src_folder is cleared)
+                      - user canceled (src_folder is cleared)
         """
         if not self.experiment_controller.sample_path_exists():
             match ClearMap.gui.dialog_helpers.option_dialog('New experiment', 'This seems to be a new experiment. Do you want to: ',
@@ -1159,6 +1159,7 @@ class GuiController(BusSubscriberMixin):
     def __init__(self, bus: EventBus, experiment, tab_registry: TabRegistry,
                  group_controller: AnalysisGroupController):
         super().__init__(bus)
+        self._hydrating = False
         self.experiment_controller: ExperimentController = experiment
         self.tabs_registry: TabRegistry = tab_registry  # stays a UI concern
 
@@ -1196,11 +1197,22 @@ class GuiController(BusSubscriberMixin):
         self._install_or_update_tabs()
         self._tabs_initialized = True
 
+    @property
+    def hydrating(self) -> bool:
+        """True when either the controller or the experiment is mid-hydration."""
+        return self._hydrating or self.experiment_controller.hydrating
+
     def begin_hydration(self):
+        self._hydrating = True
         self._needs_full_refresh = False
 
     def end_hydration(self):
+        self._hydrating = False
         if self._needs_full_refresh or not self._tabs_initialized:
+            self.experiment_controller.cfg_coordinator.submit(  # Force adjusters and validators to run after hydration, to ensure UI is in sync with model
+                sample_manager=self.experiment_controller.sample_manager,
+                do_run_adjusters=True, validate=True, commit=True)
+
             self._install_or_update_tabs()
             self._tabs_initialized = True
             self._refresh_tabs_from_model()
@@ -1361,7 +1373,7 @@ class GuiController(BusSubscriberMixin):
 
     def _on_cfg_changed(self, evt: CfgChanged):
         self.sample_manager = self.experiment_controller.sample_manager  # to be sure
-        if self.experiment_controller.hydrating:  # Hydration: Cache and defer full refresh until hydration ends
+        if self.hydrating:  # Hydration: Cache and defer full refresh until hydration ends
             if self._tabs_may_have_changed(evt.changed_keys):
                 self._needs_full_refresh = True
         else:  # Normal operation
