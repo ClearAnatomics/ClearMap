@@ -26,6 +26,8 @@ from ClearMap.gui.widgets import ExtendableTabWidget, FileDropListWidget, Landma
 CLEARMAP_VERSION = Version(version('ClearMap'))
 DEBUG_PAINT_GUARD = True   # FIXME: base on machine params log_level
 
+_UNSET = object()  # sentinel singleton
+
 
 def identity_op(x):
     return x
@@ -1029,7 +1031,9 @@ class UiParameter(BusSubscriberMixin):
     def cfg_to_ui(self):
         if not self.params_dict:
             raise NotImplementedError('params_dict not set')
+
         self._painting = True
+        view = attr = keys_list = _UNSET         # Pre-initialize to avoid referencing before initialisation in err
         try:
             view = self.view
             for attr, p_link in self.params_dict.items():
@@ -1056,8 +1060,17 @@ class UiParameter(BusSubscriberMixin):
                 # Update the UI
                 setattr(self, attr, val)  # comes after the cfg otherwise, key will be missing in the callback
         except Exception as e:
-            print(f"Error in cfg_to_ui for {self.__class__.__name__}: "
-                  f"could not set {attr} with keys {keys_list} from view {view}. Exception: {e}")
+            parts = [f"Error in cfg_to_ui for {self.__class__.__name__}"]
+            # Build context defensively — each piece may or may not exist
+            for label, obj in [("attr", attr), ("keys", keys_list), ("view", view)]:
+                if obj is _UNSET:
+                    parts.append(f"{label}=<not yet assigned>")
+                else:
+                    try:
+                        parts.append(f"{label}={obj!r}")
+                    except Exception:
+                        parts.append(f"{label}=<repr failed: {type(obj).__name__}>")
+            print(" | ".join(parts + [f'exception={e!r}']))
             raise
         finally:
             self._painting = False
