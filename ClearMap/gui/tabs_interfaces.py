@@ -17,7 +17,7 @@ from PyQt5.QtWidgets import QWhatsThis, QWidget
 from ClearMap.Utils.event_bus import BusSubscriberMixin
 from ClearMap.Utils.exceptions import MissingRequirementException, PlotGraphError
 from ClearMap.Utils.utilities import title_to_snake
-from ClearMap.config.config_handler import ConfigHandler
+from ClearMap.config.config_handler import ConfigHandler, ALTERNATIVES_REG
 
 from .dialog_helpers import get_directory_dlg
 from .gui_utils_base import create_clearmap_widget, replace_widget
@@ -741,9 +741,18 @@ class PipelineTab(ExperimentTab):
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
         if not cls.processing_type:
-            raise NotImplementedError(
-                f"Class '{cls.__name__}' must override 'processing_type' with a string value."
-            )
+            raise NotImplementedError(f'Class "{cls.__name__}" must override "processing_type" with a string value.')
+
+    @classmethod
+    def requirements_fulfilled(cls, sample_manager) -> bool:
+        if not super().requirements_fulfilled(sample_manager):
+            return False
+        # Config section must exist before the tab can be created
+        if cls.pipeline_name:
+            section = ALTERNATIVES_REG.pipeline_to_section_name(cls.pipeline_name)
+            if section and not sample_manager.cfg_coordinator.get_config_view(section):
+                return False
+        return True
 
     def _iter_substeps(self) -> tuple[str | None, ...]:
         return self._workers_sub_steps or (None,)
