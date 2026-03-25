@@ -183,26 +183,70 @@ class Source(AbstractSource):
 
     @cached_property
     def _metadata_type(self):
+        # Prefer OME if tifffile recognizes it
+        if getattr(self._tif, 'is_ome', False):
+            return 'ome_metadata'
+
         populated_metadata = [f'{t}_metadata' for t in self._tif.flags
                               if getattr(self._tif, f'{t}_metadata', None) is not None]
+
         if not populated_metadata:
+            # Fallback: sniff OME XML in the first page's description
+            if self._has_ome_description():
+                return 'ome_metadata'
             return None
-        elif len(populated_metadata) > 1:
+        elif len(populated_metadata) > 1:  # If multiple types, prefer OME if present
             warnings.warn(f'Multiple metadata types found in tif file {self.location}!; metadata: {populated_metadata}')
+            if 'ome_metadata' in populated_metadata:
+                return 'ome_metadata'
         return populated_metadata[0]
+
+    def _has_ome_description(self):
+        """Check whether the first page's description contains OME XML."""
+        try:
+            if self._tif.pages:
+                desc = getattr(self._tif.pages[0], 'description', '') or ''
+                return '<OME ' in desc or 'openmicroscopy.org' in desc
+        except Exception:
+            pass
+        return False
 
     def get_raw_metadata_dictionary(self):
         if not self._metadata_type:
             return {}
-        md = getattr(self._tif, self._metadata_type) or {}
-        if self._tif.is_ome:
+
+        md = getattr(self._tif, self._metadata_type, None)
+
+        # Fallback: OME XML lives in the page description
+        if md is None and self._metadata_type == 'ome_metadata':
+            md = self._extract_ome_from_description()
+
+        if md is None:
+            md = {}
+
+        # Parse XML string → dict
+        if isinstance(md, str) and ('<OME ' in md or 'openmicroscopy.org' in md):
             md = tifffile.xml2dict(md).get('OME', {})
+        elif getattr(self._tif, 'is_ome', False) and isinstance(md, str):
+            md = tifffile.xml2dict(md).get('OME', {})
+
         if not isinstance(md, dict):
             if isinstance(md, (list, tuple)) and len(md) == 1:
                 md = md[0] if md else {}
             else:
                 raise ValueError(f'Unexpected metadata format in tif file {self.location}: {type(md)}')
         return md
+
+    def _extract_ome_from_description(self):
+        """Extract raw OME XML string from the first page description."""
+        try:
+            if self._tif.pages:
+                desc = getattr(self._tif.pages[0], 'description', '') or ''
+                if '<OME ' in desc:
+                    return desc
+        except Exception:
+            pass
+        return None
 
     def metadata(self, info=('shape', 'resolution', 'overlap')):
         """Returns metadata from this tif file.
@@ -356,6 +400,14 @@ class BaseMetadataParser:
                 value.append(astype(v))
         if value:
             self.info[name] = tuple(value)
+
+    # --- stubs for keys that only some parsers implement ---
+
+    def parse_channels_excitation(self):
+        self.info['channels_excitation'] = None
+
+    def parse_stitching(self):
+        self.info['stitching'] = None
 
     def parse_order(self):
         self.info['order'] = self.pixels_metadata.get('DimensionOrder', None)
