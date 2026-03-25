@@ -21,6 +21,7 @@ from ClearMap.IO.assets_constants import CONTENT_TYPE_TO_PIPELINE
 from ClearMap.Utils.events import ChannelRenamed, CfgChanged
 from ..Utils.event_bus import EventBus
 from ..config.compound_keys import PairKey
+from ..config.config_adjusters.type_hints import SampleManagerProtocol
 from ..config.config_handler import ALTERNATIVES_REG
 
 # if TYPE_CHECKING:
