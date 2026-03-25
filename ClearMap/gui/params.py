@@ -1382,7 +1382,7 @@ class VesselBinarizationPerformanceParams(ChannelUiParameter):
     @property
     def cfg_subtree(self):
         # Root for this channel’s perf; ParamLinks are already fully qualified, so this is mostly for helpers
-        return ['vasculature', 'performance', 'single_channels', self.name]
+        return ['vasculature', 'performance', 'binarization', 'single_channels', self.name]
 
 
 class VesselGraphParams(UiParameter):
