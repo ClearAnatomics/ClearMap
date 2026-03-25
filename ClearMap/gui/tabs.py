@@ -332,52 +332,57 @@ class SampleInfoTab(ExperimentTab):
         specs: list of ChannelPatternSpec
             The list of channel pattern specifications to apply
         """
-        desired_channels = [s.name for s in specs]
-        existing_channels = list(self.params.channels)
+        gui = self.main_window.gui_controller
+        gui.begin_hydration()  # WARNING: required to avoid collisions with config and UI rebuild
+        try:
+            desired_channels = [s.name for s in specs]
+            existing_channels = list(self.params.channels)
 
-        # Remove obsolete channels
-        obsolete_channels = set(existing_channels) - set(desired_channels)
-        for ch in obsolete_channels:
-            self.remove_channel(ch)
+            # Remove obsolete channels
+            obsolete_channels = set(existing_channels) - set(desired_channels)
+            for ch in obsolete_channels:
+                self.remove_channel(ch)
 
-        # SORT BY CHANNEL INDEX if possible to match order in .ome xml
-        def _maybe_channel_index(spec: "ChannelPatternSpec") -> int | None:
-            # try to extract from pattern like C00 / _C01 / channel-02 etc.
-            m = re.search(r"[Cc](\d{2})", spec.pattern_relpath)
-            return int(m.group(1)) if m else None
+            # SORT BY CHANNEL INDEX if possible to match order in .ome xml
+            def _maybe_channel_index(spec: "ChannelPatternSpec") -> int | None:
+                # try to extract from pattern like C00 / _C01 / channel-02 etc.
+                m = re.search(r"[Cc](\d{2})", spec.pattern_relpath)
+                return int(m.group(1)) if m else None
 
-        specs_sorted = sorted(specs, key=lambda s: (_maybe_channel_index(s) is None, _maybe_channel_index(s) or 1000))
+            specs_sorted = sorted(specs, key=lambda s: (_maybe_channel_index(s) is None, _maybe_channel_index(s) or 1000))
 
-        # Add / update channels
-        for i, pattern_spec in enumerate(specs_sorted):
-            if pattern_spec.name not in self.params:
-                self.params.request_add_channel(pattern_spec.name)
-                self.add_channel_tab(pattern_spec.name)
+            # Add / update channels
+            for i, pattern_spec in enumerate(specs_sorted):
+                if pattern_spec.name not in self.params:
+                    self.params.request_add_channel(pattern_spec.name)
+                    self.add_channel_tab(pattern_spec.name)
 
-            p = self.params[pattern_spec.name]
-            p.path = pattern_spec.pattern_relpath
-            p.data_type = pattern_spec.data_type
-            if isinstance(pattern_spec.extension, (list, tuple)):  # REFACTOR: find more elegant handling here
-                warnings.warn('Multiple extensions found, picking the first one.')
-                p.extension = pattern_spec.extension[0]
-            else:
-                p.extension = pattern_spec.extension  # WARNING: Will do successive modifications. Check if we should batch update
+                p = self.params[pattern_spec.name]
+                p.path = pattern_spec.pattern_relpath
+                p.data_type = pattern_spec.data_type
+                if isinstance(pattern_spec.extension, (list, tuple)):  # REFACTOR: find more elegant handling here
+                    warnings.warn('Multiple extensions found, picking the first one.')
+                    p.extension = pattern_spec.extension[0]
+                else:
+                    p.extension = pattern_spec.extension  # WARNING: Will do successive modifications. Check if we should batch update
 
-            # If we have a pattern, we can stitch:
-            exp = Expression(pattern_spec.pattern_relpath)
-            axes = exp.tag_names()  # e.g. ['Z', 'Y', 'X'] or similar
-            first_tile = exp.string(values={axis: 0 for axis in axes})  # Ideally, pick min(axis) for each
-            ome_info = parse_ome_info(Path(self.src_folder) / first_tile)
-            if 'resolution' in ome_info and ome_info['resolution'] is not None:
-                res = ome_info['resolution']
-                if (isinstance(res, (list, tuple))
-                    and len(res) == 3
-                    and all(v in (1, 2, 3) for v in res)):
-                    p.resolution = ome_info['resolution']
-            if 'channels_excitation' in ome_info and ome_info['channels_excitation'] is not None:
-                p.wavelength = ome_info['channels_excitation'][i]
+                # If we have a pattern, we can stitch:
+                exp = Expression(pattern_spec.pattern_relpath)
+                axes = exp.tag_names()  # e.g. ['Z', 'Y', 'X']
+                first_tile = exp.string(values={axis: 0 for axis in axes})  # Ideally, pick min(axis) for each
+                ome_info = parse_ome_info(Path(self.src_folder) / first_tile)
+                if 'resolution' in ome_info and ome_info['resolution'] is not None:
+                    res = ome_info['resolution']
+                    if (isinstance(res, (list, tuple))
+                        and len(res) == 3
+                        and all(v in (1, 2, 3) for v in res)):
+                        p.resolution = ome_info['resolution']
+                if 'channels_excitation' in ome_info and ome_info['channels_excitation'] is not None:
+                    p.wavelength = ome_info['channels_excitation'][i]
 
-        self.publish(UiChannelsChanged(before=existing_channels, after=desired_channels))
+            self.publish(UiChannelsChanged(before=existing_channels, after=desired_channels))
+        finally:
+            gui.end_hydration()
 
     def plot_mini_brain(self, event: UiRequestPlotMiniBrain):
         """
