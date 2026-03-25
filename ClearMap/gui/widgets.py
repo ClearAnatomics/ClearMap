@@ -38,7 +38,7 @@ from PyQt5.QtWidgets import (QWidget, QDialogButtonBox, QListWidget, QListWidget
                              QPushButton, QTableWidget, QTableWidgetItem, QToolBox, QRadioButton,
                              QTreeWidget, QTreeWidgetItem, QTabWidget, QFileDialog,
                              QAbstractItemView, QGroupBox, QButtonGroup, QLabel, QSlider, QFrame,
-                             QCheckBox, QComboBox, QSpinBox)
+                             QCheckBox, QComboBox, QSpinBox, QApplication)
 
 from ClearMap import Settings
 from ClearMap.IO.assets_constants import DATA_CONTENT_TYPES
@@ -1305,6 +1305,60 @@ class PatternDialog(WizardWidget):
             for ax in range(p_finder.pattern.n_tags(), 4):  # Hide the rest
                 self.hide_widgets(self.get_widgets(pattern_idx, ax))
 
+        self._fit_to_content()
+
+    def _fit_to_content(self):
+        """
+        Measure the plain-text width of all pattern labels
+        and resize the dialog so nothing is clipped.
+        """
+        import re
+
+        max_label_width = 0
+
+        for page in self._get_channel_pages():
+            for attr_name in ('pattern0_0', 'pattern0_1', 'pattern0_2',
+                              'pattern0_3', 'result'):
+                label = getattr(page, attr_name, None)
+                if label is None:
+                    continue
+
+                text = label.text()
+                if not text or text == '...':
+                    continue
+
+                # Strip HTML tags → measure plain text with the label's font
+                plain = re.sub(r'<[^>]+>', '', text)
+                w = label.fontMetrics().horizontalAdvance(plain) + 30
+
+                # Force this label to request that width
+                label.setMinimumWidth(w)
+                max_label_width = max(max_label_width, w)
+
+        if max_label_width == 0:
+            return
+
+        needed_width = max_label_width + 210
+
+        screen = QApplication.primaryScreen()
+        if screen:
+            needed_width = min(needed_width, int(screen.availableGeometry().width() * 0.9))
+
+        self.dlg.setMinimumWidth(needed_width)
+        self.dlg.resize(needed_width, self.dlg.sizeHint().height())
+
+    @staticmethod
+    def _measure_rich_label(label):
+        """
+        Accurately measure the rendered width of a QLabel containing HTML.
+        QLabel.sizeHint() is unreliable for rich text, so we use QTextDocument.
+        """
+        doc = QTextDocument()
+        doc.setDefaultFont(label.font())
+        doc.setHtml(label.text())
+        doc.setDocumentMargin(0)
+        return int(doc.idealWidth()) + 10  # small safety margin
+
     def get_widgets(self, image_group_id, axis):
         """
         Get the widgets (label, pattern and combo) for a given image group and axis
@@ -1372,6 +1426,8 @@ class PatternDialog(WizardWidget):
 
         result_widget = tool_box.widget(pattern_idx).result
         result_widget.setText(pattern.relative_string(self.src_folder))
+
+        self._fit_to_content()
 
     def get_patterns(self) -> List[PatternFinder]:
         """
