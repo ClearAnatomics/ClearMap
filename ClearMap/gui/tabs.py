@@ -352,33 +352,42 @@ class SampleInfoTab(ExperimentTab):
             specs_sorted = sorted(specs, key=lambda s: (_maybe_channel_index(s) is None, _maybe_channel_index(s) or 1000))
 
             # Add / update channels
+            channels_patch = {}
             for i, pattern_spec in enumerate(specs_sorted):
-                if pattern_spec.name not in self.params:
-                    self.params.request_add_channel(pattern_spec.name)
-                    self.add_channel_tab(pattern_spec.name)
-
-                p = self.params[pattern_spec.name]
-                p.path = pattern_spec.pattern_relpath
-                p.data_type = pattern_spec.data_type
                 if isinstance(pattern_spec.extension, (list, tuple)):  # REFACTOR: find more elegant handling here
                     warnings.warn('Multiple extensions found, picking the first one.')
-                    p.extension = pattern_spec.extension[0]
+                    ext = pattern_spec.extension[0]
                 else:
-                    p.extension = pattern_spec.extension  # WARNING: Will do successive modifications. Check if we should batch update
-
+                    ext = pattern_spec.extension  # WARNING: Will do successive modifications. Check if we should batch update
+                entry = {
+                    'path': pattern_spec.pattern_relpath,
+                    'data_type': pattern_spec.data_type,
+                    'extension': ext,
+                }
                 # If we have a pattern, we can stitch:
                 exp = Expression(pattern_spec.pattern_relpath)
                 axes = exp.tag_names()  # e.g. ['Z', 'Y', 'X']
                 first_tile = exp.string(values={axis: 0 for axis in axes})  # Ideally, pick min(axis) for each
                 ome_info = parse_ome_info(Path(self.src_folder) / first_tile)
-                if 'resolution' in ome_info and ome_info['resolution'] is not None:
+                if ome_info.get('resolution') is not None:
                     res = ome_info['resolution']
                     if (isinstance(res, (list, tuple))
                         and len(res) == 3
                         and all(v in (1, 2, 3) for v in res)):
-                        p.resolution = ome_info['resolution']
-                if 'channels_excitation' in ome_info and ome_info['channels_excitation'] is not None:
-                    p.wavelength = ome_info['channels_excitation'][i]
+                        entry['resolution'] = list(res)
+                if ome_info.get('channels_excitation') is not None:
+                    entry['wavelength'] = ome_info['channels_excitation'][i]
+                channels_patch[pattern_spec.name] = entry
+
+            # Single submit_patch → adjusters see complete data_types → correct reference resolution
+            self.main_window.experiment_controller.apply_ui_patch({'sample': {'channels': channels_patch}})
+
+            # Now create UI tabs from the fully reconciled config
+            for pattern_spec in specs_sorted:
+                if pattern_spec.name not in self.ui.channelsParamsTabWidget.get_channels_names():
+                    self.add_channel_tab(pattern_spec.name)
+                if pattern_spec.name in self.params:
+                    self.params[pattern_spec.name].cfg_to_ui()
 
             self.publish(UiChannelsChanged(before=existing_channels, after=desired_channels))
         finally:
