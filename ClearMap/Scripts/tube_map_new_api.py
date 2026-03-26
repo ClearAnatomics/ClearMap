@@ -8,21 +8,17 @@ optionally, provide the atlas base name as second argument
 """
 import sys
 
-from ClearMap.Scripts.align_new_api import stitch, register, plot_registration_results
-from ClearMap.pipeline_orchestrators.sample_info_management import SampleManager
-from ClearMap.pipeline_orchestrators.stitching_orchestrator import StitchingProcessor
-from ClearMap.pipeline_orchestrators.registration_orchestrator import RegistrationProcessor
+from ClearMap.pipeline_orchestrators.utils import init_sample_manager_and_processors
 from ClearMap.pipeline_orchestrators.tube_map import BinaryVesselProcessor, VesselGraphProcessor
+
+from ClearMap.Scripts.align_new_api import stitch, register, plot_registration_results
 
 
 def main(src_directory):
-    sample_manager = SampleManager()
-    sample_manager.setup(src_dir=src_directory)
-
-    stitcher = StitchingProcessor(sample_manager)
-    stitcher.setup()
-    registration_processor = RegistrationProcessor(sample_manager)
-    registration_processor.setup()
+    orchestrators = init_sample_manager_and_processors(src_directory)
+    sample_manager = orchestrators['sample_manager']
+    stitcher = orchestrators['stitcher']
+    registration_processor = orchestrators['registration_processor']
 
     stitch(stitcher)
     stitcher.plot_stitching_results(mode='overlay')

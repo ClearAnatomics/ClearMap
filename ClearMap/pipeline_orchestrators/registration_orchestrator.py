@@ -569,6 +569,23 @@ class RegistrationProcessor(PipelineOrchestrator):
 
         self.update_watcher_main_progress()
 
+    # Plot functions
+    def __prepare_registration_results_graph(self, channel):
+        img_paths = [self.get_fixed_image(channel).path, self.get_aligned_image(channel)]
+        if not all([p.exists() for p in img_paths]):
+            raise ValueError(f'Missing requirements {img_paths}')
+        titles = [img.parent.stem if 'aligned_to' in str(img) else img.stem for img in img_paths]
+        # TODO: replace result<N,1> by channel name
+        return img_paths, titles
+
+    def plot_registration_results(self, channel, composite=False, parent=None):
+        image_sources, titles = self.prepare_registration_results_graph(channel)
+        if composite:
+            image_sources = [image_sources, ]
+        dvs = q_plot_3d.plot(image_sources, title=titles, arrange=False, sync=True,
+                             lut=self.machine_config['default_lut'], parent=parent)
+        return dvs, titles
+
 
 class MiniBrain(TypedDict):
     """

@@ -800,7 +800,8 @@ def build_sample_manager(src_dir='', bus: Optional[EventBus] = None):
 
     cfg_coordinator_factory = make_cfg_coordinator_factory(bus)
     cfg_coordinator = cfg_coordinator_factory(bootstrap_dir,
-                                              config_groups=(ALTERNATIVES_REG._pipeline_groups, ALTERNATIVES_REG._global_groups))
+                                              config_groups=(ALTERNATIVES_REG._pipeline_groups,
+                                                             ALTERNATIVES_REG._global_groups))
 
     cfg_coordinator.seed_missing_from_defaults(tabs_only=True)
 

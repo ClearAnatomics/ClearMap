@@ -34,9 +34,10 @@ __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
 
 def process_sample(folder, align=False, cells=False, vasc=False):
-    res = init_sample_manager_and_processors(folder=folder)
-    keys = ['sample_manager', 'stitching_processor', 'registration_processor']
-    sample_manager, stitching_processor, registration_processor = [res[k] for k in keys]
+    orchestrators = init_sample_manager_and_processors(folder=folder)
+    sample_manager = orchestrators['sample_manager']
+    stitching_processor = orchestrators['stitcher']
+    registration_processor = orchestrators['registration_processor']
 
     if align:
         stitching_processor.stitch()
@@ -86,9 +87,10 @@ def main(samples_file):
 
 
 def voxelize_sample(folder, align=False, cells=False, vasc=False, voxelization_radius=(10, 10, 10)):
-    res = init_sample_manager_and_processors(folder=folder)
-    keys = ['sample_manager', 'stitching_processor', 'registration_processor']
-    sample_manager, stitching_processor, registration_processor = [res[k] for k in keys]
+    orchestrators = init_sample_manager_and_processors(folder=folder)
+    sample_manager = orchestrators['sample_manager']
+    stitching_processor = orchestrators['stitcher']
+    registration_processor = orchestrators['registration_processor']
 
     if align:
         stitching_processor.stitch()
@@ -109,9 +111,9 @@ def voxelize_folders(folders, align=False, cells=True, vasc=False):
 
 
 def convert_to_cm_2_1(folder, atlas_base_name='ABA_25um'):
-    res = init_sample_manager_and_processors(folder)
-    sample_manager = res['sample_manager']
-    registration_processor = res['registration_processor']
+    orchestrators = init_sample_manager_and_processors(folder)
+    sample_manager = orchestrators['sample_manager']
+    registration_processor = orchestrators['registration_processor']
 
     for channel in sample_manager.get_channels_by_pipeline('CellMap', as_list=True):
         cell_detector = CellDetector(sample_manager, channel=channel, registration_processor=registration_processor)
@@ -119,9 +121,9 @@ def convert_to_cm_2_1(folder, atlas_base_name='ABA_25um'):
 
 
 def realign(folder, atlas_base_name='ABA_25um'):
-    res = init_sample_manager_and_processors(folder)
-    sample_manager = res['sample_manager']
-    registration_processor = res['registration_processor']
+    orchestrators = init_sample_manager_and_processors(folder)
+    sample_manager = orchestrators['sample_manager']
+    registration_processor = orchestrators['registration_processor']
 
     for channel in sample_manager.get_channels_by_pipeline('CellMap', as_list=True):
         cell_detector = CellDetector(sample_manager, channel=channel, registration_processor=registration_processor)
@@ -156,8 +158,8 @@ def rescale_channel(folder, atlas_base_name=None, dest_resolution=(3, 3, 6), n_c
     """
     n_cpus = multiprocessing.cpu_count() - 2 if n_cpus is None else n_cpus
 
-    res = init_sample_manager_and_processors(folder)
-    sample_manager = res['sample_manager']
+    orchestrators = init_sample_manager_and_processors(folder)
+    sample_manager = orchestrators['sample_manager']
 
     file_list = sample_manager.get('raw', channel=channel).variant(extension=ext).file_list
     print(f'Processing {file_list}')
@@ -181,8 +183,8 @@ def rescale_channel(folder, atlas_base_name=None, dest_resolution=(3, 3, 6), n_c
 def batch_crop(folder, crop_x=0, crop_y=0, suffix='_cropped', channel=None):
     if channel is None:
         raise ValueError('Please provide a channel')
-    res = init_sample_manager_and_processors(folder)
-    sample_manager = res['sample_manager']
+    orchestrators = init_sample_manager_and_processors(folder)
+    sample_manager = orchestrators['sample_manager']
 
     raw_asset = sample_manager.get('raw', channel=channel)
     shape = clearmap_io.shape(raw_asset.filelist[-1])

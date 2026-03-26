@@ -917,17 +917,6 @@ class RegistrationTab(PreProcessingTab):
         registered_channels = [ch for ch in self.params.keys() if self.worker.channel_was_registered(ch)]
         populate_combobox(self.ui.plotChannelComboBox, registered_channels)
 
-    def __prepare_registration_results_graph(self, channel):
-        img_paths = [
-            self.worker.get_fixed_image(channel).path,
-            self.worker.get_aligned_image(channel)
-        ]
-        if not all([p.exists() for p in img_paths]):
-            raise ValueError(f'Missing requirements {img_paths}')
-        titles = [img.parent.stem if 'aligned_to' in str(img) else img.stem for img in img_paths]
-        # TODO: replace result<N,1> by channel name
-        return img_paths, titles
-
     def plot_registration_results(self):
         """
         Plot the result of the registration between 2 channels. Either side by side or as a composite
@@ -938,12 +927,8 @@ class RegistrationTab(PreProcessingTab):
         channel = self.params.shared_params.plot_channel
         composite = self.params.shared_params.plot_composite
         self.main_window.clear_plots()
-        image_sources, titles = self.__prepare_registration_results_graph(channel)
-        if composite:
-            image_sources = [image_sources, ]
-        dvs = plot_3d.plot(image_sources, title=titles, arrange=False, sync=True,
-                           lut=self.main_window.preference_editor.params.lut,
-                           parent=self.main_window.centralWidget())
+        dvs, titles = self.worker.plot_registration_results(
+            channel=channel, composite=composite, parent=self.main_window.centralWidget())
         self.main_window.setup_plots(dvs, graph_names=titles)
         if not composite:
             link_dataviewers_cursors(dvs)

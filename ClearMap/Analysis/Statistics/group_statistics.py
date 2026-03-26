@@ -501,9 +501,9 @@ def dirs_to_cells_dfs(directory, dirs):
 
 
 def get_volume_map(folder, channel=None):
-    res = init_sample_manager_and_processors(folder)
-    sample_manager = res['sample_manager']
-    registration_manager = res['registration_processor']
+    orchestrators = init_sample_manager_and_processors(folder)
+    sample_manager = orchestrators['sample_manager']
+    registration_manager = orchestrators['registration_processor']
 
     if channel is None:
         annotator = registration_manager.annotators[sample_manager.alignment_reference_channel]
@@ -520,17 +520,16 @@ def make_summary(directory, gp1_name, gp2_name, gp1_dirs, gp2_dirs, channel=None
 
     dfs = {}
     if channel is None:
-        sample_manager = build_sample_manager(src_dir=directory / gp1_dirs[0])
-        channels = sample_manager.channels_to_detect
+        tmp_sample_manager = build_sample_manager(src_dir=directory / gp1_dirs[0])
+        channels = tmp_sample_manager.channels_to_detect
     else:
         channels = [channel]
 
     for channel_ in channels:
         # Use the first sample to get the annotator for the cohort
-        sample_manager = build_sample_manager(src_dir=directory / gp1_dirs[0])
+        orchestrators = init_sample_manager_and_processors(folder=directory / gp1_dirs[0])
+        aligner = orchestrators['registration_processor']
 
-        aligner = RegistrationProcessor(sample_manager=sample_manager)
-        aligner.setup()
         annotator = aligner.annotators[channel_]
 
         gp1_dfs = dirs_to_cells_dfs(directory, gp1_dirs)

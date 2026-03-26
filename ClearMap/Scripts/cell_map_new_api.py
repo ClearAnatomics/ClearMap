@@ -8,21 +8,17 @@ optionally, provide the atlas base name as second argument
 """
 import sys
 
-from ClearMap.pipeline_orchestrators.sample_info_management import SampleManager
-from ClearMap.pipeline_orchestrators.stitching_orchestrator import StitchingProcessor
-from ClearMap.pipeline_orchestrators.registration_orchestrator import RegistrationProcessor
-from ClearMap.Scripts.align_new_api import plot_registration_results, register, stitch
+from ClearMap.pipeline_orchestrators.utils import init_sample_manager_and_processors
 from ClearMap.pipeline_orchestrators.cell_map import CellDetector
+
+from ClearMap.Scripts.align_new_api import plot_registration_results, register, stitch
 
 
 def main(src_directory):
-    sample_manager = SampleManager()
-    sample_manager.setup(src_dir=src_directory)
-
-    stitcher = StitchingProcessor(sample_manager)
-    stitcher.setup()
-    registration_processor = RegistrationProcessor(sample_manager)
-    registration_processor.setup()
+    orchestrators = init_sample_manager_and_processors(src_directory)
+    sample_manager = orchestrators['sample_manager']
+    stitcher = orchestrators['stitcher']
+    registration_processor = orchestrators['registration_processor']
 
     stitch(stitcher)
     stitcher.plot_stitching_results(mode='overlay')
@@ -30,12 +26,7 @@ def main(src_directory):
     register(registration_processor)
     plot_registration_results(registration_processor, sample_manager.alignment_reference_channel)
 
-    cell_detection_config = sample_manager.config_loader.get_cfg('cell_map')['channels']
-    if 'example' in cell_detection_config:
-        print('Channels not yet configured in cell_map_params.cfg. Aborting.')
-        return
-
-    for channel in cell_detection_config.keys():
+    for channel in sample_manager.get_channels_by_pipeline('CellMap', as_list=True):
         cell_detector = CellDetector(sample_manager, channel=channel, registration_processor=registration_processor)
         # TEST CELL DETECTION
         # slicing = (
