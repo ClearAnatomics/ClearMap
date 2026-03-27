@@ -1007,7 +1007,6 @@ class ClearMapApp(ClearMapAppBase):
         tab_title = self.tabWidget.tabText(index)
         self.bus.publish(UiTabActivated(key=title_to_snake(tab_title)))
 
-
     def _on_tab_activation_result(self, event: TabActivationResult):
         if not event.ok:
             self.popup('WARNING', event.message)
@@ -1365,9 +1364,27 @@ class GuiController(BusSubscriberMixin):
 
         return True, ''
 
-    def _find_tab_by_key(self, key: str) -> Optional[Any]:
+    def _find_tab_by_key(self, key: str) -> Optional[GenericTab]:
+        """
+        Find a tab instance by its key (e.g. 'sample', 'registration', etc).
+
+        .. warning::
+            The `key` parameter is expected to be in snake_case and is derived from the tab title
+            (e.g. 'Sample info' → 'sample_info').
+
+        Parameters
+        ----------
+        key: str
+            The key of the tab to find (e.g. 'sample', 'registration', etc)
+            The key is expected to be in snake_case and is derived from the tab title (e.g. 'Sample info' → 'sample_info')
+
+        Returns
+        -------
+        Optional[GenericTab]
+            The tab instance matching the key, or None if not found
+        """
         for tab in self._tabs:
-            if tab.name.title() == key:
+            if title_to_snake(tab.name) == key:
                 return tab
         return None
 
