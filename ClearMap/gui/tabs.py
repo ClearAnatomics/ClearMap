@@ -454,7 +454,7 @@ class StitchingTab(PreProcessingTab):
     def on_selected(self):
         self.update_plotable_channels()
         chans = self._get_channels()
-        sample_view = self.main_window.experiment_controller.get_config_view('sample')['channels']
+        sample_view = self.main_window.experiment_controller.get_config_view()['sample']['channels']
         for chan in chans:
             if sample_view[chan]['extension'] == '.ome.tif':
                 if prompt_dialog('Create layout from OME metadata',
