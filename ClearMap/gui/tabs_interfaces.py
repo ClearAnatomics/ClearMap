@@ -592,7 +592,7 @@ class GenericTab(GenericUi, BusSubscriberMixin):
         """
         self.main_window.clear_plots()
         try:
-            dvs = plot_method(self, *args, **kwargs)  # We need to pass `self` because method
+            dvs = plot_method(*args, **kwargs)
         except MissingRequirementException as err:
             self.main_window.print_error_msg(f'Missing {plot_method.__name__} files {str(err)}. '
                                              f'Please ensure previous steps are run first.')
