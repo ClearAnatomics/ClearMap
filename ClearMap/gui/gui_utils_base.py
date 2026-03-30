@@ -228,9 +228,20 @@ def replace_widget(old_widget: QWidget, new_widget: QWidget, layout: Optional[QL
     """
     if layout is None:
         layout = find_parent_layout(old_widget)
+
+    # Transfer objectName so ParamLink.findChild can locate the replacement
+    obj_name = old_widget.objectName()
+    if obj_name and not new_widget.objectName():
+        new_widget.setObjectName(obj_name)
+
     layout.replaceWidget(old_widget, new_widget)
+
+    # Poison: make _is_alive return False immediately (don't wait for event loop)
+    old_widget.setObjectName('')
+    old_widget.setProperty('_cm_replaced', True)
     old_widget.setParent(None)
     old_widget.deleteLater()
+
     return new_widget
 
 
