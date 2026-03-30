@@ -60,6 +60,14 @@ def _set_list_box_value(instance, values):
     """
     if values is None:
         instance.disableControls()
+
+        # Display the text corresponding to the "special" value
+        for spin in _get_sorted_spin_boxes(instance):
+            if spin.specialValueText():
+                spin.blockSignals(True)
+                spin.setValue(spin.minimum())
+                spin.blockSignals(False)
+
         return
     elif isinstance(values, (list, tuple)) and len(values) != len(_get_sorted_spin_boxes(instance)):
         raise ValueError(f'Expected {len(_get_sorted_spin_boxes(instance))} values, got {len(values)}')
