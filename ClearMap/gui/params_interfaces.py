@@ -339,18 +339,19 @@ def _equals_disabled_value(val, token):
 
 class VectorLink(ParamLink):
     def __init__(self, keys: Sequence[str], widget: QFrame, *,
-                disable_globally: bool | str = "auto",
-                disabled_value: Optional[Union[str, None]] = None,
-                cast_to_ui: Optional[Callable[[Any], Any]] = None,
-                cast_from_ui: Optional[Callable[[Any], Any]] = None,
-                collapse_singular: bool = True,
-                enforce_sentinel_min: bool = True,
-                n: Optional[int] = None,
-                dtype: Callable[[Any], Any] | str = "auto",
-                ui_sentinel: Union[int, float] = -1,
-                notify_apply: Callable[[], None] | None = None,
-                extra_connect: Callable[[QFrame, Callable[[], None]], None] | None = None,
-                show_sentinel_when_off: bool = False):
+                 disable_globally: bool | str = "auto",
+                 disabled_value: Optional[Union[str, None]] = None,
+                 cast_to_ui: Optional[Callable[[Any], Any]] = None,
+                 cast_from_ui: Optional[Callable[[Any], Any]] = None,
+                 collapse_singular: bool = True,
+                 enforce_sentinel_min: bool = True,
+                 n: Optional[int] = None,
+                 dtype: Callable[[Any], Any] | str = "auto",
+                 ui_sentinel: Union[int, float] = -1,
+                 default_on_enable=None,
+                 notify_apply: Callable[[], None] | None = None,
+                 extra_connect: Callable[[QFrame, Callable[[], None]], None] | None = None,
+                 show_sentinel_when_off: bool = False):
         """
         ParamLink specialisation for numeric vectors with optional global disable.
         This is a **meta**widget that maps a vector of ints or bools to several spinboxes
@@ -404,6 +405,7 @@ class VectorLink(ParamLink):
             raise ValueError("disabled_value must be None or 'auto'")
         self.disable_globally = disable_globally
         self.disabled_value = disabled_value
+        self._default_on_enable = default_on_enable
 
         self.collapse_singular = collapse_singular
         self._n = n
@@ -437,7 +439,13 @@ class VectorLink(ParamLink):
         super().__init__(keys=self.keys, widget=widget,
                          cast_to_ui=final_cast_to_ui, cast_from_ui=final_cast_from_ui,
                          connect=True, notify_apply=notify_apply, extra_connect=extra_connect,
-                         disabled_value=disabled_value, ui_sentinel=ui_sentinel)
+                         disabled_value=disabled_value, ui_sentinel=None)
+        # WARNING: set after super() to avoid double wrapping of cast functions with sentinel logic
+        self.ui_sentinel = ui_sentinel
+        if self.has_global_toggle and self._default_on_enable is not None:
+            cb = self.widget.getCheckBox()
+            if cb is not None:
+                cb.toggled.connect(self._on_global_toggled)
 
     def _has_global_toggle(self) -> bool:
         get_cb = getattr(self.widget, "getCheckBox", None)
@@ -453,6 +461,20 @@ class VectorLink(ParamLink):
     @functools.cached_property
     def has_global_toggle(self):
         return self._has_global_toggle() if self.disable_globally == "auto" else bool(self.disable_globally)
+
+    def _on_global_toggled(self, checked):
+        if not checked:
+            return
+        # Only populate defaults if all spinboxes are still at sentinel
+        spins = _get_sorted_spin_boxes(self.widget)  # WARNING: private dependency on monkeypatch
+        if not all(s.value() == s.minimum() for s in spins):
+            return  # user had real values, preserve them
+
+        vals = _ensure_list(self._default_on_enable, len(spins))
+        for i, (spin, val) in enumerate(zip(spins, vals)):
+            spin.blockSignals(True)
+            spin.setValue(self.dtype(val))
+            spin.blockSignals(False)
 
     def _infer_arity(self) -> int:
         name = self.widget.objectName() or ""
