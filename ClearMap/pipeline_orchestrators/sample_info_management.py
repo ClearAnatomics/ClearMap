@@ -102,10 +102,11 @@ class SampleManager(OrchestratorBase):
                 self.workspace = workspace
                 self.resource_type_to_folder = workspace.resource_type_to_folder
 
-            # REFACTOR: Make this more robust by triggering upon self.prefix change
-            if self.prefix is not None and self.workspace.sample_id != self.prefix:
-                self.workspace.set_sample_id(self.config['sample_id'])
             self.update_workspace()
+
+            desired_sample_id = self.prefix  # None when use_id_as_prefix is False
+            if desired_sample_id != self.workspace.sample_id:
+                self.workspace.set_sample_id(desired_sample_id or '')
 
             sections = self.compute_required_sections()
             self.cfg_coordinator.load_all(sections)
@@ -133,8 +134,14 @@ class SampleManager(OrchestratorBase):
         # Only reconcile when sample/channels subtree changed.
         if not evt.changed_keys:
             return
-        channels_changed = any(k.startswith('sample.channels') or k == 'sample' for k in evt.changed_keys)
-        if channels_changed:
+        needs_workspace_update = any(
+            k == 'sample' or  # whole sample section changed
+            k.startswith('sample.channels') or  # channels subtree changed
+            k == 'sample.use_id_as_prefix' or  # use_id_as_prefix affects prefix and thus asset paths
+            k == 'sample.sample_id'  # sample_id affects prefix and thus asset paths
+            for k in evt.changed_keys
+        )
+        if needs_workspace_update:
             self.update_workspace()
 
     def patch_channel(self, channel, patch: dict):
@@ -168,6 +175,11 @@ class SampleManager(OrchestratorBase):
             return
 
         self._ensure_workspace()
+
+        desired_sample_id = self.prefix  # None when use_id_as_prefix is False
+        current_sample_id = self.workspace.sample_id
+        if desired_sample_id != current_sample_id:
+            self.workspace.set_sample_id(desired_sample_id or '')
 
         self.incomplete_channels = []
         # Add or update channels in the workspace
