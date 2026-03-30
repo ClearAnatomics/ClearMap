@@ -20,6 +20,7 @@ from ClearMap.Utils.utilities import set_item_recursive, get_item_recursive, DEL
 from ClearMap.Utils.exceptions import ConfigNotFoundError, ClearMapValueError
 from ClearMap.config.config_handler import ALTERNATIVES_REG
 from ClearMap.gui.gui_utils_base import disconnect_widget_signal
+from ClearMap.gui.widget_monkeypatch_callbacks import _get_sorted_spin_boxes
 from ClearMap.gui.widgets import ExtendableTabWidget, FileDropListWidget, LandmarksWeightsPanel, GroupsWidgetAdapter, \
     NProcessesWidget
 
@@ -37,10 +38,18 @@ def invert(x):
 
 
 def _is_alive(widget):
+    if widget is None:
+        return False
     try:
-        return (widget is not None) and not sip.isdeleted(widget)
+        if sip.isdeleted(widget):
+            return False
     except Exception:
-        return widget is not None  # FIXME: what about ParamLinks with None widgets
+        # Not a sip-wrapped object (e.g. mock in tests).
+        # Can't determine deletion state; assume alive.
+        return True
+    if widget.property('_cm_replaced'):
+        return False
+    return True
 
 
 # REFACTOR: merge with VectorLink version
@@ -101,6 +110,19 @@ class ParamLink:
             connect = False
         self.keys: List[str] = keys
         self._widget: QWidget = widget
+        self._had_widget: bool = widget is not None  # intentionally None vs later-stale
+
+        # Auto-populate re-find coordinates when not explicit
+        if widget is not None:
+            if object_name is None:
+                name = widget.objectName()
+                if name:
+                    object_name = name
+            if scope_root is None and object_name:
+                parent = widget.parentWidget()
+                if parent is not None:
+                    scope_root = parent
+
         self.object_name: Optional[str] = object_name  # Name of the widget to find inside scope_root
         self.scope_root: Optional[QWidget] = scope_root  # Where to find the widget by name
         self.default: Optional[Any] = default
@@ -152,13 +174,34 @@ class ParamLink:
         if _is_alive(w):
             return w
 
-        if self.scope_root is None or not self.object_name:
+        # Intentionally None from construction — not stale, just absent
+        if not self._had_widget:
             return None
 
-        # stale → re-find inside scope_root
-        resolved = self.scope_root.findChild(QWidget, self.object_name)
-        self._widget = resolved  # cache for next time
-        return resolved
+        # Stale: was set but now dead — attempt re-find
+        if self.scope_root is not None and self.object_name:
+            resolved = self.scope_root.findChild(QWidget, self.object_name)
+            if resolved is not None:
+                self._widget = resolved  # cache for next time
+                return resolved
+            warnings.warn(
+                f"ParamLink re-find failed: no widget named {self.object_name!r} "
+                f"under {self.scope_root.objectName()!r}. "
+                f"Was replace_widget called without transferring objectName?",
+                RuntimeWarning, stacklevel=2)
+        else:
+            old_name = '<deleted>'
+            try:
+                old_name = w.objectName() if w is not None else '<None>'
+            except RuntimeError:
+                pass
+            warnings.warn(
+                f"ParamLink widget {old_name!r} is stale (replaced or deleted) "
+                f"but no scope_root/object_name available for re-find. "
+                f"Provide object_name= and scope_root= or ensure "
+                f"_setup_channel runs before _create_channel_params.",
+                RuntimeWarning, stacklevel=2)
+        return None
 
     @widget.setter
     def widget(self, value: QWidget):  # to set explicitly (especially in child clkass)
