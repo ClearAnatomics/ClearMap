@@ -345,8 +345,25 @@ class SampleParameters(ChannelsUiParameterCollection):
     def propagate_params(self, channel):
         target_params = self[channel]
         ref_params = self[target_params.geometry_settings_from]
-        for key in ('slice_x', 'slice_y', 'slice_z', 'resolution', 'orientation'):
-            setattr(target_params, key, getattr(ref_params, key))
+
+        keys_to_copy = ('slice_x', 'slice_y', 'slice_z', 'resolution', 'orientation')
+        patch = {}
+        # Suppress all signal-driven config writes during bulk UI update
+        with target_params._suppress_handlers():
+            for key in keys_to_copy:
+                value = getattr(ref_params, key)
+                setattr(target_params, key, value)
+
+                # Collect config patch
+                p_link = target_params.params_dict.get(key)
+                if isinstance(p_link, ParamLink) and p_link.keys:
+                    set_item_recursive(patch, target_params.cfg_subtree + p_link.keys, value)
+                elif isinstance(p_link, list):  # e.g. orientation: ['orientation']
+                    set_item_recursive(patch, target_params.cfg_subtree + p_link, value)
+
+        # Single atomic config write
+        if patch:
+            self._apply_patch(patch)
 
 
 class SharedSampleParams(UiParameter):

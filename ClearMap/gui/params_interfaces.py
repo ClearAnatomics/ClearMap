@@ -3,6 +3,7 @@ import functools
 import traceback
 import warnings
 from abc import ABC, abstractmethod
+from contextlib import contextmanager
 from typing import List, Any, Callable, Mapping, Optional, Dict, Type, Tuple, Sequence, Union
 
 from importlib_metadata import version
@@ -868,6 +869,7 @@ def n_proc_connector(widget: NProcessesWidget, cb):
 WIDGET_OPS.register(NProcessesWidget, getter=n_proc_getter,
                     setter=n_proc_setter, connector=n_proc_connector)
 
+
 class UiParameter(BusSubscriberMixin):
     """
     This is a class to link the GUI widgets to the config file.
@@ -930,6 +932,15 @@ class UiParameter(BusSubscriberMixin):
 
     def post_connect(self):
         pass
+
+    @contextmanager
+    def _suppress_handlers(self):
+        old = self._painting
+        self._painting = True
+        try:
+            yield
+        finally:
+            self._painting = old
 
     def _validate_params_dict(self):
         for k, v in self.params_dict.items():
