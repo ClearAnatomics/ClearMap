@@ -150,13 +150,13 @@ def ui_task_progress(title_fn, steps_fn):
     """
     def deco(fn):
         @functools.wraps(fn)
-        def wrapper(self, *args, **kwargs):
+        def wrapper(self, *_, **kwargs):
             title = title_fn(self)
             self.main_window.print_status_msg(title)
             steps = steps_fn(self)
             self.main_window.make_progress_dialog(title, n_steps=steps)
             try:
-                return fn(self, *args, **kwargs)
+                return fn(self, **kwargs)
             finally:
                 self.main_window.signal_process_finished()
         return wrapper

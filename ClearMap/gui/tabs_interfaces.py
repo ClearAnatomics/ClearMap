@@ -635,7 +635,8 @@ class GenericTab(GenericUi, BusSubscriberMixin):
             def wrapper(self, *args, **kwargs):
                 if status_msg:
                     self.main_window.print_status_msg(status_msg)
-                return self.wrap_plot(fn, *args, **kwargs)
+                bound_method = functools.partial(fn, self)
+                return self.wrap_plot(bound_method, *args, **kwargs)
             return wrapper
         return deco
 
