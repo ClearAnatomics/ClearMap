@@ -652,15 +652,16 @@ class RigidChannelStitchingParams(ChannelUiParameter):
             'skip': ParamLink(['skip'], self.tab.rigidParamsGroupBox,
                               cast_to_ui=invert, cast_from_ui=invert),
             'x_overlap': VectorLink(['overlap_x'], self.tab.xOverlapSinglet,
-                                     disable_globally=True, disabled_value='auto',
-                                     show_sentinel_when_off=True),
+                                    disable_globally=True, disabled_value='auto',
+                                    default_on_enable=1, show_sentinel_when_off=True),
             'y_overlap': VectorLink(['overlap_y'], self.tab.yOverlapSinglet,
-                                     disable_globally=True, disabled_value='auto',
-                                     show_sentinel_when_off=True),
-            'projection_thickness': VectorLink(['projection_thickness'], self.tab.projectionThicknessDoublet,
-                                                disable_globally=False, disabled_value=None,
-                                                cast_from_ui=lambda v: (v + [None]) if isinstance(v, list) else [v, None]),
-                                                # Projection thickness has 2 axis in UI but 3 in config
+                                    disable_globally=True, disabled_value='auto',
+                                    default_on_enable=1, show_sentinel_when_off=True),
+            'projection_thickness': VectorLink(
+                ['projection_thickness'], self.tab.projectionThicknessDoublet,
+                disable_globally=False, disabled_value=None, default_on_enable=[1, 1],
+                cast_from_ui=lambda v: (v + [None]) if isinstance(v, list) else [v, None]),
+                # Projection thickness has 2 axis in UI but 3 in config
             'max_shifts_x': ParamLink(['max_shifts_x'], self.tab.rigidMaxShiftsXDoublet),
             'max_shifts_y': ParamLink(['max_shifts_y'], self.tab.rigidMaxShiftsYDoublet),
             'max_shifts_z': ParamLink(['max_shifts_z'], self.tab.rigidMaxShiftsZDoublet),
@@ -697,9 +698,11 @@ class WobblyChannelStitchingParams(ChannelUiParameter):
             'max_shifts_y': ParamLink(['max_shifts_y'], self.tab.wobblyMaxShiftsYDoublet),
             'max_shifts_z': ParamLink(['max_shifts_z'], self.tab.wobblyMaxShiftsZDoublet),
             'stack_valid_range': VectorLink(['stack_valid_range'], self.tab.wobblyStackValidRangeDoublet),
-            'stack_pixel_size': VectorLink(['stack_pixel_size'], self.tab.wobblyStackPixelSizeSinglet),
+            'stack_pixel_size': VectorLink(['stack_pixel_size'], self.tab.wobblyStackPixelSizeSinglet,
+                                           default_on_enable=1, disabled_value=None, show_sentinel_when_off=True),
             'slice_valid_range': VectorLink(['slice_valid_range'], self.tab.wobblySliceRangeDoublet),
-            'slice_pixel_size': VectorLink(['slice_pixel_size'], self.tab.wobblySlicePixelSizeSinglet)
+            'slice_pixel_size': VectorLink(['slice_pixel_size'], self.tab.wobblySlicePixelSizeSinglet,
+                                           default_on_enable=1, disabled_value=None, show_sentinel_when_off=True)
         }
 
     @property
@@ -1007,7 +1010,7 @@ class ChannelCellMapParams(ChannelUiParameter, OrthoviewerSlicingMixin):
             'cell_filter_size': ParamLink(['cell_filtration', 'thresholds', 'size'], self.tab.cellFilterThresholdSizeDoublet),
             'cell_filter_intensity': VectorLink(['cell_filtration', 'thresholds', 'intensity'],
                                                  self.tab.cellFilterThresholdIntensityDoublet,
-                                                 disabled_value=None,  # -1 sentinel maps to None by default
+                                                 disabled_value=None, default_on_enable=[0, 65535],
                                                  cast_from_ui=self.cast_max_from_ui),
             'voxelization_radii': ParamLink(['voxelization', 'radii'], self.tab.voxelizationRadiusTriplet),
             'crop_x_min': ParamLink(['detection', 'test_set_slicing', 'dim_0', 0], self.tab.detectionSubsetXRangeMin),
