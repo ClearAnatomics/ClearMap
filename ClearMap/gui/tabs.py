@@ -455,6 +455,7 @@ class StitchingTab(PreProcessingTab):
         self.update_plotable_channels()
         if self._selected_once:
             return
+        return  # TODO: reenable after testing
         chans = self._get_channels()
         sample_view = self.main_window.experiment_controller.get_config_view()['sample']['channels']
         for chan in chans:
