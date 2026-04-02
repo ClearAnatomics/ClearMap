@@ -571,8 +571,16 @@ class ChannelStitchingParams(UiParameterCollection):
 
     @property
     def params(self):
-        return self.shared, self.stitching_rigid, self.stitching_wobbly  # TODO: check if None is a problem
-
+        result = [self.shared]
+        try:
+            view = self.shared.view or {}
+        except Exception:
+            view = {}
+        if self.stitching_rigid is not None and 'rigid' in view:
+            result.append(self.stitching_rigid)
+        if self.stitching_wobbly is not None and 'wobbly' in view:
+            result.append(self.stitching_wobbly)
+        return result
 
 class GeneralChannelStitchingParams(ChannelUiParameter):
     publishes = Publishes(UiLayoutChannelChanged, UiUseExistingLayoutChanged)
