@@ -13,7 +13,7 @@ import numpy as np
 
 from PyQt5.QtCore import Qt, QTimer, QSignalBlocker
 from PyQt5.QtWidgets import (QToolBox, QCheckBox, QLabel, QHBoxLayout, QVBoxLayout,
-                             QSpinBox, QLineEdit, QDoubleSpinBox, QRadioButton, QFrame, QWidget)
+                             QSpinBox, QLineEdit, QDoubleSpinBox, QRadioButton, QFrame)
 
 from ClearMap.config.atlas import ATLAS_NAMES_MAP
 from ClearMap.Utils.exceptions import ClearMapValueError
@@ -992,9 +992,7 @@ class ChannelCellMapParams(ChannelUiParameter, OrthoviewerSlicingMixin):
     colocalization_compatible: bool
     plot_when_finished: bool
     plot_detected_cells: bool
-    crop_x_min: int; crop_x_max: int  # TODO: if 99.9 % source put to 100% (None)
-    crop_y_min: int; crop_y_max: int  # TODO: if 99.9 % source put to 100% (None)
-    crop_z_min: int; crop_z_max: int  # TODO: if 99.9 % source put to 100% (None)
+    crop_x: List[int]; crop_y: List[int]; crop_z: List[int]  # TODO: if 99.9 % source put to 100% (None)
     n_detected_cells: int
     n_filtered_cells: int
 
@@ -1021,12 +1019,9 @@ class ChannelCellMapParams(ChannelUiParameter, OrthoviewerSlicingMixin):
                                                  disabled_value=None, default_on_enable=[0, 65535],
                                                  cast_from_ui=self.cast_max_from_ui),
             'voxelization_radii': ParamLink(['voxelization', 'radii'], self.tab.voxelizationRadiusTriplet),
-            'crop_x_min': ParamLink(['detection', 'test_set_slicing', 'dim_0', 0], self.tab.detectionSubsetXRangeMin),
-            'crop_x_max': ParamLink(['detection', 'test_set_slicing', 'dim_0', 1], self.tab.detectionSubsetXRangeMax),
-            'crop_y_min': ParamLink(['detection', 'test_set_slicing', 'dim_1', 0], self.tab.detectionSubsetYRangeMin),
-            'crop_y_max': ParamLink(['detection', 'test_set_slicing', 'dim_1', 1], self.tab.detectionSubsetYRangeMax),
-            'crop_z_min': ParamLink(['detection', 'test_set_slicing', 'dim_2', 0], self.tab.detectionSubsetZRangeMin),
-            'crop_z_max': ParamLink(['detection', 'test_set_slicing', 'dim_2', 1], self.tab.detectionSubsetZRangeMax),
+            'crop_x': VectorLink(['detection', 'test_set_slicing', 'dim_0'], self.tab.detectionSubsetXRangeDoublet),
+            'crop_y': VectorLink(['detection', 'test_set_slicing', 'dim_1'], self.tab.detectionSubsetYRangeDoublet),
+            'crop_z': VectorLink(['detection', 'test_set_slicing', 'dim_2'], self.tab.detectionSubsetZRangeDoublet),
             'plot_when_finished': ParamLink(['run', 'plot_when_finished'], self.tab.runCellMapPlotCheckBox),
             'detect_cells': ParamLink(None, self.tab.runCellMapDetectCellsCheckBox),
             'filter_cells': ParamLink(None, self.tab.runCellMapFilterCellsCheckBox),
@@ -1115,9 +1110,9 @@ class ChannelTractMapParams(ChannelUiParameter, OrthoviewerSlicingMixin):
     clipping_decimation_ratio: int
     clipping_percents: List[float]
     clip_range: List[int]
-    crop_x_min: int; crop_x_max: int  # TODO: if 99.9 % source put to 100% (None)
-    crop_y_min: int; crop_y_max: int  # TODO: if 99.9 % source put to 100% (None)
-    crop_z_min: int; crop_z_max: int  # TODO: if 99.9 % source put to 100% (None)
+    crop_x: List[int]  # TODO: if 99.9 % source put to 100% (None)
+    crop_y: List[int]  # TODO: if 99.9 % source put to 100% (None)
+    crop_z: List[int]  # TODO: if 99.9 % source put to 100% (None)
     display_decimation_ratio: int  # For the "cells.feather" file
     voxelization_radii: List[int]
     binarize: bool
@@ -1138,12 +1133,9 @@ class ChannelTractMapParams(ChannelUiParameter, OrthoviewerSlicingMixin):
                                            self.tab.clippingPixelsPercentDoublet,
                                            default=[70, 99.999]),
             'clip_range': ParamLink(['binarization', 'clip_range'], self.tab.clipRangeDoublet),
-            'crop_x_min': ParamLink(['test_set_slicing', 'dim_0', 0], self.tab.detectionSubsetXRangeMin),
-            'crop_x_max': ParamLink(['test_set_slicing', 'dim_0', 1], self.tab.detectionSubsetXRangeMax),
-            'crop_y_min': ParamLink(['test_set_slicing', 'dim_1', 0], self.tab.detectionSubsetYRangeMin),
-            'crop_y_max': ParamLink(['test_set_slicing', 'dim_1', 1], self.tab.detectionSubsetYRangeMax),
-            'crop_z_min': ParamLink(['test_set_slicing', 'dim_2', 0], self.tab.detectionSubsetZRangeMin),
-            'crop_z_max': ParamLink(['test_set_slicing', 'dim_2', 1], self.tab.detectionSubsetZRangeMax),
+            'crop_x': VectorLink(['test_set_slicing', 'dim_0'], self.tab.detectionSubsetXRangeDoublet),
+            'crop_y': VectorLink(['test_set_slicing', 'dim_1'], self.tab.detectionSubsetYRangeDoublet),
+            'crop_z': VectorLink(['test_set_slicing', 'dim_2'], self.tab.detectionSubsetZRangeDoublet),
             'display_decimation_ratio': ParamLink(['display', 'decimation_ratio'], self.tab.displayDecimationRatioSpinBox),
             'voxelization_radii': ParamLink(['voxelization', 'radii'], self.tab.voxelizationRadiusTriplet),
             'binarize': ParamLink(['steps', 'binarize'], self.tab.binarizeCheckBox),
@@ -1669,9 +1661,9 @@ class GraphFilterParams(UiParameter):  # FIXME: do we really pass the graph as a
 
 
 class VesselVisualizationParams(UiParameter, OrthoviewerSlicingMixin):
-    crop_x_min: int; crop_x_max: int
-    crop_y_min: int; crop_y_max: int
-    crop_z_min: int; crop_z_max: int
+    crop_x: List[int]
+    crop_y: List[int]
+    crop_z: List[int]
     graph_step: str
     plot_type: str
     voxelization_size: List[int]
@@ -1688,12 +1680,9 @@ class VesselVisualizationParams(UiParameter, OrthoviewerSlicingMixin):
 
     def build_params_dict(self):
         return {  # TODO: if 99.9 % source put to 100% (None)
-            'crop_x_min': ParamLink(['slicing', 'dim_0', 0], self.tab.graphConstructionSlicerXRangeMin),
-            'crop_x_max': ParamLink(['slicing', 'dim_0', 1], self.tab.graphConstructionSlicerXRangeMax),
-            'crop_y_min': ParamLink(['slicing', 'dim_1', 0], self.tab.graphConstructionSlicerYRangeMin),
-            'crop_y_max': ParamLink(['slicing', 'dim_1', 1], self.tab.graphConstructionSlicerYRangeMax),
-            'crop_z_min': ParamLink(['slicing', 'dim_2', 0], self.tab.graphConstructionSlicerZRangeMin),
-            'crop_z_max': ParamLink(['slicing', 'dim_2', 1], self.tab.graphConstructionSlicerZRangeMax),
+            'crop_x': VectorLink(['slicing', 'dim_0'], self.tab.graphConstructionSlicerXRangeDoublet),
+            'crop_y': VectorLink(['slicing', 'dim_1'], self.tab.graphConstructionSlicerYRangeDoublet),
+            'crop_z': VectorLink(['slicing', 'dim_2'], self.tab.graphConstructionSlicerZRangeDoublet),
             'graph_step': ParamLink(None, self.tab.graphSlicerStepComboBox, connect=False),
             'plot_type': ParamLink(None, self.tab.graphPlotTypeComboBox, connect=False),
             'voxelization_size': ParamLink(['voxelization', 'size'], self.tab.vasculatureVoxelizationRadiusTriplet),

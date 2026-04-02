@@ -2,7 +2,7 @@
 Mixins for params classes
 The `OrthoviewerSlicingMixin` provides orthoviewer-related functionality.
 """
-from typing import Protocol, runtime_checkable, Literal, Any, Optional, Mapping
+from typing import Protocol, runtime_checkable, Literal, Any, Optional, Mapping, List
 
 import numpy as np
 
@@ -12,12 +12,9 @@ from ClearMap.IO.assets_constants import CONTENT_TYPE_TO_PIPELINE
 @runtime_checkable
 class HasSlicingFields(Protocol):
     """Implemented by params classes that expose crop_* fields."""
-    crop_x_min: int
-    crop_x_max: int
-    crop_y_min: int
-    crop_y_max: int
-    crop_z_min: int
-    crop_z_max: int
+    crop_x: List[int]
+    crop_y: List[int]
+    crop_z: List[int]
 
 
 class OrthoviewerSlicingMixin:
@@ -107,14 +104,36 @@ class OrthoviewerSlicingMixin:
         axis_ratio = float(self.ratios['xyz'.index(axis)])
         scaled = round(val / axis_ratio) if axis_ratio else val
         return int(scaled)
+    #
+    # @property
+    # def crop_x_min(self) -> int:
+    #     return self.crop_x[0]
+    #
+    # @property
+    # def crop_x_max(self) -> int:
+    #     return self.crop_x[1]
+    #
+    # @property
+    # def crop_y_min(self) -> int:
+    #     return self.crop_y[0]
+    #
+    # @property
+    # def crop_y_max(self) -> int:
+    #     return self.crop_y[1]
+    #
+    # @property
+    # def crop_z_min(self) -> int:
+    #     return self.crop_z[0]
+    #
+    # @property
+    # def crop_z_max(self) -> int:
+    #     return self.crop_z[1]
 
     @property
     def slice_tuples(self):
         if not isinstance(self, HasSlicingFields):
             raise AttributeError('slice_tuples requires crop_* fields.')
-        return ((self.crop_x_min, self.crop_x_max),
-                (self.crop_y_min, self.crop_y_max),
-                (self.crop_z_min, self.crop_z_max))
+        return (tuple(ax) for ax in (self.crop_x, self.crop_y, self.crop_z))
 
     @property
     def slicing(self):
