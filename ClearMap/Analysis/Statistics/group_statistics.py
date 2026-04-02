@@ -32,7 +32,6 @@ from ClearMap.config.atlas import ATLAS_NAMES_MAP
 from ClearMap.config.config_handler import ConfigHandler
 from ClearMap.pipeline_orchestrators.sample_info_management import build_sample_manager
 from ClearMap.pipeline_orchestrators.utils import init_sample_manager_and_processors
-from ClearMap.pipeline_orchestrators.registration_orchestrator import RegistrationProcessor
 
 import ClearMap.Analysis.Statistics.StatisticalTests as clearmap_stat_tests
 from ClearMap.Analysis.Statistics import MultipleComparisonCorrection as clearmap_FDR

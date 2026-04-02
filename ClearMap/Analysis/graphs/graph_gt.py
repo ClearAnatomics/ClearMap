@@ -795,7 +795,7 @@ class Graph(grp.AnnotatedGraph):
         """
         for v_prop_name in edge_geometry_vertex_properties:
             if v_prop_name in original_graph.vertex_properties:
-                # If already exists
+                # If already exists, skip
                 if self.edge_geometry_property_name(v_prop_name) in self.edge_geometry_property_names:
                     continue  # Skip if already set, it will be handled by the edge aggregation
                 v_prop = original_graph.vertex_property(v_prop_name)[branch_indices]
