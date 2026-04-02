@@ -21,7 +21,7 @@ from ClearMap.Utils.utilities import set_item_recursive, get_item_recursive, DEL
 from ClearMap.Utils.exceptions import ConfigNotFoundError, ClearMapValueError
 from ClearMap.config.config_handler import ALTERNATIVES_REG
 from ClearMap.gui.gui_utils_base import disconnect_widget_signal
-from ClearMap.gui.widget_monkeypatch_callbacks import _get_sorted_spin_boxes
+from ClearMap.gui.widget_monkeypatch_callbacks import _get_sorted_spin_boxes, ensure_compound_box_patched
 from ClearMap.gui.widgets import ExtendableTabWidget, FileDropListWidget, LandmarksWeightsPanel, GroupsWidgetAdapter, \
     NProcessesWidget
 
@@ -107,6 +107,8 @@ class ParamLink:
                  missing_ok: bool = False,
                  present_if: Optional[Callable[[dict], bool]] = None,
                  disabled_value: Any =None, ui_sentinel: Any =None, enforce_sentinel_min=False,):
+        if isinstance(widget, QFrame):
+            ensure_compound_box_patched(widget)
         if keys is None:
             connect = False
         self.keys: List[str] = keys
@@ -400,6 +402,7 @@ class VectorLink(ParamLink):
         ui_sentinel: Union[int, float]
             The sentinel value to use for None or 'auto'.
         """
+        ensure_compound_box_patched(widget)
         self.keys = list(keys)
         self.widget = widget
         if disabled_value not in (None, "auto"):
