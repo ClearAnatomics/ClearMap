@@ -98,7 +98,15 @@ def _get_sorted_spin_boxes(instance):
         try:  # Sort by integer following the last underscore in the objectName
             indices.append(int(spin_box.objectName().split('_')[-1]))
         except ValueError:
-            raise ValueError(f'Could not extract index from "{spin_box.objectName()}" in "{instance.objectName()}"')
+            err_msg = f'Could not extract index from "{spin_box.objectName()}" in "{instance.objectName()}"'
+            if len(spin_boxes)  == 2:
+                if spin_box.objectName().lower().endswith('min'):
+                    indices.append(0)
+                elif spin_box.objectName().lower().endswith('max'):
+                    indices.append(1)
+                else:
+                    raise ValueError(err_msg)
+            raise ValueError(err_msg)
     sorted_spin_boxes = [box for _, box in sorted(zip(indices, spin_boxes))]
     instance._cm_sorted_spin_boxes = sorted_spin_boxes  # cache the result
     return sorted_spin_boxes
