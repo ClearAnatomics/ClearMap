@@ -236,21 +236,44 @@ def recursive_patch_compound_boxes(parent):
         bx_name = bx.objectName().lower()
         if not is_compound_box(bx_name):
             continue
+        ensure_compound_box_patched(bx)
 
-        bx.controlsEnabled = types.MethodType(_controls_enabled, bx)
-        bx.getCheckBox = types.MethodType(_get_check_box, bx)
-        bx.enableControls = types.MethodType(_enable_controls, bx)
-        bx.disableControls = types.MethodType(_disable_controls, bx)
-        if is_list_box(bx_name):
-            bx.getValue = types.MethodType(_get_list_box_value, bx)
-            bx.setValue = types.MethodType(_set_list_box_value, bx)
-            bx.valueChangedConnect = types.MethodType(_connect_value_changed, bx)
-        elif is_optional_box(bx_name):
-            bx.setText = types.MethodType(_set_text, bx)
-            bx.text = types.MethodType(_get_text, bx)
-            bx.textChangedConnect = types.MethodType(_connect_text_changed, bx)
-        else:
-            print(f'Skipping box "{bx_name}", type not recognised')
+
+def ensure_compound_box_patched(bx: QFrame, bx_name: str = ''):
+    """
+    Ensure a single QFrame has compound-box methods.
+
+    .. note::
+        Idempotent
+
+    Parameters
+    ----------
+    bx: QFrame
+        The box to patch
+    bx_name: str
+        The objectName of the box, used to determine the type of compound box and thus the
+        methods to patch
+    """
+    if not bx_name:
+        bx_name = bx.objectName().lower()
+        if not is_compound_box(bx_name):
+            return
+    if hasattr(bx, 'getCheckBox'):
+        return  # already patched
+    bx.getCheckBox = types.MethodType(_get_check_box, bx)
+    bx.controlsEnabled = types.MethodType(_controls_enabled, bx)
+    bx.enableControls = types.MethodType(_enable_controls, bx)
+    bx.disableControls = types.MethodType(_disable_controls, bx)
+    if is_list_box(bx_name):
+        bx.getValue = types.MethodType(_get_list_box_value, bx)
+        bx.setValue = types.MethodType(_set_list_box_value, bx)
+        bx.valueChangedConnect = types.MethodType(_connect_value_changed, bx)
+    elif is_optional_box(bx_name):
+        bx.setText = types.MethodType(_set_text, bx)
+        bx.text = types.MethodType(_get_text, bx)
+        bx.textChangedConnect = types.MethodType(_connect_text_changed, bx)
+    else:
+        print(f'Skipping box "{bx_name}", type not recognised')
 
 
 def is_list_box(bx_name):
