@@ -95,18 +95,20 @@ def _get_sorted_spin_boxes(instance):
     indices = []
     spin_boxes = instance.findChildren(QSpinBox) or instance.findChildren(QDoubleSpinBox)
     for spin_box in spin_boxes:
+        box_name = spin_box.objectName().lower()
         try:  # Sort by integer following the last underscore in the objectName
-            indices.append(int(spin_box.objectName().split('_')[-1]))
+            indices.append(int(box_name.split('_')[-1]))
         except ValueError:
             err_msg = f'Could not extract index from "{spin_box.objectName()}" in "{instance.objectName()}"'
-            if len(spin_boxes)  == 2:
-                if spin_box.objectName().lower().endswith('min'):
+            if len(spin_boxes) == 2:
+                if box_name.endswith('min'):
                     indices.append(0)
-                elif spin_box.objectName().lower().endswith('max'):
+                elif box_name.endswith('max'):
                     indices.append(1)
                 else:
-                    raise ValueError(err_msg)
-            raise ValueError(err_msg)
+                    raise ValueError(err_msg + '; Unknown suffix')
+            else:
+                raise ValueError(err_msg)
     sorted_spin_boxes = [box for _, box in sorted(zip(indices, spin_boxes))]
     instance._cm_sorted_spin_boxes = sorted_spin_boxes  # cache the result
     return sorted_spin_boxes
