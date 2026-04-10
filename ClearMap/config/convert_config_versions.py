@@ -89,9 +89,7 @@ def version_guard(from_v, to_v, key: str = 'clearmap_version'):
                 warnings.warn(f'Config already in version {to_v}')
                 return cfg.filename
             if current != from_v:
-                raise ValueError(
-                    f'Only version {from_v} is supported (got {current})'
-                )
+                raise ValueError(f'Only version {from_v} is supported (got {current})')
             return func(v1_path, *args, **kwargs)
         return wrapper
     return decorator
