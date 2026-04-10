@@ -177,8 +177,9 @@ def delete_widget(widget: Optional[QWidget] = None, layout: Optional[QLayout] = 
             layout = find_parent_layout(widget)   # WARNING: layout may not be a parent of the widget
         if layout is not None:
             layout.removeWidget(widget)
-    widget.setParent(None)
-    widget.deleteLater()
+    if widget is not None:
+        widget.setParent(None)
+        widget.deleteLater()
 
   # REFACTOR: rename to get_widget_and_count
 def get_widget(layout, key='', widget_type=None, index=0) -> tuple[QWidget | None, int]:
