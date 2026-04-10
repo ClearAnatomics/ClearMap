@@ -27,7 +27,8 @@ def main(src_directory):
     plot_registration_results(registration_processor, sample_manager.alignment_reference_channel)
 
     for channel in sample_manager.get_channels_by_pipeline('CellMap', as_list=True):
-        cell_detector = CellDetector(sample_manager, channel=channel, registration_processor=registration_processor)
+        cell_detector = CellDetector(sample_manager, config_coordinator=sample_manager.cfg_coordinator,
+                                     channel=channel, registration_processor=registration_processor)
         # TEST CELL DETECTION
         # slicing = (
         #    slice(*cell_detector.processing_config['test_set_slicing']['dim_0']),
