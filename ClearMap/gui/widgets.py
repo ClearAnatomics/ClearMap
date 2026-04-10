@@ -1540,7 +1540,7 @@ class SamplePickerDialog(WizardWidget):
         Connect the buttons to their slots.
         This method is called automatically in the constructor
         """
-        self.dlg.addGroupPushButton.clicked.connect(functools.partial(self.__handle_add_group, add_to_params=True))
+        self.dlg.addGroupPushButton.clicked.connect(self.__handle_add_group)
         self.dlg.groupsComboBox.currentIndexChanged.connect(self.__handle_group_changed)
         self.dlg.buttonBox.accepted.connect(self.__apply_changes)
         self.dlg.buttonBox.rejected.connect(self.dlg.close)
@@ -1570,14 +1570,12 @@ class SamplePickerDialog(WizardWidget):
         return sample_folders
 
     def __apply_changes(self):
-        """
-        Save the selected groups of samples to the configuration file and close the dialog
-        """
-        for group, paths in enumerate(self.group_paths):
-            if group > self.params.n_groups:
-                self.params.add_group()
-            if paths:
-                self.params.set_paths(group, paths)
+        """Flush all wizard groups to params atomically."""
+        groups = {}
+        for group_idx, paths in enumerate(self.group_paths):
+            name = f"Group_{group_idx + 1}"
+            groups[name] = paths
+        self.params.groups = groups          # single atomic write via ParamLink → set_value
         self.dlg.close()
 
     def __handle_group_changed(self):
@@ -1605,9 +1603,10 @@ class SamplePickerDialog(WizardWidget):
             Whether to add the group to the parameters object. Default is True
         """
         self.dlg.groupsComboBox.addItem(f'{self.dlg.groupsComboBox.count() + 1}')
-        if add_to_params:
-            self.params.add_group()
+        # if add_to_params:  # Only on "apply"
+        #     self.params.add_group()
         self.group_paths.append([])
+        self.dlg.groupsComboBox.setCurrentIndex(self.dlg.groupsComboBox.count() - 1)
 
 
 class Landmark:
@@ -2459,6 +2458,7 @@ class GroupPage:
     def __init__(self, *, ui_name: str = 'sample_group_controls.ui', start_folder_getter=lambda: ""):
         self._widget: QWidget = create_clearmap_widget(ui_name, patch_parent_class='QWidget')
         self._start = start_folder_getter
+        self._config_connected = False  # avoid dupes when wiring up new pages in GroupsWidgetAdapter
 
     @property
     def widget(self) -> QWidget:
@@ -2484,11 +2484,16 @@ class GroupPage:
         lst_widget.addItems(items or [])
 
     def connect(self, on_changed: Callable[[], None]) -> None:
-        self.connect_group_name_changed(on_changed)
+        """Wire config-writing callbacks. Idempotent."""
+        if self._config_connected:
+            return
+        # self.connect_group_name_changed(on_changed)
+        self._widget.gpNameLineEdit.editingFinished.connect(on_changed)
         self._widget.gpAddSrcFolderBtn.clicked.connect(lambda:
             self._add_folder(on_changed))
         self._widget.gpRemoveSrcFolderBtn.clicked.connect(lambda:
             self._remove_selected(on_changed))
+        self._config_connected = True
 
     # --- actions ---
     def _add_folder(self, on_changed: Callable[[], None]) -> None:
@@ -2531,6 +2536,7 @@ class GroupsWidgetAdapter(QWidget):
         self._start = start_folder_getter
         self._ui_name = groups_ui_file
         self._pages: List[GroupPage] = []
+        self._on_changed: Optional[Callable[[], None]] = None
 
     # ---- ParamLink surface -------------------------------------------------
     def set_value(self, groups: Dict[str, List[str]]) -> None:
@@ -2538,14 +2544,16 @@ class GroupsWidgetAdapter(QWidget):
         for name, paths in groups.items():
             idx = self._append_page(name, paths)
             # keep tab label in sync with gpNameLineEdit
-            self._pages[idx].connect_group_name_changed(
-                lambda txt, i=idx: self._toolbox.setItemText(i, self.__gp_name(txt, i))
-            )
+            # TODO: check if redundant
+            # self._pages[idx].connect_group_name_changed(
+            #     lambda txt, i=idx: self._toolbox.setItemText(i, self.__gp_name(txt, i))
+            # )
 
     def get_value(self) -> Dict[str, List[str]]:
         return {page.name: page.paths for page in self._pages}
 
     def connect(self, on_changed: Callable[[], None]) -> None:
+        self._on_changed = on_changed
         # add/remove group
         self._add_btn.clicked.connect(lambda: (self._append_page(), on_changed()))
         self._rm_btn.clicked.connect(lambda: (self._remove_current_page(), on_changed()))
@@ -2553,6 +2561,14 @@ class GroupsWidgetAdapter(QWidget):
         for i, p in enumerate(self._pages):
             p.connect(on_changed)
             self._sync_label(i)
+
+   # ---- public API for wizards / params -----------------------------------
+    def add_group(self, name: Optional[str] = None, paths: Optional[List[str]] = None) -> int:
+        """Add a new (possibly empty) group and return its index."""
+        idx = self._append_page(name=name, paths=paths)
+        if self._on_changed:
+            self._on_changed()          # propagate change to config
+        return idx
 
     # BatchParameters API
     def group_count(self) -> int:
@@ -2605,6 +2621,7 @@ class GroupsWidgetAdapter(QWidget):
 
     def _append_page(self, name: Optional[str] = None, paths: Optional[List[str]] = None,
                      on_changed: Optional[Callable[[], None]] = None) -> int:
+        on_changed = on_changed or self._on_changed
         page = GroupPage(ui_name=self._ui_name, start_folder_getter=self._start)
         if name:
             page.name = name

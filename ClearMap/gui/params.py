@@ -18,7 +18,7 @@ from PyQt5.QtWidgets import (QToolBox, QCheckBox, QLabel, QHBoxLayout, QVBoxLayo
 from ClearMap.config.atlas import ATLAS_NAMES_MAP
 from ClearMap.Utils.exceptions import ClearMapValueError
 from ClearMap.Utils.utilities import (validate_orientation, snake_to_title, set_item_recursive,
-                                      DEFAULT_ORIENTATION,  trim_or_pad)
+                                      DEFAULT_ORIENTATION, trim_or_pad, REPLACE)
 from ClearMap.Utils.event_bus import Publishes, EventBus
 from ClearMap.Utils.events import (UiChannelRenamed, UiCropChanged, UiOrientationChanged, UiRequestPlotAtlas,
                                    UiConvertToClearMapFormat, UiRequestPlotMiniBrain, UiChannelsChanged,
@@ -1755,14 +1755,37 @@ class BatchParameters(UiParameter):
         return {'results_folder': ParamLink(['paths', 'results_folder'], self.tab.resultsFolderLineEdit,
                                             notify_apply=lambda: self.publish(UiBatchResultsFolderChanged(self.results_folder))),
                 'groups': ParamLink(['groups'], self.groups_adapter,
-                                    notify_apply=lambda: self.publish(UiBatchGroupsChanged(self.groups)))
+                                    connect=False)#notify_apply=lambda: self.publish(UiBatchGroupsChanged(self.groups)))
                 }
 
+    def connect(self):
+        self.groups_adapter.connect(self._on_groups_widget_changed)
+
+
+    @param_handler
+    def _on_groups_widget_changed(self, *_):
+        """
+        Atomic write: REPLACE the entire groups dict so renamed/deleted
+        keys are removed.  This is the single writer for groups; no other
+        code path should write groups to config.
+        """
+        new_groups = self.groups_adapter.get_value()
+        self._emit_patch(['groups'], REPLACE(new_groups))
+        self.publish(UiBatchGroupsChanged(self.groups))
+
     def cfg_to_ui(self):
-        self.groups = self.view['groups']
-        results_folder = self.view['paths'].get('results_folder', '')
-        if results_folder:
-            self.results_folder = results_folder
+        self._painting = True
+        try:
+            self.groups = self.view.get('groups', {})
+            results_folder = self.view.get('paths', {}).get('results_folder', '')
+            if results_folder:
+                self.results_folder = results_folder
+        finally:
+            self._painting = False
+
+    def add_group(self, name: Optional[str] = None) -> None:
+        """Add a new empty group (called by SamplePickerDialog and similar wizards)."""
+        self.groups_adapter.add_group(name=name)
 
     def remove_current_group(self):  # FIXME: not bound
         idx, removed_name = self.groups_adapter.remove_current_page()

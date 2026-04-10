@@ -136,6 +136,8 @@ from .gui_utils_images import np_to_qpixmap
 from .params import (VesselParams, SampleParameters, StitchingParams, CellMapParams, GroupAnalysisParams,
                      BatchProcessingParams, RegistrationParams, TractMapParams, ColocalizationParams)
 from ClearMap.IO.metadata import parse_ome_info
+from ..pipeline_orchestrators.cell_map import CellDetector
+from ..pipeline_orchestrators.generic_orchestrators import PipelineOrchestrator
 
 if TYPE_CHECKING:
     from ClearMap.pipeline_orchestrators.experiment_controller import AnalysisGroupController
@@ -368,6 +370,7 @@ class SampleInfoTab(ExperimentTab):
                 exp = Expression(pattern_spec.pattern_relpath)
                 axes = exp.tag_names()  # e.g. ['Z', 'Y', 'X']
                 first_tile = exp.string(values={axis: 0 for axis in axes})  # Ideally, pick min(axis) for each
+                # FIXME: if Path(self.src_folder) / first_tile.endswith('.ome.tif') and we don't have resolution in the cfg, we can try to parse it from the OME metadata
                 ome_info = parse_ome_info(Path(self.src_folder) / first_tile)
                 if ome_info.get('resolution') is not None:
                     res = ome_info['resolution']
@@ -960,6 +963,10 @@ class CellCounterTab(PostProcessingTab):
             'channel.hMaxSinglet',
             'channel.cellMapPerformanceGroupBox',
         ]
+
+    def get_worker(self, channel: Optional[str | Tuple[str, str]] = None,
+                   substep: Optional[str] = None) -> CellDetector:  # To help linter, we specialise
+        return super().get_worker(channel, substep=substep)
 
     def on_selected(self):
         if not self.sample_manager.workspace:
@@ -1907,16 +1914,26 @@ class GroupAnalysisTab(BatchTab):
         self.subscribe(UiBatchGroupsChanged, self.handle_groups_changed)
 
     def handle_groups_changed(self, event: UiBatchGroupsChanged):
-        self.group_controller.set_groups(self.params.groups)  # REFACTOR: use events data
+        pass # in theory cfg already commited with REPLACE
+        # self.group_controller.set_groups(self.params.groups)  # REFACTOR: use events data
 
     @property
     def processor(self):
         return self.group_controller.get_density_orchestrator()  # FIXME:
 
     def _setup_workers(self):
+        results_folder = self.params.get('results_folder')
+
+        # ---- auto-default from experiment src_folder / preferences ----
+        if not results_folder:
+            results_folder = self._infer_default_results_folder()
+            if results_folder:
+                self.params.results_folder = str(results_folder)
+
         if self.params.results_folder is not None:
             # self.group_controller.set_group_base_dir(self.params.results_folder)
             self.group_controller.set_groups(self.params.groups)
+
         self.group_controller.set_progress_watcher(self.main_window.progress_watcher)
         self.group_controller.set_thread_wrapper(self.main_window.wrap_in_thread)
 
@@ -1929,6 +1946,15 @@ class GroupAnalysisTab(BatchTab):
         self.ui.runPValsPushButton.clicked.connect(self.run_p_vals)
         self.ui.plotPValsPushButton.clicked.connect(self.plot_p_vals)
         self.ui.batchStatsPushButton.clicked.connect(self.make_group_stats_tables)
+
+        self.subscribe(UiBatchResultsFolderChanged, self._on_results_folder_changed)
+        self.subscribe(UiBatchGroupsChanged, self.handle_groups_changed)
+
+    def _on_results_folder_changed(self, event: UiBatchResultsFolderChanged):
+        """Keep coordinator base_dir in sync when user changes results folder."""
+        folder = event.results_folder
+        if folder:
+            self.group_controller.set_group_base_dir(folder)
 
     def get_analysable_channels(self):
         """
@@ -2011,6 +2037,16 @@ class BatchProcessingTab(BatchTab):
                                             apply_patch=self.group_controller.apply_patch)
 
     def _setup_workers(self):
+        results_folder = self.params.get('results_folder')
+
+        if not results_folder:
+            results_folder = self._infer_default_results_folder()
+            if results_folder:
+                self.params.results_folder = str(results_folder)
+
+        if results_folder and self.group_controller:
+            self.group_controller.set_group_base_dir(results_folder)
+
         self.processor.params = self.params
 
     def _bind(self):
@@ -2020,10 +2056,16 @@ class BatchProcessingTab(BatchTab):
         """
         super()._bind()
         self.ui.batchRunPushButton.clicked.connect(self.run_batch_process)
+        self.subscribe(UiBatchResultsFolderChanged, self._on_results_folder_changed)
 
     def run_batch_process(self):
         self.main_window.make_progress_dialog('Analysing samples', n_steps=0, maximum=0)  # TODO: see abort callback
         self.main_window.wrap_in_thread(self.processor.process_folders)
+
+    def _on_results_folder_changed(self, event: UiBatchResultsFolderChanged):
+        folder = event.results_folder
+        if folder and self.group_controller:
+            self.group_controller.set_group_base_dir(folder)
 
 
 DATA_TYPE_TO_TAB_CLASS = {  # WARNING: not all data types are covered

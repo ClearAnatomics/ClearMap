@@ -91,9 +91,9 @@ def adjust_batch_groups_and_comparisons(view: ConfigView, ctx: AdjustmentContext
     deduped_pairs = _dedupe_preserve_order(normalized_pairs, key=lambda x: tuple(x))
     if deduped_pairs != comps:
         comps = deduped_pairs
-        changed = True
+        groups_changed = True
 
-    if not changed:
+    if not groups_changed:
         return {}
 
     section['groups'] = groups

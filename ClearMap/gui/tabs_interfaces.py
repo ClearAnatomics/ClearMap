@@ -948,3 +948,10 @@ class BatchTab(GroupTab):
 
     def create_wizard(self):
         return SamplePickerDialog(self.params.results_folder, self.params)  # FIXME: check if results_folder or make both equal with self.params.src_folder
+
+
+    def _infer_default_results_folder(self) -> Optional[str]:
+        """Derive a default results folder from the experiment source
+        folder, falling back to preferences.start_folder."""
+        src = self.main_window.gui_controller.group_controller.group_base_dir
+        return src
