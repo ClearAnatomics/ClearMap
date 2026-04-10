@@ -579,7 +579,7 @@ class RegistrationProcessor(PipelineOrchestrator):
         return img_paths, titles
 
     def plot_registration_results(self, channel, composite=False, parent=None):
-        image_sources, titles = self.prepare_registration_results_graph(channel)
+        image_sources, titles = self.__prepare_registration_results_graph(channel)
         if composite:
             image_sources = [image_sources, ]
         dvs = q_plot_3d.plot(image_sources, title=titles, arrange=False, sync=True,
