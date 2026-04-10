@@ -88,7 +88,7 @@ import re
 import warnings
 
 from pathlib import Path
-from typing import List, Optional, TYPE_CHECKING
+from typing import List, Optional, TYPE_CHECKING, Tuple
 
 import numpy as np
 import pandas as pd
@@ -1251,7 +1251,7 @@ class TractMapTab(PostProcessingTab):
         self.sample_manager = sample_manager
 
         self.advanced_controls_names = [# 'channel.tractMapAdvancedGroupBox'
-            'channel.performanceGroupBox',
+            'performanceGroupBox',
         ]
 
     def _bind(self):
@@ -1261,25 +1261,34 @@ class TractMapTab(PostProcessingTab):
         pass
 
     def _build_performance_ui(self):
-        gb = self.ui.performanceGroupBox
-        layout = gb.verticalLayout()
+        gb = self.ui.performanceGroupBox  # FIXME: per channel ?
 
-        # --- binarization: just n_processes ---
-        # TODO: check self.binarizationPerf or self.ui.binarizationPerf
-        self.binarizationPerf = NProcessesWidget(gb, label="Binarization n_processes")
-        layout.addWidget(self.binarizationPerf)
+        if hasattr(gb, 'binarizationPerf'):
+            return  # idempotent
 
-        # --- where: just n_processes ---
-        self.wherePerf = NProcessesWidget(gb, label="Where n_processes")
-        layout.addWidget(self.wherePerf)
+        layout = gb.layout()
 
-        # --- transform: full block_processing ---
-        self.transformBlock = BlockProcessingWidget(gb, title="Transform block processing")
-        layout.addWidget(self.transformBlock)
+        def registrer_bp_widget(parent, title, layout):
+            widget = BlockProcessingWidget(parent=parent, title=title)
+            layout.addWidget(widget)
+            return widget
 
-        # --- label: full block_processing ---
-        self.labelBlock = BlockProcessingWidget(gb, title="Label block processing")
-        layout.addWidget(self.labelBlock)
+        def register_n_procs_widget(parent, label, layout):
+            widget = NProcessesWidget(parent=parent, label=label)
+            layout.addWidget(widget)
+            return widget
+
+        # N processes only:
+        # --- binarization
+        gb.binarizationPerf = register_n_procs_widget(gb, label="Binarization n_processes", layout=layout)
+        # --- where
+        gb.wherePerf = register_n_procs_widget(gb, label="Where n_processes", layout=layout)
+
+        # Full block_processing:
+        # --- transform
+        gb.transformBlock = registrer_bp_widget(gb, title="Transform block processing", layout=layout)
+        # --- label
+        gb.labelBlock = registrer_bp_widget(gb, title="Label block processing", layout=layout)
 
     def _set_params(self):
         self.params = TractMapParams(self.ui, self.sample_params, event_bus=self._bus,

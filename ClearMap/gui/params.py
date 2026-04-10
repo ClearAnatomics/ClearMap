@@ -1159,35 +1159,35 @@ class TractMapPerformanceParams(UiParameter):
     cfg_subtree = ['tract_map', 'performance']
 
     def build_params_dict(self):
-        t = self.tab  # shorthand
+        perf_box = self.tab.performanceGroupBox # shorthand
         return {
             # binarization.performance
-            'binarization_n_processes': ParamLink(['performance', 'binarization', 'n_processes'],
-                                                  t.binarizationPerf),
+            'binarization_n_processes': ParamLink(['binarization', 'n_processes'], perf_box.binarizationPerf),
 
             # where.performance
-            'where_n_processes': ParamLink(['performance', 'where', 'n_processes'],
-                                           t.wherePerf),
+            'where_n_processes': ParamLink(['where', 'n_processes'], perf_box.wherePerf),
 
             # transform.block_processing
-            'transform_size_min': ParamLink(['performance', 'transform', 'block_processing', 'size_min'],
-                                            t.transformBlock._size_min_spin),
-            'transform_size_max': ParamLink(['performance', 'transform', 'block_processing', 'size_max'],
-                                            t.transformBlock._size_max_spin),
-            'transform_overlap': ParamLink(['performance', 'transform', 'block_processing', 'overlap'],
-                                           t.transformBlock._overlap_spin),
-            'transform_n_processes': ParamLink(['performance', 'transform', 'block_processing', 'n_processes'],
-                                               t.transformBlock._nproc_widget),
+            'transform_size_min': ParamLink(['transform', 'block_processing', 'size_min'],
+                                            perf_box.transformBlock._size_min_spin),
+            'transform_size_max': ParamLink(['transform', 'block_processing', 'size_max'],
+                                            perf_box.transformBlock._size_max_spin),
+            'transform_overlap': ParamLink(['transform', 'block_processing', 'overlap'],
+                                           perf_box.transformBlock._overlap_spin,
+                                           disabled_value=None, ui_sentinel=-1, enforce_sentinel_min=True),
+            'transform_n_processes': ParamLink(['transform', 'block_processing', 'n_processes'],
+                                               perf_box.transformBlock._nproc_widget),
 
             # label.block_processing
-            'label_size_min': ParamLink(['performance', 'label', 'block_processing', 'size_min'],
-                                        t.labelBlock._size_min_spin),
-            'label_size_max': ParamLink(['performance', 'label', 'block_processing', 'size_max'],
-                                        t.labelBlock._size_max_spin),
-            'label_overlap': ParamLink(['performance', 'label', 'block_processing', 'overlap'],
-                                       t.labelBlock._overlap_spin),
-            'label_n_processes': ParamLink(['performance', 'label', 'block_processing', 'n_processes'],
-                t.labelBlock._nproc_widget),
+            'label_size_min': ParamLink(['label', 'block_processing', 'size_min'],
+                                        perf_box.labelBlock._size_min_spin),
+            'label_size_max': ParamLink(['label', 'block_processing', 'size_max'],
+                                        perf_box.labelBlock._size_max_spin),
+            'label_overlap': ParamLink(['label', 'block_processing', 'overlap'],
+                                       perf_box.labelBlock._overlap_spin,
+                                       disabled_value=None, ui_sentinel=-1, enforce_sentinel_min=True),
+            'label_n_processes': ParamLink(['label', 'block_processing', 'n_processes'],
+                perf_box.labelBlock._nproc_widget),
         }
 
 
