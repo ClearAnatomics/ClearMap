@@ -44,6 +44,7 @@ def main(src_directory):
         print('Starting cell detection')
         cell_detector.run_cell_detection(tuning=False)
         cell_detector.post_process_cells()
+        cell_detector.voxelize()
         cell_detector.plot_voxelized_counts(arrange=True)
         print('Cell detection done')
 
