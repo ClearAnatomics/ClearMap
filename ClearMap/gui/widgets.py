@@ -47,6 +47,7 @@ from ClearMap.Utils.utilities import gpu_params, bytes_to_human, trim_or_pad
 from ClearMap.Visualization import Plot3d as plot_3d
 from ClearMap.Visualization.Qt.widgets import Scatter3D
 from ClearMap.config.atlas import STRUCTURE_TREE_NAMES_MAP
+from ClearMap.config.config_handler import scan_folder_for_experiments
 
 from ClearMap.gui import dialog_helpers as dlg_help
 from ClearMap.gui.gui_utils_base import create_clearmap_widget, compute_grid, get_widget, delete_widget, clear_layout
@@ -1551,23 +1552,16 @@ class SamplePickerDialog(WizardWidget):
 
     def parse_sample_folders(self):
         """
-        Scan the source folder to find the sample folders based on
-        the presence of a `sample_params.cfg` file (skip `config_snapshots` folders)
+        Scan the source folder to find experiment folders based on
+        the presence of a sample config file (any supported name/extension).
 
         Returns
         -------
         list(str)
-            The list of sample folders
+            The list of sample folders, naturally sorted.
         """
-        sample_folders = []
-        for root, dirs, files in os.walk(self.src_folder):
-            for fldr in dirs:
-                if fldr == 'config_snapshots' or root.endswith('config_snapshots'):
-                    continue
-                fldr = os.path.join(root, fldr)
-                if 'sample_params.cfg' in os.listdir(fldr):
-                    sample_folders.append(fldr)
-        return sample_folders
+        roots = scan_folder_for_experiments(self.src_folder)
+        return natsorted(str(p) for p in roots)
 
     def __apply_changes(self):
         """Flush all wizard groups to params atomically."""
