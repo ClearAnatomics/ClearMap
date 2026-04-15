@@ -1978,10 +1978,17 @@ class GroupAnalysisTab(BatchTab):
 
     def run_p_vals(self):
         self.main_window.print_status_msg('Computing p_val maps')
+
+        comparisons = self.params.selected_comparisons
+
+        if not comparisons:
+            self.main_window.popup('No comparisons selected')
+            return
+
         # TODO: set abort callback
-        self.main_window.make_progress_dialog('P value maps', n_steps=len(self.params.selected_comparisons))
+        self.main_window.make_progress_dialog('P value maps', n_steps=len(comparisons))
         try:
-            self.processor.compute_p_values(self.params.selected_comparisons,
+            self.processor.compute_p_values(comparisons,
                                             channels=self.get_analysable_channels(),
                                             advanced=self.params.compute_sd_and_effect_size,
                                             density_files_suffix=self.params.density_suffix)
@@ -1998,7 +2005,11 @@ class GroupAnalysisTab(BatchTab):
 
     @GenericTab.ui_plot('Plotting p_val maps')
     def plot_p_vals(self, *_, **__):
-        return self.processor.plot_p_value_maps(comparisons=self.params.selected_comparisons,
+        selected_comparisons = self.params.selected_comparisons
+        if not selected_comparisons:
+            self.main_window.popup('No comparisons selected')
+            return []
+        return self.processor.plot_p_value_maps(comparisons=selected_comparisons,
                                                 channel=self.params.plot_channel, suffix=self.params.density_suffix,
                                                 parent=self.main_window.centralWidget())
 
