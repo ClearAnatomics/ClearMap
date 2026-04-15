@@ -1885,8 +1885,8 @@ class GroupAnalysisTab(BatchTab):
 
         self.advanced_controls_names = [
             'computeSdAndEffectSizeCheckBox',
-            'densitySuffixTextFilterLabel',
-            'densitySuffixTextFilterLineEdit'
+            #'densitySuffixTextFilterLabel',
+            #'densitySuffixTextFilterLineEdit'
         ]
 
     def _set_params(self):
