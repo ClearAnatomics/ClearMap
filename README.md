@@ -13,6 +13,10 @@ ClearMap 2.1
 [![Language](https://img.shields.io/github/languages/top/ChristophKirst/ClearMap?style=plastic)](https://github.com/ChristophKirst/ClearMap2)
 [![](https://github.com/ChristophKirst/RepoTracker/workflows/RepoTracker/badge.svg)](https://github.com/ChristophKirst/RepoTracker/actions)
 
+> [!IMPORTANT]
+> 🚀 **ClearMap 3.1 is coming soon!** A major new release is currently in testing and will be available shortly.
+> Check out the [`v3.1-beta`](https://github.com/ClearAnatomics/ClearMap/tree/v3.1.x) branch to try it early, and please [report any issues](https://github.com/ClearAnatomics/ClearMap/issues).
+> See the [changelog](#versions) for what's new.
 
 <p align="center">
 <img src="https://clearanatomics.github.io/ClearMapDocumentation/images/TubeMap_graph_movie.gif" height="150">
