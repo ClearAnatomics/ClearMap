@@ -350,15 +350,16 @@ def patch_env(cfg_path, dest_path, use_cuda_torch=True, pip_mode=False, use_spyd
             if platform.system().startswith('Linux'):
                 viable_versions = [Version(v) for v in ('11.8', '12.4', '12.6', '12.8', '13.0')]
                 actual_cuda = pytorch_v_mgr.cuda_version
-                for v in viable_versions[::-1]:
-                    if actual_cuda <= v:
-                        actual_cuda = v
+                for candidate_cuda in viable_versions[::-1]:
+                    if candidate_cuda <= actual_cuda:
+                        actual_cuda = candidate_cuda
                         break
                 else:
                     raise ValueError(f'No matching CUDA version found for {pytorch_v_mgr.pytorch_version} for PyTorch.'
                                      f'options are {viable_versions}.')
                 cuda_suffix = f"cu{str(actual_cuda).replace('.', '')}"
                 env_mgr.add_pip_option(f'--extra-index-url https://download.pytorch.org/whl/{cuda_suffix}')
+                env_mgr.add_pip_dependency(f'cuda-toolkit=={actual_cuda}.*')
             env_mgr.add_pip_dependency('torch')
             env_mgr.add_pip_dependency('torchvision')
         else:
