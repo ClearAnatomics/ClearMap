@@ -13,7 +13,7 @@
   <property name="windowTitle">
    <string>Form</string>
   </property>
-  <layout class="QVBoxLayout" name="verticalLayout_4">
+  <layout class="QVBoxLayout" name="verticalLayout">
    <item>
     <widget class="QFrame" name="frame_2">
      <property name="minimumSize">
@@ -79,15 +79,15 @@
       <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Compute the summary stats table for all the pairs of groups selected in the &lt;span style=&quot; font-style:italic;&quot;&gt;comparisons&lt;/span&gt; tab&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
      </property>
      <property name="currentIndex">
-      <number>2</number>
+      <number>1</number>
      </property>
      <widget class="QWidget" name="sampleFoldersPage">
       <property name="geometry">
        <rect>
         <x>0</x>
         <y>0</y>
-        <width>438</width>
-        <height>620</height>
+        <width>381</width>
+        <height>501</height>
        </rect>
       </property>
       <attribute name="label">
@@ -161,7 +161,22 @@
       </attribute>
       <layout class="QVBoxLayout" name="verticalLayout_3">
        <item>
-        <layout class="QVBoxLayout" name="comparisonsVerticalLayout"/>
+        <layout class="QVBoxLayout" name="comparisonsVerticalLayout">
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout">
+           <item>
+            <widget class="QLabel" name="densitySuffixTextFilterLabel">
+             <property name="text">
+              <string>Density suffix</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="densitySuffixTextFilterLineEdit"/>
+           </item>
+          </layout>
+         </item>
+        </layout>
        </item>
       </layout>
      </widget>
@@ -170,41 +185,14 @@
        <rect>
         <x>0</x>
         <y>0</y>
-        <width>438</width>
-        <height>620</height>
+        <width>381</width>
+        <height>501</height>
        </rect>
       </property>
       <attribute name="label">
        <string>P Values</string>
       </attribute>
       <layout class="QGridLayout" name="gridLayout_2">
-       <item row="4" column="1">
-        <widget class="QPushButton" name="plotPValsPushButton">
-         <property name="text">
-          <string>Display</string>
-         </property>
-        </widget>
-       </item>
-       <item row="2" column="1">
-        <widget class="QLineEdit" name="densitySuffixTextFilterLineEdit"/>
-       </item>
-       <item row="2" column="0">
-        <widget class="QLabel" name="densitySuffixTextFilterLabel">
-         <property name="text">
-          <string>Density suffix</string>
-         </property>
-        </widget>
-       </item>
-       <item row="3" column="1">
-        <widget class="QPushButton" name="runPValsPushButton">
-         <property name="toolTip">
-          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Compute the p value maps for all the pairs of groups selected in the &lt;span style=&quot; font-style:italic;&quot;&gt;comparisons&lt;/span&gt; tab&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-         </property>
-         <property name="text">
-          <string>Run</string>
-         </property>
-        </widget>
-       </item>
        <item row="0" column="0" colspan="2">
         <widget class="QCheckBox" name="computeSdAndEffectSizeCheckBox">
          <property name="text">
@@ -219,6 +207,23 @@
          </property>
         </widget>
        </item>
+       <item row="3" column="1">
+        <widget class="QPushButton" name="plotPValsPushButton">
+         <property name="text">
+          <string>Display</string>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="1">
+        <widget class="QPushButton" name="runPValsPushButton">
+         <property name="toolTip">
+          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Compute the p value maps for all the pairs of groups selected in the &lt;span style=&quot; font-style:italic;&quot;&gt;comparisons&lt;/span&gt; tab&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+         </property>
+         <property name="text">
+          <string>Run</string>
+         </property>
+        </widget>
+       </item>
        <item row="1" column="1">
         <widget class="QComboBox" name="batchPipelineNameComboBox"/>
        </item>
@@ -229,8 +234,8 @@
        <rect>
         <x>0</x>
         <y>0</y>
-        <width>438</width>
-        <height>620</height>
+        <width>381</width>
+        <height>501</height>
        </rect>
       </property>
       <attribute name="label">
