@@ -980,8 +980,7 @@ class ClearMapApp(ClearMapAppBase):
         self.assetsManagerWidget = cmp_widgets.ManageAssetsWidget(
             self.src_folder, sample_cfg, sample_manager=self.sample_manager, app=self)
         self.assetsManagerDock.setWidget(self.assetsManagerWidget.widget)
-        # self.tabifyDockWidget(self.dataViewerDockWidget, self.assetsManagerDock)
-        # dlg.exec()
+        self.assetsManagerDock.setVisible(True)  # In case user hid it
 
     def reload_prefs(self):
         self.set_font_size(self.preference_editor.params.font_size)
