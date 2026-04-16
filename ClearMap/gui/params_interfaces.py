@@ -1320,15 +1320,25 @@ class UiParameterCollection(BusSubscriberMixin, ABC):
 
         channels_before = self.channels[:]
 
+        # 1. Remove from in-memory dict FIRST (prevents re-entrant KeyError)
+        popped_channel = self.channel_params.pop(channel_name)
+
+        # 2. Remove UI widget BEFORE firing events (so reconcile_channel_pages
+        #    won't see it as obsolete and try to pop again)
+        tab_widget = getattr(self.tab, 'channelsParamsTabWidget', None)
+        if tab_widget is not None:
+            tab_widget.remove_channel_widget(channel_name)
+
+        # 3. Notify config (may fire synchronous ChannelsChanged — now harmless)
         try:
-            self._apply_patch({'channels': {channel_name: DELETE}})
+            self._emit_patch(['channels', channel_name], DELETE)
         except Exception as e:
             warnings.warn(f'Could not remove "{channel_name=}" from config: {e}')
             return None
 
-        popped_channel = self.channel_params.pop(channel_name)
+        # popped_channel = self.channel_params.pop(channel_name)
 
-        # Ensure all signals get disconnected and resources freed
+        # 4. Ensure all signals get disconnected and resources freed
         try:
             popped_channel.teardown()
         except Exception as e:
@@ -1337,6 +1347,7 @@ class UiParameterCollection(BusSubscriberMixin, ABC):
         tab = self.tab.channelsParamsTabWidget
         tab.remove_channel_widget(channel_name)
 
+        # 5. Bus notification
         channels_after = self.channels
         self.publish(ChannelsChanged(before=channels_before, after=channels_after))
         return popped_channel

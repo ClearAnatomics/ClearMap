@@ -159,8 +159,7 @@ class SampleChannelParameters(ChannelUiParameter):
 
     def connect(self):
         def _on_name_editing_finished():
-            # tab_widget = self.tab.parent().parent()  # Not clear what is n+1
-            channels_tab_w = self.tab.channelsParamsTabWidget
+            channels_tab_w = self.tab.parent().parent()  #  n+1 is "qt_tabwidget_stackedwidget"
             old_name = channels_tab_w.tabText(self.page_index)  # still the old name at this time
             new_name = self.nameWidget.text().strip()
             if new_name and new_name != old_name:
@@ -231,12 +230,18 @@ class SampleParameters(ChannelsUiParameterCollection):
     def cfg_to_ui(self):
         # hydrate shared first
         self.shared_sample_params.cfg_to_ui()
+
         # create UI elements for channels in config
+        tab_widget = self.tab.channelsParamsTabWidget
         for channel_name in self.config_channels:
             if channel_name not in self.channels:
-                self.tab.add_channel_tab(channel_name)
+                # self.tab.add_channel_tab(channel_name)  # Wrong object tab as in python tab not tabwidget Qt tab
+                if (hasattr(tab_widget, 'get_channel_widget')
+                        and tab_widget.get_channel_widget(channel_name) is not None):
+                    self.ensure_channel_param(channel_name)
                 # self.ensure_channel_param(channel_name)
-            self.channel_params[channel_name].cfg_to_ui()
+            if channel_name in self.channel_params:
+                self.channel_params[channel_name].cfg_to_ui()
         self.reconcile_from_config()
 
     def request_add_channel(self, channel_name: str):
@@ -255,6 +260,18 @@ class SampleParameters(ChannelsUiParameterCollection):
         self.channel_params[channel_name] = channel_params
 
     def add_channel(self, channel_name: str):
+        if channel_name in self.channels:
+            return
+        self.request_add_channel(channel_name)
+            # ↑ May fire ChannelsChanged synchronously.
+            #   reconcile_channel_pages runs, but the page already exists
+            #   in the tab widget, so it's a no-op for this channel.
+            #   Re-entry into add_channel is blocked by the guard above
+            #   because ensure_channel_param may have run via reconcile...
+            #   BUT reconcile_channel_pages only calls add_channel_tab
+            #   for channels NOT in tab_widget, and ours IS there already.
+        if channel_name in self.channels:  # belt-and-suspenders:
+            return  # reconcile beat us to it
         self.ensure_channel_param(channel_name)
 
     def _bind_channel_signals(self, channel_params: "SampleChannelParameters"):
