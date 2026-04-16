@@ -911,7 +911,7 @@ class ClearMapApp(ClearMapAppBase):
 
         # Merge & write back to the proper GLOBAL path (user defaults dir)
         deep_merge(current_dict, machine_patch)
-        target_path = self.config_loader.get_default_path('machine', must_exist=False)
+        target_path = self.config_loader.get_global_path('machine', must_exist=False)
         ConfigHandler.dump(target_path, current_dict)
 
     def amend_ui(self):
