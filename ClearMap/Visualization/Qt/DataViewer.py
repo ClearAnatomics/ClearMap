@@ -32,7 +32,7 @@ from PyQt5 import QtWidgets
 from PyQt5.QtCore import QEvent, QRect, QSize, pyqtSignal, Qt
 from PyQt5.QtGui import QPainter, QIcon
 from PyQt5.QtWidgets import (QWidget, QRadioButton, QLabel, QSplitter, QApplication, QSizePolicy, QPushButton,
-                             QCheckBox,  QGraphicsPathItem, QGridLayout, QLineEdit, QScrollArea, QFileDialog)
+                             QCheckBox, QGraphicsPathItem, QGridLayout, QLineEdit, QScrollArea, QFileDialog, QSpinBox)
 
 from ClearMap.Utils.utilities import runs_on_spyder
 from ClearMap.IO.IO import as_source
@@ -221,6 +221,19 @@ class DataViewer(QWidget):
         self.points_color_button.setMaximumWidth(30)
         self.points_color_button.sigColorChanged.connect(self.change_points_color)
         axis_tools_layout.addWidget(self.points_color_button, 0, 4)
+
+        # Controls for marker size
+        self.marker_size_spin = QSpinBox()
+        self.marker_size_spin.setRange(1, 100)
+        self.marker_size_spin.setValue(10)
+        self.marker_size_spin.setPrefix("Marker: ")
+        self.marker_size_spin.valueChanged.connect(lambda: self.updateSlice(force_update=True))
+        axis_tools_layout.addWidget(self.marker_size_spin, 0, 11)
+
+        self.marker_scale_with_zoom = QCheckBox("Scale w/ zoom")
+        self.marker_scale_with_zoom.setChecked(False)
+        self.marker_scale_with_zoom.stateChanged.connect(lambda: self.updateSlice(force_update=True))
+        axis_tools_layout.addWidget(self.marker_scale_with_zoom, 0, 12)
 
         # vectors color and threshold
         self.vectors_color_button = pg.ColorButton(color=self.vectors_style.get('brush'))
@@ -654,22 +667,37 @@ class DataViewer(QWidget):
             index = min(max(0, int(self.sliceLine.value())), self.source_shape[ax] - 1)
             self.plot_scatter_markers(ax, index)
 
+    def _scale_markers(self):
+        base_size = self.marker_size_spin.value()
+        if self.marker_scale_with_zoom.isChecked():
+            x_range, y_range = self.view.viewRange()
+            scale_x = self.source_range_x / (x_range[1] - x_range[0])
+            scale_y = self.source_range_y / (y_range[1] - y_range[0])
+            zoom_factor = (scale_x + scale_y) / 2.0
+            scaled_size = round(base_size * zoom_factor)
+        else:
+            scaled_size = base_size
+            zoom_factor = 1.0  # for the surrounding-slice path
+
+        return scaled_size, zoom_factor
+
 
     def plot_scatter_markers(self, ax, index):
         if self.scatter_coords is None:
             return
         self.scatter.clear()
         self.scatter_coords.axis = ax
-        pos = self.scatter_coords.get_pos(index)
-        x_range, y_range = self.view.viewRange()
+
+        # x_range, y_range = self.view.viewRange()
         # Compute scale from the ratio between original and current view range
+        # scale_x = self.source_range_x / (x_range[1] - x_range[0])
+        # scale_y = self.source_range_y / (y_range[1] - y_range[0])
+        # zoom_factor = (scale_x + scale_y) / 2.0
+        #
+        # scaled_size = round(self.scatter_coords.marker_size * zoom_factor)
 
-        scale_x = self.source_range_x / (x_range[1] - x_range[0])
-        scale_y = self.source_range_y / (y_range[1] - y_range[0])
-        zoom_factor = (scale_x + scale_y) / 2.0
-
-        scaled_size = round(self.scatter_coords.marker_size * zoom_factor)
-
+        scaled_size, zoom_factor = self._scale_markers()
+        pos = self.scatter_coords.get_pos(index)
         if all(pos.shape):
             if self.scatter_coords.has_colours:
                 self.scatter.setData(pos=pos,

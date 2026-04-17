@@ -40,7 +40,7 @@ class Scatter3D:
                 colors = pseudo_random_rgb_array(n_samples)
             if colors is not None and not is_valid_hex_color(str(colors[0])):  # Convert to hex if not yet
                 if not smarties:
-                    colors_dict = {col: to_hex(col) for col in np.unique(colors, axis=0)}
+                    colors_dict = {tuple(col): to_hex(col) for col in np.unique(colors, axis=0)}
                     colors_dict[None] = to_hex((1, 0, 0))  # default to red
                     colors = [colors_dict[col] for col in colors]
                 else:
@@ -92,10 +92,11 @@ class Scatter3D:
         # print(self.data['colour'].values, df['colour'])
         if isinstance(df, dict):
             df = pd.DataFrame(df)
-        if 'colour' in df.columns:
-            if isinstance(df['colour'][0], np.ndarray):  # TODO: should be iterable
+        if len(df) and 'colour' in df.columns:
+            sample_colour = df['colour'][0]
+            if isinstance(sample_colour, np.ndarray):  # TODO: should be iterable
                 df['colour'] = [to_hex(c) for c in df['colour']]  # OPTIMISE: see map
-            elif isinstance(df['colour'][0], QColor):
+            elif isinstance(sample_colour, QColor):
                 df['colour'] = [c.name() for c in df['colour']]  # OPTIMISE: see map
             unique_colors = np.unique(df['colour'])
             self.point_map = pd.DataFrame({
@@ -151,7 +152,7 @@ class Scatter3D:
             else:
                 current_slice = i
             current_z_data = pd.DataFrame(columns=['x', 'y', 'colour', 'size', 'symbol'])  # WARNING: this is x/y of the view, not the 3D image
-            indices = self.current_slice_indices(current_slice)
+            indices = self.current_slice_mask(current_slice)
             pos = self.get_pos(indices=indices)
             if not all(pos.shape):  # empty
                 continue
@@ -174,8 +175,31 @@ class Scatter3D:
             # output['brush'] = data_df['brush'].values
         return output
 
+    # vectorised approach for get_all_data to test
+    # def get_all_data(self, main_slice_idx, half_slice_thickness=None):
+    #     hst = half_slice_thickness or self.half_slice_thickness or 3
+    #     z = self.coordinates[:, self.axis]
+    #     mask = (z >= main_slice_idx - hst) & (z < main_slice_idx + hst) & (z >= 0)
+    #
+    #     if not mask.any():
+    #         empty = {'pos': np.empty((0, 2)), 'size': np.empty(0), 'symbol': np.empty(0)}
+    #         if self.has_colours:
+    #             empty['pen'] = np.empty(0)
+    #         return empty
+    #
+    #     axes = [a for a in range(3) if a != self.axis]
+    #     pos = self.coordinates[np.ix_(mask, axes)]
+    #     distances = np.abs(z[mask] - main_slice_idx)
+    #     sizes = np.round(10 * ((hst - distances) / hst)).astype(int)
+    #     symbols = self.data.loc[mask, 'symbol'].values if self.has_hemispheres else np.full(mask.sum(), self.symbols[0])
+    #
+    #     output = {'pos': pos, 'size': sizes, 'symbol': symbols}
+    #     if self.has_colours:
+    #         output['pen'] = self.data.loc[mask, 'pen'].values
+    #     return output
+
     def get_draw_params(self, current_slice):
-        indices = self.current_slice_indices(current_slice)
+        indices = self.current_slice_mask(current_slice)
         if indices is not None:
             draw_params = {
                 'pen': self.data.loc[indices, 'pen'].values,
@@ -187,7 +211,7 @@ class Scatter3D:
 
     def get_symbols(self, current_slice):
         if self.has_hemispheres:
-            indices = self.current_slice_indices(current_slice)
+            indices = self.current_slice_mask(current_slice)
             if indices is not None:
                 return self.data.loc[indices, 'symbol'].values
             else:
@@ -196,13 +220,13 @@ class Scatter3D:
             return self.symbols[0]
 
     def get_symbol_sizes(self, main_slice_idx, slice_idx, indices=None, half_size=3):
-        marker_size = round(10 * ((half_size - abs(main_slice_idx - slice_idx)) / half_size))
+        marker_size = round(self.marker_size * ((half_size - abs(main_slice_idx - slice_idx)) / half_size))
         n_markers = self.get_n_markers(indices=indices)
         return np.full(n_markers, marker_size)
 
     def get_n_markers(self, slice_idx=None, indices=None):
         if indices is None:
-            indices = self.current_slice_indices(slice_idx)
+            indices = self.current_slice_mask(slice_idx)
         if len(self.data):
             return np.count_nonzero(indices)
         else:
@@ -210,19 +234,20 @@ class Scatter3D:
 
     def get_colours(self, current_slice=None, indices=None):
         if indices is None:
-            indices = self.current_slice_indices(current_slice)
+            indices = self.current_slice_mask(current_slice)
         if indices is not None:
             return self.data.loc[indices, 'colour']
         else:
             return np.array([])
 
-    def current_slice_indices(self, current_slice):  #  FIXME: more of a mask actually
+    def current_slice_mask(self, current_slice):
         if len(self.data):
             return self.coordinates[:, self.axis] == current_slice
+        return np.zeros(len(self.data), dtype=bool)
 
     def get_pos(self, current_slice=None, indices=None):
         if indices is None:
-            indices = self.current_slice_indices(current_slice)
+            indices = self.current_slice_mask(current_slice)
         if indices is not None:
             axes = [0, 1, 2]
             axes.pop(self.axis)  # coordinates in the two other axes
