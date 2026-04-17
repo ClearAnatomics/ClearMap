@@ -201,10 +201,6 @@ class SampleInfoTab(ExperimentTab):
     def _get_channels(self):
         return self.sample_manager.channels
 
-    # Pipeline tabs use ChannelsChanged because cfg based but here display
-    def _on_bus_channels_changed(self, event: UiChannelsChanged | ChannelsChanged):
-        self.reconcile_channel_pages(event.after)
-
     def _on_workspace_changed(self, event: WorkspaceChanged):
         if getattr(self, "params"):
             self.params.shared_sample_params.src_folder = event.exp_dir
@@ -498,13 +494,6 @@ class StitchingTab(PreProcessingTab):
 
         self.subscribe(ChannelsChanged, self._on_bus_channels_changed)
 
-    def _on_bus_channels_changed(self, event: ChannelsChanged):
-        """update the run list (preserve checks if possible)"""
-        stitchable = set(self._get_channels())
-        desired = [c for c in event.after if c in stitchable]
-        self.reconcile_channel_pages(desired)  # WARNING: do not rely on event.after here
-                                               #   because stitching tab may fewer channels than sample tab
-
     def _after_channels_reconciled(self, desired_channels: list[str]) -> None:
         self._refresh_ui()
         self.update_plotable_channels()
@@ -730,9 +719,6 @@ class RegistrationTab(PreProcessingTab):
         add_missing_combobox_items(self.ui.atlasIdComboBox, ATLAS_NAMES_MAP.keys())
         add_missing_combobox_items(self.ui.structureTreeIdComboBox, STRUCTURE_TREE_NAMES_MAP.keys())
 
-    def _on_bus_channels_changed(self, event: ChannelsChanged):
-        self.reconcile_channel_pages(event.after)
-
     def _after_channels_reconciled(self, desired_channels: list[str]) -> None:
         for ch in desired_channels:
             self.__update_channel_combo_boxes(ch)
@@ -780,7 +766,7 @@ class RegistrationTab(PreProcessingTab):
                                          apply_patch=self.main_window.experiment_controller.apply_ui_patch)
 
     def _get_channels(self):
-        return self.sample_manager.channels  # All channels so we can decide whether to register in UI
+        return self.sample_manager.pipeline_ready_channels  # All channels so we can decide whether to register in UI
 
     def _setup_channel(self, page_widget, channel):
         self.__update_channel_combo_boxes(channel, page_widget)
@@ -913,7 +899,7 @@ class RegistrationTab(PreProcessingTab):
                                        step_kw_args={'channel': channel, 'increment_main': (i != 0)})
                     else:
                         continue
-        self.main_window.wrap_in_thread(self.worker.align)
+        self.main_window.wrap_in_thread(self.worker.align)  # FIXME: why not wrap_step
         # Force update because event fired from call above is outside main thread so won't update the UI otherwise
         self._update_plotable_channels()
         self.main_window.print_status_msg('Registered')

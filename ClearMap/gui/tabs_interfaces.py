@@ -22,6 +22,8 @@ from ClearMap.config.config_handler import ConfigHandler, ALTERNATIVES_REG
 from .dialog_helpers import get_directory_dlg
 from .gui_utils_base import create_clearmap_widget, replace_widget
 from .widgets import ExtendableTabWidget, SamplePickerDialog
+from ..Utils.events import ChannelsChanged, UiChannelsChanged
+
 if TYPE_CHECKING:
     from PyQt5.QtWidgets import QMainWindow, QToolButton
     from ClearMap.pipeline_orchestrators.sample_info_management import SampleManager
@@ -698,6 +700,11 @@ class ExperimentTab(GenericTab):
         that depend on the list of channels
         """
         pass
+
+    def _on_bus_channels_changed(self, event: UiChannelsChanged | ChannelsChanged):  # Support UiChannelsChanged for Sample Tab
+        relevant = set(self._get_channels())
+        desired = [c for c in event.after if c in relevant]
+        self.reconcile_channel_pages(desired)
 
     def _setup_workers(self):
         """

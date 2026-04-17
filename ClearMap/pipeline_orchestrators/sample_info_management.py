@@ -286,6 +286,12 @@ class SampleManager(OrchestratorBase):
         return list(cfg['channels'].keys())
 
     @property
+    def pipeline_ready_channels(self) -> list[str]:
+        """Channels with a meaningful data_type (excludes undefined/unconfigured)."""
+        excluded = (None, 'undefined', 'no-pipeline')
+        return [c for c in self.channels if self.data_type(c) not in excluded]
+
+    @property
     @adjuster_safe
     def renamed_channels(self) -> dict[str, str]:
         return dict(self._renamed_channels)  # copy to discourage mutation

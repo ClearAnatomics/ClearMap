@@ -1386,7 +1386,7 @@ class ChannelsUiParameterCollection(UiParameterCollection):
         self._channels = {}
 
     @property
-    def relevant_channels(self):
+    def relevant_channels(self):  # Same as sm.get_channels_by_pipeline whithout going through SampleManager instance
         return [c for c, v in self._get_view()['sample']['channels'].items() if
                 v['data_type'] and CONTENT_TYPE_TO_PIPELINE[v['data_type']] == self.pipeline_name]
     @property
