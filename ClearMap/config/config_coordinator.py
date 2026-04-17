@@ -407,12 +407,22 @@ class ConfigCoordinator(BusSubscriberMixin):
         with self.__edit_session(origin=origin, validate=False) as working_cfg:
             self._merge_patch(working_cfg, clean_patch, allowed_sections=allowed)
             changed_keys = _patch_to_config_keys_sets(clean_patch)
+
+            # Pass rename map to sample manager — the APPLY_RENAMES adjuster
+            # reads ctx.sample_manager.renamed_channels
+            if rename_map and sample_manager is not None:
+                sample_manager.set_renamed_channels(rename_map)
+
             if do_run_adjusters:
                 patch2 = self.adjust_config(sample_manager=sample_manager, phase=phase, view=working_cfg,
                                             active_sections=None, changed_keys=changed_keys, apply=False)
                 if patch2:
                     self._merge_patch(working_cfg, patch2, allowed_sections=allowed)
                     changed_keys.extend(_patch_to_config_keys_sets(patch2))
+
+            # Clear after adjusters consumed it
+            if rename_map and sample_manager is not None:
+                sample_manager.clear_renamed_channels()
 
         changed_keys = sorted(set(changed_keys))  # Deduplicate
 

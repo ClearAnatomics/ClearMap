@@ -12,7 +12,7 @@ with the @adjuster decorator
 from copy import deepcopy
 from typing import Any, Optional, Iterable, Dict, Sequence, List, Set, Tuple
 
-from ClearMap.Utils.utilities import deep_merge, REPLACE, DELETE
+from ClearMap.Utils.utilities import deep_merge, REPLACE, DELETE, _REPLACE
 
 from ClearMap.config.compound_keys import PairKey
 
@@ -128,6 +128,11 @@ INSTANCE_SPECS: tuple[InstanceContainerSpec, ...] = (
 INSTANCE_SPECS_REGISTRY = ContainerSpecRegistry(INSTANCE_SPECS)
 
 RENAME_KEYS = tuple(spec.owns_prefix() for spec in INSTANCE_SPECS_REGISTRY.specs)
+# Keys whose values are channel name references
+BACKREF_FIELDS = {  # REFACTOR: rename to more explicit like CHANNEL_REF_FIELDS
+    'registration': ('align_with', 'moving_channel'),
+    'stitching': ('layout_channel',),
+}
 GENERIC_INSTANCE_KEYS = tuple(s.owns_prefix() for s in INSTANCE_SPECS_REGISTRY.generic_instance_specs())
 static_candidates = ALTERNATIVES_REG.canonical_pipeline_config_names + ALTERNATIVES_REG.canonical_global_config_names
 STATIC_SECTIONS = tuple(s for s in static_candidates if s != 'sample')
@@ -163,7 +168,7 @@ def apply_channel_renames(view: ConfigView, ctx: AdjustmentContext) -> ConfigPat
 
     patch: ConfigPatch = {}
 
-    # rename targets are declared by spec.rename.applies
+    # 1. Structural: rename keys in instance containers
     for spec in INSTANCE_SPECS_REGISTRY.specs:
         if not spec.rename.applies:
             continue
@@ -186,7 +191,48 @@ def apply_channel_renames(view: ConfigView, ctx: AdjustmentContext) -> ConfigPat
         if changed:
             set_patch_at_path(patch, abs_path, REPLACE(updated))
 
+    # 2. Values: fix back-references to old channel names
+    _fix_channel_backreferences(view, rename_map, patch)
+
     return patch
+
+
+def _fix_channel_backreferences(view: ConfigView, rename_map: dict[str, str],
+                                patch: ConfigPatch) -> None:
+    """
+    Update config values that hold channel names as references
+    (e.g. align_with='Channel_0' → 'alexa' after rename).
+
+    Mutates *patch* in place.
+    """
+    for section, fields in BACKREF_FIELDS.items():
+        # Read from patch if the container was already REPLACE'd,
+        # otherwise from view
+        channels = _get_channels_from_patch_or_view(patch, view, section)
+        if not channels:
+            continue
+
+        for ch_name, ch_cfg in channels.items():
+            if not isinstance(ch_cfg, dict):
+                continue
+            for field in fields:
+                val = ch_cfg.get(field)
+                if val in rename_map:
+                    ch_cfg[field] = rename_map[val]
+
+
+def _get_channels_from_patch_or_view(patch: ConfigPatch, view: ConfigView,
+                                     section: str) -> dict[str, Any]:
+    """
+    Get the channels dict for a section, preferring the patch (which may
+    contain a REPLACE'd version from the structural rename step above).
+    """
+    from_patch = (patch.get(section) or {}).get('channels')
+    if isinstance(from_patch, _REPLACE):
+        return from_patch.payload
+    if isinstance(from_patch, dict):
+        return from_patch
+    return (view.get(section) or {}).get('channels') or {}
 
 
 # WARNING: this must not touch instance containers declared by InstanceContainerSpec
