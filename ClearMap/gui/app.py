@@ -514,7 +514,7 @@ class ClearMapAppBase(QMainWindow, Ui_ClearMapGui):
     def make_progress_dialog(self, title: str = 'Processing', n_steps: int = 1, maximum: int = 100,
                              abort: Optional[Callable] = None, parent: Optional[QWidget] = None):
         """
-        Create a single or nested (2 nested bars) progress dialog
+        Create a single or nested (2 nested bars) progress dialog.
         The dialog is initialised with the parameters below and linked to self.progress_watcher
         to drive updates of the titles and progress bar.
 
@@ -525,7 +525,7 @@ class ClearMapAppBase(QMainWindow, Ui_ClearMapGui):
         n_steps : int
             The number of steps of the main step for nested dialogs
         maximum : int
-            the maximum value of the progress bar (or the second bar for nested dialogs)
+            The maximum value of the progress bar (or the second bar for nested dialogs)
         abort : function
             The function to trigger when the abort button is clicked
         parent : QWidget
@@ -534,21 +534,39 @@ class ClearMapAppBase(QMainWindow, Ui_ClearMapGui):
         if n_steps:
             n_steps += 1  # To avoid range shrinking because starting from 1 not 0
             nested = True
-            self.progress_dialog = ClearMap.gui.dialog_helpers.make_nested_progress_dialog(title=title, overall_maximum=n_steps,
-                                                                                           abort_callback=abort, parent=parent)
-            self.progress_watcher.main_max_changed.connect(self.progress_dialog.mainProgressBar.setMaximum)
-            self.progress_watcher.main_progress_changed.connect(self.progress_dialog.mainProgressBar.setValue)
-            self.progress_watcher.main_step_name_changed.connect(self.handle_step_name_change)
+            self.progress_dialog = ClearMap.gui.dialog_helpers.make_nested_progress_dialog(
+                title=title, overall_maximum=n_steps,
+                abort_callback=abort, parent=parent)
+
+            # Dialog-bound slots — disconnect_all because target widget changes each call
+            unique_connect(self.progress_watcher.main_max_changed,
+                           self.progress_dialog.mainProgressBar.setMaximum,
+                           disconnect_all=True)
+            unique_connect(self.progress_watcher.main_progress_changed,
+                           self.progress_dialog.mainProgressBar.setValue,
+                           disconnect_all=True)
+
+            # Stable slot — just ensure no duplicate
+            unique_connect(self.progress_watcher.main_step_name_changed,
+                           self.handle_step_name_change)
         else:
             nested = False
-            self.progress_dialog = ClearMap.gui.dialog_helpers.make_simple_progress_dialog(title=title, abort_callback=abort,
-                                                                                           parent=parent)
+            self.progress_dialog = ClearMap.gui.dialog_helpers.make_simple_progress_dialog(
+                title=title, abort_callback=abort, parent=parent)
 
-        self.progress_watcher.max_changed.connect(self.progress_dialog.subProgressBar.setMaximum)
-        self.progress_watcher.progress_changed.connect(self.progress_dialog.subProgressBar.setValue)
-        self.progress_watcher.sub_step_name_changed.connect(self.handle_sub_step_change)
+        # Dialog-bound slots — disconnect_all because target widget changes each call
+        unique_connect(self.progress_watcher.max_changed,
+                       self.progress_dialog.subProgressBar.setMaximum,
+                       disconnect_all=True)
+        unique_connect(self.progress_watcher.progress_changed,
+                       self.progress_dialog.subProgressBar.setValue,
+                       disconnect_all=True)
 
-        self.progress_watcher.finished.connect(self.signal_process_finished)
+        # Stable slots — just ensure no duplicate
+        unique_connect(self.progress_watcher.sub_step_name_changed,
+                       self.handle_sub_step_change)
+        unique_connect(self.progress_watcher.finished,
+                       self.signal_process_finished)
 
         if nested:
             self.progress_watcher.setup(main_step_name=title, main_step_length=n_steps)
@@ -604,8 +622,9 @@ class ClearMapAppBase(QMainWindow, Ui_ClearMapGui):
         self.print_status_msg(msg)
         self.log_progress(msg)
         if self.progress_dialog is not None:
-            self.progress_dialog.done(1)
-            self.progress_dialog = None  # del
+            dlg = self.progress_dialog
+            self.progress_dialog = None  # ← set to None BEFORE done()
+            dlg.done(1)  # so re-entrant calls are no-ops
 
     def handle_step_name_change(self, step_name: str):
         """

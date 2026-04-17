@@ -264,23 +264,29 @@ def disconnect_widget_signal(widget_signal, max_iter: int = 10,
     raise ValueError(f'Could not disconnect signal after {max_iter} iterations')
 
 
-def unique_connect(signal: pyqtSignal, slot: Callable, max_disconnect_iter: int = 10):
+def unique_connect(signal: pyqtSignal, slot: Callable, *,
+                   max_disconnect_iter: int = 10, disconnect_all: bool = False) -> None:
     """
-    Connect a signal to a slot, disconnecting any previous connection
+    Connect a signal to a slot, ensuring no duplicate connections.
 
     Parameters
     ----------
-    signal: pyqtSignal
-        The signal to connect
-    slot: callable
-        The slot to connect
-    max_disconnect_iter: int
-        Maximum number of attempts to disconnect the signal
+    signal : pyqtSignal
+        The signal to connect.
+    slot : callable
+        The slot to connect.
+    max_disconnect_iter : int
+        Maximum number of attempts to disconnect (safety valve against
+        multiply-connected signals).
+    disconnect_all : bool
+        If False (default), only disconnect *slot* if already connected
+        (idempotent re-connect of the same slot).
+        If True, disconnect ALL existing slots first, then connect *slot*
+        (ensures this is the ONLY slot on the signal — useful when the
+        slot target changes between calls, e.g. progress dialog widgets).
     """
-    warnings.warn('unique_connect is deprecated, '
-                  'use signal.connect(slot, type=Qt.AutoConnection, unique=True) instead (PyQt >=5.15.2)',
-                  DeprecationWarning, stacklevel=2)
-    disconnect_widget_signal(signal, max_iter=max_disconnect_iter, slot=slot)
+    disconnect_widget_signal(signal, max_iter=max_disconnect_iter,
+                             slot=None if disconnect_all else slot)
     signal.connect(slot)
 
 
