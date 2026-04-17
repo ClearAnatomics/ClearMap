@@ -1325,8 +1325,12 @@ class GuiController(BusSubscriberMixin):
 
     def _tabs_may_have_changed(self, changed_keys: Tuple[str, ...]) -> bool:
         """
-        Infer whether the set of tabs may have changed based on which config keys changed.
-        Typically if channels or their data types changed, tabs may have changed.
+        Infer whether the set of visible tabs may have changed based on which
+        config keys changed.
+
+        Returns True when a channel's data_type changes, or when channels are
+        added/removed AND at least one channel has a pipeline-relevant data_type
+        (either before or after the change).
 
         Parameters
         ----------
@@ -1338,14 +1342,43 @@ class GuiController(BusSubscriberMixin):
         bool
             True if tabs may have changed, False otherwise
         """
+        irrelevant_d_types = {'undefined', 'no-pipeline', None}
+
         for k in changed_keys:
             if k == 'sample':  # Whole sample changed
                 return True
             elif k.startswith('sample.channels.'):
+                channels = self.experiment_controller.get_config_view().get(
+                    'sample', {}).get('channels', {})
                 if k.count('.') == 2:  # channels list changed
-                    return True
+                    # check if any ch has pipeline relevant data
+                    data_types = {ch.get('data_type') for ch in channels.values()}
+                    if data_types - irrelevant_d_types:
+                        return True
+                    # Post-change has no relevant types — but maybe pre-change did
+                    # (channel with relevant type was just removed).
+                    # Check if any existing tab serves a pipeline that no longer
+                    # has channels:
+                    for tab in self._tabs:
+                        if hasattr(tab, '_get_channels') and tab._get_channels():
+                            continue  # tab still has work to do
+                        if getattr(tab, 'pipeline_name', None):
+                            return True  # orphaned pipeline tab → needs rebuild
                 elif k.endswith('.data_type'):  # data type of a channel changed
-                    return True
+                    # Check if it changed from invalid to valid or vice versa (exclude from missing to invalid)
+                    channel_name = k.split('.')[2]
+                    new_type = channels.get(channel_name, {}).get('data_type')
+                    if new_type not in irrelevant_d_types:
+                        return True  # became relevant
+                    # New type is irrelevant — but was old type relevant?
+                    # We don't have the old value, so check if ANY channel
+                    # still has a relevant type. If not, tabs may need pruning.
+                    all_types = {ch.get('data_type') for ch in channels.values()}
+                    if not (all_types - irrelevant_d_types):
+                        # No relevant channels left — if we currently have
+                        # pipeline tabs, they need to go
+                        if any(getattr(t, 'pipeline_name', None) for t in self._tabs):
+                            return True
         else:
             return False
 
