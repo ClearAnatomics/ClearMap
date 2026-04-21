@@ -1694,7 +1694,7 @@ class VasculatureTab(PostProcessingTab):
         """
         self.wrap_plot(self.get_worker(substep='graph').visualize_graph_annotations,
                        self.params.visualization_params.slicing,
-                       plot_type='mesh', graph_step=graph_step, show=False)
+                       plot_type=self.params.visualization_params.plot_type, graph_step=graph_step, show=False)
         self.main_window.perf_monitor.stop()
 
     def display_graph_chunk_from_cfg(self):  # REFACTOR: split ?
