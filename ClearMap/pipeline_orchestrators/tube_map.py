@@ -27,7 +27,8 @@ from PyQt5.QtWidgets import QDialogButtonBox
 
 from ClearMap.IO.workspace2 import Workspace2
 from ClearMap.ParallelProcessing.DataProcessing.ArrayProcessing import initialize_sink
-from ClearMap.Utils.exceptions import PlotGraphError, ClearMapVRamException, MissingRequirementException
+from ClearMap.Utils.exceptions import PlotGraphError, ClearMapVRamException, MissingRequirementException, \
+    MissingAssetError
 from ClearMap.Visualization.Qt.utils import link_dataviewers_cursors
 from ClearMap.config.config_coordinator import ConfigCoordinator
 from ClearMap.pipeline_orchestrators.generic_orchestrators import PipelineOrchestrator, ProcessorSteps
@@ -1147,19 +1148,23 @@ class VesselGraphProcessor(PipelineOrchestrator):
 
         df.to_feather(self.get_path('vertices', channel=self.parent_channels, extension='.feather'))
 
-    @requires_graph('traced')
+    @requires_graph('annotated')
     def get_structure_sub_graph(self, structure_id):
         # Assign label of requested structure to all its children
         annotator = self.registration_processor.annotators[self.parent_channels[0]]
         level = annotator.find(structure_id)['level']
-        label_leveled = annotator.convert_label(self.graph_traced.vertex_annotation(), value='id', level=level)
+        try:
+            graph = self.graph_traced
+        except MissingAssetError:
+            graph = self.graph_annotated
+        label_leveled = annotator.convert_label(graph.vertex_annotation(), value='id', level=level)
 
         vertex_filter = label_leveled == structure_id
         # if get_neighbours:
         #     vertex_filter = graph.expand_vertex_filter(vertex_filter, steps=2)
         if vertex_filter is None:
             return
-        return self.graph_traced.sub_graph(vertex_filter=vertex_filter)
+        return graph.sub_graph(vertex_filter=vertex_filter)
 
     def plot_graph_structure(self, structure_id, plot_type):
         annotator = self.registration_processor.annotators[self.parent_channels[0]]
