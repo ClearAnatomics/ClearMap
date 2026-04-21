@@ -439,6 +439,9 @@ class RegistrationProcessor(PipelineOrchestrator):
                                                       label_source=atlas_cfg['structure_tree_id'],
                                                       target_directory=annotator.target_directory)
                 annotator = self.annotators[channel]
+        else:
+            if channel not in self.annotators:   # TODO: check if we only update
+                self.annotators[channel] = annotator
         atlas_asset = self.get('atlas', channel=channel)
         for sub_type_name, file_path in annotator.get_atlas_paths().items():
             sub_type = atlas_asset.type_spec.add_sub_type(sub_type_name, expression=os.path.abspath(file_path))
