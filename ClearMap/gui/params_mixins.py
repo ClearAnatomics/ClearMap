@@ -7,6 +7,7 @@ from typing import Protocol, runtime_checkable, Literal, Any, Optional, Mapping,
 import numpy as np
 
 from ClearMap.IO.assets_constants import CONTENT_TYPE_TO_PIPELINE
+from ClearMap.gui.params_interfaces import ParamLink
 
 
 @runtime_checkable
@@ -104,30 +105,54 @@ class OrthoviewerSlicingMixin:
         axis_ratio = float(self.ratios['xyz'.index(axis)])
         scaled = round(val / axis_ratio) if axis_ratio else val
         return int(scaled)
-    #
-    # @property
-    # def crop_x_min(self) -> int:
-    #     return self.crop_x[0]
-    #
-    # @property
-    # def crop_x_max(self) -> int:
-    #     return self.crop_x[1]
-    #
-    # @property
-    # def crop_y_min(self) -> int:
-    #     return self.crop_y[0]
-    #
-    # @property
-    # def crop_y_max(self) -> int:
-    #     return self.crop_y[1]
-    #
-    # @property
-    # def crop_z_min(self) -> int:
-    #     return self.crop_z[0]
-    #
-    # @property
-    # def crop_z_max(self) -> int:
-    #     return self.crop_z[1]
+
+    @property
+    def crop_x_min(self) -> int:
+        return self.crop_x[0]
+
+    @crop_x_min.setter
+    def crop_x_min(self, value):
+        self.crop_x = [value, self.crop_x_max]
+
+    @property
+    def crop_x_max(self) -> int:
+        return self.crop_x[1]
+
+    @crop_x_max.setter
+    def crop_x_max(self, value):
+        self.crop_x = [self.crop_x_min, value]
+
+    @property
+    def crop_y_min(self) -> int:
+        return self.crop_y[0]
+
+    @crop_y_min.setter
+    def crop_y_min(self, value):
+        self.crop_y = [value, self.crop_y_max]
+
+    @property
+    def crop_y_max(self) -> int:
+        return self.crop_y[1]
+
+    @crop_y_max.setter
+    def crop_y_max(self, value):
+        self.crop_y = [self.crop_y_min, value]
+
+    @property
+    def crop_z_min(self) -> int:
+        return self.crop_z[0]
+
+    @crop_z_min.setter
+    def crop_z_min(self, value):
+        self.crop_z = [value, self.crop_z_max]
+
+    @property
+    def crop_z_max(self) -> int:
+        return self.crop_z[1]
+
+    @crop_z_max.setter
+    def crop_z_max(self, value):
+        self.crop_z = [self.crop_z_min, value]
 
     @property
     def slice_tuples(self):

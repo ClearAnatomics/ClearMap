@@ -167,11 +167,18 @@ class OrthoViewer:
 
     def __update_range(self, region_item, axis=0):
         rng = region_item.getRegion()
+
+        # Debounce
+        cache = getattr(self, '_range_cache', {})
+        if cache.get(axis) == rng:
+            return
+        cache[axis] = rng
+        self._range_cache = cache
+
         if self.params is not None:
             if not self.no_scale:
                 rng = [self.params.scale_axis(val, 'xyz'[axis]) for val in rng]
-            setattr(self.params, f'crop_{"xyz"[axis]}_min', rng[0])
-            setattr(self.params, f'crop_{"xyz"[axis]}_max', rng[1])
+            setattr(self.params, f'crop_{"xyz"[axis]}', rng)
 
     def add_regions(self):  # FIXME: improve documenation
         """
