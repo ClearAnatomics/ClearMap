@@ -2409,10 +2409,19 @@ class ComparisonsWidgetAdapter:
         self._checkboxes: List[QCheckBox] = []
         self._plot_btns: List[QPushButton] = []
         self._channel_combo: Optional[QComboBox] = None
+        self._suffix_widget: Optional[QWidget] = None  # ← preserve across rebuilds
 
     def rebuild(self, model: ComparisonsModel, *, on_plot_group: Callable[[str], None],
                 channels: List[str], on_channel_changed: Callable[[str], None],
                 preselected_comparisons: Optional[List[Pair]] = None) -> None:
+
+        # Rescue persistent widgets BEFORE clearing
+        if self._suffix_widget is None:
+            parent_widget = self._layout.parentWidget()
+            self._suffix_widget = parent_widget.findChild(QWidget, 'densitySuffixContainerWidget') if parent_widget else None
+        if self._suffix_widget is not None:
+            self._suffix_widget.setParent(None)  # detach so clear_layout won't delete it
+
         clear_layout(self._layout)
         wanted = set(preselected_comparisons or [])
 
@@ -2435,6 +2444,10 @@ class ComparisonsWidgetAdapter:
             self._plot_btns.append(btn)
 
         self._layout.addStretch()
+
+        # Re-insert the stashed widget
+        if self._suffix_widget is not None:
+            self._layout.addWidget(self._suffix_widget)
 
         # Channel to plot combobox
         if channels:
