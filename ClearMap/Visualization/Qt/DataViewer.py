@@ -200,13 +200,14 @@ class DataViewer(QWidget):
 
         self.sliceLine.sigPositionChanged.connect(self.updateSlice)
 
-        # Axis tools
+        # Axis tools  # FIXME: extract and make addWidget widget location incremental not absolute
         self.axis_buttons = []
         axis_tools_layout, axis_tools_widget = self.__setup_axes_controls()
 
         # max projection depth
         self.max_projection = max_projection
         self.max_projection_edit = QLineEdit()
+        self.max_projection_edit.setPlaceholderText('max projection')
         if self.max_projection is not None:
             self.max_projection_edit.setText('%d' % self.max_projection)
         # self.max_projection_edit.setValidator(pg.QtGui.QIntValidator())
@@ -218,25 +219,14 @@ class DataViewer(QWidget):
 
         # points color
         self.points_color_button = pg.ColorButton(color=self.points_style.get('brush'))
+        self.points_color_button.setVisible(False)
         self.points_color_button.setMaximumWidth(30)
         self.points_color_button.sigColorChanged.connect(self.change_points_color)
         axis_tools_layout.addWidget(self.points_color_button, 0, 4)
 
-        # Controls for marker size
-        self.marker_size_spin = QSpinBox()
-        self.marker_size_spin.setRange(1, 100)
-        self.marker_size_spin.setValue(10)
-        self.marker_size_spin.setPrefix("Marker: ")
-        self.marker_size_spin.valueChanged.connect(lambda: self.updateSlice(force_update=True))
-        axis_tools_layout.addWidget(self.marker_size_spin, 0, 11)
-
-        self.marker_scale_with_zoom = QCheckBox("Scale w/ zoom")
-        self.marker_scale_with_zoom.setChecked(False)
-        self.marker_scale_with_zoom.stateChanged.connect(lambda: self.updateSlice(force_update=True))
-        axis_tools_layout.addWidget(self.marker_scale_with_zoom, 0, 12)
-
         # vectors color and threshold
         self.vectors_color_button = pg.ColorButton(color=self.vectors_style.get('brush'))
+        self.vectors_color_button.setVisible(False)
         self.vectors_color_button.setMaximumWidth(30)
         self.vectors_color_button.sigColorChanged.connect(self.change_vectors_color)
         axis_tools_layout.addWidget(self.vectors_color_button, 0, 5)
@@ -245,6 +235,7 @@ class DataViewer(QWidget):
         vectors_threshold = self.vectors_style.get('threshold', None)
         if vectors_threshold is not None:
             self.vectors_threshold_edit.setText('%.4f' % vectors_threshold)
+        self.vectors_threshold_edit.setVisible(False)
         self.vectors_threshold_edit.setMaxLength(6)
         self.vectors_threshold_edit.setAlignment(Qt.AlignRight)
         self.vectors_threshold_edit.setMaximumWidth(60)
@@ -253,11 +244,13 @@ class DataViewer(QWidget):
 
         # orientation threshold
         self.orientations_color_button = pg.ColorButton(color=self.orientations_style.get('pen'))
+        self.orientations_color_button.setVisible(False)
         self.orientations_color_button.setMaximumWidth(30)
         self.orientations_color_button.sigColorChanged.connect(self.change_orientations_color)
         axis_tools_layout.addWidget(self.orientations_color_button, 0, 7)
 
         self.orientations_threshold_edit = QLineEdit()
+        self.orientations_threshold_edit.setVisible(False)
         orientations_threshold = self.orientations_style.get('threshold', None)
         if orientations_threshold is not None:
             self.orientations_threshold_edit.setText('%.4f' % orientations_threshold)
@@ -288,7 +281,25 @@ class DataViewer(QWidget):
         self.screenshot_btn.setToolTip('Save screenshot')
         self.screenshot_btn.setMaximumWidth(34)
         self.screenshot_btn.clicked.connect(self.save_screenshot)
-        axis_tools_layout.addWidget(self.screenshot_btn, 0, 10)
+        axis_tools_layout.addWidget(self.screenshot_btn, 1, 2)
+
+
+        # Controls for marker size
+        # FIXME: Invisible if no markers
+        self.marker_size_spin = QSpinBox()
+        self.marker_size_spin.setRange(1, 100)
+        self.marker_size_spin.setValue(10)
+        self.marker_size_spin.setPrefix("Marker: ")
+        self.marker_size_spin.valueChanged.connect(lambda: self.updateSlice(force_update=True))
+        axis_tools_layout.addWidget(self.marker_size_spin, 1, 3)
+
+        self.marker_scale_with_zoom = QCheckBox("Scale w/ zoom")
+        self.marker_scale_with_zoom.setChecked(False)
+        self.marker_scale_with_zoom.stateChanged.connect(lambda: self.updateSlice(force_update=True))
+        axis_tools_layout.addWidget(self.marker_scale_with_zoom, 1, 4)
+
+        self.marker_size_spin.setVisible(self.scatter is not None)
+        self.marker_scale_with_zoom.setVisible(self.scatter is not None)
 
         self.graphicsView.scene().sigMouseMoved.connect(self.updateLabelFromMouseMove)
 
@@ -685,6 +696,8 @@ class DataViewer(QWidget):
     def plot_scatter_markers(self, ax, index):
         if self.scatter_coords is None:
             return
+        self.marker_size_spin.setVisible(self.scatter is not None)
+        self.marker_scale_with_zoom.setVisible(self.scatter is not None)
         self.scatter.clear()
         self.scatter_coords.axis = ax
 
@@ -741,6 +754,7 @@ class DataViewer(QWidget):
             self.points = as_source(points)
         self.initialize_points_item()
         self.update_points()
+        self.points_color_button.setVisible(True)
 
     def update_points(self):
         if self.points is not None:
@@ -775,6 +789,8 @@ class DataViewer(QWidget):
     def set_vectors(self, vectors):
         self.vectors = vectors
         self.update_vectors()
+        self.vectors_color_button.setVisible(True)
+        self.vectors_threshold_edit.setVisible(True)
 
     def update_vectors(self):
         if self.vectors is not None:
@@ -835,6 +851,8 @@ class DataViewer(QWidget):
     def set_orientations(self, orientations):
         self.orientations = orientations
         self.update_orientations()
+        self.orientations_color_button.setVisible(True)
+        self.orientations_threshold_edit.setVisible(True)
 
     def update_orientations(self):
         if self.orientations is not None:
