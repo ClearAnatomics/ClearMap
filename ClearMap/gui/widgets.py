@@ -1153,9 +1153,12 @@ class ManageAssetsWidget(WizardWidget):
                 sources = [asset.path for asset in assets]
                 if all([asset.shape() == assets[0].shape() for asset in assets]):
                     sources = [sources]  # overlay
-                plot_3d.plot(sources, arrange=False, lut='grey')  # REFACTORING: in WS2 ?
-            for asset in assets:
-                getattr(asset, action_name)(**params)
+                dvs = plot_3d.plot(sources, arrange=False, lut='grey',
+                                   parent=self.app.centralWidget())
+                self.app.setup_plots(dvs)
+            else:
+                for asset in assets:
+                    getattr(asset, action_name)(**params)
         else:
             method = getattr(self.sample_manager, f'{action_name}_assets')
             # WARNING: resample and crop will need extra dialog to get the parameters
