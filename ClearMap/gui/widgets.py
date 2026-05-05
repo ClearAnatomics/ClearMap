@@ -2009,13 +2009,17 @@ class PerfMonitor(QWidget):
         return round(psutil.cpu_percent())
 
     def get_thread_percent(self):
-        try:
-            clear_map_proc_cpu = [proc.cpu_percent() for proc in psutil.process_iter()
-                                  if proc and 'python' in proc.name().lower() and
-                                  USER_NAME in proc.username() and
-                                  'clearmap' in proc.exe().lower()]
-        except psutil.NoSuchProcess:
-            clear_map_proc_cpu = []
+        clear_map_proc_cpu = []
+        for proc in psutil.process_iter(['name', 'username', 'exe', 'cpu_percent']):
+            try:
+                info = proc.info  # pre-fetched by process_iter attrs
+                name = (info.get('name') or '').lower()
+                user = (info.get('username') or '')
+                exe = (info.get('exe') or '').lower()
+                if 'python' in name and USER_NAME in user and 'clearmap' in exe:
+                    clear_map_proc_cpu.append(info.get('cpu_percent') or 0)
+            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                continue
         # The name filter is not sufficient but necessary because the exe is not always allowed
         return max(clear_map_proc_cpu) if clear_map_proc_cpu else 0
 
@@ -2048,22 +2052,21 @@ class PerfMonitor(QWidget):
     def handle_gpu_vals_updated(self):
         try:
             with open(self.gpu_proc_file_path, 'r') as proc_file:
-                line = proc_file.read()
+                line = proc_file.read().strip()
                 if not line:
                     return
                 elems = line.split(',')
                 if len(elems) < 3:
                     return
-                mem_used, mem_total, gpu_percent = [s.strip() for s in elems]
+                mem_used, mem_total, gpu_percent = [s.strip() for s in elems][:3]  # cap to first 3
                 percent_v_ram = int((float(mem_used) / float(mem_total)) * 100)
                 percent_gpu = int(gpu_percent)
             if percent_gpu != self.percent_gpu or percent_v_ram != self.percent_v_ram:
                 self.percent_gpu = percent_gpu
                 self.percent_v_ram = percent_v_ram
                 self.gpu_vals_changed.emit(self.percent_gpu, self.percent_v_ram)
-        except ValueError as err:
-            print(err)
-            pass
+        except (ValueError, ZeroDivisionError) as err:
+            print(f'GPU monitor: {err}')
 
 
 class ExtendableTabWidget(QTabWidget):
