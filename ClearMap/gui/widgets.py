@@ -1355,17 +1355,17 @@ class PatternDialog(WizardWidget):
         self.dlg.setMinimumWidth(needed_width)
         self.dlg.resize(needed_width, self.dlg.sizeHint().height())
 
-    @staticmethod
-    def _measure_rich_label(label):
-        """
-        Accurately measure the rendered width of a QLabel containing HTML.
-        QLabel.sizeHint() is unreliable for rich text, so we use QTextDocument.
-        """
-        doc = QTextDocument()
-        doc.setDefaultFont(label.font())
-        doc.setHtml(label.text())
-        doc.setDocumentMargin(0)
-        return int(doc.idealWidth()) + 10  # small safety margin
+    # @staticmethod
+    # def _measure_rich_label(label):
+    #     """
+    #     Accurately measure the rendered width of a QLabel containing HTML.
+    #     QLabel.sizeHint() is unreliable for rich text, so we use QTextDocument.
+    #     """
+    #     doc = QTextDocument()
+    #     doc.setDefaultFont(label.font())
+    #     doc.setHtml(label.text())
+    #     doc.setDocumentMargin(0)
+    #     return int(doc.idealWidth()) + 10  # small safety margin
 
     def get_widgets(self, image_group_id, axis):
         """
@@ -1425,15 +1425,17 @@ class PatternDialog(WizardWidget):
         pattern_idx = tool_box.currentIndex()
         pattern = self.patterns_finders[pattern_idx].pattern
 
-        axis_names = []
+        # Convert generic axes names (I, J, K...) to coordinate axes (X, Y, Z) based on the user selection in the combo boxes
+        axis_names = []  # TODO: avoid duplicated axes
         for i in range(pattern.n_tags()):
             _, _, combo_widget = self.get_widgets(pattern_idx, i)
             axis_names.append(combo_widget.currentText())
-
         pattern.assign_axes_from_combo(axis_names)
 
         result_widget = tool_box.widget(pattern_idx).result
-        result_widget.setText(pattern.relative_string(self.src_folder))
+        result_widget.setTextFormat(Qt.PlainText)  # Avoid conversion to html and stripping of <X,I,2> pattern elements
+        formatted_pattern = pattern.relative_string(self.src_folder)
+        result_widget.setText(formatted_pattern)
 
         self._fit_to_content()
 
