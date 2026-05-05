@@ -6,6 +6,7 @@ from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from typing import List, Any, Callable, Mapping, Optional, Dict, Type, Tuple, Sequence, Union
 
+from PyQt5.QtCore import QEvent, QObject
 from importlib_metadata import version
 from packaging.version import Version
 
@@ -620,6 +621,18 @@ def list_widget_setter(widget: QListWidget, itm_list: List[str]):
         pass
 
 
+class EditingFinishedFilter(QObject):
+    """Emits a callback when a QPlainTextEdit loses focus (≈ editingFinished)."""
+    def __init__(self, callback, parent=None):
+        super().__init__(parent)
+        self._cb = callback
+
+    def eventFilter(self, obj, event) -> bool:
+        if event.type() == QEvent.FocusOut:
+            self._cb()
+        return False
+
+
 Getter     = Callable[[QWidget], Any]
 Setter     = Callable[[QWidget, Any], None]
 Connector  = Callable[[QWidget, Callable[[], None]], None]
@@ -771,6 +784,11 @@ class WidgetOps:
             w.valueChanged.connect(cb)
             return lambda: disconnect_widget_signal(w.valueChanged, slot=cb)
 
+        def plain_text_editing_finished_connector(w: QPlainTextEdit, cb: Callable[[], None]):
+            f = EditingFinishedFilter(cb, parent=w)
+            w.installEventFilter(f)
+            return lambda: w.removeEventFilter(f)
+
         self.register(QSpinBox,
             getter=lambda w: w.value(),
             setter=lambda w, v: w.setValue(int(v)),
@@ -784,7 +802,7 @@ class WidgetOps:
         self.register(QPlainTextEdit,
             getter=lambda w: w.toPlainText(),
             setter=lambda w, v: w.setPlainText("" if v is None else str(v)),
-            connector=text_changed_connector,
+            connector=plain_text_editing_finished_connector,
         )
         self.register(QTextEdit,  # FIXME: check if HTML for both getter and setter is what we want
             getter=lambda w: w.toHtml(),  # TODO: check if this always what we want
