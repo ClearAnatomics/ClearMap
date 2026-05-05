@@ -17,6 +17,8 @@ BASE_GROUP: Dict[type[GenericTab], int] = {
 
 # Within-group score for concrete classes: 0..100
 CONCRETE_TIER: Dict[Union[str, type[GenericTab]], int] = {
+    'GroupAnalysisTab': 25,  # Ensures that comes before batch
+    'BatchProcessingTab': 30,
     'StitchingTab': 30,
     'RegistrationTab': 35,
     'ColocalizationTab': 80,
