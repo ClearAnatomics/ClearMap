@@ -86,6 +86,15 @@ class SampleManager(OrchestratorBase):
             The source directory of the sample
         """
         if src_dir is not None:
+            src_dir = Path(src_dir).expanduser().resolve()
+
+            # Invalidate workspace if directory changed
+            if self.workspace is not None:
+                old_dir = Path(self.workspace.directory).resolve()
+                if old_dir != src_dir:
+                    self.workspace = None
+                    self.resource_type_to_folder = None
+
             self.cfg_coordinator.set_base_dir(src_dir)
             # FIXME: add to set_base_dir ?
             self.cfg_coordinator.load('sample')  # need to load at least sample config to know pipelines
@@ -99,6 +108,9 @@ class SampleManager(OrchestratorBase):
             workspace_path = self.cfg_coordinator.workspace_config_path
             if workspace_path.exists():
                 workspace = Workspace2.from_yaml(workspace_path)
+                # Ensure loaded workspace points to the right directory
+                if str(Path(workspace.directory).resolve()) != str(src_dir):
+                    workspace.directory = str(src_dir)
                 self.workspace = workspace
                 self.resource_type_to_folder = workspace.resource_type_to_folder
 
@@ -222,6 +234,14 @@ class SampleManager(OrchestratorBase):
             self.workspace.save(workspace_cfg_path)
 
     def _ensure_workspace(self):
+        current_base = str(Path(self.cfg_coordinator.base_dir).resolve())
+
+        # Stale workspace pointing to a different directory
+        if self.workspace is not None:
+            ws_dir = str(Path(self.workspace.directory).resolve())
+            if ws_dir != current_base:
+                self.workspace = None
+
         if self.workspace is None:
             first_channel = self.channels[0] if self.channels else None
             workspace_cfg_path = self.cfg_coordinator.workspace_config_path
@@ -230,8 +250,12 @@ class SampleManager(OrchestratorBase):
                     self.workspace = Workspace2.from_yaml(workspace_cfg_path)
                 else:  # legacy fallback
                     self.workspace = Workspace2.load(workspace_cfg_path)
+                # Patch directory if YAML contains a stale path
+                if str(Path(self.workspace.directory).resolve()) != current_base:
+                    self.workspace.directory = current_base  # set and propagate to assets
+                    self.save_workspace()  # persist so next load is correct
             else:
-                self.workspace = Workspace2(self.cfg_coordinator.base_dir,
+                self.workspace = Workspace2(current_base,
                                             sample_id=self.prefix,
                                             default_channel=first_channel,
                                             resource_type_to_folder=self.resource_type_to_folder)

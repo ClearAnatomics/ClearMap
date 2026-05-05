@@ -1068,13 +1068,25 @@ class AssetCollection:  # FIXME: fix how assets are retrieved
             The channel specification of the assets in the collection.
             If dict, it should have the keys 'channel_name' and 'content_type'.
         """
-        self.base_directory = base_directory
+        self._base_directory = base_directory
         self._sample_id = None
         self.sample_id = sample_id
         if isinstance(channel_spec, dict):
             channel_spec = ChannelSpec(**channel_spec)
         self.channel_spec = channel_spec
         self.assets = {}
+
+    @property
+    def base_directory(self) -> str:
+        return self._base_directory
+
+    @base_directory.setter
+    def base_directory(self, value: str | Path):
+        new = str(value)
+        if self._base_directory != new:  # Update and propagate if different
+            self._base_directory = new
+            for asset in self.assets.values():
+                asset.base_directory = Path(new)
 
     @property
     def sample_id(self):

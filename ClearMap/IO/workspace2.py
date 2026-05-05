@@ -91,7 +91,7 @@ class Workspace2:  # REFACTOR: subclass dict
     """
     def __init__(self, directory: str | Path, default_channel: str | None = None, sample_id: str | None = None,
                  resource_type_to_folder: dict | None = None, assets_types_config: dict | None = None):
-        self.directory = str(directory)  # TODO: support pathlib.Path?
+        self._directory = directory
         self.sample_id = sample_id
 
         self.resource_type_to_folder = deepcopy(RESOURCE_TYPE_TO_FOLDER)
@@ -163,6 +163,21 @@ class Workspace2:  # REFACTOR: subclass dict
             if col.channel_spec not in specs:
                 specs.append(col.channel_spec)
         return specs
+
+    @property
+    def directory(self) -> str:
+        return self._directory
+
+    @directory.setter
+    def directory(self, value: str | Path):
+        old = self._directory
+        new = str(Path(value).resolve())
+        if old != new:  # Update and propagate to assets if changed
+            self._directory = new
+            for collection in self.asset_collections.values():
+                collection.base_directory = new
+                for asset in collection.assets.values():
+                    asset.base_directory = Path(new)
 
     def to_dict(self) -> dict:
         """

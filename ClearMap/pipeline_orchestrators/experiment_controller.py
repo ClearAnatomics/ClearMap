@@ -277,9 +277,13 @@ class ExperimentController(BusSubscriberMixin):
         return self._exp_dir
 
     def set_experiment_dir(self, exp_dir: str | Path) -> None:
+        # Clear cached workers if directory changed (they hold old workspace refs)
+        if self._exp_dir is not None and self._exp_dir != exp_dir:
+            self._workers.clear()
+
         self._exp_dir = Path(exp_dir).expanduser().resolve()
         self.cfg_coordinator.set_base_dir(self._exp_dir)
-        self.sample_manager.setup(exp_dir)
+        self.sample_manager.setup(self._exp_dir)
         self.publish(WorkspaceChanged(exp_dir=str(self._exp_dir)))
 
     @staticmethod
