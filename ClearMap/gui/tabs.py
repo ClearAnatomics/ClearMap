@@ -1995,9 +1995,12 @@ class GroupAnalysisTab(BatchTab):
         if not selected_comparisons:
             self.main_window.popup('No comparisons selected')
             return []
-        return self.processor.plot_p_value_maps(comparisons=selected_comparisons,
-                                                channel=self.params.plot_channel, suffix=self.params.density_suffix,
-                                                parent=self.main_window.centralWidget())
+        return self.processor.plot_p_value_maps(
+            comparisons=selected_comparisons,
+            channel=self.params.plot_channel,
+            suffix=self.params.density_suffix,
+            advanced=self.params.compute_sd_and_effect_size,
+            parent=self.main_window.centralWidget())
 
     def run_df_plots(self, plot_function, plot_kw_args):
         self.main_window.clear_plots()

@@ -79,22 +79,19 @@ class DensityGroupAnalysisOrchestrator(GroupOrchestratorBase):
         return reg.annotators[channel]
 
     # ---------- plots ----------
-
-    def plot_p_value_maps(self, comparisons: List[Pair], *, channel: str, suffix: str, parent=None):
+    def plot_p_value_maps(self, comparisons: List[Pair], *, channel: str, suffix: str, advanced: bool = False, parent=None):
         results_folder = Path(self.results_folder)
 
-        p_val_imgs = []
-        for gp1, gp2 in comparisons:
-            if suffix:
-                p_path = results_folder / f'{channel}_p_val_colors_{gp1}_{gp2}_{suffix}.tif'
-            else:
-                p_path = results_folder / f'{channel}_p_val_colors_{gp1}_{gp2}.tif'
-            p_val_imgs.append(clm_io.read(p_path))
+        if len(comparisons) > 1:  # Multiple comparisons: just show p-value maps
+            p_val_imgs = []
+            for gp1, gp2 in comparisons:
+                sfx = f'_{suffix}' if suffix else ''
+                p_path = results_folder / f'{channel}_p_val_colors_{gp1}_{gp2}{sfx}.tif'
+                p_val_imgs.append(clm_io.read(p_path))
 
-        if len(comparisons) > 1:
             titles = [f'{gp1} vs {gp2} p values' for gp1, gp2 in comparisons]
             dvs = plot_3d.plot(p_val_imgs, title=titles, arrange=False, sync=True, parent=parent)
-        else:  # If only one comparison, show more details (avg, sd, effect size, atlas)
+        else:  # If only one comparison, show more details (avg, sd, effect size, atlas (+ sd and effect_size if advanced)
             gp1, gp2 = comparisons[0]
 
             assets = p_val_assets_for_pair(self.results_folder, channel, gp1, gp2, suffix)
@@ -103,15 +100,24 @@ class DensityGroupAnalysisOrchestrator(GroupOrchestratorBase):
             annotator = self._get_annotator(sample_dir, channel=channel)
             colored_atlas = annotator.create_color_annotation()
 
-            stats_title = f'P values {"and effect size" if res.has_effect else ""}'
-            stats_lut = [None, 'flame'] if res.has_effect else None
-
             panels = [
-                PlotPanel(images=res.gp1_imgs, title=gp1, lut='flame'),
-                PlotPanel(images=res.gp2_imgs, title=gp2, lut='flame'),
-                PlotPanel(images=res.stats_imgs, title=stats_title, lut=stats_lut),
-                PlotPanel(images=colored_atlas, title='colored_atlas', lut=None, min_max=(0, 255)),
+                PlotPanel(images=res.gp1_avg, title=f'{gp1} avg', lut='flame'),
+                PlotPanel(images=res.gp2_avg, title=f'{gp2} avg', lut='flame'),
+                PlotPanel(images=res.p_vals, title='P values', lut=None),
             ]
+
+            if advanced:
+                if res.gp1_sd is not None:
+                    panels.append(PlotPanel(images=res.gp1_sd, title=f'{gp1} SD', lut='viridis'))
+                if res.gp2_sd is not None:
+                    panels.append(PlotPanel(images=res.gp2_sd, title=f'{gp2} SD', lut='viridis'))
+                if res.effect_size is not None:
+                    panels.append(PlotPanel(images=res.effect_size, title='Effect size', lut='flame'))
+
+            panels.append(
+                PlotPanel(images=colored_atlas, title='Atlas', lut=None, min_max=(0, 255))
+            )
+
             dvs = multi_plot_from_panels(panels, arrange=False, sync=True, parent=parent)
 
             names_map = annotator.get_names_map()
