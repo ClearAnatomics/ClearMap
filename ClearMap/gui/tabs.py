@@ -367,8 +367,15 @@ class SampleInfoTab(ExperimentTab):
                 exp = Expression(pattern_spec.pattern_relpath)
                 axes = exp.tag_names()  # e.g. ['Z', 'Y', 'X']
                 first_tile = exp.string(values={axis: 0 for axis in axes})  # Ideally, pick min(axis) for each
-                # FIXME: if Path(self.src_folder) / first_tile.endswith('.ome.tif') and we don't have resolution in the cfg, we can try to parse it from the OME metadata
-                ome_info = parse_ome_info(Path(self.src_folder) / first_tile)
+                first_tile_path = Path(self.src_folder) / first_tile
+                if first_tile_path.suffix == '.tif' and str(first_tile_path).endswith('.ome.tif'):
+                    try:
+                        ome_info = parse_ome_info(first_tile_path)
+                    except (FileNotFoundError, Exception) as e:
+                        warnings.warn(f'Could not parse OME metadata from {first_tile_path}: {e}')
+                        ome_info = {}
+                else:
+                    ome_info = {}
                 if ome_info.get('resolution') is not None:
                     res = ome_info['resolution']
                     if (isinstance(res, (list, tuple))
