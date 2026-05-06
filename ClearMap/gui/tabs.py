@@ -112,17 +112,19 @@ from ClearMap.config.atlas import ATLAS_NAMES_MAP, STRUCTURE_TREE_NAMES_MAP
 
 from ClearMap.pipeline_orchestrators.utils import init_sample_manager_and_processors
 from ClearMap.pipeline_orchestrators.batch_process import BatchProcessor
+from ClearMap.pipeline_orchestrators.cell_map import CellDetector
 
 from ClearMap.Visualization.Matplotlib.PlotUtils import plot_sample_stats_histogram, plot_volcano
 from ClearMap.Visualization.Qt.utils import link_dataviewers_cursors
 from ClearMap.Visualization.Qt import Plot3d as plot_3d
 
-from ClearMap.Utils.exceptions import ClearMapVRamException, GroupStatsError, MissingRequirementException, \
-    ClearMapWorkspaceError
-from ClearMap.Utils.events import ChannelsChanged, UiConvertToClearMapFormat, UiRequestPlotMiniBrain, \
-    UiRequestPlotAtlas, UiOrientationChanged, UiCropChanged, ChannelDefaultsChanged, \
-    UiRequestLandmarksDialog, UiAlignWithChanged, UiVesselGraphFiltersChanged, RegistrationStatusChanged, \
-    UiBatchResultsFolderChanged, UiBatchGroupsChanged, UiChannelsChanged, WorkspaceChanged
+from ClearMap.Utils.exceptions import (ClearMapVRamException, GroupStatsError, MissingRequirementException,
+                                       ClearMapWorkspaceError)
+from ClearMap.Utils.events import (ChannelsChanged, UiPrepareRawDataForClearMap, UiRequestPlotMiniBrain,
+                                   UiRequestPlotAtlas, UiOrientationChanged, UiCropChanged, ChannelDefaultsChanged,
+                                   UiRequestLandmarksDialog, UiAlignWithChanged, UiVesselGraphFiltersChanged,
+                                   RegistrationStatusChanged,  UiBatchResultsFolderChanged, UiBatchGroupsChanged,
+                                   UiChannelsChanged, WorkspaceChanged)
 
 from .dialog_helpers import option_dialog, make_splash, prompt_dialog
 from .dialogs import ResourceTypeToFolderDialog
@@ -136,8 +138,6 @@ from .gui_utils_images import np_to_qpixmap
 from .params import (VesselParams, SampleParameters, StitchingParams, CellMapParams, GroupAnalysisParams,
                      BatchProcessingParams, RegistrationParams, TractMapParams, ColocalizationParams)
 from ClearMap.IO.metadata import parse_ome_info
-from ..pipeline_orchestrators.cell_map import CellDetector
-from ..pipeline_orchestrators.generic_orchestrators import PipelineOrchestrator
 
 if TYPE_CHECKING:
     from ClearMap.pipeline_orchestrators.experiment_controller import AnalysisGroupController
@@ -180,13 +180,15 @@ class SampleInfoTab(ExperimentTab):
         self.detached = False  # WARNING: To avoid calling update when channels are setup by
                                #   the wizard
 
+        self._preparation_offered = False  # once-per-session auto-prompt guard
+
     def _set_params(self):
         exp_ctrl = self.main_window.experiment_controller
         self.params = SampleParameters(self.ui, event_bus=self._bus,
                                        get_view=exp_ctrl.get_config_view, apply_patch=exp_ctrl.apply_ui_patch)
 
     def _bind_params_signals(self):
-        self.subscribe(UiConvertToClearMapFormat, self.convert_to_clearmap_format)
+        self.subscribe(UiPrepareRawDataForClearMap, self.prepare_channel_raw_data)
         self.subscribe(UiRequestPlotMiniBrain, self.plot_mini_brain)
         self.subscribe(UiRequestPlotAtlas, self.display_atlas)
 
@@ -227,7 +229,6 @@ class SampleInfoTab(ExperimentTab):
         automatically set through the params object attribute
         """
         self.params.set_painting(True)
-        t = self.params[channel].data_type  # TEST: remove after
         content_types = natsorted(list(set(DATA_CONTENT_TYPES)))
 
         data_type_box = page_widget.dataTypeComboBox
@@ -425,13 +426,57 @@ class SampleInfoTab(ExperimentTab):
                 warnings.warn('RegistrationProcessor not setup, cannot plot atlas. '
                               'Please call registration_tab.finalise_set_params() first')
 
-    def convert_to_clearmap_format(self, event: UiConvertToClearMapFormat):
-        stitching_processor = self.exp_controller.get_worker('stitching')
-        channel = event.channel_name
-        if self.sample_manager.is_tiled(channel):
-            stitching_processor.convert_tiles_channel(channel)
-        else:
-            stitching_processor.copy_or_stack(channel)
+    def prompt_prepare_all_channels_raw_data(self, force: bool = False):
+        """
+        GUI wrapper for bulk raw-data preparation with user confirmation.
+
+        Checks which pipeline-ready channels still need their working asset
+        (npy tiles for tiled channels, stitched volume in npy for non-tiled)
+        and presents a confirmation dialog before proceeding.
+
+        Prompts automatically once per session on first call. Subsequent
+        automatic calls are no-ops; the manual button bypasses this guard
+        via force=True.
+
+        Parameters
+        ----------
+        force : bool
+            If True, include already-prepared channels and bypass the
+            once-per-session guard. Intended for the manual re-import button.
+        """
+        if self._preparation_offered and not force:
+            return
+
+        sm = self.sample_manager
+        candidates = []
+        for ch in sm.pipeline_ready_channels:
+            if sm.is_tiled(ch):
+                if force or not sm.has_npy(ch):
+                    candidates.append((ch, 'convert tiles'))
+            else:
+                if force or not sm.get('stitched', channel=ch).exists:
+                    candidates.append((ch, 'stack/import'))
+
+        self._preparation_offered = True
+
+        if not candidates:
+            return
+
+        details = '\n'.join(f'  • {ch} ({action})' for ch, action in candidates)
+        verb = 'Re-import' if force else 'Import'
+        if not prompt_dialog('Channel data import', f'{verb} {len(candidates)} channel(s) into workspace?\n\n'
+                                                    f'{details}\n\nThis prepares raw data for processing.'):
+            return
+
+        stitching_worker = self.exp_controller.get_worker('stitching')
+        self.wrap_step(f'Preparing {len(candidates)} channel(s)',
+                       stitching_worker.prepare_all_channels_raw_data,
+                       step_kw_args={'force': force}, n_steps=len(candidates), nested=False)
+
+    def prepare_channel_raw_data(self, event: UiPrepareRawDataForClearMap):
+        """Per-channel 'stitched' asset creation from button."""
+        stitching_worker = self.exp_controller.get_worker('stitching')
+        stitching_worker.prepare_channel_raw_data(event.channel_name)
 
 
 class StitchingTab(PreProcessingTab):

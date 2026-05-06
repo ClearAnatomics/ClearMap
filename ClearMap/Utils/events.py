@@ -49,7 +49,7 @@ class UiCropChanged:
     slice_z: Any
 
 @dataclass(frozen=True)
-class UiConvertToClearMapFormat:
+class UiPrepareRawDataForClearMap:
     channel_name: str
 
 @dataclass(frozen=True)

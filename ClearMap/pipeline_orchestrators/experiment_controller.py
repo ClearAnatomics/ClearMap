@@ -364,6 +364,9 @@ class ExperimentController(BusSubscriberMixin):
         finally:
             self._hydrating = False
 
+        stitching_worker = self.get_worker('stitching')
+        return stitching_worker.prepare_all_channels_raw_data()
+
     def boot_new(self, dest_dir: Optional[Path] = None, template_dir: Optional[Path] = None) -> None:
         """
         Create a new experiment from defaults or clone a template, then open it.

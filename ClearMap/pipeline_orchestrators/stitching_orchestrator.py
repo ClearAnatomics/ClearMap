@@ -211,6 +211,34 @@ class StitchingProcessor(PipelineOrchestrator):
             asset.expression = exp.string().replace(z_expression, '')  # overwrite expression
             self.sample_manager.set_channel_expression(channel, asset.expression)
 
+    def prepare_all_channels_raw_data(self, force: bool = False) -> list[str]:
+        """
+        Prepare all pipeline-ready channels that don't yet have their working asset.
+        Tiled channels → convert tiles to npy. Non-tiled → stack/copy to stitched volume.
+        Idempotent unless force=True.
+
+        Parameters
+        ----------
+        force : bool
+            If True, re-prepare even if the working asset already exists.
+
+        Returns
+        -------
+        list[str]
+            Channel names that were prepared.
+        """
+        prepared = []
+        for ch in self.sample_manager.pipeline_ready_channels:
+            if self.sample_manager.is_tiled(ch):
+                if force or not self.sample_manager.has_npy(ch):
+                    self.convert_tiles_channel(ch)
+                    prepared.append(ch)
+            else:
+                if force or not self.sample_manager.get('stitched', channel=ch).exists:  # WARNING: self.workspace might not yet exist
+                    self.copy_or_stack(ch)
+                    prepared.append(ch)
+        return prepared
+
     def copy_or_stack(self, channel):
         """
         Copy or stack or convert to npy the channel data in case there is no X/Y tiling

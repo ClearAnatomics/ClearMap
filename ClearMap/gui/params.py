@@ -21,7 +21,7 @@ from ClearMap.Utils.utilities import (validate_orientation, snake_to_title, set_
                                       DEFAULT_ORIENTATION, trim_or_pad, REPLACE)
 from ClearMap.Utils.event_bus import Publishes, EventBus
 from ClearMap.Utils.events import (UiChannelRenamed, UiCropChanged, UiOrientationChanged, UiRequestPlotAtlas,
-                                   UiConvertToClearMapFormat, UiRequestPlotMiniBrain, UiChannelsChanged,
+                                   UiPrepareRawDataForClearMap, UiRequestPlotMiniBrain, UiChannelsChanged,
                                    UiLayoutChannelChanged, UiUseExistingLayoutChanged, UiAlignWithChanged,
                                    UiRequestLandmarksDialog, UiAtlasIdChanged, UiAtlasStructureTreeIdChanged,
                                    UiVesselGraphFiltersChanged, UiBatchResultsFolderChanged, UiBatchGroupsChanged)
@@ -124,7 +124,8 @@ class SampleChannelParameters(ChannelUiParameter):
             'geometry_settings_from': ParamLink(None, self.tab.sampleChannelGeometryChannelComboBox),
             'data_type': ParamLink(['data_type'], self.tab.dataTypeComboBox),
             'extension': ParamLink(['extension'], self.tab.extensionComboBox),
-            'path': ParamLink(['path'], self.tab.pathPlainTextEdit),
+            'path': ParamLink(['path'], self.tab.pathPlainTextEdit,
+                              notify_apply=self._update_convert_button_label),
             'resolution': VectorLink(['resolution'], self.tab.resolutionTriplet,
                                      disabled_value=None, ui_sentinel=-1,
                                      default_on_enable=[1.0, 1.0, 1.0],
@@ -140,6 +141,10 @@ class SampleChannelParameters(ChannelUiParameter):
                                  notify_apply=self._publish_crop_changed),
             'orientation': ['orientation']  #  Last in case of validation issues
         }
+
+    def cfg_to_ui(self):
+        super().cfg_to_ui()
+        self._update_convert_button_label()  # Force run after hydration endc
 
     def _publish_crop_changed(self, _=None):
         self.publish(UiCropChanged(channel_name=self.name, slice_x=self.slice_x,
@@ -203,12 +208,34 @@ class SampleChannelParameters(ChannelUiParameter):
         if 0 not in ori:  # i.e. fully defined
             self.publish(UiOrientationChanged(channel_name=self.name, orientation=ori))
 
+    def _update_convert_button_label(self, _=None):
+        """Update the button text based on the channel's raw path pattern."""
+        btn = self.tab.convertToClearMapPushButton
+        try:
+            path = self.path  # reads from widget via ParamLink
+            if not path:
+                btn.setText('Import to workspace')
+                return
+
+            from ClearMap.Utils.tag_expression import Expression
+            exp = Expression(path)
+            tag_names = set(exp.tag_names())
+
+            if tag_names & {'X', 'Y'}:
+                btn.setText('Convert tiles to numpy')
+            elif 'Z' in tag_names:
+                btn.setText('Stack layers into volume')
+            else:
+                btn.setText('Import to workspace')
+        except Exception:
+            btn.setText('Import to workspace')
+
 
 class SampleParameters(ChannelsUiParameterCollection):
     """
     Class that links the sample params file to the UI
     """
-    publishes = Publishes(UiConvertToClearMapFormat, UiRequestPlotMiniBrain, UiRequestPlotAtlas,
+    publishes = Publishes(UiPrepareRawDataForClearMap, UiRequestPlotMiniBrain, UiRequestPlotAtlas,
                           UiChannelRenamed, UiChannelsChanged, UiOrientationChanged, UiCropChanged)
 
     cfg_subtree = ['sample']
@@ -358,7 +385,7 @@ class SampleParameters(ChannelsUiParameterCollection):
                 func(self.get_channel_name(idx))
 
         channel_params.tab.convertToClearMapPushButton.clicked.connect(
-            functools.partial(publish_with_current_name, UiConvertToClearMapFormat),
+            functools.partial(publish_with_current_name, UiPrepareRawDataForClearMap),
             type=Qt.UniqueConnection)  # avoid double binding (PyQt >= 5.14)
         channel_params.tab.plotMiniBrainPushButton.clicked.connect(
             functools.partial(publish_with_current_index, UiRequestPlotMiniBrain),

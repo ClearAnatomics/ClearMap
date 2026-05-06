@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from packaging.version import Version
 
+from ClearMap.config.change_detection import (channels_added_or_removed, channel_data_type_changed,
+                                              whole_sample_changed, channels_with_changed_property,
+                                              channel_path_changed, IRRELEVANT_DATA_TYPES)
 from ClearMap.config.convert_config_versions import convert_versions
 
 """
@@ -1178,7 +1181,7 @@ class GuiController(BusSubscriberMixin):
         super().__init__(bus)
         self._hydrating = False
         self.experiment_controller: ExperimentController = experiment
-        self.tabs_registry: TabRegistry = tab_registry  # stays a UI concern
+        self.tabs_registry: TabRegistry = tab_registry
 
         self.group_controller: AnalysisGroupController = group_controller
 
@@ -1235,6 +1238,8 @@ class GuiController(BusSubscriberMixin):
             self._refresh_tabs_from_model()
             self._needs_full_refresh = False
 
+        self._trigger_raw_data_preparation()
+
     def _build_main_window(self) -> QMainWindow:
         window = ClearMapApp(self.experiment_controller, self._bus, self)
         window.fix_styles()
@@ -1258,6 +1263,10 @@ class GuiController(BusSubscriberMixin):
 
     def _tab_instances_by_class(self) -> Dict[Type[Any], Any]:
         return {t.__class__: t for t in self._tabs}
+
+    def _active_pipeline_names(self) -> set[str]:
+        """Pipeline names currently served by active tabs."""
+        return {getattr(t, 'pipeline_name', None) for t in self._tabs if getattr(t, 'pipeline_name', None)}
 
     def _get_or_create(self, cls: Type[GenericTab], tab_idx: int = -1) -> GenericTab:
         by_cls = self._tab_instances_by_class()
@@ -1321,7 +1330,7 @@ class GuiController(BusSubscriberMixin):
     def _get_config_view(self) -> Any:
         return self.experiment_controller.get_config_view
 
-    # ---------- handlers ----------
+    # ---------- change classification ----------
 
     def _tabs_may_have_changed(self, changed_keys: Tuple[str, ...]) -> bool:
         """
@@ -1334,53 +1343,94 @@ class GuiController(BusSubscriberMixin):
 
         Parameters
         ----------
-        changed_keys: Tuple[str, ...]
-            The keys that changed in the config
+        changed_keys : Tuple[str, ...]
+            The keys that changed in the config.
 
         Returns
         -------
         bool
-            True if tabs may have changed, False otherwise
+            True if tabs may need to be rebuilt.
         """
-        irrelevant_d_types = {'undefined', 'no-pipeline', None}
+        if whole_sample_changed(changed_keys):
+            return True
 
-        for k in changed_keys:
-            if k == 'sample':  # Whole sample changed
+        channels = self.experiment_controller.get_config_view().get(
+            'sample', {}).get('channels', {})
+
+        if channels_added_or_removed(changed_keys):
+            # check if any ch has pipeline relevant data
+            data_types = {ch.get('data_type') for ch in channels.values()}
+            if data_types - IRRELEVANT_DATA_TYPES:
                 return True
-            elif k.startswith('sample.channels.'):
-                channels = self.experiment_controller.get_config_view().get(
-                    'sample', {}).get('channels', {})
-                if k.count('.') == 2:  # channels list changed
-                    # check if any ch has pipeline relevant data
-                    data_types = {ch.get('data_type') for ch in channels.values()}
-                    if data_types - irrelevant_d_types:
-                        return True
-                    # Post-change has no relevant types — but maybe pre-change did
-                    # (channel with relevant type was just removed).
-                    # Check if any existing tab serves a pipeline that no longer
-                    # has channels:
-                    for tab in self._tabs:
-                        if hasattr(tab, '_get_channels') and tab._get_channels():
-                            continue  # tab still has work to do
-                        if getattr(tab, 'pipeline_name', None):
-                            return True  # orphaned pipeline tab → needs rebuild
-                elif k.endswith('.data_type'):  # data type of a channel changed
-                    # Check if it changed from invalid to valid or vice versa (exclude from missing to invalid)
-                    channel_name = k.split('.')[2]
-                    new_type = channels.get(channel_name, {}).get('data_type')
-                    if new_type not in irrelevant_d_types:
-                        return True  # became relevant
-                    # New type is irrelevant — but was old type relevant?
-                    # We don't have the old value, so check if ANY channel
-                    # still has a relevant type. If not, tabs may need pruning.
-                    all_types = {ch.get('data_type') for ch in channels.values()}
-                    if not (all_types - irrelevant_d_types):
-                        # No relevant channels left — if we currently have
-                        # pipeline tabs, they need to go
-                        if any(getattr(t, 'pipeline_name', None) for t in self._tabs):
-                            return True
-        else:
+            if self._has_orphaned_pipeline_tabs():
+                return True
+
+        if channel_data_type_changed(changed_keys):
+            if self._data_type_change_affects_tabs(changed_keys, channels):
+                return True
+
+        return False
+
+    def _has_orphaned_pipeline_tabs(self) -> bool:
+        """Check if any pipeline tab no longer has channels to serve."""
+        for tab in self._tabs:
+            if hasattr(tab, '_get_channels') and tab._get_channels():
+                continue  # tab still has work to do
+            if getattr(tab, 'pipeline_name', None):
+                return True  # orphaned pipeline tab → needs rebuild
+        return False
+
+    def _data_type_change_affects_tabs(self, changed_keys: Tuple[str, ...],
+                                        channels: dict) -> bool:
+        """Check if a data_type change requires tab rebuild."""
+        changed_channels = channels_with_changed_property(changed_keys, '.data_type')
+        if not changed_channels:
             return False
+
+        for channel_name in changed_channels:
+            new_type = channels.get(channel_name, {}).get('data_type')
+            if new_type not in IRRELEVANT_DATA_TYPES:
+                return True  # became relevant
+
+        # Type became irrelevant — check if any relevant types remain
+        all_types = {ch.get('data_type') for ch in channels.values()}
+        if not (all_types - IRRELEVANT_DATA_TYPES):  # prune pipeline tabs if no relevant channels left
+            if self._active_pipeline_names():
+                return True
+
+        return False
+
+    # ---------- raw data preparation ----------
+
+    def _trigger_raw_data_preparation(self):
+        """Prompt assembly of non-tiled channels when needed."""
+        sample_tab = self._find_tab_by_key('sample_info')
+        if sample_tab:
+            sample_tab.prompt_prepare_all_channels_raw_data()
+
+    def _reset_preparation_guard(self):
+        """Reset the once-per-session guard so the prompt fires for newly configured channels."""
+        sample_tab = self._find_tab_by_key('sample_info')
+        if sample_tab:
+            sample_tab._preparation_offered = False
+
+    # ---------- event handlers ----------
+
+    def _on_cfg_changed(self, evt: CfgChanged):
+        self.sample_manager = self.experiment_controller.sample_manager  # to be sure
+        if self.hydrating:  # Hydration: Cache and defer full refresh until hydration ends
+            if self._tabs_may_have_changed(evt.changed_keys):
+                self._needs_full_refresh = True
+        else:  # Normal operation
+            if self._tabs_may_have_changed(evt.changed_keys):  # Infer if channels/types changed
+                self._install_or_update_tabs()
+                self._tabs_initialized = True
+            self._refresh_tabs_from_model()
+
+            # Channel path changed → may need raw data preparation
+            if channel_path_changed(evt.changed_keys):
+                self._reset_preparation_guard()
+                self._trigger_raw_data_preparation()
 
     def _on_tab_activated(self, evt: UiTabActivated) -> None:
         ok, msg = self._handle_tab_activation(evt.key)
@@ -1426,8 +1476,7 @@ class GuiController(BusSubscriberMixin):
         Parameters
         ----------
         key: str
-            The key of the tab to find (e.g. 'sample', 'registration', etc)
-            The key is expected to be in snake_case and is derived from the tab title (e.g. 'Sample info' → 'sample_info')
+            Snake_case key derived from the tab title (e.g. 'sample_info').
 
         Returns
         -------
@@ -1438,17 +1487,6 @@ class GuiController(BusSubscriberMixin):
             if title_to_snake(tab.name) == key:
                 return tab
         return None
-
-    def _on_cfg_changed(self, evt: CfgChanged):
-        self.sample_manager = self.experiment_controller.sample_manager  # to be sure
-        if self.hydrating:  # Hydration: Cache and defer full refresh until hydration ends
-            if self._tabs_may_have_changed(evt.changed_keys):
-                self._needs_full_refresh = True
-        else:  # Normal operation
-            if self._tabs_may_have_changed(evt.changed_keys):  # Infer if channels/types changed
-                self._install_or_update_tabs()
-                self._tabs_initialized = True
-            self._refresh_tabs_from_model()
 
     def _on_refresh_tabs(self, evt: UiRequestRefreshTabs):
         self._install_or_update_tabs()
