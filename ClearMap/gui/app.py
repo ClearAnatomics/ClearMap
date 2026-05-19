@@ -744,6 +744,7 @@ class ClearMapApp(ClearMapAppBase):
         self.actionStructureSelector.triggered.connect(self.structure_selector.show)
 
         self.amend_ui()
+        self._init_drag_drop()
         self.setup_monitoring_bars()
         self.app = QApplication.instance() # noqa
 
@@ -761,9 +762,33 @@ class ClearMapApp(ClearMapAppBase):
 
         self.amend_ui()
 
-    def _select_experiment_mode(self):
+    def _infer_mode_from_folder(self, folder: Path) -> tuple[AppMode, Path]:
+        """
+        Heuristic:
+          - folder itself has a sample config  → EXPERIMENT
+          - folder contains sub-experiments    → GROUP
+          - neither                            → EXPERIMENT (new/unconfigured)
+
+        Returns (mode, effective_root) where effective_root is the
+        folder to pass to the respective setup method.
+        """
+        # Already an experiment folder
+        if ConfigHandler(folder).get_local_canonical_path('sample').exists():
+            return AppMode.EXPERIMENT, folder
+
+        # Batch: contains sub-experiments
+        exp_roots = scan_folder_for_experiments(folder)
+        if exp_roots:
+            return AppMode.GROUP, folder
+
+        # Unconfigured new experiment
+        return AppMode.EXPERIMENT, folder
+
+    def _select_experiment_mode(self, exp_dir=None):
         self.gui_controller.set_mode(AppMode.EXPERIMENT)
         self.centralStack.setCurrentIndex(1)  # tabs page
+        if exp_dir:
+            self._set_src_folder(str(exp_dir))
 
     def _read_exp_version(self, exp_dir: Path) -> Version | None:
         loader = ConfigHandler(exp_dir)
@@ -774,10 +799,11 @@ class ClearMapApp(ClearMapAppBase):
         v = cfg.get('clearmap_version')
         return Version(str(v)) if v else None
 
-    def _select_group_mode(self):
-        base = self.preference_editor.params.start_folder
-        group_dir = ClearMap.gui.dialog_helpers.get_directory_dlg(
-            base, title='Select cohort folder (contains experiment folders)')
+    def _select_group_mode(self, group_dir=None):
+        if not group_dir:
+            base = self.preference_editor.params.start_folder
+            group_dir = ClearMap.gui.dialog_helpers.get_directory_dlg(
+                base, title='Select cohort folder (contains experiment folders)')
         if not group_dir:
             return
 
@@ -810,6 +836,27 @@ class ClearMapApp(ClearMapAppBase):
         # 2) switch mode
         self.gui_controller.set_mode(AppMode.GROUP)
         self.centralStack.setCurrentIndex(1)  # tabs page
+
+    def _init_drag_drop(self):
+        self.dragAndDropLabel.setAcceptDrops(True)
+        self.dragAndDropLabel.dragEnterEvent = self._on_drag_enter
+        self.dragAndDropLabel.dropEvent = self._on_drop
+
+    def _on_drag_enter(self, event):
+        if event.mimeData().hasUrls():
+            urls = event.mimeData().urls()
+            if len(urls) == 1 and Path(urls[0].toLocalFile()).is_dir():
+                event.acceptProposedAction()
+                return
+        event.ignore()
+
+    def _on_drop(self, event):
+        urls = event.mimeData().urls()
+        if urls:
+            folder = Path(urls[0].toLocalFile())
+            if folder.is_dir():
+                self._open_dropped_folder(folder)
+                event.acceptProposedAction()
 
     @property
     def sample_manager(self):
@@ -1080,6 +1127,13 @@ class ClearMapApp(ClearMapAppBase):
         self.experiment_controller.clone_from(folder_to_clone, Path(self.src_folder))
         self.print_status_msg(f'Cloned config from {folder_to_clone} to {self.src_folder}')
         return True
+
+    def _open_dropped_folder(self, folder: Path):
+        mode, root = self._infer_mode_from_folder(folder)
+        if mode == AppMode.EXPERIMENT:
+            self._select_experiment_mode(root)
+        else:
+            self._select_group_mode(group_dir=root)  # Already parametrized, bypass dlg
 
     def prompt_experiment_folder(self):
         """Prompt the user for the main experiment data folder and set it"""
