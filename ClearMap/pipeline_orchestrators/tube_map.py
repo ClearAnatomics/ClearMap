@@ -446,7 +446,7 @@ class BinaryVesselProcessor(PipelineOrchestrator):
                                     processing_parameter=block_params,
                                     processes=None, verbose=True)  # FIXME: n_processes in config?
         else:
-            clearmap_io.copy_file(source, sink)  # FIXME: could be a symlink
+            clearmap_io.link_file(source, sink)
 
     def plot_vessel_filling_results(self, parent=None, channel='', arrange=False):
         channel = channel if channel else self.all_vessels_channel
