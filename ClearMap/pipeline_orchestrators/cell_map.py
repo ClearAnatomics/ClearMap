@@ -372,7 +372,7 @@ class CellDetector(ChannelPipelineOrchestrator):
                 self.get_path('atlas', channel=self.channel, asset_sub_type='hemispheres')
             )
             tmp['Structure volume'] = tmp.set_index(['Structure ID', 'Hemisphere']).index.map(vol_map.get)
-            order_map = {id_: annotator.find(id_, key='id')['order'] for id_ in uniq_ids}
+            order_map = {int(id_): annotator.find(id_, key='id')['order'] for id_ in uniq_ids}
             tmp['Structure order'] = tmp['Structure ID'].map(order_map)
             collapsed = tmp.merge(collapsed[['Structure ID', 'Hemisphere', 'Cell counts', 'Average cell size']],
                                   how='left', on=['Structure ID', 'Hemisphere'])
