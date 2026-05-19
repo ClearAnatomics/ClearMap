@@ -1124,6 +1124,7 @@ class ChannelCellMapParams(ChannelUiParameter, OrthoviewerSlicingMixin):
                                                  disabled_value=None, default_on_enable=[0, 65535],
                                                  cast_from_ui=self.cast_max_from_ui),
             'voxelization_radii': ParamLink(['voxelization', 'radii'], self.tab.voxelizationRadiusTriplet),
+            'voxelization_weights': ParamLink(['voxelization', 'weights'], self.tab.voxelizationWeightsComboBox),
             'crop_x': VectorLink(['detection', 'test_set_slicing', 'dim_0'], self.tab.detectionSubsetXRangeDoublet),
             'crop_y': VectorLink(['detection', 'test_set_slicing', 'dim_1'], self.tab.detectionSubsetYRangeDoublet),
             'crop_z': VectorLink(['detection', 'test_set_slicing', 'dim_2'], self.tab.detectionSubsetZRangeDoublet),

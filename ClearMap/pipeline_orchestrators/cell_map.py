@@ -24,7 +24,7 @@ import re
 import platform
 import warnings
 from concurrent.futures.process import BrokenProcessPool
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
@@ -60,6 +60,9 @@ __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
 from ClearMap.pipeline_orchestrators.sample_info_management import SampleManager
 from ClearMap.pipeline_orchestrators.registration_orchestrator import RegistrationProcessor
+
+if TYPE_CHECKING:
+    from PyQt5.QtWidgets import QWidget
 
 USE_BINARY_POINTS_FILE = not platform.system().lower().startswith('darwin')
 
@@ -250,7 +253,7 @@ class CellDetector(ChannelPipelineOrchestrator):
 
         return coords
 
-    def filter_cells(self):
+    def filter_cells(self, distance_from_surface_px: int = 0):
         thresholds = {
             'source': self.config['cell_filtration']['thresholds']['intensity'],
             'size': self.config['cell_filtration']['thresholds']['size']
@@ -261,6 +264,12 @@ class CellDetector(ChannelPipelineOrchestrator):
                                               f' cannot filter cells. Please run cell detection first.')
         dest_path = self.get_path('cells', channel=self.channel, asset_sub_type='filtered')
         cell_detection.filter_cells(source=src_path, sink=dest_path, thresholds=thresholds)
+        if distance_from_surface_px > 0:
+            table, filtered_coords = self.get_coords(coord_type='filtered')
+            uncrusted_coords, mask = self.remove_crust(coordinates=filtered_coords,
+                                                       threshold=distance_from_surface_px, return_mask=True)
+            table = table[mask]
+            clearmap_io.write(dest_path, table)  # Overwrite filtered with uncrusted
 
     def run_cell_detection(self, tuning=False, save_maxima=False, save_shape=False, save_as_binary_mask=False):
         self.workspace.debug = tuning  # TODO: use context manager
@@ -488,7 +497,7 @@ class CellDetector(ChannelPipelineOrchestrator):
         else:
             return uncrusted_coordinates
 
-    def preview_cell_detection(self, parent=None, arrange=True, sync=True):
+    def preview_cell_detection(self, parent: Optional['QWidget'] = None, arrange: bool = True, sync: bool = True) -> list:
         sources = [
             self.get_path('stitched', channel=self.channel),
             self.get_path('cells', channel=self.channel, asset_sub_type='bkg'),

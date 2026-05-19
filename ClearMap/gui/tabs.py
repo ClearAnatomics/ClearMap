@@ -123,7 +123,7 @@ from ClearMap.Utils.exceptions import (ClearMapVRamException, GroupStatsError, M
 from ClearMap.Utils.events import (ChannelsChanged, UiPrepareRawDataForClearMap, UiRequestPlotMiniBrain,
                                    UiRequestPlotAtlas, UiOrientationChanged, UiCropChanged, ChannelDefaultsChanged,
                                    UiRequestLandmarksDialog, UiAlignWithChanged, UiVesselGraphFiltersChanged,
-                                   RegistrationStatusChanged,  UiBatchResultsFolderChanged, UiBatchGroupsChanged,
+                                   RegistrationStatusChanged, UiBatchResultsFolderChanged, UiBatchGroupsChanged,
                                    UiChannelsChanged, WorkspaceChanged)
 
 from .dialog_helpers import option_dialog, make_splash, prompt_dialog
@@ -1000,6 +1000,10 @@ class CellCounterTab(PostProcessingTab):
             'channel.detectionShapeGroupBox',
             'channel.hMaxSinglet',
             'channel.cellMapPerformanceGroupBox',
+            'channel.distanceFromSurfaceLabel',
+            'channel.distanceFromSurfaceFrame',
+            'channel.weigtsSourceLabel',
+            'channel.voxelizationWeightsComboBox',
         ]
 
     def get_worker(self, channel: Optional[str | Tuple[str, str]] = None,
@@ -1032,12 +1036,13 @@ class CellCounterTab(PostProcessingTab):
         Called once per channel page, before binding.
         Here we replace the placeholder with our BlockProcessingWidget.
         """
-        # Replace detectionPerfPlaceholder with a real BlockProcessingWidget
         bp_widget = BlockProcessingWidget(parent=page_widget)
         page_widget.detectionBlockProcessingWidget = replace_widget(
             page_widget.detectionPerfPlaceholder, bp_widget,
-            layout=page_widget.cellDetectionPerfVerticalLayout
-        )
+            layout=page_widget.cellDetectionPerfVerticalLayout)
+        page_widget.voxelizationWeightsComboBox.clear()
+        page_widget.voxelizationWeightsComboBox.addItems(
+            ['None', 'size', 'source', 'x', 'xt', 'y', 'yt', 'z', 'zt', 'hemisphere'])
 
     def _on_channel_added(self, channel: str):
         """
@@ -1113,7 +1118,9 @@ class CellCounterTab(PostProcessingTab):
         """Creates the cell density plot """
         if self.sample_manager.get('cells', channel=channel, postfix='filtered').exists:
             worker = self.get_worker(channel)
-            self.wrap_step('Voxelization', worker.voxelize, abort_func=worker.stop_process, nested=False)
+            self.wrap_step('Voxelization', worker.voxelize,
+                           step_kw_args={'weights_column': self.params.voxelization_weights},
+                           abort_func=worker.stop_process, nested=False)
         else:
             self.main_window.popup('Could not run voxelization, missing filtered cells table. '
                                    'Please ensure that cell filtering has been run.', base_msg='Missing file')
@@ -1245,8 +1252,9 @@ class CellCounterTab(PostProcessingTab):
             detector = self.get_worker(channel)
             self.wrap_step('Filtering cells', detector.filter_cells, n_steps=2 + (1 - is_last_step),
                            abort_func=detector.stop_process, close_when_done=False)
-            self.wrap_step('Voxelizing', detector.voxelize, step_args=['filtered'], save_cfg=False,
-                           close_when_done=is_last_step)  # , main_thread=True)
+            self.wrap_step('Voxelizing', detector.voxelize, step_args=['filtered'],
+                           step_kw_args={'weights_column': self.params.voxelization_weights},
+                           save_cfg=False, close_when_done=is_last_step)  # , main_thread=True)
         self.update_cell_number(channel)
         self.plot_cell_filter_results(channel)
 
