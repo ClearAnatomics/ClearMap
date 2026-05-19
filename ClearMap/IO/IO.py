@@ -61,7 +61,7 @@ from ClearMap.Utils.utilities import CancelableProcessPoolExecutor
 # FIXME:
 from ClearMap.IO.FileUtils import (is_file, is_directory, file_extension,   # analysis:ignore
                                    join, split, abspath, create_directory, 
-                                   delete_directory, copy_file, delete_file)
+                                   delete_directory, copy_file, link_file, delete_file)
 
 ###############################################################################
 # ## Source associations
