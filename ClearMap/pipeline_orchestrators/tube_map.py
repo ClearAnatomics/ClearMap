@@ -455,8 +455,8 @@ class BinaryVesselProcessor(PipelineOrchestrator):
                   (self.get_path('binary', channel=channel, asset_sub_type='filled'))]
         titles = [img.stem for img in images]
         images = [str(img) for img in images]
-        return q_p3d.plot(images, title=titles, arrange=arrange,
-                          lut=self.machine_config['default_lut'], parent=parent)
+        lut_ = self.machine_config['default_lut']
+        return q_p3d.plot(images, title=titles, arrange=arrange, lut=lut_, parent=parent)
 
     def plot_combined(self, parent=None, arrange=False):  # TODO: final or not option
         all_vessels = self.steps[self.all_vessels_channel].get_asset(self.steps[self.all_vessels_channel].filled, step_back=True)
@@ -1163,7 +1163,7 @@ class VesselGraphProcessor(PipelineOrchestrator):
         if self.registration_processor.was_registered:
             annotator = self.registration_processor.annotators[self.parent_channels[0]]
             coordinates_transformed = self.graph_traced.vertex_property('coordinates_atlas')
-            atlas_resolution = self.get_alignment_ref_channel_reg_cfg['resampled_resolution']
+            atlas_resolution = self.get_alignment_ref_channel_reg_cfg()['resampled_resolution']
             extra_columns = annotator.get_columns(coordinates_transformed, atlas_resolution,
                                                   self.graph_traced.vertex_property('annotation'))
             df = pd.concat([df, extra_columns], axis=1)
