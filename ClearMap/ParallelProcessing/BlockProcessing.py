@@ -132,9 +132,9 @@ def process(function, source, sink = None,
   
   Arguments
   ---------
-  function : function
+  function : function | np.ufunc
     The main data processing script.
-  source : str, Source, or list
+  source : str | Source | List[Source]
     The source or list of sources to apply a function to 
   sink : str, Source, list, or None
     The sink or list of sinks to write the result to.
