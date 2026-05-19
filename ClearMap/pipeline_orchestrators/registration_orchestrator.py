@@ -306,9 +306,9 @@ class RegistrationProcessor(PipelineOrchestrator):
             src_res = self.sample_manager.get_channel_resolution(channel)
 
         if source_asset.is_tiled:
-            if 'Z' in source_asset.tag_names:
+            if 'Z' in source_asset.tag_names:  # real tiles -> count planes
                 n_planes = source_asset.expression.tag_range('Z')[1] + 1
-            else:
+            else:  # columns -> take z column shape
                 n_planes = clearmap_io.shape(source_asset.file_list[0])[0]
         else: # Stacked or single file, take the first dimension of the asset
             n_planes = source_asset.shape()[0]

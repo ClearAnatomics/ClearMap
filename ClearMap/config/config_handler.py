@@ -1165,7 +1165,7 @@ class ConfigHandler:
         atomic_replace(tmp, path)
 
 
-# FIXME: fix missing stuff here
+# FIXME: DEPRECATED
 def get_configs(cfg_path: str | Path, processing_params_path: str | Path, machine_cfg_path: str | Path | None = None):
     """
     Get the machine, sample and processing configurations from the given paths.

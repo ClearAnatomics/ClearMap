@@ -240,7 +240,7 @@ def graph_from_skeleton(skeleton, points=None, radii=None, compute_vertex_coordi
         The graph corresponding to the skeleton.
     """
     if compute_edge_length and not compute_vertex_coordinates:
-        raise ValueError('Activating `compute_edge_length` requires `vertex_coordinates` to be True!')
+        raise ValueError('Activating `compute_edge_length` requires `compute_vertex_coordinates` to be True!')
 
     skeleton = io.as_source(skeleton)
     if skeleton.dtype not in ('bool', np.uint8):

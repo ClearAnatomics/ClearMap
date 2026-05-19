@@ -2769,7 +2769,16 @@ class NProcessesWidget(QWidget):
     """
     valueChanged = pyqtSignal(int)
 
-    def __init__(self, parent=None, label: str = "n_processes"):
+    def __init__(self, parent: QWidget | None = None, label: str = 'n_processes'):
+        """
+
+        Parameters
+        ----------
+        parent: QWidget | None
+            The optional parent widget
+        label: str
+            The title of the widget
+        """
         super().__init__(parent)
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)

@@ -336,7 +336,7 @@ class SampleManager(OrchestratorBase):
         return int(match.group(1)) if match else None
 
     @adjuster_safe
-    def data_type(self, channel: str) -> str:
+    def data_type(self, channel: str) -> str:            # WARNING: ConfigObj Section does not support get() method
         return self.config.get('channels', {}).get(channel, {}).get('data_type', 'undefined')
 
     @property
