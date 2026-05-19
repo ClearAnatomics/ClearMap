@@ -1703,9 +1703,11 @@ class VasculatureTab(PostProcessingTab['BinaryVesselProcessor']):
         """Run the complete vasculature pipeline."""
         try:
             worker = self.get_worker(substep='binary')
-            self.binarize_channel(worker.all_vessels_channel, stop_on_error=True)
-            self.binarize_channel(worker.arteries_channel, stop_on_error=True)
-        except ClearMapVRamException:
+            for channel in worker.sample_manager.get_channels_by_pipeline('TubeMap', as_list=True):
+                self.binarize_and_postprocess_channel(channel, stop_on_error=True)
+            # self.binarize_channel(worker.all_vessels_channel, stop_on_error=True)
+            # self.binarize_channel(worker.arteries_channel, stop_on_error=True)
+        except ClearMapVRamException:  # TODO: check if we should popup
             return
         self.combine()
         self.build_graph()
