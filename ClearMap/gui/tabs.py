@@ -1504,6 +1504,7 @@ class VasculatureTab(PostProcessingTab['BinaryVesselProcessor']):
 
         self.advanced_controls_names: list[str] = [
             'channel.binarizationPerformanceGroupBox',
+            'graphPerformanceGroupBox',
         ]
 
     # ---- setup --------------------------------------------------------------
@@ -1548,10 +1549,31 @@ class VasculatureTab(PostProcessingTab['BinaryVesselProcessor']):
 
         self.ui.saveStatsPushButton.clicked.connect(self.save_stats)
 
+        self._setup_graph_perf()  # TODO: check if best place to call
+
     def _set_params(self) -> None:
         self.params = VesselParams(self.ui, self.sample_params, event_bus=self._bus,
                                    get_view=self.main_window.experiment_controller.get_config_view,
                                    apply_patch=self.main_window.experiment_controller.apply_ui_patch)
+
+    def _setup_graph_perf(self) -> None:
+        """
+        Create graph construction performance widgets in graphPerformanceGroupBox.
+        Idempotent.
+        """
+        gp_bx = self.ui.graphPerformanceGroupBox
+        if hasattr(self.ui, 'skeletonizeNProcessesWidget'):
+            return   # Idempotent
+
+        layout = gp_bx.layout()  # graphPerformanceGroupBoxVLayout
+
+        for attr_name, label in (('skeletonizeNProcessesWidget', 'Skeletonize n_processes'),
+                                 ('buildGraphNProcessesWidget', 'Build graph n_processes'),
+                                 ('cleanGraphNProcessesWidget', 'Clean graph n_processes'),
+                                 ('reduceGraphNProcessesWidget', 'Reduce graph n_processes')):
+            widget = NProcessesWidget(gp_bx, label=label)
+            layout.addWidget(widget)
+            setattr(self.ui, attr_name, widget)
 
     def _get_channels(self) -> list[str]:
         return self.sample_manager.get_channels_by_pipeline('TubeMap', as_list=True)

@@ -1,4 +1,3 @@
-#!/usr/bin/env python2
 # -*- coding: utf-8 -*-
 """
 GraphProcessing
@@ -647,7 +646,9 @@ class PropertyAggregator:
         "edge"  → aggregating edge properties
         "vertex"→ aggregating vertex properties
     """
-    def __init__(self, graph: graph_gt.Graph, mapping: Dict[str, Callable], kind: str = "edge"):
+    def __init__(self, graph: graph_gt.Graph, mapping: Dict[str, Callable], kind: str = 'edge',
+                 n_processes: int | None= None):
+        self.n_processes = n_processes
         self.offsets = None  # offsets for the chains, (i.e., cumsum of chain lengths -> start/end indices)
         if kind not in self.ALLOWED_KINDS:
             raise ValueError(f"kind must be in {self.ALLOWED_KINDS}")
@@ -729,7 +730,7 @@ class PropertyAggregator:
         offsets = np.cumsum([0] + [len(x) for x in self.chain_indices]).astype(np.uint64)
         self.offsets = offsets
 
-        n_procs = multiprocessing.cpu_count() - 2
+        n_procs = max(1, self.n_processes if self.n_processes is not None else multiprocessing.cpu_count() - 2)
 
         for prop_name, arr in self.properties.items():
             reduction_fn = self.aggregation_functions[prop_name]
@@ -855,7 +856,7 @@ def reduce_graph(graph, vertex_to_edge_mappings=None,
                  compute_edge_geometry=True,
                  edge_geometry_vertex_properties=('coordinates', 'radii', 'chain_id', '_vertex_id_'),
                  edge_geometry_edge_properties=('chain_id', ),
-                 return_maps=False, drop_pure_degree_2_loops=True,
+                 return_maps=False, drop_pure_degree_2_loops=True, n_processes=None,
                  verbose=False, label_branches=False, save_modified_graph_path=''):
     """
     Reduce graph by removing all vertices with degree two.
@@ -954,8 +955,8 @@ def reduce_graph(graph, vertex_to_edge_mappings=None,
         chain_id_prop_arr = add_chain_id(graph, prop_kind='edge')
         chain_id_vertex_prop_arr = add_chain_id(graph, prop_kind='vertex')
 
-    vertex_agg = PropertyAggregator(graph, vertex_to_edge_mappings, kind="vertex")
-    edge_agg = PropertyAggregator(graph, edge_to_edge_mappings, kind="edge")
+    vertex_agg = PropertyAggregator(graph, vertex_to_edge_mappings, kind='vertex', n_processes=n_processes)
+    edge_agg = PropertyAggregator(graph, edge_to_edge_mappings, kind='edge', n_processes=n_processes)
     # vertex_geometry_agg =
     # edge_geometry_agg =
 

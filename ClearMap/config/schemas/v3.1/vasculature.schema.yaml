@@ -175,3 +175,12 @@ properties:
             additionalProperties: true
             properties:
               block_processing: { $ref: "./typedefs.schema.yaml#/$defs/blockProcessing" }
+      graph_construction:
+        type: object
+        additionalProperties: true
+        properties:
+          skeletonize:
+            type: object
+            additionalProperties: true
+            properties:
+              block_processing: { $ref: "./typedefs.schema.yaml#/$defs/blockProcessing" }

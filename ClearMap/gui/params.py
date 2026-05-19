@@ -1384,13 +1384,16 @@ class VesselParams(ChannelsUiParameterCollection):
                                                                        get_view=get_view,
                                                                        apply_patch=apply_patch)
         self.graph_params = VesselGraphParams(tab, event_bus=event_bus, get_view=get_view, apply_patch=apply_patch)
+        self.graph_perf_params = VesselGraphPerformanceParams(tab, event_bus=event_bus, get_view=get_view, apply_patch=apply_patch)
         self.visualization_params = VesselVisualizationParams(tab, sample_params=sample_params, event_bus=event_bus,
                                                                 get_view=get_view, apply_patch=apply_patch)
         self._perf_params: dict[str, VesselBinarizationPerformanceParams] = {}
 
     @property
     def params(self):
-        return list(self.values()) + [self.graph_params, self.visualization_params] + list(self._perf_params.values())
+        return (list(self.values()) +
+                [self.graph_params, self.graph_perf_params, self.visualization_params] +
+                list(self._perf_params.values()))
 
     def get_selected_steps_and_channels(self):
         shared_params = self.shared_binarization_params
@@ -1598,6 +1601,28 @@ class VesselGraphParams(UiParameter):
         #           parts.append(op)
         #   suffix = '_'.join(parts)
         return suffix
+
+
+class VesselGraphPerformanceParams(UiParameter):
+    """
+    Graph construction performance parameters.
+    Global — graph operates on the combined binary, not per-channel.
+    Widgets are created dynamically in VasculatureTab._setup_graph_perf()
+    before VesselParams is instantiated.
+    """
+    cfg_subtree = ['vasculature', 'performance', 'graph_construction']
+
+    def build_params_dict(self) -> dict:
+        return {
+            'skeletonize_n_processes': ParamLink(['skeletonize', 'n_processes'],
+                                                 self.tab.skeletonizeNProcessesWidget),
+            'build_n_processes': ParamLink(['build', 'n_processes'],
+                                           self.tab.buildGraphNProcessesWidget),
+            'clean_n_processes': ParamLink(['clean', 'n_processes'],
+                                           self.tab.cleanGraphNProcessesWidget),
+            'reduce_n_processes': ParamLink(['reduce', 'n_processes'],
+                                            self.tab.reduceGraphNProcessesWidget),
+        }
 
 
 class GraphFilterParams(UiParameter):  # FIXME: do we really pass the graph as argument or just the prop names/types ?

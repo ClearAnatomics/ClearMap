@@ -129,7 +129,7 @@ class BinaryVesselProcessor(PipelineOrchestrator):
         self.inputs_match = False
 
         # asset parameters for the postprocessing step that was run last
-        self.postprocessing_last_step = {}  # {'ch0': {'source': None, 'temp_path': '', 'keep': True}}
+        self.postprocessing_last_step = {}  # example: {'ch0': {'source': None, 'temp_path': '', 'keep': True}}
 
         self.all_vessels_channel: str = ''
         self.arteries_channel: str = ''
@@ -152,6 +152,7 @@ class BinaryVesselProcessor(PipelineOrchestrator):
                 warnings.warn('Vessels channel not set')
                 return
 
+            # noinspection PyTypeChecker
             self.arteries_channel = self.sample_manager.get_channels_by_type(channel_type='arteries',
                                                                              multiple_found_action='warn')
 
@@ -652,6 +653,25 @@ class VesselGraphProcessor(PipelineOrchestrator):
             return wrapper
         return decorator
 
+    # ################################ perf config accessor #####################################
+
+    @property
+    def _graph_perf_cfg(self) -> dict:
+        """
+        Read graph construction performance config (fresh each call)
+        """
+        return self.config.get('performance', {}).get('graph_construction', {})
+
+    def _n_processes(self, step: str) -> int | None:
+        """
+        Resolve n_processes for a graph construction step.
+        (Returns None when unset)
+        """
+        raw = self._graph_perf_cfg.get(step, {}).get('n_processes')
+        return sanitize_n_processes(raw) if raw is not None else None
+
+    ##################################### ACTUAL COMPUTATIONS ###################################
+
     def pre_process(self):
         self.skeletonize_and_build_graph()
         self.clean_graph()
@@ -690,7 +710,7 @@ class VesselGraphProcessor(PipelineOrchestrator):
             self.prepare_watcher_for_substep(n_blocks, self.skel_re, f'Skeletonization', True)
             binary = self.get_path('binary', channel=self.parent_channels, asset_sub_type='final')
             skeletonization.skeletonize(binary, sink=self.get_path('skeleton', channel=self.parent_channels),  # WARNING: prange
-                                        delete_border=True, verbose=True)
+                                        delete_border=True, processes=self._n_processes('skeletonize'), verbose=True)
 
     def _measure_radii(self):  # FIXME: do on the clean graph to avoid measuring cliques ?
         coordinates = self.graph_raw.vertex_coordinates()
@@ -734,7 +754,7 @@ class VesselGraphProcessor(PipelineOrchestrator):
             skeleton_path = self.get_path('skeleton', channel=self.parent_channels)
             spacing = self.sample_manager.get_channel_resolution(self.parent_channels[0])
             self.graph_raw = graph_processing.graph_from_skeleton(skeleton_path, spacing=spacing, physical_units='µm',
-                                                                  verbose=True)  # WARNING: main thread (prange)
+                                                                  processes=self._n_processes('build'), verbose=True)  # WARNING: main thread (prange)
             self._measure_radii()  # WARNING: main thread (prange)
             if self.use_arteries_for_graph:  # TODO: do same for veins if exists
                 self._set_artery_binary()  # WARNING: main thread (prange)
@@ -757,7 +777,9 @@ class VesselGraphProcessor(PipelineOrchestrator):
                 'artery_raw': np.max
             })  # TODO: do same for veins if exists
         self.steps.remove_next_steps_files(self.steps.graph_cleaned)
-        self.graph_cleaned = graph_processing.clean_graph(self.graph_raw, vertex_mappings=vertex_mappings, verbose=True)
+        self.graph_cleaned = graph_processing.clean_graph(
+            self.graph_raw, vertex_mappings=vertex_mappings,
+            processes=self._n_processes('clean'), verbose=True)
         self.save_graph('cleaned')
 
     @requires_graph('cleaned')
@@ -786,7 +808,7 @@ class VesselGraphProcessor(PipelineOrchestrator):
                                                            edge_to_edge_mappings=edge_to_edge_mappings,
                                                            compute_edge_length=True,
                                                            edge_geometry_vertex_properties=edge_geometry_vertex_properties,
-                                                           return_maps=False, verbose=True)
+                                                           return_maps=False, processes=self._n_processes('reduce'), verbose=True)
         self.save_graph('reduced')
 
     @property
