@@ -111,7 +111,13 @@ class CellDetector(ChannelPipelineOrchestrator):
             raise ValueError('CellDetector not properly initialized')
         self.patch_channel({'voxelization': {'radii': list(voxelization_radii)}})
 
-    def voxelize(self, sub_step=''):
+    def list_valid_weighing_columns(self, sub_step=''):
+        aligned = sub_step != ''
+        cells_df = self.get_coords(coord_type=sub_step, aligned=aligned)
+        excluded_columns = {'id', 'name', 'order', 'color', 'volume'}
+        return set(cells_df.columns) - excluded_columns
+
+    def voxelize(self, sub_step='', weights_column=None):        # FIXME: add uncrusting ?
         """
         Unweighted voxelization (i.e. cell counts)
         This will draw a sphere of radius r around each cell and increment the voxel values.
@@ -120,9 +126,34 @@ class CellDetector(ChannelPipelineOrchestrator):
         ----------
         sub_step: str
             If specified, will use the coordinates from the specified sub_step (e.g. 'aligned')
+        weights_column: str
+            If specified, this column in the cells table will be used to add weights to the
+            voxelization spheres (e.g. for intensity voxelization).
+            The column must be present in the cells table.
+
+        Returns
+        -------
+            coordinates, counts_file_path: np.array, str
         """
+        if weights_column not in self.list_valid_weighing_columns(sub_step=sub_step):
+            raise ValueError(f'Column {weights_column} is invalid. '
+                             f'Valid options are {self.list_valid_weighing_columns(sub_step)}')
         coordinates, cells, voxelization_parameter = self.get_voxelization_params(sub_step=sub_step)
-        _ = self.voxelize_unweighted(coordinates, voxelization_parameter)
+
+        title = 'Voxelisation'
+        suffix = 'counts'
+        weights = None
+        if weights_column:
+            suffix += f'_{weights_column}'
+            title += f' weighted by {weights_column}'
+            weights = self.get_cells_df()[weights_column]
+        counts_asset = self.get('density', channel=self.channel, asset_sub_type=suffix)
+        counts_asset.delete(missing_ok=True)  # Remove previous counts file if exists
+        self.set_watcher_step(title)
+
+        voxelization.voxelize(coordinates, sink=counts_asset.path, weights=weights, **voxelization_parameter)  # WARNING: prange
+        self.update_watcher_main_progress()
+        return coordinates, counts_asset.path
 
     @requires_assets([FilePath('density', asset_sub_type='counts')])
     def plot_voxelized_counts(self, arrange=True, parent=None):
@@ -174,48 +205,6 @@ class CellDetector(ChannelPipelineOrchestrator):
         axes = ['xt', 'yt', 'zt'] if aligned else ['x', 'y', 'z']
         coordinates = np.array([table[axis] for axis in axes]).T  # .T for (n, axes)
         return table, coordinates
-
-    def voxelize_unweighted(self, coordinates, voxelization_parameter):
-        """
-        Voxelize un weighted i.e. for cell counts
-
-        Parameters
-        ----------
-        coordinates: str, array or Source
-            Source of point of nxd coordinates.
-        voxelization_parameter:  dict
-            Dictionary to be passed to voxelization.voxelise (i.e. with these optional keys:
-                shape, dtype, weights, method, radius, kernel, processes, verbose
-
-        Returns
-        -------
-        coordinates, counts_file_path: np.array, str
-        """
-        counts_asset = self.get('density', channel=self.channel, asset_sub_type='counts')
-        counts_asset.delete(missing_ok=True)  # Remove previous counts file if exists
-        self.set_watcher_step('Unweighted voxelisation')
-        voxelization.voxelize(coordinates, sink=counts_asset.path, **voxelization_parameter)  # WARNING: prange
-        self.update_watcher_main_progress()
-        # uncrusted_coordinates = self.remove_crust(coordinates)  # WARNING: currently causing issues
-        #         density_path = self.get_path('density', channel=self.channel, asset_sub_type='counts_wcrust')
-        #         voxelization.voxelize(uncrusted_coordinates, sink=density_path, **voxelization_parameter)   # WARNING: prange
-        return coordinates, counts_asset.path
-
-    def voxelize_weighted(self, coordinates, source, voxelization_parameter):
-        """
-        Voxelize weighted i.e. for cell intensities
-
-        Parameters
-        ----------
-        coordinates: np.array
-        source: Source.Source
-        voxelization_parameter: dict
-        """
-        intensities_asset = self.get('density', channel=self.channel, asset_sub_type='intensities')
-        intensities_asset.delete(missing_ok=True)  # Remove previous intensities file if exists
-        intensities = source['source']
-        voxelization.voxelize(coordinates, sink=intensities_asset.path, weights=intensities, **voxelization_parameter)   # WARNING: prange
-        return intensities_asset.path
 
     def atlas_align(self):
         """Atlas alignment and annotation """
