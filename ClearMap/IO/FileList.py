@@ -788,7 +788,7 @@ def shape_list(expression = None, file_list = None, axes_order = None):
   expression, file_list = _expression_and_file_list(expression=expression, file_list=file_list);
   
   if len(file_list) == 0:
-    raise ValueError('Cannot determine dimension of the file list %r without files.!' % expression);
+    raise FileNotFoundError('Cannot determine dimension of the file list %r without files.!' % expression);
   
   #ordering of the axes
   if axes_order is None:
