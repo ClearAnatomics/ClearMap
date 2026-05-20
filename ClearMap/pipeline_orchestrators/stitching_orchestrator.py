@@ -43,11 +43,16 @@ class StitchingProcessor(PipelineOrchestrator):
                                            re.compile(r"Alignment: aligning \(\d+, \d+\) with \(\d+, \d+\), alignment"
                                                       r" pair \d+/\d+ done, shift = \(-?\d+, -?\d+, -?\d+\),"
                                                       r" quality = -\d+\.\d+e\+\d+!"))
+        self.setup(sample_manager)
 
     def setup(self, sample_manager: Optional[SampleManager] = None, convert_tiles: bool = False):
         self.sample_manager = sample_manager if sample_manager else self.sample_manager
         if not self.cfg_coordinator.get_config_view('stitching'):
-            raise ValueError('Stitching config not set in config coordinator')
+            # Config not yet loaded (e.g. processor created before boot_open).
+            # workspace stays None; setup_complete stays False.
+            warnings.warn('Stitching config not set in config coordinator; StitchingProcessor setup incomplete.',
+                          stacklevel=2)
+            return
         if self.sample_manager.setup_complete:
             self.workspace = self.sample_manager.workspace
             if convert_tiles:
@@ -248,8 +253,11 @@ class StitchingProcessor(PipelineOrchestrator):
         channel : str
             The channel to copy or stack
         """
-        clearmap_io.convert(self.get_path('raw', channel=channel),
-                            self.get_path('stitched', channel=channel))
+        try:
+            clearmap_io.convert(self.get_path('raw', channel=channel),
+                                self.get_path('stitched', channel=channel))
+        except FileNotFoundError as err:
+            warnings.warn(f'Could not copy / stack {channel=}, files not found; {err}')
 
     def stitch(self):
         if self.stopped:
