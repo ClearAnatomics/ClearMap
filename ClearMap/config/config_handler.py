@@ -346,6 +346,15 @@ class FlowList(list):
 def represent_flow_list(dumper, data):
     return dumper.represent_sequence('tag:yaml.org,2002:seq', data, flow_style=True)
 
+
+class _IndentedSafeDumper(yaml.SafeDumper):
+    """SafeDumper that always indents block-sequence items under their parent key."""
+    def increase_indent(self, flow=False, indentless=False):
+        return super().increase_indent(flow=flow, indentless=False)   # never indentless
+
+
+_IndentedSafeDumper.add_representer(FlowList, represent_flow_list)
+
 yaml.add_representer(FlowList, represent_flow_list)
 yaml.add_representer(FlowList, represent_flow_list, Dumper=yaml.SafeDumper)
 
@@ -394,7 +403,7 @@ def to_yml(path: Path, data: dict) -> None:
     pretty = mark_inline_sequences(data, max_items=3)
     pretty = prioritize_top_keys(pretty)
     with path.open('w', encoding='utf-8') as f:
-        yaml.safe_dump(pretty, f, sort_keys=False, allow_unicode=True, default_flow_style=False)
+        yaml.dump(pretty, f, Dumper=_IndentedSafeDumper, sort_keys=False, allow_unicode=True, default_flow_style=False)
 
 def to_json(path: Path, data: dict) -> None:
     """
