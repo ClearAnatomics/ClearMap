@@ -60,7 +60,7 @@ from statistics import mode
 print('Importing PyQt5...', flush=True)
 from PyQt5 import QtGui
 from PyQt5.QtGui import QGuiApplication
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QBuffer
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QPushButton, QSpinBox, QDoubleSpinBox,
                              QComboBox, QLineEdit, QMessageBox, QToolBox, QProgressBar, QLabel,
                              QStyle, QAction, QDockWidget)
@@ -838,19 +838,67 @@ class ClearMapApp(ClearMapAppBase):
         self.centralStack.setCurrentIndex(1)  # tabs page
 
     def _init_drag_drop(self):
-        self.dragAndDropLabel.setAcceptDrops(True)
-        self.dragAndDropLabel.dragEnterEvent = self._on_drag_enter
-        self.dragAndDropLabel.dropEvent = self._on_drop
+        lbl = self.dragAndDropLabel
+
+        # ---- static style: dashed border, centered, subdued ----
+        lbl.setAlignment(Qt.AlignCenter)
+        lbl.setWordWrap(True)
+
+        # Folder icon above the text via rich-text (uses built-in Qt icon)
+        folder_icon = self.style().standardIcon(QStyle.SP_DirOpenIcon)
+        pixmap = folder_icon.pixmap(32, 32)
+        # Embed as base64 so we can put it inline in the label HTML
+        buf = QBuffer()
+        buf.open(QBuffer.WriteOnly)
+        pixmap.save(buf, 'PNG')
+        icon_b64 = bytes(buf.data().toBase64()).decode()
+
+        lbl.setText(
+            f'<center>'
+            f'<img src="data:image/png;base64,{icon_b64}" width="32" height="32"/><br/>'
+            f'<span style="font-size:11pt; color:#aaa;">Drop experiment or cohort folder here</span>'
+            f'</center>'
+        )
+
+        self._drop_idle_style = """
+            QLabel {
+                border: 2px dashed #555;
+                border-radius: 8px;
+                background: transparent;
+                padding: 18px;
+                color: #aaa;
+            }
+        """
+        self._drop_hover_style = """
+            QLabel {
+                border: 2px dashed #74c69d;
+                border-radius: 8px;
+                background: rgba(116, 198, 157, 0.08);
+                padding: 18px;
+                color: #74c69d;
+            }
+        """
+        lbl.setStyleSheet(self._drop_idle_style)
+
+        lbl.setAcceptDrops(True)
+        lbl.dragEnterEvent = self._on_drag_enter
+        lbl.dragLeaveEvent = self._on_drag_leave
+        lbl.dropEvent = self._on_drop
 
     def _on_drag_enter(self, event):
         if event.mimeData().hasUrls():
             urls = event.mimeData().urls()
             if len(urls) == 1 and Path(urls[0].toLocalFile()).is_dir():
+                self.dragAndDropLabel.setStyleSheet(self._drop_hover_style)
                 event.acceptProposedAction()
                 return
         event.ignore()
 
+    def _on_drag_leave(self, event):
+        self.dragAndDropLabel.setStyleSheet(self._drop_idle_style)
+
     def _on_drop(self, event):
+        self.dragAndDropLabel.setStyleSheet(self._drop_idle_style)
         urls = event.mimeData().urls()
         if urls:
             folder = Path(urls[0].toLocalFile())
