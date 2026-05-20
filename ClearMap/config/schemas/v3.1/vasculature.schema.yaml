@@ -15,6 +15,7 @@ $defs:
         additionalProperties: true
         properties:
           run: { type: boolean }
+          save:  { type: boolean }
           clip_range: { $ref: "./typedefs.schema.yaml#/$defs/numberPairPositive" }
           threshold: { type: ["number", "null"] }
       smooth:
@@ -22,17 +23,27 @@ $defs:
         additionalProperties: true
         properties:
           run: { type: boolean }
+          save:  { type: boolean }
       binary_fill:
         type: object
         additionalProperties: true
         properties:
           run: { type: boolean }
+          save:  { type: boolean }
       deep_fill:
         type: object
         additionalProperties: true
         properties:
           run: { type: boolean }
+          save:  { type: boolean }
           resample_factor: { type: number, exclusiveMinimum: 0 }
+      step_order:
+        type: array
+        items:
+          type: string
+          enum: [ binarize, smooth, binary_fill, deep_fill ]
+        minItems: 1
+        uniqueItems: true
 
   binarizationChannelsContainer:
     type: object
@@ -183,4 +194,19 @@ properties:
             type: object
             additionalProperties: true
             properties:
-              block_processing: { $ref: "./typedefs.schema.yaml#/$defs/blockProcessing" }
+              n_processes: { $ref: "./typedefs.schema.yaml#/$defs/nProcessesType" }
+          build:
+            type: object
+            additionalProperties: true
+            properties:
+              n_processes: { $ref: "./typedefs.schema.yaml#/$defs/nProcessesType" }
+          clean:
+            type: object
+            additionalProperties: true
+            properties:
+              n_processes: { $ref: "./typedefs.schema.yaml#/$defs/nProcessesType" }
+          reduce:
+            type: object
+            additionalProperties: true
+            properties:
+              n_processes: { $ref: "./typedefs.schema.yaml#/$defs/nProcessesType" }

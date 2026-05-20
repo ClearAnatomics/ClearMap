@@ -141,10 +141,11 @@ from ClearMap.IO.metadata import parse_ome_info
 if TYPE_CHECKING:
     from ClearMap.pipeline_orchestrators.experiment_controller import AnalysisGroupController
     from ClearMap.IO.metadata import ChannelPatternSpec
+    from .pipeline_widgets import LinearPipelineWidget
     from ClearMap.pipeline_orchestrators.registration_orchestrator import RegistrationProcessor
     from ClearMap.pipeline_orchestrators.stitching_orchestrator import StitchingProcessor
     from ClearMap.pipeline_orchestrators.cell_map import CellDetector
-    from ClearMap.pipeline_orchestrators.tube_map import BinaryVesselProcessor
+    from ClearMap.pipeline_orchestrators.tube_map import BinaryVesselProcessor, BinaryVesselProcessorSteps
     from ClearMap.pipeline_orchestrators.tube_map import VesselGraphProcessor
     from ClearMap.pipeline_orchestrators.tract_map import TractMapProcessor
     from ClearMap.pipeline_orchestrators.colocalization import ColocalizationProcessor
@@ -477,8 +478,8 @@ class SampleInfoTab(ExperimentTab):
             return
 
         details = '\n'.join(f'  • {ch} ({action})' for ch, action in candidates)
-        verb = 'Re-import' if force else 'Import'
-        if not prompt_dialog('Channel data import', f'{verb} {len(candidates)} channel(s) into workspace?\n\n'
+        action = 'Re-import' if force else 'Import'
+        if not prompt_dialog('Channel data import', f'{action} {len(candidates)} channel(s) into workspace?\n\n'
                                                     f'{details}\n\nThis prepares raw data for processing.'):
             return
 
@@ -1497,7 +1498,7 @@ class VasculatureTab(PostProcessingTab['BinaryVesselProcessor']):
     workers_are_global = True
     _workers_sub_steps = ('binary', 'graph')
 
-    def __init__(self, main_window, tab_idx, sample_manager=None):
+    def __init__(self, main_window, tab_idx: int, sample_manager=None):
         super().__init__(main_window, 'vasculature_tab', tab_idx)
 
         self.sample_manager = sample_manager
@@ -1621,8 +1622,8 @@ class VasculatureTab(PostProcessingTab['BinaryVesselProcessor']):
 
     def _on_channel_added(self, channel: str) -> None:
         """
-        Hook invoked by add_channel_tab() once the page exists and has been setup/bound.
-        We create the perf params now.
+        Called once the channel page exists and has been setup/bound.
+        Creates perf params and wires pipeline widget → config.
         """
         page_widget = self.get_channel_ui(channel)
         if page_widget is None:
@@ -1682,14 +1683,24 @@ class VasculatureTab(PostProcessingTab['BinaryVesselProcessor']):
                 self.main_window.print_error_msg(f'Cannot binarize: shape mismatch between channels '
                                                  f'({shapes[0]}vx vs {shapes[1]}vx)')
             return
+
+        # Determine step order from the worker
+        steps_obj = worker.steps[channel]
+        asset_to_gui = {v: k for k, v in BinaryVesselProcessorSteps._GUI_STEP_TO_ASSET.items()}
+
+        # Resolve enabled state from config (each *_channel method checks run flag)
+        # and order from config step_order
+        ordered_gui_steps = [asset_to_gui[stp] for stp in steps_obj.steps
+                             if stp not in BinaryVesselProcessorSteps._lifecycle_steps]
+
+        kwargs = {'step_args': [channel], 'abort_func': worker.stop_process}
         try:
-            kwargs = {'step_args': [channel], 'abort_func': worker.stop_process}
-            self.wrap_step('Vessel binarization', worker.binarize_channel, **kwargs)
-            self.wrap_step('Vessel binarization', worker.smooth_channel, **kwargs)
-            self.wrap_step('Vessel binarization', worker.deep_fill_channel, **kwargs)
-            # WARNING: The parallel cython loops inside cannot run from child thread
-            self.wrap_step('Vessel binarization', worker.fill_channel, main_thread=True, **kwargs)
-        except ClearMapVRamException as err:
+            for step_name in ordered_gui_steps:
+                # WARNING: The parallel cython loops inside fill_channel cannot run from child thread
+                method_name, run_on_main_thread = BinaryVesselProcessorSteps._BINARIZE_STEP_MAP[step_name]
+                method = getattr(worker, method_name)
+                self.wrap_step('Vessel binarization', method, main_thread=run_on_main_thread, **kwargs)
+        except ClearMapVRamException:
             if stop_on_error:
                 raise
 
@@ -1725,10 +1736,8 @@ class VasculatureTab(PostProcessingTab['BinaryVesselProcessor']):
         """Run the complete vasculature pipeline."""
         try:
             worker = self.get_worker(substep='binary')
-            for channel in worker.sample_manager.get_channels_by_pipeline('TubeMap', as_list=True):
+            for channel in worker.channels_to_binarize():
                 self.binarize_and_postprocess_channel(channel, stop_on_error=True)
-            # self.binarize_channel(worker.all_vessels_channel, stop_on_error=True)
-            # self.binarize_channel(worker.arteries_channel, stop_on_error=True)
         except ClearMapVRamException:  # TODO: check if we should popup
             return
         self.combine()

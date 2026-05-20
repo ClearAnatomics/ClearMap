@@ -224,7 +224,7 @@ def delete_file(filename):
 
     Arguments
     ---------
-    filename : str
+    filename : str | Path
         Filename to delete.
     """
     if isinstance(filename, Path):
@@ -238,7 +238,7 @@ def copy_file(source, sink):
 
     Arguments
     ---------
-    source : str
+    source : str | pathlib.Path
         Filename of the file to copy.
     sink : str
         File or directory name to copy the file to.

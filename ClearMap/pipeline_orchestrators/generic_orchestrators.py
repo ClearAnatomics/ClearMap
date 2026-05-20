@@ -4,6 +4,7 @@ This is inherited by all pipeline_orchestrators in ClearMap
 """
 import sys
 import warnings
+from abc import ABC, abstractmethod
 from concurrent.futures.process import BrokenProcessPool
 from pathlib import Path
 from types import MappingProxyType
@@ -14,74 +15,109 @@ from ClearMap.IO.workspace_asset import Asset
 from ClearMap.Utils.event_bus import BusSubscriberMixin
 from ClearMap.Utils.exceptions import ClearMapRuntimeError
 from ClearMap.Utils.utilities import handle_deprecated_args, deep_freeze, infer_origin_from_caller
-if TYPE_CHECKING:
+if TYPE_CHECKING:    # WARNING: some circular imports below, use only for type checking with quotes
     from ClearMap.config.config_coordinator import ConfigCoordinator
+    from ClearMap.pipeline_orchestrators.sample_info_management import SampleManager
+    from ClearMap.pipeline_orchestrators.registration_orchestrator import RegistrationProcessor
+    from ClearMap.pipeline_orchestrators.experiment_controller import AnalysisGroupController
 from ClearMap.gui.widgets import ProgressWatcher
 
 
-class ProcessorSteps:
-    def __init__(self, workspace, channel: str | Sequence[str] = '', sub_step=''):
+class ProcessorSteps(ABC):
+    """
+    Ordered sequence of processing steps with disk-level asset tracking.
+
+    Step order is resolved fresh on every access via an injected provider
+    callable, so GUI-driven reordering takes effect immediately without
+    processor reconstruction.
+    """
+    _default_steps: tuple[str, ...] = ()
+
+    def __init__(self, workspace: Workspace2, channel: str | Sequence[str] = '',
+                 step_order_provider: Callable[[], tuple[str, ...]] | None = None):
+        """
+        Parameters
+        ----------
+        workspace
+        channel
+        step_order_provider: Callable
+        """
         self.channel: str | Sequence[str] = channel
-        self.sub_step: str = sub_step
         self.workspace: Workspace2 = workspace
+        self._step_order_provider = step_order_provider
 
     @property
-    def steps(self) -> List[str]:
-        raise NotImplementedError
+    def steps(self) -> tuple[str, ...]:
+        if self._step_order_provider is not None:
+            return self._step_order_provider()
+        return self._default_steps
 
+    @abstractmethod
     def asset_from_step_name(self, step_name: str) -> Asset:
         raise NotImplementedError
 
     @property
-    def existing_steps(self) -> List[str]:
+    def existing_steps(self) -> list[str]:
         return [s for s in self.steps if self.step_exists(s)]
 
     @property
     def last_step(self) -> Optional[str]:
-        return self.existing_steps[-1]
-
-    def get_next_steps(self, step_name: str) -> List[str]:
-        return self.steps[self.steps.index(step_name)+1:]
+        existing = self.existing_steps
+        return existing[-1] if existing else None
 
     def step_exists(self, step_name: str) -> bool:
         return self.asset_from_step_name(step_name).exists
+
+    def get_next_steps(self, step_name: str) -> list[str]:
+        idx = self.steps.index(step_name)
+        return list(self.steps[idx + 1:])
 
     def remove_next_steps_files(self, target_step_name: str) -> None:
         for step_name in self.get_next_steps(target_step_name):
             asset = self.asset_from_step_name(step_name)
             if asset.exists:
-                warnings.warn(f"WARNING: Remove previous step {step_name}, file {asset.path}")
+                warnings.warn(f'WARNING: Removing downstream step {step_name!r}: {asset.path}')
                 asset.path.unlink(missing_ok=True)
 
-    def get_asset(self, step: str, step_back: bool = False, n_before: int = 0) -> Asset:
+    def get_asset(self, step: str, *, step_back: bool = False, n_before: int = 0) -> Asset:
         """
-        Get the asset corresponding to the step name, optionally picking the nth previous step if `n_before` is set.
-        If the asset does not exist, it will try to get the previous step if `step_back` is True.
+        Return the Asset for ``step``, optionally walking back if absent and ``step_back`` is True.
 
         Parameters
         ----------
-        step: str
-            Name of the step to get the asset for.
-        step_back: bool
-            If True, will try to get the previous step's asset if the current step's asset does not exist.
-        n_before: int
-            If set, will return the asset of the nth previous step instead of the current step.
-            Useful when you want to get the asset source to the current step for example.
+        step : str
+            Target step name.
+        step_back : bool
+            If True and the asset does not exist, walk backwards through
+            all preceding steps until one is found.
+        n_before : int
+            If > 0, resolve to the step ``n_before`` positions earlier
+            before checking existence.
 
         Returns
         -------
         Asset
             The asset corresponding to the step name.
         """
+        idx = self.steps.index(step)
         if n_before:
-            step = self.steps[self.steps.index(step) - n_before]
+            idx = max(0, idx - n_before)
+            step = self.steps[idx]
+
         asset = self.asset_from_step_name(step)
-        if not asset.exists:
-            if step_back:  # FIXME: steps back only once ??
-                asset = self.get_asset(self.steps[self.steps.index(step) - 1])
-            else:
-                raise IndexError(f'Could not find path "{asset}" and not allowed to step back')
-        return asset
+        if asset.exists:
+            return asset
+
+        if not step_back:
+            raise IndexError(f'Asset for step {step!r} not found: {asset.path}')
+
+        # TODO: return how many before and step name
+        for prev in reversed(self.steps[:idx]):
+            candidate = self.asset_from_step_name(prev)
+            if candidate.exists:
+                return candidate
+
+        raise IndexError(f'No existing asset found at or before step {step!r}')
 
 
 class OrchestratorBase(BusSubscriberMixin):
@@ -95,7 +131,7 @@ class OrchestratorBase(BusSubscriberMixin):
         self.registration_processor: Optional["RegistrationProcessor"] = None
         self.setup_complete: bool = False
 
-    def get_alignment_ref_channel_reg_cfg(self):
+    def get_alignment_ref_channel_reg_cfg(self) -> Mapping[str, Any]:
         if not getattr(self, 'registration_processor'):
             raise ValueError(f'{self.__class__.__name__} cannot call '
                              f'get_alignment_ref_channel_reg_cfg() without a registration_processor attribute')

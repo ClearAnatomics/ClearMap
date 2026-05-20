@@ -43,7 +43,7 @@
             </font>
            </property>
            <property name="currentIndex">
-            <number>1</number>
+            <number>0</number>
            </property>
            <widget class="QWidget" name="binarization">
             <property name="geometry">
@@ -108,7 +108,7 @@
                  <item>
                   <widget class="QCheckBox" name="binarizationConbineBinaryFillingCheckBox">
                    <property name="text">
-                    <string>Binary fill</string>
+                    <string>Binary fill &quot;combined&quot;</string>
                    </property>
                   </widget>
                  </item>
@@ -171,7 +171,12 @@
                       </item>
                       <item>
                        <property name="text">
-                        <string>postprocessed</string>
+                        <string>smoothed</string>
+                       </property>
+                      </item>
+                      <item>
+                       <property name="text">
+                        <string>deep_filled</string>
                        </property>
                       </item>
                       <item>
@@ -217,7 +222,7 @@
                     <item>
                      <widget class="QComboBox" name="binarizationPlotStep2ComboBox">
                       <property name="currentIndex">
-                       <number>1</number>
+                       <number>0</number>
                       </property>
                       <item>
                        <property name="text">
@@ -231,7 +236,12 @@
                       </item>
                       <item>
                        <property name="text">
-                        <string>postprocessed</string>
+                        <string>smoothed</string>
+                       </property>
+                      </item>
+                      <item>
+                       <property name="text">
+                        <string>deep_filled</string>
                        </property>
                       </item>
                       <item>
@@ -364,9 +374,9 @@
              <item row="11" column="0" colspan="2">
               <widget class="QGroupBox" name="graphPerformanceGroupBox">
                <property name="title">
-                <string>Block parameters</string>
+                <string>CPU parameters</string>
                </property>
-               <layout class="QVBoxLayout" name="verticalLayout_5">
+               <layout class="QVBoxLayout" name="graphPerformanceGroupBoxVLayout">
                 <item>
                  <widget class="QWidget" name="placeHolderWidget" native="true"/>
                 </item>

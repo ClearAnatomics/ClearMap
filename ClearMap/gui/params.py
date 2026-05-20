@@ -28,10 +28,12 @@ from ClearMap.Utils.events import (UiChannelRenamed, UiCropChanged, UiOrientatio
 
 from .gui_utils_base import replace_widget
 from .params_mixins import OrthoviewerSlicingMixin
+from .pipeline_model import BINARIZATION_STEPS, PipelineStep, LinearPipeline
+from .pipeline_widgets import LinearPipelineWidget
 from .widget_monkeypatch_callbacks import recursive_patch_compound_boxes
 from .params_interfaces import (ParamLink, UiParameter, ChannelUiParameter, UiParameterCollection,
                                 ChannelsUiParameterCollection, VectorLink, invert, param_setter, param_handler,
-                                list_widget_setter, list_widget_getter)
+                                list_widget_setter, list_widget_getter, _linear_pipeline_connector)
 from .widgets import LandmarksWeightsPanel, ComparisonsModel, ComparisonsWidgetAdapter, Pair, GroupsWidgetAdapter, \
     FileDropListWidget
 
@@ -1449,7 +1451,6 @@ class VesselBinarizationParams(ChannelUiParameter):
     def build_params_dict(self):
         return {
             # FIXME: add tabs to UI with matching control names
-            'run_binarization': ParamLink(['binarize', 'run'], self.tab.runBinarizationCheckBox),
             'binarization_clip_range': ParamLink(['binarize', 'clip_range'], self.tab.binarizationClipRangeDoublet),
             'binarization_threshold': ParamLink(['binarize','threshold'],
                                                 self.tab.binarizationThresholdSpinBox,
@@ -1459,22 +1460,103 @@ class VesselBinarizationParams(ChannelUiParameter):
                                                 # cast_to_ui=self.sanitize_nones,  # REFACTOR: use VectorLink instead ?
                                                 # cast_from_ui=self.sanitize_neg_one
                                                 ),
-            'run_smoothing': ParamLink(['smooth', 'run'], self.tab.binarizationSmoothingCheckBox),
-            'run_binary_filling': ParamLink(['binary_fill', 'run'], self.tab.binarizationBinaryFillingCheckBox),
-            'run_deep_filling': ParamLink(['deep_fill', 'run'], self.tab.binarizationDeepFillingCheckBox),
         }
-        # self.tab.binarizationControlsGroupBox.setTitle(channel_name)
 
     @property
     def cfg_subtree(self):
         return ['vasculature', 'binarization', 'single_channels', self.name]   # REFACTOR: section name from config_handler
 
+    def cfg_to_ui(self) -> None:
+        super().cfg_to_ui()
+        # Sync pipeline widget from config — runs even during hydration
+        if self._pipeline_widget is not None:
+            self.widget_ops.set(self._pipeline_widget, self._pipeline_state_from_cfg(), silent=True)
+
+    @property
+    def _pipeline_widget(self) -> Optional['LinearPipelineWidget']:
+        """The LinearPipelineWidget attached to this channel's page widget."""
+        return getattr(self.tab, 'binarizationPipelineWidget', None)
+
+    def _pipeline_state_from_cfg(self) -> dict:
+        """Build the config-schema dict that _lp_setter expects."""
+        cfg = self.view
+        order = cfg.get('step_order') or list(BINARIZATION_STEPS.keys())
+        return {
+            'step_order': order,
+            **{name: {'run': cfg.get(name, {}).get('run', True),
+                      'keep_intermediate': cfg.get(name, {}).get('save', True),}
+               for name in order if name in BINARIZATION_STEPS}
+        }
+
+    def pipeline_from_config(self) -> 'LinearPipeline':
+        """
+        Reconstruct a LinearPipeline from config run flags and step_order.
+        Falls back to BINARIZATION_STEPS insertion order when step_order
+        is absent (e.g. legacy config).
+        """
+        cfg = self.view
+        order = cfg.get('step_order') or list(BINARIZATION_STEPS.keys())
+        steps = []
+        for name in order:
+            if name not in BINARIZATION_STEPS:
+                continue
+            enabled = cfg.get(name, {}).get('run', True)
+            keep_intermediate = cfg.get(name, {}).get('save', True)
+            position_locked = (name == 'binarize')   # binarize must always come first  #  FIXME: use BINARIZATION_STEPS metadata for this instead of hardcoding
+            steps.append(PipelineStep(spec_name=name, enabled=enabled,
+                                      keep_intermediate=keep_intermediate, locked=position_locked))
+        return LinearPipeline(steps=steps)
+
+    def apply_pipeline_to_config(self, pipeline: 'LinearPipeline') -> None:
+        """
+        Write step order and enabled flags from pipeline to config.
+        Called by the tab whenever the pipeline widget changes.
+        """
+        patch = {}
+        for step in pipeline.steps:
+            set_item_recursive(patch,
+                               self.cfg_subtree + [step.spec_name, 'run'], step.enabled)
+            set_item_recursive(patch,
+                               self.cfg_subtree + [step.spec_name, 'save'], step.keep_intermediate)
+        set_item_recursive(patch,
+                           self.cfg_subtree + ['step_order'], [s.spec_name for s in pipeline.steps])
+        self._apply_patch(patch)
+
+    def post_connect(self) -> None:
+        """
+        Create and wire the LinearPipelineWidget after ParamLink connections
+        are established. The widget replaces the run_* checkboxes and is
+        owned here because it drives config writes via apply_pipeline_to_config.
+        """
+        # Build initial state from config (handles hydration correctly)
+        pipeline = self.pipeline_from_config()
+
+        # Build and insert widget
+        pipeline_widget = LinearPipelineWidget(pipeline, parent=self.tab)
+        self.tab.binarizationPipelineWidget = pipeline_widget
+        ctrl_box = self.tab.binarizationStepsGroupBox
+        ctrl_box.layout().insertWidget(0, pipeline_widget)
+
+        # Register in params_dict for cfg_to_ui (WIDGET_OPS.set) and teardown
+        # connect=False because keys=None
+        p_link = ParamLink(keys=None, widget=pipeline_widget)
+        self.params_dict['pipeline'] = p_link
+
+        # Force save to add section if missing
+        self.apply_pipeline_to_config(pipeline_widget.pipeline)
+
+        # Wire change → config write; store disconnector so teardown() cleans up
+        callback = lambda: self.apply_pipeline_to_config(pipeline_widget.pipeline)
+        disconnector = _linear_pipeline_connector(pipeline_widget, callback)
+        p_link.add_disconnector(disconnector)
+
     @property
     def n_steps(self):
-        n_steps = self.run_binarization
-        n_steps += self.run_smoothing or self.run_binary_filling
-        n_steps += self.run_deep_filling
-        return n_steps
+        if self._pipeline_widget is not None:
+            return len(self._pipeline_widget.pipeline.enabled_steps)
+        # fallback before widget exists (e.g. before hydration)
+        return len([stp for stp in BINARIZATION_STEPS if self.view.get(stp, {}).get('run', True)])
+
 
 class VesselBinarizationPerformanceParams(ChannelUiParameter):
     n_processes: int

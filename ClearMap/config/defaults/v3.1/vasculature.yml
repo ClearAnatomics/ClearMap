@@ -6,27 +6,45 @@ binarization:
     vessels_template:
       binarize:
         run: true
+        save: true
         clip_range: [350, 1000]
         threshold: null
       smooth:
         run: true
+        save: true
       binary_fill:
         run: true
+        save: true
       deep_fill:
         run: true
+        save: true
         resample_factor: 1
+      step_order:
+        - binarize
+        - smooth
+        - binary_fill
+        - deep_fill
     large_vessels_template:  # same params for arteries and veins
       binarize:
         run: true
+        save: true
         clip_range: [1000, 8000]
         threshold: 450
       smooth:
         run: true
+        save: true
       binary_fill:
         run: true
+        save: true
       deep_fill:
         run: true
+        save: true
         resample_factor: 2
+      step_order:
+        - binarize
+        - smooth
+        - binary_fill
+        - deep_fill
   combined:
     binary_fill: true
     compress: false
@@ -112,8 +130,11 @@ performance:
         size_max: 500
         overlap: 0
   graph_construction:
-    block_processing:
+    skeletonize:
       n_processes: -1
-      size_min: null
-      size_max: 500
-      overlap: 0
+    build:
+      n_processes: -1
+    clean:
+      n_processes: -1
+    reduce:
+      n_processes: -1

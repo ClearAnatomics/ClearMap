@@ -17,26 +17,28 @@ import platform
 import warnings
 import gc
 from concurrent.futures import ProcessPoolExecutor
-from typing import Optional, Dict, Sequence, Any
+from pathlib import Path
+from typing import Optional, Dict, Any, Union, Callable
 
 import numpy as np
 import pandas as pd
 
-from ClearMap.Analysis.graphs.graph_filters import GraphFilter
 from PyQt5.QtWidgets import QDialogButtonBox
 
-from ClearMap.IO.workspace2 import Workspace2
-from ClearMap.ParallelProcessing.DataProcessing.ArrayProcessing import initialize_sink
-from ClearMap.Utils.exceptions import PlotGraphError, ClearMapVRamException, MissingRequirementException, \
-    MissingAssetError
-from ClearMap.Visualization.Qt.utils import link_dataviewers_cursors
-from ClearMap.config.config_coordinator import ConfigCoordinator
-from ClearMap.pipeline_orchestrators.generic_orchestrators import PipelineOrchestrator, ProcessorSteps
-
 import ClearMap.IO.IO as clearmap_io
+from ClearMap.IO.Source import Source
+from ClearMap.IO.workspace2 import Workspace2
+from ClearMap.IO.workspace_asset import Asset
+
+from ClearMap.config.config_coordinator import ConfigCoordinator
+
+from ClearMap.pipeline_orchestrators.generic_orchestrators import PipelineOrchestrator, ProcessorSteps
 
 import ClearMap.Alignment.Resampling as resampling_module
 import ClearMap.Alignment.Elastix as elastix
+
+from ClearMap.ParallelProcessing.DataProcessing.ArrayProcessing import initialize_sink
+import ClearMap.ParallelProcessing.BlockProcessing as block_processing
 
 import ClearMap.ImageProcessing.Experts.Vasculature as vasculature
 import ClearMap.ImageProcessing.machine_learning.vessel_filling.vessel_filling as vessel_filling
@@ -45,16 +47,20 @@ import ClearMap.ImageProcessing.Binary.Filling as binary_filling
 
 import ClearMap.Analysis.Measurements.MeasureExpression as measure_expression
 import ClearMap.Analysis.Measurements.radius_measurements as measure_radius
-from ClearMap.Analysis.graphs import graph_processing
 import ClearMap.Analysis.Measurements.Voxelization as voxelization
 
-import ClearMap.ParallelProcessing.BlockProcessing as block_processing
+from ClearMap.Analysis.graphs import graph_processing
+from ClearMap.Analysis.graphs.graph_filters import GraphFilter
 
+from ClearMap.Visualization.Qt.utils import link_dataviewers_cursors
 from ClearMap.Visualization.Qt import Plot3d as q_p3d
 from ClearMap.Visualization.Vispy import plot_graph_3d  # WARNING: vispy dependency
 
 from ClearMap.gui.dialog_helpers import warning_popup
 from ClearMap.Utils.utilities import is_in_range, get_free_v_ram, clear_cuda_cache, sanitize_n_processes
+from ClearMap.Utils.exceptions import (PlotGraphError, ClearMapVRamException,
+                                       MissingRequirementException, MissingAssetError, AssetNotFoundError,
+                                       ClearMapAssetError)
 
 __author__ = ('Christoph Kirst <christoph.kirst.ck@gmail.com>,'
               ' Sophie Skriabine <sophie.skriabine@icm-institute.org>,'
@@ -65,42 +71,68 @@ __webpage__ = 'https://idisco.info'
 __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
 from ClearMap.pipeline_orchestrators.sample_info_management import SampleManager
-from ClearMap.pipeline_orchestrators.registration_orchestrator import RegistrationProcessor, RegistrationStatus
+from ClearMap.pipeline_orchestrators.registration_orchestrator import RegistrationProcessor
+
+MAX_PLOT_VERTICES = 300_000  # Empirical max number of vertices that can safely be plotted
 
 USE_BINARY_POINTS_FILE = not platform.system().lower().startswith('darwin')
+_SourcePath = Union[Path, str]
 
 
 class VesselGraphProcessorSteps(ProcessorSteps):
-    def __init__(self, workspace, channel: str | Sequence[str] ='', sub_step=''):
-        super().__init__(workspace, channel=channel, sub_step=sub_step)
-        self.graph_raw = 'raw'
-        self.graph_cleaned = 'cleaned'
-        self.graph_reduced = 'reduced'
-        self.graph_annotated = 'annotated'
+    graph_raw       = 'raw'
+    graph_cleaned   = 'cleaned'
+    graph_reduced   = 'reduced'
+    graph_annotated = 'annotated'
 
-    @property
-    def steps(self):
-        return self.graph_raw, self.graph_cleaned, self.graph_reduced, self.graph_annotated  # TODO: add traced
+    _default_steps = (graph_raw, graph_cleaned, graph_reduced, graph_annotated)  # TODO: add traced
 
     def asset_from_step_name(self, step):
         return self.workspace.get('graph', channel=self.channel, asset_sub_type=step)
 
 
 class BinaryVesselProcessorSteps(ProcessorSteps):
-    def __init__(self, workspace, channel='', sub_step=''):
-        super().__init__(workspace, channel=channel, sub_step=sub_step)
-        self.stitched = 'stitched'
-        self.binary = 'binary'
-        # self.postprocessed = 'postprocessed'
-        self.smoothed = 'smoothed'
-        self.deep_filled = 'deep_filled'
-        self.filled = 'filled'
-        self.combined = 'combined'
-        self.final = 'final'
+    stitched    = 'stitched'
+    binary      = 'binary'
+    smoothed    = 'smoothed'
+    deep_filled = 'deep_filled'
+    filled      = 'filled'
+    combined    = 'combined'
+    final       = 'final'
 
-    @property
-    def steps(self):
-        return self.stitched, self.binary, self.smoothed, self.deep_filled, self.filled, self.combined, self.final
+    _default_steps = (stitched, binary, smoothed, deep_filled, filled, combined, final)
+
+    # Fixed anchors that cannot be reordered
+    _prefix_steps = (stitched, binary)
+    _suffix_steps = (combined, final)
+
+    _GUI_STEP_TO_ASSET: dict[str, str] = {
+        'binarize': 'binary',
+        'smooth': 'smoothed',
+        'binary_fill': 'filled',
+        'deep_fill': 'deep_filled',
+    }
+
+    _BINARIZE_STEP_MAP: dict[str, tuple[str, bool]] = {
+        'binarize':    ('binarize_channel',  False),
+        'smooth':      ('smooth_channel',    False),
+        'binary_fill': ('fill_channel',      True),   # prange — must be main thread
+        'deep_fill':   ('deep_fill_channel', False),
+    }
+
+    _lifecycle_steps: frozenset[str] = frozenset({stitched, combined, final})
+
+    def __init__(self, workspace, channel, config_provider: Callable[[], dict] | None = None):
+        self._config_provider = config_provider or (lambda: {})
+        super().__init__(workspace, channel)
+        self._outputs: Dict[str, _SourcePath] = {}
+        self._pending_cleanup: list[str] = []  # canonical paths to delete
+
+    @classmethod
+    def _default_middle_steps(cls) -> tuple[str, ...]:
+        """Steps between prefix and suffix, derived from _default_steps."""
+        anchors = set(cls._prefix_steps) | set(cls._suffix_steps)
+        return tuple(s for s in cls._default_steps if s not in anchors)
 
     def asset_from_step_name(self, step):  # FIXME: split step and substep
         if step in (self.stitched, self.binary):
@@ -109,27 +141,134 @@ class BinaryVesselProcessorSteps(ProcessorSteps):
             asset = self.workspace.get('binary', channel=self.channel, asset_sub_type=step)
         return asset
 
-    # def last_path(self, arteries=False):
-    #     return self.path(self.last_step, arteries=arteries)
-    #
-    # def previous_path(self, arteries=False):
-    #     if self.previous_step is not None:
-    #         return self.path(self.previous_step, arteries=arteries)
+    @property
+    def steps(self) -> tuple[str, ...]:
+        """
+        Compute step order fresh on each access — reflects any GUI
+        reordering committed to config since construction.
+        """
+        cfg_order = self._config_provider().get('step_order')
+
+        prefix = list(self._prefix_steps)
+        suffix = list(self._suffix_steps)
+        anchor_assets = set(self._prefix_steps) | set(self._suffix_steps)
+
+        if cfg_order:
+            middle = [self._GUI_STEP_TO_ASSET[name]
+                      for name in cfg_order
+                      if name in self._GUI_STEP_TO_ASSET
+                      and self._GUI_STEP_TO_ASSET[name] not in anchor_assets]
+        else:
+            middle = list(self._default_middle_steps())
+
+        return tuple(prefix + middle + suffix)
+
+
+    #   #################################  output tracking ####################################
+
+    @staticmethod
+    def _extract_backing_path(output: Any) -> _SourcePath:
+        """
+        Extract a plain path from whatever a step produces.
+        Asset → .path, Source → .location, Path/str → as-is.
+        Never stores a live Source or array — clearmap_io.as_source()
+        reconstructs on demand.
+        """
+        if isinstance(output, Asset):
+            return output.path
+        if isinstance(output, Source):  # covers MMP.Source, npy.Source …
+            return output.location
+        if isinstance(output, (Path, str)):
+            return output
+        return output  # unexpected — caller will fail loudly
+
+    def record_output(self, asset: str, output: Any,
+                      temp_path: str = '', keep: bool = False) -> None:
+        """
+        Store the backing path of a completed step.
+
+        Source objects are serialisable path handles — we extract .path so
+        _outputs holds only plain Paths, never live Source instances.
+        clearmap_io.as_source(path) reconstructs on demand.
+        """
+        output_path = self._extract_backing_path(output)
+        self._outputs[asset] = output_path
+        if output_path and not keep:
+            self._pending_cleanup.append(str(output_path))
+
+    def consume_and_cleanup(self) -> None:
+        """Delete the pending temp file once the next step has consumed its input."""
+        for to_clean in self._pending_cleanup:
+            try:
+                clearmap_io.delete_file(to_clean)
+            except Exception:
+                pass
+        self._pending_cleanup = []
+
+    def get_source(self, current_asset: str) -> _SourcePath:
+        """
+        Walk backward from current_asset through the configured (non-lifecycle)
+        step order and return the first available backing path.
+
+        Precedence per previous step:
+          1. In-memory result stored by record_output  (is-not-None guard)
+          2. On-disk asset
+          3. Raw binary (fallback)
+
+        Callers reconstruct the Source with clearmap_io.as_source(result).
+        """
+        order = [s for s in self.steps if s not in self._lifecycle_steps]
+
+        try:
+            current_idx = order.index(current_asset)
+        except ValueError:
+            return self.asset_from_step_name(self.binary).path
+
+        for prev_asset in reversed(order[:current_idx]):
+            stored = self._outputs.get(prev_asset)
+            if stored is not None:
+                return stored
+            try:
+                asset = self.get_asset(prev_asset)
+                if asset.exists:
+                    return asset.path
+            except (KeyError, AttributeError, FileNotFoundError,
+                    AssetNotFoundError, ClearMapAssetError):  # For skipped steps
+                continue
+
+        return self.asset_from_step_name(self.binary).path
+
+    def get_last_output(self) -> _SourcePath:
+        """
+        Return the last available output path, used by combine_binary.
+        """
+        order = [s for s in self.steps if s not in self._lifecycle_steps]
+
+        for step in reversed(order):
+            stored = self._outputs.get(step)
+            if stored is not None:
+                return stored
+            try:
+                asset = self.get_asset(step)
+                if asset.exists:
+                    return asset.path
+            except (KeyError, AttributeError, FileNotFoundError):
+                continue
+
+        raise FileNotFoundError(f'No binary output found for channel "{self.channel}"')
 
 
 class BinaryVesselProcessor(PipelineOrchestrator):
     config_name = 'vasculature'
 
     def __init__(self, sample_manager: Optional[SampleManager] = None,
-                 config_coordonator: Optional[ConfigCoordinator] = None):
-        super().__init__(config_coordonator)
+                 config_coordinator: Optional[ConfigCoordinator] = None):
+        super().__init__(config_coordinator)
         self.sample_manager: Optional[SampleManager] = None
         self.workspace: Optional[Workspace2] = None
 
         self.inputs_match = False
-
-        # asset parameters for the postprocessing step that was run last
-        self.postprocessing_last_step = {}  # example: {'ch0': {'source': None, 'temp_path': '', 'keep': True}}
+        self.inputs_shapes: tuple = (None, None)
 
         self.all_vessels_channel: str = ''
         self.arteries_channel: str = ''
@@ -159,18 +298,23 @@ class BinaryVesselProcessor(PipelineOrchestrator):
             self.assert_input_shapes_match()
 
             all_channels = self.sample_manager.channels
-            for k in self.steps.keys():
-                if k not in all_channels:
-                    self.steps.pop(k)
+            obsolete_channels = [k for k in self.steps if k not in all_channels]
+            for k in obsolete_channels:
+                del self.steps[k]
 
-            for channel_name in (self.all_vessels_channel, self.arteries_channel):  # TODO: add veins here too
+            for channel_name in self.channels_to_binarize():
                 if channel_name:
-                    self.steps[channel_name] = BinaryVesselProcessorSteps(self.workspace, channel=channel_name)
+                    self.steps[channel_name] = BinaryVesselProcessorSteps(
+                        self.workspace, channel=channel_name,
+                        config_provider=lambda ch=channel_name: (
+                            self.config.get('binarization', {}).get('single_channels', {}).get(ch, {})))
 
             compound_channel = tuple(self.channels_to_binarize())  # FIXME: old keys not cleared
             sample_id = self.sample_manager.prefix
             self.workspace.ensure_pipeline('TubeMap', compound_channel, sample_id=sample_id,
                                            channel_content_type='compound', create_channel=True)
+
+    # ############################### INPUTS ###############################
 
     def assert_input_shapes_match(self):
         """
@@ -196,13 +340,20 @@ class BinaryVesselProcessor(PipelineOrchestrator):
         self.inputs_match = True  # WARNING: may need to be reset when changing channels to binarize
         self.inputs_shapes = shapes
 
+    def channels_to_binarize(self):
+        return self.sample_manager.get_channels_by_pipeline('TubeMap', as_list=True)
+
     def assets_to_binarize(self) -> list[Any]:
         channels_to_binarize = self.channels_to_binarize()
         assets_to_binarize = [self.workspace.get('stitched', channel=c) for c in channels_to_binarize]
         return assets_to_binarize
 
+    # ############################# PUBLIC API ######################################
+
     def run(self):
         self.binarize()
+        for channel in self.channels_to_binarize():
+            self.postprocess(channel)
         self.combine_binary()
 
     def binarize(self):
@@ -214,8 +365,25 @@ class BinaryVesselProcessor(PipelineOrchestrator):
         else:
             raise ValueError('Channels to binarize have different shapes. This is not supported yet.')
 
-    def channels_to_binarize(self):
-        return self.sample_manager.get_channels_by_pipeline('TubeMap', as_list=True)
+    def postprocess(self, channel: str) -> None:
+        """
+        Run post-processing steps (smooth, fill, deep_fill) for *channel* in
+        the order declared by step_order in the config.
+
+        Binarize is always the first step and is excluded here — it runs via
+        binarize() / binarize_channel() before postprocess is called.
+        """
+        dispatch: Dict[str, Callable] = {
+            BinaryVesselProcessorSteps.smoothed: self.smooth_channel,
+            BinaryVesselProcessorSteps.filled: self.fill_channel,
+            BinaryVesselProcessorSteps.deep_filled: self.deep_fill_channel,
+        }
+        for step in self.steps[channel].steps:
+            if step in BinaryVesselProcessorSteps._lifecycle_steps or step == BinaryVesselProcessorSteps.binary:
+                continue
+            fn = dispatch.get(step)
+            if fn is not None:
+                fn(channel)
 
     def __get_n_blocks(self, channel):
         # TODO: use actual processing params to get real n blocks
@@ -225,21 +393,23 @@ class BinaryVesselProcessor(PipelineOrchestrator):
         n_blocks = int(np.ceil((dim_size - blk_size) / (blk_size - overlap) + 1))
         return n_blocks
 
-
     @staticmethod
     def setup_channel_operation(operation):
         @functools.wraps(operation)
         def wrapper(self, channel, *args, **kwargs):
-            cfg = self.config['binarization']['single_channels']
             operation_type = operation.__name__.replace('_channel', '')
-            operations = list(cfg[channel].keys())
             if operation_type == 'deep_fill':
                 n_blocks = 1200
             else:
                 n_blocks = self.__get_n_blocks(channel)
 
-            # FIXME: find other way to increment
-            increment_main = not( channel == self.channels_to_binarize()[0] and operation_type == operations[0])
+            asset_to_gui = {v: k for k, v in BinaryVesselProcessorSteps._GUI_STEP_TO_ASSET.items()}
+            gui_order = [asset_to_gui[stp] for stp in self.steps[channel].steps
+                         if stp not in BinaryVesselProcessorSteps._lifecycle_steps]
+                         # and stp in asset_to_gui]  # TODO: check guard against unknown steps
+            first_op = gui_order[0] if gui_order else operation_type
+            first_step = channel == self.channels_to_binarize()[0] and operation_type == first_op
+            increment_main = not first_step
             self.prepare_watcher_for_substep(n_blocks, self.block_re,
                                              f'{operation_type} {channel.title()}', increment_main)
 
@@ -261,7 +431,7 @@ class BinaryVesselProcessor(PipelineOrchestrator):
 
     @setup_channel_operation
     def deep_fill_channel(self, channel):  # n_blocks because of decorator
-        self.__deep_fill_channel(channel)  # TODO: update watcher
+        self._deep_fill_channel(channel)  # TODO: update watcher
 
     def _binarize(self, channel):
         """
@@ -297,6 +467,8 @@ class BinaryVesselProcessor(PipelineOrchestrator):
         vasculature.binarize(source, sink,
                              binarization_parameter=binarization_parameter,
                              processing_parameter=processing_parameter)
+        keep = binarization_cfg['binarize'].get('save', True)
+        self.steps[channel].record_output(BinaryVesselProcessorSteps.binary, sink, keep=keep)
 
     def plot_binarization_result(self, parent=None, channel='', arrange=False):
         """
@@ -308,14 +480,6 @@ class BinaryVesselProcessor(PipelineOrchestrator):
         dvs = q_p3d.plot(images, title=[img.name for img in images],
                          arrange=arrange, lut=self.machine_config['default_lut'], parent=parent)
         return dvs
-
-    def __get_post_processing_source(self, channel, step):
-        if channel not in self.postprocessing_last_step:
-            self.postprocessing_last_step[channel] = {'source': None, 'temp_path': '', 'keep': True}
-        src = self.postprocessing_last_step[channel]['source']
-        previous_step_path = (self.steps[channel].get_asset(step, step_back=True, n_before=1)).path
-        return src or previous_step_path  #  self.get_path('binary', channel=channel)
-
     def _smooth(self, channel):
         binarization_cfg = self.config['binarization']['single_channels'][channel]
         if not binarization_cfg['smooth']['run']:
@@ -323,53 +487,50 @@ class BinaryVesselProcessor(PipelineOrchestrator):
 
         self.steps[channel].remove_next_steps_files(self.steps[channel].smoothed)
 
-        source = self.__get_post_processing_source(channel, 'smoothed')
+        source = self.steps[channel].get_source(BinaryVesselProcessorSteps.smoothed)
         source = clearmap_io.as_source(source)
-        sink = self.get_path('binary', channel=channel, asset_sub_type='smoothed')
-        sink = initialize_sink(sink, shape=source.shape, dtype=source.dtype, order=source.order, return_buffer=False)
-
-        if binarization_cfg['smooth']['run']:  # FIXME: path excluded above
-            smoothing_parameters = copy.deepcopy(vasculature.default_postprocessing_parameter['smooth'])
-        else:
-            smoothing_parameters = {}
+        sink_path = self.get_path('binary', channel=channel, asset_sub_type='smoothed')
+        smoothing_parameters = copy.deepcopy(vasculature.default_postprocessing_parameter['smooth'])
 
         channel_perf = self.config['performance']['binarization']['single_channels'][channel]
         perf_cfg = channel_perf['smooth']['block_processing']
         perf_params = copy.deepcopy(vasculature.default_postprocessing_processing_parameter)
         perf_params.update(size_max=perf_cfg['size_max'])
-        smoothed, tmp_f_path = vasculature.apply_smoothing(source, sink, smoothing_parameters, perf_params,
-                                                           processes=sanitize_n_processes(perf_cfg['n_processes']),
-                                                           verbose=True)
 
-        self.postprocessing_last_step[channel] = {'source': smoothed, 'temp_path': tmp_f_path,
-                                                  'keep': smoothing_parameters.get('save', False)}
+        result = vasculature.apply_smoothing(source, sink_path, smoothing_parameters, perf_params,
+                                             processes=sanitize_n_processes(perf_cfg['n_processes']),
+                                             verbose=True)
+
+        self.steps[channel].consume_and_cleanup()
+        keep = binarization_cfg['smooth'].get('save', True)
+        self.steps[channel].record_output(BinaryVesselProcessorSteps.smoothed, result, keep=keep)
 
     def _fill(self, channel):
         if not self.config['binarization']['single_channels'][channel]['binary_fill']['run']:
             return
-        source = self.__get_post_processing_source(channel, 'filled')
-        sink = self.get_path('binary', channel=channel, asset_sub_type='filled')
 
         self.steps[channel].remove_next_steps_files(self.steps[channel].filled)
 
+        source = self.steps[channel].get_source(BinaryVesselProcessorSteps.filled)
         source = clearmap_io.as_source(source)
+        sink = self.get_path('binary', channel=channel, asset_sub_type='filled')
         sink = initialize_sink(sink, shape=source.shape, dtype=source.dtype, order=source.order, return_buffer=False)
 
         perf_cfg = self.config['performance']['binarization']['single_channels'][channel]['binary_fill']
         binary_filling.fill(source, sink=sink, processes=sanitize_n_processes(perf_cfg['n_processes']),
-                            verbose=True)  # WARNING: prange if filling
-        if self.postprocessing_last_step[channel]['temp_path'] and not self.postprocessing_last_step[channel]['keep']:
-            clearmap_io.delete_file(self.postprocessing_last_step[channel]['temp_path'])
+                            verbose=True)
 
-        self.postprocessing_last_step[channel] = {'source': sink, 'temp_path': '', 'keep': False}
+        self.steps[channel].consume_and_cleanup()
+        keep = self.config['binarization']['single_channels'][channel]['binary_fill'].get('save', True)
+        self.steps[channel].record_output(BinaryVesselProcessorSteps.filled, sink, keep=keep)
 
-    def __deep_fill_channel(self, channel, size_max=None, overlap=None, resample_factor=None):
+    def _deep_fill_channel(self, channel, size_max=None, overlap=None, resample_factor=None):
         binary_cfg = self.config['binarization']['single_channels'][channel]
         if not binary_cfg['deep_fill']['run']:
             return
 
         perf_params = self.config['performance']['binarization']['single_channels'][channel]['deep_fill']['block_processing']
-        REQUIRED_V_RAM = 22000  # FIXME: put in config or at top of module
+        REQUIRED_V_RAM = 22000  # REFACTOR: put in config or at top of module
         if size_max is None:
             size_max = perf_params['size_max']
         if overlap is None:
@@ -380,17 +541,17 @@ class BinaryVesselProcessor(PipelineOrchestrator):
         if not get_free_v_ram() > REQUIRED_V_RAM:
             btn = warning_popup(f'Insufficient VRAM',
                                 f'You do not have enough free memory on your graphics card to '
-                                f'run this operation. This step needs 22GB VRAM, {get_free_v_ram()/1000} were found. '
+                                f'run this operation. This step needs 22GB VRAM, {get_free_v_ram() / 1000} were found. '
                                 f'Please free some or upgrade your hardware.')
             if btn == QDialogButtonBox.Abort:
                 raise ClearMapVRamException(f'Insufficient VRAM, found only {get_free_v_ram()} < {REQUIRED_V_RAM}')
             elif btn == QDialogButtonBox.Retry:
-                self.__deep_fill_channel(channel, size_max, overlap, resample_factor)
+                self._deep_fill_channel(channel, size_max, overlap, resample_factor)
 
         self.steps[channel].remove_next_steps_files(self.steps[channel].deep_filled)
 
         # TODO: check how source casts to bool
-        source = self.__get_post_processing_source(channel, 'deep_filled')
+        source = self.steps[channel].get_source(BinaryVesselProcessorSteps.deep_filled)
         sink = self.get_path('binary', channel=channel, asset_sub_type='deep_filled')
 
         processing_parameter = copy.deepcopy(vessel_filling.default_fill_vessels_processing_parameter)
@@ -398,35 +559,24 @@ class BinaryVesselProcessor(PipelineOrchestrator):
 
         vessel_filling.fill_vessels(source, sink, resample=resample_factor, threshold=0.5,
                                     cuda=True, processing_parameter=processing_parameter, verbose=True)
-        gc.collect()
-        clear_cuda_cache()
+        gc.collect(); clear_cuda_cache()
 
-        self.postprocessing_last_step[channel] = {'source': sink, 'temp_path': '', 'keep': False}
+        self.steps[channel].consume_and_cleanup()
+        keep = binary_cfg['deep_fill'].get('save', True)
+        self.steps[channel].record_output(BinaryVesselProcessorSteps.deep_filled, sink, keep=keep)
 
     def combine_binary(self):
         """Merge the binary images of the different vascular network components into a single mask"""
         # FIXME: probably missing the call to workspace.add_channel(self.channels_to_binarize())
         sink_asset = self.get('binary', channel=self.channels_to_binarize(), asset_sub_type='combined')  # Temporary
         if len(self.channels_to_binarize()) > 1:
-            sources = []
-            for channel in self.channels_to_binarize():
-                if channel not in self.postprocessing_last_step:
-                    self.postprocessing_last_step[channel] = {'source': None, 'temp_path': '', 'keep': True}
-                if self.postprocessing_last_step[channel]['source']:
-                    sources.append(self.postprocessing_last_step[channel]['source'])
-                else:
-                    asset = self.steps[channel].get_asset(self.steps[channel].filled, step_back=True)
-                    if asset.exists:
-                        sources.append(asset.path)
-                    else:
-                        raise FileNotFoundError(f'File {asset.path} not found')
+            sources = [self.steps[ch].get_last_output() for ch in self.channels_to_binarize()]
             perf_params = self.config['performance']['binarization']['combine']['block_processing']
             block_processing.process(np.logical_or, sources, sink_asset.path,
                                      size_max=perf_params['size_max'], overlap=perf_params['overlap'],
                                      processes=sanitize_n_processes(perf_params['n_processes']), verbose=True)
         else:  # We expect to have at least all_vessels_channel
-            source = self.steps[self.all_vessels_channel].get_asset(self.steps[self.all_vessels_channel].filled,
-                                                                    step_back=True).path
+            source = self.steps[self.all_vessels_channel].get_last_output()
             clearmap_io.copy_file(source, sink_asset.path)
 
         self.post_process_binary_combined()
@@ -444,14 +594,14 @@ class BinaryVesselProcessor(PipelineOrchestrator):
             block_params['size_max'] = 50
             vasculature.postprocess(source, sink, postprocessing_parameter=postprocessing_parameter,
                                     processing_parameter=block_params,
-                                    processes=None, verbose=True)  # FIXME: n_processes in config?
+                                    processes=sanitize_n_processes(-1), verbose=True)  # TODO: n_processes in config?
         else:
             clearmap_io.link_file(source, sink)
 
     def plot_vessel_filling_results(self, parent=None, channel='', arrange=False):
         channel = channel if channel else self.all_vessels_channel
         images = [(self.steps[self.all_vessels_channel].get_asset(
-            self.steps[self.all_vessels_channel].postprocessed, step_back=True).path),
+            self.steps[self.all_vessels_channel].filled, step_back=True).path),  # FIXME: check if we really want filled here
                   (self.get_path('binary', channel=channel, asset_sub_type='filled'))]
         titles = [img.stem for img in images]
         images = [str(img) for img in images]
@@ -459,7 +609,8 @@ class BinaryVesselProcessor(PipelineOrchestrator):
         return q_p3d.plot(images, title=titles, arrange=arrange, lut=lut_, parent=parent)
 
     def plot_combined(self, parent=None, arrange=False):  # TODO: final or not option
-        all_vessels = self.steps[self.all_vessels_channel].get_asset(self.steps[self.all_vessels_channel].filled, step_back=True)
+        all_vessels = self.steps[self.all_vessels_channel].get_asset(self.steps[self.all_vessels_channel].filled,
+                                                                     step_back=True)
         combined = self.get_path('binary', channel=self.channels_to_binarize(), asset_sub_type='combined')
         if self.config['binarization']['single_channels'][self.arteries_channel]['binarize']['run']:
             arteries_filled = self.get_path('binary', channel=self.arteries_channel, asset_sub_type='filled')
@@ -517,15 +668,11 @@ class VesselGraphProcessor(PipelineOrchestrator):
             'annotated': None,
             'traced': None
         }
-        self.sample_manager: Optional[SampleManager] = sample_manager
-        self.registration_processor: Optional[RegistrationProcessor] = registration_processor
         self.branch_density = None
         self.steps: VesselGraphProcessorSteps = VesselGraphProcessorSteps(self.workspace)  # FIXME: handle skeleton
         self.setup(sample_manager, registration_processor)
         self.parent_channels = tuple(self.config['binarization']['single_channels'].keys())
         self.steps.channel = self.parent_channels
-        self.arteries_channel = self.sample_manager.get_channels_by_type('arteries', missing_action='ignore',
-                                                                         multiple_found_action='error')
 
     def setup(self, sample_manager=None, registration_processor=None):
         self.sample_manager = sample_manager if sample_manager is not None else self.sample_manager
@@ -602,7 +749,7 @@ class VesselGraphProcessor(PipelineOrchestrator):
     def unload_temporary_graphs(self):
         """
         To free up memory
-        
+
         Returns
         -------
 
@@ -610,6 +757,11 @@ class VesselGraphProcessor(PipelineOrchestrator):
         self.graph_raw = None
         self.graph_cleaned = None
         self.graph_reduced = None
+
+    @property
+    def arteries_channel(self) -> str:
+        return self.sample_manager.get_channels_by_type('arteries', missing_action='ignore',
+                                                        multiple_found_action='error')
 
     @property
     def use_arteries_for_graph(self):  # TODO: see if improve
@@ -625,6 +777,7 @@ class VesselGraphProcessor(PipelineOrchestrator):
         def wrapper(self, *args, **kwargs):
             graph_cfg = self.config['graph_construction']
             return operation(self, *args, graph_cfg=graph_cfg, **kwargs)
+
         return wrapper
 
     @staticmethod
@@ -637,7 +790,9 @@ class VesselGraphProcessor(PipelineOrchestrator):
                 except FileNotFoundError:
                     raise MissingRequirementException(f"Graph for step '{step}' is missing.")
                 return operation(self, *args, **kwargs)
+
             return wrapper
+
         return decorator
 
     @staticmethod
@@ -650,7 +805,9 @@ class VesselGraphProcessor(PipelineOrchestrator):
                 except FileNotFoundError:
                     raise MissingRequirementException(f"Binary asset '{asset_sub_type}' is missing.")
                 return operation(self, *args, **kwargs)
+
             return wrapper
+
         return decorator
 
     # ################################ perf config accessor #####################################
@@ -740,7 +897,7 @@ class VesselGraphProcessor(PipelineOrchestrator):
 
     def _set_artery_binary(self):
         """Define if vertex is artery from binary labelling"""
-        self._set_graph_artery_property('binary', asset_sub_type=['filled', 'postprocessed'])
+        self._set_graph_artery_property('binary', asset_sub_type=['filled', 'postprocessed'])   # FIXME: should use last step of BinaryVesselProcessor
 
     def _set_arteriness(self):
         """assign 'arteriness' from signal intensity"""
@@ -790,12 +947,13 @@ class VesselGraphProcessor(PipelineOrchestrator):
         -------
 
         """
+
         def vote(expression):
             return np.sum(expression) >= len(expression) / 1.5
 
         vertex_to_edge_mappings = vertex_to_edge_mappings or graph_processing.DEFAULT_VERTEX_TO_EDGE
         edge_to_edge_mappings = edge_to_edge_mappings
-        edge_geometry_vertex_properties = ['coordinates', 'coordinates_units', 'radii', 'radius_units', 
+        edge_geometry_vertex_properties = ['coordinates', 'coordinates_units', 'radii', 'radius_units',
                                            'length', 'chain_id', '_vertex_id_']
         if self.use_arteries_for_graph:
             vertex_to_edge_mappings.update({
@@ -808,7 +966,8 @@ class VesselGraphProcessor(PipelineOrchestrator):
                                                            edge_to_edge_mappings=edge_to_edge_mappings,
                                                            compute_edge_length=True,
                                                            edge_geometry_vertex_properties=edge_geometry_vertex_properties,
-                                                           return_maps=False, processes=self._n_processes('reduce'), verbose=True)
+                                                           return_maps=False, processes=self._n_processes('reduce'),
+                                                           verbose=True)
         self.save_graph('reduced')
 
     @property
@@ -831,7 +990,7 @@ class VesselGraphProcessor(PipelineOrchestrator):
                 for channel in self.get_registration_sequence_channels():
                     results_dir = self.get_path('aligned', channel=channel).parent
                     coordinates = elastix.transform_points(coordinates, transform_directory=results_dir,
-                                                      binary=USE_BINARY_POINTS_FILE, indices=False)
+                                                           binary=USE_BINARY_POINTS_FILE, indices=False)
             return coordinates
 
         self.graph_reduced.transform_properties(transformation=transformation,
@@ -842,6 +1001,7 @@ class VesselGraphProcessor(PipelineOrchestrator):
 
     def _scale(self):
         """Apply transform to graph properties"""
+
         def scaling(radii):
             resample_factor = resampling_module.resample_factor(
                 original_shape=self.binary_shape,
@@ -857,7 +1017,8 @@ class VesselGraphProcessor(PipelineOrchestrator):
 
     def _annotate(self):
         """Atlas annotation of the graph (i.e. add property 'region' to vertices)"""
-        annotator = self.registration_processor.annotators[self.parent_channels[0]]  # warning: assuming same annotator for all channels
+        annotator = self.registration_processor.annotators[
+            self.parent_channels[0]]  # warning: assuming same annotator for all channels
         self.graph_reduced.annotate_properties(functools.partial(annotator.label_points),
                                                vertex_properties={'coordinates_atlas': 'annotation'},
                                                edge_geometry_properties={'coordinates_atlas': 'annotation'})
@@ -1009,11 +1170,12 @@ class VesselGraphProcessor(PipelineOrchestrator):
             if kwargs['distance_to_surface'][edge] < kwargs['distance_threshold'] or kwargs['vein'][edge]:
                 return False
             else:
-                return kwargs['radii'][edge] >= kwargs['artery_trace_radius'] and \
-                       kwargs['artery_intensity'][edge] >= kwargs['artery_intensity_min']
+                return (kwargs['radii'][edge] >= kwargs['artery_trace_radius'] and
+                        kwargs['artery_intensity'][edge] >= kwargs['artery_intensity_min'])
 
         artery_traced = graph_processing.trace_edge_label(self.graph_annotated, artery,
-                                                          condition=continue_edge, max_iterations=max_tracing_iterations,
+                                                          condition=continue_edge,
+                                                          max_iterations=max_tracing_iterations,
                                                           **condition_args)
         # artery_traced = graph.edge_open_binary(graph.edge_close_binary(artery_traced, steps=1), steps=1)
         self.graph_annotated.define_edge_property('artery', artery_traced)
@@ -1199,7 +1361,8 @@ class VesselGraphProcessor(PipelineOrchestrator):
                                      title=f'Structure {structure_name} graph',
                                      plot_type=plot_type, region_color=region_color)
 
-    def plot_graph_chunk(self, graph_chunk, plot_type='mesh', title='sub graph', region_color=None, show=True, n_max_vertices=300000):
+    def plot_graph_chunk(self, graph_chunk, plot_type='mesh', title='sub graph', region_color=None,
+                         show=True, n_max_vertices=MAX_PLOT_VERTICES):
         if plot_type == 'line':
             scene = plot_graph_3d.plot_graph_line(graph_chunk, vertex_colors=region_color, title=title,
                                                   show=show, bg_color=self.machine_config['three_d_plot_bg'])

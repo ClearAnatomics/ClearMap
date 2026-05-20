@@ -22,6 +22,8 @@ from ClearMap.Utils.utilities import set_item_recursive, get_item_recursive, DEL
 from ClearMap.Utils.exceptions import ConfigNotFoundError, ClearMapValueError
 from ClearMap.config.config_handler import ALTERNATIVES_REG
 from ClearMap.gui.gui_utils_base import disconnect_widget_signal
+from ClearMap.gui.pipeline_model import LinearPipeline, PipelineStep, BINARIZATION_STEPS
+from ClearMap.gui.pipeline_widgets import LinearPipelineWidget
 from ClearMap.gui.widget_monkeypatch_callbacks import _get_sorted_spin_boxes, ensure_compound_box_patched
 from ClearMap.gui.widgets import ExtendableTabWidget, FileDropListWidget, LandmarksWeightsPanel, GroupsWidgetAdapter, \
     NProcessesWidget
@@ -621,6 +623,49 @@ def list_widget_setter(widget: QListWidget, itm_list: List[str]):
         pass
 
 
+def _linear_pipeline_getter(w: LinearPipelineWidget) -> dict:
+    """Translate widget state to existing config schema."""
+    return {
+        'step_order': [s.spec_name for s in w.pipeline.steps],
+        **{s.spec_name: {'run': s.enabled} for s in w.pipeline.steps}
+    }
+
+def _linear_pipeline_setter(w: LinearPipelineWidget, value: dict | None) -> None:
+    """Reconstruct pipeline from existing config schema."""
+    if not value:
+        return
+    order = value.get('step_order') or list(BINARIZATION_STEPS.keys())
+    w._pipeline = LinearPipeline(steps=[
+        PipelineStep(
+            spec_name=name,
+            enabled=value.get(name, {}).get('run', True),
+            keep_intermediate=value.get(name, {}).get('keep_intermediate', True),
+            locked=(name == 'binarize'),
+        )
+        for name in order
+        if name in BINARIZATION_STEPS
+    ])
+    w._populate()
+
+
+def _linear_pipeline_connector(w: 'LinearPipelineWidget', cb: Callable) -> Callable:
+    """
+    Connect all pipeline-mutation signals to cb.
+    Returns a single disconnector that tears down every connection.
+    """
+    slot_pipeline = lambda _steps:       cb()
+    slot_keep     = lambda _spec, _keep: cb()
+
+    w.pipeline_changed.connect(slot_pipeline)
+    w.keep_intermediate_changed.connect(slot_keep)
+
+    def _disconnect():
+        disconnect_widget_signal(w.pipeline_changed,          slot=slot_pipeline)
+        disconnect_widget_signal(w.keep_intermediate_changed, slot=slot_keep)
+
+    return _disconnect
+
+
 class EditingFinishedFilter(QObject):
     """Emits a callback when a QPlainTextEdit loses focus (≈ editingFinished)."""
     def __init__(self, callback, parent=None):
@@ -869,6 +914,14 @@ WIDGET_OPS.register(
     setter=lambda w, v: w.set_value(v or {}),
     connector=lambda w, cb: w.connect(cb),
 )
+
+WIDGET_OPS.register(
+    LinearPipelineWidget,
+    getter=_linear_pipeline_getter,
+    setter=_linear_pipeline_setter,
+    connector=_linear_pipeline_connector,
+)
+
 
 
 def n_proc_getter(widget: NProcessesWidget):
