@@ -6,74 +6,83 @@ Statistics
 Create some statistics to test significant changes in voxelized and labeled 
 data.
 """
-__author__ = 'Christoph Kirst <christoph.kirst.ck@gmail.com>, Sophie Skriabine <sophie.skriabine@icm-institute.org>, Charly Rousseau <charly.rousseau@icm-institute.org>'
+__author__ = ('Christoph Kirst <christoph.kirst.ck@gmail.com>, '
+              'Sophie Skriabine <sophie.skriabine@icm-institute.org>, '
+              'Charly Rousseau <charly.rousseau@icm-institute.org>')
 __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
-import os
-import math
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Optional
 
 import numpy as np
 import pandas as pd
 from scipy import stats
 
-
-from ClearMap.Alignment.utils import get_all_region_ids
 from ClearMap.IO import IO as clearmap_io
-from ClearMap.Utils.exceptions import GroupStatsError
-from ClearMap.Utils.path_utils import is_density_file, find_density_file, find_cells_df
-from ClearMap.Utils.utilities import make_abs
-from ClearMap.config.atlas import ATLAS_NAMES_MAP
-from ClearMap.config.config_handler import ConfigHandler
-from ClearMap.pipeline_orchestrators.sample_info_management import build_sample_manager
-from ClearMap.pipeline_orchestrators.utils import init_sample_manager_and_processors
 
-import ClearMap.Analysis.Statistics.StatisticalTests as clearmap_stat_tests
 from ClearMap.Analysis.Statistics import MultipleComparisonCorrection as clearmap_FDR
 
-colors = {  # REFACTOR: move to visualisation module
-    'red': [255, 0, 0],
+# ---------------------------------------------------------------------------
+#  Constants
+# ---------------------------------------------------------------------------
+# REFACTOR: move to visualisation module
+P_VALUE_COLORS = {
+    'red':   [255, 0, 0],
     'green': [0, 255, 0],
-    'blue': [0, 0, 255]
+    'blue':  [0, 0, 255]
 }
 
+# ---------------------------------------------------------------------------
+#  Dataclasses
+# ---------------------------------------------------------------------------
 
-@dataclass(frozen=True)
-class PValueAssets:
-    p_vals: Path
-    gp1_avg: Path
-    gp1_sd: Optional[Path]
-    gp2_avg: Path
-    gp2_sd: Optional[Path]
-    effect_size: Optional[Path]
+@dataclass
+class LoadedPValueResults:
+    gp1_avg: np.ndarray
+    gp1_sd: Optional[np.ndarray]
+    gp2_avg: np.ndarray
+    gp2_sd: Optional[np.ndarray]
+    p_vals: np.ndarray
+    effect_size: Optional[np.ndarray]
+
+    @property
+    def has_sd(self) -> bool:
+        return (self.gp1_sd is not None) and (self.gp2_sd is not None)
+
+    @property
+    def has_effect(self) -> bool:
+        return self.effect_size is not None
+
+    @property
+    def gp1_imgs(self):
+        return [self.gp1_avg, self.gp1_sd] if self.has_sd else self.gp1_avg
+
+    @property
+    def gp2_imgs(self):
+        return [self.gp2_avg, self.gp2_sd] if self.has_sd else self.gp2_avg
+
+    @property
+    def stats_imgs(self):
+        return [self.p_vals, self.effect_size] if self.has_effect else self.p_vals
 
 
-def p_val_assets_for_pair(results_dir: Path, channel: str, gp1: str, gp2: str, density_suffix: str = '') -> PValueAssets:
-    if density_suffix and not density_suffix.startswith('_'):
-        density_suffix = '_' + density_suffix
-    pvals = results_dir / f'{channel}_p_val_colors_{gp1}_{gp2}{density_suffix}.tif'
-    eff   = results_dir / f'{channel}_effect_size_{gp1}_{gp2}{density_suffix}.tif'
+# ---------------------------------------------------------------------------
+#  Pure statistics
+# ---------------------------------------------------------------------------
 
-    gp1_avg = results_dir / f'{channel}_avg_density{density_suffix}_{gp1}.tif'
-    gp1_sd  = results_dir / f'{channel}_sd_density_{gp1}{density_suffix}.tif'
-    gp2_avg = results_dir / f'{channel}_avg_density{density_suffix}_{gp2}.tif'
-    gp2_sd  = results_dir / f'{channel}_sd_density_{gp2}{density_suffix}.tif'
-
-    def _opt(p: Path) -> Optional[Path]:
-        return p if p.exists() else None
-
-    return PValueAssets(p_vals=pvals,
-                        gp1_avg=gp1_avg, gp1_sd=_opt(gp1_sd),
-                        gp2_avg=gp2_avg, gp2_sd=_opt(gp2_sd),
-                        effect_size=_opt(eff))
+def remove_p_val_nans(p_vals, t_vals):
+    invalid_idx = np.isnan(p_vals)
+    p_vals_c = p_vals.copy()
+    p_vals_c[invalid_idx] = 1.0
+    t_vals_c = t_vals.copy()
+    t_vals_c[invalid_idx] = 0.0
+    return p_vals_c, t_vals_c
 
 
-def t_test_voxelization(group1, group2, signed=False, remove_nan=True, p_cutoff=None):
+def t_test_voxelization(group1, group2, *, signed=False, remove_nan=True, p_cutoff=None):
     """
     t-Test on differences between the individual voxels in group1 and group2
 
@@ -111,7 +120,7 @@ def t_test_voxelization(group1, group2, signed=False, remove_nan=True, p_cutoff=
 
 
 # WARNING: needs clean up
-def t_test_region_counts(counts1, counts2, signed=False, remove_nan=True, p_cutoff=None, equal_var=False):
+def t_test_region_counts(counts1, counts2, *, signed=False, remove_nan=True, p_cutoff=None, equal_var=False):
     """t-Test on differences in counts of points in labeled regions"""
 
     # ids, p1 = countPointsGroupInRegions(pointGroup1, labeledImage = labeledImage, withIds = True);
@@ -135,16 +144,21 @@ def t_test_region_counts(counts1, counts2, signed=False, remove_nan=True, p_cuto
         return p_vals
 
 
+# ---------------------------------------------------------------------------
+#  Data loading / stacking
+# ---------------------------------------------------------------------------
+
 # TODO: group sources in IO
 def read_group(sources, combine=True, **args):
-    """Turn a list of sources for data into a numpy stack.
+    """
+    Turn a list of sources for data into a numpy stack.
 
     Arguments
     ---------
     sources : list of str or sources
         The sources to combine.
     combine : bool
-        If true combine the sources to ndarray, oterhwise return a list.
+        If true combine the sources to ndarray, otherwise return a list.
 
     Returns
     -------
@@ -159,176 +173,59 @@ def read_group(sources, combine=True, **args):
     # read the individual files
     group = []
     for f in sources:
-        data = clearmap_io.as_source(f, **args).array
-        data = np.reshape(data, (1,) + data.shape)
-        group.append(data)
-
+        data = clearmap_io.as_source(f).array
+        group.append(data[np.newaxis, ...])
     if combine:
         return np.vstack(group)
     else:
         return group
 
-
-def weights_from_precentiles(intensities, percentiles=[25, 50, 75, 100]):
-    perc = np.percentiles(intensities, percentiles)
-    weights = np.zeros(intensities.shape)
-    for p in perc:
-        ii = intensities > p
-        weights[ii] = weights[ii] + 1
-
-    return weights
-
-
-def __prepare_cumulative_data(data, offset):  # FIXME: use better variable names
-    # fill up the low count data
-    n = np.array([x.size for x in data])
-    nm = n.max()
-    m = np.array([x.max() for x in data])
-    mm = m.max()
-    k = n.size
-    # print nm, mm, k
-    if offset is None:
-        # assume data starts at 0 !
-        offset = mm / nm  # ideal for all statistics this should be mm + eps to have as little influence as possible.
-    datac = [x.copy() for x in data]
-    return datac, k, m, mm, n, nm, offset
-
-
-def __plot_cumulative_test(datac, m, plot):
-    # test by plotting
-    if plot:
-        import matplotlib.pyplot as plt
-        for i in range(m.size):
-            datac[i].sort()
-            plt.step(datac[i], np.arange(datac[i].size))
-
-
-def __run_cumulative_test(datac, k, method):  # FIXME: remove one letter variable names
-    if method in ('KolmogorovSmirnov', 'KS'):
-        if k == 2:
-            s, p = stats.ks_2samp(datac[0], datac[1])
-        else:
-            raise RuntimeError('KolmogorovSmirnov only for 2 samples not %d' % k)
-
-    elif method in ('CramervonMises', 'CM'):
-        if k == 2:
-            s, p = clearmap_stat_tests.test_cramer_von_mises_2_sample(datac[0], datac[1])
-        else:
-            raise RuntimeError('CramervonMises only for 2 samples not %d' % k)
-
-    elif method in ('AndersonDarling', 'AD'):
-        s, a, p = stats.anderson_ksamp(datac)
-    return p, s
-
-
-def test_completed_cumulatives(data, method='AndersonDarling', offset=None, plot=False):
-    """Test if data sets have the same number / intensity distribution by adding max intensity counts
-    to the smaller sized data sets and performing a distribution comparison test"""
-
-    # idea: fill up data points to the same numbers at the high intensity values and use KS test
-    # cf. work in progress on thoroughly testing the differences in histograms
-
-    datac, k, m, mm, n, nm, offset = __prepare_cumulative_data(data, offset)
-    for i in range(m.size):
-        if n[i] < nm:
-            datac[i] = np.concatenate((datac[i], np.ones(nm-n[i], dtype=datac[i].dtype) * (mm + offset)))  # + 10E-5 * numpy.random.rand(nm-n[i])));
-
-    __plot_cumulative_test(datac, m, plot)
-
-    return __run_cumulative_test(datac, k, method)
-
-
-def test_completed_inverted_cumulatives(data, method='AndersonDarling', offset=None, plot=False):
-    """Test if data sets have the same number / intensity distribution by adding zero intensity counts
-    to the smaller sized data sets and performing a distribution comparison test on the reversed cumulative distribution"""
-
-    # idea: fill up data points to the same numbers at the high intensity values and use KS test
-    # cf. work in progress on thoroughly testing the differences in histograms
-
-    datac, k, m, mm, n, nm, offset = __prepare_cumulative_data(data, offset)
-    for i in range(m.size):
-        if n[i] < nm:
-            datac[i] = np.concatenate((-datac[i], np.ones(nm-n[i], dtype=datac[i].dtype) * (offset)))  # + 10E-5 * numpy.random.rand(nm-n[i])));  # FIXME: only different lines with function above
-        else:
-            datac[i] = -datac[i]
-
-    __plot_cumulative_test(datac, m, plot)
-
-    return __run_cumulative_test(datac, k, method)
-
-
-def remove_p_val_nans(p_vals, t_vals):
-    invalid_idx = np.isnan(p_vals)
-    p_vals_c = p_vals.copy()
-    t_vals_c = t_vals.copy()
-    p_vals_c[invalid_idx] = 1.0
-    t_vals_c[invalid_idx] = 0
-    return p_vals_c, t_vals_c
-
-
-def stack_voxelizations(directory, f_list, suffix, channel=None):
+def stack_voxelizations(arrays: list[np.ndarray]) -> np.ndarray:
     """
-    Regroup voxelizations to simplify further processing
+    Stack a list of 3-D voxelization arrays into a single (X, Y, Z, N) float32 array.
 
     Parameters
     ----------
-    directory
-    f_list
-    suffix
+    arrays : list of np.ndarray
+        Per-sample voxelization volumes, each shaped (X, Y, Z).
 
     Returns
     -------
-
+    np.ndarray
+        Shape (X, Y, Z, N).
     """
-    for i, file_name in enumerate(f_list):
-        img = clearmap_io.read(make_abs(directory, file_name))
-        if i == 0:  # init on first image
-            stacked_voxelizations = img[:, :, :, np.newaxis]
-        else:
-            stacked_voxelizations = np.concatenate((stacked_voxelizations, img[:, :, :, np.newaxis]), axis=3)
-    stacked_voxelizations = stacked_voxelizations.astype(np.float32)
-    try:
-        clearmap_io.write(directory /f'{channel}_stacked_density_{suffix}.tif', stacked_voxelizations, bigtiff=True)
-    except ValueError:
-        pass
-    return stacked_voxelizations
+    expanded_arrays = [a[:, :, :, np.newaxis] for a in arrays]  # Add concatenation dimension
+    return np.concatenate(expanded_arrays, axis=3).astype(np.float32)
 
 
-def average_voxelization_groups(stacked_voxelizations, directory, suffix, channel='', compute_sd=False):
-    avg_voxelization = np.mean(stacked_voxelizations, axis=3)
-    clearmap_io.write(directory / f'{channel}_avg_density_{suffix}.tif', avg_voxelization)
+# ---------------------------------------------------------------------------
+#  P-value coloring  (REFACTOR: move to visualisation module eventually)
+# ---------------------------------------------------------------------------
 
-    if compute_sd:
-        sd_voxelization = np.std(stacked_voxelizations, axis=3)
-        clearmap_io.write(directory / f'{channel}_sd_density_{suffix}.tif', sd_voxelization)
-
-
-# REFACTOR: move to visualisation module
 def __validate_colors(positive_color, negative_color):
     if len(positive_color) != len(negative_color):
         raise ValueError(f'Length of positive and negative colors do not match, '
                          f'got {len(positive_color)} and {len(negative_color)}')
 
 
-  # REFACTOR: move to visualisation module
-def color_p_values(p_vals, p_sign, positive_color=[1, 0], negative_color=[0, 1], p_cutoff=None,
-                   positive_trend=[0, 0, 1, 0], negative_trend=[0, 0, 0, 1], p_max=None):
+def color_p_values(p_vals, p_sign, positive_color=(1, 0), negative_color=(0, 1), p_cutoff=None,
+                   positive_trend=(0, 0, 1, 0), negative_trend=(0, 0, 0, 1), p_max=None):
     """
 
     Parameters
     ----------
-    p_vals np.array:
-    p_sign np.array:
-    positive list:
-    negative list:
-    p_cutoff float:
-    positive_trend list:
-    negative_trend list:
-    p_max float:
+    p_vals : np.ndarray
+    p_sign : np.ndarray
+    positive_color : tuple
+    negative_color : tuple
+    p_cutoff : float, optional
+    positive_trend : tuple
+    negative_trend : tuple
+    p_max : float, optional
 
     Returns
     -------
-
+    np.ndarray
     """
     if p_max is None:
         p_max = p_vals.max()
@@ -341,7 +238,7 @@ def color_p_values(p_vals, p_sign, positive_color=[1, 0], negative_color=[0, 1],
         # 3D + color output array
         d = len(positive_color)  # 3D
         output_shape = p_vals.shape + (d,)  # 3D + color
-        colored_p_vals = np.zeros(output_shape)
+        colored_p_vals = np.zeros(output_shape)  # FIXME: simplify with newaxis
 
         # coloring
         for neg, col in ((False, positive_color), (True, negative_color)):
@@ -380,65 +277,65 @@ def get_colored_p_vals(p_vals, t_vals, significance, color_names):
     p_vals_f = np.clip(p_vals, None, significance)
     p_sign = np.sign(t_vals)
     return color_p_values(p_vals_f, p_sign,
-                          positive_color=colors[color_names[0]],
-                          negative_color=colors[color_names[1]])
+                          positive_color=P_VALUE_COLORS[color_names[0]],
+                          negative_color=P_VALUE_COLORS[color_names[1]])
 
 
-def dirs_to_density_files(directory, f_list, channel, suffix=''):
-    out = []
-    for i, f_name in enumerate(f_list):
-        f_name = make_abs(directory, f_name)
-        if not is_density_file(f_name):
-            f_name = find_density_file(f_name, channel, suffix=suffix)
-        out.append(f_name)
-    return out
+# ---------------------------------------------------------------------------
+#  Region-level cell counting
+# ---------------------------------------------------------------------------
 
-
-# def get_p_vals_f(p_vals, t_vals, p_cutoff):
-#     p_vals2 = np.clip(p_vals, None, p_cutoff)
-#     p_sign = np.sign(t_vals)
-#     return p_vals2, p_sign
-
-
-def group_cells_counts(annotator, region_ids, group_cells_dfs, sample_ids, volume_map):
+def group_region_counts(annotator, region_ids, group_dfs, sample_ids, volume_map) -> pd.DataFrame:
     """
+    Count entities (cells, tracts, …) per region per hemisphere for each sample in a group.
+
+    .. note::
+
+        Works for any labeled DataFrame that has an 'id' column.
+        'hemisphere' is optional — when absent all entities are treated as
+        belonging to a single synthetic hemisphere (value 0).
 
     Parameters
     ----------
-    struct_ids list:
-    group_cells_dfs: list(pd.DataFrame)
-    sample_ids: list
-    volume_map: dict
-        maps each id from structure_ids to the corresponding structure's volume (in pixel)
+    annotator : Annotator
+        Atlas annotator for structure name lookup.
+    region_ids : array-like
+        Region IDs to count.
+    group_dfs : list[pd.DataFrame]
+        One DataFrame per sample, with 'id' and (optional) 'hemisphere' columns.
+    sample_ids : list
+        Sample identifiers (strings or ints).
+    volume_map : dict
+        Maps (id, hemisphere) to structure volume in pixels.
 
     Returns
     -------
-
+    pd.DataFrame
     """
-    all_ints = False
-    if all_ints:
-        output = pd.DataFrame(columns=['id', 'hemisphere'] + [f'counts_{str(sample_ids[i]).zfill(2)}' for i in range(len(group_cells_dfs))])
-    else:
-        output = pd.DataFrame(columns=['id', 'hemisphere'] + [f'counts_{sample_ids[i]}' for i in range(len(group_cells_dfs))])
+    has_hemisphere = all('hemisphere' in df.columns for df in group_dfs)
+    hemispheres = (0, 255) if has_hemisphere else (0,)
 
-    output['id'] = np.tile(region_ids, 2)  # for each hemisphere
-    output['name'] = np.tile([annotator.find(id_, key='id')['name'] for id_ in region_ids], 2)
-    output['hemisphere'] = np.repeat((0, 255), len(region_ids))  # FIXME: translate hemisphere to plain text
+    all_ints = all(isinstance(sid, int) or (isinstance(sid, str) and sid.isdigit())
+                   for sid in sample_ids)
+    col_ids = [str(sid).zfill(2) if all_ints else str(sid) for sid in sample_ids]
+    count_cols = [f'counts_{cid}' for cid in col_ids]
+
+    output = pd.DataFrame(columns=['id', 'hemisphere'] + count_cols)
+    output['id'] = np.tile(region_ids, len(hemispheres))
+    output['name'] = np.tile([annotator.find(id_, key='id')['name'] for id_ in region_ids], len(hemispheres))
+    output['hemisphere'] = np.repeat(hemispheres, len(region_ids))  # FIXME: translate hemisphere to plain text
     output['volume'] = output.set_index(['id', 'hemisphere']).index.map(volume_map.get)
     output = output[output['volume'].notna()]
 
-    for multiplier, hem_id in zip((1, 2), (0, 255)):
-        for j, sample_df in enumerate(group_cells_dfs):
-            if all_ints:
-                col_name = f'counts_{str(sample_ids[j]).zfill(2)}'  # TODO: option with f'counts_{j}'
-            else:
-                col_name = f'counts_{sample_ids[j]}'
+    for hem_id in hemispheres:
+        for j, sample_df in enumerate(group_dfs):
+            hem_df = (sample_df[sample_df['hemisphere'] == hem_id]
+                      if has_hemisphere else sample_df)
+            for struct_id in region_ids:
+                mask = ((output['id'] == struct_id) &
+                        (output['hemisphere'] == hem_id))
+                output.loc[mask, count_cols[j]] = len(hem_df[hem_df['id'] == struct_id])
 
-            hem_sample_df = sample_df[sample_df['hemisphere'] == hem_id]
-            # FIXME: replace loop (slow)
-            for i, struct_id in enumerate(region_ids):
-                row_idx = output[(output['id'] == struct_id) & (output['hemisphere'] == hem_id)].index
-                output.loc[row_idx, col_name] = len(hem_sample_df[hem_sample_df['id'] == struct_id])
     return output
 
 
@@ -473,13 +370,6 @@ def generate_summary_table(cells_dfs, p_cutoff=None):
 def sanitize_df(gp_names, grouped_counts, total_df):
     """
     Remove rows with all 0 or NaN in at least 1 group
-    Args:
-        gp_names:
-        grouped_counts:
-        total_df:
-
-    Returns:
-
     """
     bad_idx = total_df[f'mean_{gp_names[0]}'] == 0  # FIXME: check that either not and
     bad_idx = np.logical_or(bad_idx, total_df[f'mean_{gp_names[1]}'] == 0)
@@ -487,141 +377,6 @@ def sanitize_df(gp_names, grouped_counts, total_df):
     bad_idx = np.logical_or(bad_idx, np.isnan(total_df[f'mean_{gp_names[1]}']))
 
     return total_df[~bad_idx], [grouped_counts[0][~bad_idx], grouped_counts[1][~bad_idx]]
-
-
-def dirs_to_cells_dfs(directory, dirs):
-    out = []
-    for i, f_name in enumerate(dirs):
-        f_name = make_abs(directory, f_name)
-        if not f_name.endswith('cells.feather'):  # FIXME: per channel
-            f_name = find_cells_df(f_name)
-        out.append(pd.read_feather(f_name))
-    return out
-
-
-def get_volume_map(folder, channel=None):
-    orchestrators = init_sample_manager_and_processors(folder)
-    sample_manager = orchestrators['sample_manager']
-    registration_manager = orchestrators['registration_processor']
-
-    if channel is None:
-        annotator = registration_manager.annotators[sample_manager.alignment_reference_channel]
-    else:
-        annotator = registration_manager.annotators[channel]
-    atlas_id = registration_manager.config['atlas']['id']
-    atlas_scale = [ATLAS_NAMES_MAP[atlas_id]['resolution']] * 3
-    return annotator.get_lateralised_volume_map(atlas_scale)
-
-
-# REFACTOR: move to separate module
-def make_summary(directory, gp1_name, gp2_name, gp1_dirs, gp2_dirs, channel=None, output_path=None, save=True):
-    directory = Path(directory)
-
-    dfs = {}
-    if channel is None:
-        tmp_sample_manager = build_sample_manager(src_dir=directory / gp1_dirs[0])
-        channels = tmp_sample_manager.channels_to_detect
-    else:
-        channels = [channel]
-
-    for channel_ in channels:
-        # Use the first sample to get the annotator for the cohort
-        orchestrators = init_sample_manager_and_processors(folder=directory / gp1_dirs[0])
-        aligner = orchestrators['registration_processor']
-
-        annotator = aligner.annotators[channel_]
-
-        gp1_dfs = dirs_to_cells_dfs(directory, gp1_dirs)
-        gp2_dfs = dirs_to_cells_dfs(directory, gp2_dirs)
-        gp_cells_dfs = [gp1_dfs, gp2_dfs]
-        region_ids = get_all_region_ids(gp1_dfs + gp2_dfs)
-
-        gp1_sample_ids = [dir_to_sample_id(folder) for folder in gp1_dirs]
-        gp2_sample_ids = [dir_to_sample_id(folder) for folder in gp2_dirs]
-        sample_ids = [gp1_sample_ids, gp2_sample_ids]
-
-        volume_map = get_volume_map(gp1_dirs[0], channel=channel)  # WARNING Hacky
-
-        aggregated_dfs = {gp_name: group_cells_counts(annotator, region_ids, gp_cells_dfs[i], sample_ids[i], volume_map)
-                          for i, gp_name in enumerate((gp1_name, gp2_name))}
-        total_df = generate_summary_table(aggregated_dfs)
-
-        if output_path is None and save:
-            output_path = directory / f'{channel}_statistics_{gp1_name}_{gp2_name}.csv'
-        if save:
-            total_df.to_csv(output_path)
-        dfs[channel_] = total_df
-    return dfs
-
-
-def density_files_are_comparable(directory, *, gp1_dirs, gp2_dirs, channel, density_files_suffix=''):
-    gp1_f_list = dirs_to_density_files(directory, gp1_dirs, channel, suffix=density_files_suffix)
-    gp2_f_list = dirs_to_density_files(directory, gp2_dirs, channel, suffix=density_files_suffix)
-    all_files = gp1_f_list + gp2_f_list
-    sizes = [os.path.getsize(f) for f in all_files]
-    tolerance = 1024  # 1 KB
-    comparable = all(math.isclose(s, sizes[0], abs_tol=tolerance) for s in sizes)
-    if comparable:
-        return True
-    else:
-        raise GroupStatsError(f'Could not compare files, for channel {channel} sizes differ\n\n'
-                              f'Group 1: {gp1_f_list}\n'
-                              f'Group 2: {gp2_f_list}\n'
-                              f'Sizes 1: {[os.path.getsize(f) for f in gp1_f_list]}\n'
-                              f'Sizes 2: {[os.path.getsize(f) for f in gp2_f_list]}\n')
-
-
-# REFACTOR: move to separate module
-def compare_groups(directory, gp1_name, gp2_name, gp1_dirs, gp2_dirs, prefix='p_val_colors',
-                   advanced=True, density_files_suffix=''):
-    directory = Path(directory)
-
-    sample_manager = build_sample_manager(src_dir=directory / gp1_dirs[0])
-
-    result = {}
-    for channel in sample_manager.channels:
-        # FIXME: counts is only for cell_map, make compatible with other pipelines
-        asset_sub_type = 'counts' or density_files_suffix
-        density_asset = sample_manager.get('density', channel=channel, asset_sub_type=asset_sub_type,
-                                           default=None)
-        if density_asset is None or not density_asset.exists:
-            print(f'No density files found for channel {channel}, skipping')
-            continue
-
-        gp1_f_list = dirs_to_density_files(directory, gp1_dirs, channel, density_files_suffix)
-        gp2_f_list = dirs_to_density_files(directory, gp2_dirs, channel, density_files_suffix)
-
-        gp1_stacked_voxelizations = stack_voxelizations(directory, gp1_f_list, channel=channel,
-                                                        suffix=f'{density_files_suffix}_{gp1_name}')
-        average_voxelization_groups(gp1_stacked_voxelizations, directory, f'{density_files_suffix}_{gp1_name}',
-                                    channel=channel, compute_sd=advanced)
-        gp2_stacked_voxelizations = stack_voxelizations(directory, gp2_f_list, channel=channel,
-                                                        suffix=f'{density_files_suffix}_{gp2_name}')
-        average_voxelization_groups(gp2_stacked_voxelizations, directory, f'{density_files_suffix}_{gp2_name}',
-                                    channel=channel, compute_sd=advanced)
-
-        t_vals, p_vals = stats.ttest_ind(gp1_stacked_voxelizations, gp2_stacked_voxelizations, axis=3, equal_var=False)
-        p_vals, t_vals = remove_p_val_nans(p_vals, t_vals)
-
-        colored_p_vals_05 = get_colored_p_vals(p_vals, t_vals, 0.05, ('red', 'green'))
-        colored_p_vals_01 = get_colored_p_vals(p_vals, t_vals, 0.01, ('green', 'blue'))
-        colored_p_vals = np.maximum(colored_p_vals_05, colored_p_vals_01).astype(np.uint8)
-
-        output_f_name = f'{channel}_{prefix}_{gp1_name}_{gp2_name}_{density_files_suffix}.tif'
-        output_file_path = directory / output_f_name
-        clearmap_io.write(output_file_path, colored_p_vals, photometric='rgb', imagej=True)
-
-        if advanced:
-            effect_size = np.abs(np.mean(gp1_stacked_voxelizations, axis=3).astype(int) -
-                                 np.mean(gp2_stacked_voxelizations, axis=3).astype(int))
-            effect_size = effect_size.astype(np.uint16)  # for imagej compatibility
-            output_f_name = f'{channel}_effect_size_{gp1_name}_{gp2_name}_{density_files_suffix}.tif'
-            output_file_path = directory / output_f_name
-            clearmap_io.write(output_file_path, effect_size, imagej=True)
-
-        result[channel] = colored_p_vals
-
-    return result
 
 
 # def test_completed_cumulatives_in_spheres(points1, intensities1, points2, intensities2,
@@ -696,59 +451,3 @@ def compare_groups(directory, gp1_name, gp2_name, gp1_dirs, gp2_dirs, prefix='p_
 #
 #     import ClearMap.Visualization.Plot3d as p3d
 #     p3d.plot(pvalscol)
-
-
-def check_ids_are_unique(gp1, gp2):
-    ids = []
-    for gp_dir in gp1 + gp2:
-        loader = ConfigHandler(gp_dir)
-        ids.append(loader.get_cfg('sample')['sample_id'])
-    if len(ids) != len(set(ids)):
-        raise GroupStatsError('Analysis impossible, some IDs are not unique. please check and start again')
-
-
-@dataclass
-class LoadedPValueResults:
-    gp1_avg: np.ndarray
-    gp1_sd: Optional[np.ndarray]
-    gp2_avg: np.ndarray
-    gp2_sd: Optional[np.ndarray]
-    p_vals: np.ndarray
-    effect_size: Optional[np.ndarray]
-
-    @property
-    def has_sd(self) -> bool:
-        return (self.gp1_sd is not None) and (self.gp2_sd is not None)
-
-    @property
-    def has_effect(self) -> bool:
-        return self.effect_size is not None
-
-    @property
-    def gp1_imgs(self):
-        return [self.gp1_avg, self.gp1_sd] if self.has_sd else self.gp1_avg
-
-    @property
-    def gp2_imgs(self):
-        return [self.gp2_avg, self.gp2_sd] if self.has_sd else self.gp2_avg
-
-    @property
-    def stats_imgs(self):
-        return [self.p_vals, self.effect_size] if self.has_effect else self.p_vals
-
-
-def dir_to_sample_id(folder):
-    """
-    Get the sample ID from a directory
-
-    Parameters
-    ----------
-    folder : str
-        The directory to check
-
-    Returns
-    -------
-
-    """
-    cfg_loader = ConfigHandler(folder)
-    return cfg_loader.get_cfg('sample')['sample_id']
