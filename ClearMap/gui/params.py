@@ -2047,7 +2047,7 @@ class GroupAnalysisParams(BatchParameters):
         self.extend_params_dict({
             # 'plot_channel': ParamLink(None, self.tab.plotChannelComboBox),
             'compute_sd_and_effect_size': ParamLink(None, self.tab.computeSdAndEffectSizeCheckBox),
-            'density_suffix': ParamLink(None, self.tab.densitySuffixTextFilterLineEdit),
+            'density_suffix': ParamLink(None, self.tab.densitySuffixComboBox),
             'pipeline': ParamLink(['pipeline'], self.tab.batchPipelineNameComboBox)
         })
 
