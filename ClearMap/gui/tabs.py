@@ -1973,6 +1973,8 @@ class GroupAnalysisTab(BatchTab):
                                           get_view=self.group_controller.get_config_view,
                                           apply_patch=self.group_controller.apply_patch)
         self.params.set_pipelines(['CellMap', 'TractMap', 'TubeMap', 'Colocalization'])
+        self.params.params_dict['pipeline'].notify_apply = (
+            lambda: self.processor.__setattr__('pipeline', self.params.pipeline))
 
         def _channels_provider(params) -> list[str]:
             sample_folders_paths = params.get_all_paths()
@@ -1996,7 +1998,9 @@ class GroupAnalysisTab(BatchTab):
 
     @property
     def processor(self):
-        return self.group_controller.get_density_orchestrator()  # FIXME:
+        proc = self.group_controller.get_density_orchestrator()
+        proc.pipeline = self.params.pipeline  # keep in sync whenever called
+        return proc
 
     def _setup_workers(self) -> None:
         results_folder = self.params.get('results_folder')
@@ -2077,7 +2081,8 @@ class GroupAnalysisTab(BatchTab):
     @ui_task_progress(lambda s: 'Group stats', lambda s: len(s.params.selected_comparisons))
     def make_group_stats_tables(self) -> None:
         self.main_window.clear_plots()
-        tables_by_pair = self.processor.compute_stats_tables(self.params.selected_comparisons, save=True)
+        tables_by_pair = self.processor.compute_stats_tables(self.params.selected_comparisons,
+                                                             density_suffix=self.params.density_suffix, save=True)
         dvs = [DataFrameWidget(tables[self.params.plot_channel]).table for tables in tables_by_pair.values()]
         self.main_window.setup_plots(dvs)  # TODO: use wrap_plot
 
@@ -2096,7 +2101,8 @@ class GroupAnalysisTab(BatchTab):
 
     def run_df_plots(self, plot_function: Callable, plot_kw_args: dict) -> list:
         self.main_window.clear_plots()
-        dvs = self.processor.run_plots(plot_function, self.params.selected_comparisons, plot_kw_args)
+        dvs = self.processor.run_plots(plot_function, self.params.selected_comparisons,
+                                       channel=self.params.plot_channel, plot_kw_args=plot_kw_args)
         self.main_window.setup_plots(dvs)
         return dvs
 
@@ -2104,10 +2110,8 @@ class GroupAnalysisTab(BatchTab):
         self.run_df_plots(plot_volcano, {'group_names': None, 'p_cutoff': 0.05, 'show': False, 'save_path': ''})
 
     def plot_histograms(self, fold_threshold: int = 2) -> None:  # TODO: check plot wraps
-        folder = Path(self.params.results_folder) / self.params.groups[self.params.group_names[0]][0] # FIXME: check if absolute
-        processors = init_sample_manager_and_processors(folder)
-        registration_processor = processors['registration_processor']
-        annotator = registration_processor.annotators[self.params.plot_channel]
+        sample_dir = self.processor._any_sample_in(self.params.group_names[0])
+        annotator = self.processor._get_annotator(sample_dir, self.params.plot_channel)
         aba_df = annotator.df
         # aba_json_df_path = annotation.default_label_file  # FIXME: aba_json needs fold levels
         self.run_df_plots(plot_sample_stats_histogram,
