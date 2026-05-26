@@ -14,7 +14,7 @@ from typing import Any, Optional, Iterable, Dict, Sequence, List, Set, Tuple
 
 from ClearMap.Utils.utilities import deep_merge, REPLACE, DELETE, _REPLACE
 
-from ClearMap.config.compound_keys import PairKey
+from ClearMap.config.compound_keys import CompoundKey
 
 from ClearMap.config.config_handler import ALTERNATIVES_REG
 from ClearMap.config.config_adjusters.type_hints import (ConfigView, ConfigPatch, SampleManagerProtocol, KeysPath,
@@ -179,7 +179,7 @@ def apply_channel_renames(view: ConfigView, ctx: AdjustmentContext) -> ConfigPat
             continue
 
         if spec.compound and spec.rename.migrate_payload:
-            updated, changed = PairKey.rename_container_keys(current, rename_map, oriented=spec.compound_oriented)
+            updated, changed = CompoundKey.rename_container_keys(current, rename_map, oriented=spec.compound_oriented)
         else:
             changed = False
             updated = deepcopy(current)
@@ -428,10 +428,10 @@ def _compound_preprocess(*, spec: InstanceContainerSpec, cur_map: dict[str, Any]
     if not spec.compound:
         return cur_map, False
 
-    cur_map, moved = PairKey.normalize_container_keys(cur_map, oriented=spec.compound_oriented)
+    cur_map, moved = CompoundKey.normalize_container_keys(cur_map, oriented=spec.compound_oriented)
 
     if spec.compound_prune_invalid_atoms:
-        pruned = PairKey.prune_container_invalid_atoms(cur_map, allowed_atoms=set(sm.channels), oriented=spec.compound_oriented)
+        pruned = CompoundKey.prune_container_invalid_atoms(cur_map, allowed_atoms=set(sm.channels), oriented=spec.compound_oriented)
         moved = moved or (pruned != cur_map)
         cur_map = pruned
 
@@ -493,7 +493,7 @@ def _reconcile_replace_container(*, spec: InstanceContainerSpec, view: ConfigVie
         carried_cfg = None
         carried = False
         if spec.compound and spec.rename.migrate_payload:
-            carried_cfg, carried = PairKey.migrate_container_payload(
+            carried_cfg, carried = CompoundKey.migrate_container_payload(
                 container=cur_map, new_key=k, rename_map=sm.renamed_channels, oriented=spec.compound_oriented)
 
         base = _bound_template_for_key(spec=spec, key=k, view=view, sm=sm, resolver=resolver)
