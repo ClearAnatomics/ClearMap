@@ -823,27 +823,23 @@ def postprocess(source, sink=None, postprocessing_parameter=default_postprocessi
 
     gc.collect()
 
-
 def apply_smoothing(source, sink, parameter_smooth, processing_parameter, processes=None, verbose=True):
-
-    source_size = np.prod(source.shape) * source.dtype.itemsize
-
-    if parameter_smooth.get('iterations', 1) > 1:  # Try to save to temp to ensure locality if >1 iter
-        if get_free_temp_space() > source_size:
-            tmp_f_path = tempfile.mktemp(prefix='TubeMap_vasc_smooth_', suffix='.npy')
-        else:  # Default to experiment directory
-            warnings.warn(f'Free space in temporary directory is insufficient, '
-                          f'required {bytes_to_human(source_size)}, '
-                          f'got {bytes_to_human(get_free_temp_space())} '
-                          f'defaulting to experiment directory')
-            tmp_f_path = Path(source.location).parent / f'TubeMap_vasc_smooth_{source.name}.npy'
-        sink = ap.initialize_sink(tmp_f_path, shape=source.shape, dtype=source.dtype,
-                                  order=source.order, return_buffer=False)
+    """
+    When iterations > 1 the intermediate file is written as a sibling of
+    the source in the experiment directory.
+    The caller owns the returned path and decides whether to delete it via
+    BinaryVesselProcessorSteps.consume_and_cleanup().
+    """
+    if parameter_smooth.get('iterations', 1) > 1:
+        source_path = Path(source.location)
+        tmp_f_path = str(source_path.parent / f'{source_path.stem}_smooth_tmp.npy')
+        tmp_sink = ap.initialize_sink(tmp_f_path, shape=source.shape, dtype=source.dtype,
+                                      order=source.order, return_buffer=False)
     else:
         tmp_f_path = ''
+        tmp_sink = sink
 
-    # run smoothing
-    smoothed = bs.smooth_by_configuration(source, sink=sink, processing_parameter=processing_parameter,
+    smoothed = bs.smooth_by_configuration(source, sink=tmp_sink, processing_parameter=processing_parameter,
                                           processes=processes, verbose=verbose, **parameter_smooth)
     return smoothed, tmp_f_path
 
