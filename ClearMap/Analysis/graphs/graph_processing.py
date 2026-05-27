@@ -278,19 +278,22 @@ def graph_from_skeleton(skeleton, points=None, radii=None, compute_vertex_coordi
     if verbose: timer.print_elapsed_time(f'Graph initialized with {n_vertices:,} vertices', reset=True)
 
     # ######################### detect edges #########################
-    edges_all = np.zeros((0, 2), dtype=int)  # TODO: list and stack later
+    edges = []
     for i, o in enumerate(t3d.orientations()):
         offset = np.sum((np.hstack(np.where(o)) - [1, 1, 1]) * skeleton.strides)
         # edges = ap.neighbours(points, offset)
-        edges = neighbours(points, offset)
-        if len(edges) > 0:
-            edges_all = np.vstack([edges_all, edges])
+        tmp_edges = neighbours(points, offset)
+        if len(tmp_edges) > 0:
+            edges.append(tmp_edges)
 
         if verbose:
-            timer.print_elapsed_time(f'{edges.shape[0]:,} edges with orientation {i + 1}/13 found', reset=True)
+            timer.print_elapsed_time(f'{len(tmp_edges):,} edges with orientation {i + 1}/13 found', reset=True)
 
-    if edges_all.shape[0] > 0:
+    if edges:
+        edges_all = np.vstack(edges, dtype=int)
         g.add_edge(edges_all)
+    else:
+        edges_all = np.zeros((0, 2), dtype=int)
 
     if verbose: timer.print_elapsed_time(f'Added {edges_all.shape[0]:,} edges to graph', reset=True)
 
