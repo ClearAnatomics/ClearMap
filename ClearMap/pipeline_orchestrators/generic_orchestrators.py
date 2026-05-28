@@ -15,12 +15,13 @@ from ClearMap.IO.workspace_asset import Asset
 from ClearMap.Utils.event_bus import BusSubscriberMixin
 from ClearMap.Utils.exceptions import ClearMapRuntimeError
 from ClearMap.Utils.utilities import handle_deprecated_args, deep_freeze, infer_origin_from_caller
+
 if TYPE_CHECKING:    # WARNING: some circular imports below, use only for type checking with quotes
     from ClearMap.config.config_coordinator import ConfigCoordinator
     from ClearMap.pipeline_orchestrators.sample_info_management import SampleManager
     from ClearMap.pipeline_orchestrators.registration_orchestrator import RegistrationProcessor
     from ClearMap.pipeline_orchestrators.experiment_controller import AnalysisGroupController
-from ClearMap.gui.widgets import ProgressWatcher
+    from ClearMap.gui.widgets import ProgressWatcher
 
 
 class ProcessorSteps(ABC):
@@ -230,7 +231,7 @@ class PipelineOrchestrator(OrchestratorBase):
     def __init__(self, coordinator: "ConfigCoordinator"):
         super().__init__(coordinator)
         self.stopped: bool = False
-        self.progress_watcher: Optional[ProgressWatcher] = None  # FIXME: ensure assigned
+        self.progress_watcher: Optional["ProgressWatcher"] = None  # FIXME: ensure assigned
         self.sample_manager: Optional["SampleManager"] = None  # FIXME: ensure assigned
 
     def setup_if_needed(self):

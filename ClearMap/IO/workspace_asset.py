@@ -51,7 +51,6 @@ from ClearMap.IO import FileUtils as file_utils
 from ClearMap.IO.assets_constants import CONTENT_TYPE_TO_PIPELINE
 from ClearMap.IO.assets_specs import TypeSpec, ChannelSpec, StateManager, SubTypeSpec
 from ClearMap.Utils.tag_expression import Expression
-from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
 from ClearMap.Utils.exceptions import ClearMapAssetError, AssetNotFoundError
 
 
@@ -622,6 +621,7 @@ class Asset(clearmap_io.AssetBase):
         return pipeline
 
     def plot(self, **kwargs):
+        from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
         if self.is_existing_source:
             q_plot_3d.plot(self.existing_path, **kwargs)
         else:

@@ -4,28 +4,34 @@ import warnings
 from concurrent.futures.process import BrokenProcessPool
 from enum import Enum
 from pathlib import Path
-from typing import Dict, Optional, TypedDict
+from typing import Dict, Optional, TypedDict, TYPE_CHECKING
 
 import numpy as np
+from skimage import transform as sk_transform
 
-from ClearMap import Settings as settings
+from ClearMap import Settings as settings, Settings
 from ClearMap.Alignment import Resampling as resampling, Elastix as elastix
 from ClearMap.Alignment.Annotation import Annotation
-from ClearMap.IO import IO as clearmap_io
+
+from ClearMap.IO import IO as clearmap_io, TIF
 from ClearMap.IO.assets_specs import ChannelSpec, TypeSpec
 from ClearMap.IO.metadata import define_auto_resolution
-from ClearMap.Utils.events import ChannelRenamed, UiAtlasIdChanged, UiAtlasStructureTreeIdChanged, \
-    RegistrationStatusChanged
+
+from ClearMap.Utils.events import (ChannelRenamed, UiAtlasIdChanged,
+                                   UiAtlasStructureTreeIdChanged,  RegistrationStatusChanged)
 from ClearMap.Utils.exceptions import ClearMapAssetError, ParamsOrientationError
-from ClearMap.Utils.utilities import runs_on_ui, check_stopped, DEFAULT_ORIENTATION, validate_orientation, \
-    sanitize_n_processes
-from ClearMap.Visualization import Plot3d as q_plot_3d
+from ClearMap.Utils.utilities import (runs_on_ui, check_stopped, DEFAULT_ORIENTATION,
+                                      validate_orientation,  sanitize_n_processes)
+
 from ClearMap.config.atlas import ATLAS_NAMES_MAP
 from ClearMap.config.config_coordinator import ConfigCoordinator
-from ClearMap.gui.gui_utils_images import surface_project, setup_mini_brain
-from ClearMap.gui.widgets import ProgressWatcher
+
 from ClearMap.pipeline_orchestrators.generic_orchestrators import PipelineOrchestrator, CanceledProcessing
 from ClearMap.pipeline_orchestrators.sample_info_management import SampleManager
+
+if TYPE_CHECKING:
+    from ClearMap.gui.widgets import ProgressWatcher
+    from ClearMap.Visualization import Plot3d as q_plot_3d  # WARNING: Local imports, for reference only
 
 
 class RegistrationStatus(Enum):
@@ -47,7 +53,7 @@ class RegistrationProcessor(PipelineOrchestrator):
         self.sample_manager: SampleManager = sample_manager
         self.annotators: Dict[str, Annotation] = {}  # 1 for each channel
         self.mini_brains: Dict[str, MiniBrain] = {}  # 1 for each channel
-        self.progress_watcher: Optional[ProgressWatcher] = None  # FIXME:
+        self.progress_watcher: Optional["ProgressWatcher"] = None  # FIXME:
         self.__bspline_registration_re = re.compile(r"\d+\s-?\d+\.\d+\s\d+\.\d+\s\d+\.\d+\s\d+\.\d+")
         self.__affine_registration_re = re.compile(r"\d+\s-\d+\.\d+\s\d+\.\d+\s\d+\.\d+\s\d+\.\d+\s\d+\.\d+")
         self.__resample_re = ('Resampling: resampling',
@@ -225,6 +231,7 @@ class RegistrationProcessor(PipelineOrchestrator):
         return registration_params_files
 
     def plot_atlas(self, channel):  # REFACTOR: idealy part of sample_manager
+        from ClearMap.Visualization import Plot3d as q_plot_3d
         atlas_path = self.get_path('atlas', channel=channel, asset_sub_type='reference')
         return q_plot_3d.plot(atlas_path, lut=self.machine_config['default_lut'])
 
@@ -476,6 +483,7 @@ class RegistrationProcessor(PipelineOrchestrator):
         np.ndarray, np.ndarray
             The mask and the projection
         """
+        from ClearMap.gui.gui_utils_images import surface_project
         img = self.__transform_mini_brain(channel)
         mask, proj = surface_project(img)
         return mask, proj
@@ -582,6 +590,7 @@ class RegistrationProcessor(PipelineOrchestrator):
         return img_paths, titles
 
     def plot_registration_results(self, channel, composite=False, parent=None):
+        from ClearMap.Visualization import Plot3d as q_plot_3d
         image_sources, titles = self.__prepare_registration_results_graph(channel)
         if composite:
             image_sources = [image_sources, ]
@@ -597,3 +606,21 @@ class MiniBrain(TypedDict):
     """
     scaling: tuple[float, float, float]
     array: np.ndarray
+
+
+def setup_mini_brain(atlas_base_name, mini_brain_scaling=(5, 5, 5)):  # TODO: scaling in prefs
+    """
+    Create a downsampled version of the Allen Brain Atlas for the mini brain widget
+
+    Parameters
+    ----------
+    mini_brain_scaling : tuple(int, int, int)
+        The scaling factors for the mini brain. Default is (5, 5, 5)
+
+    Returns
+    -------
+    tuple(scale, downsampled_array)
+    """
+    atlas_path = os.path.join(Settings.atlas_folder, f'{atlas_base_name}_annotation.tif')
+    arr = TIF.Source(atlas_path).array
+    return mini_brain_scaling, sk_transform.downscale_local_mean(arr, mini_brain_scaling)

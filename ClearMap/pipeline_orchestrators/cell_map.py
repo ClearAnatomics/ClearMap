@@ -29,28 +29,26 @@ from typing import Optional, TYPE_CHECKING
 import numpy as np
 import pandas as pd
 
-import pyqtgraph as pg
-from matplotlib.colors import to_hex
+# noinspection PyPep8Naming
+import ClearMap.IO.IO as clearmap_io
+from ClearMap.IO.workspace2 import Workspace2
 
 # noinspection PyPep8Naming
 import ClearMap.Alignment.Elastix as elastix
-# noinspection PyPep8Naming
-import ClearMap.IO.IO as clearmap_io
-# noinspection PyPep8Naming
-import ClearMap.Visualization.Plot3d as plot_3d
-import ClearMap.Visualization.Qt.Plot3d as qplot_3d
 # noinspection PyPep8Naming
 import ClearMap.Alignment.Resampling as resampling
 # noinspection PyPep8Naming
 import ClearMap.ImageProcessing.Experts.Cells as cell_detection
 # noinspection PyPep8Naming
 import ClearMap.Analysis.Measurements.Voxelization as voxelization
-from ClearMap.IO.workspace2 import Workspace2
+
 from ClearMap.Utils.exceptions import MissingRequirementException
 from ClearMap.Utils.utilities import requires_assets, FilePath, sanitize_n_processes
+
 from ClearMap.config.config_coordinator import ConfigCoordinator
+
 from ClearMap.pipeline_orchestrators.generic_orchestrators import ChannelPipelineOrchestrator
-from ClearMap.Visualization.Qt.widgets import Scatter3D
+
 
 __author__ = 'Christoph Kirst <christoph.kirst.ck@gmail.com>, Charly Rousseau <charly.rousseau@icm-institute.org>'
 __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE)'
@@ -160,6 +158,7 @@ class CellDetector(ChannelPipelineOrchestrator):
 
     @requires_assets([FilePath('density', asset_sub_type='counts')])
     def plot_voxelized_counts(self, arrange=True, parent=None):
+        import ClearMap.Visualization.Plot3d as plot_3d
         scale = self.channel_cfg_view('registration')['resampled_resolution']
         return plot_3d.plot(self.get_path('density', channel=self.channel, asset_sub_type='counts'),
                             scale=scale, title='Cell density (voxelized)', lut='flame',
@@ -383,6 +382,11 @@ class CellDetector(ChannelPipelineOrchestrator):
         collapsed.to_csv(csv_file_path, index=False)
 
     def plot_cells_3d_scatter_w_atlas_colors(self, raw=False, parent=None):
+        import ClearMap.Visualization.Qt.Plot3d as qplot_3d
+        from ClearMap.Visualization.Qt.widgets import Scatter3D
+        import pyqtgraph as pg
+        from matplotlib.colors import to_hex
+
         asset_properties = {'channel': self.channel}
         if raw:
             asset_properties['asset_type'] = 'stitched'
@@ -456,6 +460,10 @@ class CellDetector(ChannelPipelineOrchestrator):
 
     @requires_assets([FilePath('cells', asset_sub_type='filtered'), FilePath('stitched')])
     def plot_filtered_cells(self, parent=None, smarties=False):
+        import ClearMap.Visualization.Qt.Plot3d as qplot_3d
+        from ClearMap.Visualization.Qt.widgets import Scatter3D
+        import pyqtgraph as pg
+
         _, coordinates = self.get_coords('filtered')
         stitched_path = self.get_path('stitched', channel=self.channel)
         dv = qplot_3d.plot(stitched_path, title='Stitched and filtered cells', arrange=False,
@@ -470,6 +478,7 @@ class CellDetector(ChannelPipelineOrchestrator):
         return [dv]
 
     def plot_background_subtracted_img(self):
+        import ClearMap.Visualization.Plot3d as plot_3d
         src = self.get('cells', channel=self.channel, asset_sub_type='raw').as_source()
         coordinates = np.hstack([src[c][:, None] for c in 'xyz'])
         p = plot_3d.list_plot_3d(coordinates)
@@ -498,6 +507,7 @@ class CellDetector(ChannelPipelineOrchestrator):
             return uncrusted_coordinates
 
     def preview_cell_detection(self, parent: Optional['QWidget'] = None, arrange: bool = True, sync: bool = True) -> list:
+        import ClearMap.Visualization.Plot3d as plot_3d
         sources = [
             self.get_path('stitched', channel=self.channel),
             self.get_path('cells', channel=self.channel, asset_sub_type='bkg'),
@@ -525,6 +535,7 @@ class CellDetector(ChannelPipelineOrchestrator):
             return 0
 
     def plot_voxelized_intensities(self, arrange=True):
+        import ClearMap.Visualization.Plot3d as plot_3d
         density_path = self.get_path('density', channel=self.channel, asset_sub_type='intensities')
         return plot_3d.plot(density_path, arrange=arrange)
 

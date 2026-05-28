@@ -48,7 +48,6 @@ from ClearMap.Utils.event_bus import EventBus, BusSubscriberMixin
 from ClearMap.Utils.events import WorkspaceChanged, UiChannelRenamed, UiChannelsChanged
 from ClearMap.config.config_adjusters.type_hints import AdjusterScope
 from ClearMap.config.config_coordinator import ConfigCoordinator
-from ClearMap.config.config_handler import ALTERNATIVES_REG
 from ClearMap.config.defaults_provider import DefaultsProvider
 from ClearMap.pipeline_orchestrators.group_orchestrators import DensityGroupAnalysisOrchestrator
 from ClearMap.pipeline_orchestrators.processor_launcher import ProcessorLauncher

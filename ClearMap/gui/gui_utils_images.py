@@ -1,15 +1,9 @@
-import os
-
 import matplotlib
 import numpy as np
 from matplotlib.colors import hsv_to_rgb
-from skimage import transform as sk_transform
 
 from PyQt5 import QtGui
 from PyQt5.QtGui import QColor
-
-from ClearMap import Settings
-from ClearMap.IO import TIF
 
 
 def np_to_qpixmap(img_array, alpha):
@@ -61,24 +55,6 @@ def surface_project(img):
     proj = 255 - proj  # invert
     proj = proj.astype(np.uint8).T
     return mask, proj
-
-
-def setup_mini_brain(atlas_base_name, mini_brain_scaling=(5, 5, 5)):  # TODO: scaling in prefs
-    """
-    Create a downsampled version of the Allen Brain Atlas for the mini brain widget
-
-    Parameters
-    ----------
-    mini_brain_scaling : tuple(int, int, int)
-        The scaling factors for the mini brain. Default is (5, 5, 5)
-
-    Returns
-    -------
-    tuple(scale, downsampled_array)
-    """
-    atlas_path = os.path.join(Settings.atlas_folder, f'{atlas_base_name}_annotation.tif')
-    arr = TIF.Source(atlas_path).array
-    return mini_brain_scaling, sk_transform.downscale_local_mean(arr, mini_brain_scaling)
 
 
 def get_current_res(app):

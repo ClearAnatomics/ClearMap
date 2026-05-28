@@ -8,7 +8,7 @@ from scipy import stats
 
 
 # import mpld3  # WARNING: local import. Present here only for reference
-from PyQt5.QtWidgets import QApplication
+# from PyQt5.QtWidgets import QApplication
 
 from ClearMap.IO  import IO as clm_io
 from ClearMap.Analysis.Statistics.group_statistics import (generate_summary_table, group_region_counts,
@@ -22,8 +22,6 @@ from ..IO.assets_constants import CHANNELS_ASSETS_TYPES_CONFIG
 from ..Utils.exceptions import GroupStatsError
 from ..Visualization.Qt.Plot3d import PlotPanel, multi_plot_from_panels
 from ..config.atlas import ATLAS_NAMES_MAP
-from ClearMap.Visualization.Qt import Plot3d as plot_3d
-from ClearMap.Visualization.Qt.utils import link_dataviewers_cursors
 
 if TYPE_CHECKING:
     from ClearMap.IO.workspace_asset import Asset
@@ -232,6 +230,7 @@ class DensityGroupAnalysisOrchestrator(GroupOrchestratorBase):
 
     def run_plots(self, plot_function, comparisons: List[Pair], *,
                   channel: str, plot_kw_args: Dict) -> list['QWebEngineView']:
+        from PyQt5.QtWidgets import QApplication
         app = QApplication.instance()
         if app is not None and app.applicationName() == 'ClearMap':
             from PyQt5.QtWebEngineWidgets import QWebEngineView
@@ -312,12 +311,12 @@ class DensityGroupAnalysisOrchestrator(GroupOrchestratorBase):
 
     # ---------- plots ----------
     def plot_p_value_maps(self, comparisons: List[Pair], *, channel: str, suffix: str, advanced: bool = False, parent=None):
-        results_folder = Path(self.results_folder)
+        from ClearMap.Visualization.Qt import Plot3d as plot_3d
+        from ClearMap.Visualization.Qt.utils import link_dataviewers_cursors
 
         if len(comparisons) > 1:  # Multiple comparisons: just show p-value maps
             p_val_imgs = []
             for gp1, gp2 in comparisons:
-                sfx = f'_{suffix}' if suffix else ''
                 p_path = self.assets.p_val_colors_path(channel, gp1, gp2, suffix)
                 p_val_imgs.append(clm_io.read(p_path))
 
@@ -361,6 +360,8 @@ class DensityGroupAnalysisOrchestrator(GroupOrchestratorBase):
         return dvs
 
     def plot_density_maps(self, group_folders: List[str], *, channel: str, density_suffix: str, parent=None):
+        from ClearMap.Visualization.Qt import Plot3d as plot_3d
+        from ClearMap.Visualization.Qt.utils import link_dataviewers_cursors
         paths, titles = [], []
         for folder in group_folders:
             asset = self._density_asset(folder, channel, suffix=density_suffix or None)

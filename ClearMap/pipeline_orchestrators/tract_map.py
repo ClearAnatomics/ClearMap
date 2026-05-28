@@ -9,25 +9,27 @@ from typing import Optional
 
 import numpy as np
 import pandas as pd
-import pyqtgraph as pg
-from matplotlib.colors import to_hex
 
 from ClearMap.IO import IO as cmp_io
 from ClearMap.IO.workspace2 import Workspace2
+
 from ClearMap.Utils.exceptions import MissingRequirementException
 from ClearMap.Utils.utilities import sanitize_n_processes
+
 from ClearMap.config.config_coordinator import ConfigCoordinator
+
 from ClearMap.pipeline_orchestrators.generic_orchestrators import ChannelPipelineOrchestrator
+from ClearMap.pipeline_orchestrators.sample_info_management import SampleManager
+
 from ClearMap.Alignment import Elastix as elastix
 from ClearMap.Alignment.Resampling import resample_points
+
 from ClearMap.ParallelProcessing.DataProcessing import ArrayProcessing as array_processing
 from ClearMap.ParallelProcessing import BlockProcessing as block_processing
-from ClearMap.ImageProcessing.Experts import Vasculature as vasculature
-from ClearMap.Analysis.Measurements.Voxelization import voxelize
 
-from ClearMap.Visualization.Qt.widgets import Scatter3D
-from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
-from ClearMap.pipeline_orchestrators.sample_info_management import SampleManager
+from ClearMap.ImageProcessing.Experts import Vasculature as vasculature
+
+from ClearMap.Analysis.Measurements.Voxelization import voxelize
 
 USE_BINARY_POINTS_FILE = not platform.system().lower().startswith('darwin')  # i.e. binary is available in elastix
 
@@ -386,6 +388,7 @@ class TractMapProcessor(ChannelPipelineOrchestrator):
         print('TractMap voxelization finished')
 
     def plot_binarization_levels(self, low_spin_box, high_spin_box):  # TODO: default=None and create dialog if missing
+        from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
         asset = self.get('stitched', channel=self.channel)
         if not asset.exists:  # FIXME: could compute
             raise MissingRequirementException(f'plot_binarization_levels missing file: {asset} {asset.path} not found')
@@ -398,6 +401,8 @@ class TractMapProcessor(ChannelPipelineOrchestrator):
         # return dvs
 
     def plot_binary(self, debug=False):
+        from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
+
         ws_debug_backup = self.workspace.debug
         self.workspace.debug = debug
         binary_asset = self.get('binary', channel=self.channel)
@@ -413,6 +418,11 @@ class TractMapProcessor(ChannelPipelineOrchestrator):
         return [dv]
 
     def plot_tracts_3d_scatter_w_atlas_colors(self, raw=False, coordinates_from_debug=False, plot_onto_debug=False, parent=None):
+        import pyqtgraph as pg
+        from matplotlib.colors import to_hex
+        from ClearMap.Visualization.Qt.widgets import Scatter3D
+        from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
+
         asset_properties = {'channel': self.channel}
         if raw:
             asset_properties['asset_type'] = 'stitched'  # FIXME: select based on range
@@ -472,6 +482,8 @@ class TractMapProcessor(ChannelPipelineOrchestrator):
         return [dv]
 
     def plot_voxelized_counts(self):
+        from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
+
         asset = self.get('density', channel=self.channel, asset_sub_type='counts')
         if not asset.exists:
             raise MissingRequirementException(f'plot_voxelized_counts missing file: {asset.path} not found')

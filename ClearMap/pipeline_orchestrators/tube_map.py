@@ -52,15 +52,14 @@ import ClearMap.Analysis.Measurements.Voxelization as voxelization
 from ClearMap.Analysis.graphs import graph_processing
 from ClearMap.Analysis.graphs.graph_filters import GraphFilter
 
-from ClearMap.Visualization.Qt.utils import link_dataviewers_cursors
-from ClearMap.Visualization.Qt import Plot3d as q_p3d
-from ClearMap.Visualization.Vispy import plot_graph_3d  # WARNING: vispy dependency
-
 from ClearMap.gui.dialog_helpers import warning_popup
 from ClearMap.Utils.utilities import is_in_range, get_free_v_ram, clear_cuda_cache, sanitize_n_processes
 from ClearMap.Utils.exceptions import (PlotGraphError, ClearMapVRamException,
                                        MissingRequirementException, MissingAssetError, AssetNotFoundError,
                                        ClearMapAssetError)
+
+from .sample_info_management import SampleManager
+from .registration_orchestrator import RegistrationProcessor
 
 __author__ = ('Christoph Kirst <christoph.kirst.ck@gmail.com>,'
               ' Sophie Skriabine <sophie.skriabine@icm-institute.org>,'
@@ -69,9 +68,6 @@ __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://github.com/ClearAnatomics/ClearMap'
-
-from ClearMap.pipeline_orchestrators.sample_info_management import SampleManager
-from ClearMap.pipeline_orchestrators.registration_orchestrator import RegistrationProcessor
 
 MAX_PLOT_VERTICES = 300_000  # Empirical max number of vertices that can safely be plotted
 
@@ -475,11 +471,13 @@ class BinaryVesselProcessor(PipelineOrchestrator):
         channel str:
             The channel to plot
         """
+        from ClearMap.Visualization.Qt import Plot3d as q_p3d
         images = [(self.get_path('stitched', asset_sub_type=channel)),
                   (self.get_path('binary', asset_sub_type=channel))]
         dvs = q_p3d.plot(images, title=[img.name for img in images],
                          arrange=arrange, lut=self.machine_config['default_lut'], parent=parent)
         return dvs
+
     def _smooth(self, channel):
         binarization_cfg = self.config['binarization']['single_channels'][channel]
         if not binarization_cfg['smooth']['run']:
@@ -599,6 +597,7 @@ class BinaryVesselProcessor(PipelineOrchestrator):
             clearmap_io.link_file(source, sink)
 
     def plot_vessel_filling_results(self, parent=None, channel='', arrange=False):
+        from ClearMap.Visualization.Qt import Plot3d as q_p3d
         channel = channel if channel else self.all_vessels_channel
         images = [(self.steps[self.all_vessels_channel].get_asset(
             self.steps[self.all_vessels_channel].filled, step_back=True).path),  # FIXME: check if we really want filled here
@@ -609,6 +608,7 @@ class BinaryVesselProcessor(PipelineOrchestrator):
         return q_p3d.plot(images, title=titles, arrange=arrange, lut=lut_, parent=parent)
 
     def plot_combined(self, parent=None, arrange=False):  # TODO: final or not option
+        from ClearMap.Visualization.Qt import Plot3d as q_p3d
         all_vessels = self.steps[self.all_vessels_channel].get_asset(self.steps[self.all_vessels_channel].filled,
                                                                      step_back=True)
         combined = self.get_path('binary', channel=self.channels_to_binarize(), asset_sub_type='combined')
@@ -622,6 +622,8 @@ class BinaryVesselProcessor(PipelineOrchestrator):
         return dvs
 
     def plot_results(self, steps, channels=None, side_by_side=True, arrange=True, parent=None):
+        from ClearMap.Visualization.Qt.utils import link_dataviewers_cursors
+        from ClearMap.Visualization.Qt import Plot3d as q_p3d
         if channels is None:
             channels = [self.all_vessels_channel, ]
         images = [self.steps[channels[i]].get_asset(steps[i], step_back=True) for i in range(len(steps))]
@@ -1309,6 +1311,7 @@ class VesselGraphProcessor(PipelineOrchestrator):
         self.__voxelize(vertices, voxelize_branch_parameter)
 
     def plot_voxelization(self, parent):
+        from ClearMap.Visualization.Qt import Plot3d as q_p3d
         return q_p3d.plot(self.get_path('density', channel=self.parent_channels, asset_sub_type='branches'),
                           arrange=False, parent=parent, lut='flame')
 
@@ -1363,6 +1366,7 @@ class VesselGraphProcessor(PipelineOrchestrator):
 
     def plot_graph_chunk(self, graph_chunk, plot_type='mesh', title='sub graph', region_color=None,
                          show=True, n_max_vertices=MAX_PLOT_VERTICES):
+        from ClearMap.Visualization.Vispy import plot_graph_3d  # WARNING: vispy dependency
         if plot_type == 'line':
             scene = plot_graph_3d.plot_graph_line(graph_chunk, vertex_colors=region_color, title=title,
                                                   show=show, bg_color=self.machine_config['three_d_plot_bg'])

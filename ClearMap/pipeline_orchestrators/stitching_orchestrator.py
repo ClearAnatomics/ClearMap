@@ -3,23 +3,27 @@ import re
 import warnings
 from concurrent.futures.process import BrokenProcessPool
 from pathlib import Path
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 import numpy as np
 
-from ClearMap.Alignment.Stitching import StitchingRigid as stitching_rigid, StitchingWobbly as stitching_wobbly
-from ClearMap.Alignment.Stitching.StitchingWobbly import WobblyLayout
+from ClearMap.Alignment.Stitching import StitchingWobbly as stitching_wobbly
+from ClearMap.Alignment.Stitching import StitchingRigid as stitching_rigid
+
 from ClearMap.IO import IO as clearmap_io
 from ClearMap.IO.metadata import define_auto_stitching_params, parse_ome_info
+
 from ClearMap.Utils.exceptions import MissingRequirementException
 from ClearMap.Utils.tag_expression import Expression
 from ClearMap.Utils.utilities import check_stopped, sanitize_n_processes
-from ClearMap.Visualization.Color.Color import gray_image_to_rgb
-from ClearMap.Visualization.Qt import Plot3d as plot_3d
+
 from ClearMap.config.config_coordinator import ConfigCoordinator
-from ClearMap.gui.widgets import ProgressWatcher
+
 from ClearMap.pipeline_orchestrators.generic_orchestrators import PipelineOrchestrator
 from ClearMap.pipeline_orchestrators.sample_info_management import SampleManager
+
+if TYPE_CHECKING:
+    from ClearMap.gui.widgets import ProgressWatcher
 
 
 class StitchingProcessor(PipelineOrchestrator):
@@ -32,7 +36,7 @@ class StitchingProcessor(PipelineOrchestrator):
     def __init__(self, sample_manager: SampleManager, cfg_coordinator: ConfigCoordinator):
         super().__init__(cfg_coordinator)
         self.sample_manager: SampleManager = sample_manager
-        self.progress_watcher: Optional[ProgressWatcher] = None
+        self.progress_watcher: Optional["ProgressWatcher"] = None
         self.__wobbly_stitching_place_re = 'done constructing constraints for component'
         self.__wobbly_stitching_align_lyt_re = ('Alignment: Wobbly alignment',
                                                 re.compile(r"Alignment:\sWobbly alignment \(\d+, \d+\)->\(\d+, \d+\) "
@@ -188,8 +192,10 @@ class StitchingProcessor(PipelineOrchestrator):
         overlaps_px = self._pick_overlap_px(ome_info.get('stitching'))
 
         # Real WobblyLayout
-        lyt = WobblyLayout(sources=sources, tile_shape=(nx, ny), tile_positions=tile_positions,
-                           positions=positions, overlaps=overlaps_px, axis=2)  # Axis = which axis "wobbles"
+        lyt = stitching_wobbly.WobblyLayout(sources=sources, tile_shape=(nx, ny),
+                                            tile_positions=tile_positions,
+                                            positions=positions, overlaps=overlaps_px,
+                                            axis=2)  # Axis = which axis "wobbles"
         lyt.lower_to_origin()  # Just in case
 
         placed_asset_path = self.get_path('layout', channel=channel, asset_sub_type='placed')
@@ -495,6 +501,7 @@ class StitchingProcessor(PipelineOrchestrator):
             return
 
     def plot_stitching_results(self, channels=None, mode='side-by-side', parent=None):
+        from ClearMap.Visualization.Qt import Plot3d as plot_3d
         if channels is None:
             channels = self.sample_manager.stitchable_channels
         paths = []
@@ -536,6 +543,7 @@ class StitchingProcessor(PipelineOrchestrator):
         np.array(dtype=uint8)
             The overlay image
         """
+        from ClearMap.Visualization.Color.Color import gray_image_to_rgb
         asset = self.get('raw', channel=channel, sample_id=self.sample_manager.prefix)
         positions = asset.positions
         tile_shape = {k: v for k, v in zip('XYZ', asset.tile_shape)}  # TODO: use asset.tile_grid_shape
@@ -592,6 +600,7 @@ class StitchingProcessor(PipelineOrchestrator):
         image : array
           A color image.
         """
+        from ClearMap.Visualization.Color.Color import gray_image_to_rgb
         dest_shape = tuple(layout.extent[:-1])
         full_lower = layout.lower
         middle_z = round(layout.sources[0].shape[-1] / 2)

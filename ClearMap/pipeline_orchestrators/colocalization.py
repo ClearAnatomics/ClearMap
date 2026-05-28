@@ -4,12 +4,11 @@ from typing import List, Optional
 import numpy as np
 import pandas as pd
 
-from matplotlib.colors import to_hex
-import pyqtgraph as pg
-
 from ClearMap.IO.workspace2 import Workspace2
+
 from ClearMap.Utils.exceptions import ClearMapValueError
 from ClearMap.Utils.utilities import sanitize_n_processes
+
 from ClearMap.config.config_coordinator import ConfigCoordinator
 
 from ClearMap.Analysis.Measurements import Voxelization as voxelization
@@ -18,9 +17,6 @@ from ClearMap.Analysis.colocalization.channel import Channel as ColocalizationCh
 from ClearMap.pipeline_orchestrators.generic_orchestrators import CompoundChannelPipelineOrchestrator
 from ClearMap.pipeline_orchestrators.sample_info_management import SampleManager
 from ClearMap.pipeline_orchestrators.registration_orchestrator import RegistrationProcessor
-
-from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
-from ClearMap.Visualization.Qt.widgets import Scatter3D
 
 
 class ColocalizationProcessor(CompoundChannelPipelineOrchestrator):
@@ -105,6 +101,11 @@ class ColocalizationProcessor(CompoundChannelPipelineOrchestrator):
                                                          asset_sub_type='filtered_report'))
 
     def plot_nearest_neighbors(self, channel_a, channel_b, parent=None):  # TODO: improve with line between particles
+        from matplotlib.colors import to_hex
+        import pyqtgraph as pg
+        from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
+        from ClearMap.Visualization.Qt.widgets import Scatter3D
+
         channel_a_particle_coordinates, channel_b_particle_coordinates, channel_a_no_neighbour_coordinates = self.filter_table(
             channel_a, channel_b)
 

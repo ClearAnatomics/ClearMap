@@ -17,6 +17,7 @@ __download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
 
 import copy
 import numbers
+import pathlib
 from typing import Optional, Iterable, Dict
 from pathlib import Path
 
@@ -1295,7 +1296,7 @@ class Graph(grp.AnnotatedGraph):
         print(self.__str__())
         self._base.list_properties()
 
-    def save(self, filename):
+    def save(self, filename: str | Path):
         self._base.save(str(filename))
 
     def export_vertex_properties(self, output_path: str | Path, v_props: list[str] | None = None):

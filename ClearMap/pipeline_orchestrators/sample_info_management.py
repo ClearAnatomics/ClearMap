@@ -24,7 +24,6 @@ from ..config.compound_keys import PairKey
 from ..config.config_adjusters.type_hints import SampleManagerProtocol
 from ..config.config_handler import ALTERNATIVES_REG
 
-# if TYPE_CHECKING:
 from ClearMap.config.config_coordinator import ConfigCoordinator, make_cfg_coordinator_factory
 
 # noinspection PyPep8Naming

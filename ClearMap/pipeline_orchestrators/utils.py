@@ -1,5 +1,5 @@
-from ClearMap.pipeline_orchestrators.registration_orchestrator import RegistrationProcessor
 from ClearMap.pipeline_orchestrators.sample_info_management import SampleManager, build_sample_manager
+from ClearMap.pipeline_orchestrators.registration_orchestrator import RegistrationProcessor
 from ClearMap.pipeline_orchestrators.stitching_orchestrator import StitchingProcessor
 
 
