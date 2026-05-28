@@ -11,8 +11,8 @@ due to oscillatory movements during image aquisition.
 __author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
 __license__   = 'GPLv3 - GNU General Pulic License v3 (see LICENSE)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
-__webpage__   = 'http://idisco.info'
-__download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
+__webpage__   = 'https://idisco.info'
+__download__  = 'https://www.github.com/ChristophKirst/ClearMap2'
 
 import warnings
 
@@ -31,6 +31,7 @@ import ClearMap.ParallelProcessing.ParallelTraceback as ptb
 
 import ClearMap.Utils.Timer as tmr
 import ClearMap.Utils.tag_expression as te
+from ClearMap.Alignment.Stitching import stitching_rigid_plots
 
 from ClearMap.Utils.utilities import CancelableProcessPoolExecutor
 
@@ -215,7 +216,7 @@ class WobblySource(strg.Source):
     
     Returns
     -------
-    loacl_coordinate : int
+    local_coordinate : int
       The local coordinate within this source.
     """
     position = self.coordinate;
@@ -929,7 +930,7 @@ class WobblyLayout(strg.TiledLayout):
         sliced_sources.append(strg.Source(source = slc.Slice(source=source.source.as_virtual(), slicing=slicing), position=position, tile_position=source.tile_position));
          
       sliced_layout = strg.Layout(sources = sliced_sources, shape = None, position = None, dtype = self.dtype, order = self.order);
-      strg.plot_layout(sliced_layout, **kwargs)
+      stitching_rigid_plots.plot_layout(sliced_layout, **kwargs)
       
     return sliced_layout                                     
 
