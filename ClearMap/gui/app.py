@@ -759,7 +759,7 @@ class ClearMapApp(ClearMapAppBase):
         self.ortho_viewer = cmp_widgets.OrthoViewer()
 
         self._init_sample_tab_mgr()
-
+        self.gui_controller._needs_tab_reset = True  # Will clear tabs on next call
         self.amend_ui()
 
     def _infer_mode_from_folder(self, folder: Path) -> tuple[AppMode, Path]:
@@ -1281,7 +1281,8 @@ class GuiController(BusSubscriberMixin):
     def __init__(self, bus: EventBus, experiment, tab_registry: TabRegistry,
                  group_controller: AnalysisGroupController):
         super().__init__(bus)
-        self._hydrating = False
+        self._needs_tab_reset: bool = False
+        self._hydrating: bool = False
         self.experiment_controller: ExperimentController = experiment
         self.tabs_registry: TabRegistry = tab_registry
 
@@ -1295,8 +1296,8 @@ class GuiController(BusSubscriberMixin):
         self.window: QMainWindow | None = None
 
         # Hydration state flags
-        self._needs_full_refresh = False
-        self._tabs_initialized = False
+        self._needs_full_refresh: bool = False
+        self._tabs_initialized: bool = False
 
         self.subscribe(CfgChanged, self._on_cfg_changed)
         self.subscribe(UiRequestRefreshTabs, self._on_refresh_tabs)
@@ -1406,6 +1407,11 @@ class GuiController(BusSubscriberMixin):
         Decide which tabs exist (via TabRegistry + validators/materializers),
         create or reuse instances, inject callbacks, and notify UI.
         """
+        if self._needs_tab_reset:
+            self._tabs = []  # empties the lookup before _build_tabs_from_registry
+            self._tabs_initialized = False
+            self._needs_tab_reset = False
+
         self._tabs = self._build_tabs_from_registry()
         self.publish(TabsUpdated(titles=[t.name for t in self._tabs], tabs=self._tabs))
 
