@@ -36,16 +36,14 @@ import ClearMap.Utils.tag_expression as te
 import ClearMap.Utils.Timer as tmr
 from ClearMap.Utils.Formatting import ensure
 
-from ClearMap.Alignment.Stitching import stitching_rigid_plots
-from ClearMap.Alignment.Stitching.stitching_rigid_plots import (plot_sources, plot_layout, plot_regions,
-                                                                plot_alignments,  plot_along_axis_mip,
-                                                                overlay_layout, overlay_sources,
-                                                                overlay_along_axis_mip)
 
 from ClearMap.Alignment.Stitching.layout_graph_utils import (get_connected_components, connect_sources,
                                                              get_positions_from_tree)
 
 from ClearMap.Utils.utilities import CancelableProcessPoolExecutor
+
+from ClearMap.Utils.Lazy import lazy_mixin
+
 
 ###############################################################################
 # Geometry
@@ -734,6 +732,7 @@ def _source_string(self):
 ########################################################################################
 
 #TODO: really need this base class ?
+@lazy_mixin('ClearMap.Alignment.Stitching.stitching_plots.AlignmentBasePlotMixin')
 class AlignmentBase:
     """Base class to handle alignments between two adjacent sources."""
     #note: could make this a source like object with data and plot routines
@@ -812,37 +811,6 @@ class AlignmentBase:
           The dimension of the sources.
         """
         return self.pre.ndim
-
-    def plot(self, *args, **kwargs):
-        """Plots this alignment"""
-        plot_sources(self.sources, *args, **kwargs)
-
-    def overlay(self, **kwargs):
-        return overlay_sources(self.sources, **kwargs)
-
-    def plot_overlay(self, **kwargs):
-        import ClearMap.Visualization.Plot3d as p3d
-        ovl = self.overlay(colors='ids', **kwargs)
-        return p3d.plot([ovl])
-
-    def overlay_overlap(self, max_shifts = 0):
-        o1,o2 = _overlap_with_shifts(self.pre, self.post, max_shifts=max_shifts)
-        i1 = self.pre[o1.local_slicing(self.pre)]
-        i2 = self.post[o2.local_slicing(self.post)]
-        return [i1,i2]
-
-    def plot_overlap(self, **kwargs):
-        # cut overlap region
-        import ClearMap.Visualization.Plot3d as p3d
-        return p3d.plot([self.overlay_overlap(**kwargs)])
-
-    def overlay_mip(self, *args, **kwargs):
-        """Overlays this alignment using max intensity projection."""
-        return overlay_along_axis_mip(self.pre, self.post, *args, **kwargs)
-
-    def plot_mip(self, *args, **kwargs):
-        """Plots this alignment using max intensity projection."""
-        return plot_along_axis_mip(self.pre, self.post, *args, **kwargs)
 
     def copy(self):
         return copy.copy(self)
@@ -940,12 +908,6 @@ class Alignment(AlignmentBase):
         """A axis for maximum projections."""
         return _mip_axis(self.pre, self.post, axis=axis, max_shifts=max_shifts)
 
-    def plot(self, *args, **kwargs):
-        """Plots this alignment"""
-        post = self.post.copy()
-        post.position = tuple(p + d for p,d in zip(self.pre.position, self.displacement))
-        return plot_sources([self.pre, post], *args, **kwargs)
-
     @property
     def name(self):
         return type(self).__name__
@@ -955,7 +917,7 @@ class Alignment(AlignmentBase):
         if quality is not None:
             quality = '%.2e' % quality
 
-        return "%s(%r->%r)D%rS%r[%s]" % (self.name, self.pre.identifier, self.post.identifier, self.displacement, self.shift, quality)
+        return f"{self.name}({self.pre.identifier!r}->{self.post.identifier!r})D{self.displacement!r}S{self.shift!r}[{quality}]"
 
 
 class Layout(SourceRegion, src.AbstractSource):
@@ -1659,98 +1621,6 @@ class Layout(SourceRegion, src.AbstractSource):
         l = self.slice_along_axis(coordinate = coordinate, axis = axis)
         return l.stitch(sink = sink)
 
-    def overlay(self, colors = None, percentile = 98, normalize = True, coordinate = None, axis = 2):
-        """Overlays the sources to check their placement.
-
-        Arguments
-        ---------
-        colors : list of tuple of floats or color names
-          The optional RGB colors to use.
-        percentile : int
-          Use this percentile as upper cutoff in the resulting image to enhance contrast.
-        normalize : bool
-          If True normalize image to floats between 0 and 1.
-        coordinate : int or None
-          Optional coordinate at which to take a slice.
-        axis : int
-          Optional axis to take the slice in.
-
-        Returns
-        -------
-        image : array
-          A color image.
-        """
-        if coordinate is None:
-            layout = self
-        else:
-            layout = self.slice_along_axis(coordinate = coordinate, axis = axis)
-        return overlay_layout(layout, colors = colors, percentile = percentile, normalize = normalize)
-
-    def plot(self, colors = None, percentile = 98, normalize = True, color_ids = None, coordinate = None, axis = 2):
-        """Plots overlayed sources to check their placement.
-
-        Arguments
-        ---------
-        colors : list of tuple of floats or color names
-          The optional RGB colors to use.
-        percentile : int
-          Use this percentile as upper cutoff in the resulting image to enhance contrast.
-        normalize : bool
-          If True normalize image to floats between 0 and 1.
-        color_ids : list of ints
-          Use specific color ids for the sources contributing to the layout.
-        coordinate : int or None
-          Optional coordinate at which to take a slice.
-        axis : int
-          Optional axis to take the slice in.
-
-        Returns
-        -------
-        image : array
-          A color image.
-        """
-        if coordinate is None:
-            layout = self
-        else:
-            layout = self.slice_along_axis(coordinate = coordinate, axis = axis)
-        return plot_layout(layout, colors = colors, percentile = percentile, normalize = normalize)
-
-
-    def plot_regions(self, cmap=None, annotate=True, axes=[0,1]):
-        """Overlays and plots regions to check the alignment of this layout.
-
-        Arguments
-        ---------
-        cmap : colormap
-          The color map to use to color the regions.
-        annotate : bool
-          Use annotation or not.
-        axes : tuple of ints
-          Axes to use if sources are larger than 2d.
-        """
-        if cmap is None:
-            from matplotlib import pyplot as plt
-            plt.cm.rainbow
-        position, shape, regions = self.embedding()
-        plot_regions(regions, sources = self.sources, cmap = cmap, annotate = annotate, axes = axes)
-
-    def plot_alignments(self, cmap=None, annotate=True, axes=[0,1]):
-        """Overlays and plots regions to check the alignment of this layout.
-
-        Arguments
-        ---------
-        cmap : colormap
-          The color map to use to color the regions.
-        annotate : bool
-          Use annotation or not.
-        axes : tuple of ints
-          Axes to use if sources are larger than 2d.
-        """
-        if cmap is None:
-            from matplotlib import pyplot as plt
-            plt.cm.rainbow
-        plot_alignments(self.alignments, sources = self.sources, cmap = cmap, annotate = annotate, axes = axes)
-
     def load(self, filename):
         """Loads the layout specifications from a file.
         """
@@ -2082,14 +1952,14 @@ def _initialize_tiles_from_sources(sources, tile_shape = None, tile_positions = 
     if tile_positions is None: # infer tiling from sources or tile_shape
         if tile_shape is None: # infer tiling from structure of sources
             if isinstance(sources, list): # nested list structure
-                #grid shape
+                # grid shape
                 src = sources
                 tile_shape = ()
                 while isinstance(src, list):
                     tile_shape += (len(src),)
                     src = src[0]
 
-                #convert to flat list
+                # convert to flat list
                 src = sources
                 while isinstance(src[0], list):
                     sl = []
@@ -4355,7 +4225,8 @@ def _test():
     s.align(max_shifts = 20, verbose = True, processes=None)
 
     s.place(verbose = True)
-    stitching_rigid_plots.plot_alignments()
+    from . import stitching_plots
+    stitching_plots.plot_alignments()
 
     d = s.stitch(verbose = True, method = 'max')
     stb.p3d.plot(d)
