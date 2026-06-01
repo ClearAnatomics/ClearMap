@@ -2082,6 +2082,7 @@ class GroupAnalysisTab(BatchTab):
     def make_group_stats_tables(self) -> None:
         self.main_window.clear_plots()
         tables_by_pair = self.processor.compute_stats_tables(self.params.selected_comparisons,
+                                                             channel=self.params.plot_channel,
                                                              density_suffix=self.params.density_suffix, save=True)
         dvs = [DataFrameWidget(tables[self.params.plot_channel]).table for tables in tables_by_pair.values()]
         self.main_window.setup_plots(dvs)  # TODO: use wrap_plot
