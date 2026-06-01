@@ -1,14 +1,14 @@
-# -*- coding: utf-8 -*-
 """
-StitchingRigid
-==============
+stitching_rigid
+===============
 
 Stitching module for aligning and stitching data sets rigidly.
 
 The module provides base classes and routines for stitching images. The
-:mod:`~ClearMap.Alignment.Stitching.StitchingWobbly` module builds on this
+:mod:`~ClearMap.Alignment.Stitching.stitching_wobbly` module builds on this
 module.
 """
+# -*- coding: utf-8 -*-
 __author__ = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
 __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
@@ -4187,7 +4187,7 @@ def stitch_layout(layout, sink = None, method = 'interpolation', verbose = False
 ########################################################################################
 
 def _test():
-    import ClearMap.Alignment.Stitching.StitchingRigid as stb
+    import ClearMap.Alignment.Stitching.stitching_rigid as stb
     from importlib import reload
     reload(stb)
 
@@ -4198,7 +4198,7 @@ def _test():
     print(r)
 
 
-    import ClearMap.Alignment.Stitching.StitchingRigid as stb
+    import ClearMap.Alignment.Stitching.stitching_rigid as stb
     import numpy as np
     import ClearMap.Tests.Files as tfs
     data = np.load(tfs.vasculature_pre)[:,:100,:100]

@@ -7,8 +7,8 @@ from typing import Optional, TYPE_CHECKING
 
 import numpy as np
 
-from ClearMap.Alignment.Stitching import StitchingWobbly as stitching_wobbly
-from ClearMap.Alignment.Stitching import StitchingRigid as stitching_rigid
+from ClearMap.Alignment.Stitching import stitching_wobbly as stitching_wobbly
+from ClearMap.Alignment.Stitching import stitching_rigid as stitching_rigid
 
 from ClearMap.IO import IO as clearmap_io
 from ClearMap.IO.metadata import define_auto_stitching_params, parse_ome_info

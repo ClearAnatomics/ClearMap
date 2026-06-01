@@ -14,5 +14,5 @@ The :mod:`ClearMap.Alignment` module includes methods for
 
 * 3d rigid and wobbly stitching via :doc:`/advanced/wobblystitcher`:
 
-  - :mod:`~ClearMap.Alignment.Stitching.StitchingRigid`
-  - :mod:`~ClearMap.Alignment.Stitching.StitchingWobbly`
+  - :mod:`~ClearMap.Alignment.Stitching.stitching_rigid`
+  - :mod:`~ClearMap.Alignment.Stitching.stitching_wobbly`

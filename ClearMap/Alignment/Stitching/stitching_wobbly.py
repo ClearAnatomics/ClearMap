@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-StitchingWobbly
-===============
+stitching_wobbly
+================
 
 Wobbly stitching module handles the alignment of large volumetric data sets.
 
@@ -24,7 +24,7 @@ import multiprocessing as mp
 import ClearMap.IO.IO as io
 import ClearMap.IO.Slice as slc
 
-import ClearMap.Alignment.Stitching.StitchingRigid as strg
+import ClearMap.Alignment.Stitching.stitching_rigid as strg
 import ClearMap.Alignment.Stitching.Tracking as trk
 
 import ClearMap.ParallelProcessing.ParallelTraceback as ptb
@@ -2170,7 +2170,7 @@ def _stitch_slice(slice_layout, slice_id, n_slices, sink, method, axis, full_reg
 #############################################################################################################
 
 def _test():
-    import ClearMap.Alignment.Stitching.StitchingWobbly as stw
+    import ClearMap.Alignment.Stitching.stitching_wobbly as stw
 
     from importlib import reload
     reload(stw)
@@ -2261,7 +2261,7 @@ def _test():
 
 
     # wobble + axis alignment
-    import ClearMap.Alignment.Stitching.StitchingWobbly as stw
+    import ClearMap.Alignment.Stitching.stitching_wobbly as stw
     reload(stw.strg)
     reload(stw)
     import numpy as np
@@ -2321,7 +2321,7 @@ def _test():
 
 
     # wobble + axis alignment + status
-    import ClearMap.Alignment.Stitching.StitchingWobbly as stw
+    import ClearMap.Alignment.Stitching.stitching_wobbly as stw
     reload(stw.strg)
     reload(stw)
     import numpy as np
@@ -2460,8 +2460,8 @@ def _test():
     ### Test on real data
     import numpy as np
     import ClearMap.IO.IO as io
-    import ClearMap.Alignment.Stitching.StitchingRigid as stg
-    import ClearMap.Alignment.Stitching.StitchingWobbly as stw
+    import ClearMap.Alignment.Stitching.stitching_rigid as stg
+    import ClearMap.Alignment.Stitching.stitching_wobbly as stw
     import ClearMap.IO.Workspace as wsp
 
     directory = '/home/ckirst/Science/Projects/WholeBrainClearing/Vasculature/Experiment/Stitching_2018_06'

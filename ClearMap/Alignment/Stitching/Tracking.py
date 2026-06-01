@@ -7,7 +7,7 @@ Simple particle tracker based on liner programming.
 
 Note
 ----
-This module is used by :mod:`~ClearMap.Alignment.Stitching.StitchingWobbly`
+This module is used by :mod:`~ClearMap.Alignment.Stitching.stitching_wobbly`
 to trace wobbly stacks.
 """
 __author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
@@ -253,7 +253,7 @@ def _test():
   from importlib import reload
   reload(trk)
 
-  import ClearMap.Alignment.StitchingWobbly as stw
+  import ClearMap.Alignment.stitching_wobbly as stw
   
   positions = [[(5,6),(10,10)], [(5,7), (11,10),(30,10)],[(9,10),(31,9)]]
   

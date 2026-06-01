@@ -8,7 +8,7 @@ Mixins are injected at runtime via ``@lazy_mixin``, so matplotlib is never
 imported on a headless cluster unless a plot method is actually called.
 
 Standalone functions duck-type on layout / source / alignment objects and only
-import from ``StitchingRigid`` / ``StitchingWobbly`` locally when they need to
+import from ``stitching_rigid`` / ``stitching_wobbly`` locally when they need to
 *construct* helper objects.
 """
 
@@ -124,7 +124,7 @@ class AlignmentBasePlotMixin:
 
     def overlay_overlap(self, max_shifts=0):
         """Return the overlapping sub-arrays of pre and post."""
-        from ClearMap.Alignment.Stitching.StitchingRigid import _overlap_with_shifts
+        from ClearMap.Alignment.Stitching.stitching_rigid import _overlap_with_shifts
         o1, o2 = _overlap_with_shifts(self.pre, self.post, max_shifts=max_shifts)
         i1 = self.pre[o1.local_slicing(self.pre)]
         i2 = self.post[o2.local_slicing(self.post)]
@@ -172,7 +172,7 @@ class WobblyAlignmentPlotMixin:
     def overlay_mip_wobbly(self, overlap=True, mip_axis=None,
                            percentile=98, normalize=True):
         """Colour MIP overlay of the wobbly alignment."""
-        from ClearMap.Alignment.Stitching.StitchingRigid import _mip_axis
+        from ClearMap.Alignment.Stitching.stitching_rigid import _mip_axis
         import ClearMap.Visualization.Color as col
 
         ovl_mip = self.overlay_wobbly(overlap=overlap)
@@ -244,8 +244,8 @@ class WobblyLayoutPlotMixin:
                        plot=True, use_displacements=True, **kwargs):
         """Diagnostic: gather alignment info and optionally overlay a slice."""
         import ClearMap.IO.Slice as slc
-        from ClearMap.Alignment.Stitching.StitchingWobbly import WobblySource, WobblyAlignment
-        from ClearMap.Alignment.Stitching.StitchingRigid import Source, Layout
+        from ClearMap.Alignment.Stitching.stitching_wobbly import WobblySource, WobblyAlignment
+        from ClearMap.Alignment.Stitching.stitching_rigid import Source, Layout
 
         s = self.source_from_tile_position(tile_position)
         status = s.status_at_coordinate(coordinate)
@@ -305,7 +305,7 @@ class WobblyLayoutPlotMixin:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Standalone plot helpers — duck-typed, no StitchingRigid import at module level
+# Standalone plot helpers — duck-typed, no stitching_rigid import at module level
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def plot_layout(layout, colors=None, percentile=98, normalize=True, color_ids=None):
@@ -530,7 +530,7 @@ def plot_alignments(alignments, sources=None, axes=None, annotate=True,
             q_max = q_min + 1
 
     if sources is None:
-        from ClearMap.Alignment.Stitching.StitchingRigid import sources_from_alignments
+        from ClearMap.Alignment.Stitching.stitching_rigid import sources_from_alignments
         sources = sources_from_alignments(alignments)
 
     # plot
@@ -591,7 +591,7 @@ def plot_sources(sources, colors=None, percentile=98, normalize=True):
     image : array
         A color image of the overlayed sources.
     """
-    from ClearMap.Alignment.Stitching.StitchingRigid import Layout
+    from ClearMap.Alignment.Stitching.stitching_rigid import Layout
     layout = Layout(sources=sources)
     return plot_layout(layout, colors=colors, percentile=percentile, normalize=normalize)
 
@@ -615,15 +615,15 @@ def overlay_sources(sources, colors=None, percentile=98, normalize=True):
     image : array
         A color image.
     """
-    from ClearMap.Alignment.Stitching.StitchingRigid import Layout
+    from ClearMap.Alignment.Stitching.stitching_rigid import Layout
     layout = Layout(sources=sources)
     return overlay_layout(layout, colors=colors, percentile=percentile, normalize=normalize)
 
 
 def layout_along_axis_mip(src1, src2, axis=2, depth=10, max_shifts=10, ranges=None, verbose=False):
     """Build a Layout from MIP-projected sources."""
-    from ClearMap.Alignment.Stitching.StitchingRigid import (Layout, Source, Slice, _format_max_shifts, _mip_axis,
-                                                             max_intensity_projection)
+    from ClearMap.Alignment.Stitching.stitching_rigid import (Layout, Source, Slice, _format_max_shifts, _mip_axis,
+                                                              max_intensity_projection)
 
     # format the shifts
     ndim = src1.ndim

@@ -52,8 +52,8 @@ import ClearMap.ParallelProcessing.DataProcessing.ArrayProcessing as ap
 import ClearMap.Alignment.Annotation as ano     
 import ClearMap.Alignment.Resampling as res
 import ClearMap.Alignment.Elastix as elx       
-import ClearMap.Alignment.Stitching.StitchingRigid as st
-import ClearMap.Alignment.Stitching.StitchingWobbly as stw
+import ClearMap.Alignment.Stitching.stitching_rigid as st
+import ClearMap.Alignment.Stitching.stitching_wobbly as stw
 
 #image processing
 import ClearMap.ImageProcessing.Clipping.Clipping as clp
