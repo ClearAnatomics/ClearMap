@@ -1,9 +1,10 @@
 import math
 from pathlib import Path
-from typing import Iterable, Tuple, List, Dict, Optional, TYPE_CHECKING
+from typing import Iterable, Tuple, List, Dict, Optional, TYPE_CHECKING, Any
 
 import numpy as np
 import pandas as pd
+from pandas import DataFrame
 from scipy import stats
 
 
@@ -22,6 +23,7 @@ from ..IO.assets_constants import CHANNELS_ASSETS_TYPES_CONFIG
 from ..Utils.exceptions import GroupStatsError
 from ..Visualization.Qt.Plot3d import PlotPanel, multi_plot_from_panels
 from ..config.atlas import ATLAS_NAMES_MAP
+from ..config.compound_keys import CompoundKey
 
 if TYPE_CHECKING:
     from ClearMap.IO.workspace_asset import Asset
@@ -75,6 +77,25 @@ class DensityGroupAnalysisOrchestrator(GroupOrchestratorBase):
         return self._assets
 
     # ── sample asset resolution ─────────
+
+    def _points_df(self, sample_dir: Path, channel) -> pd.DataFrame:
+        sm = self.get_sample_manager_for(sample_dir)
+
+        if CompoundKey.is_valid_key_str(channel):  #  If we deal with CompoundKey -> split to components
+            channel = CompoundKey.from_string(channel).as_tuple()
+
+        asset = sm.get(self._points_asset_type(), channel=channel)
+        if not asset.exists:
+            raise FileNotFoundError(f'No {self._points_asset_type()} for {channel=} in {sample_dir}')
+        df = pd.read_feather(asset.path)
+        self._ensure_registered(df, channel)
+        return df
+
+    def _ensure_registered(self, df: DataFrame, channel: tuple[str, ...] | tuple[str, str] | Any):
+        if 'id' not in df.columns:
+            raise ValueError(
+                f'{self._points_asset_type()} for {channel=} has no "id" column. '
+                f'Ensure registration and annotation were run.')
 
     def _density_asset(self, sample_dir: Path, channel: str, suffix: str) -> 'Asset':
         sm = self.get_sample_manager_for(sample_dir)
