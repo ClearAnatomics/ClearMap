@@ -454,11 +454,48 @@ class Graph(grp.AnnotatedGraph):
     def has_vertex_radii(self):
         return 'radii' in self.vertex_properties
 
-    def vertex_radii(self, vertex=None):  # FIXME: hacky to have 2 return options (hides)
-        if 'radii' in self.vertex_properties:
-            return self.vertex_property('radii', vertex=vertex)
-        else:
-            return self.vertex_property('radius_units', vertex=vertex)
+    def vertex_radii_voxels(self, vertex=None) -> np.ndarray:
+        """
+        Vertex radii in **voxels**.
+
+        Raises
+        ------
+        KeyError
+            If radii have not been measured yet.  Call _measure_radii() first.
+            For physical units use :meth:`vertex_radii_units`.
+        """
+        if 'radii' not in self.vertex_properties:
+            raise KeyError("'radii' (voxel) property not found. "
+                           "Ensure graph_processing._measure_radii() was called before accessing vertex_radii_voxels(). "
+                           "For physical units use vertex_radii_units().")
+        return self.vertex_property('radii', vertex=vertex)
+
+    def vertex_radii_units(self, vertex=None) -> np.ndarray:
+        """
+        Vertex radii in **physical units** (µm).
+
+        Raises
+        ------
+        KeyError
+            If radius_units have not been measured yet.  Call _measure_radii()
+            with a valid spacing array first.
+            For voxel units use :meth:`vertex_radii_voxels`.
+        """
+        if 'radius_units' not in self.vertex_properties:
+            raise KeyError("'radius_units' (µm) property not found. "
+                           "Ensure graph_processing._measure_radii() was called with "
+                           "a valid spacing array before accessing vertex_radii_units().")
+        return self.vertex_property('radius_units', vertex=vertex)
+
+    def vertex_radii(self, vertex=None) -> np.ndarray:
+        """
+        .. deprecated::
+            Use :meth:`vertex_radii_voxels` or :meth:`vertex_radii_units` explicitly.
+            This method returns voxel radii and will be removed in a future version.
+        """
+        warnings.warn("vertex_radii() is ambiguous and deprecated. Use vertex_radii_voxels() for voxel units "
+                      "or vertex_radii_units() for physical units (µm).", DeprecationWarning, stacklevel=2)
+        return self.vertex_radii_voxels(vertex=vertex)
 
     def set_vertex_radii(self, radii, vertex=None):
         self.define_vertex_property('radii', radii, vertex=vertex)
@@ -480,8 +517,51 @@ class Graph(grp.AnnotatedGraph):
     def has_edge_radii(self):
         return 'radii' in self.edge_properties
 
-    def edge_radii(self, edge=None):
+    @property
+    def has_edge_radii_um(self) -> bool:
+        """True if µm radii have been propagated to edges."""
+        return 'radius_units' in self.edge_properties
+
+    def edge_radii_voxels(self, edge=None) -> np.ndarray:
+        """
+        Edge radii in **voxels** (aggregated from vertex radii during reduce_graph).
+
+        Raises
+        ------
+        KeyError
+            If radii have not been propagated to edges yet.
+        """
+        if 'radii' not in self.edge_properties:
+            raise KeyError(
+                "'radii' (voxel) edge property not found. "
+                "Ensure reduce_graph() ran with 'radii' in vertex_to_edge_mappings.")
         return self.edge_property('radii', edge=edge)
+
+    def edge_radii_um(self, edge=None) -> np.ndarray:
+        """
+        Edge radii in **physical units** (µm).
+
+        Raises
+        ------
+        KeyError
+            If radius_units have not been propagated to edges yet.
+        """
+        if 'radius_units' not in self.edge_properties:
+            raise KeyError(
+                "'radius_units' (µm) edge property not found. "
+                "Ensure reduce_graph() ran with 'radius_units' in vertex_to_edge_mappings.")
+        return self.edge_property('radius_units', edge=edge)
+
+    def edge_radii(self, edge=None) -> np.ndarray:
+        """
+        .. deprecated::
+            Use :meth:`edge_radii_voxels` or :meth:`edge_radii_um` explicitly.
+        """
+        import warnings
+        warnings.warn(
+            "edge_radii() is ambiguous and deprecated. Use edge_radii_voxels() or edge_radii_um().",
+            DeprecationWarning, stacklevel=2)
+        return self.edge_radii_voxels(edge=edge)
 
     def set_edge_radii(self, radii, edge=None):
         self.define_edge_property('radii', radii, edge=edge)

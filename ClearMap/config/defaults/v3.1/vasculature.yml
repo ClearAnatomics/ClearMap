@@ -59,16 +59,20 @@ graph_construction:
 vessel_type_postprocessing:
   pre_filtering:
     vein_intensity_range_on_arteries_ch: [0, 2500]
-    restrictive_vein_radius: 6
-    permissive_vein_radius: 6.5
-    final_vein_radius: 5
-    arteries_min_radius: 2
+    restrictive_vein_radius_um: 15.0  # 6 vox × max(2.5 µm)
+    permissive_vein_radius_um:  16.25 # 6.5 × 2.5
+    final_vein_radius_um:        12.5  # 5 × 2.5
+    arteries_min_noise_edges: 2   # discard artery components with fewer edges than this
   tracing:
     max_arteries_iterations: 5
     max_veins_iterations: 5
+    artery_trace_radius_um: 6.4  # 4vx × 1.6 µm/vox
+    vein_trace_radius_um: 8.0            # 5 vox × max(1.6, 1.6, 2.5)
+    distance_to_surface_min: 15.0
+    artery_intensity_min: 200.0
   capillaries_removal:
-    min_artery_size: 30
-    min_vein_size: 30
+    min_artery_component_edges: 30
+    min_vein_component_edges: 30
 visualization:
   voxelization:
     size: [15, 15, 15]

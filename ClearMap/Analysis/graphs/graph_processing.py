@@ -27,6 +27,7 @@ import ClearMap.Utils.Timer as tmr
 
 from ClearMap.Analysis.graphs import graph_gt
 from ClearMap.Analysis.graphs.fast_graph_reduce import find_degree2_branches, cy_reduce
+from ClearMap.Utils.utilities import sanitize_n_processes
 
 SENTINEL = -1
 
@@ -74,8 +75,10 @@ DEFAULT_VERTEX_TO_VERTEX = {
     'length': np.sum,
     'radii': np.max,
     'radius_units': np.max,
-    # 'chain_id': functools.partial(np.quantile, 0.5, method='nearest', axis=0),
+    'radii_axial': np.max,  # (k,3) → (3,) max per axis ✓
+    'radius_units_axial': np.max,  # (k,3) → (3,) max per axis ✓
     'chain_id': np.mean,
+    # 'chain_id': functools.partial(np.quantile, 0.5, method='nearest', axis=0),
     '_vertex_id_': np.min
 }
 
@@ -201,7 +204,8 @@ def get_distance_map_27(resolution):
 
 
 def graph_from_skeleton(skeleton, points=None, radii=None, compute_vertex_coordinates=True, compute_edge_length=True,
-                        check_border=True, delete_border=False, spacing=None, physical_units='', verbose=False):
+                        check_border=True, delete_border=False, spacing=None, physical_units='',
+                        n_processes=-2, verbose=False):
     """
     Converts a binary skeleton image to a graph-tool graph.
 

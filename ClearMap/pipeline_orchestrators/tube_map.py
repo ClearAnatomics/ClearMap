@@ -14,9 +14,11 @@ import copy
 import re
 import functools
 import platform
+import time
 import warnings
 import gc
 from concurrent.futures import ProcessPoolExecutor
+from enum import Enum
 from pathlib import Path
 from typing import Optional, Dict, Any, Union, Callable
 
@@ -653,6 +655,29 @@ class VesselGraphProcessor(PipelineOrchestrator):
     """
     config_name = 'vasculature'
 
+    # Legacy voxel-space thresholds — kept for old graphs without spacing/radius_units
+    # New graphs use µm equivalents from config
+    _LEGACY_THRESHOLDS = {
+        # artery channel expression measurement
+        'artery_search_shift_vx': 0.0,  # _set_artery_binary
+        'arteriness_search_shift_vx': 10.0,  # _set_arteriness
+        # vein channel expression measurement
+        'vein_search_shift_vx':      0.0,
+        'veinness_search_shift_vx':  10.0,
+        # post-process filters
+        'restrictive_vein_radius_vx': 6.5,
+        'permissive_vein_radius_vx': 6.5,
+        'final_vein_radius_vx': 6.5,
+        'artery_trace_radius_vx': 4.0,
+        'vein_trace_radius_vx': 5.0,
+    }
+
+    # Support for legacy graphs without physical units — determines how radii are measured and thresholds applied
+    class RadiusLevel(Enum):
+        FULL = 'full'  # spacing + radius_units + radius_units_axial  (current)
+        SCALAR_UM = 'scalar_um'  # spacing + radius_units, no axial             (intermediate)
+        VOXELS = 'voxels'  # only radii in voxels
+
     def __init__(self, sample_manager: Optional[SampleManager] = None,
                  config_coordinator: Optional[ConfigCoordinator] = None,
                  registration_processor: Optional[RegistrationProcessor] = None):
@@ -707,6 +732,24 @@ class VesselGraphProcessor(PipelineOrchestrator):
     def save_graph(self, base_name):
         graph = self.__graphs[base_name]  # We do not use the getter here to avoid loading the graph
         self.get('graph', channel=self.parent_channels, asset_sub_type=base_name).write(graph)
+
+    @staticmethod
+    def _graph_radius_level(graph) -> 'VesselGraphProcessor.RadiusLevel':
+        has_spacing = 'spacing' in graph.graph_properties
+        has_um = 'radius_units' in graph.vertex_properties
+        has_um_axial = 'radius_units_axial' in graph.vertex_properties
+        if has_spacing and has_um and has_um_axial:
+            return VesselGraphProcessor.RadiusLevel.FULL
+        if has_spacing and has_um:
+            return VesselGraphProcessor.RadiusLevel.SCALAR_UM
+        return VesselGraphProcessor.RadiusLevel.VOXELS
+
+    def _legacy_warn(self, method: str) -> None:
+        """Warn user if graphs are outdated and miss the units aware radii"""
+        warnings.warn(f"{method}: graph predates unit-aware radii ('radius_units_axial' / 'spacing' absent). "
+                      f"Falling back to voxel-space computation with legacy thresholds. "
+                      f"Rebuild the graph (re-run clean + reduce) for physical accuracy.",
+                      DeprecationWarning, stacklevel=3)
 
     @property
     def graph_raw(self):
@@ -763,6 +806,11 @@ class VesselGraphProcessor(PipelineOrchestrator):
     @property
     def arteries_channel(self) -> str:
         return self.sample_manager.get_channels_by_type('arteries', missing_action='ignore',
+                                                        multiple_found_action='error')
+
+    @property
+    def veins_channel(self) -> str:
+        return self.sample_manager.get_channels_by_type('veins', missing_action='ignore',
                                                         multiple_found_action='error')
 
     @property
@@ -874,36 +922,115 @@ class VesselGraphProcessor(PipelineOrchestrator):
     def _measure_radii(self):  # FIXME: do on the clean graph to avoid measuring cliques ?
         coordinates = self.graph_raw.vertex_coordinates()
         source = self.get_path('binary', channel=self.parent_channels, asset_sub_type='final')
-        spacing = np.array(self.sample_manager.get_channel_resolution(self.parent_channels[0]))
-        radii = measure_radius.measure_radius(source, coordinates,
-                                              value=0, fraction=None, max_radius=150,
-                                              return_indices=False, default=-1, scale=spacing)  # WARNING: prange
-        self.graph_raw.define_vertex_property('radius_units', radii)
-        # TODO: call measure_radius with return_radii_as_scalar=False and store vectors
+        spacing = np.array(self.sample_manager.get_channel_resolution(self.parent_channels[0])) # µm/vox, shape (3,)
 
-    def _set_graph_artery_property(self, asset_type, asset_sub_type=None, suffix='', radius_shift=0):
-        suffix = suffix or asset_type
+        # Distances in all 3 directions
+        radii_um_axial = measure_radius.measure_radius(source, coordinates,
+                                                       value=0, fraction=None, max_radius=150,
+                                                       return_indices=False, default=-1,
+                                                       return_radii_as_scalar=False, scale=spacing)  # WARNING: prange
+
+        radii_vx_axial = radii_um_axial / spacing[None, :]  # (n, 3) voxels per axis
+
+        self.graph_raw.define_vertex_property('radius_units_axial', radii_um_axial)  # µm (n,3)
+        self.graph_raw.define_vertex_property('radii_axial', radii_vx_axial)  # vox (n,3)
+
+        # Euclidean norms
+        radii_um_scalar = np.linalg.norm(radii_um_axial, axis=1)
+        radii_vx_scalar = np.linalg.norm(radii_vx_axial, axis=1)
+
+        self.graph_raw.set_vertex_radii(radii_vx_scalar)
+        self.graph_raw.define_vertex_property('radius_units', radii_um_scalar)
+
+        if not self.graph_raw.has_graph_property('spacing'):
+            self.graph_raw.add_graph_property('spacing', spacing)
+
+    def _set_vertex_vessel_type_expression(self, asset_type: str, channel: str, asset_sub_type=None,
+                                           radius_shift_um: float = 0.0,
+                                           _legacy_radius_shift_vx: float = 0.0):
+        """
+        Parameters
+        ----------
+        radius_shift_um : float
+            Extra search margin beyond the measured vessel wall, in µm.
+        """
+        dtype = self.sample_manager.data_type(channel)
+        dtype_singular = f'{dtype[:-3]}y' if dtype.endswith('ies') else dtype[:-1]
+        property_name = f'{dtype_singular}_{"raw" if asset_type == "stitched" else asset_type}'
+
         if not isinstance(asset_sub_type, (list, tuple)):
             asset_sub_type = [asset_sub_type]
         for sub_type in asset_sub_type:
-            source = self.get_path(asset_type, channel=self.arteries_channel, asset_sub_type=sub_type)
+            source = self.get_path(asset_type, channel=channel, asset_sub_type=sub_type)
             if source.exists():
                 break
-        coordinates = self.graph_raw.vertex_coordinates()  # OPTIMISE: cache ?
-        radii = self.graph_raw.vertex_radii() + radius_shift
-        search_radius = radii
-        # FIXME: search_radius in pixels so convert if physical units
-        expression = measure_expression.measure_expression(source, coordinates, search_radius, method='max')  # WARNING: prange
-        prop = expression if asset_type == 'binary' else np.asarray(expression.array, dtype=float)  # TODO: do as f(source.dtype)
-        self.graph_raw.define_vertex_property(f'artery_{suffix}', prop)
+
+        coordinates = self.graph_raw.vertex_coordinates()
+
+        level = self._graph_radius_level(self.graph_raw)
+        if level == VesselGraphProcessor.RadiusLevel.FULL:
+            spacing = np.array(self.graph_raw.graph_property('spacing'))   # µm/vox (3,)
+            # Per-axis physical radii + margin
+            radii_um_axial = self.graph_raw.vertex_property('radius_units_axial') + radius_shift_um  # Conservative: search far enough to cover vessel boundary in every axis
+            search_radius_vx = np.max(radii_um_axial / spacing, axis=1)
+        elif level == VesselGraphProcessor.RadiusLevel.SCALAR_UM:  # Intermediate level
+            self._legacy_warn(f'_set_vertex_channel_expression({property_name}) scalar µm fallback')
+            spacing          = np.array(self.graph_raw.graph_property('spacing'))
+            radii_um         = self.graph_raw.vertex_property('radius_units') + radius_shift_um
+            search_radius_vx = radii_um / np.mean(spacing)   # isotropic approx
+        else:  # full legacy level
+            self._legacy_warn(f'_set_vertex_channel_expression({property_name})')
+            search_radius_vx = self.graph_raw.vertex_radii_voxels() + _legacy_radius_shift_vx
+
+        res = measure_expression.measure_expression(source, coordinates, search_radius_vx, method='max',
+                                                    n_processes=self._n_processes('build'))  # WARNING: prange
+        prop = res if asset_type == 'binary' else np.asarray(res, dtype=float)  # TODO: do as f(source.dtype)
+        self.graph_raw.define_vertex_property(property_name, prop)
 
     def _set_artery_binary(self):
-        """Define if vertex is artery from binary labelling"""
-        self._set_graph_artery_property('binary', asset_sub_type=['filled', 'postprocessed'])   # FIXME: should use last step of BinaryVesselProcessor
+        """Define if vertex is artery from binary labeling"""
+        # FIXME: should use last step of BinaryVesselProcessor
+        self._set_vertex_vessel_type_expression(asset_type='binary', channel=self.arteries_channel,
+                                                asset_sub_type=['filled', 'postprocessed'],
+                                                radius_shift_um=0.0,
+                                                _legacy_radius_shift_vx=self._LEGACY_THRESHOLDS[
+                                                    'artery_search_shift_vx'])
 
     def _set_arteriness(self):
-        """assign 'arteriness' from signal intensity"""
-        self._set_graph_artery_property('stitched', suffix='raw', radius_shift=10)
+        """Assign 'arteriness' from signal intensity."""
+        level = self._graph_radius_level(self.graph_raw)
+        if level != self.RadiusLevel.VOXELS:
+            spacing = np.array(self.graph_raw.graph_property('spacing'))
+            radius_shift_um = 10.0 * np.mean(spacing)  # average enclosing
+        else:
+            # Legacy path — radius_shift_um is ignored inside
+            # _set_vertex_vessel_type_expression because it takes the
+            # voxel branch using _legacy_radius_shift_vx instead
+            radius_shift_um = 0.0
+
+        self._set_vertex_vessel_type_expression(asset_type='stitched', channel=self.arteries_channel,
+                                                radius_shift_um=radius_shift_um,
+                                                _legacy_radius_shift_vx=self._LEGACY_THRESHOLDS['arteriness_search_shift_vx'])
+
+    def _set_vein_binary(self):
+        """Define if vertex is vein from binary labeling"""
+        self._set_vertex_vessel_type_expression(asset_type='binary', channel=self.veins_channel,
+                                                asset_sub_type=['filled', 'postprocessed'],
+                                                radius_shift_um=0.0,
+                                                _legacy_radius_shift_vx=self._LEGACY_THRESHOLDS['vein_search_shift_vx'])
+
+    def _set_veinness(self):
+        """Assign 'veinness' from signal intensity."""
+        level = self._graph_radius_level(self.graph_raw)
+        if level != self.RadiusLevel.VOXELS:
+            spacing = np.array(self.graph_raw.graph_property('spacing'))
+            radius_shift_um = 10.0 * np.mean(spacing)
+        else:
+            radius_shift_um = 0.0
+
+        self._set_vertex_vessel_type_expression(asset_type='stitched', channel=self.veins_channel,
+                                                radius_shift_um=radius_shift_um,
+                                                _legacy_radius_shift_vx=self._LEGACY_THRESHOLDS['veinness_search_shift_vx'])
 
     def _build_graph_from_skeleton(self):  # TODO: split for requirements
         if self.config['graph_construction']['build']:
@@ -913,11 +1040,16 @@ class VesselGraphProcessor(PipelineOrchestrator):
             skeleton_path = self.get_path('skeleton', channel=self.parent_channels)
             spacing = self.sample_manager.get_channel_resolution(self.parent_channels[0])
             self.graph_raw = graph_processing.graph_from_skeleton(skeleton_path, spacing=spacing, physical_units='µm',
-                                                                  processes=self._n_processes('build'), verbose=True)  # WARNING: main thread (prange)
+                                                                  # check_border=False, verbose=True)  # WARNING: main thread (prange)
+                                                                  check_border=False,
+                                                                  n_processes=1, verbose=True)  # WARNING: main thread (prange)
             self._measure_radii()  # WARNING: main thread (prange)
             if self.use_arteries_for_graph:  # TODO: do same for veins if exists
                 self._set_artery_binary()  # WARNING: main thread (prange)
                 self._set_arteriness()  # WARNING: main thread (prange)
+            if self.veins_channel:
+                self._set_vein_binary()
+                self._set_veinness()
             self.save_graph('raw')
 
     @requires_graph('raw')
@@ -931,10 +1063,9 @@ class VesselGraphProcessor(PipelineOrchestrator):
         """
         vertex_mappings = copy.copy(graph_processing.DEFAULT_VERTEX_TO_VERTEX)
         if self.use_arteries_for_graph:
-            vertex_mappings.update({
-                'artery_binary': np.max,
-                'artery_raw': np.max
-            })  # TODO: do same for veins if exists
+            vertex_mappings.update({'artery_binary': np.max, 'artery_raw': np.max})
+        if self.veins_channel:
+            vertex_mappings.update({'vein_binary': np.max, 'vein_raw': np.max})
         self.steps.remove_next_steps_files(self.steps.graph_cleaned)
         self.graph_cleaned = graph_processing.clean_graph(
             self.graph_raw, vertex_mappings=vertex_mappings,
@@ -957,11 +1088,17 @@ class VesselGraphProcessor(PipelineOrchestrator):
         edge_to_edge_mappings = edge_to_edge_mappings
         edge_geometry_vertex_properties = ['coordinates', 'coordinates_units', 'radii', 'radius_units',
                                            'length', 'chain_id', '_vertex_id_']
+        # add conditionally on new graphs
+        if 'radii_axial' in self.graph_cleaned.vertex_properties:
+            edge_geometry_vertex_properties.append('radii_axial')
+        if 'radius_units_axial' in self.graph_cleaned.vertex_properties:
+            edge_geometry_vertex_properties.append('radius_units_axial')
         if self.use_arteries_for_graph:
-            vertex_to_edge_mappings.update({
-                'artery_binary': vote,
-                'artery_raw': np.max})  # TODO: do same for veins if exists
+            vertex_to_edge_mappings.update({'artery_binary': vote, 'artery_raw': np.max})
             edge_geometry_vertex_properties.extend(['artery_binary', 'artery_raw'])
+        if self.veins_channel:
+            vertex_to_edge_mappings.update({'vein_binary': vote, 'vein_raw': np.max})
+            edge_geometry_vertex_properties.extend(['vein_binary', 'vein_raw'])
         self.steps.remove_next_steps_files(self.steps.graph_reduced)
         self.graph_reduced = graph_processing.reduce_graph(self.graph_cleaned,
                                                            vertex_to_edge_mappings=vertex_to_edge_mappings,
@@ -1002,20 +1139,84 @@ class VesselGraphProcessor(PipelineOrchestrator):
         self.save_graph('reduced')
 
     def _scale(self):
-        """Apply transform to graph properties"""
+        """
+        Convert radius properties from original space to atlas-voxel space.
 
-        def scaling(radii):
-            resample_factor = resampling_module.resample_factor(
-                original_shape=self.binary_shape,
-                resampled_shape=self.resampled_shape)
-            return radii * np.mean(resample_factor)
+        New graphs (FULL/SCALAR_UM): µm → atlas voxels
+            scalar:  r_atlas = r_um / mean(atlas_spacing)
+            axial:   r_atlas[:, i] = r_um[:, i] / atlas_spacing[i]
 
-        from_name = 'radius_units' if 'radius_units' in list(self.graph_reduced.vertex_properties) else 'radii'
-        to_name = f'{from_name}_atlas'
-        mapping = {from_name: to_name}
+        Legacy graphs (VOXELS): original voxels → atlas voxels
+            scalar:  r_atlas = r_vx * mean(spacing) / mean(atlas_spacing)
+            axial:   r_atlas[:, i] = r_vx[:, i] * resample_factor[i]
+        """
+        resample_factor = np.array(resampling_module.resample_factor(
+            original_shape=self.binary_shape,
+            resampled_shape=self.resampled_shape))                    # (3,)
 
-        self.graph_reduced.transform_properties(transformation=scaling, vertex_properties=mapping,
-                                                edge_properties=mapping, edge_geometry_properties=mapping)
+        graph = self.graph_reduced
+        level = self._graph_radius_level(graph)
+
+        if 'spacing' in graph.graph_properties:
+            spacing = np.array(graph.graph_property('spacing'))
+        else:
+            self._legacy_warn('_scale (no spacing)')
+            spacing = np.array(
+                self.sample_manager.get_channel_resolution(self.parent_channels[0]))
+
+        atlas_spacing      = spacing / resample_factor                # µm/atlas-vox (3,)
+        atlas_spacing_mean = float(np.mean(atlas_spacing))
+        spacing_mean       = float(np.mean(spacing))
+
+        # ── scan all radius-like properties ──────────────────────────────
+        radius_props: dict[str, tuple[bool, bool]] = {}   # name → (is_um, is_axial)
+        for prop_name in list(graph.vertex_properties):
+            if not ('radii' in prop_name or 'radius' in prop_name):
+                continue
+            if prop_name.endswith('_atlas'):
+                continue
+            prop   = graph.vertex_property(prop_name)
+            is_um    = any(prop_name.endswith(sfx) for sfx in ('_units', 'um'))
+            is_axial = prop.ndim == 2 and prop.shape[1] == 3
+            radius_props[prop_name] = (is_um, is_axial)
+
+        # ── define scaling functions ─────────────────────────────────────
+        def scale_um_scalar(r):
+            return r / atlas_spacing_mean
+
+        def scale_um_axial(r):
+            return r / atlas_spacing  # (n,3) / (3,)
+
+        def scale_vx_scalar(r):
+            return r * (spacing_mean / atlas_spacing_mean)
+
+        def scale_vx_axial(r):
+            return r * resample_factor  # (n,3) * (3,)
+
+        dispatch = {  # key tuple (is_um, us_axial)
+            (True,  True):  scale_um_axial,
+            (True,  False): scale_um_scalar,
+            (False, True):  scale_vx_axial,
+            (False, False): scale_vx_scalar,
+        }
+
+        # ── apply per group ──────────────────────────────────────────────
+        groups: dict[tuple[bool, bool], list[str]] = {}
+        for prop_name, key in radius_props.items():
+            groups.setdefault(key, []).append(prop_name)
+
+        for key, prop_names in groups.items():
+            fn      = dispatch[key]
+            mapping = {p: f'{p}_atlas' for p in prop_names}
+
+            e_mapping = {k: v for k, v in mapping.items()
+                         if k in graph.edge_properties}
+            eg_mapping = {k: v for k, v in mapping.items()
+                          if k in graph.edge_geometry_properties}
+
+            graph.transform_properties(transformation=fn, vertex_properties=mapping,
+                                         edge_properties=e_mapping or None,
+                                         edge_geometry_properties=eg_mapping or None)
 
     def _annotate(self):
         """Atlas annotation of the graph (i.e. add property 'region' to vertices)"""
@@ -1031,8 +1232,8 @@ class VesselGraphProcessor(PipelineOrchestrator):
 
     def _compute_distance_to_surface(self):
         """add distance to brain surface as vertices properties"""
-        # %% Distance to surface
-        distance_atlas = self.get('atlas', channel=self.parent_channels[0], asset_sub_type='distance_to_surface').read()
+        distance_atlas = self.get('atlas', channel=self.parent_channels[0],
+                                  asset_sub_type='distance_to_surface').read()
         atlas_shape = distance_atlas.shape
 
         def distance(coordinates):
@@ -1060,7 +1261,7 @@ class VesselGraphProcessor(PipelineOrchestrator):
             self._compute_distance_to_surface()
         self.steps.remove_next_steps_files(self.steps.graph_annotated)
 
-        # discard non connected graph components
+        # discard non-connected graph components
         self.graph_annotated = self.graph_reduced.largest_component()
         self.save_graph('annotated')
 
@@ -1081,7 +1282,7 @@ class VesselGraphProcessor(PipelineOrchestrator):
                 - int/float: exact match
                 - str: string match (e.g. 'artery', 'vein')
                 - bool: 'True' or 'False' for boolean properties
-                - tuple: range (min, max) for numerical properties. None means open ended range.
+                - tuple: range (min, max) for numerical properties. None means open-ended range.
 
         Returns
         -------
@@ -1093,7 +1294,7 @@ class VesselGraphProcessor(PipelineOrchestrator):
 
     # POST PROCESS
     @requires_graph('annotated')
-    def _pre_filter_veins(self, vein_intensity_range_on_arteries_channel, min_vein_radius):
+    def _pre_filter_veins(self, vein_intensity_range_on_arteries_channel: tuple[float, float], min_vein_radius_um: float):
         """
         Filter veins based on radius and intensity in arteries channel
 
@@ -1109,18 +1310,27 @@ class VesselGraphProcessor(PipelineOrchestrator):
         """
         is_in_vein_range = is_in_range(self.graph_annotated.edge_property('artery_raw'),
                                        vein_intensity_range_on_arteries_channel)
-        radii = self.graph_annotated.edge_property('radii')
-        restrictive_vein = np.logical_and(radii >= min_vein_radius, is_in_vein_range)
-        return restrictive_vein
+
+        level = self._graph_radius_level(self.graph_annotated)
+        if level != VesselGraphProcessor.RadiusLevel.VOXELS:
+            radii = self.graph_annotated.edge_radii_um()
+            threshold = min_vein_radius_um
+        else:
+            self._legacy_warn('_pre_filter_veins')
+            radii = self.graph_annotated.edge_radii_voxels()
+            threshold = self._LEGACY_THRESHOLDS['restrictive_vein_radius_vx']
+
+        return np.logical_and(radii >= threshold, is_in_vein_range)
 
     @requires_graph('annotated')
-    def _pre_filter_arteries(self, huge_vein, min_size):
+    def _pre_filter_arteries(self, arteries_min_noise_edges: int):
         """
-        Remove capillaries and veins from arteries
+        Remove components where too few edges are arteries
 
         Parameters
         ----------
-        min_size : (int)  below is capillary
+        arteries_min_noise_edges : (int)
+            below is capillary
 
         Returns
         -------
@@ -1131,23 +1341,30 @@ class VesselGraphProcessor(PipelineOrchestrator):
         artery_graph = self.graph_annotated.sub_graph(edge_filter=artery, view=True)
         artery_graph_edge, edge_map = artery_graph.edge_graph(return_edge_map=True)
         artery_components, artery_size = artery_graph_edge.label_components(return_vertex_counts=True)
-        too_small = edge_map[np.in1d(artery_components, np.where(artery_size < min_size)[0])]
+        too_small = edge_map[np.in1d(artery_components, np.where(artery_size < arteries_min_noise_edges)[0])]
         artery[too_small] = False
-        artery[huge_vein] = False
         return artery
 
     @requires_graph('annotated')
-    def _post_filter_veins(self, restrictive_veins, min_vein_radius=6.5):
-        radii = self.graph_annotated.edge_property('radii')
+    def _post_filter_veins(self, restrictive_veins, min_vein_radius_um: float | int):
         artery = self.graph_annotated.edge_property('artery')
 
-        large_vessels = radii >= min_vein_radius
+        level = self._graph_radius_level(self.graph_annotated)
+        if level != VesselGraphProcessor.RadiusLevel.VOXELS:
+            radii = self.graph_annotated.edge_radii_um()
+            threshold = min_vein_radius_um
+        else:
+            self._legacy_warn('_post_filter_veins')
+            radii = self.graph_annotated.edge_radii_voxels()
+            threshold = self._LEGACY_THRESHOLDS['permissive_vein_radius_vx']
+
+        large_vessels = radii >= threshold
         permissive_veins = np.logical_and(np.logical_or(restrictive_veins, large_vessels), np.logical_not(artery))
         return permissive_veins
 
     # TRACING
     @requires_graph('annotated')
-    def _trace_arteries(self, veins, max_tracing_iterations=5):
+    def _trace_arteries(self, veins, max_tracing_iterations: int = 5):
         """
         Trace arteries by hysteresis thresholding
         Keeps small arteries that are too weakly immuno-positive but still too big to be capillaries
@@ -1158,14 +1375,24 @@ class VesselGraphProcessor(PipelineOrchestrator):
         veins
         """
         artery = self.graph_annotated.edge_property('artery')
+
+        level = self._graph_radius_level(self.graph_annotated)
+        if level != VesselGraphProcessor.RadiusLevel.VOXELS:
+            radii = self.graph_annotated.edge_radii_um()
+            trace_radius = self.config['vessel_type_postprocessing']['tracing']['artery_trace_radius_um']
+        else:
+            self._legacy_warn('_trace_arteries')
+            radii = self.graph_annotated.edge_radii_voxels()
+            trace_radius = self._LEGACY_THRESHOLDS['artery_trace_radius_vx']
+
         condition_args = {
             'distance_to_surface': self.graph_annotated.edge_property('distance_to_surface'),
-            'distance_threshold': 15,
+            'distance_threshold': self.config['vessel_type_postprocessing']['tracing']['distance_to_surface_min'],
             'vein': veins,
-            'radii': self.graph_annotated.edge_property('radii'),
-            'artery_trace_radius': 4,  # FIXME: param
+            'radii': radii,
+            'artery_trace_radius': trace_radius,
             'artery_intensity': self.graph_annotated.edge_property('artery_raw'),
-            'artery_intensity_min': 200  # FIXME: param
+            'artery_intensity_min': self.config['vessel_type_postprocessing']['tracing']['artery_intensity_min']
         }
 
         def continue_edge(graph, edge, **kwargs):
@@ -1183,18 +1410,25 @@ class VesselGraphProcessor(PipelineOrchestrator):
         self.graph_annotated.define_edge_property('artery', artery_traced)
 
     @requires_graph('annotated')
-    def _trace_veins(self, max_tracing_iterations=5):
+    def _trace_veins(self, max_tracing_iterations: int = 5):
         """
         Trace veins by hysteresis thresholding - stop before arteries
         """
         min_distance_to_artery = 1
 
         artery = self.graph_annotated.edge_property('artery')
-        radii = self.graph_annotated.edge_property('radii')
+        level = self._graph_radius_level(self.graph_annotated)
+        if level != VesselGraphProcessor.RadiusLevel.VOXELS:
+            radii = self.graph_annotated.edge_radii_um()
+            trace_radius = self.config['vessel_type_postprocessing']['tracing']['vein_trace_radius_um']
+        else:
+            self._legacy_warn('_trace_veins')
+            radii = self.graph_annotated.edge_radii_voxels()
+            trace_radius = self._LEGACY_THRESHOLDS['vein_trace_radius_vx']
         condition_args = {
             'artery_expanded': self.graph_annotated.edge_dilate_binary(artery, steps=min_distance_to_artery),
             'radii': radii,
-            'vein_trace_radius': 5  # FIXME: param
+            'vein_trace_radius': trace_radius
         }
 
         def continue_edge(graph, edge, **kwargs):
@@ -1211,7 +1445,7 @@ class VesselGraphProcessor(PipelineOrchestrator):
         self.graph_annotated.define_edge_property('vein', vein_traced)
 
     @requires_graph('annotated')
-    def _remove_small_vessel_components(self, vessel_name, min_vessel_size=30):
+    def _remove_small_vessel_components(self, vessel_name, min_vessel_size: int = 30):
         """
         Filter out small components that will become capillaries
         """
@@ -1236,26 +1470,34 @@ class VesselGraphProcessor(PipelineOrchestrator):
         """
         if self.use_arteries_for_graph:
             cfg = self.config['vessel_type_postprocessing']
-            # Definitely a vein because too big
-            restrictive_veins = self._pre_filter_veins(cfg['pre_filtering']['vein_intensity_range_on_arteries_ch'],
-                                                       min_vein_radius=cfg['pre_filtering']['restrictive_vein_radius'])
 
-            artery = self._pre_filter_arteries(restrictive_veins, min_size=cfg['pre_filtering']['arteries_min_radius'])
+            artery = self._pre_filter_arteries(cfg['pre_filtering']['arteries_min_noise_edges'])
+
+            # Definitely a vein because too big
+            restrictive_veins = self._pre_filter_veins(
+                cfg['pre_filtering']['vein_intensity_range_on_arteries_ch'],
+                min_vein_radius_um=cfg['pre_filtering']['restrictive_vein_radius_um'])
+            artery[restrictive_veins] = False
+
             self.graph_annotated.define_edge_property('artery', artery)
 
             # Not huge vein but not an artery so still a vein (with temporary radius for artery tracing)
             tmp_veins = self._post_filter_veins(restrictive_veins,
-                                                min_vein_radius=cfg['pre_filtering']['permissive_vein_radius'])
+                                                min_vein_radius_um=cfg['pre_filtering']['permissive_vein_radius_um'])
             self._trace_arteries(tmp_veins, max_tracing_iterations=cfg['tracing']['max_arteries_iterations'])
 
             # The real vein size filtering
-            vein = self._post_filter_veins(restrictive_veins, min_vein_radius=cfg['pre_filtering']['final_vein_radius'])
+            vein = self._post_filter_veins(restrictive_veins,
+                                           min_vein_radius_um=cfg['pre_filtering']['final_vein_radius_um'])
             self.graph_annotated.define_edge_property('vein', vein)
 
             self._trace_veins(max_tracing_iterations=cfg['tracing']['max_veins_iterations'])
 
-            self._remove_small_vessel_components('artery', min_vessel_size=cfg['capillaries_removal']['min_artery_size'])
-            self._remove_small_vessel_components('vein', min_vessel_size=cfg['capillaries_removal']['min_vein_size'])
+            #  Clean up fragments (veins or arteries) that tracing extended but not enough to be biologically meaningful.
+            self._remove_small_vessel_components('artery',
+                                                 min_vessel_size=cfg['capillaries_removal']['min_artery_component_edges'])
+            self._remove_small_vessel_components('vein',
+                                                 min_vessel_size=cfg['capillaries_removal']['min_vein_component_edges'])
 
             self.graph_annotated.save(self.get_path('graph', channel=self.parent_channels))
             self.graph_traced = self.graph_annotated
@@ -1270,7 +1512,7 @@ class VesselGraphProcessor(PipelineOrchestrator):
         }
         return voxelize_branch_parameter
 
-    def __voxelize(self, vertices, voxelize_branch_parameter):
+    def __voxelize(self, vertices, voxelize_branch_parameter: dict[str, Any]):
         density_path = self.get_path('density', channel=self.parent_channels, asset_sub_type='branches')
         clearmap_io.delete_file(density_path)
         self.branch_density = voxelization.voxelize(vertices,
@@ -1306,7 +1548,7 @@ class VesselGraphProcessor(PipelineOrchestrator):
             vertices = vertices[combined.as_mask('vertex')]
 
         if weight_by_radius:
-            voxelize_branch_parameter.update(weights=graph.vertex_radii())
+            voxelize_branch_parameter.update(weights=graph.vertex_radii_units())
 
         self.__voxelize(vertices, voxelize_branch_parameter)
 
@@ -1322,8 +1564,11 @@ class VesselGraphProcessor(PipelineOrchestrator):
         """
         coordinates = self.graph_traced.vertex_property('coordinates')
         df = pd.DataFrame({'x': coordinates[:, 0], 'y': coordinates[:, 1], 'z': coordinates[:, 2]})
-        df['radius'] = self.graph_traced.vertex_property('radii')
         df['degree'] = self.graph_traced.vertex_degrees()
+
+        df['radius_vx'] = self.graph_traced.vertex_radii_voxels()
+        if 'radius_units' in self.graph_traced.vertex_properties:
+            df['radius_um'] = self.graph_traced.vertex_radii_units()
 
         if self.registration_processor.was_registered:
             annotator = self.registration_processor.annotators[self.parent_channels[0]]

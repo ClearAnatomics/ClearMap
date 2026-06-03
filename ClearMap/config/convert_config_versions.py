@@ -8,6 +8,7 @@ from functools import wraps
 from pathlib import Path
 from typing import Callable, Dict, Tuple
 
+import numpy as np
 from packaging.version import Version
 from importlib_metadata import version as importlib_version
 
@@ -597,11 +598,90 @@ def convert_2_1_to_3_0(main_folder='', create_app=True):
     upgrader.run()
 
 
-def migrate_vasculature_performance_v3_0_to_v3_1(
-    old_cfg: dict,
-    merged: dict,
-    default_cfg: dict,
-):
+def migrate_vasculature_postprocessing_v3_0_to_v3_1(old_cfg: dict, merged: dict, default_cfg: dict,
+        sample_cfg: dict | None = None) -> None:
+    """
+    Rename vessel_type_postprocessing thresholds from voxels to µm,
+    and fix the arteries_min_radius misnomer.
+
+    Conversion: old_vox × mean(spacing).
+    spacing is read from sample config if available, otherwise
+    falls back to a documented default with a warning.
+    """
+    # Try to get actual spacing from "vessels" channel in sample config
+    spacing = None
+    if sample_cfg is not None:
+        for ch_name, ch_cfg in sample_cfg['channels'].items():
+            if ch_cfg.get('data_type') == 'vessels':
+                spacing = np.array(ch_cfg['resolution'], dtype=float)
+                break
+
+    if spacing is not None:
+        vox_to_um_factor = float(np.mean(spacing))
+    else:
+        vox_to_um_factor = 1.9   # mean([1.625, 1.625, 2.5]) — documented fallback
+        warnings.warn(
+            f'No sample resolution found for vasculature config migration. '
+            f'Using fallback vox→µm factor={vox_to_um_factor:.1f}. '
+            f'Please verify vessel_type_postprocessing radius thresholds '
+            f'in the converted config.',
+            RuntimeWarning, stacklevel=2)
+
+    pre_filt_path = ['vessel_type_postprocessing', 'pre_filtering']
+    tracing_path  = ['vessel_type_postprocessing', 'tracing']
+    capillaries_rm_path = ['vessel_type_postprocessing', 'capillaries_removal']
+
+    # ── voxel radius → µm ────────────────────────────────────────────
+    vox_to_um_renames = {
+        'restrictive_vein_radius': 'restrictive_vein_radius_um',
+        'permissive_vein_radius':  'permissive_vein_radius_um',
+        'final_vein_radius':       'final_vein_radius_um',
+    }
+    for old_key, new_key in vox_to_um_renames.items():
+        old_path = pre_filt_path + [old_key]
+        new_path = pre_filt_path + [new_key]
+        val = try_get_item_recursive(old_cfg, old_path, None)
+        if val is not None:
+            scaled_val = round(float(val) * vox_to_um_factor, 2)
+            set_item_recursive(merged, new_path, scaled_val)
+            set_item_recursive(merged, old_path, DELETE)
+
+    capillaries_rm_renames = {
+        'min_artery_size': 'min_artery_component_edges',
+        'min_vein_size': 'min_vein_component_edges',
+    }
+    for old_key, new_key in capillaries_rm_renames.items():  # REFACTOR: too similar to above
+        old_p = capillaries_rm_path + [old_key]
+        new_p = capillaries_rm_path + [new_key]
+        val = try_get_item_recursive(old_cfg, old_p, None)
+        if val is not None:
+            set_item_recursive(merged, new_p, int(val))
+            set_item_recursive(merged, old_p, DELETE)
+
+    # ── arteries_min_radius → arteries_min_noise_edges ───────────
+    old_path = pre_filt_path + ['arteries_min_radius']
+    new_path = pre_filt_path + ['arteries_min_noise_edges']
+    val = try_get_item_recursive(old_cfg, old_path, None)
+    if val is not None:
+        set_item_recursive(merged, new_path, int(val))
+        set_item_recursive(merged, old_path, DELETE)
+
+    # ── new tracing keys absent in 3.0 — fill from defaults if missing ───
+    new_tracing_defaults = {
+        'vein_trace_radius_um': try_get_item_recursive(default_cfg, tracing_path + ['vein_trace_radius_um'], 8.0),
+        'artery_trace_radius_um': try_get_item_recursive(default_cfg, tracing_path + ['artery_trace_radius_um'], 6.4),
+        'distance_to_surface_min': try_get_item_recursive(default_cfg, tracing_path + ['distance_to_surface_min'], 15.0),
+        'artery_intensity_min': try_get_item_recursive(default_cfg, tracing_path + ['artery_intensity_min'], 200.0),
+    }
+    for key, default_val in new_tracing_defaults.items():
+        path = tracing_path + [key]
+        if not has_item_recursive(merged, path):
+            set_item_recursive(merged, path, default_val)
+
+    set_item_recursive(merged, tracing_path + ['artery_trace_radius'], DELETE)
+
+
+def migrate_vasculature_performance_v3_0_to_v3_1(old_cfg: dict, merged: dict, default_cfg: dict, sample_config: dict) -> None:
     mappings = [
         (['binarization', 'vessels', 'deep_fill'],
          ['performance', 'binarization', 'channels', 'vessels', 'deep_fill', 'block_processing']),
@@ -626,6 +706,10 @@ def migrate_vasculature_performance_v3_0_to_v3_1(
         set_item_recursive(merged, old_path + ['overlap'], DELETE)
 
 
+def migrate_vasculature_v3_0_to_v3_1(old_cfg, merged, default_cfg, sample_config):
+    migrate_vasculature_performance_v3_0_to_v3_1(old_cfg, merged, default_cfg, sample_config)
+    migrate_vasculature_postprocessing_v3_0_to_v3_1(old_cfg, merged, default_cfg, sample_config)
+
 
 def make_generic_3_0_to_3_1_converter(config_type: str,
                                       migration_func: Callable[[dict, dict, dict], None] | None = None):
@@ -644,7 +728,7 @@ def make_generic_3_0_to_3_1_converter(config_type: str,
 
     @cfg_conv_decorator('3.0', '3.1', canonical)
     @version_guard('3.0', '3.1')
-    def _convert_3_0_to_3_1(v1_path, v2_path=''):
+    def _convert_3_0_to_3_1(v1_path, v2_path='', sample_config=None):
         v1_path = Path(v1_path).expanduser().resolve()
 
         if not v2_path:
@@ -667,7 +751,7 @@ def make_generic_3_0_to_3_1_converter(config_type: str,
         deep_merge(merged, cfg_v1)
 
         if migration_func is not None:  # Optional (and section specific)
-            migration_func(cfg_v1, merged, default_cfg)
+            migration_func(cfg_v1, merged, default_cfg, sample_config)
 
         # COPY (shallow copy of top-level keys is enough;
         #       nested sections stay as config-like objects.)
@@ -684,16 +768,16 @@ def make_generic_3_0_to_3_1_converter(config_type: str,
     return _convert_3_0_to_3_1
 
 
-
 convert_sample_3_0_to_3_1 = make_generic_3_0_to_3_1_converter('sample')
 convert_stitching_3_0_to_3_1 = make_generic_3_0_to_3_1_converter('stitching')
 convert_registration_3_0_to_3_1 = make_generic_3_0_to_3_1_converter('registration')
 convert_cell_map_3_0_to_3_1 = make_generic_3_0_to_3_1_converter('cell_map')
 convert_tract_map_3_0_to_3_1 = make_generic_3_0_to_3_1_converter('tract_map')
 convert_colocalization_3_0_to_3_1 = make_generic_3_0_to_3_1_converter('colocalization')
-# convert_vasculature_3_0_to_3_1 = make_generic_3_0_to_3_1_converter('vasculature')
-convert_vasculature_3_0_to_3_1   = make_generic_3_0_to_3_1_converter(
-    'vasculature', migration_func=migrate_vasculature_performance_v3_0_to_v3_1)
+convert_vasculature_3_0_to_3_1 = make_generic_3_0_to_3_1_converter(
+    'vasculature', migration_func=migrate_vasculature_v3_0_to_v3_1)
+# convert_vasculature_3_0_to_3_1   = make_generic_3_0_to_3_1_converter(
+#     'vasculature', migration_func=migrate_vasculature_performance_v3_0_to_v3_1)
 convert_batch_3_0_to_3_1 = make_generic_3_0_to_3_1_converter('batch_processing')
 convert_group_analysis_3_0_to_3_1 = make_generic_3_0_to_3_1_converter('group_analysis')
 

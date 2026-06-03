@@ -1602,6 +1602,7 @@ class VesselGraphParams(UiParameter):
 
     cfg_subtree = ['vasculature']
 
+    # graph_construction
     skeletonize: bool
     build: bool
     clean: bool
@@ -1609,15 +1610,25 @@ class VesselGraphParams(UiParameter):
     transform: bool
     annotate: bool
     use_arteries: bool
+
+    # pre_filtering
     vein_intensity_range_on_arteries_channel: List[int]
     restrictive_min_vein_radius: float
     permissive_min_vein_radius: float
     final_min_vein_radius: float
-    arteries_min_radius: float
+    arteries_min_noise_edges: int
+
+    # tracing
     max_arteries_tracing_iterations: int
     max_veins_tracing_iterations: int
-    min_artery_size: int
-    min_vein_size: int
+    artery_trace_radius_um: float
+    vein_trace_radius_um: float
+    distance_to_surface_min: float
+    artery_intensity_min: float
+
+    # capillaries_removal
+    min_artery_component_edges: int
+    min_vein_component_edges: int
 
     def __init__(self, tab, *, event_bus: EventBus, get_view=None, apply_patch=None):
         super().__init__(tab, event_bus=event_bus, get_view=get_view, apply_patch=apply_patch)
@@ -1631,35 +1642,50 @@ class VesselGraphParams(UiParameter):
             'reduce': ParamLink(['graph_construction', 'reduce'], self.tab.buildGraphReduceCheckBox),
             'transform': ParamLink(['graph_construction', 'transform'], self.tab.buildGraphTransformCheckBox),
             'annotate':  ParamLink(['graph_construction', 'annotate'], self.tab.buildGraphRegisterCheckBox),
-            'use_arteries': ParamLink(
-                ['graph_construction', 'use_arteries'],
-                self.tab.buildGraphUseArteriesCheckBox),
+            'use_arteries': ParamLink(['graph_construction', 'use_arteries'],
+                                      self.tab.buildGraphUseArteriesCheckBox),
+
             'vein_intensity_range_on_arteries_channel': ParamLink(
                 ['vessel_type_postprocessing', 'pre_filtering', 'vein_intensity_range_on_arteries_ch'],
                 self.tab.veinIntensityRangeOnArteriesChannelDoublet),
             'restrictive_min_vein_radius': ParamLink(
-                ['vessel_type_postprocessing', 'pre_filtering', 'restrictive_vein_radius'],
+                ['vessel_type_postprocessing', 'pre_filtering', 'restrictive_vein_radius_um'],
                 self.tab.restrictiveMinVeinRadiusDoubleSpinBox),
             'permissive_min_vein_radius': ParamLink(
-                ['vessel_type_postprocessing', 'pre_filtering', 'permissive_vein_radius'],
+                ['vessel_type_postprocessing', 'pre_filtering', 'permissive_vein_radius_um'],
                 self.tab.permissiveMinVeinRadiusDoubleSpinBox),
             'final_min_vein_radius': ParamLink(
-                ['vessel_type_postprocessing', 'pre_filtering', 'final_vein_radius'],
+                ['vessel_type_postprocessing', 'pre_filtering', 'final_vein_radius_um'],
                 self.tab.finalMinVeinRadiusDoubleSpinBox),
-            'arteries_min_radius': ParamLink(
-                ['vessel_type_postprocessing', 'pre_filtering', 'arteries_min_radius'],
-                self.tab.arteriesMinRadiusDoubleSpinBox),
+            'arteries_min_noise_edges': ParamLink(
+                ['vessel_type_postprocessing', 'pre_filtering', 'arteries_min_noise_edges'],
+                self.tab.arteriesMinComponentEdgesSpinBox),
+
             'max_arteries_tracing_iterations': ParamLink(
                 ['vessel_type_postprocessing', 'tracing', 'max_arteries_iterations'],
                 self.tab.maxArteriesTracingIterationsSpinBox),
             'max_veins_tracing_iterations': ParamLink(
                 ['vessel_type_postprocessing', 'tracing', 'max_veins_iterations'],
                 self.tab.maxVeinsTracingIterationsSpinBox),
-            'min_artery_size': ParamLink(
-                ['vessel_type_postprocessing', 'capillaries_removal', 'min_artery_size'],
-                self.tab.minArterySizeSpinBox),  # WARNING: not the same unit as below
-            'min_vein_size': ParamLink(['vessel_type_postprocessing', 'capillaries_removal', 'min_vein_size'],
-                                       self.tab.minVeinSizeDoubleSpinBox)
+            'artery_trace_radius_um': ParamLink(
+                ['vessel_type_postprocessing', 'tracing', 'artery_trace_radius_um'],
+                self.tab.arteryTraceRadiusDoubleSpinBox),
+            'vein_trace_radius_um': ParamLink(
+                ['vessel_type_postprocessing', 'tracing', 'vein_trace_radius_um'],
+                self.tab.veinTraceRadiusDoubleSpinBox),
+            'distance_to_surface_min': ParamLink(
+                ['vessel_type_postprocessing', 'tracing', 'distance_to_surface_min'],
+                self.tab.arteryDistanceToSurfaceMinDoubleSpinBox),
+            'artery_intensity_min': ParamLink(
+                ['vessel_type_postprocessing', 'tracing', 'artery_intensity_min'],
+                self.tab.arteryIntensityMinDoubleSpinBox),
+
+            'min_artery_component_edges': ParamLink(
+                ['vessel_type_postprocessing', 'capillaries_removal', 'min_artery_component_edges'],
+                self.tab.arteryMinComponentEdgesSpinBox),
+            'min_vein_component_edges': ParamLink(
+                ['vessel_type_postprocessing', 'capillaries_removal', 'min_vein_component_edges'],
+                self.tab.veinsMinComponentEdgesSpinBox)
         }
 
     def add_graph_filter_params(self, widget, graph):
