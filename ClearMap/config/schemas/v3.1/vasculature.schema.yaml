@@ -141,6 +141,7 @@ properties:
           artery_trace_radius_um:  { $ref: "./typedefs.schema.yaml#/$defs/positiveNumber" }
           vein_trace_radius_um:    { $ref: "./typedefs.schema.yaml#/$defs/positiveNumber" }
           distance_to_surface_min: { $ref: "./typedefs.schema.yaml#/$defs/positiveNumber" }
+          vein_intensity_min:    { $ref: "./typedefs.schema.yaml#/$defs/positiveNumber" }
           artery_intensity_min:    { $ref: "./typedefs.schema.yaml#/$defs/positiveNumber" }
       capillaries_removal:
         type: object

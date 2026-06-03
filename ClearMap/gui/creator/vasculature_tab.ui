@@ -751,6 +751,34 @@
                       </property>
                      </widget>
                     </item>
+                    <item row="2" column="0">
+                     <widget class="QLabel" name="veinIntensityMinLbl">
+                      <property name="toolTip">
+                       <string>Minimum vein marker intensity for tracing</string>
+                      </property>
+                      <property name="whatsThis">
+                       <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Minimum signal intensity in the vein channel to continue tracing a vein. &lt;/p&gt;&lt;p&gt;Only used when a dedicated vein channel is available. &lt;/p&gt;&lt;p&gt;Edges with vein marker intensity below this value stop the vein extension.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                      </property>
+                      <property name="text">
+                       <string>Min. vein intensity</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="2" column="1">
+                     <widget class="QSpinBox" name="veinIntensityMinSpinBox">
+                      <property name="maximum">
+                       <number>65535</number>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="2" column="2">
+                     <widget class="QToolButton" name="veinIntensityMinInfoToolButton">
+                      <property name="icon">
+                       <iconset resource="icons.qrc">
+                        <normaloff>:/icons/icons/info.svg</normaloff>:/icons/icons/info.svg</iconset>
+                      </property>
+                     </widget>
+                    </item>
                    </layout>
                   </widget>
                  </item>

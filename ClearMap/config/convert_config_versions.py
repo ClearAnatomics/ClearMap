@@ -672,6 +672,7 @@ def migrate_vasculature_postprocessing_v3_0_to_v3_1(old_cfg: dict, merged: dict,
         'artery_trace_radius_um': try_get_item_recursive(default_cfg, tracing_path + ['artery_trace_radius_um'], 6.4),
         'distance_to_surface_min': try_get_item_recursive(default_cfg, tracing_path + ['distance_to_surface_min'], 15.0),
         'artery_intensity_min': try_get_item_recursive(default_cfg, tracing_path + ['artery_intensity_min'], 200.0),
+        'vein_intensity_min': try_get_item_recursive(default_cfg, tracing_path + ['vein_intensity_min'], 200.0),
     }
     for key, default_val in new_tracing_defaults.items():
         path = tracing_path + [key]

@@ -1406,7 +1406,7 @@ class VesselGraphProcessor(PipelineOrchestrator):
                                                           condition=continue_edge,
                                                           max_iterations=max_tracing_iterations,
                                                           **condition_args)
-        # artery_traced = graph.edge_open_binary(graph.edge_close_binary(artery_traced, steps=1), steps=1)
+
         self.graph_annotated.define_edge_property('artery', artery_traced)
 
     @requires_graph('annotated')
@@ -1415,32 +1415,57 @@ class VesselGraphProcessor(PipelineOrchestrator):
         Trace veins by hysteresis thresholding - stop before arteries
         """
         min_distance_to_artery = 1
-
         artery = self.graph_annotated.edge_property('artery')
+        artery_expanded = self.graph_annotated.edge_dilate_binary(artery, steps=min_distance_to_artery)
+
+        trace_cfg = self.config['vessel_type_postprocessing']['tracing']
+        pre_filt_cfg = self.config['vessel_type_postprocessing']['pre_filtering']
+
         level = self._graph_radius_level(self.graph_annotated)
         if level != VesselGraphProcessor.RadiusLevel.VOXELS:
             radii = self.graph_annotated.edge_radii_um()
-            trace_radius = self.config['vessel_type_postprocessing']['tracing']['vein_trace_radius_um']
+            trace_radius = trace_cfg['vein_trace_radius_um']
         else:
             self._legacy_warn('_trace_veins')
             radii = self.graph_annotated.edge_radii_voxels()
             trace_radius = self._LEGACY_THRESHOLDS['vein_trace_radius_vx']
+
+        artery_intensity = self.graph_annotated.edge_property('artery_raw') if self.use_arteries_for_graph else None
+        vein_intensity = self.graph_annotated.edge_property('vein_raw') if self.veins_channel else None
+
         condition_args = {
-            'artery_expanded': self.graph_annotated.edge_dilate_binary(artery, steps=min_distance_to_artery),
+            'artery_expanded': artery_expanded,
             'radii': radii,
-            'vein_trace_radius': trace_radius
+            'artery_intensity': artery_intensity,
+            'vein_trace_radius': trace_radius,
+            'vein_intensity': vein_intensity,
+            'vein_intensity_range': tuple(pre_filt_cfg['vein_intensity_range_on_arteries_ch']),
+            'vein_intensity_min': trace_cfg['vein_intensity_min']
         }
 
         def continue_edge(graph, edge, **kwargs):
-            if kwargs['artery_expanded'][edge]:
+            if kwargs['artery_expanded'][edge]:  # too close to artery
                 return False
             else:
-                return kwargs['radii'][edge] >= kwargs['vein_trace_radius']
+                radius_ok = kwargs['radii'][edge] >= kwargs['vein_trace_radius']
+                if not radius_ok:
+                    return False
+                else:
+                    # If we have vein signal: must be positive
+                    if kwargs['vein_intensity'] is not None:
+                        if kwargs['vein_intensity'][edge] < kwargs['vein_intensity_min']:
+                            return False
+                    # If we have artery signal: must be low
+                    if kwargs['artery_intensity'] is not None:
+                        lo, hi = kwargs['vein_intensity_range_on_arteries_ch']
+                        if not (lo <= kwargs['artery_intensity'][edge] <= hi):
+                            return False
+                    return True
 
-        vein_traced = graph_processing.trace_edge_label(self.graph_annotated, self.graph_annotated.edge_property('vein'),
-                                                        condition=continue_edge, max_iterations=max_tracing_iterations,
-                                                        **condition_args)
-        # vein_traced = graph.edge_open_binary(graph.edge_close_binary(vein_traced, steps=1), steps=1)
+        vein_traced = graph_processing.trace_edge_label(
+            self.graph_annotated, self.graph_annotated.edge_property('vein'),
+            condition=continue_edge, max_iterations=max_tracing_iterations,
+            **condition_args)
 
         self.graph_annotated.define_edge_property('vein', vein_traced)
 

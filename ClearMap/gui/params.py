@@ -1625,6 +1625,7 @@ class VesselGraphParams(UiParameter):
     vein_trace_radius_um: float
     distance_to_surface_min: float
     artery_intensity_min: float
+    vein_intensity_min: float
 
     # capillaries_removal
     min_artery_component_edges: int
@@ -1673,6 +1674,9 @@ class VesselGraphParams(UiParameter):
             'vein_trace_radius_um': ParamLink(
                 ['vessel_type_postprocessing', 'tracing', 'vein_trace_radius_um'],
                 self.tab.veinTraceRadiusDoubleSpinBox),
+            'vein_intensity_min': ParamLink(
+                ['vessel_type_postprocessing', 'tracing', 'vein_intensity_min'],
+                self.tab.veinIntensityMinSpinBox),
             'distance_to_surface_min': ParamLink(
                 ['vessel_type_postprocessing', 'tracing', 'distance_to_surface_min'],
                 self.tab.arteryDistanceToSurfaceMinDoubleSpinBox),
