@@ -263,11 +263,20 @@ def graph_from_skeleton(skeleton, points=None, radii=None, compute_vertex_coordi
         timer_all = tmr.Timer()
         print('Graph from skeleton calculation initialized.!')
 
+    n_processes = sanitize_n_processes(n_processes)
     if points is None:
-        # points = ap.where(skeleton.reshape(-1, order='A')).array  # FIXME: put back to ap.where
-        points = np.where(skeleton.reshape(-1, order='A'))[0]
-
-        if verbose: timer.print_elapsed_time('Point list generation', reset=True)
+        if n_processes > 1:
+            # Get 3d coordinates of positive voxels
+            coords_3d = ap.where(skeleton, processes=n_processes)
+            # convert to linear indices using strides (efficient memory indexing)
+            strides = np.array(skeleton.strides) // skeleton.dtype.itemsize  # divide to get in units of array elelements
+            points = (coords_3d[:, 0] * strides[0] +
+                      coords_3d[:, 1] * strides[1] +
+                      coords_3d[:, 2] * strides[2])
+            points.sort()  # searchsorted in neighbours() requires sorted
+        else:
+            points = np.where(skeleton.reshape(-1, order='A'))[0]
+        if verbose: timer.print_elapsed_time(f'Point list generation with {n_processes=}', reset=True)
 
     # create graph
     n_vertices = points.shape[0]
@@ -311,18 +320,22 @@ def graph_from_skeleton(skeleton, points=None, radii=None, compute_vertex_coordi
             coords_dtype = np.int32
         vertex_coordinates = vertex_coordinates.astype(coords_dtype)
         g.set_vertex_coordinates(vertex_coordinates, dtype=coords_dtype)
+        if verbose: timer.print_elapsed_time(f'Added {len(vertex_coordinates)} vertex coordinates', reset=True)
 
         if spacing is not None:
             # Upcast to float because result is in physical units
             coords_phys = vertex_coordinates.astype(np.float32) * spacing[None, :]  # None broadcasts spacing to (1, 3)
             g.define_vertex_property('coordinates_units', coords_phys, dtype=np.float32)
+            if verbose: timer.print_elapsed_time(f'Added physical units coordinates', reset=True)
 
     if radii is not None:
         g.set_vertex_radius(radii)
+        if verbose: timer.print_elapsed_time(f'Added radii', reset=True)
 
     if compute_edge_length:
         edge_lengths = annotate_edge_lengths(g, spacing=spacing)
         g.define_edge_property('length', edge_lengths, dtype=np.float64)
+        if verbose: timer.print_elapsed_time(f'Added lengths', reset=True)
 
     if verbose:
         timer_all.print_elapsed_time('Skeleton to Graph')
@@ -1369,7 +1382,8 @@ def trace_vertex_label(graph, vertex_label, condition, dilation_steps=1, max_ite
     return label
 
 
-def trace_edge_label(graph, edge_label, condition, max_iterations = None, dilation_steps = 1, pass_label = False, **condition_args):
+def trace_edge_label(graph, edge_label, condition, max_iterations = None,
+                     dilation_steps = 1, pass_label = False, **condition_args):
     """Traces label within a graph.
 
     Arguments
