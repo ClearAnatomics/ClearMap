@@ -172,6 +172,9 @@ class Graph(grp.AnnotatedGraph):
     def vertex_property_map(self, name):
         return self._base.vertex_properties[name]
 
+    def has_vertex_property(self, prop_name: str):
+        return prop_name in self.vertex_properties
+
     @property
     def vertex_properties(self):
         return self._base.vertex_properties.keys()
@@ -305,6 +308,9 @@ class Graph(grp.AnnotatedGraph):
     def edge_properties(self):
         return self._base.edge_properties.keys()
 
+    def has_edge_property(self, prop_name: str):
+        return prop_name in self.edge_properties
+
     def add_edge_property(self, name, source=None, dtype=None):
         p = edge_property_map_from_python(source, self)
         self._base.edge_properties[name] = p
@@ -362,6 +368,9 @@ class Graph(grp.AnnotatedGraph):
     @property
     def graph_properties(self):
         return self._base.graph_properties.keys()
+
+    def has_graph_property(self, prop_name: str):
+        return prop_name in self.graph_properties
 
     def add_graph_property(self, name, source, dtype=None):
         if dtype is None:
