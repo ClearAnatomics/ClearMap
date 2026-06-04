@@ -26,7 +26,7 @@ import ClearMap.Utils.Timer as tmr
 ###############################################################################
 
 def measure_expression(source, points, search_radius, method = 'max',
-                       sink = None, processes = None, verbose = False):
+                       sink = None, n_processes = None, verbose = False):
   """Measures the expression around a list of points in a source.
   
   Arguments
@@ -40,42 +40,42 @@ def measure_expression(source, points, search_radius, method = 'max',
     this radius for all points. Array should be of length of points.
   method : 'max' or 'min', 'mean'
     Measurement type.
-  processes : int or None
+  n_processes : int or None
     Number of processes to use.
   verbose : bool
     If True, print progress info.  
     
     
   """
-  source = io.as_source(source);
-  ndim = source.ndim;
+  source = io.as_source(source)
+  ndim = source.ndim
 
   if verbose:
-    timer = tmr.Timer();
-    print('Measuring expression of %d points in array of shape %r.' % (points.shape[0], source.shape));
+    timer = tmr.Timer()
+    print(f'Measuring expression of {points.shape[0]:d} points in array of shape {source.shape!r}.')
   
   if not hasattr(search_radius, '__len__'):
-    search_radius = search_radius * np.ones(points.shape[0]);
+    search_radius = search_radius * np.ones(points.shape[0])
   if len(search_radius) != len(points):
-    raise ValueError('The search_radius is not valid!');
+    raise ValueError('The search_radius is not valid!')
   
-  indices, radii_indices = search_indices(search_radius, ndim);
+  indices, radii_indices = search_indices(search_radius, ndim)
   
   if method == 'max':
-    expression = mpl.measure_max(source, points, indices, radii_indices, sink=sink, processes=processes, verbose=verbose);
+    expression = mpl.measure_max(source, points, indices, radii_indices, sink=sink, processes=n_processes, verbose=verbose)
   elif method == 'min':
-    expression = mpl.measure_min(source, points, indices, radii_indices, sink=sink, processes=processes, verbose=verbose);
+    expression = mpl.measure_min(source, points, indices, radii_indices, sink=sink, processes=n_processes, verbose=verbose)
   elif method == 'mean':
-    expression = mpl.measure_mean(source, points, indices, radii_indices, sink=sink, processes=processes, verbose=verbose);
+    expression = mpl.measure_mean(source, points, indices, radii_indices, sink=sink, processes=n_processes, verbose=verbose)
   elif method == 'sum':
-    expression = mpl.measure_sum(source, points, indices, radii_indices, sink=sink, processes=processes, verbose=verbose);  
+    expression = mpl.measure_sum(source, points, indices, radii_indices, sink=sink, processes=n_processes, verbose=verbose)
   else:
-    raise ValueError("Method %r not in 'max', 'min', 'mean'" % method);
+    raise ValueError(f"Method {method!r} not in 'max', 'min', 'mean'")
   
   if verbose:
-    timer.print_elapsed_time('Measuring expression done');
+    timer.print_elapsed_time('Measuring expression done')
   
-  return expression;
+  return expression
 
 
 ###############################################################################
@@ -141,10 +141,10 @@ def test():
   search, indices = mex.search_indices(radii=radii, ndim=1)      
        
   points = np.array([10,10]);   
-  d = mex.measure_expression(data, points, search_radius=radii, method='min', verbose = True, processes = None);             
+  d = mex.measure_expression(data, points, search_radius=radii, method='min', verbose = True, n_processes= None);
   print(d)            
   
-  d = mex.measure_expression(data, points, search_radius=radii, method='mean', verbose = True, processes = None);             
+  d = mex.measure_expression(data, points, search_radius=radii, method='mean', verbose = True, n_processes= None);
   print(d) 
   
   #3d data
@@ -154,7 +154,7 @@ def test():
   data[14,14,24] = 3;
   
   points = np.array([[14,14,24], [3,3,3]]);
-  d = mex.measure_expression(data, points, search_radius=1, method='min', verbose = True, processes = None);             
+  d = mex.measure_expression(data, points, search_radius=1, method='min', verbose = True, n_processes= None);
   print(d) 
 
   
