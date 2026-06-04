@@ -14,7 +14,6 @@ import copy
 import re
 import functools
 import platform
-import time
 import warnings
 import gc
 from concurrent.futures import ProcessPoolExecutor
@@ -660,10 +659,10 @@ class VesselGraphProcessor(PipelineOrchestrator):
     _LEGACY_THRESHOLDS = {
         # artery channel expression measurement
         'artery_search_shift_vx': 0.0,  # _set_artery_binary
-        'arteriness_search_shift_vx': 10.0,  # _set_arteriness
+        'arteriness_search_shift_vx': 3.0,  # _set_arteriness
         # vein channel expression measurement
         'vein_search_shift_vx':      0.0,
-        'veinness_search_shift_vx':  10.0,
+        'veinness_search_shift_vx':  3.0,
         # post-process filters
         'restrictive_vein_radius_vx': 6.5,
         'permissive_vein_radius_vx': 6.5,
@@ -939,7 +938,7 @@ class VesselGraphProcessor(PipelineOrchestrator):
         radii_um_scalar = np.linalg.norm(radii_um_axial, axis=1)
         radii_vx_scalar = np.linalg.norm(radii_vx_axial, axis=1)
 
-        self.graph_raw.set_vertex_radii(radii_vx_scalar)
+        self.graph_raw.set_vertex_radii(radii_vx_scalar)  # FIXME: deprecate
         self.graph_raw.define_vertex_property('radius_units', radii_um_scalar)
 
         if not self.graph_raw.has_graph_property('spacing'):
@@ -982,6 +981,7 @@ class VesselGraphProcessor(PipelineOrchestrator):
             self._legacy_warn(f'_set_vertex_channel_expression({property_name})')
             search_radius_vx = self.graph_raw.vertex_radii_voxels() + _legacy_radius_shift_vx
 
+        search_radius_vx = np.floor(search_radius_vx).astype(np.int32)
         res = measure_expression.measure_expression(source, coordinates, search_radius_vx, method='max',
                                                     n_processes=self._n_processes('build'))  # WARNING: prange
         prop = res if asset_type == 'binary' else np.asarray(res, dtype=float)  # TODO: do as f(source.dtype)
@@ -1001,7 +1001,7 @@ class VesselGraphProcessor(PipelineOrchestrator):
         level = self._graph_radius_level(self.graph_raw)
         if level != self.RadiusLevel.VOXELS:
             spacing = np.array(self.graph_raw.graph_property('spacing'))
-            radius_shift_um = 10.0 * np.mean(spacing)  # average enclosing
+            radius_shift_um = VesselGraphProcessor._LEGACY_THRESHOLDS['arteriness_search_shift_vx'] * np.mean(spacing)  # average enclosing
         else:
             # Legacy path — radius_shift_um is ignored inside
             # _set_vertex_vessel_type_expression because it takes the
@@ -1024,7 +1024,7 @@ class VesselGraphProcessor(PipelineOrchestrator):
         level = self._graph_radius_level(self.graph_raw)
         if level != self.RadiusLevel.VOXELS:
             spacing = np.array(self.graph_raw.graph_property('spacing'))
-            radius_shift_um = 10.0 * np.mean(spacing)
+            radius_shift_um = VesselGraphProcessor._LEGACY_THRESHOLDS['veinness_search_shift_vx'] * np.mean(spacing)
         else:
             radius_shift_um = 0.0
 
@@ -1040,9 +1040,9 @@ class VesselGraphProcessor(PipelineOrchestrator):
             skeleton_path = self.get_path('skeleton', channel=self.parent_channels)
             spacing = self.sample_manager.get_channel_resolution(self.parent_channels[0])
             self.graph_raw = graph_processing.graph_from_skeleton(skeleton_path, spacing=spacing, physical_units='µm',
-                                                                  # check_border=False, verbose=True)  # WARNING: main thread (prange)
                                                                   check_border=False,
-                                                                  n_processes=1, verbose=True)  # WARNING: main thread (prange)
+                                                                  n_processes=self._n_processes('build'), verbose=True)  # WARNING: main thread (prange)
+
             self._measure_radii()  # WARNING: main thread (prange)
             if self.use_arteries_for_graph:  # TODO: do same for veins if exists
                 self._set_artery_binary()  # WARNING: main thread (prange)
