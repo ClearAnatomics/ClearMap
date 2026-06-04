@@ -21,6 +21,7 @@ __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__   = 'https://idisco.info'
 __download__  = 'https://www.github.com/ChristophKirst/ClearMap2'
 import time
+from contextlib import contextmanager
 
 import ClearMap.Utils.Sound as snd
 
@@ -133,20 +134,35 @@ class Timer:
         return self.__str__()
 
 
+def _format_elapsed(seconds: float) -> str:
+    h, rem = divmod(seconds, 3600)
+    m, s   = divmod(rem, 60)
+    ms     = (s % 1) * 1000
+    return f'{int(h):d}:{int(m):02d}:{int(s):02d}.{int(ms):03d}'
+
+
 def timeit(method):
-    def timed(*args, **kw):
-        ts = time.time()
+    """Decorator — times a method call."""
+    def timed_(*args, **kw):
+        ts     = time.time()
         result = method(*args, **kw)
-        te = time.time()
-
-        m, s = divmod(te-ts, 60)
-        h, m = divmod(m, 60)
-        ms = 1000 * (s % 1)
-
-        print(f"{method.__name__} took {h:d}:{m:02d}:{s:02d}.{ms:03d}")
+        print(f'{method.__name__}: {_format_elapsed(time.time() - ts)}')
         return result
+    return timed_
 
-    return timed
+
+@contextmanager
+def timed(label: str = '', logger=None):
+    """Context manager — times a code block."""
+    ts = time.time()
+    try:
+        yield
+    finally:
+        msg = f'{label}: {_format_elapsed(time.time() - ts)}'
+        if logger is not None:
+            logger.info(msg)
+        else:
+            print(msg)
 
 
 def _test():
