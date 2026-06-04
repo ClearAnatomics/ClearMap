@@ -26,7 +26,8 @@ import ClearMap.Utils.Timer as tmr
 def measure_radius(source, points, fraction=None, value=None,
                    max_radius=100, method='sphere', default=np.inf, scale=None,
                    return_radii=True, return_radii_as_scalar=True,
-                   return_indices=False, processes=None, verbose=False) -> np.array | tuple(np.array, np.array):
+                   return_indices=False, processes=None,
+                   verbose=False) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
     """
     Measures a radius via decay of intensity values for a list of points.
 
@@ -114,9 +115,8 @@ def measure_radius(source, points, fraction=None, value=None,
     if return_radii:
         if scale is None:
             scale = 1
-        if not hasattr(scale, '__len__'):
-            scale = [scale] * ndim
-            scale = np.asarray(scale)
+        if not hasattr(scale, '__len__'):  # scalar provided -> broadcast
+            scale = np.full(ndim, scale, dtype=float)
         distance_table = np.abs(search) * scale
         if return_radii_as_scalar:
             distance_table = np.sqrt(np.sum(distance_table * distance_table, axis=1))
