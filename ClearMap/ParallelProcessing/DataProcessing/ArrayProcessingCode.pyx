@@ -346,6 +346,25 @@ cpdef index_t[:] block_sums_3d(source_t[:,:,:] source, int blocks, int processes
 
   return blocksums
 
+cpdef index_t[:] block_sums_3d_f(source_t[:,:,:] source, int blocks, int processes):
+    cdef index_t i, j, k, p
+    cdef index_t shape_0 = source.shape[0]
+    cdef index_t shape_1 = source.shape[1]
+    cdef index_t shape_2 = source.shape[2]
+
+    cdef index_t nblocks = min(shape_2, blocks)
+    cdef index_t[:] ranges = np.array(np.linspace(0, shape_2, nblocks + 1), dtype=int)
+    cdef index_t[:] blocksums = np.zeros(nblocks, dtype=int)
+
+    with nogil, parallel(num_threads=processes):
+        for p in prange(nblocks, schedule='guided'):
+            for k in range(ranges[p], ranges[p+1]):
+                for j in range(shape_1):
+                    for i in range(shape_0):
+                        blocksums[p] += (source[i, j, k] > 0)
+    return blocksums
+
+
 cpdef np.ndarray[Py_ssize_t, ndim=1] neighbours(index_t[:] indices, int offset, int processes):
   cdef index_t n = indices.shape[0]
   cdef index_t p, i, plo, phi, target
@@ -477,6 +496,36 @@ cpdef void where_3d(source_t[:,:,:] source, index_t[:,:] where, index_t[:] sums,
               l[p]+=1
 
   return
+
+cpdef void where_3d_f(source_t[:,:,:] source, index_t[:,:] where,
+                       index_t[:] sums, int blocks, int processes):
+    cdef index_t i, j, k, p
+    cdef index_t shape_0 = source.shape[0]
+    cdef index_t shape_1 = source.shape[1]
+    cdef index_t shape_2 = source.shape[2]
+
+    cdef index_t nblocks = min(shape_2, blocks)
+    cdef index_t[:] ranges = np.array(np.linspace(0, shape_2, nblocks + 1), dtype=int)
+
+    if sums is None:
+        sums = block_sums_3d_f(source, nblocks, processes)
+
+    cdef index_t[:] l = np.append([0], np.cumsum(sums))
+
+    if where is None:
+        where = np.zeros((np.sum(sums), 3), dtype=int)
+
+    with nogil, parallel(num_threads=processes):
+        for p in prange(nblocks, schedule='guided'):
+            for k in range(ranges[p], ranges[p+1]):
+                for j in range(shape_1):
+                    for i in range(shape_0):
+                        if source[i, j, k] > 0:
+                            where[l[p], 0] = i
+                            where[l[p], 1] = j
+                            where[l[p], 2] = k
+                            l[p] += 1
+    return
 
 ###############################################################################
 ### IO

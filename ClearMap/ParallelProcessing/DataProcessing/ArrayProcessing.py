@@ -191,7 +191,8 @@ def correlate1d(source, kernel, sink = None, axis=0, processes=None, verbose=Fal
 ### Where
 ###############################################################################
 
-def where(source, sink=None, blocks=None, cutoff=None, processes=None, verbose=False):
+def where(source, sink=None, blocks=None,
+          cutoff=None, processes=None, verbose=False):
   """Returns the indices of the non-zero entries of the array.
   
   Arguments
@@ -215,8 +216,9 @@ def where(source, sink=None, blocks=None, cutoff=None, processes=None, verbose=F
   Note
   ----
     Uses numpy.where if there is no match of dimension implemented!
-  """  
+  """
   source, source_buffer = initialize_source(source)
+  order = getattr(source, 'order', None) or ('F' if source_buffer.flags['F_CONTIGUOUS'] else 'C')
 
   ndim = source_buffer.ndim
   if not ndim in [1,2,3]:
@@ -243,7 +245,10 @@ def where(source, sink=None, blocks=None, cutoff=None, processes=None, verbose=F
     elif ndim == 2:
       sums = code.block_sums_2d(source_buffer, blocks=blocks, processes=processes)
     else:
-      sums = code.block_sums_3d(source_buffer, blocks=blocks, processes=processes)
+      if order == 'F':
+        sums = code.block_sums_3d_f(source_buffer, blocks=blocks, processes=processes)
+      else:
+        sums = code.block_sums_3d(source_buffer, blocks=blocks, processes=processes)
 
     if ndim == 1:
       sink_shape = (np.sum(sums),)
@@ -256,7 +261,11 @@ def where(source, sink=None, blocks=None, cutoff=None, processes=None, verbose=F
     elif ndim == 2:
       code.where_2d(source_buffer, where=sink_buffer, sums=sums, blocks=blocks, processes=processes)
     else:
-      code.where_3d(source_buffer, where=sink_buffer, sums=sums, blocks=blocks, processes=processes)
+      if order == 'F':
+        code.where_3d_f(source_buffer, where=sink_buffer, sums=sums, blocks=blocks, processes=processes)
+      else:
+        code.where_3d(source_buffer, where=sink_buffer, sums=sums, blocks=blocks, processes=processes)
+
 
   finalize_processing(verbose=verbose, function='where', timer=timer)
 
