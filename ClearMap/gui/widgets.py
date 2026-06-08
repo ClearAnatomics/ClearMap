@@ -2460,10 +2460,14 @@ class ComparisonsWidgetAdapter:
 
         # Channel to plot combobox
         if channels:
+            lyt = QHBoxLayout(parent=self._layout)
+            plot_channel_lbl = QLabel('Channel: ')
+            lyt.addWidget(plot_channel_lbl)
             plot_channel_combobox = QComboBox()
             plot_channel_combobox.addItems(channels)
             plot_channel_combobox.currentTextChanged.connect(on_channel_changed)
-            self._layout.addWidget(plot_channel_combobox)
+            lyt.addWidget(plot_channel_combobox)
+            self._layout.addLayout(lyt)
             self._channel_combo = plot_channel_combobox
 
         self._layout.addStretch()
