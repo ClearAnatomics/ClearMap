@@ -14,3 +14,10 @@ __license__   = 'GPLv3 - GNU General Public License v3 (see LICENSE)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__   = 'https://idisco.info'
 __download__  = 'https://www.github.com/ChristophKirst/ClearMap2'
+
+import sys
+from ClearMap.Alignment.Stitching import stitching_wobbly, stitching_rigid
+
+# Backward compat alias for layouts (pickled) objects saved under old module name
+sys.modules['ClearMap.Alignment.Stitching.StitchingWobbly'] = stitching_wobbly
+sys.modules['ClearMap.Alignment.Stitching.StitchingRigid'] = stitching_rigid
