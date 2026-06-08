@@ -1995,15 +1995,15 @@ class BatchParameters(UiParameter):
 
     # IMPORTANT: implement in subclass
     def build_params_dict(self) -> dict:
-        return {'results_folder': ParamLink(['paths', 'results_folder'], self.tab.resultsFolderLineEdit,
-                                            notify_apply=lambda: self.publish(UiBatchResultsFolderChanged(self.results_folder))),
-                'groups': ParamLink(['groups'], self.groups_adapter,
-                                    connect=False)#notify_apply=lambda: self.publish(UiBatchGroupsChanged(self.groups)))
-                }
+        return {
+            'results_folder': ParamLink(['paths', 'results_folder'], self.tab.resultsFolderLineEdit,
+                                        notify_apply=lambda: self.publish(UiBatchResultsFolderChanged(self.results_folder))),
+            'groups': ParamLink(['groups'], self.groups_adapter,
+                                connect=False)#notify_apply=lambda: self.publish(UiBatchGroupsChanged(self.groups)))
+        }
 
     def connect(self):
         self.groups_adapter.connect(self._on_groups_widget_changed)
-
 
     @param_handler
     def _on_groups_widget_changed(self, *_):
