@@ -17,18 +17,21 @@ from PyQt5.QtWidgets import QApplication, QDialog
 
 from ClearMap.IO.assets_constants import CHANNELS_ASSETS_TYPES_CONFIG
 from ClearMap.Utils.tag_expression import Expression
-from ClearMap.Utils.utilities import try_get_item_recursive, set_item_recursive, has_item_recursive, DELETE, deep_merge
+from ClearMap.Utils.utilities import (try_get_item_recursive, set_item_recursive, has_item_recursive, deep_merge,
+                                      del_item_recursive)
 from ClearMap.config.config_handler import ConfigHandler, ALTERNATIVES_REG
 
 from ClearMap.gui.dialogs import RenameChannelsDialog, VerifyRenamingDialog
 from ClearMap.gui.dialog_helpers import get_directory_dlg
 from ClearMap.gui.gui_utils_base import ensure_qapp
 
+
 clearmap_version = importlib_version('ClearMap')
 VERSION_SUFFIX = f'v{Version(clearmap_version).major}_{Version(clearmap_version).minor}'
 
 
 SUPPORTED_VERSIONS = [Version(v) for v in ('2.1', '3.0', '3.1')]
+
 
 def _norm_ver(v) -> Version:
     return v if isinstance(v, Version) else Version(str(v))
@@ -87,9 +90,9 @@ def version_guard(from_v, to_v, key: str = 'clearmap_version'):
             cfg = read_cfg(v1_path)
             current = Version(str(cfg.get(key, '0.0.0')))
             if current == to_v:
-                warnings.warn(f'Config already in version {to_v}')
+                warnings.warn(f'Config already at version {to_v}')
                 return cfg.filename
-            if current != from_v:
+            if current != from_v and current != Version('0.0.0'):  # 0.0.0 (not set should default to 2.1, last ver not set)
                 raise ValueError(f'Only version {from_v} is supported (got {current})')
             return func(v1_path, *args, **kwargs)
         return wrapper
@@ -182,7 +185,7 @@ def convert_sample_2_1_to_3_0(v1_path, v2_path=''):
 
 @cfg_converter('2.1', '3.0', 'cell_map')
 @version_guard('2.1', '3.0')
-def convert_cell_map_2_1_to_3_0(v1_path, v2_path, channel_name='channel_0'):
+def convert_cell_map_2_1_to_3_0(v1_path, v2_path='', channel_name='channel_0'):
     config_v1, config_v2 = get_configs(v1_path, v2_path)
 
     config_v2['clearmap_version'] = '3.0.0'
@@ -644,7 +647,7 @@ def migrate_vasculature_postprocessing_v3_0_to_v3_1(old_cfg: dict, merged: dict,
         if val is not None:
             scaled_val = round(float(val) * vox_to_um_factor, 2)
             set_item_recursive(merged, new_path, scaled_val)
-            set_item_recursive(merged, old_path, DELETE)
+            del_item_recursive(merged, old_path)
 
     capillaries_rm_renames = {
         'min_artery_size': 'min_artery_component_edges',
@@ -656,7 +659,7 @@ def migrate_vasculature_postprocessing_v3_0_to_v3_1(old_cfg: dict, merged: dict,
         val = try_get_item_recursive(old_cfg, old_p, None)
         if val is not None:
             set_item_recursive(merged, new_p, int(val))
-            set_item_recursive(merged, old_p, DELETE)
+            del_item_recursive(merged, old_p)
 
     # ── arteries_min_radius → arteries_min_noise_edges ───────────
     old_path = pre_filt_path + ['arteries_min_radius']
@@ -664,7 +667,7 @@ def migrate_vasculature_postprocessing_v3_0_to_v3_1(old_cfg: dict, merged: dict,
     val = try_get_item_recursive(old_cfg, old_path, None)
     if val is not None:
         set_item_recursive(merged, new_path, int(val))
-        set_item_recursive(merged, old_path, DELETE)
+        del_item_recursive(merged, old_path)
 
     # ── new tracing keys absent in 3.0 — fill from defaults if missing ───
     new_tracing_defaults = {
@@ -679,7 +682,7 @@ def migrate_vasculature_postprocessing_v3_0_to_v3_1(old_cfg: dict, merged: dict,
         if not has_item_recursive(merged, path):
             set_item_recursive(merged, path, default_val)
 
-    set_item_recursive(merged, tracing_path + ['artery_trace_radius'], DELETE)
+    del_item_recursive(merged, tracing_path + ['artery_trace_radius'])
 
 
 def migrate_vasculature_performance_v3_0_to_v3_1(old_cfg: dict, merged: dict, default_cfg: dict, sample_config: dict) -> None:
@@ -703,8 +706,8 @@ def migrate_vasculature_performance_v3_0_to_v3_1(old_cfg: dict, merged: dict, de
                 set_item_recursive(merged, new_path + ['overlap'], overlap)
 
         # --- delete legacy keys from merged ---
-        set_item_recursive(merged, old_path + ['size_max'], DELETE)
-        set_item_recursive(merged, old_path + ['overlap'], DELETE)
+        del_item_recursive(merged, old_path + ['size_max'])
+        del_item_recursive(merged, old_path + ['overlap'])
 
 
 def migrate_vasculature_v3_0_to_v3_1(old_cfg, merged, default_cfg, sample_config):
@@ -848,19 +851,23 @@ def convert_versions(previous_version: str, new_version: str, *,
     exp_dir = str(Path(exp_dir).expanduser().resolve())
     previous_version = _norm_ver(previous_version)
     new_version = _norm_ver(new_version)
+
     if previous_version == new_version:
         warnings.warn(f'No conversion needed: already at version {new_version}')
         return
 
-    # Look up in registry
-    converter = PROJECT_CONVERTERS.get((previous_version, new_version))
-    if not converter:
-        raise NotImplementedError(
-            f'No converter registered for {previous_version} → {new_version}. '
-            f'Supported: {SUPPORTED_VERSIONS}'
-        )
+    steps = get_conversion_steps(previous_version, new_version)
 
-    converter(exp_dir, create_app=create_app)
+    for from_v, to_v in steps:
+        converter = PROJECT_CONVERTERS.get((from_v, to_v))
+        if not converter:
+            raise NotImplementedError(
+                f'No project converter registered for {from_v} → {to_v}. '
+                f'Supported steps: {SUPPORTED_VERSIONS}')
+        print(f'Converting {from_v} → {to_v}...')
+        converter(exp_dir, create_app=create_app)
+        print(f'✓ {from_v} → {to_v} complete')
+
     print(f'\n✓ Upgrade complete: {previous_version} → {new_version}\n')
 
 
