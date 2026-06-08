@@ -1069,7 +1069,7 @@ class VesselGraphProcessor(PipelineOrchestrator):
         self.steps.remove_next_steps_files(self.steps.graph_cleaned)
         self.graph_cleaned = graph_processing.clean_graph(
             self.graph_raw, vertex_mappings=vertex_mappings,
-            processes=self._n_processes('clean'), verbose=True)
+            verbose=True)  # FIXME: add processes=self._n_processes('clean'),
         self.save_graph('cleaned')
 
     @requires_graph('cleaned')
@@ -1105,7 +1105,7 @@ class VesselGraphProcessor(PipelineOrchestrator):
                                                            edge_to_edge_mappings=edge_to_edge_mappings,
                                                            compute_edge_length=True,
                                                            edge_geometry_vertex_properties=edge_geometry_vertex_properties,
-                                                           return_maps=False, processes=self._n_processes('reduce'),
+                                                           return_maps=False,  # FIXME: add processes=self._n_processes('reduce'),
                                                            verbose=True)
         self.save_graph('reduced')
 
