@@ -134,8 +134,8 @@ See :func:`binarize` for details."""
 
 default_binarization_processing_parameter = dict(
     size_max=40,
-    size_min=5,
-    overlap=5,
+    size_min=6,
+    overlap=5,  # has to be < size_min
     axes=[2],
     optimization=True,
     optimization_fix='all',
