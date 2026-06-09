@@ -357,7 +357,7 @@ cdef int get_reducer_enum(object reducer_fn):
         return RED_MAX
     elif name == 'sum':
         return RED_SUM
-    elif name == 'mean':
+    elif name == 'mean' or name == 'vote':
         return RED_MEAN
     else:
         return -1    # signal “unknown Python reducer”
@@ -399,13 +399,13 @@ cdef inline double c_sum(source_t[:] src, sink_t[:] sink, uint64[:] idxs, uint64
         acc = acc + <double>src[idxs[j]]
     return acc
 
-cdef inline sink_t c_mean(source_t[:] src, sink_t[:] sink, uint64[:] idxs, uint64 start, uint64 end)  nogil except +:
+cdef inline double c_mean(source_t[:] src, sink_t[:] sink, uint64[:] idxs, uint64 start, uint64 end)  nogil except +:
     """Compute the mean of src over indices in idxs[start:end]."""
     cdef uint64 length = end - start
     if length <= 0:
-        return 0
+        return 0.0
     cdef double total = c_sum(src, sink, idxs, start, end)
-    return <sink_t>(total / length)
+    return <sink_t>(total / <double>length)
 
 
 cpdef bint cy_reduce(source_t[:] source, sink_t[:] sink, uint64[:] idx_stack, uint64[:] offsets,
@@ -452,7 +452,7 @@ cpdef bint cy_reduce(source_t[:] source, sink_t[:] sink, uint64[:] idx_stack, ui
     #         raise ValueError(f"Sink array must be of type 'd' (float64) for sum reduction, got {sink.format}.")
 
     if function_code == -1:  # use Python reducer
-        warnings.warn(f'Unknown reducer function {reducer_fn}. Using Python fallback.'
+        warnings.warn(f'Unknown reducer function {reducer_fn} (name={reducer_fn.__name__}). Using Python fallback.'
                       f'This is typically significantly slower', UserWarning)
         return False
     else:
@@ -463,7 +463,7 @@ cpdef bint cy_reduce(source_t[:] source, sink_t[:] sink, uint64[:] idx_stack, ui
                 if function_code == RED_SUM:  # Sum needs upcasting to float
                     sink[i] = <sink_t>c_sum(source, sink, idx_stack, start, end)
                 elif function_code == RED_MEAN:  # Mean needs upcasting to float
-                    sink[i] = c_mean(source, sink, idx_stack, start, end)
+                    sink[i] = <sink_t>c_mean(source, sink, idx_stack, start, end)
                 elif function_code == RED_MIN:  # Min needs upcasting to source_t
                     sink[i] = c_min(source, sink, idx_stack, start, end)
                 elif function_code == RED_MAX:  # Max needs upcasting to source_t

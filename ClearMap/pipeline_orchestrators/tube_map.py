@@ -70,6 +70,8 @@ __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
+from ..Analysis.graphs.graph_processing import Percentile
+
 MAX_PLOT_VERTICES = 300_000  # Empirical max number of vertices that can safely be plotted
 
 USE_BINARY_POINTS_FILE = not platform.system().lower().startswith('darwin')
@@ -1081,8 +1083,8 @@ class VesselGraphProcessor(PipelineOrchestrator):
 
         """
 
-        def vote(expression):
-            return np.sum(expression) >= len(expression) / 1.5
+        binary_percentile = 100 / 3
+        vote = Percentile(binary_percentile)
 
         vertex_to_edge_mappings = vertex_to_edge_mappings or graph_processing.DEFAULT_VERTEX_TO_EDGE
         edge_to_edge_mappings = edge_to_edge_mappings

@@ -15,7 +15,7 @@ __download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
 import functools
 import multiprocessing
 import warnings
-from typing import Dict, Callable, List, Sequence
+from typing import Dict, Callable, List, Sequence, runtime_checkable, Protocol
 
 import numpy as np
 
@@ -59,6 +59,80 @@ def medoid_vertex_coordinates(coordinates):
         for i in range(3)
     ])
     return median
+
+
+@runtime_checkable
+class TwoPhaseReducer(Protocol):
+    """
+    Protocol for reducers that require an intermediate dtype different
+    from the output dtype — e.g. computing float means before thresholding
+    to a binary output.
+
+    Implementors must define:
+        __name__   : str        — maps to Cython reducer enum
+        tmp_dtype  : np.dtype   — dtype for intermediate Cython accumulation
+        finalise() : method     — converts intermediate result to final output
+    """
+    __name__: str
+    tmp_dtype: np.dtype
+
+    def __call__(self, x: np.ndarray) -> any: ...
+
+    def finalise(self, intermediate: np.ndarray, offsets: np.ndarray, arr_dtype: np.dtype) -> np.ndarray: ...
+
+    def is_compatible(self, prop_name: str, arr: np.ndarray) -> None: ...
+
+
+class Percentile:
+    """
+    Reducer that returns True if the p-th percentile of a **binary** array is 1.
+
+    For binary arrays this is equivalent to mean >= (1 - p/100),
+    implemented as a parallel Cython mean + single vectorised threshold.
+
+    .. warning::
+        Only valid for binary (0/1) arrays. For quantitative properties
+        use np.percentile directly.
+
+    Parameters
+    ----------
+    p : float
+        Percentile threshold in [0, 100].
+        p=33 means at least 67% of values must be 1 (consensus vote).
+        p=50 means at least 50% of values must be 1 (simple majority).
+    """
+    __name__ = 'vote'   # maps to RED_MEAN in get_reducer_enum
+    tmp_dtype = np.float64   # Cython accumulates means in float
+
+    def __init__(self, p: float = 33.33):
+        self.p = p
+        self.threshold = (100.0 - p) / 100.0
+
+    def __call__(self, x):
+        # Python fallback only
+        return float(np.mean(x)) >= self.threshold
+
+    # TODO: check if we want to improve this check
+    def is_compatible(self, prop_name, arr):
+        if not (np.issubdtype(arr.dtype, np.integer) and arr.max() <= 1 and arr.min() >= 0):
+            raise ValueError(
+                f'Percentile reducer applied to non-binary property "{prop_name}". '
+                f'Use np.percentile for quantitative properties.')
+
+    def finalise(self, means: np.ndarray, offsets: np.ndarray, arr_dtype: np.dtype) -> np.ndarray:
+        """
+        Convert Cython-computed means to a binary result.
+
+        Parameters
+        ----------
+        means : np.ndarray
+            Float means computed by cy_reduce (one per chain).
+        offsets : np.ndarray
+            Chain boundary offsets (length n_chains + 1).
+        arr_dtype : np.dtype
+            dtype of the source binary array — used for output dtype.
+        """
+        return (means >= self.threshold).astype(arr_dtype)
 
 
 DEFAULT_EDGE_TO_EDGE = {
@@ -757,13 +831,18 @@ class PropertyAggregator:
 
             out_dtype = np.float64 if reduction_fn is np.sum else arr.dtype
 
-            mapped = np.zeros(len(self.chain_indices), dtype=out_dtype)  # pre-allocate output array
-            success = cy_reduce(arr, mapped, idx_stack=idx_stack, offsets=offsets, reducer_fn=reduction_fn,
-                                num_threads=n_procs)
-            if not success:  # default to pure Python if Cython fails
-                starts = offsets[:-1]
-                ends = offsets[1:]
+            if hasattr(reduction_fn, 'is_compatible'):  # TwoPhaseReducer protocol
+                reduction_fn.is_compatible(prop_name, arr)  # binary and threshold in (0,1)
+
+            tmp_dtype = getattr(reduction_fn, 'tmp_dtype', out_dtype) # for percentile, we need the intermediate means in float
+            mapped = np.zeros(len(self.chain_indices), dtype=tmp_dtype)  # pre-allocate output array
+            success = cy_reduce(arr, mapped, idx_stack=idx_stack, offsets=offsets,
+                                reducer_fn=reduction_fn, num_threads=n_procs)
+            if not success:  # pure Python fallback if Cython fails
+                starts, ends = offsets[:-1], offsets[1:]
                 mapped = np.array([reduction_fn(arr[idx_stack[s:e]]) for s, e in zip(starts, ends)], dtype=out_dtype)
+            elif hasattr(reduction_fn, 'finalise'):
+                mapped = reduction_fn.finalise(mapped, offsets, arr.dtype)
             self.aggregated_properties[prop_name] = mapped
 
     def get_indices_and_ranges(self, reduced_edge_order) -> (np.ndarray, np.ndarray):
