@@ -1059,7 +1059,7 @@ def reduce_graph(graph, vertex_to_edge_mappings=None,
     # vertex_geometry_agg =
     # edge_geometry_agg =
 
-    chains, _ = find_chains(graph) #, return_endpoints_mask=True);  check_chains(g, chains, degree_2_vertices_ids, non_degree_2_vertices_ids)
+    chains = find_chains(graph) #, return_endpoints_mask=True);  check_chains(g, chains, degree_2_vertices_ids, non_degree_2_vertices_ids)
 
     direct_edges = []  # Only the direct edges between non-degree 2 vertices
 
@@ -1170,7 +1170,7 @@ def check_chains(graph, chains, degree_2_v_ids, non_degree_2_v_ids):
     assert np.all(np.isin(non_degree_2_v_ids, non_d2s_ids_from_chains))  # all non-degree 2 from chains are in non_degree_2_v_ids
 
 
-def find_chains(graph, return_endpoints_mask=False):
+def find_chains(graph, *, return_endpoints_mask=False, return_edge_descriptors: bool = False):
     """
     Find chains (i.e. list of edges between vertices that are either branching points or end points) in a graph.
 
@@ -1192,6 +1192,10 @@ def find_chains(graph, return_endpoints_mask=False):
         `vertex_ids`.  A value *True* means “this vertex is a real endpoint
         (degree != 2)”, *False* means “internal degree-2 vertex”.
         Default is *False*.
+    return_edge_descriptors: bool
+        If True, also return a list of edge descriptors (e.g. edge objects or tuples) for each chain.
+        This is particularly useful for debugging or further processing, however, it has
+        a computational cost because it materialises python objects.
 
     Returns
     -------
@@ -1219,7 +1223,8 @@ def find_chains(graph, return_endpoints_mask=False):
         vertex_degs,
     )
 
-    edge_descriptors = np.array(list(graph._base.edges()), dtype=object)
+    if return_edge_descriptors:
+        edge_descriptors = np.array(list(graph._base.edges()), dtype=object)
 
     # Add direct edges to chains to process together
     direct_edges = connectivity_w_eid[(v1_degs != 2) & (v2_degs != 2)]
@@ -1255,9 +1260,13 @@ def find_chains(graph, return_endpoints_mask=False):
         for eids, vids in chains:
             mask = (vertex_degs[vids] != 2)  # True endpoint
             chains_out.append((eids, vids, mask))
-        return chains_out, edge_descriptors
+        out = chains_out
     else:
-        return chains, edge_descriptors
+        out = chains
+    if return_edge_descriptors:
+        return out, edge_descriptors
+    else:
+        return out
 
 
 def check_graph_is_reduce_compatible(graph):
