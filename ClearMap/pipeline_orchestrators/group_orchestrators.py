@@ -217,6 +217,41 @@ class DensityGroupAnalysisOrchestrator(GroupOrchestratorBase):
                 self.assets.write_effect_size(effect_size, channel, gp1_name, gp2_name, suffix)
         # FIXME: return dict {channel_name: colored_p_vals}
 
+    def find_available_density_suffixes(self) -> List[str]:
+        """Scan the first sample's workspace to find available density suffixes."""
+        if not self.groups:
+            return []
+        first_group = next(iter(self.groups.values()), None)
+
+        sm = self.get_sample_manager_for(Path(first_group[0]))
+
+        # Get target channel(s) depending on the pipeline
+        channels = sm.get_channels_by_pipeline(self.pipeline, as_list=True)
+        if not channels:
+            return []
+
+        if self.pipeline == 'TubeMap':
+            target_ch = tuple(channels)  # Compund channel for the graph
+        else:
+            target_ch = channels[0]  # Just use the first one to probe
+
+        suffixes = set()
+
+        # Probe the workspace info dictionary for density files matching our channel
+        for asset_key in sm.workspace.info_dict().keys():
+            # asset_key is a tuple: (type, channel, subtype)
+            if len(asset_key) >= 3 and asset_key[0] == 'density' and asset_key[1] == target_ch:
+                suffixes.add(asset_key[2] or '')  # subtype is the suffix
+
+        # Fallback if scanning fails/is empty but we know defaults
+        if not suffixes:
+            if self.pipeline == 'TubeMap':
+                suffixes = {'branches'}
+            else:
+                suffixes = {'counts'}
+
+        return sorted(list(suffixes))
+
     def find_analysable_channels(self, *, density_suffix: str | None) -> List[str]:
         """
         Inspects the first sample of the first group to infer which channels have density maps.

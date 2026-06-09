@@ -1986,6 +1986,7 @@ class GroupAnalysisTab(BatchTab):
             return []
 
         self.params.set_channels_provider(functools.partial(_channels_provider, self.params))
+        self.params.set_suffixes_provider(self.processor.find_available_density_suffixes)
         self.params.set_on_plot_group(self.plot_density_maps)
 
         # self.subscribe(UiBatchResultsFolderChanged, self.group_controller.set_group_base_dir)

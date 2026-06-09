@@ -2080,6 +2080,7 @@ class GroupAnalysisParams(BatchParameters):
             'density_suffix': ParamLink(None, self.tab.densitySuffixComboBox),
             'pipeline': ParamLink(['pipeline'], self.tab.batchPipelineNameComboBox)
         })
+        self.tab.densitySuffixComboBox.setEditable(True)
 
         self._cmp_model = ComparisonsModel(sep=self.group_concatenator)
         self._cmp_ui = ComparisonsWidgetAdapter(self.tab.comparisonsVerticalLayout,
@@ -2087,6 +2088,8 @@ class GroupAnalysisParams(BatchParameters):
 
         # FIXME: do I want this ?
         self._channels_provider: Optional[Callable[[], list[str]]] = None
+        self._suffixes_provider: Optional[Callable[[], list[str]]] = None
+
         self._on_plot_group: Optional[Callable[[str], None]] = None
 
         self.plot_channel = ''
@@ -2119,6 +2122,9 @@ class GroupAnalysisParams(BatchParameters):
     def set_channels_provider(self, provider: Callable[[], list[str]]):
         self._channels_provider = provider
 
+    def set_suffixes_provider(self, provider: Callable[[], list[str]]):
+        self._suffixes_provider = provider
+
     def set_on_plot_group(self, handler: Callable[[str], None]):
         self._on_plot_group = handler
 
@@ -2128,7 +2134,9 @@ class GroupAnalysisParams(BatchParameters):
     def _rebuild_comparisons_core(self, *, preselected: Optional[list[Pair]] = None):
         self._cmp_model.group_names = list(self.group_names)
         self._cmp_model.selected = preselected or []
+
         channels = self._channels_provider() if callable(self._channels_provider) else []
+        suffixes = self._suffixes_provider() if callable(self._suffixes_provider) else []
 
         def _on_channel_changed(ch: str):
             self.plot_channel = ch
@@ -2136,10 +2144,11 @@ class GroupAnalysisParams(BatchParameters):
         self._cmp_ui.rebuild(self._cmp_model,
                              on_plot_group=(self._on_plot_group or (lambda _g: None)),
                              channels=channels, on_channel_changed=_on_channel_changed,
-                             preselected_comparisons=self._cmp_model.selected,)
+                             suffixes=suffixes,
+                             preselected_comparisons=self._cmp_model.selected)
+
         if channels and not self.plot_channel:
             self.plot_channel = channels[0]
-
     @property
     def comparisons(self) -> list[Pair]:
         return self._cmp_model.all_pairs()

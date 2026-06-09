@@ -2422,6 +2422,7 @@ class ComparisonsWidgetAdapter:
 
     def rebuild(self, model: ComparisonsModel, *, on_plot_group: Callable[[str], None],
                 channels: List[str], on_channel_changed: Callable[[str], None],
+                suffixes: List[str] = None,
                 preselected_comparisons: Optional[List[Pair]] = None) -> None:
 
         # Rescue persistent widgets BEFORE clearing
@@ -2457,6 +2458,19 @@ class ComparisonsWidgetAdapter:
         # Re-insert the stashed widget
         if self._suffix_widget is not None:
             self._layout.addWidget(self._suffix_widget)
+            # Update combobox
+            if suffixes is not None:
+                combo = self._suffix_widget.findChild(QComboBox, 'densitySuffixComboBox')
+                if combo:
+                    combo.blockSignals(True)
+                    current = combo.currentText()
+                    combo.clear()
+                    combo.addItems(suffixes)
+                    if current in suffixes:
+                        combo.setCurrentText(current)
+                    elif suffixes:
+                        combo.setCurrentText(suffixes[0])
+                    combo.blockSignals(False)
 
         # Channel to plot combobox
         if channels:
