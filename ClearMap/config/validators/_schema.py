@@ -1,24 +1,19 @@
 import re
 from pathlib import Path
-from typing import Any, Mapping, Dict, Iterable, Sequence
+from typing import Any, Mapping, Dict, Sequence
 
 from jsonschema import FormatChecker
 
 from ClearMap.IO.assets_constants import CONTENT_TYPE_TO_PIPELINE
 
-from .json_schema_utils import load_yaml_schema, compile_validator, build_schema_registry_from_dir, \
-    inject_image_content_types
+from .json_schema_utils import (load_yaml_schema, compile_validator, build_schema_registry_from_dir,
+                                inject_image_content_types)
 from ..config_handler import ALTERNATIVES_REG
 
 
-__all__ = ['SectionValidators', 'AggregatedValidationError', 'validate_sections_with_jsonschema']
+__all__ = ['SectionValidators', 'validate_sections_with_jsonschema']
 
-
-class AggregatedValidationError(Exception):  # REFACTOR: maybe in exceptions module ??
-    def __init__(self, messages: Iterable[str]):
-        super().__init__("\n".join(messages))
-        self.messages = list(messages)
-
+from ...Utils.exceptions import AggregatedValidationError
 
 FORMAT_CHECKER = FormatChecker()
 

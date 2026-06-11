@@ -12,7 +12,7 @@ from contextlib import contextmanager
 from typing import final, Callable, Any, TYPE_CHECKING, TypeVar, Generic, ParamSpec
 
 import numpy as np
-from PyQt5.QtWidgets import QWhatsThis, QWidget
+from PyQt5.QtWidgets import QWhatsThis, QWidget, QApplication
 
 from ClearMap.Utils.event_bus import BusSubscriberMixin
 from ClearMap.Utils.exceptions import MissingRequirementException, PlotGraphError
@@ -20,6 +20,7 @@ from ClearMap.Utils.utilities import title_to_snake
 from ClearMap.config.config_handler import ConfigHandler, ALTERNATIVES_REG
 
 from .dialog_helpers import get_directory_dlg
+from .exception_handler import handle_exception
 from .gui_utils_base import create_clearmap_widget, replace_widget
 from .widgets import ExtendableTabWidget, SamplePickerDialog
 from ..Utils.events import ChannelsChanged, UiChannelsChanged
@@ -557,10 +558,16 @@ class GenericTab(GenericUi, BusSubscriberMixin):
                 func(*step_args, **step_kw_args)
             else:
                 self.main_window.wrap_in_thread(func, *step_args, **step_kw_args)
-        except MissingRequirementException as err:
-            self.main_window.print_error_msg(err)
-            self.main_window.popup(str(err), base_msg=f'Could not run operation {func.__name__}', print_warning=False)
-            raise err
+        except Exception as err:
+            if not getattr(err, '_gui_handled', False):
+                func_name = getattr(func, '__name__', str(func))
+                action = handle_exception(err, parent=self.main_window, context=f'{self.name} → {func_name}')
+                err._gui_handled = True
+                if action == 'reset_workspace':
+                    self.main_window.trigger_workspace_reset()
+                elif action == 'close':
+                    QApplication.instance().quit()
+            raise err  # Re-raise so caller loops (like run_stitching) can interrupt their sequence
         finally:
             # Access the private backing field directly instead of going through the property:
             #   - avoids triggering ExperimentTab's raising property when _sample_manager is None
@@ -579,7 +586,7 @@ class GenericTab(GenericUi, BusSubscriberMixin):
     def wrap_plot(self, plot_method:  Callable[P, Any], *args: P.args, **kwargs: P.kwargs) -> 'list[DataViewer]':
         """
         Wrapper to plot a graph and display it in the main window.
-        It also handles MissingRequirementException and PlotGraphError
+        It also handles ClearMap exceptions gracefully
 
         Parameters
         ----------
@@ -598,13 +605,13 @@ class GenericTab(GenericUi, BusSubscriberMixin):
         self.main_window.clear_plots()
         try:
             dvs = plot_method(*args, **kwargs)
-        except MissingRequirementException as err:
-            self.main_window.print_error_msg(f'Missing {plot_method.__name__} files {str(err)}. '
-                                             f'Please ensure previous steps are run first.')
+        except Exception as err:
+            if not getattr(err, '_gui_handled', False):
+                func_name = getattr(plot_method, '__name__', str(plot_method))
+                handle_exception(err, parent=self.main_window, context=f'{self.name} → {func_name}')
+                err._gui_handled = True
             return []
-        except PlotGraphError as err:
-            self.main_window.popup(str(err), base_msg='PlotGraphError')
-            return []
+
         if not dvs:
             return []
         if isinstance(dvs[0], list):

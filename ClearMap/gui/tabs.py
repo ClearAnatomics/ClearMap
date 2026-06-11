@@ -110,7 +110,6 @@ from qdarkstyle import DarkPalette
 
 from ClearMap.config.atlas import ATLAS_NAMES_MAP, STRUCTURE_TREE_NAMES_MAP
 
-from ClearMap.pipeline_orchestrators.utils import init_sample_manager_and_processors
 from ClearMap.pipeline_orchestrators.batch_process import BatchProcessor
 
 from ClearMap.Visualization.Matplotlib.PlotUtils import plot_sample_stats_histogram, plot_volcano

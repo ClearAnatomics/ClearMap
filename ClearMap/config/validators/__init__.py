@@ -24,7 +24,8 @@ run_semantic_checks(config: Mapping[str, Mapping[str, Any]], sv: SectionValidato
 from pathlib import Path
 from typing import Mapping, Any, Protocol, List
 
-from ._schema import SectionValidators, AggregatedValidationError
+from ._schema import SectionValidators
+from ...Utils.exceptions import AggregatedValidationError
 from ._schema import validate_sections_with_jsonschema as validate_static
 from ._semantic import run_semantic_checks
 

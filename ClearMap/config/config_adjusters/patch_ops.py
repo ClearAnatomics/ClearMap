@@ -5,7 +5,8 @@ from typing import Tuple, Any, Iterable, Mapping, Dict
 
 from ClearMap.Utils.utilities import DELETE, _REPLACE
 from ClearMap.config.config_adjusters.dict_ops import ensure_path_dict
-from ClearMap.config.config_adjusters.type_hints import PatchConflictError, KeysPath
+from ClearMap.config.config_adjusters.type_hints import KeysPath
+from ClearMap.Utils.exceptions import PatchConflictError
 
 
 def merge_patches(dst: dict, src: dict, *, _path: Tuple[str, ...] = ()) -> dict:
@@ -31,13 +32,13 @@ def merge_patches(dst: dict, src: dict, *, _path: Tuple[str, ...] = ()) -> dict:
             dst[k] = DELETE
             continue
         elif dv is DELETE: # If destination already deleted this key, do not allow resurrection
-            raise PatchConflictError(path, dv, v, 'non-DELETE update would resurrect a DELETE')
+            raise PatchConflictError(path, v, dv, 'non-DELETE update would resurrect a DELETE')
 
 
         # REPLACE: detect conflicting REPLACE-vs-REPLACE
         if isinstance(v, _REPLACE):
             if isinstance(dv, _REPLACE) and dv.payload != v.payload:
-                raise PatchConflictError(path, dv, v, 'two different REPLACE operations for the same path')
+                raise PatchConflictError(path, v, dv, 'two different REPLACE operations for the same path')
             dst[k] = v
             continue
 
@@ -46,7 +47,7 @@ def merge_patches(dst: dict, src: dict, *, _path: Tuple[str, ...] = ()) -> dict:
             if isinstance(v, dict) and isinstance(dv.payload, dict):
                 merge_patches(dv.payload, v, _path=path)  # note: path stays same for good errors
                 continue
-            raise PatchConflictError(path, dv, v, 'non-dict update would downgrade an existing REPLACE')
+            raise PatchConflictError(path, v, dv, 'non-dict update would downgrade an existing REPLACE')
 
         # Recurse only into plain dicts
         if isinstance(v, dict) and isinstance(dv, dict):

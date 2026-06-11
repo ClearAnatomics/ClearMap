@@ -27,17 +27,6 @@ class AdjustmentContext:
     run_label: str = ""    # Optional: useful for tracing / provenance
 
 
-# REFACTOR: move to exceptions.py
-class PatchConflictError(RuntimeError):
-    def __init__(self, path: Tuple[str, ...], dst_value: object, src_value: object, reason: str):
-        dotted = '.'.join(path) if path else '<root>'
-        super().__init__(f'Patch conflict at "{dotted}": {reason}, {dst_value=}, {src_value=}')
-        self.path = path
-        self.dst_value = dst_value
-        self.src_value = src_value
-        self.reason = reason
-
-
 TemplateForKey = Callable[[str], Optional[dict]]
 KeyTransform    = Callable[[str], str]  # usually identity
 

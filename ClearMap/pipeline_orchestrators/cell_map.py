@@ -399,10 +399,11 @@ class CellDetector(ChannelPipelineOrchestrator):
                 return
 
         asset = self.get(**asset_properties)
-        if not asset.exists or not self.df_path.exists:
-            raise MissingRequirementException(f'plot_cells_3d_scatter_w_atlas_colors missing files:'
-                                              f'image: {asset.path} {"not" if not asset.exists else ""} found'
-                                              f'cells data frame {"not" if not self.df_path.exists else ""} found')
+        requirements = [asset, self.df_path]
+        if any(not req.exists for req in requirements):
+            raise MissingRequirementException(f'Cannot plot 3D scatter with atlas colors',
+                                              missing_items=[e for e in requirements if not e.exists],
+                                              found_items=[e for e in requirements if e.exists])
         dv = qplot_3d.plot(asset.path, title=f'{asset_properties["asset_type"].title()} and cells',  # FIXME: correct scaling for anisotropic if raw
                            arrange=False, lut='white', parent=parent)[0]
 

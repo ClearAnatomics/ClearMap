@@ -25,6 +25,7 @@ import datetime
 import numpy as np
 
 import ClearMap.IO.Source as src
+from ClearMap.Utils.exceptions import NrrdError
 
 
 ###############################################################################
@@ -311,10 +312,6 @@ def create(location = None, shape = None, dtype = None, order = None, mode = Non
 ###############################################################################
 ### Reading
 ###############################################################################
-
-class NrrdError(Exception):
-    """Exceptions for Nrrd class."""
-    pass
 
 def _convert_to_reproducible_floatingpoint( x ):
   #This will help prevent loss of precision

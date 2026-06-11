@@ -6,6 +6,7 @@ from ClearMap.config.change_detection import (channels_added_or_removed, channel
                                               whole_sample_changed, channels_with_changed_property,
                                               channel_path_changed, IRRELEVANT_DATA_TYPES)
 from ClearMap.config.convert_config_versions import convert_versions
+from ClearMap.gui.exception_handler import install_global_handler
 
 """
 app
@@ -1227,6 +1228,19 @@ class ClearMapApp(ClearMapAppBase):
             # splash.finish(self)
         self.manage_assets()
 
+    def trigger_workspace_reset(self):
+        """Delete workspace.yml and reload the experiment."""
+        if not self.src_folder:
+            return
+        ws_path = Path(self.src_folder) / 'workspace.yml'
+        if ws_path.exists():
+            ws_path.unlink()
+            self.print_status_msg(f'Removed {ws_path}')
+
+        # Re-open the experiment (will recreate workspace from configs)
+        self.reset()
+        self._set_src_folder(str(self.src_folder))
+
     def _prompt_sample_id(self):
         """
         Prompt the user for the sample ID and save it in the sample_params.cfg
@@ -1663,6 +1677,11 @@ def main(app_, splash_):
     gui.start(app_, centered=True)
 
     splash_.finish(gui.window)
+
+    install_global_handler(app_, parent_getter=lambda: gui.window,
+                           on_reset=lambda: gui.window.trigger_workspace_reset() if gui.window else None,
+                           on_close=lambda: app_.quit())
+
     if gui.window.preference_editor.params.verbosity != 'trace':  # WARNING: will disable progress bars
         gui.window.error_logger.setup_except_hook()
     sys.exit(app_.exec())

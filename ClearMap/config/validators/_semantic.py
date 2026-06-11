@@ -1,7 +1,6 @@
 from typing import Any, Dict, Iterable, Mapping
 
-from ._schema import AggregatedValidationError
-
+from ...Utils.exceptions import AggregatedValidationError
 
 __all__ = ['run_semantic_checks']
 

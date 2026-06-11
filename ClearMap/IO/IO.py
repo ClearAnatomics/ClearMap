@@ -169,7 +169,7 @@ def filename_to_module(filename):
 
     mod = file_extension_to_module.get(ext, None)
     if mod is None:
-        raise SourceModuleNotFoundError(f"Cannot determine module for file {filename} with extension {ext}!")
+        raise SourceModuleNotFoundError(filename, ext)
 
     return mod
 

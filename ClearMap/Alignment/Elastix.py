@@ -77,7 +77,7 @@ import numpy as np
 
 
 import ClearMap.Settings as settings
-from ClearMap.Utils.exceptions import ClearMapException
+from ClearMap.Utils.exceptions import ClearMapException, ClearMapValueError, ClearMapRuntimeError
 
 import ClearMap.IO.IO as io
 from ClearMap.IO.elastix_config import ElastixParser
@@ -135,7 +135,7 @@ class ElastixConfigPatcher:
     def __init__(self, config_paths, modified_sections=None):
         self.config_paths = config_paths
         if modified_sections is None:
-            raise ValueError('modified_sections must be a dictionary of sections to modify')
+            raise ClearMapValueError('modified_sections must be a dictionary of sections to modify')
         self.modified_sections = modified_sections
         self.original_sections = {p: self.get_original_sections(p) for p in config_paths}
 
@@ -195,7 +195,7 @@ def check_success(result_directory):
     log_path = result_directory / 'elastix.log'
     with open(log_path) as f:
         if 'fail' in f.read():
-            raise RuntimeError(f'Elastix failed, check log file: "{log_path}"')
+            raise ClearMapRuntimeError(f'Elastix failed, check log file: "{log_path}"')
 
 
 def set_elastix_library_path(elastix_lib_path=None):
@@ -213,7 +213,7 @@ def set_elastix_library_path(elastix_lib_path=None):
     elif os_name.startswith('darwin'):
         lib_var_name = 'DYLD_LIBRARY_PATH'
     else:
-        raise ValueError(f'Unknown OS {os_name}')
+        raise ClearMapValueError(f'Unknown OS {os_name}')
 
     print(f'OS: {os_name}, library variable name: {lib_var_name}')
 
@@ -245,7 +245,7 @@ def initialize_elastix(path=None):
     if path is None and settings.elastix_path is not None:
         path = settings.elastix_path
     else:
-        raise RuntimeError('Cannot find elastix path!')
+        raise ClearMapRuntimeError('Cannot find elastix path!')
 
     elastix_binary = search_elx_bin(path, 'elastix')
     transformix_binary = search_elx_bin(path, 'transformix')
@@ -264,7 +264,7 @@ def search_elx_lib(path):
         if os.path.exists(lib_path):
             return lib_path
     else:
-        raise ClearMapException(f'Cannot find elastix libs in {lib_path} set path in Settings.py accordingly!')
+        raise ClearMapRuntimeError(f'Cannot find elastix libs in {lib_path} set path in Settings.py accordingly!')
 
 
 def search_elx_bin(path, bin_type):
@@ -272,7 +272,7 @@ def search_elx_bin(path, bin_type):
     if os.path.exists(elx):
         return elx
     else:
-        raise RuntimeError(f'Cannot find elastix binary {elx}, set path in Settings.py accordingly!')
+        raise ClearMapRuntimeError(f'Cannot find elastix binary {elx}, set path in Settings.py accordingly!')
 
 
 def get_elastix_version():
@@ -307,7 +307,7 @@ def check_elastix_initialized():
       True if elastix paths are set.
     """
     if not initialized:
-        raise RuntimeError("Elastix not initialized: run initialize_elastix(path) with proper path to elastix first")
+        raise ClearMapRuntimeError("Elastix not initialized: run initialize_elastix(path) with proper path to elastix first")
 
     return True
 
@@ -338,7 +338,7 @@ def transform_file(result_directory):
     files = sorted(Path(result_directory).glob('TransformParameters.*.txt'))
 
     if not files:
-        raise RuntimeError(f'Cannot find a valid transformation file in "{result_directory}"')
+        raise ClearMapRuntimeError(f'Cannot find a valid transformation file in "{result_directory}"')
 
     return str(files[-1])
 
@@ -367,7 +367,7 @@ def transform_directory_and_file(transform_parameter_file=None, transform_direct
 
     if not transform_parameter_file:
         if not transform_directory:
-            raise ValueError('Neither the alignment directory nor the transformation parameter file is specified!')
+            raise ClearMapValueError('Neither the alignment directory nor the transformation parameter file is specified!')
         transform_parameter_dir = transform_directory
         transform_parameter_file = transform_file(transform_parameter_dir)
     else:
@@ -397,7 +397,7 @@ def set_path_transform_files(result_directory):
     files.sort()
 
     if not files:
-        raise RuntimeError(f'Cannot find a valid transformation file in {result_directory}!')
+        raise ClearMapRuntimeError(f'Cannot find a valid transformation file in {result_directory}!')
 
     rec = re.compile("\(InitialTransformParametersFileName \"(?P<parname>.*)\"\)")
 
@@ -484,7 +484,7 @@ def result_data_file(result_directory):
     files.sort()
 
     if not files:
-        raise RuntimeError('Cannot find a valid result data file in ' + result_directory)
+        raise ClearMapRuntimeError(f'Cannot find a valid result data file in {result_directory=}')
 
     return os.path.join(result_directory, files[0])
 
@@ -612,7 +612,7 @@ def align_from_dict(align_parameters, landmarks_files, landmarks_weights=None):
         tmp_registration_params = {p: {} for p in align_parameters['parameter_files']}
     for k, v in align_parameters.items():
         if not v:
-            raise ValueError(f'Registration missing parameter "{k}"')
+            raise ClearMapValueError(f'Registration missing parameter "{k}"')
     # TODO: check which files to patch
     with ElastixConfigPatcher(align_parameters['parameter_files'], tmp_registration_params):
         align(**align_parameters)  # WARNING: if using itk_mode, should use it to patch the files too
@@ -660,7 +660,7 @@ def align(fixed_image, moving_image, affine_parameter_file=None, bspline_paramet
         parameter_files = [f for f in parameter_files if f is not None]
     else:
         if affine_parameter_file or bspline_parameter_file:
-            raise ValueError('Cannot specify both parameter_files and affine_parameter_file or bspline_parameter_file')
+            raise ClearMapValueError('Cannot specify both parameter_files and affine_parameter_file or bspline_parameter_file')
 
     processes = processes if processes is not None else mp.cpu_count()
 
@@ -679,8 +679,7 @@ def align(fixed_image, moving_image, affine_parameter_file=None, bspline_paramet
                 dir(itk)  # WARNING: itk uses lazy loading
                 from itk import ParameterObject
             except ImportError as err:
-                raise ImportError(f'Could not import itk, please select itk_mode=False or install itk. '
-                                  f'Details: {err}')
+                raise ImportError(f'Could not import itk, please select itk_mode=False or install itk. Details: {err}')
         from itk import ParameterObject
         from ClearMap.Alignment.landmarks_registration.engine import AlignmentTool
         from ClearMap.Alignment.landmarks_registration.registration_data import ITKImage
@@ -724,9 +723,9 @@ def align(fixed_image, moving_image, affine_parameter_file=None, bspline_paramet
                     if workspace is not None:
                         workspace.process = proc
             except (subprocess.SubprocessError, OSError) as err:
-                raise ClearMapException(f'Align: failed executing: {" ".join(cmd)}') from err
+                raise ClearMapRuntimeError(f'Align: failed executing: {" ".join(cmd)}', command=' '.join(cmd)) from err
         except (subprocess.SubprocessError, OSError) as err:
-            raise ClearMapException(f'Align: failed executing: {" ".join(cmd)}') from err
+            raise ClearMapRuntimeError(f'Align: failed executing: {" ".join(cmd)}', command=' '.join(cmd)) from err
         finally:
             if workspace is not None:
                 workspace.process = None
@@ -740,7 +739,7 @@ def align(fixed_image, moving_image, affine_parameter_file=None, bspline_paramet
 def check_spaces(*paths):
     for p in paths:
         if p is not None and ' ' in str(p):
-            raise ValueError(f'Could not run elastix with path containing spaces: {p}')
+            raise ClearMapValueError(f'Could not run elastix with path containing spaces: {p}')
 
 
 def transform(source, sink='transformix', transform_parameter_file=None, transform_directory=None,
@@ -810,7 +809,7 @@ def transform(source, sink='transformix', transform_parameter_file=None, transfo
     res = os.system(cmd)
 
     if res != 0:
-        raise RuntimeError('transform_data: failed executing: ' + cmd)
+        raise ClearMapRuntimeError('transform_data: failed executing: ', command=cmd)
 
     # read data and clean up
     if delete_image is not None:
@@ -825,7 +824,7 @@ def transform(source, sink='transformix', transform_parameter_file=None, transfo
         result_file = result_data_file(result_dirname)
         result = io.convert(result_file, sink)
     else:
-        raise RuntimeError('transform_data: sink not valid!')
+        raise ClearMapRuntimeError('transform_data: sink not valid!')
 
     if delete_result_directory is not None:
         shutil.rmtree(delete_result_directory)
@@ -885,7 +884,7 @@ def deformation_field(sink='transformix', transform_parameter_file=None, transfo
     res = os.system(cmd)
 
     if res != 0:
-        raise RuntimeError(f'deformation_field: failed executing: {cmd}')
+        raise ClearMapRuntimeError(f'deformation_field: failed executing: {cmd}', command=' '.join(cmd))
 
     # read result and clean up
     if sink == 'transformix':
@@ -897,7 +896,7 @@ def deformation_field(sink='transformix', transform_parameter_file=None, transfo
         result_file = result_data_file(result_dirname)
         result = io.convert(result_file, sink)
     else:
-        raise RuntimeError('deformation_field: sink not valid!')
+        raise ClearMapRuntimeError('deformation_field: sink not valid!')
 
     if delete_result_directory is not None:
         shutil.rmtree(delete_result_directory)
@@ -1091,7 +1090,7 @@ def transform_points(source, sink=None, transform_parameter_file=None, transform
         delete_point_file = temp_file
         write_points(point_file, source, indices=indices, binary=binary)
     else:
-        raise RuntimeError(f'transform_points: source not string or array but "{type(source)}"!')
+        raise ClearMapRuntimeError(f'transform_points: source not string or array but "{type(source)}"!')
 
     # result directory
     if result_directory is None:
@@ -1119,7 +1118,7 @@ def transform_points(source, sink=None, transform_parameter_file=None, transform
     res = os.system(cmd)
 
     if res != 0:
-        raise RuntimeError(f'failed executing {cmd}, return code: {res}')
+        raise ClearMapRuntimeError(f'failed executing {cmd}, return code: {res}')
 
     # read data and clean up
     if delete_point_file is not None:
@@ -1209,7 +1208,7 @@ def inverse_transform(fixed_image, affine_parameter_file, bspline_parameter_file
     res = os.system(cmd)
 
     if res != 0:
-        raise RuntimeError(f'inverse_transform: failed executing: {cmd}')
+        raise ClearMapRuntimeError(f'inverse_transform: failed executing: {cmd}')
 
     return result_directory
 

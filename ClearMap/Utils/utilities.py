@@ -390,7 +390,6 @@ def _dedupe_preserve_order(seq, key=lambda x: x):
     return out
 
 
-
 def requires_assets(asset_specs):
     """
     Decorator to check if the required files exist before running the function.

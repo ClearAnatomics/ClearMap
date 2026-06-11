@@ -1,6 +1,4 @@
-import os
 import re
-from collections import defaultdict
 from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
@@ -11,19 +9,10 @@ import pandas as pd
 import tifffile
 from PIL import Image
 from natsort import natsorted
-from tifffile import TiffFile
 
-from ClearMap.IO.TIF import OMEMetadataParser
+from ClearMap.Utils.exceptions import MetadataError, NotAnOmeFile
 from ClearMap.Utils.tag_expression import Expression
 
-
-class MetadataError(Exception):
-    pass
-
-
-# class NotAnOmeFile(tifffile.TiffFileError):   Not available in tifffile==0.15.1
-class NotAnOmeFile(Exception):
-    pass
 
 Pathlike = str | Path
 
