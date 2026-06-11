@@ -37,7 +37,7 @@
         <x>0</x>
         <y>0</y>
         <width>640</width>
-        <height>330</height>
+        <height>310</height>
        </rect>
       </property>
       <attribute name="label">
@@ -98,8 +98,11 @@
        </item>
        <item row="2" column="0">
         <widget class="QLabel" name="label_7">
+         <property name="toolTip">
+          <string>Percentage of voxels below/above clip range</string>
+         </property>
          <property name="text">
-          <string>Pixels percent:</string>
+          <string>Clipping percentiles:</string>
          </property>
         </widget>
        </item>
@@ -191,7 +194,7 @@
         <x>0</x>
         <y>0</y>
         <width>640</width>
-        <height>330</height>
+        <height>310</height>
        </rect>
       </property>
       <attribute name="label">
@@ -433,7 +436,7 @@
         <x>0</x>
         <y>0</y>
         <width>640</width>
-        <height>330</height>
+        <height>310</height>
        </rect>
       </property>
       <attribute name="label">
@@ -500,7 +503,7 @@
         <x>0</x>
         <y>0</y>
         <width>626</width>
-        <height>362</height>
+        <height>420</height>
        </rect>
       </property>
       <attribute name="label">
@@ -615,7 +618,7 @@
         <x>0</x>
         <y>0</y>
         <width>640</width>
-        <height>330</height>
+        <height>310</height>
        </rect>
       </property>
       <attribute name="label">
