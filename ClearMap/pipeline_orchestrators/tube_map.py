@@ -507,7 +507,7 @@ class BinaryVesselProcessor(PipelineOrchestrator):
 
         self.steps[channel].consume_and_cleanup()
         keep = binarization_cfg['smooth'].get('save', True)
-        self.steps[channel].record_output(BinaryVesselProcessorSteps.smoothed, result, keep=keep)
+        self.steps[channel].record_output(BinaryVesselProcessorSteps.smoothed, result[1], keep=keep)
 
     def _fill(self, channel):
         if not self.config['binarization']['single_channels'][channel]['binary_fill']['run']:
