@@ -57,10 +57,12 @@ from ClearMap.gui.dialog_helpers import warning_popup
 from ClearMap.Utils.utilities import is_in_range, get_free_v_ram, clear_cuda_cache, sanitize_n_processes
 from ClearMap.Utils.exceptions import (PlotGraphError, ClearMapVRamException,
                                        MissingRequirementException, MissingAssetError, AssetNotFoundError,
-                                       ClearMapAssetError)
+                                       ClearMapAssetError, ClearMapValueError)
 
 from .sample_info_management import SampleManager
 from .registration_orchestrator import RegistrationProcessor
+
+from ..Analysis.graphs.graph_processing import Percentile
 
 __author__ = ('Christoph Kirst <christoph.kirst.ck@gmail.com>,'
               ' Sophie Skriabine <sophie.skriabine@icm-institute.org>,'
@@ -70,7 +72,6 @@ __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
-from ..Analysis.graphs.graph_processing import Percentile
 
 MAX_PLOT_VERTICES = 300_000  # Empirical max number of vertices that can safely be plotted
 
@@ -175,11 +176,13 @@ class BinaryVesselProcessorSteps(ProcessorSteps):
         """
         if isinstance(output, Asset):
             return output.path
-        if isinstance(output, Source):  # covers MMP.Source, npy.Source …
+        elif isinstance(output, Source):  # covers MMP.Source, npy.Source …
             return output.location
-        if isinstance(output, (Path, str)):
+        elif isinstance(output, (Path, str)):
             return output
-        return output  # unexpected — caller will fail loudly
+        else:
+            raise ClearMapValueError(f'Output can only be a path/str, Asset or Source. Got {type(output)}')
+        # return output  # unexpected — caller will fail loudly
 
     def record_output(self, asset: str, output: Any,
                       temp_path: str = '', keep: bool = False) -> None:
