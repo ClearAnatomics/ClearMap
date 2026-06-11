@@ -1410,6 +1410,12 @@ class PatternDialog(WizardWidget):
         group_controls.dataTypeComboBox.addItems(data_types)
         group_controls.dataTypeComboBox.setCurrentText('undefined')
 
+        def _on_import_toggled(checked, page=group_controls):
+            page.setEnabled(checked)
+            group_controls.importChannelCheckBox.setEnabled(True)  # keep checkbox itself always active
+
+        group_controls.importChannelCheckBox.toggled.connect(_on_import_toggled)
+
         self.n_image_groups += 1
 
     def connect_buttons(self):
@@ -1473,26 +1479,34 @@ class PatternDialog(WizardWidget):
         return [page.channelNameLineEdit.text() for page in self._get_channel_pages()]
 
     def all_channels_defined(self):
-        return all([page.dataTypeComboBox.currentText() != 'undefined' for page in self._get_channel_pages()])
+        return all([page.dataTypeComboBox.currentText() != 'undefined'
+                    for page in self._get_channel_pages()
+                    if page.importChannelCheckBox.isChecked()])
 
     def get_results(self) -> List[ChannelPatternSpec]:
         return self._pattern_results
 
     def save_results(self):
-        """
-        Save the file patterns to the `sample` configuration file and close the dialog
-        """
-        if not self.all_channels_defined():
-            dlg_help.warning_popup('Some data types are not defined, '
-                                   'please select a valid data type before saving')
+        pages_to_import = [(i, p) for i, p in enumerate(self._get_channel_pages())
+                           if p.importChannelCheckBox.isChecked()]
+
+        if not pages_to_import:
+            dlg_help.warning_popup('No channels selected for import.')
+            return None
+
+        undefined = [p for _, p in pages_to_import
+                     if p.dataTypeComboBox.currentText() == 'undefined']
+        if undefined:
+            dlg_help.warning_popup('Some selected channels have undefined data types. '
+                                   'Please select a valid data type or uncheck the channel.')
             return None
 
         specs: List[ChannelPatternSpec] = []
-        for i, page in enumerate(self._get_channel_pages()):
+        for original_idx, page in pages_to_import:
             channel_name = page.channelNameLineEdit.text()
 
             if not page.result.text():
-                self.dlg.patternToolBox.setCurrentIndex(i)
+                self.dlg.patternToolBox.setCurrentIndex(original_idx)
                 self.validate_pattern()
 
             specs.append(ChannelPatternSpec(
