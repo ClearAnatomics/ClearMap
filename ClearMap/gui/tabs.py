@@ -541,13 +541,13 @@ class StitchingTab(PreProcessingTab["StitchingProcessor"]):
         if not isinstance(self.ui.runChannelsCheckableListWidget, CheckableListWidget):
             self.ui.runChannelsCheckableListWidget = replace_widget(self.ui.runChannelsCheckableListWidget,
                                                                     CheckableListWidget(self.ui),
-                                                                    self.ui.runAndDisplayGridLayout)
+                                                                    self.ui.runGridLayout)
             self.ui.runChannelsCheckableListWidget.check_state_changed.connect(self.set_run_channel)
 
         if not isinstance(self.ui.plotChannelsCheckableListWidget, CheckableListWidget):
             self.ui.plotChannelsCheckableListWidget = replace_widget(self.ui.plotChannelsCheckableListWidget,
                                                                      CheckableListWidget(self.ui),
-                                                                     self.ui.runAndDisplayGridLayout)
+                                                                     self.ui.displayGridLayout)
 
         self.ui.runStitchingPushButton.clicked.connect(self.run_stitching)
         self.ui.displayStitchingPushButton.clicked.connect(self.plot_stitching_results)
