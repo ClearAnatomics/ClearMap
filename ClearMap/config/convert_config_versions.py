@@ -171,7 +171,7 @@ def convert_sample_2_1_to_3_0(v1_path, v2_path=''):
             continue
         config_v2['channels'][channel_name] = {
             'data_type': None,
-            'extension': config_v1['src_paths']['tile_extension'],  # TODO: check if .get with dot
+            'extension': config_v1['src_paths'].get('tile_extension', 'ome.tif'),  # TODO: check if .get with dot
             'path': config_v1['src_paths'][channel_name],
             'resolution': config_v1['resolutions'][channel_name],
             'orientation': config_v1['orientation'],
@@ -223,7 +223,7 @@ def _alignment_to_stitching_v3(output_path_base, config_v1):
     channel_names = [k for k, use in config_v1['stitching']['run'].items() if use]
     for i, channel in enumerate(channel_names):
         out_stitching_cfg['channels'][channel] = {
-            'use_npy': config_v1['conversion']['use_npy'],
+            'use_npy': config_v1['conversion'].get('use_npy', True),
             'run': config_v1['stitching']['run'][channel],
             'layout_channel': channel,
         }
@@ -243,8 +243,15 @@ def _alignment_to_registration_v3(output_path_base, config_v1, sample_config):
     out_registration_cfg['clearmap_version'] = '3.0.0'
     # Copy registration parameters
     out_registration_cfg['verbose'] = config_v1['registration']['resampling']['verbose']
-    out_registration_cfg['atlas'] = {k: config_v1['registration']['atlas'][k]
-                                     for k in ('id', 'structure_tree_id', 'align_files_folder')}
+    if all(k in config_v1['registration']['atlas'].keys() for k in ('id', 'structure_tree_id', 'align_files_folder')):
+        out_registration_cfg['atlas'] = {k: config_v1['registration']['atlas'][k]
+                                         for k in ('id', 'structure_tree_id', 'align_files_folder')}
+    else:
+        out_registration_cfg['atlas'] = {
+            'id': 'ABA 2017 - adult mouse - 25µm',
+            'structure_tree_id': 'ABA json 2022',
+            'align_files_folder': 'Alignment'
+        }
     autofluo_params_files = [v for k, v in config_v1['registration']['atlas'].items() if k.startswith('align_reference')]
     resample = not (config_v1['registration']['resampling']['skip'])
 
