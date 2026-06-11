@@ -439,7 +439,8 @@ class CellDetector(ChannelPipelineOrchestrator):
 
         particle_size = self.config['detection']['background_correction']['diameter'][0]
         dv.scatter_coords = Scatter3D(coordinates, colors=df['color'].to_list(),
-                                      hemispheres=hemispheres, half_slice_thickness=0,
+                                      hemispheres=hemispheres,
+                                      half_slice_thickness=self.machine_config['particle_plot_z_sphere_radius'],
                                       marker_size=max(3, particle_size // 2))
         dv.refresh()
         return [dv]

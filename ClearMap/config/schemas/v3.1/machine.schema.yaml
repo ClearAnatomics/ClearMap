@@ -26,6 +26,7 @@ properties:
 
   default_lut:     { type: string }
   three_d_plot_bg: { type: string }
+  particle_plot_z_sphere_radius: { $ref: "./typedefs.schema.yaml#/$defs/nonNegativeInteger" }
   font_size:       { $ref: "./typedefs.schema.yaml#/$defs/positiveInteger" }
 
   pattern_finder_min_n_files: { $ref: "./typedefs.schema.yaml#/$defs/positiveInteger" }
