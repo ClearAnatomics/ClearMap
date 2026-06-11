@@ -890,10 +890,10 @@ class VesselGraphProcessor(PipelineOrchestrator):
         self.register()
 
     @reload_processing_config
-    def skeletonize_and_build_graph(self, graph_cfg=None):
-        self.skeletonize()  # WARNING: main thread (prange)
+    def skeletonize_and_build_graph(self, graph_cfg=None, binary_processor=None):
+        self.skeletonize(binary_processor)  # WARNING: main thread (prange)
         if graph_cfg['build']:
-            self._build_graph_from_skeleton()  # WARNING: main thread (prange)
+            self._build_graph_from_skeleton(binary_processor)  # WARNING: main thread (prange)
 
     @reload_processing_config
     def clean_graph(self, graph_cfg=None):
@@ -915,17 +915,35 @@ class VesselGraphProcessor(PipelineOrchestrator):
             self.__register()
 
     @requires_binary('final')
-    def skeletonize(self):
+    def skeletonize(self, binary_processor=None):
         if self.config['graph_construction']['skeletonize']:
             n_blocks = 100  # TODO: TBD
             self.prepare_watcher_for_substep(n_blocks, self.skel_re, f'Skeletonization', True)
-            binary = self.get_path('binary', channel=self.parent_channels, asset_sub_type='final')
+            if len(self.parent_channels) == 1:
+                binary = binary_processor.steps[self.parent_channels[0]].get_last_output()
+            else:
+                for sfx in ('final', 'combined'):
+                    binary_asset = self.get('binary', channel=self.parent_channels,
+                                            asset_sub_type=sfx)  # WARNING final changed to deep filled
+                    if binary_asset.exists:
+                        binary = binary_asset.path
+                        break
+
             skeletonization.skeletonize(binary, sink=self.get_path('skeleton', channel=self.parent_channels),  # WARNING: prange
                                         delete_border=True, processes=self._n_processes('skeletonize'), verbose=True)
 
-    def _measure_radii(self):  # FIXME: do on the clean graph to avoid measuring cliques ?
+    def _measure_radii(self, binary_processor=None):  # FIXME: do on the clean graph to avoid measuring cliques ?
         coordinates = self.graph_raw.vertex_coordinates()
-        source = self.get_path('binary', channel=self.parent_channels, asset_sub_type='final')
+
+        if len(self.parent_channels) == 1:
+            source = binary_processor.steps[self.parent_channels[0]].get_last_output()
+        else:
+            for sfx in ('final', 'combined'):
+                binary_asset = self.get('binary', channel=self.parent_channels,
+                                        asset_sub_type=sfx)  # WARNING final changed to deep filled
+                if binary_asset.exists:
+                    source = binary_asset.path
+                    break
         spacing = np.array(self.sample_manager.get_channel_resolution(self.parent_channels[0])) # µm/vox, shape (3,)
 
         # Distances in all 3 directions
@@ -1037,7 +1055,7 @@ class VesselGraphProcessor(PipelineOrchestrator):
                                                 radius_shift_um=radius_shift_um,
                                                 _legacy_radius_shift_vx=self._LEGACY_THRESHOLDS['veinness_search_shift_vx'])
 
-    def _build_graph_from_skeleton(self):  # TODO: split for requirements
+    def _build_graph_from_skeleton(self, binary_processor=None):  # TODO: split for requirements
         if self.config['graph_construction']['build']:
             n_blocks = 100  # TBD:
             self.prepare_watcher_for_substep(n_blocks, self.build_graph_re, 'Building graph', True)
@@ -1048,7 +1066,7 @@ class VesselGraphProcessor(PipelineOrchestrator):
                                                                   check_border=False,
                                                                   n_processes=self._n_processes('build'), verbose=True)  # WARNING: main thread (prange)
 
-            self._measure_radii()  # WARNING: main thread (prange)
+            self._measure_radii(binary_processor)  # WARNING: main thread (prange)
             if self.use_arteries_for_graph:  # TODO: do same for veins if exists
                 self._set_artery_binary()  # WARNING: main thread (prange)
                 self._set_arteriness()  # WARNING: main thread (prange)

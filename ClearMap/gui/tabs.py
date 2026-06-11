@@ -149,6 +149,8 @@ if TYPE_CHECKING:
     from ClearMap.pipeline_orchestrators.tract_map import TractMapProcessor
     from ClearMap.pipeline_orchestrators.colocalization import ColocalizationProcessor
 
+from ClearMap.pipeline_orchestrators.tube_map import BinaryVesselProcessorSteps
+
 
 def ui_task_progress(title_fn: Callable, steps_fn: Callable) -> Callable:
     """
@@ -1750,7 +1752,8 @@ class VasculatureTab(PostProcessingTab['BinaryVesselProcessor']):
 
         title = 'Building vessel graph'
         worker = self.get_worker(substep='graph')
-        self.wrap_step(title, worker.skeletonize_and_build_graph, abort_func=worker.stop_process, main_thread=True)
+        self.wrap_step(title, worker.skeletonize_and_build_graph, abort_func=worker.stop_process, main_thread=True,
+                       step_kw_args={'binary_processor': self.get_worker(substep='binary')})
         self.wrap_step(title, worker.clean_graph, abort_func=worker.stop_process)
         self.wrap_step(title, worker.reduce_graph, abort_func=worker.stop_process)
         try:
