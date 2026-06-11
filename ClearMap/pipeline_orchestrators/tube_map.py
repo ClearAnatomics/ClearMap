@@ -254,7 +254,7 @@ class BinaryVesselProcessorSteps(ProcessorSteps):
                 asset = self.get_asset(step)
                 if asset.exists:
                     return asset.path
-            except (KeyError, AttributeError, FileNotFoundError):
+            except (IndexError, KeyError, AttributeError, FileNotFoundError):
                 continue
 
         raise FileNotFoundError(f'No binary output found for channel "{self.channel}"')
