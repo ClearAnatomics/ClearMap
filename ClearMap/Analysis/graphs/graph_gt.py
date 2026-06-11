@@ -1267,7 +1267,7 @@ class Graph(grp.AnnotatedGraph):
             case 'exclusive':
                 return self.sub_graph(vertex_filter=valid, view=view)
             case 'inclusive':
-                ec = self.edge_connectivity(order='src_vertex')
+                ec = self.edge_connectivity(order='eid')
                 src = ec[:, 0]
                 dst = ec[:, 1]
                 e_keep = valid[src] | valid[dst]
@@ -1277,7 +1277,14 @@ class Graph(grp.AnnotatedGraph):
                 if e_keep.any():
                     v_keep[np.unique(ec[e_keep].reshape(-1))] = True
 
-                return self.sub_graph(vertex_filter=v_keep, edge_filter=e_keep, view=view)
+                subg1 = self.sub_graph(vertex_filter=v_keep, edge_filter=e_keep, view=view)
+                valid2 = subg1.sub_slice_vertex_filter(slicing, coordinates=coordinates)
+                ec = subg1.edge_connectivity(order='eid')
+                src = ec[:, 0]
+                dst = ec[:, 1]
+                e_keep2 = valid2[src] | valid2[dst]
+
+                return subg1.sub_graph(edge_filter=e_keep2)
             case _:
                 raise ValueError(f'cut_edges must be one of: "exclusive", "inclusive"; got {cut_edges!r}')
 
