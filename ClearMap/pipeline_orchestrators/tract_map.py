@@ -1,5 +1,6 @@
 import functools
 import platform
+import re
 import shutil
 import tempfile
 import warnings
@@ -42,6 +43,10 @@ def label_points_wrapper(annotator, coords):
 class TractMapProcessor(ChannelPipelineOrchestrator):
 
     config_name = 'tract_map'
+
+    block_re = ('Processing block', re.compile(r'.*?Processing block \d+/\d+.*?\selapsed time:\s\d+:\d+:\d+\.\d+'))
+    where_re = ('Where', re.compile(r'.*?Where: processing \d+/\d+.*?\selapsed time:\s\d+:\d+:\d+\.\d+'))
+    label_re = ('Labeling', re.compile(r'.*?Label: processing \d+/\d+.*?\selapsed time:\s\d+:\d+:\d+\.\d+'))
 
     def __init__(self, sample_manager: Optional[SampleManager] = None,
                  config_coordinator: Optional[ConfigCoordinator] = None,
@@ -91,7 +96,9 @@ class TractMapProcessor(ChannelPipelineOrchestrator):
         sampling = self.config['binarization']['decimation_ratio']
         if self.uniques is None or sampling != self.sampling:
             self.sampling = sampling
-            print('Computing histogram, this may take some time')
+
+            self.prepare_watcher_for_substep(0, None, 'compute histogram', False)
+
             array = self.get('stitched', channel=self.channel).as_source()
             uniques, counts = np.unique(array[::sampling, ::sampling, ::sampling], return_counts=True)
             self.uniques = uniques
@@ -99,7 +106,6 @@ class TractMapProcessor(ChannelPipelineOrchestrator):
 
             self._cum_counts = np.cumsum(self.uniq_counts)
             self._n_pixels = int(self._cum_counts[-1])
-            print('Done')
 
     def intensities_to_percentiles(self, low_intensity, high_intensity):
         """
@@ -109,7 +115,7 @@ class TractMapProcessor(ChannelPipelineOrchestrator):
         Parameters
         ----------
         low_intensity, high_intensity : scalar
-            Intensity values (e.g. grey levels) whose positions in the global
+            Intensity values (e.g. gray levels) whose positions in the global
             histogram are required.
 
         Returns
@@ -132,7 +138,24 @@ class TractMapProcessor(ChannelPipelineOrchestrator):
         percentiles = counts * 100.0 / self._n_pixels
         return percentiles.tolist()
 
+    ####################
+
+    def _estimate_n_blocks(self, step: str) -> int:
+        """Estimate number of processing blocks for a step."""
+        try:
+            perf = self.config['performance'][step]['block_processing']
+            source = self.get('stitched', channel=self.channel)
+            dim_size = source.shape()[2]
+            size_max = perf.get('size_max', 100)
+            overlap = perf.get('overlap', 10)
+            return max(1, int(np.ceil((dim_size - size_max) / (size_max - overlap) + 1)))
+        except Exception:
+            return 100  # safe fallback
+
     def binarize(self, clip_low, clip_high):
+        n_blocks = self._estimate_n_blocks('binarize')
+        self.prepare_watcher_for_substep(n_blocks, self.block_re, 'Binarization', increment_main=True)
+
         binarization_parameter = vasculature.default_binarization_parameter.copy()
 
         binarization_parameter['clip']['clip_range'] = (clip_low, clip_high)
@@ -166,6 +189,8 @@ class TractMapProcessor(ChannelPipelineOrchestrator):
         self.update_watcher_main_progress()
 
     def mask_to_coordinates(self, as_memmap=False):
+        self.prepare_watcher_for_substep(1, self.where_re, 'Extracting coordinates', increment_main=True)
+
         mask = str(self.get_path('binary', channel=self.channel))
         output_asset = self.get('binary', asset_sub_type='pixels_raw', channel=self.channel)
         if output_asset.exists:
@@ -222,6 +247,9 @@ class TractMapProcessor(ChannelPipelineOrchestrator):
         return coords
 
     def parallel_transform(self, processes=-1):
+        n_blocks = self._estimate_n_blocks('transform')
+        self.prepare_watcher_for_substep(n_blocks, self.block_re, 'Transforming coordinates', increment_main=True)
+
         coords = self.get('binary', channel=self.channel, asset_sub_type='pixels_raw').as_source()
         coordinates_transformed_path = self.get_path('binary', asset_sub_type='coordinates_transformed', channel=self.channel)
         coordinates_transformed_path.unlink(missing_ok=True)
@@ -278,6 +306,9 @@ class TractMapProcessor(ChannelPipelineOrchestrator):
         return transformed_coords
 
     def label(self):
+        n_blocks = self._estimate_n_blocks('label')
+        self.prepare_watcher_for_substep(n_blocks, self.label_re, 'Labeling coordinates', increment_main=True)
+
         class AnnotationProxy:
             def __init__(self, annotator):
                 self._annotator = annotator
@@ -338,6 +369,8 @@ class TractMapProcessor(ChannelPipelineOrchestrator):
         self.workspace.debug = False
 
     def export_df(self, asset_sub_type=None):
+        self.prepare_watcher_for_substep(1, self.block_re, 'Exporting', increment_main=True)
+
         ratio = self.config['display']['decimation_ratio']
         decimated_coordinates_raw = self.get(
             'binary', channel=self.channel, asset_sub_type='pixels_raw').as_source()[::ratio, :]
@@ -370,6 +403,8 @@ class TractMapProcessor(ChannelPipelineOrchestrator):
         return df
 
     def voxelize(self):
+        self.prepare_watcher_for_substep(1, self.block_re, 'Voxelization', increment_main=True)
+
         voxelization_parameter = dict(
             shape=cmp_io.shape(self.registration_processor.annotators[self.channel].annotation_file),
             dtype=None,

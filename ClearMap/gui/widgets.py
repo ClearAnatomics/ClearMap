@@ -349,12 +349,12 @@ class ProgressWatcher(QWidget):  # Inspired from https://stackoverflow.com/a/662
 
         Parameters
         ----------
-        step_name
-            str
-        step_length
-            int The number of steps in the operation
-        pattern
-            str or re.Pattern or (str, re.Pattern) the text to look for in the logs to check for progress
+        step_name:  str
+            Name (title) of the substep
+        step_length: int
+            The number of steps in the operation
+        pattern:  str or re.Pattern or (str, re.Pattern) or None
+            the text to look for in the logs to check for progress
         """
         self.max_progress = step_length
         self.pattern = pattern

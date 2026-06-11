@@ -283,7 +283,7 @@ class PipelineOrchestrator(OrchestratorBase):
         ---------
         counter_size: int
             The progress bar maximum
-        pattern: str or re.Pattern or (str, re.Pattern)
+        pattern: str or re.Pattern or (str, re.Pattern) or None
             The string to search for in the log to signal an increment of 1
         title: str
             The title of the step for the progress bar

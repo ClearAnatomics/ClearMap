@@ -1411,18 +1411,33 @@ class TractMapTab(PostProcessingTab['TractMapProcessor']):
 
     def run_channel(self, channel: str, tuning: bool) -> None:
         params = self.params[channel]
-        if params.binarize:
-            self.binarize_channel(channel)
-        if params.extract_coordinates:
-            self.extract_coordinates(channel, tuning=tuning)  # mask_to_coordinates
-        if params.transform_coordinates:
-            self.transform_coordinates(channel)
-        if params.label_coordinates:
-            self.label_coordinates(channel)
-        if params.voxelize:
-            self.voxelize(channel)
-        if params.export_df:
-            self.export_df(channel)
+        steps = [
+            (params.binarize, lambda: self.binarize_channel(channel)),
+            (params.extract_coordinates, lambda: self.extract_coordinates(channel, tuning=tuning)),  # mask to coords
+            (params.transform_coordinates, lambda: self.transform_coordinates(channel)),
+            (params.label_coordinates, lambda: self.label_coordinates(channel)),
+            (params.voxelize, lambda: self.voxelize(channel)),
+            (params.export_df, lambda: self.export_df(channel)),
+        ]
+        enabled_steps = [(label, fn) for (enabled, fn), label in zip(
+            steps,
+            ['Binarization', 'Coordinates', 'Transform',
+             'Labeling', 'Voxelization', 'Export']) if enabled]
+
+        if not enabled_steps:
+            return
+
+        processor = self.get_worker(channel)
+        # Prime the watcher with total step count before any step runs
+        n_steps = len(enabled_steps)
+        processor.prepare_watcher_for_substep(n_steps, pattern=processor.block_re, title=f'Tract map ({channel})',
+                                              increment_main=False)  # steps call increment_main themselves
+
+        for _, fn in enabled_steps:
+            fn()
+            processor = self.get_worker(channel)  # re-fetch in case of reload
+            if processor.stopped:
+                return
 
     def voxelize(self, channel: str) -> None:
         worker = self.get_worker(channel)
