@@ -1446,15 +1446,27 @@ class TractMapTab(PostProcessingTab['TractMapProcessor']):
         processor = self.get_worker(channel)
         # TODO: use wrap_step but must include return
         pixel_percents = self.params[channel].clipping_percents
-        low_intensity, high_intensity = processor.compute_clip_range(pixel_percents)
-        self.params[channel].clip_range = [low_intensity, high_intensity]
+
+        def _compute():
+            low_intensity, high_intensity = processor.compute_clip_range(pixel_percents)
+            self.params[channel].clip_range = [low_intensity, high_intensity]
+
+        # To get pbar
+        self.wrap_step('Compute clipping range', _compute, abort_func=processor.stop_process,
+                       main_thread=True, nested=False)
 
     def intensities_to_percentiles(self, channel: str) -> None:
         """Convert the intensities to percentiles"""
         processor = self.get_worker(channel)
         low_intensity, high_intensity = self.params[channel].clip_range
-        low_percent, high_percent = processor.intensities_to_percentiles(low_intensity, high_intensity)
-        self.params[channel].clipping_percents = [low_percent, high_percent]
+
+        def _compute():
+            low_percent, high_percent = processor.intensities_to_percentiles(low_intensity, high_intensity)
+            self.params[channel].clipping_percents = [low_percent, high_percent]
+
+        # To get pbar
+        self.wrap_step('Intensities to percentiles', _compute, abort_func=processor.stop_process,
+                       main_thread=True, nested=False)
 
     def plot_binary(self, channel: str) -> None:
         page = self.ui.channelsParamsTabWidget.currentWidget()
