@@ -690,20 +690,42 @@ class AnalysisGroupController:
         exp_controller = self._get_or_create_exp_controller(sample_src_dir)
         return exp_controller.sample_manager
 
-    def get_density_orchestrator(self) -> "DensityGroupAnalysisOrchestrator":
-        if self._analysis_worker is not None:
-            return self._analysis_worker
-        analysis_worker = DensityGroupAnalysisOrchestrator(group_controller=self)
-        if self._progress_watcher:
-            analysis_worker.set_progress_watcher(self._progress_watcher)
-        if self._thread_wrapper:
-            analysis_worker.set_thread_wrapper(self._thread_wrapper)
-        self._analysis_worker = analysis_worker
-        return analysis_worker
+    @property
+    def density_orchestrator(self) -> "DensityGroupAnalysisOrchestrator":
+        if self._analysis_worker is None:
+            analysis_worker = DensityGroupAnalysisOrchestrator(group_controller=self, pipeline=self._infer_pipeline())
+            if self._progress_watcher:
+                analysis_worker.set_progress_watcher(self._progress_watcher)
+            if self._thread_wrapper:
+                analysis_worker.set_thread_wrapper(self._thread_wrapper)
+            self._analysis_worker = analysis_worker
+        return self._analysis_worker
 
     # FIXME: check this
     def infer_required_sections(self) -> set[str]:
         return {'group_analysis', 'batch_processing'}
+
+    def set_pipeline(self, pipeline: str) -> None:
+        """
+        Single entry point for pipeline changes.
+        Updates config and orchestrator atomically.
+        """
+        self.apply_patch({'group_analysis': {'pipeline': pipeline}})
+        self.density_orchestrator.pipeline = pipeline  # setter handles invalidation
+
+    def _infer_pipeline(self) -> str:
+        """
+        Read pipeline from group config.
+        Falls back to 'CellMap' if not set.
+        """
+        try:
+            cfg = self.get_config_view()
+            pipeline = (cfg.get('group_analysis', {}).get('pipeline')
+                        or cfg.get('batch_processing', {}).get('pipeline'))
+            if pipeline:
+                return pipeline
+        except Exception:
+            return 'CellMap'  # fallback
 
     def get_config_view(self) -> dict[str, Any]:
         return self.group_cfg_coordinator.get_config_view()

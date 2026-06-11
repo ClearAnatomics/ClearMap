@@ -1976,7 +1976,7 @@ class GroupAnalysisTab(BatchTab):
                                           apply_patch=self.group_controller.apply_patch)
         self.params.set_pipelines(['CellMap', 'TractMap', 'TubeMap', 'Colocalization'])
         self.params.params_dict['pipeline'].notify_apply = (
-            lambda: self.processor.__setattr__('pipeline', self.params.pipeline))
+            lambda: self.group_controller.set_pipeline(self.params.pipeline))
 
         def _channels_provider(params) -> list[str]:
             sample_folders_paths = params.get_all_paths()
@@ -2001,9 +2001,7 @@ class GroupAnalysisTab(BatchTab):
 
     @property
     def processor(self):
-        proc = self.group_controller.get_density_orchestrator()
-        proc.pipeline = self.params.pipeline  # keep in sync whenever called
-        return proc
+        return self.group_controller.density_orchestrator
 
     def _setup_workers(self) -> None:
         results_folder = self.params.get('results_folder')
