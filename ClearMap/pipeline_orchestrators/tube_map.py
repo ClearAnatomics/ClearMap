@@ -930,7 +930,7 @@ class VesselGraphProcessor(PipelineOrchestrator):
                         break
 
             skeletonization.skeletonize(binary, sink=self.get_path('skeleton', channel=self.parent_channels),  # WARNING: prange
-                                        delete_border=True, processes=self._n_processes('skeletonize'), verbose=True)
+                                        delete_border=True, n_processes=self._n_processes('skeletonize'), verbose=True)
 
     def _measure_radii(self, binary_processor=None):  # FIXME: do on the clean graph to avoid measuring cliques ?
         coordinates = self.graph_raw.vertex_coordinates()

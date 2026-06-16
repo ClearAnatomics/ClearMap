@@ -31,6 +31,7 @@ import ClearMap.ParallelProcessing.DataProcessing.ConvolvePointList as cpl
 import ClearMap.Utils.Timer as tmr
 
 import ClearMap.IO.FileUtils as fu
+from ClearMap.Utils.utilities import sanitize_n_processes
 
 
 ###############################################################################
@@ -291,7 +292,7 @@ rotations = t3d.rotations12(base);
 ###############################################################################
 
 def skeletonize(binary, points = None, steps = None, removals = False, radii = False,
-                check_border = True, delete_border = False, return_points = False, verbose = True):
+                check_border = True, delete_border = False, return_points = False, n_processes=None, verbose = True):
   """Skeletonize a binary 3d array using PK12 algorithm.
   
   Arguments
@@ -326,6 +327,7 @@ def skeletonize(binary, points = None, steps = None, removals = False, radii = F
   The skeletonization is done in place on the binary. Copy the binary if
   needed for further processing.
   """
+  n_processes = sanitize_n_processes(n_processes)
   
   if verbose:    
     print('#############################################################'); 
@@ -372,7 +374,7 @@ def skeletonize(binary, points = None, steps = None, removals = False, radii = F
       print('Iteration %d' % step);
       timer_iter = tmr.Timer();
   
-    border = cpl.convolve_3d_points(binary, t3d.n6, points) < 6;
+    border = cpl.convolve_3d_points(binary, t3d.n6, points, processes=n_processes) < 6;
     borderpoints = points[border];
     borderids    = np.nonzero(border)[0];
     keep         = np.ones(len(border), dtype = bool);
@@ -392,7 +394,7 @@ def skeletonize(binary, points = None, steps = None, removals = False, radii = F
         print('Sub-Iteration %d' % i);
         timer_sub_iter = tmr.Timer();
       
-      remborder = delete[cpl.convolve_3d_points(binary, rotations[i], borderpoints)];
+      remborder = delete[cpl.convolve_3d_points(binary, rotations[i], borderpoints, processes=n_processes)];
       rempoints = borderpoints[remborder];
       if verbose:
         timer_sub_iter.print_elapsed_time('Matched points: %d' % (len(rempoints),));
@@ -439,7 +441,7 @@ def skeletonize(binary, points = None, steps = None, removals = False, radii = F
     result.append(death);
   if radii is True:
     #calculate average diameter as average death of neighbourhood
-    radii = cpl.convolve_3d(death, np.array(t3d.n18, dtype = 'uint16'), points);
+    radii = cpl.convolve_3d(death, np.array(t3d.n18, dtype='uint16'), points, processes=n_processes);
     result.append(radii);
   
   if len(result) > 1:
@@ -448,7 +450,9 @@ def skeletonize(binary, points = None, steps = None, removals = False, radii = F
     return result[0];
 
 
-def skeletonize_index(binary, points = None, steps = None, removals = False, radii = False, return_points = False, check_border = True, delete_border = False, verbose = True):
+def skeletonize_index(binary, points = None, steps = None, removals = False,
+                      radii = False, return_points = False, check_border = True,
+                      delete_border = False, n_processes=None, verbose = True):
   """Skeletonize a binary 3d array using PK12 algorithm via index coordinates.
   
   Arguments
@@ -472,6 +476,7 @@ def skeletonize_index(binary, points = None, steps = None, removals = False, rad
   points : nxd array
     The point coordinates of the skeleton.
   """
+  n_processes = sanitize_n_processes(n_processes)
   
   if verbose:    
     print('#############################################################'); 
@@ -526,7 +531,7 @@ def skeletonize_index(binary, points = None, steps = None, removals = False, rad
   
   
     # print(type(points), points.dtype, binary.dtype)
-    border = cpl.convolve_3d_indices_if_smaller_than(binary, t3d.n6, points, 6);
+    border = cpl.convolve_3d_indices_if_smaller_than(binary, t3d.n6, points, 6, processes=n_processes);
     borderpoints = points[border];
     #borderids    = np.nonzero(border)[0];
     borderids    = ap.where(border).array;
@@ -547,7 +552,7 @@ def skeletonize_index(binary, points = None, steps = None, removals = False, rad
         print('Sub-Iteration %d' % i);
         timer_sub_iter = tmr.Timer();
       
-      remborder = delete[cpl.convolve_3d_indices(binary, rotations[i], borderpoints)];
+      remborder = delete[cpl.convolve_3d_indices(binary, rotations[i], borderpoints, processes=n_processes)];
       rempoints = borderpoints[remborder];
       if verbose:
         timer_sub_iter.print_elapsed_time('Matched points  : %d' % (len(rempoints),));
@@ -573,7 +578,7 @@ def skeletonize_index(binary, points = None, steps = None, removals = False, rad
     
     if step % 3 == 0:   
       npts = len(points);
-      points = points[consider[cpl.convolve_3d_indices(binary, base, points)]]; 
+      points = points[consider[cpl.convolve_3d_indices(binary, base, points, processes=n_processes)]];
       nnonrem += npts - len(points)
       if verbose:
         print('Non-removable points: %d' % (npts - len(points)));
@@ -602,7 +607,7 @@ def skeletonize_index(binary, points = None, steps = None, removals = False, rad
   
   if radii is True:
     #calculate average diameter as death average death of neighbourhood     
-    radii = cpl.convolve_3d_indices(death, t3d.n18, points, out_dtype = 'uint16');
+    radii = cpl.convolve_3d_indices(death, t3d.n18, points, out_dtype='uint16', processes=n_processes);
   else:
     radii = None;
   
