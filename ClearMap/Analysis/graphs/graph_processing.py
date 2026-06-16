@@ -803,7 +803,7 @@ class PropertyAggregator:
         need_flip   = np.sign(diffs) != first_sign
         is_not_loop = np.all(sorted_vertices[0, :] != sorted_vertices[-1, :])
         need_flip = need_flip & is_not_loop  # no flip for self-loops
-        if self.kind == 'edge'and len(need_flip) > 0:  # FIXME: dirty trick for edge/vertex geometry length mismatch
+        if self.kind == 'edge'and len(need_flip) > 0:  # FIXME: dirty trick for edge/vertex geometry length (len()) mismatch
             need_flip = np.hstack([need_flip, need_flip[-1]])  #  FIXME: could remove if split vertex/edge geometry
         self.chain_edges_direction.append(need_flip)
 
@@ -1209,14 +1209,14 @@ def find_chains(graph, *, return_endpoints_mask=False, return_edge_descriptors: 
     connectivity_w_eid = graph._base.get_edges(eprops=[graph._base.edge_index]).astype(np.uint32)
     connectivity_w_eid = np.roll(connectivity_w_eid, 1, axis=1)  # move edge id to the first column
 
-    v1_degs = graph._base.get_out_degrees(connectivity_w_eid[:, 1]).astype(np.uint8)
-    v2_degs = graph._base.get_out_degrees(connectivity_w_eid[:, 2]).astype(np.uint8)
+    v1_degs = graph._base.get_out_degrees(connectivity_w_eid[:, 1]).astype(np.uint32)
+    v2_degs = graph._base.get_out_degrees(connectivity_w_eid[:, 2]).astype(np.uint32)
 
     end_branches = np.logical_xor(v1_degs == 2, v2_degs == 2)
     end_branches_idx = np.where(end_branches)[0]
     end_branch_ids = connectivity_w_eid[end_branches_idx, 0]
 
-    vertex_degs = graph.vertex_degrees().astype(np.uint8)
+    vertex_degs = graph.vertex_degrees().astype(np.uint32)
     chains = find_degree2_branches(
         np.ascontiguousarray(connectivity_w_eid),  # FIXME: Check if contiguous is necessary
         end_branch_ids.astype(np.uint32),
@@ -1250,9 +1250,11 @@ def find_chains(graph, *, return_endpoints_mask=False, return_edge_descriptors: 
         visited[vs_idx] = True
 
     if not visited.sum() == graph.n_vertices:
-        raise ValueError(f'Not all vertices were visited during chain finding! '
-                         f'{visited.sum()} / {graph.n_vertices} visited. '
-                         f'Unvisited vertices: {np.where(~visited)[0]}')
+        unvisited_ids = np.where(~visited)[0]
+        raise ValueError(f'Not all vertices were visited during chain finding!\n'
+                         f'{visited.sum()} / {graph.n_vertices} visited.\n'
+                         f'Unvisited vertices: {unvisited_ids}\n'
+                         f'Unvisited vertices degrees: {graph.vertex_degrees()[unvisited_ids]}')
 
 
     if return_endpoints_mask:

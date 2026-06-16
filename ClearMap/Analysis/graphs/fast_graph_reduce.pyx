@@ -44,7 +44,7 @@ ctypedef vector[edge_t] edge_vector_t
 
 ctypedef pair[index_t, vertex_t] adj_entry_t  # (edge ID, neighbour vertex)
 
-ctypedef uint8_t degree_t
+ctypedef uint32_t degree_t
 ctypedef vector[degree_t] degree_vector_t
 
 ctypedef fused source_t:
@@ -79,7 +79,7 @@ ctypedef fused graphtool_scalar_t:
     int  # int32
     unsigned char  # bool_
 
-
+# FIXME: see why we can't use these typedefs in the signature for degree_t. Store explanation and remove these lines if not needed
 # ctypedef np.uint32_t np_vertex_t
 # ctypedef np.uint8_t np_degree_t
 # ctypedef np.uint32_t[::1] np_vertex_array_t
@@ -119,7 +119,7 @@ cdef edge_t find_endpoint_vertex(vertex_t v1, vertex_t v2,
 cdef size_t trace_chain(
     index_t start_edge_idx,
     uint32_t[:, :] connectivity,
-    uint8_t[:] vertex_degs,
+    uint32_t[:] vertex_degs,
     vector[vector[adj_entry_t]] &adjacency,
     vector[uint8_t] &visited_edges,
     list result
@@ -259,18 +259,13 @@ cdef uint32_t find_max_eid(uint32_t[:, :] arr):
     return max_eid
 
 
+# TODO: see why typedefs in the signature for degree_t don't work
 cpdef object find_degree2_branches(
     uint32_t[:, :] edges_array,
     uint32_t[:] end_edge_ids,
-    uint8_t[:] vertex_degs,
+    uint32_t[:] vertex_degs,
     int print_step=10
 ):
-# cpdef object find_degree2_branches(
-#     np_index_array_t  edges_array,
-#     np_index_array_t  end_edge_ids,
-#     np_degree_array_t vertex_degs,
-#     int print_step = 10
-# ):
     """
     Find chains formed by degree-2 vertices. Returns a list of tuples:
       (edge_ids_list, vertex_ids_list)
