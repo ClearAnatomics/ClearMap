@@ -10,7 +10,7 @@ from ClearMap.Analysis.vasculature.graph_corrections import remove_auto_loops
 
 def create_graph(edges, vertices=None):
     n_vertices = len(np.unique(np.array(list(edges.keys()))))
-    graph = GraphGt.Graph(n_vertices=n_vertices, edges=list(edges.keys()))
+    graph = graph_gt.Graph(n_vertices=n_vertices, edges=list(edges.keys()))
     graph.add_edge_property('length', np.array(list(edges.values())))
     if vertices is not None:
         graph.add_vertex_property('coordinates', np.array(list(vertices.values()), dtype=float))
