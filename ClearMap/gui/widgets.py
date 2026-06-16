@@ -1777,7 +1777,7 @@ class LandmarksSelectorDialog(WizardWidget):  # TODO: bind qColorDialog to color
             dv.scatter = scatter
             dv.scatter_coords = Scatter3D(self.get_coords(img_type),
                                           colors=np.array(self.colors),
-                                          half_slice_thickness=3)
+                                          z_radius=3)
             dv.mouse_clicked.connect(functools.partial(self.set_current_coords, img_type=img_type))
 
     @property

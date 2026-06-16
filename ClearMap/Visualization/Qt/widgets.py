@@ -1,5 +1,6 @@
 import re
 
+import cached_property
 import numpy as np
 import pandas as pd
 
@@ -18,11 +19,42 @@ def is_valid_hex_color(s):
 
 
 class Scatter3D:
-    def __init__(self, coordinates, smarties=False, colors=None, hemispheres=None, half_slice_thickness=None,
+    """
+    Scatter dataset for display in :class:`DataViewer`.
+
+    Markers whose coordinate along the scroll axis matches the current slice
+    are drawn at full size.  When *z_radius* is set, markers from neighbouring
+    slices are also drawn at reduced size to convey depth.
+
+    Parameters
+    ----------
+    coordinates : (N, 3) np.ndarray or pd.DataFrame
+        Point positions, or a pre-built DataFrame with columns ``x``, ``y``,
+        ``z``, ``colour``, ``symbol`` (and optionally ``pen`` / ``brush``).
+        Passing a DataFrame skips the construction logic entirely.
+    smarties : bool
+        Assign a pseudo-random colour to every point (ignored when *colors*
+        is provided).
+    colors : array-like or None
+        Per-point colours as hex strings or RGB(A) arrays.  Converted to
+        hex internally.
+    hemispheres : array-like or None
+        Integer label per point that controls the marker symbol.  -1 is
+        reserved for out-of-hemisphere points, drawn with
+        ``out_of_bounds_symbol``.
+    z_radius : int or None
+        Half-width of the depth window in slices.  Points within
+        ±*z_radius* of the current slice are drawn at a size proportional
+        to their proximity.  ``None`` / 0 disables depth display.
+    marker_size : int
+        Base marker diameter in display pixels at the current slice
+        (minimum 2).
+    """
+    def __init__(self, coordinates, smarties=False, colors=None, hemispheres=None, z_radius=None,
                  marker_size=5):
         self.__coordinates = None
         self.__has_hemispheres = hemispheres is not None  # FIXME: this should be renamed to has_different_symbols
-        self.half_slice_thickness = half_slice_thickness
+        self.z_radius = z_radius
         self.axis = 2
         self.marker_size = max(2, marker_size)
         self.out_of_bounds_symbol = 'x'  # Symbol to use for out of bounds markers
@@ -88,6 +120,10 @@ class Scatter3D:
             self.__coordinates = self.data[['x', 'y', 'z']].values
         return self.__coordinates
 
+    @property
+    def plane_axes(self):
+        return [a for a in range(3) if a != self.axis]
+
     def set_data(self, df):
         # print(self.data['colour'].values, df['colour'])
         if isinstance(df, dict):
@@ -119,84 +155,59 @@ class Scatter3D:
     def has_hemispheres(self):
         return self.__has_hemispheres
 
-    def get_all_data(self, main_slice_idx, half_slice_thickness=3):  # FIXME: rename
+    def get_3d_markers(self, main_slice_idx, z_radius=3, base_size=None):
         """
-        Get surrounding markers
+        Collect markers from slices surrounding *main_slice_idx*.
+
+        Marker size scales linearly with proximity: a point at distance *d*
+        from the main slice gets size ``base_size * (z_radius - d) / z_radius``.
 
         Parameters
         ----------
-        main_slice_idx int
-
-        half_slice_thickness int
+        main_slice_idx : int
+            Index of the currently displayed slice.
+        z_radius : int
+            Half-width of the depth window.  Overridden by ``self.z_radius``
+            when that attribute is set.
+        base_size : int or None
+            Reference size for a marker at distance 0.  Pass the current UI
+            spin-box value so surrounding markers scale consistently with the
+            main-slice markers.  Defaults to ``self.marker_size``.
 
         Returns
         -------
-
+        dict
+            Keys: ``'pos'`` (N×2), ``'size'`` (N,), ``'symbol'`` (N,),
+            and ``'pen'`` (N,) when :attr:`has_colours` is True.
+            Returns empty arrays when *z_radius* is falsy or no points fall
+            in range.
         """
-        if not half_slice_thickness:  # WARNING: optimisation
-            output = {
-                'pos': np.empty(0),
-                'size': np.empty(0),
-            }
-            if self.has_colours:
-                output['pen'] = np.empty(0)
-            return output
-        half_slice_thickness = self.half_slice_thickness if self.half_slice_thickness is not None else half_slice_thickness
-        columns = ['x', 'y', 'colour', 'size', 'symbol']
+        empty = {'pos': np.empty(0), 'size': np.empty(0), 'symbol': np.empty(0)}
         if self.has_colours:
-            columns += ['pen']
-        rows = [pd.DataFrame(columns=columns)]
-        for i in range(main_slice_idx - half_slice_thickness, main_slice_idx + half_slice_thickness):
-            if i < 0:  # or i > self.coordinates[:, 2].max()
-                continue
-            else:
-                current_slice = i
-            current_z_data = pd.DataFrame(columns=['x', 'y', 'colour', 'size', 'symbol'])  # WARNING: this is x/y of the view, not the 3D image
-            indices = self.current_slice_mask(current_slice)
-            pos = self.get_pos(indices=indices)
-            if not all(pos.shape):  # empty
-                continue
-            current_z_data[['x', 'y']] = pos
-            current_z_data['colour'] = self.get_colours(indices=indices).values  # Otherwise uses index from source
-            current_z_data['size'] = self.get_symbol_sizes(main_slice_idx, current_slice,
-                                                           indices=indices, half_size=half_slice_thickness)
-            current_z_data['symbol'] = self.get_symbols(current_slice)  # FIXME: check if we need to verify that symbools exist
-            if self.has_colours:
-                current_z_data['pen'] = self.data.loc[indices, 'pen'].values
-                # current_z_data['brush'] = self.data.loc[indices, 'brush'].values
-            rows.append(current_z_data)
+            empty['pen'] = np.empty(0)
 
-        data_df = pd.concat(rows)  # FIXME: check if to_dict method in dataframe
-        output = {'pos': data_df[['x', 'y']].values,  # WARNING: this is x/y of the view, not the 3D image
-                  'size': data_df['size'].values,
-                  'symbol': data_df['symbol'].values}
+        z_radius = self.z_radius if self.z_radius is not None else z_radius
+        if not z_radius:
+            return empty
+
+        base_size = base_size if base_size is not None else self.marker_size
+
+        z = self.coordinates[:, self.axis]
+        mask = (z >= main_slice_idx - z_radius) & (z < main_slice_idx + z_radius) & (z >= 0)
+        if not mask.any():
+            return empty
+
+        pos = self.coordinates[mask][:, self.plane_axes]
+        dist_to_main = np.abs(z[mask] - main_slice_idx)
+        sizes = np.round(base_size * ((z_radius - dist_to_main) / z_radius)).astype(int)
+
+        symbols = (self.data.loc[mask, 'symbol'].values if self.has_hemispheres
+                   else np.full(mask.sum(), self.symbols[0]))
+
+        output = {'pos': pos, 'size': sizes, 'symbol': symbols}
         if self.has_colours:
-            output['pen'] = data_df['pen'].values
-            # output['brush'] = data_df['brush'].values
+            output['pen'] = self.data.loc[mask, 'pen'].values
         return output
-
-    # vectorised approach for get_all_data to test
-    # def get_all_data(self, main_slice_idx, half_slice_thickness=None):
-    #     hst = half_slice_thickness or self.half_slice_thickness or 3
-    #     z = self.coordinates[:, self.axis]
-    #     mask = (z >= main_slice_idx - hst) & (z < main_slice_idx + hst) & (z >= 0)
-    #
-    #     if not mask.any():
-    #         empty = {'pos': np.empty((0, 2)), 'size': np.empty(0), 'symbol': np.empty(0)}
-    #         if self.has_colours:
-    #             empty['pen'] = np.empty(0)
-    #         return empty
-    #
-    #     axes = [a for a in range(3) if a != self.axis]
-    #     pos = self.coordinates[np.ix_(mask, axes)]
-    #     distances = np.abs(z[mask] - main_slice_idx)
-    #     sizes = np.round(10 * ((hst - distances) / hst)).astype(int)
-    #     symbols = self.data.loc[mask, 'symbol'].values if self.has_hemispheres else np.full(mask.sum(), self.symbols[0])
-    #
-    #     output = {'pos': pos, 'size': sizes, 'symbol': symbols}
-    #     if self.has_colours:
-    #         output['pen'] = self.data.loc[mask, 'pen'].values
-    #     return output
 
     def get_draw_params(self, current_slice):
         indices = self.current_slice_mask(current_slice)
@@ -249,8 +260,6 @@ class Scatter3D:
         if indices is None:
             indices = self.current_slice_mask(current_slice)
         if indices is not None:
-            axes = [0, 1, 2]
-            axes.pop(self.axis)  # coordinates in the two other axes
-            return self.coordinates[np.ix_(indices, axes)]
+            return self.coordinates[np.ix_(indices, self.plane_axes)]
         else:
             return np.empty((0, 2))

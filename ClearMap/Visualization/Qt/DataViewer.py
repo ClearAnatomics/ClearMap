@@ -701,14 +701,6 @@ class DataViewer(QWidget):
         self.scatter.clear()
         self.scatter_coords.axis = ax
 
-        # x_range, y_range = self.view.viewRange()
-        # Compute scale from the ratio between original and current view range
-        # scale_x = self.source_range_x / (x_range[1] - x_range[0])
-        # scale_y = self.source_range_y / (y_range[1] - y_range[0])
-        # zoom_factor = (scale_x + scale_y) / 2.0
-        #
-        # scaled_size = round(self.scatter_coords.marker_size * zoom_factor)
-
         scaled_size, zoom_factor = self._scale_markers()
         pos = self.scatter_coords.get_pos(index)
         if all(pos.shape):
@@ -720,10 +712,11 @@ class DataViewer(QWidget):
             else:
                 self.scatter.setData(pos=pos, **DataViewer.DEFAULT_SCATTER_PARAMS.copy())  # TODO: check if copy required
         try:  # TODO: check why some markers trigger errors
-            if self.scatter_coords.half_slice_thickness is not None and self.scatter_coords.half_slice_thickness > 0:
-                marker_params = self.scatter_coords.get_all_data(index)
-                if marker_params['pos'].shape[0]:
-                    marker_params['size'] *= zoom_factor
+            if self.scatter_coords.z_radius is not None and self.scatter_coords.z_radius > 0:
+                marker_params = self.scatter_coords.get_3d_markers(
+                    index, base_size=self.marker_size_spin.value())
+                if marker_params['pos'].shape[0]:  # We have markers in view
+                    marker_params['size'] = np.round(marker_params['size'] * zoom_factor).astype(int)
                     self.scatter.addPoints(brush=pg.mkBrush((0, 0, 0, 0)), **marker_params)
         except KeyError as err:
             print(f'DataViewer error: {err}')

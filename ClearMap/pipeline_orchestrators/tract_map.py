@@ -512,7 +512,7 @@ class TractMapProcessor(ChannelPipelineOrchestrator):
         color_map[0] = np.array(to_hex((1, 0, 0)))  # default to red
         df['color'] = df['id'].map(color_map)
         dv.scatter_coords = Scatter3D(coordinates, colors=df['color'].to_list(),
-                                      hemispheres=hemispheres, half_slice_thickness=0)
+                                      hemispheres=hemispheres, z_radius=0)  # plotting adjacent is too slow for tracts
         dv.refresh()
         return [dv]
 

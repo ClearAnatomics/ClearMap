@@ -7,7 +7,7 @@ temp_folder: null
 start_full_screen: false
 default_lut: "white"
 three_d_plot_bg: "grey"
-particle_plot_z_sphere_radius: 0  # set to 0 displays as disks
+particle_plot_z_sphere_radius: 3  # set to 0 displays as disks
 font_size: 8
 pattern_finder_min_n_files: 10
 elastix_path: null

@@ -141,7 +141,7 @@ class ColocalizationProcessor(CompoundChannelPipelineOrchestrator):
         scatter = pg.ScatterPlotItem()
         dv.view.addItem(scatter)
         dv.scatter = scatter
-        dv.scatter_coords = Scatter3D(scatter_df, half_slice_thickness=3,
+        dv.scatter_coords = Scatter3D(scatter_df, z_radius=self.machine_config['particle_plot_z_sphere_radius'],
                                       marker_size=self.config['comparison']['particle_diameter'] // 2)
         dv.refresh()
 
