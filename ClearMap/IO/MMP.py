@@ -62,7 +62,7 @@ class Source(npy.Source):
   def array(self, value):
     if not isinstance(value, np.memmap):
       array = np.asarray(value)
-      value = _memmap(location=self.location, array=array)
+      value = _memmap(location=self.location, array=array, mode='w+')  # Explicit write
     self._array = value
 
   @property 
@@ -112,6 +112,7 @@ class Source(npy.Source):
   @location.setter
   def location(self, value):  # FIXME: should only accept path
     if value != self.location:
+      # mode is None → _memmap infers: file exists -> 'r+';  file missing + shape given → 'w+' (creates)
       memmap = _memmap(location=value, shape=self.shape, dtype=self.dtype, order=self.order)
       self.array = memmap
 
@@ -193,33 +194,33 @@ def read(source, slicing=None, mode=None, **kwargs):
   source : Source
     The read memmap source.
   """
-  
+  mode = mode if mode is not None else 'r+'
+
   if isinstance(source, Source):
     if slicing is None:
       return source
     else:
       return source.__getitem__(slicing)
-
   elif isinstance(source, np.memmap):
     if slicing is None:
       memmap = source
     else:
       memmap = source.__getitem__(slicing)
     return Source(array = memmap)
-
   elif isinstance(source, str):
     try:
       memmap = _memmap(location=source, mode=mode)
-    except:
-      raise ValueError('Cannot read memmap from location %r!' % source)
+    except FileNotFoundError:
+      raise
+    except Exception as err:
+      raise ValueError(f'Cannot read memmap from location {source!r}!') from err
 
     if slicing is not None:
       memmap = memmap.__getitem__(slicing)
 
     return Source(array = memmap)
-
   else:
-    raise ValueError('Cannot read memmap from source %r!' % source)
+    raise ValueError(f'Cannot read memmap from source {source!r}!')
 
 
 def write(sink, data, slicing=None, **kwargs):
@@ -244,24 +245,23 @@ def write(sink, data, slicing=None, **kwargs):
 
   if isinstance(sink, (Source, np.memmap)):
     sink.__setitem__(slicing, data.array)
-
   elif isinstance(sink, str):
     if slicing == (slice(None),):
-       memmap = _memmap(location=sink, array=data.array)
+      create(location=sink, array=data.array)
     else:
       try:
         memmap = _memmap(location=sink, mode='r+')
       except:
         raise ValueError('Cannot write slice into non-existent memmap at location %r!' % sink)
       memmap.__setitem__(slicing, data.array)
-
   else:
     raise ValueError('Cannot write memmap to sink %r!' % sink)
 
   return sink
 
 
-def create(location = None, shape = None, dtype = None, order = None, mode = None, array = None, as_source = True, **kwargs):
+def create(location = None, shape = None, dtype = None, order = None,
+           mode = None, array = None, as_source = True, **kwargs):
   """Create a memory map.
   
   Arguments
@@ -290,8 +290,10 @@ def create(location = None, shape = None, dtype = None, order = None, mode = Non
   ----
   By default memmaps are initialized as fortran contiguous if order is None.
   """
-  mode = 'w+' if mode is None else mode
-  memmap = _memmap(location=location, shape=shape, dtype=dtype, order=order, mode=mode, array=array)  #FIXME: dangerous call
+  if mode is not None and mode != 'w+':
+    raise ValueError(f"create() only supports mode='w+', got {mode!r}. "
+                     f"Use read() to open existing files or initialize() for read-or-create behaviour.")
+  memmap = _memmap(location=location, shape=shape, dtype=dtype, order=order, mode='w+', array=array)
   if as_source:
     return Source(memmap)
   else:
@@ -355,7 +357,12 @@ def _memmap(location = None, shape = None, dtype = None, order = None, mode = No
 
   if array is None:
     if shape is None:
-      raise ValueError(f'Cannot create memmap without shape at location {location!r}!')
+      # We have location and mode is not EXPLICITLY write. Then we infer we tried to read
+      if isinstance(location, str) and not fu.is_file(location) and mode != 'w+':
+        raise FileNotFoundError(f'Memmap file not found at {location!r}.'
+                                f'Cannot read source (and cannot create without shape).')
+      else:
+        raise ValueError(f'Cannot create memmap without shape at location {location!r}!')
 
     mode = 'w+' if mode is None else mode
     fortran = order in ['F', None]  #default is 'F' for memmaps
