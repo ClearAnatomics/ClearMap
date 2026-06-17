@@ -1,10 +1,49 @@
 # -*- coding: utf-8 -*-
 """
-GraphGt
-=======
+graph_gt
+========
 
-Module provides basic Graph interface to the
-`graph_tool <https://graph-tool.skewed.de>`_ library.
+Graph class and utilities built on the `graph-tool <https://graph-tool.skewed.de>`_ library.
+
+:class:`Graph` is the central data structure for vasculature and network
+analyses in ClearMap.  It wraps a ``graph_tool.Graph`` backend and adds:
+
+* **Spatial embedding** — vertex coordinates in voxels
+  (``coordinates``), physical units (``coordinates_units``), and atlas
+  space (``coordinates_atlas``).
+* **Edge geometry** — variable-length arrays stored along each edge that
+  capture intermediate vertex positions, radii, and labels between branch
+  points.  Two storage modes are supported: ``'graph'`` (a single flat
+  array at graph level, indexed by per-edge start/end pairs) and ``'edge'``
+  (variable-length vectors stored in each edge property).  Convert between
+  them with :meth:`Graph.set_edge_geometry_type`.
+* **Vessel typing** — properties for artery/vein binary labels, signal
+  intensity, radii in voxels and µm, distance to surface, and atlas
+  annotation.
+* **Subgraph extraction** — :meth:`Graph.sub_graph` (vertex/edge masks),
+  :meth:`Graph.sub_slice` (axis-aligned spatial window),
+  :meth:`Graph.largest_component`.
+* **Atlas annotation** — :meth:`Graph.annotate_properties` and
+  :meth:`Graph.transform_properties` apply arbitrary callables to vertex
+  or edge properties in one pass.
+* **Morphological graph operations** — binary dilation, erosion, opening,
+  and closing on vertex and edge label arrays, propagating along graph
+  topology.
+* **Persistence** — :meth:`Graph.save` / :meth:`Graph.load` via the
+  graph-tool ``.gt`` format.
+
+Typical usage
+-------------
+Graphs are produced by
+:func:`~ClearMap.Analysis.graphs.graph_processing.graph_from_skeleton`
+and then simplified by cleaning and reduction
+
+See also
+--------
+:mod:`ClearMap.Analysis.graphs.graph_processing` :
+    Graph construction, cleaning, reduction, and label tracing.
+:class:`~ClearMap.pipeline_orchestrators.tube_map.VesselGraphProcessor` :
+    Pipeline orchestrator that builds and annotates vasculature graphs.
 """
 from __future__ import annotations
 

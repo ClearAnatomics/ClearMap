@@ -1,6 +1,72 @@
 """
-This module contains the generic processor classes that are used to define the processing steps and run the processing
-This is inherited by all pipeline_orchestrators in ClearMap
+generic_orchestrators
+=====================
+
+Base classes for all ClearMap processing workers.
+
+Architecture
+------------
+The orchestrator hierarchy has three layers:
+
+**Configuration + asset access**
+
+:class:`OrchestratorBase` owns the
+:class:`~ClearMap.config.config_coordinator.ConfigCoordinator` reference and
+exposes read-only config views, workspace asset retrieval via
+:meth:`~OrchestratorBase.get` / :meth:`~OrchestratorBase.get_path`, and
+progress-watcher plumbing.  Everything else in ``pipeline_orchestrators/``
+inherits from it.
+
+**Single-experiment pipelines**
+
+:class:`PipelineOrchestrator` adds stop/cancel logic and the
+``wrap_in_thread`` interface used by the GUI.
+
+:class:`ChannelPipelineOrchestrator` further narrows the scope to a single
+channel: its :attr:`~ChannelPipelineOrchestrator.config` property
+automatically returns the section for :attr:`~ChannelPipelineOrchestrator.channel`,
+and :meth:`~ChannelPipelineOrchestrator.patch_channel` scopes config writes
+to that channel without the caller having to know the full key path.
+
+:class:`CompoundChannelPipelineOrchestrator` is the equivalent for pipelines
+that operate on a pair (or tuple) of channels, such as colocalization.
+
+**Step tracking**
+
+:class:`ProcessorSteps` is an independent ABC that tracks which pipeline
+steps have already produced on-disk outputs.  It is composed into concrete
+orchestrators that expose a binarization or graph-construction pipeline
+so the GUI can resume from the last completed step without re-running
+everything.
+
+**Multi-experiment / group analyses**
+
+:class:`GroupOrchestratorBase` sits outside the single-sample hierarchy.
+It holds a reference to an
+:class:`~ClearMap.pipeline_orchestrators.experiment_controller.AnalysisGroupController`
+and provides per-sample worker and sample-manager access, plus progress and
+threading plumbing.
+
+Relationship to the GUI
+-----------------------
+The GUI never calls processing code directly.  Instead, each
+``pipeline_orchestrators/`` tab creates and caches one or more workers
+(subclasses of the classes here) via
+:class:`~ClearMap.pipeline_orchestrators.experiment_controller.ExperimentController.get_worker`.
+Config edits made in the GUI flow through
+:class:`~ClearMap.config.config_coordinator.ConfigCoordinator` and are
+visible to workers on the next ``self.config`` access without reconstruction.
+
+Typical advanced-user pattern::
+
+    from ClearMap.pipeline_orchestrators.sample_info_management import build_sample_manager
+    from ClearMap.pipeline_orchestrators.cell_map import CellDetector
+
+    sm = build_sample_manager('/path/to/experiment')
+    detector = CellDetector(sm, cfg_coordinator, channel='cfos')
+    detector.run_cell_detection()
+    detector.filter_cells()
+    detector.atlas_align()
 """
 import sys
 import warnings
@@ -31,49 +97,137 @@ class ProcessorSteps(ABC):
     Step order is resolved fresh on every access via an injected provider
     callable, so GUI-driven reordering takes effect immediately without
     processor reconstruction.
+
+    Parameters
+    ----------
+    workspace : Workspace2
+        The workspace that owns the on-disk assets.
+    channel : str or Sequence[str]
+        Channel name(s) this step sequence operates on.
+    step_order_provider : Callable[[], tuple[str, ...]] or None
+        Optional callable that returns the current step order.  When provided
+        it is called on every access to :attr:`steps`, allowing the GUI to
+        reorder steps without reconstructing the processor.  Falls back to
+        :attr:`_default_steps` when ``None``.
     """
     _default_steps: tuple[str, ...] = ()
 
     def __init__(self, workspace: Workspace2, channel: str | Sequence[str] = '',
                  step_order_provider: Callable[[], tuple[str, ...]] | None = None):
-        """
-        Parameters
-        ----------
-        workspace
-        channel
-        step_order_provider: Callable
-        """
         self.channel: str | Sequence[str] = channel
         self.workspace: Workspace2 = workspace
         self._step_order_provider = step_order_provider
 
     @property
     def steps(self) -> tuple[str, ...]:
+        """
+        Ordered step names, resolved fresh on every access.
+
+        Returns
+        -------
+        tuple of str
+            Step names in execution order, either from the injected provider
+            or from ``_default_steps``.
+        """
         if self._step_order_provider is not None:
             return self._step_order_provider()
         return self._default_steps
 
     @abstractmethod
     def asset_from_step_name(self, step_name: str) -> Asset:
+        """
+        Return the on-disk asset that corresponds to *step_name*.
+
+        Parameters
+        ----------
+        step_name : str
+            A member of :attr:`steps`.
+
+        Returns
+        -------
+        Asset
+            The asset associated with that step.
+
+        Raises
+        ------
+        NotImplementedError
+            Must be implemented by every concrete subclass.
+        """
         raise NotImplementedError
 
     @property
     def existing_steps(self) -> list[str]:
+        """
+        Steps whose output asset already exists on disk.
+
+        Returns
+        -------
+        list of str
+            Subset of :attr:`steps` for which :meth:`step_exists` is ``True``,
+            in step order.
+        """
         return [s for s in self.steps if self.step_exists(s)]
 
     @property
     def last_step(self) -> Optional[str]:
+        """
+        The last step whose output exists on disk, or ``None``.
+
+        Returns
+        -------
+        str or None
+            Last element of :attr:`existing_steps`, or ``None`` when no step
+            has been run yet.
+        """
         existing = self.existing_steps
         return existing[-1] if existing else None
 
     def step_exists(self, step_name: str) -> bool:
+        """
+        Check whether the output asset for *step_name* exists on disk.
+
+        Parameters
+        ----------
+        step_name : str
+            A member of :attr:`steps`.
+
+        Returns
+        -------
+        bool
+            ``True`` if the corresponding asset exists.
+        """
         return self.asset_from_step_name(step_name).exists
 
     def get_next_steps(self, step_name: str) -> list[str]:
+        """
+        Return all steps that follow *step_name* in the pipeline.
+
+        Parameters
+        ----------
+        step_name : str
+            A member of :attr:`steps`.
+
+        Returns
+        -------
+        list of str
+            Steps after *step_name*, in execution order.  Empty list when
+            *step_name* is the last step.
+        """
         idx = self.steps.index(step_name)
         return list(self.steps[idx + 1:])
 
     def remove_next_steps_files(self, target_step_name: str) -> None:
+        """
+        Delete on-disk outputs for all steps that follow *target_step_name*.
+
+        Useful when a step is re-run and downstream outputs are therefore stale.
+        Warns before each deletion.
+
+        Parameters
+        ----------
+        target_step_name : str
+            The step *after* which all existing outputs will be deleted.
+        """
         for step_name in self.get_next_steps(target_step_name):
             asset = self.asset_from_step_name(step_name)
             if asset.exists:
@@ -122,6 +276,29 @@ class ProcessorSteps(ABC):
 
 
 class OrchestratorBase(BusSubscriberMixin):
+    """
+    Minimal base shared by all ClearMap processors and managers.
+
+    Owns the :class:`~ClearMap.config.config_coordinator.ConfigCoordinator`
+    reference and provides read-only config views, workspace access, and
+    optional logging plumbing.
+
+    Parameters
+    ----------
+    coordinator : ConfigCoordinator
+        Central configuration manager.  All config reads and patch submissions
+        go through this object.
+
+    Attributes
+    ----------
+    cfg_coordinator : ConfigCoordinator
+    workspace : Workspace2 or None
+        Set by concrete subclasses after the sample is loaded.
+    registration_processor : RegistrationProcessor or None
+        Injected when atlas-space operations are needed.
+    setup_complete : bool
+        ``True`` once the subclass has finished its own ``setup()`` call.
+    """
     config_name = ''
 
     def __init__(self, coordinator: "ConfigCoordinator"):  # REFACTOR: pass event_bus explicitly (don't steal from coordinator)
@@ -133,6 +310,21 @@ class OrchestratorBase(BusSubscriberMixin):
         self.setup_complete: bool = False
 
     def get_alignment_ref_channel_reg_cfg(self) -> Mapping[str, Any]:
+        """
+        Return the registration config for the alignment reference channel.
+
+        Delegates to ``self.registration_processor.ref_channel_cfg``.
+
+        Returns
+        -------
+        Mapping[str, Any]
+            Read-only view of the reference channel's registration section.
+
+        Raises
+        ------
+        ValueError
+            If ``registration_processor`` has not been injected.
+        """
         if not getattr(self, 'registration_processor'):
             raise ValueError(f'{self.__class__.__name__} cannot call '
                              f'get_alignment_ref_channel_reg_cfg() without a registration_processor attribute')
@@ -144,6 +336,31 @@ class OrchestratorBase(BusSubscriberMixin):
          'prefix': 'sample_id'}
     )
     def get(self, asset_type, channel='current', asset_sub_type=None, **kwargs):   # channel and asset_sub_type defined for completion
+        """
+        Retrieve a workspace asset by type and channel.
+
+        Parameters
+        ----------
+        asset_type : str
+            Logical asset type, e.g. ``'stitched'``, ``'cells'``, ``'atlas'``.
+        channel : str, optional
+            Channel name.  Defaults to ``'current'``, which concrete subclasses
+            resolve to their active channel.
+        asset_sub_type : str or None, optional
+            Optional sub-type qualifier, e.g. ``'raw'``, ``'filtered'``.
+        **kwargs
+            Forwarded to :meth:`~ClearMap.IO.workspace2.Workspace2.get`.
+
+        Returns
+        -------
+        Asset
+            The workspace asset object.
+
+        Raises
+        ------
+        ClearMapRuntimeError
+            If the workspace has not been initialised yet.
+        """
         if self.workspace is None:
             raise ClearMapRuntimeError(f'Cannot call {self.__class__.__name__}.get without a workspace. '
                                        f'Please ensure it is assigned by calling {self.__class__.__name__}.setup() '
@@ -152,6 +369,25 @@ class OrchestratorBase(BusSubscriberMixin):
         return asset
 
     def get_path(self, asset_type, channel='current', asset_sub_type=None, **kwargs):   # channel and asset_sub_type defined for completion
+        """
+       Shortcut that returns the filesystem path of a workspace asset.
+
+       Parameters
+       ----------
+       asset_type : str
+           Logical asset type.
+       channel : str, optional
+           Channel name.
+       asset_sub_type : str or None, optional
+           Optional sub-type qualifier.
+       **kwargs
+           Forwarded to :meth:`get`.
+
+       Returns
+       -------
+       Path
+           The path of the requested asset.
+       """
         return self.get(asset_type, channel=channel, asset_sub_type=asset_sub_type, **kwargs).path
 
     def filename(self, *args, **kwargs):  # WARNING: deprecated
@@ -182,22 +418,49 @@ class OrchestratorBase(BusSubscriberMixin):
 
     @property
     def registration_config(self):
+        """
+        Read-only view of the ``registration`` config section.
+
+        Returns
+        -------
+        Mapping[str, Any]
+        """
         return self.cfg_coordinator.get_config_view('registration')
 
     @property
     def config(self) -> Mapping[str, Mapping[str, Any]]:
         """
-        Return an always fresh, read-only snapshot,
-        to discourage mutation outside a session
+        Always-fresh, read-only snapshot of this processor's config section.
+
+        The section is identified by :attr:`config_name`.
+
+        Returns
+        -------
+        MappingProxyType
+            Immutable view; request again to get the latest values after a patch.
         """
         return MappingProxyType(self.cfg_coordinator.get_config_view(self.config_name))
 
     @property
     def machine_config(self):
+        """
+        Read-only view of the ``machine`` (global params) config section (verbosity, start_folder, font_size…).
+
+        Returns
+        -------
+        Mapping[str, Any]
+        """
         return self.cfg_coordinator.get_config_view('machine')
 
     @property
     def verbose(self):
+        """
+        ``True`` when the machine verbosity is set to ``'debug'``.
+
+        Returns
+        -------
+        bool
+        """
         return self.machine_config['verbosity'] == 'debug'
 
     def setup_if_needed(self):
@@ -249,6 +512,20 @@ class PipelineOrchestrator(OrchestratorBase):
             self.setup()
 
     def setup(self, sample_manager: Optional["SampleManager"] = None):
+        """
+         Attach a sample manager and mark this processor as ready.
+
+         Parameters
+         ----------
+         sample_manager : SampleManager, optional
+             If provided, replaces the currently stored sample manager.
+             When ``None``, the previously stored instance is reused.
+
+         Raises
+         ------
+         ValueError
+             If the config section identified by :attr:`config_name` is absent.
+         """
         self.sample_manager = sample_manager if sample_manager else self.sample_manager
         if not self.cfg_coordinator.get_config_view(self.config_name):
             raise ValueError(f'Config section "{self.config_name}" not found in config coordinator')
@@ -260,17 +537,52 @@ class PipelineOrchestrator(OrchestratorBase):
             warnings.warn(f'Sample manager not setup yet. Cannot setup {self.__class__.__name__}.')
 
     def set_progress_watcher(self, watcher):
+        """
+        Attach a progress watcher that drives progress-bar updates.
+
+        Parameters
+        ----------
+        watcher : ProgressWatcher
+            Watcher instance whose ``increment``, ``increment_main_progress``
+            and ``main_step_name`` interface will be used.
+        """
+
         self.progress_watcher = watcher
 
     def update_watcher_progress(self, val):
+        """
+        Increment the sub-step progress bar by *val*.
+
+        Parameters
+        ----------
+        val : int
+            Number of units to add.
+        """
         if self.progress_watcher is not None:
             self.progress_watcher.increment(val)
 
     def update_watcher_main_progress(self, val=1):
+        """
+        Increment the main (top-level) progress bar by *val*.
+
+        Parameters
+        ----------
+        val : int, optional
+            Number of main steps completed.  Default is 1.
+        """
+
         if self.progress_watcher is not None:
             self.progress_watcher.increment_main_progress(val)
 
     def set_watcher_step(self, step_name):
+        """
+        Update the displayed step name in the progress dialog.
+
+        Parameters
+        ----------
+        step_name : str
+            Human-readable name of the current processing step.
+        """
         if self.progress_watcher is not None:
             self.progress_watcher.main_step_name = step_name
 
@@ -296,6 +608,14 @@ class PipelineOrchestrator(OrchestratorBase):
                 self.update_watcher_main_progress()
 
     def stop_process(self):  # REFACTOR: put in parent class ??
+        """
+        Request cancellation of the current processing step.
+
+        Sets :attr:`stopped` to ``True`` and attempts to shut down any running
+        executor or subprocess attached to the workspace.  Raises
+        :exc:`CanceledProcessing` when a subprocess is terminated.
+        """
+
         self.stopped = True
         if executor := getattr(self.workspace, 'executor', None):
             if sys.version_info[:2] >= (3, 9):
@@ -312,6 +632,14 @@ class PipelineOrchestrator(OrchestratorBase):
             raise CanceledProcessing
 
     def run(self):
+        """
+        Execute the full processing pipeline for this orchestrator.
+
+        Raises
+        ------
+        NotImplementedError
+            Must be implemented by every concrete subclass.
+        """
         raise NotImplementedError
 
     # def setup(self):
@@ -361,6 +689,21 @@ class ChannelPipelineOrchestrator(PipelineOrchestrator):
         return deep_freeze(section)
 
     def patch_channel(self, patch: dict, *, origin: str = "") -> None:
+        """
+        Submit a config patch scoped to the current channel.
+
+        The patch is automatically nested under
+        ``{config_name}.channels.{channel}`` before being forwarded to the
+        coordinator.
+
+        Parameters
+        ----------
+        patch : dict
+            Flat-or-nested dict of values to update for this channel.
+        origin : str, optional
+            Human-readable description of the call site, used for audit
+            logging.  Inferred from the call stack when empty.
+        """
         self.cfg_coordinator.submit_patch(
             {self.config_name: {"channels": {self.channel: patch}}},
             sample_manager=self.sample_manager,
@@ -434,18 +777,52 @@ class GroupOrchestratorBase:
         self._wrap_in_thread: Optional[Callable] = None
 
     def set_progress_watcher(self, watcher) -> None:
+        """
+        Attach a progress watcher for GUI progress-bar updates.
+
+        Parameters
+        ----------
+        watcher : ProgressWatcher
+        """
         self._progress_watcher = watcher
 
     def set_thread_wrapper(self, wrapper_callable: Callable) -> None:
-        """Typically main_window.wrap_in_thread; falls back to sync if not set."""
+        """
+        Inject the GUI thread-wrapping helper (to keep the UI responsive).
+
+        Parameters
+        ----------
+        wrapper_callable : Callable
+            Typically ``main_window.wrap_in_thread``.  Falls back to
+            synchronous execution when not set.
+        """
         self._wrap_in_thread = wrapper_callable
 
     @property
     def groups(self) -> dict[str, list[str]]:
+        """
+        Mapping of group name → list of experiment source-directory paths.
+
+        Returns
+        -------
+        dict[str, list[str]]
+        """
         return self.group_controller.groups
 
     @property
     def results_folder(self) -> Path:
+        """
+        Root directory where group-level outputs are written.
+
+        Returns
+        -------
+        Path
+
+        Raises
+        ------
+        ValueError
+            If ``results_folder`` has not been set via the group controller.
+        """
         return self.group_controller.group_base_dir
 
     def _any_sample_in(self, group_name: str) -> Path:
@@ -464,13 +841,51 @@ class GroupOrchestratorBase:
         return self._wrap_in_thread(func, *args, **kwargs)
 
     def get_worker_for_sample(self, sample_src_dir: str | Path, pipeline: str, *, channel=None, substep=None):
+        """
+        Return the pipeline worker for a specific sample directory.
+
+        Parameters
+        ----------
+        sample_src_dir : str or Path
+            Root directory of the experiment.
+        pipeline : str
+            Pipeline name, e.g. ``'cell_map'``, ``'registration'``.
+        channel : str or None, optional
+            Channel key (required for per-channel pipelines).
+        substep : str or None, optional
+            Substep key (required for multi-substep pipelines such as vasculature).
+
+        Returns
+        -------
+        PipelineOrchestrator
+            The worker for that sample + pipeline combination.
+        """
         return self.group_controller.get_worker(sample_src_dir, pipeline, channel=channel, substep=substep)
 
     def get_sample_manager_for(self, sample_src_dir: str | Path):
+        """
+        Return the SampleManager for a specific experiment directory.
+
+        Parameters
+        ----------
+        sample_src_dir : str or Path
+            Root directory of the experiment.
+
+        Returns
+        -------
+        SampleManager
+        """
         return self.group_controller.get_sample_manager(sample_src_dir)
 
     def run(self):
-        """Implement in subclasses if you want a one-shot entrypoint."""
+        """
+         Execute the group-level analysis.
+
+         Raises
+         ------
+         NotImplementedError
+             Must be implemented by concrete subclasses.
+         """
         raise NotImplementedError
 
 

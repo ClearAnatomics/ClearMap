@@ -1,24 +1,89 @@
 """
-Asset
-=====
+workspace_asset
+===============
 
-This module implements the Asset class that is used to represent the files and folders of a workspace.
+On-disk asset model for ClearMap workspaces.
 
-The Asset class can represent Sources in which case it wraps the IO functions to read and write the data.
-It is however not limited to Sources and can represent any file or folder of the workspace.
-It also includes the following features:
+Concepts
+--------
 
-* awareness of the content type (e.g. nuclei, veins, arteries, cells, axons, ...) and hence the algorithms applicable.
-* awareness of the resource type (e.g. data, results, graphs, ...) and hence the sub folder to store the asset in.
-* Transparent compression and decompression
-* alternate extensions.
-* checksums
-* alternate file names (shortcuts)
+**Asset**
+    A single logical file or folder that belongs to a processing pipeline step.
+    Assets can be but are not limited to Sources.
+    An :class:`Asset` knows its location on disk, its format, which pipeline it
+    belongs to, and whether it currently exists.  It wraps the ClearMap IO layer
+    so callers can do ``asset.read()``, ``asset.write(data)``, or
+    ``asset.as_source()`` without caring about the underlying format.
+    Assets also transparently implement:
+    * awareness of the content type (e.g. nuclei, veins, arteries, cells, axons, ...) and hence the algorithms applicable.
+    * awareness of the resource type (e.g. data, results, graphs, ...) and hence the sub folder to store the asset in.
+    * Transparent compression and decompression
+    * alternate extensions.
+    * checksums
+    * alternate file names (shortcuts)
 
-In the future, it will also include:
+**TypeSpec** (defined in :mod:`ClearMap.IO.assets_specs`)
+    Describes a *kind* of asset independent of any channel — its resource type
+    (``'raw'``, ``'processed'``, ``'results'``, …), allowed file extensions, the
+    relevant pipelines, and optional sub-types (e.g. ``cells_raw``,
+    ``cells_filtered``).  One ``TypeSpec`` instance is shared across all channels
+    that have that step.
 
-* status (debug, ...)
-* list of parent assets with the parametrised function to generate them
+**ChannelSpec** (defined in :mod:`ClearMap.IO.assets_specs`)
+    Describes a *channel* independent of any step — its name (e.g.
+    ``'cfos'``), content type (``'nuclei'``, ``'autofluorescence'``, …), and
+    ordinal index.  The content type determines which pipeline applies, via the
+    mapping in :mod:`ClearMap.IO.assets_constants`.
+
+**Asset type registry** (:data:`~ClearMap.IO.assets_constants.CHANNELS_ASSETS_TYPES_CONFIG`)
+    The canonical dictionary that lists every known asset type (``'raw'``,
+    ``'stitched'``, ``'cells'``, ``'density'``, …) together with its
+    ``TypeSpec`` parameters.  :class:`~ClearMap.IO.workspace2.Workspace2`
+    reads this dictionary at construction time and builds the full set of
+    ``TypeSpec`` objects for the experiment.
+
+**Resource type → folder mapping** (:data:`~ClearMap.IO.assets_constants.RESOURCE_TYPE_TO_FOLDER`)
+    Controls where each resource type lives under the experiment root.
+    ``'raw'`` and ``'elastix'`` default to the root directory; ``'results'``,
+    ``'graphs'``, etc. go into sub-folders.  Advanced users can override this
+    mapping per-workspace via
+    :meth:`~ClearMap.IO.workspace2.Workspace2.sync_resource_type_to_folder`.
+
+**AssetCollection**
+    Groups all assets that belong to a single channel into one dict-like object.
+    A :class:`~ClearMap.IO.workspace2.Workspace2` holds one
+    :class:`AssetCollection` per channel (plus a global one keyed ``None`` for
+    logs and other non-channel assets).
+
+Asset sub-classes
+-----------------
+:class:`Asset.__new__` inspects the expression pattern and promotes the
+instance to the most specific subclass automatically:
+
+* :class:`TiledAsset` — expression contains ``<X…>`` and/or ``<Y…>`` tags
+  (2-D tile grid, e.g. light-sheet mosaic acquisitions).
+* :class:`StackedAsset` — expression contains only a ``<Z…>`` tag
+  (single z-stack stored as individual planes).
+* :class:`ExpressionAsset` — any other tagged expression (parent class of the
+  two above; also used directly for non-spatial series).
+* :class:`Asset` — plain file or folder, no expression tags.
+
+Typical usage
+-------------
+Assets are normally obtained through the workspace, not constructed directly::
+
+    ws = Workspace2('/path/to/experiment')
+    raw  = ws.get('raw',      channel='cfos')
+    stitched = ws.get('stitched', channel='cfos')
+
+    if raw.is_tiled:
+        print(raw.file_list[:5])      # list of matching files on disk
+        print(raw.tile_grid_shape)    # e.g. array([3, 4])
+
+    if stitched.exists:
+        data = stitched.read()        # returns numpy array
+    else:
+        print(stitched.path)          # where it will be written
 
 .. todo::
     * Add support for status (debug, ...) link workspace status to asset status

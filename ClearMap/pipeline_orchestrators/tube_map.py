@@ -1,11 +1,76 @@
 #!/usr/bin/env python2
 # -*- coding: utf-8 -*-
 """
-TubeMap
-=======
+tube_map
+========
 
-This module contains the classes to generate annotated graphs from vasculature
-lightsheet data [Kirst2020]_.
+Vasculature binarization, graph construction, and vessel-type annotation.
+
+Two pipeline workers are defined here:
+
+:class:`BinaryVesselProcessor`
+    Converts raw fluorescence volumes into a binary vascular mask.
+    Steps (configurable order via the GUI pipeline widget):
+
+    1. **Binarize** — multi-path thresholding
+       (:mod:`~ClearMap.ImageProcessing.Experts.Vasculature`).
+    2. **Smooth** — topology-preserving binary smoothing.
+    3. **Fill** — parallel 3-D binary hole filling.
+    4. **Deep fill** — CNN-based hollow-tube filling
+       (:mod:`~ClearMap.ImageProcessing.machine_learning.vessel_filling`).
+
+    Multiple channels (e.g. all-vessels + arteries) are merged by
+    :meth:`~BinaryVesselProcessor.combine_binary`.
+    Step state is tracked by :class:`BinaryVesselProcessorSteps`.
+
+:class:`VesselGraphProcessor`
+    Converts the combined binary mask into an annotated vascular graph:
+
+    1. **Skeletonize** — topology-preserving 3-D thinning.
+    2. **Build** — raw graph from skeleton, radius measurement, artery/vein
+       expression sampling.
+    3. **Clean** — clique removal.
+    4. **Reduce** — degree-2 vertex contraction; edge geometry stored.
+    5. **Register** — atlas-space transform, radius scaling, annotation,
+       distance-to-surface labelling.
+    6. **Post-process** — iterative artery/vein hysteresis tracing.
+
+    Step state is tracked by :class:`VesselGraphProcessorSteps`.
+
+Radius units
+------------
+The graph processor handles three legacy precision levels
+(:class:`VesselGraphProcessor.RadiusLevel`):
+
+* **FULL** — spacing + per-axis µm radii (current).
+* **SCALAR_UM** — spacing + scalar µm radii (intermediate legacy).
+* **VOXELS** — voxel-space radii only (old graphs, :class:`DeprecationWarning` emitted).
+
+Typical usage
+-------------
+Both workers are accessed via
+:class:`~ClearMap.pipeline_orchestrators.experiment_controller.ExperimentController`::
+
+    binary = exp_ctrl.get_worker('vasculature', substep='binary')
+    graph  = exp_ctrl.get_worker('vasculature', substep='graph')
+
+    binary.binarize()
+    binary.postprocess('vessels')
+    binary.combine_binary()
+
+    graph.skeletonize_and_build_graph(binary_processor=binary)
+    graph.clean_graph()
+    graph.reduce_graph()
+    graph.register()
+    graph.post_process()
+
+See also
+--------
+:mod:`ClearMap.ImageProcessing.Experts.Vasculature` : Binarization algorithms.
+:mod:`ClearMap.ImageProcessing.machine_learning.vessel_filling` : CNN vessel filling.
+:mod:`ClearMap.Analysis.graphs.graph_processing` : Graph construction and reduction.
+:class:`~ClearMap.Analysis.graphs.graph_gt.Graph` : Graph data structure.
+[Kirst2020]_.
 """
 from __future__ import annotations
 

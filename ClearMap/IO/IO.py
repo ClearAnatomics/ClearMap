@@ -3,12 +3,132 @@
 IO
 ==
 
-IO interface to read files as sources.
+Unified IO interface for all ClearMap data sources.
 
-This is the main module to distribute the reading and writing of 
-individual data formats to the specialized submodules.
-  
-See :mod:`ClearMap.IO` for details.
+This module is the single entry point for reading, writing, and inspecting
+data in any format that ClearMap understands.  It dispatches every call to the
+appropriate format-specific sub-module based on the type or file extension of
+the source, so calling code never needs to import ``TIF``, ``MMP``, ``NPY``,
+etc. directly.
+
+Supported formats
+-----------------
+
+.. list-table::
+   :header-rows: 1
+   :widths: 15 20 65
+
+   * - Extension
+     - Module
+     - Notes
+   * - ``.npy``
+     - :mod:`~ClearMap.IO.MMP`
+     - Memory-mapped NumPy arrays (default for large 3-D volumes)
+   * - ``.tif`` / ``.tiff``
+     - :mod:`~ClearMap.IO.TIF`
+     - Single files and file-list expressions
+   * - ``.nrrd`` / ``.nrdh``
+     - :mod:`~ClearMap.IO.NRRD`
+     -
+   * - ``.mhd``
+     - :mod:`~ClearMap.IO.MHD`
+     - MetaImage header + raw data
+   * - ``.csv``
+     - :mod:`~ClearMap.IO.CSV`
+     - Point / coordinate tables
+   * - ``.gt``
+     - :mod:`~ClearMap.IO.GT`
+     - graph-tool graphs (optional dependency)
+   * - ``<tag expression>``
+     - :mod:`~ClearMap.IO.FileList`
+     - Ordered lists of files matched by a tag expression
+   * - ``np.ndarray``
+     - :mod:`~ClearMap.IO.NPY`
+     - In-memory NumPy arrays
+   * - ``np.memmap``
+     - :mod:`~ClearMap.IO.MMP`
+     - Memory maps passed directly
+   * - shared memory
+     - :mod:`~ClearMap.IO.SMA`
+     - Shared-memory arrays for parallel processing
+
+Source routing
+--------------
+:func:`source_to_module` maps any source specification to its handler module:
+
+* A :class:`~ClearMap.IO.Source.Source` instance → the module that created it.
+* A ``str`` or :class:`~ClearMap.Utils.tag_expression.Expression` →
+  :func:`location_to_module` (file-list expression, or extension lookup).
+* A ``np.ndarray`` / ``list`` / ``tuple`` →
+  :mod:`~ClearMap.IO.SMA` if in shared memory, else :mod:`~ClearMap.IO.NPY`.
+* A ``np.memmap`` → :mod:`~ClearMap.IO.MMP`.
+
+Core functions
+--------------
+
+**Reading and writing**
+
+.. code-block:: python
+
+    import ClearMap.IO.IO as io
+
+    data  = io.read('signal.tif')            # returns np.ndarray
+    data  = io.read('volume.npy',
+                    slicing=(slice(0, 100),)) # sub-slice
+    io.write('output.tif', data)
+
+**Source objects** — richer than raw arrays; carry shape, dtype, and location:
+
+.. code-block:: python
+
+    src = io.as_source('volume.npy')
+    print(src.shape, src.dtype, src.order)
+    data = src[10:20, :, :]               # lazy slicing
+
+**Initialising a sink** before parallel workers write into it:
+
+.. code-block:: python
+
+    # Open existing file or create it if absent
+    sink = io.initialize('counts.npy',
+                         shape_=(512, 512, 256),
+                         dtype_=np.uint16,
+                         order_='F')
+
+**File-list expressions** — match tiles with tag patterns:
+
+.. code-block:: python
+
+    files = io.file_list('raw/tile_<X,2>_<Y,2>.tif')
+
+**Bulk conversion** between formats (parallelised):
+
+.. code-block:: python
+
+    io.convert_files(files, extension='.npy', processes=8)
+
+Property helpers
+----------------
+:func:`shape`, :func:`dtype`, :func:`order`, :func:`location`,
+:func:`element_strides`, :func:`memory`, :func:`buffer` —
+each accepts any source specification (path, array, or
+:class:`~ClearMap.IO.Source.Source`) and returns the corresponding attribute
+without requiring the caller to construct a Source explicitly.
+
+File-path utilities
+-------------------
+The following functions from :mod:`~ClearMap.IO.FileUtils` are re-exported
+here for convenience:
+``is_file``, ``is_directory``, ``file_extension``, ``join``, ``split``,
+``abspath``, ``create_directory``, ``delete_directory``, ``copy_file``,
+``link_file``, ``delete_file``.
+
+See also
+--------
+:mod:`ClearMap.IO.Source` : Base Source class and AbstractSource / VirtualSource.
+:mod:`ClearMap.IO.MMP`    : Memory-mapped arrays (primary large-data format).
+:mod:`ClearMap.IO.FileList` : Tag-expression file lists.
+:mod:`ClearMap.IO.workspace2` : High-level asset management built on top of this module.
 """
 __author__ = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
 __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'

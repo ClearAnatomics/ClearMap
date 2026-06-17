@@ -1,18 +1,87 @@
 """
-This module is meant to replace the workspace module in ClearMap2.
-The main difference is the support for an unlimited number of channels.
-This is achieved by having a channel centered approach instead of a processing step centered approach.
+workspace2
+==========
 
-The file types are now context dependant. There is no more "raw" or "stitched" files but the user defines
-the channel prefix and the type (step) of the file so that there can be multiple files of the same type
-depending on the channel.
+Channel-centred workspace for ClearMap experiments.
 
-The `file_type_to_name` dictionaries have thus been extensively modified to reflect this change.
+A :class:`Workspace2` is the single source of truth for **where every
+pipeline output lives on disk**.  It maps *(channel, asset_type)* pairs to
+:class:`~ClearMap.IO.workspace_asset.Asset` objects, which know their path,
+format, and existence status and can read/write data directly.
 
-The workspace is now based on a collection of Asset objects that handle the data themselves.
-The workspace is now also fully stateful.
+Key concepts
+------------
 
-The "debug" mode is now a context manager that supports different contexts and is not restricted to debug mode.
+Channels
+    A channel is a named acquisition stream (e.g. ``'cfos'``,
+    ``'autofluorescence'``).  Each channel has a *content type*
+    (``'nuclei'``, ``'vessels'``, …) that determines which pipeline applies.
+    See :data:`~ClearMap.IO.assets_constants.CONTENT_TYPE_TO_PIPELINE`.
+
+Asset types
+    Each step in a pipeline produces a named asset type: ``'raw'``,
+    ``'stitched'``, ``'resampled'``, ``'cells'``, ``'density'``, etc.
+    Sub-types (e.g. ``'cells_raw'``, ``'cells_filtered'``) refine the step
+    further.  The full registry is
+    :data:`~ClearMap.IO.assets_constants.CHANNELS_ASSETS_TYPES_CONFIG`.
+
+Resource layout
+    Assets are stored under the experiment root according to a
+    *resource type → sub-folder* mapping
+    (:data:`~ClearMap.IO.assets_constants.RESOURCE_TYPE_TO_FOLDER`).
+    The layout can be customised per-workspace via
+    :meth:`Workspace2.sync_resource_type_to_folder`.
+
+State (debug mode)
+    The workspace has a :attr:`Workspace2.debug` flag managed by a
+    :class:`~ClearMap.IO.assets_specs.StateManager` context manager.  When
+    set, asset paths automatically point to a debug sub-tree so test runs
+    never overwrite production data.
+
+Persistence
+    :meth:`Workspace2.to_yaml` / :meth:`Workspace2.from_yaml` serialise and
+    restore the full workspace layout — channel specs, asset type definitions,
+    and the resource-type-to-folder mapping — without touching the data files
+    themselves.
+
+Typical usage
+-------------
+Workspaces are normally created and managed by
+:class:`~ClearMap.pipeline_orchestrators.sample_info_management.SampleManager`.
+Advanced users who want direct access::
+
+    from ClearMap.IO.workspace2 import Workspace2
+
+    ws = Workspace2.from_yaml('/path/to/experiment/workspace.yml')
+
+    # Retrieve an asset and check whether it exists
+    stitched = ws.get('stitched', channel='cfos')
+    if stitched.exists:
+        data = stitched.read()       # returns a numpy array / Source
+
+    # Retrieve a tiled raw dataset
+    raw = ws.get('raw', channel='cfos')
+    if raw.is_tiled:
+        print(raw.tile_grid_shape)   # e.g. array([3, 4])
+        print(raw.file_list[:3])     # first few tile paths
+
+    # Add a new channel programmatically
+    ws.add_raw_data(
+        file_path='raw/cfos_<X,2>_<Y,2>.tif',
+        channel_id='cfos',
+        data_content_type='nuclei',
+    )
+
+    # Inspect the workspace
+    print(ws.info())
+
+See also
+--------
+:mod:`ClearMap.IO.workspace_asset` : Asset, TiledAsset, StackedAsset classes.
+:mod:`ClearMap.IO.assets_constants` : Asset type registry and resource layout defaults.
+:mod:`ClearMap.IO.assets_specs` : TypeSpec, ChannelSpec, StateManager.
+:class:`~ClearMap.pipeline_orchestrators.sample_info_management.SampleManager` :
+    High-level manager that creates and reconciles the workspace from config.
 """
 from __future__ import annotations
 

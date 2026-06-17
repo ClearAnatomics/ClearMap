@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-CellMap
-=======
+cell_map
+========
 
-This module contains the class to analyze (detect) individual cells,
-e.g. to analyze immediate early gene expression data from iDISCO+ cleared tissue [Renier2016]_.
+Per-channel cell detection, filtering, atlas alignment, and density mapping.
 
+:class:`CellDetector` is the pipeline worker for the CellMap pipeline, initially
+developped to analyze immediate early gene expression data from iDISCO+ cleared tissue [Renier2016]_.
 
 .. image:: ../static/cell_abstract_2016.jpg
    :target: https://doi.org/10.1016/j.cell.2020.01.028
@@ -16,6 +17,66 @@ e.g. to analyze immediate early gene expression data from iDISCO+ cleared tissue
 
   iDISCO+ and ClearMap: A Pipeline for Cell Detection, Registration, and 
   Mapping in Intact Samples Using Light Sheet Microscopy.
+
+
+`CellDetector` processes a single fluorescence channel through the following steps:
+
+1. **Cell detection** (:meth:`~CellDetector.run_cell_detection`) —
+   background subtraction, maxima detection, and shape-based watershed
+   segmentation via :mod:`~ClearMap.ImageProcessing.Experts.Cells`.
+   Produces a raw cell table (``cells_raw``).
+2. **Filtering** (:meth:`~CellDetector.filter_cells`) —
+   thresholds on size and intensity; optional cortical-surface crust
+   removal.  Produces a filtered table (``cells_filtered``).
+3. **Atlas alignment** (:meth:`~CellDetector.atlas_align`) —
+   transforms coordinates into atlas space via Elastix and annotates
+   each cell with brain-region labels, hemisphere, and structure volume.
+   Produces a per-cell Feather table.
+4. **Voxelization** (:meth:`~CellDetector.voxelize`) —
+   rasterises cell positions (with optional intensity weighting) into a
+   density volume at atlas resolution for group statistics.
+5. **Statistics export** (:meth:`~CellDetector.export_collapsed_stats`) —
+   aggregates per-cell data into a per-structure CSV with counts, average
+   size, and volumes for both hemispheres.
+
+Configuration
+-------------
+Parameters are read from the ``cell_map`` config section:
+
+* ``detection.background_correction.diameter``
+* ``detection.maxima_detection.shape`` / ``h_max``
+* ``detection.shape_detection.threshold``
+* ``cell_filtration.thresholds.size`` / ``intensity``
+* ``voxelization.radii``
+
+Typical usage
+-------------
+Instances are normally created via
+:class:`~ClearMap.pipeline_orchestrators.experiment_controller.ExperimentController`::
+
+    detector = exp_ctrl.get_worker('cell_map', channel='cfos')
+    detector.run_cell_detection()
+    detector.filter_cells()
+    detector.atlas_align()
+    detector.voxelize()
+    detector.export_collapsed_stats()
+
+For scripted use without the GUI::
+
+    from ClearMap.pipeline_orchestrators.sample_info_management import build_sample_manager
+    from ClearMap.pipeline_orchestrators.cell_map import CellDetector
+
+    sm  = build_sample_manager('/path/to/experiment')
+    det = CellDetector(sm, sm.cfg_coordinator,
+                       channel='cfos', registration_processor=reg)
+    det.run_cell_detection()
+
+See also
+--------
+:mod:`ClearMap.ImageProcessing.Experts.Cells` : Low-level detection algorithms.
+:class:`~ClearMap.pipeline_orchestrators.registration_orchestrator.RegistrationProcessor` :
+    Required for atlas alignment.
+:mod:`ClearMap.Analysis.Measurements.Voxelization` : Density-map generation.
 """
 from __future__ import annotations
 
