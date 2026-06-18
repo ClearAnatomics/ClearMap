@@ -6,7 +6,7 @@ MultipleComparisonCorrection
 Correction methods for multiple comparison tests.
 """
 __author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>, Charly Rousseau <charly.rousseau@icm-institute.org>'
-__license__   = 'GPLv3 - GNU General Pulic License v3 (see LICENSE.txt)'
+__license__   = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__   = 'https://idisco.info'
 __download__  = 'https://www.github.com/ChristophKirst/ClearMap2'

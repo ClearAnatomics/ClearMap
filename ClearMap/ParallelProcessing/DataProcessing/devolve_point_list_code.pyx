@@ -11,7 +11,7 @@ Note
 This process is useful for integrating or visualizing points as densities.
 """
 __author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>, Charly Rousseau <charly.rousseau@icm-institute.org>'
-__license__   = 'GPLv3 - GNU General Pulic License v3 (see LICENSE)'
+__license__   = 'GPLv3 - GNU General Public License v3 (see LICENSE)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__   = 'https://idisco.info'
 __download__  = 'https://github.com/ClearAnatomics/ClearMap'

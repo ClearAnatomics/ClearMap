@@ -7,7 +7,7 @@ This module uses a convolutional neuronal network to fill empty tubes
 and vessels.
 """
 __author__ = 'Sophie Skriabine, Christoph Kirst <christoph.kirst.ck@gmail.com>'
-__license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
+__license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://github.com/ClearAnatomics/ClearMap'
