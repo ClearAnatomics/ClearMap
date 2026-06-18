@@ -500,13 +500,10 @@ class PipelineOrchestrator(OrchestratorBase):
     def setup_if_needed(self):
         """
 
-          .. warnings::
+          .. warning::
 
                 This assumes self.channel is set if needed!
                 and self.registration_processor is set if needed!
-        Returns
-        -------
-
         """
         if not self.setup_complete and self.sample_manager is not None:
             self.setup()
