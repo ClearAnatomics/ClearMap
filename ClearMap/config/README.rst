@@ -1,35 +1,76 @@
 config
 ======
 
-This package contains both the modules to handle the configuration and the default configuration files
+This package manages ClearMap's configuration system: loading, merging,
+validating, and persisting YAML/CFG/JSON configuration files.
+
 ------------------------------------------------------------------------------------------------------
 
-Composition:
+Composition
+===========
 
-config_loader
-    The module that parses the configuration in different formats
+config_handler
+    Core resolution and IO for configuration files.
+    Maps logical section names (``'sample'``, ``'cell_map'``, …) to
+    filesystem paths, supporting alternative file names, version-aware
+    folder layouts, and multiple formats (YAML, ConfigObj, JSON).
+    Also defines ``ConfigProxy`` (a dict with ``write()`` / ``reload()``),
+    ``ConfigAlternativesRegistry`` (canonical section names and aliases),
+    and the format-specific reader/writer functions.
 
-update_Config
-    The module to update the default configuration in ~/.clearmap when changing versions
+config_coordinator
+    Central in-memory working model for the whole application config.
+    Provides ``submit_patch()`` / ``submit()`` as the single write path
+    (apply → adjust → validate → commit), thread-safe via ``RLock``.
+    Publishes ``CfgChanged`` and ``ChannelsChanged`` events on the bus
+    after every committed write.
 
-machine_params
-    The preferences that are machine specific (number of cores, start path...)
+config_repository
+    File I/O and atomic commit layer.  Translates logical section names
+    to paths via ``ConfigHandler``, loads all known sections, and writes
+    atomically (temp file → rename).  Also handles cloning from a
+    template directory and copying from packaged defaults.
 
-display_params
-    Configuration of the default for visual attributes (e.g. fonts). Unlikely to be edited by the user.
+defaults_provider
+    Loads per-section default configs with a three-level precedence:
+    user YAML (``~/.clearmap/defaults/``), packaged YAML, code fallback.
+    Optionally validates defaults against JSON schemas.
 
-default_sample_params
-    The file to be stored in .clearmap and serve as the base for parameters of the current sample
+config_adjusters/
+    Adjuster engine that derives dependent config fields from the current
+    working model (e.g. inferring registration channels from sample
+    config...).  Adjusters are pure and
+    idempotent; called automatically by ``ConfigCoordinator`` after each
+    patch.
 
-default_alignment_params
-    The file to be stored in .clearmap and serve as the base for parameters of the stitching
-    and the atlas registration
+validators/
+    JSON-schema-based validation for each config section.
+    Schemas live in ``config/schemas/v3.1/``.  ``validate_all()`` is called
+    by ``ConfigCoordinator.validate()`` before every commit.
 
-default_cell_map_params
-    The file to be stored in .clearmap and serve as the base for parameters of cell detection
+update_config
+    Migration utilities to upgrade config files from older ClearMap
+    versions to the current layout.
 
-default_vasculature_params
-    The file to be stored in .clearmap and serve as the base for parameters of vasculature analysis
+atlas
+    Atlas name/ID/resolution registry used by the registration UI.
 
-default_batch_params
-    The file to be stored in .clearmap and serve as template for batch processing
+compound_keys
+    ``PairKey`` — a canonical ordered-pair key for colocalization channel
+    pairs.
+
+change_detection
+    Helpers that inspect a set of changed config keys (from a
+    ``CfgChanged`` event) to determine whether tabs need rebuilding or
+    workers need reconciliation (e.g. ``channel_data_type_changed``,
+    ``channels_added_or_removed``).
+
+defaults/v3.1/
+    Packaged YAML default configs for each pipeline section, installed
+    alongside the package.  Copied into new experiment directories on
+    first open.
+
+machine_params / display_params
+    Global (non-experiment) configs for hardware preferences and display
+    defaults.  Stored in ``~/.clearmap/`` and edited via the Preferences
+    dialog.
