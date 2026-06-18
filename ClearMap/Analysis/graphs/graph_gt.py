@@ -1513,6 +1513,9 @@ class Graph(grp.AnnotatedGraph):
     def scan_gt_properties(filename: str, as_dict: bool = False):
         """
         Scan the graph-tool file for its properties without loading the entire graph.
+
+        Parameters
+        ----------
         filename : str
             The path to the graph-tool file.
         as_dict : bool
