@@ -360,7 +360,7 @@ def find_smaller_than_values(source, points, search, values, sink = None, proces
 
 def test():
   import numpy as np
-  import ClearMap.Analysis.Measurements.MeasureRadius as mr;
+  import ClearMap.Analysis.Measurements.radius_measurements as mr;
   import ClearMap.ParallelProcessing.DataProcessing.MeasurePointList as mpl
   
   from importlib import reload

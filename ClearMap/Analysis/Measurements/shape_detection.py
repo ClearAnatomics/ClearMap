@@ -14,7 +14,7 @@ and radial measurements see the modules listed below.
 See also
 --------
 :mod:`ClearMap.Analysis.Measurements.MeasureExpression` and 
-:mod:`ClearMap.Analysis.Measurements.MeasureRadius` 
+:mod:`ClearMap.Analysis.Measurements.radius_measurements`
 """
 __author__ = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
 __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
