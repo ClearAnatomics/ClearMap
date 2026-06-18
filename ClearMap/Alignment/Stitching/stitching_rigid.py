@@ -1331,16 +1331,18 @@ class Layout(SourceRegion, src.AbstractSource):
         Arguments
         ---------
         match : str or list[str] or Expression
-          Expression of source names to match and substitute.
+            Expression of source names to match and substitute.
         replace : str or list[str] or Expression
-          Expression to replace source names with.
-        method: str
-          Replacement method to interpret the match and replace arguments as
-            - list (default if `match`, and `replace` are list[str])
-            - expressions ("expression") or just
-            - raw strings to replace ("replace").
-            - 'infer' will parse the expression of the current locations,
-            set it as match and revert to expression
+            Expression to replace source names with.
+        method : str
+            Replacement method to interpret the match and replace arguments:
+
+            - ``'list'`` — direct positional substitution (default when
+              ``match`` and ``replace`` are ``list[str]``).
+            - ``'expression'`` — treat match/replace as tag expressions.
+            - ``'replace'`` — raw string replacement.
+            - ``'infer'`` — parse the expression of the current source
+              locations, use it as match, then apply expression substitution.
 
         Note
         ----
