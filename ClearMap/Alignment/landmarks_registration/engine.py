@@ -71,7 +71,7 @@ class ElastixPointFileManager:
 
 
         Returns
-        --------
+        -------
         points : array
             The points coordinates in index coords.
         """
@@ -143,13 +143,14 @@ class AlignmentTool:
         """
         Get fixed and moving points arrays
 
-        Arguments:
+        Arguments
         ---------
         as_index (bool, optional):
             Whether the output should be in index coords. Defaults to False.
              If False, the output arrays will be in physical coords.
 
-        Returns:
+        Returns
+        -------
             tuple[np.array, np.array]: fixed_pts, moving_pts
         """
         self.try_load_points()
@@ -170,13 +171,13 @@ class AlignmentTool:
     def set_points(self, fixed_points, moving_points, as_index=False):
         """Set corresponding points (index) position from n x dim point array
 
-        Arguments:
+        Arguments
         ---------
         fixed_points: np.array
             the array of moving points
-        moving: np.array
+        moving_points: np.array
             the array of moving points
-        as_index (bool, optional):
+        as_index: bool
             Whether the passed points are already in index coords. Defaults to False.
         """
         if fixed_points is not None:
