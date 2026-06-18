@@ -6,9 +6,9 @@ Colocalization
 
 This module allows to compare signal between different channels
 
-The basic idea is to exploit the data of
-- a binary mask per channel
-- a dataframe with a representative point per connected component, given in pixel coords
+The basic idea is to exploit the data of:
+  - a binary mask per channel
+  - a dataframe with a representative point per connected component, given in pixel coords
     with possibly extra measurement information for the nucleus in the respective channel,
     eg some intensity measurement.
 
@@ -56,11 +56,11 @@ from scipy.spatial.transform import Rotation
 from sklearn import neighbors
 import skimage.morphology
 
-from ClearMap.Analysis.colocalization import bbox as bounding_boxes
-from ClearMap.Analysis.colocalization.parallelism import compare
 from ClearMap.ParallelProcessing.DataProcessing.ArrayProcessing import initialize_sink
 from ClearMap.IO.MMP import Source as MemmapSource
 from ClearMap.Utils.exceptions import ClearMapValueError
+
+from ClearMap.Analysis.colocalization import bbox as bounding_boxes
 
 try:
     from ClearMap.config.config_handler import ConfigHandler
@@ -179,7 +179,7 @@ def compress_dtype(arr, signed):
 def cleanup(binary_img: np.ndarray, df: pd.DataFrame, coord_names: List[str], as_memmap: bool=False):
     """
     Return the labeled image giving exactly the connected components of binary_img
-     that correspond to a representative in dataframe.
+    that correspond to a representative in dataframe.
     This saves a lot of memory and time by not labeling the whole image.
     To further save memory, use the as_memmap argument to store the result and temporary results in a memmap
 
@@ -730,9 +730,8 @@ class Channel:
         else:
             return minima
 
-    def compare(
-        self, other_channel: Channel, blob_diameter: int, size_min: int, size_max: int, processes: int | None = None
-    ) -> pd.DataFrame:
+    def compare(self, other_channel: Channel, blob_diameter: int, size_min: int, size_max: int,
+                processes: int | None = None) -> pd.DataFrame:
         """
         Return a final colocalization report
 
@@ -764,6 +763,8 @@ class Channel:
 
         if self.coord_names != other_channel.coord_names:
             raise ValueError("The comparison of Channels with different coord_names is not implemented.")
+
+        from ClearMap.Analysis.colocalization.parallelism import compare
         return compare(
             self.binary_img,
             self.dataframe,
@@ -779,10 +780,7 @@ class Channel:
         )
 
     # for comparison/testing purposes
-    def _naive_compare(
-        self,
-        other_channel,
-    ):
+    def _naive_compare(self, other_channel):
         max_overlaps, max_overlaps_indices = self.max_blobwise_overlaps(other_channel, return_max_indices=True)
         centers_df_0 = self.centers_df()
         c0_result = centers_df_0

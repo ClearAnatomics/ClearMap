@@ -7,14 +7,13 @@ import numpy as np
 import pandas as pd
 from sklearn import neighbors
 
-from . import channel
-
-
 from ClearMap.IO import IO as io
 
 import ClearMap.ParallelProcessing.BlockProcessing as blockprocessing
 import ClearMap.ParallelProcessing.Block as block
 from ClearMap.ParallelProcessing import ParallelTraceback as ptb
+
+from . import channel
 
 
 def compare(
@@ -32,7 +31,9 @@ def compare(
     are_already_clean: tuple[bool,bool] = (False,False)
 
 ):
-    """Make a report on colocalization between two channels
+    """
+    Make a report on colocalization between two channels
+
     Parameters
     ----------
     img_0 : str | np.ndarray
