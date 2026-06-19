@@ -56,12 +56,32 @@ def adjust_group_analysis_groups(view: ConfigView, ctx: AdjustmentContext) -> Co
 )
 def adjust_batch_groups_and_comparisons(view: ConfigView, ctx: AdjustmentContext) -> ConfigPatch:
     """
-    - Normalize groups exactly like group_analysis
-    - Validate comparisons:
-        * each item must be a 2-sequence of distinct group names
-        * both groups must exist in groups
-        * de-duplicate comparisons preserving order
-      (No lexicographic canonicalization; ["A","B"] and ["B","A"] remain distinct.)
+    Normalize batch groups and validate comparisons.
+
+    Performs two main operations:
+
+    1. Normalize groups using the same logic as group_analysis.
+    2. Validate and de-duplicate comparisons:
+        - Each comparison must be a 2-sequence of distinct group names.
+        - Both groups must exist in the groups configuration.
+        - De-duplicates comparisons while preserving order.
+
+    .. note::
+
+        No lexicographic canonicalization applied; ["A","B"] and ["B","A"]
+        remain distinct.
+
+    Parameters
+    ----------
+    view : ConfigView
+        Configuration view providing access to current configuration state.
+    ctx : AdjustmentContext
+        Adjustment context containing metadata and state for this operation.
+
+    Returns
+    -------
+    ConfigPatch
+        Patch containing normalized groups and validated, de-duplicated comparisons.
     """
     section = deepcopy(view.get('batch_processing') or {})
     groups = deepcopy(section.get('groups') or {})
