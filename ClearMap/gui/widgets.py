@@ -3,7 +3,33 @@
 widgets
 =======
 
-A set of custom widgets for the ClearMap GUI
+Custom widgets for the ClearMap GUI.
+
+This module provides reusable Qt widgets and compound controls used
+throughout the ClearMap graphical interface, including:
+
+- :class:`OrthoViewer` — orthogonal slice viewer for 3-D images.
+- :class:`ProgressWatcher` — progress monitoring with log-file polling.
+- :class:`TwoListSelection` — dual-list item picker (available ↔ selected).
+- :class:`CheckableListWidget` — list with per-item checkboxes.
+- :class:`DataFrameWidget` — simple table display for pandas DataFrames.
+- :class:`WizardWidget` — base class for multi-step dialogs built from ``.ui`` files.
+- :class:`PatternDialog` — file-pattern wizard for tiled acquisitions.
+- :class:`SamplePickerDialog` — experiment-folder picker with group support.
+- :class:`LandmarksSelectorDialog` — 3-D landmark selection for registration.
+- :class:`StructurePickerWidget` / :class:`StructureSelector` — atlas
+  region tree browser.
+- :class:`PerfMonitor` — CPU / RAM / GPU usage bars.
+- :class:`ExtendableTabWidget` — tab widget with an optional ``(+)`` button.
+- :class:`FileDropListWidget` — list that accepts file drag-and-drop.
+- :class:`LandmarksWeightsPanel` — slider panel for landmark weight tuning.
+- :class:`GraphFilterList` — AND/OR filter chain for graph properties.
+- :class:`ComparisonsWidgetAdapter` — group-comparison checkbox builder.
+- :class:`GroupsWidgetAdapter` — toolbox-based sample-group editor.
+- :class:`NProcessesWidget` — label + spin box for ``n_processes``.
+- :class:`BlockProcessingWidget` — grouped controls for block-processing
+  parameters.
+- :class:`ClickableFrame` — QFrame that emits a ``clicked`` signal.
 """
 import os
 import re
@@ -69,19 +95,20 @@ Pair = Tuple[str, str]
 
 class OrthoViewer:
     """
-    Orthogonal viewer for 3D images
+    Orthogonal viewer for 3D images.
 
     This is a class that allows to visualize 3D images in 3 orthogonal views.
     """
     def __init__(self, img=None, parent=None):
         """
-        Initialize the viewer
+        Initialize the viewer.
+
         Parameters
         ----------
         img : np.ndarray
-            The 3D image to visualize
+            The 3D image to visualize.
         parent : QWidget
-            The parent widget
+            The parent widget.
         """
         self.img = img
         self.parent = parent
@@ -92,16 +119,18 @@ class OrthoViewer:
 
     def setup(self, img, params, parent=None, no_scale=False):
         """
-        Initialize the viewer after the object has been created
+        Initialize the viewer after the object has been created.
 
         Parameters
         ----------
         img : np.ndarray
-            The 3D image to visualize
+            The 3D image to visualize.
         params : UiParameter
-            The parameters object
+            The parameters object.
         parent : QWidget
-            The parent widget
+            The parent widget.
+        no_scale : bool
+            If True, disable coordinate scaling.
         """
         self.img = img
         self.params = params
@@ -112,18 +141,18 @@ class OrthoViewer:
     @property
     def shape(self):
         """
-        Get the shape of the image
+        Get the shape of the image.
 
         Returns
         -------
-        tuple(int, int, int)
+        tuple of int
         """
         return self.img.shape if self.img is not None else None
 
     @property
     def width(self):
         """
-        Get the width of the image
+        Get the width of the image.
 
         Returns
         -------
@@ -134,7 +163,7 @@ class OrthoViewer:
     @property
     def height(self):
         """
-        Get the height of the image
+        Get the height of the image.
 
         Returns
         -------
@@ -145,7 +174,7 @@ class OrthoViewer:
     @property
     def depth(self):
         """
-        Get the depth of the image
+        Get the depth of the image.
 
         Returns
         -------
@@ -155,11 +184,11 @@ class OrthoViewer:
 
     def update_ranges(self, ranges):
         """
-        Update the ranges (min, max) for each axis of the viewer
+        Update the ranges (min, max) for each axis of the viewer.
 
         Parameters
         ----------
-        ranges : list(tuple(float, float))
+        ranges : list of tuple of float
         """
         for i, rng in enumerate(ranges):
             region_item = self.linear_regions[i]
@@ -183,7 +212,7 @@ class OrthoViewer:
 
     def add_regions(self):  # FIXME: improve documenation
         """
-        Add the regions to the viewer
+        Add the interactive linear-region overlays to each orthogonal view.
         """
         # y_axis_idx = (1, 2, 0)
         for i, dv in enumerate(self.dvs):
@@ -195,18 +224,18 @@ class OrthoViewer:
 
     def plot_orthogonal_views(self, img=None, parent=None):
         """
-        Plot the orthogonal views of the image
+        Plot the orthogonal views of the image.
 
         Parameters
         ----------
         img : np.ndarray
-            The image to plot. If None, the image set at initialization will be used
+            The image to plot. If None, the image set at initialization will be used.
         parent : QWidget
-            The parent widget to plot into. If None, the parent set at initialization will be used
+            The parent widget to plot into. If None, the parent set at initialization will be used.
 
         Returns
         -------
-        list(DataViewer)
+        list of DataViewer
         """
         if img is None:
             img = self.img.array
@@ -228,38 +257,52 @@ class OrthoViewer:
 
 class ProgressWatcher(QWidget):  # Inspired from https://stackoverflow.com/a/66266068
     """
-    A QWidget that watches the progress of a process. It uses signals to update the progress bar and the text
-    The main setup methods are `setup` and `prepare_for_substep`
-    It is meant to be used in conjunction with a ProgressWatcherDialog to which it is connected
-    through its signals
+    A QWidget that watches the progress of a process.
+
+    It uses signals to update the progress bar and the text.
+    The main setup methods are :meth:`setup` and :meth:`prepare_for_substep`.
+    It is meant to be used in conjunction with a progress dialog to which it
+    is connected through its signals.
     """
+    #: Emitted when the main step name changes. Argument: step name.
     main_step_name_changed = QtCore.pyqtSignal(str)
+    #: Emitted when the sub-step name changes. Argument: step name.
     sub_step_name_changed = QtCore.pyqtSignal(str)
 
+    #: Emitted when the main progress value changes. Argument: current value.
     main_progress_changed = QtCore.pyqtSignal(int)
+    #: Emitted when the main progress maximum changes. Argument: new maximum.
     main_max_changed = QtCore.pyqtSignal(int)
 
+    #: Emitted when the sub-step progress value changes. Argument: current value.
     progress_changed = QtCore.pyqtSignal(int)
+    #: Emitted when the sub-step progress maximum changes. Argument: new maximum.
     max_changed = QtCore.pyqtSignal(int)
 
+    #: Emitted when all processing has finished. Argument: main step name.
     finished = QtCore.pyqtSignal(str)
+    #: Emitted when processing is aborted. Argument: whether abort was confirmed.
     aborted = QtCore.pyqtSignal(bool)  # FIXME: use
 
     def __init__(self, max_progress=100, main_max_progress=1, timer_interval_ms=250, parent=None):
         """
-        Create a ProgressWatcher
+        Create a ProgressWatcher.
 
         Parameters
         ----------
         max_progress : int
-            The maximum progress value, when the progress reaches this value, the (sub-)operation is considered finished.
-            default is 100
+            The maximum progress value; when the progress reaches this value,
+            the (sub-)operation is considered finished. Default is 100.
         main_max_progress : int
-            The maximum progress value for the main operation. When the progress reaches this value, the main operation
+            The maximum progress value for the main operation.
+            When the progress reaches this value, the main operation
             is considered finished. If all sub-operations are also finished, this is usually linked to the end of the
-            whole process. Default is 1
+            whole process.
+            Default is 1.
+        timer_interval_ms : int
+            Polling interval in milliseconds for log-based progress. Default is 250.
         parent : QWidget
-            The parent widget
+            The parent widget.
         """
         super().__init__(parent)
         self._main_step_name = 'Processing'
@@ -286,7 +329,7 @@ class ProgressWatcher(QWidget):  # Inspired from https://stackoverflow.com/a/662
             self.parentWidget().app.processEvents()
 
     def reset(self):
-        """Reset all the values to their initial state"""
+        """Reset all the values to their initial state."""
         self.main_step_name = 'Processing'
         self.__main_progress = 1
         self.__main_max_progress = 1
@@ -301,14 +344,18 @@ class ProgressWatcher(QWidget):  # Inspired from https://stackoverflow.com/a/662
 
     def setup(self, main_step_name, main_step_length, sub_step_length=0, pattern=None):
         """
-        Post initialisation of the
+        Post-initialisation setup.
 
         Parameters
         ----------
-        main_step_name
-        main_step_length
-        sub_step_length
-        pattern
+        main_step_name : str
+            Title of the main processing step.
+        main_step_length : int
+            Total number of main steps.
+        sub_step_length : int
+            Total number of sub-steps within the current main step.
+        pattern : str or re.Pattern or tuple or None
+            Text pattern to search for in logs to detect progress increments.
         """
         self.main_step_name = main_step_name
         self.main_max_progress = main_step_length
@@ -324,17 +371,20 @@ class ProgressWatcher(QWidget):  # Inspired from https://stackoverflow.com/a/662
         self.progress_changed.emit(self.__progress)
 
     def set_poll_interval(self, ms: int):
+        """Set the log-polling interval in milliseconds."""
         self._interval_ms = ms
         if self._timer.isActive():
             self._timer.start(self._interval_ms)
 
     def start_polling(self):
+        """Start polling the log file for progress pattern matches."""
         if not self.log_path:  # If not setup
             return
         self.reset_log_length()
         self._timer.start(self._interval_ms)
 
     def stop_polling(self):
+        """Stop log-file polling."""
         self._timer.stop()
 
     def _on_tick(self):
@@ -345,16 +395,16 @@ class ProgressWatcher(QWidget):  # Inspired from https://stackoverflow.com/a/662
 
     def prepare_for_substep(self, step_length, pattern, step_name):
         """
-        Setup the watcher for a new substep
+        Setup the watcher for a new substep.
 
         Parameters
         ----------
-        step_name:  str
-            Name (title) of the substep
-        step_length: int
-            The number of steps in the operation
-        pattern:  str or re.Pattern or (str, re.Pattern) or None
-            the text to look for in the logs to check for progress
+        step_length : int
+            The number of steps in the operation.
+        pattern : str or re.Pattern or tuple or None
+            The text to look for in the logs to check for progress.
+        step_name : str
+            Name (title) of the substep.
         """
         self.max_progress = step_length
         self.pattern = pattern
@@ -364,7 +414,7 @@ class ProgressWatcher(QWidget):  # Inspired from https://stackoverflow.com/a/662
 
     def get_progress(self):
         """
-        Get the current progress
+        Get the current progress.
 
         Returns
         -------
@@ -374,12 +424,12 @@ class ProgressWatcher(QWidget):  # Inspired from https://stackoverflow.com/a/662
 
     def set_progress(self, value):
         """
-        Set the progress value of the current main or sub step
+        Set the progress value of the current main or sub step.
 
         Parameters
         ----------
-        value: int
-            The progress value
+        value : int
+            The progress value.
         """
         if self.__progress == value:
             return
@@ -388,12 +438,12 @@ class ProgressWatcher(QWidget):  # Inspired from https://stackoverflow.com/a/662
 
     def set_main_progress(self, value):
         """
-        Set the progress value for the main step
+        Set the progress value for the main step.
 
         Parameters
         ----------
-        value: int
-            The progress value
+        value : int
+            The progress value.
         """
         if self.__main_progress == value:
             return
@@ -405,23 +455,24 @@ class ProgressWatcher(QWidget):  # Inspired from https://stackoverflow.com/a/662
 
     def increment_main_progress(self, increment=1):
         """
-        Integer increment of the main progress
+        Integer increment of the main progress.
 
         Parameters
         ----------
-        increment: int
-            The increment value (default is 1)
+        increment : int
+            The increment value (default is 1).
         """
         self.set_main_progress(self.__main_progress + round(increment))
 
     def increment(self, increment):
         """
-        Increment the progress value of the current main or sub step
+        Increment the progress value of the current main or sub step.
 
         Parameters
         ----------
-        increment: int or float
-            The increment value. If float, it is considered as a percentage of the maximum progress value
+        increment : int or float
+            The increment value. If float, it is considered as a fraction
+            of the maximum progress value.
         """
         if isinstance(increment, float):
             self.set_progress(self.__progress + int(self.max_progress * increment))
@@ -430,6 +481,7 @@ class ProgressWatcher(QWidget):  # Inspired from https://stackoverflow.com/a/662
 
     @property
     def max_progress(self):
+        """Current sub-step maximum."""
         return self.__max_progress
 
     @max_progress.setter
@@ -439,6 +491,7 @@ class ProgressWatcher(QWidget):  # Inspired from https://stackoverflow.com/a/662
 
     @property
     def main_max_progress(self):
+        """Current main-step maximum."""
         return self.__main_max_progress
 
     @main_max_progress.setter
@@ -448,6 +501,7 @@ class ProgressWatcher(QWidget):  # Inspired from https://stackoverflow.com/a/662
 
     @property
     def main_step_name(self):
+        """Current main step name."""
         return self._main_step_name
 
     @main_step_name.setter
@@ -457,6 +511,7 @@ class ProgressWatcher(QWidget):  # Inspired from https://stackoverflow.com/a/662
 
     @property
     def sub_step_name(self):
+        """Current sub-step name."""
         return self._sub_step_name
 
     @sub_step_name.setter
@@ -474,14 +529,15 @@ class ProgressWatcher(QWidget):  # Inspired from https://stackoverflow.com/a/662
 
     def count_dones(self):
         """
-        Parse the logs to extract the number of `done` operations (based on self.pattern)
-        For each `done` operation, the progress is incremented by 1
-        For efficiency, the logs are read from the last read position
+        Parse the logs to extract the number of completed operations
+        (based on ``self.pattern``). For each match, the progress is
+        incremented by 1. For efficiency, the logs are read from the
+        last read position.
 
         Returns
         -------
         int
-            The number of `done` operations found
+            The cumulative number of matched operations.
         """
         if self.pattern is None:
             return 0
@@ -494,9 +550,7 @@ class ProgressWatcher(QWidget):  # Inspired from https://stackoverflow.com/a/662
         return self.n_dones
 
     def reset_log_length(self):
-        """
-        Resets dones to 0 and seeks to the end of the log file
-        """
+        """Reset the done counter and seek to the end of the log file."""
         with open(self.log_path, 'r') as log:
             self.previous_log_length = self.__get_log_bytes(log.readlines())
             self.n_dones = 0
@@ -505,19 +559,21 @@ class ProgressWatcher(QWidget):  # Inspired from https://stackoverflow.com/a/662
         return sum([len(ln) for ln in log])
 
     def finish(self):
-        """
-        Trigger the finish signal
-        """
+        """Trigger the finished signal."""
         self.finished.emit(self.main_step_name)
 
 
 # Adapted from https://stackoverflow.com/a/54917151 by https://stackoverflow.com/users/6622587/eyllanesc
 class TwoListSelection(QWidget):
+    """
+    A widget that allows to select items from a list and move them to another list.
+
+    This is useful for selecting items from a list of available items and
+    moving them to a list of selected items.
+    """
+    #: Emitted when a single item is selected in either list. Argument: item text.
     itemSelectionChanged = pyqtSignal(str)
-    """
-    A widget that allows to select items from a list and move them to another list
-    This is useful for selecting items from a list of available items and moving them to a list of selected items
-    """
+
     def __init__(self, parent=None, input_title=None, output_title=None):
         super().__init__(parent)
         self._input_title  = input_title      # keep for setup
@@ -527,7 +583,7 @@ class TwoListSelection(QWidget):
 
     def __setup_layout(self):
         """
-        Setup the layout of the widget with the two columns for the lists and the buttons
+        Setup the layout of the widget with the two columns for the lists and the buttons.
         """
         lyt = QHBoxLayout(self)
         self.mInput = QListWidget()
@@ -569,9 +625,7 @@ class TwoListSelection(QWidget):
         self.__connections()
 
     def __layout_buttons(self):
-        """
-        Create and lay out the control buttons of the widget
-        """
+        """Create and lay out the control buttons of the widget."""
         self.mButtonToSelected = QPushButton(">>")
         self.mBtnMoveToAvailable = QPushButton(">")
         self.mBtnMoveToSelected = QPushButton("<")
@@ -608,9 +662,7 @@ class TwoListSelection(QWidget):
         self.mBtnMoveToSelected.setDisabled(not bool(self.mOutput.selectedItems()))
 
     def __connections(self):
-        """
-        Bind the buttons to their slots
-        """
+        """Bind the buttons to their slots."""
         self.mInput.itemSelectionChanged.connect(self.update_buttons_status)
         self.mOutput.itemSelectionChanged.connect(self.update_buttons_status)
         self.mBtnMoveToAvailable.clicked.connect(self.__on_mBtnMoveToAvailable_clicked)
@@ -622,13 +674,13 @@ class TwoListSelection(QWidget):
 
     @QtCore.pyqtSlot()
     def __on_mBtnMoveToAvailable_clicked(self):
-        """move *all* selected rows from left → right"""
+        """Move all selected rows from left to right."""
         for it in reversed(self.mInput.selectedItems()):          # reversed keeps order
             self.mOutput.addItem(self.mInput.takeItem(self.mInput.row(it)))
 
     @QtCore.pyqtSlot()
     def __on_mBtnMoveToSelected_clicked(self):
-        """move *all* selected rows from right → left"""
+        """Move all selected rows from right to left."""
         for it in reversed(self.mOutput.selectedItems()):
             self.mInput.addItem(self.mOutput.takeItem(self.mOutput.row(it)))
 
@@ -658,16 +710,12 @@ class TwoListSelection(QWidget):
 
     # The actual user functions
     def clear(self):
-        """
-        Clear the lists
-        """
+        """Clear both lists."""
         self.mInput.clear()
         self.mOutput.clear()
 
     def __add_item(self, widget: QListWidget, text, user_data=None):
-        """
-        Helps attach user_data.  *text* always becomes the visible label.
-        """
+        """Attach user_data to a new item; text is the visible label."""
         item = QListWidgetItem(str(text))
         if user_data is not None:
             item.setData(Qt.UserRole, user_data)
@@ -675,12 +723,13 @@ class TwoListSelection(QWidget):
 
     def addAvailableItems(self, items):
         """
-        Add the list of available items to the left list
+        Add the list of available items to the left list.
 
         Parameters
         ----------
-        items: list(str)
-            The list of items to add
+        items : list
+            The list of items to add. Each element can be a string or a
+            ``(text, user_data)`` tuple.
         """
         for itm in items:
             if isinstance(itm, (tuple, list)) and len(itm) == 2:
@@ -690,11 +739,12 @@ class TwoListSelection(QWidget):
 
     def setSelectedItems(self, items):
         """
-        Add the list of selected items to the right list
+        Add the list of selected items to the right list.
+
         Parameters
         ----------
-        items: list(str)
-            The list of items to add
+        items : list
+            The list of items to add.
         """
         self.mOutput.clear()
         for itm in items:
@@ -730,26 +780,29 @@ class TwoListSelection(QWidget):
 
     def get_left_elements(self, with_data=False):
         """
-        Get the list of items in the left list (available items)
+        Get the list of items in the left list (available items).
 
         Returns
         -------
-        list(str)
+        list of str
         """
         return self.__get_elements(self.mInput, with_data)
 
     def get_right_elements(self, with_data=False):
         """
-        Get the list of items in the right list (selected items)
+        Get the list of items in the right list (selected items).
 
         Returns
         -------
-        list(str)
+        list of str
         """
         return self.__get_elements(self.mOutput, with_data)
 
 
 class CheckableListWidget(QWidget):
+    """A list widget where each item has a checkbox."""
+
+    #: Emitted when an item's check state changes. Arguments: ``(index, checked, item_text)``.
     check_state_changed = pyqtSignal(int, bool, str)
 
     def __init__(self, parent=None):
@@ -1984,7 +2037,9 @@ class StructureSelector(WizardWidget):
 
 
 class PerfMonitor(QWidget):
+    #: Emitted when CPU values update. Arguments: ``(cpu_percent, thread_percent, ram_percent)``.
     cpu_vals_changed = QtCore.pyqtSignal(int, int, int)
+    #: Emitted when GPU values update. Arguments: ``(gpu_percent, vram_percent)``.
     gpu_vals_changed = QtCore.pyqtSignal(int, int)
 
     def __init__(self, parent, fast_period, slow_period, *args, **kwargs):
@@ -2088,8 +2143,11 @@ class PerfMonitor(QWidget):
 
 
 class ExtendableTabWidget(QTabWidget):
+    #: Emitted when the ``(+)`` tab is clicked.
     addTabClicked = pyqtSignal()
+    #: Emitted when a channel tab is clicked. Argument: channel name.
     channelChanged = pyqtSignal(str)
+    #: Emitted when a channel tab is renamed. Arguments: ``(old_name, new_name)``.
     channelRenamed = pyqtSignal(str, str)
 
     def __init__(self, parent=None, with_add_tab=True):
@@ -2149,6 +2207,7 @@ class ExtendableTabWidget(QTabWidget):
 
 
 class FileDropListWidget(QListWidget):  # TODO: check if I need dragMoveEvent
+    #: Emitted when items are added or removed.
     itemsChanged = pyqtSignal()
     def __init__(self, parent=None, plus_btn=None, minus_btn=None):
         super().__init__(parent)
@@ -2209,19 +2268,24 @@ class FileDropListWidget(QListWidget):  # TODO: check if I need dragMoveEvent
 
 class LandmarksWeightsPanel(QFrame):
     """
-    Compact panel that renders one row per landmark-params file:
-      [Label]  0 [Slider 0..100] 100%  (value label)
+    Compact panel that renders one row per landmark-params file.
+
+    Each row contains a label, a 0–100 slider, and a value display.
 
     Public API:
-      - set_items(names: list[str], weights: list[int] | None = None)
-      - get_weights() -> list[int]            # 0..100 as integers
-      - set_weights(weights: list[int])
-      - valueChangedConnect(cb: Callable[[], None])  # Qt-like hook for external binding
 
-    Optional transforms can be supplied to map between slider value (0..100)
-    and model value (float). Defaults are identity; keep scaling (e.g. exp) in controller.
+    - :meth:`set_items` — rebuild rows from names and optional initial weights.
+    - :meth:`get_weights` — return current slider values (0–100) as integers.
+    - :meth:`set_weights` — set slider values without rebuilding rows.
+    - :meth:`valueChangedConnect` — Qt-like hook for external binding.
+
+    Optional transforms can be supplied to map between slider value (0–100)
+    and model value (float). Defaults are identity; keep scaling (e.g. exp)
+    in the controller.
     """
+    #: Emitted when any slider changes. Argument: full list of weights (0–100).
     weightsChanged = pyqtSignal(list)           # emits the full 0..100 list (ints)
+    #: Emitted when a single slider changes. Arguments: ``(index, value)``.
     weightAtChanged = pyqtSignal(int, int)      # emits (idx, 0..100)
 
     def __init__(self, parent: QWidget = None,
@@ -2343,15 +2407,18 @@ def ensure_inline_histogram(histogram: PlotWidget | QWidget, hist_idx: int, layo
     return histogram
 
 class GraphFilterList(QWidget):
-    """A vertical list of graph-filter rows with AND/OR combiners between them.
-
-    Compatibility guarantees for GraphFilterParams:
-      - The container layout is a QVBoxLayout named 'filterParamsVerticalLayout'
-      - Each filter row widget is named 'filter_{idx}'
-      - Between row i and i+1 we insert a QFrame that contains two QRadioButtons named:
-            'filter_{i}_and_btn'  (checked by default)
-            'filter_{i}_or_btn'
     """
+    A vertical list of graph-filter rows with AND/OR combiners between them.
+
+    Compatibility guarantees for ``GraphFilterParams``:
+
+    - The container layout is a ``QVBoxLayout`` named ``'filterParamsVerticalLayout'``.
+    - Each filter row widget is named ``'filter_{idx}'``.
+    - Between row *i* and *i+1* a ``QFrame`` is inserted that contains two
+      ``QRadioButton`` instances named ``'filter_{i}_and_btn'`` (checked by
+      default) and ``'filter_{i}_or_btn'``.
+    """
+    #: Emitted when filters are added or modified.
     filtersChanged = pyqtSignal()
 
     def __init__(self, layout: QVBoxLayout, parent: Optional[QWidget] = None):
@@ -2794,11 +2861,12 @@ class GroupsWidgetAdapter(QWidget):
 
 class NProcessesWidget(QWidget):
     """
-    Simple 'n_processes' widget: label + spinbox.
+    Simple ``n_processes`` widget: label + spinbox.
 
-    Exposes value()/setValue() and valueChanged signal so it can be used
-    transparently by ParamLink.
+    Exposes ``value()`` / ``setValue()`` and a ``valueChanged`` signal so
+    it can be used transparently by ``ParamLink``.
     """
+    #: Emitted when the spin box value changes. Argument: new value.
     valueChanged = pyqtSignal(int)
 
     def __init__(self, parent: QWidget | None = None, label: str = 'n_processes'):
@@ -2931,6 +2999,8 @@ class BlockProcessingWidget(QGroupBox):
 
 
 class ClickableFrame(QFrame):
+    """A QFrame that emits a ``clicked`` signal on mouse press."""
+    #: Emitted on mouse press.
     clicked = pyqtSignal()
 
     def mousePressEvent(self, event):
