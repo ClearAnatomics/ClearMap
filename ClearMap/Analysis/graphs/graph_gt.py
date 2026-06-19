@@ -869,20 +869,21 @@ class Graph(grp.AnnotatedGraph):
         Set the given edge geometry property for the graph.
 
         .. warning::
-            edge is not supported for 'graph' edge geometry type.
+            ``edge`` is not supported for ``'graph'`` edge geometry type.
 
         Parameters
         ----------
-        name: str
-            The name of the original vertex or edge property to set as edge geometry
-            As an edge_geometry property, the name will be prefixed (typically with 'edge_geometry_').
-        values: List or np.ndarray
+        name : str
+            The name of the original vertex or edge property to set as edge geometry.
+            As an edge geometry property, the name will be prefixed with
+            ``'edge_geometry_*'`` (e.g. ``'edge_geometry_coordinates'``).
+        values : list or np.ndarray
             The values to set as edge geometry.
-        indices: np.ndarray
+        indices : np.ndarray or None
             How to slice the values to map to edges.
-        edge: gt.Edge or int, optional
-            The edge to set the geometry for. If None, the geometry is set for all edges.
-            If the edge_geometry_type is 'graph', this parameter is not supported.
+        edge : gt.Edge or int, optional
+            The edge to set the geometry for.  If ``None``, the geometry is set for
+            all edges.  Not supported when ``edge_geometry_type`` is ``'graph'``.
         """
         if self.edge_geometry_type == 'graph':
             self._set_edge_geometry_graph(name, values, indices=indices, edge=edge)
@@ -1068,15 +1069,16 @@ class Graph(grp.AnnotatedGraph):
 
         Parameters
         ----------
-        vertex_filter: None | array-like | gt.PropertyMap
-            Vertex selection mask or property map. Commonly a 1-D boolean numpy array of length
-            `self.n_vertices`. True means “vertex is retained in the view”.
-        edge_filter: None | array-like | gt.PropertyMap
-            Edge selection mask or property map. Commonly a 1-D boolean numpy array of length
-            `self.n_edges`. True means “edge is retained in the view”.
-        view: bool
-            - If True: return a `Graph` wrapping a `gt.GraphView` (no pruning/copy).
-            - If False: materialize a pruned copy via `gt.Graph(gv, prune=True)`.
+        vertex_filter : None or array-like or gt.PropertyMap
+            Vertex selection mask or property map. Commonly a 1-D boolean numpy
+            array of length ``n_vertices``. ``True`` means the vertex is retained in the view.
+        edge_filter : None or array-like or gt.PropertyMap
+            Edge selection mask or property map. Commonly a 1-D boolean numpy
+            array of length ``n_edges``. ``True`` means the edge is retained in the view.
+        view : bool
+            If ``True``, return a ``Graph`` wrapping a ``gt.GraphView``
+            (no pruning/copy).  If ``False``, materialise a pruned copy
+            via ``gt.Graph(gv, prune=True)``.
 
         Returns
         -------
@@ -1086,9 +1088,12 @@ class Graph(grp.AnnotatedGraph):
         Notes
         -----
         Edge geometry handling:
-        - If the resulting graph has edges and the source graph has edge geometry, `prune_edge_geometry()`
-          is called to compact edge-geometry arrays to the retained edge set.
-        - If the resulting graph has no edges, edge geometry is removed (`remove_edge_geometry()`).
+
+        - If the resulting graph has edges and the source graph has edge
+          geometry, ``prune_edge_geometry()`` is called to compact
+          edge-geometry arrays to the retained edge set.
+        - If the resulting graph has no edges, edge geometry is removed
+          (``remove_edge_geometry()``).
         """
         gv = gt.GraphView(self.base, vfilt=vertex_filter, efilt=edge_filter)
         if view:
@@ -1262,43 +1267,41 @@ class Graph(grp.AnnotatedGraph):
         """
         Slice the graph by an axis-aligned spatial selection, with optional boundary-edge policy.
 
-        The slice is defined by applying `slicing` to per-vertex coordinates (by default the
-        'coordinates' vertex property). This produces an initial vertex mask `V0`.
+        The slice is defined by applying ``slicing`` to per-vertex coordinates
+        (by default the ``'coordinates'`` vertex property). This produces an
+        initial vertex mask ``V0``.
 
-        Two boundary policies are supported via `cut_edges`:
+        Two boundary policies are supported via ``cut_edges``:
 
-        - cut_edges='exclusive' (default; current behaviour):
-          Return the induced subgraph on V0 (i.e. retain an edge only if both endpoints are in V0).
-          Implementation: `sub_graph(vertex_filter=V0, ...)`.
-
-        - cut_edges='inclusive':
-          Retain an edge if at least one of its endpoints is in V0, based on `edge_connectivity()`.
-          Additionally expand the retained vertex set to include both endpoints of every retained edge.
-          Implementation:
-            * E_keep = (V0[src] | V0[dst])
-            * V_keep = V0 ∪ endpoints(E_keep)
-            * `sub_graph(vertex_filter=V_keep, edge_filter=E_keep, ...)`
+        - ``'exclusive'`` (default): return the induced subgraph on ``V0``
+          (retain an edge only if both endpoints are in ``V0``).
+        - ``'inclusive'``: retain an edge if at least one endpoint is in
+          ``V0``, then expand the vertex set to include both endpoints of
+          every retained edge.
 
         Parameters
         ----------
-        slicing:
-            A slicing spec accepted by `ClearMap.IO.IO.slc.unpack_slicing` (slices/ints per axis).
-        view: bool
-            If True, return a lightweight `gt.GraphView`-backed Graph wrapper.
-            If False, return a pruned copy (see `sub_graph`).
-        coordinates: None | str | np.ndarray
+        slicing : tuple of slice or int
+            A slicing spec accepted by ``ClearMap.IO.IO.slc.unpack_slicing``
+            (slices/ints per axis).
+        view : bool
+            If ``True``, return a lightweight ``gt.GraphView``-backed wrapper.
+            If ``False``, return a pruned copy (see :meth:`sub_graph`).
+        coordinates : None or str or np.ndarray
             Coordinate source to slice against:
-            - None: uses `self.vertex_coordinates()`
-            - str: name of a vertex property to use
-            - np.ndarray: explicit (N, ndim) coordinates array
-        cut_edges: str
-            Boundary edge policy. One of: 'exclusive', 'inclusive'.
+
+            - ``None``: uses ``self.vertex_coordinates()``.
+            - ``str``: name of a vertex property to use.
+            - ``np.ndarray``: explicit ``(N, ndim)`` coordinates array.
+        cut_edges : str
+            Boundary edge policy: ``'exclusive'`` or ``'inclusive'``.
 
         Returns
         -------
         Graph
-            The sliced graph (view or pruned copy). If edge geometry exists and edges are retained,
-            geometry is compacted via `prune_edge_geometry()` in `sub_graph`.
+            The sliced graph (view or pruned copy). If edge geometry exists
+            and edges are retained, geometry is compacted via
+            ``prune_edge_geometry()`` in :meth:`sub_graph`.
         """
         valid = self.sub_slice_vertex_filter(slicing, coordinates=coordinates)
 
@@ -1545,16 +1548,22 @@ class Graph(grp.AnnotatedGraph):
                      exclude_dict: Optional[Dict[str, Iterable[str]]] = None,
                      include: Optional[Iterable[str]] = None, exclude: Optional[Iterable[str]] = None):
         """
-        Partially load a graph from a file, allowing for inclusion and exclusion of specific properties.
+        Partially load a graph from a file, allowing for selective property inclusion/exclusion.
 
         Five options are available, in order of precedence:
-            1. exclude_geometry_properties: If True, all edge geometry properties (those starting with 'edge_geometry_') are excluded.
-            2. include_dict: A dictionary specifying which properties to include for each scope ('vertex', 'edge', 'graph').
-            3. exclude_dict: A dictionary specifying which properties to exclude for each scope ('vertex', 'edge', 'graph').
-            4. include: A list of property names to include across all scopes.
-            5. exclude: A list of property names to exclude across all scopes.
-        
-        Note: To know which properties are available in the file, use Graph.scan_gt_properties(filename, as_dict=True).
+
+        1. ``exclude_edge_geometry_properties``: if ``True``, all edge geometry
+           properties (those starting with ``'edge_geometry_'``) are excluded.
+        2. ``include_dict``: a dictionary specifying which properties to include
+           for each scope (``'vertex'``, ``'edge'``, ``'graph'``).
+        3. ``exclude_dict``: a dictionary specifying which properties to exclude
+           for each scope.
+        4. ``include``: a list of property names to include across all scopes.
+        5. ``exclude``: a list of property names to exclude across all scopes.
+
+        .. note::
+            To inspect which properties are available in the file, use
+            ``Graph.scan_gt_properties(filename, as_dict=True)``.
         """
         props = cls.scan_gt_properties(filename, as_dict=True)
         props_sets = {s: set(props.get(s, ())) for s in cls.SCOPES}
