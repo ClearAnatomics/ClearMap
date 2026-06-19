@@ -1413,7 +1413,8 @@ class VesselGraphProcessor(PipelineOrchestrator):
     @requires_graph('annotated')
     def _pre_filter_arteries(self, arteries_min_noise_edges: int):
         """
-        Remove components where too few edges are arteries
+        Remove components (arterial subtrees since reduced graph)
+        where too few vessel segments (reduced edges) are arteries
 
         Parameters
         ----------
@@ -1428,6 +1429,7 @@ class VesselGraphProcessor(PipelineOrchestrator):
 
         artery_graph = self.graph_annotated.sub_graph(edge_filter=artery, view=True)
         artery_graph_edge, edge_map = artery_graph.edge_graph(return_edge_map=True)
+        # FIXME: size is misleading, we're dealing with connected components here
         artery_components, artery_size = artery_graph_edge.label_components(return_vertex_counts=True)
         too_small = edge_map[np.in1d(artery_components, np.where(artery_size < arteries_min_noise_edges)[0])]
         artery[too_small] = False
@@ -1447,6 +1449,8 @@ class VesselGraphProcessor(PipelineOrchestrator):
             threshold = self._LEGACY_THRESHOLDS['permissive_vein_radius_vx']
 
         large_vessels = radii >= threshold
+        # FIXME: check for first usage at least, should be
+        #  permissive_veins = np.logical_or(restrictive_veins, np.logical_and(large_vessels, np.logical_not(artery))
         permissive_veins = np.logical_and(np.logical_or(restrictive_veins, large_vessels), np.logical_not(artery))
         return permissive_veins
 
@@ -1586,7 +1590,7 @@ class VesselGraphProcessor(PipelineOrchestrator):
 
             artery = self._pre_filter_arteries(cfg['pre_filtering']['arteries_min_noise_edges'])
 
-            # Definitely a vein because too big
+            # Definitely a vein because too big to be a capillary and not artery labeled enough to be an artery
             restrictive_veins = self._pre_filter_veins(
                 cfg['pre_filtering']['vein_intensity_range_on_arteries_ch'],
                 min_vein_radius_um=cfg['pre_filtering']['restrictive_vein_radius_um'])
@@ -1599,7 +1603,8 @@ class VesselGraphProcessor(PipelineOrchestrator):
                                                 min_vein_radius_um=cfg['pre_filtering']['permissive_vein_radius_um'])
             self._trace_arteries(tmp_veins, max_tracing_iterations=cfg['tracing']['max_arteries_iterations'])
 
-            # The real vein size filtering
+            # The real vein size filtering  --> Second pass after tracing but ODDLY, uses restrictive_veins to exclude
+            # so we won't trace over veins but we should be able to. we shouldn't have veins/arteries adjacent
             vein = self._post_filter_veins(restrictive_veins,
                                            min_vein_radius_um=cfg['pre_filtering']['final_vein_radius_um'])
             self.graph_annotated.define_edge_property('vein', vein)
