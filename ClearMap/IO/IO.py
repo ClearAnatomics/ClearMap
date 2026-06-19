@@ -216,8 +216,8 @@ def source_to_module(source_):
     """
     Returns IO module associated with a source.
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     source_ : object
         The source specification.
 
@@ -250,8 +250,8 @@ def location_to_module(location_):
     """
     Returns the IO module associated with a location string.
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     location_ : str or te.Expression or pathlib.Path
         Location of the source.
 
@@ -272,8 +272,8 @@ def filename_to_module(filename):
     """
     Returns the IO module associated with a filename.
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     filename : str
        The file name.
 
@@ -309,8 +309,8 @@ def is_source(source_, exists=True):
     """
     Checks if `source_` is a valid Source.
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     source_ : object
         Source to check.
     exists : bool
@@ -348,8 +348,8 @@ def as_source(source_, slicing=None, *args, **kwargs):
     """
     Convert source specification to a Source class.
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     source_ : object
         The source specification.
 
@@ -373,8 +373,8 @@ def source(source_, slicing=None, *args, **kwargs):
     """
     Convert source specification to a Source class.
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     source_ : object
         The source specification.
 
@@ -390,8 +390,8 @@ def ndim(source_):
     """
     Returns number of dimensions of a source.
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     source_ : str, array or Source
         The source specification.
 
@@ -408,8 +408,8 @@ def shape(source_):
     """
     Returns shape of a source.
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     source_: str, array or Source
        The source specification.
 
@@ -426,8 +426,8 @@ def size(source_):
     """
     Returns size of a source.
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     source_ : str, array or Source
         The source specification.
 
@@ -444,8 +444,8 @@ def dtype(source_):
     """
     Returns dtype of a source.
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     source_ : str, array or Source
         The source specification.
 
@@ -462,8 +462,8 @@ def order(source_):
     """
     Returns order of a source.
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     source_ : str, array or Source
         The source specification.
 
@@ -480,8 +480,8 @@ def location(source_):
     """
     Returns the location of a source.
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     source_ : str, array or Source
         The source specification.
 
@@ -498,8 +498,8 @@ def memory(source_):
     """
     Returns the memory type of `source_`.
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     source_ : str, array or Source
         The source specification.
 
@@ -519,8 +519,8 @@ def element_strides(source_):
     """
     Returns the strides of the data array of a source.
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     source_ : str, array, dtype or Source
         The source specification.
 
@@ -542,8 +542,8 @@ def buffer(source_):
     """
     Returns an io buffer of the data array of a source for use with e.g. cython.
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     source_ : source specification
       The source specification.
 
@@ -567,8 +567,8 @@ def read(source_, *args, **kwargs):
     """
     Read data from a data source.
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     source_ : str, pathlib.Path, array, Source class
        The source to read the data from.
 
@@ -587,8 +587,8 @@ def write(sink, data, *args, **kwargs):
     """
     Write data to a data source.
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     sink : str, pathlib.Path, array, Source class
         The source to write data to.
     data : array
@@ -611,8 +611,8 @@ def create(source_, *args, **kwargs):
     """
     Create a data source on disk.
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     source_ : str, pathlib.Path, array, Source class
         The source to write data to.
 
@@ -637,8 +637,8 @@ def initialize(source_=None, shape_=None, dtype_=None, order_=None, location_=No
     The source is created on disk or in memory if it does not exist so processes
     can start writing into it.
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     source_ : str, array, Source class
         The source to write data to.
     shape_ : tuple or None
@@ -754,8 +754,8 @@ def initialize_buffer(source_, shape=None, dtype=None, order=None, location=None
     """
     Initialize a buffer with specific properties.
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     source_ : str, array, Source class
         The source to write data to.
     shape : tuple or None
@@ -800,8 +800,8 @@ def file_list(expression=None, file_list=None, sort=True, verbose=False):
     """
     Returns the list of files that match the tag expression.
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     expression :str | Path | te.Expression | None
         The regular expression the file names should match.
     sort : bool
@@ -857,7 +857,7 @@ def get_value(source_, value_type):  # REFACTOR: should be moved to io_utils or 
         source_ = str(source_)
 
     if value_type not in ['min', 'max']:
-        raise ValueError(f'Unknown value type {value_type}, accepted arguments are "min" and "max"!')
+        raise ValueError(f'Unknown value type {value_type}, accepted Parameters are "min" and "max"!')
 
     if isinstance(source_, (src.Source, np.ndarray)):
         source_ = source_.dtype
@@ -882,8 +882,8 @@ def min_value(source_):
     """
     Returns the minimal value of a source data type.
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     source_ : str, array, dtype or Source
         The source specification.
 
@@ -899,8 +899,8 @@ def max_value(source_):
     """
     Returns the maximal value of a source data type.
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     source_ : str, array, dtype or Source
         The source specification.
 
@@ -917,8 +917,8 @@ def convert(source_, sink, processes=None, verbose=False, **kwargs):
     """
     Transforms a source into another format.
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     source_ : source specification
         The source or list of sources.
     sink : source specification
@@ -945,8 +945,8 @@ def convert_files(filenames, extension=None, path=None, processes=None, verbose=
     """
     Transforms list of files to their sink format in parallel.
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     filenames : list of str | list of pathlib.Path
         The filenames to convert
     extension : str
@@ -1044,7 +1044,7 @@ def _test():
 # def copy(source, sink):
 #    """Copy a data file from source to sink, which can consist of multiple files
 #    
-#    Arguments:
+#    Parameters:
 #        source (str): file name of source
 #        sink (str): file name of sink
 #    
@@ -1061,7 +1061,7 @@ def _test():
 # def convert(source, sink, **args):
 #    """Transforms data from source format to sink format
 #    
-#    Arguments:
+#    Parameters:
 #        source (str): file name of source
 #        sink (str): file name of sink
 #    
@@ -1110,7 +1110,7 @@ def _test():
 # def writeTable(filename, table):
 #    """Writes a numpy array with column names to a csv file.
 #    
-#    Arguments:
+#    Parameters:
 #        filename (str): filename to save table to
 #        table (annotated array): table to write to file
 #        
@@ -1131,7 +1131,7 @@ def _test():
 # def isFileExpression(source):
 #    """Checks if filename is a regular expression denoting a file list
 #    
-#    Arguments:
+#    Parameters:
 #        source (str): source file name
 #        
 #    Returns:
@@ -1169,7 +1169,7 @@ def _test():
 # def isDataFile(source, exists = False):
 #    """Checks if a file has a valid data file extension usable in *ClearMap*
 #     
-#    Arguments:
+#    Parameters:
 #        source (str): source file name
 #        exists (bool): if true also checks if source exists 
 #        
@@ -1193,7 +1193,7 @@ def _test():
 # def isImageFile(source, exists = False):
 #    """Checks if a file has a valid image file extension usable in *ClearMap*
 #     
-#    Arguments:
+#    Parameters:
 #        source (str): source file name
 #        exists (bool): if true also checks if source exists 
 #        
@@ -1217,7 +1217,7 @@ def _test():
 # def isArrayFile(source, exists =False):
 #    """Checks if a file is a valid array data file
 #     
-#    Arguments:
+#    Parameters:
 #        source (str): source file name
 #        exists (bool): if true also checks if source exists 
 #        
@@ -1241,7 +1241,7 @@ def _test():
 # def isDataSource(source, exists = False):
 #  """Checks if source is a valid data source for use in *ClearMap*
 #   
-#  Arguments:
+#  Parameters:
 #      source (str): source file name or array
 #      exists (bool): if true also checks if source exists 
 #      
