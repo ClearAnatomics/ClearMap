@@ -628,14 +628,33 @@ class OMEMetadataParser(BaseMetadataParser):
 
     def parse_tile_configuration(self, *, filename_order='YX'):  #  FIXME: pass arg
         """
-        Build a dict[channel][(ix,iy)] = {
-            'filename': <basename>,
-            'stage_x': float, 'stage_y': float,
-            'relative_x': float, 'relative_y': float
-        }
+        Build a tile configuration dictionary.
 
-        - (ix,iy) are taken from the filename 'YY x XX' pattern; if absent, from FilenameAxesMap.
-        - relative_* are normalized so that min(stage) per axis is 0 across all tiles.
+        Constructs a nested dictionary mapping channels and tile coordinates to tile
+        metadata including filenames and stage/relative positions.
+
+        Parameters
+        ----------
+        filename_order : str, optional
+            Order of axes in filename pattern (default: 'YX').
+
+        Returns
+        -------
+        dict
+            Nested dict with structure: {channel: {(ix, iy): {...}}}
+            where each tile dict contains:
+
+            - 'filename' : str
+                Tile filename basename.
+            - 'stage_x', 'stage_y' : float
+                Stage coordinates.
+            - 'relative_x', 'relative_y' : float
+                Normalized coordinates (min per axis = 0 across all tiles).
+
+        Notes
+        -----
+        Tile coordinates (ix, iy) are extracted from the filename 'YY x XX' pattern,
+        or from FilenameAxesMap if the pattern is absent.
         """
 
         # Parse OME xml
