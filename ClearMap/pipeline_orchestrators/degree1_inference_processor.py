@@ -15,7 +15,7 @@ from ClearMap.Analysis.graphs import graph_gt
 from ClearMap.Analysis.graphs.graph_gt import Graph
 from ClearMap.ImageProcessing.machine_learning.vertices_classification.degree1_inference_utils import (run_inference, update_graph_properties,
                                                                                                        get_default_model_path)
-from ClearMap.processors.tube_map import BinaryVesselProcessor
+from ClearMap.pipeline_orchestrators.tube_map import BinaryVesselProcessor
 
 
 def export_vertex_coordinates(graph: Graph) -> pd.DataFrame:
