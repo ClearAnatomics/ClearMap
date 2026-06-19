@@ -300,6 +300,10 @@ class ChannelSpec:
         channel_number: int
             The number of the channel.
         """
+        if isinstance(channel, list) and all(isinstance(c, str) for c in channel):
+            channel = tuple(channel)
+            warnings.warn('Passing a list as channel is deprecated and will be removed in a future version.'
+                          ' Use a tuple instead.', DeprecationWarning, stacklevel=2)
         is_tuple = isinstance(channel, tuple)
 
         # Enforce consistency between structure and content_type
