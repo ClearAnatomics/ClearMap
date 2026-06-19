@@ -32,6 +32,7 @@ from ClearMap.gui.style import WARNING_YELLOW
 
 
 class Printer(QWidget):
+    #: Triggered on ``write``
     text_updated = QtCore.pyqtSignal(str)
     original_std_out = sys.stdout
     original_std_err = sys.stderr

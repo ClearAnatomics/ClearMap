@@ -15,7 +15,9 @@ _CROSS_COLOR = QColor('#b85c5c')   # muted dusty-red
 
 class StepChip(QWidget):
     """Single step tile — click to toggle enabled/disabled."""
+    #: Triggered when step is toggled
     toggled = pyqtSignal(str, bool)   # step_id, enabled
+    #: Triggered when ``keep`` step is toggled
     keep_changed = pyqtSignal(str, bool)   # step_id, keep_intermediate
 
     _W, _H = 150, 32
@@ -135,7 +137,9 @@ class LinearPipelineWidget(QWidget):
     Vertical sequence of StepChips with connecting arrows.
     Steps can be reordered with ▲/▼ buttons except locked steps (binarize).
     """
+    #: Triggered when new pipeline selected
     pipeline_changed = pyqtSignal(list)   # list[str] of enabled step names
+    #: Triggered when ``keep`` checkbox is toggled on a step chip
     keep_intermediate_changed = pyqtSignal(str, bool)  # spec_name, keep
 
     CONNECTOR_H = _CONNECTOR_H
