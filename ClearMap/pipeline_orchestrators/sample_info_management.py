@@ -397,8 +397,24 @@ class SampleManager(OrchestratorBase):
 
     def infer_channel_index_from_name(self, path: Path | str) -> int | None:
         """
-        Extracts Cxx from typical microscopy filenames, e.g. *_C00.ome.tif -> 0
-        Returns None if no Cxx is found.
+        Extract channel index from typical microscopy filenames.
+
+        Extracts Cxx from filenames like ``_C00.ome.tif`` -> 0.
+
+        Parameters
+        ----------
+        path : Path or str
+            Microscopy image filename.
+
+        Returns
+        -------
+        int or None
+            Channel index extracted from Cxx pattern, or None if not found.
+
+        Examples
+        --------
+            >>> infer_channel_index_from_name("image_C03.ome.tif")
+            3
         """
         path = Path(path)
         match = re.search(r"[Cc](\d{2})", path.name)

@@ -51,7 +51,7 @@ Steps performed
       — rasterise graph vertices into a branch density volume.
 
 Outputs (written to the experiment directory via the workspace)
---------------------------------------------------------------
+---------------------------------------------------------------
 * ``binary.npy`` / ``binary_smoothed.npy`` / … — intermediate binary masks
 * ``binary_combined.npy`` — merged vessel mask
 * ``skeleton.npy`` — skeletonized binary

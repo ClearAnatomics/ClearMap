@@ -285,11 +285,11 @@ def first_boot(*, allow_prompt: bool = True) -> BootResult:
     """
     Call this at the very beginning of your entry point.
     It will:
-      - ensure the per-user config exists
-      - patch temp dir (may prompt unless headless or allow_prompt=False)
-      - run migrations (if version changed)
-      - ensure desktop entry on Linux (best-effort)
-      - persist a small boot state stamp
+    - ensure the per-user config exists
+    - patch temp dir (may prompt unless headless or allow_prompt=False)
+    - run migrations (if version changed)
+    - ensure desktop entry on Linux (best-effort)
+    - persist a small boot state stamp
     """
     mc = MachineConfig()
 

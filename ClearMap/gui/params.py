@@ -522,17 +522,18 @@ class StitchingParams(ChannelsUiParameterCollection):
 
     def add_channel(self, channel_name, data_type=None):
         """
-        Add a channel to the stitching parameters if not already present
+        Add a channel to the stitching parameters if not already present.
 
         .. warning::
+            This only adds the channel to the config — it **does not**
+            create the UI elements.  UI creation is handled by the tab's
+            ``add_channel_tab()`` method.
 
-            This only adds the channel to the config it **does not** create the UI elements.
-            This will be handled by
         Parameters
         ----------
-        channel_name: str
-            The name of the channel to add
-        data_type: str, optional
+        channel_name : str
+            The name of the channel to add.
+        data_type : str, optional
         """
         if channel_name in self.channels:
             return

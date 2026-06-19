@@ -628,14 +628,27 @@ class GenericTab(GenericUi, BusSubscriberMixin):
         Decorator for tab methods that produce plot widgets.
 
         Handles:
-        - status message display
-        - clearing previous plots
-        - MissingRequirementException / PlotGraphError
-        - (dvs, titles) tuple return pattern
-        - setup_plots() call
-        - filtering return to DataViewer instances only
 
-        Usage:
+        - Status message display.
+        - Clearing previous plots.
+        - ``MissingRequirementException`` / ``PlotGraphError``.
+        - ``(dvs, titles)`` tuple return pattern.
+        - ``setup_plots()`` call.
+        - Filtering return to ``DataViewer`` instances only.
+
+        Parameters
+        ----------
+        status_msg : str, optional
+            Status message to display during plotting (default: ``''``).
+
+        Returns
+        -------
+        Callable
+            Decorated function that wraps plot logic with error handling
+            and setup.
+
+        Examples
+        --------
             @GenericTab.ui_plot("Plotting p-values…")
             def plot_p_vals(self, ...):
                 # pure plotting logic

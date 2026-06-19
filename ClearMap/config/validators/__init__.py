@@ -1,25 +1,27 @@
 """
-ClearMap config validation — public API.
-This module exposes stable entrypoints; implementations live in private modules.
+ClearMap config validation - public API.
+
+This module exposes stable entrypoints; implementations live in private
+modules.
 
 Functions
 ---------
-validate_all(config: Mapping[str, Mapping[str, Any]], *, schemas_dir: Path) ->
-    Validate a full multisection config.
 
-    1) JSON-Schema per section (Draft 2020-12), with typedefs and dynamic enums
-    2) Semantic checks (cross-field/cross-section rules)
+``validate_all(config, *, schemas_dir)``
+    Validate a full multi-section config.
 
-    Raises AggregatedValidationError with aggregated messages on failure.
+    1. JSON-Schema per section (Draft 2020-12), with typedefs and dynamic enums.
+    2. Semantic checks (cross-field / cross-section rules).
 
-validate_static(config: Mapping[str, Mapping[str, Any]], sv: SectionValidators) ->
+    Raises ``AggregatedValidationError`` with aggregated messages on failure.
+
+``validate_static(config, sv)``
     Validate each section of the config using JSON-Schema (Draft 2020-12).
+    Uses the provided ``SectionValidators`` instance to load and cache schemas.
+    Raises ``AggregatedValidationError`` with aggregated messages on failure.
 
-    Uses the provided SectionValidators instance to load and cache schemas.
-
-    Raises AggregatedValidationError with aggregated messages on failure.
-
-run_semantic_checks(config: Mapping[str, Mapping[str, Any]], sv: SectionValidators) ->
+``run_semantic_checks(config, sv)``
+    Run cross-field / cross-section semantic validation rules.
 """
 from pathlib import Path
 from typing import Mapping, Any, Protocol, List

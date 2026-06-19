@@ -52,8 +52,9 @@ MaxProj: TypeAlias = Optional[Union[int, List[int]]]
 class PlotPanel:
     """
     One window in multi_plot.
-    images: Any that Plot3d already accepts:
-      Path | str | np.ndarray | Source | List[Any] | List[List[Any]] (overlays)
+
+    images : Path | str | np.ndarray | Source | List[Any] | List[List[Any]] (overlays)
+        Typically, any that Plot3d already accepts
     """
     images: SourceType
     title: Optional[str] = None

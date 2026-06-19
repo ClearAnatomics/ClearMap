@@ -24,7 +24,7 @@ class ContainerRole(StrEnum):
     """
     The role of the instance container in the overall config structure.
     1) SOURCE_OF_TRUTH: authoritative source of truth for the given keys.
-        (typically for sample.channels)
+    (typically for sample.channels)
     2) INSTANCE_RUNTIME: runtime instance container, derived from source of truth.
     """
     SOURCE_OF_TRUTH = "source_of_truth"     # sample.channels
@@ -52,6 +52,7 @@ class ReconcileKind(StrEnum):
 class InstancePolicy:
     """
     Policy for handling existing keys in instance containers.
+
     Parameters
     ----------
     preserve_existing: bool

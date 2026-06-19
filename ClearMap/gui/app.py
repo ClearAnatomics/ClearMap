@@ -308,7 +308,11 @@ class ClearMapAppBase(QMainWindow, Ui_ClearMapGui):
         Set the font sizes of the widgets based on *target_font_size*. All fonts will
         be shifted based on that size. This should preserve the size relationships of the fonts
         in the program. It is assumed that the program uses 4 font sizes:
-            - small, regular, big and huge
+        - small
+        - regular
+        - big
+        - and huge
+
         This will shift font sizes so that the supplied size corresponds to the new regular size.
 
         Parameters
@@ -1255,6 +1259,7 @@ class ClearMapApp(ClearMapAppBase):
     def load_sample(self) -> bool:
         """
         Load the sample configuration.
+
         If the sample path does not exist, prompt the user to clone an existing config,
         load a default config, or cancel.
         If the sample path exists, ensure a sample ID is set.
@@ -1263,10 +1268,9 @@ class ClearMapApp(ClearMapAppBase):
         Returns
         -------
         bool
-           True  -> existing experiment, caller must call boot_open()
-           False -> either:
-                      - new experiment already bootstrapped & opened, or
-                      - user canceled (src_folder is cleared)
+            - True: Existing experiment; caller must call boot_open().
+            - False: Either new experiment already bootstrapped & opened, or user canceled
+              (src_folder is cleared).
         """
         if not self.experiment_controller.sample_path_exists():
             match ClearMap.gui.dialog_helpers.option_dialog('New experiment', 'This seems to be a new experiment. Do you want to: ',

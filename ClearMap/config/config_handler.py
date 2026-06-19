@@ -4,7 +4,7 @@ This module provides a class to load/write configuration files from the ClearMap
 The configuration files are used to store the parameters for the ClearMap processing steps.
 Supported formats are .cfg (ConfigObj), .yml/.yaml (YAML) and .json (JSON).
 Other formats (TOML, INI, XML, etc.)  could be supported in the future through
- a simple plugin function to this module.
+a simple plugin function to this module.
 """
 import inspect
 import json
@@ -971,6 +971,7 @@ class ConfigHandler:
         from_package: bool
             If True, look for the default config in the ClearMap package directory.
             Otherwise, look in the user's ~/.clearmap directory.
+
             .. warning::
                 This only affects the default path if no base_dir is specified.
 

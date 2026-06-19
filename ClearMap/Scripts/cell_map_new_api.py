@@ -38,7 +38,7 @@ Steps performed
    d. Plots the density map and a 3-D scatter of cells coloured by atlas region.
 
 Outputs (written to the experiment directory via the workspace)
---------------------------------------------------------------
+---------------------------------------------------------------
 * ``cells_raw.npy`` — raw detected cell table per channel
 * ``cells_filtered.npy`` — filtered cell table
 * ``cells.feather`` — atlas-annotated cell table (coordinates + region labels)

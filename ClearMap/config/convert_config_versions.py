@@ -57,10 +57,23 @@ def cfg_converter(from_v: str, to_v: str, config_type: str):
     """
     Register a file-level converter.
 
-    Usage:
+    Parameters
+    ----------
+    from_v: str
+        The version the converter expects as input.
+    to_v: str
+        The version the converter produces as output.
+    config_type: str
+        The canonical name of the config type (e.g. 'sample', 'alignment', 'cell_map', 'machine').
+
+    Examples
+    --------
+
+    .. code-block:: python
+
         @register_file_converter('3.0', '3.1', 'sample')
         def convert_sample_3_0_to_3_1(cfg_path: Path) -> Path:
-            ...
+        ...
     """
     from_v = _norm_ver(from_v)
     to_v = _norm_ver(to_v)
@@ -113,7 +126,11 @@ def project_converter(from_v: str, to_v: str):
     """
     Register a project-level converter.
 
-    Usage:
+    Usage
+    -----
+
+    .. code-block:: python
+
         @register_project_converter('3.0', '3.1')
         def convert_project_3_0_to_3_1(exp_dir: Path) -> None:
             ...
