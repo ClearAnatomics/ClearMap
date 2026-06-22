@@ -188,7 +188,7 @@ class CellDetector(ChannelPipelineOrchestrator):
         ----------
         sub_step: str
             If specified, will use the coordinates from the specified sub_step (e.g. 'aligned')
-        weights_column: str
+        weights_column: str | None
             If specified, this column in the cells table will be used to add weights to the
             voxelization spheres (e.g. for intensity voxelization).
             The column must be present in the cells table.
@@ -197,7 +197,7 @@ class CellDetector(ChannelPipelineOrchestrator):
         -------
             coordinates, counts_file_path: np.array, str
         """
-        if weights_column not in self.list_valid_weighing_columns(sub_step=sub_step):
+        if weights_column is not None and weights_column not in self.list_valid_weighing_columns(sub_step=sub_step):
             raise ValueError(f'Column {weights_column} is invalid. '
                              f'Valid options are {self.list_valid_weighing_columns(sub_step)}')
         coordinates, cells, voxelization_parameter = self.get_voxelization_params(sub_step=sub_step)

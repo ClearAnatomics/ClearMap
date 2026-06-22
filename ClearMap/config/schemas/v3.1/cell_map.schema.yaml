@@ -72,6 +72,10 @@ properties:
           additionalProperties: true
           properties:
             radii: { $ref: "./typedefs.schema.yaml#/$defs/numberTriplePositive" }
+            weights:
+              anyOf:
+                - { type: string }
+                - { type: "null" }
 
         run:
           type: object

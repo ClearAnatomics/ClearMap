@@ -22,6 +22,7 @@ templates:
         intensity: null
     voxelization:
       radii: [5, 5, 5]
+      weights: null
     run:
       plot_when_finished: false
 
