@@ -128,6 +128,7 @@ from .sample_info_management import SampleManager
 from .registration_orchestrator import RegistrationProcessor
 
 from ..Analysis.graphs.graph_processing import Percentile
+from ..Analysis.graphs.vessel_classifier import ClassificationConfig, VesselClassifier
 
 __author__ = ('Christoph Kirst <christoph.kirst.ck@gmail.com>,'
               ' Sophie Skriabine <sophie.skriabine@icm-institute.org>,'
@@ -137,7 +138,6 @@ __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
-from ..Analysis.graphs.vessel_classifier import ClassificationConfig, VesselClassifier
 
 MAX_PLOT_VERTICES = 300_000  # Empirical max number of vertices that can safely be plotted
 
