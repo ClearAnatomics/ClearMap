@@ -1,7 +1,7 @@
 import sys
 
-from ClearMap.processors.sample_preparation import SampleManager
-from ClearMap.processors.degree1_inference_processor import degree1_verification
+from ClearMap.pipeline_orchestrators.sample_info_management import SampleManager
+from ClearMap.pipeline_orchestrators.degree1_inference_processor import degree1_verification
 
 
 def main(sample_directory=None, graph_step='reduced'):
