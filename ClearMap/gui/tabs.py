@@ -18,7 +18,7 @@ own UI elements. It is composed of:
 - `sample_manager`: handles the sample metadata and workspace.
 - `sample_params`: experiment-level object that links the UI to the sample configuration file.
 - `params`: tab specific parameter link object (UI - config).
-(For the `SampleInfoTab`, this is the `SampleParameters` object.)
+  (For the `SampleInfoTab`, this is the `SampleParameters` object.)
 - `name`: used to identify the tab in the GUI.
 - `processing_type`: identifies the type of tab, one of (None, 'pre', 'post', 'batch').
 

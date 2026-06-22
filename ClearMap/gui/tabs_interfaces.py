@@ -649,6 +649,9 @@ class GenericTab(GenericUi, BusSubscriberMixin):
 
         Examples
         --------
+
+        .. code-block:: python
+
             @GenericTab.ui_plot("Plotting p-values…")
             def plot_p_vals(self, ...):
                 # pure plotting logic
