@@ -1140,7 +1140,7 @@ class CellCounterTab(PostProcessingTab["CellDetector"]):
         if self.sample_manager.get('cells', channel=channel, postfix='filtered').exists:
             worker = self.get_worker(channel)
             self.wrap_step('Voxelization', worker.voxelize,
-                           step_kw_args={'weights_column': self.params.voxelization_weights},
+                           step_kw_args={'weights_column': self.params[channel].voxelization_weights},
                            abort_func=worker.stop_process, nested=False)
         else:
             self.main_window.popup('Could not run voxelization, missing filtered cells table. '

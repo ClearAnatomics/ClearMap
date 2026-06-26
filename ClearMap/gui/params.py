@@ -1093,6 +1093,7 @@ class ChannelCellMapParams(ChannelUiParameter, OrthoviewerSlicingMixin):
     cell_filter_size: List[int]
     cell_filter_intensity: List[int]
     voxelization_radii: List[int]
+    voxelization_weights: Optional[str]
     detect_cells: bool
     filter_cells: bool
     voxelize: bool

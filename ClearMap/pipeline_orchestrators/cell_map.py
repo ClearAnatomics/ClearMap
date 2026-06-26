@@ -173,20 +173,20 @@ class CellDetector(ChannelPipelineOrchestrator):
             raise ValueError('CellDetector not properly initialized')
         self.patch_channel({'voxelization': {'radii': list(voxelization_radii)}})
 
-    def list_valid_weighing_columns(self, sub_step=''):
-        aligned = sub_step != ''
+    def list_valid_weighing_columns(self, sub_step: str | None= None):
+        aligned = sub_step not in ('raw', 'filtered')
         cells_df = self.get_coords(coord_type=sub_step, aligned=aligned)
         excluded_columns = {'id', 'name', 'order', 'color', 'volume'}
         return set(cells_df.columns) - excluded_columns
 
-    def voxelize(self, sub_step='', weights_column=None):        # FIXME: add uncrusting ?
+    def voxelize(self, sub_step: str | None=None, weights_column=None):        # FIXME: add uncrusting ?
         """
         Unweighted voxelization (i.e. cell counts)
         This will draw a sphere of radius r around each cell and increment the voxel values.
 
         Parameters
         ----------
-        sub_step: str
+        sub_step: str | None
             If specified, will use the coordinates from the specified sub_step (e.g. 'aligned')
         weights_column: str | None
             If specified, this column in the cells table will be used to add weights to the
