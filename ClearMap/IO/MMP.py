@@ -304,7 +304,8 @@ def create(location = None, shape = None, dtype = None, order = None,
 ### Helpers
 ###############################################################################
 
-def _memmap(location = None, shape = None, dtype = None, order = None, mode = None, array = None):
+def _memmap(location = None, shape = None, dtype = None, order = None,
+            mode = None, array = None):
   """Create a memory map.
   
   Arguments
@@ -368,7 +369,6 @@ def _memmap(location = None, shape = None, dtype = None, order = None, mode = No
     fortran = order in ['F', None]  #default is 'F' for memmaps
     
     memmap = np.lib.format.open_memmap(location, mode=mode, shape=shape, dtype=dtype, fortran_order=fortran)
-
   elif isinstance(array, np.memmap):
     location = location if location is not None else array.filename
     location = fu.abspath(location)
@@ -392,7 +392,6 @@ def _memmap(location = None, shape = None, dtype = None, order = None, mode = No
       mode = 'r+'
     if mode != memmap.mode:
       memmap = np.lib.format.open_memmap(location, mode = mode)
-
   elif isinstance(array, np.ndarray):
     if not isinstance(location, str):
       raise ValueError('Cannot create memmap without a location!')
@@ -410,9 +409,8 @@ def _memmap(location = None, shape = None, dtype = None, order = None, mode = No
 
     if mode is None:
       mode = 'r+'
-    if mode != memmap.mode:
+    if mode not in ('w+', memmap.mode):
       memmap = np.lib.format.open_memmap(location, mode=mode)
-
   else:
     raise ValueError('Array is not a valid!')
 
