@@ -19,7 +19,7 @@ from ClearMap.IO.metadata import define_auto_resolution
 
 from ClearMap.Utils.events import (ChannelRenamed, UiAtlasIdChanged,
                                    UiAtlasStructureTreeIdChanged,  RegistrationStatusChanged)
-from ClearMap.Utils.exceptions import ClearMapAssetError, ParamsOrientationError
+from ClearMap.Utils.exceptions import ClearMapAssetError, ParamsOrientationError, MissingRequirementException
 from ClearMap.Utils.utilities import (runs_on_ui, check_stopped, DEFAULT_ORIENTATION,
                                       validate_orientation,  sanitize_n_processes)
 
@@ -47,7 +47,10 @@ class RegistrationProcessor(PipelineOrchestrator):
     Manage atlas setup and transformations.
     Handle registration configurations.
     """
+    _PARAMETRIZED_ASSET_TYPES = frozenset({'aligned', 'fixed_landmarks', 'moving_landmarks'})
+
     config_name = 'registration'
+
     def __init__(self, sample_manager: SampleManager, cfg_coordinator: ConfigCoordinator):
         super().__init__(cfg_coordinator)
         self.sample_manager: SampleManager = sample_manager
@@ -85,6 +88,48 @@ class RegistrationProcessor(PipelineOrchestrator):
         # WARNING: must be called once registration pipeline has been added to the Workspace for that channel
         # self.parametrize_assets()
 
+    def get(self, asset_type, channel='current', asset_sub_type=None, **kwargs):
+        """
+        Get an asset, automatically resolving registration template
+        variables for asset types that require parametrisation (e.g. registration
+        (Elastix) assets, where
+        moving/fixed channels are conditional).
+
+        Parameters
+        ----------
+        asset_type : str
+            The asset type name.
+        channel : str
+            The channel name.
+        asset_sub_type : str or None
+            Optional sub-type.
+        **kwargs
+            Forwarded to the parent ``get``.
+
+        Returns
+        -------
+        Asset
+            The resolved asset.
+        """
+        asset = super().get(asset_type, channel=channel, asset_sub_type=asset_sub_type, **kwargs)
+
+        if (asset_type not in self._PARAMETRIZED_ASSET_TYPES
+                or not asset.is_expression
+                or asset.is_parametrized):  # is_parametrized available only on ExpressionAsset
+            return asset
+
+        moving_channel = self.get_moving_channel(channel)
+        if moving_channel in (None, 'intrinsically_aligned'):  # No alignment planned -> no parametrization needed
+            return asset
+
+        fixed_channel, moving_channel = self.get_fixed_moving_channels(channel)
+        if fixed_channel is None or moving_channel is None:
+            return asset
+
+        parametrized = asset.specify({'moving_channel': moving_channel, 'fixed_channel': fixed_channel})
+        self.workspace.asset_collections[channel][asset_type] = parametrized  # UPDATE WORKSPACE to cache
+        return parametrized
+
     def _on_channel_renamed(self, event: ChannelRenamed):
         if event.old in self.annotators:
             self.annotators[event.new] = self.annotators.pop(event.old)
@@ -115,24 +160,20 @@ class RegistrationProcessor(PipelineOrchestrator):
 
     def parametrize_assets(self):
         for channel in self.config['channels']:
-            if self.config['channels'][channel]['align_with'] is None:
+            channel_cfg = self.config['channels'][channel]
+            if channel_cfg['align_with'] is None:
                 continue
-            if self.config['channels'][channel]['moving_channel'] in (None, 'intrinsically_aligned'):
+            if channel_cfg['moving_channel'] in (None, 'intrinsically_aligned'):  # No alignment planned -> no param
                 continue
-            for asset_type in ('fixed_landmarks', 'moving_landmarks', 'aligned'):
+            for asset_type in self._PARAMETRIZED_ASSET_TYPES:
                 try:
-                    asset = self.get_elx_asset(asset_type, channel=channel)
+                    asset = self.get(asset_type, channel=channel)  # triggers parametrization and cache to WS
                 except KeyError:
-                    continue  # FIXME: this should be handled more elegantly
-                              #  the idea is to delay the parametrization
+                    continue  #  the idea is to delay the parametrization
                               #  until the assets for all channels have been created
                 except ClearMapAssetError:  # Check that align_with is None
                     warnings.warn(f'Could not parametrize {asset_type} for {channel=}')
                     continue
-                if asset.is_expression:
-                    fixed_channel, moving_channel = self.get_fixed_moving_channels(channel)
-                    parametrized_asset = asset.specify({'moving_channel': moving_channel, 'fixed_channel': fixed_channel})
-                    self.workspace.asset_collections[channel][asset_type] = parametrized_asset
 
     def add_pipeline(self):  # WARNING: hacky. Maybe add_pipeline_if_missing
         if self.workspace is None:
@@ -252,7 +293,7 @@ class RegistrationProcessor(PipelineOrchestrator):
         if align_with is None:
             return None, moving_channel
         if not align_with:
-            raise KeyError(f'Channel {channel} missing align_with in registration config')
+            raise MissingRequirementException(f'Channel {channel} missing align_with in registration config')
         # fixed is whichever channel from ('channel', 'align_with') is not 'moving_channel'
         fixed_channel = channel if align_with == moving_channel else align_with
         return fixed_channel, moving_channel
@@ -261,17 +302,8 @@ class RegistrationProcessor(PipelineOrchestrator):
         fixed_channel, moving_channel = self.get_fixed_moving_channels(channel)
         if fixed_channel is None or moving_channel is None:
             return None
-
-        asset = self.get(asset_type, channel=channel)
-        if not asset.is_expression:
-            return asset
         else:
-            if asset.is_parametrized:
-                return asset
-            else:
-                parametrized_asset = asset.specify({'moving_channel': moving_channel, 'fixed_channel': fixed_channel})
-                self.workspace.asset_collections[channel][asset_type] = parametrized_asset
-                return parametrized_asset
+            return  self.get(asset_type, channel=channel)
 
     def get_img_to_register(self, channel, other_channel):
         if other_channel == 'atlas':
