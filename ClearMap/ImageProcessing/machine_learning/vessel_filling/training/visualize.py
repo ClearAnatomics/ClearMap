@@ -165,4 +165,4 @@ if __name__ == '__main__':
     # # viewFile('/media/sophie.skriabine/TOSHIBA EXT/Sophie/teryData/arteryData/data_arteries_crust.npy')
     # arr=np.load('/mnt/vol00-renier/Nicolas/data_binary.npy')
     # plot3d(arr)
-    # show()GXFGv
+    # show()
