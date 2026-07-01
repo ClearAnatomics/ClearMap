@@ -1225,6 +1225,8 @@ class CellCounterTab(PostProcessingTab["CellDetector"]):
     def post_process_cells(self, channel: str) -> None:  # WARNING: some plots in .post_process_cells() without UI params
         worker = self.get_worker(channel)
         self.wrap_step('Post processing cells', worker.post_process_cells, abort_func=worker.stop_process)
+        if worker.stopped:  # TODO: check if we need a warning popup
+            return
         self.update_cell_number(channel)
 
     def update_cell_number(self, channel: str) -> None:
@@ -1278,7 +1280,11 @@ class CellCounterTab(PostProcessingTab["CellDetector"]):
     def filter_cells(self, channel: str) -> None:
         self.__filter_cells(channel, is_last_step=False)
         detector = self.get_worker(channel)
+        if detector.stopped:
+            return
         self.wrap_step('Aligning', detector.atlas_align, abort_func=detector.stop_process, save_cfg=False)
+        if detector.stopped:
+            return
         detector.export_collapsed_stats()
 
     def run_cell_map(self) -> None:
@@ -1289,13 +1295,20 @@ class CellCounterTab(PostProcessingTab["CellDetector"]):
     def run_channel(self, channel: str) -> None:
         """Run the whole pipeline at once for a single channel"""
         self.update_cell_number(channel)
+        detector = self.get_worker(channel)
         params = self.params[channel]
         if params.detect_cells:
             self.detect_cells(channel)
+            if detector.stopped:
+                return
         if params.filter_cells:
             self.post_process_cells(channel)
+            if detector.stopped:
+                return
         if params.voxelize:
             self.voxelize(channel)
+            if detector.stopped:
+                return
         if params.plot_when_finished:
             self.plot_cell_map_results(channel)
 
