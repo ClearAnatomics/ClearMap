@@ -77,6 +77,7 @@ See also
 :mod:`ClearMap.IO.assets_constants` : ``CONTENT_TYPE_TO_PIPELINE`` mapping.
 """
 import atexit
+import getpass
 import os
 import re
 import shutil
@@ -897,7 +898,7 @@ def _make_bootstrap_dir() -> Path:
     until the experiment folder is set by the user.
     We prefer a user-configured temp if available (CLEARMAP_TMP env var)
     otherwise use the system temp folder.
-    The folder is named "clearmap_bootstrap/session_<pid>" to avoid clashes
+    The folder is named "clearmap_bootstrap-<username>/session_<pid>" to avoid clashes
     if multiple instances are running.
     The folder is removed on exit if it stayed unused (i.e. still a bootstrap dir).
     Returns
@@ -906,7 +907,7 @@ def _make_bootstrap_dir() -> Path:
         The path to the temporary bootstrap directory
     """
     root = Path(os.environ.get('CLEARMAP_TMP', tempfile.gettempdir()))
-    session = root / 'clearmap_bootstrap' / f'session_{os.getpid()}'
+    session = root / f'clearmap_bootstrap-{getpass.getuser()}' / f'session_{os.getpid()}'
     session.mkdir(parents=True, exist_ok=True)
     return session
 
