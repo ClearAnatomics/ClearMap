@@ -246,6 +246,19 @@ class ClearMapIoException(ClearMapException, IOError):
     user_title = 'I/O Error'
 
 
+class ClearMapFileNotFoundError(ClearMapIoException, FileNotFoundError):
+    """Raised when a required file is not found on disk."""
+    user_title = 'File Not Found'
+    severity = Severity.FATAL
+
+
+class ClearMapPermissionError(ClearMapIoException, PermissionError):
+    """Raised when there are insufficient permissions to read/write a file."""
+    user_title = 'Permission Denied'
+    user_hint = 'Check file permissions or ensure the file is not opened in another program.'
+    severity = Severity.FATAL
+
+
 class SourceModuleNotFoundError(ClearMapIoException):
     """No reader module is registered for the given file extension.
 
