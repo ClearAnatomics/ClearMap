@@ -46,10 +46,6 @@ class Source(src.Source):
     self._location = location
 
   @property
-  def name(self):
-    return "Nrrd-Source"
-
-  @property
   def location(self):
     return self._location
 
@@ -231,23 +227,14 @@ class Source(src.Source):
 
 
 class VirtualSource(src.VirtualSource):
-  def __init__(self, source = None, shape = None, dtype = None, order = None, location = None, name = None):
-    super(VirtualSource, self).__init__(source=source, shape=shape, dtype=dtype, order=order, location=location, name=name)
+  _real_class = Source
+
+  def __init__(self, source=None, shape=None, dtype=None,
+               order=None, location=None, name=None, mode=None):
+    super().__init__(source=source, shape=shape, dtype=dtype, order=order,
+                     location=location, name=name, mode=mode)
     if isinstance(source, Source):
       self.location = source.location
-
-  @property 
-  def name(self):
-    return 'Virtual-Nrrd-Source'
-
-  def as_virtual(self):
-    return self
-
-  def as_real(self):
-    return Source(location=self.location)
-
-  def as_buffer(self):
-    return self.as_real().as_buffer()
 
 
 ###############################################################################

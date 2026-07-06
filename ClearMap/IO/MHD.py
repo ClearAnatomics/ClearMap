@@ -59,10 +59,6 @@ class Source(src.Source):
                 self._array = None
 
     @property
-    def name(self):
-        return "Mhd-Source"
-
-    @property
     def location(self):
         return self._location
 
@@ -278,19 +274,7 @@ class VirtualSource(src.VirtualSource):
     def __init__(self, source=None, shape=None, dtype=None, order=None, location=None, name=None):
         super(VirtualSource, self).__init__(source=source, shape=shape, dtype=dtype, order=order, location=location,
                                             name=name)
-
-    @property
-    def name(self):
-        return 'Virtual-Mhd-Source'
-
-    def as_virtual(self):
-        return self
-
-    def as_real(self):
-        return Source(location=self.location)
-
-    def as_buffer(self):
-        return self.as_real().as_buffer()
+    _real_class = Source
 
 
 ###############################################################################

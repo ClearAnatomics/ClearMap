@@ -22,8 +22,7 @@ from typing import NamedTuple, Optional, List, Dict, Tuple, Any
 import numpy as np
 from tifffile import tifffile
 
-from ClearMap.IO.Source import Source as AbstractSource
-from ClearMap.IO.Source import VirtualSource as AbstractVirtualSource
+from ClearMap.IO import Source as source_module
 import ClearMap.IO.Slice as cmp_clicing
 
 from ClearMap.Utils.Lazy import lazyattr
@@ -33,7 +32,7 @@ from ClearMap.Utils.Lazy import lazyattr
 # ## Source class
 ###############################################################################
 
-class Source(AbstractSource):
+class Source(source_module.Source):
     """Class to handle a tif file source
 
     Note
@@ -51,11 +50,7 @@ class Source(AbstractSource):
         self._series = series
         self.multi_file = multi_file
         if not self.series_mode and not self.pages_mode:
-            raise ValueError(f'Unknown metadata type {self._metadata_type}')
-
-    @property
-    def name(self):
-        return "Tif-Source"
+            raise ClearMapValueError(f'Unknown metadata type {self._metadata_type}')
 
     @lazyattr
     def series(self):
@@ -317,25 +312,16 @@ class Source(AbstractSource):
         return f'{name}{shape}{dtype}{order}{location}'
 
 
-class VirtualSource(AbstractVirtualSource):
-    def __init__(self, source=None, shape=None, dtype=None, order=None, location=None, name=None):
-        super(VirtualSource, self).__init__(source=source, shape=shape, dtype=dtype, order=order, location=location, name=name)
+class VirtualSource(source_module.VirtualSource):
+    def __init__(self, source=None, shape=None, dtype=None,
+                 order=None, location=None, name=None, mode=None):
+        super().__init__(source=source, shape=shape, dtype=dtype, order=order, location=location, name=name, mode=mode)
         if isinstance(source, Source):
             self.multi_file = source.multi_file
             self.series = source._series
 
-    @property
-    def name(self):
-        return 'Virtual-Tif-Source'
-
-    def as_virtual(self):
-        return self
-
     def as_real(self):
         return Source(location=self.location, series=self.series, multi_file=self.multi_file)
-
-    def as_buffer(self):
-        return self.as_real().as_buffer()
 
 
 ###############################################################################

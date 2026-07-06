@@ -8,17 +8,17 @@ IO interface to numpy arrays.
 __author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
 __license__   = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
-__webpage__   = 'http://idisco.info'
-__download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
+__webpage__   = 'https://idisco.info'
+__download__  = 'https://www.github.com/ChristophKirst/ClearMap2'
 
 
 import numpy as np
 
 import ClearMap.IO.Source as src
-#import ClearMap.IO.FileUtils as fu
+from ClearMap.Utils.exceptions import ClearMapPermissionError
 
 ###############################################################################
-### Source classe
+### Source class
 ###############################################################################
 
 class Source(src.Source):
@@ -39,18 +39,9 @@ class Source(src.Source):
   def __getattr__(self, name):
     #numpy attributes
     if name != '_array' and hasattr(self, '_array') and hasattr(self._array, name):
-      return getattr(self._array, name);
+      return getattr(self._array, name)
     else:
-      raise AttributeError('Not such attribute %r!' % name);
-  
-  #def __del__(self):
-  #  self._array = None;
-    
-  
-  @property
-  def name(self):
-    return "Numpy-Source";  
-  
+      raise AttributeError(f'Not such attribute {name!r}!')
   
   @property
   def array(self):
@@ -61,12 +52,11 @@ class Source(src.Source):
     array : array
       The underlying data array of this source.
     """
-    return self._array;
+    return self._array
   
   @array.setter
   def array(self, value):
-    self._array = _array(value);
-
+    self._array = _array(value)
   
   @property 
   def shape(self):
@@ -77,13 +67,12 @@ class Source(src.Source):
     shape : tuple
       The shape of the source.
     """
-    return self._array.shape;
-  
+    return self._array.shape
+
   @shape.setter
   def shape(self, value):
-    self._array.shape = value;
-  
-  
+    self._array.shape = value
+
   @property 
   def dtype(self):
     """The data type of the source.
@@ -93,12 +82,11 @@ class Source(src.Source):
     dtype : dtype
       The data type of the source.
     """
-    return self._array.dtype;
-  
+    return self._array.dtype
+
   @dtype.setter
   def dtype(self, value):
     self._array = np.asarray(self._array, dtype=value)
-  
     
   @property 
   def order(self):
@@ -109,13 +97,12 @@ class Source(src.Source):
     order : str
       Returns 'C' for C contigous and 'F' for fortran contigous, None otherwise.
     """
-    return order(self.array);
-  
+    return order(self.array)
+
   @order.setter
   def order(self, value):
     self._array = np.asarray(self._array, order = value)
-    
-  
+
   @property
   def element_strides(self):
     """The strides of the array elements.
@@ -131,7 +118,6 @@ class Source(src.Source):
     """
     return tuple(s // self._array.itemsize for s in self._array.strides)
   
-  
   @property
   def offset(self):
     """The offset of the memory map in the file.
@@ -142,24 +128,21 @@ class Source(src.Source):
       Offset of the memeory map in the file.
     """
     if self._array.base is not None:
-      return np.byte_bounds(self._array)[0] - np.byte_bounds(self._array.base)[0];
+      return np.byte_bounds(self._array)[0] - np.byte_bounds(self._array.base)[0]
     else:
-      return 0;
-  
+      return 0
+
   ### Parallel processing
   def as_virtual(self):
     #TODO: convert to shared memory array ? -> needs to be implemented to make block processing work for in memory  numpy arrays !
-    return self;
-    
-  def as_real(self):
-    return self;
-  
+    return self
+
   def as_buffer(self):
-    return self._array;
-  
+    return self._array
+
   ### Data
   def __getitem__(self, *args):
-    return self.array.__getitem__(*args);
+    return self.array.__getitem__(*args)
 
   def __setitem__(self, *args):
     self.array.__setitem__(*args);
@@ -177,9 +160,6 @@ class Source(src.Source):
 #  def __array_finalize__(self, obj):
 #    if obj is None: return
 #    #self.order = getattr(obj, 'order', None)
-#
-#  def name(self):
-#    return "Source-Numpy";
 #    
 #  def array(self):
 #    return self.view(np.ndarray);
@@ -240,17 +220,17 @@ def order(array):
   order : 'C', 'F', None
   """
   if isinstance(array, src.Source):
-    return array.order;
+    return array.order
   elif isinstance(array, np.ndarray):
     if array.flags['C_CONTIGUOUS']:
       return 'C'
-    elif  array.flags['F_CONTIGUOUS']:
+    elif array.flags['F_CONTIGUOUS']:
       return 'F'
     else:
-      return None;
+      return None
   else:
-    return None;
-    
+    return None
+
 
 ###############################################################################
 ### IO Interface
@@ -258,31 +238,31 @@ def order(array):
 
 def is_numpy(source):
   if isinstance(source, (Source, np.ndarray, list, tuple)):
-    return True;
+    return True
   #elif isinstance(source, str): # and fu.file_extension(source) == 'npy':
   #  return True;
   else:
-    return False;
+    return False
 
 
 def read(source, slicing = None, as_source = None, as_array = None, processes = None, **kwargs):
   if isinstance(source, (list, tuple)):
-    source = np.array(source);   
+    source = np.array(source)
   if isinstance(source, Source):
     if slicing is not None:
-      source = source.__getitem__(slicing);
+      source = source.__getitem__(slicing)
     if as_array:
       return source.array
     else:
-      return source;
+      return source
   elif isinstance(source, np.ndarray):
     if slicing is not None:
-      source = source.__getitem__(slicing);
+      source = source.__getitem__(slicing)
     if as_source:
-      return Source(array = source);
+      return Source(array = source)
     else:
-      return source;
-#  elif isinstance(source, str): # and fu.file_extension(source) == 'npy':
+      return source
+  #  elif isinstance(source, str): # and fu.file_extension(source) == 'npy':
 #    source = np.load(source);   
 #    if slicing is not None:
 #      source = source.__getitem__(slicing);
@@ -297,24 +277,23 @@ def read(source, slicing = None, as_source = None, as_array = None, processes = 
 #TODO: add processes keyword for parallel writing
 def write(sink, data, slicing = None, **kwargs):
   if slicing is None:
-    slicing = ();
+    slicing = ()
   if sink is None:
-    return data.__getitem__(slicing);
+    return data.__getitem__(slicing)
   if isinstance(sink, (src.Source, np.ndarray)):
-    sink.__setitem__(slicing, data);
-    return sink;
-#  elif isinstance(sink, str): #and fu.file_extension(sink) == 'npy'
+    sink.__setitem__(slicing, data)
+    return sink
+#  elif isinstance(sink, str): # and fu.file_extension(sink) == 'npy'
 #    if slicing != ():
 #      if not fu.is_file(sink):
-#        raise ValueError('Cannot write slice to a not existing file %s!' % sink);
-#      memmap = np.lib.format.open_memmap(sink);
-#      memmap.__setitem__(slicing, data);
+#        raise ValueError('Cannot write slice to a not existing file %s!' % sink)
+#      memmap = np.lib.format.open_memmap(sink)
+#      memmap.__setitem__(slicing, data)
 #    else:
-#      np.save(sink, data);
-#    return sink;
+#      np.save(sink, data)
+#    return sink
   else:
     raise ValueError('The sink is not a valid numpy sink!')
-
 
 
 def create(shape = None, dtype = None, order = None, array = None, as_source = True, **kwargs):
@@ -344,16 +323,18 @@ def create(shape = None, dtype = None, order = None, array = None, as_source = T
   """
   array = _array(shape=shape, dtype=dtype, order=order, array=array)
   if as_source:
-    return Source(array=array);
+    return Source(array=array)
   else:
-    return array;
+    return array
+
 
 ###############################################################################
 ### Helpers
 ###############################################################################
 
 def _order(array):
-  return order(array);
+  return order(array)
+
 
 def _array(shape = None, dtype = None, order = None, array = None):
   """Create a numpy array.
@@ -375,26 +356,25 @@ def _array(shape = None, dtype = None, order = None, array = None):
     The array.
   """ 
   if isinstance(array, (list, tuple)):
-    array = np.asarray(array, order=order, dtype=dtype);
-  
+    array = np.asarray(array, order=order, dtype=dtype)
+
   if isinstance(array, np.ndarray):
-    shape = shape if shape is not None else array.shape;
-    dtype = dtype if dtype is not None else array.dtype;
-    order = order if order is not None else _order(array);
+    shape = shape if shape is not None else array.shape
+    dtype = dtype if dtype is not None else array.dtype
+    order = order if order is not None else _order(array)
 
     if shape != array.shape:
-      raise ValueError('Shape %r and array shape %r mismatch!' % (shape, array.shape));
-    
+      raise ValueError('Shape %r and array shape %r mismatch!' % (shape, array.shape))
+
     if dtype != array.dtype or order != _order(array):
-      array = np.asarray(array, order=order, dtype=dtype);
-  
+      array = np.asarray(array, order=order, dtype=dtype)
+
   else:
     if shape is None:
-      raise ValueError('Cannot create array without shape!');
-    array = np.zeros(shape, dtype=dtype, order=order);
-  
-  return array;
+      raise ValueError('Cannot create array without shape!')
+    array = np.zeros(shape, dtype=dtype, order=order)
 
+  return array
 
 
 ###############################################################################
@@ -403,22 +383,22 @@ def _array(shape = None, dtype = None, order = None, array = None):
 
 def _test():
   import numpy as np
-  import ClearMap.IO.NPY as npy;
+  import ClearMap.IO.NPY as npy
   #reload(npy);
   
-  s = npy.Source(array=np.zeros((5,7)));
-  print(s);
-  
+  s = npy.Source(array=np.zeros((5,7)))
+  print(s)
+
   import ClearMap.IO.Slice as slc
-  t = slc.Slice(source= s, slicing= (1,));
-  print(t);
-  
+  t = slc.Slice(source= s, slicing= (1,))
+  print(t)
+
   v = t.as_virtual()
-  print(v);
-  
+  print(v)
+
   x = np.ones(250*1000*1000)
-  xs = npy.Source(array=x);
-  
+  xs = npy.Source(array=x)
+
   print(xs)
 
   del x

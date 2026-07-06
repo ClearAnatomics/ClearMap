@@ -17,6 +17,7 @@ __webpage__   = 'https://idisco.info'
 __download__  = 'httpss://github.com/ClearAnatomics/ClearMap'
 
 import pathlib
+import warnings
 
 import numpy as np
 
@@ -139,22 +140,14 @@ class Source(npy.Source):
 
 class VirtualSource(src.VirtualSource):
     """Virtual memory map source."""
+    _real_class = Source
 
     def __init__(self, source = None, shape = None, dtype = None, order = None, name = None):
         super(VirtualSource, self).__init__(source=source, shape=shape, dtype=dtype, order=order, name=name)
-
-    @property
-    def name(self):
-        return 'Virtual-Memmap-Source'
-
-    def as_virtual(self):
-        return self
+        super().__init__(source=source, shape=shape, dtype=dtype, order=order, name=name, mode=mode)
 
     def as_real(self):
         return Source(location=self.location, shape=self.shape, dtype=self.dtype, order=self.order, name=self.name)
-
-    def as_buffer(self):
-        return self.as_real().as_buffer()
 
     @property
     def array(self):
