@@ -37,7 +37,7 @@
         <x>0</x>
         <y>0</y>
         <width>453</width>
-        <height>600</height>
+        <height>588</height>
        </rect>
       </property>
       <attribute name="label">
@@ -58,6 +58,9 @@
        </property>
        <item>
         <widget class="QTabWidget" name="channelsParamsTabWidget">
+         <property name="currentIndex">
+          <number>0</number>
+         </property>
          <widget class="QWidget" name="tab">
           <attribute name="title">
            <string>Tab 1</string>
@@ -78,7 +81,7 @@
         <x>0</x>
         <y>0</y>
         <width>453</width>
-        <height>600</height>
+        <height>588</height>
        </rect>
       </property>
       <attribute name="label">
@@ -148,14 +151,17 @@
           <string>Plot</string>
          </property>
          <layout class="QGridLayout" name="displayGridLayout">
-          <item row="0" column="0">
+          <item row="0" column="0" colspan="3">
+           <widget class="QWidget" name="plotChannelsCheckableListWidget" native="true"/>
+          </item>
+          <item row="1" column="0">
            <widget class="QLabel" name="label">
             <property name="text">
              <string>Mode:</string>
             </property>
            </widget>
           </item>
-          <item row="0" column="1">
+          <item row="1" column="1">
            <widget class="QComboBox" name="stitchingPlotModeComboBox">
             <item>
              <property name="text">
@@ -169,7 +175,7 @@
             </item>
            </widget>
           </item>
-          <item row="0" column="2">
+          <item row="1" column="2">
            <spacer name="horizontalSpacer_2">
             <property name="orientation">
              <enum>Qt::Horizontal</enum>
@@ -182,14 +188,14 @@
             </property>
            </spacer>
           </item>
-          <item row="0" column="3">
+          <item row="1" column="3">
            <widget class="QPushButton" name="displayStitchingPushButton">
             <property name="text">
              <string>Plot</string>
             </property>
            </widget>
           </item>
-          <item row="1" column="3">
+          <item row="2" column="3">
            <widget class="QPushButton" name="displayStitchingClearPlots">
             <property name="text">
              <string>Clear plots</string>
@@ -198,9 +204,6 @@
           </item>
          </layout>
         </widget>
-       </item>
-       <item>
-        <widget class="QWidget" name="plotChannelsCheckableListWidget" native="true"/>
        </item>
       </layout>
      </widget>
