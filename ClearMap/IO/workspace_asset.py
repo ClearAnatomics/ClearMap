@@ -110,7 +110,6 @@ import natsort
 import numpy as np
 
 from ClearMap.Analysis.graphs.graph_gt import Graph
-from ClearMap.Analysis.graphs.graph_gt import load as load_graph
 from ClearMap.IO import IO as clearmap_io
 from ClearMap.IO import FileUtils as file_utils
 from ClearMap.IO.assets_constants import CONTENT_TYPE_TO_PIPELINE
@@ -623,11 +622,21 @@ class Asset(clearmap_io.AssetBase):
     def size(self):
         return self.path.stat().st_size
 
+    def open_ro(self, *args, **kwargs):
+        return clearmap_io.open_ro(self.existing_path, *args, **kwargs)
+
     def read(self, *args, **kwargs):
         if self.type_spec.extensions[0] == '.gt':
-            return load_graph(self.existing_path, *args, **kwargs)
+            return Graph.load(self.existing_path, *args, **kwargs)
         else:
             return clearmap_io.read(self.existing_path, *args, **kwargs)
+
+    def edit(self, *args, **kwargs):
+        # graph is always in-memory, caller must .save()
+        if self.type_spec.extensions[0] == '.gt':
+            return Graph.load(self.existing_path, *args, **kwargs)
+        else:
+            return clearmap_io.edit(self.existing_path, *args, **kwargs)
 
     def write(self, data, *args, **kwargs):
         if isinstance(data, Graph):
@@ -638,7 +647,7 @@ class Asset(clearmap_io.AssetBase):
     def create(self, *args, **kwargs):
         clearmap_io.create(self.path, *args, **kwargs)
 
-    def as_source(self, slicing=None, *args, **kwargs):
+    def as_source(self, slicing=None, *args, **kwargs):  # FIXME: delegate to ``edit``
         return clearmap_io.source(self.existing_path, slicing=slicing, *args, **kwargs)
 
     def shape(self):
@@ -1234,9 +1243,10 @@ class AssetCollection:  # FIXME: fix how assets are retrieved
         kwargs : dict
             Additional parameters to pass to the Asset constructor.
 
-        Returns
-        -------
 
+        Raises
+        ------
+        ClearMapAssetError :
         """
         if type_spec and asset is None:
             asset = Asset(self.base_directory, type_spec,
