@@ -534,12 +534,12 @@ class Annotation:
             hemispheres_file_path = self.hemispheres_file
         hemispheres_atlas = clearmap_io.read(hemispheres_file_path)
         scale = np.prod(atlas_scale)
-        hem_ids = sorted(np.unique(hemispheres_atlas))
+        hem_ids = sorted(np.unique(hemispheres_atlas).astype(int).tolist())
         volumes = {}
         for hem_id in hem_ids:
             unique_ids, counts = np.unique(self.atlas[hemispheres_atlas == hem_id], return_counts=True)
-            for id_, count in zip(unique_ids, counts):
-                volumes[(id_, hem_id)] = count * scale
+            for region_id, count in zip(unique_ids.astype(int).tolist(), counts.tolist()):
+                volumes[(region_id, hem_id)] = int(count) * scale
         return volumes
 
     def get_dict_parents_to_children(self, parents_ids=None, including_parents=False):
