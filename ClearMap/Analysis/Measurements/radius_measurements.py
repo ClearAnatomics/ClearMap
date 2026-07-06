@@ -77,7 +77,7 @@ def measure_radius(source, points, fraction=None, value=None,
                       f'Please note this behavior is deprecated. Future versions will require a scale.',
                       DeprecationWarning, stacklevel=2)
 
-    source = io.read(source).array
+    source = io.read(source)
 
     if verbose:
         timer = tmr.Timer()

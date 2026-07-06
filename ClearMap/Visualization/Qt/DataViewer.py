@@ -88,7 +88,7 @@ class DataViewer(QWidget):
 
         self.points = points
         if self.points is not None:
-            self.points = cmp_io.read(points).array
+            self.points = cmp_io.read(points)
         self.points_item = None
         self.points_style = dict(pen=None, brush='white')
         if points_style is not None:
@@ -96,7 +96,7 @@ class DataViewer(QWidget):
 
         self.vectors = vectors
         if self.vectors is not None:
-            self.vectors = cmp_io.read(vectors).array
+            self.vectors = cmp_io.read(vectors)
         self.vectors_item = None
         self.vectors_base_item = None
         self.vectors_style = dict(pen=None, brush='lightblue')
@@ -105,7 +105,7 @@ class DataViewer(QWidget):
 
         self.orientations = orientations
         if self.orientations is not None:
-            self.orientations = cmp_io.read(orientations).array
+            self.orientations = cmp_io.read(orientations)
         self.orientations_item = None
         self.orientations_style = dict(pen='gray')
         if orientations_style is not None:

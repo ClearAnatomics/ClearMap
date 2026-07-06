@@ -130,7 +130,7 @@ from ClearMap.Visualization.Qt.utils import link_dataviewers_cursors
 from ClearMap.Visualization.Qt import Plot3d as plot_3d
 
 from ClearMap.Utils.exceptions import (ClearMapVRamException, GroupStatsError, MissingRequirementException,
-                                       ClearMapWorkspaceError)
+                                       ClearMapWorkspaceError, ClearMapValueError)
 from ClearMap.Utils.events import (ChannelsChanged, UiPrepareRawDataForClearMap, UiRequestPlotMiniBrain,
                                    UiRequestPlotAtlas, UiOrientationChanged, UiCropChanged, ChannelDefaultsChanged,
                                    UiRequestLandmarksDialog, UiAlignWithChanged, UiVesselGraphFiltersChanged,
@@ -812,9 +812,11 @@ class RegistrationTab(PreProcessingTab['RegistrationProcessor']):
         self.__update_channel_combo_boxes(channel)
 
     def __update_channel_combo_boxes(self, channel: str, page_widget: QWidget | None = None) -> None:
-        """Update lsit of possible channels in combo boxes"""
+        """Update list of possible channels in combo boxes"""
         if page_widget is None:
             page_widget = self.ui.channelsParamsTabWidget.get_channel_widget(channel)
+        if page_widget is None:
+            raise ClearMapValueError(f'page_widget cannot be None for {channel=}')
         other_channels = list(set(self.worker.channels_to_register()) - {channel})
         populate_combobox(page_widget.alignWithComboBox, [None, 'atlas'] + other_channels)
         populate_combobox(page_widget.movingChannelComboBox,

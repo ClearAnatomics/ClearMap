@@ -751,7 +751,7 @@ class Annotation:
             if verbose:
                 print(f'Preparing: from source {src}')
             src = clearmap_io.read(f_path)
-            data = np.array(src.array)
+            data = np.array(src)
 
             if orientation is not None:
                 # transpose data to match orientation

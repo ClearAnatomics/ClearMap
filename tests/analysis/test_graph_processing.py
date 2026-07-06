@@ -17,7 +17,7 @@ from ClearMap.Visualization.Vispy.plot_graph_3d import (plot_graph_nodes, plot_g
 def skeleton_2d_to_3d(skel_path, shift_range=False):
     skel_path = Path(skel_path)
 
-    skel = cmp_io.read(skel_path).array
+    skel = cmp_io.read(skel_path)
     if shift_range:
         skel = skel - 1  # If was drawn with 2 meaning on, 1 meaning off, 0 not existing
     skel = skel.astype(np.uint8)

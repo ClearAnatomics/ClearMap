@@ -173,7 +173,7 @@ def read_group(sources, combine=True, **args):
     # read the individual files
     group = []
     for f in sources:
-        data = clearmap_io.read(f).array
+        data = clearmap_io.read(f)
         group.append(data[np.newaxis, ...])
     if combine:
         return np.vstack(group)

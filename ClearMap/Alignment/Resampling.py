@@ -802,7 +802,7 @@ def resample_points(original_points, resampled_points=None,
                        original, resampled,
                        orientation, consistent=True)
 
-    resampled = io.read(original_points)[:] * factor
+    resampled = io.read(original_points) * factor
     resampled = orient_points(resampled, orientation, shape=orient_shape(resampled_shape, orientation, inverse=True))
     return io.write(resampled_points, resampled)
 

@@ -142,7 +142,7 @@ def detect_shape(source, seeds, threshold=None, verbose=False, processes=None, a
         timer = tmr.Timer()
         hdict.pprint(head='Shape detection', threshold=threshold)
   
-    source = io.read(source).array
+    source = io.read(source)
     seeds = io.open_ro(seeds)
     mask = None if threshold is None else source > threshold
     if seeds_as_labels:
@@ -250,7 +250,7 @@ def find_intensity(source, label, max_label=None, method='sum', verbose=False):
         timer = tmr.Timer()
         hdict.pprint(head='Intensity detection:', max_label=max_label, method=method)
 
-    source = io.read(source).array
+    source = io.read(source)
     label = io.open_ro(label)
 
     if max_label is None:
