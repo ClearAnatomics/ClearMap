@@ -33,10 +33,15 @@ from ClearMap.Utils.exceptions import (ClearMapPermissionError, ClearMapFileNotF
 ### Source class
 ###############################################################################
 
+_VALID_MODES = ('r', 'c', 'r+', 'w+')
+_READ_MODES = ('r', 'c', 'r+')
+
+
 class Source(npy.Source):
     """Memory mapped array source."""
 
-    def __init__(self, location = None, shape = None, dtype = None, order = None, array = None, mode = None, name = None):
+    def __init__(self, location=None, shape=None, dtype=None, order=None,
+                 array=None, mode=None, name=None):
         """Memory mapped source constructor.
 
         Arguments
@@ -44,12 +49,57 @@ class Source(npy.Source):
         array : array
             The underlying data array of this source.
         """
-        memmap = _memmap(location=location, shape=shape, dtype=dtype, order=order, mode=mode, array=array)  # FIXME: dangerous location
-        super(Source, self).__init__(array=memmap, name=name)
+        if isinstance(location, pathlib.Path):
+            location = str(location)
+
+        if mode is None and array is None and location is not None:
+            mode = 'r+' if fu.is_file(location) else 'w+'
+            warnings.warn(
+                f'Constructing mmp.Source without explicit mode is deprecated. '
+                f'Inferred mode={mode!r}. '
+                f'Use mode="r" to read, mode="r+" to edit, mode="w+" to create.',
+                FutureWarning, stacklevel=2)
+
+        if mode is None and array is not None:
+            mode = 'w+'
+
+        if mode not in _VALID_MODES:
+            raise ClearMapValueError(f'Invalid mode {mode!r}.', value=mode, expected=_VALID_MODES)
+
+        if mode in _READ_MODES:
+            memmap = self._open_existing(location, mode=mode)
+        else:  # 'w+'
+            memmap = self._create_new(location, shape=shape, dtype=dtype, order=order, array=array)
+
+        super().__init__(array=memmap, name=name)
+        self._mode = mode
 
     @property
-    def name(self):
-        return "Memmap-Source"
+    def mode(self):
+        return self._mode
+
+    @staticmethod
+    def _open_existing(location, mode):
+        if not isinstance(location, str):
+            raise ClearMapValueError(f'Cannot open memmap: location must be a string, got {type(location).__name__}',
+                                     value=type(location).__name__, expected='str')
+        if not fu.is_file(location):
+            raise ClearMapFileNotFoundError(f'Cannot open memmap in mode {mode!r}: file not found at {location!r}')
+        return _open_memmap(location, mode=mode, context=f'opening existing file as {mode!r}')
+
+    @staticmethod
+    def _create_new(location, shape, dtype, order, array):
+        if array is not None:
+            return _create_from_array(location, array, shape, dtype, order,
+                                      mode='w+', context='creating in __init__')
+        if shape is None:
+            raise ClearMapValueError('Cannot create memmap without shape or source array!',
+                                     value=None, expected='shape or array')
+        if dtype is None:
+            raise ClearMapValueError('Cannot create memmap without dtype or source array!',
+                                     value=None, expected='dtype or array')
+        return _open_memmap(location, mode='w+', shape=shape, dtype=dtype,
+                            order=order, context='creating empty in __init__')
 
     @property
     def array(self):
@@ -66,7 +116,7 @@ class Source(npy.Source):
     def array(self, value):
         if not isinstance(value, np.memmap):
             array = np.asarray(value)
-            value = _memmap(location=self.location, array=array, mode='w+')  # Explicit write
+            value = _create_from_array(location=self.location, array=array, mode='w+', context='Source.array setter')
         self._array = value
 
     @property
@@ -116,9 +166,12 @@ class Source(npy.Source):
     @location.setter
     def location(self, value):  # FIXME: should only accept path
         if value != self.location:
-            # mode is None → _memmap infers: file exists -> 'r+';  file missing + shape given → 'w+' (creates)
-            memmap = _memmap(location=value, shape=self.shape, dtype=self.dtype, order=self.order)
-            self.array = memmap
+            if not fu.is_file(value):
+                warnings.warn('Implicitly copying data to a new location via Source.location setter '
+                              'is deprecated. Use _create_from_array() explicitly then construct '
+                              'a new Source.', FutureWarning, stacklevel=2)
+                _create_from_array(value, self._array, context='Source.location setter')
+            self.__init__(location=value, mode=self._mode)
 
     @property
     def offset(self):
@@ -142,12 +195,13 @@ class VirtualSource(src.VirtualSource):
     """Virtual memory map source."""
     _real_class = Source
 
-    def __init__(self, source = None, shape = None, dtype = None, order = None, name = None):
-        super(VirtualSource, self).__init__(source=source, shape=shape, dtype=dtype, order=order, name=name)
+    def __init__(self, source=None, shape=None,
+                 dtype=None, order=None, name=None, mode=None):
         super().__init__(source=source, shape=shape, dtype=dtype, order=order, name=name, mode=mode)
 
     def as_real(self):
-        return Source(location=self.location, shape=self.shape, dtype=self.dtype, order=self.order, name=self.name)
+        return self._real_class(location=self.location, shape=self.shape, dtype=self.dtype, order=self.order,
+                                name=self.name, mode=self._mode)
 
     @property
     def array(self):
@@ -189,33 +243,60 @@ def read(source, slicing=None, mode=None, **kwargs):
     source : Source
         The read memmap source.
     """
-    mode = mode if mode is not None else 'r+'  # FIXME: this is edit, not read
+    if mode == 'r+':
+        warnings.warn('read() does not support mode="r+" (edit mode). Use edit() instead.',
+                       FutureWarning, stacklevel=2)
+    mode = mode if mode is not None else 'r'
 
     if isinstance(source, Source):
-        if slicing is None:
-            return source
-        else:
-            return source.__getitem__(slicing)
+        src = source if source.mode == mode else Source(location=source.location, mode=mode)
     elif isinstance(source, np.memmap):
-        if slicing is None:
-            memmap = source
-        else:
-            memmap = source.__getitem__(slicing)
-        return Source(array = memmap)
-    elif isinstance(source, str):
+        src = Source(location=source.filename, mode=mode)
+    elif isinstance(source, np.ndarray):
+        src = npy.Source(array=source)
+    elif isinstance(source, str):  # TOOD: early raise ?
         try:
-            memmap = _memmap(location=source, mode=mode)
-        except FileNotFoundError:
-            raise
+            src = Source(location=source, mode=mode)
+        except FileNotFoundError as err:
+            raise ClearMapFileNotFoundError(f'Memmap file not found: {source!r}') from err
         except Exception as err:
-            raise ValueError(f'Cannot read memmap from location {source!r}!') from err
-
-        if slicing is not None:
-            memmap = memmap.__getitem__(slicing)
-
-        return Source(array = memmap)
+            raise ClearMapValueError(f'Cannot read memmap from location {source!r}!') from err  # FIXME: specific
     else:
-        raise ValueError(f'Cannot read memmap from source {source!r}!')
+        raise ValueError(f'Cannot read memmap from {source=!r}!')
+
+    return src if slicing is None else npy.Source(array=(src.__getitem__(slicing)))
+
+
+def edit(source, **kwargs):
+    """Open an existing memmap for in-place modification."""
+    if isinstance(source, Source):
+        if source.mode == 'r+':
+            return source
+        location = source.location
+    elif isinstance(source, np.memmap):
+        location=source.filename
+    elif isinstance(source, str):
+        location=source
+    else:
+        raise ValueError(f'Cannot edit {source!r} as memmap')
+
+    return Source(location=location, mode='r+')
+
+
+def open_ro(source, **kwargs):
+    """Open a source strictly read-only for metadata queries."""
+    if isinstance(source, Source):
+        if source.mode == 'r':
+            return source
+        return Source(location=source.location, mode='r')
+    elif isinstance(source, np.memmap):
+        return Source(location=source.filename, mode='r')
+    elif isinstance(source, np.ndarray):
+        return npy.Source(array=source)  # already in memory, inherently read-only-ish
+    elif isinstance(source, str):
+        return Source(location=source, mode='r')
+    else:
+        raise ValueError(f'Cannot inspect {source!r} as memmap source')
 
 
 def write(sink, data, slicing=None, **kwargs):
@@ -235,6 +316,10 @@ def write(sink, data, slicing=None, **kwargs):
     sink : str, memmap, or Source
         The sink.
     """
+    if isinstance(sink, Source) and not sink.is_persistable:
+        raise PermissionError(f'Source {sink} was opened in mode="{sink.mode}" '
+                              f'and cannot persist changes to disk. '
+                              f'Use io.edit() to open for in-place editing.')
     if slc.is_trivial(slicing):
         slicing = (slice(None),)
 
@@ -244,11 +329,7 @@ def write(sink, data, slicing=None, **kwargs):
         if slicing == (slice(None),):
             create(location=sink, array=data.array)
         else:
-            try:
-                memmap = _memmap(location=sink, mode='r+')  # FIXME: r+ = edit (or read_and_write)
-            except:
-                raise ValueError(f'Cannot write slice into non-existent memmap at {sink=!r}!')
-            memmap.__setitem__(slicing, data.array)
+            _create_from_array(sink, data.array, slicing=slicing, context='write')
     else:
         raise ValueError(f'Cannot write memmap to {sink=!r}!')
 
@@ -286,18 +367,50 @@ def create(location = None, shape = None, dtype = None, order = None,
     By default memmaps are initialized as Fortran contiguous if order is None.
     """
     if mode is not None and mode != 'w+':
-        raise ValueError(f'create() only supports mode="w+", got {mode!r}. '
-                         f'Use read() to open existing files or initialize() for read-or-create behaviour.')
-    memmap = _memmap(location=location, shape=shape, dtype=dtype, order=order, mode='w+', array=array)
-    if as_source:
-        return Source(memmap)
-    else:
-       return memmap
+        raise ClearMapValueError(f'create() only supports mode="w+", got {mode!r}. '
+                                 f'Use read() to open existing files or initialize() for read-or-create behaviour.')
+    if dtype is None and array is None:
+        raise ClearMapValueError('Cannot create memmap without dtype or source array!',
+                                 value=None, expected='dtype or array')
+    if shape is None and array is None:
+        raise ClearMapValueError('Cannot create memmap without shape or source array!',
+                                 value=None, expected='shape or array')
+    src = Source(location=location, shape=shape, dtype=dtype, order=order, array=array, mode='w+')
+    return src if as_source else src.array
 
 
 ###############################################################################
 ### Helpers
 ###############################################################################
+
+def _create_from_array(location, array, shape=None, dtype=None, order=None,
+                       mode=None, slicing=None, context=''):
+    """Create or edit a memmap at location, populate from array, return in desired mode."""
+    if slicing is not None:
+        # Editing an existing file at a specific slice
+        if not isinstance(location, str) or not fu.is_file(location):
+            raise ClearMapValueError(f'Cannot write slice into non-existent memmap at {location!r}!',
+                                     value=location, expected='existing file path')
+        memmap = _open_memmap(location, mode='r+', context=context)
+        memmap.__setitem__(slicing, array)
+        return _reopen_with_mode(location, memmap, mode)
+
+    # Full write — resolve, validate, create, populate
+    location, shape, dtype, order = _resolve_params(array, location, shape, dtype, order)
+
+    if isinstance(location, str):
+        if shape == array.shape:
+            memmap = _open_memmap(location, mode='w+', shape=shape, dtype=dtype, order=order, context=context)
+            memmap[:] = array
+        else:
+            raise ClearMapValueError(f'Shape mismatch to create memmap: '
+                                     f'requested {shape!r}, array has {array.shape!r}.',
+                                     value=array.shape, expected=shape)
+    else:
+        raise ClearMapIoException(f'Cannot create memmap without a location! '
+                                  f'Got {location!r} (type={type(location).__name__})')
+
+    return _reopen_with_mode(location, memmap, mode)
 
 def _open_memmap(location, mode=None, shape=None, dtype=None, order=None, context=''):
     """
@@ -370,13 +483,10 @@ def _open_memmap(location, mode=None, shape=None, dtype=None, order=None, contex
 def _try_read_existing(location, mode):
     """Attempt to read an existing memmap, handling the read-only fallback on permission errors."""
     try:
-        if mode:
-            return _open_memmap(location, mode=mode, context='reading existing file')
-        else:
-            try:
-                return _open_memmap(location, context='reading existing file')
-            except ClearMapPermissionError:  # Read fallback
-                return _open_memmap(location, mode='r', context='reading existing file (fallback read-only)')
+        mode = mode or 'r'
+        return _open_memmap(location, mode=mode, context='reading existing file')
+    except ClearMapPermissionError:  # Read fallback
+        return _open_memmap(location, mode='r', context='reading existing file (fallback read-only)')
     except (ClearMapRuntimeError, ClearMapValueError, ClearMapFileNotFoundError):
         # ignore general runtime/value errors here and fall through to creation
         return None
@@ -493,30 +603,11 @@ def _memmap(location=None, shape=None, dtype=None, order=None,
         if _is_exact_memmap_match(array, location, shape, dtype, order):
             memmap = array  # shape=array.shape already checked above
         else:  # Fallback: create a new memmap and copy data if shapes align
-            if shape == array.shape:
-                memmap = _open_memmap(location, mode='w+', shape=shape, dtype=dtype, order=order,
-                                      context='creating from memmap source')
-                memmap[:] = array
-            else:
-                raise ClearMapValueError(f'Cannot create memmap from source: shape {shape!r} does not match '
-                                         f'array shape {array.shape!r}. Explicit reshaping or slicing is required.',
-                                         value=array.shape, expected=shape)
-        memmap = _reopen_with_mode(location, memmap, mode)
+            memmap = _create_from_array(location, array, shape=shape, dtype=dtype, order=order,
+                                        mode=mode, context='creating new file from existing memmap (copy fallback)')
     elif isinstance(array, np.ndarray):    # Existing ndarray source -> cast to memmap and use
-        location, shape, dtype, order = _resolve_params(array, location, shape, dtype, order)
-
-        if isinstance(location, str):
-            if shape == array.shape:
-                memmap = _open_memmap(location, mode='w+', shape=shape, dtype=dtype, order=order,
-                                      context='creating from ndarray')
-                memmap[:] = array
-            else:
-                raise ClearMapValueError(f'Cannot create memmap from source: shape {shape!r} does not match '
-                                         f'array shape {array.shape!r}. Explicit reshaping or slicing is required.',
-                                         value=array.shape, expected=shape)
-        else:
-            raise ClearMapIoException(f'Cannot create memmap without a location! Got {location} of type {type(location).__name__}')
-        memmap = _reopen_with_mode(location, memmap, mode)
+        memmap = _create_from_array(location, array, shape=shape, dtype=dtype, order=order,
+                           mode=mode, context='creating from numpy array')
     else:  # No valid input found -> raise
         raise ClearMapValueError(f'Array type {type(array).__name__} is not valid for memmap creation!',
                                  value=type(array).__name__, expected='np.ndarray, np.memmap, or None')

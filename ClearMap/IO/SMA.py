@@ -38,10 +38,11 @@ __all__ = sma.__all__
 class Source(npy.Source):
   """Shared memory source."""
 
-  def __init__(self, array = None, shape = None, dtype = None, order = None, handle = None, name = None):
+  def __init__(self, array=None, shape=None, dtype=None, order=None,
+               handle=None, name=None, mode=None):
     """Shared memory source constructor."""
-    super().__init__(array=shared, name=name);
     shared = _shared(shape=shape, dtype=dtype, order=order, array=array, handle=handle)
+    super().__init__(array=shared, name=name, mode=mode)
     
     self._handle = handle
 
@@ -75,10 +76,11 @@ class Source(npy.Source):
 
 
 class VirtualSource(src.VirtualSource):
-  def __init__(self, source = None, shape = None, dtype = None, order = None, handle = None, name = None):
-    super(VirtualSource, self).__init__(source=source, shape=shape, dtype=dtype, order=order, name=name);
   _real_class = Source
 
+  def __init__(self, source=None, shape=None, dtype=None, order=None,
+               handle=None, name=None, mode=None):
+    super().__init__(source=source, shape=shape, dtype=dtype, order=order, name=name, mode=mode)
     if handle is None and source is not None:
       handle = source.handle
     self._handle = handle

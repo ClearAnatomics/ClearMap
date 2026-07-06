@@ -26,6 +26,7 @@ from ClearMap.IO import Source as source_module
 import ClearMap.IO.Slice as cmp_clicing
 
 from ClearMap.Utils.Lazy import lazyattr
+from ClearMap.Utils.exceptions import ClearMapValueError, ClearMapPermissionError
 
 
 ###############################################################################
@@ -41,7 +42,8 @@ class Source(source_module.Source):
 
     .. warning:: It is also assumed that the last 3 dimensions are the image dimensions in the order z,y,x.
     """
-    def __init__(self, location, series=0, multi_file=False):
+    def __init__(self, location, series=0, multi_file=False, mode=None):
+        super().__init__(name=None, mode=mode)  # skip AbstractSource
         try:
             self._tif = tifffile.TiffFile(location, multifile=multi_file)
         except TypeError:  # TODO: filter with message
@@ -164,6 +166,9 @@ class Source(source_module.Source):
             return array[slicing]
 
     def __setitem__(self, *args):
+        if not self.is_writable:
+            raise ClearMapPermissionError('Tif Source was open RO. '
+                                          'Please reopen RW (r+ or w+) to write to disk')
         memmap = self.as_memmap()
         memmap.__setitem__(*args)
 

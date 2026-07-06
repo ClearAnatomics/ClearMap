@@ -25,7 +25,7 @@ import datetime
 import numpy as np
 
 import ClearMap.IO.Source as src
-from ClearMap.Utils.exceptions import NrrdError
+from ClearMap.Utils.exceptions import NrrdError, ClearMapPermissionError
 
 
 ###############################################################################
@@ -35,7 +35,7 @@ from ClearMap.Utils.exceptions import NrrdError
 class Source(src.Source):
   """Nrrd array source."""
   
-  def __init__(self, location):
+  def __init__(self, location, mode=None):
     """Nrrd source class constructor.
     
     Arguments
@@ -43,6 +43,7 @@ class Source(src.Source):
     location : str
       The file nameof the nrrd source.
     """
+    super().__init__(mode=mode)
     self._location = location
 
   @property
@@ -151,6 +152,9 @@ class Source(src.Source):
     return memmap.__getitem__(*args)
 
   def __setitem__(self, *args):
+    if not self.is_writable:
+        raise ClearMapPermissionError(f'Source {self} was opened read-only (mode="r"). '
+                                      f'Use io.edit() to open for writing.')
     memmap = _memmap(self.location)
     memmap.__setitem__(*args)
 

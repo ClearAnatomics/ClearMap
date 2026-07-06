@@ -24,17 +24,17 @@ from ClearMap.Utils.exceptions import ClearMapPermissionError
 class Source(src.Source):
   """Numpy array source."""
   
-  def __init__(self, array = None, shape = None, dtype = None, order = None, name = None):
-    """Numpy source class construtor.
+  def __init__(self, array=None, shape=None, dtype=None,
+               order=None, name=None, mode=None):
+    """Numpy source class constructor.
     
     Arguments
     ---------
     array : array
       The underlying data array of this source.
     """
-    super(Source, self).__init__(name=name);
-    self._array = _array(shape=shape, dtype=dtype, order=order, array=array);
-
+    super().__init__(name=name, mode=mode)
+    self._array = _array(shape=shape, dtype=dtype, order=order, array=array)
     
   def __getattr__(self, name):
     #numpy attributes
@@ -145,8 +145,10 @@ class Source(src.Source):
     return self.array.__getitem__(*args)
 
   def __setitem__(self, *args):
-    self.array.__setitem__(*args);
-
+    if not self.is_writable:
+      raise ClearMapPermissionError(f'Source {self} was opened read-only (mode="r"). '
+                                    f'Use io.edit() to open for writing.')
+    self.array.__setitem__(*args)
 
 
 #class Array(np.ndarray):
@@ -276,6 +278,10 @@ def read(source, slicing = None, as_source = None, as_array = None, processes = 
 
 #TODO: add processes keyword for parallel writing
 def write(sink, data, slicing = None, **kwargs):
+  if isinstance(sink, Source) and not sink.is_persistable:
+    raise PermissionError(f'Source {sink} was opened in mode="{sink.mode}" '
+                          f'and cannot persist changes to disk. '
+                          f'Use io.edit() to open for in-place editing.')
   if slicing is None:
     slicing = ()
   if sink is None:

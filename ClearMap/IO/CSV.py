@@ -27,9 +27,9 @@ import ClearMap.IO.Slice as slc
 
 class Source(src.Source):
   """CSV array source."""
-  
-  def __init__(self, location):
-    """CSV source class construtor.
+
+  def __init__(self, location, mode=None):
+    """CSV source class constructor.
     
     Arguments
     ---------
@@ -198,9 +198,11 @@ class Source(src.Source):
 
 
 class VirtualSource(src.VirtualSource):
-  def __init__(self, source = None, shape = None, dtype = None, order = None, location = None, name = None):
-    super(VirtualSource, self).__init__(source=source, shape=shape, dtype=dtype, order=order, location=location, name=name);
   _real_class = Source
+
+  def __init__(self, source=None, shape=None, dtype=None, order=None,
+               location=None, name=None, mode=None):
+    super().__init__(source=source, shape=shape, dtype=dtype, order=order, location=location, name=name, mode=mode)
     if isinstance(source, Source):
       self.location = source.location
 
