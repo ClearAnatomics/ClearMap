@@ -47,7 +47,7 @@ def measure_expression(source, points, search_radius, method = 'max',
     
     
   """
-  source = io.as_source(source)
+  source = io.open_ro(source)
   ndim = source.ndim
 
   if verbose:

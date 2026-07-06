@@ -146,7 +146,7 @@ def fill_vessels(source, sink,
         print(f'Vessel filling: using {"gpu" if cuda else "cpu"}')
 
     # initialize source
-    source = clearmap_io.as_source(source)
+    source = clearmap_io.open_ro(source)
 
     if verbose:
         timer.print_elapsed_time('Vessel filling: source loaded')

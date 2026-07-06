@@ -272,9 +272,9 @@ def _test():
   import ClearMap.ParallelProcessing.Block as blk
   
   import ClearMap.IO.IO as io
-  source = io.as_source(np.asarray(np.random.rand(50,100,200), order = 'F'))
+  source = io.open_ro(np.asarray(np.random.rand(50,100,200), order='F'))
   
-  block = blk.Block(source=source, index = (1,2,3), blocks_shape = (10,20,30))
+  block = blk.Block(source=source, index=(1,2,3), blocks_shape=(10,20,30))
   
   print(block.n_iterations)
   print(block.iteration)

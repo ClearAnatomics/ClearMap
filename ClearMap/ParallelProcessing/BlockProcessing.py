@@ -13,7 +13,7 @@ Example
 >>> import numpy as np
 >>> import ClearMap.IO.IO as io
 >>> import ClearMap.ParallelProcessing.BlockProcessing as bp
->>> source = io.as_source(np.asarray(np.random.rand(50,100,200), order = 'F'))
+>>> source = io.open_ro(np.asarray(np.random.rand(50,100,200), order = 'F'))
 >>> blocks = bp.split_into_blocks(source, processes=10, axes=[2], size_min=30, size_max=50, overlap=20);
 >>> blocks[0]
 Block-Numpy-Source(50, 100, 38)[float64]|F|
@@ -196,7 +196,7 @@ def process(function, source, sink = None,
     sources = source
   else:
     sources = [source]
-  sources = [io.as_source(s).as_virtual() for s in sources]
+  sources = [io.open_ro(s).as_virtual() for s in sources]
 
   #if sink is None:
   #  sink = sma.Source(shape=sources[0].shape, dtype=sources[0].dtype, order=sources[0].order);
@@ -593,7 +593,7 @@ def block_axes(source, axes=None):
       raise ValueError(f'Axes specification {axes} for source with dimension {source.ndim} not valid!')
     return axes
   
-  source = io.as_source(source)
+  source = io.open_ro(source)  # metadata only
   if source.order == 'F':
     axes = [source.ndim-1]
   else:
@@ -726,7 +726,7 @@ def _test():
   import ClearMap.IO.IO as io
   import ClearMap.ParallelProcessing.BlockProcessing as bp
   
-  source = io.as_source(np.asarray(np.random.rand(50,100,200), order = 'F'))
+  source = io.open_ro(np.asarray(np.random.rand(50,100,200), order = 'F'))
   
   blocks = bp.split_into_blocks(source, processes=10, axes=[2], size_min=30, size_max=50, overlap=20)
   print(blocks)

@@ -776,7 +776,7 @@ def transform(source, sink='transformix', transform_parameter_file=None, transfo
     check_elastix_initialized()
 
     # image
-    source = io.as_source(source)
+    source = io.open_ro(source)
     if isinstance(source, io.tif.Source):
         img_name = source.location
         delete_image = None

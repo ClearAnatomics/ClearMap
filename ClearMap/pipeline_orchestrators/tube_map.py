@@ -237,7 +237,7 @@ class BinaryVesselProcessorSteps(ProcessorSteps):
         """
         Extract a plain path from whatever a step produces.
         Asset → .path, Source → .location, Path/str → as-is.
-        Never stores a live Source or array — clearmap_io.as_source()
+        Never stores a live Source or array — clearmap_io
         reconstructs on demand.
         """
         if isinstance(output, Asset):
@@ -257,7 +257,7 @@ class BinaryVesselProcessorSteps(ProcessorSteps):
 
         Source objects are serialisable path handles — we extract .path so
         _outputs holds only plain Paths, never live Source instances.
-        clearmap_io.as_source(path) reconstructs on demand.
+        clearmap_io reconstructs on demand.
         """
         output_path = self._extract_backing_path(output)
         self._outputs[asset] = output_path
@@ -283,7 +283,7 @@ class BinaryVesselProcessorSteps(ProcessorSteps):
           2. On-disk asset
           3. Raw binary (fallback)
 
-        Callers reconstruct the Source with clearmap_io.as_source(result).
+        Callers reconstruct the Source with clearmap_io.
         """
         order = [s for s in self.steps if s not in self._lifecycle_steps]
 
@@ -558,7 +558,7 @@ class BinaryVesselProcessor(PipelineOrchestrator):
         self.steps[channel].remove_next_steps_files(self.steps[channel].smoothed)
 
         source = self.steps[channel].get_source(BinaryVesselProcessorSteps.smoothed)
-        source = clearmap_io.as_source(source)
+        source = clearmap_io.open_ro(source)
         sink_path = self.get_path('binary', channel=channel, asset_sub_type='smoothed')
         smoothing_parameters = copy.deepcopy(vasculature.default_postprocessing_parameter['smooth'])
 
@@ -582,7 +582,7 @@ class BinaryVesselProcessor(PipelineOrchestrator):
         self.steps[channel].remove_next_steps_files(self.steps[channel].filled)
 
         source = self.steps[channel].get_source(BinaryVesselProcessorSteps.filled)
-        source = clearmap_io.as_source(source)
+        source = clearmap_io.open_ro(source)
         sink = self.get_path('binary', channel=channel, asset_sub_type='filled')
         sink = initialize_sink(sink, shape=source.shape, dtype=source.dtype, order=source.order, return_buffer=False)
 

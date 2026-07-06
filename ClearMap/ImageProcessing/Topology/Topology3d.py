@@ -528,10 +528,10 @@ def _test():
   import ClearMap.ParallelProcessing.DataProcessing.ArrayProcessing as ap
   ap.write('test.npy', x)
   
-  y = io.as_source('test.npy')
-  z = io.create('resuly.npy', shape=y.shape, order='C', dtype='uint32');
+  z = io.create('resuly.npy', shape=io.shape('test.npy'), order='C', dtype='uint32')
   
-  cProfile.runctx("c =top.index_from_binary(y, method='!shared', sink=z, verbose=True, processes=None)", globals(), locals(), "Profile.prof")
+  cProfile.runctx("c =top.index_from_binary(y, method='!shared', sink=z, verbose=True, processes=None)",
+                  globals(), locals(), "Profile.prof")
   
   s = pstats.Stats("Profile.prof")
   s.strip_dirs().sort_stats("time").print_stats()

@@ -408,12 +408,12 @@ def smooth_by_configuration(source, sink=None, iterations=1, processing_paramete
     print('Binary smoothing: initialized!')
     timer = tmr.Timer()
 
-  #smoothing function
+  # smoothing function
   smooth = functools.partial(smooth_by_configuration_block, iterations=iterations, verbose=False)
   smooth.__name__ = 'smooth_by_configuration'
   
-  #initialize sources and sinks
-  source = io.as_source(source)
+  # initialize sources and sinks
+  source = io.open_ro(source)
   sink   = io.initialize(sink, shape_=source.shape, dtype_=bool, order_=source.order)
 
   #block processing parameter

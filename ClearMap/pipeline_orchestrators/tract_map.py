@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 
 from ClearMap.IO import IO as cmp_io
+from ClearMap.IO.MMP import Source as memmap_source
 from ClearMap.IO.workspace2 import Workspace2
 
 from ClearMap.Utils.exceptions import MissingRequirementException
@@ -99,7 +100,7 @@ class TractMapProcessor(ChannelPipelineOrchestrator):
 
             self.prepare_watcher_for_substep(0, None, 'compute histogram', False)
 
-            array = self.get('stitched', channel=self.channel).as_source()
+            array = self.get('stitched', channel=self.channel).open_ro()
             uniques, counts = np.unique(array[::sampling, ::sampling, ::sampling], return_counts=True)
             self.uniques = uniques
             self.uniq_counts = counts
@@ -250,7 +251,7 @@ class TractMapProcessor(ChannelPipelineOrchestrator):
         n_blocks = self._estimate_n_blocks('transform')
         self.prepare_watcher_for_substep(n_blocks, self.block_re, 'Transforming coordinates', increment_main=True)
 
-        coords = self.get('binary', channel=self.channel, asset_sub_type='pixels_raw').as_source()
+        coords = self.get('binary', channel=self.channel, asset_sub_type='pixels_raw').open_ro()
         coordinates_transformed_path = self.get_path('binary', asset_sub_type='coordinates_transformed', channel=self.channel)
         coordinates_transformed_path.unlink(missing_ok=True)
         transformed_coords = array_processing.initialize_sink(coordinates_transformed_path,
@@ -322,7 +323,7 @@ class TractMapProcessor(ChannelPipelineOrchestrator):
         AnnotationManager.register('Annotation', AnnotationProxy)  # added 3.11 shutdown_timeout
 
         coordinates_transformed = self.get('binary', channel=self.channel,
-                                           asset_sub_type='coordinates_transformed').as_source()
+                                           asset_sub_type='coordinates_transformed').open_ro()
         labels = array_processing.initialize_sink(self.get_path('binary', channel=self.channel,
                                                                 asset_sub_type='labels'),
                                  dtype='int64', shape=(coordinates_transformed.shape[0], 1),
@@ -344,11 +345,12 @@ class TractMapProcessor(ChannelPipelineOrchestrator):
     def shift_coordinates(self):
         """Shift the coordinates by the cropping amount to get the values in whole sample reference frame"""
         coords_asset = self.get('binary', asset_sub_type='pixels_raw', channel=self.channel)
-        coordinates = coords_asset.as_source()
+        coordinates = coords_asset.edit()
         for i in range(3):
             shift = self.config['test_set_slicing'][f'dim_{i}'][0]
             coordinates[:, i] += shift
-        cmp_io.write(coords_asset.path, coordinates)
+        if not isinstance(coordinates, (np.memmap, memmap_source)):
+            cmp_io.write(coords_asset.path, coordinates)
         print('TractMap coordinates shifted')
 
     def run_pipeline(self, tuning=False):
@@ -373,14 +375,14 @@ class TractMapProcessor(ChannelPipelineOrchestrator):
 
         ratio = self.config['display']['decimation_ratio']
         decimated_coordinates_raw = self.get(
-            'binary', channel=self.channel, asset_sub_type='pixels_raw').as_source()[::ratio, :]
+            'binary', channel=self.channel, asset_sub_type='pixels_raw').open_ro()[::ratio, :]
 
         decimated_coordinates_transformed = self.get(
             'binary', channel=self.channel,
-            asset_sub_type='coordinates_transformed').as_source()[::ratio, :]
+            asset_sub_type='coordinates_transformed').open_ro()[::ratio, :]
 
         decimated_labels = self.get('binary', channel=self.channel,
-                                    asset_sub_type='labels').as_source()[::ratio, :]
+                                    asset_sub_type='labels').open_ro()[::ratio, :]
 
         # Build the DataFrame
         df = pd.DataFrame({'id': decimated_labels[:, 0]})
@@ -415,10 +417,9 @@ class TractMapProcessor(ChannelPipelineOrchestrator):
             processes=None,
             verbose=True
         )
-        voxelize(self.get('binary', asset_sub_type='coordinates_transformed', channel=self.channel).as_source(),
-                 sink=self.get_path('density', channel=self.channel, asset_sub_type='counts'),
-                 **voxelization_parameter
-        )
+        coords_src = self.get('binary', asset_sub_type='coordinates_transformed', channel=self.channel).open_ro()
+        density_f_path = self.get_path('density', channel=self.channel, asset_sub_type='counts')
+        voxelize(coords_src, sink=density_f_path, **voxelization_parameter)
         self.update_watcher_main_progress()
         print('TractMap voxelization finished')
 

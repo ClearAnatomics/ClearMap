@@ -563,7 +563,7 @@ def filter_cells(source, sink, thresholds):
     sink : str, array or Source
         The thresholded cell data.
     """
-    source = clearmap_io.as_source(source)
+    source = clearmap_io.open_ro(source)
 
     ids = np.ones(source.shape[0], dtype=bool)
     for filter_name, thrsh in thresholds.items():

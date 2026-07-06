@@ -142,13 +142,13 @@ def detect_shape(source, seeds, threshold=None, verbose=False, processes=None, a
         timer = tmr.Timer()
         hdict.pprint(head='Shape detection', threshold=threshold)
   
-    source = io.as_source(source).array
-    seeds = io.as_source(seeds)
+    source = io.read(source).array
+    seeds = io.open_ro(seeds)
     mask = None if threshold is None else source > threshold
     if seeds_as_labels:
         peaks = seeds
     else:
-        peaks = labeled_pixels_from_centers(seeds,np.arange(1, seeds.shape[0]+1), source.shape)
+        peaks = labeled_pixels_from_centers(seeds, np.arange(1, seeds.shape[0]+1), source.shape)
 
     # We check that source has no 0 value otherwise the map source -> -source is not necessarily decreasing, eg for source.dtype=uint16.
     if np.any(source == 0) and np.issubdtype(source.dtype,np.unsignedinteger):
@@ -209,7 +209,7 @@ def find_size(label, max_label=None, verbose=False):
         timer = tmr.Timer()
         hdict.pprint(head='Size detection:', max_label=max_label)
 
-    label = io.as_source(label)
+    label = io.open_ro(label)
 
     if max_label is None:
         max_label = int(label.max())
@@ -250,8 +250,8 @@ def find_intensity(source, label, max_label=None, method='sum', verbose=False):
         timer = tmr.Timer()
         hdict.pprint(head='Intensity detection:', max_label=max_label, method=method)
 
-    source = io.as_source(source).array
-    label = io.as_source(label)
+    source = io.read(source).array
+    label = io.open_ro(label)
 
     if max_label is None:
         max_label = label.max()

@@ -507,7 +507,7 @@ def binarize_block(source, sink, parameter=default_binarization_parameter):
     # initialize binary status for inspection
     binary_status = parameter.get('binary_status')
     if binary_status:
-        binary_status = io.as_source(binary_status)
+        binary_status = io.open_ro(binary_status)
         binary_status = binary_status[base_slicing]
 
     default_step_params = {'parameter': parameter, 'steps_to_measure': {}, 'prefix': prefix,
@@ -797,7 +797,7 @@ def postprocess(source, sink=None, postprocessing_parameter=default_postprocessi
         warnings.warn('No postprocessing steps defined, skipping postprocessing.')
         return
 
-    source = io.as_source(source)
+    source = io.open_ro(source)
     sink = ap.initialize_sink(sink, shape=source.shape, dtype=source.dtype, order=source.order, return_buffer=False)
 
     if verbose:
@@ -891,7 +891,7 @@ def threshold_isodata(source):
 
 def threshold_adaptive(source, function=threshold_isodata, selem=(100, 100, 3), spacing=(25, 25, 3),
                        interpolate=1, mask=None, step=None):
-    source = io.as_source(source)[:]
+    source = io.read(source)[:]
     threshold = ls.apply_local_function(source, function=function, mask=mask, dtype=float,
                                         selem=selem, spacing=spacing, interpolate=interpolate, step=step)
     return threshold
@@ -957,7 +957,7 @@ def binary_statistics(source):
     statistics : dict
        A dict with entires {description : count}.
     """
-    status, counts = np.unique(io.as_source(source)[:], return_counts=True)
+    status, counts = np.unique(io.read(source)[:], return_counts=True)
     return {status_to_description(s): c for s, c in zip(status, counts)}
 
 

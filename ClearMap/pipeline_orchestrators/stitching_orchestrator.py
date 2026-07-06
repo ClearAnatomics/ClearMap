@@ -363,8 +363,8 @@ class StitchingProcessor(PipelineOrchestrator):
     def get_wobbly_layout(self, channel, overlaps=None):
         if overlaps is None:
             rigid_cfg = self.config['channels'][channel]['rigid']
-            overlaps, _ = define_auto_stitching_params(
-                self.get('raw', channel=channel).file_list[0], rigid_cfg).as_source()
+            first_tile_path = self.get('raw', channel=channel).file_list[0]
+            overlaps, _ = define_auto_stitching_params(first_tile_path, rigid_cfg)
         extension = '.npy' if self.sample_manager.use_npy(channel) else None  # TODO: optional requires
         raw_expr = str(self.get_path('raw', channel=channel, extension=extension))
         tag_names = tuple(sorted(Expression(raw_expr).tag_names()))  # sort alphabetically to ensure consistent order

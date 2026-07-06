@@ -69,13 +69,14 @@ def compare(
 
     scale = np.array(scale)
     voxel_blob_diameters = np.array(blob_diameter) / scale
-    source_0 = io.as_source(img_0)
-    source_1 = io.as_source(img_1)
+    source_0 = io.open_ro(img_0)
+    source_1 = io.open_ro(img_1)
     if not isinstance(df_0, pd.DataFrame):
         df_0 = pd.read_feather(df_0)
     if not isinstance(df_1, pd.DataFrame):
         df_1 = pd.read_feather(df_1)
 
+    processes = n
     if not ((processes is None) or (isinstance(processes, int) and processes >= 1)):
         raise ValueError("The passed processes argument must be a positive integer or None.")
 

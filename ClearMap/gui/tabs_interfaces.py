@@ -993,10 +993,10 @@ class PostProcessingTab(PipelineTab[TWorker]):
         self.main_window.clear_plots()
         no_scale = False
         if isinstance(channel, (list, tuple)):
-            sources = [self.sample_manager.get('resampled', channel=ch).as_source() for ch in channel]
+            sources = [self.sample_manager.get('resampled', channel=ch).open_ro() for ch in channel]
             if not np.all([src.shape == sources[0].shape for src in sources]):
                 raise ValueError('Channels have different shapes')
-            plot_image = np.mean([self.sample_manager.get('resampled', channel=ch).as_source() for ch in channel], axis=0)
+            plot_image = np.mean([self.sample_manager.get('resampled', channel=ch).read() for ch in channel], axis=0)
             channel = channel[0]
         else:
             # asset = self.sample_manager.get('stitched', channel=channel)
@@ -1005,7 +1005,7 @@ class PostProcessingTab(PipelineTab[TWorker]):
             # else:  # missing stitched
             # FIXME: we cannot currently use stitched because we need to transpose it and it is too heavy for that
             asset = self.sample_manager.get('resampled', channel=channel)
-            plot_image = asset.as_source()
+            plot_image = asset.open_ro()
         self.main_window.ortho_viewer.setup(plot_image, params, parent=self.main_window, no_scale=no_scale)
         dvs = self.main_window.ortho_viewer.plot_orthogonal_views()
         if not no_scale:

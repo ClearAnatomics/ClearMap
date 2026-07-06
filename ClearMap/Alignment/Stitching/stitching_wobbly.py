@@ -2208,7 +2208,7 @@ def _test():
     stw.strg.p3d.plot(s)
 
     #true if not optimized
-    np.all(stw.io.as_source(s)[:190,:,:] == data[:190,:,:nz])
+    np.all(stw.io.open_ro(s)[:190,:,:] == data[:190,:,:nz])
 
 
     plt.figure(2); plt.clf()
@@ -2219,7 +2219,6 @@ def _test():
     np.all(l.sources[1].wobble[:,0] - 100 == wobble[:,0] )
 
     stw.strg.p3d.plot(s)
-
 
     # Sin wobble
     import numpy as np
@@ -2257,7 +2256,7 @@ def _test():
 
 
     # True for non-optimized placements
-    np.all(stw.io.as_source(s)[:190,:,:] == data[:190,:,:nz])
+    np.all(stw.io.open_ro(s)[:190,:,:] == data[:190,:,:nz])
 
 
     # wobble + axis alignment
@@ -2310,7 +2309,7 @@ def _test():
     stw.strg.dv.plot(s)
 
     # True for non-optimized placements
-    np.all(stw.io.as_source(s)[:190,:,sh:nz] == data[:190,:,sh:nz])
+    np.all(stw.io.open_ro(s)[:190,:,sh:nz] == data[:190,:,sh:nz])
 
 
     plt.figure(2); plt.clf()
@@ -2439,7 +2438,7 @@ def _test():
     stw.strg.dv.plot(s)
 
     # True for non-optimized placements
-    np.all(stw.io.as_source(s)[:190,:,sh:nz] == data[:190,:,sh:nz])
+    np.all(stw.io.open_ro(s)[:190,:,sh:nz] == data[:190,:,sh:nz])
 
 
     s = l.slice_along_axis_wobbly(32)

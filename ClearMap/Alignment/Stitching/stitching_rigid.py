@@ -407,7 +407,7 @@ class Source(SourceRegion, src.AbstractSource):
           Optional position of this source in a tiling grid.
         """
         if source is not None:
-            source = io.as_source(source)
+            source = io.open_ro(source)
             sid = None
         if isinstance(source, Source):
             position = source.position if position is None else position
@@ -424,7 +424,7 @@ class Source(SourceRegion, src.AbstractSource):
 
         SourceRegion.__init__(self, position = position, shape = shape)
 
-        src.AbstractSource.__init__(self, source = source)
+        src.AbstractSource.__init__(self, source=source)
         self._source = source
 
         self._tile_position = ensure(tile_position, tuple)

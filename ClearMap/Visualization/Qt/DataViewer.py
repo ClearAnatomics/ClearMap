@@ -35,7 +35,7 @@ from PyQt5.QtWidgets import (QWidget, QRadioButton, QLabel, QSplitter, QApplicat
                              QCheckBox, QGraphicsPathItem, QGridLayout, QLineEdit, QScrollArea, QFileDialog, QSpinBox)
 
 from ClearMap.Utils.utilities import runs_on_spyder
-from ClearMap.IO.IO import as_source
+from ClearMap.IO import IO as cmp_io
 from ClearMap.IO.Source import Source
 from ClearMap.Visualization.Qt.data_viewer_luts import LUT, HighLowLUT
 
@@ -88,7 +88,7 @@ class DataViewer(QWidget):
 
         self.points = points
         if self.points is not None:
-            self.points = as_source(points).array
+            self.points = cmp_io.read(points).array
         self.points_item = None
         self.points_style = dict(pen=None, brush='white')
         if points_style is not None:
@@ -96,7 +96,7 @@ class DataViewer(QWidget):
 
         self.vectors = vectors
         if self.vectors is not None:
-            self.vectors = as_source(vectors).array
+            self.vectors = cmp_io.read(vectors).array
         self.vectors_item = None
         self.vectors_base_item = None
         self.vectors_style = dict(pen=None, brush='lightblue')
@@ -105,7 +105,7 @@ class DataViewer(QWidget):
 
         self.orientations = orientations
         if self.orientations is not None:
-            self.orientations = as_source(orientations).array
+            self.orientations = cmp_io.read(orientations).array
         self.orientations_item = None
         self.orientations_style = dict(pen='gray')
         if orientations_style is not None:
@@ -385,7 +385,7 @@ class DataViewer(QWidget):
         # initialize sources and axis settings
         source = self.__cast_source(source)
         self.n_sources = len(source)
-        self.sources = [as_source(s) for s in source]
+        self.sources = [cmp_io.open_ro(s) for s in source]
         for s in self.sources:
             if s.ndim == 2:
                 s.shape = s.shape + (1,)  # Add empty z dimension # FIXME: see if works or need to expand_dims
@@ -420,11 +420,11 @@ class DataViewer(QWidget):
             source = self.__cast_source(source)
             if self.n_sources != len(source):
                 raise RuntimeError(f'Number of sources does not match! got {len(source)}, expected {self.n_sources}')
-            source = [as_source(s) for s in source]
+            source = [cmp_io.open_ro(s) for s in source]
             index = range(self.n_sources)
         else:
             s = self.sources
-            s[index] = as_source(source)
+            s[index] = cmp_io.open_ro(source)
             source = s
             index = [index]
 
@@ -745,7 +745,7 @@ class DataViewer(QWidget):
     def set_points(self, points):
         self.points = points
         if self.points is not None:
-            self.points = as_source(points)
+            self.points = cmp_io.open_ro(points)  # TODO: see if read is better
         self.initialize_points_item()
         self.update_points()
         self.points_color_button.setVisible(True)

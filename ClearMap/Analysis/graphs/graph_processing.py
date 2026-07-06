@@ -277,7 +277,8 @@ def get_distance_map_27(resolution):
     return distance_table
 
 
-def graph_from_skeleton(skeleton, points=None, radii=None, compute_vertex_coordinates=True, compute_edge_length=True,
+def graph_from_skeleton(skeleton, points=None, radii=None,
+                        compute_vertex_coordinates=True, compute_edge_length=True,
                         check_border=True, delete_border=False, spacing=None, physical_units='',
                         n_processes=-2, verbose=False):
     """
@@ -287,6 +288,11 @@ def graph_from_skeleton(skeleton, points=None, radii=None, compute_vertex_coordi
     .. note::
 
         Edges are detected between neighbouring foreground pixels using 26-connectivity.
+
+    .. warning::
+
+        If ``delete_border`` is True, the input skeleton will be mutated in-place.
+        Otherwise the behaviour is RO
 
     Arguments
     ---------
@@ -320,7 +326,7 @@ def graph_from_skeleton(skeleton, points=None, radii=None, compute_vertex_coordi
     if compute_edge_length and not compute_vertex_coordinates:
         raise ValueError('Activating `compute_edge_length` requires `compute_vertex_coordinates` to be True!')
 
-    skeleton = io.as_source(skeleton)
+    skeleton = io.edit(skeleton)  # WARNING: ``edit`` here because delete_border (optional) is in-place
     if skeleton.dtype not in ('bool', np.uint8):
         raise TypeError('The skeleton array needs to be a boolean array!')
 

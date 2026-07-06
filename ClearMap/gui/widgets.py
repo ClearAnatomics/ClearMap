@@ -1107,7 +1107,7 @@ class ManageAssetsWidget(WizardWidget):
                     try:
                         txt += f'Source info:\n'
                         txt += f'    shape: {asset.shape()}\n'
-                        txt += f'    dtype: {asset.as_source().dtype}\n'
+                        txt += f'    dtype: {asset.dtype()}\n'
                     except ValueError as err:
                         if self.app is not None:
                             base_msg = f'Source info error with {asset.type_spec.name}'

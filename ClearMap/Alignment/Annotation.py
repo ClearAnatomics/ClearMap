@@ -748,9 +748,9 @@ class Annotation:
                 raise FileNotFoundError(f'Cannot find annotation file: {f_path}')
 
             # Extract array
-            src = clearmap_io.as_source(f_path)
             if verbose:
                 print(f'Preparing: from source {src}')
+            src = clearmap_io.read(f_path)
             data = np.array(src.array)
 
             if orientation is not None:

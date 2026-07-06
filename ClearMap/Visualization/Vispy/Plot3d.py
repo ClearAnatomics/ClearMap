@@ -159,7 +159,7 @@ def plot_3d(source, colormap=None, view=None, title=None, center_view=True, **kw
     style.update(**kwargs)
 
     # source
-    source = io.as_source(source)[:]
+    source = io.read(source)[:]
     if source.dtype == bool:
         source = source.view(dtype='uint8')
 

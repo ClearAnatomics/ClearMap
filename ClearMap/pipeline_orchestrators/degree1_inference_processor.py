@@ -99,8 +99,7 @@ def degree1_verification(sample_manager, model_weights_path=None, threshold=0.8,
         return
 
     # Load image and graph
-    image = stitched_asset.as_source(mode='r')
-    # image = np.load(stitched_path, mmap_mode="r").swapaxes(0, 2)
+    image = stitched_asset.open_ro()
     graph = graph_asset.read()
 
     # Prepare vertex coordinates (DataFrame)

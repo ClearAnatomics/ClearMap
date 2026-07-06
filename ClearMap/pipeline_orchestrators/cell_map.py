@@ -543,7 +543,7 @@ class CellDetector(ChannelPipelineOrchestrator):
 
     def plot_background_subtracted_img(self):
         import ClearMap.Visualization.Plot3d as plot_3d
-        src = self.get('cells', channel=self.channel, asset_sub_type='raw').as_source()
+        src = self.get('cells', channel=self.channel, asset_sub_type='raw').open_ro()
         coordinates = np.hstack([src[c][:, None] for c in 'xyz'])
         p = plot_3d.list_plot_3d(coordinates)
         return plot_3d.plot_3d(self.get_path('stitched', channel=self.channel),
@@ -626,7 +626,7 @@ class CellDetector(ChannelPipelineOrchestrator):
         """
         warnings.warn('Method "export_to_clearmap1_fmt" is deprecated and will be removed in future versions;'
                       'please use the new formats from atlas_align and export_collapsed_stats', DeprecationWarning, 2)
-        source = self.get('cells', channel=self.channel).as_source()
+        source = self.get('cells', channel=self.channel).read()
         clearmap1_format = {'points': ['x', 'y', 'z'],
                             'points_transformed': ['xt', 'yt', 'zt'],
                             'intensities': ['source', 'dog', 'background', 'size']}

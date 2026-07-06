@@ -42,16 +42,13 @@ def ndim_to_gtype(ndim, gtype):
 def ndim_from_source(source):
     """Determines the dimension of a source appropriate for graph_tool."""
     if isinstance(source, (list, tuple)):
-        if len(source) > 0:
-            ndim = 2
-        else:
-            ndim = 0
-    elif hasattr(source, 'dtype') and hasattr(source, 'ndim'):
+        ndim = 2 if len(source) > 0 else 0
+    elif hasattr(source, 'ndim'):
         ndim = source.ndim
     else:
         try:
             import ClearMap.IO.IO as io
-            source = io.as_source(source)
+            source = io.open_ro(source)
             ndim = source.ndim
         except:
             ndim = 0
@@ -70,16 +67,16 @@ def gtype_from_source(source, vectorize=True, graph_property=False):
             gtype = dtype_to_gtype('object')
             ndim = 0
     elif hasattr(source, 'dtype') and hasattr(source, 'ndim'):
+        ndim = source.ndim
         dtype = source.dtype
         gtype = dtype_to_gtype(dtype)
-        ndim = source.ndim
     else:
         try:
             import ClearMap.IO.IO as io
-            source = io.as_source(source)
+            source = io.open_ro(source)
+            ndim = source.ndim
             dtype = source.dtype
             gtype = dtype_to_gtype(dtype)
-            ndim = source.ndim
         except:
             gtype = dtype_to_gtype('object')
             ndim = 0

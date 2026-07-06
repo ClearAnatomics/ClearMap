@@ -554,7 +554,7 @@ def resample(original, resampled=None,
     else:
         new_path = None
 
-    original = io.as_source(original)
+    original = io.open_ro(original)
     dtype = original.dtype
     order = original.order
 
@@ -709,7 +709,7 @@ def resample_inverse(resampled, original=None,
     * All arguments, except source and sink should be passed as :func:`resample`
       to invert the resampling.
     """
-    resampled = io.as_source(resampled)
+    resampled = io.open_ro(resampled)
 
     # invert orientation
     resampled = orient(resampled, orientation, inverse=True)
@@ -802,8 +802,7 @@ def resample_points(original_points, resampled_points=None,
                        original, resampled,
                        orientation, consistent=True)
 
-    resampled = io.as_source(original_points)
-    resampled = resampled[:] * factor
+    resampled = io.read(original_points)[:] * factor
     resampled = orient_points(resampled, orientation, shape=orient_shape(resampled_shape, orientation, inverse=True))
     return io.write(resampled_points, resampled)
 
@@ -859,7 +858,7 @@ def resample_points_inverse(resampled_points, original_points=None,
                        original, resampled,
                        orientation, consistent=True)
 
-    resampled_points = io.as_source(resampled_points)
+    resampled_points = io.open_ro(resampled_points)
     original = orient_points(resampled_points, orientation, shape=resampled_shape, inverse=True)
     original = original[:] / factor
     return io.write(original_points, original)
