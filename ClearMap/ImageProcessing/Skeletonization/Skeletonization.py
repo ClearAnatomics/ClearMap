@@ -92,7 +92,7 @@ def skeletonize(source, sink = None, points = None,
     timer.print_elapsed_time(head='Skeletonization')
 
   if sink is None:
-    sink = ap.io.as_source(result)
+    sink = io.initialize(result)
   elif isinstance(sink, str):
     sink = ap.write(sink, result)  # prange
   else:

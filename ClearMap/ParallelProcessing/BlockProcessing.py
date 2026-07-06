@@ -207,8 +207,7 @@ def process(function, source, sink = None,
   else:
     sinks = [sink]
 
-  sinks = [io.initialize(s, hint=sources[0]) for s in sinks]
-  sinks = [io.as_source(s).as_virtual() for s in sinks]
+  sinks = [io.initialize(s, hint=sources[0]).as_virtual() for s in sinks]
 
   axes = block_axes(sources[0], axes=axes)
 

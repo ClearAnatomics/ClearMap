@@ -1,4 +1,3 @@
-#!/usr/bin/env python2
 # -*- coding: utf-8 -*-
 """
 ArrayProcessing
@@ -20,6 +19,8 @@ __webpage__   = 'https://idisco.info'
 __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
 import os
+import warnings
+
 import numpy as np
 import multiprocessing as mp
 
@@ -235,7 +236,7 @@ def where(source, sink=None, blocks=None,
   if source_buffer.size <= cutoff:
     result = np.vstack(np.where(source_buffer)).T
     if sink is None:
-      sink = io.as_source(result)
+      sink = io.initialize(result)
     else:
       sink, sink_buffer = initialize_sink(sink=sink, shape=result.shape)
       sink[:] = result
@@ -334,8 +335,8 @@ def read(source, sink=None, slicing=None, memory=None, blocks=None, processes=No
   processes, timer, blocks = initialize_processing(processes=processes, verbose=verbose, function='read',
                                                    blocks=blocks, return_blocks=True)
 
-  #source info
-  source = io.as_source(source)
+  # source info
+  source = io.open_ro(source)
   if slicing is not None:
     source = slc.Slice(source=source, slicing=slicing)
 
@@ -387,7 +388,7 @@ def write(sink, source, slicing=None, overwrite=True, blocks=None, processes=Non
   source, source_buffer, source_order = initialize_source(source, as_1d=True, return_order = True)
   
   try:
-    sink = io.as_source(sink)
+    sink = io.initialize(sink)
     location = sink.location
   except:
     if isinstance(sink, str):
@@ -514,45 +515,60 @@ def index_neighbours(indices, offset, processes=None):
 ### Initialization
 ###############################################################################
 
-def initialize_processing(processes=None, verbose=False, function=None, blocks=None, return_blocks=False):
+def initialize_processing(processes=None, verbose=False, function=None, blocks=None,
+                          return_blocks=False) ->  tuple[int, tmr.Timer | None] | tuple[int, tmr.Timer | None, int]:
   """Initialize parallel array processing.
   
-  Arguments
-  ---------
-  processes : int, 'serial' or None
-    The number of processes to use. If None use number of cpus.
-  verbose : bool
-    If True, print progress information.
-  function : str or None
-    The name of the function.
+
+    Parameters
+    ----------
+    processes : int, 'serial', or None
+        Number of worker processes to use. If None, use ``default_processes``.
+        If ``'serial'``, use one process.
+    verbose : bool
+        If True, print initialization information and return a timer.
+    function : str or None
+        Name of the function being initialized, used only for verbose output.
+    blocks : int or None
+        Number of processing blocks. Only used when ``return_blocks=True``.
+        If None, defaults to ``processes * default_blocks_per_process``.
+    return_blocks : bool
+        If True, return ``(processes, timer, blocks)``.
+        If False, return ``(processes, timer)``.
   
   Returns
-  -------
-  processes : int
-    The number of processes.
-  timer : Timer
-    A timer for the processing.
-  """
-  if processes is None:
-    processes = default_processes
-  if processes == 'serial':
-    processes = 1
-  
+    -------
+    tuple
+        If ``return_blocks`` is False:
+
+        ``(processes, timer)``
+
+        If ``return_blocks`` is True:
+
+        ``(processes, timer, blocks)``
+
+    processes : int
+        Number of worker processes.
+    timer : Timer or None
+        Timer instance when ``verbose=True``; otherwise None.
+    blocks : int
+        Number of processing blocks, only returned when
+        ``return_blocks=True``.
+    """
+  processes = sanitize_n_processes(processes)
+
+  timer = None
   if verbose:
     if function:
-      print('%s: initialized!' % function)
+      print(f'{function}: initialized!')
     timer = tmr.Timer()
-  else:
-    timer = None
-  
-  results = (processes, timer)
-  
+
   if return_blocks:
     if blocks is None:
       blocks = processes * default_blocks_per_process
-    results += (blocks,)
-  
-  return results
+    return processes, timer, blocks
+  else:
+    return processes, timer
 
 
 def finalize_processing(verbose=False, function=None, timer=None):
@@ -600,7 +616,7 @@ def initialize_source(source, return_buffer=True, as_1d=False,
   return_Strides : tuple of int
     Element strides of the source. 
   """
-  source = io.as_source(source)
+  source = io.as_source(source)  # FIXME: check if we need the output editable
 
   if return_shape:
     shape = np.array(source.shape, dtype=int)
@@ -618,7 +634,7 @@ def initialize_source(source, return_buffer=True, as_1d=False,
       source_buffer = source_buffer.view('uint8')
 
     if as_1d:
-      source_buffer = source_buffer.reshape(-1, order = 'A')
+      source_buffer = source_buffer.reshape(-1, order='A')
 
   result = (source,)
   if return_buffer:

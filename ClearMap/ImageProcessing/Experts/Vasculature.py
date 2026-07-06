@@ -525,7 +525,7 @@ def binarize_block(source, sink, parameter=default_binarization_parameter):
         not_low = np.logical_not(low)
 
         if save:
-            save = io.as_source(save)
+            save = io.initialize(save)  # edit or create
             save[base_slicing] = clipped[valid_slicing]
 
         if binary_status is not None:
@@ -569,7 +569,7 @@ def binarize_block(source, sink, parameter=default_binarization_parameter):
         del binarized
 
         if save:
-            save = io.as_source(save)
+            save = io.initialize(save)  # edit or create
             save[base_slicing] = deconvolved[valid_slicing]
 
         if verbose:
@@ -623,7 +623,7 @@ def binarize_block(source, sink, parameter=default_binarization_parameter):
         equalized = equalize(median, mask=mask, **parameter_equalize)
 
         if save:
-            save = io.as_source(save)
+            save = io.initialize(save)  # edit or create
             save[base_slicing] = equalized[valid_slicing]
 
         if verbose:
@@ -670,7 +670,7 @@ def binarize_block(source, sink, parameter=default_binarization_parameter):
             del background
 
             if save:
-                save = io.as_source(save)
+                save = io.initialize(save)  # edit or create
                 save[base_slicing] = tubeness[valid_slicing]
         else:
             tubeness = equalized
@@ -680,7 +680,7 @@ def binarize_block(source, sink, parameter=default_binarization_parameter):
 
         save = parameter_vesselization.get('save')
         if save:
-            save = io.as_source(save)
+            save = io.initialize(save)  #  edit or create
             save[base_slicing] = tubeness[valid_slicing]
 
         if verbose:
