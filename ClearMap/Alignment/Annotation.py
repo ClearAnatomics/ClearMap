@@ -749,7 +749,7 @@ class Annotation:
 
             # Extract array
             if verbose:
-                print(f'Preparing: from source {src}')
+                print(f'Preparing: from file: "{f_path}"')
             src = clearmap_io.read(f_path)
             data = np.array(src)
 
