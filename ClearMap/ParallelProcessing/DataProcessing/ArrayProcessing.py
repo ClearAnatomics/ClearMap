@@ -29,6 +29,7 @@ import pyximport
 import ClearMap.IO.IO as io
 import ClearMap.IO.Slice as slc
 import ClearMap.Utils.Timer as tmr
+from ClearMap.Utils.utilities import sanitize_n_processes
 
 pyximport.install(setup_args={"include_dirs": [np.get_include(), os.path.dirname(os.path.abspath(__file__))]},
                   reload_support=True)
@@ -208,12 +209,12 @@ def where(source, sink=None, blocks=None,
     Number of elements below whih to switch to numpy.where
   processes : None or int
     Number of processes, if None use number of cpus.
-    
+
   Returns
   -------
   where : array
       Positions of the nonzero entries of the input array
-  
+
   Note
   ----
     Uses numpy.where if there is no match of dimension implemented!
@@ -222,13 +223,17 @@ def where(source, sink=None, blocks=None,
   order = getattr(source, 'order', None) or ('F' if source_buffer.flags['F_CONTIGUOUS'] else 'C')
 
   ndim = source_buffer.ndim
-  if not ndim in [1,2,3]:
-    raise Warning('Using numpy.where for dimension %d!' % (ndim,))
-    return io.as_source(np.vstack(np.where(source_buffer)).T)
+  if ndim == 0:
+    raise ValueError('where() is not defined for 0-dimensional sources!')
+  elif ndim > 3:
+    warnings.warn(f'array_processing.where only supports dimensions 1-3. '
+                  f'Falling back to numpy.where for dimension {ndim:d}!', RuntimeWarning, stacklevel=2)
+    result = np.vstack(np.where(source_buffer)).T
+    return io.initialize(result)
 
   processes, timer, blocks = initialize_processing(processes=processes, function='where', verbose=verbose,
                                                    blocks=blocks, return_blocks=True)
-    
+
   if cutoff is None:
     cutoff = 1
   cutoff = min(1, cutoff)
