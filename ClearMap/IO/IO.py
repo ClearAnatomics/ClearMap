@@ -352,6 +352,8 @@ def as_source(source_, slicing=None, *args, **kwargs):
     ----------
     source_ : object
         The source specification.
+    slicing : int, slice, list of slices or None
+        Optional slicing to apply to the source after opening.
 
     Returns
     -------
@@ -400,7 +402,7 @@ def ndim(source_):
     ndim : int
         The number of dimensions in the source.
     """
-    source_ = as_source(source_)
+    source_ = open_ro(source_)
     return source_.ndim
 
 
@@ -418,7 +420,7 @@ def shape(source_):
     shape : tuple of ints
        The shape of the source.
     """
-    source_ = as_source(source_)
+    source_ = open_ro(source_)
     return source_.shape
 
 
@@ -436,7 +438,7 @@ def size(source_):
     size : int
         The size of the source.
     """
-    source_ = as_source(source_)
+    source_ = open_ro(source_)
     return source_.size
 
 
@@ -454,7 +456,7 @@ def dtype(source_):
     dtype : dtype
         The data type of the source.
     """
-    source_ = as_source(source_)
+    source_ = open_ro(source_)
     return source_.dtype
 
 
@@ -472,7 +474,7 @@ def order(source_):
     order : 'C', 'F', or None
         The order of the source data items.
     """
-    source_ = as_source(source_)
+    source_ = open_ro(source_)
     return source_.order
 
 
@@ -490,7 +492,7 @@ def location(source_):
     location : str or None
         The location of the source.
     """
-    source_ = as_source(source_)
+    source_ = open_ro(source_)
     return source_.location
 
 
@@ -530,7 +532,7 @@ def element_strides(source_):
         The strides of the source.
     """
     try:
-        source_ = as_source(source_)
+        source_ = open_ro(source_)
         strides = source_.element_strides
     except Exception as e:
         raise ValueError(f'Cannot determine the strides for the source!; {e}')
@@ -567,6 +569,11 @@ def read(source_, *args, **kwargs):
     """
     Read data from a data source.
 
+    .. warning::
+        For some modules (file types) this does an active read
+        for others, it just does an open and returns a Source class
+        that can be used to read the data.
+
     Parameters
     ----------
     source_ : str, pathlib.Path, array, Source class
@@ -581,6 +588,34 @@ def read(source_, *args, **kwargs):
         source_ = str(source_)
     mod = source_to_module(source_)
     return mod.read(source_, *args, **kwargs)
+
+
+def open_ro(source_, **kwargs):
+    """Open a source strictly read-only for metadata queries."""
+    if isinstance(source_, pathlib.Path):
+        source_ = str(source_)
+    mod = source_to_module(source_)
+    if isinstance(source_, src.Source):
+        if source_.mode == 'r':
+            return source_
+        if hasattr(mod, 'open_ro'):
+            return mod.open_ro(source_, **kwargs)
+        return source_  # non-MMP Sources are read-only at API level already
+    else:  # e.g. string
+        if hasattr(mod, 'open_ro'):
+            return mod.open_ro(source_, **kwargs)
+    # no open_ro available -> fallback: construct with mode='r'
+    return mod.Source(source_, mode='r', **kwargs)
+
+
+def edit(source_, **kwargs):
+    """Open a source for in-place editing (mode='r+')."""
+    if isinstance(source_, pathlib.Path):
+        source_ = str(source_)
+    mod = source_to_module(source_)
+    if hasattr(mod, 'edit'):
+        return mod.edit(source_, **kwargs)
+    return as_source(source_, **kwargs)  # FIXME: explicit mode = r+
 
 
 def write(sink, data, *args, **kwargs):
@@ -604,7 +639,7 @@ def write(sink, data, *args, **kwargs):
     if isinstance(sink, pathlib.Path):
         sink = str(sink)
     mod = source_to_module(sink)
-    return mod.write(sink, as_source(data), *args, **kwargs)
+    return mod.write(sink, open_ro(data), *args, **kwargs)
 
 
 def create(source_, *args, **kwargs):
@@ -627,10 +662,10 @@ def create(source_, *args, **kwargs):
     return mod.create(source_, *args, **kwargs)
 
 
-def initialize(source_=None, shape_=None, dtype_=None, order_=None, location_=None,
-               memory_=None, like=None, hint=None, **kwargs):
+def initialize(source_=None, shape_=None, dtype_=None,
+               order_=None, location_=None, memory_=None, like=None, hint=None, **kwargs):
     """
-    Initialize a source with specified properties.
+    Initialize (open to edit or create if missing) a source with specified properties.
 
     Note
     ----
@@ -682,11 +717,15 @@ def initialize(source_=None, shape_=None, dtype_=None, order_=None, location_=No
 
     if source_ is None:
         if location_ is not None:  # No source but a path
-            try:
-                source_ = as_source(location_)  # First, attempt to read the source
+            try: # First, attempt to read the source in 'edit' mode
+                mod = location_to_module(location_)
+                if hasattr(mod, 'edit'):
+                    source_ = mod.edit(location_)
+                else:
+                    source_ = as_source(location_, mode='r+')  # FIXME: check if we nuke existing data here, maybe we need an argument erase=False and/or a warning
             except (FileNotFoundError, ValueError) as err:  # No file found, then create # TODO: see if nore exceptions are needed
                 if isinstance(err, ValueError):
-                    if not str(err).startswith('Cannot create memmap without shape at location'):
+                    if not str(err).startswith('Cannot create memmap without shape at location'):  # FIXME: msg too specific, use ClearMap specific exception class
                         raise err
                 try:
                     if os.path.exists(location_):
@@ -698,7 +737,6 @@ def initialize(source_=None, shape_=None, dtype_=None, order_=None, location_=No
                                              f'shape {shape_}, dtype {dtype_}, order {order_}; '
                                              f'file exists with shape {parsed_shape}, dtype {parsed_dtype}, order {parsed_order}')
                     shape_, dtype_, order_ = _from_hint(hint, shape_, dtype_, order_)
-                    mod = location_to_module(location_)
                     return mod.create(location=location_, shape=shape_, dtype=dtype_, order=order_, **kwargs)
                 except Exception as error:
                     raise ValueError(f'Cannot initialize source for location {location_}; {error}')
@@ -717,8 +755,9 @@ def initialize(source_=None, shape_=None, dtype_=None, order_=None, location_=No
         raise ValueError(f'Source specification {source_} not a valid location, array or Source class!')
 
     current_vars = locals()
-    for attr in ('shape', 'dtype', 'order'):
-        if current_vars.get(attr) is not None and current_vars[attr] != getattr(source_, attr, None):
+    for attr in ('shape_', 'dtype_', 'order_'):
+        base_attr = attr[:-1]
+        if current_vars.get(attr) is not None and current_vars[attr] != getattr(source_, base_attr, None):
             raise IncompatibleSource(source_, attr, current_vars)
 
     if location_ is not None and abspath(location_) != abspath(source_.location):
@@ -731,7 +770,7 @@ def initialize(source_=None, shape_=None, dtype_=None, order_=None, location_=No
 
 def _from_like(like, shape, dtype, order):
     if like is not None:
-        like = as_source(like)
+        like = open_ro(like)
         if shape is None:
             shape = like.shape
         if dtype is None:
@@ -931,7 +970,7 @@ def convert(source_, sink, processes=None, verbose=False, **kwargs):
     """
     if isinstance(sink, pathlib.Path):
         sink = str(sink)
-    source_ = as_source(source_)
+    source_ = open_ro(source_)
     if verbose:
         print(f'converting {source_} -> {sink}')
     mod = source_to_module(source_)
@@ -1004,7 +1043,7 @@ def convert_files(filenames, extension=None, path=None, processes=None, verbose=
 
 @ptb.parallel_traceback
 def _convert_files(source_, sink, fid, n_files, extension, verbose, verify=False):
-    source_ = as_source(source_)
+    source_ = open_ro(source_)
     if verbose:
         print(f'Converting file {fid}/{n_files} {source_} -> {sink}')
     mod = file_extension_to_module[extension]
