@@ -150,24 +150,42 @@ def detect_shape(source, seeds, threshold=None, verbose=False, processes=None, a
     else:
         peaks = labeled_pixels_from_centers(seeds, np.arange(1, seeds.shape[0]+1), source.shape)
 
-    # We check that source has no 0 value otherwise the map source -> -source is not necessarily decreasing, eg for source.dtype=uint16.
+    # We check that source has no 0 value otherwise the map source -> -source is not necessarily decreasing, e.g. for source.dtype=uint16.
     if np.any(source == 0) and np.issubdtype(source.dtype,np.unsignedinteger):
         max_val = np.ma.minimum_fill_value(source)
-        print('Received uint source array with 0 values. To avoid inconsistent results in watershedding, we need to shift the source intensity by 1 prior to taking its opposite.')
+        print('Received uint source array with 0 values. To avoid inconsistent results in watershedding, '
+              'we need to shift the source intensity by 1 prior to taking its opposite.')
         if not source.max() < max_val:
             source = np.clip(source, a_min=None, a_max=max_val-1)
-            warnings.warn(f'Received an uint source using the full range of available values. We had to clip upper values to {max_val-1} before shifting intensity by 1.')
+            warnings.warn(f'Received an uint source using the full range of available values. '
+                          f'We had to clip upper values to {max_val-1} before shifting intensity by 1.')
         source += 1
 
-    try:
+    if verbose:
+        print('Shape detection: before watershed', flush=True)
+
+    try:  # REFACTOR: do once at module level
         shapes = skimage.morphology.watershed(-source, peaks, mask=mask, watershed_line=watershed_line)
     except AttributeError:
         shapes = skimage.segmentation.watershed(-source, peaks, mask=mask, watershed_line=watershed_line)
 
-    if np.unique(shapes).size != np.unique((peaks if mask is None else peaks*mask)).size:
-        raise RuntimeError(f'watersheding yields unexpected results: the seed number was {np.unique(peaks*mask).size-1}'
-                           + f'and the number of labeled region in output was {np.unique(shapes).size} counting the zero labeled region'
-                           + 'However,' + ( 'there was no zero labeled pixel' if np.count_nonzero(shapes==0)==0  else 'there was some zero labeled pixel') )
+    if verbose:
+        print('Shape detection: after watershed, before unique check', flush=True)
+
+    n_shape_labels = np.unique(shapes).size
+    if verbose:
+        print(f'Shape detection: after unique(shapes): {n_shape_labels}', flush=True)
+
+    n_peak_labels = np.unique((peaks if mask is None else peaks * mask)).size
+    if verbose:
+        print(f'Shape detection: after unique(peaks/mask): {n_peak_labels}', flush=True)
+
+    if n_shape_labels != n_peak_labels:
+        labeled_pixels_str = ('there was no zero labeled pixel' if np.count_nonzero(shapes == 0) == 0 else
+                              'there was some zero labeled pixel')
+        raise RuntimeError(f'watersheding yields unexpected results: the seed number was {np.unique(peaks*mask).size-1} '
+                           f'and the number of labeled region in output was {np.unique(shapes).size} '
+                           f'counting the zero labeled region. However, {labeled_pixels_str}')
 
     if verbose:
         timer.print_elapsed_time('Shape detection')
@@ -177,12 +195,12 @@ def detect_shape(source, seeds, threshold=None, verbose=False, processes=None, a
         sizes = find_size(shapes, max_label=max_label)
     
         if as_binary_mask:
-            return (shapes>0),sizes
+            return (shapes > 0), sizes
         else:
-            return shapes,sizes
+            return shapes, sizes
     else:
         if as_binary_mask:
-            return shapes>0
+            return shapes > 0
         else:
             return shapes
 
@@ -272,4 +290,3 @@ def find_intensity(source, label, max_label=None, method='sum', verbose=False):
         timer.print_elapsed_time(head='Intensity detection')
 
     return intensities
-  
