@@ -990,10 +990,10 @@ class ClearMapApp(ClearMapAppBase):
         self.error_logger.set_file(src_folder / 'errors.html')
         self.progress_logger.set_file(src_folder / 'progress.log')
 
-    def reset_loggers(self):# FIXME: redirect should be f(log_level)
-        self.logger = Printer(redirects=None if DEBUG else 'stdout')
+    def reset_loggers(self):
+        self.logger = Printer(redirects='stdout')
         self.logger.text_updated.connect(self.textBrowser.append)
-        self.error_logger = Printer(color='red', logger_type='error', redirects=None if DEBUG else 'stderr')
+        self.error_logger = Printer(color='red', logger_type='error', redirects='stderr')
         self.error_logger.text_updated.connect(self.textBrowser.append)
         if DEBUG:
             self.patch_warnings_color()

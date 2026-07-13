@@ -5,6 +5,7 @@ gui_logging
 
 Defines the Printer class used to log to file and to the GUI widgets from simple prints
 """
+import re
 import sys
 import traceback
 from datetime import datetime
@@ -29,6 +30,17 @@ from pygments.lexers.python import PythonTracebackLexer  # noqa
 from qdarkstyle import DarkPalette
 
 from ClearMap.gui.style import WARNING_YELLOW
+_ANSI_RE = re.compile(
+    r'(?:'
+    r'\x1b\[[0-9;]*[A-Za-z]'           # CSI sequence  ESC [ ... X
+    r'|\x1b\][^\x07\x1b\x9c]*'         # OSC open      ESC ] ...
+      r'(?:\x07|\x1b\\|\x9c)'          #   ... terminated by BEL, ST, or 0x9C
+    r'|\x1b[PX^_][^\x1b\x9c]*'         # DCS / SOS / PM / APC
+      r'(?:\x1b\\|\x9c)'               #   ... terminated
+    r'|\x1b[@-Z\\-_]'                  # Fe sequences  ESC + one byte
+    r'|[\x80-\x9f]'                    # C1 control bytes (includes 0x9C)
+    r')'
+)
 
 
 class Printer(QWidget):
@@ -47,6 +59,7 @@ class Printer(QWidget):
         #     self.setup_except_hook()
         print(f'Logger initialized with type: {logger_type}, redirects: {redirects}, log path: {log_path}')
         self.redirects = redirects
+        self._original_stream = None  # stored before redirect
 
         self.set_file(log_path, open_mode)
 
@@ -57,6 +70,10 @@ class Printer(QWidget):
 
     def __del__(self):
         self.close_file()
+
+    @staticmethod
+    def _strip_ansi(text: str) -> str:
+        return _ANSI_RE.sub('', text)
 
     def close_file(self):
         try:
@@ -89,23 +106,45 @@ class Printer(QWidget):
 
     def __set_redirects(self):
         if self.redirects == 'stdout':
+            self._original_stream = self.original_std_out
+            self.encoding = sys.stdout.encoding
             sys.stdout = self
         elif self.redirects == 'stderr':
+            self._original_stream = self.original_std_err
+            self.encoding = sys.stderr.encoding
             sys.stderr = self
 
     def __unset_redirects(self):
         if self.redirects == 'stdout':
-            sys.stdout = self.original_std_out
+            sys.stdout = self._original_stream or self.original_std_out
         elif self.redirects == 'stderr':
-            sys.stderr = self.original_std_err
+            sys.stderr = self._original_stream or self.original_std_err
+        self._original_stream = None
 
-    def write(self, msg):
+    def write(self, msg: str):
+        # Write to origianl stream (console): keep ANSI so colours render
+        if self.redirects and self._original_stream is not None:
+            try:
+                self._original_stream.write(msg)
+                if not msg.endswith('\n'):
+                    self._original_stream.write('\n')
+                self._original_stream.flush()
+            except (ValueError, OSError):
+                pass  # stream closed
+        # Now strip before the rest
+        clean = self._strip_ansi(msg)
+
+        # Write to log file: no ANSI, no double-newline
         if self.file is not None:
             if self.type in ('error', 'progress'):
                 self.file.write(f'{datetime.now().strftime("%y-%m-%d %H:%M:%S")}: ')
-            self.file.write(msg+'\n')
+            self.file.write(clean)
+            if not clean.endswith('\n'):
+                self.file.write('\n')
             self.file.flush()
-        self.text_updated.emit(self.colourise(msg))
+
+        # GUI: clean text + HTML formating
+        self.text_updated.emit(self.colourise(clean))
 
     def flush(self):
         try:
