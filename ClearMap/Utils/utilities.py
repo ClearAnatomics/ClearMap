@@ -607,7 +607,7 @@ def sanitize_n_processes(processes):
                              f'Use None, "serial" or an integer.')
     if isinstance(processes, int):
         if processes < 0:
-            processes = multiprocessing.cpu_count() - processes
+            processes = multiprocessing.cpu_count() + processes
         processes = max(1, processes)
         return processes
     else:
