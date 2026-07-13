@@ -95,7 +95,7 @@ cdef void hessian_eigenvalue_core(void kernel(sink_t*, index_t, double, double, 
   
   
   # Compute eigenvalues and apply kernel
-  cdef double s, p1, p2, p, r, phi, pi_3, pi_2
+  cdef double s, p1, p2, p, r, phi, pi_3, pi_2, pi_3_2
   cdef double e1, e2, e3
   
   pi_3 = M_PI / 3
