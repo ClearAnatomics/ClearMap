@@ -2,8 +2,6 @@ import os
 import sys
 import subprocess
 import platform
-import functools
-from concurrent.futures import ProcessPoolExecutor
 
 from multiprocessing import cpu_count
 from pathlib import Path
@@ -19,10 +17,47 @@ from Cython.Build import cythonize
 # Pull the installation dir info from distutils with:
 from distutils.command.install import INSTALL_SCHEMES
 
-
 # Modify the data install dir to match the source install dir:
 for scheme in INSTALL_SCHEMES.values():
     scheme['data'] = scheme['purelib']
+
+
+###############################################################################
+# Parallel C/C++ compilation
+###############################################################################
+
+from setuptools.command.build_ext import build_ext as _build_ext
+
+# N_PROCS must be defined before this class is used.
+class parallel_build_ext(_build_ext):
+    def initialize_options(self):
+        super().initialize_options()
+        self.parallel = N_PROCS
+
+
+###############################################################################
+# Platform helpers
+###############################################################################
+
+def _to_msvc_flags(flags):
+    """Convert GCC-style flags to MSVC equivalents where possible."""
+    out = []
+    for arg in flags:
+        if arg == '-fopenmp':
+            out.append('/openmp')
+        elif arg.startswith('-m'):
+            # -march=native, -mtune=native → no MSVC equivalent, skip
+            continue
+        elif arg == '-O3':
+            out.append('/O2')  # MSVC max optimisation
+        elif arg == '-w':
+            out.append('/w')   # disable warnings
+        elif arg.startswith('-f'):
+            # -flarge-source-files etc → no MSVC equivalent, skip
+            continue
+        else:
+            out.append(arg)
+    return out
 
 requirements = [  # pip
     'lxml'
@@ -30,7 +65,7 @@ requirements = [  # pip
 os_name = platform.system().lower()
 
 OPTIMISE_COMPILATION_FOR_TARGET = os.environ.get('OPTIMISE_CLEARMAP_COMPILATION_FOR_TARGET', True) != 'False' # Cython code will run on the machine where is was compiled
-N_PROCS = cpu_count() - 2
+N_PROCS = max(1, cpu_count() - 2)
 
 DEFAULT_COMPILE_ARGS = []
 DEFAULT_LIBRARIES = []
@@ -47,6 +82,7 @@ if os_name.startswith('linux'):
 
 
 if '--no-openmp' in sys.argv:
+    sys.argv.remove('--no-openmp')
     USE_OPENMP = False
 else:
     if os_name.startswith('linux') or os_name.startswith('windows'):
@@ -61,7 +97,7 @@ if OPTIMISE_COMPILATION_FOR_TARGET and not os_name.startswith('windows'):
     DEFAULT_COMPILE_ARGS += ['-march=native', '-mtune=native']
 
 
-def module_path_to_doted(ext_path):
+def module_path_to_dotted(ext_path):
     return os.path.splitext(ext_path)[0].replace(os.sep, '.')
 
 
@@ -77,44 +113,46 @@ def find_data_files(src_dir):
 
 
 excluded_pyx = ['_Old', '_Todo', 'StatisticsPointListCode', 'flow', 'OrientationCode']
-extension_paths = [str(p) for p in Path('ClearMap').rglob('*.pyx') if not any([excl in str(p) for excl in excluded_pyx])]
+extension_paths = [str(p) for p in Path('ClearMap').rglob('*.pyx')
+                   if not any(excl in str(p) for excl in excluded_pyx)]
 
-extra_args = ['-fopenmp'] if USE_OPENMP else []
+###############################################################################
+# OpenMP flags (platform-conditional — NOT in file headers)
+###############################################################################
+
+extra_compile_args = list(DEFAULT_COMPILE_ARGS)
+extra_link_args = list(DEFAULT_LINK_ARGS)
+
+if USE_OPENMP:
+    extra_compile_args += ['-fopenmp']
+    extra_link_args += ['-fopenmp']
+
 if os_name.startswith('windows'):
-    extra_args = [arg.replace('-f', '/') for arg in extra_args]
-    extra_args = [arg.replace('-m', '/') for arg in extra_args]  # FIXME: /openmp only for compile ?
-    DEFAULT_COMPILE_ARGS = [arg.replace('-m', '/') for arg in DEFAULT_COMPILE_ARGS]
-    DEFAULT_LINK_ARGS = [arg.replace('-m', '/') for arg in DEFAULT_LINK_ARGS]
-    extra_link_args = []
-else:
-    extra_link_args = extra_args
+    extra_compile_args = _to_msvc_flags(extra_compile_args)
+    extra_link_args = _to_msvc_flags(extra_link_args)
 
-print(f'Building extensions with {N_PROCS} processes, '
-      f'using OpenMP: {USE_OPENMP}, '
-      f'libraries: {DEFAULT_LIBRARIES}, ',
-      f'compile args: {DEFAULT_COMPILE_ARGS + extra_args},'
-      f'link args: {DEFAULT_LINK_ARGS + extra_args}')
 extensions = []
 for ext_path in extension_paths:
     extension = Extension(
-        name=module_path_to_doted(ext_path),
+        name=module_path_to_dotted(ext_path),
         sources=[ext_path],
         libraries=DEFAULT_LIBRARIES,
-        language='c++',  # WARNING: should be in file header
+        # language= intentionally omitted — read from #distutils: header
         include_dirs=[np.get_include(), os.path.dirname(os.path.abspath(ext_path))],
-        extra_compile_args=DEFAULT_COMPILE_ARGS+extra_args,
-        extra_link_args=DEFAULT_LINK_ARGS+extra_args,
+        extra_compile_args=extra_compile_args,
+        extra_link_args=extra_link_args,
     )
     extensions.append(extension)
 
+print(f'Building {len(extensions)} extensions with {N_PROCS} processes, '
+      f'using OpenMP: {USE_OPENMP}, '
+      f'libraries: {DEFAULT_LIBRARIES}, ',
+      f'compile args: {extra_compile_args},'
+      f'link args: {extra_link_args}')
 if os_name.startswith('darwin') or os_name.startswith('windows'):
     ext_modules = cythonize(extensions, quiet=True)
 else:
     ext_modules = cythonize(extensions, nthreads=N_PROCS, quiet=True)
-# with ProcessPoolExecutor(max_workers=N_PROCS) as executor:
-#    parametrized_cythonize = functools.partial(cythonize, quiet=True)
-#    ext_modules = executor.map(parametrized_cythonize, extensions)
-#    ext_modules = [item for sublist in ext_modules for item in sublist]
 
 data_dirs = [
     'ClearMap/External/elastix',
@@ -130,8 +168,9 @@ for p in data_dirs:
     data_files.extend([(k, v) for k, v in find_data_files(p).items()])
 data_files.extend([('', ['start_gui.sh'])])
 
-packages = find_packages(exclude=('doc', 'tests*', 'pickle_python_2', 'deprecated', 'ClearMap.External.elastix',
-                                  'ClearMap.External.geodesic_distance'))
+packages = find_packages(exclude=('doc', 'tests*', 'pickle_python_2', 'deprecated',
+                                  'ClearMap.External.elastix', 'ClearMap.External.geodesic_distance'))
+
 setup(
     name='ClearMap',
     version='3.1.0',
@@ -139,6 +178,7 @@ setup(
     install_requires=requirements,
     packages=packages,
     ext_modules=ext_modules,
+    cmdclass={'build_ext': parallel_build_ext},
     entry_points={
         'gui_scripts': [
             'clearmap-ui = ClearMap.gui.app:entry_point'
@@ -169,7 +209,8 @@ setup(
             'creator/icons/*.png',
             'creator/icons/*.jpg',
             'creator/icons/*.svg',
-        ]},
+        ],
+    },
     data_files=data_files,
     zip_safe=False
 )
