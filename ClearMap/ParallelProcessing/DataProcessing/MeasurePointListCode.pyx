@@ -64,7 +64,10 @@ cdef extern from "stdio.h":
        
 #@cython.boundscheck(False)
 #@cython.wraparound(False)
-cpdef void measure_max(source_t[:] source, index_t[:] shape, index_t[:] strides, point_t[:,:] points, index_t[:,:] search, index_t[:] max_search, sink_t[:] sink, int processes) nogil:
+cpdef void measure_max(const source_t[:] source, const index_t[:] shape,
+                       const index_t[:] strides, const point_t[:,:] points,
+                       const index_t[:,:] search, const index_t[:] max_search,
+                       sink_t[:] sink, int processes) nogil:
     
   cdef index_t i, j, k, d, n, v
   cdef index_t n_points = points.shape[0];
@@ -101,7 +104,10 @@ cpdef void measure_max(source_t[:] source, index_t[:] shape, index_t[:] strides,
 
 #@cython.boundscheck(False)
 #@cython.wraparound(False)
-cpdef void measure_min(source_t[:] source, index_t[:] shape, index_t[:] strides, point_t[:,:] points, index_t[:,:] search, index_t[:] max_search, sink_t[:] sink, int processes) nogil:
+cpdef void measure_min(const source_t[:] source, const index_t[:] shape,
+                       const index_t[:] strides, const point_t[:,:] points,
+                       const index_t[:,:] search, const index_t[:] max_search,
+                       sink_t[:] sink, int processes) nogil:
     
   cdef index_t i, j, k, d, n, v
   cdef index_t n_points = points.shape[0];
@@ -138,7 +144,10 @@ cpdef void measure_min(source_t[:] source, index_t[:] shape, index_t[:] strides,
 
 #@cython.boundscheck(False)
 #@cython.wraparound(False)
-cpdef void measure_mean(source_t[:] source, index_t[:] shape, index_t[:] strides, point_t[:,:] points, index_t[:,:] search, index_t[:] max_search, value_t[:] sink, int processes) nogil:
+cpdef void measure_mean(const source_t[:] source, const index_t[:] shape,
+                        const index_t[:] strides, const point_t[:,:] points,
+                        const index_t[:,:] search, const index_t[:] max_search,
+                        value_t[:] sink, int processes) nogil:
     
   cdef index_t i, j, k, d, n, v, l
   cdef index_t n_points = points.shape[0];
@@ -177,7 +186,10 @@ cpdef void measure_mean(source_t[:] source, index_t[:] shape, index_t[:] strides
 
 #@cython.boundscheck(False)
 #@cython.wraparound(False)
-cpdef void measure_sum(source_t[:] source, index_t[:] shape, index_t[:] strides, point_t[:,:] points, index_t[:,:] search, index_t[:] max_search, value_t[:] sink, int processes) nogil:
+cpdef void measure_sum(const source_t[:] source, const index_t[:] shape,
+                       const index_t[:] strides, const point_t[:,:] points,
+                       const index_t[:,:] search, const index_t[:] max_search,
+                       value_t[:] sink, int processes) nogil:
     
   cdef index_t i, j, k, d, n, v, l
   cdef index_t n_points = points.shape[0];
@@ -220,7 +232,10 @@ cpdef void measure_sum(source_t[:] source, index_t[:] shape, index_t[:] strides,
        
 #@cython.boundscheck(False)
 #@cython.wraparound(False)
-cpdef void find_smaller_than_value(source_t[:] source, index_t[:] shape, index_t[:] strides, point_t[:,:] points, index_t[:,:] search, value_t value, index_t[:] sink, int processes) nogil:
+cpdef void find_smaller_than_value(const source_t[:] source, const index_t[:] shape,
+                                   const index_t[:] strides, const point_t[:,:] points,
+                                   const index_t[:,:] search, value_t value,
+                                   index_t[:] sink, int processes) nogil:
   
   cdef index_t i, j, k, d, n, v
   cdef index_t n_points = points.shape[0];
@@ -251,7 +266,10 @@ cpdef void find_smaller_than_value(source_t[:] source, index_t[:] shape, index_t
 
 #@cython.boundscheck(False)
 #@cython.wraparound(False)
-cpdef void find_smaller_than_fraction(source_t[:] source, index_t[:] shape, index_t[:] strides, point_t[:,:] points, index_t[:,:] search, value_t fraction, index_t[:] sink, int processes) nogil:
+cpdef void find_smaller_than_fraction(const source_t[:] source, const index_t[:] shape,
+                                      const index_t[:] strides, const point_t[:,:] points,
+                                      const index_t[:,:] search, value_t fraction,
+                                      index_t[:] sink, int processes) nogil:
   
   cdef index_t i, j, k, d, n, v
   cdef index_t n_points = points.shape[0];
@@ -289,7 +307,10 @@ cpdef void find_smaller_than_fraction(source_t[:] source, index_t[:] shape, inde
 
 #@cython.boundscheck(False)
 #@cython.wraparound(False)
-cpdef void find_smaller_than_values(source_t[:] source, index_t[:] shape, index_t[:] strides, point_t[:,:] points, index_t[:,:] search, value_t[:] value, index_t[:] sink, int processes) nogil:
+cpdef void find_smaller_than_values(const source_t[:] source, const index_t[:] shape,
+                                    const index_t[:] strides, const point_t[:,:] points,
+                                    const index_t[:,:] search, const value_t[:] value,
+                                    index_t[:] sink, int processes) nogil:
 
   cdef index_t i, j, k, d, n, v
   cdef index_t n_points = points.shape[0];

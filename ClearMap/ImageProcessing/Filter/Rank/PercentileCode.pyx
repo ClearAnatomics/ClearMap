@@ -61,16 +61,16 @@ cdef inline void kernel_autolevel(sink_t* sink, index_t* histo, index_t pop, sou
         sink[0] = <sink_t>0
 
 
-def autolevel(source_t[:, :, :] source, char[:, :, :] selem,
-               sink_t[:, :, :, :] sink, 
-               index_t max_bin, index_t[:] p, double[:] q):
+def autolevel(const source_t[:, :, :] source, const char[:, :, :] selem,
+              sink_t[:, :, :, :] sink,
+              index_t max_bin, index_t[:] p, double[:] q):
 
   rank_core(kernel_autolevel[sink_t, index_t, source_t], source, selem, 
             sink, max_bin, p, q)
 
-def autolevel_masked(source_t[:, :, :] source, char[:, :, :] selem,
-                      char[:, :, :] mask, sink_t[:, :, :, :] sink,
-                      index_t max_bin, index_t[:] p, double[:] q):
+def autolevel_masked(const source_t[:, :, :] source, const char[:, :, :] selem,
+                     const char[:, :, :] mask, sink_t[:, :, :, :] sink,
+                     index_t max_bin, index_t[:] p, double[:] q):
 
   rank_core_masked(kernel_autolevel[sink_t, index_t, source_t], source, selem, 
                    mask, sink, max_bin, p, q)
@@ -105,16 +105,16 @@ cdef inline void kernel_gradient(sink_t* sink, index_t* histo, index_t pop, sour
         sink[0] = <sink_t>0
 
 
-def gradient(source_t[:, :, :] source, char[:, :, :] selem,
-               sink_t[:, :, :, :] sink, 
-               index_t max_bin, index_t[:] p, double[:] q):
+def gradient(const source_t[:, :, :] source, const char[:, :, :] selem,
+             sink_t[:, :, :, :] sink,
+             index_t max_bin, index_t[:] p, double[:] q):
 
   rank_core(kernel_gradient[sink_t, index_t, source_t], source, selem,
             sink, max_bin, p, q)
 
-def gradient_masked(source_t[:, :, :] source, char[:, :, :] selem,
-                     char[:, :, :] mask, sink_t[:, :, :, :] sink,
-                     index_t max_bin, index_t[:] p, double[:] q):
+def gradient_masked(const source_t[:, :, :] source, const char[:, :, :] selem,
+                    const char[:, :, :] mask, sink_t[:, :, :, :] sink,
+                    index_t max_bin, index_t[:] p, double[:] q):
 
   rank_core_masked(kernel_gradient[sink_t, index_t, source_t], source, selem, 
                    mask, sink, max_bin, p, q)
@@ -147,16 +147,16 @@ cdef inline void kernel_mean(sink_t* sink, index_t* histo, index_t pop, source_t
         sink[0] = <sink_t>0
 
 
-def mean(source_t[:, :, :] source, char[:, :, :] selem,
-          sink_t[:, :, :, :] sink, 
-          index_t max_bin, index_t[:] p, double[:] q):
+def mean(const source_t[:, :, :] source, const char[:, :, :] selem,
+         sink_t[:, :, :, :] sink,
+         index_t max_bin, index_t[:] p, double[:] q):
 
   rank_core(kernel_mean[sink_t, index_t, source_t], source, selem,
             sink, max_bin, p, q)
 
-def mean_masked(source_t[:, :, :] source, char[:, :, :] selem,
-                 char[:, :, :] mask, sink_t[:, :, :, :] sink,
-                 index_t max_bin, index_t[:] p, double[:] q):
+def mean_masked(const source_t[:, :, :] source, const char[:, :, :] selem,
+                const char[:, :, :] mask, sink_t[:, :, :, :] sink,
+                index_t max_bin, index_t[:] p, double[:] q):
 
   rank_core_masked(kernel_mean[sink_t, index_t, source_t], source, selem, 
                    mask, sink, max_bin, p, q)
@@ -189,16 +189,16 @@ cdef inline void kernel_sum(sink_t* sink, index_t* histo, index_t pop, source_t 
         sink[0] = <sink_t>0
 
 
-def sum(source_t[:, :, :] source, char[:, :, :] selem,
-         sink_t[:, :, :, :] sink, 
-         index_t max_bin, index_t[:] p, double[:] q):
+def sum(const source_t[:, :, :] source, const char[:, :, :] selem,
+        sink_t[:, :, :, :] sink,
+        index_t max_bin, index_t[:] p, double[:] q):
 
   rank_core(kernel_sum[sink_t, index_t, source_t], source, selem,
             sink, max_bin, p, q)
 
-def sum_masked(source_t[:, :, :] source, char[:, :, :] selem,
-                char[:, :, :] mask, sink_t[:, :, :, :] sink,
-                index_t max_bin, index_t[:] p, double[:] q):
+def sum_masked(const source_t[:, :, :] source, const char[:, :, :] selem,
+               const char[:, :, :] mask, sink_t[:, :, :, :] sink,
+               index_t max_bin, index_t[:] p, double[:] q):
 
   rank_core_masked(kernel_sum[sink_t, index_t, source_t], source, selem, 
                    mask, sink, max_bin, p, q)
@@ -230,15 +230,15 @@ cdef inline void kernel_sum_above(sink_t* sink, index_t* histo, index_t pop, sou
         sink[0] = <sink_t>0
 
 
-def sum_above(source_t[:, :, :] source, char[:, :, :] selem,
+def sum_above(const source_t[:, :, :] source, const char[:, :, :] selem,
               sink_t[:, :, :, :] sink, 
               index_t max_bin, index_t[:] p, double[:] q):
 
   rank_core(kernel_sum_above[sink_t, index_t, source_t], source, selem,
             sink, max_bin, p, q)
 
-def sum_above_masked(source_t[:, :, :] source, char[:, :, :] selem,
-                     char[:, :, :] mask, sink_t[:, :, :, :] sink,
+def sum_above_masked(const source_t[:, :, :] source, const char[:, :, :] selem,
+                     const char[:, :, :] mask, sink_t[:, :, :, :] sink,
                      index_t max_bin, index_t[:] p, double[:] q):
 
   rank_core_masked(kernel_sum_above[sink_t, index_t, source_t], source, selem, 
@@ -273,16 +273,16 @@ cdef inline void kernel_subtract_mean(sink_t* sink, index_t* histo, index_t pop,
     sink[0] = <sink_t>0
 
 
-def subtract_mean(source_t[:, :, :] source, char[:, :, :] selem,
-               sink_t[:, :, :, :] sink, 
-               index_t max_bin, index_t[:] p, double[:] q):
+def subtract_mean(const source_t[:, :, :] source, const char[:, :, :] selem,
+                  sink_t[:, :, :, :] sink,
+                  index_t max_bin, index_t[:] p, double[:] q):
 
   rank_core(kernel_subtract_mean[sink_t, index_t, source_t], source, selem,
             sink, max_bin, p, q)
 
-def subtract_mean_masked(source_t[:, :, :] source, char[:, :, :] selem,
-                          char[:, :, :] mask, sink_t[:, :, :, :] sink,
-                          index_t max_bin, index_t[:] p, double[:] q):
+def subtract_mean_masked(const source_t[:, :, :] source, const char[:, :, :] selem,
+                         const char[:, :, :] mask, sink_t[:, :, :, :] sink,
+                         index_t max_bin, index_t[:] p, double[:] q):
 
   rank_core_masked(kernel_subtract_mean[sink_t, index_t, source_t], source, selem, 
                    mask, sink, max_bin, p, q)
@@ -323,16 +323,16 @@ cdef inline void kernel_enhance_contrast(sink_t* sink, index_t* histo, index_t p
         sink[0] = <sink_t>0
 
 
-def enhance_contrast(source_t[:, :, :] source, char[:, :, :] selem,
-                      sink_t[:, :, :, :] sink, 
-                      index_t max_bin, index_t[:] p, double[:] q):
+def enhance_contrast(const source_t[:, :, :] source, const char[:, :, :] selem,
+                     sink_t[:, :, :, :] sink,
+                     index_t max_bin, index_t[:] p, double[:] q):
 
   rank_core(kernel_enhance_contrast[sink_t, index_t, source_t], source, selem,
             sink, max_bin, p, q)
 
-def enhance_contrast_masked(source_t[:, :, :] source, char[:, :, :] selem,
-                             char[:, :, :] mask, sink_t[:, :, :, :] sink,
-                             index_t max_bin, index_t[:] p, double[:] q):
+def enhance_contrast_masked(const source_t[:, :, :] source, const char[:, :, :] selem,
+                            const char[:, :, :] mask, sink_t[:, :, :, :] sink,
+                            index_t max_bin, index_t[:] p, double[:] q):
 
   rank_core_masked(kernel_enhance_contrast[sink_t, index_t, source_t], source, selem, 
                    mask, sink, max_bin, p, q)
@@ -365,16 +365,16 @@ cdef inline void kernel_percentile(sink_t* sink, index_t* histo, index_t pop, so
 
 
 
-def percentile(source_t[:, :, :] source, char[:, :, :] selem,
-                      sink_t[:, :, :, :] sink, 
-                      index_t max_bin, index_t[:] p, double[:] q):
+def percentile(const source_t[:, :, :] source, const char[:, :, :] selem,
+               sink_t[:, :, :, :] sink,
+               index_t max_bin, index_t[:] p, double[:] q):
 
   rank_core(kernel_percentile[sink_t, index_t, source_t], source, selem,
             sink, max_bin, p, q)
 
-def percentile_masked(source_t[:, :, :] source, char[:, :, :] selem,
-                             char[:, :, :] mask, sink_t[:, :, :, :] sink,
-                             index_t max_bin, index_t[:] p, double[:] q):
+def percentile_masked(const source_t[:, :, :] source, const char[:, :, :] selem,
+                      const char[:, :, :] mask, sink_t[:, :, :, :] sink,
+                      index_t max_bin, index_t[:] p, double[:] q):
 
   rank_core_masked(kernel_percentile[sink_t, index_t, source_t], source, selem, 
                    mask, sink, max_bin, p, q)
@@ -400,16 +400,16 @@ cdef inline void kernel_pop(sink_t* sink, index_t* histo, index_t pop, source_t 
         sink[0] = <sink_t>0
 
 
-def pop(source_t[:, :, :] source, char[:, :, :] selem,
-         sink_t[:, :, :, :] sink, 
-         index_t max_bin, index_t[:] p, double[:] q):
+def pop(const source_t[:, :, :] source, const char[:, :, :] selem,
+        sink_t[:, :, :, :] sink,
+        index_t max_bin, index_t[:] p, double[:] q):
 
   rank_core(kernel_pop[sink_t, index_t, source_t], source, selem,
             sink, max_bin, p, q)
 
-def pop_masked(source_t[:, :, :] source, char[:, :, :] selem,
-                char[:, :, :] mask, sink_t[:, :, :, :] sink,
-                index_t max_bin, index_t[:] p, double[:] q):
+def pop_masked(const source_t[:, :, :] source, const char[:, :, :] selem,
+               const char[:, :, :] mask, sink_t[:, :, :, :] sink,
+               index_t max_bin, index_t[:] p, double[:] q):
 
   rank_core_masked(kernel_pop[sink_t, index_t, source_t], source, selem, 
                    mask, sink, max_bin, p, q)
@@ -435,32 +435,16 @@ cdef inline void kernel_threshold(sink_t* sink, index_t* histo, index_t pop, sou
         sink[0] = <sink_t>0
 
 
-def threshold(source_t[:, :, :] source, char[:, :, :] selem,
-               sink_t[:, :, :, :] sink, 
-               index_t max_bin, index_t[:] p, double[:] q):
+def threshold(const source_t[:, :, :] source, const char[:, :, :] selem,
+              sink_t[:, :, :, :] sink,
+              index_t max_bin, index_t[:] p, double[:] q):
 
   rank_core(kernel_threshold[sink_t, index_t, source_t], source, selem,
             sink, max_bin, p, q)
 
-def threshold_masked(source_t[:, :, :] source, char[:, :, :] selem,
-                     char[:, :, :] mask, sink_t[:, :, :, :] sink,
+def threshold_masked(const source_t[:, :, :] source, const char[:, :, :] selem,
+                     const char[:, :, :] mask, sink_t[:, :, :, :] sink,
                      index_t max_bin, index_t[:] p, double[:] q):
 
   rank_core_masked(kernel_threshold[sink_t, index_t, source_t], source, selem, 
                    mask, sink, max_bin, p, q)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

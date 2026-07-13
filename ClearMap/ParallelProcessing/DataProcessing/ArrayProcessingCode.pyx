@@ -62,7 +62,9 @@ cdef extern from "stdio.h":
 ### Lookup table
 ###############################################################################
     
-cpdef void apply_lut(source_int_t[:] source, sink_t[:] sink, sink_t[:] lut, int blocks, int processes):
+cpdef void apply_lut(const source_int_t[:] source,
+                     sink_t[:] sink,
+                     const sink_t[:] lut, int blocks, int processes):
     cdef index_t size = source.shape[0]
     cdef index_t nblocks = min(size, blocks)
     cdef index_t[:] ranges = np.array(np.linspace(0, size, nblocks + 1), dtype=int)
@@ -72,7 +74,11 @@ cpdef void apply_lut(source_int_t[:] source, sink_t[:] sink, sink_t[:] lut, int 
             for i in range(ranges[p], ranges[p+1]):
                 sink[i] = lut[source[i]]
 
-cpdef void apply_lut_to_index_3d(source_t[:,:,:] source, index_t[:,:,:] kernel, sink_t[:] lut, sink_t[:,:,:] sink, int processes) nogil:
+
+cpdef void apply_lut_to_index_3d(const source_t[:,:,:] source,
+                                 const index_t[:,:,:] kernel,
+                                 const sink_t[:] lut,
+                                 sink_t[:,:,:] sink, int processes) nogil:
   
     cdef index_t nx = source.shape[0], ny = source.shape[1], nz = source.shape[2]
     cdef index_t kx = kernel.shape[0], ky = kernel.shape[1], kz = kernel.shape[2]
@@ -120,6 +126,7 @@ cpdef void apply_lut_to_index_3d(source_t[:,:,:] source, index_t[:,:,:] kernel, 
 cdef enum:
     MAX_DIMS = 10
 
+
 cdef struct Iterator:
     index_t n_dim
     index_t shape[MAX_DIMS]
@@ -127,7 +134,9 @@ cdef struct Iterator:
     index_t strides[MAX_DIMS]
     index_t backstrides[MAX_DIMS]
 
-cdef void init_iterator(Iterator* iterator, index_t n_dim, index_t[:] shape, index_t[:] strides) nogil:
+
+cdef void init_iterator(Iterator* iterator, index_t n_dim, const index_t[:] shape,
+                        const index_t[:] strides) noexcept nogil:
     cdef index_t d
     iterator[0].n_dim = n_dim
     for d in range(n_dim):
@@ -136,7 +145,8 @@ cdef void init_iterator(Iterator* iterator, index_t n_dim, index_t[:] shape, ind
         iterator[0].strides[d]     = strides[d]
         iterator[0].backstrides[d] = strides[d] * shape[d]
 
-cdef void init_subspace_iterator(Iterator* iterator, index_t axis, index_t iter_axis) nogil:
+
+cdef void init_subspace_iterator(Iterator* iterator, index_t axis, index_t iter_axis) noexcept nogil:
     cdef index_t d, d_last = 0
     for d in range(iterator[0].n_dim):
         if d != axis and d != iter_axis:
@@ -147,15 +157,16 @@ cdef void init_subspace_iterator(Iterator* iterator, index_t axis, index_t iter_
             d_last += 1
     iterator.n_dim = d_last
 
-cdef inline void line_correlate(source_t* source_line, sink_t* sink_line, double* kernel_pointer,
+
+cdef inline void line_correlate(const source_t* source_line, sink_t* sink_line, const double* kernel_pointer,
                                 index_t k1, index_t k2, index_t line_shape,
                                 index_t source_stride_axis, index_t sink_stride_axis,
                                 index_t n_sub_iterations,
-                                Iterator source_line_iterator, Iterator sink_line_iterator) nogil:
+                                Iterator source_line_iterator, Iterator sink_line_iterator) noexcept nogil:
   
     cdef index_t i, j, m, d
     cdef double temp
-    cdef source_t* source_point
+    cdef const source_t* source_point
     cdef sink_t* sink_point
   
     for i in range(n_sub_iterations):
@@ -209,9 +220,11 @@ cdef inline void line_correlate(source_t* source_line, sink_t* sink_line, double
 #         print('d=%d, shape=%d, coords=%d, strides=%d, backstrides=%d' % (d, iterator.shape[d], iterator.coordinates[d], iterator.strides[d], iterator.backstrides[d]))
 
 
-cpdef void correlate_1d(source_t[:] source, index_t[:] source_shape, index_t[:] source_strides,
-                        sink_t[:]   sink,   index_t[:] sink_shape,   index_t[:] sink_strides, 
-                        double[:] kernel, int axis, int processes):
+cpdef void correlate_1d(const source_t[:] source, const index_t[:] source_shape,
+                        const index_t[:] source_strides,
+                        sink_t[:]   sink,   const index_t[:] sink_shape,
+                        const index_t[:] sink_strides,
+                        const double[:] kernel, int axis, int processes):
   
     cdef index_t n_dim = source_shape.shape[0]
     cdef index_t line_shape = source_shape[axis]
@@ -222,17 +235,19 @@ cpdef void correlate_1d(source_t[:] source, index_t[:] source_shape, index_t[:] 
     cdef index_t k = kernel.shape[0]
     cdef index_t k1 = k // 2
     cdef index_t k2 = k - k1
-    assert(line_shape > k1 + k2)
+    if line_shape <= k1 + k2:
+        raise ValueError(f'line_shape ({line_shape}) must be > kernel size ({k1 + k2})')
   
-    cdef source_t* source_pointer = &source[0]
+    cdef const source_t* source_pointer = &source[0]
     cdef sink_t*   sink_pointer   = &sink[0]
-    cdef double*   kernel_pointer = &kernel[k1]
+    cdef const double*   kernel_pointer = &kernel[k1]
     
     # number of lines to iterate over
     cdef index_t iteration_axis
     cdef index_t n_iterations = 0
     cdef index_t n_subiterations = 1
-    cdef max_shape = 0
+    cdef index_t max_shape = 0
+    cdef index_t d
     for d in range(n_dim):
         if d != axis:
             if max_shape < source_shape[d]:
@@ -242,7 +257,7 @@ cpdef void correlate_1d(source_t[:] source, index_t[:] source_shape, index_t[:] 
         if d != axis and d != iteration_axis:
             n_subiterations *= source_shape[d]
 
-    # initilaize iterators
+    # initialize iterators
     cdef Iterator source_iterator
     init_iterator(&source_iterator, n_dim, source_shape, source_strides)
 
@@ -268,7 +283,7 @@ cpdef void correlate_1d(source_t[:] source, index_t[:] source_shape, index_t[:] 
     # print('axis=%d, iaxis=%d' % (axis, iteration_axis))
   
     cdef index_t iteration
-    cdef source_t* source_line
+    cdef const source_t* source_line
     cdef sink_t*   sink_line
   
     with nogil, parallel(num_threads=processes):
@@ -281,13 +296,12 @@ cpdef void correlate_1d(source_t[:] source, index_t[:] source_shape, index_t[:] 
                            source_stride_axis, sink_stride_axis, n_subiterations,
                            source_line_iterator, sink_line_iterator)
 
-    return
 
 ###############################################################################
 ### Utils
 ###############################################################################
 
-cpdef index_t[:] block_sums_1d(source_t[:] source, int blocks, int processes):
+cpdef index_t[:] block_sums_1d(const source_t[:] source, int blocks, int processes):
     cdef index_t i, p
     cdef index_t size = source.shape[0]
   
@@ -304,7 +318,7 @@ cpdef index_t[:] block_sums_1d(source_t[:] source, int blocks, int processes):
 
     return blocksums
 
-cpdef index_t[:] block_sums_2d(source_t[:,:] source, int blocks, int processes):
+cpdef index_t[:] block_sums_2d(const source_t[:,:] source, int blocks, int processes):
     cdef index_t i, j, p
     cdef index_t shape_0, shape_1
     shape_0, shape_1 = source.shape
@@ -323,7 +337,7 @@ cpdef index_t[:] block_sums_2d(source_t[:,:] source, int blocks, int processes):
 
     return blocksums
 
-cpdef index_t[:] block_sums_3d(source_t[:,:,:] source, int blocks, int processes):
+cpdef index_t[:] block_sums_3d(const source_t[:,:,:] source, int blocks, int processes):
     cdef index_t i, j, k, p
     cdef index_t shape_0, shape_1, shape_2
     shape_0, shape_1, shape_2 = source.shape
@@ -343,7 +357,7 @@ cpdef index_t[:] block_sums_3d(source_t[:,:,:] source, int blocks, int processes
 
     return blocksums
 
-cpdef index_t[:] block_sums_3d_f(source_t[:,:,:] source, int blocks, int processes):
+cpdef index_t[:] block_sums_3d_f(const source_t[:,:,:] source, int blocks, int processes):
     cdef index_t i, j, k, p
     cdef index_t shape_0, shape_1, shape_2
     shape_0, shape_1, shape_2 = source.shape
@@ -361,7 +375,7 @@ cpdef index_t[:] block_sums_3d_f(source_t[:,:,:] source, int blocks, int process
     return blocksums
 
 
-cpdef np.ndarray[Py_ssize_t, ndim=2] neighbours(index_t[:] indices, int offset, int processes):
+cpdef np.ndarray[Py_ssize_t, ndim=2] neighbours(const index_t[:] indices, int offset, int processes):
     cdef index_t n = indices.shape[0]
     cdef index_t p, i, plo, phi, target
 
@@ -410,7 +424,7 @@ cpdef np.ndarray[Py_ssize_t, ndim=2] neighbours(index_t[:] indices, int offset, 
 ### Where
 ###############################################################################
 
-cpdef void where_1d(source_t[:] source, index_t[:] where, index_t[:] sums, int blocks, int processes):
+cpdef void where_1d(const source_t[:] source, index_t[:] where, index_t[:] sums, int blocks, int processes):
     cdef index_t i, p
     cdef index_t size = source.shape[0]
   
@@ -434,9 +448,8 @@ cpdef void where_1d(source_t[:] source, index_t[:] where, index_t[:] sums, int b
                     where[l[p]] = i
                     l[p]+=1
 
-    return
 
-cpdef void where_2d(source_t[:,:] source, index_t[:,:] where, index_t[:] sums, int blocks, int processes):
+cpdef void where_2d(const source_t[:,:] source, index_t[:,:] where, index_t[:] sums, int blocks, int processes):
     cdef index_t i, j, k, p
     cdef index_t shape_0, shape_1
     shape_0, shape_1 = source.shape
@@ -451,7 +464,7 @@ cpdef void where_2d(source_t[:,:] source, index_t[:,:] where, index_t[:] sums, i
     cdef index_t[:] l = np.append([0], np.cumsum(sums))
 
     if where is None:
-        where = np.zeros((np.sum(sums),2), dtype=int)
+        where = np.zeros((np.sum(sums), 2), dtype=int)
 
     with nogil, parallel(num_threads=processes):
         for p in prange(n_blocks, schedule='guided'):
@@ -460,9 +473,9 @@ cpdef void where_2d(source_t[:,:] source, index_t[:,:] where, index_t[:] sums, i
                     if source[i,j] > 0:
                         where[l[p],0] = i; where[l[p],1] = j
                         l[p]+=1
-    return
 
-cpdef void where_3d(source_t[:,:,:] source, index_t[:,:] where, index_t[:] sums, int blocks, int processes):
+
+cpdef void where_3d(const source_t[:,:,:] source, index_t[:,:] where, index_t[:] sums, int blocks, int processes):
     cdef index_t i, j, k, p
     cdef index_t shape_0, shape_1, shape_2
     shape_0, shape_1, shape_2 = source.shape
@@ -477,7 +490,7 @@ cpdef void where_3d(source_t[:,:,:] source, index_t[:,:] where, index_t[:] sums,
     cdef index_t[:] l = np.append([0], np.cumsum(sums))
   
     if where is None:
-        where = np.zeros((np.sum(sums),3), dtype=int)
+        where = np.zeros((np.sum(sums), 3), dtype=int)
 
     with nogil, parallel(num_threads=processes):
         for p in prange(n_blocks, schedule='guided'):
@@ -488,9 +501,9 @@ cpdef void where_3d(source_t[:,:,:] source, index_t[:,:] where, index_t[:] sums,
                             # printf("%d, %d, %d, %d, %d\n", p, l[p], i, j, k)
                             where[l[p],0] = i; where[l[p],1] = j; where[l[p],2] = k
                             l[p]+=1
-    return
 
-cpdef void where_3d_f(source_t[:,:,:] source, index_t[:,:] where,
+
+cpdef void where_3d_f(const source_t[:,:,:] source, index_t[:,:] where,
                        index_t[:] sums, int blocks, int processes):
     cdef index_t i, j, k, p
     cdef index_t shape_0, shape_1, shape_2
@@ -517,7 +530,7 @@ cpdef void where_3d_f(source_t[:,:,:] source, index_t[:,:] where,
                             where[l[p], 1] = j
                             where[l[p], 2] = k
                             l[p] += 1
-    return
+
 
 ###############################################################################
 ### IO
@@ -526,16 +539,14 @@ cpdef void where_3d_f(source_t[:,:,:] source, index_t[:,:] where,
 from libc.stdio cimport FILE, fopen, fread, fwrite, fclose, fseek, SEEK_SET 
 
 
-cpdef read(source_t[:] source, char* filename, index_t offset, int blocks, int processes):
+cpdef void read(source_t[:] source, char* filename, index_t offset, int blocks, int processes):
     cdef index_t p
     cdef index_t buff_bytes = source.nbytes
     cdef index_t n_blocks = min(buff_bytes, blocks)
     # printf("loading buff_bytes = %d n_blocks = %d processes = %d\n", buff_bytes, n_blocks, processes)
 
-    cdef index_t[:] ranges = np.array(np.linspace(0, buff_bytes, n_blocks + 1), dtype=int)
-    cdef index_t[:] sizes  = np.zeros(n_blocks, dtype=int)
-    for p in range(n_blocks):
-        sizes[p] = ranges[p+1] - ranges[p]
+    cdef const index_t[:] ranges = np.array(np.linspace(0, buff_bytes, n_blocks + 1), dtype=int)
+    cdef index_t[:] sizes = np.diff(ranges)
 
     cdef FILE* fid
     cdef char* source_ptr = <char*> &source[0]
@@ -548,21 +559,19 @@ cpdef read(source_t[:] source, char* filename, index_t offset, int blocks, int p
             fread(source_ptr + ranges[p], 1, sizes[p], fid)
             fclose(fid)
 
-    return
 
-cpdef write(source_t[:] source, char* filename, index_t offset, int blocks, int processes):
+cpdef void write(const source_t[:] source, char* filename,
+                 index_t offset, int blocks, int processes) except *:
     cdef index_t p
     cdef index_t buff_bytes = source.nbytes
     cdef index_t n_blocks = min(buff_bytes, blocks)
     # printf("saving buff_bytes = %d n_blocks = %d processes = %d\n", buff_bytes, n_blocks, processes)
 
-    cdef index_t[:] ranges = np.array(np.linspace(0, buff_bytes, n_blocks + 1), dtype=int)
-    cdef index_t[:] sizes  = np.zeros(n_blocks, dtype=int)
-    for p in range(n_blocks):
-        sizes[p] = ranges[p+1] - ranges[p]
+    cdef const index_t[:] ranges = np.array(np.linspace(0, buff_bytes, n_blocks + 1), dtype=int)
+    cdef const index_t[:] sizes  = np.diff(ranges)
 
     cdef FILE* fid
-    cdef char* source_ptr = <char*> &source[0]
+    cdef const char* source_ptr = <const char*> &source[0]  # needs const char*
 
     with nogil, parallel(num_threads=processes):
         for p in prange(n_blocks, schedule='guided'):
@@ -571,6 +580,4 @@ cpdef write(source_t[:] source, char* filename, index_t offset, int blocks, int 
             fseek(fid, ranges[p] + offset, SEEK_SET)
             fwrite(source_ptr + ranges[p], 1, sizes[p], fid)
             fclose(fid)
-
-    return
   

@@ -17,8 +17,7 @@
 using namespace std;
 
 template<typename T, typename C>
-class priority_queue_remove : public priority_queue<T, std::vector<T>, C>
-{
+class priority_queue_remove : public priority_queue<T, std::vector<T>, C> {
   public:
     bool remove(const T& value) {
       typename priority_queue<T, std::vector<T> >::container_type::iterator it = std::find(this->c.begin(), this->c.end(), value);
@@ -56,7 +55,7 @@ template<typename T>
 class Point3D {
   public:
     T x, y, z;
-  
+
   public:
     Point3D(T x_, T y_, T z_) {
       x = x_; y = y_; z = z_;
@@ -71,7 +70,7 @@ class Point3D {
     }
 
     Point3D() {
-      x = y = z = -1;      
+      x = y = z = -1;
     }
 
     vector<T> toVector() const {
@@ -79,11 +78,11 @@ class Point3D {
       v.push(x); v.push(y); v.push(z);
       return v;
     }
-  
+
     void fromVector(const vector<T>& v) {
       x = v[0]; y = v[1]; z = v[2];
     }
-    
+
     bool operator==(const Point3D& right) const {
       return (x==right.x) && (y==right.y) && (z==right.z);
     }
@@ -133,11 +132,11 @@ class Path {
       scale  = scale_;
       f = f_;
     }
-    
+
     void addPoint(Point point) {
       points.push_back(point);
     }
-    
+
     void reverse() {
       std::reverse(points.begin(), points.end());
     }
@@ -171,7 +170,7 @@ class Path {
 
     void clear() {
       points.clear();
-      f = 0.0;     
+      f = 0.0;
     }
 };
 
@@ -185,9 +184,8 @@ std::ostream& operator<< (std::ostream & out, Path const& path) {
 }
 
 
-
 enum search_status_t {
-  FREE = 0, 
+  FREE = 0,
   OPEN_START,
   CLOSED_START,
   OPEN_GOAL,
@@ -199,7 +197,7 @@ class SearchNode {
     Point point;
 
     double g; // cost of the path so far (up to and including this node)
-    double h; // heuristic esimate of the cost of going from here to the goal
+    double h; // heuristic estimate of the cost of going from here to the goal
     double f; // should always be the sum of g and h
 
     SearchNode* predecessor;
@@ -224,23 +222,23 @@ class SearchNode {
       predecessor = node->predecessor;
       status = node->status;
     }
-       
+    // incrementing cost along the path
     void toPath(Path& path) {
       path.clear();
       SearchNode* s = this;
-      //std::cout << "creating path"  << std::endl;  
+      //std::cout << "creating path"  << std::endl;
       double ff = 0;
       int i = 0;
       while (s != NULL && i < 100) {
         path.addPoint(s->point);
-        //std::cout << "point " << s->point << std::endl;  
+        //std::cout << "point " << s->point << std::endl;
         ff += s->f;
         s = s->predecessor;
         i++;
       }
       path.f = ff;
     }
-  
+
     void toPathReversed(Path& path) {
       toPath(path);
       path.reverse();
@@ -257,6 +255,7 @@ class SearchNode {
       return (point == right.point);
     }
 };
+
 
 std::ostream& operator<< (std::ostream & out, SearchNode const& node) {
   out << "SearchNode[" << node.point << ",g=" << node.g << ",h=" << node.h << ",f=" << node.f << ",s=" << node.status;
@@ -278,7 +277,7 @@ struct SearchNodeComparator
       else if (lhs->f > rhs->f) { return true; }
 
       if (lhs->point < rhs->point) { return false; }
-      
+
       return true;
     }
 };
@@ -289,25 +288,25 @@ class Tracer {
 
   public:
     //image data
-    source_t* source;
+    const source_t* source;
     index_t shape_x, shape_y, shape_z;
     index_t stride_x, stride_y, stride_z;
 
     //bool use_reward;
-    source_t* reward;
+    const source_t* reward;
 
     Scale scale;
-    
+
     // result
     Path path;
-    
+
     //parameter
     //bool reciprocal;
     double reciprocal_zero;
- 
+
     double reward_multiplier;
     double minimal_reward;
-   
+
     double cost_per_distance;
     double minimum_cost_per_distance;
 
@@ -321,7 +320,7 @@ class Tracer {
     typedef map<index_t, SearchNode*> search_node_map_z_t;
     typedef map<index_t, search_node_map_z_t* > search_node_map_y_t;
     typedef map<index_t, search_node_map_y_t* > search_node_map_t;
-  
+
   public:
     //constructors
 //    Tracer(source_t* source_, index_t shape_x_, index_t shape_y_, index_t shape_z_,
@@ -330,7 +329,7 @@ class Tracer {
 //      setData(source_, shape_x_, shape_y_, shape_z_,
 //                       stride_x_,stride_y_,stride_z_,
 //              reward_);
-//      
+//
 //      setDefault();
 //      scale = scale_;
 //      path = Path(scale, 0.0);
@@ -338,18 +337,18 @@ class Tracer {
 
     Tracer() {
 //      if (verbose) {
-//        std::cout << "Constructing Tracer..." << std::endl;      
+//        std::cout << "Constructing Tracer..." << std::endl;
 //      }
 
       setDefault();
     }
- 
+
     void setDefault() {
       //reciprocal = true;
       reciprocal_zero = 0.5;
-      
+
       cost_per_distance = 1.0;
-      
+
       //if (use_reward) {
       minimum_cost_per_distance = 1 / 60.0;
       //} else {
@@ -360,7 +359,7 @@ class Tracer {
       reward_multiplier = 4.0;
 
       minimal_reward = 0.2;
-      
+
       verbose = true;
 
       scale = one;
@@ -368,10 +367,12 @@ class Tracer {
 
       max_step = -1;
     }
-   
-    void setData(source_t* source_, index_t shape_x_, index_t shape_y_, index_t shape_z_,
-                                          index_t stride_x_,index_t stride_y_,index_t stride_z_,
-                 source_t* reward_) {
+
+    void setData(const source_t* source_,
+                 index_t shape_x_, index_t shape_y_, index_t shape_z_,
+                 index_t stride_x_,index_t stride_y_,index_t stride_z_,
+                 const source_t* reward_) {
+
       source = source_;
       shape_x = shape_x_;
       shape_y = shape_y_;
@@ -384,16 +385,16 @@ class Tracer {
       //use_reward = use_reward_;
       reward = reward_;
     }
-  
+
   public:
-    // measures    
+    // measures
     virtual double costMovingTo(const Point& point, int dx, int dy, int dz) {
       //std::cout << "strides=(" << stride_x << "," << stride_y << "," << stride_z << ")" << std::endl;
       index_t index = point.x * stride_x + point.y * stride_y + point.z * stride_z;
-      //std::cout << "index=" << index << std::endl;       
+      //std::cout << "index=" << index << std::endl;
       double cost;
       //std::cout << "value=" << value_at_point << std::endl;
-      
+
       //if (use_reward) {
       double measure = reward[index];
       if (measure <= minimal_reward) { measure = minimal_reward; }
@@ -422,8 +423,9 @@ class Tracer {
 
       return sqrt(dx2 + dy2 + dz2) * cost;
     }
-    
+
     virtual double estimateCostToGoal(const Point& current, const Point& goal) {
+      // computes norm of a straight line between two points
       double dx = (goal.x - current.x) * scale.x;
       double dy = (goal.y - current.y) * scale.y;
       double dz = (goal.z - current.z) * scale.z;
@@ -434,7 +436,7 @@ class Tracer {
     virtual bool atGoal(const Point& point, const Point& goal) {
       return point == goal;
     }
-  
+
   public:
     //search
     void addNodeToMap(SearchNode* n, search_node_map_t* sn_map) {
@@ -471,7 +473,7 @@ class Tracer {
       if (ity == it->second->end()) {
         return NULL;
       }
-      
+
       typename search_node_map_z_t::iterator itz = ity->second->find(point.z);
       if (itz == ity->second->end()) {
         return NULL;
@@ -479,7 +481,7 @@ class Tracer {
         return itz->second;
       }
     }
-    
+
     void clearMap(search_node_map_t* sn_map) { // this routine has a name that reminds me of another great program:)
       for (typename search_node_map_t::iterator it = sn_map->begin(); it != sn_map->end(); it++) {
         for (typename search_node_map_y_t::iterator ity = it->second->begin(); ity != it->second->end(); ity++) {
@@ -492,81 +494,79 @@ class Tracer {
     void addNode(SearchNode* n, search_node_queue_t* sn_queue, search_node_map_t* sn_map) {
       sn_queue->push(n);
       //sn_map->operator[](n->point) = n;
-	 addNodeToMap(n, sn_map);
+	  addNodeToMap(n, sn_map);
     }
 
-    //main tracing routine
+    /**main tracing routine
+     *
+     * @param start
+     * @param stop
+     * @param bidirectional
+     * @return
+     */
     int search(Point& start, Point& stop, bool bidirectional) {
+      // if (verbose) {
+      //      std::cout << "Searching path..." << std::endl;
+      //  }
 
-//      if (verbose) {
-//        std::cout << "Searching path..." << std::endl;      
-//      }
-          
       // init
-      search_node_queue_t closed_start; 
+      search_node_queue_t closed_start;
       search_node_queue_t open_start;
-  
+
       search_node_queue_t closed_goal;
       search_node_queue_t open_goal;
-  
+
       search_node_map_t map_start;
       search_node_map_t map_goal;
 
-      search_node_queue_t* closed_current;
-      search_node_queue_t* open_current;
-      
-      search_node_map_t* map_current;
-      search_node_map_t* map_other;
-
       bool from_start = true;
-  
-      Point goal_current;
-
-      search_status_t OPEN_CURRENT, CLOSED_CURRENT;
 
       path.clear();
-      
+
       SearchNode* snstart = new SearchNode(start, 0, estimateCostToGoal(start, stop ), NULL, OPEN_START);
       SearchNode* sngoal  = new SearchNode(stop , 0, estimateCostToGoal(stop , start), NULL, OPEN_GOAL );
-      
+
+      // open start and open goal are queues
       addNode(snstart, &open_start, &map_start);
       addNode(sngoal,  &open_goal,  &map_goal);
 
       int step = 0;
 
+      // while (not open_start.empty()) or (bidirectional and (not open_goal.empty())):
       while (!(open_start.empty()) || (bidirectional && (!(open_goal.empty())))) {
 
+        // max_step is not declared ?
         if (max_step > 0) {
           step++;
           if (step > max_step) { return -1; }
         }
 
         if (bidirectional) {
+          // true if len(open_start) <= len(open_goal)
           from_start = open_start.size() <= open_goal.size();
         }
-        
-        
+
+
         if (verbose) {
-          //std::cout << "---------------------------------------------------------" << std::endl;   
-          std::cout << "Next iteration " << step << " from " << (from_start ? "start" : "goal") << std::endl;  
+          std::cout << "Next iteration " << step << " from " << (from_start ? "start" : "goal") << std::endl;
           std::cout << "Queues: open start:" << open_start.size() << " open goal:" << open_goal.size() << std::endl;
           std::cout << "open start top: ";
           open_start.print_first();
-          std::cout << "open goal top: "; 
+          std::cout << "open goal top: ";
           open_goal.print_first();
           std::cout << std::endl;
         }
-        
-        open_current   = from_start ? &open_start   : &open_goal;
-        closed_current = from_start ? &closed_start : &closed_goal;
+        // open_current = open_start if from_start else open_goal
+        search_node_queue_t *open_current = from_start ? &open_start : &open_goal;
+        search_node_queue_t *closed_current = from_start ? &closed_start : &closed_goal;
 
-        map_current = from_start ? &map_start : &map_goal;
-        map_other   = from_start ? &map_goal  : &map_start;
+        search_node_map_t *map_current = from_start ? &map_start : &map_goal;
+        search_node_map_t *map_other = from_start ? &map_goal : &map_start;
 
-        goal_current = from_start ? stop  : start;
+        Point goal_current = from_start ? stop : start;
 
-        OPEN_CURRENT = from_start ? OPEN_START : OPEN_GOAL;
-        CLOSED_CURRENT = from_start ? CLOSED_START : CLOSED_GOAL;
+        search_status_t OPEN_CURRENT = from_start ? OPEN_START : OPEN_GOAL;
+        search_status_t CLOSED_CURRENT = from_start ? CLOSED_START : CLOSED_GOAL;
 
 //        if (verbose) {
 //          std::cout << "Queues: open:" << open_current->size() << " closed:" << closed_current->size() << std::endl;
@@ -576,26 +576,26 @@ class Tracer {
 //          closed_current->print();
 //          std::cout << std::endl;
 //        }
-        
-        if (open_current->size() == 0)
-		continue;
 
+        if (open_current->size() == 0) {
+            continue;
+        }
+
+        // take last search node, pop it from queue
         SearchNode* node = open_current->top();
         open_current->pop();
 
         if (verbose) {
-          std::cout << *node << std::endl;    
+          std::cout << *node << std::endl;
         }
 
-        // found the goal?
+        // found the goal? return 1
         if (this->atGoal(node->point, goal_current)) {
-//          if (verbose) {
-//             std::cout << "Goal found!" << std::endl;
-//          }
-		if (from_start) {
-            node->toPath(path);
+          // adds the node to the path
+          if (from_start) {
+              node->toPath(path);
           } else {
-            node->toPathReversed(path);
+              node->toPathReversed(path);
           }
 
           //cleanup
@@ -604,23 +604,24 @@ class Tracer {
           closed_goal.clear();
           open_goal.clear();
           clearMap(&map_start);
-          clearMap(&map_goal); 
+          clearMap(&map_goal);
           return 1;
         }
 
         node->status = CLOSED_CURRENT;
         addNode(node, closed_current, map_current);
 
-//        if (verbose) {
-//          std::cout << "Node added to closed queue" << std::endl; 
-//          std::cout << "closed current:" << std::endl;
-//          closed_current->print();
-//          std::cout << std::endl;
-//        }
+        // if (verbose) {
+        //   std::cout << "Node added to closed queue" << std::endl;
+        //   std::cout << "closed current:" << std::endl;
+        //   closed_current->print();
+        //   std::cout << std::endl;
+        // }
 
-        // search neighbours 
+        // search neighbours
         for (int dz = -1; dz <= 1; dz++) {
           int z_new = node->point.z + dz;
+          // neighbor outside graph
           if (z_new < 0 || z_new >= shape_z)
             continue;
 
@@ -632,156 +633,126 @@ class Tracer {
 
               int x_new = node->point.x + dx;
               int y_new = node->point.y + dy;
-
+              // outside graph
               if (x_new < 0 || x_new >= shape_x)
                 continue;
-
+              // outside graph
               if (y_new < 0 || y_new >= shape_y)
                 continue;
 
               Point point_new(x_new, y_new, z_new);
-
+              // total cost is estimation of cost to go to goal + effective cost from searchnode to its neighbor (depends on strides)
               double h_new = this->estimateCostToGoal(point_new, goal_current);
-              double g_new = node->g + this->costMovingTo(point_new, dx, dy, dz);  
-              //double f_new = h_new + g_new;  
+              double g_new = node->g + this->costMovingTo(point_new, dx, dy, dz);
 
               SearchNode* node_new = new SearchNode(point_new, g_new, h_new, node, FREE);
 
-//              if (verbose) {
-//                std::cout << "New node: " << *node_new << std::endl;    
-//                std::cout.flush();
-//              }
-              
-              //search_node_map_t::iterator it = map_current->find(point_new);
               SearchNode* searched = findNodeInMap(point_new, map_current);
 
-              //if (it == map_current->end()) { // not in list
-              if (searched == NULL) { // not in list
-//                if (verbose) {
-//                  std::cout << "Node not in list." << std::endl;    
-//                }
+              if (searched == NULL) { // not in list (map) . i.e. never ran through that point
+                // define it as the new current search node
                 node_new->status = OPEN_CURRENT;
                 addNode(node_new, open_current, map_current);
-//                if (verbose) {
-//                  std::cout << "Noded added to open current." << std::endl << "open current:" << std::endl;
-//                  open_current->print();
-//                  std::cout << std::endl;
-//                }
+              } else {  // already path to new position but this one might be better
 
-              } else {  //already path to new position but this one might be better 
-//                if (verbose) {
-//                  std::cout << "Node in list, checking for a better path." << std::endl;    
-//                }
-
-                //SearchNode* searched = it->second;                     
+                // if the cost of the new path is inferior to the one already existing
                 if (node_new->f < searched->f) {
-//                  if (verbose) {
-//                    std::cout << "Better path found: " << *searched << std::endl;    
-//                  }
+                  // better path found
 
                   if (searched->status == OPEN_CURRENT) {
                     open_current->remove(searched);
                   } else if (searched->status == CLOSED_CURRENT) {
                     closed_current->remove(searched);
                   }
+                  // define it as the new current search node
                   node_new->status = OPEN_CURRENT;
                   searched->from(node_new); // effectively adds new node to map
                   open_current->push(searched);
                   delete node_new;
 
-//                  if (verbose) {
-//                    std::cout << "Updated open: " << std::endl;
-//                    open_current->print();   
-//                    std::cout << std::endl << "Updated closed: " << std::endl;
-//                    closed_current->print();                               
-//                  }
                 } else {
                   delete node_new;
                 }
-              }
+              } //else
 
               if (bidirectional) {
 
-                //it = map_other->find(point_new);
                 SearchNode* searched = findNodeInMap(point_new, map_other);
-                //if (it != map_other->end()) {
                 if (searched != NULL) {
 //                  if (verbose) {
-//                    std::cout << "Searching for path!" << std::endl;    
+//                    std::cout << "Searching for path!" << std::endl;
 //                  }
-                  //SearchNode* searched = it->second;    
                   if (searched->status == CLOSED_START || searched->status == CLOSED_GOAL) {
 //                    if (verbose) {
-//                      std::cout << "Found path!" << std::endl;   
+//                      std::cout << "Found path!" << std::endl;
 //                      std::cout << "current open queue" << std::endl;
 //                      open_current->print();
 //                      std::cout << std::endl << "current closed queue" << std::endl;
-//                      closed_current->print(); 
+//                      closed_current->print();
 //                      std::cout << std::endl;
 //                    }
                     if (from_start) {
                       node->toPath(path);
-                      //std::cout << "start " << path << std::endl;    
+                      //std::cout << "start " << path << std::endl;
                       Path path_from_goal;
                       searched->toPathReversed(path_from_goal);
-                      //std::cout << "start2  " << path_from_goal << std::endl;  
+                      //std::cout << "start2  " << path_from_goal << std::endl;
                       path.append(path_from_goal);
                     } else {
                       searched->toPath(path);
-                      //std::cout << "goal " << path << std::endl;  
+                      //std::cout << "goal " << path << std::endl;
                       Path path_from_goal;
                       node->toPathReversed(path_from_goal);
-                      //std::cout << "goal2  " << path_from_goal << std::endl;  
+                      //std::cout << "goal2  " << path_from_goal << std::endl;
                       path.append(path_from_goal);
-                    }	
-//                    if (verbose) {
-//                      std::cout << path << std::endl;    
-//                    }
-            		
+                    }
+
                     closed_start.clear();
                     open_start.clear();
                     closed_goal.clear();
                     open_goal.clear();
                     clearMap(&map_start);
-                    clearMap(&map_goal);           
+                    clearMap(&map_goal);
                     return 1;
                   }
-                }
-              }
-            } //for
-          } 
-        }
+                } //if searched !=NULL
+              } //if bidirectional
+            } //for y
+          } //for x
+        } //for z
       } //while
-      //printf('this shoud never happen!');
 
+      // This should never happen!
       closed_start.clear();
       open_start.clear();
       closed_goal.clear();
       open_goal.clear();
       clearMap(&map_start);
-      clearMap(&map_goal);      
+      clearMap(&map_goal);
       return -1;
     } //search
 
-  // intreface to python/cython
-  int run(source_t* source_, index_t shape_x_, index_t shape_y_, index_t shape_z_,
-                             index_t stride_x_,index_t stride_y_,index_t stride_z_,
-          source_t* reward_,
+  // interface to python/cython
+  int run(const source_t* source_,
+          index_t shape_x_, index_t shape_y_, index_t shape_z_,
+          index_t stride_x_,index_t stride_y_,index_t stride_z_,
+          const source_t* reward_,
           index_t start_x_, index_t start_y_, index_t start_z_,
           index_t goal_x_,  index_t goal_y_,  index_t goal_z_) {
 
-    //std::cout << "init shape=" << shape_x_ << "," << shape_y_ << "," << shape_z_;
-    //std::cout << ", strides=" << stride_x_ << "," << stride_y_ << "," << stride_y_ << std::endl;
-    setData(source_, shape_x_, shape_y_, shape_z_,
-                     stride_x_,stride_y_,stride_z_,
+   // std::cout << "init shape=" << shape_x_ << "," << shape_y_ << "," << shape_z_;
+   // std::cout << ", strides=" << stride_x_ << "," << stride_y_ << "," << stride_y_ << std::endl;
+    setData(source_,
+            shape_x_, shape_y_, shape_z_,
+            stride_x_,stride_y_,stride_z_,
             reward_);
 
     Point start(start_x_, start_y_, start_z_);
     Point goal(goal_x_, goal_y_, goal_z_);
 
-    return search(start, goal, true);  
+    return search(start, goal, true);
   }
-  
+
   int getPathSize() {
     return path.size();
   }
@@ -793,14 +764,14 @@ class Tracer {
   void getPath(index_t* path_array) {
     index_t stride_dim = 3;
     Point pp;
-    index_t i = 0;      
+    index_t i = 0;
     for (Path::points_t::iterator it = path.points.begin(); it != path.points.end(); it++) {
       path_array[i    ] = it->x;
       path_array[i + 1] = it->y;
       path_array[i + 2] = it->z;
       i+=stride_dim;
-    }  
-  } 
+    }
+  }
 }; // Tracer
 
 
@@ -809,45 +780,42 @@ template <typename source_t, typename index_t, typename mask_t>
 class TracerToMask : public Tracer<source_t, index_t> {
 
   public:
-    //mask
-    mask_t* mask;
+    const mask_t* mask;
 
     TracerToMask() {
       this->setDefault();
     }
-    
-    // intreface to python/cython
-    int run(source_t* source_, index_t shape_x_, index_t shape_y_, index_t shape_z_,
-                               index_t stride_x_,index_t stride_y_,index_t stride_z_,
-            source_t* reward_,
+
+    // interface to python/cython
+    int run(const source_t* source_,
+            index_t shape_x_, index_t shape_y_, index_t shape_z_,
+            index_t stride_x_,index_t stride_y_,index_t stride_z_,
+            const source_t* reward_,
             index_t start_x_, index_t start_y_, index_t start_z_,
-            mask_t* mask_) {
-  
-      //std::cout << "init shape=" << shape_x_ << "," << shape_y_ << "," << shape_z_;
-      //std::cout << ", strides=" << stride_x_ << "," << stride_y_ << "," << stride_y_ << std::endl;
-      this->setData(source_, shape_x_, shape_y_, shape_z_,
-                             stride_x_,stride_y_,stride_z_,
+            const mask_t* mask_) {
+
+      this->setData(source_,
+                    shape_x_, shape_y_, shape_z_,
+                    stride_x_,stride_y_,stride_z_,
                     reward_);
-  
+
       mask = mask_;
-  
+
       Point start(start_x_, start_y_, start_z_);
       Point goal(0, 0, 0);
-  
-      return this->search(start, goal, false);  
+
+      return this->search(start, goal, false);
     }
 
 
     double estimateCostToGoal(const Point& current, const Point& goal) {
       index_t index = current.x * this->stride_x + current.y * this->stride_y + current.z * this->stride_z;
       double d = mask[index];
-      //std::cout << "cost to goal at " << current << " = " << mask[index] << std::endl; 
       return this->cost_per_distance * d;
     }
-
+    // goal is unused here
     bool atGoal(const Point& point, const Point& goal) {
       index_t index = point.x * this->stride_x + point.y * this->stride_y + point.z * this->stride_z;
-      //std::cout << "at goal " << point << " = " << mask[index] << std::endl; 
       return mask[index] == 0;
     }
 }; // TraceToMask

@@ -65,7 +65,10 @@ cdef extern from "stdio.h":
 
 #@cython.boundscheck(False)
 #@cython.wraparound(False)
-cpdef int devolve_uniform(point_t[:,:] points, index_t[:,:] indices, sink_t[:] sink, index_t[:] shape, index_t[:] strides, int processes) noexcept nogil:
+cpdef int devolve_uniform(const point_t[:,:] points, const index_t[:,:] indices,
+                          sink_t[:] sink,
+                          const index_t[:] shape, const index_t[:] strides,
+                          int processes) noexcept nogil:
     """Converts a list of points into an volumetric image array."""
 
     cdef index_t i, j, k, d, n, v
@@ -93,7 +96,11 @@ cpdef int devolve_uniform(point_t[:,:] points, index_t[:,:] indices, sink_t[:] s
 
 #@cython.boundscheck(False)
 #@cython.wraparound(False)
-cpdef int devolve_uniform_kernel(point_t[:,:] points, index_t[:,:] indices, kernel_t[:] kernel, sink_t[:] sink, index_t[:] shape, index_t[:] strides, int processes) noexcept nogil:
+cpdef int devolve_uniform_kernel(const point_t[:,:] points, const index_t[:,:] indices,
+                                 const kernel_t[:] kernel,
+                                 sink_t[:] sink,
+                                 const index_t[:] shape, const index_t[:] strides,
+                                 int processes) noexcept nogil:
     """Converts a list of points into an volumetric image array."""
 
     cdef index_t i, j, k, v, d, n
@@ -121,7 +128,11 @@ cpdef int devolve_uniform_kernel(point_t[:,:] points, index_t[:,:] indices, kern
 
 #@cython.boundscheck(False)
 #@cython.wraparound(False)
-cpdef int devolve_weights(point_t[:,:] points, weight_t[:] weights, index_t[:,:] indices, sink_t[:] sink, index_t[:] shape, index_t[:] strides, int processes) noexcept nogil:
+cpdef int devolve_weights(const point_t[:,:] points, const weight_t[:] weights,
+                          const index_t[:,:] indices,
+                          sink_t[:] sink,
+                          const index_t[:] shape, const index_t[:] strides,
+                          int processes) noexcept nogil:
     """Converts a list of points into an volumetric image array."""
 
     cdef index_t i, j, k, v, d, n
@@ -148,7 +159,11 @@ cpdef int devolve_weights(point_t[:,:] points, weight_t[:] weights, index_t[:,:]
 
 #@cython.boundscheck(False)
 #@cython.wraparound(False)
-cpdef int devovle_weights_kernel(point_t[:,:] points, weight_t[:] weights, index_t[:,:] indices, kernel_t[:] kernel, sink_t[:] sink, index_t[:] shape, index_t[:] strides, int processes) noexcept nogil:
+cpdef int devovle_weights_kernel(const point_t[:,:] points, const weight_t[:] weights,
+                                 const index_t[:,:] indices, const kernel_t[:] kernel,
+                                 sink_t[:] sink,
+                                 const index_t[:] shape, const index_t[:] strides,
+                                 int processes) noexcept nogil:
     """Converts a list of points into an volumetric image array."""
 
     cdef index_t i, j, k, v, d, n

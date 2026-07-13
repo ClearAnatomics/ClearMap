@@ -38,7 +38,8 @@ cdef inline double _abs(double a) nogil:
 # cdef extern from "stdio.h":
 
 
-def hessian(source_t[:, :, :] source, sink_t[:, :, :, :, :] sink, index_t sink_stride, double[:] parameter):
+def hessian(const source_t[:, :, :] source, sink_t[:, :, :, :, :] sink,
+            index_t sink_stride, const double[:] parameter):
   """Compute Hessian eigenvalues at each pixel."""
   # array sizes
   cdef index_t nx = source.shape[0]
@@ -73,8 +74,9 @@ def hessian(source_t[:, :, :] source, sink_t[:, :, :, :, :] sink, index_t sink_s
           sink[x,y,z,0,2] = sink[x,y,z,2,0] = <sink_t> ((<double>source[xp,y ,zp] - source[xm,y ,zp] - source[xp,y ,zm] + source[xm,y ,zm]) / 4.0)
           sink[x,y,z,1,2] = sink[x,y,z,2,1] = <sink_t> ((<double>source[x ,yp,zp] - source[x ,ym,zp] - source[x ,yp,zm] + source[x ,ym,zm]) / 4.0)
 
-cdef void hessian_eigenvalue_core(void kernel(sink_t*, index_t, double, double, double, double*) nogil,
-                                  source_t[:, :, :] source, sink_t[:, :, :, :] sink, index_t sink_stride, double[:] parameter) except *:
+cdef void hessian_eigenvalue_core(void kernel(sink_t*, index_t, double, double, double, const double*) nogil,
+                                  const source_t[:, :, :] source, sink_t[:, :, :, :] sink,
+                                  index_t sink_stride, const double[:] parameter) except *:
   """Compute Hessian eigenvalues for each pixel and apply a measure defined by the kernel."""
   #eigenvalues via affine change of A (see https://en.wikipedia.org/wiki/Eigenvalue_algorithm 3x3 matrices)
   
@@ -174,20 +176,26 @@ cdef void hessian_eigenvalue_core(void kernel(sink_t*, index_t, double, double, 
           kernel(&sink[x, y, z, 0], sink_stride, e1, e2, e3, &parameter[0])
 
 #Hessian eigenvalues
-cdef inline void eigenvalue_kernel(sink_t* sink, index_t sink_stride, double e1, double e2, double e3, double* par) nogil:
+cdef inline void eigenvalue_kernel(sink_t* sink, index_t sink_stride,
+                                   double e1, double e2, double e3,
+                                   const double* par) nogil:
   sink[0              ] = <sink_t> e1
   sink[1 * sink_stride] = <sink_t> e2
   sink[2 * sink_stride] = <sink_t> e3
 
 #Tubness part of a Frangi filter, i.e. the geometric mean of lowest two eigenvalues
-cdef inline void tubeness_kernel(sink_t* sink, index_t sink_stride, double e1, double e2, double e3, double* par) nogil:
+cdef inline void tubeness_kernel(sink_t* sink, index_t sink_stride,
+                                 double e1, double e2, double e3,
+                                 const double* par) nogil:
   if e2 < 0 and e3 < 0:
     sink[0] = <sink_t> sqrt(e2 * e3)
   else:
     sink[0] = 0
 
 #Thresholded Tubness part of a Frangi filter
-cdef inline void tubeness_threshold_kernel(sink_t* sink, index_t sink_stride, double e1, double e2, double e3, double* par) nogil:
+cdef inline void tubeness_threshold_kernel(sink_t* sink, index_t sink_stride,
+                                           double e1, double e2, double e3,
+                                           const double* par) nogil:
   if e2 < 0 and e3 < 0:
     if sqrt(e2 * e3) > par[0]:
       sink[0] = 1
@@ -198,7 +206,9 @@ cdef inline void tubeness_threshold_kernel(sink_t* sink, index_t sink_stride, do
 
 
 #Generalized Frangi filer [Sato et al, Three dimensional multi-scale line filter for segmentation and visualization of curvilinear structures in medicalimages, 1998]
-cdef inline void lambda123_kernel(sink_t* sink, index_t sink_stride, double e1, double e2, double e3, double* par) nogil:
+cdef inline void lambda123_kernel(sink_t* sink, index_t sink_stride,
+                                  double e1, double e2, double e3,
+                                  const double* par) nogil:
   cdef double a;
   
   if e2 < 0 and e3 < 0:
@@ -214,7 +224,9 @@ cdef inline void lambda123_kernel(sink_t* sink, index_t sink_stride, double e1, 
     sink[0] = 0
 
 #Generalized Frangi filer [Sato et al, Three dimensional multi-scale line filter for segmentation and visualization of curvilinear structures in medicalimages, 1998]
-cdef inline void lambda123_threshold_kernel(sink_t* sink, index_t sink_stride, double e1, double e2, double e3, double* par) nogil:
+cdef inline void lambda123_threshold_kernel(sink_t* sink, index_t sink_stride,
+                                            double e1, double e2, double e3,
+                                            const double* par) nogil:
   cdef double a;
   
   if e2 < 0 and e3 < 0:
@@ -231,23 +243,29 @@ cdef inline void lambda123_threshold_kernel(sink_t* sink, index_t sink_stride, d
 
 
 
-def eigenvalues(source_t[:, :, :] source, sink_t[:, :, :, :] sink, index_t sink_stride, double[:] parameter):
+def eigenvalues(const source_t[:, :, :] source, sink_t[:, :, :, :] sink,
+                index_t sink_stride, const double[:] parameter):
   hessian_eigenvalue_core(eigenvalue_kernel[sink_t], source, sink, sink_stride, parameter)
 
-def tubeness(source_t[:, :, :] source, sink_t[:, :, :, :] sink, index_t sink_stride, double[:] parameter):
+def tubeness(const source_t[:, :, :] source, sink_t[:, :, :, :] sink,
+             index_t sink_stride, const double[:] parameter):
   hessian_eigenvalue_core(tubeness_kernel[sink_t], source, sink, sink_stride, parameter)
 
-def tubeness_threshold(source_t[:, :, :] source, sink_t[:, :, :, :] sink, index_t sink_stride, double[:] parameter):
+def tubeness_threshold(const source_t[:, :, :] source, sink_t[:, :, :, :] sink,
+                       index_t sink_stride, const double[:] parameter):
   hessian_eigenvalue_core(tubeness_threshold_kernel[sink_t], source, sink, sink_stride, parameter)
 
-def lambda123(source_t[:, :, :] source, sink_t[:, :, :, :] sink, index_t sink_stride, double[:] parameter):
+def lambda123(const source_t[:, :, :] source, sink_t[:, :, :, :] sink,
+              index_t sink_stride, const double[:] parameter):
   hessian_eigenvalue_core(lambda123_kernel[sink_t], source, sink, sink_stride, parameter)
 
-def lambda123_threshold(source_t[:, :, :] source, sink_t[:, :, :, :] sink, index_t sink_stride, double[:] parameter):
+def lambda123_threshold(const source_t[:, :, :] source, sink_t[:, :, :, :] sink,
+                        index_t sink_stride, const double[:] parameter):
   hessian_eigenvalue_core(lambda123_threshold_kernel[sink_t], source, sink, sink_stride, parameter)
 
-cdef void hessian_eigensystem_core(void kernel(sink_t*, index_t, double, double, double, double, double, double, double, double, double, double*) nogil,
-                                   source_t[:, :, :] source, sink_t[:, :, :, :] sink, index_t sink_stride, double[:] parameter) except *:
+cdef void hessian_eigensystem_core(void kernel(sink_t*, index_t, double, double, double, double, double, double, double, double, double, const double*) nogil,
+                                   const source_t[:, :, :] source, sink_t[:, :, :, :] sink,
+                                   index_t sink_stride, const double[:] parameter) except *:
   """Compute Hessian eigenvalues for each pixel and apply a measure defined by the kernel that also recieves the Hessian matrix."""
   # eigenvalues via affine change of A (see https://en.wikipedia.org/wiki/Eigenvalue_algorithm 3x3 matrices)
   
@@ -349,7 +367,7 @@ cdef void hessian_eigensystem_core(void kernel(sink_t*, index_t, double, double,
 # eigensystem kernel
 cdef inline void eigensystem_kernel(sink_t* sink, index_t sink_stride, double e1, double e2, double e3,
                                     double A, double B, double C, double D, double E, double F, 
-                                    double* par) nogil:
+                                    const double* par) nogil:
   #par[0] = 0 # eigenvalues only
   #par[0] = 1,2,3 number of eigenvectors to compute
   # eigenvector calculation based on https://www.geometrictools.com/Documentation/RobustEigenSymmetric3x3.pdf
@@ -539,12 +557,14 @@ cdef inline void eigensystem_kernel(sink_t* sink, index_t sink_stride, double e1
   sink[10* sink_stride] = <sink_t> (w3 * u1 - w1 * u3)
   sink[11* sink_stride] = <sink_t> (w1 * u2 - u1 * w2)
 
-def eigensystem(source_t[:, :, :] source, sink_t[:, :, :, :] sink, index_t sink_stride, double[:] parameter):
+def eigensystem(const source_t[:, :, :] source, sink_t[:, :, :, :] sink,
+                index_t sink_stride, const double[:] parameter):
   hessian_eigensystem_core(eigensystem_kernel[sink_t], source, sink, sink_stride, parameter)
 
 #Note: this is original ClearMap 2.0 code for reference
 # cdef void hessian_core_old(void kernel(sink_t*, index_t, double, double, double, double*) nogil,
-#                        source_t[:, :, :] source, sink_t[:, :, :, :] sink, index_t sink_stride, double[:] parameter) except *:
+#                        const source_t[:, :, :] source, sink_t[:, :, :, :] sink,
+#                        index_t sink_stride, const double[:] parameter) except *:
 #   """Compute Hessian eigenvalues for each pixel and apply a measure defined by the kernel."""
   
 #   # array sizes
@@ -659,12 +679,13 @@ def eigensystem(source_t[:, :, :] source, sink_t[:, :, :, :] sink, index_t sink_
 #           kernel(&sink[x, y, z, 0], sink_stride, e1s, e2s, e3s, &parameter[0]);
 
 
-# def eigenvalues_old(source_t[:, :, :] source, sink_t[:, :, :, :] sink, index_t sink_stride, double[:] parameter):
+# def eigenvalues_old(const source_t[:, :, :] source, sink_t[:, :, :, :] sink,
+#                     index_t sink_stride, const double[:] parameter):
 #   hessian_core_old(eigenvalue_kernel[sink_t], source, sink, sink_stride, parameter);
 
 # cdef inline void test_kernel(sink_t* sink, index_t sink_stride, double e1, double e2, double e3,
 #                              double A, double B, double C, double D, double E, double F, 
-#                              double* par) nogil:
+#                              const double* par) nogil:
 
 #   sink[0              ] = <sink_t> e1; 
 #   sink[1 * sink_stride] = <sink_t> e2;
@@ -678,5 +699,5 @@ def eigensystem(source_t[:, :, :] source, sink_t[:, :, :, :] sink, index_t sink_
 #   sink[8 * sink_stride] = <sink_t> F;
 
 
-# def eigensystem_test(source_t[:, :, :] source, sink_t[:, :, :, :] sink, index_t sink_stride, double[:] parameter):
+# def eigensystem_test(const source_t[:, :, :] source, sink_t[:, :, :, :] sink, index_t sink_stride, const double[:] parameter):
 #   hessian_eigensystem_core(test_kernel[sink_t], source, sink, sink_stride, parameter);

@@ -33,11 +33,11 @@ cdef inline source_t _min(source_t a, source_t b) nogil:
   return a if a <= b else b
 
 
-cdef inline void histogram_increment(index_t* histo, index_t* pop, source_t value) nogil:
+cdef inline void histogram_increment(index_t* histo, index_t* pop, const source_t value) nogil:
   histo[value] += 1
   pop[0] += 1
 
-cdef inline void histogram_decrement(index_t* histo, index_t* pop, source_t value) nogil:
+cdef inline void histogram_decrement(index_t* histo, index_t* pop, const source_t value) nogil:
   histo[value] -= 1
   pop[0] -= 1
 
@@ -51,7 +51,7 @@ cdef inline char is_in_source(index_t nx, index_t ny, index_t nz,
 
 
 cdef void rank_core(void kernel(sink_t*, index_t*, index_t, source_t, index_t, index_t*, double*) nogil,
-                    source_t[:, :, :] source, char[:, :, :] selem,
+                    const source_t[:, :, :] source, const char[:, :, :] selem,
                     sink_t[:, :, :, :] sink,
                     index_t max_bin, index_t[:] parameter_index, double[:] parameter_double) except *:
   """Compute histogram for each pixel, azzly kernel function to calculate sinkput."""
@@ -341,7 +341,7 @@ cdef void rank_core(void kernel(sink_t*, index_t*, index_t, source_t, index_t, i
 
 
 cdef inline char is_in_masked_source(index_t nx, index_t ny, index_t nz, 
-                                     index_t x,  index_t y,  index_t z, char[:,:,:] mask) nogil:
+                                     index_t x,  index_t y,  index_t z, const char[:,:,:] mask) nogil:
   if x < 0 or x > nx - 1 or y < 0 or y > ny - 1 or z < 0 or z > nz - 1:
     return 0;
   else:
@@ -381,7 +381,7 @@ cdef inline void move_histo(index_t nx, index_t ny, index_t nz, index_t x, index
                             index_t* se_u_x, index_t* se_u_y, index_t* se_u_z, 
                             index_t* se_d_x, index_t* se_d_y, index_t* se_d_z,
                             index_t num_se_e, index_t num_se_w, index_t num_se_n, index_t num_se_s, index_t num_se_u, index_t num_se_d,
-                            index_t* histo, index_t* pop, source_t[:, :, :] source, char[:,:,:] mask) nogil:
+                            index_t* histo, index_t* pop, const source_t[:, :, :] source, const char[:,:,:] mask) nogil:
       cdef index_t xx,yy,zz,s
   
       if mode == 0:
@@ -488,7 +488,7 @@ cdef inline void clean_up(index_t* se_e_x, index_t* se_e_y, index_t* se_e_z,
 
 
 cdef void rank_core_masked(void kernel(sink_t*, index_t*, index_t, source_t, index_t, index_t*, double*) nogil,
-                           source_t[:, :, :] source, char[:, :, :] selem, char[:,:,:] mask,
+                           const source_t[:, :, :] source, const char[:, :, :] selem, const char[:,:,:] mask,
                            sink_t[:, :, :, :] sink, index_t max_bin,
                            index_t[:] parameter_index, double[:] parameter_double) except *:
   """Compute histogram for each pixel, azzly kernel function to calculate sinkput."""

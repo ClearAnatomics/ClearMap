@@ -46,16 +46,16 @@ cdef inline void kernel_nilblack(sink_t* sink, index_t* histo, index_t pop, sour
     sink[0] = <sink_t>(mu + q[0] * sqrt(sigma))
 
 
-def nilblack(source_t[:, :, :] source, char[:, :, :] selem,
-               sink_t[:, :, :, :] sink, 
-               index_t max_bin, index_t[:] p, double[:] q):
+def nilblack(const source_t[:, :, :] source, const char[:, :, :] selem,
+             sink_t[:, :, :, :] sink,
+             index_t max_bin, index_t[:] p, double[:] q):
 
   rank_core(kernel_nilblack[sink_t, index_t, source_t], source, selem, 
             sink, max_bin, p, q)
 
-def nilblack_masked(source_t[:, :, :] source, char[:, :, :] selem,
-                      char[:, :, :] mask, sink_t[:, :, :, :] sink,
-                      index_t max_bin, index_t[:] p, double[:] q):
+def nilblack_masked(const source_t[:, :, :] source, const char[:, :, :] selem,
+                    const char[:, :, :] mask, sink_t[:, :, :, :] sink,
+                    index_t max_bin, index_t[:] p, double[:] q):
 
   rank_core_masked(kernel_nilblack[sink_t, index_t, source_t], source, selem, 
                    mask, sink, max_bin, p, q)
@@ -86,16 +86,16 @@ cdef inline void kernel_sauvola(sink_t* sink, index_t* histo, index_t pop, sourc
     sink[0] = <sink_t>(mu * (1.0 + q[0] * (sqrt(sigma)/q[1] - 1.0)));
 
 
-def sauvola(source_t[:, :, :] source, char[:, :, :] selem,
-             sink_t[:, :, :, :] sink, 
-             index_t max_bin, index_t[:] p, double[:] q):
+def sauvola(const source_t[:, :, :] source, const char[:, :, :] selem,
+            sink_t[:, :, :, :] sink,
+            index_t max_bin, index_t[:] p, double[:] q):
 
   rank_core(kernel_sauvola[sink_t, index_t, source_t], source, selem, 
             sink, max_bin, p, q)
 
-def sauvola_masked(source_t[:, :, :] source, char[:, :, :] selem,
-                    char[:, :, :] mask, sink_t[:, :, :, :] sink,
-                    index_t max_bin, index_t[:] p, double[:] q):
+def sauvola_masked(const source_t[:, :, :] source, const char[:, :, :] selem,
+                   const char[:, :, :] mask, sink_t[:, :, :, :] sink,
+                   index_t max_bin, index_t[:] p, double[:] q):
   
   rank_core_masked(kernel_sauvola[sink_t, index_t, source_t], source, selem, 
                    mask, sink, max_bin, p, q)
@@ -116,7 +116,6 @@ cdef inline void kernel_clp_index(sink_t* sink, index_t* histo, index_t pop, sou
     cdef index_t i, clipped, redist, residual, residual_step, residual_max 
     cdef index_t sum = 0
 
-    
     if pop:
       # create clipped historgram
       clipped = 0;
@@ -162,9 +161,6 @@ cdef inline void kernel_clp_index(sink_t* sink, index_t* histo, index_t pop, sou
         sink[0] = <sink_t>0
 
 
-
-
-
 cdef inline void kernel_clp(sink_t* sink, index_t* histo, index_t pop, source_t g, 
                             index_t max_bin, index_t* p, double* q) nogil:
 
@@ -175,7 +171,6 @@ cdef inline void kernel_clp(sink_t* sink, index_t* histo, index_t pop, source_t 
     cdef double clipped, redist
     cdef double sum = 0
 
-    
     if pop:
       # create normalized and clipped historgram
       clipped = 0;
@@ -208,22 +203,19 @@ cdef inline void kernel_clp(sink_t* sink, index_t* histo, index_t pop, source_t 
         sink[0] = <sink_t>0
 
 
-def clp(source_t[:, :, :] source, char[:, :, :] selem,
-                      sink_t[:, :, :, :] sink, 
-                      index_t max_bin, index_t[:] p, double[:] q):
+def clp(const source_t[:, :, :] source, const char[:, :, :] selem,
+        sink_t[:, :, :, :] sink,
+        index_t max_bin, index_t[:] p, double[:] q):
 
   rank_core(kernel_clp[sink_t, index_t, source_t], source, selem,
             sink, max_bin, p, q)
 
-def clp_masked(source_t[:, :, :] source, char[:, :, :] selem,
-               char[:, :, :] mask, sink_t[:, :, :, :] sink,
+def clp_masked(const source_t[:, :, :] source, const char[:, :, :] selem,
+               const char[:, :, :] mask, sink_t[:, :, :, :] sink,
                index_t max_bin, index_t[:] p, double[:] q):
 
   rank_core_masked(kernel_clp[sink_t, index_t, source_t], source, selem, 
                    mask, sink, max_bin, p, q)
-
-
-
 
 ###############################################################################
 ### Light sheet artifact correction
@@ -275,8 +267,7 @@ cdef inline void kernel_lsac(sink_t* sink, index_t* histo, index_t pop, source_t
       #  sum_high += clip_histo[i];
       #  printf('(%d,%d)', histo[i], clip_histo[i]);                      
       #printf('\nhisto sums=%d,%d\n', sum , sum_high)
-      
-      
+
       #calculate percentiles based on clipped histogram
       sum_low = 0;
       percentile_low *= pop;
@@ -330,25 +321,21 @@ cdef inline void kernel_lsac(sink_t* sink, index_t* histo, index_t pop, source_t
       #sum = 0;     
     else:
       sink[0] = <sink_t>0
-          
-          
 
-def lsac(source_t[:, :, :] source, char[:, :, :] selem,
+
+def lsac(const source_t[:, :, :] source, const char[:, :, :] selem,
          sink_t[:, :, :, :] sink, 
          index_t max_bin, index_t[:] p, double[:] q):
 
   rank_core(kernel_lsac[sink_t, index_t, source_t], source, selem,
             sink, max_bin, p, q)
 
-def lsac_masked(source_t[:, :, :] source, char[:, :, :] selem,
-                char[:, :, :] mask, sink_t[:, :, :, :] sink,
+def lsac_masked(const source_t[:, :, :] source, const char[:, :, :] selem,
+                const char[:, :, :] mask, sink_t[:, :, :, :] sink,
                 index_t max_bin, index_t[:] p, double[:] q):
 
   rank_core_masked(kernel_lsac[sink_t, index_t, source_t], source, selem, 
                    mask, sink, max_bin, p, q)
-
-
-
 
 ################################################################################
 #### Highest slope of histogram

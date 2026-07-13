@@ -43,9 +43,9 @@ cdef extern from "TraceCode.hpp":
     cdef cppclass Tracer[source_t, index_t]:
         Tracer()
         
-        int run(source_t* source_, index_t shape_x_, index_t shape_y_, index_t shape_z_,
+        int run(const source_t* source_, index_t shape_x_, index_t shape_y_, index_t shape_z_,
                                    index_t stride_x_, index_t stride_y_, index_t sstride_z_,
-                source_t* reward_,
+                const source_t* reward_,
                 index_t start_x_, index_t start_y_, index_t start_z_,
                 index_t goal_x_,  index_t goal_y_,  index_t goal_z_)
           
@@ -71,11 +71,11 @@ cdef extern from "TraceCode.hpp":
     cdef cppclass TracerToMask[source_t, index_t, mask_t]:
         TracerToMask()
         
-        int run(source_t* source_, index_t shape_x_, index_t shape_y_, index_t shape_z_,
+        int run(const source_t* source_, index_t shape_x_, index_t shape_y_, index_t shape_z_,
                 index_t stride_x_, index_t stride_y_, index_t sstride_z_,
-                source_t* reward_,
+                const source_t* reward_,
                 index_t start_x_, index_t start_y_, index_t start_z_,
-                mask_t* mask_)
+                const mask_t* mask_)
           
         int getPathSize()
         
@@ -95,9 +95,9 @@ cdef extern from "TraceCode.hpp":
 
 
 
-def trace(source_t[:,:,:] source, 
-          source_t[:,:,:] reward, 
-          index_t[:] start, index_t[:] goal,
+def trace(const source_t[:,:,:] source,
+          const source_t[:,:,:] reward,
+          const index_t[:] start, const index_t[:] goal,
           double_t cost_per_distance, double_t minimum_cost_per_distance,
           double_t reward_multiplier, double_t minimal_reward, 
           bint return_quality,
@@ -123,22 +123,22 @@ def trace(source_t[:,:,:] source,
                      goal[0],  goal[1],  goal[2])
 
     if res < 0:
-      if return_quality:
-        return  np.zeros((0,3), dtype = int), 0
-      else:
-        return np.zeros((0,3), dtype = int)
+        if return_quality:
+            return  np.zeros((0,3), dtype = int), 0
+        else:
+            return np.zeros((0,3), dtype = int)
 
     n = tracer.getPathSize()
     cdef cnp.ndarray[index_t, ndim=2] path = np.zeros((n,3), dtype = int);
     tracer.getPath(&path[0,0])
     if return_quality:
-      return path, tracer.getPathQuality()
+        return path, tracer.getPathQuality()
     else:
-      return path
+        return path
 
-def trace_to_mask(source_t[:,:,:] source, 
-                  source_t[:,:,:] reward, 
-                  index_t[:] start, mask_t[:,:,:] mask,
+def trace_to_mask(const source_t[:,:,:] source,
+                  const source_t[:,:,:] reward,
+                  const index_t[:] start, const mask_t[:,:,:] mask,
                   double_t cost_per_distance, double_t minimum_cost_per_distance,
                   double_t reward_multiplier, double_t minimal_reward,
                   bint return_quality,
@@ -166,15 +166,15 @@ def trace_to_mask(source_t[:,:,:] source,
                      &mask[0,0,0])
 
     if res < 0:
-      if return_quality:
-        return  np.zeros((0,3), dtype = int), 0
-      else:
-        return np.zeros((0,3), dtype = int)
+        if return_quality:
+            return  np.zeros((0,3), dtype = int), 0
+        else:
+            return np.zeros((0,3), dtype = int)
 
     n = tracer.getPathSize()
     cdef cnp.ndarray[index_t, ndim=2] path = np.zeros((n, 3), dtype = int);
     tracer.getPath(&path[0,0])
     if return_quality:
-      return path, tracer.getPathQuality()
+        return path, tracer.getPathQuality()
     else:
-      return path
+        return path

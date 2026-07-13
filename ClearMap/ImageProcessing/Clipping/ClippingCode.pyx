@@ -9,8 +9,8 @@ Cython code for the Clipping module.
 __author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
 __license__   = 'GPLv3 - GNU General Pulic License v3 (see LICENSE.txt)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
-__webpage__   = 'http://idisco.info'
-__download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
+__webpage__   = 'https://idisco.info'
+__download__  = 'https://www.github.com/ChristophKirst/ClearMap2'
 
 
 cimport cython
@@ -47,8 +47,8 @@ ctypedef Py_ssize_t index_t
 #@cython.boundscheck(False)
 #@cython.wraparound(False)
 #@cython.nonecheck(False)
-cpdef void clip(source_t[:,:,:] source, sink_t[:, :, :] sink,
-                double clip_min, double clip_max, double clip_norm, int processes) nogil:
+cpdef void clip(const source_t[:,:,:] source, sink_t[:, :, :] sink,
+                double clip_min, double clip_max, double clip_norm, int processes) noexcept nogil:
     """Clip image and normalize"""
 
     # array sizes

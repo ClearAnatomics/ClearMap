@@ -358,7 +358,8 @@ cdef int get_reducer_enum(object reducer_fn):
         return -1    # signal “unknown Python reducer”
 
 
-cdef inline sink_t c_min(source_t[:] src, sink_t[:] sink, uint64[:] idxs, uint64 start, uint64 end)  nogil except +:
+cdef inline sink_t c_min(const source_t[:] src, const sink_t[:] sink, const uint64[:] idxs,
+                         uint64 start, uint64 end)  nogil except +:
     """Compute the minimum of src over indices in idxs[start:end]."""
     cdef Py_ssize_t j
     cdef uint64 idx
@@ -372,7 +373,8 @@ cdef inline sink_t c_min(source_t[:] src, sink_t[:] sink, uint64[:] idxs, uint64
             acc = <sink_t>src[idx]
     return <sink_t>acc
 
-cdef inline sink_t c_max(source_t[:] src, sink_t[:] sink, uint64[:] idxs, uint64 start, uint64 end)  nogil except +:
+cdef inline sink_t c_max(const source_t[:] src, const sink_t[:] sink, const uint64[:] idxs,
+                         uint64 start, uint64 end)  nogil except +:
     """Compute the maximum of src over indices in idxs[start:end]."""
     cdef Py_ssize_t j
     cdef uint64 idx
@@ -386,7 +388,8 @@ cdef inline sink_t c_max(source_t[:] src, sink_t[:] sink, uint64[:] idxs, uint64
             acc = <sink_t>src[idx]
     return <sink_t>acc
 
-cdef inline double c_sum(source_t[:] src, sink_t[:] sink, uint64[:] idxs, uint64 start, uint64 end)  nogil except +:
+cdef inline double c_sum(const source_t[:] src, const sink_t[:] sink, const uint64[:] idxs,
+                         uint64 start, uint64 end)  nogil except +:
     """Compute the sum of src over indices in idxs[start:end]."""
     cdef Py_ssize_t j
     cdef double acc = 0  # FIXME: float and force casting to source_t
@@ -394,7 +397,8 @@ cdef inline double c_sum(source_t[:] src, sink_t[:] sink, uint64[:] idxs, uint64
         acc = acc + <double>src[idxs[j]]
     return acc
 
-cdef inline double c_mean(source_t[:] src, sink_t[:] sink, uint64[:] idxs, uint64 start, uint64 end)  nogil except +:
+cdef inline double c_mean(const source_t[:] src, const sink_t[:] sink, const uint64[:] idxs,
+                          uint64 start, uint64 end)  nogil except +:
     """Compute the mean of src over indices in idxs[start:end]."""
     cdef uint64 length = end - start
     if length <= 0:
@@ -403,8 +407,8 @@ cdef inline double c_mean(source_t[:] src, sink_t[:] sink, uint64[:] idxs, uint6
     return <sink_t>(total / <double>length)
 
 
-cpdef bint cy_reduce(source_t[:] source, sink_t[:] sink, uint64[:] idx_stack, uint64[:] offsets,
-                            object reducer_fn, int num_threads=10):
+cpdef bint cy_reduce(const source_t[:] source, sink_t[:] sink, const uint64[:] idx_stack,
+                     const uint64[:] offsets, object reducer_fn, int num_threads=10):
     """
     Parallel reducer over ragged slices of *arr*:
 
