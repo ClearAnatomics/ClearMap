@@ -47,7 +47,11 @@ class Source:
             Name of this source.
         """
         mod_name = type(self).__module__.split(".")[-1]
-        return getattr(self, '_name', f'{mod_name}-Source')
+        name_fallback = f'{mod_name}-Source'
+        cls_name = getattr(self, '_name', name_fallback)
+        if cls_name is None:
+            cls_name = name_fallback
+        return cls_name
 
     @name.setter
     def name(self, value: str):
