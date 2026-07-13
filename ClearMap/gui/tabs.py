@@ -962,6 +962,7 @@ class RegistrationTab(PreProcessingTab['RegistrationProcessor']):
                         return
                 try:
                     self.wrap_step(f'Resampling {channel} for registration', self.worker.resample_channel,
+                                   bypass_exceptions=[FileExistsError], # FIXME: ResampledFileExistsError with recovery ??
                                    step_kw_args={'channel': channel, 'increment_main': (i != 0)})
                 except FileExistsError:  # REFACTOR: factorise with the above
                     option_idx = option_dialog('Files exist',
