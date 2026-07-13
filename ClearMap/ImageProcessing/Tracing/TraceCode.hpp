@@ -158,7 +158,7 @@ class Path {
       for (int i = 0; i < s -1; i++) {
         dx = (points[i+1].x - points[i].x) * scale.x;
         dy = (points[i+1].y - points[i].y) * scale.y;
-        dz = (points[i+2].z - points[i].z) * scale.z;
+        dz = (points[i+1].z - points[i].z) * scale.z;
         l += sqrt(dx*dx + dy*dy + dz*dz);
       }
       return l;
@@ -627,8 +627,8 @@ class Tracer {
 
           for (int dx = -1; dx <= 1; dx++) {
             for (int dy = -1; dy <= 1; dy++) {
-
-              if ((dx == 0) && (dx == 0) && (dz == 0))
+              // inplace
+              if ((dx == 0) && (dy == 0) && (dz == 0))
                 continue;
 
               int x_new = node->point.x + dx;
