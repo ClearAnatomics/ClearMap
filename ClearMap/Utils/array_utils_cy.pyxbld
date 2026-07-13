@@ -16,7 +16,7 @@ def make_ext(modname, pyxfilename):
         include_dirs=[np.get_include()],
         extra_compile_args=extra_compile_args,
         extra_link_args=extra_link_args,
-        language="c++"
+        # language="c++"
     )
     
     return ext

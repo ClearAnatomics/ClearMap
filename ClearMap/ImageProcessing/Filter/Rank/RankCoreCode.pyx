@@ -9,8 +9,8 @@ Cython code for the core rank filter functions.
 __author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
 __license__   = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
-__webpage__   = 'http://idisco.info'
-__download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
+__webpage__   = 'https://idisco.info'
+__download__  = 'https://github.com/ClearAnatomics/ClearMap'
 
 
 #TODO: masked version with skipping non-valid region borders !
@@ -53,7 +53,8 @@ cdef inline char is_in_source(index_t nx, index_t ny, index_t nz,
 cdef void rank_core(void kernel(sink_t*, index_t*, index_t, source_t, index_t, index_t*, double*) nogil,
                     const source_t[:, :, :] source, const char[:, :, :] selem,
                     sink_t[:, :, :, :] sink,
-                    index_t max_bin, index_t[:] parameter_index, double[:] parameter_double) except *:
+                    index_t max_bin, index_t[:] parameter_index,
+                    double[:] parameter_double) except *:
   """Compute histogram for each pixel, azzly kernel function to calculate sinkput."""
 
   cdef index_t nx = source.shape[0]

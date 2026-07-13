@@ -1,3 +1,4 @@
+#distutils: language = c++
 #cython: language_level=3, boundscheck=False, wraparound=False, cdivision=True
 """
 Fast graph reduction for degree-2 vertices.

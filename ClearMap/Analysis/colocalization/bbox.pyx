@@ -1,7 +1,42 @@
-# Copyright Charly Rousseau & Gaël Cousin
+#cython: language_level=3, boundscheck=False, wraparound=False, nonecheck=False, initializedcheck=False, cdivision=True
+"""
+BoundingBoxCode
+===============
 
-# cython: language="c++", language_level=3
-# distutils: language = c++
+Cython code for computing per-label axis-aligned bounding boxes on
+integer-labelled images.
+
+For each label *l* present in the input array the result contains the
+minimum and maximum coordinate along every axis::
+
+    result[l, axis, 0]  →  min coordinate
+    result[l, axis, 1]  →  max coordinate
+
+Functions
+---------
+:func:`bbox_3d`
+    Bounding boxes for a 3-D label image.
+:func:`bbox_2d`
+    Bounding boxes for a 2-D label image.
+:func:`bbox_1d`
+    Bounding boxes for a 1-D label image.
+
+Notes
+-----
+Label ``0`` is included in the output (background).  The caller can
+discard ``result[0]`` if the background bounding box is not needed.
+
+The ``max + 1`` label count may overflow for images whose maximum label
+value equals the dtype maximum (e.g. 255 for uint8).  This is
+intentional and flagged with an inline warning.
+"""
+__author__    = 'Charly Rousseau <charly.rousseau@icm-institute.org>, Gaël Cousin'
+__license__   = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
+__copyright__ = 'Copyright © 2020 by Charly Rousseau'
+__webpage__   = 'https://idisco.info'
+__download__  = 'https://github.com/ClearAnatomics/ClearMap'
+
+
 cimport cython
 import numpy as np
 cimport numpy as cnp
