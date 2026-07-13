@@ -365,7 +365,7 @@ cpdef index_t[:] block_sums_3d_f(source_t[:,:,:] source, int blocks, int process
     return blocksums
 
 
-cpdef np.ndarray[Py_ssize_t, ndim=1] neighbours(index_t[:] indices, int offset, int processes):
+cpdef np.ndarray[Py_ssize_t, ndim=2] neighbours(index_t[:] indices, int offset, int processes):
   cdef index_t n = indices.shape[0]
   cdef index_t p, i, plo, phi, target
   
