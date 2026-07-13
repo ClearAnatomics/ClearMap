@@ -541,22 +541,33 @@ class ProgressWatcher(QWidget):  # Inspired from https://stackoverflow.com/a/662
         """
         if self.pattern is None:
             return 0
-        with open(self.log_path, 'r') as log:
-            log.seek(self.previous_log_length)
-            new_lines = log.readlines()
+        try:
+            with open(self.log_path, 'rb') as log:      # binary: seek is byte-exact
+                log.seek(self.previous_log_length)
+                raw = log.read()
+                self.previous_log_length = log.tell()   # update to real end position
+        except (FileNotFoundError, OSError):
+            return self.n_dones
+
+        text = raw.decode('utf-8', errors='replace')    # 0x9C → \ufffd, no crash
+        new_lines = text.splitlines(keepends=True)
+
         n_dones = len([ln for ln in new_lines if self.__match(ln)])
         self.n_dones += n_dones
-        self.previous_log_length += self.__get_log_bytes(new_lines)
         return self.n_dones
 
     def reset_log_length(self):
         """Reset the done counter and seek to the end of the log file."""
-        with open(self.log_path, 'r') as log:
-            self.previous_log_length = self.__get_log_bytes(log.readlines())
-            self.n_dones = 0
-
-    def __get_log_bytes(self, log):
-        return sum([len(ln) for ln in log])
+        self.n_dones = 0
+        if not self.log_path:
+            self.previous_log_length = 0
+            return
+        try:
+            with open(self.log_path, 'rb') as log:
+                log.seek(0, 2)                          # SEEK_END
+                self.previous_log_length = log.tell()   # real byte offset
+        except FileNotFoundError:
+            self.previous_log_length = 0
 
     def finish(self):
         """Trigger the finished signal."""
