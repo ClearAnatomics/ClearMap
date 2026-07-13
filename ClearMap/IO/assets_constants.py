@@ -7,7 +7,7 @@ EXTENSIONS = {
     'layout': ['.lyt'],
     'elastix_image': ['.mhd'],
     'elastix_points': ['.pts'],
-    'table': ['.npy', '.feather', '.csv'],
+    'table': ['.feather', '.csv', '.npy'],
     'log': ['.log'],
     'error_log': ['.html'],
 }

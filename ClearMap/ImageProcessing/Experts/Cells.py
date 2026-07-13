@@ -18,11 +18,15 @@ __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
 import gc
 import multiprocessing
+import shutil
+import tempfile
 import warnings
+from pathlib import Path
 
 import numpy as np
 
 import cv2
+import pandas as pd
 import scipy.ndimage.filters as ndf
 import scipy.ndimage as ndi
 
@@ -44,6 +48,8 @@ from ClearMap.ImageProcessing.Experts.utils import initialize_sinks, run_step, p
 from ClearMap.ImageProcessing.LocalStatistics import local_percentile
 
 from ClearMap.Utils.exceptions import ClearMapValueError
+from ClearMap.Utils.utilities import sanitize_n_processes
+
 ###############################################################################
 # ## Default parameter
 ###############################################################################
@@ -103,7 +109,7 @@ See :func:`ClearMap.ParallelProcessing.BlockProcessing.process` for details."""
 ###############################################################################
 # ## Cell detection
 ###############################################################################
-                   
+
 def detect_cells(source, sink=None, cell_detection_parameter=default_cell_detection_parameter,
                  processing_parameter=default_cell_detection_processing_parameter, workspace=None):
     """Cell detection pipeline.
@@ -295,44 +301,50 @@ def detect_cells(source, sink=None, cell_detection_parameter=default_cell_detect
     """
 
     # initialize sink
-    shape = clearmap_io.shape(source)
-    order = clearmap_io.order(source)
-
-    initialize_sinks(cell_detection_parameter, shape, order)
+    initialize_sinks(cell_detection_parameter, clearmap_io.shape(source), clearmap_io.order(source))
 
     cell_detection_parameter.update(verbose=processing_parameter.get('verbose', False))
 
-    n_processes = multiprocessing.cpu_count() if processing_parameter.get('processes') is None else processing_parameter.get('processes')
-    n_threads = int(multiprocessing.cpu_count() / n_processes)  # Number of threads so that * n_processes, fills CPUs
+    n_processes = sanitize_n_processes(processing_parameter.get('processes'))
+    n_threads = max(1, int(multiprocessing.cpu_count() / n_processes))  # Number of threads so that * n_processes, fills CPUs
 
-    results, blocks = bp.process(detect_cells_block, source, sink=None, function_type='block', return_result=True,
-                                 return_blocks=True, parameter=cell_detection_parameter, workspace=workspace,
-                                 **{**processing_parameter, **{'n_threads': n_threads}})
+    sink_location = clearmap_io.location(sink) if sink is not None else None
+    sink_path = Path(sink_location) if sink_location is not None else None
+    result_directory = Path(tempfile.mkdtemp(prefix='cells_blocks_',
+                                             dir=sink_path.parent if sink_path is not None else None))
 
-    # merge results
-    results = np.vstack([np.hstack(r) for r in results])
+    try:
+        results = bp.process(detect_cells_block, source, sink=None, function_type='block', return_result=True,
+                             return_blocks=False, parameter=cell_detection_parameter, workspace=workspace,
+                             result_directory=result_directory, **{**processing_parameter, **{'n_threads': n_threads}})
 
-    # create column headers  # FIXME: use pd.DataFrame instead
-    header = ['x', 'y', 'z']
-    dtypes = [int, int, int]
-    if cell_detection_parameter['shape_detection'] is not None:
-        header += ['size']
-        dtypes += [int]
-    measures = cell_detection_parameter['intensity_detection']['measure']
-    header += measures
-    dtypes += [float] * len(measures)
+        # merge results
+        results = pd.concat((pd.read_feather(r) for r in results), ignore_index=True)
 
-    dt = {'names': header, 'formats': dtypes}
-    cells = np.zeros(len(results), dtype=dt)
-    for i, h in enumerate(header):
-        cells[h] = results[:, i]
+        # save results
+        if sink is None:
+            return results
+        else:
+            results.to_feather(sink)
+            return sink
 
-    # save results
-    return clearmap_io.write(sink, cells)
+    finally:
+        shutil.rmtree(result_directory, ignore_errors=True)
 
 
-def detect_cells_block(source, parameter=default_cell_detection_parameter, n_threads=None):
-    """Detect cells in a Block."""
+def detect_cells_block(source, parameter=default_cell_detection_parameter,
+                       n_threads=None, result_directory=None):
+    """Detect cells in a Block.
+
+    Returns
+    -------
+    pandas.DataFrame or str
+        If ``result_directory`` is None, returns a DataFrame with explicit
+        cell-property columns.
+
+        If ``result_directory`` is provided, writes the block table to a
+        per-block Feather file and returns the file path.
+    """
 
     # initialize parameter and slicing
     if parameter.get('verbose'):
@@ -347,6 +359,9 @@ def detect_cells_block(source, parameter=default_cell_detection_parameter, n_thr
     valid_upper = source.valid.upper
     lower = source.lower
 
+    results = {}
+    centers = None
+
     steps_to_measure = {}  # FIXME: rename
     parameter_intensity = parameter.get('intensity_detection')
     if parameter_intensity:
@@ -358,6 +373,8 @@ def detect_cells_block(source, parameter=default_cell_detection_parameter, n_thr
             if m not in valid_measurement_keys:
                 raise KeyError(f'Unknown measurement: {m}')
             steps_to_measure[m] = None
+    else:
+        measure = []
 
     if 'source' in steps_to_measure:
         steps_to_measure['source'] = source
@@ -396,15 +413,15 @@ def detect_cells_block(source, parameter=default_cell_detection_parameter, n_thr
             centers = md.find_center_of_maxima(source, maxima=maxima, verbose=parameter.get('verbose'))
         else:
             if parameter_shape:
-                threshold = parameter_shape.get('threshold',0)
-                print(f"masking maxima centers by (dog > {threshold}) for shape detection")
+                threshold = parameter_shape.get('threshold', 0)
+                print(f'{prefix}masking maxima centers by (dog > {threshold}) for shape detection')
                 mask = dog > threshold
                 maxima = maxima * mask
 
             # We treat the eventuality of connected components of size>1 in the mask (maxima>0);
             # the choice of the structure matrix for connectivity could need discussion.
             # with no further adaptation the maxima_labeling consumes too much memory
-            maxima_labels, _ = ndi.label(maxima, structure=np.ones((3,)*3,dtype='bool'))
+            maxima_labels, _ = ndi.label(maxima, structure=np.ones((3,) * 3, dtype='bool'))
             centers = np.vstack(md.label_representatives(maxima_labels)).transpose()
             # we could come back to the ancient version
             # centers = ap.where(maxima, processes=n_threads).array 
@@ -418,12 +435,13 @@ def detect_cells_block(source, parameter=default_cell_detection_parameter, n_thr
                 ids = np.logical_and(ids, np.logical_and(l <= c, c < u))
             centers = centers[ids]
             del ids
-        results = (centers,)
     else:
-        results = ()
+        valid = None
 
     # cell shape detection  # FIXME: may use centers without assignment
     if parameter_shape:
+        if parameter.get('verbose'):
+            timer = tmr.Timer(prefix)
         try:
             parser = (lambda t: t[0])
             shape, sizes = run_step('shape_detection', dog, sd.detect_shape, remove_previous_result=True, **default_step_params,
@@ -431,16 +449,17 @@ def detect_cells_block(source, parameter=default_cell_detection_parameter, n_thr
         except ClearMapValueError as err:
             if str(err) == 'An uint array with 0 values will lead to inconsistent results, consider a histogram transform or dtype conversion.':
                 warnings.warn('This block is likely to contain corrupted data, an empty output will be provided for this block.')
-                results = (centers[:0],)
-                sizes = np.array([])
+                centers = centers[:0]
+                sizes = np.array([], dtype=int)
                 shape = None
             else:
-                raise err
-                          
+                raise
 
-            
+        if parameter.get('verbose'):
+            timer.print_elapsed_time('Shape detection')
+
         valid = sizes > 0
-        results += (sizes,)
+        results['size'] = sizes
     else:
         valid = None
         shape = None
@@ -465,21 +484,52 @@ def detect_cells_block(source, parameter=default_cell_detection_parameter, n_thr
                 intensity = me.measure_expression(steps_to_measure[m], centers, search_radius=r,
                                                   **parameter_intensity, n_processes=1, verbose=False)
 
-            results += (intensity,)
+            results[m] = intensity
 
         if parameter.get('verbose'):
-            timer.print_elapsed_time('Shape detection')
+            timer.print_elapsed_time('Intensity detection')
+
+    # FIXME: extract DF creation
+    if centers is None:
+        centers = np.zeros((0, 3), dtype=int)
 
     if valid is not None:
-        results = tuple(r[valid] for r in results)
+        centers = centers[valid]
+        results = {k: v[valid] for k, v in results.items()}
     # correct coordinate offsets of blocks
-    results = (results[0] + lower,) + results[1:]
-    # correct shapes for merging
-    results = tuple(r[:, None] if r.ndim == 1 else r for r in results)
+    centers = centers + lower
+
+    # create named result table
+    results = {'x': centers[:, 0], 'y': centers[:, 1], 'z': centers[:, 2], **results}
+
+    if parameter_shape and 'size' not in results:  # TODO: check if required
+        results['size'] = np.zeros(len(centers), dtype=int)
+
+    for m in measure:
+        if m not in results:
+            results[m] = np.zeros(len(centers))
+
+    results = pd.DataFrame(results)
+
+    if result_directory is not None:
+        result_directory.mkdir(exist_ok=True)
+
+        block_id = source.iteration
+        if block_id is None:
+            block_id = 0
+
+        result_path = result_directory / f'cells_block_{block_id:04d}.feather'
+        results.to_feather(result_path)
+
+        if parameter.get('verbose'):
+            print(f'{prefix}Wrote block cell table: {result_path}, rows={len(results):d}, '
+                  f'columns={list(results.columns)}', flush=True)
+
+        results = result_path
 
     if parameter.get('verbose'):
         total_time.print_elapsed_time('Cell detection')
-  
+
     gc.collect()
 
     return results
@@ -565,16 +615,16 @@ def filter_cells(source, sink, thresholds):
     """
     source = clearmap_io.open_ro(source)
 
-    ids = np.ones(source.shape[0], dtype=bool)
+    cells_mask = np.ones(source.shape[0], dtype=bool)
     for filter_name, thrsh in thresholds.items():
-        if thrsh:
+        if thrsh is not None:
             if not isinstance(thrsh, (tuple, list)) and isinstance(thrsh, (int, float)):
                 thrsh = (thrsh, None)
             if thrsh[0] is not None:  # high pass
-                ids = np.logical_and(ids, thrsh[0] <= source[filter_name])
+                cells_mask = np.logical_and(cells_mask, thrsh[0] <= source[filter_name])
             if thrsh[1] is not None:  # low pass
-                ids = np.logical_and(ids, thrsh[1] > source[filter_name])
-    cells_filtered = source[ids]
+                cells_mask = np.logical_and(cells_mask, thrsh[1] > source[filter_name])
+    cells_filtered = source[cells_mask]
 
     return clearmap_io.write(sink, cells_filtered)
 

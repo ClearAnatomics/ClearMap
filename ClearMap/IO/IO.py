@@ -146,7 +146,7 @@ import multiprocessing as mp
 import warnings
 
 import numpy as np
-
+import pandas as pd
 
 import ClearMap.IO.Source as src
 import ClearMap.IO.Slice as slc
@@ -492,6 +492,8 @@ def location(source_):
     location : str or None
         The location of the source.
     """
+    if isinstance(source_, (str, pathlib.Path)) and not pathlib.Path(source_).exists():  # TODO: check if we **want** that bhv
+        return source_
     source_ = open_ro(source_)
     return source_.location
 
@@ -563,6 +565,10 @@ def buffer(source_):
     return buffer_
 
 
+def _is_feather_path(source_) -> bool:
+    return isinstance(source_, (str, pathlib.Path)) and str(source_).endswith('.feather')
+
+
 # TODO: arg memory= to specify which kind of array is created, better use device=
 # TODO: arg processes= in order to use ParallelIO -> can combine with buffer=
 def read(source_, *args, **kwargs):
@@ -586,6 +592,16 @@ def read(source_, *args, **kwargs):
     """
     if isinstance(source_, pathlib.Path):
         source_ = str(source_)
+    if _is_feather_path(source_):
+        return pd.read_feather(source_)
+    elif isinstance(source_, np.ndarray):  # Already materialised — nothing to do
+        return source_
+    elif isinstance(source_, src.Source):  # Source-like with .array (Block, Slice, NPY.Source, MMP.Source, ...)
+        if hasattr(source_, 'array'):
+            return source_.array
+        raise ValueError(f'Source {source_} has no array property and cannot be read directly')
+
+    # File path or expression — dispatch to the right module
     mod = source_to_module(source_)
     return mod.read(source_, *args, **kwargs)
 
@@ -594,6 +610,8 @@ def open_ro(source_, **kwargs):
     """Open a source strictly read-only for metadata queries."""
     if isinstance(source_, pathlib.Path):
         source_ = str(source_)
+    if _is_feather_path(source_):
+        return pd.read_feather(source_)
     mod = source_to_module(source_)
     if isinstance(source_, src.Source):
         if source_.mode == 'r':
@@ -612,6 +630,8 @@ def edit(source_, **kwargs):
     """Open a source for in-place editing (mode='r+')."""
     if isinstance(source_, pathlib.Path):
         source_ = str(source_)
+    if _is_feather_path(source_):
+        return pd.read_feather(source_)
     mod = source_to_module(source_)
     if hasattr(mod, 'edit'):
         return mod.edit(source_, **kwargs)
@@ -638,6 +658,13 @@ def write(sink, data, *args, **kwargs):
     """
     if isinstance(sink, pathlib.Path):
         sink = str(sink)
+    if _is_feather_path(sink):
+        if not isinstance(data, pd.DataFrame):
+            data = pd.DataFrame(data)  # backward compat: structured array
+        if not isinstance(data.index, pd.RangeIndex) or data.index[0] != 0:
+            data = data.reset_index(drop=True)  # feather requires default RangeIndex
+        data.to_feather(sink)
+        return sink
     mod = source_to_module(sink)
     return mod.write(sink, open_ro(data), *args, **kwargs)
 
