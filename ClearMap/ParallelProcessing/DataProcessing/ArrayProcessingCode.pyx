@@ -78,7 +78,7 @@ cpdef void apply_lut(const source_int_t[:] source,
 cpdef void apply_lut_to_index_3d(const source_t[:,:,:] source,
                                  const index_t[:,:,:] kernel,
                                  const sink_t[:] lut,
-                                 sink_t[:,:,:] sink, int processes) nogil:
+                                 sink_t[:,:,:] sink, int processes) noexcept nogil:
   
     cdef index_t nx = source.shape[0], ny = source.shape[1], nz = source.shape[2]
     cdef index_t kx = kernel.shape[0], ky = kernel.shape[1], kz = kernel.shape[2]
@@ -321,7 +321,7 @@ cpdef index_t[:] block_sums_1d(const source_t[:] source, int blocks, int process
 cpdef index_t[:] block_sums_2d(const source_t[:,:] source, int blocks, int processes):
     cdef index_t i, j, p
     cdef index_t shape_0, shape_1
-    shape_0, shape_1 = source.shape
+    shape_0 = source.shape[0]; shape_1 = source.shape[1]
   
     # split array in ncpus sub arrays along last dim
     cdef index_t nblocks = min(shape_1, blocks)
@@ -340,7 +340,7 @@ cpdef index_t[:] block_sums_2d(const source_t[:,:] source, int blocks, int proce
 cpdef index_t[:] block_sums_3d(const source_t[:,:,:] source, int blocks, int processes):
     cdef index_t i, j, k, p
     cdef index_t shape_0, shape_1, shape_2
-    shape_0, shape_1, shape_2 = source.shape
+    shape_0 = source.shape[0]; shape_1 = source.shape[1]; shape_2 = source.shape[2]
   
     # split array in ncpus sub arrays along last dim
     cdef index_t nblocks = min(shape_2, blocks)
@@ -360,7 +360,7 @@ cpdef index_t[:] block_sums_3d(const source_t[:,:,:] source, int blocks, int pro
 cpdef index_t[:] block_sums_3d_f(const source_t[:,:,:] source, int blocks, int processes):
     cdef index_t i, j, k, p
     cdef index_t shape_0, shape_1, shape_2
-    shape_0, shape_1, shape_2 = source.shape
+    shape_0 = source.shape[0]; shape_1 = source.shape[1]; shape_2 = source.shape[2]
 
     cdef index_t nblocks = min(shape_2, blocks)
     cdef index_t[:] ranges = np.array(np.linspace(0, shape_2, nblocks + 1), dtype=int)
@@ -452,7 +452,7 @@ cpdef void where_1d(const source_t[:] source, index_t[:] where, index_t[:] sums,
 cpdef void where_2d(const source_t[:,:] source, index_t[:,:] where, index_t[:] sums, int blocks, int processes):
     cdef index_t i, j, k, p
     cdef index_t shape_0, shape_1
-    shape_0, shape_1 = source.shape
+    shape_0 = source.shape[0]; shape_1 = source.shape[1]
 
     # split array in n_cpus sub arrays along last dim
     cdef index_t n_blocks = min(shape_1, blocks)
@@ -478,7 +478,7 @@ cpdef void where_2d(const source_t[:,:] source, index_t[:,:] where, index_t[:] s
 cpdef void where_3d(const source_t[:,:,:] source, index_t[:,:] where, index_t[:] sums, int blocks, int processes):
     cdef index_t i, j, k, p
     cdef index_t shape_0, shape_1, shape_2
-    shape_0, shape_1, shape_2 = source.shape
+    shape_0 = source.shape[0]; shape_1 = source.shape[1]; shape_2 = source.shape[2]
   
     # split array in n_cpus sub arrays along last dim
     cdef index_t n_blocks = min(shape_2, blocks)
@@ -507,7 +507,7 @@ cpdef void where_3d_f(const source_t[:,:,:] source, index_t[:,:] where,
                        index_t[:] sums, int blocks, int processes):
     cdef index_t i, j, k, p
     cdef index_t shape_0, shape_1, shape_2
-    shape_0, shape_1, shape_2 = source.shape
+    shape_0 = source.shape[0]; shape_1 = source.shape[1]; shape_2 = source.shape[2]
 
     cdef index_t n_blocks = min(shape_2, blocks)
     cdef index_t[:] ranges = np.array(np.linspace(0, shape_2, n_blocks + 1), dtype=int)
