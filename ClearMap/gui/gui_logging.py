@@ -60,6 +60,7 @@ class Printer(QWidget):
         print(f'Logger initialized with type: {logger_type}, redirects: {redirects}, log path: {log_path}')
         self.redirects = redirects
         self._original_stream = None  # stored before redirect
+        self._line_buf = ''
 
         self.set_file(log_path, open_mode)
 
@@ -76,6 +77,13 @@ class Printer(QWidget):
         return _ANSI_RE.sub('', text)
 
     def close_file(self):
+        # Flush any buffered partial line
+        if self._line_buf:
+            if self.file is not None:
+                self.file.write(self._line_buf + '\n')
+                self.file.flush()
+            self.text_updated.emit(self.colourise(self._line_buf))
+            self._line_buf = ''
         try:
             self.file.close()
         except AttributeError:
@@ -83,7 +91,8 @@ class Printer(QWidget):
         self.__unset_redirects()
 
     def set_file(self, log_path, open_mode='a'):
-        self.close_file()
+        self.close_file()  # flushes _line_buf via close_file
+        self._line_buf = ''  # reset for new file
         if log_path:
             self.file = open(log_path, open_mode)
             self.n_lines = 0
@@ -122,29 +131,37 @@ class Printer(QWidget):
         self._original_stream = None
 
     def write(self, msg: str):
-        # Write to origianl stream (console): keep ANSI so colours render
+        # Console: pass through verbatim
         if self.redirects and self._original_stream is not None:
             try:
                 self._original_stream.write(msg)
-                if not msg.endswith('\n'):
-                    self._original_stream.write('\n')
                 self._original_stream.flush()
             except (ValueError, OSError):
                 pass  # stream closed
         # Now strip before the rest
         clean = self._strip_ansi(msg)
 
-        # Write to log file: no ANSI, no double-newline
-        if self.file is not None:
-            if self.type in ('error', 'progress'):
-                self.file.write(f'{datetime.now().strftime("%y-%m-%d %H:%M:%S")}: ')
-            self.file.write(clean)
-            if not clean.endswith('\n'):
-                self.file.write('\n')
-            self.file.flush()
+        # Buffer until we have complete lines
+        self._line_buf += clean
+        if '\n' not in self._line_buf:
+            return  # wait for more
 
-        # GUI: clean text + HTML formating
-        self.text_updated.emit(self.colourise(clean))
+        # Split into complete lines + leftover
+        *lines, self._line_buf = self._line_buf.split('\n')
+
+        for line in lines:
+            if not line and not lines:  # skip empty from trailing \n
+                continue
+
+            # File
+            if self.file is not None:
+                if self.type in ('error', 'progress'):
+                    self.file.write(f'{datetime.now().strftime("%y-%m-%d %H:%M:%S")}: ')
+                self.file.write(line + '\n')
+                self.file.flush()
+
+            # GUI
+            self.text_updated.emit(self.colourise(line))
 
     def flush(self):
         try:
