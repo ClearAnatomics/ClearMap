@@ -61,7 +61,6 @@ __copyright__ = 'Copyright 2020 by Christoph Kirst'
 
 import functools as ft
 import multiprocessing as mp
-import concurrent.futures as cf
 import warnings
 
 import numpy as np
@@ -249,19 +248,25 @@ def process(function, source, sink = None,
     with CancelableProcessPoolExecutor(max_workers=processes) as executor:
       if workspace is not None:
         workspace.executor = executor
-      futures = [executor.submit(func, *args) for args in zip(source_blocks, sink_blocks)]
-      # res = executor.map(func, source_blocks, sink_blocks)
-      result = [f.result() for f in futures]  # To prevent keeping references to futures to avoid mem leaks
-      # result = list(res)
+
+      jobs = list(zip(source_blocks, sink_blocks))
+
+      futures = [executor.submit(func, *args) for args in jobs]
+
+      result = []
+      for i, f in enumerate(futures):
+        r = f.result()
+        result.append(r)
+
       if workspace is not None:
         workspace.executor = None
   else:
     result = [func(*args) for args in zip(source_blocks, sink_blocks)]  #analysis:ignore
 
   if verbose:
-    timer.print_elapsed_time("Processed %d blocks with function %r" % (n_blocks, function.__name__))
+    timer.print_elapsed_time(f"Processed {n_blocks:d} blocks with function {function.__name__!r}")
 
-  #gc.collect();
+  # gc.collect()
 
   if return_result:
     ret = result
@@ -291,9 +296,9 @@ def process_block_source(sources, sinks, function, as_memory = False, as_array =
   """
   if verbose:
     timer = tmr.Timer()
-    print('Processing block %s' % (sources[0].info(),))
+    print(f'Processing block {sources[0].info()}')
 
-  #sources = [s.as_real() for s in sources];
+  # sources = [s.as_real() for s in sources]
   sources_input = sources
   if as_memory:
     sources = [s.as_memory() for s in sources]
@@ -308,11 +313,11 @@ def process_block_source(sources, sinks, function, as_memory = False, as_array =
     sources_input = sources_input + [sources_input[0]] * (len(sinks) - len(sources))
 
   for sink, source, result in zip(sinks, sources_input, results):
-    #sink = sink.as_real();
+    # sink = sink.as_real()
     sink.valid[:] = result[source.valid.slicing]
 
   if verbose:
-    timer.print_elapsed_time('Processing block %s' % (sources_input[0].info(),))
+    timer.print_elapsed_time(f'Processing block {sources_input[0].info()}')
 
   gc.collect()
 
@@ -327,14 +332,15 @@ def process_block_block(sources, sinks, function, as_memory = False, return_resu
   ---------
   sources :  source specifications
     Sources passed to the function.
-  sinks : sourcespecifications
+  sinks : source specifications
     Sinks where data is written to.
   function  func : function
     The function to call.
   """
+  blk_info = sources[0].info()
   if verbose:
     timer = tmr.Timer()
-    print('Processing block %s' % (sources[0].info(),))
+    print(f'Processing block {blk_info}')
 
   if as_memory:
     sinks_memory = [s.as_memory_block() for s in sinks]
@@ -342,19 +348,17 @@ def process_block_block(sources, sinks, function, as_memory = False, return_resu
   else:
     sources_and_sinks = sources + sinks
   result = function(*sources_and_sinks, **kwargs)
+
   if as_memory:
     for sink, sink_memory in zip(sinks, sinks_memory):
       sink.valid[:] = sink_memory.valid[:]
 
   if verbose:
-    timer.print_elapsed_time('Processing block %s' % (sources[0].info(),))
+    timer.print_elapsed_time(f'Processing block {blk_info}')
 
   gc.collect()
 
-  if return_result:
-    return result
-  else:
-    return None
+  return result if return_result else None
 
 
 ###############################################################################
