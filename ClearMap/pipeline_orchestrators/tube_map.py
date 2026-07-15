@@ -666,7 +666,7 @@ class BinaryVesselProcessor(PipelineOrchestrator):
                                     processing_parameter=block_params,
                                     processes=sanitize_n_processes(-1), verbose=True)  # TODO: n_processes in config?
         else:
-            clearmap_io.link_file(source, sink)
+            clearmap_io.link_file(source, sink, overwrite=True)
 
     def plot_vessel_filling_results(self, parent=None, channel='', arrange=False):
         from ClearMap.Visualization.Qt import Plot3d as q_p3d

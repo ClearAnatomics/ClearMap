@@ -255,24 +255,30 @@ def copy_file(source, sink):
     return sink
 
 
-def link_file(source, sink):
-    """Create a symbolic link to a file.
+def link_file(source, sink, overwrite=False):
+    """Create a symbolic link.
 
-    Arguments
-    ---------
-    source : str
-        Filename of the file to link.
-    sink : str
-        File or directory name to create the link at.
+    Parameters
+    ----------
+    source : str | pathlib.Path
+        The file to link to.
+    sink : str | pathlib.Path
+        The link to create. If a directory, the link is created
+        inside it with the same name as source.
+    overwrite : bool
+        If True, remove existing file/symlink at sink before creating.
+        If False (default), raise FileExistsError if sink already exists.
 
     Returns
     -------
     sink : str
-        The name of the created link.
+        The link path.
     """
     if is_directory(sink):
         path, name = os.path.split(source)
         sink = os.path.join(sink, name)
+    if overwrite and os.path.lexists(sink):
+        os.remove(sink)
     os.symlink(source, sink)
     return sink
 
