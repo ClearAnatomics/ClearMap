@@ -23,7 +23,11 @@ __all__ = ['is_file', 'is_directory', 'file_extension', 'join', 'split',
            'abspath', 'create_directory', 'delete_directory',
            'copy_file', 'delete_file']
 
+import warnings
+
 from pathlib import Path
+
+from ClearMap.Utils.exceptions import ClearMapFileNotFoundError, ClearMapIoException
 
 # FIXME: not clean but cannot import IO to avoid circular import. Should be from Source attributes ?
 SOURCE_EXTENSIONS = ['npy', 'tif', 'tiff', 'nrrd', 'nrdh', 'csv', 'mhd', 'gt']
@@ -281,6 +285,85 @@ def link_file(source, sink, overwrite=False):
         os.remove(sink)
     os.symlink(source, sink)
     return sink
+
+
+def link_or_copy(source, sink, overwrite=False):
+    """Efficiently place *source* at *sink* without duplicating bytes when possible.
+
+    Strategy (in order of preference):
+
+    1. **Hardlink** — zero extra disk space, instant.  Works only on the
+       same filesystem and when the OS/filesystem supports it.
+    2. **Symlink** — via :func:`link_file`.  Cross-filesystem, works on
+       Linux/macOS out of the box.  On Windows requires Developer Mode
+       or elevated privileges.
+    3. **Full copy** — via :func:`copy_file`.  Last resort.  A warning is
+       emitted because this can be very expensive for large files.
+
+    Parameters
+    ----------
+    source : str | pathlib.Path
+        Path to the existing file.  Must exist.
+    sink : str | pathlib.Path
+        Desired destination path.  If *sink* is an existing directory the
+        file is placed inside it with the same basename as *source*.
+    overwrite : bool
+        If True, remove an existing file/symlink at *sink* before
+        creating the new link or copy.  If False (default), raise
+        ``FileExistsError`` when *sink* already exists.
+
+    Returns
+    -------
+    str
+        The final path of the created link or copy.
+
+    Raises
+    ------
+    FileNotFoundError
+        If *source* does not exist.
+    FileExistsError
+        If *sink* already exists and *overwrite* is False.
+
+    See Also
+    --------
+    link_file : Symlink creation.
+    copy_file : Full file copy.
+    """
+    source = Path(source).resolve()
+    sink = Path(sink)
+
+    if not source.exists():
+        raise ClearMapFileNotFoundError(f'Source does not exist: {source}')
+
+    if is_directory(str(sink)):
+        sink = sink / source.name
+
+    if sink.exists() or sink.is_symlink():
+        if overwrite:
+            os.remove(sink)
+        else:
+            raise ClearMapIoException(f'Destination already exists: {sink}')
+
+    sink.parent.mkdir(parents=True, exist_ok=True)
+
+    # 1) Hardlink — same filesystem, zero extra space
+    try:
+        os.link(source, sink)
+        return str(sink)
+    except OSError:
+        pass
+
+    # 2) Symlink — delegate to link_file
+    try:
+        return link_file(source, sink)
+    except OSError:
+        pass
+
+    # 3) Full copy — last resort
+    size_gb = source.stat().st_size / 1e9
+    warnings.warn(f'Falling back to full copy for {source.name} → {sink} ({size_gb:.1f} GB). '
+                  f'Consider placing data on the same filesystem to avoid duplication.', stacklevel=2)
+    return copy_file(source, sink)
 
 
 def atomic_replace(tmp: Path, dst: Path) -> None:

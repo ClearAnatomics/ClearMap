@@ -11,9 +11,10 @@ from ClearMap.Alignment.Stitching import stitching_wobbly as stitching_wobbly
 from ClearMap.Alignment.Stitching import stitching_rigid as stitching_rigid
 
 from ClearMap.IO import IO as clearmap_io
+from ClearMap.IO.FileUtils import link_or_copy
 from ClearMap.IO.metadata import define_auto_stitching_params, parse_ome_info
 
-from ClearMap.Utils.exceptions import MissingRequirementException
+from ClearMap.Utils.exceptions import MissingRequirementException, ClearMapRuntimeError
 from ClearMap.Utils.tag_expression import Expression
 from ClearMap.Utils.utilities import check_stopped, sanitize_n_processes
 
@@ -54,11 +55,14 @@ class StitchingProcessor(PipelineOrchestrator):
         if not self.cfg_coordinator.get_config_view('stitching'):
             # Config not yet loaded (e.g. processor created before boot_open).
             # workspace stays None; setup_complete stays False.
-            warnings.warn('Stitching config not set in config coordinator; StitchingProcessor setup incomplete.',
-                          stacklevel=2)
+            warnings.warn('Stitching config not set in config coordinator; '
+                          'StitchingProcessor setup incomplete.', stacklevel=2)
             return
-        if self.sample_manager.setup_complete:
+
+        if self.sample_manager.workspace is not None:
             self.workspace = self.sample_manager.workspace
+
+        if self.sample_manager.setup_complete:
             if convert_tiles:
                 self.convert_tiles()  # TODO: check if needed
             self.setup_complete = True
@@ -238,21 +242,38 @@ class StitchingProcessor(PipelineOrchestrator):
         list[str]
             Channel names that were prepared.
         """
+        if self.workspace is None:
+            warnings.warn('StitchingProcessor has no workspace; '
+                           'skipping raw-data preparation.')
+            return []
+
         prepared = []
         for ch in self.sample_manager.pipeline_ready_channels:
-            if self.sample_manager.is_tiled(ch):
-                if force or not self.sample_manager.has_npy(ch):
-                    self.convert_tiles_channel(ch)
-                    prepared.append(ch)
-            else:
-                if force or not self.sample_manager.get('stitched', channel=ch).exists:  # WARNING: self.workspace might not yet exist
-                    self.copy_or_stack(ch)
-                    prepared.append(ch)
+            try:
+                if self.sample_manager.is_tiled(ch):
+                    if force or not self.sample_manager.has_npy(ch):
+                        self.convert_tiles_channel(ch)
+                        prepared.append(ch)
+                else:
+                    stitched = self.sample_manager.get('stitched', channel=ch)
+                    if force or not stitched.exists:
+                        self.copy_or_stack(ch)
+                        prepared.append(ch)
+            except (KeyError, FileNotFoundError) as err:
+                # Channel is pipeline-ready (has a data_type) but has no raw
+                # asset in the workspace — e.g. path was left empty for
+                # pre-stitched data.  Skip without crashing.
+                warnings.warn(f'Skipping raw-data preparation for channel {ch!r}: {err}')
         return prepared
 
     def copy_or_stack(self, channel):
         """
-        Copy or stack or convert to npy the channel data in case there is no X/Y tiling
+        Import channel data into the workspace's stitched location when
+        there is no X/Y tiling
+
+        For single regular files (pre-stitched data), avoids a full copy
+        by using a hardlink (same filesystem, zero extra space) or
+        symlink (cross-filesystem) as fallback.
 
         Parameters
         ----------
@@ -260,10 +281,30 @@ class StitchingProcessor(PipelineOrchestrator):
             The channel to copy or stack
         """
         try:
-            clearmap_io.convert(self.get_path('raw', channel=channel),
-                                self.get_path('stitched', channel=channel))
-        except FileNotFoundError as err:
-            warnings.warn(f'Could not copy / stack {channel=}, files not found; {err}')
+            raw_asset = self.get('raw', channel=channel)
+            stitched_path = self.get_path('stitched', channel=channel)
+        except (KeyError, ClearMapRuntimeError) as err:
+            warnings.warn(f'Could not resolve raw/stitched paths for '
+                          f'{channel=}: {err}')
+            return
+
+        # Already at the canonical location — nothing to do
+        if raw_asset.path.resolve() == stitched_path.resolve():
+            return
+
+        if stitched_path.exists():
+            return  # idempotent
+
+        if raw_asset.is_regular_file and raw_asset.exists:
+            # Single file (pre-stitched) — link, don't copy
+            stitched_path.parent.mkdir(parents=True, exist_ok=True)
+            link_or_copy(raw_asset.path.resolve(), stitched_path)
+        else:
+            # Stacked planes or other convertible format
+            try:
+                clearmap_io.convert(str(raw_asset.path), str(stitched_path))
+            except FileNotFoundError as err:
+                warnings.warn(f'Could not copy/link/stack {channel=}, files not found; {err}')
 
     def stitch(self):
         if self.stopped:
