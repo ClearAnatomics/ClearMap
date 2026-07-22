@@ -119,8 +119,20 @@ class TypeSpec:
 
     def get_sub_type(self, sub_type_name, extensions=None, file_format_category=None, expression=None):
         sub_type = self.sub_types.get(sub_type_name)
-        if sub_type is None:
+
+        if isinstance(sub_type, dict):
+            # Explicit kwargs override the stored dict.
+            overrides = dict(sub_type)
+            if extensions is not None:
+                overrides['extensions'] = extensions
+            if file_format_category is not None:
+                overrides['file_format_category'] = file_format_category
+            if expression is not None:
+                overrides['expression'] = expression
+            sub_type = self.add_sub_type(sub_type_name, **overrides)
+        elif sub_type is None:
             sub_type = self.add_sub_type(sub_type_name, extensions, file_format_category, expression)
+
         return sub_type
 
     def add_sub_type(self, sub_type_name, extensions=None, file_format_category=None, expression=None):

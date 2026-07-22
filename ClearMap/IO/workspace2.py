@@ -126,10 +126,21 @@ def _build_asset_types(type_spec_dict: dict, resource_type_to_folder: dict) -> d
 
     subtypes = {}
     for name, spec in assets_types_config.items():
-        for st_name in spec.sub_types.keys():  # Create subtypes
+        for st_name in list(spec.sub_types.keys()):  # Create subtypes
             key = f'{name}_{st_name}'
             if key not in assets_types_config:
-                subtypes[key] = spec.get_sub_type(st_name)
+                st_value = spec.sub_types[st_name]
+                if isinstance(st_value, TypeSpec):
+                    subtypes[key] = st_value
+                elif isinstance(st_value, dict):
+                    # Sub-type carries its own format overrides
+                    # (e.g. cells.bkg is an image, not a table)
+                    subtypes[key] = spec.add_sub_type(st_name, **st_value)
+                elif st_value is None:
+                    # None → inherit parent format
+                    subtypes[key] = spec.get_sub_type(st_name)
+                else:
+                    raise ClearMapValueError(f'Type not supported for {key}, got {type(st_value)}')
     return {**assets_types_config, **subtypes}
 
 
