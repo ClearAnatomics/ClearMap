@@ -20,6 +20,7 @@ import copy
 import itertools as itt
 import functools as ft
 import inspect as insp
+import os
 
 import numpy as np
 import multiprocessing as mp
@@ -39,6 +40,7 @@ from ClearMap.Utils.Formatting import ensure
 
 from ClearMap.Alignment.Stitching.layout_graph_utils import (get_connected_components, connect_sources,
                                                              get_positions_from_tree)
+from ClearMap.Utils.exceptions import ClearMapIoException
 
 from ClearMap.Utils.utilities import CancelableProcessPoolExecutor
 
@@ -2057,6 +2059,10 @@ def _initialize_tiles_from_expression(expression, tile_axes = None, tile_shape =
 
     # construct tiling
     files = fl._file_list(expression)
+    for f in files:
+        if not os.path.exists(f):
+            raise ClearMapIoException(f'File {f!r} does not exist! '
+                                      f'Cannot proceed with TiledLayout initialization from expression {expression!r}.')
     tile_values = [expression.values(f) for f in files]
     tile_values = [tuple(tv[n] for n in tile_axes) for tv in tile_values]
 

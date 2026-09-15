@@ -103,7 +103,7 @@ import ClearMap.ImageProcessing.Experts.Cells as cell_detection
 # noinspection PyPep8Naming
 import ClearMap.Analysis.Measurements.Voxelization as voxelization
 
-from ClearMap.Utils.exceptions import MissingRequirementException
+from ClearMap.Utils.exceptions import MissingRequirementException, MissingAssetError
 from ClearMap.Utils.utilities import requires_assets, FilePath, sanitize_n_processes
 
 from ClearMap.config.config_coordinator import ConfigCoordinator
@@ -367,7 +367,10 @@ class CellDetector(ChannelPipelineOrchestrator):
                                     overlap=block_params['overlap'], verbose=True)
 
         # TODO: round to processors
-        n_steps = self.get_n_blocks(self.get('stitched', channel=self.channel).shape()[2])
+        stitched_asset = self.get('stitched', channel=self.channel)
+        if not stitched_asset.exists:
+            raise MissingAssetError(f'Stitched asset does not exist @ {stitched_asset.path}')
+        n_steps = self._get_n_blocks(stitched_asset.shape()[2])
         self.prepare_watcher_for_substep(n_steps, self.cell_detection_re, 'Detecting cells')
         try:
             dest_asset = self.get('cells', channel=self.channel, asset_sub_type='raw')
@@ -603,7 +606,7 @@ class CellDetector(ChannelPipelineOrchestrator):
         density_path = self.get_path('density', channel=self.channel, asset_sub_type='intensities')
         return plot_3d.plot(density_path, arrange=arrange)
 
-    def get_n_blocks(self, dim_size):
+    def _get_n_blocks(self, dim_size):
         raw_cfg = self.cfg_coordinator.get_config_view(self.config_name)
         perf_params = raw_cfg['performance']['channels'][self.channel]['detection']['block_processing']
         blk_size = perf_params['size_max']
