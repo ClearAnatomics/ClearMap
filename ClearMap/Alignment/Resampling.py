@@ -1060,7 +1060,7 @@ def _axes_order(axes_order, original_shape, resampled_shape, order=None, source=
     # determine axes order automatically
     if axes_order is None:
         axes_order = 'order'
-    if axes_order == 'order' and order is None and not isinstance(source, fl.Source):
+    if axes_order == 'order' and order is None and not isinstance(source, fl.FileListSource):
         axes_order = 'size'
 
     # only select axes that need resampling
@@ -1072,7 +1072,7 @@ def _axes_order(axes_order, original_shape, resampled_shape, order=None, source=
         return _order_axes(original_shape, resampled_shape, resample_axes, resample_factors, None, minimize_size)
     elif axes_order == 'order':  # order axes according to file or array order for faster io
         # determine order according to file structure (i.e. resample individual files first)
-        if isinstance(source, fl.Source):
+        if isinstance(source, fl.FileListSource):
             axes_list = source.axes_list  # axes for individual files
             shift = -(np.max(resample_factors) + 1)  # make file factors the smallest
             if not minimize_size:
@@ -1285,7 +1285,7 @@ def _test():
 #     else:  # determine automatically
 #         if axes_order is None:
 #             axes_order = 'order'
-#         if axes_order == 'order' and order is None and not isinstance(source, fl.Source):
+#         if axes_order == 'order' and order is None and not isinstance(source, FileListSource):
 #             axes_order = 'size'
 #
 #         if axes_order == 'size':  # order to reduce size as much as possible in each sub-resampling step
@@ -1332,7 +1332,7 @@ def _test():
 #
 #         elif axes_order == 'order':  # order axes according to array order for faster io
 #
-#             if isinstance(source, fl.Source):
+#             if isinstance(source, FileListSource):
 #                 # FileList determine order according to file structure
 #                 axes_list = source.axes_list
 #                 # axes_file = source.axes_file;

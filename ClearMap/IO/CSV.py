@@ -18,193 +18,195 @@ __download__  = 'https://www.github.com/ChristophKirst/ClearMap2'
 
 import numpy as np
 
-import ClearMap.IO.Source as src
+import ClearMap.IO.Source as source_mod
+# noinspection PyUnusedImports
+from ClearMap.IO.Source import create, open_ro
 import ClearMap.IO.Slice as slc
 
 ###############################################################################
-### Source class
+### CSVSource class
 ###############################################################################
 
-class Source(src.Source):
-  """CSV array source."""
+class CSVSource(source_mod.Source):
+    """CSV array source."""
 
-  def __init__(self, location, mode=None):
-    """CSV source class constructor.
-    
-    Arguments
-    ---------
-    location : str
-      The filename of the csv source.
-    """
-    super().__init__(location, mode)
+    def __init__(self, location, mode=None):
+        """CSV source class constructor.
 
-  @property
-  def location(self):
-    return self._location
+        Arguments
+        ---------
+        location : str
+            The filename of the csv source.
+        """
+        super().__init__(location, mode)
 
-  @location.setter
-  def location(self, value):
-    if value != self.location:
-      self._location = value
+    @property
+    def location(self):
+        return self._location
 
-  @property
-  def array(self):
-    """The underlying data array.
-    
-    Returns
-    -------
-    array : array
-      The underlying data array of this source.
-    """
-    return _array(self.location)
+    @location.setter
+    def location(self, value):
+        if value != self.location:
+            self._location = value
 
-  @array.setter
-  def array(self, value):
-    _write(self.location, value)
+    @property
+    def array(self):
+        """The underlying data array.
 
-  @property
-  def shape(self):
-    """The shape of the source.
-    
-    Returns
-    -------
-    shape : tuple
-      The shape of the source.
-    """
-    return self.array.shape
+        Returns
+        -------
+        array : array
+            The underlying data array of this source.
+        """
+        return _array(self.location)
 
-  @shape.setter
-  def shape(self, value):
-    raise NotImplementedError('Cannot set shape of csv file')
+    @array.setter
+    def array(self, value):
+        _write(self.location, value)
 
-  @property 
-  def dtype(self):
-    """The data type of the source.
-    
-    Returns
-    -------
-    dtype : dtype
-      The data type of the source.
-    """
-    return self.array.dtype
+    @property
+    def shape(self):
+        """The shape of the source.
 
-  @dtype.setter
-  def dtype(self, value):
-    raise NotImplementedError('Cannot set dtype of csv file')
+        Returns
+        -------
+        shape : tuple
+            The shape of the source.
+        """
+        return self.array.shape
 
-  @property 
-  def order(self):
-    """The order of how the data is stored in the source.
-    
-    Returns
-    -------
-    order : str
-      Returns 'C' for C contigous and 'F' for fortran contigous, None otherwise.
-    """
-    return self.array.order
+    @shape.setter
+    def shape(self, value):
+        raise NotImplementedError('Cannot set shape of csv file')
 
-  @order.setter
-  def order(self, value):
-    raise NotImplementedError('Cannot set order of csv file')
+    @property
+    def dtype(self):
+        """The data type of the source.
 
-  @property
-  def element_strides(self):
-    """The strides of the array elements.
-    
-    Returns
-    -------
-    strides : tuple
-      Strides of the array elements.
-      
-    Note
-    ----
-    The strides of the elements module itemsize instead of bytes.
-    """
-    array = self.array
-    return tuple(s // array.itemsize for s in array.strides)
-  
-  @property
-  def offset(self):
-    """The offset of the memory map in the file.
-    
-    Returns
-    -------
-    offset : int
-      Offset of the memeory map in the file.
-    """
-    return 0
+        Returns
+        -------
+        dtype : dtype
+            The data type of the source.
+        """
+        return self.array.dtype
 
-  ### Data
-  def __getitem__(self, *args):
-    array = _array(self.location)
-    return array.__getitem__(*args)
+    @dtype.setter
+    def dtype(self, value):
+        raise NotImplementedError('Cannot set dtype of csv file')
 
-  def __setitem__(self, *args):
-    array = _array(self.location)
-    array.__setitem__(*args)
-    _write(self.location, array)
+    @property
+    def order(self):
+        """The order of how the data is stored in the source.
 
-  def as_memmap(self):
-     raise NotImplementedError('Memmap creation not implemented yet!')
-  
-  def as_virtual(self):
-     return VirtualSource(source=self)
+        Returns
+        -------
+        order : str
+            Returns 'C' for C contigous and 'F' for fortran contigous, None otherwise.
+        """
+        return self.array.order
 
-  def as_buffer(self):
-    return self.array
+    @order.setter
+    def order(self, value):
+        raise NotImplementedError('Cannot set order of csv file')
 
-  ### Formatting
-  def __str__(self):
-    try:
-      name = self.name
-      name = '%s' % name if name is not None else ''
-    except:
-      name =''
+    @property
+    def element_strides(self):
+        """The strides of the array elements.
 
-    try:
-      array = self.array
-    except:
-      array = None
+        Returns
+        -------
+        strides : tuple
+            Strides of the array elements.
 
-    try:
-      shape = array.shape
-      shape ='%r' % ((shape,)) if shape is not None else ''
-    except:
-      shape = ''
+        Note
+        ----
+        The strides of the elements module itemsize instead of bytes.
+        """
+        array = self.array
+        return tuple(s // array.itemsize for s in array.strides)
 
-    try:
-      dtype = array.dtype
-      dtype = '[%s]' % dtype if dtype is not None else ''
-    except:
-      dtype = ''
+    @property
+    def offset(self):
+        """The offset of the memory map in the file.
 
-    try:
-      order = array.order
-      order = '|%s|' % order if order is not None else ''
-    except:
-      order = ''
+        Returns
+        -------
+        offset : int
+            Offset of the memeory map in the file.
+        """
+        return 0
 
-    try:
-      location = self.location
-      location = '%s' % location if location is not None else ''
-      if len(location) > 100:
-        location = location[:50] + '...' + location[-50:]
-      if len(location) > 0:
-        location = '{%s}' % location
-    except:
-      location = ''
+    ### Data
+    def __getitem__(self, *args):
+        array = _array(self.location)
+        return array.__getitem__(*args)
 
-    return name + shape + dtype + order + location
+    def __setitem__(self, *args):
+        array = _array(self.location)
+        array.__setitem__(*args)
+        _write(self.location, array)
+
+    def as_memmap(self):
+         raise NotImplementedError('Memmap creation not implemented yet!')
+
+    def as_virtual(self):
+        return CSVVirtualSource(source=self)
+
+    def as_buffer(self):
+        return self.array
+
+    ### Formatting
+    def __str__(self):
+        try:
+            name = self.name
+            name = '%s' % name if name is not None else ''
+        except:
+            name =''
+
+        try:
+            array = self.array
+        except:
+            array = None
+
+        try:
+            shape = array.shape
+            shape ='%r' % ((shape,)) if shape is not None else ''
+        except:
+            shape = ''
+
+        try:
+            dtype = array.dtype
+            dtype = '[%s]' % dtype if dtype is not None else ''
+        except:
+            dtype = ''
+
+        try:
+            order = array.order
+            order = '|%s|' % order if order is not None else ''
+        except:
+            order = ''
+
+        try:
+            location = self.location
+            location = '%s' % location if location is not None else ''
+            if len(location) > 100:
+                location = location[:50] + '...' + location[-50:]
+            if len(location) > 0:
+                location = '{%s}' % location
+        except:
+            location = ''
+
+        return name + shape + dtype + order + location
 
 
-class VirtualSource(src.VirtualSource):
-  _real_class = Source
+class CSVVirtualSource(source_mod.VirtualSource):
+    _real_class = CSVSource
 
-  def __init__(self, source=None, shape=None, dtype=None, order=None,
-               location=None, name=None, mode=None):
-    super().__init__(source=source, shape=shape, dtype=dtype, order=order, location=location, name=name, mode=mode)
-    if isinstance(source, Source):
-      self.location = source.location
+    def __init__(self, source=None, shape=None, dtype=None, order=None,
+                 location=None, name=None, mode=None):
+        super().__init__(source=source, shape=shape, dtype=dtype, order=order, location=location, name=name, mode=mode)
+        if isinstance(source, CSVSource):
+            self.location = source.location
 
 
 ###############################################################################
@@ -212,76 +214,72 @@ class VirtualSource(src.VirtualSource):
 ###############################################################################
 
 def is_csv(source):
-  """Checks if this source is a CSV source"""
-  if isinstance(source, Source):
-    return True
-  if isinstance(source, str) and len(source) >= 3 and source[-3:] == 'csv':
-    return True
-  return False
+    """Checks if this source is a CSV source"""
+    if isinstance(source, CSVSource):
+        return True
+    if isinstance(source, str) and len(source) >= 3 and source[-3:] == 'csv':
+        return True
+    return False
 
 
 def read(source, slicing = None, as_source = None, **kwargs):
-  """Read data from a csv file.
-  
-  Arguments
-  ---------
-  source : str
-    The name of the CSV file.
-  slicing : slice, Slice or None
-    An optional sub-slice to consider.
-  as_source : bool
-    If True, return results as a source.
-  
-  Returns
-  -------
-  array : array
-    The data in the csv file as a buffer or source.
-  """ 
-  if not isinstance(source, Source):
-    source = Source(source)
-  if slicing is None:
-    if as_source:
-      return source
+    """Read data from a csv file.
+
+    Arguments
+    ---------
+    source : str
+        The name of the CSV file.
+    slicing : slice, Slice or None
+        An optional sub-slice to consider.
+    as_source : bool
+        If True, return results as a source.
+
+    Returns
+    -------
+    array : array
+        The data in the csv file as a buffer or source.
+    """
+    if not isinstance(source, CSVSource):
+        source = CSVSource(source)
+    if slicing is None:
+        if as_source:
+            return source
+        else:
+            return source.array
     else:
-      return source.array
-  else:
-    if as_source:
-      return slc.Slice(source, slicing=slicing)
-    else:
-      return source.__getitem__(slicing)
+        if as_source:
+            return slc.Slice(source, slicing=slicing)
+        else:
+            return source.__getitem__(slicing)
 
 
 def write(sink, data, slicing = None, **kwargs):
-  """Write data to a csv file.
-  
-  Arguments
-  ---------
-  sink : str
-    The name of the CSV file.
-  data : array 
-    The data to write into the CSV file.
-  slicing : slice, Slice or None
-    An optional sub-slice to consider.
-  
-  Returns
-  -------
-  sink : array or source
-    The sink csv file.
-  """ 
-  if not isinstance(sink, Source):
-    sink = Source(sink)
+    """Write data to a csv file.
 
-  if slicing is not None:
-    array = sink.array
-    array[slicing]= data
-  else:
-    array = data
+    Arguments
+    ---------
+    sink : str
+        The name of the CSV file.
+    data : array
+        The data to write into the CSV file.
+    slicing : slice, Slice or None
+        An optional sub-slice to consider.
 
-  return _write(sink, array)
+    Returns
+    -------
+    sink : array or source
+        The sink csv file.
+    """
+    if not isinstance(sink, CSVSource):
+        sink = CSVSource(sink)
 
+    if slicing is not None:
+        array = sink.array
+        array[slicing]= data
+    else:
+        array = data
 
-def create(location = None, shape = None, dtype = None, order = None, mode = None, array = None, as_source = True, **kwargs):
-  raise NotImplementedError('Creating CSV files not implemented yet!') 
+    return _write(sink, array)
 
 
 ###############################################################################
@@ -289,29 +287,27 @@ def create(location = None, shape = None, dtype = None, order = None, mode = Non
 ###############################################################################
 
 def _write(filename, points, **args):
-    """Write point data to csv file
-
-    """
-    np.savetxt(filename, points, delimiter=',', newline='\n', fmt='%.5e')
-    return filename
+      """Write point data to csv file"""
+      np.savetxt(filename, points, delimiter=',', newline='\n', fmt='%.5e')
+      return filename
 
 
-def _array(location, delimeter = ',', **args):
+def _array(location, delimiter =',', **args):
     """Read data from csv file.
     
     Arguments
     ---------
     location : str
-      Location of the csv array data.
-    delimteter : char
-      The delimater between subsequent array entries.
+        Location of the csv array data.
+    delimiter : char
+        The delimiter between subsequent array entries.
     
     Returns
     -------
     array : array
-      The data as a numpy array.
+        The data as a numpy array.
     """
-    points = np.loadtxt(location, delimiter=delimeter)
+    points = np.loadtxt(location, delimiter=delimiter)
     return points
 
 
@@ -323,15 +319,14 @@ def test():
     """Test CSV module"""
     import os
     import numpy as np
-    import ClearMap.IO.CSV as csv
+    from ClearMap.IO.CSV import CSVSource
     
     location = 'test.csv'
     points = np.random.rand(5,3)
 
-    s = csv.Source(location)
+    s = CSVSource(location)
     print(s)    
     s.array = points
     print(s)    
     
     os.remove(location)
-    

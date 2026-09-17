@@ -7,15 +7,15 @@ IO interface to NRRD volumetric image data files.
 
 Note
 ----
-  The interface is based on nrrd.py for reading and writing nrrd files.
-  See 'this link <http://teem.sourceforge.net/nrrd/format.html>`_ for 
-  specifications.
+    The interface is based on nrrd.py for reading and writing nrrd files.
+    See 'this link <https://teem.sourceforge.net/nrrd/format.html>`_ for
+    specifications.
 """
 __author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
 __license__   = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
-__webpage__   = 'http://idisco.info'
-__download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
+__webpage__   = 'https://idisco.info'
+__download__  = 'https://www.github.com/ChristophKirst/ClearMap2'
 
 import os
 import gzip
@@ -24,221 +24,222 @@ import datetime
 
 import numpy as np
 
-import ClearMap.IO.Source as src
+import ClearMap.IO.Source as source_mod
+# noinspection PyUnusedImports
+from ClearMap.IO.Source import create
 from ClearMap.Utils.exceptions import NrrdError, ClearMapPermissionError
 
 
 ###############################################################################
-### Source class
+### NrrdSource class
 ###############################################################################
 
-class Source(src.Source):
-  """Nrrd array source."""
+class NrrdSource(source_mod.Source):
+    """Nrrd array source."""
   
-  def __init__(self, location, mode=None):
-    """Nrrd source class constructor.
-    
-    Arguments
-    ---------
-    location : str
-      The file nameof the nrrd source.
-    """
-    super().__init__(mode=mode)
-    self._location = location
+    def __init__(self, location, mode=None):
+        """Nrrd source class constructor.
 
-  @property
-  def location(self):
-    return self._location
+        Arguments
+        ---------
+        location : str
+            The file nameof the nrrd source.
+        """
+        super().__init__(mode=mode)
+        self._location = location
 
-  @location.setter
-  def location(self, value):
-    if value != self.location:
-      self._location = value
+    @property
+    def location(self):
+        return self._location
 
-  @property
-  def array(self):
-    """The underlying data array.
-    
-    Returns
-    -------
-    array : array
-      The underlying data array of this source.
-    """
-    return _array(self.location)
+    @location.setter
+    def location(self, value):
+        if value != self.location:
+            self._location = value
 
-  @array.setter
-  def array(self, value):
-    _write_data(self.location, value)
+    @property
+    def array(self):
+        """The underlying data array.
 
-  @property
-  def shape(self):
-    """The shape of the source.
-    
-    Returns
-    -------
-    shape : tuple
-      The shape of the source.
-    """
-    return _shape(self.location)
+        Returns
+        -------
+        array : array
+              The underlying data array of this source.
+        """
+        return _array(self.location)
 
-  @shape.setter
-  def shape(self, value):
-    #TODO: fix
-    raise NotImplementedError('Cannot set shape of nrrd file')
+    @array.setter
+    def array(self, value):
+        _write_data(self.location, value)
 
-  @property 
-  def dtype(self):
-    """The data type of the source.
-    
-    Returns
-    -------
-    dtype : dtype
-      The data type of the source.
-    """
-    return _dtype(self.location)
+    @property
+    def shape(self):
+        """The shape of the source.
 
-  @dtype.setter
-  def dtype(self, value):
-    #TODO: fix
-    raise NotImplementedError('Cannot set dtype of nrrd file')
+        Returns
+        -------
+        shape : tuple
+            The shape of the source.
+        """
+        return _shape(self.location)
 
-  @property 
-  def order(self):
-    """The order of how the data is stored in the source.
-    
-    Returns
-    -------
-    order : str
-      Returns 'C' for C contigous and 'F' for fortran contigous, None otherwise.
-    """
-    return _order(self.location)
+    @shape.setter
+    def shape(self, value):
+        #TODO: fix
+        raise NotImplementedError('Cannot set shape of nrrd file')
 
-  @order.setter
-  def order(self, value):
-    #TODO: fix
-    raise NotImplementedError('Cannot set order of nrrd file')
+    @property
+    def dtype(self):
+        """The data type of the source.
 
-  @property
-  def element_strides(self):
-    """The strides of the array elements.
-    
-    Returns
-    -------
-    strides : tuple
-      Strides of the array elements.
-      
-    Note
-    ----
-    The strides of the elements module itemsize instead of bytes.
-    """
-    memmap = _memmap(self.location)
-    return  tuple(s // memmap.itemsize for s in memmap.strides)
-  
-  
-  @property
-  def offset(self):
-    """The offset of the memory map in the file.
-    
-    Returns
-    -------
-    offset : int
-      Offset of the memeory map in the file.
-    """
-    return _offset(self.location)
+        Returns
+        -------
+        dtype : dtype
+            The data type of the source.
+        """
+        return _dtype(self.location)
 
-  ### Data
-  def __getitem__(self, *args):
-    memmap = _memmap(self.location)
-    return memmap.__getitem__(*args)
+    @dtype.setter
+    def dtype(self, value):
+        #TODO: fix
+        raise NotImplementedError('Cannot set dtype of nrrd file')
 
-  def __setitem__(self, *args):
-    if not self.is_writable:
-        raise ClearMapPermissionError(f'Source {self} was opened read-only (mode="r"). '
-                                      f'Use io.edit() to open for writing.')
-    memmap = _memmap(self.location)
-    memmap.__setitem__(*args)
+    @property
+    def order(self):
+        """The order of how the data is stored in the source.
 
-  def metadata(self, info = None):
-    """Returns metadata from this nrrd file.
-  
-    Arguments
-    ---------
-    info : list or all
-      Optional list of keywords, if all return full tif metadata, if None return default set info.
-    
-    Returns
-    -------
-    metadata : dict
-      Dictionary with the meta data.
-    """
-    return _read_header(self.location)
+        Returns
+        -------
+        order : str
+            Returns 'C' for C contigous and 'F' for fortran contigous, None otherwise.
+        """
+        return _order(self.location)
 
-  def as_memmap(self):
-     return _memmap(self.location)
+    @order.setter
+    def order(self, value):
+        #TODO: fix
+        raise NotImplementedError('Cannot set order of nrrd file')
 
-  def as_virtual(self):
-     return VirtualSource(source = self)
+    @property
+    def element_strides(self):
+        """The strides of the array elements.
 
-  def as_real(self):
-    return self
+        Returns
+        -------
+        strides : tuple
+            Strides of the array elements.
 
-  def as_buffer(self):
-    return self.as_memmap()
+        Note
+        ----
+        The strides of the elements module itemsize instead of bytes.
+        """
+        memmap = _memmap(self.location)
+        return  tuple(s // memmap.itemsize for s in memmap.strides)
 
-  ### Formatting
-  def __str__(self):
-    try:
-      name = self.name
-      name = '%s' % name if name is not None else ''
-    except:
-      name =''
+    @property
+    def offset(self):
+        """The offset of the memory map in the file.
 
-    try:
-      shape = self.shape
-      shape ='%r' % ((shape,)) if shape is not None else ''
-    except:
-      shape = ''
+        Returns
+        -------
+        offset : int
+            Offset of the memeory map in the file.
+        """
+        return _offset(self.location)
 
-    try:
-      dtype = self.dtype
-      dtype = '[%s]' % dtype if dtype is not None else ''
-    except:
-      dtype = ''
+    ### Data
+    def __getitem__(self, *args):
+        memmap = _memmap(self.location)
+        return memmap.__getitem__(*args)
 
-    try:
-      order = self.order
-      order = '|%s|' % order if order is not None else ''
-    except:
-      order = ''
+    def __setitem__(self, *args):
+        if not self.is_writable:
+            raise ClearMapPermissionError(f'NrrdSource {self} was opened read-only (mode="r"). '
+                                          f'Use io.edit() to open for writing.')
+        memmap = _memmap(self.location)
+        memmap.__setitem__(*args)
 
-    #    try:
-#      memory = self.memory;
-#      memory = '<%s>' % memory if memory is not None else '';
-#    except:
-#      memory = '';  
-    
-    try:
-      location = self.location
-      location = '%s' % location if location is not None else ''
-      if len(location) > 100:
-        location = location[:50] + '...' + location[-50:]
-      if len(location) > 0:
-        location = '{%s}' % location
-    except:
-      location = ''
+    def metadata(self, info = None):
+        """Returns metadata from this nrrd file.
 
-    return name + shape + dtype + order + location
+        Arguments
+        ---------
+        info : list or all
+            Optional list of keywords, if all return full tif metadata, if None return default set info.
+
+        Returns
+        -------
+        metadata : dict
+            Dictionary with the meta data.
+        """
+        return _read_header(self.location)
+
+    def as_memmap(self):
+        return _memmap(self.location)
+
+    def as_virtual(self):
+        return NrrdVirtualSource(source = self)
+
+    def as_real(self):
+        return self
+
+    def as_buffer(self):
+        return self.as_memmap()
+
+    ### Formatting
+    def __str__(self):
+        try:
+            name = self.name
+            name = '%s' % name if name is not None else ''
+        except:
+            name =''
+
+        try:
+            shape = self.shape
+            shape ='%r' % ((shape,)) if shape is not None else ''
+        except:
+            shape = ''
+
+        try:
+            dtype = self.dtype
+            dtype = '[%s]' % dtype if dtype is not None else ''
+        except:
+            dtype = ''
+
+        try:
+            order = self.order
+            order = '|%s|' % order if order is not None else ''
+        except:
+            order = ''
+
+        #    try:
+        #        memory = self.memory
+        #        memory = '<%s>' % memory if memory is not None else ''
+        #    except:
+        #        memory = ''
+
+        try:
+            location = self.location
+            location = '%s' % location if location is not None else ''
+            if len(location) > 100:
+                location = location[:50] + '...' + location[-50:]
+            if len(location) > 0:
+                location = '{%s}' % location
+        except:
+            location = ''
+
+        return name + shape + dtype + order + location
 
 
-class VirtualSource(src.VirtualSource):
-  _real_class = Source
+class NrrdVirtualSource(source_mod.VirtualSource):
+    _real_class = NrrdSource
 
-  def __init__(self, source=None, shape=None, dtype=None,
-               order=None, location=None, name=None, mode=None):
-    super().__init__(source=source, shape=shape, dtype=dtype, order=order,
-                     location=location, name=name, mode=mode)
-    if isinstance(source, Source):
-      self.location = source.location
+    def __init__(self, source=None, shape=None, dtype=None,
+                 order=None, location=None, name=None, mode=None):
+      super().__init__(source=source, shape=shape, dtype=dtype, order=order,
+                       location=location, name=name, mode=mode)
+      if isinstance(source, NrrdSource):
+          self.location = source.location
 
 
 ###############################################################################
@@ -246,72 +247,67 @@ class VirtualSource(src.VirtualSource):
 ###############################################################################
 
 def is_nrrd(source):
-  """Checks if this source is a NRRD source"""
-  if isinstance(source, Source):
-    return True
-  if isinstance(source, str) and len(source) >= 4 and source[-4:] == 'nrrd':
-    try:
-      Source(source)
-    except:
-      return False
-    return True
-  return False
+    """Checks if this source is a NRRD source"""
+    if isinstance(source, NrrdSource):
+        return True
+    if isinstance(source, str) and len(source) >= 4 and source[-4:] == 'nrrd':
+        try:
+            NrrdSource(source)
+        except:
+            return False
+        return True
+    return False
 
 
-def read(source, slicing = None, **kwargs):
-  """Read data from a nrrd file.
+def read(source, slicing=None, **kwargs):
+    """Read data from a nrrd file.
   
-  Arguments
-  ---------
-  source : str
-    The name of the nrrd file.
-  slicing : slice, Slice or None
-    An optional sub-slice to consider.
+    Arguments
+    ---------
+    source : str
+        The name of the nrrd file.
+    slicing : slice, Slice or None
+        An optional sub-slice to consider.
   
-  Returns
-  -------
-  array : array
-    The image data in the tif file as a buffer.
-  """ 
-  if not isinstance(source, Source):
-    source = Source(source)
-  if slicing is None:
-    return source.array
-  else:
-    return source.__getitem__(slicing)
+    Returns
+    -------
+    array : array
+        The image data in the tif file as a buffer.
+    """
+    if not isinstance(source, NrrdSource):
+        source = NrrdSource(source)
+    if slicing is None:
+        return source.array
+    else:
+        return source.__getitem__(slicing)
 
 
-def write(sink, data, slicing = None, **kwargs):
-  if isinstance(sink, Source):
-    sink = sink.location
-  if not isinstance(sink, str):
-    raise ValueError('Invalid sink specification %r' % sink)
+def write(sink, data, slicing=None, **kwargs):
+    if isinstance(sink, NrrdSource):
+        sink = sink.location
+    if not isinstance(sink, str):
+        raise ValueError(f'Invalid sink specification {sink!r}')
 
-  if slicing is not None:
-    memmap = _memmap(sink, mode='r+')
-    memmap[slicing]= data
-    return sink
-  else:
-    return _write(sink, data)
-
-
-def create(location = None, shape = None, dtype = None, order = None, mode = None, array = None, as_source = True, **kwargs):
-  raise NotImplementedError('Creating NRRD files not implemented yet!')  
-  
+    if slicing is not None:
+        memmap = _memmap(sink, mode='r+')
+        memmap[slicing]= data
+        return sink
+    else:
+        return _write(sink, data)
 
 
 ###############################################################################
 ### Reading
 ###############################################################################
 
-def _convert_to_reproducible_floatingpoint( x ):
-  #This will help prevent loss of precision
-  #IEEE754-1985 standard says that 17 decimal digits is enough in all cases.
-  if type(x) == float:
-      value = '{:.16f}'.format(x).rstrip('0').rstrip('.') # Remove trailing zeros, and dot if at end
-  else:
-      value = str(x)
-  return value
+def _convert_to_reproducible_floatingpoint(x):
+    # This will help prevent loss of precision
+    # IEEE754-1985 standard says that 17 decimal digits is enough in all cases.
+    if type(x) == float:
+        value = '{:.16f}'.format(x).rstrip('0').rstrip('.') # Remove trailing zeros, and dot if at end
+    else:
+        value = str(x)
+    return value
 
 _TYPEMAP_NRRD2NUMPY = {
     'signed char': 'i1',
@@ -493,7 +489,7 @@ def _validate_magic_line(line):
         if int(line[4:]) > 5:
             raise NrrdError('NRRD file version too new for this library.')
     except:
-        raise NrrdError('Invalid NRRD magic line: %s' % (line,))
+        raise NrrdError(f'Invalid NRRD magic line: {line}')
     return len(line)
 
 
@@ -513,17 +509,17 @@ def _read_header(filename):
     """
     
     if isinstance(filename, str):
-        nrrdfile = open(filename,'rb')
+        nrrd_file = open(filename,'rb')
     else:
-        nrrdfile = filename
+        nrrd_file = filename
 
     # Collect number of bytes in the file header (for seeking below)
-    headerSize = 0
-    it = iter(nrrdfile)
-    headerSize += _validate_magic_line(next(it).decode('ascii'))
+    header_size = 0
+    it = iter(nrrd_file)
+    header_size += _validate_magic_line(next(it).decode('ascii'))
     header = { 'keyvaluepairs': {} }
     for raw_line in it:
-        headerSize += len(raw_line)
+        header_size += len(raw_line)
         raw_line = raw_line.decode('ascii')
 
         # Trailing whitespace ignored per the NRRD spec
@@ -548,92 +544,92 @@ def _read_header(filename):
         field_desc = line.split(': ', 1)
         if len(field_desc) == 2:
             field, desc = field_desc
-            ## preceeding and suffixing white space should be ignored.
+            ## preceding and suffixing white space should be ignored.
             field = field.rstrip().lstrip()
             desc = desc.rstrip().lstrip()
             if field not in _NRRD_FIELD_PARSERS:
-                raise NrrdError('Unexpected field in nrrd header: "%s".' % field)
+                raise NrrdError(f'Unexpected field in nrrd header: "{field}".')
             if field in header.keys():
-                raise NrrdError('Duplicate header field: "%s"' % field)
+                raise NrrdError(f'Duplicate header field: "{field}"')
             header[field] = _NRRD_FIELD_PARSERS[field](desc)
             continue
 
         # Should not reach here
-        raise NrrdError('Invalid header line: "%s"' % line)
+        raise NrrdError(f'Invalid header line: "{line}"')
 
     # Check whether the required fields are there
     for field in _NRRD_REQUIRED_FIELDS:
         if field not in header:
-            raise NrrdError('Nrrd header misses required field: "%s".' % (field))
+            raise NrrdError(f'Nrrd header misses required field: "{field}".')
 
     # line reading was buffered; correct file pointer to just behind header:
-    nrrdfile.seek(headerSize)
+    nrrd_file.seek(header_size)
 
     return header
 
 
 def _array(filename):
-  """Read the actual data into a numpy array."""
+    """Read the actual data into a numpy array."""
     
-  with open(filename,'rb') as filehandle:
-    fields = _read_header(filehandle)
-    
-    dtype = _dtype_from_header(fields)
-    shape = fields['sizes']
-    order = 'F'
+    with open(filename,'rb') as f_handle:
+        fields = _read_header(f_handle)
 
-    #offset
-    numPixels=np.prod(shape)
-    datafilehandle = filehandle
-    datafile = fields.get("datafile", fields.get("data file", None))
-    if datafile is not None:
-        if os.path.isabs(datafile):
-            datafilename = datafile
-        else:
-            datafilename = os.path.join(os.path.dirname(filename), datafile)
-        datafilehandle = open(datafilename,'rb')
-    
-    if fields['encoding'] == 'raw':
-        byteskip = fields.get('byteskip', fields.get('byte skip', 0))
-        if byteskip == -1: # This is valid only with raw encoding
-          totalbytes = dtype.itemsize * numPixels
-          datafilehandle.seek(-totalbytes, 2)
-        else:
-          lineskip = fields.get('lineskip', fields.get('line skip', 0))
-          for _ in range(lineskip):
-            datafilehandle.readline()
-          datafilehandle.read(byteskip)
-        data = np.fromfile(datafilehandle, dtype)
-    
-    elif fields['encoding'] == 'gzip' or\
-         fields['encoding'] == 'gz':
-        gzipfile = gzip.GzipFile(fileobj=datafilehandle)
-        # Again, unfortunately, np.fromfile does not support
-        # reading from a gzip stream, so we'll do it like this.
-        data = np.fromstring(gzipfile.read(), dtype)
-    
-    elif fields['encoding'] == 'bzip2' or\
-         fields['encoding'] == 'bz2':
-        bz2file = bz2.BZ2File(fileobj=datafilehandle)
-        # Again, unfortunately, np.fromfile does not support
-        # reading from a gzip stream, so we'll do it like this.
-        data = np.fromstring(bz2file.read(), dtype)
-    
-    else:
-        raise NrrdError('Unsupported encoding: "%s"' % fields['encoding'])
+        dtype = _dtype_from_header(fields)
+        shape = fields['sizes']
+        order = 'F'
 
-    if numPixels != data.size:
-       raise NrrdError(f'ERROR: {numPixels}-{data.size}={numPixels - data.size}')
-    
-    data = np.reshape(data, shape, order=order)
-    return data
+        # offset
+        n_pixels=np.prod(shape)
+        data_file_handle = f_handle
+        datafile = fields.get("datafile", fields.get("data file", None))
+        if datafile is not None:
+            if os.path.isabs(datafile):
+                datafilename = datafile
+            else:
+                datafilename = os.path.join(os.path.dirname(filename), datafile)
+            data_file_handle = open(datafilename,'rb')
+
+        if fields['encoding'] == 'raw':
+            byte_skip = fields.get('byteskip', fields.get('byte skip', 0))
+            if byte_skip == -1: # This is valid only with raw encoding
+              totalbytes = dtype.itemsize * n_pixels
+              data_file_handle.seek(-totalbytes, 2)
+            else:
+              lineskip = fields.get('lineskip', fields.get('line skip', 0))
+              for _ in range(lineskip):
+                data_file_handle.readline()
+              data_file_handle.read(byte_skip)
+            data = np.fromfile(data_file_handle, dtype)
+
+        elif fields['encoding'] == 'gzip' or\
+             fields['encoding'] == 'gz':
+            gzipfile = gzip.GzipFile(fileobj=data_file_handle)
+            # Again, unfortunately, np.fromfile does not support
+            # reading from a gzip stream, so we'll do it like this.
+            data = np.fromstring(gzipfile.read(), dtype)
+
+        elif fields['encoding'] == 'bzip2' or\
+             fields['encoding'] == 'bz2':
+            bz2_file = bz2.BZ2File(fileobj=data_file_handle)
+            # Again, unfortunately, np.fromfile does not support
+            # reading from a gzip stream, so we'll do it like this.
+            data = np.fromstring(bz2_file.read(), dtype)
+
+        else:
+            raise NrrdError(f'Unsupported encoding: "{fields["encoding"]}"')
+
+        if n_pixels != data.size:
+           raise NrrdError(f'ERROR: {n_pixels}-{data.size}={n_pixels - data.size}')
+
+        data = np.reshape(data, shape, order=order)
+        return data
 
 
 def _dtype(filename):
     """Determine data type from nrrd file."""
     # read header
     with open(filename,'rb') as filehandle:
-       fields = _read_header(filehandle)
+        fields = _read_header(filehandle)
     
     # Determine the data type from the fields
     dtype = fields['sizes'](fields)
@@ -644,92 +640,88 @@ def _shape(filename):
     """Determine shape from nrrd file."""
     #read header
     with open(filename,'rb') as filehandle:
-       fields = _read_header(filehandle)
+        fields = _read_header(filehandle)
     
     return tuple(fields['sizes'])
 
 
 def _order(filename):
-  """Determine shape from nrrd file."""
-  return 'F'
+    """Determine shape from nrrd file."""
+    return 'F'
 
 
 def _offset(filename):
-  """Offset of data in file."""
+    """Offset of data in file."""
   
-  with open(filename,'rb') as filehandle:
-    fields = _read_header(filehandle)
-    
-    #offset
-    datafilehandle = filehandle
-    datafile = fields.get("datafile", fields.get("data file", None))
-    if datafile is not None:
-        if os.path.isabs(datafile):
-            datafilename = datafile
-        else:
-            datafilename = os.path.join(os.path.dirname(filename), datafile)
-        datafilehandle = open(datafilename,'rb')
-    
-    if fields['encoding'] == 'raw':
-        byteskip = fields.get('byteskip', fields.get('byte skip', 0))
-        if byteskip == -1: # This is valid only with raw encoding
-          numPixels=np.prod(fields['sizes'])
-          dtype = _dtype_from_header(fields)
-          totalbytes = dtype.itemsize * numPixels
-          datafilehandle.seek(-totalbytes, 2)
-        else:
-          lineskip = fields.get('lineskip', fields.get('line skip', 0))
-          for _ in range(lineskip):
-            datafilehandle.readline()
-          datafilehandle.read(byteskip)
-    
-    return datafilehandle.tell()
+    with open(filename,'rb') as f_handle:
+        fields = _read_header(f_handle)
+
+        # offset
+        data_file_handle = f_handle
+        datafile = fields.get("datafile", fields.get("data file", None))
+        if datafile is not None:
+            if os.path.isabs(datafile):
+                data_filename = datafile
+            else:
+                data_filename = os.path.join(os.path.dirname(filename), datafile)
+            data_file_handle = open(data_filename,'rb')
+
+        if fields['encoding'] == 'raw':
+            byte_skip = fields.get('byteskip', fields.get('byte skip', 0))
+            if byte_skip == -1: # This is valid only with raw encoding
+                numPixels=np.prod(fields['sizes'])
+                dtype = _dtype_from_header(fields)
+                totalbytes = dtype.itemsize * numPixels
+                data_file_handle.seek(-totalbytes, 2)
+            else:
+                lineskip = fields.get('lineskip', fields.get('line skip', 0))
+                for _ in range(lineskip):
+                    data_file_handle.readline()
+                data_file_handle.read(byte_skip)
+
+        return data_file_handle.tell()
 
 
 def _memmap(filename, mode = None):
-  """Create memmap to the nrrd data."""
-  with open(filename,'rb') as filehandle:
-    fields = _read_header(filehandle)
-    
-    if fields['encoding'] != 'raw':
-      raise NrrdError('Cannot memmap to compressed file %r!' % fields['encoding'])
+    """Create memmap to the nrrd data."""
+    with open(filename,'rb') as f_handle:
+        fields = _read_header(f_handle)
 
-    dtype = _dtype_from_header(fields)
-    shape = tuple(fields['sizes'])
-    order = 'F'
+        if fields['encoding'] != 'raw':
+            raise NrrdError(f'Cannot memmap to compressed file {fields["encoding"]!r}!')
 
-    #datafile
-    datafilename = filename
-    datafilehandle = filehandle
-    datafile = fields.get("datafile", fields.get("data file", None))
-    if datafile is not None:
-        if os.path.isabs(datafile):
-            datafilename = datafile
+        dtype = _dtype_from_header(fields)
+        shape = tuple(fields['sizes'])
+        order = 'F'
+
+        #d atafile
+        data_filename = filename
+        data_file_handle = f_handle
+        datafile = fields.get("datafile", fields.get("data file", None))
+        if datafile is not None:
+            if os.path.isabs(datafile):
+                data_filename = datafile
+            else:
+                data_filename = os.path.join(os.path.dirname(filename), datafile)
+            data_file_handle = open(data_filename,'rb')
+
+        # offset
+        byte_skip = fields.get('byteskip', fields.get('byte skip', 0))
+        if byte_skip == -1: # This is valid only with raw encoding
+            n_pixels=np.prod(shape)
+            total_bytes = dtype.itemsize * n_pixels
+            data_file_handle.seek(-total_bytes, 2)
         else:
-            datafilename = os.path.join(os.path.dirname(filename), datafile)
-        datafilehandle = open(datafilename,'rb')
-    
-    #offset
-    byteskip = fields.get('byteskip', fields.get('byte skip', 0))
-    if byteskip == -1: # This is valid only with raw encoding
-      numPixels=np.prod(shape)
-      totalbytes = dtype.itemsize * numPixels
-      datafilehandle.seek(-totalbytes, 2)
-    else:
-      lineskip = fields.get('lineskip', fields.get('line skip', 0))
-      for _ in range(lineskip):
-        datafilehandle.readline()
-      datafilehandle.read(byteskip)
-    offset = datafilehandle.tell()
+            line_skip = fields.get('lineskip', fields.get('line skip', 0))
+            for _ in range(line_skip):
+                data_file_handle.readline()
+            data_file_handle.read(byte_skip)
+        offset = data_file_handle.tell()
 
-    if mode is None:
-      mode = 'r+'
+        if mode is None:
+            mode = 'r+'
 
-    #print datafilename, dtype,  mode, shape, order, offset
-    return np.memmap(datafilename, dtype=dtype, mode=mode, offset=offset, shape=shape, order=order)
-
-
-
+        return np.memmap(data_filename, dtype=dtype, mode=mode, offset=offset, shape=shape, order=order)
 
 ###############################################################################
 ### Writing
@@ -742,7 +734,7 @@ def _format_nrrdvector(v) :
     return '(' + ','.join([_convert_to_reproducible_floatingpoint(x) for x in v]) + ')'
 
 def _format_optional_nrrdvector(v):
-    if (v == 'none') :
+    if v == 'none':
         return 'none'
     else :
         return _format_nrrdvector(v)
@@ -903,7 +895,7 @@ def _write(filename, data, options={}, separate_header=False):
 def _test():
     import os
     import numpy as np
-    import ClearMap.IO.NRRD as NRRD
+    from ClearMap.IO import NRRD
     
     data = np.random.rand(20,50,10)
     data[5:15, 20:45, 2:9] = 0

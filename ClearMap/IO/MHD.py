@@ -20,17 +20,17 @@ import os
 import numpy as np
 import zlib
 
-import ClearMap.IO.Source as src
+import ClearMap.IO.Source as source_mod
 from ClearMap.IO import IO as clearmap_io
 from ClearMap.IO.FileUtils import file_extension, is_file
 from ClearMap.Utils.exceptions import ClearMapPermissionError
 
 
 ###############################################################################
-# Source class
+# MhdSource class
 ###############################################################################
 
-class Source(src.Source):
+class MhdSource(source_mod.Source):
     """Mhd/raw array source."""
 
     def __init__(self, location, name=None, mode=None):
@@ -194,7 +194,7 @@ class Source(src.Source):
 
     def __setitem__(self, *args):
         if not self.is_writable:
-            raise ClearMapPermissionError(f'Source {self} was opened read-only (mode="r"). '
+            raise ClearMapPermissionError(f'MhdSource {self} was opened read-only (mode="r"). '
                                           f'Use io.edit() to open for writing.')
         if self._memmap is None:
             self._memmap = _memmap(self.location)
@@ -227,7 +227,7 @@ class Source(src.Source):
         return self._memmap
 
     def as_virtual(self):
-        return VirtualSource(source=self)
+        return MhdVirtualSource(source=self)
 
     def as_real(self):
         return self
@@ -274,12 +274,12 @@ class Source(src.Source):
         return name + shape + dtype + order + location
 
 
-class VirtualSource(src.VirtualSource):
-    _real_class = Source
+class MhdVirtualSource(source_mod.VirtualSource):
+    _real_class = MhdSource
 
     def __init__(self, source=None, shape=None, dtype=None,
                  order=None, location=None, name=None, mode=None):
-        super(VirtualSource, self).__init__(source=source, shape=shape, dtype=dtype, order=order, location=location,
+        super(MhdVirtualSource, self).__init__(source=source, shape=shape, dtype=dtype, order=order, location=location,
                                             name=name, mode=mode)
 
 ###############################################################################
@@ -288,12 +288,12 @@ class VirtualSource(src.VirtualSource):
 
 def is_mhd(source):
     """Checks if this source is an MHD source."""
-    if isinstance(source, Source):
+    if isinstance(source, MhdSource):
         return True
     if isinstance(source, str) and source[-3:] in ('raw', 'mhd'):
         header_file = _header_file(source)
         try:
-            Source(header_file)
+            MhdSource(header_file)
         except:
             return False
         return True
@@ -315,8 +315,8 @@ def read(source, slicing=None, **kwargs):
     array : array
       The image data in the tif file as a buffer.
     """
-    if not isinstance(source, Source):
-        source = Source(source)
+    if not isinstance(source, MhdSource):
+        source = MhdSource(source)
     if slicing is None:
         return source.array
     else:
@@ -326,7 +326,7 @@ def read(source, slicing=None, **kwargs):
 def write(sink, data, slicing=None, **kwargs):
     """Write specialization for mhd files."""
     # Note: data is ClearMap Source
-    if isinstance(sink, Source):
+    if isinstance(sink, MhdSource):
         sink.__setitem__(slicing, data.array)
     elif isinstance(sink, str):
         # header file
@@ -370,7 +370,7 @@ def create(location=None, shape=None, dtype=None, array=None, as_source=True, **
     if array is not None:
         _write_raw(raw_file, array, compression=_compression_from_header(header))
     if as_source:
-        return Source(header_file)
+        return MhdSource(header_file)
     else:
         return header_file
 
@@ -900,7 +900,7 @@ def _test():
 
     mhd.create(location='test.mhd', array=data)
 
-    source = mhd.Source('test.mhd')
+    source = mhd.MhdSource('test.mhd')
     print(source)
     np.all(data == source.array)
 
@@ -913,19 +913,19 @@ def _test():
     print(header_file, raw_file)
 
     mhd._write_header(header_file, header)
-    source = mhd.Source(header_file)
+    source = mhd.MhdSource(header_file)
     print(source)
     np.all(data == source.array)
 
     header_file = mhd.write_header_from_source('test.npy')
-    source = mhd.Source(header_file)
+    source = mhd.MhdSource(header_file)
     print(source)
     np.all(data == source.array)
 
     import ClearMap.IO.IO as io
     io.write('test.mhd', data)
 
-    source = mhd.Source('test.mhd')
+    source = mhd.MhdSource('test.mhd')
     print(source)
     np.all(data == source.array)
 
@@ -937,7 +937,7 @@ def _test():
     data_path = os.path.expanduser('~/Science/Projects/WholeBrainClearing/Axons/Analysis/AxonMap/data/'
                                    '2.Test_data_brain_regions/elastix_auto_to_reference/')
     data_file = os.path.join(data_path, 'result.0.mhd')
-    #data_file = os.path.join(data_path, 'result.0.zraw')
+    # data_file = os.path.join(data_path, 'result.0.zraw')
 
-    #source = mhd.Source(data_file)
-    #array = source.array
+    # source = mhd.MhdSource(data_file)
+    # array = source.array

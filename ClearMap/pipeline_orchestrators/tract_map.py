@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 
 from ClearMap.IO import IO as cmp_io
-from ClearMap.IO.MMP import Source as memmap_source
+from ClearMap.IO.MMP import MMPSource
 from ClearMap.IO.workspace2 import Workspace2
 
 from ClearMap.Utils.exceptions import MissingRequirementException
@@ -349,7 +349,7 @@ class TractMapProcessor(ChannelPipelineOrchestrator):
         for i in range(3):
             shift = self.config['test_set_slicing'][f'dim_{i}'][0]
             coordinates[:, i] += shift
-        if not isinstance(coordinates, (np.memmap, memmap_source)):
+        if not isinstance(coordinates, (np.memmap, MMPSource)):
             cmp_io.write(coords_asset.path, coordinates)
         print('TractMap coordinates shifted')
 

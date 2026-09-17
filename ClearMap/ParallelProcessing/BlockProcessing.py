@@ -14,7 +14,7 @@ Example
 >>> import ClearMap.IO.IO as io
 >>> import ClearMap.ParallelProcessing.BlockProcessing as bp
 >>> source = io.open_ro(np.asarray(np.random.rand(50,100,200), order = 'F'))
->>> blocks = bp.split_into_blocks(source, processes=10, axes=[2], size_min=30, size_max=50, overlap=20);
+>>> blocks = bp.split_into_blocks(source, processes=10, axes=[2], size_min=30, size_max=50, overlap=20)
 >>> blocks[0]
 Block-Numpy-Source(50, 100, 38)[float64]|F|
 
@@ -24,7 +24,7 @@ Block-Numpy-Source(50, 100, 38)[float64]|F|
 >>> b.valid
 'Sliced-Block-Numpy-Source(50, 100, 28)[float64]|F|'
 
->>> b = blocks[0];
+>>> b = blocks[0]
 >>> print(b.valid.base_shape)
 >>> print(b.valid.base_slicing)
 >>> print(b.iteration)
@@ -32,45 +32,44 @@ Block-Numpy-Source(50, 100, 38)[float64]|F|
 (slice(None, None, None), slice(None, None, None), slice(None, 28, None))
 0
  
->>> shape = (2,3,20);
->>> source = io.npy.Source(array = np.random.rand(*shape));
->>> sink = io.npy.Source(array = np.zeros(shape))
+>>> shape = (2,3,20)
+>>> source = io.npy.NumpySource(array = np.random.rand(*shape))
+>>> sink = io.npy.NumpySource(array = np.zeros(shape))
 >>>  
 >>> def process_image(source, sink=None):
 >>>    if sink is None:
->>>      sink = np.zeros(source.shape);
->>>    sink[:] = 100 * source[:];
->>>    return sink;
+>>>      sink = np.zeros(source.shape)
+>>>    sink[:] = 100 * source[:]
+>>>    return sink
 >>> 
 >>> bp.process(process_image, source, sink,
 >>>            processes = 'serial', size_max = 4, size_min = 1, overlap = 0, axes = [2],
->>>            optimization = True, verbose = True);
+>>>            optimization = True, verbose = True)
 >>>
 >>> print(np.all(sink[:] == process_image(source)))
 True
   
 >>> bp.process(process_image, source, sink,
 >>>            processes = None, size_max = 10, size_min = 6, overlap = 3, axes = 'all',
->>>            optimization = True, verbose = True);
+>>>            optimization = True, verbose = True)
 
 """
 __author__    = 'Christoph Kirst <ckirst@rockefeller.edu>'
-__license__   = 'MIT License <http://www.opensource.org/licenses/mit-license.php>'
+__license__   = 'MIT License <https://www.opensource.org/licenses/mit-license.php>'
 __copyright__ = 'Copyright 2020 by Christoph Kirst'
 
 
 import functools as ft
 import multiprocessing as mp
 import warnings
+import gc
 
 import numpy as np
-import gc
 
 import ClearMap.ParallelProcessing.Block as blk
 import ClearMap.ParallelProcessing.ParallelTraceback as ptb
 
 import ClearMap.IO.IO as io
-import ClearMap.IO.SMA as sma
 
 import ClearMap.Utils.Timer as tmr
 
@@ -197,8 +196,8 @@ def process(function, source, sink = None,
     sources = [source]
   sources = [io.open_ro(s).as_virtual() for s in sources]
 
-  #if sink is None:
-  #  sink = sma.Source(shape=sources[0].shape, dtype=sources[0].dtype, order=sources[0].order);
+  # if sink is None:
+  #     sink = SMASource(shape=sources[0].shape, dtype=sources[0].dtype, order=sources[0].order)
   if isinstance(sink, list):
     sinks = sink
   elif sink is None:
@@ -727,6 +726,7 @@ def _unpack(values, ndim = None):
 def _test():
   import numpy as np
   import ClearMap.IO.IO as io
+  from ClearMap.IO.SMA import SMASource
   import ClearMap.ParallelProcessing.BlockProcessing as bp
   
   source = io.open_ro(np.asarray(np.random.rand(50,100,200), order = 'F'))
@@ -751,8 +751,8 @@ def _test():
   print(b.valid.base_slicing)
   
   shape = (2,3,20)
-  source = io.npy.Source(array = np.random.rand(*shape))
-  sink = io.npy.Source(array = np.zeros(shape))
+  source = io.npy.NumpySource(array = np.random.rand(*shape))
+  sink = io.npy.NumpySource(array = np.zeros(shape))
   
   def process_image(source, sink = None):
     if sink is None:
@@ -793,10 +793,10 @@ def _test():
 
   #multiple sources and sinks
   shape = (2,50,30)
-  source1 = io.sma.Source(array = np.random.rand(*shape))
-  source2 = io.sma.Source(array = np.random.rand(*shape))
-  sink1 = io.sma.Source(array = np.zeros(shape))
-  sink2 = io.sma.Source(array = np.zeros(shape))
+  source1 = SMASource(array = np.random.rand(*shape))
+  source2 = SMASource(array = np.random.rand(*shape))
+  sink1 = SMASource(array = np.zeros(shape))
+  sink2 = SMASource(array = np.zeros(shape))
 
   def sum_and_difference(source1, source2, sink1 = None, sink2 = None):
     if sink1 is None:
@@ -819,8 +819,8 @@ def _test():
   
   #trace backs
   shape = (3,4)
-  source = io.sma.Source(array = np.random.rand(*shape))
-  sink = io.sma.Source(array = np.zeros(shape))
+  source = SMASource(array = np.random.rand(*shape))
+  sink = SMASource(array = np.zeros(shape))
   
   def raise_error(source, sink = None):
     raise RuntimeError('test')

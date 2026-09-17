@@ -1,11 +1,14 @@
 #TODO: integrate fully in ClearMap
 
-__author__    = 'Sophie Skriabin, Christoph Kirst <christoph.kirst.ck@gmail.com>'
+__author__    = 'Sophie Skriabine, Christoph Kirst <christoph.kirst.ck@gmail.com>'
 __license__   = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
-__webpage__   = 'http://idisco.info'
-__download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
+__webpage__   = 'https://idisco.info'
+__download__  = 'https://www.github.com/ChristophKirst/ClearMap2'
 
+import os
+
+import numpy as np
 
 import vispy
 import vispy.color
@@ -13,12 +16,9 @@ import vispy.scene
 from vispy import scene
 import vispy.app
 import vispy.visuals
-import numpy as np
-import os
-import vesselSegmentation.TurntableCamera as tc
-import vesselSegmentation.IO.MMP as mp
 
-# from skimage.measure import block_reduce
+from ClearMap.Visualization.Vispy.arbitrary_rotation_camera import ArbitraryRotationCamera
+
 
 class twoClassesMap(vispy.color.colormap.BaseColormap):
     glsl_map = """
@@ -67,8 +67,8 @@ def get_two_views():
     Get two views in order to plot two graphs/images in a consistent manner
     """
     canvas = vispy.scene.SceneCanvas(keys='interactive', title='plot3d', show=True)
-    vb1 = scene.widgets.ViewBox(border_color='yellow', parent=canvas.scene, camera=tc.ArbitraryRotationCamera())
-    vb2 = scene.widgets.ViewBox(border_color='blue', parent=canvas.scene, camera=tc.ArbitraryRotationCamera())
+    vb1 = scene.widgets.ViewBox(border_color='yellow', parent=canvas.scene, camera=ArbitraryRotationCamera())
+    vb2 = scene.widgets.ViewBox(border_color='blue', parent=canvas.scene, camera=ArbitraryRotationCamera())
 
     grid = canvas.central_widget.add_grid()
     grid.padding = 6
@@ -94,7 +94,7 @@ def plot3d(data, colormap=FireMap(), view=None):
     # build canvas
     if view is None:
         canvas = vispy.scene.SceneCanvas(keys='interactive', title='plot3d', show=True)
-        view = canvas.central_widget.add_view(camera=tc.ArbitraryRotationCamera())
+        view = canvas.central_widget.add_view(camera=ArbitraryRotationCamera())
         # view.camera = 'turntable'
         view.camera.fov = 0
         view.camera.distance = 7200

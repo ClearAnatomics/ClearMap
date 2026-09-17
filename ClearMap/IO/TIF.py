@@ -22,7 +22,7 @@ from typing import NamedTuple, Optional, List, Dict, Tuple, Any
 import numpy as np
 from tifffile import tifffile
 
-from ClearMap.IO import Source as source_module
+from ClearMap.IO import Source as source_mod
 import ClearMap.IO.Slice as cmp_clicing
 
 from ClearMap.Utils.Lazy import lazyattr
@@ -30,10 +30,10 @@ from ClearMap.Utils.exceptions import ClearMapValueError, ClearMapPermissionErro
 
 
 ###############################################################################
-# ## Source class
+# ## TifSource class
 ###############################################################################
 
-class Source(source_module.Source):
+class TifSource(source_mod.Source):
     """Class to handle a tif file source
 
     Note
@@ -167,8 +167,7 @@ class Source(source_module.Source):
 
     def __setitem__(self, *args):
         if not self.is_writable:
-            raise ClearMapPermissionError('Tif Source was open RO. '
-                                          'Please reopen RW (r+ or w+) to write to disk')
+            raise ClearMapPermissionError('TifSource was open RO. Please reopen RW (r+ or w+) to write to disk')
         memmap = self.as_memmap()
         memmap.__setitem__(*args)
 
@@ -317,16 +316,16 @@ class Source(source_module.Source):
         return f'{name}{shape}{dtype}{order}{location}'
 
 
-class VirtualSource(source_module.VirtualSource):
+class TifVirtualSource(source_mod.VirtualSource):
     def __init__(self, source=None, shape=None, dtype=None,
                  order=None, location=None, name=None, mode=None):
         super().__init__(source=source, shape=shape, dtype=dtype, order=order, location=location, name=name, mode=mode)
-        if isinstance(source, Source):
+        if isinstance(source, TifSource):
             self.multi_file = source.multi_file
             self.series = source._series
 
     def as_real(self):
-        return Source(location=self.location, series=self.series, multi_file=self.multi_file)
+        return TifSource(location=self.location, series=self.series, multi_file=self.multi_file)
 
 
 ###############################################################################
@@ -865,11 +864,11 @@ class ClearMapMetadataParser(BaseMetadataParser):
 
 def is_tif(source):
     """Checks if this is a TIF source"""
-    if isinstance(source, Source):
+    if isinstance(source, TifSource):
         return True
     if isinstance(source, str):
         try:
-            Source(source)
+            TifSource(source)
         except tifffile.TiffFileError:  # Do not catch missing file or permission errors
             return False
         return True
@@ -891,8 +890,8 @@ def read(source, slicing=None, sink=None, **args):
     data : array
         The image data in the tif file.
     """
-    if not isinstance(source, Source):
-        source = Source(source)
+    if not isinstance(source, TifSource):
+        source = TifSource(source)
     if slicing is None:
         return source.array
     else:
@@ -961,7 +960,7 @@ def create(location=None, shape=None, dtype=None, mode=None, as_source=True, **k
 
     memmap = tifffile.memmap(location, shape=shape, dtype=dtype, mode=mode)
     if as_source:
-        return Source(location)
+        return TifSource(location)
     else:
         return memmap
 
@@ -1174,11 +1173,11 @@ def _test():
     import ClearMap.IO.TIF as tif
 
     filename = tfs.filename('tif_2d')
-    t = tif.Source(location=filename)
+    t = tif.TifSource(location=filename)
     print(t)
 
     filename = tfs.filename('tif_2d_color')
-    t = tif.Source(location=filename)
+    t = tif.TifSource(location=filename)
     print(t)
 
     d = tif.read(filename)

@@ -57,7 +57,7 @@ from sklearn import neighbors
 import skimage.morphology
 
 from ClearMap.ParallelProcessing.DataProcessing.ArrayProcessing import initialize_sink
-from ClearMap.IO.MMP import Source as MemmapSource
+from ClearMap.IO.MMP import MMPSource
 from ClearMap.Utils.exceptions import ClearMapValueError
 
 from ClearMap.Analysis.colocalization import bbox as bounding_boxes
@@ -377,7 +377,7 @@ class Channel:
         self.__centers = None
 
     def __del__(self):
-        if isinstance(self._labels, MemmapSource):
+        if isinstance(self._labels, MMPSource):
             Path(self._labels.location).unlink(missing_ok=True)
         elif isinstance(self._labels, memmap):
             Path(self._labels.filename).unlink(missing_ok=True)

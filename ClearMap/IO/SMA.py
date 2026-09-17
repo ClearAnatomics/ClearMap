@@ -14,16 +14,16 @@ faster implementations.
 __author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
 __license__   = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
-__webpage__   = 'http://idisco.info'
-__download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
+__webpage__   = 'https://idisco.info'
+__download__  = 'https://www.github.com/ChristophKirst/ClearMap2'
 
 import numpy as np
 
 import ClearMap.ParallelProcessing.SharedMemoryArray as sma
 import ClearMap.ParallelProcessing.SharedMemoryManager as smm
 
-import ClearMap.IO.Source as src
-import ClearMap.IO.NPY as npy
+import ClearMap.IO.Source as source_mod
+from ClearMap.IO.NPY import NumpySource
 
 from ClearMap.ParallelProcessing.SharedMemoryArray import base, ctype, empty      #analysis:ignore 
 from ClearMap.ParallelProcessing.SharedMemoryArray import zeros, zeros_like, ones #analysis:ignore
@@ -32,65 +32,65 @@ __all__ = sma.__all__
 
 
 ###############################################################################
-### Source class
+### SMASource class
 ###############################################################################
 
-class Source(npy.Source):
-  """Shared memory source."""
+class SMASource(NumpySource):
+    """Shared memory source."""
 
-  def __init__(self, array=None, shape=None, dtype=None, order=None,
+    def __init__(self, array=None, shape=None, dtype=None, order=None,
                handle=None, name=None, mode=None):
-    """Shared memory source constructor."""
-    shared = _shared(shape=shape, dtype=dtype, order=order, array=array, handle=handle)
-    super().__init__(array=shared, name=name, mode=mode)
-    
-    self._handle = handle
+        """Shared memory source constructor."""
+        shared = _shared(shape=shape, dtype=dtype, order=order, array=array, handle=handle)
+        super().__init__(array=shared, name=name, mode=mode)
 
-  @property
-  def base(self):
-    return base(self.array)
+        self._handle = handle
 
-  @property
-  def handle(self):
-    if self._handle is None:
-      self._handle = smm.insert(self.array)
-    return self._handle
+    @property
+    def base(self):
+        return base(self.array)
 
-  @property
-  def memory(self):
-    return 'shared'
+    @property
+    def handle(self):
+        if self._handle is None:
+            self._handle = smm.insert(self.array)
+        return self._handle
 
-  def free(self):
-    if self._handle is not None:
-      smm.free(self._handle)
-      self._handle = None
+    @property
+    def memory(self):
+        return 'shared'
 
-  def as_virtual(self):
-    return VirtualSource(source = self)
+    def free(self):
+        if self._handle is not None:
+            smm.free(self._handle)
+            self._handle = None
 
-  def as_real(self):
-    return self
+    def as_virtual(self):
+        return SMAVirtualSource(source=self)
 
-  def as_buffer(self):
-    return self.array
+    def as_real(self):
+        return self
+
+    def as_buffer(self):
+        return self.array
 
 
-class VirtualSource(src.VirtualSource):
-  _real_class = Source
+class SMAVirtualSource(source_mod.VirtualSource):
+    _real_class = SMASource
 
-  def __init__(self, source=None, shape=None, dtype=None, order=None,
-               handle=None, name=None, mode=None):
-    super().__init__(source=source, shape=shape, dtype=dtype, order=order, name=name, mode=mode)
-    if handle is None and source is not None:
-      handle = source.handle
-    self._handle = handle
+    def __init__(self, source=None, shape=None, dtype=None, order=None,
+                 handle=None, name=None, mode=None):
+        super().__init__(source=source, shape=shape, dtype=dtype, order=order, name=name, mode=mode)
+        if handle is None and source is not None:
+            handle = source.handle
+        self._handle = handle
 
-  @property
-  def handle(self):
-    return self._handle
+    @property
+    def handle(self):
+        return self._handle
 
-  def as_real(self):
-    return self._real_class(handle=self.handle, mode=self._mode)
+    def as_real(self):
+        return self._real_class(handle=self.handle, mode=self._mode)
 
 
 ###############################################################################
@@ -98,92 +98,87 @@ class VirtualSource(src.VirtualSource):
 ###############################################################################
 
 def is_shared(source):
-  """Returns True if array is a shared memory array
-  
-  Arguments
-  ---------
-  source : array
-    The source array to use as template.
-   
-  Returns
-  -------
-  is_shared : bool
-    True if the array is a shared memory array.
-  """
-  if isinstance(source, (Source, VirtualSource)):
-    return True
-  else:
-    return sma.is_shared(source)
+    """Returns True if array is a shared memory array
+
+    Arguments
+    ---------
+    source : array
+        The source array to use as template.
+
+    Returns
+    -------
+    is_shared : bool
+        True if the array is a shared memory array.
+    """
+    if isinstance(source, (SMASource, SMAVirtualSource)):
+        return True
+    else:
+        return sma.is_shared(source)
 
 
 def as_shared(source):
-  """Convert array to a shared memory array
-  
-  Arguments
-  ---------
-  source : array
-    The source array to use as template.
-  copy : bool
-    If True, the data in source is copied.
-  order : C', 'F', or None
-    The order to use for an array if copied or not a shared array. If None, the order of the source is used.
+    """Convert array to a shared memory array
 
-  Returns
-  -------
-  array : array
-    A shared memory array wrapped as ndarray based on the source array.
-  """
-  if isinstance(source, (Source, VirtualSource)):
-    return source
-  elif sma.is_shared(source):
-    return Source(array=source)
-  elif isinstance(source, (list, tuple, np.ndarray)):
-    return Source(array=sma.as_shared(source))
-  else:
-    raise ValueError('Source %r cannot be transforemd to a shared array!' % source)
+    Arguments
+    ---------
+    source : array
+        The source array to use as template.
+
+    Returns
+    -------
+    array : array
+        A shared memory array wrapped as ndarray based on the source array.
+    """
+    if isinstance(source, (SMASource, SMAVirtualSource)):
+        return source
+    elif sma.is_shared(source):
+        return SMASource(array=source)
+    elif isinstance(source, (list, tuple, np.ndarray)):
+        return SMASource(array=sma.as_shared(source))
+    else:
+        raise ValueError(f'Source {source!r} cannot be transformed to a shared array!')
 
 
-#TODO: read directly into shared memory !
-#read = npy.read;
-#write = npy.write;
+# TODO: read directly into shared memory !
+# read = npy_source_mod.read
+# write = npy_source_mod.write
 
 def read(*args, **kwargs):
-  raise NotImplementedError('read not implemented for SharedMemoryArray!')
+    raise NotImplementedError('read not implemented for SharedMemoryArray!')
 
 def write(*args, **kwargs):
-  raise NotImplementedError('write not implemented for SharedMemoryArray!')
+    raise NotImplementedError('write not implemented for SharedMemoryArray!')
 
 
-def create(shape = None, dtype = None, order = None, array = None, handle = None, as_source = True, **kwargs):
-  """Create a shared memory array.
-  
-  Arguments
-  ---------
-  location : str
-    The filename of the memory mapped array.
-  shape : tuple or None
-    The shape of the memory map to create.
-  dtype : dtype 
-    The data type of the memory map.
-  order : 'C', 'F', or None
-    The contiguous order of the memmap.
-  array : array, Source or None
-    Optional source with data to fill the memory map with.
-  handle : int or None
-    Optional handle to an array from which to create this source.
-  as_source : bool
-    If True, wrap shaed array in Source class.
-    
-  Returns
-  -------
-  shared : array
-    The shared memory array.
-  """
-  array = _shared(shape=shape, dtype=dtype, order=order, array=array, handle=handle)
-  if as_source:
-    return Source(array=array)
-  else:
-    return array
+def create(shape=None, dtype=None, order=None,
+           array=None, handle=None, as_source=True, **kwargs):
+    """Create a shared memory array.
+
+    Arguments
+    ---------
+    shape : tuple or None
+        The shape of the memory map to create.
+    dtype : dtype
+        The data type of the memory map.
+    order : 'C', 'F', or None
+        The contiguous order of the memmap.
+    array : array, Source or None
+        Optional source with data to fill the memory map with.
+    handle : int or None
+        Optional handle to an array from which to create this source.
+    as_source : bool
+        If True, wrap shaed array in Source class.
+
+    Returns
+    -------
+    shared : array
+        The shared memory array.
+    """
+    array = _shared(shape=shape, dtype=dtype, order=order, array=array, handle=handle)
+    if as_source:
+        return SMASource(array=array)
+    else:
+        return array
 
 
 ###############################################################################
@@ -191,46 +186,44 @@ def create(shape = None, dtype = None, order = None, array = None, handle = None
 ###############################################################################
 
 def _shared(shape = None, dtype = None, order = None, array=None, handle = None):
-  if handle is not None:
-    array = smm.get(handle)
+    if handle is not None:
+        array = smm.get(handle)
 
-  if array is None:
-    return sma.array(shape=shape, dtype=dtype, order=order)
+    # No source data: create an uninitialised shared array.
+    if array is None:
+        return sma.array(shape=shape, dtype=dtype, order=order)
+    elif is_shared(array):
+        if shape is None and dtype is None and order is None:
+            return array
 
-  elif is_shared(array):
-    if shape is None and dtype is None and order is None:
-      return array
+        shape = shape if shape is not None else array.shape
+        dtype = dtype if dtype is not None else array.dtype
+        order = order if order is not None else source_mod.order(array)
 
-    shape = shape if shape is not None else array.shape
-    dtype = dtype if dtype is not None else array.dtype
-    order = order if order is not None else npy.order(array)
+        if shape != array.shape:
+            raise ValueError('Shapes do not match!')
 
-    if shape != array.shape:
-      raise ValueError('Shapes do not match!')
+        if np.dtype(dtype) == array.dtype and order == source_mod.order(array):
+            return array
+        else:
+            new = sma.array(shape=shape,dtype=dtype,order=order)
+            new[:] = array
+            return new
+    elif isinstance(array, (np.ndarray, list, tuple)):
+        array = np.asarray(array)
 
-    if np.dtype(dtype) == array.dtype and order == npy.order(array):
-      return array
+        shape = shape if shape is not None else array.shape
+        dtype = dtype if dtype is not None else array.dtype
+        order = order if order is not None else source_mod.order(array)
+
+        if shape != array.shape:
+            raise ValueError('Shapes do not match!')
+
+        new = sma.array(shape=shape,dtype=dtype,order=order)
+        new[:] = array
+        return new
     else:
-      new = sma.array(shape=shape,dtype=dtype,order=order)
-      new[:] = array
-      return new
-
-  elif isinstance(array, (np.ndarray, list, tuple)):
-    array = np.asarray(array)
-
-    shape = shape if shape is not None else array.shape
-    dtype = dtype if dtype is not None else array.dtype
-    order = order if order is not None else npy.order(array)
-
-    if shape != array.shape:
-      raise ValueError('Shapes do not match!')
-
-    new = sma.array(shape=shape,dtype=dtype,order=order)
-    new[:] = array
-    return new
-
-  else:
-    raise ValueError('Cannot create shared array from array %r!' % array)
+        raise ValueError(f'Cannot create shared array from array {array!r}!')
 
 
 ###############################################################################
@@ -238,16 +231,14 @@ def _shared(shape = None, dtype = None, order = None, array=None, handle = None)
 ###############################################################################
 
 def _test():
-  #from importlib import reload
-  #import numpy as np  #analysis:ignore
-  import ClearMap.IO.SMA as sma
+    import ClearMap.IO.SMA as sma
 
-  n = 10
-  array = sma.zeros(n)
-  
-  s = sma.Source(array = array)
-  print(s)
-  
-  v = s.as_virtual()
-  print(v)
-  s2 = v.open_ro()
+    n = 10
+    array = sma.zeros(n)
+
+    s = sma.SMASource(array = array)
+    print(s)
+
+    v = s.as_virtual()
+    print(v)
+    s2 = v.open_ro()

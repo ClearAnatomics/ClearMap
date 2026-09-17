@@ -165,7 +165,7 @@ class ClearMapException(Exception):
     user_title: str = 'ClearMap Error'
     user_hint: str = ''
 
-    # Set on *instances* to override class-level recovery_options.
+    default_recovery_options: tuple[RecoveryOption, ...] | None = None
     _instance_options: tuple[RecoveryOption, ...] | None = None
 
     @property
@@ -177,15 +177,19 @@ class ClearMapException(Exception):
     def recovery_options(self) -> tuple[RecoveryOption, ...]:
         if self._instance_options is not None:
             return self._instance_options
+
+        if self.default_recovery_options is not None:
+            return self.default_recovery_options
+
         return DEFAULT_RECOVERY_OPTIONS.get(self.severity, (DISMISS,))
 
     @recovery_options.setter
     def recovery_options(self, options: tuple[RecoveryOption, ...]):
-        self._instance_options = options
+        self._instance_options = tuple(options)
 
 
 # ---------------------------------------------------------------------------
-# Value / runtime
+# Standard exceptions forward
 # ---------------------------------------------------------------------------
 
 class ClearMapValueError(ClearMapException, ValueError):
@@ -235,6 +239,37 @@ class ClearMapRuntimeError(ClearMapException, RuntimeError):
         return '\n'.join(parts)
 
 
+
+class ClearMapNotImplementedError(ClearMapException, NotImplementedError):
+    """An operation is not supported by the selected ClearMap backend.
+
+    This exception remains compatible with ``NotImplementedError`` while
+    allowing the GUI and callers to distinguish an unsupported ClearMap
+    operation from other implementation errors.
+    """
+
+    severity = Severity.FATAL
+    user_title = 'Unsupported Operation'
+    user_hint = 'Choose a supported operation or use a compatible file format.'
+    default_recovery_options = (DISMISS, )
+
+    def __init__(self, message: str, operation: str = '', backend: str = ''):
+        self.operation = operation
+        self.backend = backend
+        super().__init__(message)
+
+    @property
+    def user_message(self) -> str:
+        parts = [str(self)]
+
+        if self.operation:
+            parts.append(f'Operation: {self.operation}')
+
+        if self.backend:
+            parts.append(f'Backend: {self.backend}')
+
+        return '\n'.join(parts)
+
 # ---------------------------------------------------------------------------
 # I/O
 # ---------------------------------------------------------------------------
@@ -278,6 +313,39 @@ class SourceModuleNotFoundError(ClearMapIoException):
         self.ext = ext
         msg = f'Cannot determine module for file "{filename}" with extension "{ext}"!'
         super().__init__(msg)
+
+
+class SourceNotFoundError(ClearMapFileNotFoundError):
+    """The file backing this source does not exist on disk.
+
+    Distinct from AssetNotFoundError: this is the low-level IO layer reporting an
+    absent path, and is the *only* condition under which io.initialize() may
+    legitimately fall through to creating the source.
+    """
+    user_title = 'Source File Not Found'
+    severity = Severity.RECOVERABLE
+
+    def __init__(self, message: str, location: str = ''):
+        self.location = location
+        super().__init__(message)
+
+
+class SourceExistsError(ClearMapIoException, FileExistsError):
+    """A source already exists at this location and would have been destroyed."""
+    default_severity = Severity.RECOVERABLE
+
+    def __init__(self, location=None, message=None, **kwargs):
+        self.location = location
+        super().__init__(message or f'Source already exists at {location}', **kwargs)
+
+
+class IncompleteSourceSpecError(ClearMapValueError):
+    """Not enough information (shape / dtype / array) to create a new source."""
+    user_title = 'Incomplete Source Specification'
+    user_hint = 'Provide shape and dtype, or an array to create the source from.'
+
+    def __init__(self, message: str, value=None, expected=None):
+        super().__init__(message, value=value, expected=expected)
 
 
 class IncompatibleSource(ClearMapIoException):

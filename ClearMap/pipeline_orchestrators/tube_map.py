@@ -242,7 +242,7 @@ class BinaryVesselProcessorSteps(ProcessorSteps):
         """
         if isinstance(output, Asset):
             return output.path
-        elif isinstance(output, Source):  # covers MMP.Source, npy.Source …
+        elif isinstance(output, Source):  # covers MMPSource, NpySource …
             return output.location
         elif isinstance(output, (Path, str)):
             return output

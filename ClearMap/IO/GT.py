@@ -22,14 +22,16 @@ __download__  = 'https://www.github.com/ChristophKirst/ClearMap2'
 
 from ClearMap.Analysis.graphs import graph_gt
 
-import ClearMap.IO.Source as src
+import ClearMap.IO.Source as source_mod
+# noinspection PyUnusedImports
+from ClearMap.IO.Source import create
 
 ###############################################################################
 ### Source class
 ###############################################################################
 
 
-class Source(src.Source):
+class GraphGtSource(source_mod.Source):
     """GT graph source."""
 
     def __init__(self, location=None, graph=None, name=None, mode=None):
@@ -93,7 +95,7 @@ class Source(src.Source):
         self.graph.shape = value
 
     def as_virtual(self):
-         return VirtualSource(source=self)
+         return GrpahGtVirtualSource(source=self)
 
     def as_real(self):
         return self
@@ -113,7 +115,7 @@ class Source(src.Source):
         self._graph = _graph(location)
 
     def copy(self):
-        return Source(graph=self.graph.copy())
+        return GraphGtSource(graph=self.graph.copy())
 
 
     ### Formatting
@@ -142,8 +144,8 @@ class Source(src.Source):
         return name + graph + location
 
 
-class VirtualSource(src.VirtualSource):
-    _real_class = Source
+class GrpahGtVirtualSource(source_mod.VirtualSource):
+    _real_class = GraphGtSource
 
     def __init__(self, source=None, location=None, name=None, mode=None):
         if source is not None and location is None:
@@ -193,7 +195,7 @@ class VirtualSource(src.VirtualSource):
 
 def is_graph(source):
     """Checks if this source is a graph source"""
-    if isinstance(source, Source):
+    if isinstance(source, GraphGtSource):
         return True
     if isinstance(source, str) and len(source) >= 2 and source[-2:] == 'gt':
         return True
@@ -217,8 +219,8 @@ def read(source, as_source = None, **kwargs):
     graph : Graph or Source
         The graph as a Graph class or source.
     """
-    if not isinstance(source, Source):
-        source = Source(source)
+    if not isinstance(source, GraphGtSource):
+        source = GraphGtSource(source)
     if as_source:
         return source
     else:
@@ -237,17 +239,13 @@ def write(sink, graph, **kwargs):
 
     Returns
     -------
-    sink : grpah or source
+    sink : graph or source
         The sink graph file.
     """
-    if not isinstance(sink, Source):
-        sink = Source(sink)
+    if not isinstance(sink, GraphGtSource):
+        sink = GraphGtSource(sink)
 
     return _write(sink, graph)
-
-
-def create(location = None, **kwargs):
-    raise NotImplementedError('Creating graph files not implemented yet!')
 
 
 ###############################################################################
@@ -290,14 +288,13 @@ def test():
 
     g = graph_gt.Graph(n_vertices=10)
  
-    s = gt.Source(graph=g, location=location)
+    s = gt.GraphGtSource(graph=g, location=location)
     s.shape = (1,2,3)
     print(s)
 
     s.write()
 
-    r = gt.Source(location=location) 
+    r = gt.GraphGtSource(location=location)
     print(r.shape)
     
     os.remove(location)
-    

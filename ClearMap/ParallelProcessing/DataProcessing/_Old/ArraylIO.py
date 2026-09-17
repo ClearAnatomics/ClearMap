@@ -16,7 +16,7 @@ import pyximport;
 pyximport.install(setup_args={"include_dirs":np.get_include()}, reload_support=True)
 
 import ClearMap.IO.IO as io
-import ClearMap.IO.MMP as mmp
+from ClearMap.IO.MMP import MMPSource
 import ClearMap.IO.SMA as sma
 import ClearMap.IO.Slice as slc
 import ClearMap.IO.FileUtils as fu
@@ -89,7 +89,7 @@ def read(filename, sink = None, slicing = None, as_shared = None, blocks = None,
     blocks = processes * default_blocks_per_process;
   
   #source info
-  source = mmp.Source(filename);
+  source = MMPSource(filename);
   if slicing is not None:
     source = slc.Slice(source=source, slicing=slicing);
       
@@ -166,7 +166,7 @@ def write(filename, data, slicing = None, blocks = None, processes = None, verbo
     memmap.flush();
     del(memmap);
   
-  sink = mmp.Source(location=filename);
+  sink = MMPSource(location=filename);
   if slicing is not None:
     sink = slc.Slice(source=sink, slicing=slicing);
   shape, dtype, order, offset = sink.shape, sink.dtype, sink.order, sink.offset;

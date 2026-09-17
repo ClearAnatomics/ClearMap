@@ -654,5 +654,5 @@ def setup_mini_brain(atlas_base_name, mini_brain_scaling=(5, 5, 5)):  # TODO: sc
     tuple(scale, downsampled_array)
     """
     atlas_path = os.path.join(Settings.atlas_folder, f'{atlas_base_name}_annotation.tif')
-    arr = TIF.Source(atlas_path).array
+    arr = TIF.TifSource(atlas_path).array
     return mini_brain_scaling, sk_transform.downscale_local_mean(arr, mini_brain_scaling)

@@ -77,6 +77,7 @@ import numpy as np
 
 
 import ClearMap.Settings as settings
+from ClearMap.IO.TIF import TifSource
 from ClearMap.Utils.exceptions import ClearMapException, ClearMapValueError, ClearMapRuntimeError
 
 import ClearMap.IO.IO as io
@@ -777,7 +778,7 @@ def transform(source, sink='transformix', transform_parameter_file=None, transfo
 
     # image
     source = io.open_ro(source)
-    if isinstance(source, io.tif.Source):
+    if isinstance(source, TifSource):
         img_name = source.location
         delete_image = None
     else:
