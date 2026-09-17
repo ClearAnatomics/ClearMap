@@ -140,15 +140,15 @@ __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 import importlib
 import functools
 import math
-import os.path
 import pathlib
 import multiprocessing as mp
 import warnings
+from contextlib import contextmanager
 
 import numpy as np
 import pandas as pd
 
-import ClearMap.IO.Source as src
+import ClearMap.IO.Source as source_mod
 import ClearMap.IO.Slice as slc
 import ClearMap.IO.TIF as tif
 import ClearMap.IO.NRRD as nrrd
@@ -157,7 +157,8 @@ import ClearMap.IO.NPY as npy
 import ClearMap.IO.MMP as mmp
 import ClearMap.IO.SMA as sma
 import ClearMap.IO.MHD as mhd
-from ClearMap.Utils.exceptions import IncompatibleSource, SourceModuleNotFoundError
+from ClearMap.Utils.exceptions import (IncompatibleSource, SourceModuleNotFoundError, ClearMapRuntimeError,
+                                       ClearMapException, SourceNotFoundError, AssetNotFoundError, ClearMapValueError)
 
 try:
     import ClearMap.IO.GT as gt
@@ -178,8 +179,9 @@ from ClearMap.Utils.utilities import CancelableProcessPoolExecutor
 ###############################################################################
 # ## File manipulation
 ###############################################################################
-# FIXME:
-from ClearMap.IO.FileUtils import (is_file, is_directory, file_extension,   # analysis:ignore
+# WARNING: imported just for module level access. REFACTOR: should be in subpackage __init__
+# noinspection PyUnusedImports
+from ClearMap.IO.FileUtils import (is_file, is_directory, file_extension,
                                    join, split, abspath, create_directory, 
                                    delete_directory, copy_file, link_file, delete_file)
 
@@ -197,6 +199,20 @@ file_extension_to_module = {'npy': mmp,
                             'nrdh': nrrd,
                             'csv': csv,
                             'mhd': mhd}
+
+# FIXME: there MUST be a better way
+module_to_source_cls = {
+    npy: npy.NumpySource,
+    tif: tif.TifSource,
+    mmp: mmp.MMPSource,
+    sma: sma.SMASource,
+    fl: fl.FileListSource,
+    nrrd: nrrd.NrrdSource,
+    mhd: mhd.MhdSource,
+    csv: csv.CSVSource
+}
+
+
 if gt_loaded:
     file_extension_to_module['gt'] = gt
     source_modules += [gt]
@@ -231,7 +247,9 @@ def source_to_module(source_):
     if isinstance(source_, pathlib.Path):
         source_ = str(source_)
 
-    if isinstance(source_, src.Source):
+    # FIXME: add Slice sources unwrapping (recursive call to source_to_module of source_.base
+
+    if isinstance(source_, source_mod.Source):
         return importlib.import_module(source_.__module__)
     elif isinstance(source_, (str, te.Expression)):
         return location_to_module(source_)
@@ -324,7 +342,7 @@ def is_source(source_, exists=True):
     if isinstance(source_, pathlib.Path):
         source_ = str(source_)
 
-    if isinstance(source_, src.Source):
+    if isinstance(source_, source_mod.Source):
         if exists:
             return source_.exists()
         else:
@@ -335,7 +353,7 @@ def is_source(source_, exists=True):
         except SourceModuleNotFoundError:
             return False
         if exists:
-            return mod.Source(source_).exists()
+            return module_to_source_cls[mod](source_).exists()  # FIXME: bypass module altogether with separate dict
         else:
             return True
     elif isinstance(source_, (np.memmap, np.ndarray, list, tuple)):
@@ -363,9 +381,9 @@ def as_source(source_, slicing=None, *args, **kwargs):
     if isinstance(source_, pathlib.Path):
         source_ = str(source_)
 
-    if not isinstance(source_, src.Source):
+    if not isinstance(source_, source_mod.Source):
         mod = source_to_module(source_)
-        source_ = mod.Source(source_, *args, **kwargs)
+        source_ = module_to_source_cls[mod](source_, *args, **kwargs)  # FIXME: bypass mod altogether
     if slicing is not None:
         source_ = slc.Slice(source=source_, slicing=slicing)
     return source_
@@ -571,7 +589,7 @@ def _is_feather_path(source_) -> bool:
 
 # TODO: arg memory= to specify which kind of array is created, better use device=
 # TODO: arg processes= in order to use ParallelIO -> can combine with buffer=
-def read(source_, *args, **kwargs):
+def read(source_, slicing=None, *args, **kwargs):
     """
     Read data from a data source.
 
@@ -596,10 +614,13 @@ def read(source_, *args, **kwargs):
         return pd.read_feather(source_)
     elif isinstance(source_, np.ndarray):  # Already materialised — nothing to do
         return source_
-    elif isinstance(source_, src.Source):  # Source-like with .array (Block, Slice, NPY.Source, MMP.Source, ...)
-        if hasattr(source_, 'array'):
-            return source_.array
-        raise ValueError(f'Source {source_} has no array property and cannot be read directly')
+    elif isinstance(source_, source_mod.Source):  # Source-like with .array (Block, Slice, NPY.Source, MMP.Source, ...)
+        if not hasattr(source_, 'array'):
+            raise ClearMapValueError(f'Source {source_} has no array property and cannot be read directly')
+        if args or kwargs:
+            warnings.warn(f'Ignoring unsupported read arguments {args=} and {kwargs=}'
+                          f' for materialised source {source_!r}.', stacklevel=2)
+        return source_.array  if slicing is None else source_[slicing]
 
     # File path or expression — dispatch to the right module
     mod = source_to_module(source_)
@@ -613,7 +634,7 @@ def open_ro(source_, **kwargs):
     if _is_feather_path(source_):
         return pd.read_feather(source_)
     mod = source_to_module(source_)
-    if isinstance(source_, src.Source):
+    if isinstance(source_, source_mod.Source):
         if source_.mode == 'r':
             return source_
         if hasattr(mod, 'open_ro'):
@@ -623,7 +644,24 @@ def open_ro(source_, **kwargs):
         if hasattr(mod, 'open_ro'):
             return mod.open_ro(source_, **kwargs)
     # no open_ro available -> fallback: construct with mode='r'
-    return mod.Source(source_, mode='r', **kwargs)
+    return module_to_source_cls[mod](source_, mode='r', **kwargs)
+
+
+@contextmanager
+def peek_into(source_, **kwargs):
+    """Temporarily open *source_* for metadata inspection.
+
+    Existing Source objects remain owned by the caller. Sources opened from
+    paths or other descriptors are closed on exit when possible.
+    """
+    source = open_ro(source_, **kwargs)
+    owns_source = source is not source_
+
+    try:
+        yield source
+    finally:
+        if owns_source and hasattr(source, 'close'):
+            source.close()  # FIXME: no `close` API in Source
 
 
 def edit(source_, **kwargs):
@@ -743,43 +781,43 @@ def initialize(source_=None, shape_=None, dtype_=None,
         shape_, dtype_, order_ = _from_like(like, shape_, dtype_, order_)
 
     if source_ is None:
-        if location_ is not None:  # No source but a path
-            try: # First, attempt to read the source in 'edit' mode
-                mod = location_to_module(location_)
-                if hasattr(mod, 'edit'):
-                    source_ = mod.edit(location_)
-                else:
-                    source_ = as_source(location_, mode='r+')  # FIXME: check if we nuke existing data here, maybe we need an argument erase=False and/or a warning
-            except (FileNotFoundError, ValueError) as err:  # No file found, then create # TODO: see if nore exceptions are needed
-                if isinstance(err, ValueError):
-                    if not str(err).startswith('Cannot create memmap without shape at location'):  # FIXME: msg too specific, use ClearMap specific exception class
-                        raise err
-                try:
-                    if os.path.exists(location_):
-                        parsed_shape = shape(source_)
-                        parsed_dtype = dtype(source_)
-                        parsed_order = order(source_)
-                        if not (parsed_shape == shape_ and parsed_dtype == dtype_ and parsed_order == order_):
-                            raise ValueError(f'Cannot create source at location {location_} with '
-                                             f'shape {shape_}, dtype {dtype_}, order {order_}; '
-                                             f'file exists with shape {parsed_shape}, dtype {parsed_dtype}, order {parsed_order}')
-                    shape_, dtype_, order_ = _from_hint(hint, shape_, dtype_, order_)
-                    return mod.create(location=location_, shape=shape_, dtype=dtype_, order=order_, **kwargs)
-                except Exception as error:
-                    raise ValueError(f'Cannot initialize source for location {location_}; {error}')
-        else:  # No source and no path, create an array in memory, regular or shared
+        if location_ is None:  # No source and no path: array in memory, regular or shared
             shape_, dtype_, order_ = _from_hint(hint, shape_, dtype_, order_)
             if memory_ in ['shared', 'automatic']:
                 return sma.create(shape=shape_, dtype=dtype_, order=order_, **kwargs)
             else:
-                return npy.create(shape=shape_, dtype=dtype_, order=order_)
+                return npy.create(shape=shape_, dtype=dtype_, order=order_, **kwargs)
+        else:  # No source but a path
+            # Before try because missing module != missing file so shouldn't fall through to creation.
+            mod = location_to_module(location_)
+            try:  # First, attempt to open the existing source in 'edit' mode
+                if hasattr(mod, 'edit'):
+                    source_ = mod.edit(location_)
+                else:
+                    source_ = as_source(location_, mode=source_mod.DEFAULT_EDIT_MODE)
+            except AssetNotFoundError:  # workspace-level failure is not a reason to create a file
+                raise  # WARNING: must stay before FileNotFoundError
+            except (SourceNotFoundError, FileNotFoundError): # TODO: narrow to SourceNotFoundError once every IO module raises it.
+                source_ = None
+            # Anything else (IncompleteSourceSpecError, corrupt header, shape mismatch) != missing file -> propagates
+
+            if source_ is None:  # Opening existing failed -> creation path
+                if isinstance(location_, str) and pathlib.Path(location_).is_file():  # Just belt and braces
+                    raise ClearMapRuntimeError(f'{location_} exists but could not be opened for editing; refusing overwrite.')
+                shape_, dtype_, order_ = _from_hint(hint, shape_, dtype_, order_)
+                try:
+                    return mod.create(location=location_, shape=shape_, dtype=dtype_, order=order_, **kwargs)
+                except ClearMapException:  # Catch and raise specific to avoid generic path
+                    raise
+                except Exception as error:
+                    raise ClearMapRuntimeError(f'Cannot initialize source for location {location_}') from error
 
     if isinstance(source_, np.ndarray):
         source_ = as_source(source_)
 
     # ######## Exception handling ##############
-    if not isinstance(source_, src.Source):
-        raise ValueError(f'Source specification {source_} not a valid location, array or Source class!')
+    if not isinstance(source_, source_mod.Source):
+        raise ClearMapValueError(f'Source specification {source_} not a valid location, array or Source class!')
 
     current_vars = locals()
     for attr in ('shape_', 'dtype_', 'order_'):
@@ -790,29 +828,85 @@ def initialize(source_=None, shape_=None, dtype_=None,
     if location_ is not None and abspath(location_) != abspath(source_.location):
         raise IncompatibleSource(source_, 'location', current_vars)
     if memory_ == 'shared' and not sma.is_shared(source_):
-        raise ValueError(f'Incompatible memory type, the source {source_} is not shared!')
+        raise ClearMapValueError(f'Incompatible memory type, the source {source_} is not shared!')
 
     return source_
 
 
 def _from_like(like, shape, dtype, order):
-    if like is not None:
-        like = open_ro(like)
-        if shape is None:
-            shape = like.shape
-        if dtype is None:
-            dtype = like.dtype
-        if order is None:
-            order = like.order
-    return shape, dtype, order
+    """Resolve geometry from a template (``like``) source.
+
+    Parameters
+    ----------
+    like : object or None
+        Source, source location, or other object from which missing geometry
+        properties can be inferred.
+    shape : tuple-like or None
+        Requested shape. If ``None``, infer it from ``like``.
+    dtype : dtype-like or None
+        Requested data type. If ``None``, infer it from ``like``.
+    order : {'C', 'F'} or None
+        Requested memory order. If ``None``, infer it from ``like``.
+
+    Returns
+    -------
+    shape : tuple-like or None
+        Explicitly supplied or inferred shape.
+    dtype : numpy.dtype or None
+        Explicitly supplied or inferred data type.
+    order : {'C', 'F'} or None
+        Explicitly supplied or inferred memory order.
+
+    Notes
+    -----
+    Explicit values take precedence over values inferred from ``like``.
+    The source is opened read-only for metadata inspection and any temporary
+    source opened for that purpose is closed before returning.
+    """
+    if like is None:
+        return shape, dtype, order
+    else:
+        with peek_into(like) as source:
+            return source_mod.resolve_geometry(shape=shape, dtype=dtype, order_=order, like=source)
 
 
 def _from_hint(hint, shape, dtype, order):
-    """Helper for initialize."""
+    """Best-effort geometry inference from an initialization hint.
+    Contrary to _from_like, this does not Raise
+
+    Parameters
+    ----------
+    hint : object or None
+        Source, source location, or other object from which missing geometry
+        properties should be inferred.
+    shape : tuple-like or None
+        Requested shape, or ``None`` to infer it from ``hint``.
+    dtype : dtype-like or None
+        Requested data type, or ``None`` to infer it from ``hint``.
+    order : {'C', 'F'} or None
+        Requested memory order, or ``None`` to infer it from ``hint``.
+
+    Returns
+    -------
+    shape : tuple-like or None
+        Explicitly supplied or inferred shape.
+    dtype : numpy.dtype or None
+        Explicitly supplied or inferred data type.
+    order : {'C', 'F'} or None
+        Explicitly supplied or inferred memory order.
+
+    Notes
+    -----
+    This is a non-raising wrapper around :func:`_from_like`. If inference
+    fails for any reason, a warning is emitted and the original values are
+    returned unchanged.
+
+    Explicit values take precedence over values inferred from ``hint``.
+    """
     try:
         return _from_like(hint, shape, dtype, order)
     except Exception as err:
-        warnings.warn(f'Cannot infer shape, dtype and order from hint {hint}, keeping defaults; {err}')
+        warnings.warn(f'Cannot infer shape, dtype and order from hint {hint}, keeping defaults; {err}', stacklevel=2)
         return shape, dtype, order
   
 
@@ -925,7 +1019,7 @@ def get_value(source_, value_type):  # REFACTOR: should be moved to io_utils or 
     if value_type not in ['min', 'max']:
         raise ValueError(f'Unknown value type {value_type}, accepted Parameters are "min" and "max"!')
 
-    if isinstance(source_, (src.Source, np.ndarray)):
+    if isinstance(source_, (source_mod.Source, np.ndarray)):
         source_ = source_.dtype
 
     if isinstance(source_, str):
@@ -1073,7 +1167,7 @@ def _convert_files(source_, sink, fid, n_files, extension, verbose, verify=False
     source_ = open_ro(source_)
     if verbose:
         print(f'Converting file {fid}/{n_files} {source_} -> {sink}')
-    mod = file_extension_to_module[extension]
+    mod = file_extension_to_module[extension]  # FIXME: ammend file_name_to_module to handle extension for SST
     if mod is None:
         raise ValueError(f"Cannot determine module for extension {extension}!")
     mod.write(sink, source_)

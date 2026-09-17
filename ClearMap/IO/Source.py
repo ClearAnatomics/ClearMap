@@ -19,8 +19,142 @@ import numpy as np
 import ClearMap.IO.FileUtils as fu
 
 from ClearMap.Utils.Formatting import ensure
-from ClearMap.Utils.exceptions import ClearMapValueError, ClearMapRuntimeError
+from ClearMap.Utils.exceptions import (ClearMapValueError, ClearMapRuntimeError, ClearMapPermissionError,
+                                       ClearMapNotImplementedError)
 
+VALID_MODES         = ('r', 'c', 'r+', 'w+')
+EXISTING_FILE_MODES = ('r', 'c', 'r+')
+CREATING_MODES      = ('w+',)            # truncate-or-create; one-shot, never stored
+READ_ONLY_MODES     = ('r',)
+WRITABLE_MODES      = ('c', 'r+', 'w+')  # 'c' accepts writes but does not save
+PERSISTABLE_MODES   = ('r+', 'w+')       # writes actually reach disk.  Not 'C' because 'C' is copy-on-write in memory
+DEFAULT_READ_MODE   = 'r'
+DEFAULT_EDIT_MODE   = 'r+'
+
+
+def _normalise_order(value):
+    value = ensure(value, str).upper()
+    if value not in ('C', 'F'):
+        raise ClearMapValueError('Invalid order.', value=value, expected=('C', 'F'))
+    return value
+
+
+_NORMALISERS = {'shape': tuple, 'dtype': np.dtype, 'order': _normalise_order}
+
+
+def order(array):
+    """Returns the contiguous order of an array.
+
+    Arguments
+    ---------
+    array : ndarray or Source
+
+    Returns
+    -------
+    order : 'C', 'F', None
+        None if the array is not contiguous, or if *array* is not something whose order
+        can be determined. Note that for shapes with at most one axis longer than 1 both
+        orders hold and 'C' is returned arbitrarily; use ``order_is_ambiguous`` before
+        treating a mismatch as meaningful.
+    """
+    if isinstance(array, Source):
+        value = array.order
+        return _normalise_order(value) if value is not None else None
+    elif isinstance(array, np.ndarray):
+        if array.flags['C_CONTIGUOUS']:
+            return 'C'
+        elif array.flags['F_CONTIGUOUS']:
+            return 'F'
+        else:
+            return None
+    else:
+        return None
+
+
+def order_is_ambiguous(shape):
+    """Whether C and F order are indistinguishable for this shape."""
+    return sum(n > 1 for n in tuple(shape)) <= 1
+
+
+def validate_mode(mode, *, allow_none=False, context=''):
+    """Normalise and check a mode string; raises rather than letting np.memmap decide."""
+    if mode is None:
+        if allow_none:
+            return None
+        raise ClearMapValueError(f'{context or "mode"}: a mode is required.', value=mode, expected=VALID_MODES)
+    mode = ensure(mode, str)
+    if mode not in VALID_MODES:
+        raise ClearMapValueError(f'{context or "mode"}: invalid mode {mode!r}.', value=mode, expected=VALID_MODES)
+    return mode
+
+
+def mode_after_create(mode):
+    """The mode a source must carry *after* a create call has consumed its creation intent.
+
+    ``'w+'`` is a one-shot instruction: retaining it means every later reopen,
+    ``as_real()`` or relocation re-truncates the file. Everything else passes through
+    unchanged, including ``None``.
+    """
+    return DEFAULT_EDIT_MODE if mode in CREATING_MODES else mode
+
+
+def properties_match(source, **properties):
+    """True if *source* matches every recognised property given.
+
+    Unrecognised keys and ``None`` values are ignored, so a kwargs bag can be passed
+    straight in. Values are normalised before comparison, so ``[10] == (10,)`` and
+    ``'f4' == float32``. ``order`` is skipped where the shape makes both orders equally
+    true, so a length-1 or 1-d source is never reported as mismatched on order alone.
+    """
+    for key, normalise in _NORMALISERS.items():
+        requested = properties.get(key)
+        if requested is None:  # not asked about
+            continue
+        if key == 'order':
+            if order_is_ambiguous(source.shape):
+                continue
+            actual = order(source)
+            if actual is None:  # non-contiguous: no order to compare against
+                raise ClearMapValueError(
+                    f'Cannot compare order of non-contiguous {source!r}.',
+                    value=source, expected='a contiguous source')
+        else:
+            actual = normalise(getattr(source, key))
+        if normalise(requested) != actual:
+            return False
+    return True
+
+
+def resolve_geometry(shape=None, dtype=None, order_=None, *,
+                     array=None, like=None, default_order=None):
+    """Resolve normalised shape, dtype and order from explicit values and templates."""
+    if array is not None:
+        if shape is None:
+            shape = getattr(array, 'shape', None)
+        if dtype is None:
+            dtype = getattr(array, 'dtype', None)
+        if order_ is None:
+            order_ = order(array)
+
+    if like is not None:
+        if shape is None:
+            shape = getattr(like, 'shape', None)
+        if dtype is None:
+            dtype = getattr(like, 'dtype', None)
+        if order_ is None:
+            order_ = order(like)
+
+    if order_ is None:
+        order_ = default_order
+
+    if shape is not None:
+        shape = tuple(shape)
+    if dtype is not None:
+        dtype = np.dtype(dtype)
+    if order_ is not None:
+        order_ = _normalise_order(order_)
+
+    return shape, dtype, order_
 
 ###############################################################################
 ### Source base class
@@ -178,22 +312,33 @@ class Source:
 
     @property
     def is_writable(self):
-        """True if in-memory writes are permitted (mode != 'r')."""
-        return self._mode != 'r'
+        """True if in-memory mutation via __setitem__ is permitted.
+
+        Note: mode 'c' is writable *in memory only* — changes are never persisted.
+        """
+        return self.mode is None or self.mode in WRITABLE_MODES
 
     @property
     def is_persistable(self):
         """True if changes can be written back to disk (mode 'r+' or 'w+')."""
-        return self._mode in ('r+', 'w+', None)
+        if self.mode in PERSISTABLE_MODES:
+            return True
+        if self.mode is None:
+            # mode-less is only honest for pure in-memory sources
+            return self.location is None  # FIXME: check if self.mode or self._mode
+        return False
 
     def __getitem__(self, *args):
         raise KeyError('No getitem routine for this source!')
 
     def __setitem__(self, *args):
         if not self.is_writable:
-            raise PermissionError(
-                f'Source {self} was opened read-only (mode="r"). '
-                f'Use io.edit() to open for writing.')
+            raise ClearMapPermissionError(f'Source {self} was opened read-only (mode="r"). '
+                                          f'Use io.edit() to open for writing.')
+        if self.location is not None and not self.is_persistable:
+            raise ClearMapPermissionError(f'Source {self} was opened with mode={self._mode!r}; '
+                                          f'writes would not be persisted to {self.location}. '
+                                          f'Use io.edit() to open for writing.')
         raise KeyError('No setitem routine for this source!')
 
     def read(self, *args, **kwargs):
@@ -208,35 +353,25 @@ class Source:
             name = self.name
             name = f'{name}' if name is not None else ''
         except:
-            # print('name')
             name =''
 
         try:
             shape = self.shape
             shape ='%r' % ((shape,)) if shape is not None else ''
         except:
-            # print('shape')
             shape = ''
 
         try:
             dtype = self.dtype
             dtype = f'[{dtype}]' if dtype is not None else ''
         except:
-            # print('dtype')
             dtype = ''
 
         try:
             order = self.order
             order = f'|{order}|' if order is not None else ''
         except:
-            # print('order')
             order = ''
-
-        # try:
-        #     memory = self.memory
-        #     memory = '<%s>' % memory if memory is not None else ''
-        # except:
-        #     memory = ''
 
         try:
             location = self.location
@@ -385,6 +520,10 @@ class AbstractSource(Source):
     def location(self, value):
         self._location = ensure(value, str)
 
+    @property
+    def is_writable(self):  # FIXME: check if parent implementation is OK
+        return self.mode in WRITABLE_MODES
+
     def as_virtual(self):
         return self
 
@@ -412,8 +551,10 @@ class VirtualSource(AbstractSource):
 
     @property
     def name(self):
+        if self._name is not None:
+            return self._name
         mod_name = type(self).__module__.split(".")[-1]
-        return getattr(self, '_name', f'Virtual-{mod_name}-Source')
+        return f'Virtual-{mod_name}-Source'
 
     def __getitem__(self, *args):
         return self.as_real().__getitem__(*args)
@@ -439,6 +580,45 @@ class VirtualSource(AbstractSource):
         if self._real_class is None:
             raise ClearMapRuntimeError(f'{self.__class__.__name__} must set _real_class or override as_real()')
         return self._real_class(location=self.location, mode=self._mode)
+
+
+# Module level API
+
+def create(location=None, shape=None, dtype=None, order=None, mode=None,
+           array=None, as_source=True, **kwargs):
+    """Create a source.
+
+    This generic implementation exists as the default operation for backend
+    modules that do not support source creation.
+    """
+    raise ClearMapNotImplementedError('Creating sources is not implemented by this backend.')
+
+
+def open_ro(source_, **kwargs):
+    """Open a source read-only.
+
+    Backends that cannot provide read-only access should inherit this default
+    implementation.
+    """
+    raise ClearMapNotImplementedError('Opening sources read-only is not implemented by this backend.')
+
+
+def read(source_, **kwargs):
+    """Read data from a source.
+
+    Backends that do not support reading should inherit this default
+    implementation.
+    """
+    raise ClearMapNotImplementedError('Reading sources is not implemented by this backend.')
+
+
+def write(sink, data=None, slicing=None, overwrite=False, **kwargs):
+    """Write data to a source.
+
+    Backends that do not support writing should inherit this default
+    implementation.
+    """
+    raise ClearMapNotImplementedError('Writing sources is not implemented by this backend.')
 
 
 
