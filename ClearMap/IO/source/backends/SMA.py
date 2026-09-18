@@ -25,7 +25,6 @@ import ClearMap.ParallelProcessing.SharedMemoryManager as smm
 import ClearMap.IO.source.Source as source_mod
 from ClearMap.IO.source.backends.NPY import NumpySource
 
-from ClearMap.ParallelProcessing.SharedMemoryArray import base  #analysis:ignore
 
 __all__ = sma.__all__
 
@@ -48,7 +47,7 @@ class SMASource(NumpySource):
 
     @property
     def base(self):
-        return base(self.array)
+        return sma.base(self.array)
 
     @property
     def handle(self):
@@ -232,9 +231,9 @@ def _shared(shape = None, dtype = None, order = None, array=None, handle = None)
 
 def _test():
     n = 10
-    array = SMA.zeros(n)
+    array = sma.zeros(n)
 
-    s = SMA.SMASource(array = array)
+    s = SMASource(array = array)
     print(s)
 
     v = s.as_virtual()
