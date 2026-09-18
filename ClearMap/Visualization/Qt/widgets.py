@@ -86,6 +86,7 @@ class Scatter3D:
                     symbols = [self.out_of_bounds_symbol] + self.symbols
                 else:
                     symbols = self.symbols
+                # FIXME: id_ is probably unhashable
                 self.symbol_map = {id_: symbols[i] for i, id_ in enumerate(hemispheres_values)}
 
             # colors = colors if colors is None else np.array([QColor( * col.astype(int)) for col in colors]

@@ -18,10 +18,10 @@ __download__  = 'https://www.github.com/ChristophKirst/ClearMap2'
 
 import numpy as np
 
-import ClearMap.IO.Source as source_mod
+import ClearMap.IO.source.Source as source_mod
 # noinspection PyUnusedImports
-from ClearMap.IO.Source import create, open_ro
-import ClearMap.IO.Slice as slc
+from ClearMap.IO.source.backend_defaults import create, open_ro
+import ClearMap.IO.source.Slice as slc
 
 ###############################################################################
 ### CSVSource class
@@ -29,6 +29,8 @@ import ClearMap.IO.Slice as slc
 
 class CSVSource(source_mod.Source):
     """CSV array source."""
+    _CACHED_PROPERTIES = ('_frame',)
+
 
     def __init__(self, location, mode=None):
         """CSV source class constructor.
@@ -39,6 +41,10 @@ class CSVSource(source_mod.Source):
             The filename of the csv source.
         """
         super().__init__(location, mode)
+
+    @cached_property
+    def _frame(self):
+        return _array(self.location)
 
     @property
     def location(self):
@@ -154,49 +160,6 @@ class CSVSource(source_mod.Source):
 
     def as_buffer(self):
         return self.array
-
-    ### Formatting
-    def __str__(self):
-        try:
-            name = self.name
-            name = '%s' % name if name is not None else ''
-        except:
-            name =''
-
-        try:
-            array = self.array
-        except:
-            array = None
-
-        try:
-            shape = array.shape
-            shape ='%r' % ((shape,)) if shape is not None else ''
-        except:
-            shape = ''
-
-        try:
-            dtype = array.dtype
-            dtype = '[%s]' % dtype if dtype is not None else ''
-        except:
-            dtype = ''
-
-        try:
-            order = array.order
-            order = '|%s|' % order if order is not None else ''
-        except:
-            order = ''
-
-        try:
-            location = self.location
-            location = '%s' % location if location is not None else ''
-            if len(location) > 100:
-                location = location[:50] + '...' + location[-50:]
-            if len(location) > 0:
-                location = '{%s}' % location
-        except:
-            location = ''
-
-        return name + shape + dtype + order + location
 
 
 class CSVVirtualSource(source_mod.VirtualSource):
@@ -319,7 +282,7 @@ def test():
     """Test CSV module"""
     import os
     import numpy as np
-    from ClearMap.IO.CSV import CSVSource
+    from ClearMap.IO.source.backends.CSV import CSVSource
     
     location = 'test.csv'
     points = np.random.rand(5,3)

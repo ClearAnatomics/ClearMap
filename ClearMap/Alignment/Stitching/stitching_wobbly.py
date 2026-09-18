@@ -23,7 +23,8 @@ import multiprocessing as mp
 
 import ClearMap.IO.IO as io
 from ClearMap.IO import io_ops
-import ClearMap.IO.Slice as slc
+import ClearMap.IO.source.Slice as slc
+from ClearMap.IO.source.backends import MMP, SMA
 
 import ClearMap.Alignment.Stitching.stitching_rigid as strg
 import ClearMap.Alignment.Stitching.Tracking as trk
@@ -1738,8 +1739,8 @@ def _optimize_slice_positions(positions, components, processes = None, workspace
 
 
         # construct x, M
-        X = [io.sma.zeros(n_s) for d in range(ndim)]
-        M = [io.sma.zeros((n_s, n_s)) for d in range(ndim)]
+        X = [SMA.sma.zeros(n_s) for d in range(ndim)]
+        M = [SMA.sma.zeros((n_s, n_s)) for d in range(ndim)]
         for ci, c in enumerate(cluster_component[1:]):
             #if verbose and ci % 100 == 0:
             #  print('Placement: constructing constraints %d/%d!' % (ci, n_clusters))
@@ -1790,8 +1791,8 @@ def _optimize_slice_positions(positions, components, processes = None, workspace
         #print np.linalg.pinv(-M)
 
         if isinstance(processes, int) and processes > 1:
-            M = [io.sma.smm.insert(m) for m in M]
-            X = [io.sma.smm.insert(x) for x in X]
+            M = [SMA.smm.insert(m) for m in M]
+            X = [SMA.smm.insert(x) for x in X]
             with CancelableProcessPoolExecutor(min(processes, ndim)) as executor:
                 shifts = executor.map(_optimize_shifts, M, X)
                 if workspace is not None:
@@ -1823,15 +1824,15 @@ def _optimize_slice_positions(positions, components, processes = None, workspace
 
 
 def _optimize_shifts(MM, XX):
-    M = io.sma.smm.get(MM)
-    X = io.sma.smm.get(XX)
+    M = SMA.smm.get(MM)
+    X = SMA.smm.get(XX)
 
     #ss = np.dot(np.linalg.pinv(-M), X);
     ss = np.linalg.lstsq(-M, X, rcond=None)[0]
     #ss = scipy.sparse.linalg.lsqr(-M, X)[0];
 
-    io.sma.smm.free(MM)
-    io.sma.smm.free(XX)
+    SMA.smm.free(MM)
+    SMA.smm.free(XX)
 
     return np.asarray(np.round(ss), dtype=int)
 
@@ -2099,7 +2100,7 @@ def stitch_layout(layout, sink, method = 'interpolation', processes = None, verb
 
     # create sink
     #TODO: make layout a sink ! use io.create
-    io.mmp.create(sink, shape=shape, dtype=layout.dtype, order=layout.order)
+    MMP.create(sink, shape=shape, dtype=layout.dtype, order=layout.order)
 
     # create slices
     coordinates = np.arange(origin[axis], origin[axis] + shape[axis])

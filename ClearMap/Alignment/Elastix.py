@@ -75,13 +75,11 @@ import multiprocessing as mp
 
 import numpy as np
 
-
 import ClearMap.Settings as settings
 from ClearMap.IO import conversion, io_ops
-from ClearMap.IO.TIF import TifSource
-from ClearMap.Utils.exceptions import ClearMapException, ClearMapValueError, ClearMapRuntimeError
+from ClearMap.IO.source.backends.TIF import TifSource
+from ClearMap.Utils.exceptions import ClearMapValueError, ClearMapRuntimeError
 
-import ClearMap.IO.IO as io
 from ClearMap.IO.elastix_config import ElastixParser
 
 from ClearMap.Alignment.Transformations.Transformation import TransformationBase

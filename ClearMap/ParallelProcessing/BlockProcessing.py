@@ -728,8 +728,9 @@ def _unpack(values, ndim = None):
 def _test():
   import numpy as np
   import ClearMap.IO.IO as io
-  from ClearMap.IO.SMA import SMASource
-  from ClearMap.IO.NPY import NumpySource
+  from ClearMap.IO.source.backends.SMA import SMASource
+  from ClearMap.IO.source.backends.NPY import NumpySource
+  from ClearMap.IO.source.backends import MMP
   import ClearMap.ParallelProcessing.BlockProcessing as bp
   
   source = io_ops.open_ro(np.asarray(np.random.rand(50, 100, 200), order ='F'))
@@ -781,9 +782,9 @@ def _test():
                               return_blocks = True, processes = None, verbose = True)
 
   #memmaps loading
-  source = io.mmp.create(location='source.npy', shape=shape)
+  source = MMP.create(location='source.npy', shape=shape)
   source[:] = np.random.rand(*shape)
-  sink = io.mmp.create(location='sink.npy', shape=shape)
+  sink = MMP.create(location='sink.npy', shape=shape)
   
   bp.process(process_image, source, sink,
              size_max = 10, size_min = 6, overlap = 3, axes = [2],

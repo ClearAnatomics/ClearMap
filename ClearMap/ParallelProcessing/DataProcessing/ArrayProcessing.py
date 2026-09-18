@@ -28,7 +28,7 @@ import pyximport
 
 import ClearMap.IO.IO as io
 from ClearMap.IO import dispatch, source_initialization, io_ops
-import ClearMap.IO.Slice as slc
+import ClearMap.IO.source.Slice as slc
 
 import ClearMap.Utils.Timer as tmr
 from ClearMap.Utils.utilities import sanitize_n_processes

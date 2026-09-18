@@ -16,9 +16,9 @@ import pyximport;
 pyximport.install(setup_args={"include_dirs":np.get_include()}, reload_support=True)
 
 import ClearMap.IO.IO as io
-from ClearMap.IO.MMP import MMPSource
-import ClearMap.IO.SMA as sma
-import ClearMap.IO.Slice as slc
+from ClearMap.IO.source.backends.MMP import MMPSource
+import ClearMap.IO.source.backends.SMA as sma
+import ClearMap.IO.source.Slice as slc
 import ClearMap.IO.FileUtils as fu
 import ClearMap.Utils.Timer as tmr
 

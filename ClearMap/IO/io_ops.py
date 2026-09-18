@@ -4,7 +4,7 @@ import warnings
 import numpy as np
 import pandas as pd
 
-from ClearMap.IO import Source as source_mod
+from ClearMap.IO.source import Source as source_mod
 from ClearMap.IO.IO import _is_feather_path, module_to_source_cls
 from ClearMap.IO.dispatch import source_to_module, as_source
 from ClearMap.Utils.exceptions import ClearMapValueError

@@ -1,5 +1,3 @@
-from copy import deepcopy
-
 EXTENSIONS = {
     'image': ['.npy', '.tif', '.tiff'],
     'portable_image': ['.tif', '.tiff'],

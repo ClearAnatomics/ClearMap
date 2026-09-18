@@ -25,7 +25,9 @@ import numpy as np
 import cv2
 
 import ClearMap.IO.IO as io
-import ClearMap.IO.FileList as fl
+from ClearMap.IO import conversion, source_initialization, io_ops
+from ClearMap.IO.source.backends import SMA, MMP
+import ClearMap.IO.source.backends.FileList as fl
 
 import ClearMap.ParallelProcessing.ProcessWriter as pw
 import ClearMap.ParallelProcessing.ParallelTraceback as ptb
@@ -37,7 +39,6 @@ from .Transformations.Transformation import TransformationBase
 from ClearMap.Alignment.orientation import (format_orientation, orientation_to_transposition, orient_resolution,
                                             orient_shape, orient, orient_points)
 from ClearMap.Utils.utilities import handle_deprecated_args
-from ..IO import conversion, source_initialization, io_ops
 
 
 def resample_shape_from_resolution(original_shape, original_resolution, resampled_resolution,
@@ -611,10 +612,10 @@ def resample(original, resampled=None,
             resampled_data = source_initialization.initialize(resampled, shape_=resampled_shape, dtype_=dtype, as_source=True)
         else:
             if method == 'shared':
-                resampled_data = io.sma.create(shape, dtype=dtype, order=order, as_source=True)
+                resampled_data = SMA.create(shape, dtype=dtype, order=order, as_source=True)
             else:
                 location = tempfile.mktemp(suffix='.npy')
-                resampled_data = io.mmp.create(location, shape=shape, dtype=dtype, order=order, as_source=True)
+                resampled_data = MMP.create(location, shape=shape, dtype=dtype, order=order, as_source=True)
                 delete_files.append(location)
 
         # indices for non-resampled axes

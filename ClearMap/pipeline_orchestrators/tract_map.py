@@ -13,7 +13,7 @@ import pandas as pd
 
 from ClearMap.IO import io_ops
 from ClearMap.IO import IO as clearmap_io
-from ClearMap.IO.MMP import MMPSource
+from ClearMap.IO.source.backends.MMP import MMPSource
 from ClearMap.IO.workspace2 import Workspace2
 
 from ClearMap.Utils.exceptions import MissingRequirementException

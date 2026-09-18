@@ -141,24 +141,26 @@ from contextlib import contextmanager
 
 import numpy as np
 
-import ClearMap.IO.Source as source_mod
-import ClearMap.IO.TIF as tif
-import ClearMap.IO.NRRD as nrrd
-import ClearMap.IO.CSV as csv
-import ClearMap.IO.NPY as npy
-import ClearMap.IO.MMP as mmp
-import ClearMap.IO.SMA as sma
-import ClearMap.IO.MHD as mhd
+import ClearMap.IO.source.Source as source_mod
+import ClearMap.IO.source.backends.TIF as tif
+import ClearMap.IO.source.backends.NRRD as nrrd
+import ClearMap.IO.source.backends.CSV as csv
+import ClearMap.IO.source.backends.NPY as npy
+import ClearMap.IO.source.backends.MMP as mmp
+import ClearMap.IO.source.backends.SMA as sma
+import ClearMap.IO.source.backends.MHD as mhd
+
 from ClearMap.IO.dispatch import location_to_module, as_source
 from ClearMap.IO.io_ops import open_ro
+
 from ClearMap.Utils.exceptions import (SourceModuleNotFoundError)
 
 try:
-    import ClearMap.IO.GT as gt
+    import ClearMap.IO.source.backends.GT as gt
     gt_loaded = True
 except ImportError:
     gt_loaded = False
-import ClearMap.IO.FileList as fl
+import ClearMap.IO.source.backends.FileList as fl
 
 import ClearMap.Utils.tag_expression as te
 
@@ -178,13 +180,16 @@ from ClearMap.IO.FileUtils import (is_file, is_directory, file_extension,
 source_modules = [npy, tif, mmp, sma, fl, nrrd, mhd, csv]
 """The valid source modules."""
 
-file_extension_to_module = {'npy': mmp,
-                            'tif': tif,
-                            'tiff': tif,
-                            'nrrd': nrrd,
-                            'nrdh': nrrd,
-                            'csv': csv,
-                            'mhd': mhd}
+
+file_extension_to_module = {
+    'npy': mmp,
+    'tif': tif,
+    'tiff': tif,
+    'nrrd': nrrd,
+    'nrdh': nrrd,
+    'csv': csv,
+    'mhd': mhd
+}
 
 # FIXME: there MUST be a better way
 module_to_source_cls = {

@@ -588,7 +588,7 @@ def replace(expression, replace = None, ignore = None):
           else:
             rr = '%r' % r;
           newpattern += [(TEXT, rr)];
-          replace_group[rid] = rr;
+          replace_group[rid] = rr;  # FXIME: cannot use unhashable type
         else:
           newpattern.append(p);
       else:

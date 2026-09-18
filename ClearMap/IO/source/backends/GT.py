@@ -22,13 +22,16 @@ __download__  = 'https://www.github.com/ChristophKirst/ClearMap2'
 
 from ClearMap.Analysis.graphs import graph_gt
 
-import ClearMap.IO.Source as source_mod
+import ClearMap.IO.source.Source as source_mod
+from ClearMap.IO.IO import source_modules
 # noinspection PyUnusedImports
-from ClearMap.IO.Source import create
+from ClearMap.IO.source.backend_defaults import create
 
 ###############################################################################
 ### Source class
 ###############################################################################
+
+GRAPH = source_modules.ReprField('graph', convert=lambda g: str(g)[5:])
 
 
 class GraphGtSource(source_mod.Source):
@@ -116,32 +119,6 @@ class GraphGtSource(source_mod.Source):
 
     def copy(self):
         return GraphGtSource(graph=self.graph.copy())
-
-
-    ### Formatting
-    def __str__(self):
-        try:
-            name = self.name
-            name = '%s' % name if name is not None else ''
-        except:
-            name =''
-
-        try:
-            graph = self._graph.__str__()[5:]
-        except:
-            graph = ''
-
-        try:
-            location = self.location
-            location = '%s' % location if location is not None else ''
-            if len(location) > 100:
-                location = location[:50] + '...' + location[-50:]
-            if len(location) > 0:
-                location = '{%s}' % location
-        except:
-            location = ''
-
-        return name + graph + location
 
 
 class GrpahGtVirtualSource(source_mod.VirtualSource):
@@ -282,19 +259,18 @@ def test():
     """Test GT module"""
     import os
     from ClearMap.Analysis.graphs import graph_gt
-    import ClearMap.IO.GT as gt
-    
+
     location = 'test.gt'
 
     g = graph_gt.Graph(n_vertices=10)
  
-    s = gt.GraphGtSource(graph=g, location=location)
+    s = GT.GraphGtSource(graph=g, location=location)
     s.shape = (1,2,3)
     print(s)
 
     s.write()
 
-    r = gt.GraphGtSource(location=location)
+    r = GT.GraphGtSource(location=location)
     print(r.shape)
     
     os.remove(location)

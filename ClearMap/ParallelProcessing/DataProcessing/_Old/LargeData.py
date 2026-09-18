@@ -40,7 +40,7 @@ pyximport.install(setup_args = {"include_dirs" : [np.get_include(), os.path.dirn
 
 import ClearMap.Utils.Timer as tmr
 
-import ClearMap.IO.SMA as shm
+import ClearMap.IO.source.backends.SMA as shm
 
 import ClearMap.ParallelProcessing.DataProcessing.LargeDataCode as code
 

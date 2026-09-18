@@ -24,9 +24,8 @@ import datetime
 
 import numpy as np
 
-import ClearMap.IO.Source as source_mod
-# noinspection PyUnusedImports
-from ClearMap.IO.Source import create
+import ClearMap.IO.source.Source as source_mod
+from ClearMap.IO.source.Source import ReprFields as RF
 from ClearMap.Utils.exceptions import NrrdError, ClearMapPermissionError
 
 
@@ -36,6 +35,8 @@ from ClearMap.Utils.exceptions import NrrdError, ClearMapPermissionError
 
 class NrrdSource(source_mod.Source):
     """Nrrd array source."""
+    _CACHED_PROPERTIES = ('_header', 'shape', 'dtype', 'offset')
+    _REPR_FIELDS = (RF.NAME, RF.SHAPE, RF.DTYPE, RF.ORDER, RF.LOCATION)
   
     def __init__(self, location, mode=None):
         """Nrrd source class constructor.
@@ -185,50 +186,6 @@ class NrrdSource(source_mod.Source):
 
     def as_buffer(self):
         return self.as_memmap()
-
-    ### Formatting
-    def __str__(self):
-        try:
-            name = self.name
-            name = '%s' % name if name is not None else ''
-        except:
-            name =''
-
-        try:
-            shape = self.shape
-            shape ='%r' % ((shape,)) if shape is not None else ''
-        except:
-            shape = ''
-
-        try:
-            dtype = self.dtype
-            dtype = '[%s]' % dtype if dtype is not None else ''
-        except:
-            dtype = ''
-
-        try:
-            order = self.order
-            order = '|%s|' % order if order is not None else ''
-        except:
-            order = ''
-
-        #    try:
-        #        memory = self.memory
-        #        memory = '<%s>' % memory if memory is not None else ''
-        #    except:
-        #        memory = ''
-
-        try:
-            location = self.location
-            location = '%s' % location if location is not None else ''
-            if len(location) > 100:
-                location = location[:50] + '...' + location[-50:]
-            if len(location) > 0:
-                location = '{%s}' % location
-        except:
-            location = ''
-
-        return name + shape + dtype + order + location
 
 
 class NrrdVirtualSource(source_mod.VirtualSource):
@@ -895,8 +852,7 @@ def _write(filename, data, options={}, separate_header=False):
 def _test():
     import os
     import numpy as np
-    from ClearMap.IO import NRRD
-    
+
     data = np.random.rand(20,50,10)
     data[5:15, 20:45, 2:9] = 0
 

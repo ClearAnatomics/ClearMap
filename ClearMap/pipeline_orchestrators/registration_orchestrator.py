@@ -13,7 +13,8 @@ from ClearMap import Settings as settings, Settings
 from ClearMap.Alignment import Resampling as resampling, Elastix as elastix
 from ClearMap.Alignment.Annotation import Annotation
 
-from ClearMap.IO import IO as clearmap_io, TIF
+from ClearMap.IO import IO as clearmap_io
+from ClearMap.IO.source.backends.TIF import TifSource
 from ClearMap.IO.assets_specs import ChannelSpec, TypeSpec
 from ClearMap.IO.metadata import define_auto_resolution
 
@@ -654,5 +655,5 @@ def setup_mini_brain(atlas_base_name, mini_brain_scaling=(5, 5, 5)):  # TODO: sc
     tuple(scale, downsampled_array)
     """
     atlas_path = os.path.join(Settings.atlas_folder, f'{atlas_base_name}_annotation.tif')
-    arr = TIF.TifSource(atlas_path).array
+    arr = TifSource(atlas_path).array
     return mini_brain_scaling, sk_transform.downscale_local_mean(arr, mini_brain_scaling)

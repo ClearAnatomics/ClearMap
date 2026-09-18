@@ -92,7 +92,7 @@ import pandas as pd
 from PyQt5.QtWidgets import QDialogButtonBox
 
 import ClearMap.IO.IO as clearmap_io
-from ClearMap.IO.Source import Source
+from ClearMap.IO.source.Source import Source
 from ClearMap.IO.workspace2 import Workspace2
 from ClearMap.IO.workspace_asset import Asset
 
@@ -119,7 +119,7 @@ from ClearMap.Analysis.graphs import graph_processing
 from ClearMap.Analysis.graphs.graph_filters import GraphFilter
 
 from ClearMap.gui.dialog_helpers import warning_popup
-from ClearMap.Utils.utilities import is_in_range, get_free_v_ram, clear_cuda_cache, sanitize_n_processes
+from ClearMap.Utils.utilities import get_free_v_ram, clear_cuda_cache, sanitize_n_processes
 from ClearMap.Utils.exceptions import (PlotGraphError, ClearMapVRamException,
                                        MissingRequirementException, MissingAssetError, AssetNotFoundError,
                                        ClearMapAssetError, ClearMapValueError)

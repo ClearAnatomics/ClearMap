@@ -2,7 +2,7 @@ import pathlib
 
 import numpy as np
 
-from ClearMap.IO import Source as source_mod
+from ClearMap.IO.source import Source as source_mod
 from ClearMap.IO.IO import dtype
 
 

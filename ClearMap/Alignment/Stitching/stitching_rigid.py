@@ -28,9 +28,9 @@ import concurrent.futures
 
 import ClearMap.IO.IO as io
 from ClearMap.IO import io_ops
-import ClearMap.IO.Source as src
-import ClearMap.IO.Slice as slc
-import ClearMap.IO.FileList as fl
+import ClearMap.IO.source.Source as src
+import ClearMap.IO.source.Slice as slc
+import ClearMap.IO.source.backends.FileList as fl
 
 import ClearMap.ParallelProcessing.ParallelTraceback as ptb
 
@@ -4295,7 +4295,6 @@ def _test():
     # Tiles from files
     expression = stb.te.Expression('test_<X,I,2>_<Y,I,4>.tif')
 
-    import ClearMap.IO.IO as io
     for i in range(len(tiling)):
         for j in range(len(tiling[i])):
             io_ops.write(expression.string({'X' : i, 'Y' : j}), tiling[i][j])

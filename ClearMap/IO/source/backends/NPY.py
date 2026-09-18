@@ -15,7 +15,7 @@ import warnings
 
 import numpy as np
 
-import ClearMap.IO.Source as source_mod
+import ClearMap.IO.source.Source as source_mod
 from ClearMap.Utils.exceptions import ClearMapPermissionError, ClearMapValueError
 
 
@@ -314,13 +314,12 @@ def _array(shape=None, dtype=None, order=None, array=None):
 
 def _test():
     import numpy as np
-    import ClearMap.IO.NPY as npy
     #reload(npy);
 
-    s = npy.NumpySource(array=np.zeros((5,7)))
+    s = NPY.NumpySource(array=np.zeros((5, 7)))
     print(s)
 
-    import ClearMap.IO.Slice as slc
+    import ClearMap.IO.source.Slice as slc
     t = slc.Slice(source= s, slicing= (1,))
     print(t)
 
@@ -328,7 +327,7 @@ def _test():
     print(v)
 
     x = np.ones(250*1000*1000)
-    xs = npy.NumpySource(array=x)
+    xs = NPY.NumpySource(array=x)
 
     print(xs)
 

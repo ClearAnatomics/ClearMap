@@ -36,7 +36,7 @@ from PyQt5.QtWidgets import (QWidget, QRadioButton, QLabel, QSplitter, QApplicat
 
 from ClearMap.Utils.utilities import runs_on_spyder
 from ClearMap.IO import io_ops
-from ClearMap.IO.Source import Source
+from ClearMap.IO.source.Source import Source
 from ClearMap.Visualization.Qt.data_viewer_luts import LUT, HighLowLUT
 
 pg.CONFIG_OPTIONS['useOpenGL'] = False  # set to False if trouble seeing data.

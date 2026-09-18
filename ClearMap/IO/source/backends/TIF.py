@@ -22,8 +22,8 @@ from typing import NamedTuple, Optional, List, Dict, Tuple, Any
 import numpy as np
 from tifffile import tifffile
 
-from ClearMap.IO import Source as source_mod
-import ClearMap.IO.Slice as cmp_clicing
+from ClearMap.IO.source import Source as source_mod
+import ClearMap.IO.source.Slice as cmp_clicing
 
 from ClearMap.Utils.Lazy import lazyattr
 from ClearMap.Utils.exceptions import ClearMapValueError, ClearMapPermissionError
@@ -1170,17 +1170,16 @@ def array_to_tif(array, source_order='ZYX'):
 
 def _test():
     import ClearMap.Tests.Files as tfs
-    import ClearMap.IO.TIF as tif
 
     filename = tfs.filename('tif_2d')
-    t = tif.TifSource(location=filename)
+    t = TIF.TifSource(location=filename)
     print(t)
 
     filename = tfs.filename('tif_2d_color')
-    t = tif.TifSource(location=filename)
+    t = TIF.TifSource(location=filename)
     print(t)
 
-    d = tif.read(filename)
+    d = TIF.read(filename)
     print(d.shape)
 
     v = t.as_virtual()

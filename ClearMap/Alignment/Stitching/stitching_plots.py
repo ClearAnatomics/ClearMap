@@ -243,7 +243,7 @@ class WobblyLayoutPlotMixin:
     def alignment_info(self, tile_position, coordinate,
                        plot=True, use_displacements=True, **kwargs):
         """Diagnostic: gather alignment info and optionally overlay a slice."""
-        import ClearMap.IO.Slice as slc
+        import ClearMap.IO.source.Slice as slc
         from ClearMap.Alignment.Stitching.stitching_wobbly import WobblySource, WobblyAlignment
         from ClearMap.Alignment.Stitching.stitching_rigid import Source, Layout
 

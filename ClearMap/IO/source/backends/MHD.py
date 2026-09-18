@@ -17,21 +17,37 @@ __webpage__ = 'https://idisco.info'
 __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
 import os
+from functools import cached_property
+from typing import NamedTuple
+
 import numpy as np
 import zlib
 
-import ClearMap.IO.Source as source_mod
-from ClearMap.IO import IO as clearmap_io
+import ClearMap.IO.source.Source as source_mod
+from ClearMap.IO import io_ops
 from ClearMap.IO.FileUtils import file_extension, is_file
-from ClearMap.Utils.exceptions import ClearMapPermissionError
+from ClearMap.Utils.Formatting import ensure
+from ClearMap.Utils.exceptions import ClearMapNotImplementedError
 
 
 ###############################################################################
 # MhdSource class
 ###############################################################################
 
-class MhdSource(source_mod.Source):
+class MhdInfo(NamedTuple):
+    raw_file: str
+    shape: tuple
+    dtype: np.dtype
+    order: str
+    offset: int
+    compression: bool
+    transpose: tuple
+
+
+class MhdSource(source_mod.ArraySource):
     """Mhd/raw array source."""
+    _CACHED_PROPERTIES = ('_header', '_info', '_buffer', '_array')
+    _virtual_class = None   # set below
 
     def __init__(self, location, name=None, mode=None):
         """Mhd source class constructor.
@@ -39,35 +55,59 @@ class MhdSource(source_mod.Source):
         Arguments
         ---------
         location : str
-          The file name of the mhd source.
+            The file name of the mhd source.
         """
         super().__init__(name=name, mode=mode)
-        self._location = _header_file(location)
-        self._memmap = None
-        self._array = None
-        self._init_data()
+        self._location = _header_file(ensure(location, str))
+        info = self._info  # Parse and cache the header
 
-    def _init_data(self):
-        if self._memmap is None:
-            try:
-                self._memmap = _memmap(self._location)
-            except:
-                self._memmap = None
-        if self._memmap is None and self._array is None:
-            try:
-                self._array = _array(self._location)
-            except:
-                self._array = None
+    # ## Metadata
+    @cached_property
+    def _header(self):
+        return _read_header(self.location)
+
+    @cached_property
+    def _info(self) -> MhdInfo:
+        return MhdInfo(*_read_info(self.location))
 
     @property
-    def location(self):
-        return self._location
+    def shape(self):
+        return self._info.shape
 
-    @location.setter
-    def location(self, value):
-        if value != self.location:
-            self._location = value
-            self._init_data()
+    @property
+    def dtype(self):
+        return self._info.dtype
+
+    @property
+    def order(self):
+        return self._info.order
+
+    @property
+    def offset(self):
+        return self._info.offset
+
+    def metadata(self, info=None):
+        """Returns metadata from this mhd file."""
+        header = self._header
+        if info is None:
+            return header
+        return {key: header[key] for key in info}
+
+    # ## Data
+    @cached_property
+    def _buffer(self):
+        """Memmap onto the raw data. Unavailable for compressed files."""
+        if self._info.compression:
+            raise ClearMapNotImplementedError(f'Compressed mhd {self.location!r} cannot be memory-mapped.',
+                                              operation='as_buffer', backend='MHD')
+        return _memmap(self.location, mode=self._buffer_mode())
+
+    @cached_property
+    def _array(self):
+        """Array view of the data, decoded once for compressed files."""
+        if self._info.compression:
+            return _array(self.location)
+        return np.asarray(self._buffer)
 
     @property
     def array(self):
@@ -78,109 +118,18 @@ class MhdSource(source_mod.Source):
         array : array
           The underlying data array of this source.
         """
-        if self._array is not None:
-            return self._array
-        elif self._memmap is not None:
-            return np.array(self._memmap)
-        else:
-            return _array(self._location)
+        return self._array
 
     @array.setter
     def array(self, value):
-        header, header_file, raw_file = \
-            _header_from_array(value, location=self._location, return_header_and_raw_file=True)
+        """Rewrite header and raw file; geometry may change."""
+        self._assert_writable()
+        value = np.asanyarray(value)
+        header, header_file, raw_file = _header_from_array(value, location=self._location,
+                                                           return_header_and_raw_file=True)
         _write_header(header_file, header)
         _write_raw(raw_file, value, compression=_compression_from_header(header))
-        self._init_data()
-
-    @property
-    def shape(self):
-        """The shape of the source.
-
-        Returns
-        -------
-        shape : tuple
-          The shape of the source.
-        """
-        if self._array is not None:
-            return self._array.shape
-        elif self._memmap is not None:
-            return self._memmap.shape
-        else:
-            return _shape(self._location)
-
-    @shape.setter
-    def shape(self, value):
-        raise NotImplementedError('Cannot set shape of mhd file')
-
-    @property
-    def dtype(self):
-        """The data type of the source.
-
-        Returns
-        -------
-        dtype : dtype
-          The data type of the source.
-        """
-        if self._array is not None:
-            return self._array.dtype
-        elif self._memmap is not None:
-            return self._memmap.dtype
-        else:
-            return _dtype(self._location)
-
-    @dtype.setter
-    def dtype(self, value):
-        raise NotImplementedError('Cannot set dtype of mhd file')
-
-    @property
-    def order(self):
-        """The order of how the data is stored in the source.
-
-        Returns
-        -------
-        order : str
-          Returns 'C' for C contiguous and 'F' for fortran contiguous, None otherwise.
-        """
-        return _order(self.location)
-
-    @order.setter
-    def order(self, value):
-        raise NotImplementedError('Cannot set order of mhd file')
-
-    @property
-    def element_strides(self):
-        """The strides of the array elements.
-
-        Returns
-        -------
-        strides : tuple
-          Strides of the array elements.
-
-        Note
-        ----
-        The strides of the elements module itemsize instead of bytes.
-        """
-        self._init_data()
-        if self._array is not None:
-            source = self._array
-        elif self._memmap is not None:
-            source = self._memmap
-        else:
-            raise ValueError('Cant determine strides for source without data.')
-
-        return tuple(s // source.itemsize for s in source.strides)
-
-    @property
-    def offset(self):
-        """The offset of the memory map in the file.
-
-        Returns
-        -------
-        offset : int
-          Offset of the memory map in the file.
-        """
-        return _offset(self.location)
+        self._invalidate_cache()
 
     # Data
     def __getitem__(self, *args):
@@ -192,86 +141,27 @@ class MhdSource(source_mod.Source):
         else:
             return _array(self.location).__getitem__(*args)
 
-    def __setitem__(self, *args):
-        if not self.is_writable:
-            raise ClearMapPermissionError(f'MhdSource {self} was opened read-only (mode="r"). '
-                                          f'Use io.edit() to open for writing.')
-        if self._memmap is None:
-            self._memmap = _memmap(self.location)
-        self._memmap.__setitem__(*args)
+    def _setitem(self, slicing, value):
+        if self._info.compression:
+            raise ClearMapNotImplementedError(f'Cannot write into compressed mhd {self.location!r}; '
+                                              f'assign to .array to rewrite the file instead.',
+                                              operation='setitem', backend='MHD')
+        self._buffer[slicing] = value
 
-    def metadata(self, info=None):
-        """Returns metadata from this mhd file.
-
-        Arguments
-        ---------
-        info : list or all
-          Optional list of keywords, if all return full tif metadata, if None return default set info.
-
-        Returns
-        -------
-        metadata : dict
-          Dictionary with the metadata.
-        """
-        header = _read_header(self.location)
-        if isinstance(info, list):
-            header = {key: header[key] for key in info}
-        return header
-
-    def as_array(self):
-        return self.array
+    def as_buffer(self):
+        return self._buffer
 
     def as_memmap(self):
-        if self._memmap is None:
-            self._memmap = _memmap(self.location)
-        return self._memmap
+        return self._buffer
 
     def as_virtual(self):
         return MhdVirtualSource(source=self)
 
+    def as_array(self):
+        return self.array
+
     def as_real(self):
         return self
-
-    def as_buffer(self):
-        return self.as_memmap()
-
-    # Formatting
-    def __str__(self):
-        try:
-            name = self.name
-            name = f'{name}' if name is not None else ''
-        except:
-            name = ''
-
-        try:
-            shape = self.shape
-            shape = f'{shape}' if shape is not None else ''
-        except:
-            shape = ''
-
-        try:
-            dtype = self.dtype
-            dtype = f'[{dtype}]' if dtype is not None else ''
-        except:
-            dtype = ''
-
-        try:
-            order = self.order
-            order = f'|{order}|' if order is not None else ''
-        except:
-            order = ''
-
-        try:
-            location = self.location
-            location = f'{location}' if location is not None else ''
-            if len(location) > 100:
-                location = location[:50] + '...' + location[-50:]
-            if len(location) > 0:
-                location = f'{{{location}}}'
-        except:
-            location = ''
-
-        return name + shape + dtype + order + location
 
 
 class MhdVirtualSource(source_mod.VirtualSource):
@@ -824,7 +714,7 @@ def header_from_source(source=None, location=None, header=None, return_header_an
     if source is None and location is not None:
         source = location
 
-    source = clearmap_io.open_ro(source)
+    source = io_ops.open_ro(source)
 
     if location is None and source.location is not None:
         location = source.location
@@ -872,35 +762,34 @@ def write_header_from_source(source, location=None, header=None):
 
 def _test():
     import numpy as np
-    import ClearMap.IO.MHD as mhd
     from importlib import reload
-    reload(mhd)
+    reload(MHD)
 
     data = np.array(255 * np.random.rand(20, 30, 40), order='C')
     data = np.array(data, dtype='uint8')
     data[:5,:10,:15] = 0
 
-    mhd_shape = mhd._to_mhd_shape(data.shape)
+    mhd_shape = MHD._to_mhd_shape(data.shape)
     print(mhd_shape)
-    shape = mhd._from_mhd_shape(mhd_shape)
+    shape = MHD._from_mhd_shape(mhd_shape)
     print(shape, data.shape)
 
-    header, header_file, raw_file = mhd.header_from_source(data, location='test.mhd', return_header_and_raw_file=True)
+    header, header_file, raw_file = MHD.header_from_source(data, location='test.mhd', return_header_and_raw_file=True)
     print(header)
     print(header_file, raw_file)
-    mhd._write_header(header_file, header)
-    mhd._write_raw(raw_file, data)
+    MHD._write_header(header_file, header)
+    MHD._write_raw(raw_file, data)
 
-    array = mhd._array('test.mhd')
+    array = MHD._array('test.mhd')
     print(array.shape, data.shape)
     np.all(array == data)
 
-    memmap = mhd._memmap('test.mhd')
+    memmap = MHD._memmap('test.mhd')
     np.all(memmap == data)
 
-    mhd.create(location='test.mhd', array=data)
+    MHD.create(location='test.mhd', array=data)
 
-    source = mhd.MhdSource('test.mhd')
+    source = MHD.MhdSource('test.mhd')
     print(source)
     np.all(data == source.array)
 
@@ -908,24 +797,23 @@ def _test():
     fname = 'test.npy'
     np.save(fname, data)
 
-    header, header_file, raw_file = mhd.header_from_source(fname, header=None, return_header_and_raw_file=True)
+    header, header_file, raw_file = MHD.header_from_source(fname, header=None, return_header_and_raw_file=True)
     print(header)
     print(header_file, raw_file)
 
-    mhd._write_header(header_file, header)
-    source = mhd.MhdSource(header_file)
+    MHD._write_header(header_file, header)
+    source = MHD.MhdSource(header_file)
     print(source)
     np.all(data == source.array)
 
-    header_file = mhd.write_header_from_source('test.npy')
-    source = mhd.MhdSource(header_file)
+    header_file = MHD.write_header_from_source('test.npy')
+    source = MHD.MhdSource(header_file)
     print(source)
     np.all(data == source.array)
 
-    import ClearMap.IO.IO as io
-    io.write('test.mhd', data)
+    io_ops.write('test.mhd', data)
 
-    source = mhd.MhdSource('test.mhd')
+    source = MHD.MhdSource('test.mhd')
     print(source)
     np.all(data == source.array)
 

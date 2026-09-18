@@ -29,21 +29,25 @@ import numpy as np
 import concurrent.futures
 
 import ClearMap.IO.FileUtils as fu
-import ClearMap.IO.Source as source_mod
+import ClearMap.IO.source.Source as source_mod
 # noinspection PyUnusedImports
-from ClearMap.IO.Source import read, create, write
-import ClearMap.IO.Slice as slc
+from ClearMap.IO.source.backend_defaults import read, create, write
+import ClearMap.IO.source.Slice as slc
 
-from . import IO as io
+from ClearMap.IO.source.backends import IO as io, io_ops
 import ClearMap.Utils.tag_expression as te
 import ClearMap.ParallelProcessing.ParallelTraceback as ptb
-from ..Utils.exceptions import ClearMapValueError
-from ..Utils.utilities import sanitize_n_processes
+from ClearMap.Utils.exceptions import ClearMapValueError
+from ClearMap.Utils.utilities import sanitize_n_processes
 
 
 ###############################################################################
 ### Source class
 ###############################################################################
+
+FILE_COUNT = source_mod.ReprField('_file_list', '<>', convert=len)
+EXPRESSION = source_mod.ReprField('expression', '{}', convert=lambda e: source_mod.trim_path(e.tag()))
+
 
 class FileListSource(source_mod.VirtualSource):
     """File list source.
@@ -307,7 +311,7 @@ class FileListSource(source_mod.VirtualSource):
         #@ptb.parallel_traceback
         def func(filename, index, data=data, slicing=slicing_file):
             index = (Ellipsis,) + index
-            data[index] = io.read(filename, slicing=slicing, processes = 'serial')
+            data[index] = io_ops.read(filename, slicing=slicing, processes ='serial')
 
         if processes == 'serial':
             for f,i in zip(fl, slicing_list_indices):
@@ -372,7 +376,7 @@ class FileListSource(source_mod.VirtualSource):
         @ptb.parallel_traceback
         def func(filename, index, data=data, slicing=slicing_file):
           index = (Ellipsis,) + index
-          io.write(sink=filename, data=data[index], slicing=slicing, processes='serial')
+          io_ops.write(sink=filename, data=data[index], slicing=slicing, processes='serial')
 
         if processes == 'serial':
             for f, i in zip(fl, indices):
@@ -971,7 +975,7 @@ def convert(source, sink, processes = None, verbose = False):
     file_list = [expression.string_from_index(i) for i in indices_file]
 
     print(sink)
-    sink = io.create(sink, shape=shape, dtype=dtype)
+    sink = io_ops.create(sink, shape=shape, dtype=dtype)
     sink_virtual = sink.as_virtual()
 
     @ptb.parallel_traceback
@@ -980,7 +984,7 @@ def convert(source, sink, processes = None, verbose = False):
             slicing = (Ellipsis,) + index_slicing
             if verbose:
                 print(f'Converting slice {slicing} from {filename} to {sink}')
-            sink.as_real()[slicing] = io.read(filename, processes='serial')
+            sink.as_real()[slicing] = io_ops.read(filename, processes='serial')
             # FIXME: replace with       sink[(Ellipsis,) + index_slicing] = io.read(filename, processes='serial') for performance. avoids the as_real references
             return True
         except Exception as e:
@@ -1015,7 +1019,7 @@ def _test():
     from importlib import reload
     import ClearMap.Tests.Files as tf
 
-    import ClearMap.IO.FileList as fl
+    import ClearMap.IO.source.backends.FileList as fl
     reload(fl)
 
     expression = tf.io.join(tf.tif_sequence, 'sequence<Z,I,4>.tif')
@@ -1028,8 +1032,7 @@ def _test():
     d = f[:,:,1]
 
     import numpy as np
-    import ClearMap.IO.IO as io
-    np.all(d == io.read(f.file_list[1]))
+    np.all(d == io_ops.read(f.file_list[1]))
 
 
     # genreate some files
@@ -1046,8 +1049,8 @@ def _test():
 
     data2 = f2.__getitem__(slice(None), processes='serial')
 
-    s = io.open_ro(data)
-    s2 = io.open_ro(data2)
+    s = io_ops.open_ro(data)
+    s2 = io_ops.open_ro(data2)
     print(s); print(s2)
 
     np.all(data2==data)
