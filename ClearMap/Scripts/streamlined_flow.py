@@ -9,6 +9,7 @@ from sklearn import preprocessing
 from scipy.interpolate import griddata
 import tifffile
 
+from ClearMap.IO import io_ops
 from ClearMap.Settings import atlas_folder
 import ClearMap.IO.IO as clearmap_io
 
@@ -123,7 +124,7 @@ def main():
     sxe = 'coronal'  # 'coronal' # 'sagittal'
     for sl in slices:
         if sxe == 'sagittal':
-            annotation = clearmap_io.read(os.path.join(atlas_folder, 'annotation_25_HeadLightOrientation_sagital_rotated.tif'))  # FIXME: add this file to atlas folder
+            annotation = io_ops.read(os.path.join(atlas_folder, 'annotation_25_HeadLightOrientation_sagital_rotated.tif'))  # FIXME: add this file to atlas folder
         elif sxe == 'coronal':
             annotation = tifffile.imread(os.path.join(atlas_folder, 'Reslice_of_annotation_25_HeadLightOrientation_coronal.tif'))  # FIXME: add this file to atlas folder
             annotation = np.swapaxes(annotation, 0, 2)

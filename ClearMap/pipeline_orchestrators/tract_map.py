@@ -11,7 +11,8 @@ from typing import Optional
 import numpy as np
 import pandas as pd
 
-from ClearMap.IO import IO as cmp_io
+from ClearMap.IO import io_ops
+from ClearMap.IO import IO as clearmap_io
 from ClearMap.IO.MMP import MMPSource
 from ClearMap.IO.workspace2 import Workspace2
 
@@ -350,7 +351,7 @@ class TractMapProcessor(ChannelPipelineOrchestrator):
             shift = self.config['test_set_slicing'][f'dim_{i}'][0]
             coordinates[:, i] += shift
         if not isinstance(coordinates, (np.memmap, MMPSource)):
-            cmp_io.write(coords_asset.path, coordinates)
+            io_ops.write(coords_asset.path, coordinates)
         print('TractMap coordinates shifted')
 
     def run_pipeline(self, tuning=False):
@@ -408,7 +409,7 @@ class TractMapProcessor(ChannelPipelineOrchestrator):
         self.prepare_watcher_for_substep(1, self.block_re, 'Voxelization', increment_main=True)
 
         voxelization_parameter = dict(
-            shape=cmp_io.shape(self.registration_processor.annotators[self.channel].annotation_file),
+            shape=clearmap_io.shape(self.registration_processor.annotators[self.channel].annotation_file),
             dtype=None,
             weights=None,
             method='sphere',

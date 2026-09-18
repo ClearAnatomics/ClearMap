@@ -39,7 +39,7 @@ from __future__ import annotations
 
 import inspect
 from enum import Enum
-from typing import List, Iterable, Tuple
+from typing import Iterable, Tuple
 from dataclasses import dataclass
 
 _SKIP_PATTERNS = ('wrapper', '_decorator', 'decorator', '__')

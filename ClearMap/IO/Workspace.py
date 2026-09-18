@@ -31,6 +31,7 @@ from collections import OrderedDict
 import numpy as np
 
 import ClearMap.IO.IO as clearmap_io
+from ClearMap.IO import dispatch, io_ops
 from ClearMap.Utils.tag_expression import Expression
 # import ClearMap.ParallelProcessing.DataProcessing.ArrayProcessing as array_processing
 import ClearMap.Visualization.Plot3d as q_plot_3d
@@ -508,9 +509,9 @@ class Workspace:
             debug = self.debug if self.debug is not None else 'debug'
         self.debug = None
         # FIXME: why not force debug=None here instead of unset set
-        source = clearmap_io.as_source(self.file_name(f_type, **kwargs))
+        source = dispatch.as_source(self.file_name(f_type, **kwargs))
         self.debug = debug
-        return clearmap_io.write(self.file_name(f_type, **kwargs), np.asarray(source[slicing], order='F'))
+        return io_ops.write(self.file_name(f_type, **kwargs), np.asarray(source[slicing], order='F'))
   
     def file_name(self, f_type=None, dirtype=None, ws_type=None, directory=None,
                   expression=None, values=None, prefix=None, postfix=None, extension=None, debug=None,
@@ -589,15 +590,15 @@ class Workspace:
   
     def create(self, f_type=None, dtype=None, shape=None, order=None, **kwargs):
         filename = self.file_name(f_type=f_type, **kwargs)
-        clearmap_io.create(filename, shape=shape, dtype=dtype, order=order)
+        io_ops.create(filename, shape=shape, dtype=dtype, order=order)
         return filename
   
     def source(self, *args, **kwargs):
         f_name = self.file_name(*args, **kwargs)
-        return clearmap_io.as_source(f_name)
+        return dispatch.as_source(f_name)
   
     def read(self, *args, **kwargs):
-        return clearmap_io.read(self.file_name(*args, **kwargs))
+        return io_ops.read(self.file_name(*args, **kwargs))
         # return array_processing.read(self.file_name(*args, **kwargs))
 
     def plot(self, f_type, **kwargs):
@@ -609,7 +610,7 @@ class Workspace:
         else:
             data = args[-1]
             args = args[:-1]
-        return clearmap_io.write(self.filename(*args, **kwargs), data)
+        return io_ops.write(self.filename(*args, **kwargs), data)
         # return array_processing.write(self.filename(*args, **kwargs), data)
 
     def __format_pattern_line(self, files, expression, tag_names, tile_axes_):

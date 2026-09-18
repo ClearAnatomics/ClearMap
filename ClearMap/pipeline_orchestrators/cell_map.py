@@ -92,6 +92,7 @@ import pandas as pd
 
 # noinspection PyPep8Naming
 import ClearMap.IO.IO as clearmap_io
+from ClearMap.IO import io_ops
 from ClearMap.IO.workspace2 import Workspace2
 
 # noinspection PyPep8Naming
@@ -329,7 +330,7 @@ class CellDetector(ChannelPipelineOrchestrator):
             uncrusted_coords, mask = self.remove_crust(coordinates=filtered_coords,
                                                        threshold=distance_from_surface_px, return_mask=True)
             table = table[mask]
-            clearmap_io.write(dest_path, table)  # Overwrite filtered with uncrusted
+            io_ops.write(dest_path, table)  # Overwrite filtered with uncrusted
 
     def run_cell_detection(self, tuning=False, save_maxima=False, save_shape=False, save_as_binary_mask=False):
         self.workspace.debug = tuning  # TODO: use context manager
@@ -639,7 +640,7 @@ class CellDetector(ChannelPipelineOrchestrator):
                 [source[name] if name in source.dtype.names else np.full(source.shape[0], np.nan) for name in names]
             )
             data = data.T
-            clearmap_io.write(sink, data)
+            io_ops.write(sink, data)
 
     def convert_cm2_to_cm2_1_fmt(self):
         """Atlas alignment and annotation """

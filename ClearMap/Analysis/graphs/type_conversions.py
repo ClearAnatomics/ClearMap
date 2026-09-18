@@ -47,8 +47,8 @@ def ndim_from_source(source):
         ndim = source.ndim
     else:
         try:
-            import ClearMap.IO.IO as io
-            source = io.open_ro(source)
+            from ClearMap.IO import io_ops
+            source = io_ops.open_ro(source)
             ndim = source.ndim
         except:
             ndim = 0
@@ -72,8 +72,8 @@ def gtype_from_source(source, vectorize=True, graph_property=False):
         gtype = dtype_to_gtype(dtype)
     else:
         try:
-            import ClearMap.IO.IO as io
-            source = io.open_ro(source)
+            from ClearMap.IO import io_ops
+            source = io_ops.open_ro(source)
             ndim = source.ndim
             dtype = source.dtype
             gtype = dtype_to_gtype(dtype)

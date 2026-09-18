@@ -15,7 +15,7 @@ import warnings
 
 import numpy as np
 
-import ClearMap.IO.IO as io
+from ClearMap.IO import io_ops
 import ClearMap.ParallelProcessing.DataProcessing.MeasurePointList as mpl
 import ClearMap.Utils.Timer as tmr
 
@@ -77,7 +77,7 @@ def measure_radius(source, points, fraction=None, value=None,
                       f'Please note this behavior is deprecated. Future versions will require a scale.',
                       DeprecationWarning, stacklevel=2)
 
-    source = io.read(source)
+    source = io_ops.read(source)
 
     if verbose:
         timer = tmr.Timer()
@@ -222,7 +222,7 @@ def test():
     d,i = mr.measure_radius(data, points, fraction=0.75, max_radius=10, scale=2, verbose=True, processes=4, return_indices=True)
 
     data = np.random.rand(*(30,40,50))
-    io.write('data.npy', data)
+    io_ops.write('data.npy', data)
 
     points = np.array([np.random.randint(0,s, size=10) for s in data.shape]).T
     d,i = mr.measure_radius(data, points, value=0.5, max_radius=10, scale=2, verbose=True, processes=4, return_indices=True)

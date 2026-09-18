@@ -24,7 +24,7 @@ import ClearMap.IO.IO as clearmap_io
 
 import ClearMap.ParallelProcessing.BlockProcessing as block_processing
 import ClearMap.ParallelProcessing.DataProcessing.ArrayProcessing as array_processing
-
+from ClearMap.IO import io_ops
 
 from ClearMap.ImageProcessing.machine_learning import torch_utils
 from ClearMap.ImageProcessing.machine_learning.vessel_filling.vessel_filling_network import VesselFillingNetwork
@@ -146,7 +146,7 @@ def fill_vessels(source, sink,
         print(f'Vessel filling: using {"gpu" if cuda else "cpu"}')
 
     # initialize source
-    source = clearmap_io.open_ro(source)
+    source = io_ops.open_ro(source)
 
     if verbose:
         timer.print_elapsed_time('Vessel filling: source loaded')

@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 from sklearn import neighbors
 
-from ClearMap.IO import IO as io
+from ClearMap.IO import io_ops
 
 import ClearMap.ParallelProcessing.BlockProcessing as blockprocessing
 import ClearMap.ParallelProcessing.Block as block
@@ -69,8 +69,8 @@ def compare(
 
     scale = np.array(scale)
     voxel_blob_diameters = np.array(blob_diameter) / scale
-    source_0 = io.open_ro(img_0)
-    source_1 = io.open_ro(img_1)
+    source_0 = io_ops.open_ro(img_0)
+    source_1 = io_ops.open_ro(img_1)
     if not isinstance(df_0, pd.DataFrame):
         df_0 = pd.read_feather(df_0)
     if not isinstance(df_1, pd.DataFrame):

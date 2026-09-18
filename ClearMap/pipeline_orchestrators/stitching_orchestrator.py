@@ -10,6 +10,7 @@ import numpy as np
 from ClearMap.Alignment.Stitching import stitching_wobbly as stitching_wobbly
 from ClearMap.Alignment.Stitching import stitching_rigid as stitching_rigid
 
+from ClearMap.IO import conversion, io_ops
 from ClearMap.IO import IO as clearmap_io
 from ClearMap.IO.FileUtils import link_or_copy
 from ClearMap.IO.metadata import define_auto_stitching_params, parse_ome_info
@@ -221,7 +222,7 @@ class StitchingProcessor(PipelineOrchestrator):
                 for x in range(x_min, x_max + 1):
                     column_expression = exp.string(values={'X': x, 'Y': y})
                     dest = column_expression.replace(z_expression, '')
-                    clearmap_io.convert(column_expression, dest)
+                    conversion.convert(column_expression, dest)
             # squash Z axis
             asset.expression = exp.string().replace(z_expression, '')  # overwrite expression
             self.sample_manager.set_channel_expression(channel, asset.expression)
@@ -302,7 +303,7 @@ class StitchingProcessor(PipelineOrchestrator):
         else:
             # Stacked planes or other convertible format
             try:
-                clearmap_io.convert(str(raw_asset.path), str(stitched_path))
+                conversion.convert(str(raw_asset.path), str(stitched_path))
             except FileNotFoundError as err:
                 warnings.warn(f'Could not copy/link/stack {channel=}, files not found; {err}')
 
@@ -615,7 +616,7 @@ class StitchingProcessor(PipelineOrchestrator):
         if self.sample_manager.has_npy:  # use memmap
             tile = clearmap_io.buffer(tile_path)[:, :, middle_z]
         else:
-            tile = clearmap_io.read(tile_path)[:, :, middle_z]
+            tile = io_ops.read(tile_path)[:, :, middle_z]
         return tile
 
     def _compute_stitched_shape_from_overlaps(self, overlaps, positions, tile_shape):

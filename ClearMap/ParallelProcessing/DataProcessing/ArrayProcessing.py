@@ -27,7 +27,9 @@ import multiprocessing as mp
 import pyximport
 
 import ClearMap.IO.IO as io
+from ClearMap.IO import dispatch, source_initialization, io_ops
 import ClearMap.IO.Slice as slc
+
 import ClearMap.Utils.Timer as tmr
 from ClearMap.Utils.utilities import sanitize_n_processes
 
@@ -229,7 +231,7 @@ def where(source, sink=None, blocks=None,
     warnings.warn(f'array_processing.where only supports dimensions 1-3. '
                   f'Falling back to numpy.where for dimension {ndim:d}!', RuntimeWarning, stacklevel=2)
     result = np.vstack(np.where(source_buffer)).T
-    return io.initialize(result)
+    return source_initialization.initialize(result)
 
   processes, timer, blocks = initialize_processing(processes=processes, function='where', verbose=verbose,
                                                    blocks=blocks, return_blocks=True)
@@ -241,7 +243,7 @@ def where(source, sink=None, blocks=None,
   if source_buffer.size <= cutoff:
     result = np.vstack(np.where(source_buffer)).T
     if sink is None:
-      sink = io.initialize(result)
+      sink = source_initialization.initialize(result)
     else:
       sink, sink_buffer = initialize_sink(sink=sink, shape=result.shape)
       sink[:] = result
@@ -341,7 +343,7 @@ def read(source, sink=None, slicing=None, memory=None, blocks=None, processes=No
                                                    blocks=blocks, return_blocks=True)
 
   # source info
-  source = io.open_ro(source)
+  source = io_ops.open_ro(source)
   if slicing is not None:
     source = slc.Slice(source=source, slicing=slicing)
 
@@ -393,7 +395,7 @@ def write(sink, source, slicing=None, overwrite=True, blocks=None, processes=Non
   source, source_buffer, source_order = initialize_source(source, as_1d=True, return_order = True)
   
   try:
-    sink = io.initialize(sink)
+    sink = source_initialization.initialize(sink)
     location = sink.location
   except:
     if isinstance(sink, str):
@@ -621,7 +623,7 @@ def initialize_source(source, return_buffer=True, as_1d=False,
   return_Strides : tuple of int
     Element strides of the source. 
   """
-  source = io.as_source(source)  # FIXME: check if we need the output editable
+  source = dispatch.as_source(source)  # FIXME: check if we need the output editable
 
   if return_shape:
     shape = np.array(source.shape, dtype=int)
@@ -696,8 +698,8 @@ def initialize_sink(sink=None, shape=None, dtype=None, order=None, memory=None, 
     Element strides of the source. 
   """
        
-  sink = io.initialize(sink, shape_=shape, dtype_=dtype, order_=order, memory_=memory, location_=location, mode=mode,
-                       like=source, as_source=True)
+  sink = source_initialization.initialize(sink, shape_=shape, dtype_=dtype, order_=order, memory_=memory, location_=location, mode=mode,
+                                          like=source, as_source=True)
 
   result = (sink,)
   

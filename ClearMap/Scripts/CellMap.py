@@ -26,6 +26,8 @@ __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__   = 'http://idisco.info'
 __download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 
+from ClearMap.IO import conversion, io_ops
+
 if __name__ == "__main__":
      
   #%%############################################################################
@@ -72,7 +74,7 @@ if __name__ == "__main__":
   source = ws.source('raw');
   sink   = ws.filename('stitched')
   io.delete_file(sink)
-  io.convert(source, sink, processes=None, verbose=True);
+  conversion.convert(source, sink, processes=None, verbose=True);
   
   
   #%%############################################################################
@@ -273,7 +275,7 @@ if __name__ == "__main__":
   import numpy.lib.recfunctions as rfn
   cells_data = rfn.merge_arrays([source[:], coordinates_transformed, label, names], flatten=True, usemask=False)
   
-  io.write(ws.filename('cells'), cells_data)
+  io_ops.write(ws.filename('cells'), cells_data)
   
   
   
@@ -298,7 +300,7 @@ if __name__ == "__main__":
   for filename, names in clearmap1_format.items():
     sink = ws.filename('cells', postfix=['ClearMap1', filename]);
     data = np.array([source[name] if name in source.dtype.names else np.full(source.shape[0], np.nan) for name in names]);
-    io.write(sink, data);
+    io_ops.write(sink, data);
   
   
   #%%############################################################################

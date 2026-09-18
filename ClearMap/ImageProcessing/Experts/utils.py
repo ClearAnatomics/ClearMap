@@ -1,4 +1,5 @@
 import ClearMap.IO.IO as clearmap_io
+from ClearMap.IO import source_initialization
 
 from ClearMap.ParallelProcessing.DataProcessing import ArrayProcessing as ap
 import ClearMap.Utils.Timer as tmr
@@ -43,9 +44,9 @@ def run_step(param_key, previous_result, step_function, args=(), remove_previous
 
         if save:
             if save_dtype is None:
-                save = clearmap_io.initialize(save)
+                save = source_initialization.initialize(save)
             else:                    
-                save = clearmap_io.initialize(save, dtype=save_dtype)
+                save = source_initialization.initialize(save, dtype=save_dtype)
             if presave_parser is None:
                 presave_parser = lambda t : t
             to_save = presave_parser(result)

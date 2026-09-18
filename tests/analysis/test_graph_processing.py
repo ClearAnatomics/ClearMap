@@ -5,7 +5,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from vispy import app
 
-from ClearMap.IO import IO as cmp_io
+from ClearMap.IO import io_ops
 
 from ClearMap.Analysis.graphs import graph_processing, graph_gt
 from ClearMap.Analysis.vasculature import graph_corrections
@@ -17,13 +17,13 @@ from ClearMap.Visualization.Vispy.plot_graph_3d import (plot_graph_nodes, plot_g
 def skeleton_2d_to_3d(skel_path, shift_range=False):
     skel_path = Path(skel_path)
 
-    skel = cmp_io.read(skel_path)
+    skel = io_ops.read(skel_path)
     if shift_range:
         skel = skel - 1  # If was drawn with 2 meaning on, 1 meaning off, 0 not existing
     skel = skel.astype(np.uint8)
     skel = np.expand_dims(skel, axis=2)  # Add a third dimension to make it 3D
     skel = np.pad(skel, 1, mode='constant', constant_values=0)
-    cmp_io.write(skel_path.with_stem('skeleton_cmp'), skel)
+    io_ops.write(skel_path.with_stem('skeleton_cmp'), skel)
 
 
 def print_graph_lengths(graph):

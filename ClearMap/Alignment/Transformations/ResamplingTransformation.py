@@ -4,7 +4,7 @@ from ClearMap.Alignment.Resampling import resample_information, resample_factor,
     resample_points_inverse, resample_shape
 from ClearMap.Alignment.orientation import format_orientation, orient_shape, orient, orient_points
 
-import ClearMap.IO.IO as io
+from ClearMap.IO import io_ops
 
 ########################################################################################
 # Transformation interface
@@ -84,11 +84,11 @@ class OrientationTransformation(TransformationBase):
 
     def transform_data(self, source, sink=None, inverse=False):
         inverse = self.get_inverse(inverse)
-        return io.write(sink, orient(source, orientation=self.orientation, inverse=inverse))
+        return io_ops.write(sink, orient(source, orientation=self.orientation, inverse=inverse))
 
     def transform_points(self, source, sink=None, inverse=False, **kwargs):
         inverse = self.get_inverse(inverse)
-        return io.write(sink, orient_points(source, orientation=self.orientation, shape=self.shape, inverse=inverse))
+        return io_ops.write(sink, orient_points(source, orientation=self.orientation, shape=self.shape, inverse=inverse))
 
     def transform_shape(self, shape, inverse=False, **kwargs):
         return orient_shape(self.orientation, shape, inverse=inverse)

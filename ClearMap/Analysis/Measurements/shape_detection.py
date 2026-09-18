@@ -30,13 +30,10 @@ import numpy as np
 import skimage.morphology
 import scipy.ndimage.measurements
 
-import ClearMap.IO.IO as io
-
-import ClearMap.Analysis.Measurements.Voxelization as vox
 
 import ClearMap.Utils.Timer as tmr
 import ClearMap.Utils.HierarchicalDict as hdict
-from ClearMap.Utils.exceptions import ClearMapValueError
+from ClearMap.IO import io_ops
 
 ##############################################################################
 # Cell shape detection
@@ -142,8 +139,8 @@ def detect_shape(source, seeds, threshold=None, verbose=False, processes=None, a
         timer = tmr.Timer()
         hdict.pprint(head='Shape detection', threshold=threshold)
   
-    source = io.read(source)
-    seeds = io.open_ro(seeds)
+    source = io_ops.read(source)
+    seeds = io_ops.open_ro(seeds)
     mask = None if threshold is None else source > threshold
     if seeds_as_labels:
         peaks = seeds
@@ -227,7 +224,7 @@ def find_size(label, max_label=None, verbose=False):
         timer = tmr.Timer()
         hdict.pprint(head='Size detection:', max_label=max_label)
 
-    label = io.open_ro(label)
+    label = io_ops.open_ro(label)
 
     if max_label is None:
         max_label = int(label.max())
@@ -268,8 +265,8 @@ def find_intensity(source, label, max_label=None, method='sum', verbose=False):
         timer = tmr.Timer()
         hdict.pprint(head='Intensity detection:', max_label=max_label, method=method)
 
-    source = io.read(source)
-    label = io.open_ro(label)
+    source = io_ops.read(source)
+    label = io_ops.open_ro(label)
 
     if max_label is None:
         max_label = label.max()

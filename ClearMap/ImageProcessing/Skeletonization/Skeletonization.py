@@ -36,6 +36,7 @@ import ClearMap.ParallelProcessing.DataProcessing.ArrayProcessing as ap
 import ClearMap.ImageProcessing.Skeletonization.PK12 as PK12
 
 import ClearMap.Utils.Timer as tmr
+from ClearMap.IO import source_initialization, io_ops
 from ClearMap.Utils.utilities import sanitize_n_processes
 
 
@@ -92,11 +93,11 @@ def skeletonize(source, sink = None, points = None,
     timer.print_elapsed_time(head='Skeletonization')
 
   if sink is None:
-    sink = io.initialize(result)
+    sink = source_initialization.initialize(result)
   elif isinstance(sink, str):
     sink = ap.write(sink, result)  # prange
   else:
-    sink = io.write(sink, result)
+    sink = io_ops.write(sink, result)
   return sink
 
 ###############################################################################

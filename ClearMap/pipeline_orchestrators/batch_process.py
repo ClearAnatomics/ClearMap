@@ -25,6 +25,7 @@ from ClearMap.pipeline_orchestrators.utils import init_sample_manager_and_proces
 from ClearMap.pipeline_orchestrators.cell_map import CellDetector
 
 from ClearMap.IO import IO as clearmap_io
+from ClearMap.IO import io_ops
 
 __author__ = 'Charly Rousseau <charly.rousseau@icm-institute.org>'
 __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
@@ -133,9 +134,9 @@ def realign(folder, atlas_base_name='ABA_25um'):
 
 def rescale_img(f_path, scaling_factor):
     print(f'Rescaling {f_path} by {scaling_factor}')
-    img = clearmap_io.read(f_path)
+    img = io_ops.read(f_path)
     rescaled_img = rescale(img, scaling_factor, preserve_range=True, anti_aliasing=True)
-    clearmap_io.write(f_path, rescaled_img)
+    io_ops.write(f_path, rescaled_img)
 
 
 def rescale_channel(folder, atlas_base_name=None, dest_resolution=(3, 3, 6), n_cpus=None, channel='cfos', ext='.tif',
@@ -189,10 +190,10 @@ def batch_crop(folder, crop_x=0, crop_y=0, suffix='_cropped', channel=None):
     raw_asset = sample_manager.get('raw', channel=channel)
     shape = clearmap_io.shape(raw_asset.filelist[-1])
     for f_path in raw_asset.filelist:
-        img = clearmap_io.read(f_path)
+        img = io_ops.read(f_path)
         cropped_img = img[crop_x:shape[0] - crop_x, crop_y:shape[1] - crop_y, :]
         cropped_path = f_path.replace('.ome.tif', f'{suffix}.ome.tif')
-        clearmap_io.write(cropped_path, cropped_img)
+        io_ops.write(cropped_path, cropped_img)
 
 
 if __name__ == '__main__':

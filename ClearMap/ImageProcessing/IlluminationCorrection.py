@@ -23,8 +23,8 @@ References
 __author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
 __license__   = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
-__webpage__   = 'http://idisco.info'
-__download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
+__webpage__   = 'https://idisco.info'
+__download__  = 'https://www.github.com/ChristophKirst/ClearMap2'
 
 
 import numpy as np
@@ -34,7 +34,7 @@ from scipy.optimize import curve_fit
 
 import matplotlib.pyplot as plt
 
-import ClearMap.IO.IO as io
+from ClearMap.IO import io_ops
 import ClearMap.Utils.Timer as tmr
 import ClearMap.Utils.HierarchicalDict as hdict
 
@@ -107,7 +107,7 @@ def correct_illumination(source, flatfield = None, background = None, scaling = 
   """   
   
   if background is not None:
-    background = io.open_ro(background)
+    background = io_ops.open_ro(background)
    
   if flatfield is None:
     return source
@@ -115,19 +115,19 @@ def correct_illumination(source, flatfield = None, background = None, scaling = 
     # default flatfield correction
     flatfield = default_flat_field_line_file_name
   if isinstance(flatfield, str):
-    flatfield = io.open_ro(flatfield)
+    flatfield = io_ops.open_ro(flatfield)
   if flatfield.ndim == 1:
     flatfield = flatfield_from_line(flatfield, source.shape[1])
   if flatfield.shape[:2] != source.shape[:2]:
       raise ValueError(f'The flatfield shape {flatfield.shape[:2]} does not match the source shape {source.shape[:2]}!')
-  flatfield = io.open_ro(flatfield)  # normalise to Source
+  flatfield = io_ops.open_ro(flatfield)  # normalise to Source
   
   if verbose:    
     timer = tmr.Timer()
     hdict.pprint(head='Illumination correction:', flatfield=flatfield, background=background, scaling=scaling)
   
   # initialize source
-  source = io.open_ro(source)
+  source = io_ops.open_ro(source)
   if dtype is None:
     dtype = source.dtype
   
@@ -184,7 +184,7 @@ def flatfield_from_line(line, shape, axis = 0, dtype = float):
   flatfield : array 
     Full 2d flat field.
   """
-  line = io.open_ro(line)
+  line = io_ops.open_ro(line)
   
   if isinstance(shape, int):
     shape = (line.shape[0], shape) if axis == 0 else (shape, line.shape[0]);
@@ -241,7 +241,7 @@ def flatfield_line_from_regression(source, sink = None, positions = None, method
   .. math:
       I(x) = a + b (x- x_0)^2 + c (x- x_0)^4 + d (x- x_0)^6
   """
-  source = io.open_ro(source)
+  source = io_ops.open_ro(source)
   
   # split source
   if source.ndim == 1:
@@ -310,7 +310,7 @@ def flatfield_line_from_regression(source, sink = None, positions = None, method
     plt.plot(x, fit);
     plt.title('flatfield_line_from_regression')
   
-  result = io.write(sink, fit);
+  result = io_ops.write(sink, fit);
   if return_function:
     result = (result, fopt)
   return result;

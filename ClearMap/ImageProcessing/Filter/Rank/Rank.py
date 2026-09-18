@@ -58,7 +58,10 @@ import numpy as np
 import ClearMap.IO.IO as io
 
 import pyximport;
-pyximport.install(setup_args={"include_dirs":np.get_include()}, 
+
+from ClearMap.IO import dtypes
+
+pyximport.install(setup_args={"include_dirs":np.get_include()},
                   reload_support=True,
                   language_level=3)
 
@@ -637,7 +640,7 @@ def histogram(source, selem=None, sink=None, mask=None, max_bin=None):
     """
 
     if max_bin is None:
-      max_bin = io.max_value(source.dtype);
+      max_bin = dtypes.max_value(source.dtype);
     if max_bin >= 2**16:
       raise ValueError('The histograms are to large for this code to be efficient!');
     parameter_index = [max_bin];
@@ -725,7 +728,7 @@ def _apply_code(function, function_mask, source, selem = None,
     s = sink;
   
   if max_bin is None:
-    max_bin = io.max_value(source.dtype);
+    max_bin = dtypes.max_value(source.dtype);
   if max_bin >= 2**16:
     raise ValueError('The histograms are to large for this code to be efficient!');
 

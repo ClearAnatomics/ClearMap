@@ -11,9 +11,10 @@ Example
 -------
 
 >>> import numpy as np
+>>> from ClearMap.IO import io_ops
 >>> import ClearMap.IO.IO as io
 >>> import ClearMap.ParallelProcessing.BlockProcessing as bp
->>> source = io.open_ro(np.asarray(np.random.rand(50,100,200), order = 'F'))
+>>> source = io_ops.open_ro(np.asarray(np.random.rand(50,100,200), order = 'F'))
 >>> blocks = bp.split_into_blocks(source, processes=10, axes=[2], size_min=30, size_max=50, overlap=20)
 >>> blocks[0]
 Block-Numpy-Source(50, 100, 38)[float64]|F|
@@ -72,6 +73,7 @@ import ClearMap.ParallelProcessing.ParallelTraceback as ptb
 import ClearMap.IO.IO as io
 
 import ClearMap.Utils.Timer as tmr
+from ClearMap.IO import source_initialization, io_ops
 
 #TODO: clean up block functions: act on sources, arrays or blocks + memory or views
 #TODO: integrate with Torch or tensorflow ? GPU processing ?
@@ -194,7 +196,7 @@ def process(function, source, sink = None,
     sources = source
   else:
     sources = [source]
-  sources = [io.open_ro(s).as_virtual() for s in sources]
+  sources = [io_ops.open_ro(s).as_virtual() for s in sources]
 
   # if sink is None:
   #     sink = SMASource(shape=sources[0].shape, dtype=sources[0].dtype, order=sources[0].order)
@@ -205,7 +207,7 @@ def process(function, source, sink = None,
   else:
     sinks = [sink]
 
-  sinks = [io.initialize(s, hint=sources[0]).as_virtual() for s in sinks]
+  sinks = [source_initialization.initialize(s, hint=sources[0]).as_virtual() for s in sinks]
 
   axes = block_axes(sources[0], axes=axes)
 
@@ -595,7 +597,7 @@ def block_axes(source, axes=None):
       raise ValueError(f'Axes specification {axes} for source with dimension {source.ndim} not valid!')
     return axes
   
-  source = io.open_ro(source)  # metadata only
+  source = io_ops.open_ro(source)  # metadata only
   if source.order == 'F':
     axes = [source.ndim-1]
   else:
@@ -727,9 +729,10 @@ def _test():
   import numpy as np
   import ClearMap.IO.IO as io
   from ClearMap.IO.SMA import SMASource
+  from ClearMap.IO.NPY import NumpySource
   import ClearMap.ParallelProcessing.BlockProcessing as bp
   
-  source = io.open_ro(np.asarray(np.random.rand(50,100,200), order = 'F'))
+  source = io_ops.open_ro(np.asarray(np.random.rand(50, 100, 200), order ='F'))
   
   blocks = bp.split_into_blocks(source, processes=10, axes=[2], size_min=30, size_max=50, overlap=20)
   print(blocks)
@@ -751,8 +754,8 @@ def _test():
   print(b.valid.base_slicing)
   
   shape = (2,3,20)
-  source = io.npy.NumpySource(array = np.random.rand(*shape))
-  sink = io.npy.NumpySource(array = np.zeros(shape))
+  source = NumpySource(array = np.random.rand(*shape))
+  sink = NumpySource(array = np.zeros(shape))
   
   def process_image(source, sink = None):
     if sink is None:

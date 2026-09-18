@@ -33,6 +33,8 @@ import ClearMap.ParallelProcessing.BlockProcessing as bp
 import ClearMap.ParallelProcessing.DataProcessing.ArrayProcessing as ap
 
 import ClearMap.Utils.Timer as tmr
+from ClearMap.IO import source_initialization, io_ops
+
 
 ###############################################################################
 # Smoothing by number of neighbours
@@ -413,8 +415,8 @@ def smooth_by_configuration(source, sink=None, iterations=1, processing_paramete
   smooth.__name__ = 'smooth_by_configuration'
   
   # initialize sources and sinks
-  source = io.open_ro(source)
-  sink   = io.initialize(sink, shape_=source.shape, dtype_=bool, order_=source.order)
+  source = io_ops.open_ro(source)
+  sink   = source_initialization.initialize(sink, shape_=source.shape, dtype_=bool, order_=source.order)
 
   #block processing parameter
   block_processing_parameter = dict(axes = bp.block_axes(source), 

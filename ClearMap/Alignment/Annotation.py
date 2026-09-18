@@ -40,14 +40,14 @@ from scipy.ndimage import distance_transform_edt
 import ClearMap.Settings
 import ClearMap.Settings as settings
 
-import ClearMap.IO.IO as clearmap_io
+from ClearMap.IO import IO as clearmap_io
+from ClearMap.IO import io_ops
 import ClearMap.IO.FileUtils as fu
 
 from ClearMap.Alignment.Resampling import orientation_to_transposition, format_orientation
 import ClearMap.Utils.HierarchicalDict as hdict
 
 from ClearMap.Alignment.utils import create_label_table
-from ClearMap.IO import IO as clearmap_io
 
 from ClearMap.Visualization import Color as col
 from ClearMap.config.atlas import STRUCTURE_TREE_NAMES_MAP
@@ -384,7 +384,7 @@ class Annotation:
         self.dict_name_to_id = self.get_dict(from_='name', to='id')
 
         # import atlas
-        self.atlas = clearmap_io.read(self.annotation_file)
+        self.atlas = io_ops.read(self.annotation_file)
         if self.atlas.dtype.kind == 'f':
             self.atlas = self.atlas.astype(int)
         self.children_df = create_label_table(self.label_file, save=False, from_cached=True)
@@ -532,7 +532,7 @@ class Annotation:
     def get_lateralised_volume_map(self, atlas_scale, hemispheres_file_path=None):
         if hemispheres_file_path is None:
             hemispheres_file_path = self.hemispheres_file
-        hemispheres_atlas = clearmap_io.read(hemispheres_file_path)
+        hemispheres_atlas = io_ops.read(hemispheres_file_path)
         scale = np.prod(atlas_scale)
         hem_ids = sorted(np.unique(hemispheres_atlas).astype(int).tolist())
         volumes = {}
@@ -634,7 +634,7 @@ class Annotation:
             The labels for each point. (shape = len(points))
         """
         if annotation_file_path:
-            atlas = clearmap_io.read(annotation_file_path)
+            atlas = io_ops.read(annotation_file_path)
         else:
             atlas = self.atlas
 
@@ -750,7 +750,7 @@ class Annotation:
             # Extract array
             if verbose:
                 print(f'Preparing: from file: "{f_path}"')
-            src = clearmap_io.read(f_path)
+            src = io_ops.read(f_path)
             data = np.array(src)
 
             if orientation is not None:
@@ -766,7 +766,7 @@ class Annotation:
             if slicing is not None:
                 data = data[slicing]
 
-            clearmap_io.write(new_file_path, data)
+            io_ops.write(new_file_path, data)
             results.append(new_file_path)
 
         return results
@@ -867,7 +867,7 @@ class Annotation:
             The name of the file to which the color atlas was written.
         """
         if annotation_file_path:
-            atlas = clearmap_io.read(annotation_file_path)
+            atlas = io_ops.read(annotation_file_path)
         else:
             atlas = self.atlas
         atlas = self.convert_label(atlas, key='id', value='order', method='map')  # FIXME: why value='order'?
@@ -875,7 +875,7 @@ class Annotation:
         cm = self.color_map(alpha=False, as_int=True)
         atlas = cm[atlas]
         if dest_path:
-            clearmap_io.write(dest_path, atlas)
+            io_ops.write(dest_path, atlas)
         return atlas
 
 
@@ -904,7 +904,7 @@ def get_atlas_filepath(filename, directory=None, orientation=None, slicing=None)
 
 
 def annotation_to_distance_file(annotation_file_path):
-    brain_mask = (clearmap_io.read(annotation_file_path) > 0).astype(int)
+    brain_mask = (io_ops.read(annotation_file_path) > 0).astype(int)
     distance_array = distance_transform_edt(brain_mask)
     return distance_array
 

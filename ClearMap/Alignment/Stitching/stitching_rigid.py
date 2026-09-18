@@ -27,6 +27,7 @@ import multiprocessing as mp
 import concurrent.futures
 
 import ClearMap.IO.IO as io
+from ClearMap.IO import io_ops
 import ClearMap.IO.Source as src
 import ClearMap.IO.Slice as slc
 import ClearMap.IO.FileList as fl
@@ -409,7 +410,7 @@ class Source(SourceRegion, src.AbstractSource):
           Optional position of this source in a tiling grid.
         """
         if source is not None:
-            source = io.open_ro(source)
+            source = io_ops.open_ro(source)
             sid = None
         if isinstance(source, Source):
             position = source.position if position is None else position
@@ -4297,7 +4298,7 @@ def _test():
     import ClearMap.IO.IO as io
     for i in range(len(tiling)):
         for j in range(len(tiling[i])):
-            io.write(expression.string({'X' : i, 'Y' : j}), tiling[i][j])
+            io_ops.write(expression.string({'X' : i, 'Y' : j}), tiling[i][j])
 
     reload(stb)
     l = stb.TiledLayout(expression = expression)

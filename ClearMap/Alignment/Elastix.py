@@ -77,6 +77,7 @@ import numpy as np
 
 
 import ClearMap.Settings as settings
+from ClearMap.IO import conversion, io_ops
 from ClearMap.IO.TIF import TifSource
 from ClearMap.Utils.exceptions import ClearMapException, ClearMapValueError, ClearMapRuntimeError
 
@@ -777,13 +778,13 @@ def transform(source, sink='transformix', transform_parameter_file=None, transfo
     check_elastix_initialized()
 
     # image
-    source = io.open_ro(source)
+    source = io_ops.open_ro(source)
     if isinstance(source, TifSource):
         img_name = source.location
         delete_image = None
     else:
         img_name = os.path.join(tempfile.gettempdir(), 'elastix_input.tif')
-        io.write(img_name, source)
+        io_ops.write(img_name, source)
         delete_image = img_name
 
     # result directory
@@ -820,10 +821,10 @@ def transform(source, sink='transformix', transform_parameter_file=None, transfo
         return result_data_file(result_dirname)
     elif sink is None:
         result_file = result_data_file(result_dirname)
-        result = io.read(result_file)
+        result = io_ops.read(result_file)
     elif isinstance(sink, str):
         result_file = result_data_file(result_dirname)
-        result = io.convert(result_file, sink)
+        result = conversion.convert(result_file, sink)
     else:
         raise ClearMapRuntimeError('transform_data: sink not valid!')
 
@@ -892,10 +893,10 @@ def deformation_field(sink='transformix', transform_parameter_file=None, transfo
         return result_data_file(result_dirname)
     elif sink is None:
         result_file = result_data_file(result_dirname)
-        result = io.read(result_file)
+        result = io_ops.read(result_file)
     elif isinstance(sink, str):
         result_file = result_data_file(result_dirname)
-        result = io.convert(result_file, sink)
+        result = conversion.convert(result_file, sink)
     else:
         raise ClearMapRuntimeError('deformation_field: sink not valid!')
 
@@ -923,7 +924,7 @@ def deformation_distance(deformation_field, sink=None, scale=None):
       Array or file name of the deformation distance data.
     """
 
-    deformation_field = io.read(deformation_field)
+    deformation_field = io_ops.read(deformation_field)
 
     df = np.square(deformation_field)
     if scale is not None:
@@ -931,7 +932,7 @@ def deformation_distance(deformation_field, sink=None, scale=None):
             df[:, :, :, i] = df[:, :, :, i] * (scale[i] * scale[i])
     df = np.sqrt(np.sum(df, axis=3))
 
-    return io.write(sink, df)
+    return io_ops.write(sink, df)
 
 
 ###############################################################################
@@ -957,7 +958,7 @@ def write_points(filename, points, indices=False, binary=True):
     """
 
     if not isinstance(points, np.ndarray):
-        points = io.read(points)
+        points = io_ops.read(points)
 
     if binary:
         with open(filename, 'wb') as point_file:
@@ -1082,7 +1083,7 @@ def transform_points(source, sink=None, transform_parameter_file=None, transform
             binary = source[-3:] == 'bin'
             point_file = source
         else:
-            points = io.read(source)
+            points = io_ops.read(source)
             point_file = temp_file
             delete_point_file = temp_file
             write_points(point_file, points, indices=indices, binary=binary)
@@ -1136,7 +1137,7 @@ def transform_points(source, sink=None, transform_parameter_file=None, transform
     if delete_result_directory:
         shutil.rmtree(delete_result_directory)
 
-    return io.write(sink, transformed_points)
+    return io_ops.write(sink, transformed_points)
 
 
 def inverse_transform(fixed_image, affine_parameter_file, bspline_parameter_file=None, transform_parameter_file=None,

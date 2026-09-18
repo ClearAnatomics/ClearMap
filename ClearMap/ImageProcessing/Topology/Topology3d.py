@@ -22,6 +22,7 @@ import numpy as np
 
 import ClearMap.IO.IO as io
 import ClearMap.ParallelProcessing.DataProcessing.ArrayProcessing as ap
+from ClearMap.IO import io_ops
 
 ###############################################################################
 ### Neighbourhoods
@@ -528,7 +529,7 @@ def _test():
   import ClearMap.ParallelProcessing.DataProcessing.ArrayProcessing as ap
   ap.write('test.npy', x)
   
-  z = io.create('resuly.npy', shape=io.shape('test.npy'), order='C', dtype='uint32')
+  z = io_ops.create('resuly.npy', shape=io.shape('test.npy'), order='C', dtype='uint32')
   
   cProfile.runctx("c =top.index_from_binary(y, method='!shared', sink=z, verbose=True, processes=None)",
                   globals(), locals(), "Profile.prof")

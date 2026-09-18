@@ -37,7 +37,7 @@ import ClearMap.Visualization.Vispy.VolumeVisual as volume_visual
 
 import ClearMap.Visualization.Color as col
 
-import ClearMap.IO.IO as io
+from ClearMap.IO import io_ops
 
 ###############################################################################
 # ## 3d plotting
@@ -159,7 +159,7 @@ def plot_3d(source, colormap=None, view=None, title=None, center_view=True, **kw
     style.update(**kwargs)
 
     # source
-    source = io.read(source)[:]
+    source = io_ops.read(source)[:]
     if source.dtype == bool:
         source = source.view(dtype='uint8')
 
@@ -470,7 +470,7 @@ def save(location, view, transparent=None, *args, **kwargs):
         img = img.transpose([0, 1, 2])
     else:
         img = img[:, :, :3].T
-    return io.write(location, img)
+    return io_ops.write(location, img)
 
 
 ###############################################################################

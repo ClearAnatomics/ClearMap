@@ -19,6 +19,8 @@ __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__   = 'http://idisco.info'
 __download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 
+from ClearMap.IO import dispatch, conversion
+
 if __name__ == '__main__':
 
   #%%############################################################################
@@ -62,13 +64,13 @@ if __name__ == '__main__':
   
   #%% Convet raw data to npy files     
                
-  io.convert_files(ws.file_list('raw', extension='tif'), extension='npy', 
-                   processes=12, verbose=True);
+  conversion.convert_files(ws.file_list('raw', extension='tif'), extension='npy',
+                           processes=12, verbose=True);
   
   #%% Convert artery data to npy files      
              
-  io.convert_files(ws.file_list('arteries', extension='tif'), extension='npy', 
-                   processes=12, verbose=True);                 
+  conversion.convert_files(ws.file_list('arteries', extension='tif'), extension='npy',
+                           processes=12, verbose=True);
                    
   
   #%%############################################################################
@@ -506,7 +508,7 @@ if __name__ == '__main__':
   
   #%% Distance to surface
   
-  distance_atlas = io.as_source(distance_file)
+  distance_atlas = dispatch.as_source(distance_file)
   distance_atlas_shape = distance_atlas.shape
   
   def distance(coordinates):

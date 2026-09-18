@@ -138,6 +138,7 @@ __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
+from ..IO import io_ops
 
 MAX_PLOT_VERTICES = 300_000  # Empirical max number of vertices that can safely be plotted
 
@@ -558,7 +559,7 @@ class BinaryVesselProcessor(PipelineOrchestrator):
         self.steps[channel].remove_next_steps_files(self.steps[channel].smoothed)
 
         source = self.steps[channel].get_source(BinaryVesselProcessorSteps.smoothed)
-        source = clearmap_io.open_ro(source)
+        source = io_ops.open_ro(source)
         sink_path = self.get_path('binary', channel=channel, asset_sub_type='smoothed')
         smoothing_parameters = copy.deepcopy(vasculature.default_postprocessing_parameter['smooth'])
 
@@ -582,7 +583,7 @@ class BinaryVesselProcessor(PipelineOrchestrator):
         self.steps[channel].remove_next_steps_files(self.steps[channel].filled)
 
         source = self.steps[channel].get_source(BinaryVesselProcessorSteps.filled)
-        source = clearmap_io.open_ro(source)
+        source = io_ops.open_ro(source)
         sink = self.get_path('binary', channel=channel, asset_sub_type='filled')
         sink = initialize_sink(sink, shape=source.shape, dtype=source.dtype, order=source.order, return_buffer=False)
 

@@ -20,6 +20,9 @@ import math
 import numpy as np
 
 import pyximport;
+
+from ClearMap.IO import dispatch
+
 pyximport.install(setup_args={"include_dirs":np.get_include()}, reload_support=True)
 
 import ClearMap.IO.IO as io
@@ -69,7 +72,7 @@ def devolve(source, sink = None, shape = None, dtype = None,
   processes, timer = ap.initialize_processing(processes=processes, verbose=verbose, function='devolve');
   
   #points, points_buffer = ap.initialize_source(points);
-  points_buffer = io.as_source(source).as_buffer();
+  points_buffer = dispatch.as_source(source).as_buffer();
   if points_buffer.ndim == 1:
     points_buffer = points_buffer[:,None];
   

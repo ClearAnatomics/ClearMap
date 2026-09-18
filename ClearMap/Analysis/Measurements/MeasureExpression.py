@@ -14,7 +14,7 @@ __download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 
 import numpy as np;
 
-import ClearMap.IO.IO as io
+from ClearMap.IO import io_ops
 
 import ClearMap.ParallelProcessing.DataProcessing.MeasurePointList as mpl
 
@@ -47,7 +47,7 @@ def measure_expression(source, points, search_radius, method = 'max',
     
     
   """
-  source = io.open_ro(source)
+  source = io_ops.open_ro(source)
   ndim = source.ndim
 
   if verbose:

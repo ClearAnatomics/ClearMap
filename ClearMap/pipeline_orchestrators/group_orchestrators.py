@@ -11,7 +11,7 @@ from scipy import stats
 # import mpld3  # WARNING: local import. Present here only for reference
 # from PyQt5.QtWidgets import QApplication
 
-from ClearMap.IO  import IO as clm_io
+from ClearMap.IO import io_ops
 from ClearMap.Analysis.Statistics.group_statistics import (generate_summary_table, group_region_counts,
                                                            remove_p_val_nans, stack_voxelizations, get_colored_p_vals)
 
@@ -106,7 +106,7 @@ class DensityGroupAnalysisOrchestrator(GroupOrchestratorBase):
         asset = self._density_asset(sample_dir, channel, suffix)
         if not asset.exists:
             raise FileNotFoundError(f'No density for {channel=}, {suffix=} in {sample_dir}')
-        return clm_io.read(asset.path)
+        return asset.read()
 
     def _points_asset_type(self) -> str:
         asset = _PIPELINE_POINTS_ASSET.get(self.pipeline)
@@ -374,7 +374,7 @@ class DensityGroupAnalysisOrchestrator(GroupOrchestratorBase):
             p_val_imgs = []
             for gp1, gp2 in comparisons:
                 p_path = self.assets.p_val_colors_path(channel, gp1, gp2, suffix)
-                p_val_imgs.append(clm_io.read(p_path))
+                p_val_imgs.append(io_ops.read(p_path))
 
             titles = [f'{gp1} vs {gp2} p values' for gp1, gp2 in comparisons]
             dvs = plot_3d.plot(p_val_imgs, title=titles, arrange=False, sync=True, parent=parent)

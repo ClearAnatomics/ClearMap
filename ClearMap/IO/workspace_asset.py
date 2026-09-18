@@ -111,6 +111,7 @@ import numpy as np
 
 from ClearMap.Analysis.graphs.graph_gt import Graph
 from ClearMap.IO import IO as clearmap_io
+from ClearMap.IO import conversion, io_ops
 from ClearMap.IO import FileUtils as file_utils
 from ClearMap.IO.assets_constants import CONTENT_TYPE_TO_PIPELINE
 from ClearMap.IO.assets_specs import TypeSpec, ChannelSpec, StateManager, SubTypeSpec
@@ -623,29 +624,29 @@ class Asset(clearmap_io.AssetBase):
         return self.path.stat().st_size
 
     def open_ro(self, *args, **kwargs):
-        return clearmap_io.open_ro(self.existing_path, *args, **kwargs)
+        return io_ops.open_ro(self.existing_path, *args, **kwargs)
 
     def read(self, *args, **kwargs):
         if self.type_spec.extensions[0] == '.gt':
             return Graph.load(self.existing_path, *args, **kwargs)
         else:
-            return clearmap_io.read(self.existing_path, *args, **kwargs)
+            return io_ops.read(self.existing_path, *args, **kwargs)
 
     def edit(self, *args, **kwargs):
         # graph is always in-memory, caller must .save()
         if self.type_spec.extensions[0] == '.gt':
             return Graph.load(self.existing_path, *args, **kwargs)
         else:
-            return clearmap_io.edit(self.existing_path, *args, **kwargs)
+            return io_ops.edit(self.existing_path, *args, **kwargs)
 
     def write(self, data, *args, **kwargs):
         if isinstance(data, Graph):
             data.save(self.path)
         else:
-            clearmap_io.write(self.path, data, *args, **kwargs)
+            io_ops.write(self.path, data, *args, **kwargs)
 
     def create(self, *args, **kwargs):
-        clearmap_io.create(self.path, *args, **kwargs)
+        io_ops.create(self.path, *args, **kwargs)
 
     def as_source(self, slicing=None, *args, **kwargs):  # FIXME: delegate to ``edit``
         return clearmap_io.source(self.existing_path, slicing=slicing, *args, **kwargs)
@@ -663,8 +664,8 @@ class Asset(clearmap_io.AssetBase):
             if not new_extension.startswith('.'):
                 warnings.warn(f'New extension "{new_extension}" should start with a dot. Adding it automatically.')
                 new_extension = f'.{new_extension}'
-            clearmap_io.convert(self.existing_path, self.with_extension(new_extension),
-                                processes=processes, verbose=verbose, **kwargs)
+            conversion.convert(self.existing_path, self.with_extension(new_extension),
+                               processes=processes, verbose=verbose, **kwargs)
 
     def compress(self, algorithm=None):
         algorithm = algorithm or self.type_spec.compression_algorithms[0]
@@ -705,7 +706,7 @@ class Asset(clearmap_io.AssetBase):
         if status is None:
             status = self.status_manager.status if self.status_manager.status is not None else 'debug'
         self.status_manager.status = False
-        source = self.as_source()
+        source = self.open_ro()
         self.status_manager.status = status
         return self.write(np.asarray(source[slicing], order='F'))
 
@@ -981,8 +982,8 @@ class ExpressionAsset(Asset, ExpressionDataset):
 
     def convert(self, new_extension, processes=None, verbose=False, **kwargs):
         if self.is_existing_source:
-            clearmap_io.convert_files(self.file_list, extension=new_extension,
-                                      processes=processes, verbose=verbose, verify=True, **kwargs)
+            conversion.convert_files(self.file_list, extension=new_extension,
+                                     processes=processes, verbose=verbose, verify=True, **kwargs)
 
     def format_expression(self):
         """

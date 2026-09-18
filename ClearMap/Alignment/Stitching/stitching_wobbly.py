@@ -22,6 +22,7 @@ import multiprocessing as mp
 
 
 import ClearMap.IO.IO as io
+from ClearMap.IO import io_ops
 import ClearMap.IO.Slice as slc
 
 import ClearMap.Alignment.Stitching.stitching_rigid as strg
@@ -2162,7 +2163,7 @@ def _stitch_slice(slice_layout, slice_id, n_slices, sink, method, axis, full_reg
     #stitch
     stitched = strg.stitch_layout(slice_layout, method = method)
 
-    io.write(sink, stitched[slice_slicing], slicing = full_slicing)
+    io_ops.write(sink, stitched[slice_slicing], slicing = full_slicing)
 
 
 #############################################################################################################
@@ -2171,6 +2172,7 @@ def _stitch_slice(slice_layout, slice_id, n_slices, sink, method, axis, full_reg
 
 def _test():
     import ClearMap.Alignment.Stitching.stitching_wobbly as stw
+    from ClearMap.IO import io_ops
 
     from importlib import reload
     reload(stw)
@@ -2208,7 +2210,7 @@ def _test():
     stw.strg.p3d.plot(s)
 
     #true if not optimized
-    np.all(stw.io.open_ro(s)[:190,:,:] == data[:190,:,:nz])
+    np.all(io_ops.open_ro(s)[:190, :, :] == data[:190, :, :nz])
 
 
     plt.figure(2); plt.clf()
@@ -2256,7 +2258,7 @@ def _test():
 
 
     # True for non-optimized placements
-    np.all(stw.io.open_ro(s)[:190,:,:] == data[:190,:,:nz])
+    np.all(io_ops.open_ro(s)[:190, :, :] == data[:190, :, :nz])
 
 
     # wobble + axis alignment
@@ -2309,7 +2311,7 @@ def _test():
     stw.strg.dv.plot(s)
 
     # True for non-optimized placements
-    np.all(stw.io.open_ro(s)[:190,:,sh:nz] == data[:190,:,sh:nz])
+    np.all(io_ops.open_ro(s)[:190, :, sh:nz] == data[:190, :, sh:nz])
 
 
     plt.figure(2); plt.clf()
@@ -2438,7 +2440,7 @@ def _test():
     stw.strg.dv.plot(s)
 
     # True for non-optimized placements
-    np.all(stw.io.open_ro(s)[:190,:,sh:nz] == data[:190,:,sh:nz])
+    np.all(io_ops.open_ro(s)[:190, :, sh:nz] == data[:190, :, sh:nz])
 
 
     s = l.slice_along_axis_wobbly(32)

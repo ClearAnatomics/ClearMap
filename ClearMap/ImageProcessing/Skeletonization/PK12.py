@@ -31,6 +31,7 @@ import ClearMap.ParallelProcessing.DataProcessing.ConvolvePointList as cpl
 import ClearMap.Utils.Timer as tmr
 
 import ClearMap.IO.FileUtils as fu
+from ClearMap.IO import io_ops
 from ClearMap.Utils.utilities import sanitize_n_processes
 
 
@@ -650,7 +651,7 @@ def _test():
   #Skeletonization
   reload(PK12)
   binary = tsf.skeleton_binary
-  binary_array = np.array(io.read(binary))
+  binary_array = np.array(io_ops.read(binary))
   
   #default version
   skeleton = PK12.skeletonize(binary_array.copy(), delete_border=True, verbose=True);

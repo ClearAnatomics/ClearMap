@@ -4,8 +4,8 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
-import ClearMap.IO.IO as clearmap_io
 from ClearMap.Analysis.Statistics.group_statistics import LoadedPValueResults
+from ClearMap.IO import io_ops
 
 
 @dataclass(frozen=True)
@@ -66,14 +66,14 @@ class GroupResultsAssets:
     def load_p_val_results(self, channel: str, gp1: str, gp2: str,
                            suffix: str = '') -> 'LoadedPValueResults':
         def _opt(p: Path):
-            return clearmap_io.read(p) if p.exists() else None
+            return io_ops.read(p) if p.exists() else None
 
         return LoadedPValueResults(
-            gp1_avg=clearmap_io.read(self.avg_density_path(channel, gp1, suffix)),
+            gp1_avg=io_ops.read(self.avg_density_path(channel, gp1, suffix)),
             gp1_sd=_opt(self.sd_density_path(channel, gp1, suffix)),
-            gp2_avg=clearmap_io.read(self.avg_density_path(channel, gp2, suffix)),
+            gp2_avg=io_ops.read(self.avg_density_path(channel, gp2, suffix)),
             gp2_sd=_opt(self.sd_density_path(channel, gp2, suffix)),
-            p_vals=clearmap_io.read(self.p_val_colors_path(channel, gp1, gp2, suffix)),
+            p_vals=io_ops.read(self.p_val_colors_path(channel, gp1, gp2, suffix)),
             effect_size=_opt(self.effect_size_path(channel, gp1, gp2, suffix)),
         )
 
@@ -81,21 +81,21 @@ class GroupResultsAssets:
 
     def write_avg_density(self, array: np.ndarray, channel: str,
                           group_name: str, suffix: str = '') -> None:
-        clearmap_io.write(self.avg_density_path(channel, group_name, suffix), array)
+        io_ops.write(self.avg_density_path(channel, group_name, suffix), array)
 
     def write_sd_density(self, array: np.ndarray, channel: str,
                          group_name: str, suffix: str = '') -> None:
-        clearmap_io.write(self.sd_density_path(channel, group_name, suffix), array)
+        io_ops.write(self.sd_density_path(channel, group_name, suffix), array)
 
     def write_p_val_colors(self, array: np.ndarray, channel: str,
                            gp1: str, gp2: str, suffix: str = '') -> None:
-        clearmap_io.write(self.p_val_colors_path(channel, gp1, gp2, suffix),
-                          array, photometric='rgb', imagej=True)
+        io_ops.write(self.p_val_colors_path(channel, gp1, gp2, suffix),
+                     array, photometric='rgb', imagej=True)
 
     def write_effect_size(self, array: np.ndarray, channel: str,
                           gp1: str, gp2: str, suffix: str = '') -> None:
-        clearmap_io.write(self.effect_size_path(channel, gp1, gp2, suffix),
-                          array, imagej=True)
+        io_ops.write(self.effect_size_path(channel, gp1, gp2, suffix),
+                     array, imagej=True)
 
     def write_stats_table(self, df: pd.DataFrame, channel: str,
                           gp1: str, gp2: str, suffix: str = '') -> None:

@@ -13,21 +13,22 @@ The :mod:`~ClearMap.IO.IO` module is the main module organizing all the IO
 functionailty.
 
 >>> import numpy as np
+>>> from ClearMap.IO import dispatch
 >>> import ClearMap.IO.IO as cmp_io
 >>> x = np.random.rand(30,40,50)
->>> s = cmp_io.as_source(x)
+>>> s = dispatch.as_source(x)
 >>> print(s)
 Numpy-Source(30, 40, 50)[float64]|C|
 
-The first tuple is the shape of the array, the next list contains the datype 
+The first tuple is the shape of the array, the next list contains the dtype
 or data structure, the `|.|` bracket denotes the order of this array, which 
-can be `|C|` for c-contigous, `|F|` for Fortran contigous or '' if the array
-is non-contigous.
+can be `|C|` for c-contiguous, `|F|` for Fortran contiguous or '' if the array
+is non-contiguous.
 
 File sources contain further information about the location of the files etc.
 
 The :mod:`~ClearMap.IO.FileList` source allows to turn a list of files into a 
-sinlge source, e.g. for microscope data in which each imageing plane comes
+single source, e.g. for microscope data in which each imaging plane comes
 in a separate file.
 
 Supported source types include:

@@ -44,6 +44,7 @@ import ClearMap.Analysis.Measurements.shape_detection as sd
 import ClearMap.Analysis.Measurements.MeasureExpression as me
 
 import ClearMap.Utils.Timer as tmr
+from ClearMap.IO import io_ops
 from ClearMap.ImageProcessing.Experts.utils import initialize_sinks, run_step, print_params
 from ClearMap.ImageProcessing.LocalStatistics import local_percentile
 
@@ -613,7 +614,7 @@ def filter_cells(source, sink, thresholds):
     sink : str, array or Source
         The thresholded cell data.
     """
-    source = clearmap_io.open_ro(source)
+    source = io_ops.open_ro(source)
 
     cells_mask = np.ones(source.shape[0], dtype=bool)
     for filter_name, thrsh in thresholds.items():
@@ -626,7 +627,7 @@ def filter_cells(source, sink, thresholds):
                 cells_mask = np.logical_and(cells_mask, thrsh[1] > source[filter_name])
     cells_filtered = source[cells_mask]
 
-    return clearmap_io.write(sink, cells_filtered)
+    return io_ops.write(sink, cells_filtered)
 
 
 ###############################################################################

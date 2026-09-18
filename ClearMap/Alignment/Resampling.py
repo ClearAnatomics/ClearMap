@@ -37,6 +37,7 @@ from .Transformations.Transformation import TransformationBase
 from ClearMap.Alignment.orientation import (format_orientation, orientation_to_transposition, orient_resolution,
                                             orient_shape, orient, orient_points)
 from ClearMap.Utils.utilities import handle_deprecated_args
+from ..IO import conversion, source_initialization, io_ops
 
 
 def resample_shape_from_resolution(original_shape, original_resolution, resampled_resolution,
@@ -549,12 +550,12 @@ def resample(original, resampled=None,
         for tag in exp.tags:
             exp = Expression(exp.pattern[0].replace(str(tag), ''))
         new_path = exp.pattern[0] + '.npy'
-        io.convert(original, new_path)
+        conversion.convert(original, new_path)
         original = new_path
     else:
         new_path = None
 
-    original = io.open_ro(original)
+    original = io_ops.open_ro(original)
     dtype = original.dtype
     order = original.order
 
@@ -595,7 +596,7 @@ def resample(original, resampled=None,
         if verbose:
             print('Resampling: no resampling necessary, source has same size as sink!')
         if original != resampled:  # TODO: this should be handled by Source functionality !
-            return io.write(resampled, original)
+            return io_ops.write(resampled, original)
         else:
             return original
 
@@ -607,7 +608,7 @@ def resample(original, resampled=None,
         delete_files.append(new_path)
     for step, axes, shape in zip(range(n_steps), axes_order, shape_order):
         if step == n_steps - 1 and orientation is None:  # Create final resampled file for last step
-            resampled_data = io.initialize(resampled, shape_=resampled_shape, dtype_=dtype, as_source=True)
+            resampled_data = source_initialization.initialize(resampled, shape_=resampled_shape, dtype_=dtype, as_source=True)
         else:
             if method == 'shared':
                 resampled_data = io.sma.create(shape, dtype=dtype, order=order, as_source=True)
@@ -644,7 +645,7 @@ def resample(original, resampled=None,
 
     if orientation is not None:
         resampled_data = orient(resampled_data, orientation)
-        resampled = io.write(resampled, resampled_data)
+        resampled = io_ops.write(resampled, resampled_data)
     else:
         resampled = resampled_data
 
@@ -709,7 +710,7 @@ def resample_inverse(resampled, original=None,
     * All arguments, except source and sink should be passed as :func:`resample`
       to invert the resampling.
     """
-    resampled = io.open_ro(resampled)
+    resampled = io_ops.open_ro(resampled)
 
     # invert orientation
     resampled = orient(resampled, orientation, inverse=True)
@@ -802,9 +803,9 @@ def resample_points(original_points, resampled_points=None,
                        original, resampled,
                        orientation, consistent=True)
 
-    resampled = io.read(original_points) * factor
+    resampled = io_ops.read(original_points) * factor
     resampled = orient_points(resampled, orientation, shape=orient_shape(resampled_shape, orientation, inverse=True))
-    return io.write(resampled_points, resampled)
+    return io_ops.write(resampled_points, resampled)
 
 
 def resample_points_inverse(resampled_points, original_points=None,
@@ -858,10 +859,10 @@ def resample_points_inverse(resampled_points, original_points=None,
                        original, resampled,
                        orientation, consistent=True)
 
-    resampled_points = io.open_ro(resampled_points)
+    resampled_points = io_ops.open_ro(resampled_points)
     original = orient_points(resampled_points, orientation, shape=resampled_shape, inverse=True)
     original = original[:] / factor
-    return io.write(original_points, original)
+    return io_ops.write(original_points, original)
 
 
 ########################################################################################
@@ -942,11 +943,11 @@ class OrientationTransformation(TransformationBase):
 
     def transform_data(self, source, sink=None, inverse=False):
         inverse = self.get_inverse(inverse)
-        return io.write(sink, orient(source, orientation=self.orientation, inverse=inverse))
+        return io_ops.write(sink, orient(source, orientation=self.orientation, inverse=inverse))
 
     def transform_points(self, source, sink=None, inverse=False, **kwargs):
         inverse = self.get_inverse(inverse)
-        return io.write(sink, orient_points(source, orientation=self.orientation, shape=self.shape, inverse=inverse))
+        return io_ops.write(sink, orient_points(source, orientation=self.orientation, shape=self.shape, inverse=inverse))
 
     def transform_shape(self, shape, inverse=False, **kwargs):
         return orient_shape(self.orientation, shape, inverse=inverse)
