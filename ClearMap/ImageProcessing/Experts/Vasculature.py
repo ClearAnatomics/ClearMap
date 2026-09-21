@@ -24,7 +24,7 @@ import scipy.ndimage as ndi
 import skimage.filters as skif
 
 import ClearMap.IO.IO as io
-from ClearMap.IO import source_initialization, io_ops
+from ClearMap.IO import source_initialization, io_ops, source_geometry
 
 import ClearMap.ParallelProcessing.BlockProcessing as bp
 import ClearMap.ParallelProcessing.DataProcessing.ArrayProcessing as ap
@@ -469,8 +469,8 @@ def binarize(source, sink=None, binarization_parameter=default_binarization_para
     """
 
     # initialize sink
-    shape = io.shape(source)
-    order = io.order(source)
+    shape = source_geometry.shape(source)
+    order = source_geometry.order(source)
     sink, sink_buffer = ap.initialize_sink(sink=sink, shape=shape, order=order, dtype=bool)  # , memory='shared')
 
     # initialize addition output sinks

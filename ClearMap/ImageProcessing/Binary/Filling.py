@@ -12,7 +12,6 @@ __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
 import os
 import gc
-import multiprocessing as mp
 
 import numpy as np
 
@@ -23,7 +22,7 @@ pyximport.install(setup_args={"include_dirs": [np.get_include(), os.path.dirname
 
 from . import FillingCode as code
 
-import ClearMap.IO.IO as io
+from ClearMap.IO import source_geometry
 from ClearMap.Utils.utilities import sanitize_n_processes
 import ClearMap.Utils.Timer as tmr
 
@@ -62,7 +61,7 @@ def fill(source, sink=None, seeds=None, processes=None, verbose=False):
         timer = tmr.Timer()
 
     # create temporary shared array
-    order = io.order(source)
+    order = source_geometry.order(source)
     temp = np.empty(source.shape, dtype='int8', order=order)
 
     source_flat = source.reshape(-1, order='A')
@@ -88,7 +87,7 @@ def fill(source, sink=None, seeds=None, processes=None, verbose=False):
     else:
         seeds = np.where(seeds.reshape(-1, order=order))[0]
 
-    strides = np.array(io.element_strides(source))
+    strides = np.array(source_geometry.element_strides(source))
 
     code.label_temp(temp_flat, strides, seeds, processes=processes)
     if verbose:
@@ -117,7 +116,7 @@ def border_indices(source):
 
     ndim = source.ndim
     shape = source.shape
-    strides = io.element_strides(source)
+    strides = source_geometry.element_strides(source)
 
     border = []
     for d in range(ndim):

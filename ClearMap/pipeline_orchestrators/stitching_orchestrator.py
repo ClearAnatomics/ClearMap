@@ -10,7 +10,7 @@ import numpy as np
 from ClearMap.Alignment.Stitching import stitching_wobbly as stitching_wobbly
 from ClearMap.Alignment.Stitching import stitching_rigid as stitching_rigid
 
-from ClearMap.IO import conversion, io_ops
+from ClearMap.IO import conversion, io_ops, source_geometry
 from ClearMap.IO import IO as clearmap_io
 from ClearMap.IO.FileUtils import link_or_copy
 from ClearMap.IO.metadata import define_auto_stitching_params, parse_ome_info
@@ -489,7 +489,7 @@ class StitchingProcessor(PipelineOrchestrator):
             ref_asset = self.get('raw', channel=self.sample_manager.alignment_reference_channel)
             n_slices = len(ref_asset.file_list)  # TODO: find better proxy
         except KeyError:
-            n_slices = clearmap_io.shape(self.get('raw', channel=channel).file_list[0])[0]
+            n_slices = source_geometry.shape(self.get('raw', channel=channel).file_list[0])[0]
         self.prepare_watcher_for_substep(n_slices, self.__wobbly_stitching_stitch_re,
                                          'Stitch layout wobbly', True)
         try:

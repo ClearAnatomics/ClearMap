@@ -25,7 +25,7 @@ import numpy as np
 import cv2
 
 import ClearMap.IO.IO as io
-from ClearMap.IO import conversion, source_initialization, io_ops
+from ClearMap.IO import conversion, source_initialization, io_ops, source_geometry
 from ClearMap.IO.source.backends import SMA, MMP
 import ClearMap.IO.source.backends.FileList as fl
 
@@ -228,11 +228,11 @@ def resample_information(original_shape=None, resampled_shape=None,
 
     # shapes form sources
     if original_shape is None and original is not None:
-        original_shape = io.shape(original)
+        original_shape = source_geometry.shape(original)
 
     if resampled_shape is None:
         try:
-            resampled_shape = io.shape(resampled)
+            resampled_shape = source_geometry.shape(resampled)
         except FileNotFoundError:
             pass
 
@@ -565,7 +565,7 @@ def resample(original, resampled=None,
                                                                         original_resolution, resampled_resolution,
                                                                         original, resampled,
                                                                         orientation, consistent=True)
-        original_shape = io.shape(original)
+        original_shape = source_geometry.shape(original)
         resampled_shape = None
     else:
         original_shape = original.shape
@@ -1217,7 +1217,7 @@ def _test():
     source = io.join(settings.test_data_path, 'Tif/sequence/sequence<Z,4>.tif')
     sink = io.join(settings.test_data_path, "Resampling/resampled_sequence.tif")
 
-    source_shape, sink_shape, source_res, sink_res = res.resample_shape(source_shape=io.shape(source),
+    source_shape, sink_shape, source_res, sink_res = res.resample_shape(source_shape=source_geometry.shape(source),
                                                                         source_resolution=(1., 1., 1.),
                                                                         sink_resolution=(1.6, 1.6, 2))
     axes_order = res._axes_order(None, source_shape, sink_shape)

@@ -3,7 +3,7 @@ import pathlib
 import numpy as np
 
 from ClearMap.IO.source import Source as source_mod
-from ClearMap.IO.IO import dtype
+from ClearMap.IO.source_geometry import dtype
 
 
 def get_info(d_type):

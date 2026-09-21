@@ -26,7 +26,10 @@ from multiprocessing import cpu_count;
 
 import ClearMap.IO.IO as io
 
-import pyximport; 
+import pyximport;
+
+from ClearMap.IO import source_geometry
+
 pyximport.install(setup_args={"include_dirs": [np.get_include()]}, reload_support=True)
 
 import ClearMap.ParallelProcessing.DataProcessing.ConvolvePointListCode as code
@@ -271,7 +274,7 @@ def convolve_3d_indices(source, kernel, indices, sink = None, sink_dtype = None,
     processes = cpu_count();
   
   if strides is None:
-    strides = np.array(io.element_strides(source));
+    strides = np.array(source_geometry.element_strides(source));
   
   #print d.dtype, strides.dtype, kernel.dtype, o.dtype
   if check_border:
@@ -335,7 +338,7 @@ def convolve_3d_indices_if_smaller_than(source, kernel, indices, max_value, sink
     processes = cpu_count();
   
   if strides is None:
-    strides = np.array(io.element_strides(source), dtype=int);
+    strides = np.array(source_geometry.element_strides(source), dtype=int);
   
   #print d.dtype, strides.dtype, kernel.dtype, o.dtype
   if check_border:

@@ -44,7 +44,7 @@ import ClearMap.Analysis.Measurements.shape_detection as sd
 import ClearMap.Analysis.Measurements.MeasureExpression as me
 
 import ClearMap.Utils.Timer as tmr
-from ClearMap.IO import io_ops
+from ClearMap.IO import io_ops, source_geometry
 from ClearMap.ImageProcessing.Experts.utils import initialize_sinks, run_step, print_params
 from ClearMap.ImageProcessing.LocalStatistics import local_percentile
 
@@ -302,7 +302,7 @@ def detect_cells(source, sink=None, cell_detection_parameter=default_cell_detect
     """
 
     # initialize sink
-    initialize_sinks(cell_detection_parameter, clearmap_io.shape(source), clearmap_io.order(source))
+    initialize_sinks(cell_detection_parameter, source_geometry.shape(source), source_geometry.order(source))
 
     cell_detection_parameter.update(verbose=processing_parameter.get('verbose', False))
 

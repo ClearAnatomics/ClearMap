@@ -27,7 +27,7 @@ import multiprocessing as mp
 import pyximport
 
 import ClearMap.IO.IO as io
-from ClearMap.IO import dispatch, source_initialization, io_ops
+from ClearMap.IO import dispatch, source_initialization, io_ops, source_geometry
 import ClearMap.IO.source.Slice as slc
 
 import ClearMap.Utils.Timer as tmr
@@ -470,7 +470,7 @@ def block_ranges(source, blocks=None, processes=None):
   if blocks is None:
     blocks = processes * default_blocks_per_process
 
-  size = io.size(source)
+  size = source_geometry.size(source)
   blocks = min(blocks, size)
   return np.array(np.linspace(0, size, blocks + 1), dtype=int)
 

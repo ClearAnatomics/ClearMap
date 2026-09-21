@@ -13,7 +13,7 @@ from ClearMap import Settings as settings, Settings
 from ClearMap.Alignment import Resampling as resampling, Elastix as elastix
 from ClearMap.Alignment.Annotation import Annotation
 
-from ClearMap.IO import IO as clearmap_io
+from ClearMap.IO import source_geometry
 from ClearMap.IO.source.backends.TIF import TifSource
 from ClearMap.IO.assets_specs import ChannelSpec, TypeSpec
 from ClearMap.IO.metadata import define_auto_resolution
@@ -349,7 +349,7 @@ class RegistrationProcessor(PipelineOrchestrator):
             if 'Z' in source_asset.tag_names:  # real tiles -> count planes
                 n_planes = source_asset.expression.tag_range('Z')[1] + 1
             else:  # columns -> take z column shape
-                n_planes = clearmap_io.shape(source_asset.file_list[0])[0]
+                n_planes = source_geometry.shape(source_asset.file_list[0])[0]
         else: # Stacked or single file, take the first dimension of the asset
             n_planes = source_asset.shape()[0]
 

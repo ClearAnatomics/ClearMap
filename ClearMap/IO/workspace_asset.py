@@ -110,7 +110,7 @@ import natsort
 import numpy as np
 
 from ClearMap.Analysis.graphs.graph_gt import Graph
-from ClearMap.IO import IO as clearmap_io
+from ClearMap.IO import IO as clearmap_io, source_geometry
 from ClearMap.IO import conversion, io_ops
 from ClearMap.IO import FileUtils as file_utils
 from ClearMap.IO.assets_constants import CONTENT_TYPE_TO_PIPELINE
@@ -653,11 +653,11 @@ class Asset(clearmap_io.AssetBase):
 
     def shape(self):
         if not self.is_expression:
-            return clearmap_io.shape(self.existing_path)
+            return source_geometry.shape(self.existing_path)
 
     def dtype(self):
         if self.is_existing_source and not self.is_expression:
-            return clearmap_io.dtype(self.existing_path)
+            return source_geometry.dtype(self.existing_path)
 
     def convert(self, new_extension, processes=None, verbose=False, **kwargs):
         if self.is_existing_source:
@@ -943,7 +943,7 @@ class ExpressionAsset(Asset, ExpressionDataset):
         tuple(int)
             The shape of the tiles.
         """
-        return clearmap_io.shape(self.file_list[0])
+        return source_geometry.shape(self.file_list[0])
 
     @property
     def tag_names(self):
@@ -977,7 +977,7 @@ class ExpressionAsset(Asset, ExpressionDataset):
         if self.is_tiled:
             raise ValueError(f'Asset {self} is tiled. Cannot determine shape without stitching.')
         else:
-            tile_shape = clearmap_io.shape(self.file_list[0])
+            tile_shape = source_geometry.shape(self.file_list[0])
             return len(self.file_list), tile_shape[0], tile_shape[1]
 
     def convert(self, new_extension, processes=None, verbose=False, **kwargs):

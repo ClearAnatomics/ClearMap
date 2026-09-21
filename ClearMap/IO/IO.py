@@ -142,13 +142,7 @@ from contextlib import contextmanager
 import numpy as np
 
 import ClearMap.IO.source.Source as source_mod
-import ClearMap.IO.source.backends.TIF as tif
-import ClearMap.IO.source.backends.NRRD as nrrd
-import ClearMap.IO.source.backends.CSV as csv
-import ClearMap.IO.source.backends.NPY as npy
-import ClearMap.IO.source.backends.MMP as mmp
 import ClearMap.IO.source.backends.SMA as sma
-import ClearMap.IO.source.backends.MHD as mhd
 
 from ClearMap.IO.dispatch import location_to_module, as_source
 from ClearMap.IO.io_ops import open_ro
@@ -172,42 +166,6 @@ import ClearMap.Utils.tag_expression as te
 from ClearMap.IO.FileUtils import (is_file, is_directory, file_extension,
                                    join, split, abspath, create_directory, 
                                    delete_directory, copy_file, link_file, delete_file)
-
-###############################################################################
-# ## Source associations
-###############################################################################
-
-source_modules = [npy, tif, mmp, sma, fl, nrrd, mhd, csv]
-"""The valid source modules."""
-
-
-file_extension_to_module = {
-    'npy': mmp,
-    'tif': tif,
-    'tiff': tif,
-    'nrrd': nrrd,
-    'nrdh': nrrd,
-    'csv': csv,
-    'mhd': mhd
-}
-
-# FIXME: there MUST be a better way
-module_to_source_cls = {
-    npy: npy.NumpySource,
-    tif: tif.TifSource,
-    mmp: mmp.MMPSource,
-    sma: sma.SMASource,
-    fl: fl.FileListSource,
-    nrrd: nrrd.NrrdSource,
-    mhd: mhd.MhdSource,
-    csv: csv.CSVSource
-}
-
-
-if gt_loaded:
-    file_extension_to_module['gt'] = gt
-    source_modules += [gt]
-"""Map between file extensions and modules that handle this file type."""
 
 
 class AssetBase:
@@ -284,96 +242,6 @@ def source(source_, slicing=None, *args, **kwargs):
     return as_source(source_, slicing=slicing, *args, **kwargs)
 
 
-def ndim(source_):
-    """
-    Returns number of dimensions of a source.
-
-    Parameters
-    ----------
-    source_ : str, array or Source
-        The source specification.
-
-    Returns
-    -------
-    ndim : int
-        The number of dimensions in the source.
-    """
-    source_ = open_ro(source_)
-    return source_.ndim
-
-
-def shape(source_):
-    """
-    Returns shape of a source.
-
-    Parameters
-    ----------
-    source_: str, array or Source
-       The source specification.
-
-    Returns
-    -------
-    shape : tuple of ints
-       The shape of the source.
-    """
-    source_ = open_ro(source_)
-    return source_.shape
-
-
-def size(source_):
-    """
-    Returns size of a source.
-
-    Parameters
-    ----------
-    source_ : str, array or Source
-        The source specification.
-
-    Returns
-    -------
-    size : int
-        The size of the source.
-    """
-    source_ = open_ro(source_)
-    return source_.size
-
-
-def dtype(source_):
-    """
-    Returns dtype of a source.
-
-    Parameters
-    ----------
-    source_ : str, array or Source
-        The source specification.
-
-    Returns
-    -------
-    dtype : dtype
-        The data type of the source.
-    """
-    source_ = open_ro(source_)
-    return source_.dtype
-
-
-def order(source_):
-    """
-    Returns order of a source.
-
-    Parameters
-    ----------
-    source_ : str, array or Source
-        The source specification.
-
-    Returns
-    -------
-    order : 'C', 'F', or None
-        The order of the source data items.
-    """
-    source_ = open_ro(source_)
-    return source_.order
-
-
 def location(source_):
     """
     Returns the location of a source.
@@ -413,29 +281,6 @@ def memory(source_):
 
     if sma.is_shared(source_):
         return 'shared'
-
-
-def element_strides(source_):
-    """
-    Returns the strides of the data array of a source.
-
-    Parameters
-    ----------
-    source_ : str, array, dtype or Source
-        The source specification.
-
-    Returns
-    -------
-    strides : tuple of int
-        The strides of the source.
-    """
-    try:
-        source_ = open_ro(source_)
-        strides = source_.element_strides
-    except Exception as e:
-        raise ValueError(f'Cannot determine the strides for the source!; {e}')
-
-    return strides
 
 
 def buffer(source_):

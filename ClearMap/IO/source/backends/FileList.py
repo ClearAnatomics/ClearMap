@@ -30,6 +30,7 @@ import concurrent.futures
 
 import ClearMap.IO.FileUtils as fu
 import ClearMap.IO.source.Source as source_mod
+from ClearMap.IO import source_geometry
 # noinspection PyUnusedImports
 from ClearMap.IO.source.backend_defaults import read, create, write
 import ClearMap.IO.source.Slice as slc
@@ -665,7 +666,7 @@ def ndim(expression=None, file_list=None):
     if len(file_list) == 0:
         raise ValueError(f'Cannot determine dimension of the file list {expression!r} without files.!')
 
-    return io.ndim(file_list[0]) + expression.n_tags()
+    return source_geometry.ndim(file_list[0]) + expression.n_tags()
 
 
 #TODO: arbitrary axes mixing file and list dimensions
@@ -730,7 +731,7 @@ def shape_file(expression = None, file_list = None):
         raise ValueError(f'Cannot determine dimension of the file list {expression!r} without files.!')
 
     # determine dimensions in each file
-    shape_file = io.shape(file_list[-1])  # Take the last because the first has Z
+    shape_file = source_geometry.shape(file_list[-1])  # Take the last because the first has Z
 
     return shape_file
 
@@ -797,7 +798,7 @@ def dtype(expression = None, file_list = None):
     if len(file_list) == 0:
         raise ValueError(f'Cannot determine dtype from file list {expression!r} without files!')
 
-    return io.dtype(file_list[0])
+    return source_geometry.dtype(file_list[0])
 
 
 def order(expression = None, file_list=None):
@@ -818,7 +819,7 @@ def order(expression = None, file_list=None):
     if len(file_list) == 0:
         raise ValueError(f'Cannot determine order from file list {expression!r} without files!')
 
-    order_file = io.order(file_list[0])
+    order_file = source_geometry.order(file_list[0])
     if order_file == 'F':
         return 'F'
     else:

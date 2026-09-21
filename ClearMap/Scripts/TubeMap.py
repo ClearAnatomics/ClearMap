@@ -19,7 +19,7 @@ __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__   = 'http://idisco.info'
 __download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 
-from ClearMap.IO import dispatch, conversion
+from ClearMap.IO import dispatch, conversion, source_geometry
 
 if __name__ == '__main__':
 
@@ -460,8 +460,8 @@ if __name__ == '__main__':
   def transformation(coordinates):
     coordinates = res.resample_points(
                     coordinates, sink=None, orientation=None, 
-                    source_shape=io.shape(ws.filename('binary', postfix='filled')), 
-                    sink_shape=io.shape(ws.filename('resampled')));
+                    source_shape=source_geometry.shape(ws.filename('binary', postfix='filled')),
+                    sink_shape=source_geometry.shape(ws.filename('resampled')));
     
     coordinates = elx.transform_points(
                     coordinates, sink=None, 
@@ -483,8 +483,8 @@ if __name__ == '__main__':
   
   def scaling(radii):
     resample_factor = res.resample_factor(
-                        source_shape=io.shape(ws.filename('binary', postfix='filled')), 
-                        sink_shape=io.shape(ws.filename('resampled')))
+                        source_shape=source_geometry.shape(ws.filename('binary', postfix='filled')),
+                        sink_shape=source_geometry.shape(ws.filename('resampled')))
     return radii * np.mean(resample_factor);
   
   
@@ -800,7 +800,7 @@ if __name__ == '__main__':
       "method"  : 'sphere',      
       "radius"  : (15,15,15),
       "weights" : None,
-      "shape"   : io.shape(reference_file),
+      "shape"   : source_geometry.shape(reference_file),
       "verbose" : True                  
   };
   

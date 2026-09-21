@@ -21,7 +21,7 @@ import numpy as np
 
 import pyximport;
 
-from ClearMap.IO import dispatch
+from ClearMap.IO import dispatch, source_geometry
 
 pyximport.install(setup_args={"include_dirs":np.get_include()}, reload_support=True)
 
@@ -82,11 +82,11 @@ def devolve(source, sink = None, shape = None, dtype = None,
     else:
       shape = (int(math.ceil(points_buffer[:].max())),)
   elif isinstance(shape, str):
-    shape= io.shape(shape);
+    shape= source_geometry.shape(shape);
   
   if sink is None and dtype is None:
     if weights is not None:
-      dtype = io.dtype(weights);
+      dtype = source_geometry.dtype(weights);
     elif kernel is not None:
       kernel = np.asarray(kernel);
       dtype = kernel.dtype;

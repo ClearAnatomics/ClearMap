@@ -15,14 +15,14 @@ __download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 import numpy as np
 import scipy.ndimage as ndi    
 
-import ClearMap.IO.IO as io
-
 import pyximport
+
+from ClearMap.IO import source_geometry
+
 pyximport.install(setup_args={"include_dirs":np.get_include()}, reload_support=True)
 
 from . import HessianCode as code
 
-#import ClearMap.IO.IO as io
 
 __all__ = ['hessian', 'hessian_eigenvalues', 'hessian_eigensystem', 'lambda123', 'tubeness'];
 
@@ -223,7 +223,7 @@ def _apply_code(function, source, sink, sink_dtype = None, sink_shape_per_pixel 
   else:
     s = sink;
 
-  sink_stride = io.element_strides(sink)[-1];
+  sink_stride = source_geometry.element_strides(sink)[-1];
     
   if parameter is None:
     parameter = np.zeros(0);

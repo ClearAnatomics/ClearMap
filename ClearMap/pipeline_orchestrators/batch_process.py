@@ -24,8 +24,8 @@ except ImportError:
 from ClearMap.pipeline_orchestrators.utils import init_sample_manager_and_processors
 from ClearMap.pipeline_orchestrators.cell_map import CellDetector
 
-from ClearMap.IO import IO as clearmap_io
 from ClearMap.IO import io_ops
+from ClearMap.IO import source_geometry
 
 __author__ = 'Charly Rousseau <charly.rousseau@icm-institute.org>'
 __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
@@ -188,7 +188,7 @@ def batch_crop(folder, crop_x=0, crop_y=0, suffix='_cropped', channel=None):
     sample_manager = orchestrators['sample_manager']
 
     raw_asset = sample_manager.get('raw', channel=channel)
-    shape = clearmap_io.shape(raw_asset.filelist[-1])
+    shape = source_geometry.shape(raw_asset.filelist[-1])
     for f_path in raw_asset.filelist:
         img = io_ops.read(f_path)
         cropped_img = img[crop_x:shape[0] - crop_x, crop_y:shape[1] - crop_y, :]

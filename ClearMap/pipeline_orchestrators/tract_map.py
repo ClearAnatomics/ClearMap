@@ -11,8 +11,7 @@ from typing import Optional
 import numpy as np
 import pandas as pd
 
-from ClearMap.IO import io_ops
-from ClearMap.IO import IO as clearmap_io
+from ClearMap.IO import io_ops, source_geometry
 from ClearMap.IO.source.backends.MMP import MMPSource
 from ClearMap.IO.workspace2 import Workspace2
 
@@ -409,7 +408,7 @@ class TractMapProcessor(ChannelPipelineOrchestrator):
         self.prepare_watcher_for_substep(1, self.block_re, 'Voxelization', increment_main=True)
 
         voxelization_parameter = dict(
-            shape=clearmap_io.shape(self.registration_processor.annotators[self.channel].annotation_file),
+            shape=source_geometry.shape(self.registration_processor.annotators[self.channel].annotation_file),
             dtype=None,
             weights=None,
             method='sphere',
