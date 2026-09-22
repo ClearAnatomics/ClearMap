@@ -1,13 +1,72 @@
-import importlib
-import pathlib
+import os
 
 import numpy as np
 
+import ClearMap.ParallelProcessing.SharedMemoryArray as sma
 from ClearMap.IO import FileUtils as fu
 from ClearMap.IO.source import Slice as slc, Source as source_mod
-from ClearMap.IO.source.backends import file_list_backend as fl, mmp_backend, sma_backend, npy_backend
+from ClearMap.IO.source.protocol import Backend
+from ClearMap.IO.source.backends.registry import BY_EXTENSION
 from ClearMap.Utils import tag_expression as te
-from ClearMap.Utils.exceptions import SourceModuleNotFoundError
+from ClearMap.Utils.exceptions import SourceModuleNotFoundError, ClearMapValueError
+
+
+_LOCATION_SPEC = (str, bytes, os.PathLike, te.Expression)
+
+
+def _normalize_source_spec(source_):
+    if isinstance(source_, _LOCATION_SPEC):
+        return fu.normalize_location_spec(source_)
+    return source_
+
+
+def source_to_backend(source_) -> Backend:
+    if isinstance(source_, slc.Slice):
+        return source_to_backend(source_.source)
+
+    if isinstance(source_, source_mod.Source):
+        if source_.backend is None:
+            raise ClearMapValueError(f'Source {source_!r} has no backend identity.')
+        return source_.backend
+
+    source_ = _normalize_source_spec(source_)
+
+    if isinstance(source_, (str, te.Expression)):
+        return location_to_backend(source_)
+
+    if isinstance(source_, np.memmap):
+        return Backend.MMP
+
+    if isinstance(source_, (np.ndarray, list, tuple)) or source_ is None:
+        return Backend.SMA if sma.is_shared(source_) else Backend.NPY
+
+    raise ClearMapValueError(f'{source_!r} is not a valid source specification.')
+
+
+def filename_to_backend(filename) -> Backend:
+    filename = fu.normalize_location_spec(filename)
+    extension = fu.file_extension(filename)
+    backend = BY_EXTENSION.get(extension.lower() if extension else extension)
+
+    if backend is None:
+        raise SourceModuleNotFoundError(filename, extension)
+
+    return backend
+
+
+def location_to_backend(location_) -> Backend:
+    location_ = fu.normalize_location_spec(location_)
+
+    if isinstance(location_, te.Expression):
+        return Backend.FILELIST
+
+    if not isinstance(location_, str):  # REFACTOR: ClearMapTypeError
+        raise TypeError(f'Expected a location string or Expression, got {type(location_).__name__}.')
+
+    if fu.is_directory(location_) or te.Expression.is_expression(location_):
+        return Backend.FILELIST
+
+    return filename_to_backend(location_)
 
 
 def source_to_module(source_):
@@ -24,23 +83,7 @@ def source_to_module(source_):
     type : module
         The module that handles the IO of the source.
     """
-    source_ = fu.normalize_location_spec(source_)
-
-    # FIXME: add Slice sources unwrapping (recursive call to source_to_module of source_.base
-
-    if isinstance(source_, source_mod.Source):
-        return importlib.import_module(source_.__module__)
-    elif isinstance(source_, (str, te.Expression)):
-        return location_to_module(source_)
-    elif isinstance(source_, np.memmap):
-        return mmp_backend
-    elif isinstance(source_, (np.ndarray, list, tuple)) or source_ is None:
-        if sma_backend.is_shared(source_):
-            return sma_backend
-        else:
-            return npy_backend
-    else:
-        raise ValueError(f'The source {source_} is not a valid source!')
+    return source_to_backend(source_).module
 
 
 def location_to_module(location_):
@@ -57,11 +100,7 @@ def location_to_module(location_):
     module : module
         The module that handles the IO of the source specified by its location.
     """
-    location_ = fu.normalize_location_spec(location_)
-    if fl.is_file_list(location_):
-        return fl
-    else:
-        return filename_to_module(location_)
+    return location_to_backend(location_).module
 
 
 def filename_to_module(filename):
@@ -78,13 +117,7 @@ def filename_to_module(filename):
     module : module
        The module that handles the IO of the file.
     """
-    filename = fu.normalize_location_spec(filename)
-    ext = fu.file_extension(filename)
-    mod = file_extension_to_module.get(ext, None)
-    if mod is None:
-        raise SourceModuleNotFoundError(filename, ext)
-
-    return mod
+    return filename_to_backend(filename).module
 
 
 def as_source(source_, slicing=None, *args, **kwargs):
@@ -103,11 +136,11 @@ def as_source(source_, slicing=None, *args, **kwargs):
     source : Source class
         The source class.
     """
-    source_ = fu.normalize_location_spec(source_)
-
     if not isinstance(source_, source_mod.Source):
-        mod = source_to_module(source_)
-        source_ = module_to_source_cls[mod](source_, *args, **kwargs)  # FIXME: bypass mod altogether
+        source_ = _normalize_source_spec(source_)
+        source_ = source_to_backend(source_).source_class(source_, *args, **kwargs)
+
     if slicing is not None:
         source_ = slc.Slice(source=source_, slicing=slicing)
+
     return source_
