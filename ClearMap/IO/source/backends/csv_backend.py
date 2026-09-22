@@ -282,7 +282,7 @@ def test():
     """Test CSV module"""
     import os
     import numpy as np
-    from ClearMap.IO.source.backends.CSV import CSVSource
+    from ClearMap.IO.source.backends.csv_backend import CSVSource
     
     location = 'test.csv'
     points = np.random.rand(5,3)

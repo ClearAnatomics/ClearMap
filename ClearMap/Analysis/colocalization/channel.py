@@ -57,7 +57,7 @@ from sklearn import neighbors
 import skimage.morphology
 
 from ClearMap.ParallelProcessing.DataProcessing.ArrayProcessing import initialize_sink
-from ClearMap.IO.source.backends.MMP import MMPSource
+from ClearMap.IO.source.backends.mmp_backend import MMPSource
 from ClearMap.Utils.exceptions import ClearMapValueError
 
 from ClearMap.Analysis.colocalization import bbox as bounding_boxes

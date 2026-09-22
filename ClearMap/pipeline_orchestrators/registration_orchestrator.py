@@ -14,7 +14,7 @@ from ClearMap.Alignment import Resampling as resampling, Elastix as elastix
 from ClearMap.Alignment.Annotation import Annotation
 
 from ClearMap.IO import source_geometry
-from ClearMap.IO.source.backends.TIF import TifSource
+from ClearMap.IO.source.backends.tif_backend import TifSource
 from ClearMap.IO.assets_specs import ChannelSpec, TypeSpec
 from ClearMap.IO.metadata import define_auto_resolution
 

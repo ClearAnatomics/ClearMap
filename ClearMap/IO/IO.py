@@ -141,7 +141,7 @@ import pathlib
 import numpy as np
 
 import ClearMap.IO.source.Source as source_mod
-import ClearMap.IO.source.backends.SMA as sma
+import ClearMap.IO.source.backends.sma_backend as sma
 
 from ClearMap.IO.dispatch import location_to_module, as_source
 from ClearMap.IO.io_ops import open_ro
@@ -149,11 +149,11 @@ from ClearMap.IO.io_ops import open_ro
 from ClearMap.Utils.exceptions import (SourceModuleNotFoundError)
 
 try:
-    import ClearMap.IO.source.backends.GT as gt
+    import ClearMap.IO.source.backends.gt_backend as gt
     gt_loaded = True
 except ImportError:
     gt_loaded = False
-import ClearMap.IO.source.backends.FileList as fl
+import ClearMap.IO.source.backends.file_list_backend as fl
 
 import ClearMap.Utils.tag_expression as te
 

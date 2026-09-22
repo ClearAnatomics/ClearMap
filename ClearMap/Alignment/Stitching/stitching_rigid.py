@@ -30,7 +30,7 @@ import ClearMap.IO.IO as io
 from ClearMap.IO import io_ops
 import ClearMap.IO.source.Source as src
 import ClearMap.IO.source.Slice as slc
-import ClearMap.IO.source.backends.FileList as fl
+import ClearMap.IO.source.backends.file_list_backend as fl
 
 import ClearMap.ParallelProcessing.ParallelTraceback as ptb
 

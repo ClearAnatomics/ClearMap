@@ -5,7 +5,7 @@ import numpy as np
 
 from ClearMap.IO import FileUtils as fu
 from ClearMap.IO.source import Slice as slc, Source as source_mod
-from ClearMap.IO.source.backends import FileList as fl, MMP, SMA, NPY
+from ClearMap.IO.source.backends import file_list_backend as fl, mmp_backend, sma_backend, npy_backend
 from ClearMap.Utils import tag_expression as te
 from ClearMap.Utils.exceptions import SourceModuleNotFoundError
 
@@ -33,12 +33,12 @@ def source_to_module(source_):
     elif isinstance(source_, (str, te.Expression)):
         return location_to_module(source_)
     elif isinstance(source_, np.memmap):
-        return MMP
+        return mmp_backend
     elif isinstance(source_, (np.ndarray, list, tuple)) or source_ is None:
-        if SMA.is_shared(source_):
-            return SMA
+        if sma_backend.is_shared(source_):
+            return sma_backend
         else:
-            return NPY
+            return npy_backend
     else:
         raise ValueError(f'The source {source_} is not a valid source!')
 

@@ -28,7 +28,7 @@ from ClearMap.IO.source.geometry_utils import resolve_geometry, properties_match
 
 from ClearMap.IO.source.source_modes import (VALID_MODES, EXISTING_FILE_MODES, PERSISTABLE_MODES,
                                              DEFAULT_EDIT_MODE,  mode_after_create)
-from ClearMap.IO.source.backends.NPY import NumpySource
+from ClearMap.IO.source.backends.npy_backend import NumpySource
 import ClearMap.IO.source.Slice as slc
 import ClearMap.IO.FileUtils as fu
 
@@ -794,7 +794,7 @@ def header_size(filename):
 
 def _test():
     # reload(mmp)
-    from ClearMap.IO.source.backends.MMP import MMPSource
+    from ClearMap.IO.source.backends.mmp_backend import MMPSource
 
     m = MMPSource(location='test.npy', shape=4)
     print(m)

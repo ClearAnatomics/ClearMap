@@ -77,7 +77,7 @@ import numpy as np
 
 import ClearMap.Settings as settings
 from ClearMap.IO import conversion, io_ops
-from ClearMap.IO.source.backends.TIF import TifSource
+from ClearMap.IO.source.backends.tif_backend import TifSource
 from ClearMap.Utils.exceptions import ClearMapValueError, ClearMapRuntimeError
 
 from ClearMap.IO.elastix_config import ElastixParser

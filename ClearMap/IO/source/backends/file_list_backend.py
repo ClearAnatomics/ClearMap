@@ -1019,7 +1019,7 @@ def _test():
     from importlib import reload
     import ClearMap.Tests.Files as tf
 
-    import ClearMap.IO.source.backends.FileList as fl
+    import ClearMap.IO.source.backends.file_list_backend as fl
     reload(fl)
 
     expression = tf.io.join(tf.tif_sequence, 'sequence<Z,I,4>.tif')

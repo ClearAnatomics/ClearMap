@@ -316,7 +316,7 @@ def _array(shape=None, dtype=None, order=None, array=None):
 
 def _test():
     import numpy as np
-    from ClearMap.IO.source.backends.NPY import NumpySource
+    from ClearMap.IO.source.backends.npy_backend import NumpySource
     #reload(npy);
 
     s = NumpySource(array=np.zeros((5, 7)))

@@ -26,8 +26,8 @@ import cv2
 
 import ClearMap.IO.IO as io
 from ClearMap.IO import conversion, source_initialization, io_ops, source_geometry
-from ClearMap.IO.source.backends import SMA, MMP
-import ClearMap.IO.source.backends.FileList as fl
+from ClearMap.IO.source.backends import sma_backend, mmp_backend
+import ClearMap.IO.source.backends.file_list_backend as fl
 
 import ClearMap.ParallelProcessing.ProcessWriter as pw
 import ClearMap.ParallelProcessing.ParallelTraceback as ptb
@@ -612,10 +612,10 @@ def resample(original, resampled=None,
             resampled_data = source_initialization.initialize(resampled, shape_=resampled_shape, dtype_=dtype, as_source=True)
         else:
             if method == 'shared':
-                resampled_data = SMA.create(shape, dtype=dtype, order=order, as_source=True)
+                resampled_data = sma_backend.create(shape, dtype=dtype, order=order, as_source=True)
             else:
                 location = tempfile.mktemp(suffix='.npy')
-                resampled_data = MMP.create(location, shape=shape, dtype=dtype, order=order, as_source=True)
+                resampled_data = mmp_backend.create(location, shape=shape, dtype=dtype, order=order, as_source=True)
                 delete_files.append(location)
 
         # indices for non-resampled axes

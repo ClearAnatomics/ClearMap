@@ -137,7 +137,7 @@ def parse_ome_info(img_path: Path) -> Dict[str, Any]:
         raise FileNotFoundError(f'File {img_path} not found for OME metadata parsing')
     if not str(img_path).endswith('ome.tif'):
         raise NotAnOmeFile(f'File {img_path} is not an OME-TIFF file')
-    from ClearMap.IO.source.backends.TIF import TifSource
+    from ClearMap.IO.source.backends.tif_backend import TifSource
     src = TifSource(img_path)
     return src.metadata(info=[
         'order',  # First because used by shape and resolution

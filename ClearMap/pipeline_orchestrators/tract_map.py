@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 
 from ClearMap.IO import io_ops, source_geometry
-from ClearMap.IO.source.backends.MMP import MMPSource
+from ClearMap.IO.source.backends.mmp_backend import MMPSource
 from ClearMap.IO.workspace2 import Workspace2
 
 from ClearMap.Utils.exceptions import MissingRequirementException

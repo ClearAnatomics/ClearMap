@@ -5,7 +5,7 @@ import numpy as np
 
 from ClearMap.IO import io_ops
 from ClearMap.IO.source import source_modes, Source as source_mod, geometry_utils
-from ClearMap.IO.source.backends import SMA, NPY
+from ClearMap.IO.source.backends import sma_backend, npy_backend
 from ClearMap.IO.FileUtils import abspath, normalize_location_spec
 from ClearMap.IO.io_ops import peek_into
 from ClearMap.IO.dispatch import location_to_module, as_source
@@ -70,9 +70,9 @@ def initialize(source_=None, shape_=None, dtype_=None,
         if location_ is None:  # No source and no path: array in memory, regular or shared
             shape_, dtype_, order_ = _from_hint(hint, shape_, dtype_, order_)
             if memory_ in ['shared', 'automatic']:
-                return SMA.create(shape=shape_, dtype=dtype_, order=order_, **kwargs)
+                return sma_backend.create(shape=shape_, dtype=dtype_, order=order_, **kwargs)
             else:
-                return NPY.create(shape=shape_, dtype=dtype_, order=order_, **kwargs)
+                return npy_backend.create(shape=shape_, dtype=dtype_, order=order_, **kwargs)
         else:  # No source but a path
             # Before try because missing module != missing file so shouldn't fall through to creation.
             mod = location_to_module(location_)
@@ -113,7 +113,7 @@ def initialize(source_=None, shape_=None, dtype_=None,
 
     if location_ is not None and abspath(location_) != abspath(source_.location):
         raise IncompatibleSource(source_, 'location', current_vars)
-    if memory_ == 'shared' and not SMA.is_shared(source_):
+    if memory_ == 'shared' and not sma_backend.is_shared(source_):
         raise ClearMapValueError(f'Incompatible memory type, the source {source_} is not shared!')
 
     return source_

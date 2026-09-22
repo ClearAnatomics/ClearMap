@@ -23,7 +23,7 @@ import ClearMap.ParallelProcessing.SharedMemoryArray as sma
 import ClearMap.ParallelProcessing.SharedMemoryManager as smm
 
 import ClearMap.IO.source.Source as source_mod
-from ClearMap.IO.source.backends.NPY import NumpySource
+from ClearMap.IO.source.backends.npy_backend import NumpySource
 
 
 __all__ = sma.__all__

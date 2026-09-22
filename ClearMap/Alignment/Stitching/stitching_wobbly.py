@@ -24,7 +24,7 @@ import multiprocessing as mp
 import ClearMap.IO.IO as io
 from ClearMap.IO import io_ops
 import ClearMap.IO.source.Slice as slc
-from ClearMap.IO.source.backends import MMP, SMA
+from ClearMap.IO.source.backends import mmp_backend, sma_backend
 
 import ClearMap.Alignment.Stitching.stitching_rigid as strg
 import ClearMap.Alignment.Stitching.Tracking as trk
@@ -1739,8 +1739,8 @@ def _optimize_slice_positions(positions, components, processes = None, workspace
 
 
         # construct x, M
-        X = [SMA.sma.zeros(n_s) for d in range(ndim)]
-        M = [SMA.sma.zeros((n_s, n_s)) for d in range(ndim)]
+        X = [sma_backend.sma.zeros(n_s) for d in range(ndim)]
+        M = [sma_backend.sma.zeros((n_s, n_s)) for d in range(ndim)]
         for ci, c in enumerate(cluster_component[1:]):
             #if verbose and ci % 100 == 0:
             #  print('Placement: constructing constraints %d/%d!' % (ci, n_clusters))
@@ -1791,8 +1791,8 @@ def _optimize_slice_positions(positions, components, processes = None, workspace
         #print np.linalg.pinv(-M)
 
         if isinstance(processes, int) and processes > 1:
-            M = [SMA.smm.insert(m) for m in M]
-            X = [SMA.smm.insert(x) for x in X]
+            M = [sma_backend.smm.insert(m) for m in M]
+            X = [sma_backend.smm.insert(x) for x in X]
             with CancelableProcessPoolExecutor(min(processes, ndim)) as executor:
                 shifts = executor.map(_optimize_shifts, M, X)
                 if workspace is not None:
@@ -1824,15 +1824,15 @@ def _optimize_slice_positions(positions, components, processes = None, workspace
 
 
 def _optimize_shifts(MM, XX):
-    M = SMA.smm.get(MM)
-    X = SMA.smm.get(XX)
+    M = sma_backend.smm.get(MM)
+    X = sma_backend.smm.get(XX)
 
     #ss = np.dot(np.linalg.pinv(-M), X);
     ss = np.linalg.lstsq(-M, X, rcond=None)[0]
     #ss = scipy.sparse.linalg.lsqr(-M, X)[0];
 
-    SMA.smm.free(MM)
-    SMA.smm.free(XX)
+    sma_backend.smm.free(MM)
+    sma_backend.smm.free(XX)
 
     return np.asarray(np.round(ss), dtype=int)
 
@@ -2100,7 +2100,7 @@ def stitch_layout(layout, sink, method = 'interpolation', processes = None, verb
 
     # create sink
     #TODO: make layout a sink ! use io.create
-    MMP.create(sink, shape=shape, dtype=layout.dtype, order=layout.order)
+    mmp_backend.create(sink, shape=shape, dtype=layout.dtype, order=layout.order)
 
     # create slices
     coordinates = np.arange(origin[axis], origin[axis] + shape[axis])

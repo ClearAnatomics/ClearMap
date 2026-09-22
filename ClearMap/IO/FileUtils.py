@@ -27,7 +27,7 @@ import warnings
 
 from pathlib import Path
 
-from ClearMap.Utils.exceptions import ClearMapFileNotFoundError, ClearMapIoException, ClearMapValueError
+from ClearMap.Utils.exceptions import ClearMapFileNotFoundError, ClearMapIoException
 from ClearMap.Utils.tag_expression import Expression
 
 # FIXME: not clean but cannot import IO to avoid circular import. Should be from Source attributes ?
