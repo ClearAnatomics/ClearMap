@@ -521,6 +521,8 @@ class ArraySource(Source):
         return np.array(self.as_buffer())  # FIXME: check if we need to check instance (mmemmap) to decide array vs asarray cost
 
 
+COLUMNS = ReprField('columns', convert=lambda columns: repr(tuple(columns)))
+
 class TableSource(Source):
     """Source whose data is a table of named columns.
 
@@ -529,7 +531,7 @@ class TableSource(Source):
     """
 
     data_model: ClassVar[str] = 'table'
-    _REPR_FIELDS = (ReprFields.NAME, ReprFields.SHAPE, ReprFields.COLUMNS, ReprFields.LOCATION)
+    _REPR_FIELDS = (ReprFields.NAME, ReprFields.SHAPE, COLUMNS, ReprFields.LOCATION)
 
     @property
     def frame(self):
