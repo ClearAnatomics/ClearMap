@@ -20,7 +20,7 @@ import importlib.util
 from enum import Enum
 from typing import cast
 
-from ClearMap.IO.source.module_protocol import SourceModule
+from ClearMap.IO.source.protocol import SourceModule
 
 
 PACKAGE = __name__.rpartition('.')[0]  # ClearMap.IO.source.backends
