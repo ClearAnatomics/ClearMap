@@ -33,7 +33,7 @@ def open_ro(source_, **kwargs):
                                       operation='open_ro')
 
 
-def read(source_, **kwargs):
+def read(source_, slicing=None, **kwargs):
     """Read data from a source.
 
     Backends that do not support reading should inherit this default
