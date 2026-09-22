@@ -137,7 +137,6 @@ __webpage__ = 'https://idisco.info'
 __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
 import pathlib
-from contextlib import contextmanager
 
 import numpy as np
 
@@ -298,29 +297,8 @@ def buffer(source_):
     return buffer_
 
 
-def _is_feather_path(source_) -> bool:
-    return isinstance(source_, (str, pathlib.Path)) and str(source_).endswith('.feather')
-
-
 # TODO: arg memory= to specify which kind of array is created, better use device=
 # TODO: arg processes= in order to use ParallelIO -> can combine with buffer=
-
-
-@contextmanager
-def peek_into(source_, **kwargs):
-    """Temporarily open *source_* for metadata inspection.
-
-    Existing Source objects remain owned by the caller. Sources opened from
-    paths or other descriptors are closed on exit when possible.
-    """
-    source = open_ro(source_, **kwargs)
-    owns_source = source is not source_
-
-    try:
-        yield source
-    finally:
-        if owns_source and hasattr(source, 'close'):
-            source.close()  # FIXME: no `close` API in Source
 
 
 def file_list(expression=None, file_list=None, sort=True, verbose=False):

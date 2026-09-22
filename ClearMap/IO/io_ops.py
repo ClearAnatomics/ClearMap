@@ -117,3 +117,20 @@ def create(source_, *args, **kwargs):
     source_ = normalize_location_spec(source_)
     mod = source_to_module(source_)
     return mod.create(source_, *args, **kwargs)
+
+
+@contextmanager
+def peek_into(source_, **kwargs):
+    """Temporarily open *source_* for metadata inspection.
+
+    Existing Source objects remain owned by the caller. Sources opened from
+    paths or other descriptors are closed on exit when possible.
+    """
+    source = open_ro(source_, **kwargs)
+    owns_source = source is not source_
+
+    try:
+        yield source
+    finally:
+        if owns_source and hasattr(source, 'close'):
+            source.close()  # FIXME: no `close` API in Source
