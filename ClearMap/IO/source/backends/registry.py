@@ -75,9 +75,13 @@ class Backend(Enum):
 
 BY_KEY = {backend.key: backend for backend in Backend}
 BY_MODULE_NAME = {backend.module_name: backend for backend in Backend}
+BY_EXTENSION = {ext: backend for backend in Backend for ext in backend.extensions}
 
 _extensions = [ext for backend in Backend for ext in backend.extensions]
 if len(_extensions) != len(set(_extensions)):
     raise RuntimeError('Duplicate file extensions declared by IO backends.')
 
-BY_EXTENSION = {ext: backend for backend in Backend for ext in backend.extensions}
+SOURCE_EXTENSIONS = _extensions
+
+def supports_extension(extension: str) -> bool:
+    return extension.lstrip('.').lower() in BY_EXTENSION

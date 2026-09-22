@@ -115,6 +115,7 @@ from ClearMap.IO import conversion, io_ops
 from ClearMap.IO import FileUtils as file_utils
 from ClearMap.IO.assets_constants import CONTENT_TYPE_TO_PIPELINE
 from ClearMap.IO.assets_specs import TypeSpec, ChannelSpec, StateManager, SubTypeSpec
+from ClearMap.IO.source.backends import registry
 from ClearMap.Utils.tag_expression import Expression
 from ClearMap.Utils.exceptions import ClearMapAssetError, AssetNotFoundError
 
@@ -606,7 +607,7 @@ class Asset:
         -------
         bool
         """
-        return self.exists and file_utils.is_clearmap_source_extension(self.existing_extension)
+        return self.exists and registry.supports_extension(self.existing_extension)
 
     @property
     def checksum(self):

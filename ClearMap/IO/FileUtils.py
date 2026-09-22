@@ -27,11 +27,9 @@ import warnings
 
 from pathlib import Path
 
-from ClearMap.Utils.exceptions import ClearMapFileNotFoundError, ClearMapIoException
+from ClearMap.IO.source.backends import registry
+from ClearMap.Utils.exceptions import ClearMapFileNotFoundError, ClearMapIoException, ClearMapValueError
 from ClearMap.Utils.tag_expression import Expression
-
-# FIXME: not clean but cannot import IO to avoid circular import. Should be from Source attributes ?
-SOURCE_EXTENSIONS = ['npy', 'tif', 'tiff', 'nrrd', 'nrdh', 'csv', 'mhd', 'gt']
 
 ##############################################################################
 # ## Basic file queries
@@ -567,26 +565,9 @@ def check_extensions(extensions):
     """
     for ext in extensions:
         if not ext.startswith('.'):
-            raise ValueError(f'Extension "{ext}" should start with a dot.')
-        if not is_clearmap_source_extension(ext):
-            raise ValueError(f'Unknown extension "{ext}". '
-                             f'Supported extensions are "{SOURCE_EXTENSIONS}".')
-
-
-def is_clearmap_source_extension(extension):
-    """
-    Check if the extension is supported by ClearMap IO.
-
-    Parameters
-    ----------
-    extension: str
-        The extension to check.
-
-    Returns
-    -------
-    bool
-    """
-    return extension.lstrip('.') in SOURCE_EXTENSIONS
+            raise ClearMapValueError(f'Extension "{ext}" should start with a dot.')
+        if not registry.supports_extension(ext):
+            raise ClearMapValueError(f'Unknown extension "{ext}". Supported extensions are "{registry.SOURCE_EXTENSIONS}".')
 
 
 def normalize_location_spec(location)-> str | Expression | None:
