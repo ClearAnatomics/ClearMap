@@ -153,7 +153,7 @@ def _from_like(like, shape, dtype, order):
         return shape, dtype, order
     else:
         with peek_into(like) as source:
-            return source_mod.resolve_geometry(shape=shape, dtype=dtype, order_=order, like=source)
+            return geometry_utils.resolve_geometry(shape=shape, dtype=dtype, order_=order, like=source)
 
 
 def _from_hint(hint, shape, dtype, order):
