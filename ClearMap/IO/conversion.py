@@ -4,7 +4,6 @@ import multiprocessing as mp
 import pathlib
 
 from ClearMap.IO import FileUtils as fu, io_ops
-from ClearMap.IO.IO import file_extension_to_module
 from ClearMap.IO.io_ops import open_ro, write
 from ClearMap.IO.dispatch import source_to_module
 from ClearMap.ParallelProcessing import ParallelTraceback as ptb
@@ -28,8 +27,7 @@ def convert(source_, sink, processes=None, verbose=False, **kwargs):
     sink : sink specification
         The sink or list of sinks.
     """
-    if isinstance(sink, pathlib.Path):
-        sink = str(sink)
+    sink = fu.normalize_location_spec(sink)
     source_ = open_ro(source_)
     if verbose:
         print(f'converting {source_} -> {sink}')
@@ -106,9 +104,6 @@ def _convert_files(source_, sink, fid, n_files, extension, verbose, verify=False
     source_ = open_ro(source_)
     if verbose:
         print(f'Converting file {fid}/{n_files} {source_} -> {sink}')
-    mod = file_extension_to_module[extension]  # FIXME: ammend file_name_to_module to handle extension for SST
-    if mod is None:
-        raise ValueError(f"Cannot determine module for extension {extension}!")
     io_ops.write(sink, source_)
     if verify:
         src_mean = source_.array.mean()

@@ -28,6 +28,7 @@ import warnings
 from pathlib import Path
 
 from ClearMap.Utils.exceptions import ClearMapFileNotFoundError, ClearMapIoException
+from ClearMap.Utils.tag_expression import Expression
 
 # FIXME: not clean but cannot import IO to avoid circular import. Should be from Source attributes ?
 SOURCE_EXTENSIONS = ['npy', 'tif', 'tiff', 'nrrd', 'nrdh', 'csv', 'mhd', 'gt']
@@ -231,8 +232,7 @@ def delete_file(filename):
     filename : str | Path
         Filename to delete.
     """
-    if isinstance(filename, Path):
-        filename = str(filename)
+    filename = normalize_location_spec(filename)
     if is_file(filename):
         os.remove(filename)
 
@@ -587,6 +587,16 @@ def is_clearmap_source_extension(extension):
     bool
     """
     return extension.lstrip('.') in SOURCE_EXTENSIONS
+
+
+def normalize_location_spec(location):
+    if isinstance(location, Expression):
+        return location
+
+    if isinstance(location, os.PathLike):
+        return os.fspath(location)
+
+    return location
     
 
 ###############################################################################

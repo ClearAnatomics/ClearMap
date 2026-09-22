@@ -119,7 +119,7 @@ from ClearMap.Utils.tag_expression import Expression
 from ClearMap.Utils.exceptions import ClearMapAssetError, AssetNotFoundError
 
 
-class Asset(clearmap_io.AssetBase):
+class Asset:
     """
     An asset is a file or a folder that is part of a workspace.
 
@@ -242,6 +242,9 @@ class Asset(clearmap_io.AssetBase):
                 return f'{hdr_str}: {paths_str}\n'
         else:
             return f'{hdr_str}: no file\n'
+
+    def __fspath__(self):  # pathlike interface
+        return str(self.path)
 
     @property
     def expression(self):

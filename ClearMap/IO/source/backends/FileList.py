@@ -852,8 +852,7 @@ def _file_list(expression=None, file_list=None, sort=True, verbose=False):
     if isinstance(file_list, list):
         return file_list
 
-    if isinstance(expression, pathlib.Path):
-        expression = str(expression)
+    expression = fu.normalize_location_spec(expression)
 
     if isinstance(expression, te.Expression):
         fl = expression.glob()

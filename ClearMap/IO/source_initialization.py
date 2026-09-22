@@ -4,10 +4,10 @@ import warnings
 import numpy as np
 
 from ClearMap.IO import io_ops
-from ClearMap.IO.source import source_modes, Source as source_mod
+from ClearMap.IO.source import source_modes, Source as source_mod, geometry_utils
 from ClearMap.IO.source.backends import SMA, NPY
-from ClearMap.IO.FileUtils import abspath
-from ClearMap.IO.IO import peek_into
+from ClearMap.IO.FileUtils import abspath, normalize_location_spec
+from ClearMap.IO.io_ops import peek_into
 from ClearMap.IO.dispatch import location_to_module, as_source
 from ClearMap.Utils import tag_expression as te
 from ClearMap.Utils.exceptions import (ClearMapException, AssetNotFoundError, SourceNotFoundError,
@@ -57,8 +57,7 @@ def initialize(source_=None, shape_=None, dtype_=None,
     source: Source class
         The initialized source.
     """
-    if isinstance(source_, pathlib.Path):
-        source_ = str(source_)
+    source_ = normalize_location_spec(source_)
 
     if isinstance(source_, (str, te.Expression)):  # If the source is a path (location)
         location_ = source_

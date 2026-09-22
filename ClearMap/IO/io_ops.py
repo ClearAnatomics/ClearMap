@@ -1,16 +1,18 @@
-import pathlib
+import os
 import warnings
+from contextlib import contextmanager
 
 import numpy as np
-import pandas as pd
 
+from ClearMap.IO.FileUtils import normalize_location_spec
 from ClearMap.IO.source import Source as source_mod
-from ClearMap.IO.IO import _is_feather_path, module_to_source_cls
 from ClearMap.IO.dispatch import source_to_module, as_source
+
 from ClearMap.Utils.exceptions import ClearMapValueError
 
 
-def read(source_, slicing=None, *args, **kwargs):
+def read(source_: os.PathLike | np.ndarray | source_mod.Source,
+         slicing=None, *args, **kwargs):
     """
     Read data from a data source.
 
@@ -29,11 +31,9 @@ def read(source_, slicing=None, *args, **kwargs):
     data : array
         The data of the source.
     """
-    if isinstance(source_, pathlib.Path):
-        source_ = str(source_)
-    if _is_feather_path(source_):
-        return pd.read_feather(source_)
-    elif isinstance(source_, np.ndarray):  # Already materialised — nothing to do
+    source_ = normalize_location_spec(source_)
+
+    if isinstance(source_, np.ndarray):  # Already materialised — nothing to do
         return source_
     elif isinstance(source_, source_mod.Source):  # Source-like with .array (Block, Slice, NPY.Source, MMP.Source, ...)
         if not hasattr(source_, 'array'):
@@ -50,10 +50,8 @@ def read(source_, slicing=None, *args, **kwargs):
 
 def open_ro(source_, **kwargs):
     """Open a source strictly read-only for metadata queries."""
-    if isinstance(source_, pathlib.Path):
-        source_ = str(source_)
-    if _is_feather_path(source_):
-        return pd.read_feather(source_)
+    source_ = normalize_location_spec(source_)
+
     mod = source_to_module(source_)
     if isinstance(source_, source_mod.Source):
         if source_.mode == 'r':
@@ -65,15 +63,13 @@ def open_ro(source_, **kwargs):
         if hasattr(mod, 'open_ro'):
             return mod.open_ro(source_, **kwargs)
     # no open_ro available -> fallback: construct with mode='r'
-    return module_to_source_cls[mod](source_, mode='r', **kwargs)
+    return module_to_source_cls[mod](source_, mode='r', **kwargs)  # FIXME:
 
 
 def edit(source_, **kwargs):
     """Open a source for in-place editing (mode='r+')."""
-    if isinstance(source_, pathlib.Path):
-        source_ = str(source_)
-    if _is_feather_path(source_):
-        return pd.read_feather(source_)
+    source_ = normalize_location_spec(source_)
+
     mod = source_to_module(source_)
     if hasattr(mod, 'edit'):
         return mod.edit(source_, **kwargs)
@@ -98,15 +94,8 @@ def write(sink, data, *args, **kwargs):
     sink : str, array or Source class
         The sink to which the data was written.
     """
-    if isinstance(sink, pathlib.Path):
-        sink = str(sink)
-    if _is_feather_path(sink):
-        if not isinstance(data, pd.DataFrame):
-            data = pd.DataFrame(data)  # backward compat: structured array
-        if not isinstance(data.index, pd.RangeIndex) or data.index[0] != 0:
-            data = data.reset_index(drop=True)  # feather requires default RangeIndex
-        data.to_feather(sink)
-        return sink
+    # REFACTOR: if both source_to_module and mod.write implement normalize, we can kick it here (and in create...)
+    sink = normalize_location_spec(sink)
     mod = source_to_module(sink)
     return mod.write(sink, open_ro(data), *args, **kwargs)
 
@@ -125,7 +114,6 @@ def create(source_, *args, **kwargs):
     sink : str, array or Source class
        The sink to which the data was written.
     """
-    if isinstance(source_, pathlib.Path):
-        source_ = str(source_)
+    source_ = normalize_location_spec(source_)
     mod = source_to_module(source_)
     return mod.create(source_, *args, **kwargs)

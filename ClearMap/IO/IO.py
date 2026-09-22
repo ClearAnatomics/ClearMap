@@ -164,14 +164,8 @@ import ClearMap.Utils.tag_expression as te
 # WARNING: imported just for module level access. REFACTOR: should be in subpackage __init__
 # noinspection PyUnusedImports
 from ClearMap.IO.FileUtils import (is_file, is_directory, file_extension,
-                                   join, split, abspath, create_directory, 
-                                   delete_directory, copy_file, link_file, delete_file)
-
-
-class AssetBase:
-    @property
-    def path(self):
-        raise NotImplementedError('AssetBase is an abstract class, cannot get path!')
+                                   join, split, abspath, create_directory,
+                                   delete_directory, copy_file, link_file, delete_file, normalize_location_spec)
 
 
 ##############################################################################
@@ -202,8 +196,7 @@ def is_source(source_, exists=True):
     is_source : bool
        True if source is a valid source.
     """
-    if isinstance(source_, pathlib.Path):
-        source_ = str(source_)
+    source_ = normalize_location_spec(source_)
 
     if isinstance(source_, source_mod.Source):
         if exists:
@@ -276,8 +269,7 @@ def memory(source_):
     memory : str or None
         The memory type of the source.
     """
-    if isinstance(source_, pathlib.Path):
-        source_ = str(source_)
+    source_ = normalize_location_spec(source_)
 
     if sma.is_shared(source_):
         return 'shared'

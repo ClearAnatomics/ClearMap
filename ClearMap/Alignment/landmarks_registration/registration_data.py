@@ -5,6 +5,7 @@ from dataclasses import dataclass
 import itk
 import numpy as np
 
+from ClearMap.IO.FileUtils import normalize_location_spec
 
 # WARNING: required to have access to module
 #  We execute two commands to force itk to load subpackages, so as to have the following type available.
@@ -72,8 +73,8 @@ class ITKImage:
             ValueError: _description_
             ValueError: _description_
         """
-        if isinstance(source, (str, Path)):
-            source = str(source)
+        source = normalize_location_spec(source)
+        if isinstance(source, str):
             if source.endswith('.npy'):
                 self.image = np.load(source)  # TODO: see if same as below
             else:

@@ -206,8 +206,7 @@ class MMPSource(NumpySource):
         array : array
             The underlying data array of this source.
         """
-        if isinstance(location, pathlib.Path):
-            location = str(location)
+        location = fu.normalize_location_spec(location)
 
         if mode is None and array is None and location is not None:
             mode = 'r+' if fu.is_file(location) else 'w+'

@@ -6,7 +6,6 @@ import numpy as np
 from ClearMap.IO import FileUtils as fu
 from ClearMap.IO.source import Slice as slc, Source as source_mod
 from ClearMap.IO.source.backends import FileList as fl, MMP, SMA, NPY
-from ClearMap.IO.IO import AssetBase, file_extension_to_module, module_to_source_cls
 from ClearMap.Utils import tag_expression as te
 from ClearMap.Utils.exceptions import SourceModuleNotFoundError
 
@@ -25,10 +24,7 @@ def source_to_module(source_):
     type : module
         The module that handles the IO of the source.
     """
-    if isinstance(source_, AssetBase):
-        source_ = source_.path
-    if isinstance(source_, pathlib.Path):
-        source_ = str(source_)
+    source_ = fu.normalize_location_spec(source_)
 
     # FIXME: add Slice sources unwrapping (recursive call to source_to_module of source_.base
 
@@ -61,8 +57,7 @@ def location_to_module(location_):
     module : module
         The module that handles the IO of the source specified by its location.
     """
-    if isinstance(location_, pathlib.Path):
-        location_ = str(location_)
+    location_ = fu.normalize_location_spec(location_)
     if fl.is_file_list(location_):
         return fl
     else:
@@ -83,11 +78,8 @@ def filename_to_module(filename):
     module : module
        The module that handles the IO of the file.
     """
-    if isinstance(filename, pathlib.Path):
-        filename = str(filename)
-
+    filename = fu.normalize_location_spec(filename)
     ext = fu.file_extension(filename)
-
     mod = file_extension_to_module.get(ext, None)
     if mod is None:
         raise SourceModuleNotFoundError(filename, ext)
@@ -111,8 +103,7 @@ def as_source(source_, slicing=None, *args, **kwargs):
     source : Source class
         The source class.
     """
-    if isinstance(source_, pathlib.Path):
-        source_ = str(source_)
+    source_ = fu.normalize_location_spec(source_)
 
     if not isinstance(source_, source_mod.Source):
         mod = source_to_module(source_)
