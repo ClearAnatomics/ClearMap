@@ -150,7 +150,7 @@ class Source:
 
     def _coerce_location(self, value):
         """Normalise a location before storing. Override to canonicalise."""
-        return ensure(value, str)
+        return fu.normalize_location_spec(value)
 
     def _on_location_changed(self):
         """Hook for subclasses that must re-derive state eagerly."""

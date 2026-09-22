@@ -16,6 +16,7 @@ import warnings
 import numpy as np
 
 import ClearMap.IO.source.Source as source_mod
+from ClearMap.IO.source.backends.registry import BackendName
 from ClearMap.Utils.exceptions import ClearMapPermissionError, ClearMapValueError
 
 
@@ -25,6 +26,7 @@ from ClearMap.Utils.exceptions import ClearMapPermissionError, ClearMapValueErro
 
 class NumpySource(source_mod.Source):
     """Numpy array source."""
+    backend = BackendName.NPY
 
     def __init__(self, array=None, shape=None, dtype=None,
                  order=None, name=None, mode=None):
@@ -314,9 +316,10 @@ def _array(shape=None, dtype=None, order=None, array=None):
 
 def _test():
     import numpy as np
+    from ClearMap.IO.source.backends.NPY import NumpySource
     #reload(npy);
 
-    s = NPY.NumpySource(array=np.zeros((5, 7)))
+    s = NumpySource(array=np.zeros((5, 7)))
     print(s)
 
     import ClearMap.IO.source.Slice as slc
@@ -327,7 +330,7 @@ def _test():
     print(v)
 
     x = np.ones(250*1000*1000)
-    xs = NPY.NumpySource(array=x)
+    xs = NumpySource(array=x)
 
     print(xs)
 

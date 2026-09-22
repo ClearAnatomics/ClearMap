@@ -27,7 +27,7 @@ import warnings
 
 from pathlib import Path
 
-from ClearMap.Utils.exceptions import ClearMapFileNotFoundError, ClearMapIoException
+from ClearMap.Utils.exceptions import ClearMapFileNotFoundError, ClearMapIoException, ClearMapValueError
 from ClearMap.Utils.tag_expression import Expression
 
 # FIXME: not clean but cannot import IO to avoid circular import. Should be from Source attributes ?
@@ -589,12 +589,28 @@ def is_clearmap_source_extension(extension):
     return extension.lstrip('.') in SOURCE_EXTENSIONS
 
 
-def normalize_location_spec(location):
-    if isinstance(location, Expression):
+def normalize_location_spec(location)-> str | Expression | None:
+    """Normalise representation without interpreting location semantics.
+
+    Path-like and byte representations are converted to text.
+    Tag Expression objects retain their semantic type.
+    Strings are returned unchanged, including strings containing tag
+    expressions such as ``tile_<X,2>.tif``.
+    """
+    if location is None:
+        return None
+
+    if isinstance(location, Expression):  # strings representing expressions remain strings
         return location
 
     if isinstance(location, os.PathLike):
-        return os.fspath(location)
+        location = os.fspath(location)
+
+    if isinstance(location, bytes):
+        location = os.fsdecode(location)
+
+    if not isinstance(location, str):  # FIXME: more ClearMapTypeError probably
+        raise ClearMapIoException(f'Expected str, bytes, os.PathLike, Expression or None; got {type(location).__name__}')
 
     return location
     
