@@ -23,8 +23,9 @@ import warnings
 
 import numpy as np
 
-from ClearMap.IO.source import Source as source_mod
+from ClearMap.IO.source import Source as source_mod, geometry_utils
 from ClearMap.IO.source.geometry_utils import resolve_geometry, properties_match
+from ClearMap.IO.source.protocol import Backend
 
 from ClearMap.IO.source.source_modes import (VALID_MODES, EXISTING_FILE_MODES, PERSISTABLE_MODES,
                                              DEFAULT_EDIT_MODE,  mode_after_create)
@@ -143,7 +144,7 @@ def _create_sink(path, array, overwrite, kwargs):
                                 message=f'Cannot write to {path}: pass overwrite=True to replace it.')
     kwargs.setdefault('shape', array.shape)
     kwargs.setdefault('dtype', array.dtype)
-    kwargs.setdefault('order', source_mod.order(array))
+    kwargs.setdefault('order', geometry_utils.order(array))
     return create(location=str(path), mode='w+', **kwargs)
 
 
@@ -196,6 +197,7 @@ def _assign(sink, array, slicing):
 
 class MMPSource(NumpySource):
     """Memory mapped array source."""
+    backend = Backend.MMP
 
     def __init__(self, location=None, shape=None, dtype=None, order=None,
                  array=None, mode=None, name=None):
@@ -309,7 +311,7 @@ class MMPSource(NumpySource):
         order : str
             Returns 'C' for C contiguous and 'F' for Fortran contiguous, None otherwise.
         """
-        return source_mod.order(self.array)
+        return geometry_utils.order(self.array)
 
     @order.setter
     def order(self, value):
@@ -443,7 +445,7 @@ class MMPVirtualSource(source_mod.VirtualSource):
     def array(self):
        return self.as_real().array
 
-
+SOURCE_CLASS = MMPSource
 ###############################################################################
 ### IO Interface
 ###############################################################################

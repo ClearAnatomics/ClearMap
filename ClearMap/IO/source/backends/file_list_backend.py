@@ -14,7 +14,6 @@ __webpage__   = 'https://idisco.info'
 __download__  = 'https://www.github.com/ChristophKirst/ClearMap2'
 
 import os
-import pathlib
 import re
 import glob
 import traceback
@@ -28,16 +27,17 @@ import numbers
 import numpy as np
 import concurrent.futures
 
-import ClearMap.IO.FileUtils as fu
-import ClearMap.IO.source.Source as source_mod
 from ClearMap.IO import source_geometry
+from ClearMap.IO import io_ops
+import ClearMap.IO.FileUtils as fu
 # noinspection PyUnusedImports
 from ClearMap.IO.source.backend_defaults import read, create, write
+import ClearMap.IO.source.Source as source_mod
 import ClearMap.IO.source.Slice as slc
 
-from ClearMap.IO.source.backends import IO as io, io_ops
 import ClearMap.Utils.tag_expression as te
 import ClearMap.ParallelProcessing.ParallelTraceback as ptb
+from ClearMap.IO.source.protocol import Backend
 from ClearMap.Utils.exceptions import ClearMapValueError
 from ClearMap.Utils.utilities import sanitize_n_processes
 
@@ -59,6 +59,8 @@ class FileListSource(source_mod.VirtualSource):
     the shape of the data in each file, i.e. shape = file_list_shape + array_shape.
     """
     _name = 'FileList-Source'
+    _real_class = None  # REFACTOR:
+    backend = Backend.FILELIST
 
     def __init__(self, expression=None, file_list=None, axes_order=None,
                  shape=None, dtype=None, order=None,
@@ -1018,11 +1020,12 @@ def convert(source, sink, processes = None, verbose = False):
 def _test():
     from importlib import reload
     import ClearMap.Tests.Files as tf
+    from ClearMap.IO import FileUtils as fu
 
     import ClearMap.IO.source.backends.file_list_backend as fl
     reload(fl)
 
-    expression = tf.io.join(tf.tif_sequence, 'sequence<Z,I,4>.tif')
+    expression = fu.join(tf.tif_sequence, 'sequence<Z,I,4>.tif')
 
     f = FileListSource(expression=expression)
     print(f)

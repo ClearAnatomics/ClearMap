@@ -12,7 +12,8 @@ __webpage__   = 'https://idisco.info'
 __download__  = 'https://www.github.com/ChristophKirst/ClearMap2'
 
 import warnings
-from typing import ClassVar
+from functools import cached_property
+from typing import ClassVar, TYPE_CHECKING
 
 import numpy as np
 
@@ -22,7 +23,10 @@ from ClearMap.IO.source.source_modes import WRITABLE_MODES, PERSISTABLE_MODES
 
 from ClearMap.Utils.Formatting import ensure
 from ClearMap.Utils.exceptions import (ClearMapValueError, ClearMapRuntimeError, ClearMapPermissionError,
-                                       ClearMapNotImplementedError)
+                                       ClearMapNotImplementedError, SourceNotFoundError)
+
+if TYPE_CHECKING:
+    from ClearMap.IO.source.protocol import Backend
 
 
 def trim_path(path, max_len=100, keep=50):
@@ -95,7 +99,7 @@ class ReprFields:
 
 class Source:
     """Base abstract source class."""
-    backend: ClassVar['BackendName | None'] = None
+    backend: ClassVar['Backend | None'] = None
 
     _name: ClassVar[str | None] = None  # override in subclasses as class variable
     _location: ClassVar[str | None] = None
@@ -301,7 +305,7 @@ class AbstractSource(Source):
         self._dtype    = ensure(dtype,    np.dtype)
         self._order    = ensure(order,    str)
         # self._memory   = ensure(memory,   str)
-        self._location = ensure(location, str)
+        self._location = self._coerce_location(location)
 
     @property
     def shape(self):
@@ -350,20 +354,9 @@ class AbstractSource(Source):
             raise ValueError(f"Order {value!r} not in [None, 'C' or 'F']!")
         self._order = ensure(value, str)
 
-    @property
-    def location(self):
-        """The location of the source's data.
-
-        Returns
-        -------
-        location : str or None
-            Returns the location of the data source or None if there is none.
-        """
-        return self._location
-
-    @location.setter
-    def location(self, value):
-        self._location = ensure(value, str)
+    # @location.setter
+    # def location(self, value):
+    #     self._location = ensure(value, str)
 
     @property
     def is_writable(self):  # FIXME: check if parent implementation is OK
@@ -393,6 +386,13 @@ class VirtualSource(AbstractSource):
                  order=None, location=None, name=None, mode=None):
         AbstractSource.__init__(self, source=source, shape=shape, dtype=dtype,
                                 order=order, location=location, name=name, mode=mode)
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        if cls.backend is None:
+            real_cls = cls._real_class
+            if real_cls is not None:
+                cls.backend = real_cls.backend
 
     @property
     def name(self):
@@ -449,9 +449,8 @@ class ArraySource(Source):
     @property
     def array(self):
         """The underlying data array."""
-        raise ClearMapNotImplementedError(
-            f'{type(self).__name__} does not expose an array.',
-            operation='array', backend=type(self).__name__)
+        raise ClearMapNotImplementedError(f'{type(self).__name__} does not expose an array.',
+                                          operation='array', backend=type(self).__name__)
 
     # ## Geometry
     @property
@@ -460,9 +459,8 @@ class ArraySource(Source):
 
     @shape.setter
     def shape(self, value):
-        raise ClearMapNotImplementedError(
-            f'Cannot set shape on {type(self).__name__}.',
-            operation='shape', backend=type(self).__name__)
+        raise ClearMapNotImplementedError(f'Cannot set shape on {type(self).__name__}.',
+                                          operation='shape', backend=type(self).__name__)
 
     @property
     def dtype(self):
@@ -470,9 +468,8 @@ class ArraySource(Source):
 
     @dtype.setter
     def dtype(self, value):
-        raise ClearMapNotImplementedError(
-            f'Cannot set dtype on {type(self).__name__}.',
-            operation='dtype', backend=type(self).__name__)
+        raise ClearMapNotImplementedError(f'Cannot set dtype on {type(self).__name__}.',
+                                          operation='dtype', backend=type(self).__name__)
 
     @property
     def order(self):
@@ -521,25 +518,103 @@ class ArraySource(Source):
         return np.array(self.as_buffer())  # FIXME: check if we need to check instance (mmemmap) to decide array vs asarray cost
 
 
-COLUMNS = ReprField('columns', convert=lambda columns: repr(tuple(columns)))
+###############################################################################
+### Table sources
+###############################################################################
+
+# Shape and columns only render once the table is loaded, so printing a source
+# never triggers a full read of a large file.
+TABLE_SHAPE = ReprField('_loaded_shape', convert=lambda s: repr(tuple(s)))
+TABLE_COLUMNS = ReprField('_loaded_columns', convert=lambda c: repr(tuple(c)))
+
 
 class TableSource(Source):
-    """Source whose data is a table of named columns.
+    """Source whose data is a table of named columns stored as a whole-table file.
 
-    ``order`` is deliberately absent: memory layout is not a meaningful
-    property of a table, and ``dtype`` is per-column rather than global.
+    Conventions
+    -----------
+    * Item access follows pandas ``DataFrame.__getitem__``: a column name gives a
+      Series, a list of names gives a DataFrame, a slice or a boolean mask selects rows.
+    * Tables are read and written whole. There is no item assignment and no edit mode:
+      read the frame, modify it, write it back.
+    * Columns must be named with strings. An array is not a table: writing one raises
+      unless ``columns=`` names its columns, and so does a DataFrame with default
+      integer column labels.
+    * ``order`` and a global ``dtype`` are deliberately absent; see ``dtypes``.
+
+    Subclasses implement the two hooks ``_load`` and ``_dump`` and set ``backend``.
+    The protocol functions of a table backend module are thin wrappers around the
+    classmethods ``open_ro``, ``read_table``, ``write_table``, ``create_table`` and
+    ``edit``.
     """
 
     data_model: ClassVar[str] = 'table'
-    _REPR_FIELDS = (ReprFields.NAME, ReprFields.SHAPE, COLUMNS, ReprFields.LOCATION)
+    _CACHED_PROPERTIES = ('frame',)
+    _REPR_FIELDS = (ReprFields.NAME, TABLE_SHAPE, TABLE_COLUMNS, ReprFields.LOCATION)
 
-    @property
+    def __init__(self, location, mode=None, name=None):
+        if location is None:
+            raise ClearMapValueError(f'{type(self).__name__} requires a location.')
+        if mode not in (None, 'r'):
+            raise ClearMapValueError(f'{type(self).__name__} only supports mode="r": tables are written whole '
+                                     f'with write(), not edited in place.', value=mode, expected="'r' or None")
+        super().__init__(name=name, mode='r')
+        self.location = location
+
+    # ## Backend hooks
+    @classmethod
+    def _load(cls, location, **kwargs):
+        """Read the whole table at *location* into a DataFrame."""
+        raise ClearMapNotImplementedError(f'{cls.__name__} does not implement _load().',
+                                          operation='load', backend=cls.__name__)
+
+    @classmethod
+    def _dump(cls, frame, location, **kwargs):
+        """Write *frame*, which has a default RangeIndex, to *location*."""
+        raise ClearMapNotImplementedError(f'{cls.__name__} does not implement _dump().',
+                                          operation='dump', backend=cls.__name__)
+
+    # ## Data
+    def _require_existing(self):
+        if not self.exists():
+            raise SourceNotFoundError(location=self.location,
+                                      message=f'{type(self).__name__}: no table file at {self.location}')
+
+    @cached_property
     def frame(self):
-        """The table as a pandas DataFrame."""
-        raise ClearMapNotImplementedError(
-            f'{type(self).__name__} does not expose a frame.',
-            operation='frame', backend=type(self).__name__)
+        """The table, loaded on first access and cached.
 
+        The cached frame is shared by every access through this source; treat it as
+        read-only. Use ``read()`` for a copy you own.
+        """
+        self._require_existing()
+        return self._load(self.location)
+
+    def read(self, slicing=None, **load_kwargs):
+        """Load the table from disk, optionally selecting with pandas ``[]`` semantics.
+
+        Always reads the file and never touches the cached ``frame``, so the result
+        belongs to the caller. ``load_kwargs`` are passed to the backend reader
+        (e.g. ``usecols=`` for CSV, ``columns=`` for Feather).
+        """
+        self._require_existing()
+        frame = self._load(self.location, **load_kwargs)
+        return frame if slicing is None else frame[slicing]
+
+    def write(self, data, overwrite=True, **dump_kwargs):
+        """Replace the table at this source's location with *data*."""
+        self.write_table(self, data, overwrite=overwrite, **dump_kwargs)
+        return self
+
+    def _getitem(self, key):
+        return self.frame[key]
+
+    def __setitem__(self, key, value):
+        raise ClearMapNotImplementedError(f'{type(self).__name__} does not support item assignment: tables are '
+                                          f'written whole. Read the frame, modify it, and write() it back.',
+                                          operation='setitem', backend=type(self).__name__)
+
+    # ## Geometry
     @property
     def columns(self):
         return tuple(self.frame.columns)
@@ -547,7 +622,7 @@ class TableSource(Source):
     @property
     def dtypes(self):
         """Mapping of column name to dtype."""
-        return {name: dtype for name, dtype in self.frame.dtypes.items()}
+        return dict(self.frame.dtypes.items())
 
     @property
     def n_rows(self):
@@ -555,7 +630,7 @@ class TableSource(Source):
 
     @property
     def n_columns(self):
-        return len(self.columns)
+        return len(self.frame.columns)
 
     @property
     def shape(self):
@@ -569,24 +644,184 @@ class TableSource(Source):
     def __len__(self):
         return self.n_rows
 
-    def _getitem(self, slicing):
-        return self.frame[slicing]
+    @property
+    def _loaded_shape(self):
+        return self.shape if 'frame' in self.__dict__ else None
 
+    @property
+    def _loaded_columns(self):
+        return self.columns if 'frame' in self.__dict__ else None
+
+    # ## Conversions
     def as_memory(self):
-        return self.frame.to_numpy()
+        """A copy of the table as a DataFrame, owned by the caller."""
+        return self.frame.copy()
 
     def as_buffer(self):
-        raise ClearMapNotImplementedError(
-            f'{type(self).__name__} has no contiguous buffer; use .frame '
-            f'or .as_memory().', operation='as_buffer',
-            backend=type(self).__name__)
+        raise ClearMapNotImplementedError(f'{type(self).__name__} has no contiguous buffer; use .frame or .read().',
+                                          operation='as_buffer', backend=type(self).__name__)
+
+    def as_real(self):
+        return self
+
+    def as_virtual(self):
+        """A table source is its own lightweight handle (location and mode), so it is its own virtual source."""
+        return self
+
+    def __getstate__(self):
+        """Pickle as a handle:
+        drop the cached frame so sending a source to workers never ships the table."""
+        state = self.__dict__.copy()
+        for key in self._CACHED_PROPERTIES:
+            state.pop(key, None)
+        return state
+
+    # ## Backend protocol implementations
+    @classmethod
+    def open_ro(cls, source_, **kwargs):
+        """Open *source_* read-only. Existing sources of this class are returned as is."""
+        if isinstance(source_, cls):
+            return source_
+        if isinstance(source_, Source):
+            raise ClearMapValueError(f'Cannot open {source_!r} as a {cls.__name__}.',
+                                     value=type(source_).__name__, expected=cls.__name__)
+        kwargs.setdefault('mode', 'r')
+        return cls(source_, **kwargs)
+
+    @classmethod
+    def read_table(cls, source_, slicing=None, **load_kwargs):
+        """Read a table as a DataFrame (or a Series, depending on *slicing*)."""
+        as_source = load_kwargs.pop('as_source', None)
+        source = cls.open_ro(source_)
+        if as_source:
+            warnings.warn(f'read(..., as_source=True) is deprecated for {cls.__name__}; use open_ro() instead.',
+                          DeprecationWarning, stacklevel=3)
+            if slicing is not None:
+                raise ClearMapValueError('as_source=True cannot be combined with slicing for tables; '
+                                         'read the frame and select from it.')
+            return source
+        return source.read(slicing=slicing, **load_kwargs)
+
+    @classmethod
+    def write_table(cls, sink, data=None, slicing=None, overwrite=True, columns=None, **dump_kwargs):
+        """Write a complete table to *sink* and return *sink* unchanged.
+
+        *data* is a DataFrame or a TableSource, or an array together with *columns*
+        naming its columns (as in ``pd.DataFrame(array, columns=...)``).
+        """
+        if slicing is not None:
+            raise ClearMapNotImplementedError(f'{cls.__name__} does not support sliced writes; write the complete '
+                                              f'table instead.', operation='write', backend=cls.__name__)
+        if data is None:
+            raise ClearMapValueError(f'{cls.__name__} write requires data.')
+        if isinstance(sink, Source) and not isinstance(sink, cls):
+            raise ClearMapValueError(f'Cannot write a {cls.__name__} table into {sink!r}.',
+                                     value=type(sink).__name__, expected=cls.__name__)
+
+        location = sink.location if isinstance(sink, cls) else fu.normalize_location_spec(sink)
+        if not overwrite and fu.is_file(location):
+            raise FileExistsError(f'Table file already exists: {location}')
+
+        frame = _as_frame(data, columns=columns)  # load before dumping: data may be read from this very file
+        cls._dump(_with_default_index(frame), location, **dump_kwargs)
+
+        if isinstance(sink, cls):
+            sink._invalidate_cache()
+        return sink
+
+    @classmethod
+    def create_table(cls, location=None, shape=None, dtype=None, order=None,
+                     mode=None, array=None, as_source=True, columns=None, **dump_kwargs):
+        """Create a table file from a DataFrame passed as *array* (or an array plus *columns*).
+
+        Blank creation from ``shape`` / ``dtype`` is unsupported: a table has named
+        columns, each with its own dtype.
+        """
+        if location is None:
+            raise ClearMapValueError(f'{cls.__name__} create requires a location.')
+        if array is None:
+            raise ClearMapNotImplementedError(f'A blank {cls.__name__} table cannot be created from shape/dtype; '
+                                              f'pass a DataFrame as array= or use write().',
+                                              operation='create', backend=cls.__name__)
+        if shape is not None or dtype is not None or order is not None:
+            raise ClearMapValueError('shape, dtype and order are not meaningful creation arguments for a table.')
+        if mode not in (None, 'w+'):
+            raise ClearMapValueError(f'{cls.__name__} create only supports mode="w+".',
+                                     value=mode, expected="'w+' or None")
+
+        cls.write_table(location, array, overwrite=True, columns=columns, **dump_kwargs)
+        source = cls(location)
+        return source if as_source else source.read()
+
+    @classmethod
+    def edit(cls, source_, **kwargs):
+        raise ClearMapNotImplementedError(f'{cls.__name__} has no edit mode: tables are read and written whole. '
+                                          f'Use frame = io.read(location), modify it, then io.write(location, frame).',
+                                          operation='edit', backend=cls.__name__)
+
+
+def _as_frame(data, columns=None):
+    """Coerce table-like *data* to a DataFrame, refusing anything that is not a table.
+
+    An array becomes a table only when *columns* names its columns. *columns* is
+    refused for data that already has column names, rather than guessing whether
+    it means renaming or selecting.
+    """
+    import pandas as pd
+
+    if isinstance(data, (TableSource, pd.DataFrame)):
+        if columns is not None:
+            raise ClearMapValueError(f'columns= only names the columns of an array; {type(data).__name__} already '
+                                     f'has named columns. Rename or select them on the DataFrame instead.',
+                                     value=columns, expected=None)
+        frame = data.frame if isinstance(data, TableSource) else data
+    elif isinstance(data, np.ndarray):
+        if columns is None:
+            raise ClearMapValueError('Arrays are not tables: pass columns=[...] to name the columns, '
+                                     'or build a DataFrame yourself.', value=data.shape, expected='columns=[...]')
+        if data.dtype.names is not None:
+            raise ClearMapValueError('Structured arrays are not supported as tables; build a DataFrame.',
+                                     value=data.dtype, expected='a plain 1-d or 2-d array')
+        try:
+            frame = pd.DataFrame(data, columns=list(columns))
+        except ValueError as err:
+            raise ClearMapValueError(f'Cannot name the columns of an array of shape {data.shape} with '
+                                     f'{list(columns)!r}: {err}', value=list(columns), expected=None) from err
+    else:
+        raise ClearMapValueError(f'Expected a DataFrame, a TableSource, or an array with columns=, '
+                                 f'got {type(data).__name__}.',
+                                 value=type(data).__name__, expected='DataFrame, TableSource or ndarray')
+
+    unnamed = [column for column in frame.columns if not isinstance(column, str)]
+    if unnamed:
+        raise ClearMapValueError(f'Table columns must be named with strings; got {unnamed!r}. '
+                                 f'A DataFrame built from a bare array has integer labels: name the columns.',
+                                 value=unnamed, expected='str column names')
+    return frame
+
+
+def _with_default_index(frame):
+    """Reduce *frame* to a default RangeIndex, since table files store columns only.
+
+    A named index carries data and becomes a column. An unnamed non-default index is
+    positional residue (e.g. from filtering rows) and is dropped.
+    """
+    import pandas as pd
+
+    if frame.index.equals(pd.RangeIndex(len(frame))):
+        return frame
+    has_names = any(name is not None for name in frame.index.names)
+    return frame.reset_index(drop=not has_names)
+
+
+GRAPH = ReprField('graph', convert=str)
 
 
 class GraphSource(Source):
     """Source whose data is a graph."""
 
     data_model: ClassVar[str] = 'graph'
-    _REPR_FIELDS = (ReprFields.NAME, ReprFields.GRAPH, ReprFields.LOCATION)  # FIXME: no Fraph in ReprFields. Move ??
+    _REPR_FIELDS = (ReprFields.NAME, GRAPH, ReprFields.LOCATION)  # FIXME: no Fraph in ReprFields. Move ??
 
     @property
     def graph(self):
@@ -597,6 +832,10 @@ class GraphSource(Source):
     @property
     def shape(self):
         return self.graph.shape
+
+    @shape.setter
+    def shape(self, value):
+        self.graph.shape = value
 
     @property
     def n_vertices(self):

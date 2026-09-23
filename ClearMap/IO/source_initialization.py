@@ -24,6 +24,9 @@ def initialize(source_=None, shape_=None, dtype_=None,
     The source is created on disk or in memory if it does not exist so processes
     can start writing into it.
 
+    .. WARNING::
+        In the case of table type sources, they can be written but not initialized
+
     Parameters
     ----------
     source_ : str, array, Source class

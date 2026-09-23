@@ -86,6 +86,10 @@ def source_to_module(source_):
     return source_to_backend(source_).module
 
 
+def source_to_class(source_):
+    return source_to_module(source_).SOURCE_CLASS
+
+
 def location_to_module(location_):
     """
     Returns the IO module associated with a location string.
@@ -141,6 +145,9 @@ def as_source(source_, slicing=None, *args, **kwargs):
         source_ = source_to_backend(source_).source_class(source_, *args, **kwargs)
 
     if slicing is not None:
+        if isinstance(source_, (source_mod.TableSource, source_mod.GraphSource)):  # Slice is array arithmetic
+            raise ClearMapValueError(f'{type(source_).__name__} cannot be sliced into a Source; '
+                                     f'use io.read(source, slicing=...) to select data instead.')
         source_ = slc.Slice(source=source_, slicing=slicing)
 
     return source_

@@ -26,6 +26,7 @@ import zlib
 import ClearMap.IO.source.Source as source_mod
 from ClearMap.IO import io_ops
 from ClearMap.IO.FileUtils import file_extension, is_file
+from ClearMap.IO.source.protocol import Backend
 from ClearMap.Utils.Formatting import ensure
 from ClearMap.Utils.exceptions import ClearMapNotImplementedError
 
@@ -47,7 +48,7 @@ class MhdInfo(NamedTuple):
 class MhdSource(source_mod.ArraySource):
     """Mhd/raw array source."""
     _CACHED_PROPERTIES = ('_header', '_info', '_buffer', '_array')
-    _virtual_class = None   # set below
+    backend = Backend.MHD
 
     def __init__(self, location, name=None, mode=None):
         """Mhd source class constructor.
@@ -160,9 +161,6 @@ class MhdSource(source_mod.ArraySource):
     def as_array(self):
         return self.array
 
-    def as_real(self):
-        return self
-
 
 class MhdVirtualSource(source_mod.VirtualSource):
     _real_class = MhdSource
@@ -171,6 +169,8 @@ class MhdVirtualSource(source_mod.VirtualSource):
                  order=None, location=None, name=None, mode=None):
         super(MhdVirtualSource, self).__init__(source=source, shape=shape, dtype=dtype, order=order, location=location,
                                             name=name, mode=mode)
+
+SOURCE_CLASS = MhdSource
 
 ###############################################################################
 # IO Interface
@@ -763,6 +763,7 @@ def write_header_from_source(source, location=None, header=None):
 def _test():
     import numpy as np
     from importlib import reload
+    from ClearMap.IO.source.backends import mhd_backend as MHD
     reload(MHD)
 
     data = np.array(255 * np.random.rand(20, 30, 40), order='C')

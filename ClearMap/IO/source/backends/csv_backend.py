@@ -3,11 +3,11 @@
 CSV
 ===
 
-Interface to read and write csv files.
+Backend for CSV tables, read and written with pandas.
 
-Note
-----
-The module utilizes the csv file writer/reader from numpy.
+A ClearMap CSV file is a table: its first row names the columns. Headerless
+numeric files written by older ClearMap versions are refused on read rather than
+silently misparsed (pandas would otherwise take the first data row as the header).
 """
 __author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
 __license__   = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
@@ -15,281 +15,112 @@ __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__   = 'https://idisco.info'
 __download__  = 'https://www.github.com/ChristophKirst/ClearMap2'
 
+import pandas as pd
 
-import numpy as np
-
-import ClearMap.IO.source.Source as source_mod
-# noinspection PyUnusedImports
-from ClearMap.IO.source.backend_defaults import create, open_ro
-import ClearMap.IO.source.Slice as slc
-
-###############################################################################
-### CSVSource class
-###############################################################################
-
-class CSVSource(source_mod.Source):
-    """CSV array source."""
-    _CACHED_PROPERTIES = ('_frame',)
+from ClearMap.IO.source.Source import TableSource
+from ClearMap.IO.source.protocol import Backend
+from ClearMap.Utils.exceptions import ClearMapValueError
 
 
-    def __init__(self, location, mode=None):
-        """CSV source class constructor.
-
-        Arguments
-        ---------
-        location : str
-            The filename of the csv source.
-        """
-        super().__init__(location, mode)
-
-    @cached_property
-    def _frame(self):
-        return _array(self.location)
-
-    @property
-    def location(self):
-        return self._location
-
-    @location.setter
-    def location(self, value):
-        if value != self.location:
-            self._location = value
-
-    @property
-    def array(self):
-        """The underlying data array.
-
-        Returns
-        -------
-        array : array
-            The underlying data array of this source.
-        """
-        return _array(self.location)
-
-    @array.setter
-    def array(self, value):
-        _write(self.location, value)
-
-    @property
-    def shape(self):
-        """The shape of the source.
-
-        Returns
-        -------
-        shape : tuple
-            The shape of the source.
-        """
-        return self.array.shape
-
-    @shape.setter
-    def shape(self, value):
-        raise NotImplementedError('Cannot set shape of csv file')
-
-    @property
-    def dtype(self):
-        """The data type of the source.
-
-        Returns
-        -------
-        dtype : dtype
-            The data type of the source.
-        """
-        return self.array.dtype
-
-    @dtype.setter
-    def dtype(self, value):
-        raise NotImplementedError('Cannot set dtype of csv file')
-
-    @property
-    def order(self):
-        """The order of how the data is stored in the source.
-
-        Returns
-        -------
-        order : str
-            Returns 'C' for C contigous and 'F' for fortran contigous, None otherwise.
-        """
-        return self.array.order
-
-    @order.setter
-    def order(self, value):
-        raise NotImplementedError('Cannot set order of csv file')
-
-    @property
-    def element_strides(self):
-        """The strides of the array elements.
-
-        Returns
-        -------
-        strides : tuple
-            Strides of the array elements.
-
-        Note
-        ----
-        The strides of the elements module itemsize instead of bytes.
-        """
-        array = self.array
-        return tuple(s // array.itemsize for s in array.strides)
-
-    @property
-    def offset(self):
-        """The offset of the memory map in the file.
-
-        Returns
-        -------
-        offset : int
-            Offset of the memeory map in the file.
-        """
-        return 0
-
-    ### Data
-    def __getitem__(self, *args):
-        array = _array(self.location)
-        return array.__getitem__(*args)
-
-    def __setitem__(self, *args):
-        array = _array(self.location)
-        array.__setitem__(*args)
-        _write(self.location, array)
-
-    def as_memmap(self):
-         raise NotImplementedError('Memmap creation not implemented yet!')
-
-    def as_virtual(self):
-        return CSVVirtualSource(source=self)
-
-    def as_buffer(self):
-        return self.array
+# Reader options that change how the header row is found; forwarded to the header probe.
+_HEADER_PROBE_KWARGS = ('sep', 'delimiter', 'encoding', 'comment', 'skiprows', 'compression', 'quotechar')
 
 
-class CSVVirtualSource(source_mod.VirtualSource):
-    _real_class = CSVSource
+class CSVSource(TableSource):
+    """Table source backed by a CSV file with a header row."""
 
-    def __init__(self, source=None, shape=None, dtype=None, order=None,
-                 location=None, name=None, mode=None):
-        super().__init__(source=source, shape=shape, dtype=dtype, order=order, location=location, name=name, mode=mode)
-        if isinstance(source, CSVSource):
-            self.location = source.location
+    backend = Backend.CSV
+    _name = 'CSV-Source'
 
+    @classmethod
+    def _load(cls, location, **kwargs):
+        if 'header' not in kwargs and 'names' not in kwargs:  # caller took charge of the header explicitly
+            _check_header(location, kwargs)
+        return pd.read_csv(location, **kwargs)
+
+    @classmethod
+    def _dump(cls, frame, location, **kwargs):
+        _check_column_names(frame.columns, location, reading=False)
+        kwargs.setdefault('index', False)
+        frame.to_csv(location, **kwargs)
+
+
+# class CSVVirtualSource(VirtualSource):
+#     _real_class = CSVSource
+#
+#     def __init__(self, source=None, shape=None, dtype=None, order=None,
+#                  location=None, name=None, mode=None):
+#         super().__init__(source=source, shape=shape, dtype=dtype, order=order, location=location, name=name, mode=mode)
+#         if isinstance(source, CSVSource):
+#             self.location = source.location
+
+SOURCE_CLASS = CSVSource
 
 ###############################################################################
 ### IO Interface
 ###############################################################################
 
+def open_ro(source_, **kwargs):
+    return CSVSource.open_ro(source_, **kwargs)
+
+
+def read(source_, slicing=None, **kwargs):
+    return CSVSource.read_table(source_, slicing=slicing, **kwargs)
+
+
+def write(sink, data=None, slicing=None, overwrite=True, **kwargs):
+    return CSVSource.write_table(sink, data, slicing=slicing, overwrite=overwrite, **kwargs)
+
+
+def create(location=None, shape=None, dtype=None, order=None,
+           mode=None, array=None, as_source=True, **kwargs):
+    return CSVSource.create_table(location, shape=shape, dtype=dtype, order=order,
+                                  mode=mode, array=array, as_source=as_source, **kwargs)
+
+
+def edit(source_, **kwargs):
+    return CSVSource.edit(source_, **kwargs)
+
+
 def is_csv(source):
-    """Checks if this source is a CSV source"""
-    if isinstance(source, CSVSource):
-        return True
-    if isinstance(source, str) and len(source) >= 3 and source[-3:] == 'csv':
-        return True
-    return False
-
-
-def read(source, slicing = None, as_source = None, **kwargs):
-    """Read data from a csv file.
-
-    Arguments
-    ---------
-    source : str
-        The name of the CSV file.
-    slicing : slice, Slice or None
-        An optional sub-slice to consider.
-    as_source : bool
-        If True, return results as a source.
-
-    Returns
-    -------
-    array : array
-        The data in the csv file as a buffer or source.
-    """
-    if not isinstance(source, CSVSource):
-        source = CSVSource(source)
-    if slicing is None:
-        if as_source:
-            return source
-        else:
-            return source.array
-    else:
-        if as_source:
-            return slc.Slice(source, slicing=slicing)
-        else:
-            return source.__getitem__(slicing)
-
-
-def write(sink, data, slicing = None, **kwargs):
-    """Write data to a csv file.
-
-    Arguments
-    ---------
-    sink : str
-        The name of the CSV file.
-    data : array
-        The data to write into the CSV file.
-    slicing : slice, Slice or None
-        An optional sub-slice to consider.
-
-    Returns
-    -------
-    sink : array or source
-        The sink csv file.
-    """
-    if not isinstance(sink, CSVSource):
-        sink = CSVSource(sink)
-
-    if slicing is not None:
-        array = sink.array
-        array[slicing]= data
-    else:
-        array = data
-
-    return _write(sink, array)
+    """Checks if this source is a CSV source."""
+    return isinstance(source, CSVSource) or (isinstance(source, str) and source.lower().endswith('.csv'))
 
 
 ###############################################################################
-### Helpers
+### Header validation
 ###############################################################################
 
-def _write(filename, points, **args):
-      """Write point data to csv file"""
-      np.savetxt(filename, points, delimiter=',', newline='\n', fmt='%.5e')
-      return filename
+def _is_number(value):
+    try:
+        float(value)
+    except (TypeError, ValueError):
+        return False
+    return True
 
 
-def _array(location, delimiter =',', **args):
-    """Read data from csv file.
-    
-    Arguments
-    ---------
-    location : str
-        Location of the csv array data.
-    delimiter : char
-        The delimiter between subsequent array entries.
-    
-    Returns
-    -------
-    array : array
-        The data as a numpy array.
-    """
-    points = np.loadtxt(location, delimiter=delimiter)
-    return points
+def _check_column_names(columns, location, reading=True):
+    """Raise if more than half of *columns* parse as numbers, i.e. look like data, not names."""
+    n_numeric = sum(_is_number(column) for column in columns)
+    if n_numeric * 2 <= len(columns):
+        return
+    if reading:
+        raise ClearMapValueError(
+            f'{location}: the first row looks like data, not a header ({n_numeric}/{len(columns)} fields are '
+            f'numbers). ClearMap tables need a header row naming the columns. For a headerless file from an '
+            f'older ClearMap version, add a header line, or read it explicitly with header=None, names=[...].',
+            value=tuple(columns), expected='a header row of column names')
+    raise ClearMapValueError(
+        f'Refusing to write {location}: {n_numeric}/{len(columns)} column names look like numbers and would '
+        f'be unreadable as a header. Give the columns descriptive names.',
+        value=tuple(columns), expected='descriptive column names')
 
 
-###############################################################################
-### Tests
-###############################################################################
-
-def test():    
-    """Test CSV module"""
-    import os
-    import numpy as np
-    from ClearMap.IO.source.backends.csv_backend import CSVSource
-    
-    location = 'test.csv'
-    points = np.random.rand(5,3)
-
-    s = CSVSource(location)
-    print(s)    
-    s.array = points
-    print(s)    
-    
-    os.remove(location)
+def _check_header(location, read_kwargs):
+    """Validate the header row by reading it alone, before paying for a full read."""
+    probe = {key: read_kwargs[key] for key in _HEADER_PROBE_KWARGS if key in read_kwargs}
+    try:
+        columns = pd.read_csv(location, nrows=0, **probe).columns
+    except pd.errors.EmptyDataError as err:
+        raise ClearMapValueError(f'{location} is empty; expected at least a header row.') from err
+    _check_column_names(columns, location, reading=True)

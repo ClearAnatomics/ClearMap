@@ -26,17 +26,22 @@ import numpy as np
 
 import ClearMap.IO.source.Source as source_mod
 from ClearMap.IO.source.Source import ReprFields as RF
-from ClearMap.Utils.exceptions import NrrdError, ClearMapPermissionError
+# noinspection PyUnusedImports
+from ClearMap.IO.source.backend_defaults import create
+from ClearMap.IO.source.protocol import Backend
+
+from ClearMap.Utils.exceptions import NrrdError
 
 
 ###############################################################################
 ### NrrdSource class
 ###############################################################################
 
-class NrrdSource(source_mod.Source):
+class NrrdSource(source_mod.ArraySource):
     """Nrrd array source."""
     _CACHED_PROPERTIES = ('_header', 'shape', 'dtype', 'offset')
     _REPR_FIELDS = (RF.NAME, RF.SHAPE, RF.DTYPE, RF.ORDER, RF.LOCATION)
+    backend = Backend.NRRD
   
     def __init__(self, location, mode=None):
         """Nrrd source class constructor.
@@ -48,15 +53,6 @@ class NrrdSource(source_mod.Source):
         """
         super().__init__(mode=mode)
         self._location = location
-
-    @property
-    def location(self):
-        return self._location
-
-    @location.setter
-    def location(self, value):
-        if value != self.location:
-            self._location = value
 
     @property
     def array(self):
@@ -122,22 +118,6 @@ class NrrdSource(source_mod.Source):
         raise NotImplementedError('Cannot set order of nrrd file')
 
     @property
-    def element_strides(self):
-        """The strides of the array elements.
-
-        Returns
-        -------
-        strides : tuple
-            Strides of the array elements.
-
-        Note
-        ----
-        The strides of the elements module itemsize instead of bytes.
-        """
-        memmap = _memmap(self.location)
-        return  tuple(s // memmap.itemsize for s in memmap.strides)
-
-    @property
     def offset(self):
         """The offset of the memory map in the file.
 
@@ -149,16 +129,6 @@ class NrrdSource(source_mod.Source):
         return _offset(self.location)
 
     ### Data
-    def __getitem__(self, *args):
-        memmap = _memmap(self.location)
-        return memmap.__getitem__(*args)
-
-    def __setitem__(self, *args):
-        if not self.is_writable:
-            raise ClearMapPermissionError(f'NrrdSource {self} was opened read-only (mode="r"). '
-                                          f'Use io.edit() to open for writing.')
-        memmap = _memmap(self.location)
-        memmap.__setitem__(*args)
 
     def metadata(self, info = None):
         """Returns metadata from this nrrd file.
@@ -176,13 +146,10 @@ class NrrdSource(source_mod.Source):
         return _read_header(self.location)
 
     def as_memmap(self):
-        return _memmap(self.location)
+        return _memmap(self.location, mode=self.mode)
 
     def as_virtual(self):
         return NrrdVirtualSource(source = self)
-
-    def as_real(self):
-        return self
 
     def as_buffer(self):
         return self.as_memmap()
@@ -198,7 +165,7 @@ class NrrdVirtualSource(source_mod.VirtualSource):
       if isinstance(source, NrrdSource):
           self.location = source.location
 
-
+SOURCE_CLASS = NrrdSource
 ###############################################################################
 ### IO Interface
 ###############################################################################
@@ -852,6 +819,8 @@ def _write(filename, data, options={}, separate_header=False):
 def _test():
     import os
     import numpy as np
+
+    from ClearMap.IO.source.backends import nrrd_backend as NRRD
 
     data = np.random.rand(20,50,10)
     data[5:15, 20:45, 2:9] = 0

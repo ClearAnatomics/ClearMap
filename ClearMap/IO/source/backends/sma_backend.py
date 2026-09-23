@@ -23,11 +23,18 @@ import ClearMap.ParallelProcessing.SharedMemoryArray as sma
 import ClearMap.ParallelProcessing.SharedMemoryManager as smm
 
 import ClearMap.IO.source.Source as source_mod
+# noinspection PyUnusedImports
+from ClearMap.IO.source.backend_defaults import read, write, open_ro
+# TODO: read directly into shared memory !
 from ClearMap.IO.source.backends.npy_backend import NumpySource
 
 
 __all__ = sma.__all__
 
+from ClearMap.IO.source.geometry_utils import resolve_geometry, properties_match
+
+from ClearMap.IO.source.protocol import Backend
+from ClearMap.Utils.exceptions import ClearMapValueError
 
 ###############################################################################
 ### SMASource class
@@ -36,6 +43,8 @@ MEMORY = source_mod.ReprField('memory', '<>')
 
 class SMASource(NumpySource):
     """Shared memory source."""
+    backend = Backend.SMA
+    _virtual_class = None
 
     def __init__(self, array=None, shape=None, dtype=None, order=None,
                handle=None, name=None, mode=None):
@@ -67,12 +76,6 @@ class SMASource(NumpySource):
     def as_virtual(self):
         return SMAVirtualSource(source=self)
 
-    def as_real(self):
-        return self
-
-    def as_buffer(self):
-        return self.array
-
 
 class SMAVirtualSource(source_mod.VirtualSource):
     _real_class = SMASource
@@ -91,6 +94,8 @@ class SMAVirtualSource(source_mod.VirtualSource):
     def as_real(self):
         return self._real_class(handle=self.handle, mode=self._mode)
 
+
+SOURCE_CLASS = SMASource
 
 ###############################################################################
 ### IO Interface
@@ -138,23 +143,15 @@ def as_shared(source):
         raise ValueError(f'Source {source!r} cannot be transformed to a shared array!')
 
 
-# TODO: read directly into shared memory !
-# read = npy_source_mod.read
-# write = npy_source_mod.write
-
-def read(*args, **kwargs):
-    raise NotImplementedError('read not implemented for SharedMemoryArray!')
-
-def write(*args, **kwargs):
-    raise NotImplementedError('write not implemented for SharedMemoryArray!')
-
-
-def create(shape=None, dtype=None, order=None,
+def create(location=None, shape=None, dtype=None, order=None, mode=None,
            array=None, handle=None, as_source=True, **kwargs):
     """Create a shared memory array.
 
     Arguments
     ---------
+    location: str | None
+        This is here only to respect the general protocol.
+        Do not use
     shape : tuple or None
         The shape of the memory map to create.
     dtype : dtype
@@ -173,10 +170,14 @@ def create(shape=None, dtype=None, order=None,
     shared : array
         The shared memory array.
     """
+    if location is not None:
+        raise ClearMapValueError('SMA sources cannot have a filesystem location.')
     array = _shared(shape=shape, dtype=dtype, order=order, array=array, handle=handle)
     if as_source:
-        return SMASource(array=array)
+        return SMASource(array=array, handle=handle, mode=mode)
     else:
+        if mode is not None:
+            raise ClearMapValueError('`mode` has no meaning when as_source=False')
         return array
 
 
@@ -184,45 +185,35 @@ def create(shape=None, dtype=None, order=None,
 ### Helpers
 ###############################################################################
 
-def _shared(shape = None, dtype = None, order = None, array=None, handle = None):
+def _shared(shape=None, dtype=None, order=None, array=None, handle=None):
     if handle is not None:
         array = smm.get(handle)
 
     # No source data: create an uninitialised shared array.
     if array is None:
         return sma.array(shape=shape, dtype=dtype, order=order)
-    elif is_shared(array):
-        if shape is None and dtype is None and order is None:
-            return array
 
-        shape = shape if shape is not None else array.shape
-        dtype = dtype if dtype is not None else array.dtype
-        order = order if order is not None else source_mod.order(array)
-
-        if shape != array.shape:
-            raise ValueError('Shapes do not match!')
-
-        if np.dtype(dtype) == array.dtype and order == source_mod.order(array):
-            return array
-        else:
-            new = sma.array(shape=shape,dtype=dtype,order=order)
-            new[:] = array
-            return new
-    elif isinstance(array, (np.ndarray, list, tuple)):
+    if isinstance(array, SMAVirtualSource):
+        array = array.as_real().array
+    elif isinstance(array, source_mod.ArraySource):
+        array = array.array
+    elif isinstance(array, (list, tuple)):
         array = np.asarray(array)
 
-        shape = shape if shape is not None else array.shape
-        dtype = dtype if dtype is not None else array.dtype
-        order = order if order is not None else source_mod.order(array)
+    if not isinstance(array, np.ndarray):
+        raise ValueError(f'Cannot create shared array from {array!r}!')
 
-        if shape != array.shape:
-            raise ValueError('Shapes do not match!')
+    shape, dtype, order = resolve_geometry(shape=shape, dtype=dtype, order_=order, array=array)
 
-        new = sma.array(shape=shape,dtype=dtype,order=order)
-        new[:] = array
-        return new
-    else:
-        raise ValueError(f'Cannot create shared array from array {array!r}!')
+    if shape != array.shape:
+        raise ValueError(f'Shapes do not match: requested {shape}, source has {array.shape}.')
+
+    if sma.is_shared(array) and properties_match(array, shape=shape, dtype=dtype, order=order):
+        return array
+
+    shared = sma.array(shape=shape, dtype=dtype, order=order)
+    shared[:] = array
+    return shared
 
 
 ###############################################################################

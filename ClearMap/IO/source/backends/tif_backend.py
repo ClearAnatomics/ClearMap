@@ -20,20 +20,22 @@ from functools import cached_property
 from typing import NamedTuple, Optional, List, Dict, Tuple, Any
 
 import numpy as np
+from numpy import dtype
 from tifffile import tifffile
 
 from ClearMap.IO.source import Source as source_mod
 import ClearMap.IO.source.Slice as cmp_clicing
+from ClearMap.IO.source.protocol import Backend
 
 from ClearMap.Utils.Lazy import lazyattr
-from ClearMap.Utils.exceptions import ClearMapValueError, ClearMapPermissionError
+from ClearMap.Utils.exceptions import ClearMapValueError
 
 
 ###############################################################################
 # ## TifSource class
 ###############################################################################
 
-class TifSource(source_mod.Source):
+class TifSource(source_mod.ArraySource):
     """Class to handle a tif file source
 
     Note
@@ -42,6 +44,10 @@ class TifSource(source_mod.Source):
 
     .. warning:: It is also assumed that the last 3 dimensions are the image dimensions in the order z,y,x.
     """
+    backend = Backend.TIF
+    # FIXME: check if series is indeed cached under series here by lazyattr
+    _CACHED_PROPERTIES = ('series', 'series_mode', 'pages_mode', 'shape', 'tif_shape', 'dtype', '_metadata_type')
+
     def __init__(self, location, series=0, multi_file=False, mode=None):
         super().__init__(name=None, mode=mode)  # skip AbstractSource
         try:
@@ -118,33 +124,24 @@ class TifSource(source_mod.Source):
     def location(self):
         return self._tif._fh.path
 
-    @location.setter
-    def location(self, value):
-        if value != self.location:
-            self._tif = tifffile.TiffFile(value, multifile=False)
+    def _on_location_changed(self):
+        tif = getattr(self, '_tif', None)
+        if tif is not None:
+            tif.close()
+
+        try:
+            self._tif = tifffile.TiffFile(self.location, multifile=self.multi_file)
+        except TypeError:
+            self._tif = tifffile.TiffFile(self.location, _multifile=self.multi_file)
 
     @property
-    def array(self, processes=None):
-        array = self._tif.asarray(maxworkers=processes, squeeze=True)
-        return self.to_clearmap_order(array)
+    def array(self):
+        return self.to_clearmap_order(self._tif.asarray(squeeze=True))
 
-    @cached_property
-    def element_strides(self):
-        """The strides of the array elements.
+    def _getitem(self, slicing):
+        return self.read(slicing=slicing)
 
-        Returns
-        -------
-        strides : tuple
-            Strides of the array elements.
-
-        Note
-        ----
-        The strides of the elements module itemsize instead of bytes.
-        """
-        memmap = self.as_memmap()
-        return tuple(s // memmap.itemsize for s in memmap.strides)
-
-    def __getitem__(self, slicing, processes=None):
+    def read(self, slicing=None, n_processes=None):
         ndim = self.ndim
         if ndim >= 3:
             slicing = cmp_clicing.unpack_slicing(slicing, ndim)  # matches dimensions for slicing (may assume space at the end)
@@ -152,24 +149,21 @@ class TifSource(source_mod.Source):
             slicing_z = slicing[-1]
             if isinstance(slicing_z, (int, np.int64)):
                 slicing_z = int(slicing_z)
-            array = self._tif.asarray(key=slicing_z, maxworkers=processes)
+            array = self._tif.asarray(key=slicing_z, maxworkers=n_processes)
             array = self.to_clearmap_order(array)
 
-            slicing_xy = (Ellipsis,) + slicing[-3: -1]  #  Assumes that the last dimensions are space and in the order z,y,x ??
+            slicing_xy = (Ellipsis,) + slicing[-3: -1]  # Assumes that the last dimensions are space and in the order z,y,x ??
             if len(array.shape) > len(self._tif.pages[0].shape):  # FIXME: is self._tif.pages[0].shape used for series mode?
-                slicing_xy = slicing_xy + (slice(None), )
+                slicing_xy = slicing_xy + (slice(None),)
             return array[slicing_xy]
         else:
-            array = self._tif.asarray(maxworkers=processes)
+            array = self._tif.asarray(maxworkers=n_processes)
             array = self.to_clearmap_order(array)
 
             return array[slicing]
 
-    def __setitem__(self, *args):
-        if not self.is_writable:
-            raise ClearMapPermissionError('TifSource was open RO. Please reopen RW (r+ or w+) to write to disk')
-        memmap = self.as_memmap()
-        memmap.__setitem__(*args)
+    def _setitem(self, slicing, value):
+        self.as_buffer()[slicing] = value
 
     def to_clearmap_order(self, array):
         try:
@@ -280,43 +274,29 @@ class TifSource(source_mod.Source):
         elif self._metadata_type == 'shaped_metadata':
             parser = ClearMapMetadataParser(self, metadata, info)
         else:
-            raise ValueError(f'Unknown metadata type {self._metadata_type}.'
-                             f'Please subclass BaseMetadataParser to handle this metadata type.')
+            raise ClearMapValueError(f'Unknown metadata type {self._metadata_type}.'
+                                     f'Please subclass BaseMetadataParser to handle this metadata type.')
 
         parser.parse()
         return parser.info
 
     def as_memmap(self):
         try:
-            return self.to_clearmap_order(tifffile.memmap(self.location))
+            mode = self.mode if self.mode in ('r', 'r+', 'c') else 'r'
+            return self.to_clearmap_order(tifffile.memmap(self.location, mode=mode))
         except ValueError as err:
-            raise ValueError(f'The tif file {self.location} cannot be memmaped!; {err}')
+            raise ClearMapValueError(f'The tif file {self.location} cannot be memmaped!; {err}')
 
     def as_virtual(self):
-        return VirtualSource(source=self)
-
-    def as_real(self):
-        return self
+        return TifVirtualSource(source=self)
 
     def as_buffer(self):
         return self.as_memmap()
 
-    # #### Formatting ###
-    def __str__(self):
-        try:
-            name = self.name or ''
-            shape = repr((self.shape,)) if self.shape else ''
-            dtype = f'[{self.dtype}]' if self.dtype else ''
-            order = f'|{self.order}|' if self.order else ''
-            location = f'{self.location}' if self.location else ''
-            location = location if len(location) <= 100 else location[:50] + '...' + location[-50:]
-        except TypeError:
-            name = shape = dtype = order = location = ''
-
-        return f'{name}{shape}{dtype}{order}{location}'
-
 
 class TifVirtualSource(source_mod.VirtualSource):
+    _real_class = TifSource
+
     def __init__(self, source=None, shape=None, dtype=None,
                  order=None, location=None, name=None, mode=None):
         super().__init__(source=source, shape=shape, dtype=dtype, order=order, location=location, name=name, mode=mode)
@@ -325,8 +305,10 @@ class TifVirtualSource(source_mod.VirtualSource):
             self.series = source._series
 
     def as_real(self):
-        return TifSource(location=self.location, series=self.series, multi_file=self.multi_file)
+        return TifSource(location=self.location, series=self.series, multi_file=self.multi_file,
+                         mode=self.mode)
 
+SOURCE_CLASS = TifSource
 
 ###############################################################################
 # ## TIF Parsers
@@ -875,6 +857,15 @@ def is_tif(source):
     return False
 
 
+def open_ro(source_, **kwargs):
+    if isinstance(source_, TifSource):
+        if source_.mode == 'r':
+            return source_
+        return TifSource(source_.location, series=source_._series, multi_file=source_.multi_file, mode='r')
+
+    return TifSource(source_, mode='r', **kwargs)
+
+
 def read(source, slicing=None, sink=None, **args):
     """Read data from a tif file.
 
@@ -914,12 +905,12 @@ def write(sink, data, **args):
     try:
         data = array_to_tif(data)
     except ValueError as err:
-        raise ValueError(f'Cannot write array to tif file {sink}!; {err}')
+        raise ClearMapValueError(f'Cannot write array to tif file {sink}!; {err}')
     # TODO: add axes order 'XYZ(C)' to metadata
     try:
-        tifffile.imsave(sink, data, **args)  # noqa
-    except AttributeError:
         tifffile.imwrite(sink, data, **args)
+    except AttributeError:
+        tifffile.imsave(sink, data, **args)  # noqa
     return sink
 
 
@@ -960,7 +951,7 @@ def create(location=None, shape=None, dtype=None, mode=None, as_source=True, **k
 
     memmap = tifffile.memmap(location, shape=shape, dtype=dtype, mode=mode)
     if as_source:
-        return TifSource(location)
+        return TifSource(location, mode=mode)
     else:
         return memmap
 
@@ -1170,16 +1161,17 @@ def array_to_tif(array, source_order='ZYX'):
 
 def _test():
     import ClearMap.Tests.Files as tfs
+    from ClearMap.IO.source.backends.tif_backend import TifSource
 
     filename = tfs.filename('tif_2d')
-    t = TIF.TifSource(location=filename)
+    t = TifSource(location=filename)
     print(t)
 
     filename = tfs.filename('tif_2d_color')
-    t = TIF.TifSource(location=filename)
+    t = TifSource(location=filename)
     print(t)
 
-    d = TIF.read(filename)
+    d = read(filename)
     print(d.shape)
 
     v = t.as_virtual()

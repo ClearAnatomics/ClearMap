@@ -16,7 +16,9 @@ import warnings
 import numpy as np
 
 import ClearMap.IO.source.Source as source_mod
-from ClearMap.IO.source.backends.registry import BackendName
+from ClearMap.IO.source import geometry_utils
+from ClearMap.IO.source.protocol import Backend
+
 from ClearMap.Utils.exceptions import ClearMapPermissionError, ClearMapValueError
 
 
@@ -24,9 +26,9 @@ from ClearMap.Utils.exceptions import ClearMapPermissionError, ClearMapValueErro
 ### NumpySource class
 ###############################################################################
 
-class NumpySource(source_mod.Source):
+class NumpySource(source_mod.ArraySource):
     """Numpy array source."""
-    backend = BackendName.NPY
+    backend = Backend.NPY
 
     def __init__(self, array=None, shape=None, dtype=None,
                  order=None, name=None, mode=None):
@@ -101,59 +103,19 @@ class NumpySource(source_mod.Source):
         order : str
             Returns 'C' for C contigous and 'F' for fortran contigous, None otherwise.
         """
-        return source_mod.order(self.array)
+        return geometry_utils.order(self.array)
 
     @order.setter
     def order(self, value):
         self._array = np.asarray(self._array, order = value)
-
-    @property
-    def element_strides(self):
-        """The strides of the array elements.
-
-        Returns
-        -------
-        strides : tuple
-            Strides of the array elements.
-
-        Note
-        ----
-        The strides of the elements module itemsize instead of bytes.
-        """
-        return tuple(s // self._array.itemsize for s in self._array.strides)
-
-    @property
-    def offset(self):
-        """The offset of the memory map in the file.
-
-        Returns
-        -------
-        offset : int
-            Offset of the memory map in the file.
-        """
-        if self._array.base is not None:
-            return np.byte_bounds(self._array)[0] - np.byte_bounds(self._array.base)[0]
-        else:
-            return 0
 
     ### Parallel processing
     def as_virtual(self):
         # TODO: convert to shared memory array ? -> needs to be implemented to make block processing work for in memory  numpy arrays !
         return self
 
-    def as_buffer(self):
-        return self._array
 
-    ### Data
-    def __getitem__(self, *args):
-        return self.array.__getitem__(*args)
-
-    def __setitem__(self, *args):
-        if not self.is_writable:
-            raise ClearMapPermissionError(f'NumpySource {self} was opened read-only (mode="r"). '
-                                          f'Use io.edit() to open for writing.')
-        self.array.__setitem__(*args)
-
+SOURCE_CLASS = NumpySource
 
 ###############################################################################
 ### Functionality
@@ -162,7 +124,7 @@ class NumpySource(source_mod.Source):
 def order(array):
     warnings.warn('NPY.order is deprecated; use Source.order instead.',
                   DeprecationWarning, stacklevel=2)
-    return source_mod.order(array)
+    return geometry_utils.order(array)
 
 
 ###############################################################################
@@ -271,43 +233,52 @@ def create(shape=None, dtype=None, order=None,
 
 
 def _array(shape=None, dtype=None, order=None, array=None):
-    """Create a numpy array.
+    """Create a numpy array, or conform an existing one to the requested geometry.
 
     Arguments
     ---------
     shape : tuple or None
-        The shape of the memory map to create.
-    dtype : dtype
-        The data type of the memory map.
+        The shape of the array. Inferred from *array* if None.
+    dtype : dtype or None
+        The data type of the array. Inferred from *array* if None.
     order : 'C', 'F', or None
-        The contiguous order of the memmap.
-    array : array, Source or None
-        Optional source with data to fill the memory map.
+        The contiguous order of the array. Inferred from *array* if None.
+    array : array, list, tuple or None
+        Optional data. Returned as is when it already matches the requested
+        geometry; converted (copied) otherwise.
 
     Returns
     -------
     array : np.ndarray
         The array.
     """
+    if array is None:
+        if shape is None:
+            raise ClearMapValueError('Cannot create an array without a shape.')
+        shape, dtype, order = geometry_utils.resolve_geometry(shape, dtype, order)
+        return np.zeros(shape, dtype=dtype, order=order)
+
     if isinstance(array, (list, tuple)):
         array = np.asarray(array, order=order, dtype=dtype)
+    if not isinstance(array, np.ndarray):
+        raise ClearMapValueError(f'Cannot create a numpy array from {type(array).__name__}.',
+                                 value=type(array).__name__, expected='ndarray, list or tuple')
 
-    if isinstance(array, np.ndarray):
-        shape = shape if shape is not None else array.shape
-        dtype = dtype if dtype is not None else array.dtype
-        order = order if order is not None else source_mod.order(array)
+    shape, dtype, order = geometry_utils.resolve_geometry(shape, dtype, order, array=array)
+    if shape != array.shape:
+        raise ClearMapValueError(f'Requested shape {shape} does not match array shape {array.shape}.',
+                                 value=shape, expected=array.shape)
 
-        if shape != array.shape:
-            raise ValueError('Shape %r and array shape %r mismatch!' % (shape, array.shape))
+    if _matches(array, dtype, order):
+        return array
+    return np.asarray(array, dtype=dtype, order=order)
 
-        if dtype != array.dtype or order != source_mod.order(array):
-            array = np.asarray(array, order=order, dtype=dtype)
-    else:
-        if shape is None:
-            raise ValueError('Cannot create array without shape!')
-        array = np.zeros(shape, dtype=dtype, order=order)
 
-    return array
+def _matches(array, dtype, order):
+    """True if *array* already has *dtype* and *order* (None means "don't care")."""
+    if order is not None and geometry_utils.order(array) is None:
+        return False  # non-contiguous: any requested order needs a copy
+    return geometry_utils.properties_match(array, dtype=dtype, order=order)
 
 
 ###############################################################################
@@ -317,7 +288,7 @@ def _array(shape=None, dtype=None, order=None, array=None):
 def _test():
     import numpy as np
     from ClearMap.IO.source.backends.npy_backend import NumpySource
-    #reload(npy);
+    # reload(npy)
 
     s = NumpySource(array=np.zeros((5, 7)))
     print(s)
