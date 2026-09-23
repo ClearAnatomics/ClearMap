@@ -23,19 +23,21 @@ __download__  = 'https://www.github.com/ChristophKirst/ClearMap2'
 from ClearMap.Analysis.graphs import graph_gt
 
 import ClearMap.IO.source.Source as source_mod
-from ClearMap.IO.IO import source_modules
 # noinspection PyUnusedImports
 from ClearMap.IO.source.backend_defaults import create
+from ClearMap.IO.source.protocol import Backend
+from ClearMap.Utils.exceptions import ClearMapValueError
 
 ###############################################################################
 ### Source class
 ###############################################################################
 
-GRAPH = source_modules.ReprField('graph', convert=lambda g: str(g)[5:])
+GRAPH = source_mod.ReprField('graph', convert=lambda g: str(g)[5:])
 
 
-class GraphGtSource(source_mod.Source):
+class GraphGtSource(source_mod.GraphSource):
     """GT graph source."""
+    backend = Backend.GT
 
     def __init__(self, location=None, graph=None, name=None, mode=None):
         """GT source class constructor.
@@ -57,15 +59,6 @@ class GraphGtSource(source_mod.Source):
         self._graph = graph
 
     @property
-    def location(self):
-        return self._location
-
-    @location.setter
-    def location(self, value):
-        if value != self.location:
-            self._location = value
-
-    @property
     def graph(self):
         """The underlying graph.
 
@@ -82,30 +75,13 @@ class GraphGtSource(source_mod.Source):
     def graph(self, value):
         self._graph = value
 
-    @property
-    def shape(self):
-        """The shape of the source.
-
-        Returns
-        -------
-        shape : tuple
-            The shape of the source.
-        """
-        return self.graph.shape
-
-    @shape.setter
-    def shape(self, value):
-        self.graph.shape = value
-
     def as_virtual(self):
-         return GrpahGtVirtualSource(source=self)
-
-    def as_real(self):
-        return self
+        if self.location is None:
+            raise ClearMapValueError('Cannot create a graph virtual source without a location. '
+                                     'It could not reconstruct itself')
+        return GraphGtVirtualSource(source=self)
 
     ### Generic
-    def info(self):
-        self.graph.info()
 
     def write(self, location = None):
         if location is None:
@@ -121,7 +97,7 @@ class GraphGtSource(source_mod.Source):
         return GraphGtSource(graph=self.graph.copy())
 
 
-class GrpahGtVirtualSource(source_mod.VirtualSource):
+class GraphGtVirtualSource(source_mod.VirtualSource):
     _real_class = GraphGtSource
 
     def __init__(self, source=None, location=None, name=None, mode=None):
@@ -149,7 +125,6 @@ class GrpahGtVirtualSource(source_mod.VirtualSource):
     def graph(self, value):
         raise NotImplementedError("Cannot set virtual graph")
 
-
     @property
     def shape(self):
         """The shape of the source.
@@ -166,6 +141,7 @@ class GrpahGtVirtualSource(source_mod.VirtualSource):
         raise NotImplementedError("Cannot set shape of virtual graph")
 
 
+SOURCE_CLASS = GraphGtSource
 ###############################################################################
 ### IO Interface
 ###############################################################################
@@ -259,18 +235,19 @@ def test():
     """Test GT module"""
     import os
     from ClearMap.Analysis.graphs import graph_gt
+    from ClearMap.IO.source.backends.gt_backend import GraphGtSource
 
     location = 'test.gt'
 
     g = graph_gt.Graph(n_vertices=10)
  
-    s = GT.GraphGtSource(graph=g, location=location)
+    s = GraphGtSource(graph=g, location=location)
     s.shape = (1,2,3)
     print(s)
 
     s.write()
 
-    r = GT.GraphGtSource(location=location)
+    r = GraphGtSource(location=location)
     print(r.shape)
     
     os.remove(location)
