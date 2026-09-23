@@ -136,6 +136,7 @@ CHANNELS_ASSETS_TYPES_CONFIG = {
             'filtered': None,                              # inherits table
             'shape': {'file_format_category': 'image'},    # image → array
             'bkg': {'file_format_category': 'image'},      # image → array
+            'maxima': {'file_format_category': 'image'},   # image → array
         }
     },
     'vertices': {

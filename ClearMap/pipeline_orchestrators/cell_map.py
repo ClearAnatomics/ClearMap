@@ -260,7 +260,7 @@ class CellDetector(ChannelPipelineOrchestrator):
         kwargs = {'asset_type': 'cells', 'channel': self.channel, 'asset_sub_type': coord_type}
 
         table_path = self.get_path(**kwargs, extension='.feather')
-        if not table_path.exists:
+        if not table_path.exists():
             table_path = self.get_path(**kwargs)
 
         loaders = {'.feather': pd.read_feather, '.npy': np.load}
@@ -320,7 +320,7 @@ class CellDetector(ChannelPipelineOrchestrator):
             'size': self.config['cell_filtration']['thresholds']['size']
         }
         src_path = self.get_path('cells', channel=self.channel, asset_sub_type='raw')
-        if not src_path.exists:
+        if not src_path.exists():
             raise MissingRequirementException(f'Cell detection not run yet (no file found at "{src_path}"),'
                                               f' cannot filter cells. Please run cell detection first.')
         dest_path = self.get_path('cells', channel=self.channel, asset_sub_type='filtered')
@@ -464,11 +464,11 @@ class CellDetector(ChannelPipelineOrchestrator):
                 return
 
         asset = self.get(**asset_properties)
-        requirements = [asset, self.df_path]
-        if any(not req.exists for req in requirements):
+        requirements = [(asset, asset.exists), (self.df_path, self.df_path.exists())]  # asset.exists is a property
+        if not all(ok for _, ok in requirements):
             raise MissingRequirementException(f'Cannot plot 3D scatter with atlas colors',
-                                              missing_items=[e for e in requirements if not e.exists],
-                                              found_items=[e for e in requirements if e.exists])
+                                              missing_items=[r for r, ok in requirements if not ok],
+                                              found_items=[r for r, ok in requirements if ok])
         dv = qplot_3d.plot(asset.path, title=f'{asset_properties["asset_type"].title()} and cells',  # FIXME: correct scaling for anisotropic if raw
                            arrange=False, lut='white', parent=parent)[0]
 
@@ -513,7 +513,7 @@ class CellDetector(ChannelPipelineOrchestrator):
     @property
     def df_path(self):
         feather_path = self.get_path('cells', channel=self.channel, extension='.feather')
-        if feather_path.exists:
+        if feather_path.exists():
             return feather_path
         else:
             return self.get_path('cells', channel=self.channel)
@@ -548,7 +548,7 @@ class CellDetector(ChannelPipelineOrchestrator):
     def plot_background_subtracted_img(self):
         import ClearMap.Visualization.Plot3d as plot_3d
         src = self.get('cells', channel=self.channel, asset_sub_type='raw').open_ro()
-        coordinates = np.hstack([src[c][:, None] for c in 'xyz'])
+        coordinates = np.column_stack([np.asarray(src[c]) for c in 'xyz'])
         p = plot_3d.list_plot_3d(coordinates)
         return plot_3d.plot_3d(self.get_path('stitched', channel=self.channel),
                                view=p, cmap=plot_3d.grays_alpha(alpha=1))
@@ -581,7 +581,7 @@ class CellDetector(ChannelPipelineOrchestrator):
             self.get_path('cells', channel=self.channel, asset_sub_type='bkg'),
             self.get_path('cells', channel=self.channel, asset_sub_type='shape')
         ]
-        sources = [s for s in sources if s.exists]  # Remove missing files (if not tuning)
+        sources = [s for s in sources if s.exists()]  # Remove missing files (if not tuning)
         if not sources:
             raise MissingRequirementException('No files found for preview')
         titles = [s.name for s in sources]
@@ -630,21 +630,24 @@ class CellDetector(ChannelPipelineOrchestrator):
         """
         warnings.warn('Method "export_to_clearmap1_fmt" is deprecated and will be removed in future versions;'
                       'please use the new formats from atlas_align and export_collapsed_stats', DeprecationWarning, 2)
-        source = self.get('cells', channel=self.channel).read()
+        cells = self.get_cells_df()  # Feather table or legacy structured .npy, always as a DataFrame
         clearmap1_format = {'points': ['x', 'y', 'z'],
                             'points_transformed': ['xt', 'yt', 'zt'],
                             'intensities': ['source', 'dog', 'background', 'size']}
         for sub_type, names in clearmap1_format.items():
-            sink = self.get_path('cells', channel=self.channel, asset_sub_type=f'ClearMap1{sub_type}')
-            data = np.array(
-                [source[name] if name in source.dtype.names else np.full(source.shape[0], np.nan) for name in names]
-            )
-            data = data.T
+            # ClearMap1 reads plain (n, k) .npy arrays. Without an explicit extension, the sink would
+            # resolve to the table default (.feather), which cannot hold a bare array.
+            sink = self.get_path('cells', channel=self.channel, asset_sub_type=f'ClearMap1{sub_type}',
+                                 extension='.npy')
+            data = cells.reindex(columns=names).to_numpy()  # missing columns become NaN, as before
             io_ops.write(sink, data)
 
     def convert_cm2_to_cm2_1_fmt(self):
-        """Atlas alignment and annotation """
-        cells = self.get('cells', channel=self.channel).read()
+        """Convert a ClearMap 2.0 cells file (structured .npy) to the annotated 2.1+ Feather table."""
+        npy_path = self.get_path('cells', channel=self.channel, extension='.npy')
+        if not npy_path.exists():
+            raise MissingRequirementException(f'No ClearMap 2.0 cells file found at "{npy_path}"; nothing to convert.')
+        cells = pd.DataFrame(np.load(npy_path))  # structured array: field names become columns
         df = pd.DataFrame({ax: cells[ax] for ax in 'xyz'})
         df['size'] = cells['size']
         df['source'] = cells['source']
@@ -664,7 +667,7 @@ class CellDetector(ChannelPipelineOrchestrator):
         id_map = {lbl: annotator.find(lbl, key='order')['id'] for lbl in unique_labels}
 
         atlas = self.get('atlas', channel=self.channel, asset_sub_type='annotation').read()
-        atlas_scale = np.prod(self.get_alignment_ref_channel_reg_cfg['resampled_resolution'])
+        atlas_scale = np.prod(self.get_alignment_ref_channel_reg_cfg()['resampled_resolution'])
         volumes = {_id: (atlas == _id).sum() * atlas_scale for _id in
                    id_map.values()}  # Volumes need a lookup on ID since the atlas is in ID space
 
