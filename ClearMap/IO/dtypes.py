@@ -1,8 +1,6 @@
-import pathlib
-
 import numpy as np
 
-from ClearMap.IO.FileUtils import normalize_location_spec
+from ClearMap.IO.dispatch import normalize_source_spec
 from ClearMap.IO.source import Source as source_mod
 from ClearMap.IO.source_geometry import dtype
 
@@ -43,7 +41,7 @@ def get_value(source_, value_type):  # REFACTOR: should be moved to io_utils or 
     value: number
         The value of the data type.
     """
-    source_ = normalize_location_spec(source_)
+    source_ = normalize_source_spec(source_)  # locations are normalised; arrays, dtypes and Sources pass through
 
     if value_type not in ['min', 'max']:
         raise ValueError(f'Unknown value type {value_type}, accepted Parameters are "min" and "max"!')

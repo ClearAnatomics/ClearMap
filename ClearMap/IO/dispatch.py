@@ -14,7 +14,12 @@ from ClearMap.Utils.exceptions import SourceModuleNotFoundError, ClearMapValueEr
 _LOCATION_SPEC = (str, bytes, os.PathLike, te.Expression)
 
 
-def _normalize_source_spec(source_):
+def normalize_source_spec(source_):
+    """Normalise *source_* if it is a location (path, bytes, Expression); pass anything else through.
+
+    Unlike :func:`FileUtils.normalize_location_spec`, this accepts every source
+    specification (arrays, Sources, None, ...), which is what the IO entry points receive.
+    """
     if isinstance(source_, _LOCATION_SPEC):
         return fu.normalize_location_spec(source_)
     return source_
@@ -29,7 +34,7 @@ def source_to_backend(source_) -> Backend:
             raise ClearMapValueError(f'Source {source_!r} has no backend identity.')
         return source_.backend
 
-    source_ = _normalize_source_spec(source_)
+    source_ = normalize_source_spec(source_)
 
     if isinstance(source_, (str, te.Expression)):
         return location_to_backend(source_)
@@ -141,7 +146,7 @@ def as_source(source_, slicing=None, *args, **kwargs):
         The source class.
     """
     if not isinstance(source_, source_mod.Source):
-        source_ = _normalize_source_spec(source_)
+        source_ = normalize_source_spec(source_)
         source_ = source_to_backend(source_).source_class(source_, *args, **kwargs)
 
     if slicing is not None:

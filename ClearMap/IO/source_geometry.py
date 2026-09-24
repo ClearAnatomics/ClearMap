@@ -1,3 +1,5 @@
+import pathlib
+
 from ClearMap.IO.io_ops import open_ro
 
 
@@ -112,3 +114,22 @@ def element_strides(source_):
         raise ValueError(f'Cannot determine the strides for the source!; {e}')
 
     return strides
+
+
+def location(source_):
+    """
+    Returns the location of a source.
+
+    Parameters
+    ----------
+    source_ : str, array or Source
+        The source specification.
+
+    Returns
+    -------
+    location : str or None
+        The location of the source. A path that does not exist yet is returned as is.
+    """
+    if isinstance(source_, (str, pathlib.Path)) and not pathlib.Path(source_).exists():  # TODO: check if we **want** that bhv
+        return str(source_)
+    return open_ro(source_).location

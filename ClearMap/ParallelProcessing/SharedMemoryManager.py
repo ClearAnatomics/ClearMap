@@ -23,7 +23,7 @@ __all__ = ['get', 'insert', 'free', 'clean', 'zeros'];
 ### Manager
 ###############################################################################
 
-class SharedMemmoryManager:
+class SharedMemmoryManager:  # FIXME: module level functions only
   """SharedMemmoryManager provides handles to shared arrays for parallel processing."""
   
   _instance = None
