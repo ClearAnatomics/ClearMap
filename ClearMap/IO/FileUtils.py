@@ -375,6 +375,33 @@ def atomic_replace(tmp: Path, dst: Path) -> None:
     os.replace(tmp, dst)
 
 
+def atomic_write(write, location) -> None:
+    """Write a file atomically, so a crash mid-write never destroys the previous file.
+
+    ``write(tmp_path)`` must produce the complete file at ``tmp_path``, which is then
+    moved onto *location* with :func:`atomic_replace`. The temporary file sits in the
+    same directory (so the move is atomic) and keeps the full original file name as
+    its suffix, since some writers pick the format from the extension (e.g. ``.gt``
+    vs ``.gt.gz``). It is removed if writing fails.
+
+    Parameters
+    ----------
+    write : callable
+        Called with the temporary path as a ``str``.
+    location : str or Path
+        The final file.
+    """
+    location = Path(location)
+    location.parent.mkdir(parents=True, exist_ok=True)
+    tmp = location.with_name(f'.tmp-{os.getpid()}-{location.name}')
+    try:
+        write(str(tmp))
+        atomic_replace(tmp, location)
+    except BaseException:
+        tmp.unlink(missing_ok=True)
+        raise
+
+
 def uncompress(file_path, extension='zip', check=True, verbose=False):
     """
     Unzips a file only if:
