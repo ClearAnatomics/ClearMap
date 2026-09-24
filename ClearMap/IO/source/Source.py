@@ -11,6 +11,7 @@ __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__   = 'https://idisco.info'
 __download__  = 'https://www.github.com/ChristophKirst/ClearMap2'
 
+import os
 import warnings
 from functools import cached_property
 from typing import ClassVar, TYPE_CHECKING
@@ -100,8 +101,6 @@ class ReprFields:
 class Source:
     """Base abstract source class."""
     backend: ClassVar['Backend | None'] = None
-
-    _name: ClassVar[str | None] = None  # override in subclasses as class variable
     _location: ClassVar[str | None] = None
     _CACHED_PROPERTIES: ClassVar[tuple[str, ...]] = ()
     _REPR_FIELDS: ClassVar[tuple[ReprField, ...]] = (ReprFields.NAME, ReprFields.LOCATION)
@@ -113,30 +112,14 @@ class Source:
     def __init__(self, name=None, mode=None):
         """Initialization."""
         if name is not None:
-            self._name = name
+            warnings.warn('The name argument is deprecated and ignored: a source is named after its class.',
+                          DeprecationWarning, stacklevel=3)
         self._mode = mode
 
     @property
     def name(self):
-        """The name of this source.
-
-        Returns
-        -------
-        name : str
-            Name of this source.
-        """
-        mod_name = type(self).__module__.split(".")[-1]
-        name_fallback = f'{mod_name}-Source'
-        cls_name = getattr(self, '_name', name_fallback)
-        if cls_name is None:
-            cls_name = name_fallback
-        return cls_name
-
-    @name.setter
-    def name(self, value: str):
-        warnings.warn('Setting name on a Source instance is discouraged (reserved for testing/debugging). '
-                      'Define _name as a class variable in subclasses instead.', UserWarning, stacklevel=2)
-        self._name = ensure(value, str)
+        """The name of this source: its class name."""
+        return type(self).__name__
 
     @property
     def location(self):
@@ -254,8 +237,46 @@ class Source:
 ### Abstract and VirtualSource base class
 ###############################################################################
 
+
+class BaseArraySource(Source):
+    """Interface shared by every source whose data is an n-dimensional array.
+
+    Subclasses answer ``shape``, ``dtype`` and ``order`` in their own way: from an
+    array they hold (:class:`ArraySource`), from stored metadata
+    (:class:`AbstractSource`, :class:`VirtualSource`), or from another source and a
+    slicing (:class:`~ClearMap.IO.source.Slice.Slice`). Everything derived from the
+    geometry lives here, once.
+    """
+
+    data_model: ClassVar[str] = 'array'
+    _REPR_FIELDS = (ReprFields.NAME, ReprFields.SHAPE, ReprFields.DTYPE, ReprFields.ORDER, ReprFields.LOCATION)
+
+    @property
+    def shape(self):
+        raise ClearMapNotImplementedError(f'{type(self).__name__} does not define shape.',
+                                          operation='shape', backend=type(self).__name__)
+
+    @property
+    def dtype(self):
+        raise ClearMapNotImplementedError(f'{type(self).__name__} does not define dtype.',
+                                          operation='dtype', backend=type(self).__name__)
+
+    @property
+    def order(self):
+        raise ClearMapNotImplementedError(f'{type(self).__name__} does not define order.',
+                                          operation='order', backend=type(self).__name__)
+
+    @property
+    def ndim(self):
+        return len(self.shape)
+
+    @property
+    def size(self):
+        return int(np.prod(self.shape))
+
+
 # TODO: memory -> device argument
-class AbstractSource(Source):
+class AbstractSource(BaseArraySource):
     """Abstract source to handle data sources without data in memory.
 
     Note
@@ -285,26 +306,15 @@ class AbstractSource(Source):
         """
         super().__init__(name=name, mode=mode)
 
+        self._shape, self._dtype, self._order = geometry_utils.resolve_geometry(shape, dtype, order, like=source)
         if source is not None:
-            if shape is None and hasattr(source, 'shape'):
-                shape = source.shape
-            if dtype is None and hasattr(source, 'dtype'):
-                dtype = source.dtype
-            if order is None and hasattr(source, 'order'):
-                order = source.order
-            # if memory is None and hasattr(source, 'memory'):
-            #     memory = memory.order
-            if location is None and hasattr(source, 'location'):
-                location = source.location
+            if location is None:
+                location = getattr(source, 'location', None)
             if hasattr(source, 'mode'):  # Don't add to sources that don't have that attr
                 if mode is None:
                     mode = source.mode
                 self._mode = ensure(mode, str)
 
-        self._shape    = ensure(shape,    tuple)
-        self._dtype    = ensure(dtype,    np.dtype)
-        self._order    = ensure(order,    str)
-        # self._memory   = ensure(memory,   str)
         self._location = self._coerce_location(location)
 
     @property
@@ -394,13 +404,6 @@ class VirtualSource(AbstractSource):
             if real_cls is not None:
                 cls.backend = real_cls.backend
 
-    @property
-    def name(self):
-        if self._name is not None:
-            return self._name
-        mod_name = type(self).__module__.split(".")[-1]
-        return f'Virtual-{mod_name}-Source'
-
     def __getitem__(self, *args):
         return self.as_real().__getitem__(*args)
 
@@ -432,7 +435,7 @@ def element_strides(array):
     return tuple(s // array.itemsize for s in array.strides)
 
 
-class ArraySource(Source):
+class ArraySource(BaseArraySource):
     """Source whose data is an n-dimensional array.
 
     Geometry is answered from ``self.array`` by default, which is correct for
@@ -441,9 +444,6 @@ class ArraySource(Source):
     properties with a ``cached_property`` and list them in
     ``_CACHED_PROPERTIES``.
     """
-
-    data_model: ClassVar[str] = 'array'
-    _REPR_FIELDS = (ReprFields.NAME, ReprFields.SHAPE, ReprFields.DTYPE, ReprFields.ORDER, ReprFields.LOCATION)
 
     # ## Data
     @property
@@ -481,13 +481,6 @@ class ArraySource(Source):
                                           operation='order', backend=type(self).__name__)
 
     # ## Derived geometry
-    @property
-    def ndim(self):
-        return len(self.shape)
-
-    @property
-    def size(self):
-        return int(np.prod(self.shape))
 
     @property
     def element_strides(self):
@@ -537,9 +530,10 @@ class TableSource(Source):
       Series, a list of names gives a DataFrame, a slice or a boolean mask selects rows.
     * Tables are read and written whole. There is no item assignment and no edit mode:
       read the frame, modify it, write it back.
-    * Columns must be named with strings. An array is not a table: writing one raises
-      unless ``columns=`` names its columns, and so does a DataFrame with default
-      integer column labels.
+    * Columns must be named with strings. A plain array is not a table: writing one
+      raises unless ``columns=`` names its columns, and so does a DataFrame with
+      default integer column labels. Structured arrays are accepted, since their
+      field names are explicit column names.
     * ``order`` and a global ``dtype`` are deliberately absent; see ``dtypes``.
 
     Subclasses implement the two hooks ``_load`` and ``_dump`` and set ``backend``.
@@ -763,34 +757,44 @@ class TableSource(Source):
 def _as_frame(data, columns=None):
     """Coerce table-like *data* to a DataFrame, refusing anything that is not a table.
 
-    An array becomes a table only when *columns* names its columns. *columns* is
-    refused for data that already has column names, rather than guessing whether
-    it means renaming or selecting.
+    Accepted:
+
+    * a DataFrame or a TableSource;
+    * a structured array (field names become the column names), e.g. a legacy
+      ClearMap cells array, bare or wrapped in an array Source;
+    * a plain array together with *columns*, which names its columns.
+
+    *columns* is refused for data that already has column names (DataFrames,
+    TableSources, structured arrays), rather than guessing whether it means
+    renaming or selecting.
     """
     import pandas as pd
 
+    if isinstance(data, ArraySource):  # e.g. an MMP source of a legacy structured .npy
+        data = data.array
+
     if isinstance(data, (TableSource, pd.DataFrame)):
-        if columns is not None:
-            raise ClearMapValueError(f'columns= only names the columns of an array; {type(data).__name__} already '
-                                     f'has named columns. Rename or select them on the DataFrame instead.',
-                                     value=columns, expected=None)
+        _refuse_columns(columns, type(data).__name__)
         frame = data.frame if isinstance(data, TableSource) else data
+    elif isinstance(data, np.ndarray) and data.dtype.names is not None:
+        _refuse_columns(columns, 'a structured array')
+        if data.ndim != 1:
+            raise ClearMapValueError(f'A structured array must be 1-d to be a table (one record per row); '
+                                     f'got shape {data.shape}.', value=data.shape, expected='a 1-d array')
+        frame = pd.DataFrame(data)
     elif isinstance(data, np.ndarray):
         if columns is None:
             raise ClearMapValueError('Arrays are not tables: pass columns=[...] to name the columns, '
                                      'or build a DataFrame yourself.', value=data.shape, expected='columns=[...]')
-        if data.dtype.names is not None:
-            raise ClearMapValueError('Structured arrays are not supported as tables; build a DataFrame.',
-                                     value=data.dtype, expected='a plain 1-d or 2-d array')
         try:
             frame = pd.DataFrame(data, columns=list(columns))
         except ValueError as err:
             raise ClearMapValueError(f'Cannot name the columns of an array of shape {data.shape} with '
                                      f'{list(columns)!r}: {err}', value=list(columns), expected=None) from err
     else:
-        raise ClearMapValueError(f'Expected a DataFrame, a TableSource, or an array with columns=, '
-                                 f'got {type(data).__name__}.',
-                                 value=type(data).__name__, expected='DataFrame, TableSource or ndarray')
+        raise ClearMapValueError(f'Expected a DataFrame, a TableSource, a structured array, or an array with '
+                                 f'columns=, got {type(data).__name__}.', value=type(data).__name__,
+                                 expected='DataFrame, TableSource, structured array or ndarray + columns=')
 
     unnamed = [column for column in frame.columns if not isinstance(column, str)]
     if unnamed:
@@ -798,6 +802,13 @@ def _as_frame(data, columns=None):
                                  f'A DataFrame built from a bare array has integer labels: name the columns.',
                                  value=unnamed, expected='str column names')
     return frame
+
+
+def _refuse_columns(columns, what):
+    if columns is not None:
+        raise ClearMapValueError(f'columns= only names the columns of a plain array; {what} already has named '
+                                 f'columns. Rename or select them on the DataFrame instead.',
+                                 value=columns, expected=None)
 
 
 def _with_default_index(frame):
@@ -814,23 +825,117 @@ def _with_default_index(frame):
     return frame.reset_index(drop=not has_names)
 
 
-GRAPH = ReprField('graph', convert=str)
+# Only rendered once the graph is loaded, so printing a source never triggers a load.
+GRAPH = ReprField('_graph', convert=str)
 
 
 class GraphSource(Source):
-    """Source whose data is a graph."""
+    """Source whose data is a graph, stored as a whole-graph file or held in memory.
+
+    Conventions
+    -----------
+    * Graphs are read and written whole. There is no item assignment and no edit mode:
+      read the graph, modify it, write it back.
+    * The graph is loaded lazily on first access to ``graph`` and cached. ``read()``
+      hands the cached graph over to the caller (no copy, no second load) or loads it.
+    * A file-backed graph source is its own lightweight handle: it pickles without
+      the graph, so it can be sent to worker processes cheaply.
+    * Writes are atomic: the graph is saved to a temporary file next to the target,
+      then moved into place, so a crash never destroys the previous file.
+
+    Subclasses implement ``_load`` and ``_dump``, set ``backend`` and list the graph
+    classes they accept in ``_graph_types``.
+    """
 
     data_model: ClassVar[str] = 'graph'
-    _REPR_FIELDS = (ReprFields.NAME, GRAPH, ReprFields.LOCATION)  # FIXME: no Fraph in ReprFields. Move ??
+    _REPR_FIELDS = (ReprFields.NAME, GRAPH, ReprFields.LOCATION)
+    _graph_types: ClassVar[tuple[type, ...]] = ()
+
+    def __init__(self, location=None, graph=None, mode=None, name=None):
+        if location is None and graph is None:
+            raise ClearMapValueError(f'{type(self).__name__} needs a location, a graph, or both.')
+        if mode not in (None, 'r'):
+            raise ClearMapValueError(f'{type(self).__name__} only supports mode="r": graphs are written whole '
+                                     f'with write(), not edited in place.', value=mode, expected="'r' or None")
+        super().__init__(name=name, mode='r')
+        self._graph = None if graph is None else self._as_graph(graph)
+        if location is not None:
+            self.location = location
+
+    # ## Backend hooks
+    @classmethod
+    def _load(cls, location, **kwargs):
+        """Load the graph at *location*; *kwargs* select a partial load."""
+        raise ClearMapNotImplementedError(f'{cls.__name__} does not implement _load().',
+                                          operation='load', backend=cls.__name__)
+
+    @classmethod
+    def _dump(cls, graph, location, **kwargs):
+        """Save *graph* to *location*."""
+        raise ClearMapNotImplementedError(f'{cls.__name__} does not implement _dump().',
+                                          operation='dump', backend=cls.__name__)
+
+    # ## Data
+    def _require_existing(self):
+        if not self.exists():
+            raise SourceNotFoundError(location=self.location,
+                                      message=f'{type(self).__name__}: no graph file at {self.location}')
 
     @property
     def graph(self):
-        raise ClearMapNotImplementedError(
-            f'{type(self).__name__} does not expose a graph.',
-            operation='graph', backend=type(self).__name__)
+        """The graph, loaded on first access and cached. Shared: prefer read() to take ownership."""
+        if self._graph is None:
+            self._require_existing()
+            self._graph = self._load(self.location)
+        return self._graph
+
+    @graph.setter
+    def graph(self, value):
+        self._graph = self._as_graph(value)
 
     @property
+    def is_loaded(self):
+        return self._graph is not None
+
+    def read(self, slicing=None, **load_kwargs):
+        """Return the graph, owned by the caller.
+
+        A cached graph is handed over rather than copied or reloaded, and this source
+        drops its reference to it (unless the source has no file to reload from).
+        ``load_kwargs`` request a partial load and always read the file.
+        """
+        if slicing is not None:
+            raise ClearMapNotImplementedError(f'{type(self).__name__} cannot be sliced; pass load options '
+                                              f'(e.g. property filters) to select what is loaded.',
+                                              operation='read', backend=type(self).__name__)
+        if not load_kwargs and self._graph is not None:
+            graph = self._graph
+            if self.location is not None:
+                self._graph = None
+            return graph
+        self._require_existing()
+        return self._load(self.location, **load_kwargs)
+
+    def write(self, data=None, overwrite=True, **dump_kwargs):
+        """Save *data* (default: this source's graph) to this source's location."""
+        if isinstance(data, (str, os.PathLike)):  # legacy GraphGtSource.write(location)
+            warnings.warn('GraphSource.write(location) is deprecated; use io.write(location, source.graph).',
+                          DeprecationWarning, stacklevel=2)
+            self.write_graph(data, self.graph, overwrite=overwrite, **dump_kwargs)
+            return self
+        if self.location is None:
+            raise ClearMapValueError(f'{type(self).__name__} has no location to write to.')
+        self.write_graph(self, self.graph if data is None else data, overwrite=overwrite, **dump_kwargs)
+        return self
+
+    def __setitem__(self, key, value):
+        raise ClearMapNotImplementedError(f'{type(self).__name__} does not support item assignment.',
+                                          operation='setitem', backend=type(self).__name__)
+
+    # ## Geometry
+    @property
     def shape(self):
+        """The shape of the space the graph is embedded in."""
         return self.graph.shape
 
     @shape.setter
@@ -848,10 +953,109 @@ class GraphSource(Source):
     def info(self):
         return self.graph.info()
 
+    # ## Conversions
     def as_buffer(self):
-        raise ClearMapNotImplementedError(
-            f'{type(self).__name__} has no buffer representation.',
-            operation='as_buffer', backend=type(self).__name__)
+        raise ClearMapNotImplementedError(f'{type(self).__name__} has no buffer representation.',
+                                          operation='as_buffer', backend=type(self).__name__)
+
+    def as_real(self):
+        return self
+
+    def as_virtual(self):
+        """A file-backed graph source is its own handle: it pickles without the graph."""
+        if self.location is None:
+            raise ClearMapValueError(f'{type(self).__name__} holds an in-memory graph with no location; '
+                                     f'save it first so workers can load it.')
+        return self
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        if self.location is not None:  # workers reload from the file; never ship the graph
+            state['_graph'] = None
+        return state
+
+    # ## Backend protocol implementations
+    @classmethod
+    def _as_graph(cls, data):
+        if isinstance(data, GraphSource):
+            return data.graph
+        if isinstance(data, cls._graph_types):
+            return data
+        expected = ', '.join(t.__name__ for t in cls._graph_types) or 'a graph'
+        raise ClearMapValueError(f'Expected {expected} or a GraphSource, got {type(data).__name__}.',
+                                 value=type(data).__name__, expected=expected)
+
+    @classmethod
+    def open_ro(cls, source_, **kwargs):
+        """Open *source_* read-only, without loading. Existing sources of this class are returned as is."""
+        if isinstance(source_, cls):
+            return source_
+        if isinstance(source_, Source):
+            raise ClearMapValueError(f'Cannot open {source_!r} as a {cls.__name__}.',
+                                     value=type(source_).__name__, expected=cls.__name__)
+        kwargs.setdefault('mode', 'r')
+        return cls(source_, **kwargs)
+
+    @classmethod
+    def read_graph(cls, source_, slicing=None, **load_kwargs):
+        """Read a graph, fully or partially (see ``_load`` of the backend for options)."""
+        as_source = load_kwargs.pop('as_source', None)
+        source = cls.open_ro(source_)
+        if as_source:
+            warnings.warn(f'read(..., as_source=True) is deprecated for {cls.__name__}; use open_ro() instead.',
+                          DeprecationWarning, stacklevel=3)
+            return source
+        return source.read(slicing=slicing, **load_kwargs)
+
+    @classmethod
+    def write_graph(cls, sink, data=None, slicing=None, overwrite=True, **dump_kwargs):
+        """Atomically save a whole graph to *sink* and return *sink* unchanged."""
+        if slicing is not None:
+            raise ClearMapNotImplementedError(f'{cls.__name__} does not support sliced writes.',
+                                              operation='write', backend=cls.__name__)
+        if data is None:
+            raise ClearMapValueError(f'{cls.__name__} write requires a graph.')
+        if isinstance(sink, Source) and not isinstance(sink, cls):
+            raise ClearMapValueError(f'Cannot write a {cls.__name__} graph into {sink!r}.',
+                                     value=type(sink).__name__, expected=cls.__name__)
+
+        location = sink.location if isinstance(sink, cls) else fu.normalize_location_spec(sink)
+        if location is None:
+            raise ClearMapValueError(f'{cls.__name__} write requires a location.')
+        if not overwrite and fu.is_file(location):
+            raise FileExistsError(f'Graph file already exists: {location}')
+
+        graph = cls._as_graph(data)
+        fu.atomic_write(lambda tmp: cls._dump(graph, tmp, **dump_kwargs), location)
+
+        if isinstance(sink, cls) and sink._graph is not graph:
+            sink._graph = None  # the file changed under the cached graph
+        return sink
+
+    @classmethod
+    def create_graph(cls, location=None, shape=None, dtype=None, order=None,
+                     mode=None, array=None, as_source=True, **dump_kwargs):
+        """Create a graph file from a graph passed as *array* (the protocol's name for the data)."""
+        if location is None:
+            raise ClearMapValueError(f'{cls.__name__} create requires a location.')
+        if array is None:
+            raise ClearMapNotImplementedError(f'A blank {cls.__name__} cannot be created from shape/dtype; '
+                                              f'pass a graph as array= or use write().',
+                                              operation='create', backend=cls.__name__)
+        if shape is not None or dtype is not None or order is not None:
+            raise ClearMapValueError('shape, dtype and order are not meaningful creation arguments for a graph.')
+        if mode not in (None, 'w+'):
+            raise ClearMapValueError(f'{cls.__name__} create only supports mode="w+".',
+                                     value=mode, expected="'w+' or None")
+        cls.write_graph(location, array, overwrite=True, **dump_kwargs)
+        source = cls(location)
+        return source if as_source else source.read()
+
+    @classmethod
+    def edit(cls, source_, **kwargs):
+        raise ClearMapNotImplementedError(f'{cls.__name__} has no edit mode: graphs are read and written whole. '
+                                          f'Use graph = io.read(location), modify it, then io.write(location, graph).',
+                                          operation='edit', backend=cls.__name__)
 
 
 ###############################################################################

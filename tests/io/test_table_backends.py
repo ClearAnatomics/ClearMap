@@ -138,8 +138,6 @@ def test_unsupported_operations(tmp_path, frame):
         csv_backend.write(path, frame, slicing=slice(0, 2))
     with pytest.raises(ClearMapNotImplementedError):
         csv_backend.edit(path)
-    with pytest.raises(ClearMapNotImplementedError):
-        source.as_virtual()
     with pytest.raises(FileExistsError):
         csv_backend.write(path, frame, overwrite=False)
     with pytest.raises(ClearMapValueError):
@@ -178,7 +176,7 @@ def test_array_with_columns_is_a_table(tmp_path):
 @pytest.mark.parametrize('data, columns', [
     (np.zeros((3, 2)), ['x']),                                     # wrong number of names
     (pd.DataFrame({'x': [1]}), ['y']),                             # rename or select? refuse to guess
-    (np.zeros(3, dtype=[('x', 'f4'), ('y', 'f4')]), ['x', 'y']),   # structured arrays belong in .npy
+    (np.zeros(3, dtype=[('x', 'f4'), ('y', 'f4')]), ['x', 'y']),   # already named: rename or select?
 ])
 def test_columns_misuse(tmp_path, data, columns):
     with pytest.raises(ClearMapValueError):
@@ -206,3 +204,34 @@ def test_as_source_refuses_table_slicing(tmp_path, frame):
     assert isinstance(dispatch.as_source(path), csv_backend.CSVSource)
     with pytest.raises(ClearMapValueError):
         dispatch.as_source(path, slicing='x')
+
+
+def test_table_source_is_its_own_virtual_handle(tmp_path, frame):
+    import pickle
+    path = str(tmp_path / 't.csv')
+    source = csv_backend.create(path, array=frame)
+    assert source.as_virtual() is source and source.as_virtual().as_real() is source
+    source.frame  # load the cache
+    clone = pickle.loads(pickle.dumps(source))
+    assert 'frame' not in clone.__dict__ and 'frame' in source.__dict__  # cache is not shipped, nor dropped locally
+    pd.testing.assert_frame_equal(clone.read(), frame)
+
+
+# ---- structured arrays (legacy ClearMap cells) --------------------------------
+
+def test_structured_array_is_a_table(tmp_path):
+    cells = np.zeros(4, dtype=[('x', 'i4'), ('y', 'i4'), ('z', 'i4'), ('size', 'f4')])
+    cells['x'] = [1, 2, 3, 4]
+    for suffix in ('csv', 'feather'):
+        if suffix == 'feather' and len(_backends()) < 2:
+            continue
+        path = str(tmp_path / f'cells.{suffix}')
+        from ClearMap.IO import io_ops
+        io_ops.write(path, cells)
+        frame = io_ops.read(path)
+        assert frame.columns.tolist() == ['x', 'y', 'z', 'size'] and frame['x'].tolist() == [1, 2, 3, 4]
+
+
+def test_structured_array_must_be_1d(tmp_path):
+    with pytest.raises(ClearMapValueError):
+        csv_backend.write(str(tmp_path / 't.csv'), np.zeros((2, 2), dtype=[('x', 'f4')]))

@@ -109,13 +109,12 @@ from typing import Protocol, Sequence, runtime_checkable, Any, Optional
 import natsort
 import numpy as np
 
-from ClearMap.Analysis.graphs.graph_gt import Graph
-from ClearMap.IO import IO as clearmap_io, source_geometry
-from ClearMap.IO import conversion, io_ops
+from ClearMap.IO import source_geometry
+from ClearMap.IO import conversion, dispatch, io_ops
 from ClearMap.IO import FileUtils as file_utils
 from ClearMap.IO.assets_constants import CONTENT_TYPE_TO_PIPELINE
 from ClearMap.IO.assets_specs import TypeSpec, ChannelSpec, StateManager, SubTypeSpec
-from ClearMap.IO.source.backends import registry
+from ClearMap.IO.source.backends import file_list_backend, registry
 from ClearMap.Utils.tag_expression import Expression
 from ClearMap.Utils.exceptions import ClearMapAssetError, AssetNotFoundError
 
@@ -630,30 +629,29 @@ class Asset:
     def open_ro(self, *args, **kwargs):
         return io_ops.open_ro(self.existing_path, *args, **kwargs)
 
+    @property
+    def data_model(self):
+        """The data model of the backend handling this asset's file: 'array', 'table' or 'graph'."""
+        return dispatch.location_to_backend(self.path).source_class.data_model
+
     def read(self, *args, **kwargs):
-        if self.type_spec.extensions[0] == '.gt':
-            return Graph.load(self.existing_path, *args, **kwargs)
-        else:
-            return io_ops.read(self.existing_path, *args, **kwargs)
+        return io_ops.read(self.existing_path, *args, **kwargs)
 
     def edit(self, *args, **kwargs):
-        # graph is always in-memory, caller must .save()
-        if self.type_spec.extensions[0] == '.gt':
-            return Graph.load(self.existing_path, *args, **kwargs)
-        else:
-            return io_ops.edit(self.existing_path, *args, **kwargs)
+        if self.data_model == 'graph':
+            # Graphs have no edit mode (they are written whole). Kept for compatibility:
+            # return the loaded graph; the caller saves it with asset.write(graph). or graph.save()
+            return self.read(*args, **kwargs)
+        return io_ops.edit(self.existing_path, *args, **kwargs)
 
     def write(self, data, *args, **kwargs):
-        if isinstance(data, Graph):
-            data.save(self.path)
-        else:
-            io_ops.write(self.path, data, *args, **kwargs)
+        io_ops.write(self.path, data, *args, **kwargs)
 
     def create(self, *args, **kwargs):
         io_ops.create(self.path, *args, **kwargs)
 
     def as_source(self, slicing=None, *args, **kwargs):  # FIXME: delegate to ``edit``
-        return clearmap_io.source(self.existing_path, slicing=slicing, *args, **kwargs)
+        return dispatch.as_source(self.existing_path, slicing=slicing, *args, **kwargs)
 
     def shape(self):
         if not self.is_expression:
@@ -823,7 +821,7 @@ class ExpressionAsset(Asset, ExpressionDataset):
         -------
 
         """
-        return clearmap_io.file_list(self.path)  # We need path to have the folder
+        return file_list_backend.file_list(self.path)  # We need path to have the folder
     
     @property
     def existing_extension(self):

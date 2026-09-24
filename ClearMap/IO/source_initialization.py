@@ -6,9 +6,9 @@ import numpy as np
 from ClearMap.IO import io_ops
 from ClearMap.IO.source import source_modes, Source as source_mod, geometry_utils
 from ClearMap.IO.source.backends import sma_backend, npy_backend
-from ClearMap.IO.FileUtils import abspath, normalize_location_spec
+from ClearMap.IO.FileUtils import abspath
 from ClearMap.IO.io_ops import peek_into
-from ClearMap.IO.dispatch import location_to_module, as_source
+from ClearMap.IO.dispatch import location_to_backend, as_source, normalize_source_spec
 from ClearMap.Utils import tag_expression as te
 from ClearMap.Utils.exceptions import (ClearMapException, AssetNotFoundError, SourceNotFoundError,
                                        ClearMapRuntimeError, ClearMapValueError, IncompatibleSource)
@@ -24,8 +24,8 @@ def initialize(source_=None, shape_=None, dtype_=None,
     The source is created on disk or in memory if it does not exist so processes
     can start writing into it.
 
-    .. WARNING::
-        In the case of table type sources, they can be written but not initialized
+    Only array sources can be initialized. Tables and graphs are written whole
+    (``io_ops.write``), never opened for editing or pre-allocated.
 
     Parameters
     ----------
@@ -60,7 +60,7 @@ def initialize(source_=None, shape_=None, dtype_=None,
     source: Source class
         The initialized source.
     """
-    source_ = normalize_location_spec(source_)
+    source_ = normalize_source_spec(source_)  # locations are normalised; arrays and Sources pass through
 
     if isinstance(source_, (str, te.Expression)):  # If the source is a path (location)
         location_ = source_
@@ -78,7 +78,12 @@ def initialize(source_=None, shape_=None, dtype_=None,
                 return npy_backend.create(shape=shape_, dtype=dtype_, order=order_, **kwargs)
         else:  # No source but a path
             # Before try because missing module != missing file so shouldn't fall through to creation.
-            mod = location_to_module(location_)
+            backend = location_to_backend(location_)
+            data_model = backend.source_class.data_model
+            if data_model != 'array':
+                raise ClearMapValueError(f'Cannot initialize {location_}: {data_model} sources are written whole '
+                                         f'with io_ops.write(), not initialized.')
+            mod = backend.module
             try:  # First, attempt to open the existing source in 'edit' mode
                 if hasattr(mod, 'edit'):
                     source_ = io_ops.edit(location_)

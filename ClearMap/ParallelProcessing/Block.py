@@ -63,17 +63,6 @@ class Block(slc.Slice):
         self._neighbours = neighbours
 
     @property
-    def name(self):
-        """The name of this source.
-
-        Returns
-        -------
-        name : str
-            Name of this source.
-        """
-        return 'Block-' + self.source.name
-
-    @property
     def valid(self):
         """
         Return the slice of the valid region of this block.

@@ -3,23 +3,38 @@
 Slice
 =====
 
-This module provides basic handling of slicing of sources.
+Virtual slices of array sources.
 
-The main functionality is to virtually slice an array and return its 
-expected shape and order. Virtual slices can also be used as handles with 
-low communication overhead in parallel processing.
+A :class:`Slice` pairs an array source with a slice specification. It reports
+the shape, dtype, order, strides and offset of the sliced data without reading
+it, and reads or writes through to the underlying source only on item access.
+
+Slices are cheap to send to worker processes: :meth:`Slice.as_virtual` keeps the
+slicing and virtualizes the source. This makes them the handles that
+:mod:`~ClearMap.ParallelProcessing.Block` and
+:mod:`~ClearMap.ParallelProcessing.BlockProcessing` pass around.
+
+Only array sources can be sliced this way. Tables and graphs are selected with
+``io_ops.read(source, slicing=...)``.
+
+The module also provides the slicing arithmetic used throughout ClearMap:
+:func:`unpack_slicing`, :func:`sliced_shape`, :func:`sliced_order`,
+:func:`sliced_slicing` and related helpers.
 
 Example
 -------
 >>> import numpy as np
->>> import ClearMap.IO.IO as io
->>> source = io.source(np.random.rand(30,40))
->>> sliced = io.slc.Slice(source, slicing=(slice(None), slice(10,20)))
->>> sliced
-Sliced-Numpy-Source(30, 10)[float64]
+>>> from ClearMap.IO import dispatch
+>>> from ClearMap.IO.source.Slice import Slice
+>>> source = dispatch.as_source(np.random.rand(30, 40))
+>>> sliced = Slice(source, slicing=(slice(None), slice(10, 20)))
+>>> sliced.shape
+(30, 10)
+>>> sliced.base is source
+True
 
->>> sliced.base
-Numpy-Source(30, 40)[float64]|C|
+The same slice can be made in one step with
+``dispatch.as_source(array, slicing=(slice(None), slice(10, 20)))``.
 """
 __author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
 __license__   = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
@@ -38,7 +53,7 @@ import ClearMap.IO.source.Source as source_mod
 ### Source class
 ###############################################################################
 
-class Slice(source_mod.Source):
+class Slice(source_mod.BaseArraySource):
   """A virtual slice of a source."""
   
   def __init__(self, source=None, slicing=None, name=None):
@@ -58,7 +73,7 @@ class Slice(source_mod.Source):
 
   @property
   def name(self):
-    return 'Sliced-' + self.source.name
+    return f'{type(self).__name__}[{self.source.name}]'
 
   @property
   def mode(self):
@@ -66,6 +81,11 @@ class Slice(source_mod.Source):
     Delegate since a slice has no mode of its own."""
     return self.source.mode
   
+  @property
+  def data_model(self):
+    """A slice has the data model of the source it slices."""
+    return self.source.data_model
+
   @property
   def source(self):
     """The source of this sliced source.

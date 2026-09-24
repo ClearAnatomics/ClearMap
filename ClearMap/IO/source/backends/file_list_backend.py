@@ -27,17 +27,19 @@ import numbers
 import numpy as np
 import concurrent.futures
 
-from ClearMap.IO import source_geometry
 from ClearMap.IO import io_ops
 import ClearMap.IO.FileUtils as fu
+import ClearMap.IO.source.Source as source_mod
+from ClearMap.IO.source.Source import ReprFields as RF
+from ClearMap.IO import source_geometry
 # noinspection PyUnusedImports
 from ClearMap.IO.source.backend_defaults import read, create, write
-import ClearMap.IO.source.Source as source_mod
 import ClearMap.IO.source.Slice as slc
+from ClearMap.IO.source.protocol import Backend
+
+import ClearMap.ParallelProcessing.ParallelTraceback as ptb
 
 import ClearMap.Utils.tag_expression as te
-import ClearMap.ParallelProcessing.ParallelTraceback as ptb
-from ClearMap.IO.source.protocol import Backend
 from ClearMap.Utils.exceptions import ClearMapValueError
 from ClearMap.Utils.utilities import sanitize_n_processes
 
@@ -58,9 +60,9 @@ class FileListSource(source_mod.VirtualSource):
     The full shape of the file list source is the shape of the expression and
     the shape of the data in each file, i.e. shape = file_list_shape + array_shape.
     """
-    _name = 'FileList-Source'
     _real_class = None  # REFACTOR:
     backend = Backend.FILELIST
+    _REPR_FIELDS = (RF.NAME, RF.SHAPE, RF.DTYPE, RF.ORDER, FILE_COUNT, EXPRESSION)
 
     def __init__(self, expression=None, file_list=None, axes_order=None,
                  shape=None, dtype=None, order=None,
@@ -394,47 +396,6 @@ class FileListSource(source_mod.VirtualSource):
     def array(self):
         return self.__getitem__(slice(None))
 
-    def __str__(self):
-        try:
-            name = self.name
-            name = '%s' % name if name is not None else ''
-        except:
-            name =''
-
-        try:
-            shape = self.shape # _shape
-            shape ='%r' % ((shape,)) if shape is not None else ''
-        except:
-            shape = ''
-
-        try:
-            dtype = self.dtype  #_dtype
-            dtype = '[%s]' % dtype if dtype is not None else ''
-        except:
-            dtype = ''
-
-        try:
-            order = self.order  #_order
-            order = '|%s|' % order if order is not None else ''
-        except:
-            order = ''
-
-        try:
-            file_list = '<%d>' % len(self._file_list)
-        except:
-            file_list = ''
-
-        try:
-            expression = self.expression.tag()
-            if len(expression) > 100:
-                expression = expression[:50] + '...' + expression[-50:]
-            expression = '{%s}' % expression
-        except:
-            expression = ''
-
-        return name + shape + dtype + file_list + expression
-
-
     def as_real(self):
         return self
 
@@ -450,6 +411,7 @@ class FileListSource(source_mod.VirtualSource):
 class FileListVirtualSource(source_mod.VirtualSource):
     """Virtual file list source."""
     _real_class = FileListSource
+    _REPR_FIELDS = FileListSource._REPR_FIELDS
 
     def __init__(self, expression=None, file_list=None, shape=None,
                  dtype=None, order=None, axes_order=None, source=None,
@@ -529,53 +491,14 @@ class FileListVirtualSource(source_mod.VirtualSource):
 
     def as_real(self):
         return self._real_class(expression=self.expression, file_list=self.file_list, axes_order=self.axes_order,
-                                shape=self.shape, dtype=self.dtype, order=self.order, name=self.name)
+                                shape=self.shape, dtype=self.dtype, order=self.order)
 
     @property
     def array(self):
         return self.as_real().array
 
-    def __str__(self):
-        try:
-            name = self.name
-            name = '%s' % name if name is not None else ''
-        except:
-            name =''
 
-        try:
-            shape = self.shape # _shape
-            shape ='%r' % ((shape,)) if shape is not None else ''
-        except:
-            shape = ''
-
-        try:
-            dtype = self.dtype  #_dtype
-            dtype = '[%s]' % dtype if dtype is not None else ''
-        except:
-            dtype = ''
-
-        try:
-            order = self.order  #_order
-            order = '|%s|' % order if order is not None else ''
-        except:
-            order = ''
-
-        try:
-            file_list = '<%d>' % len(self._file_list)
-        except:
-            file_list = ''
-
-        try:
-            expression = self.expression.tag()
-            if len(expression) > 100:
-                expression = expression[:50] + '...' + expression[-50:]
-            expression = '{%s}' % expression
-        except:
-          expression = ''
-
-        return name + shape + dtype + order + file_list + expression
-
-
+SOURCE_CLASS = FileListSource
 ###############################################################################
 ### IO Interface
 ###############################################################################
@@ -834,45 +757,47 @@ def order(expression = None, file_list=None):
 ### Helpers
 ###############################################################################
 
-def _file_list(expression=None, file_list=None, sort=True, verbose=False):
-    """Returns the list of files that match the tag expression.
+def file_list(expression=None, file_list=None, sort=True, verbose=False):
+    """Returns the list of files that match a tag expression, or that are in a directory.
 
     Arguments
     ---------
-    expression :str
-        The regular expression the file names should match.
+    expression : str, Path, Expression or None
+        The tag expression the file names should match, or a directory.
+    file_list : list of str or None
+        An explicit file list, returned as is.
     sort : bool
         If True, sort files naturally.
     verbose : bool
-        If True, print warning if no files exists.
+        If True, warn if no files match.
 
     Returns
     -------
     file_list : list of str
-        The list of files that matched the expression.
+        The files that matched the expression.
     """
     if isinstance(file_list, list):
         return file_list
 
     expression = fu.normalize_location_spec(expression)
+    if expression is None:
+        raise ClearMapValueError('Either expression or file_list must be specified.')
 
-    if isinstance(expression, te.Expression):
-        fl = expression.glob()
-    elif fu.is_directory(expression):
-        expression = fu.join(expression, '*')
-        fl = glob.glob(expression)
+    if not isinstance(expression, te.Expression) and fu.is_directory(expression):
+        fl = glob.glob(fu.join(expression, '*'))
+        if sort:
+            fl = natsort.natsorted(fl)
     else:
-        e = te.Expression(expression)
-        fl = e.glob()
+        if not isinstance(expression, te.Expression):
+            expression = te.Expression(expression)
+        fl = expression.glob(sort=sort)
 
-    if verbose and len(fl) == 0:
-        warnings.warn(f'No files found matching {expression} !')
-        return []
-
-    if sort:
-        fl = natsort.natsorted(fl)
-
+    if verbose and not fl:
+        warnings.warn(f'No files found matching {expression}!')
     return fl
+
+# WARNING: do not remove
+_file_list = file_list  # reexport privately to avoid local name clashes
 
 
 def _first_file(expression):
@@ -898,7 +823,7 @@ def _expression_and_file_list(expression=None, file_list=None):
     if file_list is None:
         if expression is None:
             raise ClearMapValueError('Either expression or file_list need to be specified!')
-        file_list = glob.glob(expression.glob())
+        file_list = expression.glob(sort=True)
     elif isinstance(file_list, list):
         if expression is None:
             expression = te.detect(file_list)
@@ -932,7 +857,7 @@ def _expression_or_file_list(expression=None, file_list=None):
 ### Conversions
 ###############################################################################
 
-def convert(source, sink, processes = None, verbose = False):
+def convert(source, sink, processes=None, verbose=False):
     """
     Converts list of files to a sink in parallel
 
@@ -976,7 +901,6 @@ def convert(source, sink, processes = None, verbose = False):
         indices_file = [tuple(i[j] for j in axes_to_tags) for i in indices_file]
     file_list = [expression.string_from_index(i) for i in indices_file]
 
-    print(sink)
     sink = io_ops.create(sink, shape=shape, dtype=dtype)
     sink_virtual = sink.as_virtual()
 
