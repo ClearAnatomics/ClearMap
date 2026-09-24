@@ -21,12 +21,13 @@ import itertools as itt
 import functools as ft
 import inspect as insp
 import os
+import pickle
+import warnings
 
 import numpy as np
 import multiprocessing as mp
 import concurrent.futures
 
-import ClearMap.IO.IO as io
 from ClearMap.IO import io_ops
 import ClearMap.IO.source.Source as src
 import ClearMap.IO.source.Slice as slc
@@ -389,10 +390,26 @@ class SourceRegion(Region):
     pass
 
 
-class Source(SourceRegion, src.AbstractSource):
+COUNTS        = src.ReprField('_counts', convert=lambda c: f'<<{c[0]:d}s, {c[1]:d}a>>')
+
+_STITCH_FIELDS = (
+    src.ReprField('id', '()', convert=lambda i: f'#{i:d}'),
+    src.ReprField('tile_position', convert=lambda t: f'T{tuple(t)!r}'),
+    src.ReprField('position', convert=lambda p: f'P{list(p)!r}'),
+    src.ReprFields.SHAPE,
+    src.ReprFields.DTYPE,
+    src.ReprFields.ORDER,
+    src.ReprField('location', '{}',
+                  convert=lambda l: str(l) if len(str(l)) <= 25 else '...' + str(l)[-25:])
+)
+
+
+
+class StitchSource(SourceRegion, src.AbstractSource):  # FIXME: rename to StitchingSource or similar
     """Class to handle basic data sources in a layout for stitching."""
 
     #__slots__ = ('_position', '_shape', '_dtype', '_order', '_location')
+    _REPR_FIELDS = (src.ReprFields.NAME,) + _STITCH_FIELDS
 
     counter = 0
     """Counter for the sources used to create unique ids."""
@@ -412,7 +429,7 @@ class Source(SourceRegion, src.AbstractSource):
         if source is not None:
             source = io_ops.open_ro(source)
             sid = None
-        if isinstance(source, Source):
+        if isinstance(source, StitchSource):
             position = source.position if position is None else position
             tile_position = source.tile_position if tile_position is None else tile_position
             sid = source.id
@@ -433,14 +450,14 @@ class Source(SourceRegion, src.AbstractSource):
         self._tile_position = ensure(tile_position, tuple)
 
         if sid is None:
-            self._id = Source.counter
-            Source.counter += 1
+            self._id = StitchSource.counter
+            StitchSource.counter += 1
         else:
             self._id = sid
 
     @property
     def name(self):
-        return f'Stitchable-{self.source.name}'
+        return f'{type(self).__name__}[{self.source.name}]'
 
     @property
     def id(self):
@@ -534,7 +551,6 @@ class Source(SourceRegion, src.AbstractSource):
 
         return Slice(source=self, slicing=slicing)
 
-
     def as_virtual(self):
         new = self.copy()
         new._source = self._source.as_virtual()
@@ -547,21 +563,6 @@ class Source(SourceRegion, src.AbstractSource):
 
     def __getitem__(self, *args):
         return self._source.__getitem__(*args)
-
-    #def __setitem__(self, *args):
-    #  self._source.__setitem__(*args);
-
-    def __str__(self):
-        return _source_string(self)
-
-    # other source attributes
-    #def __getattr__(self, name):
-    #  print 'getattr', self.__class__, name
-    #  print self._source.__class__
-    #  if not hasattr(self._source, name):
-    #    raise AttributeError('The source does not have the attribute %s!' % name);
-    #  return getattr(self._source, name);
-
 
     @property
     def location(self):
@@ -576,8 +577,10 @@ class Source(SourceRegion, src.AbstractSource):
         return p3d.plot(self.source)
 
 
-class Slice(slc.Slice, SourceRegion):
+class Slice(slc.Slice, SourceRegion):  # FIXME: rename to StitchSlice
     """Class to handle a slice of a stitchable source."""
+    _REPR_FIELDS = (src.ReprFields.NAME,) + _STITCH_FIELDS
+
 
     def __init__(self, source, position = None, tile_position = None, slicing = None):
         """Slice class constructor.
@@ -594,7 +597,7 @@ class Slice(slc.Slice, SourceRegion):
           The slice specification to obtain this slice.
         """
         if not isinstance(source, SourceRegion):
-            source = Source(source = source, position = position, tile_position = tile_position)
+            source = StitchSource(source = source, position = position, tile_position = tile_position)
 
         SourceRegion.__init__(self, position = None, shape = None)
         slc.Slice.__init__(self, source = source, slicing = slicing)
@@ -654,16 +657,6 @@ class Slice(slc.Slice, SourceRegion):
     def tile_position(self):
         return self._source.tile_position
 
-    def __str__(self):
-        return _source_string(self)
-
-    # source attributes
-    #def __getattr__(self, name):
-    #  if not hasattr(self.source, name):
-    #    raise AttributeError('The source does not have the attribute %s!' % name);
-    #  return getattr(self.source, name);
-
-
     def as_virtual(self):
         new = self.copy()
         new._source = self._source.as_virtual()
@@ -673,61 +666,6 @@ class Slice(slc.Slice, SourceRegion):
         new = self.copy()
         new._source = self._source.as_real()
         return new
-
-
-def _source_string(self):
-    """Helper to generate a string describing a source with positional information."""
-    try:
-        name = self.name
-        name = f'{name}' if name is not None else ''
-    except:
-        name =''
-
-    try:
-        shape = self.shape
-        shape ='%r' % ((shape,)) if shape is not None else ''
-    except:
-        shape = ''
-
-    try:
-        dtype = self.dtype
-        dtype = f'[{dtype}]' if dtype is not None else ''
-    except:
-        dtype = ''
-
-    try:
-        order = self.order
-        order = f'|{order}|' if order is not None else ''
-    except:
-        order = ''
-
-    try:
-        location = self.source.location
-        location = f'{location}' if location is not None else ''
-        if len(location) > 25:
-            #location = location[:25] + '...' + location[-25:]
-            location = '...' + location[-25:]
-        if len(location) > 0:
-            location = f'{{{location}}}'
-    except:
-        location = ''
-
-    try:
-        position = f"P{list(self.position)!r}"
-    except:
-        position = ''
-
-    try:
-        tile_position = f"T{tuple(self.tile_position)!r}"
-    except:
-        tile_position = ''
-
-    try:
-        ids = f'(#{self.id:d})'
-    except:
-        ids = ''
-
-    return name + ids + tile_position + position + shape + dtype + order + location
 
 
 ########################################################################################
@@ -925,6 +863,7 @@ class Alignment(AlignmentBase):
 
 class Layout(SourceRegion, src.AbstractSource):
     """Base class to handle the layout of multiple sources."""
+    _REPR_FIELDS = (src.ReprFields.NAME, COUNTS) + _STITCH_FIELDS
 
     def __init__(self, sources, alignments = None, position = None, shape = None, dtype = None, order = None, location = None):
         """Layout constructor.
@@ -947,8 +886,12 @@ class Layout(SourceRegion, src.AbstractSource):
         SourceRegion.__init__(self, position = position, shape = shape)
         src.AbstractSource.__init__(self, source = None, shape = shape, dtype = dtype, order = order, location = location)
 
-        self._sources = [s if isinstance(s, SourceRegion) else Source(source = s) for s in sources]
+        self._sources = [s if isinstance(s, SourceRegion) else StitchSource(source = s) for s in sources]
         self._alignments = [] if alignments is None else alignments
+
+    @property
+    def _counts(self):
+        return self.n_sources, self.n_alignments
 
     @property
     def sources(self):
@@ -1685,15 +1628,6 @@ class Layout(SourceRegion, src.AbstractSource):
         new.sources_as_real()
         return new
 
-    def __str__(self):
-        name = self.name
-        s = _source_string(self)
-        layout = f"<<{self.n_sources:d}s, {self.n_alignments:d}a>>"
-        return name + layout + s[len(name):]
-
-    def __repr__(self):
-        return self.__str__()
-
 
 class TiledLayout(Layout):
     """TiledLayout handles stacks aligned on a tiling grid."""
@@ -1990,10 +1924,10 @@ def _initialize_tiles_from_sources(sources, tile_shape = None, tile_positions = 
     src = []; pos = []
     for s, p in zip(sources, tile_positions):
         if s is not None:
-            if isinstance(s, Source):
+            if isinstance(s, StitchSource):
                 src.append(s)
             else:
-                src.append(Source(source = s))
+                src.append(StitchSource(source = s))
             pos.append(p)
     sources = src
     tile_positions = pos
@@ -2257,6 +2191,37 @@ def save_layout(filename, layout):
     fid.close()
 
     return filename
+
+
+_BACKENDS = 'ClearMap.IO.source.backends'
+_STITCHING = 'ClearMap.Alignment.Stitching'
+
+# (module, class) recorded in layout files saved by older versions -> (module, class) today.
+_RENAMED_CLASSES = {
+    # IO backends (tile sources); layouts hold the virtual ones, save_layout calls layout.as_virtual()
+    ('ClearMap.IO.MMP', 'Source'):        (f'{_BACKENDS}.mmp_backend', 'MMPSource'),
+    ('ClearMap.IO.MMP', 'VirtualSource'): (f'{_BACKENDS}.mmp_backend', 'MMPVirtualSource'),
+    (f'{_STITCHING}.stitching_wobbly', 'WobblySource'): (f'{_STITCHING}.stitching_wobbly', 'WobblyStitchSource'),
+    # Defensive: other tile formats and renamed stitching classes
+    ('ClearMap.IO.TIF', 'Source'):        (f'{_BACKENDS}.tif_backend', 'TifSource'),
+    ('ClearMap.IO.TIF', 'VirtualSource'): (f'{_BACKENDS}.tif_backend', 'TifVirtualSource'),
+    ('ClearMap.IO.NPY', 'Source'):        (f'{_BACKENDS}.npy_backend', 'NumpySource'),
+    # Stitching renames
+    (f'{_STITCHING}.stitching_rigid', 'Source'): (f'{_STITCHING}.stitching_rigid', 'StitchSource'),
+    (f'{_STITCHING}.stitching_rigid', 'Slice'):  (f'{_STITCHING}.stitching_rigid', 'StitchSlice'),
+}
+
+
+class _LayoutUnpickler(pickle.Unpickler):
+    """Unpickler that maps renamed or moved classes, so layouts saved by older versions still load."""
+
+    def find_class(self, module, name):
+        if (module, name) in _RENAMED_CLASSES:
+            new_module, new_name = _RENAMED_CLASSES[(module, name)]
+            warnings.warn(f'Layout file uses {module}.{name}, now {new_module}.{new_name}; '
+                          f'save it again to update it.', DeprecationWarning, stacklevel=2)
+            module, name = new_module, new_name
+        return super().find_class(module, name)
 
 
 def load_layout(filename):
@@ -2682,9 +2647,9 @@ def align_2_sources_along_axis(src1, src2, axis = 0, overlap = 10, max_shifts = 
     This routine simply translates overlap specifications in one axis direction into max_shifts for use with align_2_sources.
     """
     if not isinstance(src1, SourceRegion):
-        src1 = Source(src1)
+        src1 = StitchSource(src1)
     if not isinstance(src2, SourceRegion):
-        src2 = Source(src2)
+        src2 = StitchSource(src2)
 
     if src1.ndim != src2.ndim:
         raise ValueError(f'Images expected to have the same dimensions,'
@@ -2763,9 +2728,9 @@ def align_2_sources_along_axis_mip(src1, src2, axis = 2, depth = 10, max_shifts 
       Optional maximum intensity projections.
     """
     if not isinstance(src1, SourceRegion):
-        src1 = Source(src1)
+        src1 = StitchSource(src1)
     if not isinstance(src2, SourceRegion):
-        src2 = Source(src2)
+        src2 = StitchSource(src2)
 
     if src1.ndim != src2.ndim:
         raise ValueError(f'Images expected to have the same dimensions, '
@@ -2796,8 +2761,8 @@ def align_2_sources_along_axis_mip(src1, src2, axis = 2, depth = 10, max_shifts 
     p2 = src2.position[:axis] + src2.position[axis+1:]
     #print axis, p1, p2
 
-    mip1 = Source(mip1, position = p1, tile_position = src1.tile_position)
-    mip2 = Source(mip2, position = p2, tile_position = src2.tile_position)
+    mip1 = StitchSource(mip1, position = p1, tile_position = src1.tile_position)
+    mip2 = StitchSource(mip2, position = p2, tile_position = src2.tile_position)
     #print mip1, mip2
 
     mip_shift, quality = align_2_sources(mip1, mip2, max_shifts = max_shifts, clip = clip, background = background, verbose = verbose)
@@ -4197,10 +4162,11 @@ def stitch_layout(layout, sink = None, method = 'interpolation', verbose = False
 
 def _test():
     import ClearMap.Alignment.Stitching.stitching_rigid as stb
+    from ClearMap.IO.FileUtils import delete_file
     from importlib import reload
     reload(stb)
 
-    #overlaps and embeddings
+    # overlaps and embeddings
     r1 = stb.Region(lower = (0,0), upper = (100,100))
     r2 = stb.Region(lower = (80,20), upper = (180, 120))
     r = stb.embedding([r1,r2])
@@ -4212,18 +4178,18 @@ def _test():
     import ClearMap.Tests.Files as tfs
     data = np.load(tfs.vasculature_pre)[:,:100,:100]
 
-    #divide data
+    # divide data
     data1 = data[:210,:,:]
     data2 = data[200:,:,:]
 
-    #reload(stb)
-    s1 = stb.Source(source=data1, position = (0,0,0))
-    s2 = stb.Source(source=data2, position = (190,0,0))
+    # reload(stb)
+    s1 = stb.StitchSource(source=data1, position = (0, 0, 0))
+    s2 = stb.StitchSource(source=data2, position = (190, 0, 0))
 
     stb.align_2_sources(s1, s2, max_shifts = 20)
 
 
-    #Slicing layouts
+    # Slicing layouts
     l = stb.Layout(sources = [s1, s2], alignments = [stb.Alignment(pre=s1, post=s2)])
 
     l.alignments[0].plot_overlay()
@@ -4248,7 +4214,7 @@ def _test():
 
     l.alignments[0].plot_overlay()
 
-    #Tiled layouts
+    # Tiled layouts
     reload(stb)
     l = stb.TiledLayout([data1, data2], overlaps = 15)
     l.plot_regions()
@@ -4265,11 +4231,11 @@ def _test():
     np.all(d == data)
     stb.p3d.plot(d)
 
-    #2d Tiles
+    # 2d Tiles
     data = np.load(tfs.vasculature_pre)[:,:,:100]
     data.shape
 
-    #divide data
+    # divide data
     data1 = data[:220,:220,:]
     data2 = data[200:,:215,:]
     data3 = data[:208,200:,:]
@@ -4312,7 +4278,7 @@ def _test():
     stb.p3d.plot(s)
 
     np.all(s == data)
-    #cleanup
+    # cleanup
     for i in range(len(tiling)):
         for j in range(len(tiling[i])):
-            stb.io.delete_file(expression.string({'X' : i, 'Y' : j}))
+            delete_file(expression.string({'X' : i, 'Y' : j}))

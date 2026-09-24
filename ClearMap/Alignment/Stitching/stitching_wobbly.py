@@ -24,12 +24,14 @@ import multiprocessing as mp
 import ClearMap.IO.IO as io
 from ClearMap.IO import io_ops
 import ClearMap.IO.source.Slice as slc
-from ClearMap.IO.source.backends import mmp_backend, sma_backend
+from ClearMap.IO.source.backends import mmp_backend
 
 import ClearMap.Alignment.Stitching.stitching_rigid as strg
 import ClearMap.Alignment.Stitching.Tracking as trk
 
 import ClearMap.ParallelProcessing.ParallelTraceback as ptb
+from ClearMap.ParallelProcessing import SharedMemoryArray as shared_memory_array
+from ClearMap.ParallelProcessing.SharedMemoryManager import SharedMemmoryManager
 
 import ClearMap.Utils.Timer as tmr
 import ClearMap.Utils.tag_expression as te
@@ -44,7 +46,7 @@ from ClearMap.Alignment.Stitching.layout_graph_utils import cluster_components
 ###  Layout
 ###############################################################################
 
-class WobblySource(strg.Source):
+class WobblyStitchSource(strg.StitchSource):
     """Class to handle source data and positions of wobbly stacks."""
 
     ISOLATED = -2
@@ -69,25 +71,21 @@ class WobblySource(strg.Source):
         wobble : list of list of ints or None
           The positions of the individual planes in this wobbly source.
         """
-        strg.Source.__init__(self, source = source, position = position, tile_position = tile_position)
+        strg.StitchSource.__init__(self, source = source, position = position, tile_position = tile_position)
 
         self._axis = int(axis)
 
         if wobble is None:
-            shape = super(WobblySource, self).shape
+            shape = super(WobblyStitchSource, self).shape
             self._wobble = np.zeros((shape[self._axis], len(shape) - 1), dtype = int)
         else:
             self._wobble = np.array(wobble, dtype = int)
 
         if status is None:
-            shape = super(WobblySource, self).shape
+            shape = super(WobblyStitchSource, self).shape
             self._status = np.full(shape[self._axis], self.VALID, dtype = int)
         else:
             self._status = np.array(status, dtype = int)
-
-    @property
-    def name(self):
-        return 'Wobbly-' + self.source.name
 
     @property
     def axis(self):
@@ -402,8 +400,6 @@ class WobblySource(strg.Source):
         return new
 
 
-
-
 class WobblyAlignment(strg.Alignment):
 
     NOSIGNAL = -5
@@ -679,7 +675,7 @@ class WobblyLayout(strg.TiledLayout):
 
         # convert sources to WobblySources
         sources = self.sources
-        self.sources = [WobblySource(source = s, axis = axis) for s in sources]
+        self.sources = [WobblyStitchSource(source = s, axis = axis) for s in sources]
 
         alignments = []
         sources_to_wobbly_sources = {s : w for s,w in zip(sources, self.sources)}
@@ -759,7 +755,7 @@ class WobblyLayout(strg.TiledLayout):
         for source in sources:
             position = source.wobble_at_coordinate(coordinate)
             slicing = (slice(None),) * axis + (coordinate - source.coordinate,) + (slice(None),) * (ndim-1-axis)
-            sliced_sources.append(strg.Source(source = slc.Slice(source=source.source.as_virtual(), slicing=slicing), position=position, tile_position=source.tile_position))
+            sliced_sources.append(strg.StitchSource(source = slc.Slice(source=source.source.as_virtual(), slicing=slicing), position=position, tile_position=source.tile_position))
 
         if self._shape is not None:
             shape = self._shape[:axis] + self._shape[axis+1]
@@ -1739,8 +1735,8 @@ def _optimize_slice_positions(positions, components, processes = None, workspace
 
 
         # construct x, M
-        X = [sma_backend.sma.zeros(n_s) for d in range(ndim)]
-        M = [sma_backend.sma.zeros((n_s, n_s)) for d in range(ndim)]
+        X = [shared_memory_array.zeros(n_s) for d in range(ndim)]
+        M = [shared_memory_array.zeros((n_s, n_s)) for d in range(ndim)]
         for ci, c in enumerate(cluster_component[1:]):
             #if verbose and ci % 100 == 0:
             #  print('Placement: constructing constraints %d/%d!' % (ci, n_clusters))
@@ -1791,8 +1787,8 @@ def _optimize_slice_positions(positions, components, processes = None, workspace
         #print np.linalg.pinv(-M)
 
         if isinstance(processes, int) and processes > 1:
-            M = [sma_backend.smm.insert(m) for m in M]
-            X = [sma_backend.smm.insert(x) for x in X]
+            M = [SharedMemmoryManager.insert(m) for m in M]
+            X = [SharedMemmoryManager.insert(x) for x in X]
             with CancelableProcessPoolExecutor(min(processes, ndim)) as executor:
                 shifts = executor.map(_optimize_shifts, M, X)
                 if workspace is not None:
@@ -1824,15 +1820,15 @@ def _optimize_slice_positions(positions, components, processes = None, workspace
 
 
 def _optimize_shifts(MM, XX):
-    M = sma_backend.smm.get(MM)
-    X = sma_backend.smm.get(XX)
+    M = SharedMemmoryManager.get(MM)
+    X = SharedMemmoryManager.get(XX)
 
     #ss = np.dot(np.linalg.pinv(-M), X);
     ss = np.linalg.lstsq(-M, X, rcond=None)[0]
     #ss = scipy.sparse.linalg.lsqr(-M, X)[0];
 
-    sma_backend.smm.free(MM)
-    sma_backend.smm.free(XX)
+    SharedMemmoryManager.free(MM)
+    SharedMemmoryManager.free(XX)
 
     return np.asarray(np.round(ss), dtype=int)
 

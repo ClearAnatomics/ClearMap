@@ -244,8 +244,8 @@ class WobblyLayoutPlotMixin:
                        plot=True, use_displacements=True, **kwargs):
         """Diagnostic: gather alignment info and optionally overlay a slice."""
         import ClearMap.IO.source.Slice as slc
-        from ClearMap.Alignment.Stitching.stitching_wobbly import WobblySource, WobblyAlignment
-        from ClearMap.Alignment.Stitching.stitching_rigid import Source, Layout
+        from ClearMap.Alignment.Stitching.stitching_wobbly import WobblyStitchSource, WobblyAlignment
+        from ClearMap.Alignment.Stitching.stitching_rigid import StitchSource, Layout
 
         s = self.source_from_tile_position(tile_position)
         status = s.status_at_coordinate(coordinate)
@@ -256,7 +256,7 @@ class WobblyLayoutPlotMixin:
             a_status.append((a.pre.identifier, a.post.identifier,
                              a.status_at_coordinate(coordinate)))
 
-        print(f'Source status: {WobblySource.status_to_description[status]!r}')
+        print(f'Source status: {WobblyStitchSource.status_to_description[status]!r}')
         for a in a_status:
             status = WobblyAlignment.status_to_description[a[2]]
             print(f'Alignment status: {a[0]!r}->{a[1]!r}: {status !r}')
@@ -294,8 +294,8 @@ class WobblyLayoutPlotMixin:
                            + (coordinate - source.coordinate,)
                            + (slice(None),) * (ndim - 1 - axis))
                 sliced_sources.append(
-                    Source(source=slc.Slice(source=source.source.as_virtual(), slicing=slicing),
-                           position=position, tile_position=source.tile_position))
+                    StitchSource(source=slc.Slice(source=source.source.as_virtual(), slicing=slicing),
+                                 position=position, tile_position=source.tile_position))
 
             sliced_layout = Layout(sources=sliced_sources, shape=None, position=None,
                                    dtype=self.dtype, order=self.order)
@@ -622,7 +622,7 @@ def overlay_sources(sources, colors=None, percentile=98, normalize=True):
 
 def layout_along_axis_mip(src1, src2, axis=2, depth=10, max_shifts=10, ranges=None, verbose=False):
     """Build a Layout from MIP-projected sources."""
-    from ClearMap.Alignment.Stitching.stitching_rigid import (Layout, Source, Slice, _format_max_shifts, _mip_axis,
+    from ClearMap.Alignment.Stitching.stitching_rigid import (Layout, StitchSource, Slice, _format_max_shifts, _mip_axis,
                                                               max_intensity_projection)
 
     # format the shifts
@@ -678,8 +678,8 @@ def layout_along_axis_mip(src1, src2, axis=2, depth=10, max_shifts=10, ranges=No
     p1 = src1.position[:mip_axis] + src1.position[mip_axis + 1:]
     p2 = src2.position[:mip_axis] + src2.position[mip_axis + 1:]
 
-    mip1 = Source(mip1, position=p1, tile_position=src1.tile_position)
-    mip2 = Source(mip2, position=p2, tile_position=src2.tile_position)
+    mip1 = StitchSource(mip1, position=p1, tile_position=src1.tile_position)
+    mip2 = StitchSource(mip2, position=p2, tile_position=src2.tile_position)
 
     return Layout(sources=[mip1, mip2])
 
