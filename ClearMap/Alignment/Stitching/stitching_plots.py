@@ -622,7 +622,7 @@ def overlay_sources(sources, colors=None, percentile=98, normalize=True):
 
 def layout_along_axis_mip(src1, src2, axis=2, depth=10, max_shifts=10, ranges=None, verbose=False):
     """Build a Layout from MIP-projected sources."""
-    from ClearMap.Alignment.Stitching.stitching_rigid import (Layout, StitchSource, Slice, _format_max_shifts, _mip_axis,
+    from ClearMap.Alignment.Stitching.stitching_rigid import (Layout, StitchSource, StitchSlice, _format_max_shifts, _mip_axis,
                                                               max_intensity_projection)
 
     # format the shifts
@@ -651,8 +651,8 @@ def layout_along_axis_mip(src1, src2, axis=2, depth=10, max_shifts=10, ranges=No
                 sl1 += (slice(None),)
                 sl2 += (slice(None),)
 
-        src1 = Slice(source=src1, slicing=sl1)
-        src2 = Slice(source=src2, slicing=sl2)
+        src1 = StitchSlice(source=src1, slicing=sl1)
+        src2 = StitchSlice(source=src2, slicing=sl2)
 
     # mip
     mip_depth = depth[mip_axis]

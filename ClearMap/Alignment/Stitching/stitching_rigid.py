@@ -405,7 +405,7 @@ _STITCH_FIELDS = (
 
 
 
-class StitchSource(SourceRegion, src.AbstractSource):  # FIXME: rename to StitchingSource or similar
+class StitchSource(SourceRegion, src.AbstractSource):
     """Class to handle basic data sources in a layout for stitching."""
 
     #__slots__ = ('_position', '_shape', '_dtype', '_order', '_location')
@@ -549,7 +549,7 @@ class StitchSource(SourceRegion, src.AbstractSource):  # FIXME: rename to Stitch
         slicing[axis] = local_coordinate
         slicing = tuple(slicing)
 
-        return Slice(source=self, slicing=slicing)
+        return StitchSlice(source=self, slicing=slicing)
 
     def as_virtual(self):
         new = self.copy()
@@ -577,7 +577,7 @@ class StitchSource(SourceRegion, src.AbstractSource):  # FIXME: rename to Stitch
         return p3d.plot(self.source)
 
 
-class Slice(slc.Slice, SourceRegion):  # FIXME: rename to StitchSlice
+class StitchSlice(slc.Slice, SourceRegion):
     """Class to handle a slice of a stitchable source."""
     _REPR_FIELDS = (src.ReprFields.NAME,) + _STITCH_FIELDS
 
@@ -3029,13 +3029,13 @@ def _align_layout_axis(src1, src2, aid, n_alignments, axis, axis_range, depth, m
         sl1 = list(sl)
         sl1[axis] = slice(axis_range[0] - p1[axis], axis_range[1] - p1[axis])
         sl1 = tuple(sl1)
-        src1 = Slice(source = src1, slicing = sl1)
+        src1 = StitchSlice(source = src1, slicing = sl1)
 
         p2 = list(src2.position)
         sl2 = list(sl)
         sl2[axis] = slice(axis_range[0] - p2[axis], axis_range[1] - p2[axis])
         sl2 = tuple(sl2)
-        src2 = Slice(source = src2, slicing = sl2)
+        src2 = StitchSlice(source = src2, slicing = sl2)
 
         #mip axis
     #  t1 = src1.tile_position;
@@ -3199,8 +3199,8 @@ def _align_layout_ridgid_mip(src1, src2, aid, n_alignments, depth, max_shifts, r
                 sl1 += (slice(None),)
                 sl2 += (slice(None),)
 
-        src1 = Slice(source = src1, slicing = sl1)
-        src2 = Slice(source = src2, slicing = sl2)
+        src1 = StitchSlice(source = src1, slicing = sl1)
+        src2 = StitchSlice(source = src2, slicing = sl2)
 
     result = align_2_sources_along_axis_mip(src1, src2, axis = mip_axis, depth = mip_depth, max_shifts = max_shifts, clip = clip, background = background, verbose = False)
 
