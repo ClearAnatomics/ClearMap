@@ -24,7 +24,7 @@ import scipy.ndimage as ndi
 
 import multiprocessing as mp
 
-import ClearMap.IO.IO as io
+from ClearMap.IO.source import Source as source_mod
 import ClearMap.IO.FileUtils as fu
 
 import ClearMap.ImageProcessing.Topology.Topology3d as t3d
@@ -349,7 +349,7 @@ def smooth_by_configuration_block(source, iterations = 1, verbose = False):
     The smoothed binary array.
   """
   try:
-    if isinstance(source, io.src.Source):
+    if isinstance(source, source_mod.Source):
       smoothed = source.array
     else:
       smoothed = source
