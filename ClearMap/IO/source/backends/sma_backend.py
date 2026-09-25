@@ -35,8 +35,7 @@ from ClearMap.ParallelProcessing.SharedMemoryManager import SharedMemmoryManager
 import ClearMap.IO.source.Source as source_mod
 # noinspection PyUnusedImports
 from ClearMap.IO.source.backend_defaults import read  # protocol function: io_ops reads in-memory sources itself
-# noinspection PyUnusedImports
-from ClearMap.IO.source.backends.npy_backend import NumpySource, write  # writing into an in-memory array is the same
+from ClearMap.IO.source.backends.npy_backend import NumpySource
 from ClearMap.IO.source.geometry_utils import resolve_geometry, properties_match
 from ClearMap.IO.source.protocol import Backend
 
@@ -106,6 +105,60 @@ class SMASource(NumpySource):
         # Must override NumpySource.as_virtual, which returns self: workers need the handle,
         # not a pickled copy of the array (writes to a copy would be silently lost).
         return SMAVirtualSource(source=self)
+
+    # ## Backend protocol implementations (write_array: NumpySource's)
+    @classmethod
+    def open_ro(cls, source_, **kwargs):
+        """Open a shared memory source for reading.
+
+        Shared memory lives in this process, so there is nothing to open: an existing
+        shared source is returned as is, and a shared array is wrapped without copying.
+        """
+        if isinstance(source_, (SMASource, SMAVirtualSource)):
+            return source_
+        if _shared_array.is_shared(source_):
+            return SMASource(array=source_)
+        raise ClearMapValueError(f'{source_!r} is not in shared memory; use as_shared() to copy it there.',
+                                 value=type(source_).__name__, expected='a shared array or SMASource')
+
+    @classmethod
+    def create_array(cls, location=None, shape=None, dtype=None, order=None, mode=None,
+                     array=None, handle=None, as_source=True, **kwargs):
+        """Create a shared memory array.
+
+        Arguments
+        ---------
+        location : None
+            Accepted for protocol compatibility only; shared memory has no location.
+        shape : tuple or None
+            The shape of the array to create.
+        dtype : dtype or None
+            The data type of the array.
+        order : 'C', 'F', or None
+            The contiguous order of the array.
+        mode : str or None
+            The mode of the returned source.
+        array : array, Source or None
+            Optional data to fill the array with.
+        handle : int or None
+            Optional handle of an array already registered in the shared memory manager.
+        as_source : bool
+            If True, return an SMASource, else the bare shared array.
+
+        Returns
+        -------
+        shared : SMASource or array
+            The shared memory array.
+        """
+        if location is not None:
+            raise ClearMapValueError('SMA sources cannot have a filesystem location.', value=location, expected=None)
+        shared = _shared(shape=shape, dtype=dtype, order=order, array=array, handle=handle)
+        if as_source:
+            return SMASource(array=shared, handle=handle, mode=mode)
+        else:
+            if mode is not None:
+                raise ClearMapValueError('`mode` has no meaning when as_source=False', value=mode, expected=None)
+            return shared
 
 
 class SMAVirtualSource(source_mod.VirtualSource):
@@ -198,52 +251,19 @@ def open_ro(source_, **kwargs):
     Shared memory lives in this process, so there is nothing to open: an existing
     shared source is returned as is, and a shared array is wrapped without copying.
     """
-    if isinstance(source_, (SMASource, SMAVirtualSource)):
-        return source_
-    if _shared_array.is_shared(source_):
-        return SMASource(array=source_)
-    raise ClearMapValueError(f'{source_!r} is not in shared memory; use as_shared() to copy it there.',
-                             value=type(source_).__name__, expected='a shared array or SMASource')
+    return SMASource.open_ro(source_, **kwargs)
+
+
+def write(sink, data, slicing=None, **kwargs):
+    return SMASource.write_array(sink, data, slicing=slicing, **kwargs)
 
 
 def create(location=None, shape=None, dtype=None, order=None, mode=None,
            array=None, handle=None, as_source=True, **kwargs):
-    """Create a shared memory array.
+    return SMASource.create_array(location=location, shape=shape, dtype=dtype, order=order, mode=mode,
+                                  array=array, handle=handle, as_source=as_source, **kwargs)
 
-    Arguments
-    ---------
-    location : None
-        Accepted for protocol compatibility only; shared memory has no location.
-    shape : tuple or None
-        The shape of the array to create.
-    dtype : dtype or None
-        The data type of the array.
-    order : 'C', 'F', or None
-        The contiguous order of the array.
-    mode : str or None
-        The mode of the returned source.
-    array : array, Source or None
-        Optional data to fill the array with.
-    handle : int or None
-        Optional handle of an array already registered in the shared memory manager.
-    as_source : bool
-        If True, return an SMASource, else the bare shared array.
-
-    Returns
-    -------
-    shared : SMASource or array
-        The shared memory array.
-    """
-    if location is not None:
-        raise ClearMapValueError('SMA sources cannot have a filesystem location.', value=location, expected=None)
-    shared = _shared(shape=shape, dtype=dtype, order=order, array=array, handle=handle)
-    if as_source:
-        return SMASource(array=shared, handle=handle, mode=mode)
-    else:
-        if mode is not None:
-            raise ClearMapValueError('`mode` has no meaning when as_source=False', value=mode, expected=None)
-        return shared
-
+create.__doc__ = SMASource.create_array.__doc__
 
 ###############################################################################
 ### Helpers
