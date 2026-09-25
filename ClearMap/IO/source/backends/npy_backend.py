@@ -173,7 +173,7 @@ def read(source, slicing=None, as_source=None, as_array=None, processes=None, **
 def write(sink, data, slicing=None, **kwargs):
     if isinstance(sink, NumpySource) and not sink.is_persistable:
         raise ClearMapPermissionError(f'Source {sink} was opened in mode="{sink.mode}" '
-                                      f'and cannot persist changes to disk. Use io.edit() to open for in-place editing.')
+                                      f'and cannot persist changes to disk. Use io_ops.edit() to open for in-place editing.')
     if slicing is None:
         slicing = ()
     if sink is None:

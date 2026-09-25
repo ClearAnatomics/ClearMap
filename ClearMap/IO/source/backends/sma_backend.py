@@ -30,12 +30,13 @@ __download__  = 'https://www.github.com/ChristophKirst/ClearMap2'
 import numpy as np
 
 import ClearMap.ParallelProcessing.SharedMemoryArray as _shared_array
-from ClearMap.ParallelProcessing.SharedMemoryManager import SharedMemmoryManager
+from ClearMap.ParallelProcessing.SharedMemoryManager import SharedMemmoryManager as _SharedMemmoryManager
 
 import ClearMap.IO.source.Source as source_mod
 # noinspection PyUnusedImports
-from ClearMap.IO.source.backend_defaults import read, write, open_ro  # protocol functions
-from ClearMap.IO.source.backends.npy_backend import NumpySource
+from ClearMap.IO.source.backend_defaults import read  # protocol function: io_ops reads in-memory sources itself
+# noinspection PyUnusedImports
+from ClearMap.IO.source.backends.npy_backend import NumpySource, write  # writing into an in-memory array is the same
 from ClearMap.IO.source.geometry_utils import resolve_geometry, properties_match
 from ClearMap.IO.source.protocol import Backend
 
@@ -88,7 +89,7 @@ class SMASource(NumpySource):
     def handle(self):
         """Handle of this array in the shared memory manager, registered on first access."""
         if self._handle is None:
-            self._handle = SharedMemmoryManager.insert(self.array)
+            self._handle = _SharedMemmoryManager.insert(self.array)
         return self._handle
 
     @property
@@ -98,7 +99,7 @@ class SMASource(NumpySource):
     def free(self):
         """Release this array's handle in the shared memory manager."""
         if self._handle is not None:
-            SharedMemmoryManager.free(self._handle)
+            _SharedMemmoryManager.free(self._handle)
             self._handle = None
 
     def as_virtual(self):
@@ -191,6 +192,20 @@ def as_shared(source):
                              value=type(source).__name__, expected='array, list, tuple or SMASource')
 
 
+def open_ro(source_, **kwargs):
+    """Open a shared memory source for reading.
+
+    Shared memory lives in this process, so there is nothing to open: an existing
+    shared source is returned as is, and a shared array is wrapped without copying.
+    """
+    if isinstance(source_, (SMASource, SMAVirtualSource)):
+        return source_
+    if _shared_array.is_shared(source_):
+        return SMASource(array=source_)
+    raise ClearMapValueError(f'{source_!r} is not in shared memory; use as_shared() to copy it there.',
+                             value=type(source_).__name__, expected='a shared array or SMASource')
+
+
 def create(location=None, shape=None, dtype=None, order=None, mode=None,
            array=None, handle=None, as_source=True, **kwargs):
     """Create a shared memory array.
@@ -237,7 +252,7 @@ def create(location=None, shape=None, dtype=None, order=None, mode=None,
 def _shared(shape=None, dtype=None, order=None, array=None, handle=None):
     """Return a shared array with the requested geometry, reusing *array* when it already fits."""
     if handle is not None:
-        array = SharedMemmoryManager.get(handle)
+        array = _SharedMemmoryManager.get(handle)
         if array is None:
             raise ClearMapValueError(f'No shared array registered under handle {handle} in this process '
                                      f'(freed, or the worker was not started by fork).',
