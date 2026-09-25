@@ -13,7 +13,6 @@ __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 
 import io
 import pickle
-import numpy as np
 
 
 # Base class

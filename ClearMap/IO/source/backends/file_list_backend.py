@@ -911,7 +911,7 @@ def convert(source, sink, processes=None, verbose=False):
             if verbose:
                 print(f'Converting slice {slicing} from {filename} to {sink}')
             sink.as_real()[slicing] = io_ops.read(filename, processes='serial')
-            # FIXME: replace with       sink[(Ellipsis,) + index_slicing] = io.read(filename, processes='serial') for performance. avoids the as_real references
+            # FIXME: replace with       sink[(Ellipsis,) + index_slicing] = io_ops.read(filename, processes='serial') for performance. avoids the as_real references
             return True
         except Exception as e:
             print(f'Error converting slice {slicing} from {filename} to {sink}: {e}')

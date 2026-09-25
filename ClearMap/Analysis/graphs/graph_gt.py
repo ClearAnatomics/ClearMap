@@ -1040,7 +1040,7 @@ class Graph(grp.AnnotatedGraph):
     #
     #     # lbl.AnnotationFile
     #     # label points
-    #     aba = np.array(io.read(annotation), dtype=int)
+    #     aba = np.array(io_ops.read(annotation), dtype=int)
     #
     #     # get vertex coordinates
     #     x,y,z = self.vertex_coordinates().T
@@ -1282,7 +1282,7 @@ class Graph(grp.AnnotatedGraph):
         Parameters
         ----------
         slicing : tuple of slice or int
-            A slicing spec accepted by ``ClearMap.IO.IO.slc.unpack_slicing``
+            A slicing spec accepted by ``ClearMap.IO.source.Slice.unpack_slicing``
             (slices/ints per axis).
         view : bool
             If ``True``, return a lightweight ``gt.GraphView``-backed wrapper.
@@ -1331,8 +1331,8 @@ class Graph(grp.AnnotatedGraph):
                 raise ValueError(f'cut_edges must be one of: "exclusive", "inclusive"; got {cut_edges!r}')
 
     def _slice_coordinates(self, coordinates, slicing, size):
-        import ClearMap.IO.IO as io
-        slicing = io.slc.unpack_slicing(slicing, self.ndim)
+        import ClearMap.IO.source.Slice as slice_mod
+        slicing = slice_mod.unpack_slicing(slicing, self.ndim)
         valid = np.ones(size, dtype=bool)
         for d, s in enumerate(slicing):
             if isinstance(s, slice):
@@ -1738,7 +1738,7 @@ def _test():
 
     # test large arrays in graphs
     import numpy as np
-    import ClearMap.IO.IO as io
+    from ClearMap.IO import FileUtils as file_utils
     import ClearMap.Analysis.graphs.graph_gt as ggt
     reload(ggt)
 
@@ -1758,4 +1758,4 @@ def _test():
     f.info()
     print(f.graph_property('test').shape)
 
-    io.delete_file('test.gt')
+    file_utils.delete_file('test.gt')

@@ -175,10 +175,10 @@ class Source:
 
     def _assert_writable(self):
         if not self.is_writable:
-            raise ClearMapPermissionError(f'{self} was opened read-only (mode="r"). Use io.edit() to open for writing.')
+            raise ClearMapPermissionError(f'{self} was opened read-only (mode="r"). Use io_ops.edit() to open for writing.')
         if self.location is not None and not self.is_persistable:
             raise ClearMapPermissionError(f'{self} was opened with mode={self._mode!r}; writes would not be '
-                                          f'persisted to {self.location}. Use io.edit() to open for writing.')
+                                          f'persisted to {self.location}. Use io_ops.edit() to open for writing.')
 
     # ## Element access
 
@@ -750,7 +750,7 @@ class TableSource(Source):
     @classmethod
     def edit(cls, source_, **kwargs):
         raise ClearMapNotImplementedError(f'{cls.__name__} has no edit mode: tables are read and written whole. '
-                                          f'Use frame = io.read(location), modify it, then io.write(location, frame).',
+                                          f'Use frame = io_ops.read(location), modify it, then io_ops.write(location, frame).',
                                           operation='edit', backend=cls.__name__)
 
 
@@ -919,7 +919,7 @@ class GraphSource(Source):
     def write(self, data=None, overwrite=True, **dump_kwargs):
         """Save *data* (default: this source's graph) to this source's location."""
         if isinstance(data, (str, os.PathLike)):  # legacy GraphGtSource.write(location)
-            warnings.warn('GraphSource.write(location) is deprecated; use io.write(location, source.graph).',
+            warnings.warn('GraphSource.write(location) is deprecated; use io_ops.write(location, source.graph).',
                           DeprecationWarning, stacklevel=2)
             self.write_graph(data, self.graph, overwrite=overwrite, **dump_kwargs)
             return self
@@ -1054,7 +1054,7 @@ class GraphSource(Source):
     @classmethod
     def edit(cls, source_, **kwargs):
         raise ClearMapNotImplementedError(f'{cls.__name__} has no edit mode: graphs are read and written whole. '
-                                          f'Use graph = io.read(location), modify it, then io.write(location, graph).',
+                                          f'Use graph = io_ops.read(location), modify it, then io_ops.write(location, graph).',
                                           operation='edit', backend=cls.__name__)
 
 

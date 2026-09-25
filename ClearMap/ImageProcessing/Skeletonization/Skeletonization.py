@@ -29,7 +29,7 @@ __download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 
 import numpy as np
 
-import ClearMap.IO.IO as io
+from ClearMap.IO import FileUtils as file_utils
 
 import ClearMap.ParallelProcessing.DataProcessing.ArrayProcessing as ap
 
@@ -73,7 +73,7 @@ def skeletonize(source, sink = None, points = None,
   if verbose:
     timer = tmr.Timer()
   
-  if not in_place and io.is_file(source):
+  if not in_place and file_utils.is_file(source):
     binary_buffer = ap.read(source).as_buffer()  # prange
   else:
     binary, binary_buffer = ap.initialize_source(source)

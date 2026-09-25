@@ -386,7 +386,7 @@ def sanitize_df(gp_names, grouped_counts, total_df):
 #
 #   # TODO: simple implementation -> slow -> speed up
 #   if not isinstance(shape, tuple):
-#     shape = io.shape(shape)
+#     shape = source_geometry.shape(shape)
 #   if len(shape) != 3:
 #       raise RuntimeError('Shape expected to be 3d, found %r' % (shape,))
 #

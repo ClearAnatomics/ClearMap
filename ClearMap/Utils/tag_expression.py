@@ -794,8 +794,9 @@ def _test():
 
     # glob
     import ClearMap.Tests.Files as tf
+    from ClearMap.IO import FileUtils as file_utils
 
-    s = tf.io.join(tf.tif_sequence, 'sequence<I,4>.tif')
+    s = file_utils.join(tf.tif_sequence, 'sequence<I,4>.tif')
     t = te.parse(s)
     f = t.glob()
 

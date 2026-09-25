@@ -19,7 +19,7 @@ __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__   = 'http://idisco.info'
 __download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 
-from ClearMap.IO import dispatch, conversion, source_geometry
+from ClearMap.IO import dispatch, conversion, source_geometry, FileUtils as file_utils
 
 if __name__ == '__main__':
 
@@ -53,9 +53,9 @@ if __name__ == '__main__':
       overwrite=False, verbose=True);
   
   #alignment parameter files    
-  align_channels_affine_file   = io.join(resources_directory, 'Alignment/align_affine.txt')
-  align_reference_affine_file  = io.join(resources_directory, 'Alignment/align_affine.txt')
-  align_reference_bspline_file = io.join(resources_directory, 'Alignment/align_bspline.txt')
+  align_channels_affine_file   = file_utils.join(resources_directory, 'Alignment/align_affine.txt')
+  align_reference_affine_file  = file_utils.join(resources_directory, 'Alignment/align_affine.txt')
+  align_reference_bspline_file = file_utils.join(resources_directory, 'Alignment/align_bspline.txt')
   
   
   #%%############################################################################
@@ -147,7 +147,7 @@ if __name__ == '__main__':
       "verbose" : True,             
       };
   
-  io.delete_file(ws.filename('resampled'));
+  file_utils.delete_file(ws.filename('resampled'));
   
   res.resample(ws.filename('stitched'), sink=ws.filename('resampled'), **resample_parameter)
   
@@ -160,7 +160,7 @@ if __name__ == '__main__':
       "verbose" : True,                
       };    
   
-  io.delete_file(ws.filename('resampled', postfix='autofluorescence'));
+  file_utils.delete_file(ws.filename('resampled', postfix='autofluorescence'));
   
   res.resample(ws.filename('autofluorescence'), sink=ws.filename('resampled', postfix='autofluorescence'), **resample_parameter_auto)
   
@@ -317,7 +317,7 @@ if __name__ == '__main__':
                    
   source = ws.filename('binary', postfix='arteries_postprocessed');
   sink   = ws.filename('binary', postfix='arteries_filled');
-  io.delete_file(sink);
+  file_utils.delete_file(sink);
   
   processing_parameter = vf.default_fill_vessels_processing_parameter.copy();
   processing_parameter.update(size_max = 1000, 

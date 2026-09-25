@@ -24,8 +24,7 @@ import numpy as np
 
 import cv2
 
-import ClearMap.IO.IO as io
-from ClearMap.IO import conversion, source_initialization, io_ops, source_geometry
+from ClearMap.IO import conversion, source_initialization, io_ops, source_geometry, FileUtils as file_utils
 from ClearMap.IO.source.backends import sma_backend, mmp_backend
 import ClearMap.IO.source.backends.file_list_backend as fl
 
@@ -38,7 +37,7 @@ from ClearMap.Utils.tag_expression import Expression
 from .Transformations.Transformation import TransformationBase
 from ClearMap.Alignment.orientation import (format_orientation, orientation_to_transposition, orient_resolution,
                                             orient_shape, orient, orient_points)
-from ClearMap.Utils.utilities import handle_deprecated_args
+from ClearMap.Utils.utilities import handle_deprecated_args, sanitize_n_processes
 
 
 def resample_shape_from_resolution(original_shape, original_resolution, resampled_resolution,
@@ -583,8 +582,7 @@ def resample(original, resampled=None,
 
     interpolation = _interpolation_to_cv2(interpolation, dtype=dtype)
 
-    if not isinstance(processes, int) and processes != 'serial':
-        processes = io.mp.cpu_count()
+    processes = sanitize_n_processes(processes)
 
     # determine order of resampling
     axes_order, shape_order = _axes_order(axes_order, original_shape, resampled_shape_in_original_orientation,
@@ -651,7 +649,7 @@ def resample(original, resampled=None,
         resampled = resampled_data
 
     for f in delete_files:
-        io.delete_file(f)
+        file_utils.delete_file(f)
 
     if verbose:
         timer.print_elapsed_time('Resampling')
@@ -1161,7 +1159,7 @@ def _test():
     """Tests"""
     import numpy as np
     import ClearMap.Settings as settings
-    import ClearMap.IO.IO as io
+    from ClearMap.IO import FileUtils as file_utils
 
     import ClearMap.Alignment.Resampling as res
     from ClearMap.Alignment.orientation import orient, orient_points
@@ -1211,11 +1209,11 @@ def _test():
     p3d.plot([resampled])
     p3d.plot([original, upsampled])
 
-    source = io.join(settings.test_data_path, 'Resampling/test.tif')
-    sink = io.join(settings.test_data_path, "Resampling/resampled.npy")
+    source = file_utils.join(settings.test_data_path, 'Resampling/test.tif')
+    sink = file_utils.join(settings.test_data_path, "Resampling/resampled.npy")
 
-    source = io.join(settings.test_data_path, 'Tif/sequence/sequence<Z,4>.tif')
-    sink = io.join(settings.test_data_path, "Resampling/resampled_sequence.tif")
+    source = file_utils.join(settings.test_data_path, 'Tif/sequence/sequence<Z,4>.tif')
+    sink = file_utils.join(settings.test_data_path, "Resampling/resampled_sequence.tif")
 
     source_shape, sink_shape, source_res, sink_res = res.resample_shape(source_shape=source_geometry.shape(source),
                                                                         source_resolution=(1., 1., 1.),

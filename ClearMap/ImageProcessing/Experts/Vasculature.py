@@ -15,7 +15,6 @@ __webpage__ = 'https://idisco.info'
 __download__ = 'https://github.com/ClearAnatomics/ClearMap'
   
 import gc
-import tempfile
 import warnings
 from pathlib import Path
 
@@ -23,7 +22,7 @@ import numpy as np
 import scipy.ndimage as ndi
 import skimage.filters as skif
 
-import ClearMap.IO.IO as io
+from ClearMap.IO import FileUtils as file_utils
 from ClearMap.IO import source_initialization, io_ops, source_geometry
 
 import ClearMap.ParallelProcessing.BlockProcessing as bp
@@ -816,7 +815,7 @@ def postprocess(source, sink=None, postprocessing_parameter=default_postprocessi
     if run_binary_filling:
         bf.fill(fill_source, sink=sink, processes=processes, verbose=verbose)
         if parameter_smooth and not keep_smoothed:  # FIXME: should be in a finaly block
-            io.delete_file(tmp_f_path)
+            file_utils.delete_file(tmp_f_path)
 
     if verbose:
         timer.print_elapsed_time('Binary post processing')
@@ -992,8 +991,8 @@ def _test():
     binary = vasc.binarize(source, sink=sink, binarization_parameter=bpar, processing_parameter=ppar)
     p3d.plot([source, binary])
 
-    import ClearMap.IO.IO as io
-    io.delete_file(sink)
+    from ClearMap.IO import FileUtils as file_utils
+    file_utils.delete_file(sink)
 
     pppar = vasc.default_postprocessing_parameter.copy()
     pppar['smooth']['iterations'] = 3

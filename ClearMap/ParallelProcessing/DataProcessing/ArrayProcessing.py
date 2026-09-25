@@ -26,7 +26,6 @@ import multiprocessing as mp
 
 import pyximport
 
-import ClearMap.IO.IO as io
 from ClearMap.IO import dispatch, source_initialization, io_ops, source_geometry
 import ClearMap.IO.source.Slice as slc
 
@@ -407,11 +406,11 @@ def write(sink, source, slicing=None, overwrite=True, blocks=None, processes=Non
     raise ValueError('Sink is not a valid writable sink specification!')
 
   if slicing is not None:
-    if not io.is_file(location):
+    if not file_utils.is_file(location):
       raise ValueError('Cannot write a slice to a non-existent sink %s!' % location)
     sink = slc.Slice(source=sink, slicing=slicing)
   else:
-    if io.is_file(location):
+    if file_utils.is_file(location):
       mode = None
       if (sink.shape != source.shape or sink.dtype != source.dtype or sink.order != source_order):
         if overwrite:
@@ -787,6 +786,7 @@ def _test():
   # IO
   import ClearMap.ParallelProcessing.DataProcessing.ArrayProcessing as ap
   import numpy as np
+  from ClearMap.IO import FileUtils as file_utils
     # reload(ap)
   
   data = np.random.rand(10,200,10)
@@ -797,7 +797,7 @@ def _test():
   read = ap.read('test.npy', verbose=True)
   assert(np.all(read.array == data))
   
-  ap.io.delete_file('test.npy')
+  file_utils.delete_file('test.npy')
 
   # where
     # reload(ap)

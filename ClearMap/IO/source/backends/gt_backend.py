@@ -10,7 +10,7 @@ loaded lazily, read and written whole, written atomically, and pickled as a
 lightweight handle so workers reload from disk instead of receiving the graph.
 
 Partial loads are forwarded to :meth:`Graph.partial_load`, e.g.
-``io.read(path, exclude_edge_geometry_properties=True)`` loads the topology and
+``io_ops.read(path, exclude_edge_geometry_properties=True)`` loads the topology and
 properties without the (large) edge geometry array.
 
 See also

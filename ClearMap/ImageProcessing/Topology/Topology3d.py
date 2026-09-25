@@ -20,7 +20,7 @@ __copyright__ = 'Copyright (c) 2019 by Christoph Kirst, The Rockefeller Universi
 import tempfile
 import numpy as np
 
-import ClearMap.IO.IO as io
+from ClearMap.IO import FileUtils as file_utils
 import ClearMap.ParallelProcessing.DataProcessing.ArrayProcessing as ap
 from ClearMap.IO import io_ops, source_geometry
 
@@ -193,7 +193,7 @@ def index_from_binary(source, sink = None, method = 'shared', dtype = 'uint32', 
     source_buffer = sink_buffer;
     
   for f in delete_files:
-    io.delete_file(f);
+    file_utils.delete_file(f);
     
   ap.finalize_processing(verbose=verbose, function='index_from_binary', timer=timer);
   

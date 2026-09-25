@@ -319,7 +319,7 @@ class SourceNotFoundError(ClearMapFileNotFoundError):
     """The file backing this source does not exist on disk.
 
     Distinct from AssetNotFoundError: this is the low-level IO layer reporting an
-    absent path, and is the *only* condition under which io.initialize() may
+    absent path, and is the *only* condition under which source_initialization.initialize() may
     legitimately fall through to creating the source.
     """
     user_title = 'Source File Not Found'

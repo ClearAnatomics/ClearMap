@@ -932,9 +932,9 @@ def _test1():
     cnts = annotator.count_points(points, hierarchical=False)
     print(cnts)
 
-    import ClearMap.IO.IO as io
+    from ClearMap.IO import FileUtils as file_utils
     ano.write_color_annotation('test.tif')
-    io.delete_file('test.tif')
+    file_utils.delete_file('test.tif')
 
     l = annotator.find(247, key='id')
     print(l)

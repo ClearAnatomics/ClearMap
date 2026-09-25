@@ -133,12 +133,3 @@ def __getattr__(name):
 
 def __dir__():
     return sorted(list(globals()) + list(_MOVED) + list(_COMPUTED))
-
-###############################################################################
-# ## Tests
-###############################################################################
-def _test():
-    import ClearMap.IO.IO as io
-
-    print(io.abspath('.'))
-    # reload(io)

@@ -26,7 +26,7 @@ __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__   = 'http://idisco.info'
 __download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 
-from ClearMap.IO import conversion, io_ops, source_geometry
+from ClearMap.IO import conversion, io_ops, source_geometry, FileUtils as file_utils
 
 if __name__ == "__main__":
      
@@ -60,9 +60,9 @@ if __name__ == "__main__":
       overwrite=False, verbose=True);
   
   #alignment parameter files    
-  align_channels_affine_file   = io.join(resources_directory, 'Alignment/align_affine.txt')
-  align_reference_affine_file  = io.join(resources_directory, 'Alignment/align_affine.txt')
-  align_reference_bspline_file = io.join(resources_directory, 'Alignment/align_bspline.txt')
+  align_channels_affine_file   = file_utils.join(resources_directory, 'Alignment/align_affine.txt')
+  align_reference_affine_file  = file_utils.join(resources_directory, 'Alignment/align_affine.txt')
+  align_reference_bspline_file = file_utils.join(resources_directory, 'Alignment/align_bspline.txt')
   
   
   #%%############################################################################
@@ -73,7 +73,7 @@ if __name__ == "__main__":
                
   source = ws.source('raw');
   sink   = ws.filename('stitched')
-  io.delete_file(sink)
+  file_utils.delete_file(sink)
   conversion.convert(source, sink, processes=None, verbose=True);
   
   
@@ -90,7 +90,7 @@ if __name__ == "__main__":
       "verbose" : True,             
       };
   
-  io.delete_file(ws.filename('resampled'))
+  file_utils.delete_file(ws.filename('resampled'))
   
   res.resample(ws.filename('stitched'), sink=ws.filename('resampled'), **resample_parameter)
   
@@ -172,7 +172,7 @@ if __name__ == "__main__":
   cell_detection_parameter['intensity_detection']['measure'] = ['source'];
   cell_detection_parameter['shape_detection']['threshold'] = 500;
   
-  io.delete_file(ws.filename('cells', postfix='maxima'))
+  file_utils.delete_file(ws.filename('cells', postfix='maxima'))
   cell_detection_parameter['maxima_detection']['save'] = ws.filename('cells', postfix='maxima')
   
   processing_parameter = cells.default_cell_detection_processing_parameter.copy();

@@ -823,7 +823,7 @@ def _test():
   
   # write image
   
-  import ClearMap.IO.IO as io
+  from ClearMap.IO import io_ops
   
   #r = np.asarray(128 * binary_new, dtype = 'uint8');
   #g = r.copy(); b = r.copy();
@@ -835,7 +835,7 @@ def _test():
   img = np.asarray(128 * binary_new, dtype = 'uint8');
   img[:] = img + 127 * skel_2[0];
   
-  io.writeData('/home/ckirst/Desktop/3d.tif', img)
+  io_ops.write('/home/ckirst/Desktop/3d.tif', img)
   
   
   #%%

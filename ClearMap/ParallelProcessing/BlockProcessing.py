@@ -12,7 +12,7 @@ Example
 
 >>> import numpy as np
 >>> from ClearMap.IO import io_ops
->>> import ClearMap.IO.IO as io
+>>> from ClearMap.IO.source.backends.npy_backend import NumpySource
 >>> import ClearMap.ParallelProcessing.BlockProcessing as bp
 >>> source = io_ops.open_ro(np.asarray(np.random.rand(50,100,200), order = 'F'))
 >>> blocks = bp.split_into_blocks(source, processes=10, axes=[2], size_min=30, size_max=50, overlap=20)
@@ -34,8 +34,8 @@ Block-Numpy-Source(50, 100, 38)[float64]|F|
 0
  
 >>> shape = (2,3,20)
->>> source = io.npy.NumpySource(array = np.random.rand(*shape))
->>> sink = io.npy.NumpySource(array = np.zeros(shape))
+>>> source = NumpySource(array = np.random.rand(*shape))
+>>> sink = NumpySource(array = np.zeros(shape))
 >>>  
 >>> def process_image(source, sink=None):
 >>>    if sink is None:
@@ -727,7 +727,7 @@ def _unpack(values, ndim = None):
 
 def _test():
   import numpy as np
-  import ClearMap.IO.IO as io
+  from ClearMap.IO import FileUtils as file_utils
   from ClearMap.IO.source.backends.sma_backend import SMASource
   from ClearMap.IO.source.backends.npy_backend import NumpySource
   from ClearMap.IO.source.backends import mmp_backend
@@ -792,8 +792,8 @@ def _test():
 
   assert(np.all(sink[:] == process_image(source))) 
   
-  io.delete_file(source.location)
-  io.delete_file(sink.location)
+  file_utils.delete_file(source.location)
+  file_utils.delete_file(sink.location)
 
   #multiple sources and sinks
   shape = (2,50,30)

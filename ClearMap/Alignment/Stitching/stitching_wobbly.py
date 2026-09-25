@@ -20,11 +20,10 @@ import numpy as np
 import functools as ft
 import multiprocessing as mp
 
-
-import ClearMap.IO.IO as io
-from ClearMap.IO import io_ops
+from ClearMap.IO import io_ops, FileUtils as file_utils
 import ClearMap.IO.source.Slice as slc
 from ClearMap.IO.source.backends import mmp_backend
+from ClearMap.IO.source.backends.file_list_backend import file_list
 
 import ClearMap.Alignment.Stitching.stitching_rigid as strg
 import ClearMap.Alignment.Stitching.Tracking as trk
@@ -836,7 +835,7 @@ class Verbose:
         if self.directory is None:
             return filename
         else:
-            return io.join(self.directory, filename)
+            return file_utils.join(self.directory, filename)
 
     def create_directory(self, prefix = None):
         if self.directory is None:
@@ -845,8 +844,8 @@ class Verbose:
             if prefix is not None:
                 directory = f'{prefix}_{directory}'
             self.directory = directory
-        if not io.is_directory(self.directory):
-            io.create_directory(self.directory)
+        if not file_utils.is_directory(self.directory):
+            file_utils.create_directory(self.directory)
         return self.directory
 
 
@@ -1382,7 +1381,7 @@ def inspect_align_layout(alignment, verbose):
 
     #minima
     positions_expression = verbose.full_filename(te.Expression(f'positions_{verbose.save}_<s>_<e>.npy'))
-    positions_files = io.file_list(positions_expression)
+    positions_files = file_list(positions_expression)
 
     minima = []
     for p in positions_files:
@@ -1395,7 +1394,7 @@ def inspect_align_layout(alignment, verbose):
 
     #potential trajectories
     trajectory_expression = verbose.full_filename(te.Expression(f'trajectories_{verbose.save}_<s>_<e>.npy'))
-    trajectory_files = io.file_list(trajectory_expression)
+    trajectory_files = file_list(trajectory_expression)
     paths = []
     for t in trajectory_files:
         values = trajectory_expression.values(t)
@@ -1410,7 +1409,7 @@ def inspect_align_layout(alignment, verbose):
 
     #optimal trajectory
     trajectory_expression = verbose.full_filename(te.Expression(f'trajectory_opt_{verbose.save}_<s>_<e>.npy'))
-    trajectory_files = io.file_list(trajectory_expression)
+    trajectory_files = file_list(trajectory_expression)
     opt_paths = []
     for t in trajectory_files:
         values = trajectory_expression.values(t)
@@ -2095,7 +2094,7 @@ def stitch_layout(layout, sink, method = 'interpolation', processes = None, verb
     shape = layout.shape_wobbly
 
     # create sink
-    #TODO: make layout a sink ! use io.create
+    #TODO: make layout a sink ! use io_ops.create
     mmp_backend.create(sink, shape=shape, dtype=layout.dtype, order=layout.order)
 
     # create slices
@@ -2457,7 +2456,6 @@ def _test():
 
     ### Test on real data
     import numpy as np
-    import ClearMap.IO.IO as io
     import ClearMap.Alignment.Stitching.stitching_rigid as stg
     import ClearMap.Alignment.Stitching.stitching_wobbly as stw
     import ClearMap.IO.Workspace as wsp
@@ -2465,7 +2463,7 @@ def _test():
     directory = '/home/ckirst/Science/Projects/WholeBrainClearing/Vasculature/Experiment/Stitching_2018_06'
     expression = 'tiny_[<Y,2> x <X,2>]_C00.ome.npy'
     ws = wsp.Workspace(name = 'test', directory = directory, expression=expression)
-    io.file_list(ws.filename('expression'))
+    file_list(ws.filename('expression'))
 
     l = stw.WobblyLayout(expression = ws.filename('expression'), tile_axes = ['X', 'Y'], overlaps = (25, 155))
 

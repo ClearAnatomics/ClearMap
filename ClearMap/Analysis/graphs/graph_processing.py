@@ -19,7 +19,7 @@ from typing import Dict, Callable, List, Sequence, runtime_checkable, Protocol
 
 import numpy as np
 
-import ClearMap.IO.IO as io
+from ClearMap.IO import io_ops
 
 import ClearMap.ParallelProcessing.DataProcessing.ArrayProcessing as ap
 import ClearMap.ImageProcessing.Topology.Topology3d as t3d
@@ -326,7 +326,7 @@ def graph_from_skeleton(skeleton, points=None, radii=None,
     if compute_edge_length and not compute_vertex_coordinates:
         raise ValueError('Activating `compute_edge_length` requires `compute_vertex_coordinates` to be True!')
 
-    skeleton = io.edit(skeleton)  # WARNING: ``edit`` here because delete_border (optional) is in-place
+    skeleton = io_ops.edit(skeleton)  # WARNING: ``edit`` here because delete_border (optional) is in-place
     if skeleton.dtype not in ('bool', np.uint8):
         raise TypeError('The skeleton array needs to be a boolean array!')
 
