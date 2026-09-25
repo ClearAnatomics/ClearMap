@@ -610,10 +610,10 @@ def resample(original, resampled=None,
             resampled_data = source_initialization.initialize(resampled, shape_=resampled_shape, dtype_=dtype, as_source=True)
         else:
             if method == 'shared':
-                resampled_data = sma_backend.create(shape, dtype=dtype, order=order, as_source=True)
+                resampled_data = sma_backend.create(shape=shape, dtype=dtype, order=order, as_source=True)
             else:
                 location = tempfile.mktemp(suffix='.npy')
-                resampled_data = mmp_backend.create(location, shape=shape, dtype=dtype, order=order, as_source=True)
+                resampled_data = mmp_backend.create(location=location, shape=shape, dtype=dtype, order=order, as_source=True)
                 delete_files.append(location)
 
         # indices for non-resampled axes
