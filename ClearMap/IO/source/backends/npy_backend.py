@@ -191,8 +191,9 @@ def open_ro(source_, **kwargs):
     return NumpySource.open_ro(source_, **kwargs)
 
 
-def read(source_, slicing=None, **kwargs):
-    return NumpySource.read_array(source_, slicing=slicing, **kwargs)
+def read(source, slicing=None, as_source=None, as_array=None, processes=None, **kwargs):
+    return NumpySource.read_array(source, slicing=slicing, as_source=as_source, as_array=as_array,
+                                  processes=processes, **kwargs)
 
 
 # TODO: add processes keyword for parallel writing
