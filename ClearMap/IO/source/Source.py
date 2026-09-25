@@ -510,6 +510,63 @@ class ArraySource(BaseArraySource):
     def as_memory(self):
         return np.array(self.as_buffer())  # FIXME: check if we need to check instance (mmemmap) to decide array vs asarray cost
 
+    # ## Backend protocol implementations
+    # The module-level protocol functions of an array backend (open_ro, read, write, create,
+    # edit) are thin wrappers around these classmethods. The defaults below suit sources
+    # whose constructor takes the data or location as first argument; backends override
+    # what differs (a file format's mode handling, what read returns, how files are created).
+
+    @classmethod
+    def open_ro(cls, source_, **kwargs):
+        """Open *source_* read-only.
+
+        A source of this class is returned as is. Anything else is passed to the
+        constructor with ``mode='r'``.
+        """
+        if isinstance(source_, cls):
+            return source_
+        if isinstance(source_, Source):
+            raise ClearMapValueError(f'Cannot open {source_!r} as a {cls.__name__}.',
+                                     value=type(source_).__name__, expected=cls.__name__)
+        kwargs.setdefault('mode', 'r')
+        return cls(source_, **kwargs)
+
+    @classmethod
+    def read_array(cls, source_, slicing=None, **kwargs):
+        """Read the data of *source_*, or its *slicing*, as an array.
+
+        Other keyword arguments are accepted and ignored: callers pass options meant
+        for other backends (e.g. ``processes`` from file lists). Backends whose legacy
+        ``read`` took flags such as ``as_source`` handle them in their override.
+        """
+        source = cls.open_ro(source_)
+        return source.array if slicing is None else source[slicing]
+
+    @classmethod
+    def write_array(cls, sink, data, slicing=None, **kwargs):
+        """Write *data* into *sink*, an existing array Source or ndarray, and return *sink*.
+
+        Writing through a Source goes through ``__setitem__``, so a read-only sink raises.
+        """
+        if not isinstance(sink, (Source, np.ndarray)):
+            raise ClearMapValueError(f'{cls.__name__} cannot write to {sink!r}.',
+                                     value=type(sink).__name__, expected='an array Source or ndarray')
+        sink[() if slicing is None else slicing] = data
+        return sink
+
+    @classmethod
+    def create_array(cls, location=None, shape=None, dtype=None, order=None,
+                     mode=None, array=None, as_source=True, **kwargs):
+        """Create a new array source. No default: every backend creates in its own way."""
+        raise ClearMapNotImplementedError(f'{cls.__name__} does not support create().',
+                                          operation='create', backend=cls.__name__)
+
+    @classmethod
+    def edit(cls, source_, **kwargs):
+        """Open *source_* for in-place editing. No default: only some backends can edit."""
+        raise ClearMapNotImplementedError(f'{cls.__name__} does not support edit().',
+                                          operation='edit', backend=cls.__name__)
+
 
 ###############################################################################
 ### Table sources

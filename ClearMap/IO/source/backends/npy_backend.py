@@ -19,7 +19,7 @@ import ClearMap.IO.source.Source as source_mod
 from ClearMap.IO.source import geometry_utils
 from ClearMap.IO.source.protocol import Backend
 
-from ClearMap.Utils.exceptions import ClearMapPermissionError, ClearMapValueError
+from ClearMap.Utils.exceptions import ClearMapValueError
 
 
 ###############################################################################
@@ -114,6 +114,53 @@ class NumpySource(source_mod.ArraySource):
         # TODO: convert to shared memory array ? -> needs to be implemented to make block processing work for in memory  numpy arrays !
         return self
 
+    # ## Backend protocol implementations (open_ro: ArraySource default)
+    @classmethod
+    def read_array(cls, source_, slicing=None, as_source=None, as_array=None, **kwargs):
+        """Read with the legacy NPY rules: what goes in decides what comes out.
+
+        * A NumpySource reads as itself, or as its array if *as_array*. With *slicing*
+          it reads as the sliced ndarray.
+        * An ndarray, list or tuple (cast with ``np.asarray``) reads as an ndarray, or
+          as a new NumpySource if *as_source*.
+
+        Other keyword arguments (e.g. ``processes``) are accepted and ignored.
+        """
+        if isinstance(source_, NumpySource):
+            if slicing is not None:
+                return source_[slicing]  # an ndarray (the old code then crashed on as_array=True)
+            return source_.array if as_array else source_
+        data = super().read_array(source_, slicing=slicing)  # casts lists and tuples via the constructor
+        return cls(array=data) if as_source else data
+
+    @classmethod
+    def write_array(cls, sink, data, slicing=None, **kwargs):
+        """Write *data* into an array or array Source; with no sink, return the (sliced) data."""
+        if sink is None:  # legacy: io_ops.write(None, data) dispatches here
+            return data[() if slicing is None else slicing]
+        return super().write_array(sink, data, slicing=slicing, **kwargs)
+
+    @classmethod
+    def create_array(cls, location=None, shape=None, dtype=None, order=None,
+                     mode=None, array=None, as_source=True, **kwargs):
+        """Create an in-memory array, blank from *shape* or conformed from *array*.
+
+        *mode* and other keyword arguments are accepted and ignored, as before (FIXME:
+        callers such as ``source_initialization.initialize`` forward options meant for
+        file backends). The source is created without a mode: in memory, writable.
+        """
+        if location is not None:
+            raise ClearMapValueError('In-memory numpy arrays have no location.', value=location, expected=None)
+        array = _array(shape=shape, dtype=dtype, order=order, array=array)
+        return cls(array=array) if as_source else array
+
+    @classmethod
+    def edit(cls, source_, **kwargs):
+        """An in-memory array is always editable: wrap it (no copy), or return the source as is."""
+        if isinstance(source_, cls):
+            return source_
+        return cls(source_, **kwargs)
+
 
 SOURCE_CLASS = NumpySource
 
@@ -140,63 +187,21 @@ def is_numpy(source):
         return False
 
 
-def read(source, slicing=None, as_source=None, as_array=None, processes=None, **kwargs):
-    if isinstance(source, (list, tuple)):
-        source = np.array(source)
-    if isinstance(source, NumpySource):
-        if slicing is not None:
-            source = source.__getitem__(slicing)
-        if as_array:
-            return source.array
-        else:
-            return source
-    elif isinstance(source, np.ndarray):
-        if slicing is not None:
-            source = source.__getitem__(slicing)
-        if as_source:
-            return NumpySource(array=source)
-        else:
-            return source
-        #  elif isinstance(source, str): # and fu.file_extension(source) == 'npy':
-        #      source = np.load(source)
-        #      if slicing is not None:
-        #          source = source.__getitem__(slicing)
-        #      if as_source:
-        #          return NumpySource(array = source)
-        #      else:
-        #          return source
-    else:
-        raise ValueError('The source is not a valid numpy source!')
-    
+def open_ro(source_, **kwargs):
+    return NumpySource.open_ro(source_, **kwargs)
 
-#TODO: add processes keyword for parallel writing
+
+def read(source_, slicing=None, **kwargs):
+    return NumpySource.read_array(source_, slicing=slicing, **kwargs)
+
+
+# TODO: add processes keyword for parallel writing
 def write(sink, data, slicing=None, **kwargs):
-    if isinstance(sink, NumpySource) and not sink.is_persistable:
-        raise ClearMapPermissionError(f'Source {sink} was opened in mode="{sink.mode}" '
-                                      f'and cannot persist changes to disk. Use io_ops.edit() to open for in-place editing.')
-    if slicing is None:
-        slicing = ()
-    if sink is None:
-        return data.__getitem__(slicing)
-    if isinstance(sink, (source_mod.Source, np.ndarray)):
-        sink.__setitem__(slicing, data)
-        return sink
-    # elif isinstance(sink, str): # and fu.file_extension(sink) == 'npy'
-    #     if slicing != ():
-    #         if not fu.is_file(sink):
-    #             raise ValueError('Cannot write slice to a not existing file %s!' % sink)
-    #         memmap = np.lib.format.open_memmap(sink)
-    #         memmap.__setitem__(slicing, data)
-    #     else:
-    #         np.save(sink, data)
-    #     return sink
-    else:
-        raise ClearMapValueError('The sink is not a valid numpy sink!')
+    return NumpySource.write_array(sink, data, slicing=slicing, **kwargs)
 
 
-def create(shape=None, dtype=None, order=None,
-           array=None, as_source=True, **kwargs):
-    """Create a numpy array.
+def create(shape=None, dtype=None, order=None, array=None, as_source=True, **kwargs):
+    """Create a numpy array, or a NumpySource holding it.
 
     Arguments
     ---------
@@ -211,20 +216,15 @@ def create(shape=None, dtype=None, order=None,
     as_source : bool
         If True, return as Source class.
 
-    Returns
-    -------
-    array : np.array
-        The numpy array.
-
-    Note
-    ----
-    By default numpy arrays are initialized as fortran contiguous if order is None.
+    Other keyword arguments, including *location* and *mode*, are accepted and ignored,
+    as before (FIXME: callers such as ``source_initialization.initialize`` forward
+    options meant for file backends).
     """
-    array = _array(shape=shape, dtype=dtype, order=order, array=array)
-    if as_source:
-        return NumpySource(array=array)
-    else:
-       return array
+    return NumpySource.create_array(shape=shape, dtype=dtype, order=order, array=array, as_source=as_source)
+
+
+def edit(source_, **kwargs):
+    return NumpySource.edit(source_, **kwargs)
 
 
 ###############################################################################
