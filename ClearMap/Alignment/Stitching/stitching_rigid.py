@@ -426,14 +426,15 @@ class StitchSource(SourceRegion, src.AbstractSource):
         tile_position : array or None
           Optional position of this source in a tiling grid.
         """
-        if source is not None:
-            source = io_ops.open_ro(source)
-            sid = None
-        if isinstance(source, StitchSource):
+        sid = None
+        # WARNING: do not invert order here
+        if isinstance(source, StitchSource):  # re-wrapping (e.g. WobblyLayout converting its sources): reuse the inner source
             position = source.position if position is None else position
             tile_position = source.tile_position if tile_position is None else tile_position
             sid = source.id
             source = source.source
+        elif source is not None:
+            source = io_ops.open_ro(source)
 
         shape = source.shape
         if shape is None:
