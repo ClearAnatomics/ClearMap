@@ -27,6 +27,7 @@ import ClearMap.IO.source.Source as source_mod
 from ClearMap.IO import io_ops
 from ClearMap.IO.FileUtils import file_extension, is_file
 from ClearMap.IO.source.protocol import Backend
+from ClearMap.IO.source.source_modes import mode_after_create
 from ClearMap.Utils.Formatting import ensure
 from ClearMap.Utils.exceptions import ClearMapNotImplementedError
 
@@ -101,7 +102,7 @@ class MhdSource(source_mod.ArraySource):
         if self._info.compression:
             raise ClearMapNotImplementedError(f'Compressed mhd {self.location!r} cannot be memory-mapped.',
                                               operation='as_buffer', backend='MHD')
-        return _memmap(self.location, mode=self._buffer_mode())
+        return _memmap(self.location, mode=mode_after_create(self.mode))  # None -> 'r+' (numpy's default); never 'w+'
 
     @cached_property
     def _array(self):
@@ -132,15 +133,10 @@ class MhdSource(source_mod.ArraySource):
         _write_raw(raw_file, value, compression=_compression_from_header(header))
         self._invalidate_cache()
 
-    # Data
-    def __getitem__(self, *args):
-        self._init_data()
-        if self._memmap is not None:
-            return self._memmap.__getitem__(*args)
-        elif self._array is not None:
-            return self._array.__getitem__(*args)
-        else:
-            return _array(self.location).__getitem__(*args)
+    def _getitem(self, slicing):
+        if self._info.compression:  # no memmap: slice the decoded array
+            return self.array[slicing]
+        return self._buffer[slicing]
 
     def _setitem(self, slicing, value):
         if self._info.compression:
