@@ -428,6 +428,173 @@ class MMPSource(NumpySource):
     def as_buffer(self):
         return self._array
 
+    # ## Backend protocol implementations (bodies moved unchanged from the module functions)
+    @classmethod
+    def read_array(cls, source, slicing=None, mode=None, **kwargs):
+        """Read data from a memory mapped source.
+
+        Arguments
+        ---------
+        source : str, memmap, or Source
+            The source to read the data from.
+        slicing : slice specification
+            Optional slice specification of memmap to read from.
+        mode : str
+            Optional mode specification of how to open the memmap.
+
+        Returns
+        -------
+        source : Source
+            The read memmap source.
+        """
+        if mode == 'r+':
+            warnings.warn('read() does not support mode="r+" (edit mode). Use edit() instead.',
+                           FutureWarning, stacklevel=2)
+        mode = mode if mode is not None else 'r'
+
+        if isinstance(source, MMPSource):
+            src = source if source.mode == mode else MMPSource(location=source.location, mode=mode)
+        elif isinstance(source, np.memmap):
+            src = MMPSource(location=source.filename, mode=mode)
+        elif isinstance(source, np.ndarray):
+            src = NumpySource(array=source)
+        elif isinstance(source, str):  # TOOD: early raise ?
+            try:
+                src = MMPSource(location=source, mode=mode)
+            except FileNotFoundError as err:
+                raise ClearMapFileNotFoundError(f'Memmap file not found: {source!r}') from err
+            except Exception as err:
+                raise ClearMapValueError(f'Cannot read memmap from location {source!r}!') from err  # FIXME: specific
+        else:
+            raise ValueError(f'Cannot read memmap from {source=!r}!')
+
+        return src if slicing is None else NumpySource(array=(src.__getitem__(slicing)))
+
+    @classmethod
+    def edit(cls, source, **kwargs):
+        """Open an existing memmap for in-place modification."""
+        if isinstance(source, MMPSource):
+            if source.mode == 'r+':
+                return source
+            location = source.location
+        elif isinstance(source, np.memmap):
+            location=source.filename
+        elif isinstance(source, str):
+            location=source
+        else:
+            raise ValueError(f'Cannot edit {source!r} as memmap')
+
+        return MMPSource(location=location, mode='r+')
+
+    @classmethod
+    def open_ro(cls, source, **kwargs):
+        """Open a source strictly read-only for metadata queries."""
+        if isinstance(source, MMPSource):
+            if source.mode == 'r':
+                return source
+            return MMPSource(location=source.location, mode='r')
+        elif isinstance(source, np.memmap):
+            return MMPSource(location=source.filename, mode='r')
+        elif isinstance(source, np.ndarray):
+            return NumpySource(array=source)  # already in memory, inherently read-only-ish
+        elif isinstance(source, str):
+            return MMPSource(location=source, mode='r')
+        else:
+            raise ValueError(f'Cannot inspect {source!r} as memmap source')
+
+    @classmethod
+    def write_array(cls, sink, data, slicing=None, overwrite=True, flush=None, **kwargs):
+        """Write data to a memory map.
+
+        Arguments
+        ---------
+        sink : str, memmap, or Source
+            The sink to write the data to.
+        data : array
+            The data to write int the sink.
+        slicing : slice specification or None
+            Optional slice specification of an existing memmap to write to.
+        overwrite : bool
+            Whether an existing file may be replaced. For a sliced write this only applies
+            when the requested shape/dtype/order disagree with the existing file, since the
+            .npy header cannot be changed in place.
+        flush : bool or None
+            Whether to msync before returning. ``None`` (default) flushes whole-array writes,
+            where the barrier is once per file and the pages are dirty anyway, and does not
+            flush sliced writes, where a per-slice barrier serialises writeback. Pass
+            ``flush=True`` at a block boundary instead.
+
+        Returns
+        -------
+        sink : memmap or Source
+            The sink that was written to. For a location sink this is the opened or created
+            Source, not the input path.
+        """
+        _validate_write_request(sink, data, kwargs)
+        array = _as_array(data)
+        whole = slicing is None or slc.is_trivial(slicing)
+
+        # ---- 1. location sinks ------------------------------------------------
+        if isinstance(sink, (str, pathlib.Path)):
+            path = pathlib.Path(sink)
+            if whole:
+                sink= _create_sink(path, array, overwrite, kwargs)
+            else:  # Block write: full shape must come from args or existing file
+                sink =_create_block_sink(path, array, slicing, overwrite, kwargs)
+
+        # ---- 2. object sinks --------------------------------------------------
+        if not isinstance(sink, (MMPSource, np.ndarray)):
+            raise ClearMapValueError(f'Cannot write to sink of type {type(sink).__name__}!',
+                                     value=sink, expected='a location, a Source or a numpy array')
+
+        _assert_durable_sink(sink, context='MMP.write')  # if we don't persist to disk, it's not a "write"
+        _assign(sink, array, slicing)
+
+        if flush or (flush is None and whole):
+            _flush_sink(sink)
+        return sink
+
+    @classmethod
+    def create_array(cls, location = None, shape = None, dtype = None, order = None,
+               mode = None, array = None, as_source = True, **kwargs):
+        """Create a memory map.
+
+        Arguments
+        ---------
+        location : str
+            The filename of the memory mapped array.
+        shape : tuple or None
+            The shape of the memory map to create.
+        dtype : dtype
+            The data type of the memory map.
+        order : 'C', 'F', or None
+            The contiguous order of the memmap.
+        mode : 'r', 'w', 'w+', None
+            The mode to open the memory map.
+        array : array, Source or None
+            Optional source with data to fill the memory map with.
+        as_source : bool
+            If True, return as Source class.
+
+        Returns
+        -------
+        memmap : np.memmap
+            The memory map.
+
+        Note
+        ----
+        By default memmaps are initialized as Fortran contiguous if order is None.
+        """
+        if kwargs:
+            raise ClearMapValueError(f'Unexpected keyword arguments {sorted(kwargs)} for create().',
+                                     value=sorted(kwargs), expected=None)
+        if mode is not None and mode != 'w+':
+            raise ClearMapValueError(f'create() only supports mode="w+", got {mode!r}. '
+                                     f'Use read() to open existing files or initialize() for read-or-create behaviour.')
+        # param validation happens in ctor
+        source = MMPSource(location=location, shape=shape, dtype=dtype, order=order, array=array, mode='w+')
+        return source if as_source else source.array
+
 
 class MMPVirtualSource(source_mod.VirtualSource):
     """Virtual memory map source."""
@@ -465,169 +632,25 @@ def is_memmap(source):
 
 
 def read(source, slicing=None, mode=None, **kwargs):
-    """Read data from a memory mapped source.
-
-    Arguments
-    ---------
-    source : str, memmap, or Source
-        The source to read the data from.
-    slicing : slice specification
-        Optional slice specification of memmap to read from.
-    mode : str
-        Optional mode specification of how to open the memmap.
-
-    Returns
-    -------
-    source : Source
-        The read memmap source.
-    """
-    if mode == 'r+':
-        warnings.warn('read() does not support mode="r+" (edit mode). Use edit() instead.',
-                       FutureWarning, stacklevel=2)
-    mode = mode if mode is not None else 'r'
-
-    if isinstance(source, MMPSource):
-        src = source if source.mode == mode else MMPSource(location=source.location, mode=mode)
-    elif isinstance(source, np.memmap):
-        src = MMPSource(location=source.filename, mode=mode)
-    elif isinstance(source, np.ndarray):
-        src = NumpySource(array=source)
-    elif isinstance(source, str):  # TOOD: early raise ?
-        try:
-            src = MMPSource(location=source, mode=mode)
-        except FileNotFoundError as err:
-            raise ClearMapFileNotFoundError(f'Memmap file not found: {source!r}') from err
-        except Exception as err:
-            raise ClearMapValueError(f'Cannot read memmap from location {source!r}!') from err  # FIXME: specific
-    else:
-        raise ValueError(f'Cannot read memmap from {source=!r}!')
-
-    return src if slicing is None else NumpySource(array=(src.__getitem__(slicing)))
+    return MMPSource.read_array(source, slicing=slicing, mode=mode, **kwargs)
 
 
 def edit(source, **kwargs):
-    """Open an existing memmap for in-place modification."""
-    if isinstance(source, MMPSource):
-        if source.mode == 'r+':
-            return source
-        location = source.location
-    elif isinstance(source, np.memmap):
-        location=source.filename
-    elif isinstance(source, str):
-        location=source
-    else:
-        raise ValueError(f'Cannot edit {source!r} as memmap')
-
-    return MMPSource(location=location, mode='r+')
+    return MMPSource.edit(source, **kwargs)
 
 
 def open_ro(source, **kwargs):
-    """Open a source strictly read-only for metadata queries."""
-    if isinstance(source, MMPSource):
-        if source.mode == 'r':
-            return source
-        return MMPSource(location=source.location, mode='r')
-    elif isinstance(source, np.memmap):
-        return MMPSource(location=source.filename, mode='r')
-    elif isinstance(source, np.ndarray):
-        return NumpySource(array=source)  # already in memory, inherently read-only-ish
-    elif isinstance(source, str):
-        return MMPSource(location=source, mode='r')
-    else:
-        raise ValueError(f'Cannot inspect {source!r} as memmap source')
+    return MMPSource.open_ro(source, **kwargs)
 
 
 def write(sink, data, slicing=None, overwrite=True, flush=None, **kwargs):
-    """Write data to a memory map.
-
-    Arguments
-    ---------
-    sink : str, memmap, or Source
-        The sink to write the data to.
-    data : array
-        The data to write int the sink.
-    slicing : slice specification or None
-        Optional slice specification of an existing memmap to write to.
-    overwrite : bool
-        Whether an existing file may be replaced. For a sliced write this only applies
-        when the requested shape/dtype/order disagree with the existing file, since the
-        .npy header cannot be changed in place.
-    flush : bool or None
-        Whether to msync before returning. ``None`` (default) flushes whole-array writes,
-        where the barrier is once per file and the pages are dirty anyway, and does not
-        flush sliced writes, where a per-slice barrier serialises writeback. Pass
-        ``flush=True`` at a block boundary instead.
-
-    Returns
-    -------
-    sink : memmap or Source
-        The sink that was written to. For a location sink this is the opened or created
-        Source, not the input path.
-    """
-    _validate_write_request(sink, data, kwargs)
-    array = _as_array(data)
-    whole = slicing is None or slc.is_trivial(slicing)
-
-    # ---- 1. location sinks ------------------------------------------------
-    if isinstance(sink, (str, pathlib.Path)):
-        path = pathlib.Path(sink)
-        if whole:
-            sink= _create_sink(path, array, overwrite, kwargs)
-        else:  # Block write: full shape must come from args or existing file
-            sink =_create_block_sink(path, array, slicing, overwrite, kwargs)
-
-    # ---- 2. object sinks --------------------------------------------------
-    if not isinstance(sink, (MMPSource, np.ndarray)):
-        raise ClearMapValueError(f'Cannot write to sink of type {type(sink).__name__}!',
-                                 value=sink, expected='a location, a Source or a numpy array')
-
-    _assert_durable_sink(sink, context='MMP.write')  # if we don't persist to disk, it's not a "write"
-    _assign(sink, array, slicing)
-
-    if flush or (flush is None and whole):
-        _flush_sink(sink)
-    return sink
+    return MMPSource.write_array(sink, data, slicing=slicing, overwrite=overwrite, flush=flush, **kwargs)
 
 
 def create(location = None, shape = None, dtype = None, order = None,
            mode = None, array = None, as_source = True, **kwargs):
-    """Create a memory map.
-
-    Arguments
-    ---------
-    location : str
-        The filename of the memory mapped array.
-    shape : tuple or None
-        The shape of the memory map to create.
-    dtype : dtype
-        The data type of the memory map.
-    order : 'C', 'F', or None
-        The contiguous order of the memmap.
-    mode : 'r', 'w', 'w+', None
-        The mode to open the memory map.
-    array : array, Source or None
-        Optional source with data to fill the memory map with.
-    as_source : bool
-        If True, return as Source class.
-
-    Returns
-    -------
-    memmap : np.memmap
-        The memory map.
-
-    Note
-    ----
-    By default memmaps are initialized as Fortran contiguous if order is None.
-    """
-    if kwargs:
-        raise ClearMapValueError(f'Unexpected keyword arguments {sorted(kwargs)} for create().',
-                                 value=sorted(kwargs), expected=None)
-    if mode is not None and mode != 'w+':
-        raise ClearMapValueError(f'create() only supports mode="w+", got {mode!r}. '
-                                 f'Use read() to open existing files or initialize() for read-or-create behaviour.')
-    # param validation happens in ctor
-    source = MMPSource(location=location, shape=shape, dtype=dtype, order=order, array=array, mode='w+')
-    return source if as_source else source.array
+    return MMPSource.create_array(location=location, shape=shape, dtype=dtype, order=order,
+                                  mode=mode, array=array, as_source=as_source, **kwargs)
 
 
 ###############################################################################
