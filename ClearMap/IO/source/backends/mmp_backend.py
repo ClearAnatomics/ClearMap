@@ -80,7 +80,7 @@ def _assert_durable_sink(sink, context: str = ''):
     if isinstance(sink, MMPSource):
         if not sink.is_persistable:
             raise ClearMapPermissionError(f'Cannot write to {sink!r}{ctx}: opened with mode={sink.mode!r}. '
-                                          f'One of {PERSISTABLE_MODES} is required; use io.edit() to reopen for writing.')
+                                          f'One of {PERSISTABLE_MODES} is required; use io_ops.edit() to reopen for writing.')
         return
 
     if isinstance(sink, np.memmap):                      # before ndarray because mmemap is a subclass of ndarray!
@@ -226,7 +226,7 @@ class MMPSource(NumpySource):
         else:  # 'w+'
             memmap = self._create_new(location, shape=shape, dtype=dtype, order=order, array=array)
 
-        final_mode = mode_after_create(self._mode)
+        final_mode = mode_after_create(mode)  # WARNING: self._mode does not exist before super().__init__
         if memmap.mode != final_mode:
             memmap = _reopen_with_mode(location, memmap, mode=final_mode)
 
@@ -359,7 +359,7 @@ class MMPSource(NumpySource):
         # 1. validate before touching anything
         if delete_source and self._mode not in PERSISTABLE_MODES:
             raise ClearMapPermissionError(f'Cannot move {self!r}: opened with mode={self._mode!r}. '
-                                          f'Reopen with io.edit() before moving it.')
+                                          f'Reopen with io_ops.edit() before moving it.')
 
         dtype, shape = old_array.dtype, old_array.shape
         order = 'F' if old_array.flags['F_CONTIGUOUS'] else 'C'
@@ -438,8 +438,8 @@ class MMPVirtualSource(source_mod.VirtualSource):
         super().__init__(source=source, shape=shape, dtype=dtype, order=order, name=name, mode=mode)
 
     def as_real(self):
-        return self._real_class(location=self.location, shape=self.shape, dtype=self.dtype, order=self.order,
-                                name=self.name, mode=self.mode)
+        return self._real_class(location=self.location, shape=self.shape, dtype=self.dtype,
+                                order=self.order, mode=self.mode)
 
     @property
     def array(self):
