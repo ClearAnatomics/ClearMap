@@ -2,6 +2,7 @@ import os
 import re
 import warnings
 from concurrent.futures.process import BrokenProcessPool
+from copy import deepcopy
 from enum import Enum
 from pathlib import Path
 from typing import Dict, Optional, TypedDict, TYPE_CHECKING
@@ -14,13 +15,13 @@ from ClearMap.Alignment import Resampling as resampling, Elastix as elastix
 from ClearMap.Alignment.Annotation import Annotation
 
 from ClearMap.IO import source_geometry
-from ClearMap.IO.source.backends.tif_backend import TifSource
+from ClearMap.IO.source.backends.tif_backend import TifSource, parse_img_res
 from ClearMap.IO.assets_specs import ChannelSpec, TypeSpec
-from ClearMap.IO.metadata import define_auto_resolution
 
 from ClearMap.Utils.events import (ChannelRenamed, UiAtlasIdChanged,
                                    UiAtlasStructureTreeIdChanged,  RegistrationStatusChanged)
-from ClearMap.Utils.exceptions import ClearMapAssetError, ParamsOrientationError, MissingRequirementException
+from ClearMap.Utils.exceptions import (ClearMapAssetError, ParamsOrientationError, MissingRequirementException,
+                                       NotAnOmeFile, MetadataError)
 from ClearMap.Utils.utilities import (runs_on_ui, check_stopped, DEFAULT_ORIENTATION,
                                       validate_orientation,  sanitize_n_processes)
 
@@ -657,3 +658,29 @@ def setup_mini_brain(atlas_base_name, mini_brain_scaling=(5, 5, 5)):  # TODO: sc
     atlas_path = os.path.join(Settings.atlas_folder, f'{atlas_base_name}_annotation.tif')
     arr = TifSource(atlas_path).array
     return mini_brain_scaling, sk_transform.downscale_local_mean(arr, mini_brain_scaling)
+
+
+def define_auto_resolution(img_path, cfg_res):
+    if cfg_res == 'auto':
+        cfg_res = ('auto', )*3
+    out_res = deepcopy(cfg_res)
+    if not cfg_res.count('auto'):
+        return out_res
+
+    parsed_res = None
+    try:
+        parsed_res = parse_img_res(img_path)
+    except NotAnOmeFile as e:
+        print(str(e))
+        print('Defaulting to config values')
+    except KeyError as e:
+        print(f"Could not find resolution for image {img_path}, defaulting to config")
+
+    if parsed_res is None and cfg_res.count('auto'):
+        raise MetadataError(f"Could not determine auto config for file {img_path}")
+
+    for i, ax_res in enumerate(cfg_res):
+        if ax_res == 'auto':
+            out_res[i] = parsed_res[i]
+
+    return out_res

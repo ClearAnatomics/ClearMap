@@ -13,9 +13,9 @@ from ClearMap.Alignment.Stitching import stitching_rigid as stitching_rigid
 from ClearMap.IO import conversion, io_ops, source_geometry
 from ClearMap.IO import IO as clearmap_io
 from ClearMap.IO.FileUtils import link_or_copy
-from ClearMap.IO.metadata import define_auto_stitching_params, parse_ome_info
+from ClearMap.IO.source.backends.tif_backend import parse_ome_info
 
-from ClearMap.Utils.exceptions import MissingRequirementException, ClearMapRuntimeError
+from ClearMap.Utils.exceptions import MissingRequirementException, ClearMapRuntimeError, MetadataError
 from ClearMap.Utils.tag_expression import Expression
 from ClearMap.Utils.utilities import check_stopped, sanitize_n_processes
 
@@ -679,3 +679,20 @@ class StitchingProcessor(PipelineOrchestrator):
         layout = stitching_rigid.load_layout(self.get_path('layout', channel=channel, asset_sub_type=asset_sub_type))
         overlay = self.overlay_layout_plane(layout)
         return overlay
+
+
+def define_auto_stitching_params(img_path, stitching_cfg):
+    overlaps = [stitching_cfg['overlap_x'], stitching_cfg['overlap_y']]
+    if any(overlap == 'auto' for overlap in overlaps):
+        ome_info = parse_ome_info(Path(img_path))
+        parsed_overlaps = ome_info.get('overlap') or {}
+    projection_thickness = stitching_cfg['projection_thickness']
+    for i, axis in enumerate('XY'):
+        if overlaps[i] == 'auto':
+            value = parsed_overlaps.get(axis)
+            if value is None:
+                raise MetadataError(f"Could not determine {axis} overlap from OME metadata for file {img_path}")
+            overlaps[i] = value
+        if projection_thickness[i] == 'auto':
+            projection_thickness[i] = overlaps[i]  # TODO: see if 0.9*overlaps[i] instead
+    return overlaps, projection_thickness

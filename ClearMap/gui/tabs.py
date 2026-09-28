@@ -113,13 +113,15 @@ from PyQt5.QtWidgets import QButtonGroup, QWidget, QDialog
 import pyqtgraph as pg
 from natsort import natsorted
 
-from ClearMap.Analysis.graphs.graph_filters import GraphFilter
-from ClearMap.IO.assets_constants import DATA_CONTENT_TYPES, EXTENSIONS
-
 # app = QApplication.instance()
 # if app is not None and app.applicationName() == 'ClearMap':
 #     from PyQt5.QtWebEngineWidgets import QWebEngineView
 from qdarkstyle import DarkPalette
+
+
+from ClearMap.Analysis.graphs.graph_filters import GraphFilter
+from ClearMap.IO.assets_constants import DATA_CONTENT_TYPES, EXTENSIONS
+from ClearMap.IO.source.backends.tif_backend import parse_ome_info
 
 from ClearMap.config.atlas import ATLAS_NAMES_MAP, STRUCTURE_TREE_NAMES_MAP
 
@@ -148,7 +150,7 @@ from .gui_utils_base import (format_long_nb, replace_widget, add_missing_combobo
 from .gui_utils_images import np_to_qpixmap
 from .params import (VesselParams, SampleParameters, StitchingParams, CellMapParams, GroupAnalysisParams,
                      BatchProcessingParams, RegistrationParams, TractMapParams, ColocalizationParams)
-from ClearMap.IO.metadata import parse_ome_info
+
 
 if TYPE_CHECKING:
     from ClearMap.pipeline_orchestrators.experiment_controller import AnalysisGroupController

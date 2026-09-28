@@ -17,6 +17,7 @@ __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 import re
 import warnings
 from functools import cached_property
+from pathlib import Path
 from typing import NamedTuple, Optional, List, Dict, Tuple, Any
 
 import numpy as np
@@ -28,7 +29,7 @@ import ClearMap.IO.source.Slice as cmp_clicing
 from ClearMap.IO.source.protocol import Backend
 
 from ClearMap.Utils.Lazy import lazyattr
-from ClearMap.Utils.exceptions import ClearMapValueError
+from ClearMap.Utils.exceptions import ClearMapValueError, NotAnOmeFile
 
 
 ###############################################################################
@@ -330,35 +331,21 @@ class BaseMetadataParser:
         self.info: Dict[str, Dict | Any | None] = {k: None for k in info_categories}
 
     def parse(self):
-        sequence = [
-            'order',  # First because used by shape and resolution
-            'shape',  # calls parse_pixel_metadata() (order + shape)
-            'resolution',
-            'overlap',
-            'description',
-            'tile_configuration',
-            'date',
-            'channels_excitation',
-            'stitching',
-        ]
+        dispatch = {
+            'order': self.parse_order,
+            'shape': self.parse_pixel_metadata,  # legacy aliases (so requesting 'shape' still calls parse_pixel_metadata  (order + shape)
+            'resolution': self.parse_resolution,
+            'overlap': self.parse_overlap,
+            'description': self.parse_description,
+            'tile_configuration': self.parse_tile_configuration,
+            'date': self.parse_date,
+            'channels_excitation': self.parse_channels_excitation,
+            'stitching': self.parse_stitching,
+        }
 
-        # legacy aliases (so requesting 'shape' still calls parse_pixel_metadata)
-        special = {'shape': self.parse_pixel_metadata}
-
-        for key in sequence:  # FIXME: handle dependency chains
+        for key, fn in dispatch.items():  # FIXME: handle dependency chains
             if key in self.info:
-                fn = special.get(key) or getattr(self, f'parse_{key}')
-                if fn is not None:
-                    fn()
-            # else:
-            #     fn = getattr(self, f'parse_{key}', None)
-            #     if fn:
-            #         print(f'Warning: key not found in info_categories: {key}.'
-            #               f'Trying to force call parse_{key} anyway.')
-            #         try:
-            #             fn()
-            #         except KeyError as err:
-            #             print(f'Warning: could not parse {key}: {err}')
+                fn()
 
     def update_info(self, name, keys, mdict, astype):
         value = []
@@ -379,6 +366,7 @@ class BaseMetadataParser:
         self.info['channels_excitation'] = None
 
     def parse_stitching(self):
+        warnings.warn(f"Stitching parsing is not available for {self.__class__.__name__}, skipping!")
         self.info['stitching'] = None
 
     def parse_order(self):
@@ -550,8 +538,12 @@ class OMEMetadataParser(BaseMetadataParser):
     def parse_overlap(self):
         custom_md = self.metadata.get('CustomAttributes', {}).get('PropArray', {})  # UM2
         if custom_md:
-            overlap_keys = [f'xyz-Table_{dim}_Overlap.Value' for dim in 'XY']
-            self.update_info('overlap', overlap_keys, custom_md, float)
+            overlap = {}
+            for dim in 'XY':
+                v = custom_md.get(f'xyz-Table_{dim}_Overlap', {})
+                v = v.get('Value') if isinstance(v, dict) else None
+                overlap[dim] = float(v) if v is not None else None
+            self.info['overlap'] = overlap if any(v is not None for v in overlap.values()) else None
         else:
             # Prefer pixel props if present; else percent (old behavior)
             props = self._props_map()
@@ -559,13 +551,14 @@ class OMEMetadataParser(BaseMetadataParser):
             sz_y = int(self.pixels_metadata.get('SizeY', 0))
             ovrlp_x, ovrlp_y = self._declared_overlap_px(sz_x, sz_y, props)
             if ovrlp_x is not None or ovrlp_y is not None:
-                self.info['overlap'] = (ovrlp_x, ovrlp_y)
+                self.info['overlap'] = {'X': ovrlp_x, 'Y': ovrlp_y}
             else:
-                custom_md = self.metadata.get('CustomAttributes', {}).get('Properties', {}).get('prop', {})
-                overlap_keys = [f'xyz-Table {dim} Overlap' for dim in 'XY']
-                overlaps = [float(label.get('Value')) for label in custom_md
-                            if label.get('label') in overlap_keys]
-                self.info['overlap'] = tuple(overlaps) if overlaps else None
+                prop_list = self.metadata.get('CustomAttributes', {}).get('Properties', {}).get('prop', {})
+                label_map = {p.get('label'): p.get('Value') for p in prop_list}
+                overlap = {dim: (float(label_map[f'xyz-Table {dim} Overlap'])
+                                 if label_map.get(f'xyz-Table {dim} Overlap') is not None else None)
+                           for dim in 'XY'}
+                self.info['overlap'] = overlap if any(v is not None for v in overlap.values()) else None
 
     def parse_channels_excitation(self):
         chans = self.pixels_metadata.get('Channel', [])
@@ -1153,6 +1146,40 @@ def shape_to_tif(shape, order='ZYX', dest_order='XYZ'):
 
 def array_to_tif(array, source_order='ZYX'):
     return transpose_array(array, source_order, 'XYZ')
+
+
+def parse_ome_info(img_path: Path) -> Dict[str, Any]:
+    # Ask only for what we need; 'stitching' will consult/produce tile_configuration
+    if not img_path.exists():
+        raise FileNotFoundError(f'File {img_path} not found for OME metadata parsing')
+    if not str(img_path).endswith('ome.tif'):
+        raise NotAnOmeFile(f'File {img_path} is not an OME-TIFF file')
+    src = TifSource(img_path)
+    return src.metadata(info=[
+        'order',  # First because used by shape and resolution
+        'shape',  # calls parse_pixel_metadata() (order + shape)
+        'resolution',
+        'overlap',
+        'description',
+        'tile_configuration',
+        'date',
+        'channels_excitation',
+        'stitching'
+    ])
+
+
+def _get_ome_dict(img_path: str | Path):  # WARNING: works only with recent versions of tifffile not 0.15.1
+    if not tifffile.TiffFile(img_path).is_ome:
+        raise NotAnOmeFile(f"File {img_path} is not a valid ome.tif file")
+    ome_metadata = tifffile.tiffcomment(img_path)
+    ome_dict = tifffile.xml2dict(ome_metadata)
+    return ome_dict
+
+
+def parse_img_res(img_path):
+    ome_dict = _get_ome_dict(img_path)
+    return [ome_dict['OME']['Image']['Pixels'][f'PhysicalSize{ax}'] for ax in ('X', 'Y', 'Z')]
+
 
 
 ################################################################################
