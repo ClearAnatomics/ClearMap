@@ -32,8 +32,7 @@ def get_tiles_list_from_sample_folder(src_dir: Path, min_file_number: int = 10,
                                       tile_extensions: List[str] = ['.ome.tif', '.ome.npy']) -> Dict[Path, List[Path]]:
     tile_extensions = _as_list(tile_extensions)
     data_dirs: Dict[Path, List[Path]] = {}
-    for f_name in sorted(src_dir.iterdir()):
-        f_path = src_dir / f_name
+    for f_path in sorted(src_dir.iterdir()):
         if f_path.is_dir():
             for tile_extension in tile_extensions:
                 tiles = sorted(f_path.glob(f'*{tile_extension}'))  # , recursive=True)
