@@ -1299,7 +1299,7 @@ class Layout(SourceRegion, src.AbstractSource):
         initial_locations = [s.location for s in self.sources]
 
         if match is None or method == 'infer':
-            from ClearMap.IO.metadata import PatternFinder
+            from ClearMap.IO.tile_patterns import PatternFinder
             df = PatternFinder.file_list_to_df(initial_locations)
             pattern = PatternFinder.pattern_from_df(df)
             axes = te.Expression(replace).tag_names()

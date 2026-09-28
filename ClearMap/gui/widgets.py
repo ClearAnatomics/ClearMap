@@ -68,7 +68,7 @@ from PyQt5.QtWidgets import (QWidget, QDialogButtonBox, QListWidget, QListWidget
 
 from ClearMap import Settings
 from ClearMap.IO.assets_constants import DATA_CONTENT_TYPES
-from ClearMap.IO.metadata import pattern_finders_from_base_dir, ChannelPatternSpec, PatternFinder
+from ClearMap.IO.tile_patterns import pattern_finders_from_base_dir, ChannelPatternSpec, PatternFinder
 from ClearMap.Utils.utilities import gpu_params, bytes_to_human, trim_or_pad
 from ClearMap.Visualization import Plot3d as plot_3d
 from ClearMap.Visualization.Qt.widgets import Scatter3D

@@ -154,7 +154,7 @@ from .params import (VesselParams, SampleParameters, StitchingParams, CellMapPar
 
 if TYPE_CHECKING:
     from ClearMap.pipeline_orchestrators.experiment_controller import AnalysisGroupController
-    from ClearMap.IO.metadata import ChannelPatternSpec
+    from ClearMap.IO.tile_patterns import ChannelPatternSpec
     from .pipeline_widgets import LinearPipelineWidget
     from ClearMap.pipeline_orchestrators.registration_orchestrator import RegistrationProcessor
     from ClearMap.pipeline_orchestrators.stitching_orchestrator import StitchingProcessor
