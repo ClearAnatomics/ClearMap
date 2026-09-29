@@ -53,7 +53,7 @@ _MOVED = {
     'dtype': ('ClearMap.IO.source_geometry', 'dtype'),
     'order': ('ClearMap.IO.source_geometry', 'order'),
     'element_strides': ('ClearMap.IO.source_geometry', 'element_strides'),
-    'location': ('ClearMap.IO.source_geometry', 'location'),
+    'location': ('ClearMap.IO.source_geometry', 'location'),  # FIXME: Why is location in there ??
     'memory': (f'{_BACKENDS}.sma_backend', 'memory'),
     # initialisation
     'initialize': ('ClearMap.IO.source_initialization', 'initialize'),

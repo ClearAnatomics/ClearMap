@@ -86,6 +86,7 @@ class ReprField:
     def __repr__(self):
         return f'{type(self).__name__}({self.attr!r}, {self.open + self.close!r})'
 
+
 class ReprFields:
     """Shared display fields. See ``Source.__str__``."""
     NAME     = ReprField('name')

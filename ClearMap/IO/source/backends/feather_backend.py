@@ -17,7 +17,7 @@ class FeatherSource(TableSource):
     """Table source backed by a Feather file."""
 
     backend = Backend.FEATHER
-    _name = 'Feather-Source'
+    _name = 'Feather-Source'  # FIXME
 
     @classmethod
     def _load(cls, location, **kwargs):
