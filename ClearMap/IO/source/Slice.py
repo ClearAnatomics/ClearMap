@@ -176,7 +176,7 @@ class Slice(source_mod.BaseArraySource):
         offset : int
            Offset of the memeory map in the file.
         """
-        return self.source.offset + sliced_offset(self.slicing, self.source.strides)
+        return self.source.offset + sliced_offset(self.slicing, self.source.strides, self.source.shape)
 
     @property
     def location(self):
@@ -352,15 +352,6 @@ class Slice(source_mod.BaseArraySource):
 ### Functionality
 ###############################################################################
 
-allow_index_arrays = False
-"""Default value to allow index arrays in slicing.
-
-Note
-----
-If True, allows indexing to also be integer or boolean arrays. 
-In numpy this type of indexing triggers copying of the array and the 
-sliced array is not a view into the original array.
-"""
 
 def slice_to_range(slicing, shape = None):
     """Transforms a slice object to a range.
@@ -407,7 +398,7 @@ def unpack_slicing(slicing, ndim):
         slicing = (slicing,)
     slicing = list(slicing)
 
-    n_no_newaxis = len([s for s in slicing if not (s is np.newaxis or s is None)])
+    n_no_newaxis = len([s for s in slicing if not (s is np.newaxis)])
 
     is_ellipsis = [s is Ellipsis for s in slicing]
     n_ellipsis = np.sum(is_ellipsis)
@@ -456,6 +447,13 @@ def simplify_slicing(slicing, ndim = None):
     -------
     slicing : object
         The full slice specification.
+
+    Note
+    ----
+    An index array is turned into a slice only when that is exact without knowing
+    the axis length: evenly spaced, strictly monotonic, and all of one sign. Any
+    other array (repeated indices, mixed signs, irregular spacing) is returned
+    unchanged, and the functions below then reject it as fancy indexing.
     """
     if not isinstance(slicing, tuple):
         slicing = (slicing,)
@@ -473,14 +471,10 @@ def simplify_slicing(slicing, ndim = None):
             if len(s) == 0:
                 simple.append(slice(0, 0))
                 continue
-            elif len(s) == 1 :
-                simple.append(slice(s[0], s[0]+1))
+            as_slice = _indices_to_slice(s)
+            if as_slice is not None:
+                simple.append(as_slice)
                 continue
-            else:
-                step = np.unique(np.diff(s))
-                if len(step) == 1:
-                    simple.append(slice(s[0], s[-1] + 1, step[0]))
-                    continue
 
         simple.append(s)
 
@@ -501,7 +495,7 @@ def is_view(slicing):
         True if the sliced array is a view.
     """
     for s in slicing:
-        if not isinstance(s, (slice, numbers.Integral)) and not (s is Ellipsis or s is None or s is np.newaxis):
+        if not isinstance(s, (slice, numbers.Integral)) and not (s is Ellipsis or s is np.newaxis):
             return False
     return True
 
@@ -531,43 +525,7 @@ def is_trivial(slicing):
     return True
 
 
-class _ArrayBudget:
-    """How many axes may still use fancy indexing (a 1-d boolean mask or 1-d integer array).
-
-    At most one such axis in total, of either kind, and none at all unless
-    allow_index_arrays is set. This is a single shared counter, not one per
-    kind: combining a mask on one axis with an index array on another axis
-    requires numpy to broadcast the two together into one shared output axis
-    (or raise, if their lengths disagree) -- something sliced_shape and its
-    siblings do not compute. A separate per-kind budget would silently let
-    that combination through and report a wrong shape/offset/start for it, so
-    a second fancy axis is refused regardless of what kind it is.
-
-    Note
-    ----
-    BUG FIX relative to the original module: the original tracked a bool-array
-    count and an int-array count separately, each capped at 1, which let one of
-    each through simultaneously -- a combination the module's own arithmetic
-    computes incorrectly (see the class docstring above). This is the last
-    commit meant to carry allow_index_arrays support at all; see the module
-    docstring/changelog.
-    """
-    def __init__(self, allow_index_arrays):
-        self._max = 1 if allow_index_arrays else 0
-        self._count = 0
-
-    def check_ndim(self, s, d):
-        if s.ndim != 1:
-            raise IndexError(f'Fancy slicing in dimension {d} not supported!')
-
-    def check_limit(self, s, d):
-        self._count += 1
-        if self._count > self._max:
-            name = 'Boolean' if s.dtype == bool else 'Index'
-            raise IndexError(f'{name} array slicing in dimension {d} not supported!')
-
-
-def sliced_ndim(slicing, ndim, allow_index_arrays=allow_index_arrays):
+def sliced_ndim(slicing, ndim):
     """Returns the dimension of a slicing of an array with given dimension.
 
     Arguments
@@ -584,10 +542,9 @@ def sliced_ndim(slicing, ndim, allow_index_arrays=allow_index_arrays):
 
     Note
     ----
-    Like :func:`sliced_shape`, only integers, slices and new axes are accepted:
-    anything else, including boolean or integer arrays, raises IndexError.
+    Only integers, slices and new axes are accepted: arrays (fancy indexing)
+    are no longer supported and raise IndexError, like anything else invalid.
     """
-    budget = _ArrayBudget(allow_index_arrays)
     d = 0
     for s in unpack_slicing(slicing, ndim):
         s = _standard_slice(s)
@@ -596,17 +553,32 @@ def sliced_ndim(slicing, ndim, allow_index_arrays=allow_index_arrays):
             continue
         elif isinstance(s, slice) or s is np.newaxis:  # np.newaxis is None. a slice keeps its axis, a new axis adds one
             d += 1
-        elif isinstance(s, np.ndarray):
-            budget.check_ndim(s, d)
-            budget.check_limit(s, d)
-            d += 1
         else:
             raise IndexError(f'Invalid indexing object {s!r}')
 
     return d
 
 
-def sliced_shape(slicing, shape, allow_index_arrays=allow_index_arrays):
+def _iter_axes(slicing, ndim):
+    """Yield (axis, s) for each standardized entry of the unpacked slicing.
+
+    axis is the position being consumed in the source being sliced; a new axis
+    consumes none of it, so it is yielded as (None, np.newaxis) rather than
+    advancing axis. Shared by every function below that walks a slicing axis
+    by axis and skips new axes (sliced_shape also needs to see them, to record
+    the extra length-1 dimension they add).
+    """
+    axis = -1
+    for s in unpack_slicing(slicing, ndim):
+        s = _standard_slice(s)
+        if s is np.newaxis:
+            yield None, s
+            continue
+        axis += 1
+        yield axis, s
+
+
+def sliced_shape(slicing, shape):
     """Returns the shape that results from slicing.
 
     Arguments
@@ -623,38 +595,23 @@ def sliced_shape(slicing, shape, allow_index_arrays=allow_index_arrays):
 
     Note
     ----
-    Only integers, slices and new axes are accepted: anything else, including
-    boolean or integer arrays (fancy indexing), raises IndexError.
+    Only integers, slices and new axes are accepted: arrays (fancy indexing)
+    are no longer supported and raise IndexError, like anything else invalid.
     """
     if shape is None:
         return None
 
     sliced = []
-    budget = _ArrayBudget(allow_index_arrays)
-    axis = -1
-    for s in unpack_slicing(slicing, len(shape)):
-        s = _standard_slice(s)
-        if s is np.newaxis:  # np.new_axis is None. A new axis consumes no axis of the source
+    for axis, s in _iter_axes(slicing, len(shape)):
+        if axis is None:  # a new axis consumes no axis of the source
             sliced.append(1)
             continue
-        axis += 1
 
         if isinstance(s, int):
             if s >= shape[axis] or -s > shape[axis]:
                 raise IndexError(f'Index out of range in dimension {axis:d}!')
         elif isinstance(s, slice):
-            start, stop, step = s.indices(shape[axis])
-            sliced.append((stop - start - 1) // step + 1)
-        elif isinstance(s, np.ndarray):
-            budget.check_ndim(s, axis)
-            if s.dtype == bool:
-                if len(s) != shape[axis]:
-                    raise IndexError(f'The boolean indexing has different shape {len(s)} than the source {shape[axis]} in dimension {axis}!')
-            else:
-                if np.any(s >= shape[axis]) or np.any(-s > shape[axis]):
-                    raise IndexError(f'Index out of range in dimension {axis}!')
-            budget.check_limit(s, axis)
-            sliced.append(np.sum(s) if s.dtype == bool else len(s))
+            sliced.append(_slice_length(s, shape[axis]))
         else:
             raise IndexError(f'Invalid indexing object {s!r}')
 
@@ -682,7 +639,7 @@ def _contiguity_step(size, shape_d, is_initial, is_subslice):
     return False, True
 
 
-def sliced_order(slicing, order, shape,  allow_index_arrays =allow_index_arrays):
+def sliced_order(slicing, order, shape):
     """Returns the contiguous order of a sliced array.
 
     Arguments
@@ -699,10 +656,7 @@ def sliced_order(slicing, order, shape,  allow_index_arrays =allow_index_arrays)
     order : 'C', 'F' or None
         The order of the sliced source.
     """
-    if order is None:
-        return None
-
-    if shape is None:
+    if order is None or shape is None:
         return None
 
     slicing = unpack_slicing(slicing, len(shape))
@@ -712,45 +666,29 @@ def sliced_order(slicing, order, shape,  allow_index_arrays =allow_index_arrays)
         shape   = shape[::-1]
 
     # check order
-    budget = _ArrayBudget(allow_index_arrays)
     is_subslice = False
     is_initial = True
-    d = -1
-    for s in slicing:
-        d += 1
-        s = _standard_slice(s)
+    for axis, s in _iter_axes(slicing, len(shape)):
+        if axis is None:  # a new axis consumes no axis of the source and does not affect contiguity
+            continue
 
         if isinstance(s, int):
-            if s >= shape[d] or -s > shape[d]:
-                raise IndexError(f'Index out of range in dimension {d:d}!')
+            if s >= shape[axis] or -s > shape[axis]:
+                raise IndexError(f'Index out of range in dimension {axis:d}!')
             size = 1
         elif isinstance(s, slice):
             if s == slice(None):
                 is_initial = False
                 is_subslice = True
                 continue
-            start, stop, step = s.indices(shape[d])
-            size = (stop - start - 1) // step + 1
-            if size != 1 and step > 1:
+            size = _slice_length(s, shape[axis])
+            step = s.indices(shape[axis])[2]
+            if size > 1 and step != 1:  # strided or reversed
                 return None
-        elif isinstance(s, np.ndarray) and s.dtype == bool:
-            budget.check_ndim(s, d)
-            if len(s) != shape[d]:
-                raise IndexError(f'The boolean indexing has different shape {len(s)} than the source {shape[d]} in dimension {d}!')
-            budget.check_limit(s, d)
-            size = np.sum(s)
-        elif isinstance(s, np.ndarray) and s.dtype == int:
-            budget.check_ndim(s, d)
-            if np.any(s >= shape[d]) or np.any(-s > shape[d]):
-                raise IndexError(f'Index out of range in dimension {d}!')
-            budget.check_limit(s, d)
-            size = len(s)
-        elif s is np.newaxis or s is None:
-            continue
         else:
             raise IndexError(f'Invalid indexing object {s!r}')
 
-        result = _contiguity_step(size, shape[d], is_initial, is_subslice)
+        result = _contiguity_step(size, shape[axis], is_initial, is_subslice)
         if result is None:
             return None
         is_initial, is_subslice = result
@@ -758,7 +696,7 @@ def sliced_order(slicing, order, shape,  allow_index_arrays =allow_index_arrays)
     return order
 
 
-def sliced_offset(slicing, strides, shape=None, allow_index_arrays=allow_index_arrays):
+def sliced_offset(slicing, strides, shape=None):
     """Returns the offset to the first element of the slicing into a buffer with given strides.
 
     Arguments
@@ -774,13 +712,9 @@ def sliced_offset(slicing, strides, shape=None, allow_index_arrays=allow_index_a
         Offset into the sliced array.
     """
     offset = 0
-    budget = _ArrayBudget(allow_index_arrays)
-    axis = -1
-    for s in unpack_slicing(slicing, len(strides)):
-        s = _standard_slice(s)
-        if s is np.newaxis:
+    for axis, s in _iter_axes(slicing, len(strides)):
+        if axis is None:
             continue
-        axis += 1
 
         if isinstance(s, int):
             if s < 0:
@@ -791,32 +725,7 @@ def sliced_offset(slicing, strides, shape=None, allow_index_arrays=allow_index_a
                     raise IndexError(f'Index out of bounds in dimension {axis:d}!')
             offset += s * strides[axis]
         elif isinstance(s, slice):
-            start = s.start or 0
-            if start < 0:
-                if shape is None:
-                    raise IndexError('Cannot determine offset without shape!')
-                start = shape[axis] + start
-                start = 0 if start < 0 else start
-            offset += start * strides[axis]
-        elif isinstance(s, np.ndarray):
-            budget.check_ndim(s, axis)
-            budget.check_limit(s, axis)
-            if s.dtype == bool:
-                first = np.where(s)[0]
-                if len(first) == 0:
-                    raise IndexError(f'There is not True value in boolean array slicing in dimension {axis}!')
-                first = first[0]
-            else:
-                if len(s) == 0:
-                    raise IndexError(f'There is no index in array slicing in dimension {axis}!')
-                first = s[0]
-                if first < 0:
-                    if shape is None:
-                        raise IndexError('Cannot determine offset without shape!')
-                    first = shape[axis] + first
-                    if first < 0:
-                        raise IndexError(f'Index out of bounds in dimension {axis}!')
-            offset += first * strides[axis]
+            offset += _slice_first(s, shape, axis, 'offset') * strides[axis]
         else:
             raise IndexError(f'Invalid indexing object {s!r}')
 
@@ -858,7 +767,7 @@ def sliced_strides(slicing, strides):
     return tuple(sliced)
 
 
-def sliced_start(slicing, shape, allow_index_arrays=allow_index_arrays):
+def sliced_start(slicing, shape):
     """Returns the starting position of the slicing in the original source.
 
     Arguments
@@ -871,53 +780,29 @@ def sliced_start(slicing, shape, allow_index_arrays=allow_index_arrays):
     Returns
     -------
     start : tuple of int
-        Start position of the slicing in the original source.
+        Start position of the slicing in the original source: along each axis, the
+        position of the first element read (for a reversed slice, its high end).
     """
     start = []
-    budget = _ArrayBudget(allow_index_arrays)
-    axis = -1
-    for s in unpack_slicing(slicing, len(shape)):
-        s = _standard_slice(s)
-        if s is np.newaxis:
+    for axis, s in _iter_axes(slicing, len(shape)):
+        if axis is None:
             continue
-        axis += 1
 
         if isinstance(s, int):
             if s < 0:
                 s = shape[axis] + s
             if s < 0:
-                raise IndexError(f'Index out of bounds in dimension {s:d}!')  # FIXME: should be {axis}, not {s}
+                raise IndexError(f'Index out of bounds in dimension {axis:d}!')
             start.append(s)
         elif isinstance(s, slice):
-            first = s.start or 0
-            if first < 0:
-                first = shape[axis] + first
-                first = 0 if first < 0 else first
-            start.append(first)
-        elif isinstance(s, np.ndarray):
-            budget.check_ndim(s, axis)
-            budget.check_limit(s, axis)
-            if s.dtype == bool:
-                start = np.where(s)[0]  # FIXME: (kept): shadows the accumulator `start`
-                if len(start) == 0:
-                    raise IndexError(f'There is not True value in boolean array slicing in dimension {axis}!')
-                start.append(start[0])  # FIXME: ndarray has no .append -> always raises AttributeError here
-            else:
-                if len(s) == 0:
-                    raise IndexError(f'There is no index in array slicing in dimension {axis}!')
-                first = s[0]
-                if first < 0:
-                    first = shape[axis] + first
-                    if first < 0:
-                        raise IndexError(f'Index out of bounds in dimension {axis}')
-                start.append(first)
+            start.append(_slice_first(s, shape, axis, 'start'))
         else:
             raise IndexError(f'Invalid indexing object {s!r}')
 
     return tuple(start)
 
 
-def sliced_slicing(slicing_second, slicing_first, shape, allow_index_arrays = allow_index_arrays):
+def sliced_slicing(slicing_second, slicing_first, shape):
     """Returns a slicing of a slicing if possible.
 
     Arguments
@@ -932,13 +817,20 @@ def sliced_slicing(slicing_second, slicing_first, shape, allow_index_arrays = al
     Returns
     -------
     slicing : object
-        The reduced slicing.
+        The reduced slicing: source[slicing] selects the same elements as
+        source[slicing_first][slicing_second].
 
     Note
     ----
-    After simplification, slicing_first may only contain integers, slices and new axes:
-    sliced_shape rejects anything else. Boolean masks in slicing_second are turned into
-    index arrays by simplify_slicing.
+    After simplification, both slicing_first and slicing_second may only contain
+    integers, slices and new axes: an irregular array or mask that simplify_slicing
+    cannot turn into an equivalent slice is invalid in either one.
+
+    Each axis of slicing_first is resolved to a range of source positions, and the
+    matching entry of slicing_second is applied to that range: Python's own range
+    indexing does the composition, for any sign of step and with numpy's
+    out-of-range rules for integers. The one case that cannot be reduced is an
+    empty slice of a new axis made by slicing_first; it raises IndexError.
     """
     shape1 = shape
     slicing1 = simplify_slicing(slicing_first, len(shape1))
@@ -946,14 +838,35 @@ def sliced_slicing(slicing_second, slicing_first, shape, allow_index_arrays = al
     shape2 = sliced_shape(slicing1, shape1)  # also validates slicing1, see Note
     slicing2 = simplify_slicing(slicing_second, len(shape2))
 
+    def next_second_index(d2):
+        """Advance to the next non-newaxis entry of slicing2, appending np.newaxis to
+        the (enclosing) `slicing` output for every new axis skipped along the way.
+        Returns the new d2 and that entry. d2 is a position in slicing2 only; the
+        length an entry is resolved against comes from slicing1, never shape2[d2].
+        """
+        d2 += 1
+        s2 = _standard_slice(slicing2[d2])
+        while s2 is np.newaxis:
+            slicing.append(np.newaxis)
+            d2 += 1
+            s2 = _standard_slice(slicing2[d2])
+        return d2, s2
+
+    def resolve_second(selected, s2, d2):
+        """Apply second index s2 to `selected`, the range of source positions one axis
+        of slicing1 selected. An int gives one position, a slice a sub-range."""
+        if isinstance(s2, int):
+            try:
+                return selected[s2]
+            except IndexError:
+                raise IndexError(f'Index {s2:d} in second slicing out of range in dimension {d2:d}!') from None
+        elif isinstance(s2, slice):
+            return selected[s2]
+        raise IndexError(f'The index at dimension {d2:d} in second slicing is invalid!')
+
     d1 = -1
     d2 = -1
     slicing = []
-    index_array1 = 0
-    bool_array1 = 0
-    index_array2 = 0
-    bool_array2 = 0
-    max_arrays = 1 if allow_index_arrays else 0
 
     for s1 in slicing1:
         s1 = _standard_slice(s1)
@@ -965,232 +878,33 @@ def sliced_slicing(slicing_second, slicing_first, shape, allow_index_arrays = al
             slicing.append(s1)
         elif isinstance(s1, slice):
             d1 += 1
-            start1,stop1,step1 = s1.indices(shape1[d1])
-
-            d2 += 1
-            s2 = _standard_slice(slicing2[d2])
-
-            while s2 is np.newaxis or s2 is None:
-                d2 += 1
-                s2 = _standard_slice(slicing2[d2])
-                slicing.append(np.newaxis)
-
-            if isinstance(s2, int):
-                if s2 < 0:
-                    s = stop1 + step1 * s2
-                else:
-                    s = start1 + step1 * s2
-                if s < start1 or s > stop1 or s > shape1[d1]:
-                    raise ValueError(f'Index {s:d} in second slicing out of range in dimension {d2:d}!')
-                slicing.append(s)
-            elif isinstance(s2, slice):
-                start2, stop2, step2 = s2.indices(shape2[d2])
-                start = start1 + start2
-                stop = start1 +  stop2
-                stop = min(stop1, stop)
-                step = step1 * step2
-                start = None if start == 0 else start
-                stop = None if stop == shape1[d1] else stop
-                step = None if step == 1 else step
-                slicing.append(slice(start, stop, step))
-            elif isinstance(s2, np.ndarray) and s2.dtype == bool:
-                if s2.ndim != 1:
-                    raise IndexError(f'Fancy second slicing in dimension {d2:d} not supported!')
-                bool_array2 += 1
-                if bool_array2 > max_arrays:
-                    raise IndexError(f'Second boolean array slicing in dimension {d2:d} not supported!')
-                if len(s2) != shape2[d2]:
-                    raise IndexError(f'Second boolean array slicing with shape {len(s2):d} is not of shape {shape2[d2]:d} in dimension {d2:d}!')
-                slicing.append(np.arange(start1, stop1, step1)[s2])
-            elif isinstance(s2, np.ndarray) and s2.dtype == int:
-                if s2.ndim != 1:
-                    raise IndexError(f'Fancy second slicing in dimension {d2:d} not supported!')
-                index_array2 += 1
-                if index_array2 > max_arrays:
-                    raise IndexError(f'Second index array slicing in dimension {d2:d} not supported!')
-                try:
-                    slicing.append(np.arange(start1, stop1, step1)[s2])
-                except:
-                    raise IndexError(f'Index out of range in second array slicing in dimension {d2:d}!')
+            d2, s2 = next_second_index(d2)
+            selected = resolve_second(range(*s1.indices(shape1[d1])), s2, d2)
+            if isinstance(selected, range):
+                slicing.append(_range_to_slice(selected, shape1[d1]))
             else:
-                raise IndexError(f'The index at dimension {d2:d} in second slicing is invalid!')
-        elif isinstance(s1, np.ndarray) and s1.dtype == bool:
-            d1 += 1
-            if s1.ndim != 1:
-                raise IndexError(f'Fancy slicing in dimension {d1:d} not supported!')
-            bool_array1 += 1
-            if bool_array1 > max_arrays:
-                raise IndexError(f'Boolean array slicing in dimension {d1:d} not supported!')
-            if len(s1) != shape1[d1]:
-                raise IndexError(f'Boolean array slicing with shape {len(s1):d} is not of shape {shape1[d1]:d} in dimension {d1:d}!')
-            s1 = np.where(s1)[0]
-
-            d2 += 1
-            s2 = _standard_slice(slicing2[d2])
-
-            while s2 is np.newaxis or s2 is None:
-                d2 += 1
-                s2 = _standard_slice(slicing2[d2])
+                slicing.append(selected)
+        elif s1 is np.newaxis: # slicing1 made a length-1 axis here that the source does not have
+            d2, s2 = next_second_index(d2)
+            selected = resolve_second(range(1), s2, d2)
+            if isinstance(selected, range):
+                if len(selected) == 0:
+                    raise IndexError(f'Empty slice of a new axis cannot be reduced in dimension {d2}!')
                 slicing.append(np.newaxis)
-
-            if isinstance(s2, int):
-                try:
-                    s = s1[s2]
-                except:
-                    raise IndexError(f'Index {s:d} in second slicing out of range in dimension {d2:d}!')
-                if s > shape1[d1] or -s > shape1[d1]:
-                    raise ValueError(f'Index {s:d} in second slicing out of range in dimension {d2:d}!')
-                slicing.append(s)
-            elif isinstance(s2, slice):
-                try:
-                    slicing.append(s1[s2])
-                except:
-                    raise IndexError(f'Index out of range in second slicing in dimension {d2:d}!')
-            elif isinstance(s2, np.ndarray) and s2.dtype == bool:
-                if s2.ndim != 1:
-                    raise IndexError(f'Fancy second slicing in dimension {d2:d} not supported!')
-                bool_array2 += 1
-                if bool_array2 > max_arrays:
-                    raise IndexError(f'Second boolean array slicing in dimension {d2:d} not supported!')
-                if len(s2) != shape2[d2]:
-                    raise IndexError(f'Second boolean array slicing with shape {len(s2):d} is not an array'
-                                     f' with shape {shape2[d2]:d} in dimension {d2:d}!')
-                s1 = np.where(s1)[0]
-                try:
-                    slicing.append(s1[s2])
-                except:
-                    raise IndexError(f'Index out of range in second slicing in dimension {d2:d}!')
-            elif isinstance(s2, np.ndarray) and s2.dtype == int:
-                if s2.ndim != 1:
-                    raise IndexError(f'Fancy second slicing in dimension {d2:d} not supported!')
-                index_array2 += 1
-                if index_array2 > max_arrays:
-                    raise IndexError(f'Second index array slicing in dimension {d2:d} not supported!')
-                if len(s2) == 0:
-                    raise IndexError(f'There is no index in second array slicing in dimension {d2:d}!')
-                try:
-                    slicing.append(s1[s2])
-                except:
-                    raise IndexError(f'Index out of range in second slicing in dimension {d2:d}!')
-            else:
-                raise IndexError(f'The index at dimension {d2:d} in second slicing is invalid!')
-        elif isinstance(s1, np.ndarray) and s1.dtype == int:
-            d1 += 1
-            if s1.ndim != 1:
-                raise IndexError(f'Fancy slicing in dimension {d1:d} not supported!')
-            index_array1 += 1
-            if index_array1 > max_arrays:
-                raise IndexError(f'Integer array slicing in dimension {d1:d} not supported!')
-            if len(s1) == 0:
-                raise IndexError(f'There is no index in array slicing in dimension {d1:d}!')
-
-            d2 += 1
-            s2 = _standard_slice(slicing2[d2])
-
-            while s2 is np.newaxis or s2 is None:
-                d2 += 1
-                s2 = _standard_slice(slicing2[d2])
-                slicing.append(np.newaxis)
-
-            if isinstance(s2, int):
-                try:
-                    s = s1[s2]
-                except:
-                    raise IndexError('Index %d in second slicing out of range in dimension %d!' % (s, d2))
-                if s > shape1[d1] or -s > shape1[d1]:
-                    raise ValueError('Index %d in second slicing out of range in dimension %d!' % (s, d2))
-                slicing.append(s)
-            elif isinstance(s2, slice):
-                try:
-                    slicing.append(s1[s2])
-                except:
-                    raise IndexError('Index out of range in second slicing in dimension %d!' % d2)
-            elif isinstance(s2, np.ndarray) and s2.dtype == bool:
-                if s2.ndim != 1:
-                    raise IndexError('Fancy second slicing in dimension %d not supported!' % d2)
-                bool_array2 += 1
-                if bool_array2 > max_arrays:
-                    raise IndexError('Second boolean array slicing in dimension %d not supported!' % d2)
-                if len(s2) != shape2[d2]:
-                    raise IndexError('Second boolean array slicing with shape %d is not an array with shape %d in dimension %d!' % (len(s2), shape2[d2], d2))
-                try:
-                    slicing.append(s1[s2])
-                except:
-                    raise IndexError('Index out of range in second slicing in dimension %d!' % d2)
-            elif isinstance(s2, np.ndarray) and s2.dtype == int:
-                if s2.ndim != 1:
-                    raise IndexError('Fancy second slicing in dimension %d not supported!' % d2)
-                index_array2 += 1
-                if index_array2 > max_arrays:
-                    raise IndexError('Second index array slicing in dimension %d not supported!' % d2)
-                if len(s2) == 0:
-                    raise IndexError('There is no index in second array slicing in dimension %d!' % d2)
-                try:
-                    slicing.append(s1[s2])
-                except:
-                    raise IndexError('Index out of range in second slicing in dimension %d!' % d2)
-            else:
-                raise IndexError('The index at dimension %d in second slicing is invalid!' % d2)
-
-        elif s1 is np.newaxis or s2 is None:
-            d2 += 1
-            s2 = _standard_slice(slicing2[d2])
-
-            while s2 is np.newaxis or s2 is None:
-                d2 += 1
-                s2 = _standard_slice(slicing2[d2])
-                slicing.append(np.newaxis)
-
-            assert shape2[d2] == 1
-
-            if isinstance(s2, int):
-                if s2 not in [0,-1]:
-                    raise IndexError('Index %d in second slicing out of range in dimension %d!' % (s, d2))
-            elif isinstance(s2, slice):
-                start, stop, step = s2.indices(1)
-                if start == 1 or stop == 0:
-                    raise IndexError('Empty slice of a new axis cannot be reduced in dimension %d!' % d2)
-                else:
-                    slicing.append(np.newaxis)
-            elif isinstance(s2, np.ndarray) and s2.dtype == bool:
-                if s2.ndim != 1:
-                    raise IndexError('Fancy second slicing in dimension %d not supported!' % d2)
-                bool_array2 += 1
-                if bool_array2 > max_arrays:
-                    raise IndexError('Second boolean array slicing in dimension %d not supported!' % d2)
-                if len(s2) != shape2[d2]:
-                    raise IndexError('Second boolean array slicing with shape %d is not of shape %d in dimension %d!' % (len(s2), shape2[d2], d2))
-                if s2[0] == False:
-                    raise IndexError('Empty slice of a new axis cannot be reduced in dimension %d!' % d2)
-                else:
-                    slicing.append(np.newaxis)
-            elif isinstance(s2, np.ndarray) and s2.dtype == int:
-                if s2.ndim != 1:
-                    raise IndexError('Fancy second slicing in dimension %d not supported!' % d2)
-                index_array2 += 1
-                if index_array2 > max_arrays:
-                    raise IndexError('Second index array slicing in dimension %d not supported!' % d2)
-                if len(s2) != shape2[d2]:
-                    raise IndexError('Second boolean array slicing with shape %d is not of shape %d in dimension %d!' % (len(s2), shape2[d2], d2))
-                if s2[0] not in [0,-1]:
-                    raise IndexError('Index %d in second slicing out of range in dimension %d!' % (s, d2))
-                slicing.append(np.newaxis)
-            else:
-                raise IndexError('The index at dimension %d in second slicing is invalid!' % d2)
+            # an int (0 or -1) takes the new axis away again: nothing to append
         else:
-            raise IndexError(f'The index at dimension {d1:d} in first slicing is invalid!')
+            raise IndexError(f'The index at dimension {d1} in first slicing is invalid!')
 
-    d2 += 1
-    while d2 < len(slicing2):
-        if not (slicing2[d2] is np.newaxis or slicing2[d2] is None):
-            raise IndexError(f'The index at dimension {d2:d} in second slicing is invalid!')
-        else:
-            slicing.append(np.newaxis)
+    # anything left in slicing2 must be trailing new axes
+    for s2 in slicing2[d2 + 1:]:
+        if s2 is not np.newaxis:
+            raise IndexError(f'The index at dimension {d2} in second slicing is invalid!')
+        slicing.append(np.newaxis)
 
     return tuple(slicing)
 
 
-def sliced_reduction(slicing, ndim, allow_index_arrays = allow_index_arrays):
+def sliced_reduction(slicing, ndim):
     """Returns a slicing that slices a list retaining only full dimensions in the slice.
 
     Arguments
@@ -1205,38 +919,14 @@ def sliced_reduction(slicing, ndim, allow_index_arrays = allow_index_arrays):
     slicing : object
         Slice specification that reduces a list of length ndim to the new dimensions of the slice.
     """
-    slicing = unpack_slicing(slicing, ndim)
-
     reduction = []
-    index_array = 0
-    bool_array = 0
-    max_arrays = 1 if allow_index_arrays else 0
-    d = -1
-    for s in slicing:
-        s = _standard_slice(s)
-        if s is np.newaxis:
+    for d, s in _iter_axes(slicing, ndim):
+        if d is None:
             continue
-        d += 1
 
         if isinstance(s, int):
             continue
         elif isinstance(s, slice):
-            reduction.append(d)
-        elif isinstance(s, np.ndarray) and s.dtype == bool:
-            if s.ndim != 1:
-                raise IndexError(f'Fancy slicing in dimension {d:d} not supported!')
-            bool_array += 1
-            if bool_array > max_arrays:
-                raise IndexError(f'Boolean array slicing in dimension {d:d} not supported!')
-            reduction.append(d)
-        elif isinstance(s, np.ndarray) and s.dtype == int:
-            if s.ndim != 1:
-                raise IndexError(f'Fancy slicing in dimension {d:d} not supported!')
-            index_array += 1
-            if index_array > max_arrays:
-                raise IndexError(f'Index array slicing in dimension {d:d} not supported!')
-            if len(s) == 0:
-                raise IndexError(f'There is no index in array slicing in dimension {d:d}!')
             reduction.append(d)
         else:
             raise IndexError(f'Invalid indexing object {s!r}')
@@ -1247,6 +937,90 @@ def sliced_reduction(slicing, ndim, allow_index_arrays = allow_index_arrays):
 ###############################################################################
 ### Helpers
 ###############################################################################
+
+def _slice_length(s, axis_length):
+    """Number of elements slice s selects from an axis of the given length (0 if empty, any step)."""
+    return len(range(*s.indices(axis_length)))
+
+
+def _clip_range_val(value, low, high):
+    """value as a slice bound, or None if it is at or beyond either edge of the axis.
+
+    A start or stop at the edge a slice defaults to, or past it, selects the same
+    elements as None, so None is the shorter spelling. low and high are those
+    edges for the slice's direction:
+
+    * positive step: (0, axis_length) -- runs from 0 up to axis_length;
+    * negative step: (-1, axis_length - 1) -- runs from axis_length - 1 down to
+      past 0. Here the edge value -1 must never be written as a bound: a slice
+      reads -1 as "the last element", which is why it becomes None.
+    """
+    return None if value <= low or value >= high else value
+
+
+def _range_to_slice(r, axis_length):
+    """The shortest slice that selects exactly the elements of range r from an axis of the given length.
+
+    r comes from slicing a range(*s.indices(axis_length)), so its elements are
+    valid, non-negative positions. Its own stop is not reused: stepping backwards
+    past index 0 gives a negative stop, which a slice would read as counting from
+    the end. The stop is rebuilt one step past the last element instead, and set
+    to None where that falls off either end of the axis.
+    """
+    if len(r) == 0:
+        return slice(0, 0)
+    step = r.step
+    if step > 0:
+        low, high, stop = 0, axis_length, r[-1] + 1
+    else:
+        low, high, stop = -1, axis_length - 1, r[-1] - 1
+    return slice(_clip_range_val(r[0], low, high),
+                 _clip_range_val(stop, low, high),
+                 None if step == 1 else step)
+
+
+def _slice_first(s, shape, axis, what):
+    """Position along the axis of the first element slice s reads: where numpy's view of it starts.
+
+    For a negative step that is the high end of the range, not s.start, and it can
+    only be found from the axis length; without a shape it raises rather than guess.
+    """
+    if shape is not None:
+        return max(s.indices(shape[axis])[0], 0)  # max: a reversed slice of an empty axis gives -1
+    if s.step is not None and s.step < 0:
+        raise IndexError(f'Cannot determine {what} of a reversed slice without shape!')
+    first = s.start or 0
+    if first < 0:  # FIXME: improve error message.
+        raise IndexError(f'Cannot determine {what} without shape!')
+    return first
+
+
+def _indices_to_slice(indices):
+    """A slice selecting exactly the given 1-d integer indices, in order, or None if there is none.
+
+    Only exact without knowing the axis length when the indices are evenly spaced
+    with a non-zero step and all of one sign (all >= 0, or all < 0 i.e. all counted
+    from the end). The stop is placed one step past the last index; if that crosses
+    zero it would change meaning (e.g. -1 + 1 == 0 is the first element, not "past
+    the end"), so it becomes None there.
+    """
+    if indices.ndim != 1 or len(indices) == 0:
+        return None
+    first, last = int(indices[0]), int(indices[-1])
+    if len(indices) == 1:
+        step = 1
+    else:
+        steps = np.unique(np.diff(indices))
+        if len(steps) != 1 or steps[0] == 0:
+            return None
+        step = int(steps[0])
+    if not (np.all(indices >= 0) or np.all(indices < 0)):
+        return None
+    stop = last + (1 if step > 0 else -1)
+    if (last >= 0) != (stop >= 0):  # stepped across 0: past the end of the axis
+        stop = None
+    return slice(first, stop, None if step == 1 else step)
+
 
 def _standard_slice(s):
     if s is Ellipsis:
@@ -1282,13 +1056,13 @@ def _slicing_to_str(slicing, ndim):
             else:
                 for r in [s.start, s.stop, s.step]:
                     if r is not None:
-                        info += '%d' % r
+                        info += f'{r:d}'
                     info += ':'
                 if s.step is None:
                     info = info[:-1]
                 info = info[:-1]
         else:
-            info += '%r' % s
+            info += f'{s!r}'
         info += ','
     info = info[:-1] + ')'
     return info
@@ -1304,14 +1078,17 @@ def _test():
     from importlib import reload
     reload(slc)
 
+    # NOTE: allow_index_arrays has been removed; [1,2,3,4,5] below is a regular run so
+    # simplify_slicing still turns it into a slice, but an irregular array like the old
+    # [0,2,1] example is no longer valid input anywhere in this module.
     s1 = (slice(1,4), [1,2,3,4,5], None, Ellipsis)
     ss = slc.simplify_slicing(s1, ndim = 5)
     print(ss)
 
     shape = (7,6,2,3,5)
 
-    d1 = slc.sliced_ndim(s1, 5, allow_index_arrays = True)
-    shape1 = slc.sliced_shape(s1, shape, allow_index_arrays=True)
+    d1 = slc.sliced_ndim(s1, 5)
+    shape1 = slc.sliced_shape(s1, shape)
     print(d1, shape1)
 
     x = np.random.rand(*shape)
@@ -1319,8 +1096,8 @@ def _test():
     x1.shape == shape1
 
 
-    s2 = (slice(None, None, 2), slice(3,4), slice(None), 1, [0,2,1])
-    s12 = slc.sliced_slicing(s2, s1, shape, allow_index_arrays=True)
+    s2 = (slice(None, None, 2), slice(3,4), slice(None), 1, slice(0, 3, 2))
+    s12 = slc.sliced_slicing(s2, s1, shape)
 
     np.all(x[s12] == x[s1][s2])
 
