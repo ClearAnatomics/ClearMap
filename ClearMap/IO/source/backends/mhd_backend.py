@@ -74,7 +74,13 @@ class MhdSource(source_mod.ArraySource):
 
     @property
     def shape(self):
-        return self._info.shape
+        """Shape of the array view (after transposition), i.e. header DimSize order (x, y, z).
+
+        .. note:: ``_info.shape`` is the shape of the raw C-ordered buffer on disk (reversed DimSize),
+            not the shape of the array this source exposes.
+        """
+        info = self._info
+        return tuple(info.shape[i] for i in info.transpose)
 
     @property
     def dtype(self):
@@ -82,7 +88,14 @@ class MhdSource(source_mod.ArraySource):
 
     @property
     def order(self):
-        return self._info.order
+        """Memory order of the array view.
+
+        The raw buffer is read in C order and reversed by the transposition, so the exposed
+        array is F-contiguous. npy files referenced by an mhd header are not transposed and stay C.
+        """
+        info = self._info
+        is_transposed = info.transpose != tuple(range(len(info.shape)))
+        return 'F' if is_transposed else info.order
 
     @property
     def offset(self):
