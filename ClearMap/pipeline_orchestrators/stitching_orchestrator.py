@@ -11,11 +11,12 @@ from ClearMap.Alignment.Stitching import stitching_wobbly as stitching_wobbly
 from ClearMap.Alignment.Stitching import stitching_rigid as stitching_rigid
 
 from ClearMap.IO import conversion, io_ops, source_geometry
+from ClearMap.IO.assets_constants import EXTENSIONS
 from ClearMap.IO import IO as clearmap_io
 from ClearMap.IO.FileUtils import link_or_copy
 from ClearMap.IO.source.backends.tif_backend import parse_ome_info
 
-from ClearMap.Utils.exceptions import MissingRequirementException, ClearMapRuntimeError, MetadataError
+from ClearMap.Utils.exceptions import MissingRequirementException, ClearMapRuntimeError, MetadataError, NotAnOmeFile
 from ClearMap.Utils.tag_expression import Expression
 from ClearMap.Utils.utilities import check_stopped, sanitize_n_processes
 
@@ -681,17 +682,47 @@ class StitchingProcessor(PipelineOrchestrator):
         return overlay
 
 
+# Tile extensions the stitching backend can handle. Tile discovery reports the full compound
+# extension of the microscope tiles (.ome.tif, .ome.npy), so those are part of the choices.
+STITCHABLE_TILE_EXTENSIONS = (*EXTENSIONS['image'], '.ome.tif', '.ome.npy')
+
+
+def supports_auto_overlap(extension: str) -> bool:
+    """The 'auto' overlap is read from the OME metadata, so it needs .ome.tif tiles (see parse_ome_info)."""
+    return str(extension).endswith('ome.tif')
+
+
 def define_auto_stitching_params(img_path, stitching_cfg):
+    """
+    Resolve the 'auto' overlaps (and projection thickness) of the rigid stitching.
+
+    'auto' overlaps are read from the OME metadata of the tile at ``img_path``, so they can only be
+    resolved for ``.ome.tif`` tiles. For any other tile type the overlap must be set explicitly.
+    The config is not modified.
+
+    Returns
+    -------
+    overlaps : list
+        [overlap_x, overlap_y]
+    projection_thickness : list
+        The projection thickness with 'auto' replaced by the matching overlap.
+    """
     overlaps = [stitching_cfg['overlap_x'], stitching_cfg['overlap_y']]
+    projection_thickness = list(stitching_cfg['projection_thickness'])  # copy: do not mutate the config
+    parsed_overlaps = {}
     if any(overlap == 'auto' for overlap in overlaps):
-        ome_info = parse_ome_info(Path(img_path))
+        try:
+            ome_info = parse_ome_info(Path(img_path))
+        except NotAnOmeFile as err:
+            raise MetadataError(f'Cannot resolve the "auto" stitching overlap: tile {img_path} is not an OME-TIFF '
+                                f'(no OME metadata). Set overlap_x and overlap_y explicitly for this channel.') from err
         parsed_overlaps = ome_info.get('overlap') or {}
-    projection_thickness = stitching_cfg['projection_thickness']
     for i, axis in enumerate('XY'):
         if overlaps[i] == 'auto':
             value = parsed_overlaps.get(axis)
             if value is None:
-                raise MetadataError(f"Could not determine {axis} overlap from OME metadata for file {img_path}")
+                raise MetadataError(f"Could not determine {axis} overlap from OME metadata for file {img_path}. "
+                                    f"Set overlap_{axis.lower()} explicitly for this channel.")
             overlaps[i] = value
         if projection_thickness[i] == 'auto':
             projection_thickness[i] = overlaps[i]  # TODO: see if 0.9*overlaps[i] instead

@@ -789,11 +789,34 @@ class RigidChannelStitchingParams(ChannelUiParameter):
     def cfg_subtree(self):
         return ['stitching', 'channels', self.name, 'rigid']   # REFACTOR: section name from config_handler
 
+    OVERLAP_ATTRS = ('x_overlap', 'y_overlap')
+
     def set_visible(self, state):
         self.tab.rigidParamsGroupBox.setVisible(state)
 
     def set_enabled(self, state):
         self.tab.rigidParamsGroupBox.setEnabled(state)
+
+    def set_auto_overlap_allowed(self, allowed: bool, reason: str = '') -> None:
+        """
+        Allow or forbid the 'auto' overlap (read from the OME metadata of the tiles).
+
+        When forbidden (tiles without OME metadata), the overlap global toggle is forced on
+        (i.e. manual values) and locked. If the config still holds 'auto', the value shown in
+        the spinboxes (the default on enable) is written to the config so that the UI and config agree.
+        When allowed again, the toggle is simply unlocked (the current value is kept).
+        """
+        for attr in self.OVERLAP_ATTRS:
+            link = self.params_dict[attr]
+            check_box = link.widget.getCheckBox()
+            if check_box is None:
+                continue
+            if not allowed and not check_box.isChecked():
+                with self._suppress_handlers():  # Do not patch the config for the toggle itself
+                    check_box.setChecked(True)
+                self._emit_patch(link.keys, getattr(self, attr))  # Now UI == config, no silent mismatch
+            check_box.setEnabled(allowed)
+            check_box.setToolTip('' if allowed else reason)
 
 
 class WobblyChannelStitchingParams(ChannelUiParameter):

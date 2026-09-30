@@ -120,7 +120,7 @@ from qdarkstyle import DarkPalette
 
 
 from ClearMap.Analysis.graphs.graph_filters import GraphFilter
-from ClearMap.IO.assets_constants import DATA_CONTENT_TYPES, EXTENSIONS
+from ClearMap.IO.assets_constants import DATA_CONTENT_TYPES
 from ClearMap.IO.source.backends.tif_backend import parse_ome_info
 
 from ClearMap.config.atlas import ATLAS_NAMES_MAP, STRUCTURE_TREE_NAMES_MAP
@@ -133,7 +133,7 @@ from ClearMap.Visualization.Qt import Plot3d as plot_3d
 
 from ClearMap.Utils.exceptions import (ClearMapVRamException, GroupStatsError, MissingRequirementException,
                                        ClearMapWorkspaceError, ClearMapValueError)
-from ClearMap.Utils.events import (ChannelsChanged, UiPrepareRawDataForClearMap, UiRequestPlotMiniBrain,
+from ClearMap.Utils.events import (ChannelsChanged, CfgChanged, UiPrepareRawDataForClearMap, UiRequestPlotMiniBrain,
                                    UiRequestPlotAtlas, UiOrientationChanged, UiCropChanged, ChannelDefaultsChanged,
                                    UiRequestLandmarksDialog, UiAlignWithChanged, UiVesselGraphFiltersChanged,
                                    RegistrationStatusChanged, UiBatchResultsFolderChanged, UiBatchGroupsChanged,
@@ -164,6 +164,7 @@ if TYPE_CHECKING:
     from ClearMap.pipeline_orchestrators.tract_map import TractMapProcessor
     from ClearMap.pipeline_orchestrators.colocalization import ColocalizationProcessor
 
+from ClearMap.pipeline_orchestrators.stitching_orchestrator import STITCHABLE_TILE_EXTENSIONS, supports_auto_overlap
 from ClearMap.pipeline_orchestrators.tube_map import BinaryVesselProcessorSteps
 
 
@@ -263,7 +264,7 @@ class SampleInfoTab(ExperimentTab):
         data_type_box.setCurrentText('undefined')  # FIXME: from cfg
         ext_box = page_widget.extensionComboBox
         if ext_box.count() == 0:  # REFACTOR: is the opposite even possible ?
-            ext_box.addItems(EXTENSIONS['image'])
+            ext_box.addItems(STITCHABLE_TILE_EXTENSIONS)
         self.params.set_painting(False)
 
     def remove_current_channel(self) -> None:
@@ -546,6 +547,7 @@ class StitchingTab(PreProcessingTab["StitchingProcessor"]):
         self.reconcile_channel_pages(desired)
         self.params.reconcile_children_from_view()
         super()._load_config_to_gui()  # == self.params.cfg_to_ui()
+        self._update_auto_overlap_availability()  # After cfg_to_ui which would re-untick the toggle
         self.update_plotable_channels()
 
     def _bind(self) -> None:
@@ -569,6 +571,32 @@ class StitchingTab(PreProcessingTab["StitchingProcessor"]):
         self.ui.displayStitchingClearPlots.clicked.connect(self.main_window.clear_plots)
 
         self.subscribe(ChannelsChanged, self._on_bus_channels_changed)
+        self.subscribe(CfgChanged, self._on_cfg_changed_extension)
+
+    def _on_cfg_changed_extension(self, evt: CfgChanged) -> None:
+        """A tile extension changed: the availability of the 'auto' overlap may have changed"""
+        if any(k == 'sample' or k.startswith('sample.channels') for k in evt.changed_keys):
+            self._update_auto_overlap_availability()
+
+    def _update_auto_overlap_availability(self) -> None:
+        """
+        'auto' overlap is read from the OME metadata, only available for .ome.tif tiles.
+        For other tiles, force manual overlaps in the channel pages.
+        """
+        try:
+            sample_channels = self.main_window.experiment_controller.get_config_view()['sample']['channels']
+        except (KeyError, TypeError, AttributeError):
+            return  # Config not loaded yet
+        for channel in self._get_channels():
+            if channel not in self.params.channel_params:
+                continue
+            rigid = self.params[channel].stitching_rigid  # None if the layout comes from another channel
+            if rigid is None:
+                continue
+            extension = str(sample_channels.get(channel, {}).get('extension', ''))
+            has_ome = supports_auto_overlap(extension)
+            rigid.set_auto_overlap_allowed(has_ome, reason=f'"auto" overlap needs OME metadata (.ome.tif tiles), '
+                                                           f'but channel "{channel}" uses "{extension}" tiles: set the overlap manually.')
 
     def _after_channels_reconciled(self, desired_channels: list[str]) -> None:
         self._refresh_ui()
@@ -593,6 +621,8 @@ class StitchingTab(PreProcessingTab["StitchingProcessor"]):
             if ch in self.params.channel_params:
                 run_chans_widget.set_item_checked(ch, bool(self.params[ch].shared.run))
         run_chans_widget.blockSignals(False)
+
+        self._update_auto_overlap_availability()
 
         # refresh the layout combobox for the active page
         active_channel = self.ui.channelsParamsTabWidget.current_channel()
