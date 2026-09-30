@@ -100,7 +100,7 @@ def initialize(source_=None, shape_=None, dtype_=None,
                     raise ClearMapRuntimeError(f'{location_} exists but could not be opened for editing; refusing overwrite.')
                 shape_, dtype_, order_ = _from_hint(hint, shape_, dtype_, order_)
                 try:
-                    return io_ops.create(location=location_, shape=shape_, dtype=dtype_, order=order_, **kwargs)
+                    return io_ops.create(location_, shape=shape_, dtype=dtype_, order=order_, **kwargs)
                 except ClearMapException:  # Catch and raise specific to avoid generic path
                     raise
                 except Exception as error:
