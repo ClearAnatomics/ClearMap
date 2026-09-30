@@ -89,7 +89,7 @@ from typing import Optional, Callable, List, Dict
 import numpy as np
 
 from ClearMap.IO.assets_constants import CONTENT_TYPE_TO_PIPELINE
-from ClearMap.Utils.events import ChannelRenamed, CfgChanged
+from ClearMap.Utils.events import ChannelRenamed, CfgChanged, WorkspaceChannelsUpdated
 from ..Utils.event_bus import EventBus
 from ..config.compound_keys import PairKey
 from ..config.config_adjusters.type_hints import SampleManagerProtocol
@@ -138,6 +138,7 @@ class SampleManager(OrchestratorBase):
         self.workspace: Optional[Workspace2] = None  # Defined in update_workspace
 
         self._renamed_channels: dict[str, str] = {}
+        self._published_channel_map: dict[str, str] = {}  # last channel->data_type published to the bus
 
         self.subscribe(ChannelRenamed, self._on_channel_renamed)
         self.subscribe(CfgChanged, self._on_cfg_changed)
@@ -294,6 +295,25 @@ class SampleManager(OrchestratorBase):
         print(self.workspace.info())
 
         self.save_workspace()
+        self._publish_channels_updated()
+
+    def _workspace_channel_map(self) -> dict[str, str]:
+        """channel -> data_type for the config channels that are registered in the workspace"""
+        if self.workspace is None:
+            return {}
+        return {ch: self.data_type(ch) for ch in self.channels if ch in self.workspace}
+
+    def _publish_channels_updated(self) -> None:
+        """Publish WorkspaceChannelsUpdated if the workspace channel set/types changed since last publication."""
+        after = self._workspace_channel_map()
+        before = self._published_channel_map
+        if after == before:
+            return
+        self._published_channel_map = after
+        try:
+            self.publish(WorkspaceChannelsUpdated(before=dict(before), after=dict(after)))
+        except Exception as err:  # A failing subscriber must not break the config -> workspace reconciliation
+            warnings.warn(f'A subscriber of WorkspaceChannelsUpdated failed: {err!r}')
 
     def save_workspace(self):
         workspace_cfg_path = self.cfg_coordinator.workspace_config_path

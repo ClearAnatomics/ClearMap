@@ -24,6 +24,18 @@ class ChannelsChanged:
     after: List[str]
 
 @dataclass(frozen=True)
+class WorkspaceChannelsUpdated:
+    """
+    Fact: the workspace channels (name -> data_type) changed after a reconciliation with the sample config.
+    Published by SampleManager.update_workspace() once the workspace is saved,
+    only when the mapping actually differs from the last published one.
+    Orchestrators that derive state from the channel set (e.g. TubeMap steps) subscribe to this.
+    """
+    before: Dict[str, str]
+    after: Dict[str, str]
+
+
+@dataclass(frozen=True)
 class ChannelsSnapshot:
     names: List[str]
 

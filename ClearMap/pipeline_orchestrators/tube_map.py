@@ -119,6 +119,7 @@ from ClearMap.Analysis.graphs import graph_processing
 from ClearMap.Analysis.graphs.graph_filters import GraphFilter
 
 from ClearMap.gui.dialog_helpers import warning_popup
+from ClearMap.Utils.events import WorkspaceChannelsUpdated
 from ClearMap.Utils.utilities import get_free_v_ram, clear_cuda_cache, sanitize_n_processes
 from ClearMap.Utils.exceptions import (PlotGraphError, ClearMapVRamException,
                                        MissingRequirementException, MissingAssetError, AssetNotFoundError,
@@ -343,12 +344,21 @@ class BinaryVesselProcessor(PipelineOrchestrator):
         self.arteries_channel: str = ''
         # TODO: add veins too
         self.steps: Dict[str, BinaryVesselProcessorSteps] = {}
+        self._compound_channel: tuple = ()
         self.block_re = ('Processing block',
                          re.compile(r'.*?Processing block \d+/\d+.*?\selapsed time:\s\d+:\d+:\d+\.\d+'))
         self.vessel_filling_re = ('Vessel filling',
                                   re.compile(r'.*?Vessel filling: processing block \d+/\d+.*?\selapsed time:\s\d+:\d+:\d+\.\d+'))
 
         self.setup(sample_manager)
+        self.subscribe(WorkspaceChannelsUpdated, self._on_workspace_channels_updated)
+
+    def _on_workspace_channels_updated(self, evt: WorkspaceChannelsUpdated) -> None:
+        """Channels/data types changed in the workspace: resync the steps and the compound channel"""
+        if self.sample_manager is None or not self.sample_manager.setup_complete:
+            return
+        if self.workspace is None or set(self.channels_to_binarize()) != set(self.steps):
+            self.setup()
 
     def setup(self, sample_manager=None):
         self.sample_manager = sample_manager if sample_manager is not None else self.sample_manager
@@ -356,29 +366,33 @@ class BinaryVesselProcessor(PipelineOrchestrator):
             self.workspace = self.sample_manager.workspace
 
             self.all_vessels_channel = self.sample_manager.get_channels_by_type(channel_type='vessels')
-            if not self.all_vessels_channel:
-                warnings.warn('Vessels channel not set')
-                return
-
             # noinspection PyTypeChecker
             self.arteries_channel = self.sample_manager.get_channels_by_type(channel_type='arteries',
                                                                              multiple_found_action='warn')
+            if not self.all_vessels_channel:
+                warnings.warn('Vessels channel not set')
+                self.steps.clear()
+                return
 
             self.assert_input_shapes_match()
 
-            all_channels = self.sample_manager.channels
-            obsolete_channels = [k for k in self.steps if k not in all_channels]
-            for k in obsolete_channels:
+            to_binarize = [c for c in self.channels_to_binarize() if c]
+            # Drop steps of channels that are not (or no longer) binarized: removed OR re-typed
+            for k in [k for k in self.steps if k not in to_binarize]:
                 del self.steps[k]
 
-            for channel_name in self.channels_to_binarize():
-                if channel_name:
-                    self.steps[channel_name] = BinaryVesselProcessorSteps(
-                        self.workspace, channel=channel_name,
-                        config_provider=lambda ch=channel_name: (
-                            self.config.get('binarization', {}).get('single_channels', {}).get(ch, {})))
+            for channel_name in to_binarize:  # Recreated on each setup
+                self.steps[channel_name] = BinaryVesselProcessorSteps(
+                    self.workspace, channel=channel_name,
+                    config_provider=lambda ch=channel_name: (
+                        self.config.get('binarization', {}).get('single_channels', {}).get(ch, {})))
 
-            compound_channel = tuple(self.channels_to_binarize())  # FIXME: old keys not cleared
+            compound_channel = tuple(to_binarize)
+            if self._compound_channel and self._compound_channel != compound_channel:
+                # Only the key we registered ourselves (tuple, as passed to ensure_pipeline) is dropped.
+                # Registry entry only, no file is deleted.
+                self.workspace.asset_collections.pop(self._compound_channel, None)
+            self._compound_channel = compound_channel
             sample_id = self.sample_manager.prefix
             self.workspace.ensure_pipeline('TubeMap', compound_channel, sample_id=sample_id,
                                            channel_content_type='compound', create_channel=True)
@@ -771,6 +785,11 @@ class VesselGraphProcessor(PipelineOrchestrator):
         self.setup(sample_manager, registration_processor)
         self.parent_channels = tuple(self.config['binarization']['single_channels'].keys())
         self.steps.channel = self.parent_channels
+        self.subscribe(WorkspaceChannelsUpdated, self._on_workspace_channels_updated)
+
+    def _on_workspace_channels_updated(self, evt: WorkspaceChannelsUpdated) -> None:
+        if self.sample_manager is not None and self.sample_manager.setup_complete:
+            self.setup()
 
     def setup(self, sample_manager=None, registration_processor=None):
         self.sample_manager = sample_manager if sample_manager is not None else self.sample_manager
