@@ -32,6 +32,22 @@ from ClearMap.Utils.Lazy import lazyattr
 from ClearMap.Utils.exceptions import ClearMapValueError, NotAnOmeFile
 
 
+_WARNED: set[tuple[str, str]] = set()
+
+
+def _warn_once(location, message: str, category=UserWarning):
+    """Warn at most once per (file, message) for the lifetime of the process.
+
+    Metadata fallbacks are hit every time a TifSource for the same file is (re)opened,
+    e.g. once per slice when viewers or workers go through ``as_virtual().as_real()``.
+    """
+    key = (str(location), message)
+    if key in _WARNED:
+        return
+    _WARNED.add(key)
+    warnings.warn(f'{message} (file: {location})', category, stacklevel=3)
+
+
 ###############################################################################
 # ## TifSource class
 ###############################################################################
@@ -47,7 +63,8 @@ class TifSource(source_mod.ArraySource):
     """
     backend = Backend.TIF
     # FIXME: check if series is indeed cached under series here by lazyattr
-    _CACHED_PROPERTIES = ('series', 'series_mode', 'pages_mode', 'shape', 'tif_shape', 'dtype', '_metadata_type')
+    _CACHED_PROPERTIES = ('series', 'series_mode', 'pages_mode', 'shape', 'tif_shape', 'dtype', '_metadata_type',
+                          'axes_order')
 
     def __init__(self, location, series=0, multi_file=False, mode=None):
         super().__init__(name=None, mode=mode)  # skip AbstractSource
@@ -69,8 +86,8 @@ class TifSource(source_mod.ArraySource):
     def is_clearmap(self):
         return self._tif.is_shaped  # Likely written by clearmap if not more metadata
 
-    @property
-    def axes_order(self):
+    @cached_property
+    def axes_order(self):  # Cached: to_clearmap_order() needs it on every read (i.e. every displayed plane)
         md = self.metadata(info=['shape'])
         return md['order']
 
@@ -257,8 +274,7 @@ class TifSource(source_mod.ArraySource):
         """
         metadata = self.get_raw_metadata_dictionary()
         if not metadata:
-            warnings.warn(f'No metadata found in tif file {self._tif.filename}!'
-                          f'Assuming XYZ order and shape {self.shape}.')
+            _warn_once(self.location, f'No metadata found in tif file! Assuming XYZ order and shape {self.shape}.')
             shape = self.shape
             order = ''.join([ax for i, ax in zip(shape, 'XYZ')])
             return {'shape': shape, 'order': order}
@@ -372,7 +388,7 @@ class BaseMetadataParser:
     def parse_order(self):
         self.info['order'] = self.pixels_metadata.get('DimensionOrder', None)
         if not self.info['order']:
-            warnings.warn(f'No dimension order found in tif metadata! Assuming "XYZ" order.')
+            _warn_once(self.source.location, 'No dimension order found in tif metadata! Assuming "XYZ" order.')
             self.info['order'] = 'XYZ'
 
     def parse_shape(self):
@@ -725,8 +741,7 @@ class ImageJMetadataParser(BaseMetadataParser):
             return {(line.split('=', 1)[0]).strip(): (line.split('=', 1)[1]).strip()
                     for line in labels[0].split('\n') if '=' in line}
         else:
-            print(f'WARNING: Image: {self.source._tif.filename}, no labels found in imagej metadata!;'
-                  f' metadata: {self.metadata}')
+            _warn_once(self.source.location, f'No labels found in imagej metadata!; metadata: {self.metadata}')
             return self.parse_info_field()
 
     def parse_info_field(self):
@@ -734,8 +749,7 @@ class ImageJMetadataParser(BaseMetadataParser):
         try:
             md_info = [ln.strip() for ln in self.metadata['Info'].split('\n')]
         except KeyError:
-            warnings.warn(f'No Info metadata found in tif file {self.source._tif.filename}!'
-                          f'Metadata: {self.metadata}')
+            _warn_once(self.source.location, f'No Info metadata found in tif file!; metadata: {self.metadata}')
             parsed_info['order'] = 'XYZ'
             return parsed_info
         if md_info[0].startswith('NRRD'):  # FIXME: just get pixel metadata
@@ -750,7 +764,7 @@ class ImageJMetadataParser(BaseMetadataParser):
                 parsed_info['shape'] = tuple(dim for dim in parsed_info['shape'] if dim != 1)
             elif 'ImageDescription' in md_info[0] and 'shape' in md_info[0]:
                 parsed_info['order'] = 'xyz'
-                warnings.warn(f'Order not found, assuming {"xyz"}')
+                _warn_once(self.source.location, 'Order not found, assuming "xyz"')
                 desc = eval(md_info[0].replace('ImageDescription:', '').strip())  # WARNING: dangerous
                 parsed_info['shape'] = desc['shape']
             else:
@@ -816,7 +830,7 @@ class ClearMapMetadataParser(BaseMetadataParser):
         # parsed_info = self.metadata[0]  # FIXME: check, which is best
         super().parse_order()
         if self.info['order'] is None:
-            warnings.warn('WARNING: No dimension order found in tif metadata! Assuming "XYZTC" order.')
+            _warn_once(self.source.location, 'No dimension order found in tif metadata! Assuming "XYZTC" order.')
             self.info['order'] = ''.join([d for d in 'XYZTC' if f'Size{d}' in self.pixels_metadata.keys()])
             if not self.info['order']:
                 self.info['order'] = 'XYZ'
