@@ -1,3 +1,4 @@
+import math
 import re
 
 import cached_property
@@ -53,6 +54,10 @@ class Scatter3D:
     def __init__(self, coordinates, smarties=False, colors=None, hemispheres=None, z_radius=None,
                  marker_size=5):
         self.__coordinates = None
+        self._axis_indices = {}  # axis -> (order, sorted_keys), built lazily by slab_indices
+        self._default_pen = None
+        self._default_brush = None
+        self._clear_brush = None
         self.__has_hemispheres = hemispheres is not None  # FIXME: this should be renamed to has_different_symbols
         self.z_radius = z_radius
         self.axis = 2
@@ -147,6 +152,7 @@ class Scatter3D:
             self.data = df
             # print(self.data['colour'].values, df['colour'].values)
             self.__coordinates = None
+            self._axis_indices = {}
 
     @property
     def has_colours(self):
@@ -155,6 +161,158 @@ class Scatter3D:
     @property
     def has_hemispheres(self):
         return self.__has_hemispheres
+
+    def _axis_index(self, axis):
+        """
+        Row order sorted by the (integer) position along *axis*, and the sorted keys.
+
+        Built once per axis on first use (~1 s for 8M points), then every slab lookup is
+        two binary searches instead of a full-array comparison. Non-finite coordinates
+        get a sentinel key that no slab request can reach, so they are never drawn.
+        """
+        cached = self._axis_indices.get(axis)
+        if cached is None:
+            values = self.coordinates[:, axis]
+            finite = np.isfinite(values)
+            keys = np.full(len(values), np.iinfo(np.int32).min, dtype=np.int32)
+            keys[finite] = np.clip(np.floor(values[finite]), -2 ** 30, 2 ** 30)
+            order = np.argsort(keys, kind='stable').astype(np.int32)
+            cached = (order, keys[order])
+            self._axis_indices[axis] = cached
+        return cached
+
+    def is_prepared(self, axis=None):
+        """Whether the slice index of *axis* (default: current one) is built, i.e. slab lookups are instant."""
+        return (self.axis if axis is None else axis) in self._axis_indices
+
+    def prepare(self, axes=None, progress=None):
+        """
+        Build the slice index now instead of at the first draw (~1 s per axis for 8M markers).
+
+        Parameters
+        ----------
+        axes : int or iterable of int or None
+            The axes to prepare (default: the current one).
+        progress : Callable[[str], None] or None
+            Called with a short message before each axis is indexed.
+        """
+        if axes is None:
+            axes = [self.axis]
+        elif isinstance(axes, int):
+            axes = [axes]
+        for axis in axes:
+            if not self.is_prepared(axis):
+                if progress is not None:
+                    progress(f'Indexing markers along axis {axis}')
+                self._axis_index(axis)
+
+    def slab_indices(self, lo, hi, axis=None):
+        """
+        Row indices of the points with ``lo <= floor(coord[axis]) < hi`` (negative positions are never returned).
+        Rows are in ascending original order within one slice.
+        """
+        order, keys = self._axis_index(self.axis if axis is None else axis)
+        # Needles must have the keys' dtype: otherwise numpy upcasts the whole (8M) key array on every call
+        needles = np.array([max(math.ceil(lo), 0), max(math.ceil(hi), 0)]).clip(0, 2 ** 30).astype(np.int32)
+        start, stop = np.searchsorted(keys, needles)
+        return order[start:stop]
+
+    def build_draw_data(self, index, *, base_size=None, main_size=None, zoom_factor=1.0,
+                        view_rect=None, depth_limit=None):
+        """
+        Everything needed to draw the markers of the slice *index* (and its neighbours) in a
+        single ``ScatterPlotItem.setData`` call.
+
+        Parameters
+        ----------
+        index : int
+            The current slice along ``self.axis``.
+        base_size : int or None
+            Size of a marker at distance 0, used for the neighbours' sizes (defaults to ``self.marker_size``).
+        main_size : int or None
+            Size of the markers in the current slice (defaults to *base_size*).
+        zoom_factor : float
+            Multiplies the neighbours' sizes (zoom-scaled markers).
+        view_rect : ((x0, x1), (y0, y1)) or None
+            Only markers inside this rectangle (plane coordinates) are returned.
+        depth_limit : int or None
+            Neighbour markers are omitted if more than this many would be drawn
+            (``None``: no limit, ``0``: never draw them).
+
+        Returns
+        -------
+        data : dict or None
+            Keyword arguments for ``setData`` (``pos, size, symbol, pen, brush``), None if there is nothing to draw.
+        info : dict
+            ``n_main``, ``n_depth`` (drawn), ``n_depth_candidates`` (before applying the limit), ``depth_skipped``.
+
+        Note
+        ----
+        Compared to :meth:`get_3d_markers`, markers of the current slice are not drawn a second time as
+        hollow neighbours and neighbours whose size rounds to 0 are dropped.
+        """
+        axis, plane = self.axis, self.plane_axes
+        base_size = self.marker_size if base_size is None else base_size
+        main_size = base_size if main_size is None else main_size
+        coords = self.coordinates
+
+        def gather(idx):
+            c = coords[idx]
+            if view_rect is not None and len(idx):
+                (x0, x1), (y0, y1) = view_rect
+                px, py = c[:, plane[0]], c[:, plane[1]]
+                keep = (px >= x0) & (px <= x1) & (py >= y0) & (py <= y1)
+                idx, c = idx[keep], c[keep]
+            return idx, c
+
+        main_idx, main_c = gather(self.slab_indices(index, index + 1))
+
+        radius = self.z_radius
+        depth_idx = np.empty(0, dtype=np.int32)
+        depth_c = np.empty((0, 3))
+        depth_size = np.empty(0, dtype=int)
+        n_candidates = 0
+        depth_skipped = False
+        if radius and depth_limit != 0:
+            idx = np.concatenate([self.slab_indices(index - radius, index),
+                                  self.slab_indices(index + 1, index + radius)])
+            idx, c = gather(idx)
+            dist = np.abs(c[:, axis] - index)
+            size = np.round(base_size * ((radius - dist) / radius)).astype(int)
+            size = np.round(size * zoom_factor).astype(int)
+            keep = size > 0
+            depth_idx, depth_c, depth_size = idx[keep], c[keep], size[keep]
+            n_candidates = len(depth_idx)
+            if depth_limit is not None and n_candidates > depth_limit:
+                depth_skipped = True
+                depth_idx, depth_c, depth_size = depth_idx[:0], depth_c[:0], depth_size[:0]
+
+        info = {'n_main': len(main_idx), 'n_depth': len(depth_idx),
+                'n_depth_candidates': n_candidates, 'depth_skipped': depth_skipped}
+        if not (len(main_idx) or len(depth_idx)):
+            return None, info
+
+        rows = np.concatenate([main_idx, depth_idx])
+        if self.has_colours:
+            pens = self.data['pen'].values[rows]
+            brushes = self.data['brush'].values[rows]
+        else:
+            if self._default_pen is None:
+                self._default_pen, self._default_brush = pg.mkPen('red'), pg.mkBrush('red')
+            pens = np.full(len(rows), self._default_pen, dtype=object)
+            brushes = np.full(len(rows), self._default_brush, dtype=object)
+        if self._clear_brush is None:
+            self._clear_brush = pg.mkBrush((0, 0, 0, 0))
+        brushes[len(main_idx):] = self._clear_brush  # neighbours are hollow
+        if self.has_hemispheres:
+            symbols = self.data['symbol'].values[rows]
+        else:
+            symbols = np.full(len(rows), self.symbols[0], dtype=object)
+
+        data = {'pos': np.concatenate([main_c[:, plane], depth_c[:, plane]]),
+                'size': np.concatenate([np.full(len(main_idx), main_size, dtype=int), depth_size]),
+                'symbol': symbols, 'pen': pens, 'brush': brushes}
+        return data, info
 
     def get_3d_markers(self, main_slice_idx, z_radius=3, base_size=None):
         """
