@@ -1,7 +1,6 @@
 import math
 import re
 
-import cached_property
 import numpy as np
 import pandas as pd
 
@@ -248,8 +247,8 @@ class Scatter3D:
 
         Note
         ----
-        Compared to :meth:`get_3d_markers`, markers of the current slice are not drawn a second time as
-        hollow neighbours and neighbours whose size rounds to 0 are dropped.
+        Markers of the current slice are drawn once (not again as hollow neighbours) and neighbours whose
+        size rounds to 0 are dropped.
         """
         axis, plane = self.axis, self.plane_axes
         base_size = self.marker_size if base_size is None else base_size
@@ -314,81 +313,6 @@ class Scatter3D:
                 'symbol': symbols, 'pen': pens, 'brush': brushes}
         return data, info
 
-    def get_3d_markers(self, main_slice_idx, z_radius=3, base_size=None):
-        """
-        Collect markers from slices surrounding *main_slice_idx*.
-
-        Marker size scales linearly with proximity: a point at distance *d*
-        from the main slice gets size ``base_size * (z_radius - d) / z_radius``.
-
-        Parameters
-        ----------
-        main_slice_idx : int
-            Index of the currently displayed slice.
-        z_radius : int
-            Half-width of the depth window.  Overridden by ``self.z_radius``
-            when that attribute is set.
-        base_size : int or None
-            Reference size for a marker at distance 0.  Pass the current UI
-            spin-box value so surrounding markers scale consistently with the
-            main-slice markers.  Defaults to ``self.marker_size``.
-
-        Returns
-        -------
-        dict
-            Keys: ``'pos'`` (N×2), ``'size'`` (N,), ``'symbol'`` (N,),
-            and ``'pen'`` (N,) when :attr:`has_colours` is True.
-            Returns empty arrays when *z_radius* is falsy or no points fall
-            in range.
-        """
-        empty = {'pos': np.empty(0), 'size': np.empty(0), 'symbol': np.empty(0)}
-        if self.has_colours:
-            empty['pen'] = np.empty(0)
-
-        z_radius = self.z_radius if self.z_radius is not None else z_radius
-        if not z_radius:
-            return empty
-
-        base_size = base_size if base_size is not None else self.marker_size
-
-        z = self.coordinates[:, self.axis]
-        mask = (z >= main_slice_idx - z_radius) & (z < main_slice_idx + z_radius) & (z >= 0)
-        if not mask.any():
-            return empty
-
-        pos = self.coordinates[mask][:, self.plane_axes]
-        dist_to_main = np.abs(z[mask] - main_slice_idx)
-        sizes = np.round(base_size * ((z_radius - dist_to_main) / z_radius)).astype(int)
-
-        symbols = (self.data.loc[mask, 'symbol'].values if self.has_hemispheres
-                   else np.full(mask.sum(), self.symbols[0]))
-
-        output = {'pos': pos, 'size': sizes, 'symbol': symbols}
-        if self.has_colours:
-            output['pen'] = self.data.loc[mask, 'pen'].values
-        return output
-
-    def get_draw_params(self, current_slice):
-        indices = self.current_slice_mask(current_slice)
-        if indices is not None:
-            draw_params = {
-                'pen': self.data.loc[indices, 'pen'].values,
-                'brush': self.data.loc[indices, 'brush'].values
-            }
-            return draw_params
-        else:
-            return {'pen': np.empty(0), 'brush': np.empty(0)}
-
-    def get_symbols(self, current_slice):
-        if self.has_hemispheres:
-            indices = self.current_slice_mask(current_slice)
-            if indices is not None:
-                return self.data.loc[indices, 'symbol'].values
-            else:
-                return np.array([])
-        else:
-            return self.symbols[0]
-
     def get_symbol_sizes(self, main_slice_idx, slice_idx, indices=None, half_size=3):
         marker_size = round(self.marker_size * ((half_size - abs(main_slice_idx - slice_idx)) / half_size))
         n_markers = self.get_n_markers(indices=indices)
@@ -414,11 +338,3 @@ class Scatter3D:
         if len(self.data):
             return self.coordinates[:, self.axis] == current_slice
         return np.zeros(len(self.data), dtype=bool)
-
-    def get_pos(self, current_slice=None, indices=None):
-        if indices is None:
-            indices = self.current_slice_mask(current_slice)
-        if indices is not None:
-            return self.coordinates[np.ix_(indices, self.plane_axes)]
-        else:
-            return np.empty((0, 2))
