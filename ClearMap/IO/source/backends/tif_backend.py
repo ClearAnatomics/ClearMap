@@ -1183,7 +1183,9 @@ def parse_ome_info(img_path: Path) -> Dict[str, Any]:
 
 
 def _get_ome_dict(img_path: str | Path):  # WARNING: works only with recent versions of tifffile not 0.15.1
-    if not tifffile.TiffFile(img_path).is_ome:
+    with tifffile.TiffFile(img_path) as tif:  # close the handle
+        is_ome = tif.is_ome
+    if not is_ome:
         raise NotAnOmeFile(f"File {img_path} is not a valid ome.tif file")
     ome_metadata = tifffile.tiffcomment(img_path)
     ome_dict = tifffile.xml2dict(ome_metadata)
