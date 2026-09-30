@@ -114,7 +114,7 @@ def make_nested_progress_dialog(title='Processing', overall_maximum=100, sub_pro
     progress_icon_path = os.path.join(UI_FOLDER, 'creator', 'graphics_resources', 'searching_mouse.png')
     dlg.progressImageLabel.setPixmap(QPixmap(progress_icon_path))  # TODO: why doesn't work with qrc ??
     dlg.setWindowTitle('Clearmap progress')
-    dlg.mainLabel.setText(f'{title}, please wait.')
+    dlg.mainLabel.setText(f'{title},\n please wait.')
 
     dlg.mainProgressBar.setRange(1, overall_maximum)
     dlg.subProgressLabel.setText(sub_process_name)

@@ -1258,14 +1258,15 @@ class CellCounterTab(PostProcessingTab["CellDetector"]):
 
     def plot_cell_filter_results(self, channel: str) -> None:
         """Plot the cells as colored dots on top of the raw image fraction used for tests"""
-        self.wrap_plot(self.get_worker(channel).plot_filtered_cells, smarties=True)
+        self.wrap_plot(self.get_worker(channel).plot_filtered_cells, smarties=True, busy_title='Preparing cell markers')
 
     def plot_labeled_cells_scatter(self, channel: str, raw: bool = False) -> None:
         """
         Plot the cells as colored symbols on top of either the raw stitched (not aligned) image
         or the resampled (aligned) image
         """
-        self.wrap_plot(self.get_worker(channel).plot_cells_3d_scatter_w_atlas_colors, raw=raw)
+        self.wrap_plot(self.get_worker(channel).plot_cells_3d_scatter_w_atlas_colors, raw=raw,
+                       busy_title='Preparing cell markers')
 
     def __filter_cells(self, channel: str, is_last_step: bool = True) -> None:
         if self.sample_manager.get('cells', channel=channel, asset_sub_type='raw').exists:

@@ -8,7 +8,7 @@ import functools
 import warnings
 from dataclasses import dataclass
 from pathlib import Path
-from contextlib import contextmanager
+from contextlib import contextmanager, ExitStack
 from typing import final, Callable, Any, TYPE_CHECKING, TypeVar, Generic, ParamSpec, Tuple
 
 import numpy as np
@@ -19,7 +19,7 @@ from ClearMap.Utils.exceptions import MissingRequirementException, PlotGraphErro
 from ClearMap.Utils.utilities import title_to_snake
 from ClearMap.config.config_handler import ConfigHandler, ALTERNATIVES_REG
 
-from .dialog_helpers import get_directory_dlg
+from .dialog_helpers import get_directory_dlg, make_simple_progress_dialog
 from .exception_handler import handle_exception
 from .gui_utils_base import create_clearmap_widget, replace_widget
 from .widgets import ExtendableTabWidget, SamplePickerDialog
@@ -589,7 +589,31 @@ class GenericTab(GenericUi, BusSubscriberMixin):
                 self.main_window.print_status_msg(msg)
                 self.main_window.log_progress(f'    : {msg}')
 
-    def wrap_plot(self, plot_method:  Callable[P, Any], *args: P.args, **kwargs: P.kwargs) -> 'list[DataViewer]':
+    @contextmanager
+    def busy_dialog(self, title: str, message: str = ''):
+        """
+        Show a "please wait" dialog (busy indicator, no abort) around a short computation which
+        has to run in the main thread, typically building the widgets of a plot
+        (see the ``busy_title`` argument of :meth:`wrap_plot`).
+
+        Unlike :meth:`wrap_step`, it does not touch the progress watcher.
+
+        .. code-block:: python
+
+            with self.busy_dialog('Building the view'):
+                do_something_short_in_the_main_thread()
+        """
+        dlg = make_simple_progress_dialog(title=title, sub_process_name=message, parent=self.main_window)
+        dlg.subProgressBar.setMaximum(0)  # Busy (indeterminate) indicator
+        dlg.buttonBox.setVisible(False)  # Nothing to abort
+        QApplication.processEvents()  # Paint the dialog before blocking the main thread
+        try:
+            yield dlg
+        finally:
+            dlg.done(1)
+
+    def wrap_plot(self, plot_method:  Callable[P, Any], *args: P.args, busy_title: str | None = None,
+                  **kwargs: P.kwargs) -> 'list[DataViewer]':
         """
         Wrapper to plot a graph and display it in the main window.
         It also handles ClearMap exceptions gracefully
@@ -600,6 +624,11 @@ class GenericTab(GenericUi, BusSubscriberMixin):
             The function (or method) to plot the graph
         args: list
             The positional arguments to plot_function
+        busy_title: str | None
+            If given, a "please wait" dialog with this title is displayed while the plot is built.
+            Use it for plots which take more than a moment to build (large marker sets, big volumes...)
+            since it is not worth flashing a dialog for the others.
+            Keyword only; it is not forwarded to plot_method.
         kwargs: dict
             The keyword arguments to plot_function
 
@@ -609,27 +638,31 @@ class GenericTab(GenericUi, BusSubscriberMixin):
             The data viewers returned by plot_function
         """
         self.main_window.clear_plots()
-        try:
-            dvs = plot_method(*args, **kwargs)
-        except Exception as err:
-            if not getattr(err, '_gui_handled', False):
-                func_name = getattr(plot_method, '__name__', str(plot_method))
-                handle_exception(err, parent=self.main_window, context=f'{self.name} → {func_name}')
-                err._gui_handled = True
-            return []
+        with ExitStack() as busy:
+            if busy_title:
+                busy.enter_context(self.busy_dialog(busy_title))
+            try:
+                dvs = plot_method(*args, **kwargs)
+            except Exception as err:
+                busy.close()  # Before the error message box, not under it
+                if not getattr(err, '_gui_handled', False):
+                    func_name = getattr(plot_method, '__name__', str(plot_method))
+                    handle_exception(err, parent=self.main_window, context=f'{self.name} → {func_name}')
+                    err._gui_handled = True
+                return []
 
-        if not dvs:
-            return []
-        if isinstance(dvs[0], list):
-            dvs, titles = dvs
-            self.main_window.setup_plots(dvs, titles)
-        else:
-            self.main_window.setup_plots(dvs)
-        from ClearMap.Visualization.Qt.DataViewer import DataViewer  # runtime import for isinstance
-        return [widget for widget in dvs if isinstance(widget, DataViewer)]
+            if not dvs:
+                return []
+            if isinstance(dvs[0], list):
+                dvs, titles = dvs
+                self.main_window.setup_plots(dvs, titles)
+            else:
+                self.main_window.setup_plots(dvs)
+            from ClearMap.Visualization.Qt.DataViewer import DataViewer  # runtime import for isinstance
+            return [widget for widget in dvs if isinstance(widget, DataViewer)]
 
     @staticmethod
-    def ui_plot(status_msg: str = '') -> Callable:
+    def ui_plot(status_msg: str = '', busy_title: str = '') -> Callable:
         """
         Decorator for tab methods that produce plot widgets.
 
@@ -646,6 +679,8 @@ class GenericTab(GenericUi, BusSubscriberMixin):
         ----------
         status_msg : str, optional
             Status message to display during plotting (default: ``''``).
+        busy_title : str, optional
+            If given, display a "please wait" dialog with this title while plotting (default: none).
 
         Returns
         -------
@@ -669,7 +704,7 @@ class GenericTab(GenericUi, BusSubscriberMixin):
                 if status_msg:
                     self.main_window.print_status_msg(status_msg)
                 bound_method = functools.partial(fn, self)
-                return self.wrap_plot(bound_method, *args, **kwargs)
+                return self.wrap_plot(bound_method, *args, busy_title=busy_title or None, **kwargs)
             return wrapper
         return deco
 
