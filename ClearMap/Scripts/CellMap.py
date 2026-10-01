@@ -26,7 +26,23 @@ __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__   = 'http://idisco.info'
 __download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 
+import numpy as np
+import matplotlib.pyplot as plt
+
+import ClearMap.Settings as settings
+
 from ClearMap.IO import conversion, io_ops, source_geometry, FileUtils as file_utils
+import ClearMap.IO.Workspace as wsp
+
+import ClearMap.Visualization.Plot3d as p3d
+
+import ClearMap.Alignment.Annotation as ano
+import ClearMap.Alignment.Resampling as res
+import ClearMap.Alignment.Elastix as elx
+
+import ClearMap.Analysis.Measurements.Voxelization as vox
+
+import ClearMap.ImageProcessing.Experts.Cells as cells
 
 if __name__ == "__main__":
      
@@ -35,8 +51,6 @@ if __name__ == "__main__":
   ###############################################################################
   
   #%% Initialize workspace
-  
-  from ClearMap.Environment import *  #analysis:ignore
   
   #directories and files
   directory = '/home/ckirst/Programs/ClearMap2/ClearMap/Tests/Data/CellMap_Example/'    

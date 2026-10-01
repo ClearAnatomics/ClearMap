@@ -19,18 +19,43 @@ __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__   = 'http://idisco.info'
 __download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 
+import numpy as np
+
+import ClearMap.Settings as settings
+
+import ClearMap.IO.Workspace as wsp
 from ClearMap.IO import dispatch, conversion, source_geometry, FileUtils as file_utils
+
+import ClearMap.Visualization.Plot3d as p3d
+import ClearMap.Visualization.Color as col
+
+import ClearMap.ParallelProcessing.BlockProcessing as bp
+
+import ClearMap.Alignment.Annotation as ano
+import ClearMap.Alignment.Resampling as res
+import ClearMap.Alignment.Elastix as elx
+import ClearMap.Alignment.Stitching.stitching_rigid as st
+import ClearMap.Alignment.Stitching.stitching_wobbly as stw
+
+import ClearMap.ImageProcessing.Skeletonization.Skeletonization as skl
+import ClearMap.ImageProcessing.machine_learning.vessel_filling.vessel_filling as vf
+import ClearMap.ImageProcessing.Experts.Vasculature as vasc
+
+import ClearMap.Analysis.graphs.graph_gt as grp
+import ClearMap.Analysis.graphs.graph_processing as gp
+import ClearMap.Analysis.Measurements.MeasureExpression as me
+import ClearMap.Analysis.Measurements.radius_measurements as mr
+import ClearMap.Analysis.Measurements.Voxelization as vox
+
 
 if __name__ == '__main__':
 
   #%%############################################################################
   ### Initialization 
   ###############################################################################
-  
+
   #%% Initialize workspace
-  
-  from ClearMap.Environment import *  #analysis:ignore
-  
+
   #directories and files
   directory = '/home/ckirst/Programs/ClearMap2/ClearMap/Tests/Data/TubeMap_Example'    
   
