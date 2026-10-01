@@ -261,7 +261,7 @@ def where(source, sink=None, blocks=None,
                                                    blocks=blocks, return_blocks=True)
 
   if source_buffer.dtype not in [np.dtype(d) for d in SOURCE_DTYPES]:
-    source_buffer = (source_buffer > 0).view(np.uint8)  # the Cython code selects the entries > 0
+    source_buffer = ac.as_uint8_flags(source_buffer, name='source')
 
   if cutoff is None:
     cutoff = 1

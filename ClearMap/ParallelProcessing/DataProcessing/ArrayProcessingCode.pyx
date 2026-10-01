@@ -314,7 +314,7 @@ cpdef index_t[:] block_sums_1d(const source_t[:] source, int blocks, int process
     with nogil, parallel(num_threads=processes):
         for p in prange(nblocks, schedule='guided'):
             for i in range(ranges[p], ranges[p+1]):
-                blocksums[p] += (source[i] > 0)
+                blocksums[p] += (source[i] != 0)
 
     return blocksums
 
@@ -333,7 +333,7 @@ cpdef index_t[:] block_sums_2d(const source_t[:,:] source, int blocks, int proce
         for p in prange(nblocks, schedule='guided'):
             for i in range(shape_0):
                 for j in range(ranges[p], ranges[p+1]):
-                  blocksums[p] += (source[i, j] > 0)
+                  blocksums[p] += (source[i, j] != 0)
 
     return blocksums
 
@@ -353,7 +353,7 @@ cpdef index_t[:] block_sums_3d(const source_t[:,:,:] source, int blocks, int pro
             for i in range(shape_0):
                 for j in range(shape_1):
                     for k in range(ranges[p], ranges[p+1]):
-                        blocksums[p] += (source[i, j, k] > 0)
+                        blocksums[p] += (source[i, j, k] != 0)
 
     return blocksums
 
@@ -371,7 +371,7 @@ cpdef index_t[:] block_sums_3d_f(const source_t[:,:,:] source, int blocks, int p
             for k in range(ranges[p], ranges[p+1]):
                 for j in range(shape_1):
                     for i in range(shape_0):
-                        blocksums[p] += (source[i, j, k] > 0)
+                        blocksums[p] += (source[i, j, k] != 0)
     return blocksums
 
 
@@ -443,7 +443,7 @@ cpdef void where_1d(const source_t[:] source, index_t[:] where, index_t[:] sums,
     with nogil, parallel(num_threads=processes):
         for p in prange(n_blocks, schedule='guided'):
             for i in range(ranges[p], ranges[p+1]):
-                if source[i] > 0:
+                if source[i] != 0:
                     # printf("%d, %d, %d\n", p, l[p], i)
                     where[l[p]] = i
                     l[p]+=1
@@ -470,7 +470,7 @@ cpdef void where_2d(const source_t[:,:] source, index_t[:,:] where, index_t[:] s
         for p in prange(n_blocks, schedule='guided'):
             for i in range(shape_0):
                 for j in range(ranges[p], ranges[p+1]):
-                    if source[i,j] > 0:
+                    if source[i,j] != 0:
                         where[l[p],0] = i; where[l[p],1] = j
                         l[p]+=1
 
@@ -497,7 +497,7 @@ cpdef void where_3d(const source_t[:,:,:] source, index_t[:,:] where, index_t[:]
             for i in range(shape_0):
                 for j in range(shape_1):
                     for k in range(ranges[p], ranges[p+1]):
-                        if source[i,j,k] > 0:
+                        if source[i,j,k] != 0:
                             # printf("%d, %d, %d, %d, %d\n", p, l[p], i, j, k)
                             where[l[p],0] = i; where[l[p],1] = j; where[l[p],2] = k
                             l[p]+=1
@@ -525,7 +525,7 @@ cpdef void where_3d_f(const source_t[:,:,:] source, index_t[:,:] where,
             for k in range(ranges[p], ranges[p+1]):
                 for j in range(shape_1):
                     for i in range(shape_0):
-                        if source[i, j, k] > 0:
+                        if source[i, j, k] != 0:
                             where[l[p], 0] = i
                             where[l[p], 1] = j
                             where[l[p], 2] = k
