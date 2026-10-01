@@ -97,7 +97,7 @@ from ClearMap.IO.assets_constants import CONTENT_TYPE_TO_PIPELINE, CHANNELS_ASSE
 from ClearMap.IO.assets_specs import ChannelSpec, TypeSpec, StateManager, ChannelId
 from ClearMap.IO.workspace_asset import Asset, AssetCollection
 from ClearMap.Utils.exceptions import (ClearMapWorkspaceError, ClearMapAssetError, MissingChannelError,
-                                       MissingAssetError)
+                                       MissingAssetError, ClearMapValueError)
 from ClearMap.Utils.utilities import substitute_deprecated_arg, handle_deprecated_args, get_ok_n_ok_symbols
 
 SCHEMA_V_STR = 'clearmap_workspace_v2'
@@ -785,10 +785,12 @@ class Workspace2:  # REFACTOR: subclass dict
             else:
                 return default
         if sample_id or extension or version or suffix:  # FIXME: subdirectory
+            # WARNING: call variant(...) w/ kwargs only
             if suffix:
-                asset = asset.variant(sample_id, asset_sub_type, extension, version, sub_type=suffix)  # FIXME: suffix should be different from asset_sub_type
+                asset = asset.variant(sample_id=sample_id, extension=extension, version=version,
+                                      sub_type=suffix)  # FIXME: suffix should be different from asset_sub_type
             else:
-                asset = asset.variant(sample_id, extension, version)
+                asset = asset.variant(sample_id=sample_id, extension=extension, version=version)
         return asset
 
     def get_closest_matching_asset(self, asset_type, channel=None):  # FIXME: compound keys
