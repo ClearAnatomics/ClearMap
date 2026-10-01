@@ -196,7 +196,7 @@ def sum_relative_bilateral(source, selem=None, sink=None, mask=None, s0=0.5, s1=
   sink : array
     The filtered array.
   """
-  return rnk._apply_code(code.sum, code.sum_masked, sink_dtype = float,
+  return rnk._apply_code(code.sum_relative, code.sum_relative_masked, sink_dtype = float,
                          source=source, selem=selem, sink=sink, mask=mask, parameter_float=[s0,s1], **kwargs);
 
 
@@ -230,5 +230,3 @@ def mean_scale_bilateral(source, selem=None, sink=None, mask=None, s0=10, s1=10,
   return rnk._apply_code(code.mean_scale, code.mean_scale_masked, sink_dtype = float,
                          source=source, selem=selem, sink=sink, mask=mask, 
                          parameter_index=[s0,s1], parameter_float=[p0,p1], **kwargs);
-
-

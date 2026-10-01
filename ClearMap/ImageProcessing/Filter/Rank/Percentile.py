@@ -126,7 +126,7 @@ def mean_percentile(source, selem=None, sink=None, mask=None, percentiles=(0,1),
     The filtered array.
   """
   return rnk._apply_code(code.mean, code.mean_masked, sink_dtype = float,
-                         source=source, selem=selem, sink=sink, mask=mask, parameter_float=percentiles **kwargs);
+                         source=source, selem=selem, sink=sink, mask=mask, parameter_float=percentiles, **kwargs);
 
 
 
@@ -158,7 +158,7 @@ def subtract_mean_percentile(source, selem=None, sink=None, mask=None, percentil
     The filtered array.
   """
   return rnk._apply_code(code.subtract_mean, code.subtract_mean_masked,
-                         source=source, selem=selem, sink=sink, mask=mask, parameter_float=percentiles **kwargs);
+                         source=source, selem=selem, sink=sink, mask=mask, parameter_float=percentiles, **kwargs);
 
 
 
@@ -370,7 +370,4 @@ def threshold_percentile(source, selem=None, sink=None, mask=None, percentile=0,
     The filtered array.
   """
   return rnk._apply_code(code.threshold, code.threshold_masked,
-                        source=source, selem=selem, sink=sink, mask=mask, parameter_float=percentile, **kwargs);
-
-
-    
+                        source=source, selem=selem, sink=sink, mask=mask, parameter_float=percentile, **kwargs)

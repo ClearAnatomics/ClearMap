@@ -207,14 +207,14 @@ def clp(const source_t[:, :, :] source, const np.uint8_t[:, :, :] selem,
         sink_t[:, :, :, :] sink,
         index_t max_bin, index_t[:] p, double[:] q):
 
-  rank_core(kernel_clp[sink_t, index_t, source_t], source, selem,
+  rank_core(kernel_clp_index[sink_t, index_t, source_t], source, selem,
             sink, max_bin, p, q)
 
 def clp_masked(const source_t[:, :, :] source, const np.uint8_t[:, :, :] selem,
                const np.uint8_t[:, :, :] mask, sink_t[:, :, :, :] sink,
                index_t max_bin, index_t[:] p, double[:] q):
 
-  rank_core_masked(kernel_clp[sink_t, index_t, source_t], source, selem, 
+  rank_core_masked(kernel_clp_index[sink_t, index_t, source_t], source, selem,
                    mask, sink, max_bin, p, q)
 
 ###############################################################################

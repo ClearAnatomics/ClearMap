@@ -92,7 +92,7 @@ cpdef void threshold(const source_t[:] source, sink_t[:] sink,
         # add neighbours to the queue
         for d in range(ndim):
           j = i - strides[d]
-          if j > 0 and sink[j] == <sink_t>NOT_CHECKED:
+          if j >= 0 and sink[j] == <sink_t>NOT_CHECKED:
             q.push(j)
           j = i + strides[d]
           if j < n and sink[j] == <sink_t>NOT_CHECKED:

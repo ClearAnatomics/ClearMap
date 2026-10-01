@@ -55,7 +55,7 @@ def nilblack(source, selem=None, sink=None, mask=None, k=0.0, **kwargs):
                          source=source, selem=selem, sink=sink, mask=mask, parameter_float=[k], **kwargs);
     
     
-def sauvola(source, selem=None, sink=None, mask=None, k=0.0, R=1.0):
+def sauvola(source, selem=None, sink=None, mask=None, k=0.0, R=1.0, **kwargs):
   """Local Sauvola threshold of an image.
 
   The resulting binary mask is True if the greyvalue of the center pixel is
@@ -83,7 +83,7 @@ def sauvola(source, selem=None, sink=None, mask=None, k=0.0, R=1.0):
     The filtered array.
   """
   return rnk._apply_code(code.sauvola, code.sauvola_masked, sink_dtype = None,
-                         source=source, selem=selem, sink=sink, mask=mask, parameter_float=[k,R]);
+                         source=source, selem=selem, sink=sink, mask=mask, parameter_float=[k,R], **kwargs);
  
 
 
@@ -115,15 +115,19 @@ def contrast_limited_percentile(source, selem=None, sink=None, mask=None, percen
   sink : array
     The filtered array.
   """
+  # The kernel (kernel_clp_index in ParametricCode.pyx) reads
+  #   p = [clip_limit, scratch[max_bin]]
+  #   and q = [percentile].
+  max_bin = rnk._resolve_max_bin(source.dtype, kwargs.pop('max_bin', None))
   if limit is None:
-    selem = rnk._initialize_selem(selem, source.ndim);
-    n_selem = np.sum(selem);
-    limit = int(np.round(contrast_limit * n_selem));
+    selem = rnk._initialize_selem(selem, source.ndim)
+    n_selem = np.sum(selem)
+    limit = int(np.round(contrast_limit * n_selem))
   
-  parameter_float = [percentile];
-  parameter_index = np.hstack([[limit],  np.zeros(max_bin, dtype=int)]);                         
+  parameter_index = np.hstack([[limit], np.zeros(max_bin, dtype=np.intp)])
+  parameter_float = [percentile]
   return rnk._apply_code(code.clp, code.clp_masked, sink_dtype = float,
-                         source=source, selem=selem, sink=sink, mask=mask, 
+                         source=source, selem=selem, sink=sink, mask=mask, max_bin=max_bin,
                          parameter_index=parameter_index, parameter_float=parameter_float, **kwargs);
    
                          
@@ -155,15 +159,16 @@ def light_sheet_artifact_correction(source, selem=None, sink=None, mask=None, pe
   sink : array
     The filtered array.
   """
+  # The kernel (kernel_lsac in ParametricCode.pyx) reads p = [clip_limit, scratch[max_bin]].
+  max_bin = rnk._resolve_max_bin(source.dtype, kwargs.pop('max_bin', None))
   if limit is None:
     selem = rnk._initialize_selem(selem, source.ndim);
     n_selem = np.sum(selem);
     limit = int(np.round(contrast_limit * n_selem));
   
   parameter_float = np.array(percentiles, dtype = float);
-  parameter_index = np.hstack([[limit],  np.zeros(max_bin, dtype=int)]);
+  parameter_index = np.hstack([[limit],  np.zeros(max_bin, dtype=np.intp)]);
                              
   return rnk._apply_code(code.lsac, code.lsac_masked, sink_dtype = float,
-                         source=source, selem=selem, sink=sink, mask=mask, 
-                         parameter_index=parameter_index, parameter_float=parameter_float, **kwargs);                         
-                         
+                         source=source, selem=selem, sink=sink, mask=mask, max_bin=max_bin,
+                         parameter_index=parameter_index, parameter_float=parameter_float, **kwargs)

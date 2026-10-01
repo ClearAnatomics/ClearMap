@@ -161,15 +161,18 @@ def apply_lut_to_index(source, kernel, lut, sink=None, processes=None, verbose=F
 ### Correlation
 ###############################################################################
 
-def correlate1d(source, kernel, sink = None, axis=0, processes=None, verbose=False):
+def correlate1d(source, kernel, sink=None,
+                axis=0, processes=None, verbose=False):
   """Correlates the source along the given axis wih ta 1d kernel.
   
   Arguments
   ---------
   source : array 
     The source array.
-  lut : array
-    The lookup table.
+  kernel : array
+    The correlation kernel.
+  axis : int
+    The axis along which to correlate.
   sink : array or None
     The result array, if none an array is created.
   processes : None or int
@@ -262,7 +265,7 @@ def where(source, sink=None, blocks=None,
 
   if cutoff is None:
     cutoff = 1
-  cutoff = min(1, cutoff)
+  cutoff = max(1, cutoff)
 
   if source_buffer.size <= cutoff:
     result = np.vstack(np.where(source_buffer)).T
@@ -529,23 +532,6 @@ def block_sums(source, blocks=None, processes=None):
   ac.check_dtype(source_buffer, SOURCE_DTYPES, name='source')
 
   return code.block_sums_1d(source_buffer, blocks=blocks, processes=processes)
-
-
-def index_neighbours(indices, offset, processes=None):
-  """Returns all pairs of indices that are a part of a specified offset.
-  
-  Arguments
-  ---------
-  indices : array
-    List of indices.
-  offset : int
-    The offset to check for.
-  processes : None or int
-    Number of processes, if None use number of cpus.
-  """
-  processes, _ = initialize_processing(processes=processes, verbose=False)
-  indices, indices_buffer = initialize_source(indices)
-  return code.index_neighbours(indices_buffer, offset=offset, processes=processes)
 
 
 def _check_lut_sink(sink_buffer, lut_buffer, source_buffer_shape):

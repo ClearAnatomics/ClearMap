@@ -115,7 +115,7 @@ def trace(const source_t[:,:,:] source,
     tracer.max_step = max_step
     tracer.verbose = verbose
 
-    strides = np.array(source.strides) / source.itemsize
+    strides = np.array(source.strides) // source.itemsize
     res = tracer.run(&source[0,0,0], source.shape[0], source.shape[1], source.shape[2],
                                      strides[0], strides[1], strides[2],
                      &reward[0,0,0],
@@ -157,7 +157,7 @@ def trace_to_mask(const source_t[:,:,:] source,
     tracer.max_step = max_step
     tracer.verbose = verbose
 
-    strides = np.array(source.strides) / source.itemsize
+    strides = np.array(source.strides) // source.itemsize
     # print('strides: ', strides)
     res = tracer.run(&source[0,0,0], source.shape[0], source.shape[1], source.shape[2],
                      strides[0], strides[1], strides[2],

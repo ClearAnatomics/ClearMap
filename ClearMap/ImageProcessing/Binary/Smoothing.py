@@ -75,7 +75,7 @@ def smooth_by_counting(source, sink = None, low = 5, high = 10, shape = None):
   for d in range(ndim):
     weights = np.ones(shape[d], dtype = int)
     temp = np.zeros(source.shape, dtype = 'uint8')
-    ap.correlate1d(filtered, weights, sink=temp, axis=d, mode='constant', cval=0)
+    ap.correlate1d(filtered, weights, sink=temp, axis=d)  # zero padded borders (mode='constant', cval=0)
     filtered = temp
 
   if sink is None:

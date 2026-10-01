@@ -155,14 +155,14 @@ cdef inline void kernel_sum_relative(sink_t* sink, index_t* histo, index_t pop, 
       sink[0] = <sink_t>0
 
 
-def sum_realtive(const source_t[:, :, :] source, const cnp.uint8_t[:, :, :] selem,
+def sum_relative(const source_t[:, :, :] source, const cnp.uint8_t[:, :, :] selem,
                  sink_t[:, :, :, :] sink, 
                  index_t max_bin, index_t[:] p, double[:] q):
 
   rank_core(kernel_sum_relative[sink_t, index_t, source_t], source, selem, 
             sink, max_bin, p, q)
 
-def sum_relaive_masked(const source_t[:, :, :] source, const cnp.uint8_t[:, :, :] selem,
+def sum_relative_masked(const source_t[:, :, :] source, const cnp.uint8_t[:, :, :] selem,
                        const cnp.uint8_t[:, :, :] mask, sink_t[:, :, :, :] sink,
                        index_t max_bin, index_t[:] p, double[:] q):
 

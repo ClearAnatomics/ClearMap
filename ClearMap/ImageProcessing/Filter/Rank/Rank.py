@@ -634,10 +634,7 @@ def histogram(source, selem=None, sink=None, mask=None, max_bin=None):
         at each pixel.
     """
 
-    if max_bin is None:
-        max_bin = dtypes.max_value(source.dtype)
-    if max_bin >= 2**16:
-        raise ValueError('The histograms are to large for this code to be efficient!')
+    max_bin = _resolve_max_bin(source.dtype, max_bin)
     parameter_index = [max_bin]
 
     return _apply_code(code.histogram, code.histogram_masked, max_bin=max_bin,
@@ -653,6 +650,29 @@ def histogram(source, selem=None, sink=None, mask=None, max_bin=None):
 # A bool array is accepted for sinks and masks and viewed as uint8.
 _SOURCE_DTYPES = (np.uint8, np.uint16, np.int64)
 _SINK_DTYPES = (np.uint8, np.uint16, np.int64, np.float64)
+
+
+def _resolve_max_bin(source_dtype, max_bin=None):
+    """Number of histogram bins used by the Cython code (``max_bin``).
+
+    Arguments
+    ---------
+    source_dtype : dtype
+        dtype of the source.
+    max_bin : int or None
+        Explicit number of bins, if None the maximal value of the source dtype.
+
+    Returns
+    -------
+    max_bin : int
+        The number of bins.
+    """
+    if max_bin is None:
+        max_bin = dtypes.max_value(source_dtype)
+    max_bin = int(max_bin)
+    if max_bin >= 2**16:
+        raise ValueError('The histograms are to large for this code to be efficient!')
+    return max_bin
 
 
 def _initialize_selem(selem, ndim):
@@ -850,10 +870,7 @@ def _apply_code(function, function_mask, source, selem=None,
     sink = _prepare_sink(sink, sink_dtype, source, shape_per_pixel)
     sink_view = sink.view('uint8') if sink.dtype == bool else sink
 
-    if max_bin is None:
-        max_bin = dtypes.max_value(source.dtype)
-    if max_bin >= 2**16:
-        raise ValueError('The histograms are to large for this code to be efficient!')
+    max_bin = _resolve_max_bin(source.dtype, max_bin)
 
     bit_depth = int(np.log2(max_bin))
     if bit_depth > 12:

@@ -153,9 +153,9 @@ def hessian_eigensystem(source, sink = None, sigma = None, eigenvectors = 3):
 
 
 #Note: for testing only
-def hessian_test(source, sink = None, sigma = None):
+def _hessian_test(source, sink = None, sigma = None):
   """Returns the hessian matrix at each location calculatd via finite differences.
-  
+
   Arguments
   ---------
   source : array
@@ -168,7 +168,8 @@ def hessian_test(source, sink = None, sigma = None):
   hessian : array:
       5d array with the hessian matrix in the first two dimensions.
   """
-  return _apply_code(code.eigensystem_test, source, sink, sink_shape_per_pixel = (3 + 6,), parameter = None, sigma = sigma);
+  return _apply_code(code.eigensystem_test, source, sink,
+                     sink_shape_per_pixel=(3 + 6,), parameter=None, sigma=sigma)
 
 # def eigenvalues_test(source, sink = None, sigma = None):
 #   """Hessian eigenvalues of source data
