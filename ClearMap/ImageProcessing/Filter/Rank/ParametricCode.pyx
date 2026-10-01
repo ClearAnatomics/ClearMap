@@ -46,15 +46,15 @@ cdef inline void kernel_nilblack(sink_t* sink, index_t* histo, index_t pop, sour
     sink[0] = <sink_t>(mu + q[0] * sqrt(sigma))
 
 
-def nilblack(const source_t[:, :, :] source, const char[:, :, :] selem,
+def nilblack(const source_t[:, :, :] source, const np.uint8_t[:, :, :] selem,
              sink_t[:, :, :, :] sink,
              index_t max_bin, index_t[:] p, double[:] q):
 
   rank_core(kernel_nilblack[sink_t, index_t, source_t], source, selem, 
             sink, max_bin, p, q)
 
-def nilblack_masked(const source_t[:, :, :] source, const char[:, :, :] selem,
-                    const char[:, :, :] mask, sink_t[:, :, :, :] sink,
+def nilblack_masked(const source_t[:, :, :] source, const np.uint8_t[:, :, :] selem,
+                    const np.uint8_t[:, :, :] mask, sink_t[:, :, :, :] sink,
                     index_t max_bin, index_t[:] p, double[:] q):
 
   rank_core_masked(kernel_nilblack[sink_t, index_t, source_t], source, selem, 
@@ -86,15 +86,15 @@ cdef inline void kernel_sauvola(sink_t* sink, index_t* histo, index_t pop, sourc
     sink[0] = <sink_t>(mu * (1.0 + q[0] * (sqrt(sigma)/q[1] - 1.0)));
 
 
-def sauvola(const source_t[:, :, :] source, const char[:, :, :] selem,
+def sauvola(const source_t[:, :, :] source, const np.uint8_t[:, :, :] selem,
             sink_t[:, :, :, :] sink,
             index_t max_bin, index_t[:] p, double[:] q):
 
   rank_core(kernel_sauvola[sink_t, index_t, source_t], source, selem, 
             sink, max_bin, p, q)
 
-def sauvola_masked(const source_t[:, :, :] source, const char[:, :, :] selem,
-                   const char[:, :, :] mask, sink_t[:, :, :, :] sink,
+def sauvola_masked(const source_t[:, :, :] source, const np.uint8_t[:, :, :] selem,
+                   const np.uint8_t[:, :, :] mask, sink_t[:, :, :, :] sink,
                    index_t max_bin, index_t[:] p, double[:] q):
   
   rank_core_masked(kernel_sauvola[sink_t, index_t, source_t], source, selem, 
@@ -203,15 +203,15 @@ cdef inline void kernel_clp(sink_t* sink, index_t* histo, index_t pop, source_t 
         sink[0] = <sink_t>0
 
 
-def clp(const source_t[:, :, :] source, const char[:, :, :] selem,
+def clp(const source_t[:, :, :] source, const np.uint8_t[:, :, :] selem,
         sink_t[:, :, :, :] sink,
         index_t max_bin, index_t[:] p, double[:] q):
 
   rank_core(kernel_clp[sink_t, index_t, source_t], source, selem,
             sink, max_bin, p, q)
 
-def clp_masked(const source_t[:, :, :] source, const char[:, :, :] selem,
-               const char[:, :, :] mask, sink_t[:, :, :, :] sink,
+def clp_masked(const source_t[:, :, :] source, const np.uint8_t[:, :, :] selem,
+               const np.uint8_t[:, :, :] mask, sink_t[:, :, :, :] sink,
                index_t max_bin, index_t[:] p, double[:] q):
 
   rank_core_masked(kernel_clp[sink_t, index_t, source_t], source, selem, 
@@ -323,15 +323,15 @@ cdef inline void kernel_lsac(sink_t* sink, index_t* histo, index_t pop, source_t
       sink[0] = <sink_t>0
 
 
-def lsac(const source_t[:, :, :] source, const char[:, :, :] selem,
+def lsac(const source_t[:, :, :] source, const np.uint8_t[:, :, :] selem,
          sink_t[:, :, :, :] sink, 
          index_t max_bin, index_t[:] p, double[:] q):
 
   rank_core(kernel_lsac[sink_t, index_t, source_t], source, selem,
             sink, max_bin, p, q)
 
-def lsac_masked(const source_t[:, :, :] source, const char[:, :, :] selem,
-                const char[:, :, :] mask, sink_t[:, :, :, :] sink,
+def lsac_masked(const source_t[:, :, :] source, const np.uint8_t[:, :, :] selem,
+                const np.uint8_t[:, :, :] mask, sink_t[:, :, :, :] sink,
                 index_t max_bin, index_t[:] p, double[:] q):
 
   rank_core_masked(kernel_lsac[sink_t, index_t, source_t], source, selem, 

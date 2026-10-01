@@ -30,12 +30,12 @@ ctypedef fused index_t:
 
 
 cdef void rank_core(void kernel(sink_t*, index_t*, index_t, source_t, index_t, index_t*, double*) nogil,
-                    const source_t[:, :, :] image, const char[:, :, :] selem,
+                    const source_t[:, :, :] image, const uint8_t[:, :, :] selem,
                     sink_t[:, :, :, :] sink, index_t max_bin,
                     index_t[:] parameter_index, double[:] parameter_double) except *
 
 
 cdef void rank_core_masked(void kernel(sink_t*, index_t*, index_t, source_t, index_t, index_t*, double*) nogil,
-                           const source_t[:, :, :] source, const char[:, :, :] selem, const char[:,:,:] mask,
+                           const source_t[:, :, :] source, const uint8_t[:, :, :] selem, const uint8_t[:,:,:] mask,
                            sink_t[:, :, :, :] sink, index_t max_bin,
                            index_t[:] parameter_index, double[:] parameter_double) except *
