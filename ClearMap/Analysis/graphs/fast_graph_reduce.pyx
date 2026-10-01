@@ -119,8 +119,8 @@ cdef edge_t find_endpoint_vertex(vertex_t v1, vertex_t v2,
 
 cdef size_t trace_chain(
     index_t start_edge_idx,
-    uint32_t[:, :] connectivity,
-    uint32_t[:] vertex_degs,
+    const uint32_t[:, :] connectivity,
+    const uint32_t[:] vertex_degs,
     vector[vector[adj_entry_t]] &adjacency,
     vector[uint8_t] &visited_edges,
     list result
@@ -192,7 +192,7 @@ cdef size_t trace_chain(
 cdef void to_python(
     index_vector_t& full_edges,
     vertex_vector_t& full_verts,
-    uint32_t[:] edge_ids,
+    const uint32_t[:] edge_ids,
     list result
 ):
     """
@@ -227,7 +227,7 @@ cdef void to_python(
 
 # ================================================================
 
-cdef vertex_t find_max_v_id(uint32_t[:, :] arr):
+cdef vertex_t find_max_v_id(const uint32_t[:, :] arr):
     cdef vertex_t max_vertex_id = 0
     cdef size_t n_rows = arr.shape[0]
 
@@ -244,7 +244,7 @@ cdef vertex_t find_max_v_id(uint32_t[:, :] arr):
     return max_vertex_id
 
 
-cdef uint32_t find_max_eid(uint32_t[:, :] arr):
+cdef uint32_t find_max_eid(const uint32_t[:, :] arr):
     """
     Find the maximum edge id in the edges array.
     """
@@ -262,9 +262,9 @@ cdef uint32_t find_max_eid(uint32_t[:, :] arr):
 
 # TODO: see why typedefs in the signature for degree_t don't work
 cpdef object find_degree2_branches(
-    uint32_t[:, :] edges_array,
-    uint32_t[:] end_edge_ids,
-    uint32_t[:] vertex_degs,
+    const uint32_t[:, :] edges_array,
+    const uint32_t[:] end_edge_ids,
+    const uint32_t[:] vertex_degs,
     int print_step=10
 ):
     """
@@ -321,7 +321,8 @@ cpdef object find_degree2_branches(
     cdef bint is_start_edge
     printf(b"Starting loop on %zu edges\n", num_edges)
     cdef size_t i = 0, ret_code = 0, n_end_edges = len(end_edge_ids)
-    for i, edge_id in enumerate(end_edge_ids):  # We only loop over end edges (i.e. mixed deg2, non deg2)
+    for i in range(n_end_edges):  # We only loop over end edges (i.e. mixed deg2, non deg2)
+        edge_id = end_edge_ids[i]
         if (i % print_step) == 0:
             # print(f'\r{i}/{n_end_edges}', end='')
             printf(b"\r%zu/%zu", i+1, n_end_edges)

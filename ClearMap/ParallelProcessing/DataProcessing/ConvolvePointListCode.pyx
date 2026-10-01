@@ -62,7 +62,7 @@ ctypedef np.uint8_t bool_t
 #@cython.boundscheck(False)
 #@cython.wraparound(False)
 cpdef void convolve_3d_xyz(const source_t[:, :, :] source, const kernel_t[:, :, :] kernel,
-                           index_t[:] x, index_t[:] y, index_t[:] z,
+                           const index_t[:] x, const index_t[:] y, const index_t[:] z,
                            sink_t[:] sink, int processes) noexcept nogil:
     """Convolves binary data with binary kernel at specific x,y,z coordinates only."""
     
@@ -95,7 +95,7 @@ cpdef void convolve_3d_xyz(const source_t[:, :, :] source, const kernel_t[:, :, 
 #@cython.boundscheck(False)
 #@cython.wraparound(False)
 cpdef void convolve_3d_xyz_no_check(const source_t[:, :, :] source, const kernel_t[:, :, :] kernel,
-                                    index_t[:] x, index_t[:] y, index_t[:] z,
+                                    const index_t[:] x, const index_t[:] y, const index_t[:] z,
                                     sink_t[:] sink, int processes) noexcept nogil:
     """Convolves binary data with binary kernel at specific x,y,z coordinates only."""
     
