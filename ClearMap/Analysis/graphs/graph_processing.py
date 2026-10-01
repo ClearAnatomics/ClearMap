@@ -24,6 +24,7 @@ from ClearMap.IO import io_ops
 import ClearMap.ParallelProcessing.DataProcessing.ArrayProcessing as ap
 import ClearMap.ImageProcessing.Topology.Topology3d as t3d
 import ClearMap.Utils.Timer as tmr
+import ClearMap.Utils.array_checks as ac
 
 from ClearMap.Analysis.graphs import graph_gt
 from ClearMap.Analysis.graphs.fast_graph_reduce import find_degree2_branches, cy_reduce
@@ -842,7 +843,7 @@ class PropertyAggregator:
 
             tmp_dtype = getattr(reduction_fn, 'tmp_dtype', out_dtype) # for percentile, we need the intermediate means in float
             mapped = np.zeros(len(self.chain_indices), dtype=tmp_dtype)  # pre-allocate output array
-            success = cy_reduce(arr, mapped, idx_stack=idx_stack, offsets=offsets,
+            success = cy_reduce(ac.bool_as_uint8(arr), ac.bool_as_uint8(mapped), idx_stack=idx_stack, offsets=offsets,
                                 reducer_fn=reduction_fn, num_threads=n_procs)
             if not success:  # pure Python fallback if Cython fails
                 starts, ends = offsets[:-1], offsets[1:]

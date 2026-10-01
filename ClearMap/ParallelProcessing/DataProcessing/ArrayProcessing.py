@@ -32,6 +32,7 @@ from ClearMap.IO import FileUtils as file_utils
 
 import ClearMap.Utils.Timer as tmr
 from ClearMap.Utils.utilities import sanitize_n_processes
+import ClearMap.Utils.array_checks as ac
 
 pyximport.install(setup_args={"include_dirs": [np.get_include(), os.path.dirname(os.path.abspath(__file__))]},
                   reload_support=True)
@@ -52,6 +53,12 @@ Note
 ----
 10 blocks per process is a good choice.
 """
+
+# dtypes the Cython code (ArrayProcessingCode.pyx) is compiled for.
+SOURCE_DTYPES = (np.int32, np.int64, np.uint8, np.uint16, np.uint32, np.float32, np.float64)  # source_t
+SOURCE_INT_DTYPES = (np.int32, np.int64, np.uint8, np.uint16, np.uint32)  # source_int_t
+SINK_DTYPES = SOURCE_DTYPES  # sink_t
+
 
 default_cutoff = 20000000
 """Default size of array below which ordinary numpy is used.
@@ -93,9 +100,12 @@ def apply_lut(source, lut, sink=None, blocks=None, processes=None, verbose=False
 
     source, source_buffer = initialize_source(source, as_1d=True)
     lut, lut_buffer = initialize_source(lut)
+    ac.check_dtype(source_buffer, SOURCE_INT_DTYPES, name='source')
+    ac.check_dtype(lut_buffer, SINK_DTYPES, name='lut')
 
     sink, sink_buffer = initialize_sink(sink=sink, source=source, as_1d=True, dtype=lut.dtype)
-  
+    _check_lut_sink(sink_buffer, lut_buffer, source_buffer.shape)
+
     code.apply_lut(source_buffer, sink_buffer, lut_buffer, blocks=blocks, processes=processes)
 
     finalize_processing(verbose=verbose, function='apply_lut', timer=timer)
@@ -128,12 +138,17 @@ def apply_lut_to_index(source, kernel, lut, sink=None, processes=None, verbose=F
 
   source, source_buffer, source_shape   = initialize_source(source, return_shape=True)
   kernel, kernel_buffer, kernel_shape   = initialize_source(kernel, return_shape=True)
-  sink, sink_buffer, sink_shape = initialize_sink(sink=sink, dtype=lut.dtype, source=source, return_shape=True)
   lut, lut_buffer = initialize_source(lut)
+  sink, sink_buffer, sink_shape = initialize_sink(sink=sink, dtype=lut.dtype, source=source, return_shape=True)
 
   if len(source_shape) != 3 or len(kernel_shape) != 3 or len(sink_shape) != 3:
     raise NotImplementedError(
         'apply_lut_index not implemented for non 3d sources, found %d dimensions!' % len(source_shape))
+
+  ac.check_dtype(source_buffer, SOURCE_DTYPES, name='source')
+  ac.check_dtype(lut_buffer, SINK_DTYPES, name='lut')
+  kernel_buffer = ac.as_index_array(kernel_buffer, name='kernel', ndim=3)
+  _check_lut_sink(sink_buffer, lut_buffer, source_buffer.shape)
 
   code.apply_lut_to_index_3d(source_buffer, kernel_buffer, lut_buffer, sink_buffer, processes=processes)
 
@@ -180,7 +195,13 @@ def correlate1d(source, kernel, sink = None, axis=0, processes=None, verbose=Fal
                                                                 dtype=dtype, source=source, return_shape=True,
                                                                 return_strides=True)
 
-  kernel_buffer = np.asarray(kernel_buffer, dtype=float)
+  kernel_buffer = ac.as_dtype(kernel_buffer, np.float64, name='kernel')
+  ac.check_dtype(source_buffer, SOURCE_DTYPES, name='source')
+  ac.check_dtype(sink_buffer, SINK_DTYPES, name='sink')
+  if not 0 <= axis < len(source_shape):
+    raise ValueError(f'Axis {axis} out of range for a source with {len(source_shape):d} dimensions!')
+  if tuple(sink_shape) != tuple(source_shape):
+    raise ValueError(f'The sink shape {tuple(sink_shape)!r} does not match the source shape {tuple(source_shape)!r}!')
 
   code.correlate_1d(source_buffer, source_shape, source_strides, 
                     sink_buffer, sink_shape, sink_strides, 
@@ -236,6 +257,9 @@ def where(source, sink=None, blocks=None,
   processes, timer, blocks = initialize_processing(processes=processes, function='where', verbose=verbose,
                                                    blocks=blocks, return_blocks=True)
 
+  if source_buffer.dtype not in [np.dtype(d) for d in SOURCE_DTYPES]:
+    source_buffer = (source_buffer > 0).view(np.uint8)  # the Cython code selects the entries > 0
+
   if cutoff is None:
     cutoff = 1
   cutoff = min(1, cutoff)
@@ -262,7 +286,10 @@ def where(source, sink=None, blocks=None,
       sink_shape = (np.sum(sums),)
     else:
       sink_shape = (np.sum(sums), ndim)
-    sink, sink_buffer = initialize_sink(sink=sink, shape=sink_shape, dtype=int)
+    sink, sink_buffer = initialize_sink(sink=sink, shape=sink_shape, dtype=np.intp)
+    ac.check_dtype(sink_buffer, (np.intp,), name='sink')
+    if tuple(sink_buffer.shape) != tuple(sink_shape):
+      raise ValueError(f'The sink has shape {tuple(sink_buffer.shape)!r}, expected {sink_shape!r}!')
 
     if ndim == 1:
       code.where_1d(source_buffer, where=sink_buffer, sums=sums, blocks=blocks, processes=processes)
@@ -305,6 +332,7 @@ def neighbours(indices, offset, processes=None, verbose=False):
   """
   processes, timer = initialize_processing(processes=processes, verbose=verbose, function='neighbours')
 
+  indices = ac.as_index_array(indices, name='indices', ndim=1)
   neighbours =  code.neighbours(indices, offset=offset,  processes=processes)
 
   finalize_processing(verbose=verbose, timer=timer, function='neighbours')
@@ -356,6 +384,7 @@ def read(source, sink=None, slicing=None, memory=None, blocks=None, processes=No
     #TODO: implement parallel reader with strides !
   
   sink, sink_buffer = initialize_sink(sink=sink, shape=shape, dtype=dtype, order=order, memory=memory, as_1d=True)
+  ac.check_dtype(sink_buffer, SOURCE_DTYPES, name='sink')
 
   code.read(sink_buffer, location.encode(), offset=offset, blocks=blocks, processes=processes)
 
@@ -437,7 +466,7 @@ def write(sink, source, slicing=None, overwrite=True, blocks=None, processes=Non
   if (source_order != sink_order):
     raise RuntimeError('Order of source %r and sink %r do not match!' % (source_order, sink_order))
 
-    #print(source_buffer.shape, location, sink_offset, blocks, processes)
+  ac.check_dtype(source_buffer, SOURCE_DTYPES, name='source')
   code.write(source_buffer, location.encode(), offset=sink_offset, blocks=blocks, processes=processes)
 
   finalize_processing(verbose=verbose, function='write', timer=timer)
@@ -497,6 +526,7 @@ def block_sums(source, blocks=None, processes=None):
     blocks = processes * default_blocks_per_process
 
   source, source_buffer = initialize_source(source, as_1d=True)
+  ac.check_dtype(source_buffer, SOURCE_DTYPES, name='source')
 
   return code.block_sums_1d(source_buffer, blocks=blocks, processes=processes)
 
@@ -516,6 +546,14 @@ def index_neighbours(indices, offset, processes=None):
   processes, _ = initialize_processing(processes=processes, verbose=False)
   indices, indices_buffer = initialize_source(indices)
   return code.index_neighbours(indices_buffer, offset=offset, processes=processes)
+
+
+def _check_lut_sink(sink_buffer, lut_buffer, source_buffer_shape):
+  """The sink and the look-up table share the fused type sink_t in the Cython code."""
+  if sink_buffer.dtype != lut_buffer.dtype:
+    raise TypeError(f'The sink dtype {sink_buffer.dtype.name} must match the look-up table dtype {lut_buffer.dtype.name}!')
+  if tuple(sink_buffer.shape) != tuple(source_buffer_shape):
+    raise ValueError(f'The sink shape {tuple(sink_buffer.shape)!r} does not match the source {tuple(source_buffer_shape)!r}!')
 
 
 ###############################################################################
@@ -626,10 +664,10 @@ def initialize_source(source, return_buffer=True, as_1d=False,
   source = dispatch.as_source(source)  # FIXME: check if we need the output editable
 
   if return_shape:
-    shape = np.array(source.shape, dtype=int)
+    shape = np.array(source.shape, dtype=np.intp)  # index_t (Py_ssize_t) in the Cython code
 
   if return_strides:
-    strides = np.array(source.element_strides, dtype=int)
+    strides = np.array(source.element_strides, dtype=np.intp)
 
   if return_order:
     order = source.order
@@ -704,21 +742,21 @@ def initialize_sink(sink=None, shape=None, dtype=None, order=None, memory=None, 
   result = (sink,)
   
   if return_buffer:
-    buffer = sink.as_buffer()
-  
-    if buffer.dtype == bool:
-      buffer = sink.view('uint8')
-      
+    buffer = ac.bool_as_uint8(sink.as_buffer())
+
     if as_1d:
-      buffer = buffer.reshape(-1, order = 'A')
-  
+        flat = buffer.reshape(-1, order = 'A')
+        if buffer.size > 0 and not np.shares_memory(flat, buffer):  # the results would be written to a copy
+            raise ValueError(f'The sink of shape {buffer.shape!r} is not contiguous and cannot be processed as a 1d array!')
+        buffer = flat
+
     result += (buffer,)
 
   if return_shape:
-    result += (np.array(sink.shape,dtype=int),)
+    result += (np.array(sink.shape, dtype=np.intp),)
 
   if return_strides:
-    result += (np.array(sink.element_strides, dtype=int),)
+    result += (np.array(sink.element_strides, dtype=np.intp),)
   
   if len(result) == 1:
     return result[0]

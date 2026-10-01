@@ -30,6 +30,7 @@ ctypedef fused source_t:
   np.float64_t
   
 ctypedef fused sink_t:
+  np.int8_t  # default sink of Thresholding.threshold, -1 (NOT_CHECKED) must fit
   np.int32_t
   np.int64_t
   np.uint8_t
@@ -62,7 +63,7 @@ cdef extern from "stdio.h":
 #@cython.wraparound(False)
 cpdef void threshold(const source_t[:] source, sink_t[:] sink,
                      const index_t[:] strides, const index_t[:] seeds,
-                     index_t[:] parameter_index, double[:] parameter_double):
+                     const index_t[:] parameter_index, const double[:] parameter_double):
     
   cdef double threshold = parameter_double[0]
   
@@ -101,9 +102,9 @@ cpdef void threshold(const source_t[:] source, sink_t[:] sink,
 #@cython.boundscheck(False)
 #@cython.wraparound(False)
 cpdef void threshold_to_background(const source_t[:] source, sink_t[:] sink,
-                                   bool_t[:] background,
+                                   const bool_t[:] background,
                                    const index_t[:] strides, const index_t[:] seeds,
-                                   index_t[:] parameter_index, double[:] parameter_double):
+                                   const index_t[:] parameter_index, const double[:] parameter_double):
     
   cdef double threshold = parameter_double[0]
   

@@ -18,6 +18,7 @@ import scipy.ndimage as ndi
 import pyximport
 
 from ClearMap.IO import source_geometry
+import ClearMap.Utils.array_checks as ac
 
 pyximport.install(setup_args={"include_dirs":np.get_include()}, reload_support=True)
 
@@ -207,27 +208,30 @@ def _apply_code(function, source, sink, sink_dtype = None, sink_shape_per_pixel 
   else:
     shape_per_pixel = sink_shape_per_pixel;
   
+  expected_shape = source.shape + shape_per_pixel
   if sink is None:
     if sink_dtype is None:
       sink_dtype = float
-    sink = np.zeros(source.shape + shape_per_pixel, dtype = sink_dtype, order = 'F')
+    sink = np.zeros(expected_shape, dtype = sink_dtype, order = 'F')
   else:
     if shape_per_pixel != (1,):
-      if sink.shape != source.shape + shape_per_pixel:
-        raise ValueError('The sink of shape %r does not have expected shape %r!' % (sink.shape, source.shape + shape_per_pixel));
-    if sink.shape != source.shape + shape_per_pixel:
-      sink = sink.reshape(source.shape + shape_per_pixel)
-  
-  if sink.dtype == bool:
-    s = sink.view('uint8')
-  else:
-    s = sink;
+      if sink.shape != expected_shape:
+        raise ValueError('The sink of shape %r does not have expected shape %r!' % (sink.shape, expected_shape));
+    if sink.shape != expected_shape:
+      reshaped = sink.reshape(expected_shape)
+      if not np.shares_memory(reshaped, sink):  # the result would be written to a copy
+        raise ValueError(f'The sink of shape {sink.shape!r} cannot be reshaped to {expected_shape!r} without copying!')
+      sink = reshaped
+
+  # source_t / sink_t of HessianCode.pyx, bool sinks are viewed as uint8
+  s = ac.check_dtype(ac.bool_as_uint8(sink), (np.uint8, np.uint16, np.float32, np.float64), name='sink')
 
   sink_stride = source_geometry.element_strides(sink)[-1];
-    
-  if parameter is None:
-    parameter = np.zeros(0);
-  parameter = np.asarray([parameter], dtype = float).flatten();
+
+  # WARNING: the kernels take &parameter[0] (bounds checks are off): never pass an empty array
+  parameter = ac.scratch_parameters(parameter, float)
+  if parameter.size == 0:
+    parameter = np.zeros(1)
                      
   if sigma is not None:
     data = ndi.gaussian_filter(np.asarray(source, dtype=float), sigma=sigma);

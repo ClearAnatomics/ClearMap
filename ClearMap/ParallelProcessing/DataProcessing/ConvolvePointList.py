@@ -22,13 +22,14 @@ __download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 
 
 import numpy as np;
-from multiprocessing import cpu_count;
+from multiprocessing import cpu_count
 
-import ClearMap.IO.IO as io
+import ClearMap.Utils.array_checks as ac
 
 import pyximport;
 
 from ClearMap.IO import source_geometry
+from ClearMap.Utils.utilities import sanitize_n_processes
 
 pyximport.install(setup_args={"include_dirs": [np.get_include()]}, reload_support=True)
 
@@ -39,6 +40,34 @@ import ClearMap.ParallelProcessing.DataProcessing.ConvolvePointListCode as code
 ###############################################################################
 
 #TODO: use ArrayProcessing initialization tools 
+# dtypes the Cython code (ConvolvePointListCode.pyx) is compiled for (source_t, kernel_t, sink_t).
+_DTYPES = (np.int32, np.int64, np.uint8, np.uint16, np.uint32, np.float32, np.float64)
+
+
+def _prepare(source, kernel, sink, sink_dtype, npts, processes):
+  """Validate and coerce the arguments shared by the convolve_3d_* functions.
+
+  Returns
+  -------
+  source, kernel : arrays
+    bool arrays are viewed as uint8.
+  sink : array
+    The sink (allocated if None) as seen by the user and ``o`` its uint8 view if it is bool.
+  o : array
+    The array handed to the Cython code.
+  processes : int
+    The number of processes.
+  """
+  d = ac.check_dtype(ac.bool_as_uint8(source), _DTYPES, 'source')
+  k = ac.check_dtype(ac.bool_as_uint8(kernel), _DTYPES, 'kernel')
+  if sink is None:
+    sink = np.zeros(npts, dtype=kernel.dtype if sink_dtype is None else sink_dtype)
+  if sink.ndim != 1 or sink.shape[0] != npts:
+    raise ValueError(f'The sink has shape {sink.shape!r} but expected ({npts:d},)!')
+  o = ac.check_dtype(ac.bool_as_uint8(sink), _DTYPES, 'sink')
+  return d, k, sink, o, sanitize_n_processes(processes)
+
+
 def convolve_3d(source, kernel, points = None, indices = None, x = None, y = None, z = None, sink = None, sink_dtype = None, strides = None, check_border = True, processes = cpu_count()):
   """Convolves source with a specified kernel at specific points only.
     
@@ -121,34 +150,9 @@ def convolve_3d_points(source, kernel, points, sink = None, sink_dtype = None, c
     List of results of convolution at specified points
   """
   
-  if source.dtype == bool:
-    d = source.view('uint8');
-  else:
-    d = source;
-  
-  npts = points.shape[0];  
-    
-  if sink is None:
-    if sink_dtype is None:
-      sink_dtype = kernel.dtype;
-    sink = np.zeros(npts, dtype = sink_dtype);
-  
-  if sink.shape[0] != npts:
-     raise RuntimeError('The sinkput has not the expected size of %d but %d' % (npts, sink.shape[0]));
-  
-  if sink.dtype == bool:
-    o = sink.view('uint8');
-  else:
-    o = sink;
+  points = ac.as_index_array(points, 'points', ndim=2)
+  d, k, sink, o, processes = _prepare(source, kernel, sink, sink_dtype, points.shape[0], processes)
 
-  if kernel.dtype == bool:
-    k = np.array(kernel, 'uint8');
-  else:
-    k = kernel;
-  
-  if processes is None:
-    processes = cpu_count();
-  
   if check_border:
     code.convolve_3d_points(d, k, points, o, processes);
   else:
@@ -183,38 +187,15 @@ def convolve_3d_xyz(source, kernel, x, y, z, sink = None, sink_dtype = None, che
     List of results of convolution.
   """
   
-  if source.dtype == bool:
-    d = source.view('uint8');
-  else:
-    d = source;
-    
-  npts = len(x);
-    
-  if sink is None:
-    if sink_dtype is None:
-      sink_dtype = kernel.dtype;
-    sink = np.zeros(npts, dtype = sink_dtype);
-  
-  if sink.shape[0] != npts or len(y) != npts or len(z) != npts:
-     raise RuntimeError('The sinkput has size %d and does not match the x,y,z coordinates of sizes: %d = %d = %d' % (sink.shape[0], len(x), len(y), len(z)));
-  
-  if sink.dtype == bool:
-    o = sink.view('uint8');
-  else:
-    o = sink;
+  x, y, z = (ac.as_index_array(c, name, ndim=1) for c, name in ((x, 'x'), (y, 'y'), (z, 'z')))
+  if not (len(x) == len(y) == len(z)):
+    raise ValueError(f'The x,y,z coordinates have different sizes: {len(x):d}, {len(y):d}, {len(z):d}!')
+  d, k, sink, o, processes = _prepare(source, kernel, sink, sink_dtype, len(x), processes)
 
-  if kernel.dtype == bool:
-    k = np.array(kernel, 'uint8');
-  else:
-    k = kernel;
-    
-  if processes is None:
-    processes = cpu_count();
-  
   if check_border:
     code.convolve_3d_xyz(d, k, x, y, z, o, processes);
   else:
-    code.convolve_3_xyz_no_check(d, k, x, y, z, o, processes);
+    code.convolve_3d_xyz_no_check(d, k, x, y, z, o, processes);
   
   return sink;
 
@@ -246,37 +227,13 @@ def convolve_3d_indices(source, kernel, indices, sink = None, sink_dtype = None,
   convolved : array
     List of results of convolution.
   """
-  d = source.reshape(-1, order = 'A');
-  if source.dtype == bool:
-    d = d.view('uint8');
-    
-  npts = indices.shape[0];
-    
-  if sink is None:
-    if sink_dtype is None:
-      sink_dtype = kernel.dtype;
-    sink = np.zeros(npts, dtype = sink_dtype);
-  
-  if sink.shape[0] != npts:
-     raise RuntimeError('The sinkput has not the expected size of %d but %d' % (npts, sink.shape[0]));
-  
-  if sink.dtype == bool:
-    o = sink.view('uint8');
-  else:
-    o = sink;
+  indices = ac.as_index_array(indices, 'indices', ndim=1)
+  d, k, sink, o, processes = _prepare(source.reshape(-1, order = 'A'), kernel, sink, sink_dtype, indices.shape[0], processes)
 
-  if kernel.dtype == bool:
-    k = np.array(kernel, 'uint8');
-  else:
-    k = kernel; 
-
-  if processes is None:
-    processes = cpu_count();
-  
   if strides is None:
-    strides = np.array(source_geometry.element_strides(source));
-  
-  #print d.dtype, strides.dtype, kernel.dtype, o.dtype
+    strides = source_geometry.element_strides(source)
+  strides = ac.as_index_array(strides, 'strides', ndim=1)
+
   if check_border:
     code.convolve_3d_indices(d, strides, k, indices, o, processes);
   else:
@@ -398,7 +355,7 @@ def convolve_3d_find_smaller_than(source, search, indices, max_value, sink = Non
 
 def test():
   import numpy as np
-  import ClearMap.sourceProcessing.ConvolvePointList as cpl
+  import ClearMap.ParallelProcessing.DataProcessing.ConvolvePointList as cpl
   
   from importlib import reload
   reload(cpl);

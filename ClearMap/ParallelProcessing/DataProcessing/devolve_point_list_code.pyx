@@ -159,7 +159,7 @@ cpdef int devolve_weights(const point_t[:,:] points, const weight_t[:] weights,
 
 #@cython.boundscheck(False)
 #@cython.wraparound(False)
-cpdef int devovle_weights_kernel(const point_t[:,:] points, const weight_t[:] weights,
+cpdef int devolve_weights_kernel(const point_t[:,:] points, const weight_t[:] weights,
                                  const index_t[:,:] indices, const kernel_t[:] kernel,
                                  sink_t[:] sink,
                                  const index_t[:] shape, const index_t[:] strides,

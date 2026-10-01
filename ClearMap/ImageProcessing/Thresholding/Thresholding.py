@@ -14,7 +14,8 @@ __copyright__ = 'Copyright (c) 2017 by Christoph Kirst, The Rockefeller Universi
 import os
 import numpy as np
 
-import ClearMap.IO.IO as io;
+from ClearMap.IO import source_geometry
+import ClearMap.Utils.array_checks as ac
 
 import pyximport;
 #pyximport.install(setup_args={"include_dirs":np.get_include()}, reload_support=True)
@@ -33,6 +34,11 @@ pyximport.install(setup_args = {"include_dirs" : [np.get_include(), os.path.dirn
 
 
 from . import ThresholdingCode as code
+
+
+# dtypes of source_t and sink_t in ThresholdingCode.pyx (bool arrays are viewed as uint8)
+_DTYPES = (np.int32, np.int64, np.uint8, np.uint16, np.uint32, np.float32, np.float64)
+_SINK_DTYPES = (np.int8,) + _DTYPES
 
 
 ###############################################################################
@@ -69,26 +75,42 @@ def threshold(source, sink = None, threshold = None, hysteresis_threshold = None
     if source is sink:
       raise NotImplementedError("Cannot perform operation in place.")
 
+    # The kernels work on flat arrays with the strides of the source: every flat array (source,
+    # sink, seeds, background) must be flattened in the same order, that of the source.
+    order = source_geometry.order(source)  # keep the layout of contiguous sources
+    if order not in ('C', 'F'):  # non contiguous: copy to ClearMap's default (Fortran) order
+      order = 'F'
+    source = np.asarray(source, order=order)  # copy only if not contiguous (read-only is fine)
+
     if sink is None:
-      sink = np.zeros(source.shape, dtype = 'int8', order = io.order(source));
-    
-    source_flat = source.reshape(-1, order=io.order(source));
-    sink_flat   = sink.reshape(-1, order=io.order(sink));                           
-    strides     = np.array(io.element_strides(source));
+      sink = np.zeros(source.shape, dtype='int8', order=order)
+    if sink.shape != source.shape:
+      raise ValueError(f'The sink shape {sink.shape!r} does not match the source shape {source.shape!r}!')
+
+    source_flat = ac.check_dtype(ac.bool_as_uint8(source.reshape(-1, order=order)), _DTYPES, name='source')
+    sink_flat = ac.check_dtype(ac.bool_as_uint8(sink.reshape(-1, order=order)), _SINK_DTYPES, name='sink')
+    if not np.shares_memory(sink_flat, sink):  # the result would be written to a copy
+      raise ValueError(f'The sink must be {order}-contiguous like the source!')
+    strides = ac.as_index_array(source_geometry.element_strides(source), name='strides', ndim=1)
      
     if seeds is None:
-      seeds = np.where(source_flat >= threshold)[0];
+      seeds = np.where(source_flat >= threshold)[0]
     else:
-      seeds_flat = seeds.reshape(-1, order=io.order(seeds));
-      seeds = np.where(seeds_flat)[0];
+      seeds = np.asarray(seeds)
+      if seeds.shape != source.shape:
+        raise ValueError(f'The seeds shape {seeds.shape!r} does not match the source shape {source.shape!r}!')
+      seeds = np.where(seeds.reshape(-1, order=order))[0]
+    seeds = ac.as_index_array(seeds, name='seeds', ndim=1)
     
     if hysteresis_threshold is not None:
-      parameter_index = np.zeros(0, dtype = int);
-      parameter_double = np.array([hysteresis_threshold], dtype = float);   
+      parameter_index = np.zeros(0, dtype = np.intp)
+      parameter_double = np.array([hysteresis_threshold], dtype=float)
 
       if background is not None:
-        background_flat = background.reshape(-1, order=io.order(background));                                     
-        background_flat = background_flat.view(dtype='uint8')                                
+        background = np.asarray(background)
+        if background.shape != source.shape:
+          raise ValueError(f'The background shape {background.shape!r} does not match the source shape {source.shape!r}!')
+        background_flat = ac.as_uint8_flags(background.reshape(-1, order=order), name='background')
         code.threshold_to_background(source_flat, sink_flat, background_flat, strides, seeds, parameter_index, parameter_double);
       else:
         code.threshold(source_flat, sink_flat, strides, seeds, parameter_index, parameter_double);
@@ -114,5 +136,4 @@ def _test():
   d = np.exp(-(x*x + y*y +z*z)/10.0**2)                  
                
   t = th.threshold(d, sink = None, threshold = 0.9, hysteresis_threshold=0.5);               
-  p3d.plot([[d,t]])     
-        
+  p3d.plot([[d,t]])

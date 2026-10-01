@@ -19,17 +19,20 @@ __download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 import math
 import numpy as np
 
-import pyximport;
+import pyximport
 
 from ClearMap.IO import dispatch, source_geometry
 
 pyximport.install(setup_args={"include_dirs":np.get_include()}, reload_support=True)
 
-import ClearMap.IO.IO as io
-
 import ClearMap.ParallelProcessing.DataProcessing.ArrayProcessing as ap
 
 import ClearMap.ParallelProcessing.DataProcessing.devolve_point_list_code as code
+import ClearMap.Utils.array_checks as ac
+
+
+# dtypes of point_t, sink_t and weight_t in devolve_point_list_code.pyx
+_DTYPES = (np.int32, np.int64, np.uint8, np.uint16, np.uint32, np.uint64, np.float32, np.float64)
 
 ###############################################################################
 ### Voxelization
@@ -97,13 +100,31 @@ def devolve(source, sink = None, shape = None, dtype = None,
   
   if indices is None:
     return sink;
-  indices = np.asarray(indices, dtype=int);
+
+  # The Cython code does not check any bound: validate everything it indexes with.
+  ndim = len(sink_shape)
+  n_points = points_buffer.shape[0]
+  points_buffer = ac.check_dtype(ac.bool_as_uint8(points_buffer), _DTYPES, name='points')
+  if points_buffer.ndim != 2 or points_buffer.shape[1] != ndim:
+    raise ValueError(f'The points must have shape (n, {ndim:d}) to match the sink, found {points_buffer.shape!r}!')
+  ac.check_dtype(sink_buffer, _DTYPES, name='sink')
+
+  indices = ac.as_index_array(indices, name='indices')
   if indices.ndim == 1:
     indices = indices[:,None];
-  
+  if indices.ndim != 2 or indices.shape[1] != ndim:
+    raise ValueError(f'The indices must have shape (m, {ndim:d}), found {indices.shape!r}!')
+
   if kernel is not None:
-    kernel = np.asarray(kernel, dtype=float);
-  
+    kernel = ac.as_dtype(kernel, np.float64, name='kernel')
+    if kernel.shape != (indices.shape[0],):
+      raise ValueError(f'The kernel must have one weight per index ({indices.shape[0]:d}), found shape {kernel.shape!r}!')
+
+  if weights is not None:
+    weights = ac.check_dtype(ac.bool_as_uint8(np.asarray(weights)), _DTYPES, name='weights')
+    if weights.shape != (n_points,):
+      raise ValueError(f'The weights must have one entry per point ({n_points:d}), found shape {weights.shape!r}!')
+
   if weights is None:
     if kernel is None:
       code.devolve_uniform(points_buffer, indices, sink_buffer, sink_shape, sink_strides, processes);
