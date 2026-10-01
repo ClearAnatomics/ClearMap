@@ -20,9 +20,9 @@ __webpage__   = 'http://idisco.info'
 __download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 
 
-import numpy as np;
+import numpy as np
 
-import pyximport; 
+import pyximport
 pyximport.install(setup_args={"include_dirs": [np.get_include()]}, reload_support=True)
  
 import ClearMap.ParallelProcessing.DataProcessing.ArrayProcessing as ap

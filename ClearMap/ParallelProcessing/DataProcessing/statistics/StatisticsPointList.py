@@ -19,10 +19,10 @@ __download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 import math
 import numpy as np
 
-import pyximport;
+import pyximport
 pyximport.install(setup_args={"include_dirs":np.get_include()}, reload_support=True)
 
-import ClearMap.IO.IO as io
+from ClearMap.IO import source_geometry, io_ops, dtypes
 
 import ClearMap.ParallelProcessing.DataProcessing.ArrayProcessing as ap
 
@@ -69,7 +69,7 @@ def average(source, sink = None, shape = None, dtype = None,
   processes, timer = ap.initialize_processing(processes=processes, verbose=verbose, function='devolve');
   
   #points, points_buffer = ap.initialize_source(points);
-  points_buffer = io.read(source);
+  points_buffer = io_ops.read(source);
   if points_buffer.ndim == 1:
     points_buffer = points_buffer[:,None];
   
@@ -79,11 +79,11 @@ def average(source, sink = None, shape = None, dtype = None,
     else:
       shape = (int(math.ceil(points_buffer[:].max())),)
   elif isinstance(shape, str):
-    shape= io.shape(shape);
+    shape= source_geometry.shape(shape);
   
   if sink is None and dtype is None:
     if weights is not None:
-      dtype = io.dtype(weights);
+      dtype = dtypes.dtype(weights);
     elif kernel is not None:
       kernel = np.asarray(kernel);
       dtype = kernel.dtype;
@@ -95,8 +95,7 @@ def average(source, sink = None, shape = None, dtype = None,
   #TODO: initialize properly
   counts = np.zeros(sink_shape, dtype=int, order=sink.order);
   counts_buffer  =  counts.reshape(-1, order = 'A');
-  #print(counts.shape, counts_buffer.shape)
-  
+
   if indices is None:
     return sink;
   indices = np.asarray(indices, dtype=int);
@@ -105,11 +104,7 @@ def average(source, sink = None, shape = None, dtype = None,
   
   if kernel is not None:
     kernel = np.asarray(kernel, dtype=float);
-  
-  #print(kernel);
-  #print(weights)
-  #return;
-  
+
   code.average(points_buffer, weights, indices, sink_buffer, sink_shape, sink_strides, counts_buffer, processes);
 #  if weights is None:
 #    if kernel is None:

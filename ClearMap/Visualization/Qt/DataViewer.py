@@ -56,7 +56,7 @@ if not pg.QAPP:
 class DataViewer(QWidget):
     #: Triggered when the mouse is clicked in the image view. The signal emits the x, y, and z coordinates of the click.
     mouse_clicked = pyqtSignal(int, int, int)
-    
+
     def __init__(self, source,
                  points=None, vectors=None, orientations=None, annotation=None,
                  axis=None, scale=None, title=None,

@@ -70,8 +70,6 @@ import numpy as np
 import ClearMap.ParallelProcessing.Block as blk
 import ClearMap.ParallelProcessing.ParallelTraceback as ptb
 
-import ClearMap.IO.IO as io
-
 import ClearMap.Utils.Timer as tmr
 from ClearMap.IO import source_initialization, io_ops
 

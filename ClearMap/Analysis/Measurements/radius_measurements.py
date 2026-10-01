@@ -209,7 +209,6 @@ def search_indices_rectangle(radius):
 
 def test():
     import numpy as np
-    import ClearMap.IO.IO as io
 
     # noinspection PyUnresolvedReferences
     import ClearMap.Analysis.Measurements.radius_measurements as mr

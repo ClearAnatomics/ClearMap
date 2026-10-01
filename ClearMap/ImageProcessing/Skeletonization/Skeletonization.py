@@ -105,16 +105,14 @@ def skeletonize(source, sink = None, points = None,
 ###############################################################################
   
 def _test():
-  import numpy as np;
-  import ClearMap.IO.IO as io
-  import ClearMap.ImageProcessing.Skeletonization.Skeletonization as skl;
+  import ClearMap.ImageProcessing.Skeletonization.Skeletonization as skl
   import ClearMap.Visualization.Plot3d as p3d
   import ClearMap.Tests.Files as tsf
   
   from importlib import reload
   reload(skl)
   
-  binary = tsf.skeleton_binary;
+  binary = tsf.skeleton_binary
   
   #default version
   skeleton = skl.skeletonize(binary, delete_border=True, verbose=True);

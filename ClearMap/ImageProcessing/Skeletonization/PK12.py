@@ -631,8 +631,8 @@ def skeletonize_index(binary, points = None, steps = None, removals = False,
 ###############################################################################
 
 def _test():
-  import numpy as np;
-  import ClearMap.IO.IO as io
+  import numpy as np
+
   import ClearMap.Visualization.Plot3d as p3d
   import ClearMap.Tests.Files as tsf
   import ClearMap.ImageProcessing.Skeletonization.PK12 as PK12;
