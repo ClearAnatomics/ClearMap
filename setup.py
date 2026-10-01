@@ -22,6 +22,9 @@ for scheme in INSTALL_SCHEMES.values():
     scheme['data'] = scheme['purelib']
 
 
+FORCE = '--force' in sys.argv   # python setup.py build_ext --inplace --force
+
+
 ###############################################################################
 # Parallel C/C++ compilation
 ###############################################################################
@@ -150,9 +153,9 @@ print(f'Building {len(extensions)} extensions with {N_PROCS} processes, '
       f'compile args: {extra_compile_args},'
       f'link args: {extra_link_args}')
 if os_name.startswith('darwin') or os_name.startswith('windows'):
-    ext_modules = cythonize(extensions, quiet=True)
+    ext_modules = cythonize(extensions, quiet=True, force=FORCE)
 else:
-    ext_modules = cythonize(extensions, nthreads=N_PROCS, quiet=True)
+    ext_modules = cythonize(extensions, nthreads=N_PROCS, quiet=True, force=FORCE)
 
 data_dirs = [
     'ClearMap/External/elastix',
