@@ -164,6 +164,13 @@ class RegistrationProcessor(PipelineOrchestrator):
         reg_cfg = self.registration_config['channels']
         sequence = self.get_registration_sequence_channels(first_channel, stop_channel)
 
+        # Check that the last channel in the sequence is aligned with the stop_channel
+        last_align_with = reg_cfg[sequence[-1]]['align_with']
+        if last_align_with != stop_channel:
+            raise MissingRequirementException(f'Channel "{first_channel}" is not aligned to "{stop_channel}": '
+                                              f'its registration sequence ({" -> ".join(sequence)}) '
+                                              f'ends with align_with={last_align_with!r}.')
+
         # Compile the list of directories for the registration steps in the sequence while checking that they exist
         directories = []
         for channel in sequence:
