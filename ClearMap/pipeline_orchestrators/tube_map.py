@@ -1235,8 +1235,7 @@ class VesselGraphProcessor(PipelineOrchestrator):
                 resampled_shape=self.resampled_shape)
 
             if self.registration_processor.was_registered:
-                for channel in self.get_registration_sequence_channels():
-                    results_dir = self.get_path('aligned', channel=channel).parent
+                for results_dir in self.registration_processor.get_transform_directories(self.parent_channels[0]):
                     coordinates = elastix.transform_points(coordinates, transform_directory=results_dir,
                                                            binary=USE_BINARY_POINTS_FILE, indices=False)
             return coordinates
@@ -1614,7 +1613,3 @@ class VesselGraphProcessor(PipelineOrchestrator):
         else:
             region_color = None
         return self.plot_graph_chunk(graph_chunk, plot_type, title, region_color, show)
-
-    def get_registration_sequence_channels(self):
-        return (self.registration_processor.
-                get_registration_sequence_channels(self.parent_channels[0], 'atlas'))

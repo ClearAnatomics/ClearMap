@@ -160,6 +160,22 @@ class RegistrationProcessor(PipelineOrchestrator):
             out.append(next_channel)
         return out
 
+    def get_transform_directories(self, first_channel, stop_channel='atlas'):
+        reg_cfg = self.registration_config['channels']
+        sequence = self.get_registration_sequence_channels(first_channel, stop_channel)
+
+        # Compile the list of directories for the registration steps in the sequence while checking that they exist
+        directories = []
+        for channel in sequence:
+            if reg_cfg[channel]['moving_channel'] in (None, 'intrinsically_aligned'):
+                continue  # Identity: nothing to apply
+            result_dir = self.get('aligned', channel=channel).path.parent
+            if not result_dir.exists():
+                raise MissingRequirementException(f'Elastix result directory "{result_dir}" for channel '
+                                                  f'"{channel}" not found. Please run the registration first.')
+            directories.append(result_dir)
+        return directories
+
     def parametrize_assets(self):
         for channel in self.config['channels']:
             channel_cfg = self.config['channels'][channel]
