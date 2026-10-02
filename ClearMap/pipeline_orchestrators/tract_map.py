@@ -206,10 +206,6 @@ class TractMapProcessor(ChannelPipelineOrchestrator):
         else:
             raise NotImplementedError('Output to file not implemented yet')
 
-    def get_registration_sequence_channels(self, stop_channel='atlas'):
-        return (self.registration_processor.
-                get_registration_sequence_channels(self.channel, stop_channel))
-
     @staticmethod
     def transformation(coords, source_shape, resampled_shape, results_directories):
         coords = resample_points(
@@ -267,16 +263,8 @@ class TractMapProcessor(ChannelPipelineOrchestrator):
             # FIXME: in this case compute from scale differences
             raise ValueError(f'Resampled shape not found for channel {self.channel}')
 
-        results_directories = []
-        for channel in self.get_registration_sequence_channels(stop_channel=target_channel):
-            if self.registration_config['channels'][channel]['moving_channel'] in (None, 'intrinsically_aligned'):
-                continue
-            else:
-                result_dir = self.registration_processor.get_elx_asset('aligned', channel=channel).path.parent
-                if not result_dir.exists():
-                    raise MissingRequirementException(f'Elastix result directory {result_dir} for {channel=} not found.'
-                                                      f'Please run the registration first.')
-                results_directories.append(result_dir)
+        results_directories = self.registration_processor.get_transform_directories(self.channel,
+                                                                                    stop_channel=target_channel)
 
         debug_bcp = self.workspace.debug
         self.workspace.debug = False

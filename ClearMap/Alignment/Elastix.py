@@ -1042,7 +1042,7 @@ def transform_points(source, sink=None, transform_parameter_file=None, transform
 
     Arguments
     ---------
-    source : str
+    source : str | np.ndarray
       Source of the points.
     sink : str or None
       Sink for transformed points.

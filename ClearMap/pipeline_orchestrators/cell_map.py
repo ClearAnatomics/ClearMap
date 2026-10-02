@@ -299,17 +299,12 @@ class CellDetector(ChannelPipelineOrchestrator):
                 resampled_shape = self.get('atlas', channel=self.channel, asset_sub_type='reference').shape()
             else:
                 raise ValueError(f'Resampled shape not found for channel {self.channel}')
-        coords = resampling.resample_points(
-            coords,
-            original_shape=self.sample_manager.stitched_shape(channel=self.channel),
-            resampled_shape=resampled_shape)
+        coords = resampling.resample_points(coords,
+                                            original_shape=self.sample_manager.stitched_shape(channel=self.channel),
+                                            resampled_shape=resampled_shape)
 
         if self.registration_processor.was_registered:
-            reg_cfg = self.registration_config['channels']
-            for i, channel in enumerate(self.get_registration_sequence_channels(stop_channel=target_channel)):
-                if reg_cfg[channel]['moving_channel'] in (None, 'intrinsically_aligned'):
-                    continue
-                results_dir = self.registration_processor.get_path('aligned', channel=channel).parent
+            for results_dir in self.registration_processor.get_transform_directories(self.channel, target_channel):
                 coords = elastix.transform_points(coords, transform_directory=results_dir, binary=USE_BINARY_POINTS_FILE)
 
         return coords
@@ -677,7 +672,3 @@ class CellDetector(ChannelPipelineOrchestrator):
         df['volume'] = df['id'].map(volumes)
 
         df.to_feather(self.get_path('cells', channel=self.channel, extension='.feather'))
-
-    def get_registration_sequence_channels(self, stop_channel='atlas'):
-        return (self.registration_processor.
-                get_registration_sequence_channels(self.channel, stop_channel))
