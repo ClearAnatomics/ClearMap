@@ -414,7 +414,9 @@ class ConfigCoordinator(BusSubscriberMixin):
                 sample_manager.set_renamed_channels(rename_map)
 
             if do_run_adjusters:
-                patch2 = self.adjust_config(sample_manager=sample_manager, phase=phase, view=working_cfg,
+                # The runner merges each adjuster result into the view it is given (in place). Hand it a copy
+                # so that only the returned patch, clipped to the active sections, reaches the working config.
+                patch2 = self.adjust_config(sample_manager=sample_manager, phase=phase, view=deepcopy(working_cfg),
                                             active_sections=None, changed_keys=changed_keys, apply=False)
                 if patch2:
                     self._merge_patch(working_cfg, patch2, allowed_sections=allowed)
