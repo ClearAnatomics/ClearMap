@@ -235,13 +235,8 @@ class DensityGroupAnalysisOrchestrator(GroupOrchestratorBase):
         else:
             target_ch = channels[0]  # Just use the first one to probe
 
-        suffixes = set()
-
-        # Probe the workspace info dictionary for density files matching our channel
-        for asset_key in sm.workspace.info_dict().keys():
-            # asset_key is a tuple: (type, channel, subtype)
-            if len(asset_key) >= 3 and asset_key[0] == 'density' and asset_key[1] == target_ch:
-                suffixes.add(asset_key[2] or '')  # subtype is the suffix
+        # The density sub-types are dynamic (e.g. counts_<weights_column>): look at the files
+        suffixes = set(sm.get('density', channel=target_ch, sample_id=sm.prefix).available_sub_types())
 
         # Fallback if scanning fails/is empty but we know defaults
         if not suffixes:

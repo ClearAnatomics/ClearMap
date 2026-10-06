@@ -495,6 +495,27 @@ class Asset:
         else:
             return self.directory / file_name
 
+    def available_sub_types(self) -> list[str]:
+        """
+        The sub-types of this asset that exist on disk.
+
+        Sub-types can be dynamic (e.g. ``counts_<weights_column>`` for ``density``), so they are not
+        necessarily registered in the type spec: the files are the source of truth.
+
+        Returns
+        -------
+        list[str]
+            The sorted sub-type names (e.g. ``['counts', 'counts_wcrust', 'intensities']``).
+        """
+        prefix = f'{self.base_name}_'
+        sub_types = set()
+        for ext in self.type_spec.extensions:
+            for path in self.directory.glob(f'{prefix}*{ext}'):
+                sub_type = path.name[len(prefix):-len(ext)]
+                if sub_type:  # '*' can match nothing: '<prefix>.tif' is not a sub-type
+                    sub_types.add(sub_type)
+        return sorted(sub_types)
+
     @property
     def existing_path(self):
         """
