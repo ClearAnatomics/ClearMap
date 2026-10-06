@@ -93,6 +93,7 @@ class DefaultsProvider:
             all_sections = [s for s in all_sections if ALTERNATIVES_REG.is_local_file(s)]
 
         self._validators: Dict[str, Any] = {}
+        self._resolved: Dict[str, JsonDict] = {}  # section -> resolved defaults (defaults do not change during a run)
         if self.schemas_dir:
             self._registry = build_schema_registry_from_dir(self.schemas_dir)
             for name in all_sections:
@@ -135,18 +136,28 @@ class DefaultsProvider:
 
 
     def get(self, section: str) -> JsonDict:
-        """Deep-copied defaults for a section, honoring precedence & static validation."""
+        """
+        Deep-copied defaults for a section, honoring precedence & static validation.
+
+        Each section is read and validated once, then served from memory: the defaults files
+        do not change during a run.
+        """
+        if section not in self._resolved:
+            self._resolved[section] = self._resolve(section)
+        return deepcopy(self._resolved[section])
+
+    def _resolve(self, section: str) -> JsonDict:
         # 1) user
         user_cfg = self.__get_cfg(section, from_package=False)
         if user_cfg is not None and self._validate_static(section, user_cfg):
             if not user_cfg:
                 raise ValueError(f'Invalid user config for section "{section}"')
-            return deepcopy(user_cfg)
+            return user_cfg
         # 2) built-in
         default_cfg = self.get_default_config(section)
         if not default_cfg:
             raise ValueError(f'Invalid default config for section "{section}"')
-        return deepcopy(default_cfg)
+        return default_cfg
 
     def ensure_user_file(self, section: str, out_path: Optional[Path] = None) -> Path:   # FIXME: unused
         """
