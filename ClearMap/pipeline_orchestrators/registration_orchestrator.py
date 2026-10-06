@@ -36,6 +36,24 @@ if TYPE_CHECKING:
     from ClearMap.Visualization import Plot3d as q_plot_3d  # WARNING: Local imports, for reference only
 
 
+def _atlas_orientation(orientation) -> Optional[tuple[int, ...]]:
+    """
+    The sample orientation as a tuple (the config stores a list), so that it compares
+    with DEFAULT_ORIENTATION and with the orientation of an existing Annotation.
+    """
+    return None if orientation is None else tuple(orientation)
+
+
+def _atlas_slicing(slicing) -> Optional[tuple[slice, slice, slice]]:
+    """
+    The sample slicing (config: ``{'x': [start, stop] | None, 'y': ..., 'z': ...}``) as the
+    xyz slices applied to the atlas, or None when no axis is sliced.
+    """
+    if not slicing or all(slicing.get(ax) is None for ax in 'xyz'):
+        return None
+    return tuple(slice(None) if slicing.get(ax) is None else slice(*slicing[ax]) for ax in 'xyz')
+
+
 class RegistrationStatus(Enum):
     NOT_SELECTED = 0
     MISSING_OUTPUTS = 1
@@ -485,15 +503,9 @@ class RegistrationProcessor(PipelineOrchestrator):
         if annotator is None:
             annotator = self.annotators[channel]
             sample_cfg = self.cfg_coordinator.get_config_view('sample')['channels'][channel]
-            if annotator.orientation != sample_cfg['orientation'] or \
-                annotator.slicing != sample_cfg['slicing']:
-
-                slicing = sample_cfg['slicing']
-                if slicing is not None and slicing.values() != (None, None, None):
-                    xyz_slicing = tuple(slice(None) if slc is None else slice(*slc) for slc in slicing.values())
-                else:
-                    xyz_slicing = None
-                orientation = sample_cfg['orientation']
+            orientation = _atlas_orientation(sample_cfg['orientation'])
+            xyz_slicing = _atlas_slicing(sample_cfg['slicing'])
+            if _atlas_orientation(annotator.orientation) != orientation or annotator.slicing != xyz_slicing:
                 if orientation == DEFAULT_ORIENTATION:
                     warnings.warn(f'Orientation not set for {channel}, skipping atlas setup')
                     return
@@ -592,16 +604,10 @@ class RegistrationProcessor(PipelineOrchestrator):
         atlas_base_name = ATLAS_NAMES_MAP[atlas_cfg['id']]['base_name']
         self.__setup_source_atlas(atlas_base_name)
 
-        orientation = None
         # TODO: atlas variants as multichannel assets
         for channel in sample_cfg.keys():
-            if sample_cfg[channel]['orientation'] != orientation:
-                orientation = sample_cfg[channel]['orientation']
-            slicing = sample_cfg[channel]['slicing']
-            if slicing is not None and slicing.values() != (None, None, None):
-                xyz_slicing = tuple(slice(None) if slc is None else slice(*slc) for slc in slicing.values())
-            else:
-                xyz_slicing = None
+            orientation = _atlas_orientation(sample_cfg[channel]['orientation'])
+            xyz_slicing = _atlas_slicing(sample_cfg[channel]['slicing'])
 
             if xyz_slicing is None and (orientation is None or orientation == DEFAULT_ORIENTATION):
                 target_directory = settings.atlas_folder  # For the unchanged atlas
