@@ -1298,6 +1298,8 @@ class GuiController(BusSubscriberMixin):
     installing the tabs and handling events from the EventBus.
     It interacts with the ExperimentController to manage the business logic of the application.
     """
+    MAX_TABS_INSTALL_PASSES = 3  # Installs in a row; a replay happens only if the valid tabs really changed
+
     def __init__(self, bus: EventBus, experiment, tab_registry: TabRegistry,
                  group_controller: AnalysisGroupController):
         super().__init__(bus)
@@ -1318,6 +1320,10 @@ class GuiController(BusSubscriberMixin):
         # Hydration state flags
         self._needs_full_refresh: bool = False
         self._tabs_initialized: bool = False
+
+        # Re-entrancy guard for _install_or_update_tabs
+        self._installing_tabs: bool = False
+        self._tabs_install_requested: bool = False
 
         self.subscribe(CfgChanged, self._on_cfg_changed)
         self.subscribe(UiRequestRefreshTabs, self._on_refresh_tabs)
@@ -1426,7 +1432,35 @@ class GuiController(BusSubscriberMixin):
         """
         Decide which tabs exist (via TabRegistry + validators/materializers),
         create or reuse instances, inject callbacks, and notify UI.
+
+        .. warning::
+            Creating a tab can write to the config (e.g. ``Params.add_channel``), which publishes
+            CfgChanged synchronously and may request a tab update while this one is still running
+            (``self._tabs`` not yet updated). Nesting would recreate the tab being built, forever.
+            Such requests are recorded and replayed once this update is done, if they would
+            change anything (see _tabs_install_pending).
         """
+        if self._installing_tabs:
+            self._tabs_install_requested = True
+            return
+        self._installing_tabs = True
+        try:
+            for _ in range(self.MAX_TABS_INSTALL_PASSES):
+                self._tabs_install_requested = False
+                self._install_tabs_once()
+                if not self._tabs_install_pending():
+                    break
+            else:
+                warnings.warn(f'The valid tabs still changed after {self.MAX_TABS_INSTALL_PASSES} installs. '
+                              f'Stopping to avoid an infinite loop.', RuntimeWarning)
+        finally:
+            self._installing_tabs = False
+
+    def _tabs_install_pending(self) -> bool:
+        """Whether a request recorded during the last install would change anything (stale ones are dropped)."""
+        return self._tabs_install_requested and (self._needs_tab_reset or self._valid_tab_set_changed())
+
+    def _install_tabs_once(self) -> None:
         if self._needs_tab_reset:
             self._tabs = []  # empties the lookup before _build_tabs_from_registry
             self._tabs_initialized = False
