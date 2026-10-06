@@ -76,8 +76,8 @@ from ClearMap.config.atlas import STRUCTURE_TREE_NAMES_MAP
 from ClearMap.config.config_handler import scan_folder_for_experiments
 
 from ClearMap.gui import dialog_helpers as dlg_help
-from ClearMap.gui.gui_utils_base import create_clearmap_widget, compute_grid, get_widget, delete_widget, clear_layout, \
-    unique_connect
+from ClearMap.gui.gui_utils_base import (create_clearmap_widget, compute_grid, get_widget, delete_widget, clear_layout,
+                                         unique_connect)
 from ClearMap.gui.gui_utils_images import get_pseudo_random_color, is_dark
 
 USER_NAME = getpass.getuser()
@@ -2052,6 +2052,8 @@ class PerfMonitor(QWidget):
     cpu_vals_changed = QtCore.pyqtSignal(int, int, int)
     #: Emitted when GPU values update. Arguments: ``(gpu_percent, vram_percent)``.
     gpu_vals_changed = QtCore.pyqtSignal(int, int)
+    # Internal: a CPU sample taken in the sampler thread, delivered (queued) to the main thread
+    _cpu_sampled = QtCore.pyqtSignal(int, int, int)
 
     def __init__(self, parent, fast_period, slow_period, *args, **kwargs):
         super().__init__(parent, *args, **kwargs)
@@ -2078,6 +2080,11 @@ class PerfMonitor(QWidget):
         self.file_watcher = QtCore.QFileSystemWatcher([self.gpu_proc_file_path, self.cpu_proc_file_path])
         self.file_watcher.fileChanged.connect(self.handle_proc_changed)
         self.pool = ProcessPoolExecutor(max_workers=1)
+
+        # psutil.process_iter() takes ~0.2 s: sample in a background thread, never on the main thread
+        self._cpu_sampler = ThreadPoolExecutor(max_workers=1, thread_name_prefix='perf_monitor_cpu')
+        self._cpu_sample_pending = False
+        self._cpu_sampled.connect(self._apply_cpu_values, type=Qt.QueuedConnection)
 
     def start(self):
         self.fast_timer.start()
@@ -2110,14 +2117,34 @@ class PerfMonitor(QWidget):
     def get_ram_percent(self):
         return round(psutil.virtual_memory().percent)
 
-    def _get_cpu_vals(self):
-        with ThreadPoolExecutor(max_workers=1) as pool:  # TODO: check if should use self.pool instead
-            futures = [pool.submit(f) for f in (self.get_cpu_percent, self.get_thread_percent, self.get_ram_percent)]
-            percents = [f.result() for f in futures]
-        return percents
+    def _sample_cpu_values(self) -> tuple[int, int, int]:
+        """Runs in the sampler thread."""
+        return self.get_cpu_percent(), self.get_thread_percent(), self.get_ram_percent()
 
     def update_cpu_values(self):
-        percent_cpu, percent_thread, percent_ram = self._get_cpu_vals()
+        """
+        Timer slot (main thread): request a CPU sample and return immediately.
+        The values are applied by _apply_cpu_values when the sample is ready.
+        A tick is skipped while the previous sample is still running.
+        """
+        if self._cpu_sample_pending:
+            return
+        self._cpu_sample_pending = True
+        self._cpu_sampler.submit(self._sample_cpu_values).add_done_callback(self._on_cpu_sample_done)
+
+    def _on_cpu_sample_done(self, future):
+        """Runs in the sampler thread: hand the values over to the main thread."""
+        try:
+            values = future.result()
+        except Exception as err:  # A failed sample must not stop the monitor
+            print(f'CPU monitor: {err}')
+            self._cpu_sample_pending = False
+            return
+        self._cpu_sampled.emit(*values)
+
+    def _apply_cpu_values(self, percent_cpu: int, percent_thread: int, percent_ram: int):
+        """Main thread."""
+        self._cpu_sample_pending = False
         if percent_ram != self.percent_ram or percent_cpu != self.percent_cpu or percent_thread != self.percent_thread:
             self.percent_cpu = percent_cpu
             self.percent_thread = percent_thread
