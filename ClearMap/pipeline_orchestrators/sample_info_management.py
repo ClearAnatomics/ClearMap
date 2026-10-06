@@ -83,25 +83,27 @@ import re
 import shutil
 import tempfile
 import warnings
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Callable, List, Dict
 
 import numpy as np
 
-from ClearMap.IO.assets_constants import CONTENT_TYPE_TO_PIPELINE
-from ClearMap.Utils.events import ChannelRenamed, CfgChanged, WorkspaceChannelsUpdated
-from ..Utils.event_bus import EventBus
-from ..config.compound_keys import PairKey
-from ..config.config_adjusters.type_hints import SampleManagerProtocol
-from ..config.config_handler import ALTERNATIVES_REG
-
-from ClearMap.config.config_coordinator import ConfigCoordinator, make_cfg_coordinator_factory
-
 # noinspection PyPep8Naming
 import ClearMap.Alignment.Resampling as resampling
 # noinspection PyPep8Naming
 from ClearMap.IO.workspace2 import Workspace2
-from ClearMap.IO.workspace_asset import expression_is_tiled
+from ClearMap.IO.workspace_asset import expression_is_tiled, Asset
+from ClearMap.IO.assets_constants import CONTENT_TYPE_TO_PIPELINE
+
+from ..config.compound_keys import PairKey
+from ..config.config_adjusters.type_hints import SampleManagerProtocol
+from ..config.config_handler import ALTERNATIVES_REG
+from ..config.config_coordinator import ConfigCoordinator, make_cfg_coordinator_factory
+
+from ..Utils.events import ChannelRenamed, WorkspaceChannelsUpdated
+from ..Utils.tag_expression import Expression
+from ..Utils.event_bus import EventBus
 
 from .generic_orchestrators import OrchestratorBase
 
@@ -122,6 +124,11 @@ def adjuster_safe(fn):
     return fn
 
 
+def _can_join_workspace(path: Optional[str], data_type: Optional[str]) -> bool:
+    # 'undefined' differs from None semantically (intention) but neither can join yet
+    return bool(path) and bool(data_type) and data_type != 'undefined'
+
+
 def channel_can_join_workspace(channel_cfg) -> bool:
     """
     Whether a sample channel config is complete enough for the channel to be added to the workspace.
@@ -132,9 +139,35 @@ def channel_can_join_workspace(channel_cfg) -> bool:
     """
     if not isinstance(channel_cfg, dict):
         return False
-    data_type = channel_cfg.get('data_type')
-    # 'undefined' differs from None semantically (intention) but neither can join yet
-    return bool(channel_cfg.get('path')) and bool(data_type) and data_type != 'undefined'
+    return _can_join_workspace(channel_cfg.get('path'), channel_cfg.get('data_type'))
+
+
+@dataclass(frozen=True, slots=True)
+class ChannelWorkspaceInputs:
+    """The part of a sample channel config the workspace is derived from."""
+    name: str
+    is_dict: bool  # malformed entries are reported as incomplete
+    path: str
+    data_type: Optional[str]
+
+    @property
+    def can_join(self) -> bool:
+        return self.is_dict and _can_join_workspace(self.path, self.data_type)
+
+
+@dataclass(frozen=True, slots=True)
+class WorkspaceInputs:
+    """
+    Everything the workspace is derived from (see SampleManager.update_workspace).
+    Comparable: equal inputs give the same workspace.
+    """
+    base_dir: str
+    sample_id: Optional[str]  # file prefix, None when use_id_as_prefix is False
+    channels: tuple[ChannelWorkspaceInputs, ...]
+
+    @property
+    def channel_names(self) -> list[str]:
+        return [ch.name for ch in self.channels]
 
 
 class SampleManager(OrchestratorBase):
@@ -155,9 +188,11 @@ class SampleManager(OrchestratorBase):
 
         self._renamed_channels: dict[str, str] = {}
         self._published_channel_map: dict[str, str] = {}  # last channel->data_type published to the bus
+        self._synced_workspace_inputs: Optional[WorkspaceInputs] = None  # inputs of the last workspace update
 
         self.subscribe(ChannelRenamed, self._on_channel_renamed)
-        self.subscribe(CfgChanged, self._on_cfg_changed)
+        # The workspace is derived from the sample config: update it on every commit, before CfgChanged is published
+        self.cfg_coordinator.add_post_commit_hook(self.sync_workspace)
 
         self.resource_type_to_folder: Optional[dict] = None
 
@@ -229,20 +264,6 @@ class SampleManager(OrchestratorBase):
 
         return sections
 
-    def _on_cfg_changed(self, evt: CfgChanged) -> None:
-        # Only reconcile when sample/channels subtree changed.
-        if not evt.changed_keys:
-            return
-        needs_workspace_update = any(
-            k == 'sample' or  # whole sample section changed
-            k.startswith('sample.channels') or  # channels subtree changed
-            k == 'sample.use_id_as_prefix' or  # use_id_as_prefix affects prefix and thus asset paths
-            k == 'sample.sample_id'  # sample_id affects prefix and thus asset paths
-            for k in evt.changed_keys
-        )
-        if needs_workspace_update:
-            self.update_workspace()
-
     def patch_channel(self, channel, patch: dict):
         self.cfg_coordinator.submit_patch({self.config_name: {'channels': {channel: patch}}},
                                           sample_manager=self)
@@ -267,50 +288,78 @@ class SampleManager(OrchestratorBase):
             if old_name and old_name != new_name:
                 self.workspace.rename_channel(old_name, new_name)
 
+    def _workspace_inputs(self) -> Optional[WorkspaceInputs]:
+        """The config values the workspace is derived from, or None if there are no channels yet."""
+        cfg = self.config
+        if not cfg or 'channels' not in cfg:
+            return None
+        channels = tuple(
+            ChannelWorkspaceInputs(name, True, ch_cfg.get('path', ''), ch_cfg.get('data_type'))
+            if isinstance(ch_cfg, dict) else ChannelWorkspaceInputs(name, False, '', None)
+            for name, ch_cfg in cfg['channels'].items())
+        return WorkspaceInputs(base_dir=str(Path(self.cfg_coordinator.base_dir).resolve()),
+                               sample_id=self.prefix, channels=channels)
+
+    def sync_workspace(self) -> None:
+        """
+        Bring the workspace in line with the sample config, if it changed since the last update.
+
+        Runs after every config commit (ConfigCoordinator post-commit hook), before CfgChanged is
+        published. No-op (no rebuild, no save) when the inputs of the workspace did not change.
+        """
+        inputs = self._workspace_inputs()
+        if self.workspace is not None and inputs == self._synced_workspace_inputs:
+            return
+        self._update_workspace_from(inputs)
+
     def update_workspace(self):
-        if not self.config or 'channels' not in self.config:
+        """Rebuild the config-derived part of the workspace unconditionally (see sync_workspace)."""
+        self._update_workspace_from(self._workspace_inputs())
+
+    def _update_workspace_from(self, inputs: Optional[WorkspaceInputs]) -> None:
+        """
+        .. warning::
+            Must read the config only through `inputs`: sync_workspace skips the update when
+            they are unchanged, so anything else read here would not trigger an update.
+        """
+        if inputs is None:
             # Nothing to do yet (cannot even create workspace) — config not loaded or new experiment
             self.incomplete_channels = []
             return
 
-        self._ensure_workspace()
+        self._ensure_workspace(inputs)
 
-        desired_sample_id = self.prefix  # None when use_id_as_prefix is False
+        desired_sample_id = inputs.sample_id  # should be self.prefix so None when use_id_as_prefix is False
         current_sample_id = self.workspace.sample_id
         if desired_sample_id != current_sample_id:
             self.workspace.set_sample_id(desired_sample_id or '')
 
         self.incomplete_channels = []
         # Add or update channels in the workspace
-        for channel, cfg in self.config['channels'].items():
-            if not isinstance(cfg, dict):
-                self.incomplete_channels.append(channel)
-                continue
-            raw_path = cfg.get('path', '')
-            data_content_type = cfg.get('data_type')
-            if not raw_path or not data_content_type:
-                self.incomplete_channels.append(channel)
-            else:
-                if channel in self.workspace:  # exists -> update
-                    self.workspace.update_raw_path(channel, expression=raw_path)
-                    if data_content_type in CONTENT_TYPE_TO_PIPELINE:  # WARNING: no 'compound' here
-                        channel_spec = self.workspace[channel].channel_spec
-                        self.workspace.update_pipeline_assets(channel_spec, data_content_type, sample_id=self.prefix)
-                else:  # new channel -> add
-                    if not channel_can_join_workspace(cfg):
-                        self.incomplete_channels.append(channel)
-                        continue
-                    self.workspace.add_raw_data(file_path=raw_path, channel_id=channel,
-                                                data_content_type=data_content_type, sample_id=self.prefix)
+        for ch in inputs.channels:
+            if not ch.is_dict or not ch.path or not ch.data_type:
+                self.incomplete_channels.append(ch.name)
+            elif ch.name in self.workspace:  # exists -> update
+                self.workspace.update_raw_path(ch.name, expression=ch.path)
+                if ch.data_type in CONTENT_TYPE_TO_PIPELINE:  # WARNING: no 'compound' here
+                    channel_spec = self.workspace[ch.name].channel_spec
+                    self.workspace.update_pipeline_assets(channel_spec, ch.data_type, sample_id=desired_sample_id)
+            elif not ch.can_join:  # new channel not ready yet
+                self.incomplete_channels.append(ch.name)
+            else:  # new channel -> add
+                self.workspace.add_raw_data(file_path=ch.path, channel_id=ch.name,
+                                            data_content_type=ch.data_type, sample_id=desired_sample_id)
 
         # Prune channels that are not in the config anymore
-        self.workspace.prune_missing_channels(self.channels)
+        names = inputs.channel_names
+        self.workspace.prune_missing_channels(names)
 
-        self.workspace.ensure_default_channel(self.channels, self.channels[0] if self.channels else None)
+        self.workspace.ensure_default_channel(names, names[0] if names else None)
 
         print(self.workspace.info())
 
         self.save_workspace()
+        self._synced_workspace_inputs = inputs  # before publishing: subscribers may read the workspace
         self._publish_channels_updated()
 
     def _workspace_channel_map(self) -> dict[str, str]:
@@ -339,8 +388,8 @@ class SampleManager(OrchestratorBase):
             # legacy fallback
             self.workspace.save(workspace_cfg_path)
 
-    def _ensure_workspace(self):
-        current_base = str(Path(self.cfg_coordinator.base_dir).resolve())
+    def _ensure_workspace(self, inputs: Optional[WorkspaceInputs] = None):
+        current_base = inputs.base_dir if inputs else str(Path(self.cfg_coordinator.base_dir).resolve())
 
         # Stale workspace pointing to a different directory
         if self.workspace is not None:
@@ -349,7 +398,12 @@ class SampleManager(OrchestratorBase):
                 self.workspace = None
 
         if self.workspace is None:
-            first_channel = self.channels[0] if self.channels else None
+            if inputs:
+                first_channel = inputs.channel_names[0] if inputs.channels else None
+                sample_id = inputs.sample_id
+            else:
+                first_channel = self.channels[0] if self.channels else None
+                sample_id = self.prefix
             workspace_cfg_path = self.cfg_coordinator.workspace_config_path
             if workspace_cfg_path.exists():
                 if workspace_cfg_path.suffix in {'.yml', '.yaml'}:
@@ -362,7 +416,7 @@ class SampleManager(OrchestratorBase):
                     self.save_workspace()  # persist so next load is correct
             else:
                 self.workspace = Workspace2(current_base,
-                                            sample_id=self.prefix,
+                                            sample_id=sample_id,
                                             default_channel=first_channel,
                                             resource_type_to_folder=self.resource_type_to_folder)
             self.resource_type_to_folder = self.workspace.resource_type_to_folder
@@ -579,7 +633,7 @@ class SampleManager(OrchestratorBase):
 
         .. warning::
             Derived from the sample config only, **not** from the workspace: the adjusters
-            reconcile a config edit before the workspace is updated (on CfgChanged), so a
+            reconcile a config edit before the workspace is updated (after the commit), so a
             workspace-derived answer would lag one edit behind.
 
         Returns

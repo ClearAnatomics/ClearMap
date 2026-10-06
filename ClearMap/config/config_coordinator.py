@@ -5,7 +5,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from threading import RLock
 from types import MappingProxyType
-from typing import Dict, Any, Optional, Iterable, Mapping, List, TYPE_CHECKING
+from typing import Dict, Any, Optional, Iterable, Mapping, List, Callable, TYPE_CHECKING
 from copy import deepcopy
 
 from ClearMap.Utils.event_bus import EventBus, BusSubscriberMixin
@@ -90,6 +90,7 @@ class ConfigCoordinator(BusSubscriberMixin):
 
         self._section_validators = SectionValidators(self._schemas_dir)
         self._active_sections: set[str] = set()
+        self._post_commit_hooks: list[Callable[[], None]] = []
 
     @property
     def _allowed_sections(self):
@@ -101,6 +102,21 @@ class ConfigCoordinator(BusSubscriberMixin):
     def active_sections(self) -> frozenset[str]:
         """The local sections declared active (empty means no filtering)."""
         return frozenset(self._active_sections)
+
+    def add_post_commit_hook(self, hook: Callable[[], None]) -> None:
+        """
+        Register a callable run after every committed change (submit / submit_patch),
+        *before* CfgChanged is published.
+
+        Use it to keep state derived from the config (e.g. the workspace) up to date,
+        so that every CfgChanged subscriber sees it consistent with the config, whatever
+        the subscription order (nested submits included).
+        """
+        self._post_commit_hooks.append(hook)
+
+    def _run_post_commit_hooks(self) -> None:
+        for hook in list(self._post_commit_hooks):
+            hook()
 
     @property
     def workspace_config_path(self):
@@ -439,6 +455,7 @@ class ConfigCoordinator(BusSubscriberMixin):
         if commit:
             changed_sections = {k[0] for k in changed_keys if k}
             self.commit(sections=list(changed_sections))
+            self._run_post_commit_hooks()
 
             self.publish(CfgChanged(changed_keys=tuple(".".join(k) for k in changed_keys)))
 
@@ -465,6 +482,7 @@ class ConfigCoordinator(BusSubscriberMixin):
             self.validate()
         if commit:
             self.commit()
+            self._run_post_commit_hooks()
 
             channels_after = self.current_channels
             if set(channels_before) != set(channels_after):

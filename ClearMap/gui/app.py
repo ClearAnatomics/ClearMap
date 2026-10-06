@@ -1595,11 +1595,8 @@ class GuiController(BusSubscriberMixin):
             if self._tabs_may_have_changed(evt.changed_keys):
                 self._needs_full_refresh = True
         else:  # Normal operation
-            # Ensure workspace/runtime state is reconciled before tab rebuilds
-            # that may instantiate workers reading from workspace.
-            if self.sample_manager is not None:
-                self.sample_manager.update_workspace()
-
+            # WARNING: Do not update the workspace here: SampleManager syncs it on every config commit,
+            #  before CfgChanged is published
             if self._tabs_may_have_changed(evt.changed_keys):  # Infer if channels/types changed
                 self._install_or_update_tabs()
                 self._tabs_initialized = True
