@@ -95,6 +95,7 @@ import numpy as np
 
 from ClearMap.IO.assets_constants import CONTENT_TYPE_TO_PIPELINE, CHANNELS_ASSETS_TYPES_CONFIG, RESOURCE_TYPE_TO_FOLDER
 from ClearMap.IO.assets_specs import ChannelSpec, TypeSpec, StateManager, ChannelId
+from ClearMap.config.compound_keys import compound_channel_parts
 from ClearMap.IO.workspace_asset import Asset, AssetCollection
 from ClearMap.Utils.exceptions import (ClearMapWorkspaceError, ClearMapAssetError, MissingChannelError,
                                        MissingAssetError, ClearMapValueError)
@@ -564,13 +565,14 @@ class Workspace2:  # REFACTOR: subclass dict
         return channel
 
     def _is_compound(self, channel: ChannelId) -> bool:
-        return isinstance(channel, tuple) and len(channel) > 1
+        """Whether `channel` is a compound id that can be permuted (at least 2 components)."""
+        parts = compound_channel_parts(channel)
+        return parts is not None and len(parts) > 1
 
     def _permute_channels(self, channel: ChannelId) -> ChannelId:
         if not self._is_compound(channel):
             raise NotImplementedError(f'Channel permutation is only implemented for compound channels.')
-            return channel
-        return tuple(reversed(channel))
+        return tuple(reversed(compound_channel_parts(channel)))
 
     def ensure_channel(self, channel_id: ChannelId, channel_content_type: str,
                        sample_id: str, permute_channels: bool):

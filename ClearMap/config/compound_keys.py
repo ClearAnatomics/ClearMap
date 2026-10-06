@@ -32,10 +32,15 @@ True
 from __future__ import annotations
 
 import itertools
+import re
 from typing import Iterable, Mapping, Any, Callable, Optional
 
-DEFAULT_PAIR_SEP = '-'
+from ClearMap.Utils.exceptions import ClearMapValueError
 
+
+DEFAULT_PAIR_SEP = '-'
+# WARNING: Keep in sync with ``typedefs.schema.yaml#/$defs/channelName`` (the sample channel names)
+CHANNEL_NAME_RE = re.compile(r'[A-Za-z0-9_]+')
 
 class CompoundKey:
     """
@@ -742,3 +747,53 @@ class PairKey(CompoundKey):
     def __repr__(self) -> str:
         return (f'PairKey(a="{self.a}", b="{self.b}", '
                 f'oriented={self._oriented}, sep="{self._sep}")')
+
+
+def compound_channel_parts(channel: str | tuple[str, ...] | list[str], *,
+                           sep: str = DEFAULT_PAIR_SEP) -> tuple[str, ...] | None:
+    """
+    The component channels of a compound channel key, or None for a simple channel.
+
+    Both representations in use are accepted: a tuple/list of channel names (workspace ids)
+    and the ``'a-b'`` string form (config and GUI keys). A tuple is compound whatever its
+    length: TubeMap uses a 1-tuple when there is a single parent channel.
+
+    Parameters
+    ----------
+    channel : str | tuple[str, ...] | list[str]
+        The channel key.
+    sep : str
+        The separator of the string form.
+
+    Returns
+    -------
+    tuple[str, ...] | None
+        The component channel names, or None if `channel` is a simple channel name.
+
+    Raises
+    ------
+    TypeError
+        If `channel` is not a str, tuple or list.
+    ValueError
+        If a channel name is malformed (see CHANNEL_NAME_RE), e.g. ``'@#$'``, ``''`` or the
+        empty part of ``'a-'``, or if the tuple/list is empty.
+    """
+    if isinstance(channel, str):
+        parts = tuple(channel.split(sep))
+        compound = len(parts) > 1
+    elif isinstance(channel, (tuple, list)):
+        parts = tuple(channel)
+        compound = True
+        if not parts:
+            raise ClearMapValueError('Empty compound channel')
+    else:
+        raise TypeError(f'A channel key must be a str, tuple or list, got {type(channel).__name__}: {channel!r}')
+    malformed = [part for part in parts if not (isinstance(part, str) and CHANNEL_NAME_RE.fullmatch(part))]
+    if malformed:
+        raise ClearMapValueError(f'Malformed channel name(s) {malformed!r} in channel key {channel!r}')
+    return parts if compound else None
+
+
+def is_compound_channel(channel: str | tuple[str, ...] | list[str], *, sep: str = DEFAULT_PAIR_SEP) -> bool:
+    """Whether `channel` is a compound channel key (see compound_channel_parts, which also validates it)."""
+    return compound_channel_parts(channel, sep=sep) is not None

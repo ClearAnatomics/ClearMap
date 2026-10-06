@@ -15,8 +15,8 @@ import numpy as np
 from PyQt5.QtWidgets import QWhatsThis, QWidget, QApplication
 
 from ClearMap.Utils.event_bus import BusSubscriberMixin
-from ClearMap.Utils.exceptions import MissingRequirementException, PlotGraphError
 from ClearMap.Utils.utilities import title_to_snake
+from ClearMap.config.compound_keys import is_compound_channel
 from ClearMap.config.config_handler import ConfigHandler, ALTERNATIVES_REG
 
 from .dialog_helpers import get_directory_dlg, make_simple_progress_dialog
@@ -44,11 +44,6 @@ PathLike = str | Path
 # bound at the concrete leaf (e.g. CellCounterTab[CellDetector]).
 TWorker = TypeVar('TWorker', bound='PipelineOrchestrator')
 P = ParamSpec('P')
-
-
-def channel_is_compound(channel) -> bool:
-    return (isinstance(channel, str) and '-' in channel) or \
-        (isinstance(channel, (tuple, list)))
 
 
 class GenericUi:
@@ -338,7 +333,7 @@ class GenericTab(GenericUi, BusSubscriberMixin):
                 self._on_channel_added(channel)
 
     def _create_channel_params(self, channel: str) -> None:
-        if isinstance(self, PipelineTab) and not channel_is_compound(channel):
+        if isinstance(self, PipelineTab) and not is_compound_channel(channel):
             # isinstance narrows self to PipelineTab → ExperimentTab,
             # so self.sample_manager here is SampleManager (raising property) ✓
             d_type = self.sample_manager.data_type(channel)

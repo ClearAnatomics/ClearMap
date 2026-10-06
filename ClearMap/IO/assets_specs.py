@@ -20,6 +20,7 @@ import warnings
 
 from ClearMap.IO.assets_constants import (EXTENSIONS, COMPRESSION_ALGORITHMS, CHECKSUM_ALGORITHMS,
                                           RESOURCE_TYPE_TO_FOLDER, DATA_CONTENT_TYPES)
+from ClearMap.config.compound_keys import is_compound_channel
 from ClearMap.Utils.tag_expression import Expression
 from ClearMap.Utils.utilities import validate_arg
 
@@ -348,7 +349,7 @@ class ChannelSpec:
         return self.content_type not in (None, 'undefined', 'no-pipeline', 'compound')
 
     def is_compound(self):
-        return isinstance(self.name, tuple)
+        return is_compound_channel(self.name)
 
     def to_dict(self):
         return {
