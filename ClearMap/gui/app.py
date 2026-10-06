@@ -1356,12 +1356,15 @@ class GuiController(BusSubscriberMixin):
         self._needs_full_refresh = False
 
     def end_hydration(self):
-        self._hydrating = False
-        if self._needs_full_refresh or not self._tabs_initialized:
+        needs_refresh = self._needs_full_refresh or not self._tabs_initialized
+        if needs_refresh:
+            # Still hydrating: the CfgChanged emitted by this submit is deferred to the install below
             self.experiment_controller.cfg_coordinator.submit(  # Force adjusters and validators to run after hydration, to ensure UI is in sync with model
                 sample_manager=self.experiment_controller.sample_manager,
                 do_run_adjusters=True, validate=True, commit=True)
+        self._hydrating = False
 
+        if needs_refresh:
             self._install_or_update_tabs()
             self._tabs_initialized = True
             self._refresh_tabs_from_model()
