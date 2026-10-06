@@ -520,7 +520,11 @@ class DataViewer(QWidget):
 
         x_axis, y_axis = self.getXYAxes()
         scaled_x, scaled_y = self.scale_coords(x, x_axis, y, y_axis)
-        self.mouse_clicked.emit(scaled_x, scaled_y, self.source_index[self.scroll_axis])
+        pos = [None, None, None]
+        pos[x_axis] = scaled_x
+        pos[y_axis] = scaled_y
+        pos[self.scroll_axis] = self.source_index[self.scroll_axis]
+        self.mouse_clicked.emit(int(pos[0]), int(pos[1]), int(pos[2]))
 
     def setMinMax(self, min_max, source=0):
         self.luts[source].lut.region.setRegion(min_max)
