@@ -134,17 +134,23 @@ class Tag:
         return ttype_to_dtype(self.ttype)
 
     def tag(self):
-        t = TAG_START
-        if self.name is not None:
-            t += self.name + TAG_SEPARATOR
+        """
+        The tag as a string, in the format that :meth:`parse` reads back (``<Name,Type,Width>``).
+
+        An unnamed tag keeps an empty name field (e.g. ``<,I,2>``) so that it is not read back as a
+        tag named after its type (``<I,2>`` would be a tag named "I").
+        """
+        fields = []
         if self.ttype is not None:
-            t += self.ttype + TAG_SEPARATOR
+            fields.append(self.ttype)
         if self.width is not None:
-            t += str(self.width) + TAG_SEPARATOR
-        if len(t) > len(TAG_START):
-            t = t[:-len(TAG_SEPARATOR)]
-        t += TAG_END
-        return t
+            fields.append(str(self.width))
+
+        if self.name is None and not fields:
+            return TAG_START + TAG_END  # '<>'
+
+        name = self.name or ''
+        return TAG_START + TAG_SEPARATOR.join([name, *fields]) + TAG_END
 
     def glob_pattern(self):
         e = ''
