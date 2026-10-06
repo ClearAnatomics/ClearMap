@@ -930,32 +930,32 @@ class SampleManager(OrchestratorBase):
         return pipelines
 
     def asset_names_to_assets(self, asset_names: List[str], channel: Optional[str] = None,
-                              sample_id: Optional[str] = None) -> List["WorkspaceAsset"]:
+                              sample_id: Optional[str] = None) -> List[Asset]:
         return [self.workspace.get(asset_name) for asset_name in asset_names]
 
     @staticmethod
-    def compress(assets: List["WorkspaceAsset"], format: Optional[str] = None):
+    def compress(assets: List[Asset], format: Optional[str] = None):
         for asset in assets:
             asset.compress(algorithm=format)
 
     @staticmethod
-    def decompress(assets: List["WorkspaceAsset"], check: bool = True):
+    def decompress(assets: List[Asset], check: bool = True):
         for asset in assets:
             asset.decompress(check=check)
 
     @staticmethod
-    def plot(assets: List["WorkspaceAsset"], **kwargs):  # FIXME: what if len(assets) > 1 ? Should plot together
+    def plot(assets: List[Asset], **kwargs):  # FIXME: what if len(assets) > 1 ? Should plot together
         for asset in assets:
             asset.plot(**kwargs)
 
     @staticmethod
-    def convert(assets: List["WorkspaceAsset"], new_extension: str, processes: Optional[int] = None,
+    def convert(assets: List[Asset], new_extension: str, processes: Optional[int] = None,
                 verbose: bool = False, **kwargs):
         for asset in assets:
             asset.convert(new_extension, processes=processes, verbose=verbose, **kwargs)
 
     @staticmethod
-    def resample(assets: List["WorkspaceAsset"], x_scale: float = 1, y_scale: float = 1, z_scale: float =1,
+    def resample(assets: List[Asset], x_scale: float = 1, y_scale: float = 1, z_scale: float =1,
                  x_resolution=None, y_resolution=None, z_resolution=None,
                  x_shape=None, y_shape=None, z_shape=None,
                  orientation=None,  # TODO: add orientation
