@@ -268,8 +268,16 @@ class SampleManager(OrchestratorBase):
         self.cfg_coordinator.submit_patch({self.config_name: {'channels': {channel: patch}}},
                                           sample_manager=self)
 
-    def set_channel_expression(self, channel: str, expression: "str | tag_expression.Expression"):
-        self.patch_channel(channel, patch={'path': expression})
+    def set_channel_expression(self, channel: str, expression: str | Path | Expression) -> None:
+        """
+        Set the tile path expression of `channel`.
+
+        The expression is validated (a malformed tag raises ValueError) and stored in its
+        canonical string form (e.g. ``<X,2>`` becomes ``<X,I,2>``): the config only holds plain
+        strings (an Expression has no ``__eq__``, so it would also defeat the change detection
+        of the workspace inputs).
+        """
+        self.patch_channel(channel, patch={'path': str(Expression(expression))})
 
     def set_channel_resolution(self, channel: str, resolution: tuple[float, float, float]):
         self.patch_channel(channel, patch={'resolution': list(resolution)})
