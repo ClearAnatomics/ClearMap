@@ -255,8 +255,7 @@ class Tag:
 
         body = tag[len(TAG_START):-len(TAG_END)]
         if not body:  # Use default values
-            self.name = self.width = None
-            self.ttype = TAG_INT
+            self.__init__(name=None, ttype=TAG_INT, width=None)
             return
 
         parts = body.split(TAG_SEPARATOR)
