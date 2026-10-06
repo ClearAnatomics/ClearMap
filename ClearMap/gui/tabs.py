@@ -109,7 +109,7 @@ from PyQt5.QtCore import QSignalBlocker
 
 from ClearMap.Utils.tag_expression import Expression
 
-from PyQt5.QtWidgets import QButtonGroup, QWidget, QDialog
+from PyQt5.QtWidgets import QApplication, QButtonGroup, QWidget, QDialog
 import pyqtgraph as pg
 from natsort import natsorted
 
@@ -1729,7 +1729,7 @@ class VasculatureTab(PostProcessingTab['BinaryVesselProcessor']):
         splash, pbar = make_splash(message='Loading graph ', font_size=25)
         splash.show()
         # update_pbar(self.app, progress_bar, 20)
-        self.main_window.processEvents()
+        QApplication.processEvents()  # Paint the splash before blocking the main thread
         worker = self.get_worker(substep='graph')
         # update_pbar(self.app, progress_bar, 100)
         splash.finish(self.main_window)

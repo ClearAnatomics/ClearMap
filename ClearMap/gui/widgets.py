@@ -326,7 +326,7 @@ class ProgressWatcher(QWidget):  # Inspired from https://stackoverflow.com/a/662
         self.set_main_progress(self.main_max_progress)
         self.set_progress(self.max_progress)
         if self.parentWidget() is not None:
-            self.parentWidget().app.processEvents()
+            QApplication.processEvents()
 
     def reset(self):
         """Reset all the values to their initial state."""
@@ -1296,7 +1296,7 @@ class ManageAssetsWidget(WizardWidget):
                 dv.resize(width, height)
                 dv.setMinimumSize(width, height)  # required to avoid wobbly dv
             dlg.graphLayout.addWidget(dv, row, col, 1, 1)
-        self.app.processEvents()
+        QApplication.processEvents()
 
     def assert_all_images(self):
         if not all([asset.is_existing_source for asset in self.selected_assets]):
@@ -1531,7 +1531,7 @@ class PatternDialog(WizardWidget):
             while not result.ready():
                 result.wait(0.25)
                 dlg_help.update_pbar(self.app, progress_bar.mainProgressBar, 1)  # TODO: real update
-                self.app.processEvents()
+                QApplication.processEvents()
             pattern_finders = result.get()
         dlg_help.update_pbar(self.app, progress_bar.mainProgressBar, 100)
         return pattern_finders
