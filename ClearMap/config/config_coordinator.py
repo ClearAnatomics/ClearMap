@@ -98,6 +98,11 @@ class ConfigCoordinator(BusSubscriberMixin):
         return set(self._active_sections) | set(ALTERNATIVES_REG.canonical_global_config_names)
 
     @property
+    def active_sections(self) -> frozenset[str]:
+        """The local sections declared active (empty means no filtering)."""
+        return frozenset(self._active_sections)
+
+    @property
     def workspace_config_path(self):
         return self._config_repo.base_dir() / 'workspace.yml'
 

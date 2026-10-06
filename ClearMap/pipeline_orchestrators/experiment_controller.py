@@ -45,9 +45,10 @@ from pathlib import Path
 from typing import Callable, Dict, Iterable, Optional, Tuple, Any, Union
 
 from ClearMap.Utils.event_bus import EventBus, BusSubscriberMixin
-from ClearMap.Utils.events import WorkspaceChanged, UiChannelRenamed, UiChannelsChanged
+from ClearMap.Utils.events import WorkspaceChanged, UiChannelRenamed, UiChannelsChanged, CfgChanged
 from ClearMap.config.config_adjusters.type_hints import AdjusterScope
 from ClearMap.config.config_coordinator import ConfigCoordinator
+from ClearMap.config.config_handler import ConfigHandler
 from ClearMap.config.defaults_provider import DefaultsProvider
 from ClearMap.pipeline_orchestrators.group_orchestrators import DensityGroupAnalysisOrchestrator
 from ClearMap.pipeline_orchestrators.processor_launcher import ProcessorLauncher
@@ -191,6 +192,9 @@ class ExperimentController(BusSubscriberMixin):
 
         self.subscribe(UiChannelRenamed, self.on_channel_renamed)
         self.subscribe(UiChannelsChanged, self.on_channels_changed)
+        # WARNING: must stay after SampleManager's CfgChanged subscription (it updates the workspace)
+        #   and before GuiController's (it rebuilds the tabs from the active sections)
+        self.subscribe(CfgChanged, self.on_cfg_changed)
         # FIXME: also subscribe to dtype changed in config -> reconcile workers (pipelines)
 
     @property
@@ -528,6 +532,45 @@ class ExperimentController(BusSubscriberMixin):
         """
         self._refresh_relevant_sections()
         self.reconcile_workers_after_channel_change(before=evt.before, after=evt.after)
+
+    def on_cfg_changed(self, evt: CfgChanged) -> None:
+        """
+        Sample edits (path, data_type, ...) can change which pipeline sections are required
+        (e.g. a tiled path makes 'stitching' required). Keep the active sections in sync.
+        """
+        if self._hydrating or self._exp_dir is None:
+            return
+        if not any(k == 'sample' or k.startswith('sample.channels') for k in evt.changed_keys):
+            return
+        self.sync_required_sections()
+
+    def sync_required_sections(self) -> bool:
+        """
+        Make the active config sections match the sections the sample currently requires.
+
+        Newly required sections are loaded from the experiment folder first (keeping any
+        previous user edits), then missing values are seeded from defaults, then the adjusters
+        run to populate their instance containers (e.g. stitching.channels).
+        Sections no longer required are dropped from the working config (their file is kept).
+
+        Returns
+        -------
+        bool
+            True if the active sections changed.
+        """
+        coord = self.cfg_coordinator
+        if not self.sample_manager.config:
+            return False
+        required = {ConfigHandler.normalise_cfg_name(s) for s in self.sample_manager.compute_required_sections()}
+        current = coord.active_sections
+        if required == current:  # Also the re-entrancy guard: the submit below emits CfgChanged
+            return False
+        coord.set_active_sections(required)
+        for name in required - current:
+            coord.load(name)
+        coord.seed_missing_from_defaults(tabs_only=True)
+        coord.submit(sample_manager=self.sample_manager, do_run_adjusters=True, validate=True, commit=True)
+        return True
 
     def channel_snapshot(self):
         """
