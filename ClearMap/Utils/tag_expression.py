@@ -746,6 +746,33 @@ class Expression:
         self.pattern = pattern
         self.tags = [q for q in pattern if isinstance(q, Tag) and not q.reference]
 
+    def __eq__(self, other):
+        """
+        Two expressions are equal if they have the same canonical string (e.g. ``<X,2>`` equals ``<X,I,2>``).
+
+        A str or Path is compared as the expression it parses to; one that is not a valid expression is
+        simply not equal (this never raises). Anything else is not comparable.
+        """
+        if isinstance(other, (str, Path)):
+            try:
+                other = Expression(other)
+            except ValueError:  # Malformed tag
+                return False
+        elif not isinstance(other, Expression):
+            return NotImplemented
+        return str(self) == str(other)
+
+    def __hash__(self):
+        """
+        Consistent with ``__eq__`` between expressions.
+
+        .. warning::
+            Expressions are mutable (:meth:`parse`, :meth:`detect`): do not change one while it is a
+            dict key or set member. A str that equals an expression does not have the same hash,
+            so do not mix them in the same set or dict.
+        """
+        return hash(str(self))
+
     def __str__(self):
         return f'{self.tag()}'
 
