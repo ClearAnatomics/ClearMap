@@ -394,6 +394,16 @@ class ConfigCoordinator(BusSubscriberMixin):
         rec(patch)
         return patch, rename_map
 
+    @staticmethod
+    def _refuse_unchecked_commit(*, commit: bool, do_run_adjusters: bool, validate: bool) -> None:
+        """
+        Only configs that went through the adjusters and the validators may be written
+        (and trigger the post-commit hooks and CfgChanged). Skipping them is for in-memory use (e.g. tests).
+        """
+        if commit and not (do_run_adjusters and validate):
+            raise ValueError(f'Refusing to commit a config that skipped the adjusters or the validators '
+                             f'({do_run_adjusters=}, {validate=}). Use commit=False for in-memory changes.')
+
     def submit_patch(self, patch: dict, *, sample_manager: Optional[SampleManager], do_run_adjusters: bool = True,
                      validate: bool = True, commit: bool = True, origin: str | None = "ui",
                      phase=Phase.PRE_VALIDATE) -> None:
@@ -407,6 +417,7 @@ class ConfigCoordinator(BusSubscriberMixin):
             if validate:    self.validate()
             if commit:      self.commit()
         """
+        self._refuse_unchecked_commit(commit=commit, do_run_adjusters=do_run_adjusters, validate=validate)
         if not patch:
             return
 
@@ -472,6 +483,7 @@ class ConfigCoordinator(BusSubscriberMixin):
         Run adjusters on the current working config (unfiltered), then optionally
         validate and commit. Use this when you haven't just applied a new patch.
         """
+        self._refuse_unchecked_commit(commit=commit, do_run_adjusters=do_run_adjusters, validate=validate)
         channels_before = self.current_channels
 
         applied_patch = {}
