@@ -1497,7 +1497,15 @@ class GuiController(BusSubscriberMixin):
             if self._data_type_change_affects_tabs(changed_keys, channels):
                 return True
 
-        return False
+        # Catch-all: tab requirements also depend on facts the keys above don't cover
+        #   (e.g. a tiled path makes the 'stitching' section required)
+        return self._valid_tab_set_changed()
+
+    def _valid_tab_set_changed(self) -> bool:
+        """Whether the tabs the registry would show now differ from the installed ones."""
+        valid = set(self.tabs_registry.valid_tabs(mode=self.mode, sample_manager=self.sample_manager,
+                                                  group_controller=self.group_controller))
+        return valid != {type(t) for t in self._tabs}
 
     def _has_orphaned_pipeline_tabs(self) -> bool:
         """Check if any pipeline tab no longer has channels to serve."""
