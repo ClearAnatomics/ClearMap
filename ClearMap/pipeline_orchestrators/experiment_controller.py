@@ -192,8 +192,8 @@ class ExperimentController(BusSubscriberMixin):
 
         self.subscribe(UiChannelRenamed, self.on_channel_renamed)
         self.subscribe(UiChannelsChanged, self.on_channels_changed)
-        # WARNING: must stay after SampleManager's CfgChanged subscription (it updates the workspace)
-        #   and before GuiController's (it rebuilds the tabs from the active sections)
+        # Independent of the subscription order: required sections are derived from the config alone.
+        #   the GUI re-checks its tabs on the CfgChanged emitted by sync_required_sections()
         self.subscribe(CfgChanged, self.on_cfg_changed)
         # FIXME: also subscribe to dtype changed in config -> reconcile workers (pipelines)
 

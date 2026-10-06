@@ -101,6 +101,7 @@ from ClearMap.config.config_coordinator import ConfigCoordinator, make_cfg_coord
 import ClearMap.Alignment.Resampling as resampling
 # noinspection PyPep8Naming
 from ClearMap.IO.workspace2 import Workspace2
+from ClearMap.IO.workspace_asset import expression_is_tiled
 
 from .generic_orchestrators import OrchestratorBase
 
@@ -119,6 +120,21 @@ def adjuster_safe(fn):
     """
     fn._adjuster_safe = True
     return fn
+
+
+def channel_can_join_workspace(channel_cfg) -> bool:
+    """
+    Whether a sample channel config is complete enough for the channel to be added to the workspace.
+
+    .. note::
+        Single source of truth for this rule: used by :meth:`SampleManager.update_workspace` and by
+        the config-derived facts that must agree with the workspace (e.g. stitchable channels).
+    """
+    if not isinstance(channel_cfg, dict):
+        return False
+    data_type = channel_cfg.get('data_type')
+    # 'undefined' differs from None semantically (intention) but neither can join yet
+    return bool(channel_cfg.get('path')) and bool(data_type) and data_type != 'undefined'
 
 
 class SampleManager(OrchestratorBase):
@@ -281,7 +297,7 @@ class SampleManager(OrchestratorBase):
                         channel_spec = self.workspace[channel].channel_spec
                         self.workspace.update_pipeline_assets(channel_spec, data_content_type, sample_id=self.prefix)
                 else:  # new channel -> add
-                    if data_content_type == 'undefined':  # Difference with None is semantic (intention)
+                    if not channel_can_join_workspace(cfg):
                         self.incomplete_channels.append(channel)
                         continue
                     self.workspace.add_raw_data(file_path=raw_path, channel_id=channel,
@@ -556,18 +572,30 @@ class SampleManager(OrchestratorBase):
     def stitchable_channels(self) -> list[str]:
         return self.get_stitchable_channels()
 
+    @adjuster_safe
     def get_stitchable_channels(self) -> list[str]:
-        candidates = list((self.config.get('channels') or {}).keys())
+        """
+        Channels that can join the workspace and whose raw path is a tile pattern (X and/or Y tag).
+
+        .. warning::
+            Derived from the sample config only, **not** from the workspace: the adjusters
+            reconcile a config edit before the workspace is updated (on CfgChanged), so a
+            workspace-derived answer would lag one edit behind.
+
+        Returns
+        -------
+        list[str]
+            The stitchable channel names, in config order.
+        """
         stitchable = []
-        for c in candidates:
+        for channel, cfg in (self.config.get('channels') or {}).items():
+            if not channel_can_join_workspace(cfg):
+                continue
             try:
-                asset = self.get('raw', channel=c, sample_id=self.prefix)
-                if asset.is_tiled:
-                    stitchable.append(c)
-            except KeyError:
-                continue  # channel not set up yet
-        if not stitchable:
-            warnings.warn(f'Trying to get stitchable channels before raw data is set up')
+                if expression_is_tiled(cfg['path']):
+                    stitchable.append(channel)
+            except ValueError:  # Malformed tag (e.g. path being typed): not stitchable yet
+                continue
         return stitchable
 
     def can_convert(self, channel: str) -> bool:

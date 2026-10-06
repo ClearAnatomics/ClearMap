@@ -119,6 +119,32 @@ from ClearMap.Utils.tag_expression import Expression
 from ClearMap.Utils.exceptions import ClearMapAssetError, AssetNotFoundError
 
 
+def expression_is_tiled(expression: Expression | str | None) -> bool:
+    """
+    Whether a raw data path expression describes tiles, i.e. has an X and/or a Y tag.
+
+    Parameters
+    ----------
+    expression : Expression | str | None
+        The path expression (e.g. ``'tiles/Ex_<Y,2>_<X,2>.tif'``).
+
+    Returns
+    -------
+    bool
+
+    Raises
+    ------
+    ValueError
+        If ``expression`` is a string that is not a valid tag expression.
+    """
+    if not expression:
+        return False
+    if isinstance(expression, str):
+        expression = Expression(expression)
+    tags = {t.lower() for t in expression.tag_names()}
+    return 'x' in tags or 'y' in tags
+
+
 class Asset:
     """
     An asset is a file or a folder that is part of a workspace.
@@ -575,10 +601,7 @@ class Asset:
 
     @property
     def is_tiled(self):
-        if not self.is_expression:
-            return False
-        tags = [t.lower() for t in self.expression.tag_names()]
-        return 'x' in tags or 'y' in tags
+        return expression_is_tiled(self.expression)
 
     @property
     def is_stacked(self):
