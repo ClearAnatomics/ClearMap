@@ -17,7 +17,7 @@ from ClearMap.Alignment.Annotation import Annotation
 
 from ClearMap.IO import source_geometry
 from ClearMap.IO.source.backends.tif_backend import TifSource, parse_img_res
-from ClearMap.IO.assets_specs import ChannelSpec, TypeSpec
+from ClearMap.IO.assets_specs import TypeSpec
 
 from ClearMap.Utils.events import (ChannelRenamed, UiAtlasIdChanged,
                                    UiAtlasStructureTreeIdChanged,  RegistrationStatusChanged)
@@ -76,6 +76,8 @@ class RegistrationProcessor(PipelineOrchestrator):
         super().__init__(cfg_coordinator)
         self.sample_manager: SampleManager = sample_manager
         self.annotators: Dict[str, Annotation] = {}  # 1 for each channel
+        self._source_annotator: Optional[Annotation] = None  # see source_annotator
+        self._source_annotator_key: Optional[tuple[str, str]] = None
         self.progress_watcher: Optional["ProgressWatcher"] = None  # FIXME:
         self.__bspline_registration_re = re.compile(r"\d+\s-?\d+\.\d+\s\d+\.\d+\s\d+\.\d+\s\d+\.\d+")
         self.__affine_registration_re = re.compile(r"\d+\s-\d+\.\d+\s\d+\.\d+\s\d+\.\d+\s\d+\.\d+\s\d+\.\d+")
@@ -477,11 +479,21 @@ class RegistrationProcessor(PipelineOrchestrator):
             atlas_files[channel] = self.annotators[channel].get_atlas_paths()
         return atlas_files
 
-    def __setup_source_atlas(self, atlas_base_name):
-        default_annotator = Annotation(atlas_base_name, None, None, label_source='ABA json 2022')
-        # TODO: use workspace instead
-        channel_spec = ChannelSpec(channel='atlas', content_type='atlas')
-        self.create_atlas_asset(default_annotator, channel_spec)
+    @property
+    def source_annotator(self) -> Annotation:
+        """
+        Annotator of the configured atlas, unoriented and uncropped, for orientation-independent
+        lookups (structure ids, names, colours).
+        Built on first use and cached until the atlas or the structure tree changes in the config.
+        """
+        atlas_cfg = self.config['atlas']
+        atlas_base_name = ATLAS_NAMES_MAP[atlas_cfg['id']]['base_name']
+        structure_tree_id = atlas_cfg['structure_tree_id']
+        key = (atlas_base_name, structure_tree_id)
+        if self._source_annotator_key != key:
+            self._source_annotator = Annotation(atlas_base_name, None, None, label_source=structure_tree_id)
+            self._source_annotator_key = key
+        return self._source_annotator
 
     def create_atlas_asset(self, annotator, channel_spec):  # FIXME: ensure that uses atlas subfolder from asset_constants
         try:
@@ -610,7 +622,6 @@ class RegistrationProcessor(PipelineOrchestrator):
         atlas_cfg = self.config['atlas']
 
         atlas_base_name = ATLAS_NAMES_MAP[atlas_cfg['id']]['base_name']
-        self.__setup_source_atlas(atlas_base_name)
 
         # TODO: atlas variants as multichannel assets
         for channel in sample_cfg.keys():

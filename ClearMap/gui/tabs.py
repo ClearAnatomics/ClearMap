@@ -1885,7 +1885,7 @@ class VasculatureTab(PostProcessingTab['BinaryVesselProcessor']):
         structure_id = self.params.visualization_params.structure_id
         if structure_id is not None:
             aligner = self.exp_controller.get_worker('registration')
-            annotator = aligner.annotators['atlas']  # TODO: check but atlas should be OK to just do lookup
+            annotator = aligner.source_annotator  # Orientation-independent lookup
             color = annotator.find(structure_id, key='id')['rgb']
             self._plot_graph_structure(structure_id, color)
         else:
