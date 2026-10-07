@@ -14,16 +14,16 @@ mask = cap_network.as_mask('vertex')   # one property read per leaf; single trav
 """
 
 
-import re
 from functools import cached_property
 
 import numpy as np
 
 from ClearMap.Analysis.vasculature.vasc_graph_utils import vertex_filter_to_edge_filter, edge_filter_to_vertex_filter
+from ClearMap.IO.assets_constants import FILE_NAME_TOKEN_RE
 from ClearMap.Utils.exceptions import ClearMapValueError
 
 COMBINE_OPERATOR_NAMES = ('and', 'or')
-FILE_NAME_TOKEN_RE = re.compile(r'[A-Za-z0-9_.+-]+')  # What a filter may contribute to a file name
+PROPERTY_TYPES = ('vertex', 'edge')
 
 
 def convert_property(graph, mask, src_filter_type, dest_filter_type, operator=np.logical_and):
@@ -36,6 +36,20 @@ def convert_property(graph, mask, src_filter_type, dest_filter_type, operator=np
         return edge_filter_to_vertex_filter(graph, mask, operator=operator)
     else:
         raise ValueError(f'Unsupported conversion from {src_filter_type} to {dest_filter_type}.')
+
+
+def graph_property(graph, property_type, property_name) -> np.ndarray:
+    """
+    The values of a vertex or edge property of graph, one per vertex or edge (in edge id order).
+    The vertex property 'degree' (or 'degrees') is the vertex degrees.
+    """
+    if property_type == 'vertex':
+        if property_name in ('degree', 'degrees'):
+            return graph.vertex_degrees()
+        return graph.vertex_property(property_name)
+    elif property_type == 'edge':
+        return graph.edge_property(property_name)
+    raise ClearMapValueError(f'Property type must be one of {PROPERTY_TYPES}, got {property_type!r}.')
 
 
 def file_name_token(value) -> str:
@@ -226,13 +240,7 @@ class GraphFilter(BaseFilter):
 
     @cached_property
     def _raw_property(self):
-        if self.filter_type == 'vertex':
-            if self.property_name in ('degree', 'degrees'):
-                return self.graph.vertex_degrees()
-            return self.graph.vertex_property(self.property_name)
-        elif self.filter_type == 'edge':
-            return self.graph.edge_property(self.property_name)
-        raise RuntimeError
+        return graph_property(self.graph, self.filter_type, self.property_name)
 
     def __repr__(self):
         return (f'GraphFilter({self.filter_type!r}, {self.property_name!r}, {self.property_value!r}, '

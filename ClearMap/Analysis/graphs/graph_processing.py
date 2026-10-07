@@ -157,6 +157,44 @@ DEFAULT_VERTEX_TO_VERTEX = {
     '_vertex_id_': np.min
 }
 
+
+def incident_edges_max(connectivity: np.ndarray, edge_values: np.ndarray, n_vertices: int) -> np.ndarray:
+    """
+    The maximum of the values of the edges incident to each vertex (0 for a vertex without edges).
+
+    Parameters
+    ----------
+    connectivity: np.ndarray
+        (n_edges, 2) end vertices of each edge, in edge id order like edge_values
+        (graph.edge_connectivity(order='eid')).
+    edge_values: np.ndarray
+        One non-negative value per edge.
+    n_vertices: int
+    """
+    vertex_values = np.zeros(n_vertices, dtype=edge_values.dtype)
+    np.maximum.at(vertex_values, connectivity[:, 0], edge_values)
+    np.maximum.at(vertex_values, connectivity[:, 1], edge_values)
+    return vertex_values
+
+
+def incident_edges_half_sum(connectivity: np.ndarray, edge_values: np.ndarray, n_vertices: int) -> np.ndarray:
+    """
+    Half the sum of the values of the edges incident to each vertex: every edge has two ends, so each
+    end gets half of it and the vertex values add up to the edge values (e.g. the total length),
+    whatever the degrees. A self loop gives its whole value to its vertex.
+
+    Parameters: see incident_edges_max
+    """
+    ends_values = np.repeat(edge_values, 2)  # Aligned with connectivity.ravel(): [src_0, dst_0, src_1, ...]
+    return np.bincount(connectivity.ravel(), weights=ends_values, minlength=n_vertices) / 2
+
+
+DEFAULT_EDGE_TO_VERTEX = {  # f(connectivity, edge_values, n_vertices) -> vertex_values
+    'radii': incident_edges_max,
+    'radius_units': incident_edges_max,
+    'length': incident_edges_half_sum,
+}
+
 ###############################################################################
 # ## Graphs from skeletons
 ###############################################################################

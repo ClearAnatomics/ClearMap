@@ -16,6 +16,7 @@ from PyQt5.QtWidgets import (QToolBox, QCheckBox, QLabel, QHBoxLayout, QVBoxLayo
                              QSpinBox, QLineEdit, QDoubleSpinBox, QRadioButton, QFrame)
 
 from ClearMap.Analysis.graphs.graph_filters import GraphFilter, combined_filters_name
+from ClearMap.Analysis.graphs.graph_weights import GraphWeight
 from ClearMap.config.atlas import ATLAS_NAMES_MAP
 from ClearMap.Utils.exceptions import ClearMapValueError
 from ClearMap.Utils.utilities import (validate_orientation, snake_to_title, set_item_recursive,
@@ -1938,7 +1939,7 @@ class VesselVisualizationParams(UiParameter, OrthoviewerSlicingMixin):
     plot_type: str
     voxelization_size: List[int]
     vertex_degrees: str
-    weight_by_radius: bool
+    weight: str | None  # A GraphWeight name, None: unweighted
 
     pipeline = 'TubeMap'
 
@@ -1956,8 +1957,21 @@ class VesselVisualizationParams(UiParameter, OrthoviewerSlicingMixin):
             'graph_step': ParamLink(None, self.tab.graphSlicerStepComboBox, connect=False),
             'plot_type': ParamLink(None, self.tab.graphPlotTypeComboBox, connect=False),
             'voxelization_size': ParamLink(['voxelization', 'size'], self.tab.vasculatureVoxelizationRadiusTriplet),
-            'weight_by_radius': ParamLink(None, self.tab.voxelizationWeightByRadiusCheckBox, connect=False)
+            'weight': ParamLink(None, self.tab.voxelizationWeightComboBox, connect=False)
         }
+
+    def graph_weight(self, graph) -> GraphWeight | None:
+        """The weight chosen in the UI, applied to graph (None is enough to name it)"""
+        return None if self.weight is None else GraphWeight.from_name(graph, self.weight)
+
+    def set_weight_choices(self, weight_names: list[str]) -> None:
+        """Offer these weights (see graph_weights.weight_choices), keeping the current choice if still offered"""
+        combo = self.tab.voxelizationWeightComboBox
+        current = combo.currentText()
+        combo.clear()
+        combo.addItems(['None', *weight_names])
+        if combo.findText(current) != -1:
+            combo.setCurrentText(current)
 
     def set_structure_id(self, structure_widget):
         self.structure_id = int(structure_widget.text(1))

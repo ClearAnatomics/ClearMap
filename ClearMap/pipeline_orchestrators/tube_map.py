@@ -117,6 +117,8 @@ import ClearMap.Analysis.Measurements.Voxelization as voxelization
 
 from ClearMap.Analysis.graphs import graph_processing
 from ClearMap.Analysis.graphs.graph_filters import GraphFilter, combine_filters, combined_filters_name
+from ClearMap.Analysis.graphs.graph_weights import GraphWeight
+from ClearMap.IO.assets_constants import weighted_sub_type
 
 from ClearMap.gui.dialog_helpers import warning_popup
 from ClearMap.Utils.events import WorkspaceChannelsUpdated
@@ -142,7 +144,7 @@ __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 from ..IO import io_ops
 
 MAX_PLOT_VERTICES = 300_000  # Empirical max number of vertices that can safely be plotted
-BRANCHES_DENSITY_SUB_TYPE = 'branches'  # Filtered densities are branches_<filters name>
+BRANCHES_DENSITY_SUB_TYPE = 'branches'  # Variants: branches[_weighted_<weight name>][_<filters name>]
 
 USE_BINARY_POINTS_FILE = not platform.system().lower().startswith('darwin')
 _SourcePath = Union[Path, str]
@@ -1486,19 +1488,23 @@ class VesselGraphProcessor(PipelineOrchestrator):
                                                     dtype='float32',
                                                     **voxelize_branch_parameter)  # WARNING: prange
 
-    def density_asset(self, filters=None, operators=None):
+    def density_asset(self, weight: GraphWeight | None = None, filters=None, operators=None):
         """
-        The branches density map for these filters: ``density_branches`` unfiltered,
-        ``density_branches_<filters name>`` otherwise (see graph_filters.combined_filters_name),
+        The branches density map for this weight and these filters:
+        ``density_branches[_weighted_<weight name>][_<filters name>]``
+        (see assets_constants.weighted_sub_type and graph_filters.combined_filters_name),
         so that one sample can hold several density maps (e.g. for group analyses).
 
         Parameters
         ----------
+        weight: GraphWeight | None
         filters: list[GraphFilter] | None
         operators: list[str] | None
             The operator between each pair of consecutive filters ('and' or 'or').
         """
         sub_type = BRANCHES_DENSITY_SUB_TYPE
+        if weight is not None:
+            sub_type = weighted_sub_type(sub_type, weight.name)
         if filters:
             sub_type += f'_{combined_filters_name(filters, operators or [])}'
         return self.get('density', channel=self.parent_channels, suffix=sub_type)  # suffix: dynamic sub-type
@@ -1527,14 +1533,14 @@ class VesselGraphProcessor(PipelineOrchestrator):
         return filters, operators
 
     # @requires_graph('traced')
-    def voxelize(self, weight_by_radius=False, vertex_degrees=None, filters=None, operators=None):
+    def voxelize(self, weight: GraphWeight | None = None, vertex_degrees=None, filters=None, operators=None):
         """
-        Voxelize the graph vertices (branch points) into density_asset(filters, operators).
+        Voxelize the graph vertices (branch points) into density_asset(weight, filters, operators).
 
         Parameters
         ----------
-        weight_by_radius: bool
-            Weight each vertex by its radius.
+        weight: GraphWeight | None
+            How much each vertex counts (e.g. GraphWeight(graph, 'vertex', 'radius_units')). None: 1 each.
         vertex_degrees: int | tuple[int, int] | None
             Only voxelize the vertices of this degree (or (min, max) degree range):
             a vertex degree filter and-ed after the filters, so also part of the density name.
@@ -1545,17 +1551,17 @@ class VesselGraphProcessor(PipelineOrchestrator):
             applied from left to right (see graph_filters.combine_filters).
         """
         # Validate the names before loading the graph
-        self.density_asset(*self._with_degree_filter(None, vertex_degrees, filters, operators))
+        self.density_asset(weight, *self._with_degree_filter(None, vertex_degrees, filters, operators))
         try:
             graph = self.graph_traced
         except (KeyError, FileNotFoundError):
             graph = self.graph_annotated
         filters, operators = self._with_degree_filter(graph, vertex_degrees, filters, operators)
-        density_asset = self.density_asset(filters, operators)
+        density_asset = self.density_asset(weight, filters, operators)
         vertices = graph.vertex_property('coordinates_atlas')
         voxelize_branch_parameter = self.__get_branch_voxelization_params()
 
-        weights = graph.vertex_radii_units() if weight_by_radius else None
+        weights = weight.vertex_values() if weight is not None else None
         if filters:
             mask = combine_filters(filters, operators).as_mask('vertex')
             vertices = vertices[mask]
@@ -1565,14 +1571,14 @@ class VesselGraphProcessor(PipelineOrchestrator):
 
         self.__voxelize(vertices, voxelize_branch_parameter, density_asset.path)
 
-    def plot_voxelization(self, parent, vertex_degrees=None, filters=None, operators=None):
-        """Plot the density map that voxelize made with these vertex_degrees, filters and operators"""
+    def plot_voxelization(self, parent, weight=None, vertex_degrees=None, filters=None, operators=None):
+        """Plot the density map that voxelize made with these weight, vertex_degrees, filters and operators"""
         from ClearMap.Visualization.Qt import Plot3d as q_p3d
         filters, operators = self._with_degree_filter(None, vertex_degrees, filters, operators)
-        density_asset = self.density_asset(filters, operators)
+        density_asset = self.density_asset(weight, filters, operators)
         if not density_asset.exists:
             raise AssetNotFoundError(f'No density map {density_asset.path.name}: '
-                                     f'run the voxelization with these filters first.',
+                                     f'run the voxelization with this weight and these filters first.',
                                      asset_path=str(density_asset.path), asset_type='density')
         return q_p3d.plot(density_asset.path, arrange=False, parent=parent, lut='flame')
 

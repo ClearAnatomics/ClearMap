@@ -119,6 +119,7 @@ from natsort import natsorted
 from qdarkstyle import DarkPalette
 
 
+from ClearMap.Analysis.graphs.graph_weights import weight_choices
 from ClearMap.IO.assets_constants import DATA_CONTENT_TYPES
 from ClearMap.IO.source.backends.tif_backend import parse_ome_info
 
@@ -1735,6 +1736,7 @@ class VasculatureTab(PostProcessingTab['BinaryVesselProcessor']):
         splash.finish(self.main_window)
         self.params.graph_params.add_graph_filter_params(
             filter_widget, worker.graph_annotated)
+        self.params.visualization_params.set_weight_choices(weight_choices(worker.graph_annotated))
 
     def apply_graph_filters(self) -> None:
         """
@@ -1925,12 +1927,13 @@ class VasculatureTab(PostProcessingTab['BinaryVesselProcessor']):
             self.main_window.perf_monitor.stop()
 
     def voxelize(self) -> None:
-        """Run the voxelization (density map) on the vasculature graph, filtered by the graph filters"""
+        """Run the voxelization (density map) on the vasculature graph, weighted and filtered as set in the UI"""
         worker = self.get_worker(substep='graph')
         graph_params = self.params.graph_params
-        voxelization_params = {
-            'weight_by_radius': self.params.visualization_params.weight_by_radius,
-        }
+        visualization_params = self.params.visualization_params
+        voxelization_params = {}
+        if visualization_params.weight is not None:
+            voxelization_params['weight'] = visualization_params.graph_weight(worker.graph_annotated)
         if graph_params.n_filters:
             voxelization_params['filters'] = graph_params.graph_filters(worker.graph_annotated)
             voxelization_params['operators'] = graph_params.combine_operators
@@ -1941,7 +1944,7 @@ class VasculatureTab(PostProcessingTab['BinaryVesselProcessor']):
         """Plot the density map of the current graph filters"""
         graph_params = self.params.graph_params
         return self.get_worker(substep='graph').plot_voxelization(
-            self.main_window.centralWidget(),
+            self.main_window.centralWidget(), weight=self.params.visualization_params.graph_weight(graph=None),
             filters=graph_params.graph_filters(graph=None), operators=graph_params.combine_operators)
 
     def save_stats(self) -> None:
