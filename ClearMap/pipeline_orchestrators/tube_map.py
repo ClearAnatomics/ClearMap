@@ -1555,12 +1555,13 @@ class VesselGraphProcessor(PipelineOrchestrator):
         vertices = graph.vertex_property('coordinates_atlas')
         voxelize_branch_parameter = self.__get_branch_voxelization_params()
 
+        weights = graph.vertex_radii_units() if weight_by_radius else None
         if filters:
             mask = combine_filters(filters, operators).as_mask('vertex')
             vertices = vertices[mask]
-
-        if weight_by_radius:
-            voxelize_branch_parameter.update(weights=graph.vertex_radii_units())
+            if weights is not None:
+                weights = weights[mask]  # One weight per voxelized vertex
+        voxelize_branch_parameter.update(weights=weights)
 
         self.__voxelize(vertices, voxelize_branch_parameter, density_asset.path)
 
