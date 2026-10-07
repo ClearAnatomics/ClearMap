@@ -375,7 +375,7 @@ def atomic_replace(tmp: Path, dst: Path) -> None:
     os.replace(tmp, dst)
 
 
-def atomic_write(write, location) -> None:
+def atomic_write(write, location, *args, **kwargs) -> None:
     """Write a file atomically, so a crash mid-write never destroys the previous file.
 
     ``write(tmp_path)`` must produce the complete file at ``tmp_path``, which is then
@@ -387,19 +387,30 @@ def atomic_write(write, location) -> None:
     Parameters
     ----------
     write : callable
-        Called with the temporary path as a ``str``.
+        Called as ``write(tmp_path, *args, **kwargs)``, with the temporary path as a ``str``.
     location : str or Path
         The final file.
+    *args, **kwargs
+        Forwarded to `write` (e.g. ``atomic_write(io_ops.write, path, data)``).
     """
     location = Path(location)
     location.parent.mkdir(parents=True, exist_ok=True)
     tmp = location.with_name(f'.tmp-{os.getpid()}-{location.name}')
     try:
-        write(str(tmp))
+        write(str(tmp), *args, **kwargs)
         atomic_replace(tmp, location)
     except BaseException:
         tmp.unlink(missing_ok=True)
         raise
+
+
+def atomic_write_bytes(data: bytes, location) -> None:
+    """Write `data` to `location` atomically (see atomic_write)."""
+    atomic_write(_write_bytes, location, data)
+
+
+def _write_bytes(path: str, data: bytes) -> None:
+    Path(path).write_bytes(data)
 
 
 def uncompress(file_path, extension='zip', check=True, verbose=False):
@@ -458,9 +469,10 @@ def uncompress(file_path, extension='zip', check=True, verbose=False):
                     return
             elif extension in ('bz2', 'gzip', 'lzma'):
                 mod = importlib.import_module(extension)
-                with open(file_path, 'wb') as out, \
-                        open(compressed_path, 'rb') as compressed_file:
-                    out.write(mod.decompress(compressed_file.read()))
+                with open(compressed_path, 'rb') as compressed_file:
+                    data = mod.decompress(compressed_file.read())
+                # Atomic: never leave a truncated file
+                atomic_write_bytes(data, file_path)
             else:
                 raise NotImplementedError(f'Unrecognized compression extension {extension}')
         else:

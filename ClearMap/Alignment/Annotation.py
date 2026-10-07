@@ -766,7 +766,9 @@ class Annotation:
             if slicing is not None:
                 data = data[slicing]
 
-            io_ops.write(new_file_path, data)
+            # Atomic: an existing file is reused as is ('Atlas file exists, skipping'), so a crash
+            #  mid-write must never leave a truncated one behind
+            fu.atomic_write(io_ops.write, new_file_path, data)
             results.append(new_file_path)
 
         return results
