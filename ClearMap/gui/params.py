@@ -1722,6 +1722,9 @@ class VesselGraphParams(UiParameter):
         self.filter_params.append(GraphFilterParams(main_params=self, widget=widget,
                                                     graph=graph, event_bus=self._bus,
                                                     get_view=self._get_view, apply_patch=self._apply_patch))
+        self.notify_filters_changed()
+
+    def notify_filters_changed(self) -> None:
         self.publish(UiVesselGraphFiltersChanged())
 
     @property
@@ -1803,7 +1806,7 @@ class GraphFilterParams(UiParameter):  # FIXME: do we really pass the graph as a
 
         self.handle_property_name_changed()  # Set default value for the first property
 
-        self.main_params.publish(UiVesselGraphFiltersChanged())  # Notify that properties changed
+        self.main_params.notify_filters_changed()  # Notify that properties changed
 
     @property
     def cfg_subtree(self):
@@ -1884,7 +1887,7 @@ class GraphFilterParams(UiParameter):  # FIXME: do we really pass the graph as a
         self.tab.graphFilterPropertyValueWidget = replace_widget(
             self.tab.graphFilterPropertyValueWidget, widget, layout=controls_layout)
 
-        self.main_params.publish(UiVesselGraphFiltersChanged())
+        self.main_params.notify_filters_changed()
 
     def __create_range_ctrl(self, widget_class, signed=True):
         """

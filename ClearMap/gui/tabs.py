@@ -1631,6 +1631,7 @@ class VasculatureTab(PostProcessingTab['BinaryVesselProcessor']):
         self.ui.plotGraphClearPlotPushButton.clicked.connect(self.main_window.clear_plots)
 
         self.ui.addFilterPushButton.clicked.connect(self.add_graph_filter)
+        self.ui.applyFiltersPushButton.clicked.connect(self.apply_graph_filters)
         self.subscribe(UiVesselGraphFiltersChanged, self.update_file_suffix)
 
         self.ui.voxelizeGraphPushButton.clicked.connect(self.voxelize)
@@ -1734,6 +1735,13 @@ class VasculatureTab(PostProcessingTab['BinaryVesselProcessor']):
         splash.finish(self.main_window)
         self.params.graph_params.add_graph_filter_params(
             filter_widget, worker.graph_annotated)
+
+    def apply_graph_filters(self) -> None:
+        """
+        Take the current filter values and AND/OR choices into account (they do not notify their changes):
+        refreshes the density file suffix.
+        """
+        self.params.graph_params.notify_filters_changed()
 
     def update_file_suffix(self, event: UiVesselGraphFiltersChanged) -> None:
         """Update the file suffix for the filtered graph"""
