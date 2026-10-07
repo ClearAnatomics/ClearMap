@@ -210,7 +210,7 @@ class CellDetector(ChannelPipelineOrchestrator):
             suffix += f'_{weights_column}'
             title += f' weighted by {weights_column}'
             weights = self.get_cells_df()[weights_column]
-        counts_asset = self.get('density', channel=self.channel, asset_sub_type=suffix)
+        counts_asset = self.get('density', channel=self.channel, suffix=suffix)  # suffix: the sub-type may be dynamic
         counts_asset.delete(missing_ok=True)  # Remove previous counts file if exists
         self.set_watcher_step(title)
 

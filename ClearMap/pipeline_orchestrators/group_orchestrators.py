@@ -99,7 +99,7 @@ class DensityGroupAnalysisOrchestrator(GroupOrchestratorBase):
 
     def _density_asset(self, sample_dir: Path, channel: str, suffix: str) -> 'Asset':
         sm = self.get_sample_manager_for(sample_dir)
-        asset = sm.get('density', channel=channel, asset_sub_type=suffix or None)
+        asset = sm.get('density', channel=channel, suffix=suffix)  # suffix: the sub-type may be dynamic
         return asset
 
     def _density_array(self, sample_dir: Path, channel: str, suffix: str) -> np.ndarray:
@@ -268,7 +268,7 @@ class DensityGroupAnalysisOrchestrator(GroupOrchestratorBase):
         vasc_channels = sample_mgr.get_channels_by_pipeline('TubeMap', as_list=True)
         if vasc_channels:
             compound = tuple(vasc_channels)
-            asset = sample_mgr.get('density', channel=compound, asset_sub_type=density_suffix or None, default=None)
+            asset = sample_mgr.get('density', channel=compound, suffix=density_suffix, default=None)
             if asset is not None and asset.exists:
                     channels.append(compound)
 

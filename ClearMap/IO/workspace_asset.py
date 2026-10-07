@@ -113,7 +113,7 @@ from ClearMap.IO import source_geometry
 from ClearMap.IO import conversion, dispatch, io_ops
 from ClearMap.IO import FileUtils as file_utils
 from ClearMap.IO.assets_constants import CONTENT_TYPE_TO_PIPELINE
-from ClearMap.IO.assets_specs import TypeSpec, ChannelSpec, StateManager, SubTypeSpec
+from ClearMap.IO.assets_specs import TypeSpec, ChannelSpec, StateManager
 from ClearMap.IO.source.backends import file_list_backend, registry
 from ClearMap.Utils.tag_expression import Expression
 from ClearMap.Utils.exceptions import ClearMapAssetError, AssetNotFoundError
@@ -306,7 +306,8 @@ class Asset:
         sub_type: str or TypeSpec
             The sub type of the asset. This is used to create a variant of the asset with
              a different type specification.
-            If a string, it should be a valid sub type name in the type specification.
+            If a string, the name of a sub type of this asset's type. It need not be declared
+            (dynamic sub types, e.g. ``counts_<weights_column>``), but the type must have sub types.
             If a TypeSpec, it will be used as the type specification for the variant.
 
         Returns
@@ -328,30 +329,21 @@ class Asset:
                 expression = self.expression
         if sub_type:
             if isinstance(sub_type, str):
-                type_spec = self.type_spec.sub_types.get(sub_type)
-                if not type_spec:  # Not part of standard sub_types
-                    if self.type_spec.sub_types:
-                        warnings.warn(f'The sub type "{sub_type}" is not defined. It will be created dynamically'
-                                      f'but we cannot guarantee that it will be correct.')
-                        template_sub_type_spec = list(self.type_spec.sub_types.values())[0]
-                        new_type_spec = SubTypeSpec(
-                            resource_type=template_sub_type_spec.resource_type,
-                            type_name=f'{self.type_spec.name}_{sub_type}',
-                            file_format_category=template_sub_type_spec.file_format_category,
-                            relevant_pipelines=self.type_spec.relevant_pipelines,
-                        )
-                        self.type_spec.sub_types[sub_type] = new_type_spec
-                    else:
-                        raise ValueError(f'sub_type "{sub_type}" not found in {self.type_spec.sub_types.keys()}'
-                                         f'and this type has no sub_types defined to copy.')
+                if not self.type_spec.sub_types:
+                    raise ValueError(f'sub_type "{sub_type}" requested but type "{self.type_spec.name}" '
+                                     f'has no sub_types.')
+                # Dynamic sub-types (e.g. counts_<weights_column>) are derived from the parent type
+                # exactly like the declared ones (see workspace2._build_asset_types)
+                type_spec = self.type_spec.get_sub_type(sub_type)
             elif isinstance(sub_type, TypeSpec):
                 type_spec = sub_type
             else:
                 raise ValueError(f'sub_type must be a string or a TypeSpec, got "{type(sub_type)}".')
         else:
-            type_spec = deepcopy(self.type_spec)
+            type_spec = self.type_spec
+        type_spec = deepcopy(type_spec)  # (Sub-)type specs are shared: the variant changes its own copy
         if not self.is_expression and extension:
-            type_spec.extensions = list(dict.fromkeys([extension] + self.type_spec.extensions))
+            type_spec.extensions = list(dict.fromkeys([extension] + type_spec.extensions))
         # WARNING: long list, should use keyword arguments
         return Asset(self.base_directory, type_spec, self.channel_spec, expression,
                      sample_id or self.sample_id, self.subdirectory, version or self.version,
