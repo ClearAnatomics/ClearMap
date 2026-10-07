@@ -116,7 +116,7 @@ import ClearMap.Analysis.Measurements.radius_measurements as measure_radius
 import ClearMap.Analysis.Measurements.Voxelization as voxelization
 
 from ClearMap.Analysis.graphs import graph_processing
-from ClearMap.Analysis.graphs.graph_filters import GraphFilter
+from ClearMap.Analysis.graphs.graph_filters import GraphFilter, combine_filters
 
 from ClearMap.gui.dialog_helpers import warning_popup
 from ClearMap.Utils.events import WorkspaceChannelsUpdated
@@ -1504,14 +1504,8 @@ class VesselGraphProcessor(PipelineOrchestrator):
             filters += [GraphFilter(graph, 'vertex', 'degree', vertex_degrees)]
 
         if filters:
-            if len(operators) != len(filters) - 1:
-                raise ValueError("Number of operators must be len(filters) - 1")
-
-                # Start with the first atomic filter, then fold left
-            combined = filters[0]
-            for op_str, nxt in zip(operators, filters[1:]):
-                combined = combined.combine_with(nxt, op_str)
-            vertices = vertices[combined.as_mask('vertex')]
+            mask = combine_filters(filters, operators or []).as_mask('vertex')
+            vertices = vertices[mask]
 
         if weight_by_radius:
             voxelize_branch_parameter.update(weights=graph.vertex_radii_units())
