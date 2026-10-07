@@ -1,3 +1,4 @@
+import functools
 import os
 import re
 import warnings
@@ -75,7 +76,6 @@ class RegistrationProcessor(PipelineOrchestrator):
         super().__init__(cfg_coordinator)
         self.sample_manager: SampleManager = sample_manager
         self.annotators: Dict[str, Annotation] = {}  # 1 for each channel
-        self.mini_brains: Dict[str, MiniBrain] = {}  # 1 for each channel
         self.progress_watcher: Optional["ProgressWatcher"] = None  # FIXME:
         self.__bspline_registration_re = re.compile(r"\d+\s-?\d+\.\d+\s\d+\.\d+\s\d+\.\d+\s\d+\.\d+")
         self.__affine_registration_re = re.compile(r"\d+\s-\d+\.\d+\s\d+\.\d+\s\d+\.\d+\s\d+\.\d+\s\d+\.\d+")
@@ -153,8 +153,6 @@ class RegistrationProcessor(PipelineOrchestrator):
     def _on_channel_renamed(self, event: ChannelRenamed):
         if event.old in self.annotators:
             self.annotators[event.new] = self.annotators.pop(event.old)
-        if event.old in self.mini_brains:
-            self.mini_brains[event.new] = self.mini_brains.pop(event.old)
 
     @property
     def ref_channel_cfg(self):
@@ -495,8 +493,7 @@ class RegistrationProcessor(PipelineOrchestrator):
         else:
             type_spec = TypeSpec(resource_type='atlas', type_name='atlas',
                                  file_format_category='image', relevant_pipelines=['registration'])
-            atlas_asset = self.workspace.create_asset(type_spec, channel_spec=channel_spec,
-                                                      sample_id=self.sample_manager.prefix)
+            self.workspace.create_asset(type_spec, channel_spec=channel_spec, sample_id=self.sample_manager.prefix)
             return self.update_atlas_asset(channel_spec.name, annotator=annotator)
 
     def update_atlas_asset(self, channel, annotator=None):
@@ -537,6 +534,16 @@ class RegistrationProcessor(PipelineOrchestrator):
             asset.type_spec = sub_type
         self.workspace.asset_collections[channel]['atlas_label'] = asset
         return atlas_asset
+
+    @property
+    def mini_brain(self) -> "MiniBrain":
+        """
+        The downscaled annotation of the configured atlas, used for the orientation preview.
+        Built on first use, once per atlas (see setup_mini_brain), not at setup.
+        """
+        atlas_base_name = ATLAS_NAMES_MAP[self.config['atlas']['id']]['base_name']
+        scaling, array = setup_mini_brain(atlas_base_name)
+        return MiniBrain(scaling=scaling, array=array)
 
     def project_mini_brain(self, channel):  # FIXME: idealy part of sample_manager
         """
@@ -581,8 +588,9 @@ class RegistrationProcessor(PipelineOrchestrator):
 
         params = self.cfg_coordinator.get_config_view('sample')['channels'][channel]
         orientation = params['orientation']
-        img = self.mini_brains[channel]['array'].copy()
-        x_scale, y_scale, z_scale = self.mini_brains[channel]['scaling']
+        mini_brain = self.mini_brain
+        img = mini_brain['array'].copy()
+        x_scale, y_scale, z_scale = mini_brain['scaling']
 
         if axes_to_flip := [abs(axis) - 1 for axis in orientation if axis < 0]:
             img = np.flip(img, axes_to_flip)
@@ -623,10 +631,6 @@ class RegistrationProcessor(PipelineOrchestrator):
                                                       label_source=atlas_cfg['structure_tree_id'],
                                                       target_directory=target_directory)
 
-                scaling, mini_brain = setup_mini_brain(atlas_base_name)
-                self.mini_brains[channel] = MiniBrain(scaling=scaling,
-                                                      array=mini_brain)
-
                 # Add to workspace
                 asset = self.get('atlas', channel=channel, default=None)
                 if asset is None or not asset.exists:
@@ -639,7 +643,6 @@ class RegistrationProcessor(PipelineOrchestrator):
             except ParamsOrientationError:
                 warnings.warn(f'Orientation not set for {channel}, skipping atlas setup and erasing annotators.')
                 self.annotators[channel] = None
-                self.mini_brains[channel] = None
 
         self.update_watcher_main_progress()
 
@@ -671,9 +674,13 @@ class MiniBrain(TypedDict):
     array: np.ndarray
 
 
+@functools.lru_cache(maxsize=4)
 def setup_mini_brain(atlas_base_name, mini_brain_scaling=(5, 5, 5)):  # TODO: scaling in prefs
     """
     Create a downsampled version of the Allen Brain Atlas for the mini brain widget
+
+    Cached: computed once per (atlas, scaling) for the process. The returned array is shared,
+    hence read-only (copy it before modifying it).
 
     Parameters
     ----------
@@ -686,7 +693,9 @@ def setup_mini_brain(atlas_base_name, mini_brain_scaling=(5, 5, 5)):  # TODO: sc
     """
     atlas_path = os.path.join(Settings.atlas_folder, f'{atlas_base_name}_annotation.tif')
     arr = TifSource(atlas_path).array
-    return mini_brain_scaling, sk_transform.downscale_local_mean(arr, mini_brain_scaling)
+    mini_brain = sk_transform.downscale_local_mean(arr, mini_brain_scaling)
+    mini_brain.flags.writeable = False  # Shared by the cache
+    return mini_brain_scaling, mini_brain
 
 
 def define_auto_resolution(img_path, cfg_res):
