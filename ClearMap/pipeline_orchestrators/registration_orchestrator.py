@@ -55,6 +55,21 @@ def _atlas_slicing(slicing) -> Optional[tuple[slice, slice, slice]]:
     return tuple(slice(None) if slicing.get(ax) is None else slice(*slicing[ax]) for ax in 'xyz')
 
 
+def _atlas_target_directory(orientation: Optional[tuple[int, ...]],
+                            xyz_slicing: Optional[tuple[slice, slice, slice]], cache_dir: Path) -> Path:
+    """
+    Where the atlas prepared for this orientation and slicing is stored.
+
+    The unchanged atlas is the source atlas itself. Reoriented or cropped variants go to a
+    cache shared by all experiments (`cache_dir`): their file names encode the atlas, the
+    orientation and the slicing, so experiments with the same parameters reuse the same files
+    (about 1.2 GB per variant for the 25 um ABA).
+    """
+    if xyz_slicing is None and (orientation is None or orientation == DEFAULT_ORIENTATION):
+        return Path(settings.atlas_folder)
+    return cache_dir
+
+
 class RegistrationStatus(Enum):
     NOT_SELECTED = 0
     MISSING_OUTPUTS = 1
@@ -480,6 +495,11 @@ class RegistrationProcessor(PipelineOrchestrator):
         return atlas_files
 
     @property
+    def atlas_cache_dir(self) -> Path:
+        """Where reoriented / cropped atlases are stored (machine config 'atlas_cache_folder')."""
+        return Path(self.machine_config['atlas_cache_folder']).expanduser()
+
+    @property
     def source_annotator(self) -> Annotation:
         """
         Annotator of the configured atlas, unoriented and uncropped, for orientation-independent
@@ -522,7 +542,8 @@ class RegistrationProcessor(PipelineOrchestrator):
                 self.annotators[channel] = Annotation(atlas_base_name=ATLAS_NAMES_MAP[atlas_cfg['id']]['base_name'],
                                                       slicing=xyz_slicing, orientation=orientation,
                                                       label_source=atlas_cfg['structure_tree_id'],
-                                                      target_directory=annotator.target_directory)
+                                                      target_directory=_atlas_target_directory(orientation, xyz_slicing,
+                                                                                               self.atlas_cache_dir))
                 annotator = self.annotators[channel]
         else:
             if channel not in self.annotators:   # TODO: check if we only update
@@ -628,10 +649,7 @@ class RegistrationProcessor(PipelineOrchestrator):
             orientation = _atlas_orientation(sample_cfg[channel]['orientation'])
             xyz_slicing = _atlas_slicing(sample_cfg[channel]['slicing'])
 
-            if xyz_slicing is None and (orientation is None or orientation == DEFAULT_ORIENTATION):
-                target_directory = settings.atlas_folder  # For the unchanged atlas
-            else:
-                target_directory = self.cfg_coordinator.base_dir / 'atlas'  # FIXME: use asset_constants
+            target_directory = _atlas_target_directory(orientation, xyz_slicing, self.atlas_cache_dir)
 
             try:
                 orientation = validate_orientation(orientation, channel=channel, raise_error=True)

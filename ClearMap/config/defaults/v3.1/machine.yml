@@ -4,6 +4,7 @@ clearmap_version: "3.1.0"
 verbosity: "trace"
 start_folder: "~/"
 temp_folder: null
+atlas_cache_folder: "~/.clearmap/atlas_cache"  # Reoriented / cropped atlases, shared by all experiments
 start_full_screen: false
 default_lut: "white"
 three_d_plot_bg: "grey"

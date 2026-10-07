@@ -22,6 +22,7 @@ properties:
 
   start_folder:       { type: string }
   temp_folder:        { type: ["string", "null"] }
+  atlas_cache_folder: { type: string }
   start_full_screen:  { type: boolean }
 
   default_lut:     { type: string }
