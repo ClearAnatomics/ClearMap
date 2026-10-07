@@ -1742,7 +1742,7 @@ class VasculatureTab(PostProcessingTab['BinaryVesselProcessor']):
         if graph_params.n_filters == 0:
             self.ui.fileSuffixLineEdit.clear()
             return
-        self.ui.fileSuffixLineEdit.setText(graph_params.compute_file_suffix())
+        self.ui.fileSuffixLineEdit.setText(graph_params.compute_filter_suffix())
 
     def unload_temporary_graphs(self) -> None:
         """Unload the temporary vasculature graph objects to free up RAM"""

@@ -1721,7 +1721,7 @@ class VesselGraphParams(UiParameter):
         self.filter_params.append(GraphFilterParams(main_params=self, widget=widget,
                                                     graph=graph, event_bus=self._bus,
                                                     get_view=self._get_view, apply_patch=self._apply_patch))
-        self.filtersChanged.emit()
+        self.publish(UiVesselGraphFiltersChanged())
 
     @property
     def n_filters(self):
@@ -1770,8 +1770,10 @@ class GraphFilterParams(UiParameter):  # FIXME: do we really pass the graph as a
         self.layout = self.tab.parent().findChild(QVBoxLayout, 'filterParamsVerticalLayout')
 
         self.graph = graph
-        self.update_properties()
-        self.connect()
+        self.update_properties()  # connect() is called by UiParameter.__init__
+
+    def build_params_dict(self) -> dict:
+        return {}  # UI only: filters are not stored in the config (see VesselGraphParams.compute_filter_suffix)
 
     def connect(self):
         self.tab.vertexFilterRadioButton.toggled.connect(self.update_properties)
@@ -1797,7 +1799,7 @@ class GraphFilterParams(UiParameter):  # FIXME: do we really pass the graph as a
 
         self.handle_property_name_changed()  # Set default value for the first property
 
-        self.main_params.filtersChanged.emit()  # Notify that properties changed
+        self.main_params.publish(UiVesselGraphFiltersChanged())  # Notify that properties changed
 
     @property
     def cfg_subtree(self):
@@ -1885,7 +1887,7 @@ class GraphFilterParams(UiParameter):  # FIXME: do we really pass the graph as a
         self.tab.graphFilterPropertyValueWidget = replace_widget(
             self.tab.graphFilterPropertyValueWidget, widget, layout=controls_layout)
 
-        self.main_params.filtersChanged.emit()
+        self.main_params.publish(UiVesselGraphFiltersChanged())
 
     def __create_range_ctrl(self, widget_class, signed=True):
         """
