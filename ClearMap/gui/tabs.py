@@ -119,7 +119,6 @@ from natsort import natsorted
 from qdarkstyle import DarkPalette
 
 
-from ClearMap.Analysis.graphs.graph_filters import GraphFilter
 from ClearMap.IO.assets_constants import DATA_CONTENT_TYPES
 from ClearMap.IO.source.backends.tif_backend import parse_ome_info
 
@@ -1739,10 +1738,15 @@ class VasculatureTab(PostProcessingTab['BinaryVesselProcessor']):
     def update_file_suffix(self, event: UiVesselGraphFiltersChanged) -> None:
         """Update the file suffix for the filtered graph"""
         graph_params = self.params.graph_params
+        suffix_line_edit = self.ui.fileSuffixLineEdit
+        suffix_line_edit.clear()
+        suffix_line_edit.setPlaceholderText('')
         if graph_params.n_filters == 0:
-            self.ui.fileSuffixLineEdit.clear()
             return
-        self.ui.fileSuffixLineEdit.setText(graph_params.compute_filter_suffix())
+        try:
+            suffix_line_edit.setText(graph_params.compute_filter_suffix())
+        except ValueError as err:  # e.g. a value that cannot be in a file name. The voxelization will raise
+            suffix_line_edit.setPlaceholderText(str(err))
 
     def unload_temporary_graphs(self) -> None:
         """Unload the temporary vasculature graph objects to free up RAM"""
@@ -1913,28 +1917,24 @@ class VasculatureTab(PostProcessingTab['BinaryVesselProcessor']):
             self.main_window.perf_monitor.stop()
 
     def voxelize(self) -> None:
-        """Run the voxelization (density map) on the vasculature graph"""
+        """Run the voxelization (density map) on the vasculature graph, filtered by the graph filters"""
+        worker = self.get_worker(substep='graph')
+        graph_params = self.params.graph_params
         voxelization_params = {
             'weight_by_radius': self.params.visualization_params.weight_by_radius,
         }
-        worker = self.get_worker(substep='graph')
-        if self.params.graph_params.filter_params:
-            voxelization_params['filters'] = [
-                GraphFilter(worker.graph_annotated,
-                            filter_type=g_filter.filter_type,
-                            property_name=g_filter.property_name,
-                            property_value=g_filter.get_property_value())
-                for g_filter in self.params.graph_params.filter_params]
-            voxelization_params['operators'] = [
-                g_filter.combine_operator_name
-                for g_filter in self.params.graph_params.filter_params
-                if g_filter.combine_operator_name is not None]  # skip first one
+        if graph_params.n_filters:
+            voxelization_params['filters'] = graph_params.graph_filters(worker.graph_annotated)
+            voxelization_params['operators'] = graph_params.combine_operators
         self.wrap_step('Running voxelization', worker.voxelize, step_kw_args=voxelization_params)#, main_thread=True)
 
     @GenericTab.ui_plot('Plotting vasculature graph voxelization')
     def plot_voxelization(self):
-        """Plot the density map"""
-        return self.get_worker(substep='graph').plot_voxelization(self.main_window.centralWidget())
+        """Plot the density map of the current graph filters"""
+        graph_params = self.params.graph_params
+        return self.get_worker(substep='graph').plot_voxelization(
+            self.main_window.centralWidget(),
+            filters=graph_params.graph_filters(graph=None), operators=graph_params.combine_operators)
 
     def save_stats(self) -> None:
         """Save the stats of the graph to a feather file"""

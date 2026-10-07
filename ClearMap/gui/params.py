@@ -15,6 +15,7 @@ from PyQt5.QtCore import Qt, QTimer, QSignalBlocker
 from PyQt5.QtWidgets import (QToolBox, QCheckBox, QLabel, QHBoxLayout, QVBoxLayout,
                              QSpinBox, QLineEdit, QDoubleSpinBox, QRadioButton, QFrame)
 
+from ClearMap.Analysis.graphs.graph_filters import GraphFilter, combined_filters_name
 from ClearMap.config.atlas import ATLAS_NAMES_MAP
 from ClearMap.Utils.exceptions import ClearMapValueError
 from ClearMap.Utils.utilities import (validate_orientation, snake_to_title, set_item_recursive,
@@ -1727,17 +1728,20 @@ class VesselGraphParams(UiParameter):
     def n_filters(self):
         return len(self.filter_params)
 
-    def compute_filter_suffix(self):
-        suffix = '_'.join([f'{f.property_name}_{f.get_property_value()}' for f in self.filter_params])
-        # TODO: consider:
-        #   parts = []
-        #   for i, f in enumerate(fs):
-        #       parts.append(f"{f.property_name}_{f.get_property_value()}")
-        #       op = f.combine_operator_name
-        #       if op and i < len(fs)-1:
-        #           parts.append(op)
-        #   suffix = '_'.join(parts)
-        return suffix
+    def graph_filters(self, graph) -> list[GraphFilter]:
+        """The filters set in the UI, applied to graph (None is enough to name them)"""
+        return [GraphFilter(graph, filter_type=f.filter_type, property_name=f.property_name,
+                            property_value=f.get_property_value())
+                for f in self.filter_params]
+
+    @property
+    def combine_operators(self) -> list[str]:
+        """The operator after each filter but the last one (which has no combine buttons)"""
+        return [f.combine_operator_name for f in self.filter_params[:-1]]
+
+    def compute_filter_suffix(self) -> str:
+        """The filters part of the density file name (see VesselGraphProcessor.density_asset)"""
+        return combined_filters_name(self.graph_filters(graph=None), self.combine_operators)
 
 
 class VesselGraphPerformanceParams(UiParameter):
@@ -1773,7 +1777,7 @@ class GraphFilterParams(UiParameter):  # FIXME: do we really pass the graph as a
         self.update_properties()  # connect() is called by UiParameter.__init__
 
     def build_params_dict(self) -> dict:
-        return {}  # UI only: filters are not stored in the config (see VesselGraphParams.compute_filter_suffix)
+        return {}  # UI only: filters are not stored in the config, they name the density file
 
     def connect(self):
         self.tab.vertexFilterRadioButton.toggled.connect(self.update_properties)
@@ -1855,13 +1859,6 @@ class GraphFilterParams(UiParameter):  # FIXME: do we really pass the graph as a
         if not and_button:  # Last filter
             return None
         return 'and' if and_button.isChecked() else 'or'
-
-    def suffix(self):
-        suffix = f'{self.property_name}_{self.get_property_value()}'
-        combine_action = self.combine_operator_name
-        if combine_action is not None:
-            suffix += f'_{combine_action}'
-        return suffix
 
     @param_handler  # FIXME: check
     def handle_property_name_changed(self):

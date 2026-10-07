@@ -116,7 +116,7 @@ import ClearMap.Analysis.Measurements.radius_measurements as measure_radius
 import ClearMap.Analysis.Measurements.Voxelization as voxelization
 
 from ClearMap.Analysis.graphs import graph_processing
-from ClearMap.Analysis.graphs.graph_filters import GraphFilter, combine_filters
+from ClearMap.Analysis.graphs.graph_filters import GraphFilter, combine_filters, combined_filters_name
 
 from ClearMap.gui.dialog_helpers import warning_popup
 from ClearMap.Utils.events import WorkspaceChannelsUpdated
@@ -142,6 +142,7 @@ __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 from ..IO import io_ops
 
 MAX_PLOT_VERTICES = 300_000  # Empirical max number of vertices that can safely be plotted
+BRANCHES_DENSITY_SUB_TYPE = 'branches'  # Filtered densities are branches_<filters name>
 
 USE_BINARY_POINTS_FILE = not platform.system().lower().startswith('darwin')
 _SourcePath = Union[Path, str]
@@ -1478,44 +1479,101 @@ class VesselGraphProcessor(PipelineOrchestrator):
         }
         return voxelize_branch_parameter
 
-    def __voxelize(self, vertices, voxelize_branch_parameter: dict[str, Any]):
-        density_path = self.get_path('density', channel=self.parent_channels, asset_sub_type='branches')
+    def __voxelize(self, vertices, voxelize_branch_parameter: dict[str, Any], density_path: Path):
         clearmap_io.delete_file(density_path)
         self.branch_density = voxelization.voxelize(vertices,
                                                     sink=density_path,
                                                     dtype='float32',
                                                     **voxelize_branch_parameter)  # WARNING: prange
 
+    def density_asset(self, filters=None, operators=None):
+        """
+        The branches density map for these filters: ``density_branches`` unfiltered,
+        ``density_branches_<filters name>`` otherwise (see graph_filters.combined_filters_name),
+        so that one sample can hold several density maps (e.g. for group analyses).
+
+        Parameters
+        ----------
+        filters: list[GraphFilter] | None
+        operators: list[str] | None
+            The operator between each pair of consecutive filters ('and' or 'or').
+        """
+        sub_type = BRANCHES_DENSITY_SUB_TYPE
+        if filters:
+            sub_type += f'_{combined_filters_name(filters, operators or [])}'
+        return self.get('density', channel=self.parent_channels, suffix=sub_type)  # suffix: dynamic sub-type
+
+    @staticmethod
+    def _with_degree_filter(graph, vertex_degrees, filters, operators):
+        """
+        filters and operators with, if vertex_degrees is set, a vertex degree filter and-ed after them.
+        The caller's lists are not modified.
+
+        Parameters
+        ----------
+        graph: Graph | None
+            None is enough to name the filters.
+        vertex_degrees: int | tuple[int, int] | None
+            A degree or a (min, max) degree range.
+        filters: list[GraphFilter] | None
+        operators: list[str] | None
+        """
+        filters = list(filters or [])
+        operators = list(operators or [])
+        if vertex_degrees is not None:  # A degree is an equality filter, a pair a range (see GraphFilter.as_mask)
+            if filters:
+                operators.append('and')
+            filters.append(GraphFilter(graph, 'vertex', 'degree', vertex_degrees))
+        return filters, operators
+
     # @requires_graph('traced')
     def voxelize(self, weight_by_radius=False, vertex_degrees=None, filters=None, operators=None):
+        """
+        Voxelize the graph vertices (branch points) into density_asset(filters, operators).
+
+        Parameters
+        ----------
+        weight_by_radius: bool
+            Weight each vertex by its radius.
+        vertex_degrees: int | tuple[int, int] | None
+            Only voxelize the vertices of this degree (or (min, max) degree range):
+            a vertex degree filter and-ed after the filters, so also part of the density name.
+        filters: list[GraphFilter] | None
+            Only voxelize the vertices selected by these filters.
+        operators: list[str] | None
+            The operator between each pair of consecutive filters ('and' or 'or'),
+            applied from left to right (see graph_filters.combine_filters).
+        """
+        # Validate the names before loading the graph
+        self.density_asset(*self._with_degree_filter(None, vertex_degrees, filters, operators))
         try:
             graph = self.graph_traced
         except (KeyError, FileNotFoundError):
             graph = self.graph_annotated
+        filters, operators = self._with_degree_filter(graph, vertex_degrees, filters, operators)
+        density_asset = self.density_asset(filters, operators)
         vertices = graph.vertex_property('coordinates_atlas')
         voxelize_branch_parameter = self.__get_branch_voxelization_params()
 
-        if vertex_degrees:
-            if filters is None:
-                filters = []
-                operators = []
-            if not isinstance(vertex_degrees, (list, tuple)):
-                vertex_degrees = (vertex_degrees, vertex_degrees)
-            filters += [GraphFilter(graph, 'vertex', 'degree', vertex_degrees)]
-
         if filters:
-            mask = combine_filters(filters, operators or []).as_mask('vertex')
+            mask = combine_filters(filters, operators).as_mask('vertex')
             vertices = vertices[mask]
 
         if weight_by_radius:
             voxelize_branch_parameter.update(weights=graph.vertex_radii_units())
 
-        self.__voxelize(vertices, voxelize_branch_parameter)
+        self.__voxelize(vertices, voxelize_branch_parameter, density_asset.path)
 
-    def plot_voxelization(self, parent):
+    def plot_voxelization(self, parent, vertex_degrees=None, filters=None, operators=None):
+        """Plot the density map that voxelize made with these vertex_degrees, filters and operators"""
         from ClearMap.Visualization.Qt import Plot3d as q_p3d
-        return q_p3d.plot(self.get_path('density', channel=self.parent_channels, asset_sub_type='branches'),
-                          arrange=False, parent=parent, lut='flame')
+        filters, operators = self._with_degree_filter(None, vertex_degrees, filters, operators)
+        density_asset = self.density_asset(filters, operators)
+        if not density_asset.exists:
+            raise AssetNotFoundError(f'No density map {density_asset.path.name}: '
+                                     f'run the voxelization with these filters first.',
+                                     asset_path=str(density_asset.path), asset_type='density')
+        return q_p3d.plot(density_asset.path, arrange=False, parent=parent, lut='flame')
 
     @requires_graph('traced')
     def write_vertex_table(self):

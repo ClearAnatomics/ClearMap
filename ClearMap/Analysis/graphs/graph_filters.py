@@ -14,6 +14,7 @@ mask = cap_network.as_mask('vertex')   # one property read per leaf; single trav
 """
 
 
+import re
 from functools import cached_property
 
 import numpy as np
@@ -22,6 +23,7 @@ from ClearMap.Analysis.vasculature.vasc_graph_utils import vertex_filter_to_edge
 from ClearMap.Utils.exceptions import ClearMapValueError
 
 COMBINE_OPERATOR_NAMES = ('and', 'or')
+FILE_NAME_TOKEN_RE = re.compile(r'[A-Za-z0-9_.+-]+')  # What a filter may contribute to a file name
 
 
 def convert_property(graph, mask, src_filter_type, dest_filter_type, operator=np.logical_and):
@@ -34,6 +36,30 @@ def convert_property(graph, mask, src_filter_type, dest_filter_type, operator=np
         return edge_filter_to_vertex_filter(graph, mask, operator=operator)
     else:
         raise ValueError(f'Unsupported conversion from {src_filter_type} to {dest_filter_type}.')
+
+
+def file_name_token(value) -> str:
+    """
+    The file name safe string of a filter value (see GraphFilter.as_mask for the semantics):
+    a pair is a range (``0to5``), another list a set of values (``1+2+3``), anything else is the value.
+
+    Raises
+    ------
+    ClearMapValueError
+        If the value does not make a file name safe string (e.g. empty, spaces or path separators),
+        rather than silently mapping two different values to the same file.
+    """
+    if isinstance(value, (tuple, list)):
+        if len(value) == 2:
+            token = f'{value[0]}to{value[1]}'
+        else:
+            token = '+'.join([str(v) for v in value])
+    else:
+        token = str(value)
+    if not FILE_NAME_TOKEN_RE.fullmatch(token):
+        raise ClearMapValueError(f'Filter value {value!r} cannot be used in a file name '
+                                   f'(allowed characters: {FILE_NAME_TOKEN_RE.pattern}).')
+    return token
 
 
 def combine_filters(filters, operators):
@@ -56,6 +82,18 @@ def combine_filters(filters, operators):
     for operator, graph_filter in zip(operators, filters[1:]):
         combined = combined.combine_with(graph_filter, operator)
     return combined
+
+
+def combined_filters_name(filters, operators) -> str:
+    """
+    The file name safe description of combine_filters(filters, operators),
+    e.g. ``vertex_radii_0to5_and_vertex_artery_True``
+    """
+    _check_operators(filters, operators)
+    parts = [filters[0].name]
+    for operator, graph_filter in zip(operators, filters[1:]):
+        parts += [operator, graph_filter.name]
+    return '_'.join(parts)
 
 
 def _check_operators(filters, operators):
@@ -161,6 +199,17 @@ class GraphFilter(BaseFilter):
         self.filter_type = filter_type
         self.property_name = property_name
         self.property_value = property_value
+
+    @property
+    def name(self) -> str:
+        """The file name safe description of the filter: ``<filter_type>_<property_name>_<value>``"""
+        if not self.filter_type or not self.property_name or self.property_value is None:
+            raise ClearMapValueError(f'Cannot name an incomplete filter ({self.filter_type=}, '
+                                       f'{self.property_name=}, {self.property_value=}).')
+        if not FILE_NAME_TOKEN_RE.fullmatch(self.property_name):
+            raise ClearMapValueError(f'Property name {self.property_name!r} cannot be used in a file name '
+                                       f'(allowed characters: {FILE_NAME_TOKEN_RE.pattern}).')
+        return f'{self.filter_type}_{self.property_name}_{file_name_token(self.property_value)}'
 
     def is_defined(self):
         return (self.graph is not None and
