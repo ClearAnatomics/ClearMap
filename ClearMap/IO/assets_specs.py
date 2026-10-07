@@ -85,6 +85,7 @@ class TypeSpec:
             sub_types = {k: None for k in sub_types}
         else:
             sub_types = sub_types or {}
+        # None and dict entries become SubTypeSpecs in get_sub_type
         self.sub_types: dict[str, TypeSpec | dict | None] = sub_types
         self.sub_folder = sub_folder
 

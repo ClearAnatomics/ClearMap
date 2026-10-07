@@ -131,17 +131,11 @@ def _build_asset_types(type_spec_dict: dict, resource_type_to_folder: dict) -> d
             key = f'{name}_{st_name}'
             if key not in assets_types_config:
                 st_value = spec.sub_types[st_name]
-                if isinstance(st_value, TypeSpec):
-                    subtypes[key] = st_value
-                elif isinstance(st_value, dict):
-                    # Sub-type carries its own format overrides
-                    # (e.g. cells.bkg is an image, not a table)
-                    subtypes[key] = spec.add_sub_type(st_name, **st_value)
-                elif st_value is None:
-                    # None → inherit parent format
-                    subtypes[key] = spec.get_sub_type(st_name)
-                else:
+                if st_value is not None and not isinstance(st_value, (TypeSpec, dict)):
                     raise ClearMapValueError(f'Type not supported for {key}, got {type(st_value)}')
+                # None inherits the parent format, a dict carries its own overrides
+                # (e.g. cells.bkg is an image, not a table), a TypeSpec is used as is
+                subtypes[key] = spec.get_sub_type(st_name)
     return {**assets_types_config, **subtypes}
 
 
