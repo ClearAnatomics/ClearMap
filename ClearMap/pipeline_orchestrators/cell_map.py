@@ -93,6 +93,7 @@ import pandas as pd
 # noinspection PyPep8Naming
 import ClearMap.IO.IO as clearmap_io
 from ClearMap.IO import io_ops
+from ClearMap.IO.assets_constants import weighted_sub_type
 from ClearMap.IO.workspace2 import Workspace2
 
 # noinspection PyPep8Naming
@@ -207,7 +208,7 @@ class CellDetector(ChannelPipelineOrchestrator):
         suffix = 'counts'
         weights = None
         if weights_column:
-            suffix += f'_{weights_column}'
+            suffix = weighted_sub_type(suffix, weights_column)  # Formerly counts_<weights_column> (still read)
             title += f' weighted by {weights_column}'
             weights = self.get_cells_df()[weights_column]
         counts_asset = self.get('density', channel=self.channel, suffix=suffix)  # suffix: the sub-type may be dynamic

@@ -235,7 +235,7 @@ class DensityGroupAnalysisOrchestrator(GroupOrchestratorBase):
         else:
             target_ch = channels[0]  # Just use the first one to probe
 
-        # The density sub-types are dynamic (e.g. counts_<weights_column>): look at the files
+        # The density sub-types are dynamic (e.g. counts_weighted_<weights_column>): look at the files
         suffixes = set(sm.get('density', channel=target_ch, sample_id=sm.prefix).available_sub_types())
 
         # Fallback if scanning fails/is empty but we know defaults

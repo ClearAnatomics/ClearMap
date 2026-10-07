@@ -307,7 +307,7 @@ class Asset:
             The sub type of the asset. This is used to create a variant of the asset with
              a different type specification.
             If a string, the name of a sub type of this asset's type. It need not be declared
-            (dynamic sub types, e.g. ``counts_<weights_column>``), but the type must have sub types.
+            (dynamic sub types, e.g. ``counts_weighted_<weights_column>``), but the type must have sub types.
             If a TypeSpec, it will be used as the type specification for the variant.
 
         Returns
@@ -332,7 +332,7 @@ class Asset:
                 if not self.type_spec.sub_types:
                     raise ValueError(f'sub_type "{sub_type}" requested but type "{self.type_spec.name}" '
                                      f'has no sub_types.')
-                # Dynamic sub-types (e.g. counts_<weights_column>) are derived from the parent type
+                # Dynamic sub-types (e.g. counts_weighted_<weights_column>) are derived from the parent type
                 # exactly like the declared ones (see workspace2._build_asset_types)
                 type_spec = self.type_spec.get_sub_type(sub_type)
             elif isinstance(sub_type, TypeSpec):
@@ -491,7 +491,7 @@ class Asset:
         """
         The sub-types of this asset that exist on disk.
 
-        Sub-types can be dynamic (e.g. ``counts_<weights_column>`` for ``density``), so they are not
+        Sub-types can be dynamic (e.g. ``counts_weighted_<weights_column>`` for ``density``), so they are not
         necessarily registered in the type spec: the files are the source of truth.
 
         Returns
