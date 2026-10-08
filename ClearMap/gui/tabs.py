@@ -120,11 +120,11 @@ from qdarkstyle import DarkPalette
 
 
 from ClearMap.Analysis.graphs.graph_weights import weight_choices
-from ClearMap.IO.assets_constants import DATA_CONTENT_TYPES, compound_is_oriented
+from ClearMap.IO.assets_constants import DATA_CONTENT_TYPES
 from ClearMap.IO.source.backends.tif_backend import parse_ome_info
 
 from ClearMap.config.atlas import ATLAS_NAMES_MAP, STRUCTURE_TREE_NAMES_MAP
-from ClearMap.config.compound_keys import PairKey
+from ClearMap.config.compound_keys import PairKey, compound_is_oriented
 
 from ClearMap.pipeline_orchestrators.batch_process import BatchProcessor
 

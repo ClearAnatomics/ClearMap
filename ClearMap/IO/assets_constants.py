@@ -1,7 +1,5 @@
 import re
 
-from ClearMap.Utils.exceptions import ClearMapValueError
-
 EXTENSIONS = {
     'image': ['.npy', '.tif', '.tiff'],
     'portable_image': ['.tif', '.tiff'],
@@ -80,20 +78,6 @@ PIPELINE_NAMES = frozenset({*(p for p in CONTENT_TYPE_TO_PIPELINE.values() if p 
 ORIENTED_COMPOUND_PIPELINES = frozenset({'Colocalization'})
 
 
-def compound_is_oriented(pipeline: str) -> bool:
-    """
-    Whether the order of the parts of the compound channels of pipeline carries meaning
-    (see ORIENTED_COMPOUND_PIPELINES)
-
-    Raises
-    ------
-    ClearMapValueError
-        If pipeline is not one of PIPELINE_NAMES.
-    """
-    if pipeline not in PIPELINE_NAMES:
-        raise ClearMapValueError(f'Unknown pipeline {pipeline!r}, expected one of {sorted(PIPELINE_NAMES)}.')
-    return pipeline in ORIENTED_COMPOUND_PIPELINES
-
 # TODO: add link between labels and content types
 #    e.g.
 #    {'cfos': 'nuclei',
@@ -108,24 +92,6 @@ They may or may not make sense for a given channel
 based on the pipeline(s) relevant for that channel.
 """
 FILE_NAME_TOKEN_RE = re.compile(r'[A-Za-z0-9_.+-]+')  # What a computed part of a sub-type name may contain
-WEIGHTED_SUB_TYPE_INFIX = 'weighted'  # <sub_type>_weighted_<weights name>, see weighted_sub_type
-
-
-def weighted_sub_type(sub_type: str, weights_name: str) -> str:
-    """
-    The (dynamic) sub-type of a weighted variant of sub_type,
-    e.g. ``counts_weighted_size`` or ``branches_weighted_vertex_radius_units``
-
-    Raises
-    ------
-    ClearMapValueError
-        If weights_name cannot be used in a file name.
-    """
-    if not FILE_NAME_TOKEN_RE.fullmatch(weights_name):
-        raise ClearMapValueError(f'Weights {weights_name!r} cannot be used in a file name '
-                                 f'(allowed characters: {FILE_NAME_TOKEN_RE.pattern}).')
-    return f'{sub_type}_{WEIGHTED_SUB_TYPE_INFIX}_{weights_name}'
-
 
 CHANNELS_ASSETS_TYPES_CONFIG = {
     'raw': {

@@ -19,10 +19,30 @@ import multiprocessing
 import warnings
 
 from ClearMap.IO.assets_constants import (EXTENSIONS, COMPRESSION_ALGORITHMS, CHECKSUM_ALGORITHMS,
-                                          RESOURCE_TYPE_TO_FOLDER, DATA_CONTENT_TYPES)
+                                          RESOURCE_TYPE_TO_FOLDER, DATA_CONTENT_TYPES, FILE_NAME_TOKEN_RE)
+from ClearMap.Utils.exceptions import ClearMapValueError
 from ClearMap.config.compound_keys import is_compound_channel, compound_channel_parts
 from ClearMap.Utils.tag_expression import Expression
 from ClearMap.Utils.utilities import validate_arg
+
+
+WEIGHTED_SUB_TYPE_INFIX = 'weighted'  # <sub_type>_weighted_<weights name>, see weighted_sub_type
+
+
+def weighted_sub_type(sub_type: str, weights_name: str) -> str:
+    """
+    The (dynamic) sub-type of a weighted variant of sub_type,
+    e.g. ``counts_weighted_size`` or ``branches_weighted_vertex_radius_units``
+
+    Raises
+    ------
+    ClearMapValueError
+        If weights_name cannot be used in a file name.
+    """
+    if not FILE_NAME_TOKEN_RE.fullmatch(weights_name):
+        raise ClearMapValueError(f'Weights {weights_name!r} cannot be used in a file name '
+                                 f'(allowed characters: {FILE_NAME_TOKEN_RE.pattern}).')
+    return f'{sub_type}_{WEIGHTED_SUB_TYPE_INFIX}_{weights_name}'
 
 
 class TypeSpec:

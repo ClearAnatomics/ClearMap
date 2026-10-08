@@ -119,7 +119,7 @@ import ClearMap.Analysis.Measurements.Voxelization as voxelization
 from ClearMap.Analysis.graphs import graph_processing
 from ClearMap.Analysis.graphs.graph_filters import GraphFilter, combine_filters, combined_filters_name
 from ClearMap.Analysis.graphs.graph_weights import GraphWeight
-from ClearMap.IO.assets_constants import weighted_sub_type
+from ClearMap.IO.assets_specs import weighted_sub_type
 
 from ClearMap.gui.dialog_helpers import warning_popup
 from ClearMap.Utils.events import WorkspaceChannelsUpdated
@@ -1516,7 +1516,7 @@ class VesselGraphProcessor(TubeMapOrchestrator):
         """
         The branches density map for this weight and these filters:
         ``density_branches[_weighted_<weight name>][_<filters name>]``
-        (see assets_constants.weighted_sub_type and graph_filters.combined_filters_name),
+        (see assets_specs.weighted_sub_type and graph_filters.combined_filters_name),
         so that one sample can hold several density maps (e.g. for group analyses).
 
         Parameters

@@ -83,10 +83,10 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Mapping, Any, Optional, Final, Callable, TYPE_CHECKING, Sequence, ClassVar, Iterable
 
-from ClearMap.IO.assets_constants import PIPELINE_NAMES, compound_is_oriented
+from ClearMap.IO.assets_constants import PIPELINE_NAMES
 from ClearMap.IO.workspace2 import Workspace2
 from ClearMap.IO.workspace_asset import Asset
-from ClearMap.config.compound_keys import CompoundKey, compound_channel_key
+from ClearMap.config.compound_keys import CompoundKey, compound_channel_key, compound_is_oriented
 from ClearMap.Utils.event_bus import BusSubscriberMixin
 from ClearMap.Utils.exceptions import ClearMapRuntimeError, ClearMapValueError, ClearMapConfigError, \
     ClearMapNotImplementedError, MissingChannelError
@@ -847,7 +847,7 @@ class CompoundChannelPipelineOrchestrator(PipelineOrchestrator, abstract=True):
         they are set in. This tuple is the workspace id of the compound channel, and the channel of
         get when none is given.
     oriented: bool
-        Class attribute, derived from the pipeline (assets_constants.compound_is_oriented):
+        Class attribute, derived from the pipeline (compound_keys.compound_is_oriented):
         whether the order of the parts carries meaning.
     """
     oriented: ClassVar[bool]

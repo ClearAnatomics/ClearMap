@@ -14,8 +14,7 @@ from typing import Any, Optional, Iterable, Dict, Sequence, List, Set, Tuple
 
 from ClearMap.Utils.utilities import deep_merge, REPLACE, DELETE, _REPLACE
 
-from ClearMap.config.compound_keys import CompoundKey
-from ClearMap.IO.assets_constants import compound_is_oriented
+from ClearMap.config.compound_keys import CompoundKey, compound_is_oriented
 
 from ClearMap.config.config_handler import ALTERNATIVES_REG
 from ClearMap.config.config_adjusters.type_hints import (ConfigView, ConfigPatch, SampleManagerProtocol, KeysPath,

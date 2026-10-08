@@ -35,6 +35,7 @@ import itertools
 import re
 from typing import Iterable, Mapping, Any, Callable, Optional, Sequence
 
+from ClearMap.IO.assets_constants import PIPELINE_NAMES, ORIENTED_COMPOUND_PIPELINES
 from ClearMap.Utils.exceptions import ClearMapValueError
 
 
@@ -799,6 +800,21 @@ def compound_channel_parts(channel: str | tuple[str, ...] | list[str], *,
     if malformed:
         raise ClearMapValueError(f'Malformed channel name(s) {malformed!r} in channel key {channel!r}')
     return parts if compound else None
+
+
+def compound_is_oriented(pipeline: str) -> bool:
+    """
+    Whether the order of the parts of the compound channels of pipeline carries meaning
+    (see ORIENTED_COMPOUND_PIPELINES)
+
+    Raises
+    ------
+    ClearMapValueError
+        If pipeline is not one of PIPELINE_NAMES.
+    """
+    if pipeline not in PIPELINE_NAMES:
+        raise ClearMapValueError(f'Unknown pipeline {pipeline!r}, expected one of {sorted(PIPELINE_NAMES)}.')
+    return pipeline in ORIENTED_COMPOUND_PIPELINES
 
 
 def compound_channel_key(parts: Sequence[str], *, oriented: bool) -> tuple[str, ...]:
