@@ -273,18 +273,21 @@ class DensityGroupAnalysisOrchestrator(GroupOrchestratorBase):
         first_folder = Path(first_group[0])
         sample_mgr = self.get_sample_manager_for(sample_src_dir=first_folder)
 
+        vasc_channels = sample_mgr.get_channels_by_pipeline('TubeMap', as_list=True)
+
         channels = []
         for ch in sample_mgr.pipeline_ready_channels:  # individual channels (CellMap, TractMap, Colocalization)
+            if ch in vasc_channels:  # Only analysed through their compound channel, whose density is the one made
+                continue
             asset = self._density(sample_mgr, ch, density_suffix, pipeline=self.pipeline, default=None)
             if asset is not None and asset.exists:
                 channels.append(ch)
 
-        vasc_channels = sample_mgr.get_channels_by_pipeline('TubeMap', as_list=True)
         if vasc_channels:
             compound = register_compound_channel(sample_mgr, 'TubeMap', vasc_channels)  # its workspace id
             asset = self._density(sample_mgr, compound, density_suffix, pipeline='TubeMap', default=None)
             if asset is not None and asset.exists:
-                    channels.append(compound)
+                channels.append(compound)
 
         return channels
 
