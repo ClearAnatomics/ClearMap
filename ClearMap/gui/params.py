@@ -1782,6 +1782,9 @@ class VesselGraphPerformanceParams(UiParameter):
         }
 
 
+GRAPH_FILTER_SCALAR_TYPES = (bool, int, float, str)  # The python value types a filter can compare to
+
+
 class GraphFilterParams(UiParameter):  # FIXME: do we really pass the graph as argument or just the prop names/types ?
     def __init__(self, *, main_params, widget, graph, event_bus: EventBus, get_view=None, apply_patch=None):
         self.main_params = main_params
@@ -1799,10 +1802,33 @@ class GraphFilterParams(UiParameter):  # FIXME: do we really pass the graph as a
         self.tab.vertexFilterRadioButton.toggled.connect(self.update_properties)
         self.tab.graphFilterPropertyNameComboBox.currentTextChanged.connect(self.handle_property_name_changed)
 
+    def _filterable_properties(self) -> dict[str, str]:
+        """
+        The properties that can be filtered on, for the selected filter type.
+
+        Vector valued properties (e.g. coordinates) and other non scalar ones are left out:
+        a filter compares one value (or a range) per vertex/edge.
+        ``degrees`` is only available for vertices.
+
+        Returns
+        -------
+        dict[str, str]
+            The type name ('bool', 'int', 'float' or 'str') of each property name, in graph order.
+        """
+        properties = self.graph._base.vertex_properties if self.filter_type == 'vertex' else self.graph._base.edge_properties
+        dtype_names = {}
+        for prop_name in properties.keys():
+            dtype = properties[prop_name].python_value_type()
+            if dtype in GRAPH_FILTER_SCALAR_TYPES:
+                dtype_names[prop_name] = dtype.__name__
+        if self.filter_type == 'vertex':
+            dtype_names['degrees'] = 'int'
+        return dtype_names
+
     def update_properties(self, _=None):
         """
-        Fill the property combo box with the properties of the selected filter type (vertex or edge),
-        then reset the value widget to match the first one.
+        Fill the property combo box with the filterable properties of the selected filter type
+        (vertex or edge), then reset the value widget to match the first one.
 
         Parameters
         ----------
@@ -1810,24 +1836,11 @@ class GraphFilterParams(UiParameter):  # FIXME: do we really pass the graph as a
             The checked state passed by ``toggled(bool)``. Intentionally discarded: the filter type
             is read from the radio button. Not passed when called directly.
         """
-        if self.filter_type == 'vertex':
-            properties = self.graph._base.vertex_properties
-        else:
-            properties = self.graph._base.edge_properties
-        properties_names = list(properties.keys())  # Guarantee order
-        dtypes = [properties[prop_name].python_value_type() for prop_name in properties_names]
-        dtype_names = []
-        for dtype in dtypes:
-            if isinstance(dtype, tuple):
-                dtype_names.append([t.__name__ for t in dtype][-1])  # if List[type] -> type
-            else:
-                dtype_names.append(dtype.__name__)
-
         combo_box = self.tab.graphFilterPropertyNameComboBox
         with QSignalBlocker(combo_box):  # one handler call at the end, not one per item (and none on an empty box)
             combo_box.clear()
-            for prop_name, dtype in zip(properties_names + ['degrees'], dtype_names + ['int']):
-                combo_box.addItem(prop_name, userData=dtype)
+            for prop_name, dtype_name in self._filterable_properties().items():
+                combo_box.addItem(prop_name, userData=dtype_name)
 
         self.handle_property_name_changed()  # Set default value for the first property
 
