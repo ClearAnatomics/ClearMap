@@ -830,13 +830,6 @@ class VesselGraphProcessor(TubeMapOrchestrator):
             self.workspace.ensure_pipeline(self.pipeline, self.compound_channel, channel_content_type='compound',
                                            sample_id=sample_id, create_channel=True)
 
-    @property
-    def parent_channels(self) -> tuple[str, ...]:
-        """.. deprecated:: use compound_channel"""
-        warnings.warn(f'{self.__class__.__name__}.parent_channels is deprecated, use compound_channel instead.',
-                      DeprecationWarning, stacklevel=2)
-        return self.compound_channel
-
     def __get_graph(self, step):
         if step not in self.__graphs:
             raise ValueError(f'Unknown graph step "{step}"')
