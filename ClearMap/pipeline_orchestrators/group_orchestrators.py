@@ -27,6 +27,7 @@ from ..config.compound_keys import CompoundKey
 
 if TYPE_CHECKING:
     from ClearMap.IO.workspace_asset import Asset
+    from ClearMap.pipeline_orchestrators.sample_info_management import SampleManager
     from PyQt5.QtWebEngineWidgets import QWebEngineView
 
 Pair = Tuple[str, str]
@@ -97,10 +98,24 @@ class DensityGroupAnalysisOrchestrator(GroupOrchestratorBase):
                 f'{self._points_asset_type()} for {channel=} has no "id" column. '
                 f'Ensure registration and annotation were run.')
 
+    @staticmethod
+    def _density(sample_manager: 'SampleManager', channel, suffix: str | None, *, pipeline: str,
+                 **kwargs) -> 'Asset':
+        """
+        The density asset of channel, sub-type suffix (which may be dynamic), in the sample's workspace.
+
+        A compound channel (a tuple, e.g. the TubeMap channels or a Colocalization pair) is registered
+        in a workspace by the setup of the processors of its pipeline, which the group analysis does not
+        run for its samples: register it here, for the pipeline that produced the density.
+        """
+        workspace = sample_manager.workspace
+        if isinstance(channel, tuple) and channel not in workspace:
+            workspace.ensure_pipeline(pipeline, channel, sample_id=sample_manager.prefix,
+                                      channel_content_type='compound', create_channel=True)
+        return sample_manager.get('density', channel=channel, suffix=suffix, **kwargs)
+
     def _density_asset(self, sample_dir: Path, channel: str, suffix: str) -> 'Asset':
-        sm = self.get_sample_manager_for(sample_dir)
-        asset = sm.get('density', channel=channel, suffix=suffix)  # suffix: the sub-type may be dynamic
-        return asset
+        return self._density(self.get_sample_manager_for(sample_dir), channel, suffix, pipeline=self.pipeline)
 
     def _density_array(self, sample_dir: Path, channel: str, suffix: str) -> np.ndarray:
         asset = self._density_asset(sample_dir, channel, suffix)
@@ -236,7 +251,8 @@ class DensityGroupAnalysisOrchestrator(GroupOrchestratorBase):
             target_ch = channels[0]  # Just use the first one to probe
 
         # The density sub-types are dynamic (e.g. counts_weighted_<weights_column>): look at the files
-        suffixes = set(sm.get('density', channel=target_ch, sample_id=sm.prefix).available_sub_types())
+        suffixes = set(self._density(sm, target_ch, None, pipeline=self.pipeline,
+                                     sample_id=sm.prefix).available_sub_types())
 
         # Fallback if scanning fails/is empty but we know defaults
         if not suffixes:
@@ -261,14 +277,14 @@ class DensityGroupAnalysisOrchestrator(GroupOrchestratorBase):
 
         channels = []
         for ch in sample_mgr.pipeline_ready_channels:  # individual channels (CellMap, TractMap, Colocalization)
-            asset = sample_mgr.get('density', channel=ch, suffix=density_suffix, default=None)
+            asset = self._density(sample_mgr, ch, density_suffix, pipeline=self.pipeline, default=None)
             if asset is not None and asset.exists:
                 channels.append(ch)
 
         vasc_channels = sample_mgr.get_channels_by_pipeline('TubeMap', as_list=True)
         if vasc_channels:
             compound = tuple(vasc_channels)
-            asset = sample_mgr.get('density', channel=compound, suffix=density_suffix, default=None)
+            asset = self._density(sample_mgr, compound, density_suffix, pipeline='TubeMap', default=None)
             if asset is not None and asset.exists:
                     channels.append(compound)
 
