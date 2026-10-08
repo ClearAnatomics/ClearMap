@@ -2886,9 +2886,8 @@ class GroupsWidgetAdapter(QWidget):
         if idx < 0:
             return -1
         self._discard_page(idx)
-        # re-sync label change hooks if you rely on index in the lambda above
-        for i, p in enumerate(self._pages):
-            p.connect_group_name_changed(lambda txt, idx_=i: self._toolbox.setItemText(idx_, self.__gp_name(txt, idx_)))
+        for i in range(len(self._pages)):  # The default names (Group_<n>) depend on the position
+            self._sync_label(i)
         return idx
 
     def _remove_page_at(self, idx: int) -> None:
