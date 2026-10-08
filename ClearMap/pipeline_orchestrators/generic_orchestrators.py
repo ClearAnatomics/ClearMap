@@ -28,6 +28,10 @@ automatically returns the section for :attr:`~ChannelPipelineOrchestrator.channe
 and :meth:`~ChannelPipelineOrchestrator.patch_channel` scopes config writes
 to that channel without the caller having to know the full key path.
 
+:class:`IndependentChannelsPipelineOrchestrator` processes several channels, each
+on its own (stitching, registration): it is bound to none, so every asset access
+names its channel.
+
 :class:`CompoundChannelPipelineOrchestrator` is the equivalent for pipelines
 that operate on one compound channel (a tuple of channels), such as TubeMap
 (vessels and arteries) or colocalization (a pair).
@@ -84,7 +88,8 @@ from ClearMap.IO.workspace2 import Workspace2
 from ClearMap.IO.workspace_asset import Asset
 from ClearMap.config.compound_keys import CompoundKey
 from ClearMap.Utils.event_bus import BusSubscriberMixin
-from ClearMap.Utils.exceptions import ClearMapRuntimeError, ClearMapValueError, ClearMapConfigError
+from ClearMap.Utils.exceptions import ClearMapRuntimeError, ClearMapValueError, ClearMapConfigError, \
+    ClearMapNotImplementedError
 from ClearMap.Utils.utilities import handle_deprecated_args, deep_freeze, infer_origin_from_caller
 
 if TYPE_CHECKING:    # WARNING: some circular imports below, use only for type checking with quotes
@@ -725,6 +730,22 @@ class ChannelPipelineOrchestrator(PipelineOrchestrator, abstract=True):
             {self.config_name: {"channels": {self.channel: patch}}},
             sample_manager=self.sample_manager,
             origin=origin or infer_origin_from_caller())
+
+
+class IndependentChannelsPipelineOrchestrator(PipelineOrchestrator, abstract=True):
+    """
+    Processor of several channels, each processed on its own (e.g. stitching, registration).
+
+    Not bound to a channel: every asset access names its channel (get has no default channel),
+    and channels lists the channels it processes.
+    """
+    def get(self, asset_type, channel, asset_sub_type=None, **kwargs):
+        return super().get(asset_type, channel=channel, asset_sub_type=asset_sub_type, **kwargs)
+
+    @property
+    def channels(self) -> list[str]:
+        """The channels this processor processes, each on its own"""
+        raise ClearMapNotImplementedError(f'{self.__class__.__name__} must define channels')
 
 
 class CompoundChannelPipelineOrchestrator(PipelineOrchestrator, abstract=True):

@@ -29,7 +29,7 @@ from ClearMap.Utils.utilities import (runs_on_ui, check_stopped, DEFAULT_ORIENTA
 from ClearMap.config.atlas import ATLAS_NAMES_MAP
 from ClearMap.config.config_coordinator import ConfigCoordinator
 
-from ClearMap.pipeline_orchestrators.generic_orchestrators import PipelineOrchestrator, CanceledProcessing
+from ClearMap.pipeline_orchestrators.generic_orchestrators import IndependentChannelsPipelineOrchestrator, CanceledProcessing
 from ClearMap.pipeline_orchestrators.sample_info_management import SampleManager
 
 if TYPE_CHECKING:
@@ -76,7 +76,7 @@ class RegistrationStatus(Enum):
     REGISTERED = 2
 
 
-class RegistrationProcessor(PipelineOrchestrator):
+class RegistrationProcessor(IndependentChannelsPipelineOrchestrator):
     """
     This class is used to manage the registration process
     Perform image registration operations.
@@ -126,7 +126,7 @@ class RegistrationProcessor(PipelineOrchestrator):
         # WARNING: must be called once registration pipeline has been added to the Workspace for that channel
         # self.parametrize_assets()
 
-    def get(self, asset_type, channel='current', asset_sub_type=None, **kwargs):
+    def get(self, asset_type, channel, asset_sub_type=None, **kwargs):
         """
         Get an asset, automatically resolving registration template
         variables for asset types that require parametrisation (e.g. registration
@@ -248,7 +248,8 @@ class RegistrationProcessor(PipelineOrchestrator):
                     warnings.warn('Workspace not setup, cannot add registration pipeline')
 
     @property
-    def channels(self):
+    def channels(self) -> list[str]:
+        """The channels of the registration config"""
         return list(self.config['channels'].keys())
 
     def channels_to_resample(self):

@@ -22,14 +22,14 @@ from ClearMap.Utils.utilities import check_stopped, sanitize_n_processes
 
 from ClearMap.config.config_coordinator import ConfigCoordinator
 
-from ClearMap.pipeline_orchestrators.generic_orchestrators import PipelineOrchestrator
+from ClearMap.pipeline_orchestrators.generic_orchestrators import IndependentChannelsPipelineOrchestrator
 from ClearMap.pipeline_orchestrators.sample_info_management import SampleManager
 
 if TYPE_CHECKING:
     from ClearMap.gui.widgets import ProgressWatcher
 
 
-class StitchingProcessor(PipelineOrchestrator):
+class StitchingProcessor(IndependentChannelsPipelineOrchestrator):
     """
     This class is used to manage the stitching process
     Handle image stitching operations.
@@ -52,6 +52,11 @@ class StitchingProcessor(PipelineOrchestrator):
                                                       r" pair \d+/\d+ done, shift = \(-?\d+, -?\d+, -?\d+\),"
                                                       r" quality = -\d+\.\d+e\+\d+!"))
         self.setup(sample_manager)
+
+    @property
+    def channels(self) -> list[str]:
+        """The stitchable channels of the sample (see SampleManager.stitchable_channels)"""
+        return self.sample_manager.stitchable_channels
 
     def setup(self, sample_manager: Optional[SampleManager] = None, convert_tiles: bool = False):
         self.sample_manager = sample_manager if sample_manager else self.sample_manager
@@ -76,7 +81,7 @@ class StitchingProcessor(PipelineOrchestrator):
     @check_stopped
     def convert_tiles(self, _force=False):
         """Convert list of input files to numpy files for efficiency reasons"""
-        for channel in self.sample_manager.stitchable_channels:
+        for channel in self.channels:
             self.convert_tiles_channel(channel, _force=_force)
         self.update_watcher_main_progress()
 
@@ -419,8 +424,8 @@ class StitchingProcessor(PipelineOrchestrator):
 
     @property
     def n_wobbly_steps_to_run(self):
-        out = len(self.sample_manager.stitchable_channels) - 1
-        for channel in self.sample_manager.stitchable_channels:
+        out = len(self.channels) - 1
+        for channel in self.channels:
             cfg = self.config['channels'][channel]
             if 'wobbly' in cfg and not cfg['wobbly']['skip']:
                 out += 3
@@ -547,7 +552,7 @@ class StitchingProcessor(PipelineOrchestrator):
     def plot_stitching_results(self, channels=None, mode='side-by-side', parent=None):
         from ClearMap.Visualization.Qt import Plot3d as plot_3d
         if channels is None:
-            channels = self.sample_manager.stitchable_channels
+            channels = self.channels
         paths = []
         titles = []
         for c in channels:
