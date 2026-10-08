@@ -183,7 +183,6 @@ class SampleManager(OrchestratorBase):
         super().__init__(config_coordinator)
 
         self.incomplete_channels = []
-        self.setup_complete = False
         self.workspace: Optional[Workspace2] = None  # Defined in update_workspace
 
         self._renamed_channels: dict[str, str] = {}
@@ -245,7 +244,16 @@ class SampleManager(OrchestratorBase):
             sections = self.compute_required_sections()
             self.cfg_coordinator.load_all(sections)
 
-            self.setup_complete = (not self.incomplete_channels) and bool(self.config)
+    @property
+    def setup_complete(self) -> bool:
+        """
+        Whether the sample is ready for the pipelines: its config is loaded, the workspace exists
+        and every channel of the config is registered in it (i.e. has a path and a data type).
+
+        Derived (not stored) because the channels change after the setup, e.g. when the user adds
+        a channel in the GUI: it is incomplete until its path and data type are set.
+        """
+        return bool(self.config) and self.workspace is not None and not self.incomplete_channels
 
     @adjuster_safe
     def compute_required_sections(self) -> set[str]:
