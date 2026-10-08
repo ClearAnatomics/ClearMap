@@ -2749,6 +2749,10 @@ class GroupsWidgetAdapter(QWidget):
     def set_value(self, groups: Dict[str, List[str]]) -> None:
         if self._rebuilding:   # prevent re-entrant calls from cfg_to_ui
             return
+        if list(groups.items()) == list(self.get_value().items()):
+            # The config echoes what the pages already show (e.g. the group name just edited): rebuilding
+            # would destroy the page whose line edit is emitting editingFinished (crash on focus loss)
+            return
         self._rebuilding = True
         try:
             self._clear()
@@ -2881,8 +2885,7 @@ class GroupsWidgetAdapter(QWidget):
         idx = self._toolbox.currentIndex()
         if idx < 0:
             return -1
-        delete_widget(tool_box=self._toolbox, toolbox_page_index=idx)
-        self._pages.pop(idx)
+        self._discard_page(idx)
         # re-sync label change hooks if you rely on index in the lambda above
         for i, p in enumerate(self._pages):
             p.connect_group_name_changed(lambda txt, idx_=i: self._toolbox.setItemText(idx_, self.__gp_name(txt, idx_)))
@@ -2890,8 +2893,12 @@ class GroupsWidgetAdapter(QWidget):
 
     def _remove_page_at(self, idx: int) -> None:
         if 0 <= idx < len(self._pages):
-            delete_widget(tool_box=self._toolbox, toolbox_page_index=idx)
-            self._pages.pop(idx)
+            self._discard_page(idx)
+
+    def _discard_page(self, idx: int) -> None:
+        """Remove the page from the toolbox and delete its widget (deferred, see delete_widget)"""
+        page = self._pages.pop(idx)
+        delete_widget(widget=page.widget, tool_box=self._toolbox, toolbox_page_index=idx)
 
     def __gp_name(self, name, idx):
         return name or f"Group_{idx + 1}"
