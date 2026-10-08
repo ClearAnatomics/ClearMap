@@ -93,7 +93,8 @@ from typing import List, Iterator, Sequence, Optional
 
 import numpy as np
 
-from ClearMap.IO.assets_constants import CONTENT_TYPE_TO_PIPELINE, CHANNELS_ASSETS_TYPES_CONFIG, RESOURCE_TYPE_TO_FOLDER
+from ClearMap.IO.assets_constants import (CONTENT_TYPE_TO_PIPELINE, CHANNELS_ASSETS_TYPES_CONFIG, RESOURCE_TYPE_TO_FOLDER,
+                                          PIPELINE_NAMES)
 from ClearMap.IO.assets_specs import ChannelSpec, TypeSpec, StateManager, ChannelId
 from ClearMap.config.compound_keys import compound_channel_parts
 from ClearMap.IO.workspace_asset import Asset, AssetCollection
@@ -594,6 +595,13 @@ class Workspace2:  # REFACTOR: subclass dict
 
     def ensure_pipeline(self, pipeline_name: str, channel_id: ChannelId, sample_id: str,
                         permute_channels: bool=False, create_channel: bool=False, channel_content_type: Optional[str] = None):
+        """
+        Ensure that the channel has the assets of the pipeline: only the missing ones are created,
+        the existing ones (e.g. parametrized registration assets) are kept. Idempotent.
+
+        create_channel=True also creates the channel if missing, which is meant for compound channels
+        only: the sample channels are added by the SampleManager (add_raw_data).
+        """
         channel_id = self._normalize_channel(channel_id)  # FIXME: are we sure about that?
         sample_id = sample_id or self.sample_id
 
@@ -604,20 +612,21 @@ class Workspace2:  # REFACTOR: subclass dict
                                 sample_id=sample_id,
                                 permute_channels=permute_channels)
 
-        self.add_pipeline(pipeline_name, channel_id, sample_id=sample_id)
+        self.add_pipeline(pipeline_name, channel_id, sample_id=sample_id, missing_only=True)
         if permute_channels:
             inv = self._permute_channels(channel_id)
             if inv != channel_id:
                 if inv not in self:
                     raise MissingChannelError(f'Channel "{inv}" does not exist in the workspace.'
                                               f'If you want to implicitly create it, set create_channel=True.')
-                self.add_pipeline(pipeline_name, inv, sample_id=sample_id)
+                self.add_pipeline(pipeline_name, inv, sample_id=sample_id, missing_only=True)
 
 
     def _add_channel(self, channel_spec, sample_id=''):
         self.asset_collections[channel_spec.name] = AssetCollection(self.directory, sample_id, channel_spec)
 
-    def add_pipeline(self, pipeline_name: str, channel_id: Optional[str | Sequence[str]] = None, **kwargs):
+    def add_pipeline(self, pipeline_name: str, channel_id: Optional[str | Sequence[str]] = None, *,
+                     missing_only: bool = False, **kwargs):
         """
         Add a pipeline to the workspace. This implies creating the corresponding assets
         for the given channel and pipeline.
@@ -628,11 +637,14 @@ class Workspace2:  # REFACTOR: subclass dict
             The name of the pipeline to add.
         channel_id: str | Sequence[str] | None
             The channel id to use for the asset.
+        missing_only: bool
+            Create only the assets the channel does not have yet (see ensure_pipeline),
+            instead of (re)creating them all.
         """
         if channel_id not in self:
             raise MissingChannelError(f'Channel "{channel_id}" does not exist in the workspace.'
                                       f'Use add_raw_data to create a new channel.')
-        if pipeline_name not in CONTENT_TYPE_TO_PIPELINE.values():
+        if pipeline_name not in PIPELINE_NAMES:
             raise ClearMapWorkspaceError(f'Pipeline {pipeline_name} does not exist in the workspace.')
 
         if 'sample_id' in kwargs:
@@ -641,7 +653,7 @@ class Workspace2:  # REFACTOR: subclass dict
             sample_id = self.get('raw', channel_id).sample_id
         channel_spec = self[channel_id].channel_spec
         for name, spec in self.asset_types.items():
-            if pipeline_name in spec.relevant_pipelines:
+            if pipeline_name in spec.relevant_pipelines and not (missing_only and name in self[channel_id]):
                 self.create_asset(spec, channel_spec, sample_id=sample_id)
 
     def add_asset(self, asset):

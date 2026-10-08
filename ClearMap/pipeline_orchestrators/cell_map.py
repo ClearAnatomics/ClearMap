@@ -153,6 +153,7 @@ class CellDetector(ChannelPipelineOrchestrator):
         self.registration_processor = registration_processor
         if self.sample_manager.setup_complete:
             self.workspace = sample_manager.workspace
+            self.register_in_workspace()
             self.setup_complete = True
         else:
             self.setup_complete = False

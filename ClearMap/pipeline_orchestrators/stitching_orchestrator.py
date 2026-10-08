@@ -71,6 +71,7 @@ class StitchingProcessor(IndependentChannelsPipelineOrchestrator):
             self.workspace = self.sample_manager.workspace
 
         if self.sample_manager.setup_complete:
+            self.register_in_workspace()
             if convert_tiles:
                 self.convert_tiles()  # TODO: check if needed
             self.setup_complete = True

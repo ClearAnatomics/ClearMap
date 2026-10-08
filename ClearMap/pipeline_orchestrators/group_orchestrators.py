@@ -15,7 +15,7 @@ from ClearMap.IO import io_ops
 from ClearMap.Analysis.Statistics.group_statistics import (generate_summary_table, group_region_counts,
                                                            remove_p_val_nans, stack_voxelizations, get_colored_p_vals)
 
-from .generic_orchestrators import GroupOrchestratorBase
+from .generic_orchestrators import GroupOrchestratorBase, register_compound_channel
 from .utils import init_sample_manager_and_processors
 from ..Alignment.utils import get_all_region_ids
 from ..Analysis.Statistics.group_assets import GroupResultsAssets
@@ -108,10 +108,8 @@ class DensityGroupAnalysisOrchestrator(GroupOrchestratorBase):
         in a workspace by the setup of the processors of its pipeline, which the group analysis does not
         run for its samples: register it here, for the pipeline that produced the density.
         """
-        workspace = sample_manager.workspace
-        if isinstance(channel, tuple) and channel not in workspace:
-            workspace.ensure_pipeline(pipeline, channel, sample_id=sample_manager.prefix,
-                                      channel_content_type='compound', create_channel=True)
+        if isinstance(channel, tuple):
+            channel = register_compound_channel(sample_manager, pipeline, channel)
         return sample_manager.get('density', channel=channel, suffix=suffix, **kwargs)
 
     def _density_asset(self, sample_dir: Path, channel: str, suffix: str) -> 'Asset':

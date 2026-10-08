@@ -76,6 +76,7 @@ class TractMapProcessor(ChannelPipelineOrchestrator):
 
         if self.sample_manager.setup_complete:
             self.workspace = sample_manager.workspace
+            self.register_in_workspace()
             self.setup_complete = True
         else:
             self.setup_complete = False

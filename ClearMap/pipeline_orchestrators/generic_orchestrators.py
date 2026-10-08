@@ -81,7 +81,7 @@ from abc import ABC, abstractmethod
 from concurrent.futures.process import BrokenProcessPool
 from pathlib import Path
 from types import MappingProxyType
-from typing import Mapping, Any, Optional, Final, Callable, TYPE_CHECKING, Sequence, ClassVar
+from typing import Mapping, Any, Optional, Final, Callable, TYPE_CHECKING, Sequence, ClassVar, Iterable
 
 from ClearMap.IO.assets_constants import PIPELINE_NAMES, compound_is_oriented
 from ClearMap.IO.workspace2 import Workspace2
@@ -89,7 +89,7 @@ from ClearMap.IO.workspace_asset import Asset
 from ClearMap.config.compound_keys import CompoundKey
 from ClearMap.Utils.event_bus import BusSubscriberMixin
 from ClearMap.Utils.exceptions import ClearMapRuntimeError, ClearMapValueError, ClearMapConfigError, \
-    ClearMapNotImplementedError
+    ClearMapNotImplementedError, MissingChannelError
 from ClearMap.Utils.utilities import handle_deprecated_args, deep_freeze, infer_origin_from_caller
 
 if TYPE_CHECKING:    # WARNING: some circular imports below, use only for type checking with quotes
@@ -98,6 +98,50 @@ if TYPE_CHECKING:    # WARNING: some circular imports below, use only for type c
     from ClearMap.pipeline_orchestrators.registration_orchestrator import RegistrationProcessor
     from ClearMap.pipeline_orchestrators.experiment_controller import AnalysisGroupController
     from ClearMap.gui.widgets import ProgressWatcher
+
+
+def check_sample_channels_in_workspace(sample_manager: "SampleManager", channels: Iterable[str], *,
+                                       required_by: str) -> None:
+    """
+    Raise if one of channels (sample channels) is not in the workspace of the sample.
+
+    A sample channel is added to the workspace by the SampleManager, once its config is complete
+    (path and data type), never by a processor: a processor only checks it is there.
+
+    Raises
+    ------
+    MissingChannelError
+        Naming the missing channels and the incomplete sample channels.
+    """
+    missing = [channel for channel in channels if channel not in sample_manager.workspace]
+    if missing:
+        raise MissingChannelError(f'{required_by} needs the sample channel(s) {missing}, which are not in the '
+                                  f'workspace. A sample channel joins the workspace once its config is complete '
+                                  f'(path and data type); incomplete sample channels: '
+                                  f'{sample_manager.incomplete_channels}.')
+
+
+def register_compound_channel(sample_manager: "SampleManager", pipeline: str,
+                              parts: Sequence[str]) -> tuple[str, ...]:
+    """
+    Register the compound channel made of parts in the workspace of the sample, for pipeline:
+    check its parts (sample channels, see check_sample_channels_in_workspace), and create the compound
+    channel, and its pipeline assets, if missing.
+
+    The function behind CompoundChannelPipelineOrchestrator.register_in_workspace, for the code
+    that reads the results of a pipeline without running its processors (e.g. group analyses).
+
+    Returns
+    -------
+    tuple[str, ...]
+        The workspace id of the compound channel.
+    """
+    compound_channel = tuple(parts)
+    check_sample_channels_in_workspace(sample_manager, compound_channel,
+                                       required_by=f'The {pipeline} compound channel {compound_channel}')
+    sample_manager.workspace.ensure_pipeline(pipeline, compound_channel, sample_id=sample_manager.prefix,
+                                             channel_content_type='compound', create_channel=True)
+    return compound_channel
 
 
 class ProcessorSteps(ABC):
@@ -558,6 +602,20 @@ class PipelineOrchestrator(OrchestratorBase):
             self.setup_complete = False
             warnings.warn(f'Sample manager not setup yet. Cannot setup {self.__class__.__name__}.')
 
+    def register_in_workspace(self) -> None:
+        """
+        Register in the workspace of the sample what this processor works on: check that its sample
+        channels are there (the SampleManager adds them, a processor never does), create its compound
+        channel if it has one, and add the assets of its pipeline that are missing. Idempotent,
+        called by setup.
+
+        Raises
+        ------
+        MissingChannelError
+            If a sample channel of this processor is not in the workspace.
+        """
+        raise ClearMapNotImplementedError(f'{self.__class__.__name__} must define register_in_workspace')
+
     def set_progress_watcher(self, watcher):
         """
         Attach a progress watcher that drives progress-bar updates.
@@ -689,6 +747,11 @@ class ChannelPipelineOrchestrator(PipelineOrchestrator, abstract=True):
             channel = self.channel
         return super().get(asset_type, channel=channel, asset_sub_type=asset_sub_type, **kwargs)
 
+    def register_in_workspace(self) -> None:
+        """Check that channel is in the workspace, and add the assets of the pipeline it misses"""
+        check_sample_channels_in_workspace(self.sample_manager, [self.channel], required_by=self.__class__.__name__)
+        self.workspace.ensure_pipeline(self.pipeline, self.channel, sample_id=self.sample_manager.prefix)
+
     @property
     def config(self) -> Mapping[str, Any]:
         """
@@ -747,6 +810,16 @@ class IndependentChannelsPipelineOrchestrator(PipelineOrchestrator, abstract=Tru
         """The channels this processor processes, each on its own"""
         raise ClearMapNotImplementedError(f'{self.__class__.__name__} must define channels')
 
+    def register_in_workspace(self) -> None:
+        """Register each of channels (see register_channel_in_workspace)"""
+        for channel in self.channels:
+            self.register_channel_in_workspace(channel)
+
+    def register_channel_in_workspace(self, channel: str) -> None:
+        """Check that channel is in the workspace, and add the assets of the pipeline it misses"""
+        check_sample_channels_in_workspace(self.sample_manager, [channel], required_by=self.__class__.__name__)
+        self.workspace.ensure_pipeline(self.pipeline, channel, sample_id=self.sample_manager.prefix)
+
 
 class CompoundChannelPipelineOrchestrator(PipelineOrchestrator, abstract=True):
     """
@@ -783,6 +856,10 @@ class CompoundChannelPipelineOrchestrator(PipelineOrchestrator, abstract=True):
                                          f'pass the channel explicitly or set up the processor first.')
             channel = self.compound_channel
         return super().get(asset_type, channel=channel, asset_sub_type=asset_sub_type, **kwargs)
+
+    def register_in_workspace(self) -> None:
+        """Check the parts, create compound_channel and the assets of the pipeline if missing (see register_compound_channel)"""
+        register_compound_channel(self.sample_manager, self.pipeline, self.compound_channel)
 
 
 class PerCompoundConfigMixin:

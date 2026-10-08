@@ -20,7 +20,7 @@ from ClearMap.IO.source.backends.tif_backend import TifSource, parse_img_res
 from ClearMap.IO.assets_specs import TypeSpec
 
 from ClearMap.Utils.events import (ChannelRenamed, UiAtlasIdChanged,
-                                   UiAtlasStructureTreeIdChanged,  RegistrationStatusChanged)
+                                   UiAtlasStructureTreeIdChanged,  RegistrationStatusChanged, WorkspaceChannelsUpdated)
 from ClearMap.Utils.exceptions import (ClearMapAssetError, ParamsOrientationError, MissingRequirementException,
                                        NotAnOmeFile, MetadataError)
 from ClearMap.Utils.utilities import (runs_on_ui, check_stopped, DEFAULT_ORIENTATION,
@@ -103,6 +103,7 @@ class RegistrationProcessor(IndependentChannelsPipelineOrchestrator):
         self.setup_complete: bool = False
 
         self.subscribe(ChannelRenamed, self._on_channel_renamed)
+        self.subscribe(WorkspaceChannelsUpdated, self._on_workspace_channels_updated)
         self.subscribe(UiAtlasIdChanged, self.setup_atlases)
         self.subscribe(UiAtlasStructureTreeIdChanged, self.setup_atlases)
 
@@ -117,7 +118,8 @@ class RegistrationProcessor(IndependentChannelsPipelineOrchestrator):
         elif self.sample_manager.setup_complete:
             self.workspace = self.sample_manager.workspace
             self.setup_atlases()  # TODO: check if needed
-            self.add_pipeline()
+            self.register_in_workspace()
+            self.parametrize_assets()
             self.setup_complete = True
         else:
             self.setup_complete = False  # FIXME: finish later
@@ -167,6 +169,16 @@ class RegistrationProcessor(IndependentChannelsPipelineOrchestrator):
         parametrized = asset.specify({'moving_channel': moving_channel, 'fixed_channel': fixed_channel})
         self.workspace.asset_collections[channel][asset_type] = parametrized  # UPDATE WORKSPACE to cache
         return parametrized
+
+    def _on_workspace_channels_updated(self, event: WorkspaceChannelsUpdated) -> None:
+        """A sample channel joined the workspace (its config is now complete): add its registration assets"""
+        if not self.setup_complete or self.workspace is None:
+            return
+        joined = [channel for channel in event.after if channel not in event.before and channel in self.channels]
+        for channel in joined:
+            self.register_channel_in_workspace(channel)
+        if joined:
+            self.parametrize_assets()
 
     def _on_channel_renamed(self, event: ChannelRenamed):
         if event.old in self.annotators:
@@ -233,19 +245,6 @@ class RegistrationProcessor(IndependentChannelsPipelineOrchestrator):
                 except ClearMapAssetError:  # Check that align_with is None
                     warnings.warn(f'Could not parametrize {asset_type} for {channel=}')
                     continue
-
-    def add_pipeline(self):  # WARNING: hacky. Maybe add_pipeline_if_missing
-        if self.workspace is None:
-            return
-        for channel in self.config['channels']:
-            try:
-                self.get('aligned', channel=channel)
-            except KeyError:
-                if self.sample_manager.setup_complete and channel in self.workspace.asset_collections:
-                    self.workspace.add_pipeline(self.pipeline, channel_id=channel)
-                    self.parametrize_assets()
-                else:
-                    warnings.warn('Workspace not setup, cannot add registration pipeline')
 
     @property
     def channels(self) -> list[str]:

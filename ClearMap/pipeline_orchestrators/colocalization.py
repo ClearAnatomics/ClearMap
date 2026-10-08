@@ -15,7 +15,7 @@ from ClearMap.Analysis.Measurements import Voxelization as voxelization
 from ClearMap.Analysis.colocalization.channel import Channel as ColocalizationChannel
 
 from ClearMap.pipeline_orchestrators.generic_orchestrators import (CompoundChannelPipelineOrchestrator,
-                                                                    PerCompoundConfigMixin)
+                                                                    PerCompoundConfigMixin, register_compound_channel)
 from ClearMap.pipeline_orchestrators.sample_info_management import SampleManager
 from ClearMap.pipeline_orchestrators.registration_orchestrator import RegistrationProcessor
 
@@ -54,11 +54,17 @@ class ColocalizationProcessor(PerCompoundConfigMixin, CompoundChannelPipelineOrc
             self.sample_manager = sample_manager
             self.workspace = sample_manager.workspace
 
-            sample_id = self.sample_manager.sample_id
-            self.workspace.ensure_pipeline(self.pipeline, channel_id=self.compound_channel, sample_id=sample_id,
-                                           permute_channels=True, create_channel=True)
+            self.register_in_workspace()
 
             self.finalise_setup()
+
+    def register_in_workspace(self) -> None:
+        """
+        The pair in both orientations: the results of either are computed by this processor
+        (the first channel is picked in the colocalization tab, see ColocalizationTab.sort_channels)
+        """
+        for oriented_pair in (self.compound_channel, self.compound_channel[::-1]):
+            register_compound_channel(self.sample_manager, self.pipeline, oriented_pair)
 
     def finalise_setup(self):
         if self.setup_finalised:

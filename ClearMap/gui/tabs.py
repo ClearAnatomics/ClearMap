@@ -946,25 +946,16 @@ class RegistrationTab(PreProcessingTab['RegistrationProcessor']):
             warnings.warn('Workspace not setup, cannot add registration pipeline')
             return
 
-        if channel in workspace:
-            workspace.ensure_pipeline(self.worker.pipeline, channel_id=channel,
-                                      sample_id=sample_mgr.prefix, create_channel=False)
-        else:  # Try from sample config
-            try:
-                content_type = sample_mgr.data_type(channel)
-            except KeyError:
-                warnings.warn(f'Channel "{channel}" not found in sample config; '
-                              f'cannot create registration pipeline')
-                return
-
-            if not content_type or content_type == 'undefined':
-                warnings.warn(f'Channel "{channel}" has undefined data_type; '
-                              f'cannot create registration pipeline before data_type is set.')
-                return
-
-            # Create logical channel + registration assets in workspace
-            workspace.ensure_pipeline(self.worker.pipeline, channel_id=channel, sample_id=sample_mgr.prefix,
-                                      create_channel=True, channel_content_type=content_type)
+        if channel not in workspace:
+            # The sample config is the truth: let the SampleManager (the only one to add sample channels)
+            # bring the workspace in line with it. A no-op if it already is.
+            sample_mgr.sync_workspace()
+            workspace = sample_mgr.workspace
+        if channel not in workspace:  # Config incomplete (path or data type): the worker registers it when it joins
+            warnings.warn(f'Channel "{channel}" is not in the workspace yet (incomplete sample channels: '
+                          f'{sample_mgr.incomplete_channels}): its registration assets are added once it is.')
+            return
+        self.worker.register_channel_in_workspace(channel)
         self.worker.parametrize_assets()
 
     def resample_channel(self, channel: str) -> None:

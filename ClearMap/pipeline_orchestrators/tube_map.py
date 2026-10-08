@@ -347,6 +347,17 @@ class TubeMapOrchestrator(CompoundChannelPipelineOrchestrator, abstract=True):
         """
         return tuple(sample_manager.get_channels_by_pipeline(cls.pipeline, as_list=True))
 
+    def _follow_sample_compound_channel(self) -> None:
+        """
+        Set compound_channel from the sample (compound_channel_of) and register it. When it changed,
+        the registry entry of the previous one is dropped (only the entry: no file is deleted).
+        """
+        previous = self.compound_channel
+        self.compound_channel = self.compound_channel_of(self.sample_manager)
+        if previous and previous != self.compound_channel:
+            self.workspace.asset_collections.pop(previous, None)
+        self.register_in_workspace()
+
     @property
     def representative_channel(self) -> str:
         """
@@ -402,8 +413,7 @@ class BinaryVesselProcessor(TubeMapOrchestrator):
                 self.compound_channel = ()
                 return
 
-            previous_compound_channel = self.compound_channel
-            self.compound_channel = self.compound_channel_of(self.sample_manager)
+            self._follow_sample_compound_channel()
 
             self.assert_input_shapes_match()
 
@@ -416,14 +426,6 @@ class BinaryVesselProcessor(TubeMapOrchestrator):
                     self.workspace, channel=channel_name,
                     config_provider=lambda ch=channel_name: (
                         self.config.get('binarization', {}).get('single_channels', {}).get(ch, {})))
-
-            if previous_compound_channel and previous_compound_channel != self.compound_channel:
-                # Only the key we registered ourselves (tuple, as passed to ensure_pipeline) is dropped.
-                # Registry entry only, no file is deleted.
-                self.workspace.asset_collections.pop(previous_compound_channel, None)
-            sample_id = self.sample_manager.prefix
-            self.workspace.ensure_pipeline(self.pipeline, self.compound_channel, sample_id=sample_id,
-                                           channel_content_type='compound', create_channel=True)
 
     # ############################### INPUTS ###############################
 
@@ -823,12 +825,8 @@ class VesselGraphProcessor(TubeMapOrchestrator):
             self.workspace = self.sample_manager.workspace
             self.steps.workspace = self.workspace
 
-            self.compound_channel = self.compound_channel_of(self.sample_manager)
+            self._follow_sample_compound_channel()
             self.steps.channel = self.compound_channel
-
-            sample_id = self.sample_manager.prefix
-            self.workspace.ensure_pipeline(self.pipeline, self.compound_channel, channel_content_type='compound',
-                                           sample_id=sample_id, create_channel=True)
 
     def __get_graph(self, step):
         if step not in self.__graphs:
