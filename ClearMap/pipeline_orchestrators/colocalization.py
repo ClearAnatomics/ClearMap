@@ -21,6 +21,7 @@ from ClearMap.pipeline_orchestrators.registration_orchestrator import Registrati
 
 class ColocalizationProcessor(CompoundChannelPipelineOrchestrator):
     colocalization_channels: dict[ColocalizationChannel]
+    pipeline = 'Colocalization'
     config_name = 'colocalization'
 
     def __init__(self, sample_manager: Optional[SampleManager] = None,
@@ -54,7 +55,7 @@ class ColocalizationProcessor(CompoundChannelPipelineOrchestrator):
             self.workspace = sample_manager.workspace
 
             sample_id = self.sample_manager.sample_id
-            self.workspace.ensure_pipeline('Colocalization', channel_id=self.channels, sample_id=sample_id,
+            self.workspace.ensure_pipeline(self.pipeline, channel_id=self.channels, sample_id=sample_id,
                                            permute_channels=True, create_channel=True)
 
             self.finalise_setup()

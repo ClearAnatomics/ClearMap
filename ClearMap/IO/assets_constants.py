@@ -72,6 +72,8 @@ CONTENT_TYPE_TO_PIPELINE = {
     'myelin': 'TractMap'
 }
 DATA_CONTENT_TYPES = list(CONTENT_TYPE_TO_PIPELINE.keys())
+# The pipeline names: those of the content types, and stitching, which applies to any tiled channel
+PIPELINE_NAMES = frozenset({*(p for p in CONTENT_TYPE_TO_PIPELINE.values() if p is not None), 'stitching'})
 
 # TODO: add link between labels and content types
 #    e.g.

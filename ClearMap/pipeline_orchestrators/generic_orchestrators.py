@@ -74,8 +74,9 @@ from abc import ABC, abstractmethod
 from concurrent.futures.process import BrokenProcessPool
 from pathlib import Path
 from types import MappingProxyType
-from typing import Mapping, Any, Optional, List, Final, Callable, TYPE_CHECKING, Sequence
+from typing import Mapping, Any, Optional, List, Final, Callable, TYPE_CHECKING, Sequence, ClassVar
 
+from ClearMap.IO.assets_constants import PIPELINE_NAMES
 from ClearMap.IO.workspace2 import Workspace2
 from ClearMap.IO.workspace_asset import Asset
 from ClearMap.Utils.event_bus import BusSubscriberMixin
@@ -489,7 +490,22 @@ class PipelineOrchestrator(OrchestratorBase):
         The progress watcher to monitor the progress of the processing.
     workspace: Workspace or None
         The workspace to manage the assets.
+    pipeline: str
+        Class attribute: the pipeline this orchestrator is (a step of), one of PIPELINE_NAMES.
+        A pipeline can have several orchestrators (e.g. TubeMap: BinaryVesselProcessor and
+        VesselGraphProcessor), an orchestrator belongs to one pipeline. Compulsory for concrete
+        orchestrators (checked when the class is defined); abstract bases declare abstract=True.
     """
+    pipeline: ClassVar[str]
+
+    def __init_subclass__(cls, *, abstract: bool = False, **kwargs):
+        super().__init_subclass__(**kwargs)
+        if abstract:
+            return
+        pipeline = getattr(cls, 'pipeline', None)
+        if pipeline not in PIPELINE_NAMES:
+            raise TypeError(f'{cls.__name__} must declare its pipeline as a class attribute, '
+                            f'one of {sorted(PIPELINE_NAMES)}; got {pipeline!r}.')
 
     def __init__(self, coordinator: "ConfigCoordinator"):
         super().__init__(coordinator)
@@ -647,7 +663,7 @@ class _CurrentChannelSentinel:
 CURRENT_CHANNEL: Final = _CurrentChannelSentinel()
 
 
-class ChannelPipelineOrchestrator(PipelineOrchestrator):
+class ChannelPipelineOrchestrator(PipelineOrchestrator, abstract=True):
     """
     Tab processor that is processing a single channel.
 
@@ -707,7 +723,7 @@ class ChannelPipelineOrchestrator(PipelineOrchestrator):
             origin=origin or infer_origin_from_caller())
 
 
-class CompoundChannelPipelineOrchestrator(PipelineOrchestrator):
+class CompoundChannelPipelineOrchestrator(PipelineOrchestrator, abstract=True):
     """
     Tab processor that is processing a compound channels (made of several source channels)
 

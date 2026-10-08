@@ -946,7 +946,7 @@ class RegistrationTab(PreProcessingTab['RegistrationProcessor']):
             return
 
         if channel in workspace:
-            workspace.ensure_pipeline('registration', channel_id=channel,
+            workspace.ensure_pipeline(self.worker.pipeline, channel_id=channel,
                                       sample_id=sample_mgr.prefix, create_channel=False)
         else:  # Try from sample config
             try:
@@ -962,7 +962,7 @@ class RegistrationTab(PreProcessingTab['RegistrationProcessor']):
                 return
 
             # Create logical channel + registration assets in workspace
-            workspace.ensure_pipeline('registration', channel_id=channel, sample_id=sample_mgr.prefix,
+            workspace.ensure_pipeline(self.worker.pipeline, channel_id=channel, sample_id=sample_mgr.prefix,
                                       create_channel=True, channel_content_type=content_type)
         self.worker.parametrize_assets()
 

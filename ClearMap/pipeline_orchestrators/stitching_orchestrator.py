@@ -35,6 +35,7 @@ class StitchingProcessor(PipelineOrchestrator):
     Handle image stitching operations.
     Manage stitching configurations and processes.
     """
+    pipeline = 'stitching'
     config_name = 'stitching'
     def __init__(self, sample_manager: SampleManager, cfg_coordinator: ConfigCoordinator):
         super().__init__(cfg_coordinator)

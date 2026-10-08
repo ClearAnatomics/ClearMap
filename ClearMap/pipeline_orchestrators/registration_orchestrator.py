@@ -85,6 +85,7 @@ class RegistrationProcessor(PipelineOrchestrator):
     """
     _PARAMETRIZED_ASSET_TYPES = frozenset({'aligned', 'fixed_landmarks', 'moving_landmarks'})
 
+    pipeline = 'registration'
     config_name = 'registration'
 
     def __init__(self, sample_manager: SampleManager, cfg_coordinator: ConfigCoordinator):
@@ -241,7 +242,7 @@ class RegistrationProcessor(PipelineOrchestrator):
                 self.get('aligned', channel=channel)
             except KeyError:
                 if self.sample_manager.setup_complete and channel in self.workspace.asset_collections:
-                    self.workspace.add_pipeline('registration', channel_id=channel)
+                    self.workspace.add_pipeline(self.pipeline, channel_id=channel)
                     self.parametrize_assets()
                 else:
                     warnings.warn('Workspace not setup, cannot add registration pipeline')

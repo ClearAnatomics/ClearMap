@@ -43,6 +43,7 @@ def label_points_wrapper(annotator, coords):
 
 class TractMapProcessor(ChannelPipelineOrchestrator):
 
+    pipeline = 'TractMap'
     config_name = 'tract_map'
 
     block_re = ('Processing block', re.compile(r'.*?Processing block \d+/\d+.*?\selapsed time:\s\d+:\d+:\d+\.\d+'))

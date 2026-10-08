@@ -130,6 +130,7 @@ USE_BINARY_POINTS_FILE = not platform.system().lower().startswith('darwin')
 
 class CellDetector(ChannelPipelineOrchestrator):
 
+    pipeline = 'CellMap'
     config_name = 'cell_map'
 
     def __init__(self, sample_manager: SampleManager = None, config_coordinator: ConfigCoordinator = None,

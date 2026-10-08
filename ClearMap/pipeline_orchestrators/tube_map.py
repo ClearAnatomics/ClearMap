@@ -332,6 +332,7 @@ class BinaryVesselProcessorSteps(ProcessorSteps):
 
 
 class BinaryVesselProcessor(PipelineOrchestrator):
+    pipeline = 'TubeMap'
     config_name = 'vasculature'
 
     def __init__(self, sample_manager: Optional[SampleManager] = None,
@@ -397,7 +398,7 @@ class BinaryVesselProcessor(PipelineOrchestrator):
                 self.workspace.asset_collections.pop(self._compound_channel, None)
             self._compound_channel = compound_channel
             sample_id = self.sample_manager.prefix
-            self.workspace.ensure_pipeline('TubeMap', compound_channel, sample_id=sample_id,
+            self.workspace.ensure_pipeline(self.pipeline, compound_channel, sample_id=sample_id,
                                            channel_content_type='compound', create_channel=True)
 
     # ############################### INPUTS ###############################
@@ -741,6 +742,7 @@ class VesselGraphProcessor(PipelineOrchestrator):
         * radii
         * distance_to_surface
     """
+    pipeline = 'TubeMap'
     config_name = 'vasculature'
 
     # Legacy voxel-space thresholds — kept for old graphs without spacing/radius_units
@@ -805,7 +807,7 @@ class VesselGraphProcessor(PipelineOrchestrator):
             self.steps.channel = self.parent_channels
 
             sample_id = self.sample_manager.prefix
-            self.workspace.ensure_pipeline('TubeMap', self.parent_channels, channel_content_type='compound',
+            self.workspace.ensure_pipeline(self.pipeline, self.parent_channels, channel_content_type='compound',
                                            sample_id=sample_id, create_channel=True)
 
     def __get_graph(self, step):
