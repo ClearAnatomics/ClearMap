@@ -1027,7 +1027,6 @@ class AtlasParams(UiParameter):
         self.atlas_info = ATLAS_NAMES_MAP
         self.cfg_subtree = ['registration', 'atlas']  # REFACTOR: section name from config_handler
         super().__init__(tab, event_bus=event_bus, get_view=get_view, apply_patch=apply_patch)
-        self.update_atlas_resolution()  # WARNING: after connect
 
     def build_params_dict(self):
         return {
@@ -1046,12 +1045,25 @@ class AtlasParams(UiParameter):
     def connect(self):
         self.tab.atlasResolutionTriplet.valueChangedConnect(self.handle_atlas_resolution_changed)  # TODO: replace with label
 
+    def cfg_to_ui(self):
+        super().cfg_to_ui()
+        # The atlas combo box is set silently from the config:
+        #   show the resolution of the atlas it now holds not the combo box default
+        self.update_atlas_resolution()
+
+    @property
+    def _atlas_entry(self) -> dict:
+        """The ATLAS_NAMES_MAP entry of the atlas selected in the combo box"""
+        if self.atlas_id not in self.atlas_info:
+            raise ClearMapValueError(f'Unknown atlas "{self.atlas_id}", known atlases: {list(self.atlas_info)}')
+        return self.atlas_info[self.atlas_id]
+
     def update_atlas_resolution(self):
-        self.tab.atlasResolutionTriplet.setValue([self.atlas_info[self.atlas_id]['resolution']] * 3)
+        self.tab.atlasResolutionTriplet.setValue([self._atlas_entry['resolution']] * 3)
 
     @property
     def atlas_base_name(self):
-        return self.atlas_info[self.atlas_id]['base_name']
+        return self._atlas_entry['base_name']
 
     @param_handler  # FIXME: check
     def handle_atlas_resolution_changed(self, state):
