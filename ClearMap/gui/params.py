@@ -1799,7 +1799,17 @@ class GraphFilterParams(UiParameter):  # FIXME: do we really pass the graph as a
         self.tab.vertexFilterRadioButton.toggled.connect(self.update_properties)
         self.tab.graphFilterPropertyNameComboBox.currentTextChanged.connect(self.handle_property_name_changed)
 
-    def update_properties(self):
+    def update_properties(self, _=None):
+        """
+        Fill the property combo box with the properties of the selected filter type (vertex or edge),
+        then reset the value widget to match the first one.
+
+        Parameters
+        ----------
+        _ : bool, optional
+            The checked state passed by ``toggled(bool)``. Intentionally discarded: the filter type
+            is read from the radio button. Not passed when called directly.
+        """
         if self.filter_type == 'vertex':
             properties = self.graph._base.vertex_properties
         else:
@@ -1813,9 +1823,11 @@ class GraphFilterParams(UiParameter):  # FIXME: do we really pass the graph as a
             else:
                 dtype_names.append(dtype.__name__)
 
-        self.tab.graphFilterPropertyNameComboBox.clear()
-        for prop_name, dtype in zip(properties_names + ['degrees'], dtype_names + ['int']):
-            self.tab.graphFilterPropertyNameComboBox.addItem(prop_name, userData=dtype)
+        combo_box = self.tab.graphFilterPropertyNameComboBox
+        with QSignalBlocker(combo_box):  # one handler call at the end, not one per item (and none on an empty box)
+            combo_box.clear()
+            for prop_name, dtype in zip(properties_names + ['degrees'], dtype_names + ['int']):
+                combo_box.addItem(prop_name, userData=dtype)
 
         self.handle_property_name_changed()  # Set default value for the first property
 
@@ -1877,7 +1889,17 @@ class GraphFilterParams(UiParameter):  # FIXME: do we really pass the graph as a
         return 'and' if and_button.isChecked() else 'or'
 
     @param_handler  # FIXME: check
-    def handle_property_name_changed(self):
+    def handle_property_name_changed(self, _=None):
+        """
+        Replace the value widget by one suited to the type of the selected property
+        (check box, range of numbers or text) holding the default value of this type.
+
+        Parameters
+        ----------
+        _ : str, optional
+            The property name passed by ``currentTextChanged(str)``. Intentionally discarded:
+            the property and its type are read from the combo box. Not passed when called directly.
+        """
         property_dtype = self.current_dtype
         value = self.get_default_property_value()
         controls_layout = self.tab.filterControlsGridLayout
