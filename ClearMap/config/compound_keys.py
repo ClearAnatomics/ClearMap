@@ -33,7 +33,7 @@ from __future__ import annotations
 
 import itertools
 import re
-from typing import Iterable, Mapping, Any, Callable, Optional
+from typing import Iterable, Mapping, Any, Callable, Optional, Sequence
 
 from ClearMap.Utils.exceptions import ClearMapValueError
 
@@ -187,6 +187,11 @@ class CompoundKey:
     # ── dunder ───────────────────────────────────────────────────────────
 
     def __str__(self) -> str:
+        """
+        The key string, e.g. a config key: the parts in their order, which is sorted unless oriented.
+        For a compound channel, the same order as its workspace id (compound_channel_key), hence
+        as its asset file names (channel_file_name_token).
+        """
         return self._sep.join(self._parts)
 
     def __repr__(self) -> str:
@@ -753,6 +758,8 @@ def compound_channel_parts(channel: str | tuple[str, ...] | list[str], *,
                            sep: str = DEFAULT_PAIR_SEP) -> tuple[str, ...] | None:
     """
     The component channels of a compound channel key, or None for a simple channel.
+    Parses (and validates) a key as given, in its order: compound_channel_key decides the order of
+    the workspace id, channel_file_name_token names a channel in asset file names.
 
     Both representations in use are accepted: a tuple/list of channel names (workspace ids)
     and the ``'a-b'`` string form (config and GUI keys). A tuple is compound whatever its
@@ -792,6 +799,36 @@ def compound_channel_parts(channel: str | tuple[str, ...] | list[str], *,
     if malformed:
         raise ClearMapValueError(f'Malformed channel name(s) {malformed!r} in channel key {channel!r}')
     return parts if compound else None
+
+
+def compound_channel_key(parts: Sequence[str], *, oriented: bool) -> tuple[str, ...]:
+    """
+    The workspace id of the compound channel made of parts: the tuple of the parts, in the order of
+    CompoundKey(*parts, oriented=oriented), i.e. as given if oriented (the order carries meaning,
+    e.g. the colocalization of a in b), sorted otherwise (a set of parts has one id, whatever the
+    order it is listed in, e.g. by the sample config). This order is the order of its asset file
+    names (channel_file_name_token) and of its config key (str(CompoundKey)).
+
+    Raises
+    ------
+    ValueError
+        If a part is malformed (see compound_channel_parts) or there are none.
+    """
+    parts = compound_channel_parts(tuple(parts))
+    if len(parts) == 1:  # One part, one order (CompoundKey needs 2)
+        return parts
+    return CompoundKey(*parts, oriented=oriented).as_tuple()
+
+
+def channel_file_name_token(channel: str | tuple[str, ...]) -> str:
+    """
+    How a channel appears in asset file names: a simple channel as is, a compound channel as its
+    parts joined with DEFAULT_PAIR_SEP, in the order of its workspace id (decided by
+    compound_channel_key, not here). The inverse is compound_channel_parts. A 1-tuple and its
+    single channel share their token, and so their files (TubeMap with one vessel channel).
+    """
+    parts = compound_channel_parts(channel)
+    return channel if parts is None else DEFAULT_PAIR_SEP.join(parts)
 
 
 def is_compound_channel(channel: str | tuple[str, ...] | list[str], *, sep: str = DEFAULT_PAIR_SEP) -> bool:

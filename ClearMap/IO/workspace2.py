@@ -85,7 +85,9 @@ See also
 """
 from __future__ import annotations
 
+import itertools
 import os
+import re
 import warnings
 from copy import deepcopy
 from pathlib import Path
@@ -96,7 +98,7 @@ import numpy as np
 from ClearMap.IO.assets_constants import (CONTENT_TYPE_TO_PIPELINE, CHANNELS_ASSETS_TYPES_CONFIG, RESOURCE_TYPE_TO_FOLDER,
                                           PIPELINE_NAMES)
 from ClearMap.IO.assets_specs import ChannelSpec, TypeSpec, StateManager, ChannelId
-from ClearMap.config.compound_keys import compound_channel_parts
+from ClearMap.config.compound_keys import compound_channel_parts, channel_file_name_token
 from ClearMap.IO.workspace_asset import Asset, AssetCollection
 from ClearMap.Utils.exceptions import (ClearMapWorkspaceError, ClearMapAssetError, MissingChannelError,
                                        MissingAssetError, ClearMapValueError)
@@ -383,7 +385,7 @@ class Workspace2:  # REFACTOR: subclass dict
                 if channel_spec.is_simple_channel():  # Simple channels -> direct removal
                     self.asset_collections.pop(channel)
                 elif channel_spec.is_compound():  # Compound channels -> check components
-                    channels = channel.split('-') if isinstance(channel, str) else channel
+                    channels = compound_channel_parts(channel)
                     has_obsolete_components = any([c not in desired_channels for c in channels])
                     if has_obsolete_components:
                         self.asset_collections.pop(channel)
@@ -621,6 +623,83 @@ class Workspace2:  # REFACTOR: subclass dict
                                               f'If you want to implicitly create it, set create_channel=True.')
                 self.add_pipeline(pipeline_name, inv, sample_id=sample_id, missing_only=True)
 
+
+    def adopt_compound_order(self, channel: tuple[str, ...]) -> list[tuple[Path, Path]]:
+        """
+        Make channel the only order of its parts in the workspace, for a compound channel whose parts
+        are an unordered set (see compound_keys.compound_channel_key): drop the registry entries of the
+        other orders (no file is deleted), and rename the files named in another order to the name of
+        channel (e.g. the TubeMap files named in the order of the sample config, before the parts were
+        sorted).
+
+        The files are renamed only if channel has none and exactly one other order has some: these are
+        then unambiguously the files of this compound. If channel has files, those of other orders are
+        left as they are, with a warning.
+
+        Parameters
+        ----------
+        channel: tuple[str, ...]
+            The registered compound channel.
+
+        Returns
+        -------
+        list[tuple[Path, Path]]
+            The (old, new) paths of the renamed files.
+
+        Raises
+        ------
+        ClearMapWorkspaceError
+            If channel has no files and several other orders have some, or if a new path exists.
+        """
+        channel = tuple(channel)
+        other_orders = [order for order in itertools.permutations(channel) if order != channel]
+        for order in other_orders:
+            self.asset_collections.pop(order, None)
+
+        directories = {Path(self.directory)}
+        for asset in self[channel].values():
+            directories.add(Path(self.directory) / asset.type_spec.directory)  # an absolute directory stays itself
+        orders_with_files = {order: files for order in other_orders
+                             if (files := self._files_named_after(order, directories))}
+        if not orders_with_files:
+            return []
+        if self._files_named_after(channel, directories):
+            warnings.warn(f'The compound channel {channel} has files, which are used. The files of the other orders '
+                          f'of its parts are left as they are (not used): '
+                          f'{sorted(path.name for files in orders_with_files.values() for path, _ in files)}.')
+            return []
+        if len(orders_with_files) > 1:
+            raise ClearMapWorkspaceError(f'The compound channel {channel} has no files, but several other orders of '
+                                         f'its parts have some: {sorted(orders_with_files)}. Cannot tell which ones '
+                                         f'to rename to the name of {channel}: please keep the files of only one.')
+        (old_order, files), = orders_with_files.items()
+        new_token = channel_file_name_token(channel)
+        renamed = []
+        for path, match in files:
+            new_path = path.with_name(f'{match["lead"]}{new_token}{match["rest"]}')
+            if new_path.exists():
+                raise ClearMapWorkspaceError(f'Cannot rename {path} to {new_path}: the target exists.')
+            path.rename(new_path)
+            renamed.append((path, new_path))
+        warnings.warn(f'Renamed the files of the compound channel {old_order} to the order of {channel}:\n' +
+                      '\n'.join(f'    {old.name} -> {new.name}' for old, new in renamed))
+        return renamed
+
+    def _files_named_after(self, channel: tuple[str, ...], directories) -> list[tuple[Path, re.Match]]:
+        """
+        The files (and folders) of directories whose name is an asset name of channel:
+        ``[<status>_][<sample_id>_]<channel token>_<rest>``
+        """
+        sample_prefix = f'{self.sample_id}_' if self.sample_id else ''
+        pattern = re.compile(rf'(?P<lead>(?:[A-Za-z0-9]+_)?{re.escape(sample_prefix)})'
+                             rf'{re.escape(channel_file_name_token(channel))}(?P<rest>_.+)')
+        files = []
+        for directory in directories:
+            if directory.is_dir():
+                for path in sorted(directory.iterdir()):
+                    if match := pattern.fullmatch(path.name):
+                        files.append((path, match))
+        return files
 
     def _add_channel(self, channel_spec, sample_id=''):
         self.asset_collections[channel_spec.name] = AssetCollection(self.directory, sample_id, channel_spec)

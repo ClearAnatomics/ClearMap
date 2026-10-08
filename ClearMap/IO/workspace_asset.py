@@ -114,6 +114,7 @@ from ClearMap.IO import conversion, dispatch, io_ops
 from ClearMap.IO import FileUtils as file_utils
 from ClearMap.IO.assets_constants import CONTENT_TYPE_TO_PIPELINE
 from ClearMap.IO.assets_specs import TypeSpec, ChannelSpec, StateManager
+from ClearMap.config.compound_keys import channel_file_name_token
 from ClearMap.IO.source.backends import file_list_backend, registry
 from ClearMap.Utils.tag_expression import Expression
 from ClearMap.Utils.exceptions import ClearMapAssetError, AssetNotFoundError
@@ -384,7 +385,7 @@ class Asset:
             name = ''
             for part in self.name_parts:
                 if isinstance(part, (list, tuple)):  # channel could be a tuple for compound assets
-                    part = '-'.join(part)
+                    part = channel_file_name_token(part)
                 if Expression(part).tags:
                     part = Expression(part)  # FIXME: substitute None width tags
                     values = {}

@@ -96,6 +96,7 @@ from ClearMap.IO.source.Source import Source
 from ClearMap.IO.workspace2 import Workspace2
 from ClearMap.IO.workspace_asset import Asset
 
+from ClearMap.config.compound_keys import compound_channel_key
 from ClearMap.config.config_coordinator import ConfigCoordinator
 
 from ClearMap.pipeline_orchestrators.generic_orchestrators import CompoundChannelPipelineOrchestrator, ProcessorSteps
@@ -343,9 +344,11 @@ class TubeMapOrchestrator(CompoundChannelPipelineOrchestrator, abstract=True):
     def compound_channel_of(cls, sample_manager: SampleManager) -> tuple[str, ...]:
         """
         The TubeMap compound channel of the sample: its channels whose data type belongs to the
-        pipeline. The single source of the channels the TubeMap processors combine.
+        pipeline, sorted (compound_channel_key: they are combined, their order does not matter).
+        The single source of the channels the TubeMap processors combine.
         """
-        return tuple(sample_manager.get_channels_by_pipeline(cls.pipeline, as_list=True))
+        channels = sample_manager.get_channels_by_pipeline(cls.pipeline, as_list=True)
+        return compound_channel_key(channels, oriented=cls.oriented) if channels else ()
 
     def _follow_sample_compound_channel(self) -> None:
         """
@@ -361,12 +364,13 @@ class TubeMapOrchestrator(CompoundChannelPipelineOrchestrator, abstract=True):
     @property
     def representative_channel(self) -> str:
         """
-        One part of compound_channel, to read what all the parts share: they are acquired together,
-        hence have the same shape, resolution, registration (transforms, atlas, annotator).
+        The part of compound_channel read for what all the parts share, as they are imaged together:
+        shape, resolution, registration (transforms, atlas, annotator). The all-vessels channel (data
+        type 'vessels'), the one part every TubeMap compound has; not the first part, which is just the
+        first in alphabetical order (see compound_channel_of).
         """
-        if not self.compound_channel:
-            raise ClearMapValueError(f'{self.__class__.__name__}.compound_channel is not set')
-        return self.compound_channel[0]
+        return self.sample_manager.get_channels_by_type(channel_type='vessels', missing_action='raise',
+                                                        multiple_found_action='raise')
 
 
 class BinaryVesselProcessor(TubeMapOrchestrator):

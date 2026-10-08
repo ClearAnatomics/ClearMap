@@ -281,7 +281,7 @@ class DensityGroupAnalysisOrchestrator(GroupOrchestratorBase):
 
         vasc_channels = sample_mgr.get_channels_by_pipeline('TubeMap', as_list=True)
         if vasc_channels:
-            compound = tuple(vasc_channels)
+            compound = register_compound_channel(sample_mgr, 'TubeMap', vasc_channels)  # its workspace id
             asset = self._density(sample_mgr, compound, density_suffix, pipeline='TubeMap', default=None)
             if asset is not None and asset.exists:
                     channels.append(compound)

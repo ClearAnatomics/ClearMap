@@ -20,7 +20,7 @@ import warnings
 
 from ClearMap.IO.assets_constants import (EXTENSIONS, COMPRESSION_ALGORITHMS, CHECKSUM_ALGORITHMS,
                                           RESOURCE_TYPE_TO_FOLDER, DATA_CONTENT_TYPES)
-from ClearMap.config.compound_keys import is_compound_channel
+from ClearMap.config.compound_keys import is_compound_channel, compound_channel_parts
 from ClearMap.Utils.tag_expression import Expression
 from ClearMap.Utils.utilities import validate_arg
 
@@ -318,20 +318,14 @@ class ChannelSpec:
             channel = tuple(channel)
             warnings.warn('Passing a list as channel is deprecated and will be removed in a future version.'
                           ' Use a tuple instead.', DeprecationWarning, stacklevel=2)
-        is_tuple = isinstance(channel, tuple)
-
-        # Enforce consistency between structure and content_type
-        if not is_tuple and content_type == 'compound':
-            if '-' in channel:
-                channel = tuple(channel.split('-'))
-            else:
-                raise ValueError(
-                    f"content_type='compound' requires a compound ChannelId (tuple), "
-                    f"got atomic {channel!r}"
-                )
-
-        if isinstance(channel, str) and '-' in channel:
-            channel = tuple(channel.split('-'))
+        parts = compound_channel_parts(channel)  # None for a simple channel; validates the names
+        if parts is not None:
+            channel = parts  # A compound channel is always identified by its tuple, never by 'a-b'
+        elif content_type == 'compound':  # Enforce consistency between structure and content_type
+            raise ValueError(
+                f"content_type='compound' requires a compound ChannelId (tuple), "
+                f"got atomic {channel!r}"
+            )
 
         if channel not in ChannelSpec.channel_names:
             ChannelSpec.channel_names.append(channel)

@@ -86,7 +86,7 @@ from typing import Mapping, Any, Optional, Final, Callable, TYPE_CHECKING, Seque
 from ClearMap.IO.assets_constants import PIPELINE_NAMES, compound_is_oriented
 from ClearMap.IO.workspace2 import Workspace2
 from ClearMap.IO.workspace_asset import Asset
-from ClearMap.config.compound_keys import CompoundKey
+from ClearMap.config.compound_keys import CompoundKey, compound_channel_key
 from ClearMap.Utils.event_bus import BusSubscriberMixin
 from ClearMap.Utils.exceptions import ClearMapRuntimeError, ClearMapValueError, ClearMapConfigError, \
     ClearMapNotImplementedError, MissingChannelError
@@ -126,7 +126,13 @@ def register_compound_channel(sample_manager: "SampleManager", pipeline: str,
     """
     Register the compound channel made of parts in the workspace of the sample, for pipeline:
     check its parts (sample channels, see check_sample_channels_in_workspace), and create the compound
-    channel, and its pipeline assets, if missing.
+    channel, and its pipeline assets, if missing. Idempotent: a later call for the same parts only adds
+    the pipeline assets that are still missing.
+
+    Its workspace id is compound_channel_key(parts, oriented=compound_is_oriented(pipeline)): the
+    parts in their order if oriented, sorted otherwise. For an unoriented compound, the files named
+    in another order of the parts are renamed (Workspace2.adopt_compound_order: before the parts were
+    sorted, they were in the order of the sample config).
 
     The function behind CompoundChannelPipelineOrchestrator.register_in_workspace, for the code
     that reads the results of a pipeline without running its processors (e.g. group analyses).
@@ -136,11 +142,16 @@ def register_compound_channel(sample_manager: "SampleManager", pipeline: str,
     tuple[str, ...]
         The workspace id of the compound channel.
     """
-    compound_channel = tuple(parts)
+    oriented = compound_is_oriented(pipeline)
+    compound_channel = compound_channel_key(parts, oriented=oriented)
     check_sample_channels_in_workspace(sample_manager, compound_channel,
                                        required_by=f'The {pipeline} compound channel {compound_channel}')
-    sample_manager.workspace.ensure_pipeline(pipeline, compound_channel, sample_id=sample_manager.prefix,
-                                             channel_content_type='compound', create_channel=True)
+    workspace = sample_manager.workspace
+    first_registration = compound_channel not in workspace
+    workspace.ensure_pipeline(pipeline, compound_channel, sample_id=sample_manager.prefix,
+                              channel_content_type='compound', create_channel=True)
+    if first_registration and not oriented:  # Later calls find the order already adopted: no directory scan
+        workspace.adopt_compound_order(compound_channel)
     return compound_channel
 
 
@@ -832,8 +843,9 @@ class CompoundChannelPipelineOrchestrator(PipelineOrchestrator, abstract=True):
     Attributes
     ----------
     compound_channel: tuple[str, ...]
-        The parts. This tuple is the workspace id of the compound channel, and the channel
-        of get when none is given.
+        The parts, in the order of compound_channel_key (sorted unless oriented), whatever the order
+        they are set in. This tuple is the workspace id of the compound channel, and the channel of
+        get when none is given.
     oriented: bool
         Class attribute, derived from the pipeline (assets_constants.compound_is_oriented):
         whether the order of the parts carries meaning.
@@ -847,7 +859,15 @@ class CompoundChannelPipelineOrchestrator(PipelineOrchestrator, abstract=True):
 
     def __init__(self, coordinator: "ConfigCoordinator"):
         super().__init__(coordinator)
-        self.compound_channel: tuple[str, ...] = ()
+        self._compound_channel: tuple[str, ...] = ()
+
+    @property
+    def compound_channel(self) -> tuple[str, ...]:
+        return self._compound_channel
+
+    @compound_channel.setter
+    def compound_channel(self, parts: Sequence[str]) -> None:
+        self._compound_channel = compound_channel_key(parts, oriented=self.oriented) if parts else ()
 
     def get(self, asset_type, channel=CURRENT_CHANNEL, asset_sub_type=None, **kwargs):
         if channel is CURRENT_CHANNEL:
