@@ -594,8 +594,8 @@ class BinaryVesselProcessor(TubeMapOrchestrator):
             The channel to plot
         """
         from ClearMap.Visualization.Qt import Plot3d as q_p3d
-        images = [(self.get_path('stitched', asset_sub_type=channel)),
-                  (self.get_path('binary', asset_sub_type=channel))]
+        images = [self.get_path('stitched', channel=channel),
+                  self.get_path('binary', channel=channel)]  # The binarize sink
         dvs = q_p3d.plot(images, title=[img.name for img in images],
                          arrange=arrange, lut=self.machine_config['default_lut'], parent=parent)
         return dvs

@@ -362,8 +362,6 @@ class SampleManager(OrchestratorBase):
         names = inputs.channel_names
         self.workspace.prune_missing_channels(names)
 
-        self.workspace.ensure_default_channel(names, names[0] if names else None)
-
         print(self.workspace.info())
 
         self.save_workspace()
@@ -406,12 +404,7 @@ class SampleManager(OrchestratorBase):
                 self.workspace = None
 
         if self.workspace is None:
-            if inputs:
-                first_channel = inputs.channel_names[0] if inputs.channels else None
-                sample_id = inputs.sample_id
-            else:
-                first_channel = self.channels[0] if self.channels else None
-                sample_id = self.prefix
+            sample_id = inputs.sample_id if inputs else self.prefix
             workspace_cfg_path = self.cfg_coordinator.workspace_config_path
             if workspace_cfg_path.exists():
                 if workspace_cfg_path.suffix in {'.yml', '.yaml'}:
@@ -425,7 +418,6 @@ class SampleManager(OrchestratorBase):
             else:
                 self.workspace = Workspace2(current_base,
                                             sample_id=sample_id,
-                                            default_channel=first_channel,
                                             resource_type_to_folder=self.resource_type_to_folder)
             self.resource_type_to_folder = self.workspace.resource_type_to_folder
 
@@ -939,7 +931,7 @@ class SampleManager(OrchestratorBase):
 
     def asset_names_to_assets(self, asset_names: List[str], channel: Optional[str] = None,
                               sample_id: Optional[str] = None) -> List[Asset]:
-        return [self.workspace.get(asset_name) for asset_name in asset_names]
+        return [self.workspace.get(asset_name, channel=channel, sample_id=sample_id) for asset_name in asset_names]
 
     @staticmethod
     def compress(assets: List[Asset], format: Optional[str] = None):

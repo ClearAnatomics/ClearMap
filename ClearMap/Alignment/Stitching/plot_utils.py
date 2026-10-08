@@ -10,16 +10,16 @@ import ClearMap.Alignment.Stitching.stitching_rigid as stitching_rigid
 
 
 
-def plot_all_layouts(folder):
+def plot_all_layouts(folder, channel):
     orchestrators = init_sample_manager_and_processors(folder)
     sample_manager = orchestrators['sample_manager']
     stitcher = orchestrators['stitcher']
     for postfix in ('aligned_axis', 'aligned', 'placed'):
-        layout = stitching_rigid.load_layout(sample_manager.get_path('layout', asset_sub_type=postfix))
+        layout = stitching_rigid.load_layout(sample_manager.get_path('layout', channel=channel, asset_sub_type=postfix))
         overlay = stitcher.overlay_layout_plane(layout)
         plt.imshow(overlay)
         plt.show()
 
 
 if __name__ == '__main__':
-    plot_all_layouts('/data/sample_folder')
+    plot_all_layouts('/data/sample_folder', 'cfos')

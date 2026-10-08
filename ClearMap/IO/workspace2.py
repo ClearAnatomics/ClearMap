@@ -160,14 +160,10 @@ class Workspace2:  # REFACTOR: subclass dict
     sample_id: str
         The id of the sample. This must be unique for each sample
         within an experiment.
-    default_channel: int
-        The default channel to use when no channel is specified.
-    current_channel: int
-        The channel currently in use.
     status_manager: ClearMap.IO.assets_specs.StateManager
         A context manager to handle the workspace state (e.g. debug mode).
     """
-    def __init__(self, directory: str | Path, default_channel: str | None = None, sample_id: str | None = None,
+    def __init__(self, directory: str | Path, *, sample_id: str | None = None,
                  resource_type_to_folder: dict | None = None, assets_types_config: dict | None = None):
         self._directory = directory
         self.sample_id = sample_id
@@ -182,13 +178,6 @@ class Workspace2:  # REFACTOR: subclass dict
         self.asset_collections = {
             None: AssetCollection(self.directory, self.sample_id, None)  # Global assets
         }
-        if default_channel is not None:
-            warnings.warn('The default_channel argument is potentially dangerous.'
-                          'Please use with caution. For a safer way, use the channel argument'
-                          ' in the `get` method instead.')
-
-            self.default_channel = default_channel
-            self.current_channel = default_channel
 
         self.status_manager = StateManager()
 
@@ -274,7 +263,6 @@ class Workspace2:  # REFACTOR: subclass dict
             'schema': 'clearmap_workspace_v2',
             'directory': str(self.directory),
             'sample_id': self.sample_id,
-            'default_channel': getattr(self, 'default_channel', None),
             'resource_type_to_folder': dict(self.resource_type_to_folder),
             'asset_types': asset_types_dict,
             'channels': channels_dict,
@@ -301,7 +289,7 @@ class Workspace2:  # REFACTOR: subclass dict
         ws = cls(
             directory=data['directory'],
             sample_id=data.get('sample_id'),
-            default_channel=data.get('default_channel'),
+            # 'default_channel' (older workspace files) is ignored: the channel is always explicit
             resource_type_to_folder=(data.get('resource_type_to_folder')),
             assets_types_config=types_cfg,
         )
@@ -370,10 +358,6 @@ class Workspace2:  # REFACTOR: subclass dict
     @property
     def channels(self):  # FIXME: check if we should exclude None
         return list(self.asset_collections.keys())
-
-    def ensure_default_channel(self, allowed_channels: List[str], default_channel: str):
-        if default_channel and (not hasattr(self, 'default_channel') or self.default_channel not in allowed_channels):
-            self.default_channel = default_channel
 
     def prune_missing_channels(self, desired_channels: List[str]):
         desired_channels = set(desired_channels)
@@ -785,7 +769,7 @@ class Workspace2:  # REFACTOR: subclass dict
             # REFACTOR: that should be automatic on the ChannelSpec level
             ChannelSpec.channel_names[:] = [name_map.get(n, n) for n in ChannelSpec.channel_names]
 
-    def get(self, asset_type, channel='current',
+    def get(self, asset_type, channel,
             asset_sub_type=None, sample_id=None,
             extension=None, version=None,
             status=None, debug=None,
@@ -834,11 +818,6 @@ class Workspace2:  # REFACTOR: subclass dict
         -------
         Asset object (or subclass)
         """
-
-        if channel == 'current':
-            channel = self.current_channel
-        elif channel == 'default':
-            channel = self.default_channel
 
         if isinstance(channel, list):
             channel = tuple(channel)  # Make sure it is hashable
@@ -1049,8 +1028,7 @@ class Workspace2:  # REFACTOR: subclass dict
 
 
 def test_context_manager():
-    ws = Workspace2(default_channel='auto')
-    print(ws.default_channel)
+    ws = Workspace2('/tmp/test_workspace')
     print(ws.debug)
     with ws.status_manager():
         print(ws.debug)
@@ -1081,13 +1059,12 @@ def setup_test_workspace(tmp_path):
 def test_asset_creation():
     test_dir = Path('/tmp/test_workspace')
     setup_test_workspace(test_dir)
-    ws = Workspace2(directory=test_dir,
-                    default_channel='auto')
+    ws = Workspace2(directory=test_dir)
     auto_expr = '220324_auto_17-34-31/17-34-31_auto_Blaze_C00_xyz-Table Z<Z4>.ome.tif'
     raw_expr = '220324_fos_15-07-15/15-07-15_fos_Blaze[<Y2> x <X2>]_C00.ome.tif'
     ws.add_raw_data(auto_expr, channel_id='auto', data_content_type='reference')  # FIXME:
     ws.add_raw_data(raw_expr, channel_id='cfos', data_content_type='nuclei')
-    assert ws.get('raw').channel_spec.name == 'auto'
+    assert ws.get('raw', 'auto').channel_spec.name == 'auto'
     print(ws.asset_collections)
     raw_asset = ws.get('raw', 'cfos')
     if raw_asset.is_tiled:

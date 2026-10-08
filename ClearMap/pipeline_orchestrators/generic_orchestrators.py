@@ -400,7 +400,7 @@ class OrchestratorBase(BusSubscriberMixin):
         {'postfix': 'asset_sub_type',
          'prefix': 'sample_id'}
     )
-    def get(self, asset_type, channel='current', asset_sub_type=None, **kwargs):   # channel and asset_sub_type defined for completion
+    def get(self, asset_type, channel, asset_sub_type=None, **kwargs):   # channel and asset_sub_type defined for completion
         """
         Retrieve a workspace asset by type and channel.
 
@@ -408,9 +408,9 @@ class OrchestratorBase(BusSubscriberMixin):
         ----------
         asset_type : str
             Logical asset type, e.g. ``'stitched'``, ``'cells'``, ``'atlas'``.
-        channel : str, optional
-            Channel name.  Defaults to ``'current'``, which concrete subclasses
-            resolve to their active channel.
+        channel : str | tuple[str, ...] | None
+            Channel name, compound channel tuple, or None for a global asset. Always explicit here;
+            the single and compound channel orchestrators default it to their own channel(s).
         asset_sub_type : str or None, optional
             Optional sub-type qualifier, e.g. ``'raw'``, ``'filtered'``.
         **kwargs
@@ -433,7 +433,7 @@ class OrchestratorBase(BusSubscriberMixin):
         asset = self.workspace.get(asset_type, channel=channel, asset_sub_type=asset_sub_type, **kwargs)
         return asset
 
-    def get_path(self, asset_type, channel='current', asset_sub_type=None, **kwargs):   # channel and asset_sub_type defined for completion
+    def get_path(self, asset_type, channel, asset_sub_type=None, **kwargs):   # channel and asset_sub_type defined for completion
         """
        Shortcut that returns the filesystem path of a workspace asset.
 
@@ -441,8 +441,8 @@ class OrchestratorBase(BusSubscriberMixin):
        ----------
        asset_type : str
            Logical asset type.
-       channel : str, optional
-           Channel name.
+       channel : str | tuple[str, ...] | None
+           Channel name, compound channel tuple, or None for a global asset. Always explicit.
        asset_sub_type : str or None, optional
            Optional sub-type qualifier.
        **kwargs
