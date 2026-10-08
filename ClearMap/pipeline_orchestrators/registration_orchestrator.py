@@ -178,6 +178,7 @@ class RegistrationProcessor(IndependentChannelsPipelineOrchestrator):
         for channel in joined:
             self.register_channel_in_workspace(channel)
         if joined:
+            self.setup_atlases()  # The atlas of a channel is skipped while it is incomplete (see setup_atlases)
             self.parametrize_assets()
 
     def _on_channel_renamed(self, event: ChannelRenamed):
@@ -648,6 +649,8 @@ class RegistrationProcessor(IndependentChannelsPipelineOrchestrator):
 
         # TODO: atlas variants as multichannel assets
         for channel in sample_cfg.keys():
+            if self.workspace is not None and channel not in self.workspace:
+                continue  # Incomplete channel: wait until it joins the workspace
             orientation = _atlas_orientation(sample_cfg[channel]['orientation'])
             xyz_slicing = _atlas_slicing(sample_cfg[channel]['slicing'])
 
