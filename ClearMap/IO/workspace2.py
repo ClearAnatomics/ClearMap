@@ -735,6 +735,9 @@ class Workspace2:  # REFACTOR: subclass dict
         suffix: str
             The suffix of the asset name. This is to be used for assets where the subtype is
             dynamic.
+        default: Any
+            For an unknown asset type: 'closest' (the default) uses the closest asset type,
+            anything else (e.g. None) is returned. An unknown channel always raises.
 
         Returns
         -------
@@ -762,15 +765,9 @@ class Workspace2:  # REFACTOR: subclass dict
 
         if asset_sub_type and not suffix:
             asset_type += f'_{asset_sub_type}'
-        if channel not in self and isinstance(channel, tuple):
-            warnings.warn(f'Channel {channel} not found as tuple, trying string version.')
-            channel = ('-'.join(channel)).lower()  # Try string version if tuple version not found
-
-        if channel not in self:
-            if default == 'closest':
-                raise MissingAssetError(f'Unknown channel "{channel}". Available channels: {list(self.channels)}')
-            else:
-                channel = self.default_channel
+        if channel not in self:  # Never guessed: another channel's asset would be silently wrong data
+            raise MissingAssetError(f'Unknown channel "{channel}". Available channels: {list(self.channels)}. '
+                                    f'A compound channel must be registered (ensure_pipeline) before use.')
 
         if asset_type in self[channel]:
             asset = self[channel][asset_type]

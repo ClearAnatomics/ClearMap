@@ -392,7 +392,8 @@ class RegistrationProcessor(PipelineOrchestrator):
             'verbose': self.config['verbose']
         }  # WARNING: duplicate (use method ??)
         source_asset = self.get('stitched', channel=channel, default=None)
-        source_asset = source_asset if source_asset.exists else self.get('raw', channel)
+        if source_asset is None or not source_asset.exists:
+            source_asset = self.get('raw', channel)
         if not source_asset.exists:
             raise FileNotFoundError(f'Cannot resample {channel}, source {source_asset} missing')
 
