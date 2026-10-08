@@ -310,7 +310,7 @@ class DensityGroupAnalysisOrchestrator(GroupOrchestratorBase):
                 kwargs = dict(plot_kw_args, group_names=(gp1_name, gp2_name))
             else:
                 kwargs = plot_kw_args
-            df = pd.read_csv(self.assets.stats_table_path(channel, gp1_name, gp2_name))
+            df = pd.read_csv(self.assets.readable_path(self.assets.stats_table_path(channel, gp1_name, gp2_name), channel))
             fig = plot_function(df, **kwargs)
 
             web_view = QWebEngineView()
@@ -385,7 +385,7 @@ class DensityGroupAnalysisOrchestrator(GroupOrchestratorBase):
         if len(comparisons) > 1:  # Multiple comparisons: just show p-value maps
             p_val_imgs = []
             for gp1, gp2 in comparisons:
-                p_path = self.assets.p_val_colors_path(channel, gp1, gp2, suffix)
+                p_path = self.assets.readable_path(self.assets.p_val_colors_path(channel, gp1, gp2, suffix), channel)
                 p_val_imgs.append(io_ops.read(p_path))
 
             titles = [f'{gp1} vs {gp2} p values' for gp1, gp2 in comparisons]
