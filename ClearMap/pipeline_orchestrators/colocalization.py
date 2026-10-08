@@ -14,12 +14,13 @@ from ClearMap.config.config_coordinator import ConfigCoordinator
 from ClearMap.Analysis.Measurements import Voxelization as voxelization
 from ClearMap.Analysis.colocalization.channel import Channel as ColocalizationChannel
 
-from ClearMap.pipeline_orchestrators.generic_orchestrators import CompoundChannelPipelineOrchestrator
+from ClearMap.pipeline_orchestrators.generic_orchestrators import (CompoundChannelPipelineOrchestrator,
+                                                                    PerCompoundConfigMixin)
 from ClearMap.pipeline_orchestrators.sample_info_management import SampleManager
 from ClearMap.pipeline_orchestrators.registration_orchestrator import RegistrationProcessor
 
 
-class ColocalizationProcessor(CompoundChannelPipelineOrchestrator):
+class ColocalizationProcessor(PerCompoundConfigMixin, CompoundChannelPipelineOrchestrator):
     colocalization_channels: dict[ColocalizationChannel]
     pipeline = 'Colocalization'
     config_name = 'colocalization'
@@ -30,7 +31,6 @@ class ColocalizationProcessor(CompoundChannelPipelineOrchestrator):
                  registration_processor: Optional[RegistrationProcessor] = None):
         super().__init__(config_coordinator)
         self.sample_manager = sample_manager
-        self.channels: List[str] = channels
         self.registration_processor: Optional[RegistrationProcessor] = registration_processor
         self.workspace: Workspace2 | None = None
 
@@ -47,7 +47,7 @@ class ColocalizationProcessor(CompoundChannelPipelineOrchestrator):
 
     def setup(self, sample_manager: Optional[SampleManager], channel_names: tuple[str],
               registration_processor: Optional[RegistrationProcessor] = None):
-        self.channels = tuple(channel_names)
+        self.compound_channel = tuple(channel_names)
         if registration_processor is not None:
             self.registration_processor = registration_processor
         if sample_manager is not None:
@@ -55,7 +55,7 @@ class ColocalizationProcessor(CompoundChannelPipelineOrchestrator):
             self.workspace = sample_manager.workspace
 
             sample_id = self.sample_manager.sample_id
-            self.workspace.ensure_pipeline(self.pipeline, channel_id=self.channels, sample_id=sample_id,
+            self.workspace.ensure_pipeline(self.pipeline, channel_id=self.compound_channel, sample_id=sample_id,
                                            permute_channels=True, create_channel=True)
 
             self.finalise_setup()
@@ -63,8 +63,8 @@ class ColocalizationProcessor(CompoundChannelPipelineOrchestrator):
     def finalise_setup(self):
         if self.setup_finalised:
             return
-        finalised_channels = {chan: False for chan in self.channels}
-        for channel in self.channels:
+        finalised_channels = {chan: False for chan in self.compound_channel}
+        for channel in self.compound_channel:
             resolution = self.sample_manager.get_channel_resolution(channel)
             try:
                 self.colocalization_channels[channel] = ColocalizationChannel(

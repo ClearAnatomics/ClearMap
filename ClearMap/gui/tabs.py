@@ -120,10 +120,11 @@ from qdarkstyle import DarkPalette
 
 
 from ClearMap.Analysis.graphs.graph_weights import weight_choices
-from ClearMap.IO.assets_constants import DATA_CONTENT_TYPES
+from ClearMap.IO.assets_constants import DATA_CONTENT_TYPES, compound_is_oriented
 from ClearMap.IO.source.backends.tif_backend import parse_ome_info
 
 from ClearMap.config.atlas import ATLAS_NAMES_MAP, STRUCTURE_TREE_NAMES_MAP
+from ClearMap.config.compound_keys import PairKey
 
 from ClearMap.pipeline_orchestrators.batch_process import BatchProcessor
 
@@ -1872,7 +1873,7 @@ class VasculatureTab(PostProcessingTab['BinaryVesselProcessor']):
             Depending on the display options, the whole graph may not fit in memory
         """
         self.plot_slicer('graphConstructionSlicer', self.ui, self.params.visualization_params,
-                         channel=self.get_worker(substep='graph').parent_channels)
+                         channel=self.get_worker(substep='graph').compound_channel)
         # TODO: check iif best option is to
         #   average the parent channels
 
@@ -1956,6 +1957,8 @@ class ColocalizationTab(PostProcessingTab['ColocalizationProcessor']):
     pipeline_name = 'colocalization'
     channels_ui_name = 'colocalization_params'
     workers_are_global = False
+    # The channel tabs are named after the config entries: str(PairKey(a, b, oriented=pairs_oriented))
+    pairs_oriented = compound_is_oriented('Colocalization')
 
     def __init__(self, main_window, tab_idx: int, sample_manager):
         super().__init__(main_window, 'colocalization_tab', tab_idx)
@@ -1989,13 +1992,12 @@ class ColocalizationTab(PostProcessingTab['ColocalizationProcessor']):
         if not isinstance(self.ui.channelsParamsTabWidget, ExtendableTabWidget):
             warnings.warn(f'Channel tab widget not finalised for {self.name}, skipping channel creation')
             return
-        for pair in self._get_channels():
-            channels_names_str = ('-'.join(pair)).lower()
-            if channels_names_str not in self.ui.channelsParamsTabWidget.get_channels_names():
-                self.add_channel_tab(channels_names_str)
+        for pair_key in self.sample_manager.colocalization_pair_keys(oriented=self.pairs_oriented):
+            if pair_key not in self.ui.channelsParamsTabWidget.get_channels_names():
+                self.add_channel_tab(pair_key)
 
     def _bind_channel(self, page_widget: QWidget, channel: str) -> None:
-        channel_a, channel_b = channel.split('-')
+        channel_a, channel_b = PairKey.from_string(channel, oriented=self.pairs_oriented).as_tuple()
         chan_args = {'channel_a': channel_a, 'channel_b': channel_b}
         buttons_functions = [
             ('colocalizationRunPushButton', functools.partial(self.run_colocalization_for_pair, **chan_args)),  # TODO: add load icon
@@ -2027,7 +2029,8 @@ class ColocalizationTab(PostProcessingTab['ColocalizationProcessor']):
         tuple[str, str]
             (first_channel, second_channel) as chosen by the user
         """
-        page_widget = self.ui.channelsParamsTabWidget.get_channel_widget(f'{channel_a}-{channel_b}')
+        pair_key = str(PairKey(channel_a, channel_b, oriented=self.pairs_oriented))
+        page_widget = self.ui.channelsParamsTabWidget.get_channel_widget(pair_key)
         if page_widget.colocalizationChannelAFirstRadioButton.isChecked():
             return channel_a, channel_b
         else:

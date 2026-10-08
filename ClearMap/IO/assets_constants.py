@@ -74,6 +74,25 @@ CONTENT_TYPE_TO_PIPELINE = {
 DATA_CONTENT_TYPES = list(CONTENT_TYPE_TO_PIPELINE.keys())
 # The pipeline names: those of the content types, and stitching, which applies to any tiled channel
 PIPELINE_NAMES = frozenset({*(p for p in CONTENT_TYPE_TO_PIPELINE.values() if p is not None), 'stitching'})
+# The pipelines whose compound channels are oriented: the order of the parts carries meaning
+# (the colocalization of a in b is not that of b in a). The parts of the compound channels of
+# the other pipelines are an unordered set (e.g. the TubeMap vessels and arteries).
+ORIENTED_COMPOUND_PIPELINES = frozenset({'Colocalization'})
+
+
+def compound_is_oriented(pipeline: str) -> bool:
+    """
+    Whether the order of the parts of the compound channels of pipeline carries meaning
+    (see ORIENTED_COMPOUND_PIPELINES)
+
+    Raises
+    ------
+    ClearMapValueError
+        If pipeline is not one of PIPELINE_NAMES.
+    """
+    if pipeline not in PIPELINE_NAMES:
+        raise ClearMapValueError(f'Unknown pipeline {pipeline!r}, expected one of {sorted(PIPELINE_NAMES)}.')
+    return pipeline in ORIENTED_COMPOUND_PIPELINES
 
 # TODO: add link between labels and content types
 #    e.g.

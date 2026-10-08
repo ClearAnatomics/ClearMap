@@ -15,6 +15,7 @@ from typing import Any, Optional, Iterable, Dict, Sequence, List, Set, Tuple
 from ClearMap.Utils.utilities import deep_merge, REPLACE, DELETE, _REPLACE
 
 from ClearMap.config.compound_keys import CompoundKey
+from ClearMap.IO.assets_constants import compound_is_oriented
 
 from ClearMap.config.config_handler import ALTERNATIVES_REG
 from ClearMap.config.config_adjusters.type_hints import (ConfigView, ConfigPatch, SampleManagerProtocol, KeysPath,
@@ -100,9 +101,10 @@ INSTANCE_SPECS: tuple[InstanceContainerSpec, ...] = (
         container_path='.channels',
         defaults_templates_path='.templates',
         template_kind=TemplateKind.PAIRS,
-        membership=Membership(source='sample', instance_kind='pairs', oriented=True),
+        membership=Membership(source='sample', instance_kind='pairs',
+                              oriented=compound_is_oriented('Colocalization')),
         compound=True,
-        compound_oriented=True,
+        compound_oriented=compound_is_oriented('Colocalization'),
         reconcile=ReconcileStepSpec(
             applies=True,
             kind=ReconcileKind.GENERIC,

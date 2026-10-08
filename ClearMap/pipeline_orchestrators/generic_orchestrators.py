@@ -29,7 +29,10 @@ and :meth:`~ChannelPipelineOrchestrator.patch_channel` scopes config writes
 to that channel without the caller having to know the full key path.
 
 :class:`CompoundChannelPipelineOrchestrator` is the equivalent for pipelines
-that operate on a pair (or tuple) of channels, such as colocalization.
+that operate on one compound channel (a tuple of channels), such as TubeMap
+(vessels and arteries) or colocalization (a pair).
+:class:`PerCompoundConfigMixin` scopes its config to the entry of that compound
+channel, for the pipelines with one config entry per compound (colocalization).
 
 **Step tracking**
 
@@ -74,13 +77,14 @@ from abc import ABC, abstractmethod
 from concurrent.futures.process import BrokenProcessPool
 from pathlib import Path
 from types import MappingProxyType
-from typing import Mapping, Any, Optional, List, Final, Callable, TYPE_CHECKING, Sequence, ClassVar
+from typing import Mapping, Any, Optional, Final, Callable, TYPE_CHECKING, Sequence, ClassVar
 
-from ClearMap.IO.assets_constants import PIPELINE_NAMES
+from ClearMap.IO.assets_constants import PIPELINE_NAMES, compound_is_oriented
 from ClearMap.IO.workspace2 import Workspace2
 from ClearMap.IO.workspace_asset import Asset
+from ClearMap.config.compound_keys import CompoundKey
 from ClearMap.Utils.event_bus import BusSubscriberMixin
-from ClearMap.Utils.exceptions import ClearMapRuntimeError
+from ClearMap.Utils.exceptions import ClearMapRuntimeError, ClearMapValueError, ClearMapConfigError
 from ClearMap.Utils.utilities import handle_deprecated_args, deep_freeze, infer_origin_from_caller
 
 if TYPE_CHECKING:    # WARNING: some circular imports below, use only for type checking with quotes
@@ -725,47 +729,85 @@ class ChannelPipelineOrchestrator(PipelineOrchestrator, abstract=True):
 
 class CompoundChannelPipelineOrchestrator(PipelineOrchestrator, abstract=True):
     """
-    Tab processor that is processing a compound channels (made of several source channels)
+    Processor of one compound channel: a channel made of several sample channels, its parts
+    (e.g. the TubeMap vessels and arteries, or a colocalization pair).
 
-    The config is expected to have a 'channels' section with the channel names as keys.
-    When accessed, the config property returns the section for all channels.
+    The config is the whole section (config_name). A pipeline with one config entry per
+    compound channel adds PerCompoundConfigMixin.
+
+    Attributes
+    ----------
+    compound_channel: tuple[str, ...]
+        The parts. This tuple is the workspace id of the compound channel, and the channel
+        of get when none is given.
+    oriented: bool
+        Class attribute, derived from the pipeline (assets_constants.compound_is_oriented):
+        whether the order of the parts carries meaning.
     """
-    config_name = ''
+    oriented: ClassVar[bool]
+
+    def __init_subclass__(cls, *, abstract: bool = False, **kwargs):
+        super().__init_subclass__(abstract=abstract, **kwargs)
+        if not abstract:
+            cls.oriented = compound_is_oriented(cls.pipeline)
+
     def __init__(self, coordinator: "ConfigCoordinator"):
         super().__init__(coordinator)
-        self.channels: List[str] = []
+        self.compound_channel: tuple[str, ...] = ()
 
     def get(self, asset_type, channel=CURRENT_CHANNEL, asset_sub_type=None, **kwargs):
         if channel is CURRENT_CHANNEL:
-            channel = '-'.join(self.channels)
+            if not self.compound_channel:
+                raise ClearMapValueError(f'{self.__class__.__name__}.compound_channel is not set: '
+                                         f'pass the channel explicitly or set up the processor first.')
+            channel = self.compound_channel
         return super().get(asset_type, channel=channel, asset_sub_type=asset_sub_type, **kwargs)
+
+
+class PerCompoundConfigMixin:
+    """
+    For a CompoundChannelPipelineOrchestrator whose config section has one entry per compound
+    channel, under ``channels.<compound key>`` (e.g. ``colocalization.channels['cfos-dapi']``):
+    config is (and patch_channel writes) the entry of compound_channel.
+
+    The key is str(CompoundKey(*compound_channel, oriented=oriented)), as written by the config
+    adjusters (see SampleManager.colocalization_pair_keys), case included.
+    """
+    compound_channel: tuple[str, ...]
+    oriented: ClassVar[bool]
+    config_name: str
+    cfg_coordinator: "ConfigCoordinator"
+    sample_manager: Optional["SampleManager"]
+
+    @property
+    def compound_config_key(self) -> str:
+        """The key of the config entry of compound_channel"""
+        if not self.compound_channel:
+            raise ClearMapValueError(f'{self.__class__.__name__}.compound_channel is not set')
+        return str(CompoundKey(*self.compound_channel, oriented=self.oriented))
 
     @property
     def config(self) -> Mapping[str, Any]:
         """
-        Read-only view of the config section for the current channel.
-        Raises if no channel is set or section missing.
-        """
-        return self.__channel_cfg_view(self.config_name)
+        Read-only view of the config entry of compound_channel.
 
-    def __channel_cfg_view(self, cfg_name):
+        Raises
+        ------
+        ClearMapConfigError
+            If the section has no entry for compound_channel.
         """
-        Read-only view of the config section for the current channel.
-        Raises if no channel is set or section missing.
-        """
-        if not self.channels:
-            raise ValueError(f'{self.__class__.__name__}.channels is not set')
-        cfg = self.cfg_coordinator.get_config_view(cfg_name) or {}
-        channel_str = '-'.join(self.channels).lower()
-        section = cfg.get('channels', {}).get(channel_str)
+        key = self.compound_config_key
+        cfg = self.cfg_coordinator.get_config_view(self.config_name) or {}
+        section = cfg.get('channels', {}).get(key)
         if section is None:
-            raise KeyError(f'Channel "{channel_str}" not found in config')
+            raise ClearMapConfigError(f'No entry {key!r} in {self.config_name}.channels '
+                                      f'(entries: {list(cfg.get("channels", {}))}).')
         return deep_freeze(section)
 
     def patch_channel(self, patch: dict, *, origin: str = "") -> None:
-        channel = '-'.join(self.channels).lower()
+        """Submit a config patch scoped to the entry of compound_channel (see patch_channel of ChannelPipelineOrchestrator)"""
         self.cfg_coordinator.submit_patch(
-            {self.config_name: {"channels": {channel: patch}}},
+            {self.config_name: {"channels": {self.compound_config_key: patch}}},
             sample_manager=self.sample_manager,
             origin=origin or infer_origin_from_caller())
 
