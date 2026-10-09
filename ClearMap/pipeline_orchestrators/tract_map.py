@@ -74,12 +74,12 @@ class TractMapProcessor(ChannelPipelineOrchestrator):
         self.channel = channel_name
         self.registration_processor = registration_processor
 
-        if self.sample_manager.setup_complete:
-            self.workspace = sample_manager.workspace
+        if self.sample_ready:
+            self.workspace = self.sample_manager.workspace
             self.register_in_workspace()
-            self.setup_complete = True
+            self._setup_done = True
         else:
-            self.setup_complete = False
+            self._setup_done = False
             warnings.warn(f'SampleManager not set up yet. Setting TractMapProcessor up defered.')
 
     def create_test_dataset(self, slicing):

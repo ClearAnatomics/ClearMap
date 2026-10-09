@@ -573,7 +573,34 @@ class PipelineOrchestrator(OrchestratorBase):
         self.stopped: bool = False
         self.progress_watcher: Optional["ProgressWatcher"] = None  # FIXME: ensure assigned
         self.sample_manager: Optional["SampleManager"] = None  # FIXME: ensure assigned
-        self.setup_complete: bool = False  # ``True`` once setup() has run (see SampleManager.setup_complete)
+        self._setup_done: bool = False  # Whether setup() ran, see setup_complete
+
+    @property
+    def required_sample_channels(self) -> list[str]:
+        """
+        The sample channels this orchestrator works on.
+        It can be set up once they are all in the workspace (see sample_ready).
+        """
+        raise ClearMapNotImplementedError(f'{self.__class__.__name__} must define required_sample_channels')
+
+    @property
+    def sample_ready(self) -> bool:
+        """
+        Whether the sample is loaded and the sample channels this orchestrator requires are in the workspace.
+        A channel that is not complete yet (no path or data type) is not, but it only concerns the
+        orchestrators that require it.
+        """
+        sample_manager = self.sample_manager
+        return (sample_manager is not None and sample_manager.workspace_ready and
+                sample_manager.has_channels_in_workspace(self.required_sample_channels))
+
+    @property
+    def setup_complete(self) -> bool:
+        """
+        Whether setup() ran and the sample channels this orchestrator requires are still in the workspace.
+        Derived (not stored): the channels change after the setup, e.g. when the user adds one in the GUI.
+        """
+        return self._setup_done and self.sample_ready
 
     def setup_if_needed(self):
         """
@@ -604,11 +631,11 @@ class PipelineOrchestrator(OrchestratorBase):
         self.sample_manager = sample_manager if sample_manager else self.sample_manager
         if not self.cfg_coordinator.get_config_view(self.config_name):
             raise ValueError(f'Config section "{self.config_name}" not found in config coordinator')
-        if self.sample_manager is not None and sample_manager.setup_complete:
+        if self.sample_ready:
             self.workspace = self.sample_manager.workspace
-            self.setup_complete = True
+            self._setup_done = True
         else:
-            self.setup_complete = False
+            self._setup_done = False
             warnings.warn(f'Sample manager not setup yet. Cannot setup {self.__class__.__name__}.')
 
     def register_in_workspace(self) -> None:
@@ -751,6 +778,10 @@ class ChannelPipelineOrchestrator(PipelineOrchestrator, abstract=True):
         super().__init__(coordinator)
         self.channel: str = ''
 
+    @property
+    def required_sample_channels(self) -> list[str]:
+        return [self.channel] if self.channel else []
+
     def get(self, asset_type, channel=CURRENT_CHANNEL, asset_sub_type=None, **kwargs):
         if channel is CURRENT_CHANNEL:
             channel = self.channel
@@ -819,6 +850,10 @@ class IndependentChannelsPipelineOrchestrator(PipelineOrchestrator, abstract=Tru
         """The channels this processor processes, each on its own"""
         raise ClearMapNotImplementedError(f'{self.__class__.__name__} must define channels')
 
+    @property
+    def required_sample_channels(self) -> list[str]:
+        return self.channels
+
     def register_in_workspace(self) -> None:
         """Register each of channels (see register_channel_in_workspace)"""
         for channel in self.channels:
@@ -866,6 +901,10 @@ class CompoundChannelPipelineOrchestrator(PipelineOrchestrator, abstract=True):
     @compound_channel.setter
     def compound_channel(self, parts: Sequence[str]) -> None:
         self._compound_channel = compound_channel_key(parts, oriented=self.oriented) if parts else ()
+
+    @property
+    def required_sample_channels(self) -> list[str]:
+        return list(self.compound_channel)
 
     def get(self, asset_type, channel=CURRENT_CHANNEL, asset_sub_type=None, **kwargs):
         if channel is CURRENT_CHANNEL:

@@ -350,6 +350,11 @@ class TubeMapOrchestrator(CompoundChannelPipelineOrchestrator, abstract=True):
         channels = sample_manager.get_channels_by_pipeline(cls.pipeline, as_list=True)
         return compound_channel_key(channels, oriented=cls.oriented) if channels else ()
 
+    @property
+    def required_sample_channels(self) -> list[str]:
+        """The sample channels of the TubeMap pipeline, read from the config (compound_channel is set by setup)"""
+        return list(self.compound_channel_of(self.sample_manager))
+
     def _follow_sample_compound_channel(self) -> None:
         """
         Set compound_channel from the sample (compound_channel_of) and register it. When it changed,
@@ -397,14 +402,14 @@ class BinaryVesselProcessor(TubeMapOrchestrator):
 
     def _on_workspace_channels_updated(self, evt: WorkspaceChannelsUpdated) -> None:
         """Channels/data types changed in the workspace: resync the steps and the compound channel"""
-        if self.sample_manager is None or not self.sample_manager.setup_complete:
+        if not self.sample_ready:
             return
         if self.workspace is None or self.compound_channel_of(self.sample_manager) != self.compound_channel:
             self.setup()
 
     def setup(self, sample_manager=None):
         self.sample_manager = sample_manager if sample_manager is not None else self.sample_manager
-        if self.sample_manager is not None and self.sample_manager.setup_complete:
+        if self.sample_ready:
             self.workspace = self.sample_manager.workspace
 
             self.all_vessels_channel = self.sample_manager.get_channels_by_type(channel_type='vessels')
@@ -819,13 +824,13 @@ class VesselGraphProcessor(TubeMapOrchestrator):
         self.subscribe(WorkspaceChannelsUpdated, self._on_workspace_channels_updated)
 
     def _on_workspace_channels_updated(self, evt: WorkspaceChannelsUpdated) -> None:
-        if self.sample_manager is not None and self.sample_manager.setup_complete:
+        if self.sample_ready:
             self.setup()
 
     def setup(self, sample_manager=None, registration_processor=None):
         self.sample_manager = sample_manager if sample_manager is not None else self.sample_manager
         self.registration_processor = registration_processor or self.registration_processor
-        if self.sample_manager is not None and self.sample_manager.setup_complete:
+        if self.sample_ready:
             self.workspace = self.sample_manager.workspace
             self.steps.workspace = self.workspace
 

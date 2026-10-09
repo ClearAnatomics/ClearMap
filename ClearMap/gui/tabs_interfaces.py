@@ -933,7 +933,7 @@ class PreProcessingTab(PipelineTab[TWorker]):
 
     def _setup_workers(self) -> None:
         # Use private field to avoid triggering the raising property for the None check
-        if self._sample_manager is None or not self._sample_manager.setup_complete:
+        if self._sample_manager is None or not self._sample_manager.workspace_ready:
             return
         worker = self.worker
         if worker is not None:  # e.g. not SampleInfoTab
@@ -955,7 +955,7 @@ class PostProcessingTab(PipelineTab[TWorker]):
 
     def _setup_workers(self) -> None:
         # Use private field to avoid triggering the raising property for the None check
-        if self._sample_manager is None or not self._sample_manager.setup_complete:
+        if self._sample_manager is None or not self._sample_manager.workspace_ready:
             self.main_window.print_warning_msg("SampleManager not initialised")
             return
         desired_channels = self._workers_channel_keys()

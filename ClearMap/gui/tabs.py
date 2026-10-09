@@ -942,7 +942,7 @@ class RegistrationTab(PreProcessingTab['RegistrationProcessor']):
 
         sample_mgr = self.sample_manager
         workspace = sample_mgr.workspace
-        if not sample_mgr.setup_complete:
+        if not sample_mgr.workspace_ready:
             warnings.warn('Workspace not setup, cannot add registration pipeline')
             return
 
@@ -1004,7 +1004,7 @@ class RegistrationTab(PreProcessingTab['RegistrationProcessor']):
         self.main_window.print_status_msg('Registered')
 
     def _update_plotable_channels(self, event=None) -> None:
-        if not self.sample_manager.setup_complete:
+        if not self.worker.setup_complete:  # The channels to plot must be in the workspace
             return
 
         registered_channels = [ch for ch in self.params.keys() if self.worker.channel_was_registered(ch)]

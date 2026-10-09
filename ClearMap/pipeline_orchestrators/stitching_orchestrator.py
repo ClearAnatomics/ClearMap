@@ -70,13 +70,13 @@ class StitchingProcessor(IndependentChannelsPipelineOrchestrator):
         if self.sample_manager.workspace is not None:
             self.workspace = self.sample_manager.workspace
 
-        if self.sample_manager.setup_complete:
+        if self.sample_ready:
             self.register_in_workspace()
             if convert_tiles:
                 self.convert_tiles()  # TODO: check if needed
-            self.setup_complete = True
+            self._setup_done = True
         else:
-            self.setup_complete = False
+            self._setup_done = False
             warnings.warn('Sample manager not set up yet, stitching processor setup incomplete', stacklevel=2)
 
     @check_stopped

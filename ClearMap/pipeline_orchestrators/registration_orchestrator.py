@@ -100,8 +100,6 @@ class RegistrationProcessor(IndependentChannelsPipelineOrchestrator):
         self.__resample_re = ('Resampling: resampling',
                               re.compile(r".*?Resampling:\sresampling\saxes\s.+\s?,\sslice\s.+\s/\s\d+"))
 
-        self.setup_complete: bool = False
-
         self.subscribe(ChannelRenamed, self._on_channel_renamed)
         self.subscribe(WorkspaceChannelsUpdated, self._on_workspace_channels_updated)
         self.subscribe(UiAtlasIdChanged, self.setup_atlases)
@@ -114,15 +112,15 @@ class RegistrationProcessor(IndependentChannelsPipelineOrchestrator):
 
         if self.sample_manager is None:
             warnings.warn('SampleManager not provided, RegistrationProcessor setup incomplete')
-            self.setup_complete = False
-        elif self.sample_manager.setup_complete:
+            self._setup_done = False
+        elif self.sample_ready:
             self.workspace = self.sample_manager.workspace
             self.setup_atlases()  # TODO: check if needed
             self.register_in_workspace()
             self.parametrize_assets()
-            self.setup_complete = True
+            self._setup_done = True
         else:
-            self.setup_complete = False  # FIXME: finish later
+            self._setup_done = False  # FIXME: finish later
             warnings.warn('SampleManager not setup, RegistrationProcessor setup incomplete')
 
         # WARNING: must be called once registration pipeline has been added to the Workspace for that channel
