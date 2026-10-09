@@ -361,8 +361,6 @@ class OrchestratorBase(BusSubscriberMixin):
         Set by concrete subclasses after the sample is loaded.
     registration_processor : RegistrationProcessor or None
         Injected when atlas-space operations are needed.
-    setup_complete : bool
-        ``True`` once the subclass has finished its own ``setup()`` call.
     """
     config_name = ''
 
@@ -372,7 +370,6 @@ class OrchestratorBase(BusSubscriberMixin):
         self.workspace: Optional[Workspace2] = None
         self.logger = None  # optional injected logger
         self.registration_processor: Optional["RegistrationProcessor"] = None
-        self.setup_complete: bool = False
 
     def get_alignment_ref_channel_reg_cfg(self) -> Mapping[str, Any]:
         """
@@ -576,6 +573,7 @@ class PipelineOrchestrator(OrchestratorBase):
         self.stopped: bool = False
         self.progress_watcher: Optional["ProgressWatcher"] = None  # FIXME: ensure assigned
         self.sample_manager: Optional["SampleManager"] = None  # FIXME: ensure assigned
+        self.setup_complete: bool = False  # ``True`` once setup() has run (see SampleManager.setup_complete)
 
     def setup_if_needed(self):
         """

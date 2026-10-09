@@ -85,7 +85,7 @@ import tempfile
 import warnings
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Callable, List, Dict
+from typing import Optional, Callable, List, Dict, Iterable
 
 import numpy as np
 
@@ -245,15 +245,24 @@ class SampleManager(OrchestratorBase):
             self.cfg_coordinator.load_all(sections)
 
     @property
+    def workspace_ready(self) -> bool:
+        """Whether the config is loaded and the workspace exists (whatever the state of the channels)"""
+        return bool(self.config) and self.workspace is not None
+
+    @property
     def setup_complete(self) -> bool:
         """
-        Whether the sample is ready for the pipelines: its config is loaded, the workspace exists
-        and every channel of the config is registered in it (i.e. has a path and a data type).
+        Whether the whole sample is ready: the workspace is ready and every channel of the config is
+        registered in it (i.e. has a path and a data type).
 
         Derived (not stored) because the channels change after the setup, e.g. when the user adds
         a channel in the GUI: it is incomplete until its path and data type are set.
         """
-        return bool(self.config) and self.workspace is not None and not self.incomplete_channels
+        return self.workspace_ready and not self.incomplete_channels
+
+    def has_channels_in_workspace(self, channels: Iterable[str]) -> bool:
+        """Whether all of channels (sample channels) are registered in the workspace"""
+        return self.workspace is not None and all(channel in self.workspace for channel in channels)
 
     @adjuster_safe
     def compute_required_sections(self) -> set[str]:
