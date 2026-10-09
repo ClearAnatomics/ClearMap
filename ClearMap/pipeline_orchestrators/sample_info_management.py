@@ -262,7 +262,7 @@ class SampleManager(OrchestratorBase):
 
     def has_channels_in_workspace(self, channels: Iterable[str]) -> bool:
         """Whether all of channels (sample channels) are registered in the workspace"""
-        return self.workspace is not None and all(channel in self.workspace for channel in channels)
+        return self.workspace is not None and self.workspace.has_channels(channels)
 
     @adjuster_safe
     def compute_required_sections(self) -> set[str]:

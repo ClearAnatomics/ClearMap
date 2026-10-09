@@ -91,7 +91,7 @@ import re
 import warnings
 from copy import deepcopy
 from pathlib import Path
-from typing import List, Iterator, Sequence, Optional
+from typing import List, Iterator, Sequence, Optional, Iterable
 
 import numpy as np
 
@@ -192,6 +192,22 @@ class Workspace2:  # REFACTOR: subclass dict
 
     def __contains__(self, channel: ChannelId) -> bool:
         return channel in self.asset_collections
+
+    def has_channels(self, channels: Iterable[ChannelId]) -> bool:
+        """
+        Whether all the given channels are in the workspace.
+
+        Parameters
+        ----------
+        channels : Iterable[ChannelId]
+            The channels to look for.
+
+        Returns
+        -------
+        bool
+            True if every channel is in the workspace (trivially True for no channels).
+        """
+        return all(channel in self for channel in channels)
 
     def __len__(self) -> int:
         """
