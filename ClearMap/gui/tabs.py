@@ -850,7 +850,7 @@ class RegistrationTab(PreProcessingTab['RegistrationProcessor']):
             page_widget = self.ui.channelsParamsTabWidget.get_channel_widget(channel)
         if page_widget is None:
             raise ClearMapValueError(f'page_widget cannot be None for {channel=}')
-        other_channels = list(set(self.worker.all_channels_to_register()) - {channel})
+        other_channels = list(set(self.worker.all_channels_to_register) - {channel})
         populate_combobox(page_widget.alignWithComboBox, [None, 'atlas'] + other_channels)
         populate_combobox(page_widget.movingChannelComboBox,
                           [None, 'atlas', 'intrinsically_aligned'] + other_channels + [channel])

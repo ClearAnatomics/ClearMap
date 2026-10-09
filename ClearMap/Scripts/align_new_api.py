@@ -12,7 +12,7 @@ def plot_registration_results(aligner: RegistrationProcessor, channel: str, comp
 def register(aligner: RegistrationProcessor):
     print('Registering')
     aligner.setup_atlases()
-    for channel in aligner.channels_to_resample():
+    for channel in aligner.channels_to_resample:
         aligner.resample_channel(channel)
     print('Aligning')
     aligner.align()

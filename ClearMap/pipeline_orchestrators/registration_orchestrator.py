@@ -265,6 +265,7 @@ class RegistrationProcessor(IndependentChannelsPipelineOrchestrator):
         complete = self.sample_manager.complete_channels if self.sample_manager is not None else []
         return [channel for channel in self.all_channels if channel in complete]
 
+    @property
     def all_channels_to_register(self) -> list[str]:
         """
         ALL the channels the config selects for registration, complete or not (superset of
@@ -272,12 +273,14 @@ class RegistrationProcessor(IndependentChannelsPipelineOrchestrator):
         """
         return [c for c in self.all_channels if self.config['channels'][c]['align_with'] is not None]
 
+    @property
     def channels_to_resample(self):
         return [c for c in self.channels if self.config['channels'][c]['resample']]
 
+    @property
     def channels_to_register(self):
         """The channels selected for registration which can be processed (i.e. complete)"""
-        return [c for c in self.all_channels_to_register() if c in self.channels]
+        return [c for c in self.all_channels_to_register if c in self.channels]
 
     def get_align_with(self, channel):
         return self.config['channels'][channel]['align_with']
@@ -468,7 +471,7 @@ class RegistrationProcessor(IndependentChannelsPipelineOrchestrator):
     @check_stopped
     def align(self, _force=False):
         try:
-            for channel in self.channels_to_register():
+            for channel in self.channels_to_register:
                 self.align_channel(channel)
                 self.update_watcher_main_progress()
         except CanceledProcessing:
