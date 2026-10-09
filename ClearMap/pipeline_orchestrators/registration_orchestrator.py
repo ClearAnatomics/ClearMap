@@ -22,7 +22,7 @@ from ClearMap.IO.assets_specs import TypeSpec
 from ClearMap.Utils.events import (ChannelRenamed, UiAtlasIdChanged,
                                    UiAtlasStructureTreeIdChanged,  RegistrationStatusChanged, WorkspaceChannelsUpdated)
 from ClearMap.Utils.exceptions import (ClearMapAssetError, ParamsOrientationError, MissingRequirementException,
-                                       NotAnOmeFile, MetadataError)
+                                       NotAnOmeFile, MetadataError, ClearMapRuntimeError)
 from ClearMap.Utils.utilities import (runs_on_ui, check_stopped, DEFAULT_ORIENTATION,
                                       validate_orientation,  sanitize_n_processes)
 
@@ -509,13 +509,30 @@ class RegistrationProcessor(IndependentChannelsPipelineOrchestrator):
             landmarks_files = {'moving_landmarks_path': '', 'fixed_landmarks_path': ''}  # Disable landmarks w/ empty str
         elastix.align_from_dict(align_parameters, landmarks_files, landmarks_weights=channel_cfg['landmarks_weights'])
 
+    def annotator_of(self, channel: str) -> Annotation:
+        """
+        The atlas annotator of a channel.
+
+        Raises
+        ------
+        ClearMapRuntimeError
+            If the atlas of this channel was not set up: the channel is not complete, the setup did not
+            run yet, or it was skipped because the orientation of the channel is not set.
+        """
+        annotator = self.annotators.get(channel)
+        if annotator is None:
+            raise ClearMapRuntimeError(f'No atlas annotator for channel "{channel}": the atlas setup did not run '
+                                       f'for it (channel incomplete, or orientation not set). '
+                                       f'Channels with an annotator: {[c for c, a in self.annotators.items() if a]}.')
+        return annotator
+
     def get_atlas_files(self):
         if not self.get('atlas', asset_sub_type='annotation',
                         channel=self.sample_manager.alignment_reference_channel).exists:
             self.setup_atlases()
         atlas_files = {}
         for channel in self.channels:
-            atlas_files[channel] = self.annotators[channel].get_atlas_paths()
+            atlas_files[channel] = self.annotator_of(channel).get_atlas_paths()
         return atlas_files
 
     @property
@@ -554,7 +571,7 @@ class RegistrationProcessor(IndependentChannelsPipelineOrchestrator):
 
     def update_atlas_asset(self, channel, annotator=None):
         if annotator is None:
-            annotator = self.annotators[channel]
+            annotator = self.annotator_of(channel)
             sample_cfg = self.cfg_coordinator.get_config_view('sample')['channels'][channel]
             orientation = _atlas_orientation(sample_cfg['orientation'])
             xyz_slicing = _atlas_slicing(sample_cfg['slicing'])

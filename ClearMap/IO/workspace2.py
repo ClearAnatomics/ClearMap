@@ -235,8 +235,21 @@ class Workspace2:  # REFACTOR: subclass dict
     def __getitem__(self, key):
         """
         ws[channel] -> AssetCollection
+
+        Raises
+        ------
+        MissingAssetError
+            If the channel is not in the workspace (also a KeyError, for the callers that catch it).
         """
+        if key not in self:
+            raise self._unknown_channel_error(key)
         return self.asset_collections[key]
+
+    def _unknown_channel_error(self, channel: ChannelId) -> MissingAssetError:
+        """The error to raise for a channel which is not in the workspace (single source of the message)"""
+        return MissingAssetError(f'Unknown channel "{channel}". Available channels: {list(self.channels)}. '
+                                 f'A sample channel joins the workspace once its config is complete (path and '
+                                 f'data type); a compound channel must be registered (ensure_pipeline) before use.')
 
     def _iter_channel_specs(self) -> list[ChannelSpec]:
         specs = []
@@ -852,8 +865,7 @@ class Workspace2:  # REFACTOR: subclass dict
         if asset_sub_type and not suffix:
             asset_type += f'_{asset_sub_type}'
         if channel not in self:  # Never guessed: another channel's asset would be silently wrong data
-            raise MissingAssetError(f'Unknown channel "{channel}". Available channels: {list(self.channels)}. '
-                                    f'A compound channel must be registered (ensure_pipeline) before use.')
+            raise self._unknown_channel_error(channel)
 
         if asset_type in self[channel]:
             asset = self[channel][asset_type]
