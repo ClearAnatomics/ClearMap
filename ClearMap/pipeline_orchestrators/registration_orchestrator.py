@@ -249,19 +249,35 @@ class RegistrationProcessor(IndependentChannelsPipelineOrchestrator):
                     continue
 
     @property
+    def all_channels(self) -> list[str]:
+        """
+        ALL the channels of the registration config, complete or not (superset of :attr:`channels`).
+        What the GUI shows and edits; nothing is processed from this list.
+        """
+        return list(self.config['channels'].keys())
+
+    @property
     def channels(self) -> list[str]:
         """
         The channels of the registration config whose sample channel is complete (path and data type).
         The others are only hydrated in the GUI, they are processed once complete.
         """
         complete = self.sample_manager.complete_channels if self.sample_manager is not None else []
-        return [channel for channel in self.config['channels'] if channel in complete]
+        return [channel for channel in self.all_channels if channel in complete]
+
+    def all_channels_to_register(self) -> list[str]:
+        """
+        ALL the channels the config selects for registration, complete or not (superset of
+        :meth:`channels_to_register`), e.g. to list the possible partners in the GUI.
+        """
+        return [c for c in self.all_channels if self.config['channels'][c]['align_with'] is not None]
 
     def channels_to_resample(self):
         return [c for c in self.channels if self.config['channels'][c]['resample']]
 
     def channels_to_register(self):
-        return [c for c in self.channels if self.config['channels'][c]['align_with'] is not None]
+        """The channels selected for registration which can be processed (i.e. complete)"""
+        return [c for c in self.all_channels_to_register() if c in self.channels]
 
     def get_align_with(self, channel):
         return self.config['channels'][channel]['align_with']
