@@ -102,8 +102,8 @@ class RegistrationProcessor(IndependentChannelsPipelineOrchestrator):
 
         self.subscribe(ChannelRenamed, self._on_channel_renamed)
         self.subscribe(WorkspaceChannelsUpdated, self._on_workspace_channels_updated)
-        self.subscribe(UiAtlasIdChanged, self.setup_atlases)
-        self.subscribe(UiAtlasStructureTreeIdChanged, self.setup_atlases)
+        self.subscribe(UiAtlasIdChanged, self._on_atlas_config_changed)
+        self.subscribe(UiAtlasStructureTreeIdChanged, self._on_atlas_config_changed)
 
     def setup(self, sample_manager: Optional[SampleManager] = None):
         self.sample_manager = sample_manager if sample_manager else self.sample_manager
@@ -169,15 +169,18 @@ class RegistrationProcessor(IndependentChannelsPipelineOrchestrator):
         return parametrized
 
     def _on_workspace_channels_updated(self, event: WorkspaceChannelsUpdated) -> None:
-        """A sample channel joined the workspace (its config is now complete): add its registration assets"""
-        if not self.setup_complete or self.workspace is None:
-            return
-        joined = [channel for channel in event.after if channel not in event.before and channel in self.channels]
-        for channel in joined:
-            self.register_channel_in_workspace(channel)
-        if joined:
-            self.setup_atlases()  # The atlas of a channel is skipped while it is incomplete (see setup_atlases)
-            self.parametrize_assets()
+        """
+        The sample channels in the workspace changed (e.g. one became complete): once set up,
+        redo the setup, which is idempotent, so that it includes all the channels now ready,
+        whatever the order in which they joined.
+        """
+        if self._setup_done and self.sample_ready:
+            self.setup()
+
+    def _on_atlas_config_changed(self, event) -> None:
+        """The atlas or its structure tree changed: update the annotators (before the setup, it reads the config)"""
+        if self.setup_complete:
+            self.setup_atlases()
 
     def _on_channel_renamed(self, event: ChannelRenamed):
         if event.old in self.annotators:
@@ -229,7 +232,7 @@ class RegistrationProcessor(IndependentChannelsPipelineOrchestrator):
         return directories
 
     def parametrize_assets(self):
-        for channel in self.config['channels']:
+        for channel in self.channels:
             channel_cfg = self.config['channels'][channel]
             if channel_cfg['align_with'] is None:
                 continue
@@ -247,14 +250,18 @@ class RegistrationProcessor(IndependentChannelsPipelineOrchestrator):
 
     @property
     def channels(self) -> list[str]:
-        """The channels of the registration config"""
-        return list(self.config['channels'].keys())
+        """
+        The channels of the registration config whose sample channel is complete (path and data type).
+        The others are only hydrated in the GUI, they are processed once complete.
+        """
+        complete = self.sample_manager.complete_channels if self.sample_manager is not None else []
+        return [channel for channel in self.config['channels'] if channel in complete]
 
     def channels_to_resample(self):
-        return [c for c, v in self.config['channels'].items() if v['resample']]
+        return [c for c in self.channels if self.config['channels'][c]['resample']]
 
     def channels_to_register(self):
-        return [c for c, v in self.config['channels'].items() if v['align_with'] is not None]
+        return [c for c in self.channels if self.config['channels'][c]['align_with'] is not None]
 
     def get_align_with(self, channel):
         return self.config['channels'][channel]['align_with']
@@ -324,7 +331,7 @@ class RegistrationProcessor(IndependentChannelsPipelineOrchestrator):
     def registration_params_files(self):
         align_dir = Path(settings.resources_path) / self.config['atlas']['align_files_folder']
         registration_params_files = {}
-        for channel in self.config['channels']:
+        for channel in self.channels:
             params_file_names = self.config['channels'][channel]['params_files']
             registration_params_files[channel] = [align_dir / name for name in params_file_names]  # TODO: define as property
         return registration_params_files
@@ -338,7 +345,7 @@ class RegistrationProcessor(IndependentChannelsPipelineOrchestrator):
         """
         Clear (remove) the landmarks files
         """
-        channels = [channel] if channel else self.config['channels'].keys()
+        channels = [channel] if channel else self.channels
         for channel in channels:
             for landmark_type in ('fixed', 'moving'):
                 asset = self.get_elx_asset(f'{landmark_type}_landmarks', channel=channel)
@@ -491,7 +498,7 @@ class RegistrationProcessor(IndependentChannelsPipelineOrchestrator):
                         channel=self.sample_manager.alignment_reference_channel).exists:
             self.setup_atlases()
         atlas_files = {}
-        for channel in self.config['channels']:
+        for channel in self.channels:
             atlas_files[channel] = self.annotators[channel].get_atlas_paths()
         return atlas_files
 
@@ -646,9 +653,7 @@ class RegistrationProcessor(IndependentChannelsPipelineOrchestrator):
         atlas_base_name = ATLAS_NAMES_MAP[atlas_cfg['id']]['base_name']
 
         # TODO: atlas variants as multichannel assets
-        for channel in sample_cfg.keys():
-            if self.workspace is not None and channel not in self.workspace:
-                continue  # Incomplete channel: wait until it joins the workspace
+        for channel in self.channels:
             orientation = _atlas_orientation(sample_cfg[channel]['orientation'])
             xyz_slicing = _atlas_slicing(sample_cfg[channel]['slicing'])
 

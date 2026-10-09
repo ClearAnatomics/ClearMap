@@ -640,6 +640,19 @@ class SampleManager(OrchestratorBase):
 
     @property
     @adjuster_safe
+    def complete_channels(self) -> list[str]:
+        """
+        The channels whose config is complete (path and data type): they are, or are about to be, in the workspace.
+        The others are the incomplete_channels.
+
+        .. warning::
+            Derived from the sample config only, **not** from the workspace (see get_stitchable_channels).
+        """
+        return [channel for channel, cfg in (self.config.get('channels') or {}).items()
+                if channel_can_join_workspace(cfg)]
+
+    @property
+    @adjuster_safe
     def stitchable_channels(self) -> list[str]:
         return self.get_stitchable_channels()
 
