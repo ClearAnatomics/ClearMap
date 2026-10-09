@@ -54,6 +54,21 @@ It holds a reference to an
 and provides per-sample worker and sample-manager access, plus progress and
 threading plumbing.
 
+Contract
+--------
+These rules hold for every orchestrator, new code must respect them:
+
+- **Qt independent**: orchestrators run headless. Qt is only imported for the plots, which are optional.
+  The GUI asks the orchestrators (and the SampleManager) and never the other way round.
+- **Readiness is read in this layer**: whether a sample channel is usable is read from the
+  :class:`~ClearMap.pipeline_orchestrators.sample_info_management.SampleManager` and its workspace
+  (see :attr:`PipelineOrchestrator.sample_ready` and :attr:`PipelineOrchestrator.setup_complete`), derived
+  and never stored, since the channels change after the setup.
+- **Only complete sample channels are processed**: a sample channel (path and data type set) joins the
+  workspace through the SampleManager, never through a processor. The incomplete ones are only hydrated
+  in the GUI, hence the distinction between the channels of a config (all) and the channels to process.
+- **Fail early and explicitly**: a missing channel or asset raises an error that names it, not a bare KeyError.
+
 Relationship to the GUI
 -----------------------
 The GUI never calls processing code directly.  Instead, each
