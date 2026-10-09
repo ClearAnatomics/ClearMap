@@ -462,12 +462,13 @@ class BinaryVesselProcessor(TubeMapOrchestrator):
         self.inputs_match = True  # WARNING: may need to be reset when changing channels to binarize
         self.inputs_shapes = shapes
 
+    @property
     def channels_to_binarize(self) -> tuple[str, ...]:
         """The channels binarized one by one, then combined: the parts of compound_channel"""
         return self.compound_channel
 
     def assets_to_binarize(self) -> list[Any]:
-        channels_to_binarize = self.channels_to_binarize()
+        channels_to_binarize = self.channels_to_binarize
         assets_to_binarize = [self.workspace.get('stitched', channel=c) for c in channels_to_binarize]
         return assets_to_binarize
 
@@ -475,7 +476,7 @@ class BinaryVesselProcessor(TubeMapOrchestrator):
 
     def run(self):
         self.binarize()
-        for channel in self.channels_to_binarize():
+        for channel in self.channels_to_binarize:
             self.postprocess(channel)
         self.combine_binary()
 
@@ -483,7 +484,7 @@ class BinaryVesselProcessor(TubeMapOrchestrator):
         if not self.inputs_match:
             self.assert_input_shapes_match()
         if self.inputs_match:
-            for channel in self.channels_to_binarize():
+            for channel in self.channels_to_binarize:
                 self.binarize_channel(channel)
         else:
             raise ValueError('Channels to binarize have different shapes. This is not supported yet.')
@@ -531,7 +532,7 @@ class BinaryVesselProcessor(TubeMapOrchestrator):
                          if stp not in BinaryVesselProcessorSteps._lifecycle_steps]
                          # and stp in asset_to_gui]  # TODO: check guard against unknown steps
             first_op = gui_order[0] if gui_order else operation_type
-            first_step = channel == self.channels_to_binarize()[0] and operation_type == first_op
+            first_step = channel == self.channels_to_binarize[0] and operation_type == first_op
             increment_main = not first_step
             self.prepare_watcher_for_substep(n_blocks, self.block_re,
                                              f'{operation_type} {channel.title()}', increment_main)
@@ -693,8 +694,8 @@ class BinaryVesselProcessor(TubeMapOrchestrator):
     def combine_binary(self):
         """Merge the binary images of the different vascular network components into a single mask"""
         sink_asset = self.get('binary', channel=self.compound_channel, asset_sub_type='combined')  # Temporary
-        if len(self.channels_to_binarize()) > 1:
-            sources = [self.steps[ch].get_last_output() for ch in self.channels_to_binarize()]
+        if len(self.channels_to_binarize) > 1:
+            sources = [self.steps[ch].get_last_output() for ch in self.channels_to_binarize]
             perf_params = self.config['performance']['binarization']['combine']['block_processing']
             block_processing.process(np.logical_or, sources, sink_asset.path,
                                      size_max=perf_params['size_max'], overlap=perf_params['overlap'],

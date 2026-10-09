@@ -1832,7 +1832,7 @@ class VasculatureTab(PostProcessingTab['BinaryVesselProcessor']):
         """Run the complete vasculature pipeline."""
         try:
             worker = self.get_worker(substep='binary')
-            for channel in worker.channels_to_binarize():
+            for channel in worker.channels_to_binarize:
                 self.binarize_and_postprocess_channel(channel, stop_on_error=True)
         except ClearMapVRamException:  # TODO: check if we should popup
             return
