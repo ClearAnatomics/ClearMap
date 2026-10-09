@@ -1932,8 +1932,16 @@ class VasculatureTab(PostProcessingTab['BinaryVesselProcessor']):
         self.wrap_step('Running voxelization', worker.voxelize, step_kw_args=voxelization_params)#, main_thread=True)
 
     @GenericTab.ui_plot('Plotting vasculature graph voxelization')
-    def plot_voxelization(self):
-        """Plot the density map of the current graph filters"""
+    def plot_voxelization(self, _=None):
+        """
+        Plot the density map of the current graph filters
+
+        Parameters
+        ----------
+        _ : bool, optional
+            The ``checked`` state sent by the ``clicked`` signal (and forwarded by ``ui_plot``).
+            Unused, accepted so that the button can be connected directly.
+        """
         graph_params = self.params.graph_params
         return self.get_worker(substep='graph').plot_voxelization(
             self.main_window.centralWidget(), weight=self.params.visualization_params.graph_weight(graph=None),
