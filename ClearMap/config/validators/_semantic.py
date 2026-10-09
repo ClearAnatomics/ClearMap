@@ -1,6 +1,7 @@
 from typing import Any, Dict, Iterable, Mapping
 
 from ...Utils.exceptions import AggregatedValidationError
+from ..compound_keys import compound_channel_parts
 
 __all__ = ['run_semantic_checks']
 
@@ -22,12 +23,24 @@ def _channels_in_section(config: Mapping[str, Any], section: str) -> Iterable[st
 
 
 def _validate_channels_subset(config: Mapping[str, Any], section: str) -> list[str]:
+    """
+    Every channel of a section must be a sample channel. The key of a compound channel
+    (e.g. ``'cfos-dapi'`` in colocalization) is checked through its parts, which are the sample channels.
+    """
     known = _sample_channels(config)
-    names = set(_channels_in_section(config, section))
-    unknown = sorted(names - known)
+    unknown: set[str] = set()
+    malformed: list[str] = []
+    for name in _channels_in_section(config, section):
+        try:
+            parts = compound_channel_parts(name) or (name,)
+        except (TypeError, ValueError) as err:
+            malformed.append(f"[{section}] channels: invalid channel key {name!r}: {err}")
+            continue
+        unknown.update(part for part in parts if part not in known)
+    errors = malformed
     if unknown:
-        return [f"[{section}] channels: unknown {unknown}; not present in sample.channels"]
-    return []
+        errors.append(f"[{section}] channels: unknown {sorted(unknown)}; not present in sample.channels")
+    return errors
 
 
 def _validate_registration_refs(config: Mapping[str, Any]) -> list[str]:
