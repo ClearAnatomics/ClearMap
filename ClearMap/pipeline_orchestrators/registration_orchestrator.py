@@ -457,12 +457,12 @@ class RegistrationProcessor(IndependentChannelsPipelineOrchestrator):
     def n_registration_steps(self):
         n_steps_atlas_setup = 1
         n_steps_align = 2  # WARNING: probably 1 more when arteries included
-        n_resampling_steps = len(self.sample_manager.channels_to_resample())
+        n_resampling_steps = len(self.channels_to_resample)
         return n_steps_atlas_setup + n_resampling_steps + n_steps_align
 
     @check_stopped
     def resample_for_registration(self, _force=False):
-        for i, channel in enumerate(self.sample_manager.channels_to_resample()):
+        for i, channel in enumerate(self.channels_to_resample):
             self.resample_channel(channel, increment_main=i != 0)
             if self.stopped:
                 return
