@@ -74,6 +74,8 @@ vessel_type_postprocessing:
   capillaries_removal:
     min_artery_component_edges: 30
     min_vein_component_edges: 30
+degree1_inference:
+  threshold: 0.8  # A degree 1 vertex scoring above this is predicted to be a tip cell
 visualization:
   voxelization:
     size: [15, 15, 15]
@@ -143,3 +145,6 @@ performance:
       n_processes: -1
     reduce:
       n_processes: -1
+  degree1_inference:
+    batch_size: 16  # Patches per batch on the GPU
+    n_workers: 8  # Data loader workers (0: main process)

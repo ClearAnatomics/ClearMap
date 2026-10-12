@@ -150,6 +150,12 @@ properties:
           min_artery_size: { $ref: "./typedefs.schema.yaml#/$defs/positiveNumber" }
           min_vein_size:   { $ref: "./typedefs.schema.yaml#/$defs/positiveNumber" }
 
+  degree1_inference:
+    type: object
+    additionalProperties: true
+    properties:
+      threshold: { type: number, minimum: 0, maximum: 1 }  # A degree 1 vertex scoring above this is predicted to be a tip cell
+
   visualization:
     type: object
     additionalProperties: true
@@ -215,3 +221,9 @@ properties:
             additionalProperties: true
             properties:
               n_processes: { $ref: "./typedefs.schema.yaml#/$defs/nProcessesType" }
+      degree1_inference:
+        type: object
+        additionalProperties: true
+        properties:
+          batch_size: { $ref: "./typedefs.schema.yaml#/$defs/positiveInteger" }
+          n_workers:  { $ref: "./typedefs.schema.yaml#/$defs/nonNegativeInteger" }  # Data loader workers, 0: main process

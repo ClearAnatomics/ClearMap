@@ -62,3 +62,23 @@ def test_forbidden_extension_string_fails(src_dir: Path, schemas_dir: Path, sche
     bad['default_tile_extension'] = [forbidden_extension]
     errors = list(validator.iter_errors(bad))
     assert errors, 'Expected validation to fail for non-dot-prefixed extension'
+
+
+@pytest.mark.parametrize('path, bad_value', [
+    (('degree1_inference', 'threshold'), 1.5),  # A score is in [0, 1]
+    (('degree1_inference', 'threshold'), -0.1),
+    (('performance', 'degree1_inference', 'batch_size'), 0),  # At least one patch
+    (('performance', 'degree1_inference', 'n_workers'), -1),  # 0 is the main process
+])
+def test_degree1_inference_out_of_range_value_fails(src_dir: Path, schemas_dir: Path, schema_registry,
+                                                    path: tuple, bad_value):
+    validator = Validator(_load_schema(schemas_dir / 'vasculature.schema.yaml'), registry=schema_registry)
+    cfg = _load_yaml(src_dir / 'vasculature.yml')
+    assert not list(validator.iter_errors(cfg)), 'The defaults are valid'
+
+    section = cfg
+    for key in path[:-1]:
+        section = section[key]
+    section[path[-1]] = bad_value
+
+    assert list(validator.iter_errors(cfg)), f'{".".join(path)}={bad_value} should be refused'
