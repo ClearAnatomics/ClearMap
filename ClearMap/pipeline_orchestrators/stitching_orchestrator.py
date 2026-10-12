@@ -59,25 +59,31 @@ class StitchingProcessor(IndependentChannelsPipelineOrchestrator):
         return self.sample_manager.stitchable_channels
 
     def setup(self, sample_manager: Optional[SampleManager] = None, convert_tiles: bool = False):
-        self.sample_manager = sample_manager if sample_manager else self.sample_manager
-        if not self.cfg_coordinator.get_config_view('stitching'):
-            # Config not yet loaded (e.g. processor created before boot_open).
-            # workspace stays None; setup_complete stays False.
-            warnings.warn('Stitching config not set in config coordinator; '
-                          'StitchingProcessor setup incomplete.', stacklevel=2)
-            return
+        """
+        Attach the workspace of the sample, then set up the stitching proper once the sample is ready for it.
 
+        The workspace is attached whatever the channels: the raw data of the channels that are not tiled
+        (pre-stitched) is prepared with it (see prepare_all_channels_raw_data), without stitching, so
+        without the stitching config, which only exists when the sample has stitchable (tiled) channels.
+        """
+        self.sample_manager = sample_manager if sample_manager else self.sample_manager
+        self._setup_done = False
         if self.sample_manager.workspace is not None:
             self.workspace = self.sample_manager.workspace
 
-        if self.sample_ready:
-            self.register_in_workspace()
-            if convert_tiles:
-                self.convert_tiles()  # TODO: check if needed
-            self._setup_done = True
-        else:
-            self._setup_done = False
+        if not self.sample_ready:
             warnings.warn('Sample manager not set up yet, stitching processor setup incomplete', stacklevel=2)
+            return
+        if not self.cfg_coordinator.get_config_view('stitching'):
+            if self.channels:  # The stitching section is required as soon as a channel is stitchable
+                warnings.warn(f'Stitching config not set in config coordinator although the channels '
+                              f'{self.channels} are stitchable; StitchingProcessor setup incomplete.', stacklevel=2)
+            return  # Otherwise, nothing to stitch: not set up, and nothing to say
+
+        self.register_in_workspace()
+        if convert_tiles:
+            self.convert_tiles()  # TODO: check if needed
+        self._setup_done = True
 
     @check_stopped
     def convert_tiles(self, _force=False):

@@ -8,7 +8,9 @@ docstring of :mod:`ClearMap.pipeline_orchestrators.generic_orchestrators`.
 import warnings
 from pathlib import Path
 
+import numpy as np
 import pytest
+import tifffile
 
 import ClearMap.pipeline_orchestrators.colocalization as colocalization_module
 from ClearMap.Utils.exceptions import ClearMapConfigError, ClearMapRuntimeError, MissingAssetError
@@ -21,6 +23,8 @@ from .conftest import RAW_FOLDER_NAME, ChannelEditor
 DATA_TYPE = 'nuclei'
 RESOLUTION = (1.625, 1.625, 3.0)
 CHANNELS_OF_EVERY_PIPELINE = {'nuclei_a': 'nuclei', 'nuclei_b': 'nuclei', 'myelin': 'myelin', 'vessels': 'vessels'}
+STACK_SHAPE = (3, 8, 8)  # z, y, x: a tiny stack, enough for the file handling
+TILE_EXPRESSION = 'tile_Y<Y,2>_X<X,2>.tif'
 TEMPLATES_SANITIZER_WARNING = '[runtime-templates]'  # What the last resort sanitizer says when it removes templates
 
 
@@ -208,6 +212,52 @@ def test_colocalization_worker_is_finalised_when_the_resolution_and_the_cells_ar
 
     assert worker.setup_finalised
     assert worker.colocalization_channel('channel_2').voxel_dims == RESOLUTION
+
+
+# ----------------------------------------------------------------------------------------------------------------
+# The stitching worker: it prepares the raw data of all the channels, it stitches the tiled ones
+# ----------------------------------------------------------------------------------------------------------------
+
+def _write_stack(path: Path) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tifffile.imwrite(path, np.zeros(STACK_SHAPE, dtype=np.uint16))
+    return path
+
+
+def test_raw_data_of_a_pre_stitched_channel_is_prepared_without_the_stitching_config(experiment, channel_editor,
+                                                                                    tmp_path):
+    """No tiled channel: no stitching section, but the pre-stitched channel is imported all the same"""
+    stack = _write_stack(tmp_path / RAW_FOLDER_NAME / 'pre_stitched.tif')
+    channel_editor.add('test', DATA_TYPE)
+    experiment.apply_ui_patch({'sample': {'channels': {'test': {'path': str(stack)}}}})
+    assert 'stitching' not in experiment.cfg_coordinator.active_sections
+
+    stitching_worker = experiment.get_worker('stitching')
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter('always')
+        stitching_worker.setup_if_needed()
+        prepared = stitching_worker.prepare_all_channels_raw_data()
+
+    assert prepared == ['test']
+    assert experiment.sample_manager.get('stitched', channel='test').exists
+    assert not stitching_worker.setup_complete  # Nothing to stitch
+    assert [str(w.message) for w in caught] == []  # Nothing to warn about either
+
+
+def test_stitching_worker_is_set_up_when_a_channel_is_tiled(experiment, channel_editor, tmp_path):
+    tiles_folder = tmp_path / RAW_FOLDER_NAME / 'tiles'
+    for y in range(2):
+        for x in range(2):
+            _write_stack(tiles_folder / f'tile_Y{y:02d}_X{x:02d}.tif')
+    channel_editor.add('test', DATA_TYPE)
+    experiment.apply_ui_patch({'sample': {'channels': {'test': {'path': str(tiles_folder / TILE_EXPRESSION)}}}})
+
+    stitching_worker = experiment.get_worker('stitching')
+    stitching_worker.setup_if_needed()
+
+    assert 'stitching' in experiment.cfg_coordinator.active_sections
+    assert stitching_worker.channels == ['test']
+    assert stitching_worker.setup_complete
 
 
 # ----------------------------------------------------------------------------------------------------------------
