@@ -1,4 +1,5 @@
 import math
+import warnings
 from typing import List, Optional
 
 import numpy as np
@@ -6,7 +7,7 @@ import pandas as pd
 
 from ClearMap.IO.workspace2 import Workspace2
 
-from ClearMap.Utils.exceptions import ClearMapValueError, ClearMapConfigError
+from ClearMap.Utils.exceptions import ClearMapValueError, ClearMapConfigError, ClearMapRuntimeError
 from ClearMap.Utils.utilities import sanitize_n_processes
 
 from ClearMap.config.config_coordinator import ConfigCoordinator
@@ -45,18 +46,30 @@ class ColocalizationProcessor(PerCompoundConfigMixin, CompoundChannelPipelineOrc
         self.setup_finalised: bool = False
         self.setup(sample_manager, channels, registration_processor)
 
-    def setup(self, sample_manager: Optional[SampleManager], channel_names: tuple[str],
+    def setup(self, sample_manager: Optional[SampleManager] = None, channel_names: Optional[tuple[str, ...]] = None,
               registration_processor: Optional[RegistrationProcessor] = None):
-        self.compound_channel = tuple(channel_names)
+        """
+        Register the pair of channels in the workspace once the sample is ready for it (see sample_ready),
+        then finalise: load what the comparison needs, when available. Idempotent, what is not given
+        (sample manager, channels, registration processor) is the one already set, so that it can be
+        called again, e.g. by setup_if_needed.
+        """
+        if channel_names is not None:
+            self.compound_channel = tuple(channel_names)
         if registration_processor is not None:
             self.registration_processor = registration_processor
         if sample_manager is not None:
             self.sample_manager = sample_manager
-            self.workspace = sample_manager.workspace
 
+        if self.sample_ready:
+            self.workspace = self.sample_manager.workspace
             self.register_in_workspace()
-
+            self._setup_done = True
             self.finalise_setup()
+        else:
+            self._setup_done = False
+            warnings.warn(f'Sample not ready for the channels {self.compound_channel}, '
+                          f'ColocalizationProcessor setup incomplete')
 
     def register_in_workspace(self) -> None:
         """
@@ -83,6 +96,28 @@ class ColocalizationProcessor(PerCompoundConfigMixin, CompoundChannelPipelineOrc
                 self.setup_finalised = False
         self.setup_finalised = all(finalised_channels.values())
 
+    def setup_if_needed(self):
+        """Set up if not complete, and finalise if not done: the cells or the resolution may be there now"""
+        if not self.setup_complete or not self.setup_finalised:
+            self.setup()
+
+    def colocalization_channel(self, channel: str) -> ColocalizationChannel:
+        """
+        The object that computes the colocalization for one channel of the pair, finalising the setup
+        first if it was not possible earlier (see finalise_setup).
+
+        Raises
+        ------
+        ClearMapRuntimeError
+            If it is still not possible: the cells of the channel are not detected, or its resolution is not set.
+        """
+        self.finalise_setup()
+        if channel not in self.colocalization_channels:
+            raise ClearMapRuntimeError(f'Colocalization is not ready for channel "{channel}": the cells must be '
+                                       f'detected and the resolution set. Ready channels: '
+                                       f'{list(self.colocalization_channels)}.')
+        return self.colocalization_channels[channel]
+
     def get_cells_df(self, channel):
         return pd.read_feather(self.get_path('cells', channel=channel))
 
@@ -92,11 +127,11 @@ class ColocalizationProcessor(PerCompoundConfigMixin, CompoundChannelPipelineOrc
         perf_cfg = self.cfg_coordinator.get_config_view(self.config_name)['performance']
         n_processes = sanitize_n_processes(perf_cfg['n_processes'])
 
-        report = self.colocalization_channels[channel_a].compare(self.colocalization_channels[channel_b],
-                                                                 blob_diameter=voxel_blob_diameter,
-                                                                 size_min=4*voxel_blob_diameter,
-                                                                 size_max=6*voxel_blob_diameter, #  FIXME: add control for size_max
-                                                                 processes=n_processes)
+        report = self.colocalization_channel(channel_a).compare(self.colocalization_channel(channel_b),
+                                                                blob_diameter=voxel_blob_diameter,
+                                                                size_min=4*voxel_blob_diameter,
+                                                                size_max=6*voxel_blob_diameter, #  FIXME: add control for size_max
+                                                                processes=n_processes)
         report_path = self.get_path('colocalization', channel=(channel_a, channel_b),
                                     asset_sub_type='report')
         report.reset_index(inplace=True)  # WARNING: extract the index (no drop) to a separate column to allow saving to feather
@@ -159,7 +194,7 @@ class ColocalizationProcessor(PerCompoundConfigMixin, CompoundChannelPipelineOrc
                                                asset_sub_type='report'))  # TODO: see if we cache
         maximum_distance = self.config['analysis']['max_particle_distance']
         within_distance_mask = report['closest blob distance'].values < maximum_distance
-        chan_a = self.colocalization_channels[channel_a]
+        chan_a = self.colocalization_channel(channel_a)
         channel_a_particle_coordinates = report.loc[within_distance_mask, [f'center of bounding box {ax}'
                                                                            for ax in chan_a.coord_names]]
         channel_a_particle_coordinates.columns = list(chan_a.coord_names)
@@ -193,7 +228,7 @@ class ColocalizationProcessor(PerCompoundConfigMixin, CompoundChannelPipelineOrc
         else:
             voxelization_parameter['shape'] = self.sample_manager.resampled_shape(channel_a)
         channel_a_particle_coordinates, _, _ = self.filter_table(channel_a, channel_b)
-        coordinates = channel_a_particle_coordinates[list(self.colocalization_channels[channel_a].coord_names)].values
+        coordinates = channel_a_particle_coordinates[list(self.colocalization_channel(channel_a).coord_names)].values
         return coordinates, voxelization_parameter
 
     def voxelize_unweighted(self, channel_a, channel_b, coordinates, voxelization_parameter):
