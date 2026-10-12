@@ -21,7 +21,6 @@ from ..Alignment.utils import get_all_region_ids
 from ..Analysis.Statistics.group_assets import GroupResultsAssets
 from ..IO.assets_constants import CHANNELS_ASSETS_TYPES_CONFIG
 from ..Utils.exceptions import GroupStatsError
-from ..Visualization.Qt.Plot3d import PlotPanel, multi_plot_from_panels
 from ..config.atlas import ATLAS_NAMES_MAP
 from ..config.compound_keys import CompoundKey
 
@@ -400,24 +399,24 @@ class DensityGroupAnalysisOrchestrator(GroupOrchestratorBase):
             colored_atlas = annotator.create_color_annotation()
 
             panels = [
-                PlotPanel(images=res.gp1_avg, title=f'{gp1} avg', lut='flame'),
-                PlotPanel(images=res.gp2_avg, title=f'{gp2} avg', lut='flame'),
-                PlotPanel(images=res.p_vals, title='P values', lut=None),
+                plot_3d.PlotPanel(images=res.gp1_avg, title=f'{gp1} avg', lut='flame'),
+                plot_3d.PlotPanel(images=res.gp2_avg, title=f'{gp2} avg', lut='flame'),
+                plot_3d.PlotPanel(images=res.p_vals, title='P values', lut=None),
             ]
 
             if advanced:
                 if res.gp1_sd is not None:
-                    panels.append(PlotPanel(images=res.gp1_sd, title=f'{gp1} SD', lut='viridis'))
+                    panels.append(plot_3d.PlotPanel(images=res.gp1_sd, title=f'{gp1} SD', lut='viridis'))
                 if res.gp2_sd is not None:
-                    panels.append(PlotPanel(images=res.gp2_sd, title=f'{gp2} SD', lut='viridis'))
+                    panels.append(plot_3d.PlotPanel(images=res.gp2_sd, title=f'{gp2} SD', lut='viridis'))
                 if res.effect_size is not None:
-                    panels.append(PlotPanel(images=res.effect_size, title='Effect size', lut='flame'))
+                    panels.append(plot_3d.PlotPanel(images=res.effect_size, title='Effect size', lut='flame'))
 
             panels.append(
-                PlotPanel(images=colored_atlas, title='Atlas', lut=None, min_max=(0, 255))
+                plot_3d.PlotPanel(images=colored_atlas, title='Atlas', lut=None, min_max=(0, 255))
             )
 
-            dvs = multi_plot_from_panels(panels, arrange=False, sync=True, parent=parent)
+            dvs = plot_3d.multi_plot_from_panels(panels, arrange=False, sync=True, parent=parent)
 
             names_map = annotator.get_names_map()
             for dv in dvs:
