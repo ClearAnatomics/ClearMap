@@ -17,6 +17,9 @@ COMPRESSION_ALGORITHMS = ('gzip', 'bz2', 'zip', 'lzma')
 
 CHECKSUM_ALGORITHMS = ('md5', 'sha1', 'sha256', 'sha512')
 
+TIP_CELLS_SCORED_SUB_TYPE = 'tip_cells_scored'
+"""The sub type of the graph assets whose degree 1 vertices have a tip cell score and prediction"""
+
 
 """
 Mapping of resource types to the folder where they are stored.
@@ -202,7 +205,7 @@ CHANNELS_ASSETS_TYPES_CONFIG = {
         'file_format_category': 'graph',
         'resource_type': 'graphs',
         'relevant_pipelines': ['TubeMap', 'AxonMap'],
-        'sub_types': ['raw', 'cleaned', 'reduced', 'annotated', 'updated']
+        'sub_types': ['raw', 'cleaned', 'reduced', 'annotated', TIP_CELLS_SCORED_SUB_TYPE]
     },
 }
 
