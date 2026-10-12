@@ -71,9 +71,7 @@ class MachineConfig:
             raise FileNotFoundError(f'Packaged default machine config not found: {default_path}.'
                                     f'Please check your ClearMap installation.')
 
-        user_path.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(default_path, user_path)
-        return user_path
+        return ConfigHandler.copy_if_missing(default_path, user_path)
 
     def _patch_temp_dir_cfg(self, path_str: str):
         cfg = self._read_cfg()

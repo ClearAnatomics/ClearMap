@@ -9,6 +9,7 @@ a simple plugin function to this module.
 import inspect
 import json
 import re
+import shutil
 import warnings
 from dataclasses import dataclass
 from enum import Enum
@@ -1144,6 +1145,39 @@ class ConfigHandler:
         patch_cfg(cfg, default_cfg)
         cfg.write()
         return cfg
+
+    @classmethod
+    def copy_if_missing(cls, src: Path, dst: Path) -> Path:
+        """
+        Make sure the config file `dst` exists, by copying `src` (e.g. the package default of a config to the
+        user folder) if it is missing. An existing `dst` is never touched, so the edits of the user are kept.
+
+        The file is copied as is (so with its comments, which document the parameters to the user) if the
+        formats are the same, converted otherwise. The write is atomic.
+
+        Parameters
+        ----------
+        src: Path
+            The config file to copy. It must exist.
+        dst: Path
+            The config file to ensure.
+
+        Returns
+        -------
+        Path
+            dst
+        """
+        dst = Path(dst)
+        if dst.exists():
+            return dst
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        if Path(src).suffix.lower() == dst.suffix.lower():
+            tmp = dst.with_suffix(f'{dst.suffix}.tmp')
+            shutil.copyfile(src, tmp)
+            atomic_replace(tmp, dst)
+        else:
+            cls.dump(dst, cls.get_cfg_from_path(src))
+        return dst
 
     @classmethod
     def dump(cls, path: Path, data: dict) -> None:

@@ -25,15 +25,15 @@ def update_default_config():  # FIXME: add carry over of previous version settin
         if ALTERNATIVES_REG.is_legacy_cfg(cfg_name):
             continue
         package_default_path = ConfigHandler.get_default_path(cfg_name, must_exist=True, from_package=True)
-        package_default_cfg = ConfigHandler.get_cfg_from_path(package_default_path)
         if ALTERNATIVES_REG.is_global_cfg(cfg_name):
             user_path = ConfigHandler.get_global_canonical_path(cfg_name)
         else:
             user_path = ConfigHandler.get_user_defaults_canonical_path(cfg_name)
         if not user_path.exists():  # missing -> copy
             print(f'Creating missing default config for {cfg_name}')
-            ConfigHandler.dump(user_path, package_default_cfg)  # this can convert formats too
+            ConfigHandler.copy_if_missing(package_default_path, user_path)  # this can convert formats too
         else:  # if config for **this** version is already present -> merge
+            package_default_cfg = ConfigHandler.get_cfg_from_path(package_default_path)
             user_default_cfg = ConfigHandler.get_cfg_from_path(user_path)
 
             print(f'Merging "{cfg_name}" config section')

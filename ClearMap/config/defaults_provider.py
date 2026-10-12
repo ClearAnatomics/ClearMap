@@ -5,7 +5,7 @@ from typing import Dict, Any, Optional, Iterable
 
 from .config_handler import ConfigHandler, INSTALL_CFG_DIR, ALTERNATIVES_REG
 from .validators.json_schema_utils import build_schema_registry_from_dir, load_yaml_schema, compile_validator
-
+from ..Utils.exceptions import ClearMapValueError
 
 JsonDict = Dict[str, Any]
 
@@ -121,14 +121,18 @@ class DefaultsProvider:
             warnings.warn(f'Static validation error for defaults section "{section}": {err}')
             return False
 
+    def __package_cfg_path(self, section: str) -> Path:
+        """Where the package defaults of `section` are (they may not exist: no file, only the code fallback)"""
+        return ConfigHandler.get_default_path(section, must_exist=False, from_package=True,
+                                              base_dir=self.__builtin_dir)  # For tests if not None
+
     def __get_cfg(self, section: str, from_package: bool) -> Optional[dict]:
         """
         The config of `section` from the package defaults, or from the user: the user defaults, or the
         user (global) config itself for the global sections (machine, display), which have no user defaults.
         """
         if from_package:
-            cfg_path = ConfigHandler.get_default_path(section, must_exist=False, from_package=True,
-                                                      base_dir=self.__builtin_dir)  # For tests if not None
+            cfg_path = self.__package_cfg_path(section)
         elif ConfigHandler.is_global(section):
             cfg_path = ConfigHandler.get_global_path(section, must_exist=False,
                                                      base_dir=self.__user_dir)  # For tests if not None

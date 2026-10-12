@@ -87,3 +87,87 @@ def test_global_path_of_a_missing_config_follows_base_dir_and_version(empty_user
     assert path.is_relative_to(other_dir)
     assert path == ConfigHandler.get_global_canonical_path(GLOBAL_CFG_NAME, root=other_dir, version='3.0')
     assert path != ConfigHandler.get_global_canonical_path(GLOBAL_CFG_NAME)
+
+
+# ---- Copy of a default config to the user folder ---------------------------------------------------------
+
+YAML_WITH_COMMENT = 'verbosity: debug  # Documents the parameter for the user\n'
+
+
+def test_copy_if_missing_copies_the_file_as_is_with_its_comments(tmp_path):
+    from ClearMap.config.config_handler import ConfigHandler
+    src = tmp_path / 'package' / 'machine.yml'
+    src.parent.mkdir()
+    src.write_text(YAML_WITH_COMMENT)
+    dst = tmp_path / 'user' / 'sub' / 'machine.yml'
+
+    assert ConfigHandler.copy_if_missing(src, dst) == dst
+
+    assert dst.read_text() == YAML_WITH_COMMENT
+    assert not list(dst.parent.glob('*.tmp'))
+
+
+def test_copy_if_missing_never_overwrites_the_edits_of_the_user(tmp_path):
+    from ClearMap.config.config_handler import ConfigHandler
+    src = tmp_path / 'machine.yml'
+    src.write_text(YAML_WITH_COMMENT)
+    dst = tmp_path / 'user_machine.yml'
+    dst.write_text('verbosity: quiet\n')
+
+    ConfigHandler.copy_if_missing(src, dst)
+
+    assert dst.read_text() == 'verbosity: quiet\n'
+
+
+def test_copy_if_missing_converts_to_the_format_of_the_destination(tmp_path):
+    import json
+    from ClearMap.config.config_handler import ConfigHandler
+    src = tmp_path / 'machine.yml'
+    src.write_text(YAML_WITH_COMMENT)
+    dst = tmp_path / 'machine.json'
+
+    ConfigHandler.copy_if_missing(src, dst)
+
+    assert json.loads(dst.read_text()) == {'verbosity': 'debug'}
+
+
+# ---- Copy of a default config to the user folder ---------------------------------------------------------
+
+YAML_WITH_COMMENT = 'verbosity: debug  # Documents the parameter for the user\n'
+
+
+def test_copy_if_missing_copies_the_file_as_is_with_its_comments(tmp_path):
+    from ClearMap.config.config_handler import ConfigHandler
+    src = tmp_path / 'package' / 'machine.yml'
+    src.parent.mkdir()
+    src.write_text(YAML_WITH_COMMENT)
+    dst = tmp_path / 'user' / 'sub' / 'machine.yml'
+
+    assert ConfigHandler.copy_if_missing(src, dst) == dst
+
+    assert dst.read_text() == YAML_WITH_COMMENT
+    assert not list(dst.parent.glob('*.tmp'))
+
+
+def test_copy_if_missing_never_overwrites_the_edits_of_the_user(tmp_path):
+    from ClearMap.config.config_handler import ConfigHandler
+    src = tmp_path / 'machine.yml'
+    src.write_text(YAML_WITH_COMMENT)
+    dst = tmp_path / 'user_machine.yml'
+    dst.write_text('verbosity: quiet\n')
+
+    ConfigHandler.copy_if_missing(src, dst)
+
+    assert dst.read_text() == 'verbosity: quiet\n'
+
+
+def test_copy_if_missing_converts_to_the_format_of_the_destination(tmp_path):
+    import json
+    from ClearMap.config.config_handler import ConfigHandler
+    src = tmp_path / 'machine.yml'
+    src.write_text(YAML_WITH_COMMENT)
+    dst = tmp_path / 'machine.json'
+
+    ConfigHandler.copy_if_missing(src, dst)
+
+    assert json.loads(dst.read_text()) == {'verbosity': 'debug'}
