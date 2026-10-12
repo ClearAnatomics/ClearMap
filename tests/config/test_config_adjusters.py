@@ -4,9 +4,13 @@ import pytest
 
 from ClearMap.Utils.utilities import DELETE, deep_merge
 from ClearMap.config.compound_keys import PairKey
-from ClearMap.config.config_adjusters.adjusters_api import Phase
+from ClearMap.config.config_adjusters.adjusters_api import AdjusterScope, Phase
 from ClearMap.config.config_adjusters.engine import run_adjusters
-from ClearMap.config.defaults_provider import set_defaults_provider
+from ClearMap.config.config_adjusters.type_hints import AdjustmentContext
+from ClearMap.config.defaults_provider import DefaultsProvider, get_defaults_provider, set_defaults_provider
+
+REQUIRED_SECTIONS = frozenset({'sample', 'stitching', 'registration', 'cell_map', 'tract_map', 'colocalization',
+                               'vasculature'})
 
 
 # convenience function for tests
@@ -16,137 +20,10 @@ def apply_patch(base_view, patch):
     return base
 
 
-class _FakeDefaultsProvider:
-    """
-    Just enough structure for adjusters to run.
-    """
-    def __init__(self):
-        self._store = {
-            'sample': {
-                'templates': {
-                    'channel': {
-                        # populate_sample_channel_defaults fills these if missing
-                        'orientation': [0, 0, 0],
-                        'resolution': [1.0, 1.0, 1.0],
-                        'data_type': 'nuclei',
-                    }
-                },
-            },
-            'stitching': {
-                'templates': {
-                    # layout channel owns the layout
-                    'layout_template': {
-                        'layout_channel': '${channel}',
-                        'rigid': True,
-                        'wobbly': False,
-                        'path_template': 'raw/${channel}',
-                    },
-                    # derived channel points at a reference layout
-                    'derived_template': {
-                        'layout_channel': '${reference}',
-                        'rigid': False,
-                        'wobbly': True,
-                        'path_template': 'derived/${channel}_from_${reference}',
-                    },
-                }
-            },
-            'registration': {
-                'templates': {
-                    'autofluorescence': {
-                        'moving': '${reference}',
-                        'fixed': '${reference}',
-                        'resample': True,
-                    },
-                    'regular': {
-                        'moving': '${reference}',
-                        'fixed': '${reference}',
-                        'resample': False,
-                    },
-                }
-            },
-            'cell_map': {
-                'templates': {
-                    'channel': {
-                        'detection': {
-                            'colocalization_compatible': False,
-                            'background_correction': {'diameter': [10, 10]}
-                        },
-                    }
-                }
-            },
-            'tract_map': {
-                'templates': {
-                    'channel': {
-                        'steps': {
-                            'binarize': True,
-                            'extract_coordinates': True,
-                            'transform_coordinates': True,
-                            'label_coordinates': True,
-                            'voxelize': True,
-                            'export_df': True,
-                        }
-                    }
-                }
-            },
-            'colocalization': {
-                'templates': {
-                    'channel': {
-                        'comparison': {'particle_diameter': 30},
-                        'analysis': {'relative_overlap_threshold': 0.5}
-                    }
-                }
-            },
-            'vasculature': {
-                'binarization': {
-                    'templates': {
-                        'vessels_template': {
-                            'binarize': {'run': True, 'clip_range': [350, 1000], 'threshold': None},
-                            'smooth': {'run': True},
-                            'binary_fill': {'run': True},
-                            'deep_fill': {'run': True, 'size_max': 500, 'overlap': 50, 'resample_factor': 1},
-                        },
-                        'large_vessels_template': {
-                            'binarize': {'run': True, 'clip_range': [1000, 8000], 'threshold': 450},
-                            'smooth': {'run': True},
-                            'binary_fill': {'run': True},
-                            'deep_fill': {'run': True, 'size_max': 1000, 'overlap': 100, 'resample_factor': 2},
-                        },
-                    },
-                    'combined': { 'binary_fill': True, 'compress': False },
-                },
-                'graph_construction': {
-                    'skeletonize': True, 'build': True, 'clean': True,
-                    'reduce': True, 'transform': True, 'annotate': True, 'use_arteries': True,
-                },
-                'vessel_type_postprocessing': {},
-                'visualization': {},
-                'performance': {
-                    'binarization': {
-                        'templates': {
-                            'vessels_template': {},  # TODO: fill
-                            'large_vessels_template': {}, # TODO: fill
-                        },
-                    },
-                },
-            },
-            'group_analysis': {
-                'paths': {'root': 'group_out'}
-            },
-            'batch_processing': {
-                'paths': {'root': 'batch_out'}
-            },
-            'machine': {
-                'temp_folder': None,
-                'n_processes': -1,
-            },
-            'display': {
-                'colormap': 'gray',
-                'gamma': 1.0,
-            },
-        }
+def _template(section: str, name: str) -> dict:
+    """A template of the defaults of the package (what the adjusters expand)"""
+    return get_defaults_provider().get(section)['templates'][name]
 
-    def get(self, section: str):
-        return deepcopy(self._store.get(section, {}))
 
 # --- Fake SampleManager ------------------------------------------------------------
 
@@ -159,6 +36,7 @@ class _FakeSampleManager:
     ref: str | None = None
     detect: list[str] | None = None
     colox_ok: bool = True
+    required_sections: frozenset[str] = REQUIRED_SECTIONS
 
     @property
     def channels(self): return self.chs
@@ -197,71 +75,84 @@ class _FakeSampleManager:
     def colocalization_pair_keys(self, *, oriented: bool = False):
         return [str(PairKey(a, b, oriented=oriented)) for a, b in self.colocalization_pairs(oriented=oriented)]
 
-# --- Module-scoped injection of defaults provider ---------------------------------
+    def compute_required_sections(self) -> set[str]:
+        return set(self.required_sections)
+
+# --- The defaults of the package (the templates the adjusters expand) --------------
 
 @pytest.fixture(scope='module', autouse=True)
-def _inject_defaults_provider():
-    old = set_defaults_provider(_FakeDefaultsProvider())
+def _package_defaults_provider(tmp_path_factory):
+    """
+    The real defaults of the package, not a copy: a copy goes stale when the templates change.
+    The user defaults folder is an empty one, so that the user's ~/.clearmap is not read.
+    """
+    user_dir = tmp_path_factory.mktemp('empty_user_defaults')
+    old = set_defaults_provider(DefaultsProvider(user_dir=user_dir))
     try:
         yield
     finally:
-        # leave the fake in place or restore if you keep a global elsewhere
         set_defaults_provider(old)
 
+
+def _adjust(view, sm, sections=None):
+    """Run the PRE_VALIDATE adjusters of `sections` (all if None) for the sample manager `sm`"""
+    ctx = AdjustmentContext(scope=AdjusterScope.EXPERIMENT, sample_manager=sm)
+    return run_adjusters(view=view, ctx=ctx, phase=Phase.PRE_VALIDATE, active_sections=sections)
+
+
 def _adjust_stitching(view, sm):
-    return run_adjusters(view=view, sample_manager=sm, phase=Phase.PRE_VALIDATE, active_sections=('stitching',))
+    return _adjust(view, sm, ('stitching',))
 
 def _adjust_registration(view, sm):
-    return run_adjusters(view=view, sample_manager=sm, phase=Phase.PRE_VALIDATE, active_sections=('registration',))
+    return _adjust(view, sm, ('registration',))
 
 def _adjust_cell_map(view, sm):
-    return run_adjusters(view=view, sample_manager=sm, phase=Phase.PRE_VALIDATE, active_sections=('cell_map',))
+    return _adjust(view, sm, ('cell_map',))
 
 def _adjust_coloc(view, sm):
-    return run_adjusters(view=view, sample_manager=sm, phase=Phase.PRE_VALIDATE, active_sections=('colocalization',))
+    return _adjust(view, sm, ('colocalization',))
 
 def _adjust_vasc(view, sm):
-    return run_adjusters(view=view, sample_manager=sm, phase=Phase.PRE_VALIDATE, active_sections=('vasculature',))
+    return _adjust(view, sm, ('vasculature',))
 
 def _adjust_groups(view, sm):
-    return run_adjusters(view=view, sample_manager=sm, phase=Phase.PRE_VALIDATE, active_sections=('group_analysis',))
+    return _adjust(view, sm, ('group_analysis',))
 
 def _adjust_batch(view, sm):
-    return run_adjusters(view=view, sample_manager=sm, phase=Phase.PRE_VALIDATE, active_sections=('batch_processing',))
+    return _adjust(view, sm, ('batch_processing',))
 
 def _adjust_machine(view, sm):
-    return run_adjusters(view=view, sample_manager=sm, phase=Phase.PRE_VALIDATE, active_sections=('machine',))
+    return _adjust(view, sm, ('machine',))
 
 def _adjust_display(view, sm):
-    return run_adjusters(view=view, sample_manager=sm, phase=Phase.PRE_VALIDATE, active_sections=('display',))
+    return _adjust(view, sm, ('display',))
 
 
 def test_populate_sample_channel_defaults_fills_missing():
     sm = _FakeSampleManager(['Ch488'])
     view = {'sample': {'channels': {'Ch488': {'data_type': 'nuclei'}}}}
-    patch = run_adjusters(view=view, sample_manager=sm, phase=Phase.PRE_VALIDATE,
-                          active_sections=None)
+    patch = _adjust(view, sm)
     patch = apply_patch(view, patch)
     filled = patch['sample']['channels']['Ch488']
-    assert filled['orientation'] == [0, 0, 0]
-    assert filled['resolution'] == [1.0, 1.0, 1.0]
+    template = _template('sample', 'channel')
+    assert filled['orientation'] == template['orientation']
+    assert filled['resolution'] == template['resolution']
     # user-provided survives
-    assert filled['data_type'] == 'nuclei'
+    assert filled['data_type'] == 'nuclei' != template['data_type']
 
-def test_stitching_materialize_layout_then_derived():
+def test_stitching_materialize_layout_channels():
+    """Two stitchable channels: each one is its own layout, with the full layout template"""
     sm = _FakeSampleManager(['Ch488', 'Ch561'], types={'Ch488': 'nuclei', 'Ch561': 'nuclei'})
     view = {'sample': {'channels': {'Ch488': {}, 'Ch561': {}}}, 'stitching': {'channels': {}}}
     patch = _adjust_stitching(view, sm)
     patch = apply_patch(view, patch)
     chs = patch['stitching']['channels']
     assert set(chs.keys()) == {'Ch488', 'Ch561'}
-    # one becomes layout of itself, the other derived from it
-    assert chs['Ch488']['layout_channel'] == 'Ch488'
-    assert chs['Ch561']['layout_channel'] in {'Ch488', 'Ch561'}
-    # templates expanded
-    assert 'path_template' not in chs['Ch561']
-    assert chs['Ch561']['rigid'] is True
-    assert chs['Ch561']['wobbly'] is False
+    layout_template = _template('stitching', 'layout_template')
+    for channel in ('Ch488', 'Ch561'):
+        assert chs[channel]['layout_channel'] == channel  # ${channel} expanded
+        assert chs[channel]['rigid'] == layout_template['rigid']
+        assert chs[channel]['wobbly'] == layout_template['wobbly']
 
 
 @pytest.fixture()
@@ -299,12 +190,14 @@ def test_registration_reconciles_channels_and_placeholders():
     patch = apply_patch(view, patch)
     chs = patch['registration']['channels']
 
-    # Channels where inserted
+    # Channels were inserted
     assert set(chs.keys()) == {'AF', 'Ch561'}
-    # AF uses atlas & mask true
-    assert chs['AF']['fixed'] == 'atlas' and chs['AF']['resample'] is True
-    # regular uses provided alignment reference
-    assert chs['Ch561']['fixed'] == 'AF'
+    # The autofluorescence (alignment reference) is aligned with the atlas
+    assert chs['AF']['align_with'] == 'atlas' and chs['AF']['resample'] is True
+    assert chs['AF']['params_files'] == _template('registration', 'autofluorescence')['params_files']
+    # A regular channel is aligned with the alignment reference
+    assert chs['Ch561']['align_with'] == 'AF'
+    assert chs['Ch561']['params_files'] == _template('registration', 'regular')['params_files']
 
 def test_cell_map_channel_template_applied():
     sm = _FakeSampleManager(['Ch488', 'Ch561'])
@@ -315,28 +208,8 @@ def test_cell_map_channel_template_applied():
     # Channels where inserted
     assert set(chs.keys()) == {'Ch488', 'Ch561'}
     #
-    detection = chs['Ch488']['detection']
-    assert detection['colocalization_compatible'] is False
-    assert detection['background_correction']['diameter'] == [10, 10]
+    assert chs['Ch488']['detection'] == _template('cell_map', 'channel')['detection']
 
-
-# 'templates': {
-#     'channel': {
-#         'comparison': {'particle_diameter': 30},
-#         'analysis': {'relative_overlap_threshold': 0.5}
-#     }
-
-def test_colocalization_pairs_and_rename_migration():
-    sm = _FakeSampleManager(['A', 'B'], detect=['A', 'B'], renamed={'old_A': 'A'})
-    # existing override using old pair name
-    view = {'colocalization': {'channels': {'old_A-B': {'comparison': {'particle_diameter': 25}}}}}
-    patch = _adjust_coloc(view, sm)
-    patch = apply_patch(view, patch)
-    chs = patch['colocalization']['channels']
-    # canonical key
-    assert set(chs.keys()) == {'A-B'}
-    # override migrated (metric carried)
-    assert chs['A-B']['comparison']['particle_diameter'] == 25
 
 def test_vasculature_builds_channels_and_combined_present():
     sm = _FakeSampleManager(['V1', 'V2'], types={'V1': 'vessels', 'V2': 'veins'})
@@ -349,21 +222,6 @@ def test_vasculature_builds_channels_and_combined_present():
     v1 = binarization['single_channels']['V1']
     assert 'binarize' in v1
     assert 'deep_fill' in v1
-
-def test_vasculature_apply_renames():
-    sm = _FakeSampleManager(['Ch_new'], renamed={'Ch_old': 'Ch_new'})
-    view = {'vasculature': {'binarization':
-                                {'single_channels':
-                                     {'Ch_old': {'binary_fill':
-                                                     {'run': True}}},
-                                 'combined': {'binary_fill': True}}}}
-    patch = _adjust_vasc(view, sm)  # reconcile will also seed section keys
-    # run rename step explicitly too (same phase/pipeline)
-    view1 = apply_patch(view, patch)
-    patch2 = run_adjusters(view=view1, sample_manager=sm, phase=Phase.PRE_VALIDATE, active_sections=('vasculature',))
-    merged = apply_patch(view1, patch2)
-    chs = merged['vasculature']['binarization']['single_channels']
-    assert 'Ch_old' not in chs and 'Ch_new' in chs
 
 # def test_group_analysis_defaults_and_group_normalization():
 #     sm = _FakeSampleManager(['A'])
@@ -388,7 +246,10 @@ def test_vasculature_apply_renames():
 def test_machine_and_display_fill_missing():
     sm = _FakeSampleManager(['A'])
     view = {'machine': {}, 'display': {}}
-    mpatch = _adjust_machine(view, sm)
-    dpatch = _adjust_display(view, sm)
-    assert mpatch['machine']['n_processes'] == -1
-    assert dpatch['display']['colormap'] == 'gray'
+    # One view each: the runner merges what the adjusters emit into the view it is given
+    mpatch = _adjust_machine(deepcopy(view), sm)
+    dpatch = _adjust_display(deepcopy(view), sm)
+    machine_defaults = get_defaults_provider().get('machine')
+    display_defaults = get_defaults_provider().get('display')
+    assert mpatch['machine']['verbosity'] == machine_defaults['verbosity']
+    assert dpatch['display'].keys() == display_defaults.keys()

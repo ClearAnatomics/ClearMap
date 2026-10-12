@@ -51,10 +51,10 @@ def test_pairkey_canonical_object(input_, expected):
             ["Ch488-Ch640", "Ch488-Ch561"],
         ),
         ("Ch561-Ch640", {}, []),
-        (
+        (  # Only the first part was renamed (the second one has no predecessor): the self key is discarded
             "Ch561-Ch640",
             {"Ch488": "Ch561"},
-            ["Ch488-Ch640", "Ch488-Ch561"],
+            ["Ch488-Ch640"],
         ),
     ],
 )

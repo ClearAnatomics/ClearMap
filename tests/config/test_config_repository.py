@@ -2,18 +2,26 @@ from pathlib import Path
 
 import pytest
 
+from ClearMap.config.config_handler import ALTERNATIVES_REG
 from ClearMap.config.config_repository import ConfigRepository
 
 
-def test_repo_lists_sections(tmp_repo: Path, sections):
-    repo = ConfigRepository(base_dir=tmp_repo)
-    names = set(repo.list_sections())
-    # our temp repo is seeded with these via conftest
-    assert set(sections) <= names
+def test_repo_lists_the_sections_it_is_given(tmp_repo: Path, sections):
+    repo = ConfigRepository(base_dir=tmp_repo, known_names=sections)
+
+    assert repo.list_sections() == list(sections)
 
 
-def test_repo_read_returns_dict(tmp_repo: Path):
+def test_repo_knows_the_minimum_sections_by_default(tmp_repo: Path):
+    """Without names, the sample and the global configs: the pipeline sections are the active ones to add"""
     repo = ConfigRepository(base_dir=tmp_repo)
+
+    expected = {'sample', *ALTERNATIVES_REG.canonical_global_config_names}
+    assert set(repo.list_sections()) == expected
+
+
+def test_repo_read_returns_dict(tmp_repo: Path, sections):
+    repo = ConfigRepository(base_dir=tmp_repo, known_names=sections)
     sample = repo.load('sample')
     assert isinstance(sample, dict)
     assert 'channels' in sample
