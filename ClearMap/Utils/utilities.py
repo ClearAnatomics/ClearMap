@@ -20,7 +20,7 @@ from copy import deepcopy
 from functools import reduce
 from operator import getitem
 from types import MappingProxyType
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 
 import numpy as np
 import psutil
@@ -99,6 +99,21 @@ def gpu_params(dest_file_path):  # Uses 1 query instead of 3 because too time-co
     cmd = 'nvidia-smi --query-gpu=memory.used,memory.total,utilization.gpu --format=noheader,csv,nounits'
     cmd += f' > {dest_file_path}'
     subprocess.Popen(cmd, shell=True)
+
+
+def cuda_unavailable_reason() -> Optional[str]:
+    """
+    Why PyTorch cannot use an NVIDIA GPU on this machine, or None if it can.
+
+    Cheap enough for the GUI to decide whether to offer GPU-only features.
+    """
+    try:
+        import torch  # Heavy, and only the classification needs it
+    except ImportError:
+        return 'PyTorch is not installed'
+    if not torch.cuda.is_available():
+        return 'PyTorch does not see any CUDA GPU (an NVIDIA one is required)'
+    return None
 
 
 class CancelableProcessPoolExecutor(ProcessPoolExecutor):

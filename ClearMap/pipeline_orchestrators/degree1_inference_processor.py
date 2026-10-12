@@ -1,87 +1,156 @@
 """
-This module provides functionality to run inference on the nature of degree=1 vertices in a vascular graph,
-detecting tip cells and interrupted vessels.
+degree1_inference_processor
+===========================
 
-The main user function is `degree1_verification`, which performs inference on the graph vertices
-and updates the graph in place with predictions based on a pre-trained model.
+Classification of the degree 1 vertices of the vascular graph: tip cells (vessels that grow or retract)
+or ends of a bad tracing (interrupted vessels, to be reconnected later).
+
+:class:`Degree1InferenceProcessor` is the third worker of the TubeMap pipeline, after the
+:class:`~ClearMap.pipeline_orchestrators.tube_map.BinaryVesselProcessor` and
+:class:`~ClearMap.pipeline_orchestrators.tube_map.VesselGraphProcessor`. It takes the most advanced
+graph that exists, extracts a patch of the vessels image around each of its degree 1 vertices, and has a
+model score them. The graph with the score and prediction of its vertices
+(see :mod:`ClearMap.Analysis.graphs.tip_cells`) is a new asset (:data:`TIP_CELLS_SCORED_SUB_TYPE`):
+the graphs it is computed from are left as they are.
+
+The model runs on an NVIDIA GPU: check :func:`~ClearMap.Utils.utilities.cuda_unavailable_reason`
+before offering the step.
+
+Typical usage::
+
+    tip_cells = exp_ctrl.get_worker('vasculature', substep='degree1')
+    tip_cells.run()
 """
+from __future__ import annotations
 
-# FIXME: this is not a processor. It does not follow the processor API. Convert or move to another location.
+from typing import Optional
 
 from ClearMap.Analysis.graphs.tip_cells import add_tip_cell_properties
-from ClearMap.ImageProcessing.machine_learning.vertices_classification.degree1_inference_utils import (run_inference,
-                                                                                                       get_default_model_path)
-from ClearMap.pipeline_orchestrators.tube_map import BinaryVesselProcessor
+from ClearMap.IO.assets_constants import TIP_CELLS_SCORED_SUB_TYPE
+from ClearMap.IO.workspace2 import Workspace2
+from ClearMap.Utils.events import WorkspaceChannelsUpdated
+from ClearMap.Utils.exceptions import CudaNotAvailableError, MissingRequirementException
+from ClearMap.Utils.utilities import cuda_unavailable_reason
+from ClearMap.config.config_coordinator import ConfigCoordinator
+
+from .sample_info_management import SampleManager
+from .tube_map import TubeMapOrchestrator, VesselGraphProcessorSteps
+
+PROGRESS_TITLE = 'Classifying the degree 1 vertices'
 
 
-def degree1_verification(sample_manager, model_weights_path=None, threshold=0.8, stitched_img_channel='vasc',
-                         graph_channel=('vasc'), graph_step=None):
+def _inference_utils():
+    """The module of the model (it imports torch, so only when it is needed)"""
+    from ClearMap.ImageProcessing.machine_learning.vertices_classification import degree1_inference_utils
+    return degree1_inference_utils
+
+
+class Degree1InferenceProcessor(TubeMapOrchestrator):
     """
-    Perform tip cells / interrupted vessels detection and update the graph with predictions.
-    Called externally from the pipeline (e.g. tube_map_new_api.py) with no additional logic inside.
+    Scores the degree 1 vertices of the vascular graph of the TubeMap compound channel (see the module).
 
-    Parameters
+    Attributes
     ----------
-
-    sample_manager : ClearMap.processors.sample_preparation.SampleManager
-        The SampleManager instance managing the sample data.
-    model_weights_path : str | Path | None
-        Path to the model weights file for inference. Default is None, which uses the default model.
-    threshold : float
-        Threshold for tip cell prediction. Default is 0.8.
-    stitched_img_channel : str
-        The channel of the stitched image to use for inference.
-        This is the channel which contains the grayscale of the tip cells.
-        Default is 'vasc'.
-    graph_channel: str or tuple or list
-        The channel(s) of the graph.
-        This can be a single channel or a tuple/list of channels.
-        Default is ('vasc',).
-    graph_step: str or None
-        The step in the graph processing pipeline to use for inference.
-        Typically, one of ['raw', 'cleaned', 'reduced', 'annotated']
-        If None, the default graph step will be used.
+    steps : VesselGraphProcessorSteps
+        The graphs of the pipeline, to find the most advanced one that exists.
     """
-    print("[INFO] Degree=1 Inference Processor launched...")
+    def __init__(self, sample_manager: Optional[SampleManager] = None,
+                 config_coordinator: Optional[ConfigCoordinator] = None):
+        super().__init__(config_coordinator)
+        self.sample_manager: Optional[SampleManager] = sample_manager
+        self.workspace: Optional[Workspace2] = None  # Set in setup
+        self.steps: VesselGraphProcessorSteps = VesselGraphProcessorSteps(self.workspace)
 
-    if model_weights_path is None:
-        model_weights_path = get_default_model_path()
+        self.setup(sample_manager)
+        self.subscribe(WorkspaceChannelsUpdated, self._on_workspace_channels_updated)
 
-    if not isinstance(graph_channel, tuple):
-        if isinstance(graph_channel, list):
-            graph_channel = tuple(graph_channel)
-        else:
-            graph_channel = (graph_channel,)
+    def _on_workspace_channels_updated(self, evt: WorkspaceChannelsUpdated) -> None:
+        if self.sample_ready:
+            self.setup()
 
-    # Force the workspace to recognise the compound channel of the graph
-    _ = BinaryVesselProcessor(sample_manager=sample_manager)
+    def setup(self, sample_manager: Optional[SampleManager] = None) -> None:
+        self.sample_manager = sample_manager if sample_manager is not None else self.sample_manager
+        self._setup_done = False
+        if self.sample_ready:
+            self.workspace = self.sample_manager.workspace
+            self._follow_sample_compound_channel()
+            self.steps.workspace = self.workspace
+            self.steps.channel = self.compound_channel
+            self._setup_done = True
 
-    stitched_asset = sample_manager.get('stitched', channel=stitched_img_channel)
-    graph_asset = sample_manager.get('graph', channel=graph_channel, asset_sub_type=graph_step)
+    # ################################ INPUTS ####################################
 
-    if not stitched_asset.exists or not graph_asset.exists:
-        print(f"[WARNING] Required files missing: {stitched_asset.path} or {graph_asset.path}")
-        return
+    @staticmethod
+    def ensure_cuda_available() -> None:
+        """
+        Raises
+        ------
+        CudaNotAvailableError
+            If the model cannot run on this machine (see cuda_unavailable_reason).
+        """
+        reason = cuda_unavailable_reason()
+        if reason is not None:
+            raise CudaNotAvailableError(f'The degree 1 vertices cannot be classified: {reason}.')
 
-    # Load image and graph
-    image = stitched_asset.open_ro()
-    graph = graph_asset.read()
+    @property
+    def graph_step(self) -> str:
+        """The most advanced step of the graph that exists: the one that is classified"""
+        step = self.steps.last_step
+        if step is None:
+            raise MissingRequirementException(f'No graph found for {self.compound_channel}: build it first '
+                                              f'to classify its degree 1 vertices.')
+        return step
 
-    # Prepare vertex coordinates (DataFrame)
-    coords_df = graph.vertex_properties_table(['coordinates'], with_degrees=True)
+    def _get_existing_asset(self, asset_type: str, channel, what: str, **kwargs):
+        asset = self.get(asset_type, channel=channel, **kwargs)
+        if not asset.exists:
+            raise MissingRequirementException(f'The {what} is missing: {asset.path}')
+        return asset
 
-    # Run model inference
-    scores_df = run_inference(
-        image=image,
-        vertices_df=coords_df,
-        model_weights=model_weights_path,
-        batch_size=16,
-        n_workers=8
-    )
+    # ############################### PROCESSING #################################
 
-    # Update graph and save
-    updated_graph_path = sample_manager.get_path('graph', channel=graph_channel, asset_sub_type='updated')
-    add_tip_cell_properties(graph, scores_df, threshold=threshold)
-    graph.save(updated_graph_path)
+    def run(self) -> None:
+        """
+        Score the degree 1 vertices of the most advanced graph and save the result as a new graph.
 
-    print("Degree=1 Inference Processor completed.")
+        Raises
+        ------
+        CudaNotAvailableError
+            If there is no usable GPU.
+        MissingRequirementException
+            If the graph, the image of the vessels or the weights of the model are missing.
+        ClearMapVRamException
+            If the GPU does not have enough memory for the batch size
+            (``performance.degree1_inference.batch_size``).
+        """
+        self.ensure_cuda_available()
+        inference = _inference_utils()
+
+        weights = inference.get_default_model_path()
+        if not weights.exists():
+            where = f' Download them from {inference.MODEL_WEIGHTS_URL}.' if inference.MODEL_WEIGHTS_URL else ''
+            raise MissingRequirementException(f'The weights of the model are missing: {weights}.{where}')
+
+        step = self.graph_step
+        graph_asset = self._get_existing_asset('graph', self.compound_channel, f'graph ({step})', asset_sub_type=step)
+        image_asset = self._get_existing_asset('stitched', self.representative_channel, 'stitched image of the vessels')
+
+        graph = graph_asset.read()
+        coords_table = graph.vertex_properties_table(['coordinates'], with_degrees=True)
+        scores = inference.run_inference(image=image_asset.open_ro(), vertices_df=coords_table, model_weights=weights,
+                                         batch_size=self.perf_config['batch_size'],
+                                         n_workers=self.perf_config['n_workers'],
+                                         on_start=self._prepare_progress, on_batch_done=self._on_batch_done)
+
+        add_tip_cell_properties(graph, scores, threshold=self.config['degree1_inference']['threshold'])
+        self.get('graph', channel=self.compound_channel, asset_sub_type=TIP_CELLS_SCORED_SUB_TYPE).write(graph)
+
+    @property
+    def perf_config(self) -> dict:
+        return self.config['performance']['degree1_inference']
+
+    def _prepare_progress(self, n_batches: int) -> None:
+        self.prepare_watcher_for_substep(n_batches, None, PROGRESS_TITLE)
+
+    def _on_batch_done(self) -> None:
+        self.update_watcher_progress(1)

@@ -12,9 +12,9 @@ import pytest
 
 QT_MODULES = ('PyQt5', 'pyqtgraph')
 RESULT_MARKER = 'QT_MODULES_IMPORTED:'
-HEADLESS_MODULES = ('cell_map', 'colocalization', 'experiment_controller', 'generic_orchestrators',
-                    'group_orchestrators', 'registration_orchestrator', 'sample_info_management',
-                    'stitching_orchestrator', 'tract_map', 'tube_map')
+HEADLESS_MODULES = ('cell_map', 'colocalization', 'degree1_inference_processor', 'experiment_controller',
+                    'generic_orchestrators', 'group_orchestrators', 'registration_orchestrator',
+                    'sample_info_management', 'stitching_orchestrator', 'tract_map', 'tube_map')
 
 
 def _qt_modules_imported_by(module: str) -> list[str]:

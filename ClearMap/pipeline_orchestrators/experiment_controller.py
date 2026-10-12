@@ -223,7 +223,7 @@ class ExperimentController(BusSubscriberMixin):
         def colocalization_factory(sm, coord, key):
             from ClearMap.pipeline_orchestrators.colocalization import ColocalizationProcessor
             return ColocalizationProcessor(sm, coord, channels=key, registration_processor=reg_proc)
-        # vasculature as substeps (single pipeline, two steps)
+        # vasculature as substeps (single pipeline, three steps)
         def binary_vessel_processor_factory(sm, coord, key=None):
             from ClearMap.pipeline_orchestrators.tube_map import BinaryVesselProcessor
             return BinaryVesselProcessor(sm, coord)
@@ -231,6 +231,10 @@ class ExperimentController(BusSubscriberMixin):
         def vessel_graph_processor_factory(sm, coord, key=None):
             from ClearMap.pipeline_orchestrators.tube_map import VesselGraphProcessor
             return VesselGraphProcessor(sm, coord, registration_processor=reg_proc)
+
+        def degree1_inference_processor_factory(sm, coord, key=None):
+            from ClearMap.pipeline_orchestrators.degree1_inference_processor import Degree1InferenceProcessor
+            return Degree1InferenceProcessor(sm, coord)
 
         self.register_worker_factory('stitching',  stitching_factory, scope='global')
         self.register_worker_factory('registration', registration_factory, scope='global')
@@ -245,6 +249,8 @@ class ExperimentController(BusSubscriberMixin):
                                      substep='binary', scope='global')
         self.register_worker_factory('vasculature', vessel_graph_processor_factory,
                                      substep='graph', scope='global')
+        self.register_worker_factory('vasculature', degree1_inference_processor_factory,
+                                     substep='degree1', scope='global')
 
     def register_worker_factory(self, pipeline: str, factory: Callable, substep: Optional[str] = None,
                                 scope: str = 'global') -> None:

@@ -61,7 +61,8 @@ def image():
 
 
 def _run(image, **kwargs):
-    return inference_utils.run_inference(image, VERTICES, 'unused_weights', batch_size=BATCH_SIZE, **kwargs)
+    return inference_utils.run_inference(image=image, vertices_df=VERTICES, model_weights='unused_weights',
+                                         batch_size=BATCH_SIZE, **kwargs)
 
 
 def test_only_the_degree_1_vertices_with_a_patch_in_the_image_are_classified(image):

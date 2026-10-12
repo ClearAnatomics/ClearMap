@@ -123,7 +123,7 @@ class PatchDataset(Dataset):
         self.vertices_df = self.vertices_df[valid_mask].reset_index(drop=True)
 
 
-def run_inference(image, vertices_df, model_weights, batch_size, n_workers=0,
+def run_inference(*, image, vertices_df, model_weights, batch_size, n_workers=0,
                   on_start: Optional[Callable[[int], None]] = None, on_batch_done: Optional[Callable[[], None]] = None):
     """
     Run inference on patches (of shape PATCH_SHAPE) centered on degree=1 graph vertices.

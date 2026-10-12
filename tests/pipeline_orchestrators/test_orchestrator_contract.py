@@ -18,8 +18,8 @@ import pytest
 
 from ClearMap.pipeline_orchestrators.generic_orchestrators import PipelineOrchestrator
 
-ORCHESTRATOR_MODULES = ('cell_map', 'colocalization', 'registration_orchestrator', 'stitching_orchestrator',
-                        'tract_map', 'tube_map')
+ORCHESTRATOR_MODULES = ('cell_map', 'colocalization', 'degree1_inference_processor', 'registration_orchestrator',
+                        'stitching_orchestrator', 'tract_map', 'tube_map')
 
 NUCLEI_CHANNELS = ('nuclei_a', 'nuclei_b')
 SAMPLE_CHANNELS = {'nuclei_a': 'nuclei', 'nuclei_b': 'nuclei', 'myelin': 'myelin', 'vessels': 'vessels'}
@@ -41,6 +41,7 @@ WORKER_SPECS = (
     WorkerSpec('colocalization', None, NUCLEI_CHANNELS, needs_channels=True),
     WorkerSpec('vasculature', 'binary', None, needs_channels=True),
     WorkerSpec('vasculature', 'graph', None, needs_channels=True),
+    WorkerSpec('vasculature', 'degree1', None, needs_channels=True),
 )
 
 

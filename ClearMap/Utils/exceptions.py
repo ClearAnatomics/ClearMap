@@ -662,6 +662,16 @@ class ClearMapVRamException(ClearMapException):
         return (RETRY, DISMISS)
 
 
+class CudaNotAvailableError(ClearMapRuntimeError):
+    """A step that needs a CUDA GPU (an NVIDIA one) cannot run: there is none, or the software that uses it
+    (e.g. PyTorch) cannot see it. Unlike ClearMapVRamException, retrying will not help.
+    """
+    severity = Severity.FATAL
+    user_title = 'No CUDA GPU'
+    user_hint = ('This step needs an NVIDIA GPU and its drivers. '
+                 'Check that the GPU is visible (nvidia-smi) and that PyTorch is installed with CUDA support.')
+
+
 class SmiError(ClearMapException):
     """``nvidia-smi`` returned an error or could not be executed.
 
