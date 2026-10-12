@@ -409,6 +409,7 @@ class BinaryVesselProcessor(TubeMapOrchestrator):
 
     def setup(self, sample_manager=None):
         self.sample_manager = sample_manager if sample_manager is not None else self.sample_manager
+        self._setup_done = False
         if self.sample_ready:
             self.workspace = self.sample_manager.workspace
 
@@ -435,6 +436,7 @@ class BinaryVesselProcessor(TubeMapOrchestrator):
                     self.workspace, channel=channel_name,
                     config_provider=lambda ch=channel_name: (
                         self.config.get('binarization', {}).get('single_channels', {}).get(ch, {})))
+            self._setup_done = True
 
     # ############################### INPUTS ###############################
 
@@ -831,12 +833,14 @@ class VesselGraphProcessor(TubeMapOrchestrator):
     def setup(self, sample_manager=None, registration_processor=None):
         self.sample_manager = sample_manager if sample_manager is not None else self.sample_manager
         self.registration_processor = registration_processor or self.registration_processor
+        self._setup_done = False
         if self.sample_ready:
             self.workspace = self.sample_manager.workspace
             self.steps.workspace = self.workspace
 
             self._follow_sample_compound_channel()
             self.steps.channel = self.compound_channel
+            self._setup_done = True
 
     def __get_graph(self, step):
         if step not in self.__graphs:
