@@ -179,7 +179,7 @@ class TabRegistry:  # FIXME: ensure that colocalization tab existence is trigger
 
         # Compound tabs (e.g. colocalization)
         def coloc_compatible(sm: "SampleManager") -> bool:
-            return sm.is_colocalization_compatible
+            return sm.is_colocalization_ready  # Two complete channels to detect, not only two data types
 
         required += self._filter_by_requirements(self._compound_tabs, sample_manager,
                                                  extra_requires=coloc_compatible, existing=required)

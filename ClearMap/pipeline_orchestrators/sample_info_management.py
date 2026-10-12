@@ -544,26 +544,42 @@ class SampleManager(OrchestratorBase):
 
     @property
     @adjuster_safe
+    def complete_channels_to_detect(self) -> list[str]:
+        """The channels_to_detect which are complete (path and data type), i.e. can be in the workspace"""
+        complete = self.complete_channels
+        return [channel for channel in self.channels_to_detect if channel in complete]
+
+    @property
+    @adjuster_safe
     def is_colocalization_compatible(self) -> bool:
+        """
+        Whether the config has two channels to detect (by data type only, complete or not). The config of the
+        colocalization pairs follows this. See is_colocalization_ready for what the colocalization tab needs.
+        """
         return len(self.channels_to_detect) > 1
+
+    @property
+    @adjuster_safe
+    def is_colocalization_ready(self) -> bool:
+        """Whether there are two complete channels to detect, the least to colocalize something"""
+        return len(self.complete_channels_to_detect) > 1
+
+    @staticmethod
+    def _channel_pairs(channels: Iterable[str]) -> list[tuple[str, str]]:
+        """All the pairs of channels (the order in channels is kept, duplicates removed)"""
+        deduped = list(dict.fromkeys(channels))
+        return [(deduped[i], deduped[j]) for i in range(len(deduped)) for j in range(i + 1, len(deduped))]
 
     @adjuster_safe
     def colocalization_pairs(self) -> list[tuple[str, str]]:
         if not self.is_colocalization_compatible:
             return []
-        src = self.channels_to_detect
-        seen = set()
-        deduped: list[str] = []
-        for ch in src:
-            if ch not in seen:
-                deduped.append(ch)
-                seen.add(ch)
+        return self._channel_pairs(self.channels_to_detect)
 
-        out: list[tuple[str, str]] = []
-        for i in range(len(deduped)):
-            for j in range(i + 1, len(deduped)):
-                out.append((deduped[i], deduped[j]))  # preserve order from channels_to_detect
-        return out
+    @adjuster_safe
+    def complete_colocalization_pairs(self) -> list[tuple[str, str]]:
+        """The colocalization_pairs whose two channels are complete: the ones that can be processed"""
+        return self._channel_pairs(self.complete_channels_to_detect)
 
     @adjuster_safe
     def colocalization_pair_keys(self, *, oriented: bool) -> list[str]:

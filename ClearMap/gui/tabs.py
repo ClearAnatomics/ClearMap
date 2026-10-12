@@ -1971,13 +1971,13 @@ class ColocalizationTab(PostProcessingTab['ColocalizationProcessor']):
 
     def _get_channels(self):  # intentional override: returns pairs, not list[str]
         """
-        Create combinations (e.g. [('Ch0','Ch1'), ('Ch0','Ch2'), ...]) of the channels to detect.
-        Permutations are excluded
+        The pairs of complete channels to detect (e.g. [('Ch0','Ch1'), ('Ch0','Ch2'), ...]). Permutations
+        are excluded. A channel which is not complete yet (path, data type) cannot be colocalized.
 
-        Note: return type is intentionally ``Iterable[tuple[str, str]]`` rather than
+        Note: return type is intentionally ``list[tuple[str, str]]`` rather than
         ``list[str]`` — _create_channels is overridden to handle this.
         """
-        return itertools.combinations(self.sample_manager.channels_to_detect, 2)
+        return self.sample_manager.complete_colocalization_pairs()
 
     def _bind(self) -> None:
         pass
@@ -1991,7 +1991,8 @@ class ColocalizationTab(PostProcessingTab['ColocalizationProcessor']):
         if not isinstance(self.ui.channelsParamsTabWidget, ExtendableTabWidget):
             warnings.warn(f'Channel tab widget not finalised for {self.name}, skipping channel creation')
             return
-        for pair_key in self.sample_manager.colocalization_pair_keys(oriented=self.pairs_oriented):
+        for channel_a, channel_b in self.sample_manager.complete_colocalization_pairs():
+            pair_key = str(PairKey(channel_a, channel_b, oriented=self.pairs_oriented))
             if pair_key not in self.ui.channelsParamsTabWidget.get_channels_names():
                 self.add_channel_tab(pair_key)
 
