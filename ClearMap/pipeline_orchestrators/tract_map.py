@@ -68,11 +68,16 @@ class TractMapProcessor(ChannelPipelineOrchestrator):
                              f'that matches the one in the sample_params file.')
         self.setup(sample_manager, channel, registration_processor)
 
-    def setup(self, sample_manager, channel_name, registration_processor):
+    def setup(self, sample_manager=None, channel_name=None, registration_processor=None):
+        """
+        Register the channel in the workspace once the sample is ready for it (see sample_ready).
+        Idempotent: what is not given (sample manager, channel, registration processor) is the one
+        already set, so that it can be called again without argument, e.g. by setup_if_needed.
+        """
         self.sample_manager = sample_manager if sample_manager else self.sample_manager
 
-        self.channel = channel_name
-        self.registration_processor = registration_processor
+        self.channel = channel_name if channel_name is not None else self.channel
+        self.registration_processor = registration_processor if registration_processor is not None else self.registration_processor
 
         if self.sample_ready:
             self.workspace = self.sample_manager.workspace

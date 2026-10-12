@@ -1,0 +1,202 @@
+"""
+What a user does in a new experiment, headless, one test per scenario.
+
+Every scenario is a bug report that was fixed: an incomplete channel (a data type but no path yet, or no
+resolution yet) must be hydrated, never processed, and must not break the workers. See the "Contract" in the
+docstring of :mod:`ClearMap.pipeline_orchestrators.generic_orchestrators`.
+"""
+from pathlib import Path
+
+import pytest
+
+import ClearMap.pipeline_orchestrators.colocalization as colocalization_module
+from ClearMap.Utils.exceptions import ClearMapConfigError, ClearMapRuntimeError, MissingAssetError
+
+DATA_TYPE = 'nuclei'
+RESOLUTION = (1.625, 1.625, 3.0)
+
+
+# ----------------------------------------------------------------------------------------------------------------
+# The sample manager: when does a channel join the workspace
+# ----------------------------------------------------------------------------------------------------------------
+
+def test_new_experiment_has_a_workspace_without_channels(experiment, sample_manager):
+    assert sample_manager.workspace_ready
+    assert sample_manager.channels == []
+    assert sample_manager.setup_complete
+
+
+def test_channel_with_a_data_type_only_is_incomplete(sample_manager, channel_editor):
+    channel_editor.add('test', DATA_TYPE)
+
+    assert sample_manager.channels == ['test']
+    assert sample_manager.incomplete_channels == ['test']
+    assert sample_manager.complete_channels == []
+    assert not sample_manager.setup_complete
+    assert not sample_manager.has_channels_in_workspace(['test'])
+
+
+def test_channel_joins_the_workspace_when_it_has_a_path_and_a_data_type(sample_manager, channel_editor):
+    channel_editor.add('test', DATA_TYPE)
+    channel_editor.set_path('test')
+
+    assert sample_manager.complete_channels == ['test']
+    assert sample_manager.incomplete_channels == []
+    assert sample_manager.setup_complete
+    assert sample_manager.has_channels_in_workspace(['test'])
+
+
+def test_channel_with_a_path_only_is_incomplete(sample_manager, channel_editor):
+    channel_editor.add('test', with_path=True)
+
+    assert 'test' not in sample_manager.complete_channels
+
+
+# ----------------------------------------------------------------------------------------------------------------
+# Registration: "KeyError: 'Channel_0'" / "KeyError: 'test'" when adding a channel in a new experiment
+# ----------------------------------------------------------------------------------------------------------------
+
+def test_registration_ignores_a_channel_without_path(experiment, channel_editor):
+    channel_editor.add('test', DATA_TYPE)
+
+    registration = experiment.get_worker('registration')
+    registration.setup_if_needed()
+
+    assert registration.all_channels == ['test']
+    assert registration.channels == []
+    assert registration.setup_complete
+
+
+def test_registration_follows_a_channel_which_becomes_complete(experiment, channel_editor, monkeypatch):
+    channel_editor.add('test', DATA_TYPE)
+    registration = experiment.get_worker('registration')
+    registration.setup_if_needed()
+    setups = []
+    original_setup = registration.setup
+
+    def recording_setup(*args, **kwargs):
+        setups.append(1)
+        return original_setup(*args, **kwargs)
+
+    monkeypatch.setattr(registration, 'setup', recording_setup)
+
+    channel_editor.set_path('test')  # No call to the worker: it follows the workspace
+
+    assert setups == [1]  # The setup is redone once, to include the channel
+    assert registration.channels == ['test']
+    assert registration.setup_complete
+
+
+def test_registration_lists_are_subsets_of_the_lists_of_all_channels(experiment, channel_editor):
+    channel_editor.add('complete', DATA_TYPE, with_path=True)
+    channel_editor.add('incomplete', DATA_TYPE)
+    registration = experiment.get_worker('registration')
+
+    assert registration.all_channels == ['complete', 'incomplete']
+    assert registration.channels == ['complete']
+    assert set(registration.channels_to_register) <= set(registration.all_channels_to_register)
+    assert set(registration.channels_to_resample) <= set(registration.channels)
+
+
+def test_workspace_names_the_unknown_channel(experiment, channel_editor):
+    channel_editor.add('test', DATA_TYPE)
+    workspace = experiment.sample_manager.workspace
+
+    with pytest.raises(MissingAssetError, match='Unknown channel "test"') as error:
+        workspace['test']
+    assert isinstance(error.value, KeyError)  # For the callers which catch it
+
+
+# ----------------------------------------------------------------------------------------------------------------
+# Colocalization: "unknown ['channel_2-channel_3']", then "TypeError: 'NoneType' object is not iterable"
+# ----------------------------------------------------------------------------------------------------------------
+
+def test_two_nuclei_channels_make_a_valid_colocalization_pair(experiment, channel_editor):
+    channel_editor.add('channel_2', DATA_TYPE, with_path=True)
+    channel_editor.add('channel_3', DATA_TYPE, with_path=True)  # Was rejected by the validation of the config
+
+    assert list(experiment.get_config_view()['colocalization']['channels']) == ['channel_2-channel_3']
+
+
+def test_colocalization_needs_two_complete_channels(sample_manager, channel_editor):
+    channel_editor.add('channel_2', DATA_TYPE, with_path=True)
+    channel_editor.add('channel_3', DATA_TYPE)
+
+    assert sample_manager.is_colocalization_compatible  # The config follows the data types
+    assert not sample_manager.is_colocalization_ready  # The tab needs the channels to be complete
+    assert sample_manager.complete_colocalization_pairs() == []
+
+    channel_editor.set_path('channel_3')
+
+    assert sample_manager.is_colocalization_ready
+    assert sample_manager.complete_colocalization_pairs() == [('channel_2', 'channel_3')]
+
+
+def test_resolution_of_a_new_channel_is_not_set(sample_manager, channel_editor):
+    channel_editor.add('test', DATA_TYPE, with_path=True)
+
+    with pytest.raises(ClearMapConfigError, match='test'):  # Was TypeError: 'NoneType' object is not iterable
+        sample_manager.get_channel_resolution('test')
+
+    channel_editor.set_resolution('test', RESOLUTION)
+
+    assert sample_manager.get_channel_resolution('test') == RESOLUTION
+
+
+def test_colocalization_worker_waits_for_the_resolution(experiment, channel_editor):
+    channel_editor.add('channel_2', DATA_TYPE, with_path=True)
+    channel_editor.add('channel_3', DATA_TYPE, with_path=True)
+
+    worker = experiment.get_worker('colocalization', ('channel_2', 'channel_3'))  # Was TypeError
+    worker.setup_if_needed()  # Was TypeError: setup() missing 2 required positional arguments
+
+    assert worker.setup_complete
+    assert not worker.setup_finalised
+    with pytest.raises(ClearMapRuntimeError, match='channel_2'):
+        worker.colocalization_channel('channel_2')
+
+
+def test_colocalization_worker_waits_for_the_detected_cells(experiment, channel_editor):
+    channel_editor.add('channel_2', DATA_TYPE, with_path=True, resolution=RESOLUTION)
+    channel_editor.add('channel_3', DATA_TYPE, with_path=True, resolution=RESOLUTION)
+
+    worker = experiment.get_worker('colocalization', ('channel_2', 'channel_3'))
+    worker.setup_if_needed()
+
+    assert worker.setup_complete
+    assert not worker.setup_finalised  # No cells detected yet
+    with pytest.raises(ClearMapRuntimeError, match='detected'):
+        worker.colocalization_channel('channel_3')
+
+
+def _no_cells_table(self, channel):
+    return None
+
+
+class _FakeColocalizationChannel:
+    """The colocalization package is not what is tested here: it computes on the detected cells"""
+
+    def __init__(self, cells_shape_path, cells, voxel_dims):
+        self.voxel_dims = voxel_dims
+
+
+def test_colocalization_worker_is_finalised_when_the_resolution_and_the_cells_are_there(experiment, channel_editor,
+                                                                                        monkeypatch):
+    monkeypatch.setattr(colocalization_module, 'ColocalizationChannel', _FakeColocalizationChannel)
+    monkeypatch.setattr(colocalization_module.ColocalizationProcessor, 'get_cells_df', _no_cells_table)
+    channel_editor.add('channel_2', DATA_TYPE, with_path=True)
+    channel_editor.add('channel_3', DATA_TYPE, with_path=True)
+    worker = experiment.get_worker('colocalization', ('channel_2', 'channel_3'))
+    for channel in ('channel_2', 'channel_3'):  # The cells are detected
+        cells_shape = Path(worker.get('cells', channel=channel, asset_sub_type='shape').path)
+        cells_shape.parent.mkdir(parents=True, exist_ok=True)
+        cells_shape.touch()
+    worker.setup_if_needed()
+    assert not worker.setup_finalised  # Still no resolution
+
+    channel_editor.set_resolution('channel_2', RESOLUTION)
+    channel_editor.set_resolution('channel_3', RESOLUTION)
+    worker.setup_if_needed()  # What the colocalization tab does when it is set up again
+
+    assert worker.setup_finalised
+    assert worker.colocalization_channel('channel_2').voxel_dims == RESOLUTION
