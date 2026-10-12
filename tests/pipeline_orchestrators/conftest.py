@@ -7,7 +7,7 @@ configuration ("Load default config" in the GUI), and edited through the same pa
 (:meth:`~ClearMap.pipeline_orchestrators.experiment_controller.ExperimentController.apply_ui_patch`).
 """
 from pathlib import Path
-from typing import Optional
+from typing import Iterator, Optional
 
 import pytest
 
@@ -18,20 +18,37 @@ from ClearMap.pipeline_orchestrators.experiment_controller import ExperimentCont
 from ClearMap.pipeline_orchestrators.sample_info_management import build_sample_manager
 
 RAW_FOLDER_NAME = 'raw_data'
+ATLAS_CACHE_NAME = 'clearmap_atlas_cache'  # In the pytest cache (.pytest_cache/d/)
 
 
-@pytest.fixture(autouse=True)
-def isolated_user_config(tmp_path_factory, monkeypatch) -> Path:
+@pytest.fixture(scope='session', autouse=True)
+def isolated_user_config(tmp_path_factory, pytestconfig) -> Iterator[Path]:
     """
     Never read (or write) the real ``~/.clearmap``: the tests must not depend on the machine they run on,
     nor leave anything in the home of whoever runs them. The user level config folders are new ones,
-    initialised from the package defaults like the application does on its first launch.
+    initialised from the package defaults like the application does on its first launch, once per session.
+
+    The atlas cache (reoriented atlases, about 1 GB, derived from the package atlases only) is kept in the
+    pytest cache of the repository instead, so that it is built once, not on every run.
+    ``pytest --cache-clear`` removes it.
     """
     user_dir = tmp_path_factory.mktemp('clearmap_user_config')
-    monkeypatch.setattr(ConfigHandler, 'user_defaults_dir', user_dir)
-    monkeypatch.setattr(ConfigHandler, 'user_global_dir', user_dir / 'config')
-    update_default_config()
-    return user_dir
+    with pytest.MonkeyPatch.context() as monkeypatch:
+        monkeypatch.setattr(ConfigHandler, 'user_defaults_dir', user_dir)
+        monkeypatch.setattr(ConfigHandler, 'user_global_dir', user_dir / 'config')
+        update_default_config()
+        _set_machine_config('atlas_cache_folder', str(pytestconfig.cache.mkdir(ATLAS_CACHE_NAME)))
+        yield user_dir
+
+
+def _set_machine_config(key: str, value) -> None:
+    """Edit the (isolated) machine config file, which the experiments read when they are opened"""
+    machine_cfg_path = ConfigHandler.get_global_canonical_path('machine')
+    machine_cfg = dict(ConfigHandler.get_cfg_from_path(machine_cfg_path))
+    if key not in machine_cfg:
+        raise KeyError(f'Unknown machine config key "{key}" (in {machine_cfg_path})')
+    machine_cfg[key] = value
+    ConfigHandler.dump(machine_cfg_path, machine_cfg)
 
 
 @pytest.fixture()

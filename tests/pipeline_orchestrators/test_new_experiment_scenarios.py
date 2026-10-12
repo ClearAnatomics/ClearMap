@@ -220,7 +220,7 @@ def test_colocalization_worker_is_finalised_when_the_resolution_and_the_cells_ar
 
 def _write_stack(path: Path) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
-    tifffile.imwrite(path, np.zeros(STACK_SHAPE, dtype=np.uint16))
+    tifffile.imwrite(path, np.zeros(STACK_SHAPE, dtype=np.uint16), photometric='minisblack')
     return path
 
 
