@@ -142,6 +142,10 @@ class TifSource(source_mod.ArraySource):
     def location(self):
         return self._tif._fh.path
 
+    def close(self) -> None:
+        """Close the tif file. The arrays already read are in memory and stay valid."""
+        self._tif.close()
+
     def _on_location_changed(self):
         tif = getattr(self, '_tif', None)
         if tif is not None:
@@ -888,12 +892,17 @@ def read(source, slicing=None, sink=None, **args):
     data : array
         The image data in the tif file.
     """
-    if not isinstance(source, TifSource):
-        source = TifSource(source)
-    if slicing is None:
-        return source.array
-    else:
-        return source[slicing]
+    if isinstance(source, TifSource):
+        return _read_tif_source_data(source, slicing)
+    tif_source = TifSource(source)  # Opened here, so closed here: the data is read into memory
+    try:
+        return _read_tif_source_data(tif_source, slicing)
+    finally:
+        tif_source.close()
+
+
+def _read_tif_source_data(source: TifSource, slicing):
+    return source.array if slicing is None else source[slicing]
 
 
 def write(sink, data, **args):
