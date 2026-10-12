@@ -109,7 +109,7 @@ from PyQt5.QtCore import QSignalBlocker
 
 from ClearMap.Utils.tag_expression import Expression
 
-from PyQt5.QtWidgets import QApplication, QButtonGroup, QWidget, QDialog
+from PyQt5.QtWidgets import QApplication, QButtonGroup, QWidget, QDialog, QMessageBox
 import pyqtgraph as pg
 from natsort import natsorted
 
@@ -140,7 +140,7 @@ from ClearMap.Utils.events import (ChannelsChanged, CfgChanged, UiPrepareRawData
                                    RegistrationStatusChanged, UiBatchResultsFolderChanged, UiBatchGroupsChanged,
                                    UiChannelsChanged, WorkspaceChanged)
 
-from .dialog_helpers import option_dialog, make_splash, prompt_dialog
+from .dialog_helpers import option_dialog, make_splash, prompt_dialog, abort_retry_popup
 from .dialogs import ResourceTypeToFolderDialog
 from .tabs_interfaces import PostProcessingTab, PreProcessingTab, BatchTab, ExperimentTab, GenericTab
 from .widgets import (PatternDialog, DataFrameWidget, LandmarksSelectorDialog,
@@ -167,6 +167,8 @@ if TYPE_CHECKING:
 
 from ClearMap.pipeline_orchestrators.stitching_orchestrator import STITCHABLE_TILE_EXTENSIONS, supports_auto_overlap
 from ClearMap.pipeline_orchestrators.tube_map import BinaryVesselProcessorSteps
+
+INSUFFICIENT_V_RAM_TITLE = 'Insufficient VRAM'
 
 
 def ui_task_progress(title_fn: Callable, steps_fn: Callable) -> Callable:
@@ -1789,16 +1791,35 @@ class VasculatureTab(PostProcessingTab['BinaryVesselProcessor']):
         ordered_gui_steps = [asset_to_gui[stp] for stp in steps_obj.steps
                              if stp not in BinaryVesselProcessorSteps._lifecycle_steps]
 
-        kwargs = {'step_args': [channel], 'abort_func': worker.stop_process}
         try:
             for step_name in ordered_gui_steps:
                 # WARNING: The parallel cython loops inside fill_channel cannot run from child thread
                 method_name, run_on_main_thread = BinaryVesselProcessorSteps._BINARIZE_STEP_MAP[step_name]
-                method = getattr(worker, method_name)
-                self.wrap_step('Vessel binarization', method, main_thread=run_on_main_thread, **kwargs)
-        except ClearMapVRamException:
+                self._run_binarization_step(getattr(worker, method_name), channel, run_on_main_thread)
+        except ClearMapVRamException:  # The user chose to abort (see _run_binarization_step)
             if stop_on_error:
                 raise
+
+    def _run_binarization_step(self, method: Callable, channel: str, run_on_main_thread: bool) -> None:
+        """
+        Run one binarization step of `channel`. When the graphics card does not have enough free memory
+        (the worker raises ClearMapVRamException), offer to retry, e.g. once the user has freed some.
+
+        Raises
+        ------
+        ClearMapVRamException
+            If the VRAM is insufficient and the user aborts.
+        """
+        worker: 'BinaryVesselProcessor' = self.get_worker(substep='binary')
+        while True:
+            try:
+                self.wrap_step('Vessel binarization', method, step_args=[channel], abort_func=worker.stop_process,
+                               main_thread=run_on_main_thread, bypass_exceptions=(ClearMapVRamException,))
+                return
+            except ClearMapVRamException as err:
+                self.main_window.print_warning_msg(str(err))
+                if abort_retry_popup(INSUFFICIENT_V_RAM_TITLE, str(err)) != QMessageBox.Retry:
+                    raise
 
     def combine(self) -> None:
         """Combine binarized channels into a single mask."""

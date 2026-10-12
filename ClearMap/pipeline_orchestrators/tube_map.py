@@ -89,8 +89,6 @@ from typing import Optional, Dict, Any, Union, Callable
 import numpy as np
 import pandas as pd
 
-from PyQt5.QtWidgets import QDialogButtonBox
-
 import ClearMap.IO.IO as clearmap_io
 from ClearMap.IO.source.Source import Source
 from ClearMap.IO.workspace2 import Workspace2
@@ -121,7 +119,6 @@ from ClearMap.Analysis.graphs.graph_filters import GraphFilter, combine_filters,
 from ClearMap.Analysis.graphs.graph_weights import GraphWeight
 from ClearMap.IO.assets_specs import weighted_sub_type
 
-from ClearMap.gui.dialog_helpers import warning_popup
 from ClearMap.Utils.events import WorkspaceChannelsUpdated
 from ClearMap.Utils.utilities import get_free_v_ram, clear_cuda_cache, sanitize_n_processes
 from ClearMap.Utils.exceptions import (PlotGraphError, ClearMapVRamException,
@@ -144,6 +141,7 @@ __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
 from ..IO import io_ops
 
+DEEP_FILL_REQUIRED_V_RAM = 22_000  # MiB (as reported by nvidia-smi) of free VRAM needed by the deep fill
 MAX_PLOT_VERTICES = 300_000  # Empirical max number of vertices that can safely be plotted
 BRANCHES_DENSITY_SUB_TYPE = 'branches'  # Variants: branches[_weighted_<weight name>][_<filters name>]
 
@@ -658,7 +656,6 @@ class BinaryVesselProcessor(TubeMapOrchestrator):
             return
 
         perf_params = self.config['performance']['binarization']['single_channels'][channel]['deep_fill']['block_processing']
-        REQUIRED_V_RAM = 22000  # REFACTOR: put in config or at top of module
         if size_max is None:
             size_max = perf_params['size_max']
         if overlap is None:
@@ -666,15 +663,12 @@ class BinaryVesselProcessor(TubeMapOrchestrator):
         if resample_factor is None:
             resample_factor = binary_cfg['deep_fill']['resample_factor']
 
-        if not get_free_v_ram() > REQUIRED_V_RAM:
-            btn = warning_popup(f'Insufficient VRAM',
-                                f'You do not have enough free memory on your graphics card to '
-                                f'run this operation. This step needs 22GB VRAM, {get_free_v_ram() / 1000} were found. '
-                                f'Please free some or upgrade your hardware.')
-            if btn == QDialogButtonBox.Abort:
-                raise ClearMapVRamException(f'Insufficient VRAM, found only {get_free_v_ram()} < {REQUIRED_V_RAM}')
-            elif btn == QDialogButtonBox.Retry:
-                self._deep_fill_channel(channel, size_max, overlap, resample_factor)
+        free_v_ram = get_free_v_ram()
+        if free_v_ram <= DEEP_FILL_REQUIRED_V_RAM:  # Headless: the caller decides (e.g. the GUI offers to retry)
+            raise ClearMapVRamException(f'Insufficient VRAM for the deep fill of channel "{channel}": it needs '
+                                        f'{DEEP_FILL_REQUIRED_V_RAM / 1000:.0f} GB of free VRAM, '
+                                        f'{free_v_ram / 1000:.1f} GB were found. '
+                                        f'Please free some or upgrade your hardware.')
 
         self.steps[channel].remove_next_steps_files(self.steps[channel].deep_filled)
 

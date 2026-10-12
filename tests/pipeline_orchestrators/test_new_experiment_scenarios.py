@@ -13,7 +13,9 @@ import pytest
 import tifffile
 
 import ClearMap.pipeline_orchestrators.colocalization as colocalization_module
-from ClearMap.Utils.exceptions import ClearMapConfigError, ClearMapRuntimeError, MissingAssetError
+import ClearMap.pipeline_orchestrators.tube_map as tube_map_module
+from ClearMap.Utils.exceptions import (ClearMapConfigError, ClearMapRuntimeError, ClearMapVRamException,
+                                       MissingAssetError)
 from ClearMap.config.config_adjusters.dict_ops import get_nested
 from ClearMap.config.config_adjusters.policy import INSTANCE_SPECS_REGISTRY
 from ClearMap.config.config_repository import ConfigRepository
@@ -258,6 +260,25 @@ def test_stitching_worker_is_set_up_when_a_channel_is_tiled(experiment, channel_
     assert 'stitching' in experiment.cfg_coordinator.active_sections
     assert stitching_worker.channels == ['test']
     assert stitching_worker.setup_complete
+
+
+# ----------------------------------------------------------------------------------------------------------------
+# The vasculature worker
+# ----------------------------------------------------------------------------------------------------------------
+
+def _no_free_v_ram() -> int:
+    return 0
+
+
+def test_deep_fill_raises_when_the_vram_is_insufficient(experiment, channel_editor, monkeypatch):
+    """Headless, no dialog: the worker raises, the caller decides (the GUI offers to retry)"""
+    channel_editor.add('vessels', 'vessels', with_path=True)
+    worker = experiment.get_worker('vasculature', substep='binary')
+    worker.setup_if_needed()
+    monkeypatch.setattr(tube_map_module, 'get_free_v_ram', _no_free_v_ram)
+
+    with pytest.raises(ClearMapVRamException, match='"vessels"'):
+        worker.deep_fill_channel('vessels')
 
 
 # ----------------------------------------------------------------------------------------------------------------

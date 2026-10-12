@@ -15,9 +15,6 @@ RESULT_MARKER = 'QT_MODULES_IMPORTED:'
 HEADLESS_MODULES = ('cell_map', 'colocalization', 'experiment_controller', 'generic_orchestrators',
                     'group_orchestrators', 'registration_orchestrator', 'sample_info_management',
                     'stitching_orchestrator', 'tract_map', 'tube_map')
-KNOWN_VIOLATIONS = {
-    'tube_map': 'The deep fill shows a Qt dialog when the VRAM is insufficient (warning_popup)',
-}
 
 
 def _qt_modules_imported_by(module: str) -> list[str]:
@@ -32,9 +29,6 @@ def _qt_modules_imported_by(module: str) -> list[str]:
     return [name for name in result_line.removeprefix(RESULT_MARKER).split(',') if name]
 
 
-@pytest.mark.parametrize('module_name', [
-    pytest.param(name, marks=pytest.mark.xfail(reason=KNOWN_VIOLATIONS[name], strict=True))
-    if name in KNOWN_VIOLATIONS else name
-    for name in HEADLESS_MODULES])
+@pytest.mark.parametrize('module_name', HEADLESS_MODULES)
 def test_orchestrator_module_does_not_import_qt(module_name):
     assert _qt_modules_imported_by(f'ClearMap.pipeline_orchestrators.{module_name}') == []
