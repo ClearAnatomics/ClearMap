@@ -676,10 +676,25 @@ class ConfigHandler:
         return self.src_dir / canonical_filename
 
     @classmethod
-    def get_global_canonical_path(cls, cfg_name: str) -> Path:
+    def get_global_canonical_path(cls, cfg_name: str, *, root: Path | None = None,
+                                  version: Optional[str] = None) -> Path:
+        """
+        Where the global configuration file with the given name should be (it may not exist yet).
+
+        Parameters
+        ----------
+        cfg_name: str
+            The name (without params and extension) of the configuration file
+        root: Optional[Path]
+            The base directory of the global configs. If None, the user's global config directory is used.
+        version: Optional[str]
+            The version string in the major.minor format to use for the folder structure.
+            If None, the current ClearMap version is used.
+        """
         canonical_name = ALTERNATIVES_REG.to_canonical(cfg_name)
-        return cls._name_to_shared_path(canonical_name, cls.supported_exts[0], root=cls.user_global_dir,
-                                        version=clearmap_version, defaults=False)
+        return cls._name_to_shared_path(canonical_name, cls.supported_exts[0],
+                                        root=Path(root) if root is not None else cls.user_global_dir,
+                                        version=version or clearmap_version, defaults=False)
 
     @classmethod
     def get_user_defaults_canonical_path(cls, cfg_name: str) -> Path:
@@ -900,12 +915,16 @@ class ConfigHandler:
 
     @classmethod
     def get_global_path(cls, cfg_name: str, must_exist: bool = True, *, base_dir: Path | None = None,
-                        version: Optional[str] = None) -> Path | None:
+                        version: Optional[str] = None) -> Path:
         """
         Get the path to the global configuration file with the given name.
-        Several extensions are tried in order of preference.
-        If None is found, the first possible option is returned if must_exist is False or
-        a FileNotFoundError is raised if must_exist is True.
+        Several extensions are tried in order of preference, in the global folder then (unless base_dir
+        is given) in the legacy one.
+
+        - The file exists: its path, whatever must_exist.
+        - It does not, and must_exist is False: where it should be (the canonical path in the global
+          folder), e.g. to create it. The path does not exist yet: use ``.exists()`` to tell.
+        - It does not, and must_exist is True: a FileNotFoundError is raised.
 
         Parameters
         ----------
@@ -927,25 +946,18 @@ class ConfigHandler:
         root = Path(base_dir) if base_dir is not None else cls.user_global_dir
         version = version or clearmap_version
 
-        if not must_exist:
-            return cls._find_shared_cfg_path(cfg_name, root=root, version=version, defaults=False)
-        else:
-            global_path = cls._find_shared_cfg_path(cfg_name, root=root, version=version, defaults=False)
-            if global_path is not None:
-                return global_path
-            else:
-                if base_dir is not None:
-                    raise FileNotFoundError(f'Could not find global config {cfg_name} in {base_dir}')
-                if not must_exist:
-                    loader = cls(root)
-                    return loader.get_global_canonical_path(cfg_name)
-                else:
-                    legacy_root = cls.user_defaults_dir  # Old user_global_dir was same as default
-                    global_path = cls._find_shared_cfg_path(cfg_name, root=legacy_root, version=version, defaults=False)
-                if global_path is None and must_exist:
-                    raise FileNotFoundError(f'Could not find global config "{cfg_name}" in "{root}" or "{legacy_root}"')
-                else:
-                    return global_path
+        global_path = cls._find_shared_cfg_path(cfg_name, root=root, version=version, defaults=False)
+        if global_path is None and base_dir is None:  # Old user_global_dir was same as default
+            legacy_root = cls.user_defaults_dir
+            global_path = cls._find_shared_cfg_path(cfg_name, root=legacy_root, version=version, defaults=False)
+        if global_path is not None:
+            return global_path
+
+        if not must_exist:  # Where it should be, e.g. to create it (the existing one is returned above)
+            return cls.get_global_canonical_path(cfg_name, root=root, version=version)
+        if base_dir is not None:
+            raise FileNotFoundError(f'Could not find global config {cfg_name} in {base_dir}')
+        raise FileNotFoundError(f'Could not find global config "{cfg_name}" in "{root}" or "{cls.user_defaults_dir}"')
 
     @classmethod
     def get_default_path(cls, cfg_name: str, must_exist: bool = True, *, base_dir: Path | None = None,

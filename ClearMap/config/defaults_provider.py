@@ -122,13 +122,19 @@ class DefaultsProvider:
             return False
 
     def __get_cfg(self, section: str, from_package: bool) -> Optional[dict]:
-        base_dir = self.__builtin_dir if from_package else self.__user_dir
-        if ConfigHandler.is_global(section):
+        """
+        The config of `section` from the package defaults, or from the user: the user defaults, or the
+        user (global) config itself for the global sections (machine, display), which have no user defaults.
+        """
+        if from_package:
+            cfg_path = ConfigHandler.get_default_path(section, must_exist=False, from_package=True,
+                                                      base_dir=self.__builtin_dir)  # For tests if not None
+        elif ConfigHandler.is_global(section):
             cfg_path = ConfigHandler.get_global_path(section, must_exist=False,
-                                                     base_dir=base_dir)  # For tests if not None
+                                                     base_dir=self.__user_dir)  # For tests if not None
         else:
-            cfg_path = ConfigHandler.get_default_path(section, must_exist=False, from_package=from_package,
-                                                      base_dir=base_dir)  # For tests if not None
+            cfg_path = ConfigHandler.get_default_path(section, must_exist=False, from_package=False,
+                                                      base_dir=self.__user_dir)  # For tests if not None
         if not cfg_path.exists():
             return None
         cfg = ConfigHandler.get_cfg_from_path(cfg_path)
@@ -147,6 +153,10 @@ class DefaultsProvider:
         return deepcopy(self._resolved[section])
 
     def _resolve(self, section: str) -> JsonDict:
+        # 0) a global section (machine, display) has no user defaults: the user config is the copy of the
+        #    package one that the user edits (like /etc vs ~/.config), so it is created if missing
+        if ConfigHandler.is_global(section):
+            self.ensure_user_file(section)
         # 1) user
         user_cfg = self.__get_cfg(section, from_package=False)
         if user_cfg is not None and self._validate_static(section, user_cfg):
@@ -159,20 +169,53 @@ class DefaultsProvider:
             raise ValueError(f'Invalid default config for section "{section}"')
         return default_cfg
 
-    def ensure_user_file(self, section: str, out_path: Optional[Path] = None) -> Path:   # FIXME: unused
+    def ensure_user_file(self, section: str, out_path: Optional[Path] = None) -> Path:
         """
-        Ensure ~/.clearmap/defaults/<section>.yml exists by copying built-in (or code fallback).
+        Ensure the user file of `section` exists, by writing the built-in defaults (or the code fallback)
+        if it is missing. It is never overwritten, so the edits of the user are kept.
+
+        The user file is the user defaults file of the section (in ~/.clearmap, optional: without it the package
+        defaults apply) or, for the global sections (machine, display), the user config itself.
+
+        Only the global sections are created implicitly (see `get`). The sample sections are not: their
+        config files live in the sample folders and are written there explicitly by the seeding mechanism
+        (ConfigCoordinator.seed_missing_from_defaults), from the defaults this provider returns.
+
+        Parameters
+        ----------
+        section : str
+            The config section.
+        out_path : Path, optional
+            Where the file is. If None, the user file of the section, in the user dir (the real user folders
+            if the provider has none).
+
+        Returns
+        -------
+        Path
+            The path of the file.
+
+        Raises
+        ------
+        ValueError
+            If the file is missing and there are no defaults to write.
         """
-        if not self.__user_dir:
-            raise RuntimeError("No user_dir configured")
-        dst = ConfigHandler.get_default_path(section, must_exist=False, from_package=False)
+        if out_path is not None:
+            dst = Path(out_path)
+        elif ConfigHandler.is_global(section):
+            dst = ConfigHandler.get_global_path(section, must_exist=False, base_dir=self.__user_dir)
+        else:
+            dst = ConfigHandler.get_default_path(section, must_exist=False, from_package=False, base_dir=self.__user_dir)
         if dst.exists():
             return dst
-        else:
-            dst.parent.mkdir(parents=True, exist_ok=True)
-            src_data = self.get_default_config(section)
-            ConfigHandler.dump(dst, src_data)  # atomic write (can convert if format differs)
-            return dst
+        package_path = self.__package_cfg_path(section)
+        if package_path.exists():
+            return ConfigHandler.copy_if_missing(package_path, dst)
+        default_cfg = dict(self.code_defaults.get(section, {}))  # No file: the code fallback
+        if not default_cfg:
+            raise ClearMapValueError(f'Invalid default config for section "{section}"')
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        ConfigHandler.dump(dst, default_cfg)  # atomic write (can convert if format differs)
+        return dst
 
     def get_default_config(self, section: str) -> dict[str, Any]:
         default_cfg = self.__get_cfg(section, from_package=True)
