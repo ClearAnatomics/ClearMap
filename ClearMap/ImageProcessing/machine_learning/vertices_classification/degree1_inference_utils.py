@@ -1,8 +1,9 @@
 """
-This module provides functionality to run inference on 3D patches extracted from a 3D image,
+This module provides functionality to run inference on 3D patches extracted from a 3D image.
 
-The main user functions are `run_inference`, which extracts patches centered on degree=1 graph vertices,
-and `update_graph_properties`, which updates the graph with new properties based on the inference results.
+The main user function is `run_inference`, which extracts patches centered on degree=1 graph vertices.
+The graph side (the vertices to classify, the properties to store the results) is in
+:mod:`ClearMap.Analysis.graphs.tip_cells`.
 """
 from pathlib import Path
 
@@ -14,6 +15,8 @@ import torch.nn as nn
 import torch.nn.functional as Fnn
 from torch.utils.data import Dataset, DataLoader
 from torchvision.models.video import swin3d_s
+
+from ClearMap.Analysis.graphs.tip_cells import TIP_CELL_SCORE_PROPERTY
 
 
 MAX_WORKERS_LOADER = 8
@@ -140,37 +143,4 @@ def run_inference(image, vertices_df, model_weights, patch_shape=(30, 30, 30), b
             all_ids.extend(ids.cpu().numpy())
             all_scores.extend(probs.cpu().numpy())
 
-    return pd.DataFrame({"vertex_id": all_ids, "tip_cell_score": all_scores})
-
-
-def update_graph_properties(graph, scores_df, output_graph_path, threshold=0.8):
-    """
-    Updating the graph with two new properties: tip_cell_score and tip_cell_prediction
-
-    Parameters
-    ----------
-    graph : ClearMap.Analysis.Graphs.GraphGt
-        The graph to update with new properties.
-    scores_df : pd.DataFrame
-        DataFrame containing vertex IDs and their corresponding tip cell scores.  # FIXME: check other columns
-    output_graph_path: str or Path
-        Path to save the updated graph with new properties.
-    threshold : float
-        Threshold for classifying a vertex as a tip cell. Default is 0.8.
-    """
-    vertex_degrees = np.array(graph.vertex_degrees())
-    total_vertices = len(vertex_degrees)
-
-    mapped_scores = np.full(total_vertices, -1.0, dtype=np.float32)
-    predictions = np.zeros(total_vertices, dtype=np.int32)
-
-    scores_df = scores_df.set_index("vertex_id")
-    valid_ids = scores_df.index.values
-
-    mapped_scores[valid_ids] = scores_df.tip_cell_score.values
-    predictions[valid_ids] = (scores_df.tip_cell_score.values > threshold).astype(int)
-
-    graph.add_vertex_property("tip_cell_score", mapped_scores)
-    graph.add_vertex_property("tip_cell_prediction", predictions)
-    graph.save(output_graph_path)
-    print(f"Updated graph saved to: {output_graph_path}")
+    return pd.DataFrame({"vertex_id": all_ids, TIP_CELL_SCORE_PROPERTY: all_scores})

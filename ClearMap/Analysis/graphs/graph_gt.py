@@ -1437,24 +1437,31 @@ class Graph(grp.AnnotatedGraph):
     def save(self, filename: str | Path):
         self._base.save(str(filename))
 
-    def export_vertex_properties(self, output_path: str | Path, v_props: list[str] | None = None):
+    def vertex_properties_table(self, v_props: list[str] | None = None, with_degrees: bool = False):
         """
-        Export vertex properties as a pandas DataFrame.
-        The export format will be determined by the file extension.
+        The vertex properties as a table, one row per vertex.
+
+        The columns are the ``vertex_id`` then the properties: a scalar property is one column, the
+        coordinates are one column per axis (x, y, z, with the name of the coordinates as prefix if it
+        is not the plain ``coordinates``, e.g. atlas_x), any other vector property is one column per
+        dimension (``<name>_dim<i>``).
 
         Parameters
         ----------
-        v_props: list of str
-            The vertex properties to export.
-        output_path: str | Path
-            The output file path.
+        v_props: list of str, optional
+            The vertex properties to include. Defaults to all of them.
+        with_degrees: bool
+            Whether to add the degree of the vertices as the last column (``degree``).
+
+        Returns
+        -------
+        pandas.DataFrame
         """
-        output_path = str(output_path)
         if v_props is None:
             v_props = list(self._base.vertex_properties)
 
         data = {'vertex_id': self.vertex_indices()}
-        for prop_name in  v_props:
+        for prop_name in v_props:
             prop_array = self.vertex_property(prop_name)
             if prop_array.ndim == 1:  # Scalar property
                 data[prop_name] = prop_array
@@ -1467,9 +1474,25 @@ class Graph(grp.AnnotatedGraph):
                 else:  # Generic names
                     for i in range(prop_array.shape[1]):
                         data[f'{prop_name}_dim{i}'] = prop_array[:, i]
+        if with_degrees:
+            data['degree'] = self.vertex_degrees()
 
         import pandas as pd
-        df = pd.DataFrame(data)
+        return pd.DataFrame(data)
+
+    def export_vertex_properties(self, output_path: str | Path, v_props: list[str] | None = None):
+        """
+        Export vertex properties as a pandas DataFrame (see vertex_properties_table).
+        The export format will be determined by the file extension.
+
+        Parameters
+        ----------
+        v_props: list of str
+            The vertex properties to export.
+        output_path: str | Path
+            The output file path.
+        """
+        df = self.vertex_properties_table(v_props)
         extension = Path(output_path).suffix
         if extension == '.csv':
             df.to_csv(output_path, index=False)

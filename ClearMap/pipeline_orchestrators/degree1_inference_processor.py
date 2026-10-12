@@ -8,45 +8,10 @@ and updates the graph in place with predictions based on a pre-trained model.
 
 # FIXME: this is not a processor. It does not follow the processor API. Convert or move to another location.
 
-import numpy as np
-import pandas as pd
-
-from ClearMap.Analysis.graphs import graph_gt
-from ClearMap.Analysis.graphs.graph_gt import Graph
-from ClearMap.ImageProcessing.machine_learning.vertices_classification.degree1_inference_utils import (run_inference, update_graph_properties,
+from ClearMap.Analysis.graphs.tip_cells import add_tip_cell_properties
+from ClearMap.ImageProcessing.machine_learning.vertices_classification.degree1_inference_utils import (run_inference,
                                                                                                        get_default_model_path)
 from ClearMap.pipeline_orchestrators.tube_map import BinaryVesselProcessor
-
-
-def export_vertex_coordinates(graph: Graph) -> pd.DataFrame:
-    """
-    Extract coordinates and degrees of all vertices from a graph into a DataFrame.
-
-    Parameters
-    ----------
-
-    graph : ClearMap.Analysis.graphs.graph_gt.Graph
-        The graph from which to extract vertex properties.
-
-    Returns
-    -------
-    pd.DataFrame
-        A DataFrame containing vertex IDs, coordinates (x, y, z), and degrees.
-    """
-
-    coords = np.array(graph.vertex_property("coordinates"))
-
-    # vertex_ids = np.array([int(v) for v in graph.vertices])
-
-    df = pd.DataFrame({
-        "vertex_id": graph.vertex_indices(),
-        "x": coords[:, 0],
-        "y": coords[:, 1],
-        "z": coords[:, 2],
-        "degree": np.array(graph.vertex_degrees())
-    })
-
-    return df
 
 
 def degree1_verification(sample_manager, model_weights_path=None, threshold=0.8, stitched_img_channel='vasc',
@@ -103,7 +68,7 @@ def degree1_verification(sample_manager, model_weights_path=None, threshold=0.8,
     graph = graph_asset.read()
 
     # Prepare vertex coordinates (DataFrame)
-    coords_df = export_vertex_coordinates(graph)
+    coords_df = graph.vertex_properties_table(['coordinates'], with_degrees=True)
 
     # Run model inference
     scores_df = run_inference(
@@ -116,6 +81,7 @@ def degree1_verification(sample_manager, model_weights_path=None, threshold=0.8,
 
     # Update graph and save
     updated_graph_path = sample_manager.get_path('graph', channel=graph_channel, asset_sub_type='updated')
-    update_graph_properties(graph=graph, scores_df=scores_df, output_graph_path=updated_graph_path, threshold=threshold)
+    add_tip_cell_properties(graph, scores_df, threshold=threshold)
+    graph.save(updated_graph_path)
 
     print("Degree=1 Inference Processor completed.")
