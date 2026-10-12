@@ -75,8 +75,8 @@ def degree1_verification(sample_manager, model_weights_path=None, threshold=0.8,
         image=image,
         vertices_df=coords_df,
         model_weights=model_weights_path,
-        patch_shape=(30, 30, 30),
-        batch_size=16
+        batch_size=16,
+        n_workers=8
     )
 
     # Update graph and save
