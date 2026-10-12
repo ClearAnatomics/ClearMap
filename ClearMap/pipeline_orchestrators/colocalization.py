@@ -6,7 +6,7 @@ import pandas as pd
 
 from ClearMap.IO.workspace2 import Workspace2
 
-from ClearMap.Utils.exceptions import ClearMapValueError
+from ClearMap.Utils.exceptions import ClearMapValueError, ClearMapConfigError
 from ClearMap.Utils.utilities import sanitize_n_processes
 
 from ClearMap.config.config_coordinator import ConfigCoordinator
@@ -71,14 +71,14 @@ class ColocalizationProcessor(PerCompoundConfigMixin, CompoundChannelPipelineOrc
             return
         finalised_channels = {chan: False for chan in self.compound_channel}
         for channel in self.compound_channel:
-            resolution = self.sample_manager.get_channel_resolution(channel)
             try:
+                resolution = self.sample_manager.get_channel_resolution(channel)
                 self.colocalization_channels[channel] = ColocalizationChannel(
                     self.get('cells', channel=channel, asset_sub_type='shape').existing_path,
                     self.get_cells_df(channel),
                     voxel_dims=resolution)
                 finalised_channels[channel] = True
-            except FileNotFoundError as err:
+            except (FileNotFoundError, ClearMapConfigError) as err:  # Not detected yet, or resolution not set yet
                 print(f'Colocalization {err}')
                 self.setup_finalised = False
         self.setup_finalised = all(finalised_channels.values())

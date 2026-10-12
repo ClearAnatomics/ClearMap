@@ -102,6 +102,7 @@ from ..config.config_handler import ALTERNATIVES_REG
 from ..config.config_coordinator import ConfigCoordinator, make_cfg_coordinator_factory
 
 from ..Utils.events import ChannelRenamed, WorkspaceChannelsUpdated
+from ..Utils.exceptions import ClearMapConfigError
 from ..Utils.tag_expression import Expression
 from ..Utils.event_bus import EventBus
 
@@ -740,8 +741,17 @@ class SampleManager(OrchestratorBase):
         -------
         tuple(float, float, float)
             The resolution of the channel in (x, y, z) format
+
+        Raises
+        ------
+        ClearMapConfigError
+            If the resolution of the channel is not set (yet): e.g. a channel just added.
         """
-        return tuple(self.config['channels'][channel]['resolution'])
+        resolution = self.config['channels'][channel]['resolution']
+        if resolution is None:
+            raise ClearMapConfigError(f'The resolution of channel "{channel}" is not set '
+                                      f'(sample.channels.{channel}.resolution).')
+        return tuple(resolution)
 
     def stitched_shape(self, channel: str) -> tuple[int, int, int]:
         asset = self.get('stitched', channel=channel, sample_id=self.prefix)
