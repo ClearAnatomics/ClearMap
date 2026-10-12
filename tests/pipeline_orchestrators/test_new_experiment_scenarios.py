@@ -5,15 +5,23 @@ Every scenario is a bug report that was fixed: an incomplete channel (a data typ
 resolution yet) must be hydrated, never processed, and must not break the workers. See the "Contract" in the
 docstring of :mod:`ClearMap.pipeline_orchestrators.generic_orchestrators`.
 """
+import warnings
 from pathlib import Path
 
 import pytest
 
 import ClearMap.pipeline_orchestrators.colocalization as colocalization_module
 from ClearMap.Utils.exceptions import ClearMapConfigError, ClearMapRuntimeError, MissingAssetError
+from ClearMap.config.config_adjusters.dict_ops import get_nested
+from ClearMap.config.config_adjusters.policy import INSTANCE_SPECS_REGISTRY
+from ClearMap.config.config_repository import ConfigRepository
+
+from .conftest import RAW_FOLDER_NAME, ChannelEditor
 
 DATA_TYPE = 'nuclei'
 RESOLUTION = (1.625, 1.625, 3.0)
+CHANNELS_OF_EVERY_PIPELINE = {'nuclei_a': 'nuclei', 'nuclei_b': 'nuclei', 'myelin': 'myelin', 'vessels': 'vessels'}
+TEMPLATES_SANITIZER_WARNING = '[runtime-templates]'  # What the last resort sanitizer says when it removes templates
 
 
 # ----------------------------------------------------------------------------------------------------------------
@@ -200,3 +208,40 @@ def test_colocalization_worker_is_finalised_when_the_resolution_and_the_cells_ar
 
     assert worker.setup_finalised
     assert worker.colocalization_channel('channel_2').voxel_dims == RESOLUTION
+
+
+# ----------------------------------------------------------------------------------------------------------------
+# The config: the templates of the defaults stay in the defaults
+# ----------------------------------------------------------------------------------------------------------------
+
+def _templates_reservoirs_in(sections: dict) -> list[str]:
+    """The templates reservoirs (of the defaults) found in these config sections, as dotted paths"""
+    return ['.'.join(spec.abs_templates_path()) for spec in INSTANCE_SPECS_REGISTRY.specs
+            if spec.abs_templates_path() and get_nested(sections, spec.abs_templates_path()) is not None]
+
+
+def test_templates_of_the_defaults_never_reach_a_new_experiment(experiment, tmp_path):
+    """
+    The templates only live in the defaults, where the templates resolver reads them. A new experiment, and
+    the sections its channels bring in, are written without them, so the sanitizer has nothing to remove.
+    """
+    experiment_dir = tmp_path / 'new_experiment'
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter('always')
+        experiment.boot_new(experiment_dir)
+        channel_editor = ChannelEditor(experiment, experiment_dir / RAW_FOLDER_NAME)
+        for name, data_type in CHANNELS_OF_EVERY_PIPELINE.items():
+            channel_editor.add(name, data_type, with_path=True)
+
+    sanitized = [str(w.message) for w in caught if TEMPLATES_SANITIZER_WARNING in str(w.message)]
+    assert sanitized == []
+
+    working_config = experiment.cfg_coordinator.get_config_view()
+    assert _templates_reservoirs_in(working_config) == []
+    sections = {spec.section for spec in INSTANCE_SPECS_REGISTRY.specs}
+    experiment_files = ConfigRepository(base_dir=experiment_dir, known_names=sections).load_all()
+    assert _templates_reservoirs_in(experiment_files) == []
+
+    # The templates were used all the same, from the defaults, for the instances of the channels
+    assert {'nuclei_a', 'nuclei_b'} <= set(working_config['cell_map']['channels'])
+    assert 'myelin' in working_config['tract_map']['channels']

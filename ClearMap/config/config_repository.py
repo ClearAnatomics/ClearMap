@@ -1,8 +1,13 @@
 import shutil
 from pathlib import Path
-from typing import Dict, Any, Iterable, Optional, List
+from typing import Callable, Dict, Any, Iterable, Optional, List
 
 from ClearMap.config.config_handler import ConfigHandler, ALTERNATIVES_REG
+
+UNDEFINED_SAMPLE_ID = 'undefined'
+
+SectionFilter = Callable[[str, Dict[str, Any]], Dict[str, Any]]
+"""(section name, section content) -> the content to write; must not modify its argument"""
 
 
 def _to_native_dict(obj) -> Any:
@@ -141,9 +146,17 @@ class ConfigRepository:
             dst.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(src, dst)
 
-    def copy_from_defaults(self, dest_dir: Path | str) -> None:
+    def copy_from_defaults(self, dest_dir: Path | str, *, section_filter: Optional[SectionFilter] = None) -> None:
         """
-        Copy packaged defaults for each known config into dest_dir.
+        Write the packaged defaults of each known (local) config into dest_dir.
+
+        Parameters
+        ----------
+        dest_dir : Path | str
+            The experiment folder.
+        section_filter : SectionFilter, optional
+            Applied to the content of each default before it is written, e.g. to leave out what only
+            belongs to the defaults (the templates reservoirs).
         """
         dest_dir = Path(dest_dir)
         dest_dir.mkdir(parents=True, exist_ok=True)
@@ -154,21 +167,27 @@ class ConfigRepository:
                 default_src = self.default_path_for(name, must_exist=True)
             except FileNotFoundError:
                 continue  # TODO: log missing default?
-            dest_path = dest_dir / default_src.name
-            dest_path.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(default_src, dest_path)
-
-            # reset sample_id to 'undefined' in the copied sample config
+            cfg = self._default_content(name, default_src, section_filter)
             if name == 'sample':
-                cfg = self.load(name)
-                cfg["sample_id"] = 'undefined'
-                self.commit(name, cfg)
+                cfg['sample_id'] = UNDEFINED_SAMPLE_ID
+            self._write(dest_dir / default_src.name, cfg)
 
-    def ensure_present(self, name: str) -> Path | None:  # FIXME: use this to refactor above code
+    @staticmethod
+    def _default_content(name: str, default_src: Path, section_filter: Optional[SectionFilter]) -> Dict[str, Any]:
+        """The content of the default config `name` (read from default_src), filtered if requested"""
+        cfg = _to_native_dict(ConfigHandler.get_cfg_from_path(default_src))
+        return section_filter(name, cfg) if section_filter is not None else cfg
+
+    @staticmethod
+    def _write(dest_path: Path, cfg: Dict[str, Any]) -> None:
+        dest_path.parent.mkdir(parents=True, exist_ok=True)
+        ConfigHandler.dump(dest_path, cfg)
+
+    def ensure_present(self, name: str, *, section_filter: Optional[SectionFilter] = None) -> Path | None:
         """
         Ensure a config file exists in the current experiment directory.
-        If missing, copy from packaged defaults. Return the dest path or None
-        if no default exists for that name.
+        If missing, write it from the packaged defaults (filtered by section_filter, see copy_from_defaults).
+        Return the dest path or None if no default exists for that name.
         """
         dest = self.path_for(name, must_exist=False)
         if dest.exists():
@@ -177,6 +196,5 @@ class ConfigRepository:
             src = self.default_path_for(name, must_exist=True)
         except FileNotFoundError:
             return None
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(src, dest)
+        self._write(dest, self._default_content(ConfigHandler.normalise_cfg_name(name), src, section_filter))
         return dest

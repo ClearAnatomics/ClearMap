@@ -15,6 +15,7 @@ from ClearMap.Utils.utilities import infer_origin_from_caller, deep_merge
 from .config_adjusters.type_hints import AdjustmentContext
 from .config_adjusters.adjusters_api import Phase, ConfigKeys, AdjusterScope
 from .config_adjusters.engine import run_adjusters
+from .config_adjusters.policy import INSTANCE_SPECS_REGISTRY
 from .config_handler import ALTERNATIVES_REG, ConfigHandler
 from .config_repository import ConfigRepository
 from .defaults_provider import DefaultsProvider, get_defaults_provider, SCHEMAS_DIR, set_defaults_provider
@@ -171,6 +172,7 @@ class ConfigCoordinator(BusSubscriberMixin):
         """
         For any known section missing in the working model, seed from DefaultsProvider.
         Call this after load_all() when creating a new experiment.
+        The templates reservoirs of the defaults are left out (see ContainerSpecRegistry.without_template_roots).
         """
         if not self.defaults_provider:
             return
@@ -184,7 +186,7 @@ class ConfigCoordinator(BusSubscriberMixin):
                 if sec not in wkng or not wkng[sec]:
                     dflt = self.defaults_provider.get(sec)
                     if dflt:
-                        wkng[sec] = dflt
+                        wkng[sec] = INSTANCE_SPECS_REGISTRY.without_template_roots(sec, dflt)
 
     def config_exists(self, name: str) -> bool:
         return self.path_for(name, must_exist=False).exists()
@@ -214,7 +216,8 @@ class ConfigCoordinator(BusSubscriberMixin):
         return self._config_repo.exists_any(name)
 
     def ensure_present(self, name: str) -> Path | None:
-        return self._config_repo.ensure_present(name)
+        """Ensure the config file exists in the experiment, written from the defaults without their templates"""
+        return self._config_repo.ensure_present(name, section_filter=INSTANCE_SPECS_REGISTRY.without_template_roots)
 
     def load(self, name: str) -> Dict[str, Any]:
         with self._lock:
@@ -240,9 +243,10 @@ class ConfigCoordinator(BusSubscriberMixin):
 
     def copy_from_defaults(self, dest_dir: str | Path) -> None:
         """
-        Copy all default configs to dest_dir.
+        Write all default configs to dest_dir, without their templates reservoirs: the templates only
+        live in the defaults (where the templates resolver reads them), never in an experiment.
         """
-        self._config_repo.copy_from_defaults(Path(dest_dir))
+        self._config_repo.copy_from_defaults(Path(dest_dir), section_filter=INSTANCE_SPECS_REGISTRY.without_template_roots)
 
     @property
     def rev(self) -> int:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Optional, Callable, Dict, Any, Iterable, Literal, Tuple
@@ -206,6 +207,33 @@ class ContainerSpecRegistry:
         - templates reservoirs
         """
         return self.instance_roots(section) | self.template_roots(section)
+
+    def without_template_roots(self, section: str, section_cfg: dict[str, Any]) -> dict[str, Any]:
+        """
+        A copy of a config section without its templates reservoirs.
+
+        The templates only live in the defaults, where the templates resolver reads them. A section that
+        enters an experiment (or group) from the defaults is stripped of them here, so that they never
+        reach the working config, nor the files of the experiment.
+
+        Parameters
+        ----------
+        section : str
+            The name of the section (e.g. 'cell_map'), which selects the reservoirs to remove.
+        section_cfg : dict
+            The content of the section, not modified.
+
+        Returns
+        -------
+        dict
+            A deep copy of section_cfg without the templates reservoirs of that section.
+        """
+        stripped = deepcopy(section_cfg)
+        for template_root in self.template_roots(section):
+            parent = get_nested(stripped, template_root[:-1])
+            if isinstance(parent, dict):
+                parent.pop(template_root[-1], None)
+        return stripped
 
     def skip_paths_for_missing_only_merge(self, section: str) -> set[KeysPath]:
         # Alias for potential later splitting of logic
