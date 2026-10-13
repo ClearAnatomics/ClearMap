@@ -607,7 +607,8 @@ def filter_cells(source, sink, thresholds):
         Dictionary of the form {name : threshold} where name refers to the
         column in the cell data and threshold can be None, a float
         indicating a minimal threshold or a tuple (min, max) where min, max can be
-        None or a minimal and maximal threshold value.
+        None or a minimal and maximal threshold value. Both bounds are inclusive, so
+        that a cell at the saturation value of the dtype passes a default max filter.
 
     Returns
     -------
@@ -623,8 +624,8 @@ def filter_cells(source, sink, thresholds):
                 thrsh = (thrsh, None)
             if thrsh[0] is not None:  # high pass
                 cells_mask = np.logical_and(cells_mask, thrsh[0] <= source[filter_name])
-            if thrsh[1] is not None:  # low pass
-                cells_mask = np.logical_and(cells_mask, thrsh[1] > source[filter_name])
+            if thrsh[1] is not None:  # low pass (inclusive)
+                cells_mask = np.logical_and(cells_mask, source[filter_name] <= thrsh[1])
     cells_filtered = source[cells_mask]
 
     return io_ops.write(sink, cells_filtered)
