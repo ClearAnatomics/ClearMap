@@ -14,7 +14,7 @@ from typing import final, Callable, Any, TYPE_CHECKING, TypeVar, Generic, ParamS
 import numpy as np
 from PyQt5.QtWidgets import QWhatsThis, QWidget, QApplication
 
-from ClearMap.Utils.event_bus import BusSubscriberMixin
+from ClearMap.Utils.event_bus import BusSubscriberMixin, GUI_THREAD
 from ClearMap.Utils.utilities import title_to_snake
 from ClearMap.config.compound_keys import is_compound_channel
 from ClearMap.config.config_handler import ConfigHandler, ALTERNATIVES_REG
@@ -117,6 +117,7 @@ class GenericTab(GenericUi, BusSubscriberMixin):
     A tab manager includes a tab widget, the associated parameters and
     an optional processor object which handles the computations.
     """
+    subscriber_affinity = GUI_THREAD  # The handlers touch widgets
     requirements = TabRequirements(needs_workspace=False, needs_channels=False)  # Think SampleInfoTab
 
     processing_type: str | None = None  # Not a pipeline tab by default

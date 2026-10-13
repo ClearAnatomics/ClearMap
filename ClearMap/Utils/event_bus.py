@@ -8,6 +8,18 @@ from typing import Callable, Any, Dict, List, Optional, Type, TypeVar
 
 Evt = TypeVar("Evt")
 EventSubscriber = Callable[[Evt], None]
+Delivery = Callable[[Callable[[Any], None], Any], None]  # delivery(handler, event): runs handler(event) on its thread
+
+GUI_THREAD = 'gui_thread'
+"""
+Affinity of the handlers which must run in the GUI thread (they touch widgets). The application registers its
+delivery (:meth:`EventBus.set_delivery`); headless (e.g. in the tests) nothing is, and they are called directly.
+"""
+
+
+def deliver_directly(handler: Callable[[Any], None], event: Any) -> None:
+    """The default delivery: call the handler now, in the thread of the publisher"""
+    handler(event)
 
 
 class Publishes:
@@ -19,66 +31,111 @@ class Publishes:
         self.events = frozenset(events)
 
 
+class _Subscription:
+    """One call to :meth:`EventBus.subscribe`: the (weak) handler and where it must run. Compared by identity."""
+    __slots__ = ('ref', 'affinity')
+
+    def __init__(self, ref: weakref.ReferenceType, affinity: Optional[str]):
+        self.ref = ref
+        self.affinity = affinity
+
+
 class EventBus:
-    """Minimal, thread-safe publisher/subscriber for Events."""
+    """
+    Minimal, thread-safe publisher/subscriber for Events.
+
+    Events may be published from any thread (e.g. by an orchestrator running in a worker thread).
+    Each handler runs according to the *affinity* it was subscribed with: without affinity, it is called
+    directly, in the thread of the publisher; otherwise through the delivery registered for its affinity
+    (e.g. the :data:`GUI_THREAD` handlers run in the GUI thread). The bus itself knows nothing of Qt.
+    """
     def __init__(self) -> None:
-        self._subs: Dict[Type[Any], List[weakref.ReferenceType]] = {}
+        self._subs: Dict[Type[Any], List[_Subscription]] = {}
+        self._deliveries: Dict[str, Delivery] = {}
         self._lock = threading.RLock()
         self._qt_bridge: Optional[Callable[[Type[Any], Any], None]] = None
 
-    def _remove_refs(self, event_type: Type[Evt], refs_to_remove: List[weakref.ReferenceType]) -> None:
-        """Remove these subscriptions (by identity: one subscription per call to subscribe), and the dead ones"""
-        if not refs_to_remove:
+    def set_delivery(self, affinity: str, delivery: Delivery) -> None:
+        """
+        Register how the handlers subscribed with *affinity* are run.
+
+        Parameters
+        ----------
+        affinity: str
+            The affinity (e.g. :data:`GUI_THREAD`)
+        delivery: Delivery
+            Called as delivery(handler, event) in the thread of the publisher. It must call handler(event)
+            in the right thread, now or later. A late call is safe: the handler it is given does nothing if
+            its subscriber was unsubscribed (or collected) in the meantime.
+        """
+        with self._lock:
+            self._deliveries[affinity] = delivery
+
+    def _delivery_for(self, affinity: Optional[str]) -> Delivery:
+        if affinity is None:
+            return deliver_directly
+        with self._lock:
+            return self._deliveries.get(affinity, deliver_directly)  # Headless: nothing registered
+
+    def _remove_subscriptions(self, event_type: Type[Evt], to_remove: List[_Subscription]) -> None:
+        """Remove these subscriptions (by identity: one per call to subscribe), and the dead ones"""
+        if not to_remove:
             return
         with self._lock:
             lst = self._subs.get(event_type, [])
             if not lst:
                 return
-            lst[:] = [r for r in lst if r() is not None and not any(r is gone for gone in refs_to_remove)]
+            lst[:] = [sub for sub in lst if sub.ref() is not None and not any(sub is gone for gone in to_remove)]
 
-    def subscribe(self, event_type: Type[Evt], callback: EventSubscriber[Evt]) -> Callable[[], None]:
+    def subscribe(self, event_type: Type[Evt], callback: EventSubscriber[Evt], *,
+                  affinity: Optional[str] = None) -> Callable[[], None]:
         """
         Subscribe a handler for a given event class.
         Handler signature: def handler(evt: EventType) -> None
+        affinity: where the handler must run (e.g. :data:`GUI_THREAD`), None for the thread of the publisher.
         Returns: unsubscribe() callable.
         """
-        ref: weakref.ReferenceType
         # Methods use WeakMethod; functions use weakref.ref
-        ref = weakref.WeakMethod(callback) if hasattr(callback, "__self__") \
-            else weakref.ref(callback)
+        ref = weakref.WeakMethod(callback) if hasattr(callback, "__self__") else weakref.ref(callback)
+        subscription = _Subscription(ref, affinity)
 
         with self._lock:
-            self._subs.setdefault(event_type, []).append(ref)
+            self._subs.setdefault(event_type, []).append(subscription)
 
         def _unsub() -> None:
-            self._remove_refs(event_type, [ref])
+            self._remove_subscriptions(event_type, [subscription])
 
         return _unsub
 
     def publish(self, event: Evt) -> None:
         """
-        Publish a concrete event instance. Dispatch is on its exact class.
+        Publish a concrete event instance, from any thread. Dispatch is on its exact class.
         (No inheritance walk for determinism/perf.)
         """
         event_type = type(event)
         with self._lock:
-            refs = list(self._subs.get(event_type, []))
+            subscriptions = list(self._subs.get(event_type, []))
 
-        dead: List[weakref.ReferenceType] = []
-        for ref in refs:
-            cb = ref()
-            if cb is None:
-                dead.append(ref)
+        dead: List[_Subscription] = []
+        for subscription in subscriptions:
+            if subscription.ref() is None:
+                dead.append(subscription)
                 continue
-            # try:
-            cb(event)
-            # except Exception as err:
-            #     print(str(err))   # keep bus robust  #  TODO: log
+            handler = functools.partial(self._call_if_subscribed, event_type, subscription)
+            self._delivery_for(subscription.affinity)(handler, event)
 
-        self._remove_refs(event_type, dead)
+        self._remove_subscriptions(event_type, dead)
 
         if self._qt_bridge:
             self._qt_bridge(event_type, event)
+
+    def _call_if_subscribed(self, event_type: Type[Any], subscription: _Subscription, event: Any) -> None:
+        """Run the handler of *subscription*, unless it was unsubscribed (or collected) since the event was published"""
+        with self._lock:
+            subscribed = any(sub is subscription for sub in self._subs.get(event_type, ()))
+        cb = subscription.ref() if subscribed else None
+        if cb is not None:
+            cb(event)
 
     def bridge_to_qt(self, forwarder: Callable[[Type[Any], Any], None]) -> None:
         """Optionally forward all events to a Qt slot/signal."""
@@ -86,6 +143,9 @@ class EventBus:
 
 
 class BusSubscriberMixin:
+    subscriber_affinity: Optional[str] = None
+    """Where the handlers of this subscriber run (see :class:`EventBus`); the GUI classes set :data:`GUI_THREAD`"""
+
     def __init__(self, bus: EventBus):
         self._bus = bus
         self._unsubs: List[Callable[[], None]] = []
@@ -133,7 +193,7 @@ class BusSubscriberMixin:
                 "what you’re doing."
             )
 
-        unsub = self._bus.subscribe(event_type, handler)
+        unsub = self._bus.subscribe(event_type, handler, affinity=self.subscriber_affinity)
         self._unsubs.append(unsub)
 
     def unsubscribe_all(self) -> None:

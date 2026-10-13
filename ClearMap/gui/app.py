@@ -161,7 +161,7 @@ from ClearMap.Visualization.Qt.DataViewer import DataViewer
 from ClearMap.Alignment.Stitching import layout_graph_utils  # noqa: F401 # WARNING: first because otherwise, breaks with pytorch
 
 from ClearMap.Utils.utilities import title_to_snake, snake_to_title, deep_merge
-from ClearMap.Utils.event_bus import EventBus, BusSubscriberMixin
+from ClearMap.Utils.event_bus import EventBus, BusSubscriberMixin, GUI_THREAD
 from ClearMap.Utils.events import (CfgChanged, UiRequestRefreshTabs, UiTabActivated, TabActivationResult,
                                    TabsUpdated,  ChannelsSnapshot, ChannelDefaultsChanged)
 
@@ -172,6 +172,7 @@ from ClearMap.config.config_handler import ConfigHandler, CLEARMAP_CFG_DIR, ALTE
 
 from ClearMap.gui.gui_utils_images import get_current_res
 from ClearMap.gui.tab_registry import TabRegistry
+from ClearMap.gui.event_delivery import GuiThreadDelivery
 from ClearMap.gui.widget_monkeypatch_callbacks import recursive_patch_widgets
 from ClearMap.pipeline_orchestrators.sample_info_management import SampleManager
 from ClearMap.pipeline_orchestrators.experiment_controller import ExperimentController, AnalysisGroupController, \
@@ -759,7 +760,7 @@ class ClearMapApp(ClearMapAppBase):
         if not os.path.exists(CLEARMAP_CFG_DIR):
             update_default_config()
 
-        self.bus.subscribe(TabsUpdated, self._on_tabs_updated)
+        self.bus.subscribe(TabsUpdated, self._on_tabs_updated, affinity=GUI_THREAD)
 
     def reset(self):
         self.config_loader = ConfigHandler('')
@@ -1298,6 +1299,7 @@ class GuiController(BusSubscriberMixin):
     installing the tabs and handling events from the EventBus.
     It interacts with the ExperimentController to manage the business logic of the application.
     """
+    subscriber_affinity = GUI_THREAD  # The handlers build and refresh the tabs
     MAX_TABS_INSTALL_PASSES = 3  # Installs in a row; a replay happens only if the valid tabs really changed
 
     def __init__(self, bus: EventBus, experiment, tab_registry: TabRegistry,
@@ -1717,6 +1719,7 @@ def build_business_objects(bus: EventBus):
 
 def main(app_, splash_):
     bus = EventBus()
+    bus.set_delivery(GUI_THREAD, GuiThreadDelivery())  # Created here, in the GUI thread
     experiment, group_controller = build_business_objects(bus)
     tab_registry = TabRegistry()
     gui = GuiController(bus, experiment, tab_registry, group_controller)

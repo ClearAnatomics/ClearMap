@@ -1,7 +1,11 @@
-"""The event bus: subscriptions"""
+"""The event bus: subscriptions, and where the handlers run (delivery)"""
+import importlib
+import threading
 from dataclasses import dataclass
 
-from ClearMap.Utils.event_bus import EventBus
+import pytest
+
+from ClearMap.Utils.event_bus import EventBus, BusSubscriberMixin, GUI_THREAD
 
 
 @dataclass(frozen=True)
@@ -46,3 +50,108 @@ def test_the_same_handler_subscribed_twice_is_unsubscribed_once_per_call():
     bus.publish(Ping(1))
 
     assert recorder.events == [Ping(1)]
+
+
+# ----------------------------------------------------------------------------------------------------------------
+# Delivery: where the handlers run
+# ----------------------------------------------------------------------------------------------------------------
+
+class QueuedDelivery:
+    """Stand-in for the GUI delivery: the calls are queued, then run by whoever owns the queue (the 'GUI thread')"""
+
+    def __init__(self):
+        self.queue = []
+
+    def __call__(self, handler, event):
+        self.queue.append((handler, event))
+
+    def run_pending(self):
+        pending, self.queue = self.queue, []
+        for handler, event in pending:
+            handler(event)
+
+
+class ThreadRecorder(Recorder):
+    def on_ping(self, event):
+        super().on_ping(event)
+        self.threads = getattr(self, 'threads', []) + [threading.get_ident()]
+
+
+def _publish_from_a_worker_thread(bus, event):
+    worker = threading.Thread(target=bus.publish, args=(event,))
+    worker.start()
+    worker.join()
+
+
+def test_handlers_without_affinity_run_at_once_in_the_thread_of_the_publisher():
+    bus, recorder = EventBus(), ThreadRecorder()
+    bus.subscribe(Ping, recorder.on_ping)
+    _publish_from_a_worker_thread(bus, Ping(1))
+
+    assert recorder.events == [Ping(1)]
+    assert recorder.threads[0] != threading.get_ident()
+
+
+def test_without_registered_delivery_the_gui_handlers_are_called_directly():
+    """Headless (tests, scripts): nothing is registered for GUI_THREAD, the handlers are called like the others"""
+    bus, recorder = EventBus(), Recorder()
+    bus.subscribe(Ping, recorder.on_ping, affinity=GUI_THREAD)
+    bus.publish(Ping(1))
+
+    assert recorder.events == [Ping(1)]
+
+
+def test_gui_handlers_published_from_a_worker_run_in_the_gui_thread():
+    bus, gui_handler, headless_handler, delivery = EventBus(), ThreadRecorder(), ThreadRecorder(), QueuedDelivery()
+    bus.set_delivery(GUI_THREAD, delivery)
+    bus.subscribe(Ping, gui_handler.on_ping, affinity=GUI_THREAD)
+    bus.subscribe(Ping, headless_handler.on_ping)
+
+    _publish_from_a_worker_thread(bus, Ping(1))
+    assert gui_handler.events == [] and headless_handler.events == [Ping(1)]  # Not yet: queued for the GUI thread
+
+    delivery.run_pending()  # The GUI event loop
+    assert gui_handler.events == [Ping(1)]
+    assert gui_handler.threads == [threading.get_ident()]
+
+
+def test_a_queued_event_is_not_delivered_to_a_subscriber_unsubscribed_meanwhile():
+    """e.g. a tab torn down between the publication in the worker thread and the GUI event loop"""
+    bus, recorder, delivery = EventBus(), Recorder(), QueuedDelivery()
+    bus.set_delivery(GUI_THREAD, delivery)
+    unsubscribe = bus.subscribe(Ping, recorder.on_ping, affinity=GUI_THREAD)
+    bus.publish(Ping(1))
+    unsubscribe()
+    delivery.run_pending()
+
+    assert recorder.events == []
+
+
+def test_the_subscriber_mixin_subscribes_with_its_affinity():
+    class GuiSubscriber(BusSubscriberMixin):
+        subscriber_affinity = GUI_THREAD
+
+        def __init__(self, bus):
+            super().__init__(bus)
+            self.events = []
+            self.subscribe(Ping, self.on_ping)
+
+        def on_ping(self, event):
+            self.events.append(event)
+
+    bus, delivery = EventBus(), QueuedDelivery()
+    bus.set_delivery(GUI_THREAD, delivery)
+    subscriber = GuiSubscriber(bus)
+    bus.publish(Ping(1))
+    assert subscriber.events == []
+    delivery.run_pending()
+    assert subscriber.events == [Ping(1)]
+
+
+@pytest.mark.parametrize('class_path', ['ClearMap.gui.params_interfaces.UiParameter',
+                                        'ClearMap.gui.params_interfaces.UiParameterCollection',
+                                        'ClearMap.gui.tabs_interfaces.GenericTab'])
+def test_the_gui_base_classes_run_their_handlers_in_the_gui_thread(class_path):
+    module_name, class_name = class_path.rsplit('.', 1)
+    cls = getattr(importlib.import_module(module_name), class_name)
+    assert cls.subscriber_affinity == GUI_THREAD

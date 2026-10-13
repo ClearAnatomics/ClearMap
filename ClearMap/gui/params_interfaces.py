@@ -16,7 +16,7 @@ from PyQt5.QtWidgets import (QCheckBox, QLabel, QLineEdit, QSpinBox, QFrame,
                              QWidget, QListWidget, QDoubleSpinBox)
 
 from ClearMap.IO.assets_constants import CONTENT_TYPE_TO_PIPELINE
-from ClearMap.Utils.event_bus import BusSubscriberMixin, EventBus, Publishes
+from ClearMap.Utils.event_bus import BusSubscriberMixin, EventBus, Publishes, GUI_THREAD
 from ClearMap.Utils.events import ChannelsChanged
 from ClearMap.Utils.utilities import set_item_recursive, get_item_recursive, DELETE
 from ClearMap.Utils.exceptions import ConfigNotFoundError, ClearMapValueError
@@ -981,6 +981,8 @@ class UiParameter(BusSubscriberMixin):
         The list of keys to access the config file. This allows a relative path to be used from the
         whole config file.
     """
+    subscriber_affinity = GUI_THREAD  # The handlers touch widgets
+
     def __init__(self, tab: QWidget, *, event_bus: EventBus,
                  get_view: Optional[Callable[[], Mapping[str, Any]]] = None,
                  apply_patch: Optional[Callable[[dict], None]] = None):
@@ -1354,6 +1356,8 @@ class UiParameterCollection(BusSubscriberMixin, ABC):
     Although the attributes of contained `UiParameters` are accessible,
     it is recommended to first dereference them to avoid clashes.
     """
+    subscriber_affinity = GUI_THREAD  # The handlers touch widgets
+
     def __init__(self, tab: QWidget, *, pipeline_name: str, event_bus: EventBus,
                  get_view: Callable[[], Mapping[str, Any]] | None = None,
                  apply_patch: Callable[[dict], None] | None = None):
