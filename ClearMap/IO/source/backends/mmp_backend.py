@@ -97,8 +97,12 @@ def _assert_durable_sink(sink, context: str = ''):
 
 
 def _as_array(data):
-    """Array view of *data*, accepting an MMPSource, a memmap or anything array-like."""
-    if isinstance(data, MMPSource):
+    """Array view of *data*, accepting any array Source (MMP, TIF, ...), a memmap or anything array-like.
+
+    Sources do not implement ``__array__``: handing one to ``np.asanyarray`` yields a 0-d object
+    array, which cannot be memory-mapped, so they are unwrapped through ``.array`` first.
+    """
+    if isinstance(data, source_mod.BaseArraySource):
         return data.array
     return np.asanyarray(data)
 
