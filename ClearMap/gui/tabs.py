@@ -2200,12 +2200,14 @@ class GroupAnalysisTab(BatchTab):
             return
 
         # TODO: set abort callback
-        self.main_window.make_progress_dialog('P value maps', n_steps=len(comparisons))
+        # Busy rather than progress dialog: the progress is that of each comparison, which reports none,
+        # and the dialog of the progress watcher is closed at the end of the first one
         try:
-            self.processor.compute_p_values(comparisons,
-                                            channels=self.get_analysable_channels(),
-                                            advanced=self.params.compute_sd_and_effect_size,
-                                            density_files_suffix=self.params.density_suffix)
+            with self.busy_dialog('Computing the p value maps', f'{len(comparisons)} comparison(s)'):
+                self.processor.compute_p_values(comparisons,
+                                                channels=self.get_analysable_channels(),
+                                                advanced=self.params.compute_sd_and_effect_size,
+                                                density_files_suffix=self.params.density_suffix)
         except GroupStatsError as err:
             self.main_window.popup(str(err), base_msg='Cannot proceed with analysis')
         self.main_window.signal_process_finished()
@@ -2218,7 +2220,7 @@ class GroupAnalysisTab(BatchTab):
         dvs = [DataFrameWidget(tables[self.channel]).table for tables in tables_by_pair.values()]
         self.main_window.setup_plots(dvs)  # TODO: use wrap_plot
 
-    @GenericTab.ui_plot('Plotting p_val maps')
+    @GenericTab.ui_plot('Plotting p_val maps', busy_title='Loading the p value maps')
     def plot_p_vals(self, *_, **__):
         selected_comparisons = self.params.selected_comparisons
         if not selected_comparisons:
