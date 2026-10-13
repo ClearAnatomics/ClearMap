@@ -25,8 +25,8 @@ from ClearMap.gui.gui_utils_base import disconnect_widget_signal
 from ClearMap.gui.pipeline_model import LinearPipeline, PipelineStep, BINARIZATION_STEPS
 from ClearMap.gui.pipeline_widgets import LinearPipelineWidget
 from ClearMap.gui.widget_monkeypatch_callbacks import _get_sorted_spin_boxes, ensure_compound_box_patched
-from ClearMap.gui.widgets import ExtendableTabWidget, FileDropListWidget, LandmarksWeightsPanel, GroupsWidgetAdapter, \
-    NProcessesWidget
+from ClearMap.gui.widgets import (ExtendableTabWidget, FileDropListWidget, LandmarksWeightsPanel, GroupsWidgetAdapter,
+                                  NProcessesWidget)
 
 CLEARMAP_VERSION = Version(version('ClearMap'))
 DEBUG_PAINT_GUARD = True   # FIXME: base on machine params log_level
@@ -84,6 +84,10 @@ class ParamLink:
         The list of keys to access the value in the config file
         If None, the attribute is not present in the config file and
         will not be connected
+    section_level: bool
+        If True, the keys are relative to the section (i.e. the config file, the first key of the
+        cfg_subtree of the parameter) rather than to the cfg_subtree. For values which are shared by
+        all the instances of a parameter (e.g. the performance of a section, shown on the page of each channel).
     _widget: QWidget
         The GUI widget to be connected to the config file
     object_name: str
@@ -109,12 +113,14 @@ class ParamLink:
                  extra_connect: Optional[Callable[[QWidget, Callable[[], None]], Callable | None]] = None,
                  missing_ok: bool = False,
                  present_if: Optional[Callable[[dict], bool]] = None,
-                 disabled_value: Any =None, ui_sentinel: Any =None, enforce_sentinel_min=False,):
+                 disabled_value: Any =None, ui_sentinel: Any =None, enforce_sentinel_min=False,
+                 section_level: bool = False):
         if isinstance(widget, QFrame):
             ensure_compound_box_patched(widget)
         if keys is None:
             connect = False
         self.keys: List[str] = keys
+        self.section_level: bool = section_level  # keys are relative to the section, not to the cfg_subtree
         self._widget: QWidget = widget
         self._had_widget: bool = widget is not None  # intentionally None vs later-stale
 
@@ -1077,8 +1083,22 @@ class UiParameter(BusSubscriberMixin):
         base = self._get_view()
         return get_item_recursive(base, self.cfg_subtree) if self.cfg_subtree else base
 
-    def _emit_patch(self, relative_path, value) -> None:
-        full_path = list(self.cfg_subtree) + list(relative_path)
+    @property
+    def section_subtree(self) -> List[str]:
+        """The path of the section (the config file) which holds the cfg_subtree (the first key, if any)"""
+        return list(self.cfg_subtree[:1])
+
+    @property
+    def section_view(self):
+        """The view of the whole section, for the links with section level keys"""
+        if self._get_view is None:
+            raise ValueError('View provider not set. Please call bind_view_provider first.')
+        base = self._get_view()
+        return get_item_recursive(base, self.section_subtree) if self.section_subtree else base
+
+    def _emit_patch(self, relative_path, value, *, section_level=False) -> None:
+        prefix = self.section_subtree if section_level else list(self.cfg_subtree)
+        full_path = prefix + list(relative_path)
         patch = {}
         set_item_recursive(patch, full_path, value)
         if self._apply_patch is not None:
@@ -1170,7 +1190,7 @@ class UiParameter(BusSubscriberMixin):
         if not param_link.is_relevant(self.view):
             return
         property_value = getattr(self, attr_name)  # Cast happens here, don't do it twice
-        self._emit_patch(keys, property_value)
+        self._emit_patch(keys, property_value, section_level=param_link.section_level)
         if callable(param_link.notify_apply):
             param_link.notify_apply()
 
@@ -1201,7 +1221,9 @@ class UiParameter(BusSubscriberMixin):
                     if not relevant:
                         continue
                 try:
-                    val = get_item_recursive(view, keys_list)  # check if we want try_get_item here w/ default
+                    section_level = isinstance(p_link, ParamLink) and p_link.section_level
+                    val = get_item_recursive(self.section_view if section_level else view,
+                                             keys_list)  # check if we want try_get_item here w/ default
                 except (KeyError, ConfigNotFoundError):
                     if isinstance(p_link, ParamLink) and p_link.missing_ok:
                         val = p_link.default

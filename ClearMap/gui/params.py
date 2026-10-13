@@ -1376,7 +1376,9 @@ class ChannelColocalizationParams(ChannelUiParameter):
         return {
             'particle_diameter': ParamLink(['comparison', 'particle_diameter'],
                                            self.tab.colocalizationDiameterSpinBox),
-            'n_processes': ParamLink(['performance', 'n_processes'], self.tab.colocalizationNProcessesSpinBox),
+            # performance is top level subsection, not per chan
+            'n_processes': ParamLink(['performance', 'n_processes'],
+                                     self.tab.colocalizationNProcessesSpinBox, section_level=True),
             'max_particle_distance': ParamLink(['analysis', 'max_particle_distance'],
                                                self.tab.colocalizationMaxDistanceSpinBox),
             'relative_overlap_threshold': ParamLink(['analysis', 'relative_overlap_threshold'],
