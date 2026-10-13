@@ -2540,7 +2540,7 @@ class ComparisonsWidgetAdapter:
         self._suffix_widget: Optional[QWidget] = None  # ← preserve across rebuilds
 
     def rebuild(self, model: ComparisonsModel, *, on_plot_group: Callable[[str], None],
-                channels: List[str], on_channel_changed: Callable[[str], None],
+                on_channel_changed: Callable[[str], None],
                 suffixes: List[str] = None,
                 preselected_comparisons: Optional[List[Pair]] = None) -> None:
 
@@ -2591,19 +2591,37 @@ class ComparisonsWidgetAdapter:
                         combo.setCurrentText(suffixes[0])
                     combo.blockSignals(False)
 
-        # Channel to plot combobox
-        if channels:
-            lyt = QHBoxLayout()
-            plot_channel_lbl = QLabel('Channel: ')
-            lyt.addWidget(plot_channel_lbl)
-            plot_channel_combobox = QComboBox()
-            plot_channel_combobox.addItems(channels)
-            plot_channel_combobox.currentTextChanged.connect(on_channel_changed)
-            lyt.addWidget(plot_channel_combobox)
-            self._layout.addLayout(lyt)
-            self._channel_combo = plot_channel_combobox
+        # Channel to analyse combobox (filled by set_channels, it depends on the suffix)
+        lyt = QHBoxLayout()
+        lyt.addWidget(QLabel('Channel: '))
+        channel_combobox = QComboBox()
+        channel_combobox.currentTextChanged.connect(on_channel_changed)
+        lyt.addWidget(channel_combobox)
+        self._layout.addLayout(lyt)
+        self._channel_combo = channel_combobox
 
         self._layout.addStretch()
+
+    def set_channels(self, labels: List[str], current: Optional[str] = None) -> None:
+        """
+        Fill the channels combobox, keeping the comparisons as they are.
+
+        Parameters
+        ----------
+        labels: list[str]
+            The channels to choose from
+        current: str | None
+            The one to select, the first if it is not one of labels.
+        """
+        combo = self._channel_combo
+        if combo is None:
+            return
+        combo.blockSignals(True)
+        combo.clear()
+        combo.addItems(labels)
+        if current in labels:
+            combo.setCurrentText(current)
+        combo.blockSignals(False)
 
     def selected_pairs(self, model: ComparisonsModel) -> List[Pair]:
         out: List[Pair] = []

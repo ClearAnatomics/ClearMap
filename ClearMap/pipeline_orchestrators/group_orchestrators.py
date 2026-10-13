@@ -20,7 +20,7 @@ from .utils import init_sample_manager_and_processors
 from ..Alignment.utils import get_all_region_ids
 from ..Analysis.Statistics.group_assets import GroupResultsAssets
 from ..IO.assets_constants import CHANNELS_ASSETS_TYPES_CONFIG
-from ..Utils.exceptions import GroupStatsError
+from ..Utils.exceptions import GroupStatsError, MissingRequirementException
 from ..config.atlas import ATLAS_NAMES_MAP
 from ..config.compound_keys import CompoundKey
 
@@ -229,13 +229,23 @@ class DensityGroupAnalysisOrchestrator(GroupOrchestratorBase):
                 self.assets.write_effect_size(effect_size, channel, gp1_name, gp2_name, suffix)
         # FIXME: return dict {channel_name: colored_p_vals}
 
-    def find_available_density_suffixes(self) -> List[str]:
-        """Scan the first sample's workspace to find available density suffixes."""
-        if not self.groups:
-            return []
-        first_group = next(iter(self.groups.values()), None)
+    def _first_sample_dir(self, groups: Optional[Dict[str, List[str]]] = None) -> Optional[Path]:
+        """
+        The first sample of the first group that has one, or None.
 
-        sm = self.get_sample_manager_for(Path(first_group[0]))
+        groups: the groups to look in, e.g. the ones the user is editing, which are not in the config
+        until they are applied. By default, the ones of the group controller (the config).
+        """
+        groups = self.groups if groups is None else groups
+        return next((Path(folders[0]) for folders in groups.values() if folders), None)
+
+    def find_available_density_suffixes(self, groups: Optional[Dict[str, List[str]]] = None) -> List[str]:
+        """Scan the first sample's workspace to find available density suffixes (see _first_sample_dir)."""
+        first_sample = self._first_sample_dir(groups)
+        if first_sample is None:
+            return []
+
+        sm = self.get_sample_manager_for(first_sample)
 
         # Get target channel(s) depending on the pipeline
         channels = sm.get_channels_by_pipeline(self.pipeline, as_list=True)
@@ -260,16 +270,14 @@ class DensityGroupAnalysisOrchestrator(GroupOrchestratorBase):
 
         return sorted(list(suffixes))
 
-    def find_analysable_channels(self, *, density_suffix: str | None) -> List[str]:
+    def find_analysable_channels(self, *, density_suffix: str | None, groups: Optional[Dict[str, List[str]]] = None) -> List[str]:
         """
-        Inspects the first sample of the first group to infer which channels have density maps.
+        Inspects the first sample of the first group (see _first_sample_dir) to infer which channels
+        have density maps.
         """
-        if not self.groups:
+        first_folder = self._first_sample_dir(groups)
+        if first_folder is None:
             return []
-        first_group = next(iter(self.groups.values()))
-        if not first_group:
-            return []
-        first_folder = Path(first_group[0])
         sample_mgr = self.get_sample_manager_for(sample_src_dir=first_folder)
 
         vasc_channels = sample_mgr.get_channels_by_pipeline('TubeMap', as_list=True)
@@ -432,6 +440,9 @@ class DensityGroupAnalysisOrchestrator(GroupOrchestratorBase):
         paths, titles = [], []
         for folder in group_folders:
             asset = self._density_asset(folder, channel, suffix=density_suffix or None)
+            if not asset.exists:
+                raise MissingRequirementException(f'No density map for {channel=}, suffix "{density_suffix}" '
+                                                  f'in {folder}: {asset.path} does not exist.')
             paths.append(asset.path)
             titles.append(self._sample_id(folder))
         dvs = plot_3d.plot(paths, title=titles, arrange=False, sync=True, lut=['flame']*len(paths), parent=parent)

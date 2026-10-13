@@ -2102,17 +2102,15 @@ class GroupAnalysisTab(BatchTab):
         self.params.params_dict['pipeline'].notify_apply = (
             lambda: self.group_controller.set_pipeline(self.params.pipeline))
 
-        def _channels_provider(params) -> list[str]:
-            sample_folders_paths = params.get_all_paths()
-            if sample_folders_paths:
-                example_exp_dir = sample_folders_paths[0]  # random sorting sample 0
-                sample_manager = self.group_controller.get_sample_manager(example_exp_dir)
-                channels = sample_manager.get_channels_by_pipeline(params.pipeline, as_list=True)
-                return channels
-            return []
+        # The groups of the widget, not of the config: they are only there once applied
+        def _channels_provider(density_suffix: str | None) -> list[str | tuple[str, ...]]:
+            return self.processor.find_analysable_channels(density_suffix=density_suffix, groups=self.params.groups)
 
-        self.params.set_channels_provider(functools.partial(_channels_provider, self.params))
-        self.params.set_suffixes_provider(self.processor.find_available_density_suffixes)
+        def _suffixes_provider() -> list[str]:
+            return self.processor.find_available_density_suffixes(groups=self.params.groups)
+
+        self.params.set_channels_provider(_channels_provider)
+        self.params.set_suffixes_provider(_suffixes_provider)
         self.params.set_on_plot_group(self.plot_density_maps)
 
         # self.subscribe(UiBatchResultsFolderChanged, self.group_controller.set_group_base_dir)
@@ -2162,6 +2160,15 @@ class GroupAnalysisTab(BatchTab):
         if folder:
             self.group_controller.set_group_base_dir(folder)
 
+    @property
+    def channel(self) -> str | tuple[str, ...]:
+        """The channel picked in the tab (see GroupAnalysisParams.channel)"""
+        channel = self.params.channel
+        if channel is None:
+            raise MissingRequirementException(f'No channel has a density map for the suffix '
+                                              f'"{self.params.density_suffix}" in the first sample of the groups.')
+        return channel
+
     def get_analysable_channels(self) -> list[str]:
         """
         List the channels that have density maps available for analysis.
@@ -2179,7 +2186,7 @@ class GroupAnalysisTab(BatchTab):
     def plot_density_maps(self, group_name: str):
         return self.processor.plot_density_maps(
             self.params.groups[group_name],
-            channel=self.params.plot_channel,
+            channel=self.channel,
             density_suffix=self.params.density_suffix,
             parent=self.main_window.centralWidget())
 
@@ -2206,10 +2213,9 @@ class GroupAnalysisTab(BatchTab):
     @ui_task_progress(lambda s: 'Group stats', lambda s: len(s.params.selected_comparisons))
     def make_group_stats_tables(self) -> None:
         self.main_window.clear_plots()
-        tables_by_pair = self.processor.compute_stats_tables(self.params.selected_comparisons,
-                                                             channel=self.params.plot_channel,
+        tables_by_pair = self.processor.compute_stats_tables(self.params.selected_comparisons, channel=self.channel,
                                                              density_suffix=self.params.density_suffix, save=True)
-        dvs = [DataFrameWidget(tables[self.params.plot_channel]).table for tables in tables_by_pair.values()]
+        dvs = [DataFrameWidget(tables[self.channel]).table for tables in tables_by_pair.values()]
         self.main_window.setup_plots(dvs)  # TODO: use wrap_plot
 
     @GenericTab.ui_plot('Plotting p_val maps')
@@ -2220,7 +2226,7 @@ class GroupAnalysisTab(BatchTab):
             return []
         return self.processor.plot_p_value_maps(
             comparisons=selected_comparisons,
-            channel=self.params.plot_channel,
+            channel=self.channel,
             suffix=self.params.density_suffix,
             advanced=self.params.compute_sd_and_effect_size,
             parent=self.main_window.centralWidget())
@@ -2228,7 +2234,7 @@ class GroupAnalysisTab(BatchTab):
     def run_df_plots(self, plot_function: Callable, plot_kw_args: dict) -> list:
         self.main_window.clear_plots()
         dvs = self.processor.run_plots(plot_function, self.params.selected_comparisons,
-                                       channel=self.params.plot_channel, plot_kw_args=plot_kw_args)
+                                       channel=self.channel, plot_kw_args=plot_kw_args)
         self.main_window.setup_plots(dvs)
         return dvs
 
@@ -2237,7 +2243,7 @@ class GroupAnalysisTab(BatchTab):
 
     def plot_histograms(self, fold_threshold: int = 2) -> None:  # TODO: check plot wraps
         sample_dir = self.processor._any_sample_in(self.params.group_names[0])
-        annotator = self.processor._get_annotator(sample_dir, self.params.plot_channel)
+        annotator = self.processor._get_annotator(sample_dir, self.channel)
         aba_df = annotator.df
         # aba_json_df_path = annotation.default_label_file  # FIXME: aba_json needs fold levels
         self.run_df_plots(plot_sample_stats_histogram,

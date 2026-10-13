@@ -18,6 +18,7 @@ from PyQt5.QtWidgets import (QToolBox, QCheckBox, QLabel, QHBoxLayout, QVBoxLayo
 from ClearMap.Analysis.graphs.graph_filters import GraphFilter, combined_filters_name
 from ClearMap.Analysis.graphs.graph_weights import GraphWeight
 from ClearMap.config.atlas import ATLAS_NAMES_MAP
+from ClearMap.config.compound_keys import channel_file_name_token
 from ClearMap.Utils.exceptions import ClearMapValueError
 from ClearMap.Utils.utilities import (validate_orientation, snake_to_title, set_item_recursive,
                                       DEFAULT_ORIENTATION, trim_or_pad, REPLACE)
@@ -2154,7 +2155,6 @@ class GroupAnalysisParams(BatchParameters):
     """
     Essentially batch parameters with comparisons
     """
-    # plot_channel: str
     compute_sd_and_effect_size: bool
     density_suffix: str
     pipeline: str
@@ -2175,12 +2175,16 @@ class GroupAnalysisParams(BatchParameters):
                                                 groups_sep=self.group_concatenator)
 
         # FIXME: do I want this ?
-        self._channels_provider: Optional[Callable[[], list[str]]] = None
+        self._channels_provider: Optional[Callable[[Optional[str]], list[str | tuple[str, ...]]]] = None
         self._suffixes_provider: Optional[Callable[[], list[str]]] = None
 
         self._on_plot_group: Optional[Callable[[str], None]] = None
 
-        self.plot_channel = ''
+        self._channels: dict[str, str | tuple[str, ...]] = {}  # What the user picks from (label) -> the channel
+        self._channel_label = ''
+        # The channels are those which have a density map for the suffix
+        self.tab.densitySuffixComboBox.currentIndexChanged.connect(self.refresh_channels)
+        self.tab.densitySuffixComboBox.lineEdit().editingFinished.connect(self.refresh_channels)
 
         # FIXME: do I remove this ?
         self.subscribe(UiBatchGroupsChanged, self._rebuild_comparisons)
@@ -2207,8 +2211,26 @@ class GroupAnalysisParams(BatchParameters):
         return comps
 
     # injection points from the tab
-    def set_channels_provider(self, provider: Callable[[], list[str]]):
+    def set_channels_provider(self, provider: Callable[[Optional[str]], list[str | tuple[str, ...]]]):
+        """provider(density_suffix): the channels to analyse, those which have a density map for the suffix"""
         self._channels_provider = provider
+
+    @property
+    def channel(self) -> str | tuple[str, ...] | None:
+        """
+        The channel picked in the tab, as the density maps, statistics and plots name it
+        (a tuple for a compound channel, e.g. the vessels), or None if there is none to analyse.
+        """
+        return self._channels.get(self._channel_label)
+
+    def refresh_channels(self, *_) -> None:
+        """Offer the channels which have a density map for the current suffix, keeping the pick if possible"""
+        suffix = self.density_suffix or None
+        channels = self._channels_provider(suffix) if callable(self._channels_provider) else []
+        self._channels = {channel_file_name_token(channel): channel for channel in channels}
+        if self._channel_label not in self._channels:
+            self._channel_label = next(iter(self._channels), '')
+        self._cmp_ui.set_channels(list(self._channels), current=self._channel_label)
 
     def set_suffixes_provider(self, provider: Callable[[], list[str]]):
         self._suffixes_provider = provider
@@ -2223,20 +2245,17 @@ class GroupAnalysisParams(BatchParameters):
         self._cmp_model.group_names = list(self.group_names)
         self._cmp_model.selected = preselected or []
 
-        channels = self._channels_provider() if callable(self._channels_provider) else []
         suffixes = self._suffixes_provider() if callable(self._suffixes_provider) else []
 
-        def _on_channel_changed(ch: str):
-            self.plot_channel = ch
+        def _on_channel_changed(label: str):
+            self._channel_label = label
 
         self._cmp_ui.rebuild(self._cmp_model,
                              on_plot_group=(self._on_plot_group or (lambda _g: None)),
-                             channels=channels, on_channel_changed=_on_channel_changed,
+                             on_channel_changed=_on_channel_changed,
                              suffixes=suffixes,
                              preselected_comparisons=self._cmp_model.selected)
-
-        if channels and not self.plot_channel:
-            self.plot_channel = channels[0]
+        self.refresh_channels()  # After the suffixes: the channels depend on the one selected
     @property
     def comparisons(self) -> list[Pair]:
         return self._cmp_model.all_pairs()
