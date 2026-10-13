@@ -27,15 +27,14 @@ class EventBus:
         self._qt_bridge: Optional[Callable[[Type[Any], Any], None]] = None
 
     def _remove_refs(self, event_type: Type[Evt], refs_to_remove: List[weakref.ReferenceType]) -> None:
+        """Remove these subscriptions (by identity: one subscription per call to subscribe), and the dead ones"""
         if not refs_to_remove:
             return
         with self._lock:
             lst = self._subs.get(event_type, [])
             if not lst:
                 return
-            # refset = set(refs_to_remove)
-            # lst[:] = [r for r in lst if r not in refset]
-            lst[:] = [r for r in lst if r() is not None]
+            lst[:] = [r for r in lst if r() is not None and not any(r is gone for gone in refs_to_remove)]
 
     def subscribe(self, event_type: Type[Evt], callback: EventSubscriber[Evt]) -> Callable[[], None]:
         """
