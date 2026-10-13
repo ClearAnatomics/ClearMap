@@ -1001,9 +1001,7 @@ class RegistrationTab(PreProcessingTab['RegistrationProcessor']):
                     else:
                         continue
         self.main_window.wrap_in_thread(self.worker.align)  # FIXME: why not wrap_step
-        # Force update because event fired from call above is outside main thread so won't update the UI otherwise
-        self._update_plotable_channels()
-        self.main_window.print_status_msg('Registered')
+        self.main_window.print_status_msg('Registered')  # The plotable channels follow RegistrationStatusChanged
 
     def _update_plotable_channels(self, event=None) -> None:
         if not self.worker.setup_complete:  # The channels to plot must be in the workspace

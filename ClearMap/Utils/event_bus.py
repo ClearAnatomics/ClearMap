@@ -112,6 +112,9 @@ class EventBus:
         Publish a concrete event instance, from any thread. Dispatch is on its exact class.
         (No inheritance walk for determinism/perf.)
         """
+        if isinstance(event, type):
+            raise TypeError(f'Publish an instance of {event.__name__}, not the class: the dispatch is on the type '
+                            f'of the event, so no subscriber would receive it.')
         event_type = type(event)
         with self._lock:
             subscriptions = list(self._subs.get(event_type, []))

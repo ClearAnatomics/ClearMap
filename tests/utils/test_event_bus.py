@@ -155,3 +155,12 @@ def test_the_gui_base_classes_run_their_handlers_in_the_gui_thread(class_path):
     module_name, class_name = class_path.rsplit('.', 1)
     cls = getattr(importlib.import_module(module_name), class_name)
     assert cls.subscriber_affinity == GUI_THREAD
+
+
+def test_publishing_an_event_class_instead_of_an_instance_fails_loudly():
+    """`publish(RegistrationStatusChanged)` (no parentheses) reached nobody: the dispatch is on type(event)"""
+    bus, recorder = EventBus(), Recorder()
+    bus.subscribe(Ping, recorder.on_ping)
+
+    with pytest.raises(TypeError, match='instance of Ping'):
+        bus.publish(Ping)
