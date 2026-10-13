@@ -489,9 +489,17 @@ class SampleManager(OrchestratorBase):
 
     @property
     def pipeline_ready_channels(self) -> list[str]:
-        """Channels with a meaningful data_type (excludes undefined/unconfigured)."""
+        """
+        Channels with a meaningful data_type (excludes undefined/unconfigured) which are complete,
+        i.e. have a path as well, so are (or are about to be) in the workspace.
+
+        .. warning::
+            A channel with a data type but no path is not in the workspace: asking it for an asset
+            raises MissingAssetError, which is what callers of this property are about to do.
+        """
         excluded = (None, 'undefined', 'no-pipeline')
-        return [c for c in self.channels if self.data_type(c) not in excluded]
+        complete = self.complete_channels
+        return [c for c in self.channels if self.data_type(c) not in excluded and c in complete]
 
     @property
     @adjuster_safe

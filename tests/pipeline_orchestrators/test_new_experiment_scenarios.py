@@ -50,6 +50,15 @@ def test_channel_with_a_data_type_only_is_incomplete(sample_manager, channel_edi
     assert not sample_manager.has_channels_in_workspace(['test'])
 
 
+def test_channel_with_a_data_type_only_is_not_pipeline_ready(sample_manager, channel_editor):
+    """Entering the data type before the path used to make callers ask the workspace for a channel it lacks"""
+    channel_editor.add('test', DATA_TYPE)
+
+    assert sample_manager.pipeline_ready_channels == []
+    channel_editor.set_path('test')
+    assert sample_manager.pipeline_ready_channels == ['test']
+
+
 def test_channel_joins_the_workspace_when_it_has_a_path_and_a_data_type(sample_manager, channel_editor):
     channel_editor.add('test', DATA_TYPE)
     channel_editor.set_path('test')
