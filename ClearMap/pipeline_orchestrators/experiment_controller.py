@@ -649,6 +649,9 @@ class ExperimentController(BusSubscriberMixin):
 
 
 ####################### Multi experiment controller ###########################
+DEFAULT_GROUP_PIPELINE = 'CellMap'
+
+
 class AnalysisGroupController:
     """
     Manages multiple ExperimentControllers, one per experiment root (src_dir).
@@ -759,16 +762,15 @@ class AnalysisGroupController:
     def _infer_pipeline(self) -> str:
         """
         Read pipeline from group config.
-        Falls back to 'CellMap' if not set.
+        Falls back to DEFAULT_GROUP_PIPELINE if not set (the first one the tab offers).
         """
         try:
             cfg = self.get_config_view()
             pipeline = (cfg.get('group_analysis', {}).get('pipeline')
                         or cfg.get('batch_processing', {}).get('pipeline'))
-            if pipeline:
-                return pipeline
         except Exception:
-            return 'CellMap'  # fallback
+            pipeline = None
+        return pipeline or DEFAULT_GROUP_PIPELINE
 
     def get_config_view(self) -> dict[str, Any]:
         return self.group_cfg_coordinator.get_config_view()
