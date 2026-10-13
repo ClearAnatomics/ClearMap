@@ -6,7 +6,7 @@ import tempfile
 sys.path.insert(0, "ClearMap2")
 
 import numpy as np
-import ClearMap.Analysis.colocalization.channel as channel
+import ClearMap.Analysis.colocalization.colocalization_channel_mask_components as channel
 
 import pickle
 

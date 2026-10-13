@@ -283,7 +283,7 @@ def watershed_label(binary_img: np.ndarray, representatives:tuple[np.ndarray,...
 
 
 
-class Channel:
+class ColocalizationChannelMaskComponents:
     """In our context a channel is represented by a binary mask and some voxel coordinates in a dataframe.
     The voxel coordinates should be a set of representatives for the partition of the True voxels in the binary mask
     in connected components for the 1-connectivity (also termed as 6 connectivity in 3d). We admit the situation
@@ -363,13 +363,13 @@ class Channel:
 
         # we identify the channel by a name fo caching management
         if not channel_name:
-            channel_name = Channel.channel_count
-            Channel.channel_count += 1
-        if channel_name in Channel.channel_names:
-            raise ValueError("The passed Channel name is already in use.")
+            channel_name = ColocalizationChannelMaskComponents.channel_count
+            ColocalizationChannelMaskComponents.channel_count += 1
+        if channel_name in ColocalizationChannelMaskComponents.channel_names:
+            raise ValueError("The passed ColocalizationChannelMaskComponents name is already in use.")
 
         self.name = channel_name
-        Channel.channel_names.append(channel_name)
+        ColocalizationChannelMaskComponents.channel_names.append(channel_name)
 
         self._overlaps_dic = {}
 
@@ -556,13 +556,13 @@ class Channel:
             self.index_label_correspondence
         ]
 
-    def overlap_rates(self, other_channel: Channel):
+    def overlap_rates(self, other_channel: ColocalizationChannelMaskComponents):
         """Return the rate of positive pixels for other_channel in each nucleus
 
         Parameters
         ----------
-        other_channel : Channel
-            The Channel to compare with self
+        other_channel : ColocalizationChannelMaskComponents
+            The ColocalizationChannelMaskComponents to compare with self
 
         Returns
         -------
@@ -572,7 +572,7 @@ class Channel:
 
         return self.masked_sizes(other_channel.binary_img) / self.sizes
 
-    def _set_blobwise_overlaps(self, other_channel: Channel):
+    def _set_blobwise_overlaps(self, other_channel: ColocalizationChannelMaskComponents):
         """
         Compute and store the matrix M of overlaps where M[i,j] is the overlap between blob
         of index i for self and the blob of index j for other_channel.
@@ -583,12 +583,12 @@ class Channel:
     def _reorder_counts(self, other_channel, counts):
         return counts[self.index_label_correspondence, :][:, other_channel.index_label_correspondence]
 
-    def blobwise_overlaps(self, other_channel: Channel) -> np.ndarray:
+    def blobwise_overlaps(self, other_channel: ColocalizationChannelMaskComponents) -> np.ndarray:
         """Return the matrix of overlaps.
 
         Parameters
         ----------
-        other_channel : Channel
+        other_channel : ColocalizationChannelMaskComponents
             The channel to compare with self.
 
         Returns
@@ -614,14 +614,14 @@ class Channel:
             return self._overlaps_dic[other_channel.name]
 
     def max_blobwise_overlaps(
-        self, other_channel: Channel, return_max_indices: bool = True
+        self, other_channel: ColocalizationChannelMaskComponents, return_max_indices: bool = True
     ) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
         """For each nucleus of self, compute the max overlap with a single nucleus of other_channel.
             if return_max_indices is True, nuclei indices that realize the max are also returned.
 
         Parameters
         ----------
-        other_channel: Channel
+        other_channel: ColocalizationChannelMaskComponents
             channel to compare with self
         return_max_indices: bool
             whether to return the indices of the nuclei of other_channel that realize the maxima (i.e. argmax).
@@ -652,14 +652,14 @@ class Channel:
             return np.max(counts, axis=1)
 
     def max_blobwise_overlap_rates(
-        self, other_channel: Channel, return_max_indices: bool = True
+        self, other_channel: ColocalizationChannelMaskComponents, return_max_indices: bool = True
     ) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
         """For each nucleus of self, compute the max overlap rate with a single nucleus of other_channel.
             if return_max_indices is True, nuclei indices that realize the max are also returned.
 
         Parameters
         ----------
-        other_channel: Channel
+        other_channel: ColocalizationChannelMaskComponents
             channel to compare with self
         return_max_indices: bool
             Whether to return the indices of the nuclei of other_channel that realize the maxima (i.e. argmax).
@@ -681,13 +681,13 @@ class Channel:
             maxima = self.max_blobwise_overlaps(other_channel, return_max_indices=False)
             return maxima / self.sizes
 
-    def centers_distances(self, other_channel: Channel) -> np.ndarray:
+    def centers_distances(self, other_channel: ColocalizationChannelMaskComponents) -> np.ndarray:
         """Return array of distances between centers across the two channels.
 
         Parameters
         ----------
-        other_channel : Channel
-            Channel to compare with self
+        other_channel : ColocalizationChannelMaskComponents
+            ColocalizationChannelMaskComponents to compare with self
 
         Returns
         -------
@@ -704,14 +704,14 @@ class Channel:
         return distances(physical_centers_1, physical_centers_2)
 
     def closest_center_distances(
-        self, other_channel: Channel, return_min_indices=True
+        self, other_channel: ColocalizationChannelMaskComponents, return_min_indices=True
     ) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
         """
         Return the distances to the closest centers in `other_channel` for each center in `self`.
 
         Parameters
         ----------
-        other_channel : Channel
+        other_channel : ColocalizationChannelMaskComponents
             _description_
         return_min_indices : bool, optional.
           Defaults to True.
@@ -730,7 +730,7 @@ class Channel:
         else:
             return minima
 
-    def compare(self, other_channel: Channel, blob_diameter: int, size_min: int, size_max: int,
+    def compare(self, other_channel: ColocalizationChannelMaskComponents, blob_diameter: int, size_min: int, size_max: int,
                 processes: int | None = None) -> pd.DataFrame:
         """
         Return a final colocalization report
@@ -738,7 +738,7 @@ class Channel:
 
         Parameters
         ----------
-        other_channel : Channel
+        other_channel : ColocalizationChannelMaskComponents
             _description_
         blob_diameter : int
             an upper bound for the sought blobs diameters, in PHYSICAL units
@@ -824,7 +824,7 @@ class Channel:
         return c0_result
 
 
-# random Channel generation
+# random ColocalizationChannelMaskComponents generation
 
 
 def _random_shape(radius):
@@ -892,7 +892,7 @@ def _random_channel_data(shape, num_points, min_radius, max_radius):
 
 
 def random_channel(shape, num_points, min_radius, max_radius):
-    """Return a random Channel of given shape.
+    """Return a random ColocalizationChannelMaskComponents of given shape.
     The underlying image is obtained by successive attempts of blob additions.
     If the candidate blob would be connected with existing blobs, it is rejected.
 
@@ -900,16 +900,16 @@ def random_channel(shape, num_points, min_radius, max_radius):
     Parameters
     ----------
     shape : tuple
-        3d shape for the Channel binary_image attribute
+        3d shape for the ColocalizationChannelMaskComponents binary_image attribute
     num_points : int
         number of attempts to add a blob
     min_radius : _type_
         min radius for candidate blob, if on the boundary
         the resulting blob could have smaller radius
     max_radius : _type_
-        max radius for any blob in the final Channel,
+        max radius for any blob in the final ColocalizationChannelMaskComponents,
         as detected as 1-connected components
     """
     labels, reps = _random_channel_data(shape, num_points, min_radius, max_radius)
     df = pd.DataFrame({c: reps[i] for i, c in enumerate("xyz")})
-    return Channel(labels > 0, df)
+    return ColocalizationChannelMaskComponents(labels > 0, df)

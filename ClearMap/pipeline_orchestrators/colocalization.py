@@ -13,7 +13,7 @@ from ClearMap.Utils.utilities import sanitize_n_processes
 from ClearMap.config.config_coordinator import ConfigCoordinator
 
 from ClearMap.Analysis.Measurements import Voxelization as voxelization
-from ClearMap.Analysis.colocalization.channel import Channel as ColocalizationChannel
+from ClearMap.Analysis.colocalization.colocalization_channel_mask_components import ColocalizationChannelMaskComponents as ColocalizationChannel
 
 from ClearMap.pipeline_orchestrators.generic_orchestrators import (CompoundChannelPipelineOrchestrator,
                                                                     PerCompoundConfigMixin, register_compound_channel)
