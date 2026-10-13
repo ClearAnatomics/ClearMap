@@ -2531,13 +2531,26 @@ class ComparisonsWidgetAdapter:
     Owns and (re)builds the comparisons area. Exposes only high-level ops
     so GroupAnalysisParams doesn't touch low-level widgetry.
     """
-    def __init__(self, layout, groups_sep: str = " vs "):
+    def __init__(self, layout, groups_sep: str = " vs ", *,
+                 suffix_widget: Optional[QWidget] = None, suffix_combo: Optional[QComboBox] = None):
+        """
+        Parameters
+        ----------
+        layout: QLayout
+            The layout (re)built, which also holds the density suffix widget.
+        suffix_widget: QWidget | None
+            The container of the density suffix combobox. It is kept across the rebuilds,
+            the layout is cleared otherwise (and so the widget deleted). Looked for by name if not given.
+        suffix_combo: QComboBox | None
+            The density suffix combobox, in suffix_widget. Looked for by name if not given.
+        """
         self._layout = layout
         self._sep = groups_sep
         self._checkboxes: List[QCheckBox] = []
         self._plot_btns: List[QPushButton] = []
         self._channel_combo: Optional[QComboBox] = None
-        self._suffix_widget: Optional[QWidget] = None  # ← preserve across rebuilds
+        self._suffix_widget: Optional[QWidget] = suffix_widget  # ← preserve across rebuilds
+        self._suffix_combo: Optional[QComboBox] = suffix_combo
 
     def rebuild(self, model: ComparisonsModel, *, on_plot_group: Callable[[str], None],
                 on_channel_changed: Callable[[str], None],
@@ -2579,8 +2592,10 @@ class ComparisonsWidgetAdapter:
             self._layout.addWidget(self._suffix_widget)
             # Update combobox
             if suffixes is not None:
-                combo = self._suffix_widget.findChild(QComboBox, 'densitySuffixComboBox')
-                if combo:
+                combo = self._suffix_combo
+                if combo is None:
+                    combo = self._suffix_widget.findChild(QComboBox, 'densitySuffixComboBox')
+                if combo is not None:  # Not "if combo": an empty QComboBox is falsy (len() is its count)
                     combo.blockSignals(True)
                     current = combo.currentText()
                     combo.clear()

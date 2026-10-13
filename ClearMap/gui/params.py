@@ -2172,7 +2172,9 @@ class GroupAnalysisParams(BatchParameters):
 
         self._cmp_model = ComparisonsModel(sep=self.group_concatenator)
         self._cmp_ui = ComparisonsWidgetAdapter(self.tab.comparisonsVerticalLayout,
-                                                groups_sep=self.group_concatenator)
+                                                groups_sep=self.group_concatenator,
+                                                suffix_widget=self.tab.densitySuffixContainerWidget,
+                                                suffix_combo=self.tab.densitySuffixComboBox)
 
         # FIXME: do I want this ?
         self._channels_provider: Optional[Callable[[Optional[str]], list[str | tuple[str, ...]]]] = None
