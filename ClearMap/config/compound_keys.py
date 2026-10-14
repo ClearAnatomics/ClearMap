@@ -32,16 +32,14 @@ True
 from __future__ import annotations
 
 import itertools
-import re
 from typing import Iterable, Mapping, Any, Callable, Optional, Sequence
 
+from ClearMap.config.channel import CHANNEL_NAME_RE
 from ClearMap.IO.assets_constants import PIPELINE_NAMES, ORIENTED_COMPOUND_PIPELINES
 from ClearMap.Utils.exceptions import ClearMapValueError
 
 
 DEFAULT_PAIR_SEP = '-'
-# WARNING: Keep in sync with ``typedefs.schema.yaml#/$defs/channelName`` (the sample channel names)
-CHANNEL_NAME_RE = re.compile(r'[A-Za-z0-9_]+')
 
 class CompoundKey:
     """

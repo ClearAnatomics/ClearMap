@@ -261,6 +261,11 @@ class ClearMapRuntimeError(ClearMapException, RuntimeError):
 
 
 
+class ClearMapTypeError(ClearMapException, TypeError):
+    """An argument or value is of a type ClearMap does not accept here (raised by ClearMap, not by the language)."""
+    severity = Severity.FATAL
+
+
 class ClearMapNotImplementedError(ClearMapException, NotImplementedError):
     """An operation is not supported by the selected ClearMap backend.
 
@@ -705,10 +710,27 @@ class GroupStatsError(ClearMapException):
 
 
 class ChannelNameTakenError(ClearMapValueError):
-    """A channel is renamed to the name of another channel (whose settings and results it would take over)."""
+    """
+    A channel is given the name of another channel (whose settings and results it would take over).
+    Names are unique whatever the case, so ``Fos`` is the name of ``fos``.
+    """
     severity = Severity.RECOVERABLE
     user_title = 'Channel Name Already Used'
     user_hint = 'Rename the other channel first, or choose another name.'
+
+
+class InvalidChannelNameError(ClearMapValueError):
+    """A channel name has characters other than letters, digits and underscores (``-`` joins compound channels)."""
+    severity = Severity.RECOVERABLE
+    user_title = 'Invalid Channel Name'
+    user_hint = 'Use only letters, digits and "_" in channel names.'
+
+
+class UnknownChannelError(ClearMapValueError):
+    """A channel (by name or handle) is not one of the channels of the sample."""
+    severity = Severity.RECOVERABLE
+    user_title = 'Unknown Channel'
+    user_hint = 'Add the channel in the Sample Info tab, then retry.'
 
 
 class ParamsOrientationError(ClearMapValueError):
