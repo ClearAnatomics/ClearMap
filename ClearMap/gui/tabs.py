@@ -1062,8 +1062,12 @@ class CellCounterTab(PostProcessingTab["CellDetector"]):
         if not self.sample_manager.workspace:
             self.main_window.print_warning_msg('Workspace not initialised')
             return
+        # WARNING: a channel to detect without path yet has a page, but is not in the workspace:
+        #  its worker is not set up so it has no cells to count
+        channels_in_workspace = self.sample_manager.complete_channels_to_detect
         for ch in self._get_channels():
-            self.update_cell_number(ch)
+            if ch in channels_in_workspace:
+                self.update_cell_number(ch)
 
     def _bind(self) -> None:
         pass
