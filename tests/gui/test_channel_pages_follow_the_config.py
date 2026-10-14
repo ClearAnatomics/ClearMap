@@ -33,7 +33,7 @@ class FakeChannelsTabWidget:
         return (None, -1) if return_idx else None
 
     def add_page(self, name):
-        page = object()
+        page = FakePage()  # No id: the reconcile gives it, from the registry
         self.pages.append((name, page))
         self.current_page = page
         return page
@@ -58,6 +58,19 @@ class FakeChannelsTabWidget:
 
     def setCurrentWidget(self, page):
         self.current_page = page
+
+
+class FakePage:
+    """A page: the Qt property API only (the page holds the id of its channel)"""
+
+    def __init__(self):
+        self._properties = {}
+
+    def setProperty(self, name, value):
+        self._properties[name] = value
+
+    def property(self, name):
+        return self._properties.get(name)
 
 
 class FakeChannelParams:
@@ -98,6 +111,8 @@ class PageTab:
     _desired_channel_pages = ExperimentTab._desired_channel_pages
     _drop_channel_page = ExperimentTab._drop_channel_page
     _rename_channel_page = ExperimentTab._rename_channel_page
+    _channel_registry = ExperimentTab._channel_registry
+    _give_channel_id = ExperimentTab._give_channel_id
 
     def __init__(self, sample_manager, config_writes):
         self._sample_manager = sample_manager

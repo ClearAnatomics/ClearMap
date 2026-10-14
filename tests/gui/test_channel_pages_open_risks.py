@@ -58,9 +58,10 @@ class FakeChannelsTabWidget:
                 return (page, index) if return_idx else page
         return (None, -1) if return_idx else None
 
-    def add_page(self, name):
+    def add_page(self, name, *, with_id=True):
         page = FakePage()
-        set_channel_id(page, ChannelId.new())  # As the sample tab does when it makes a page
+        if with_id:
+            set_channel_id(page, ChannelId.new())  # As the sample tab does when it makes a page
         self.pages.append((name, page))
         self.current_page = page
         return page
@@ -80,6 +81,11 @@ class FakeChannelsTabWidget:
 
     def setCurrentWidget(self, page):
         self.current_page = page
+
+    def add_channel_widget(self, widget, name=''):
+        self.pages.append((name, widget))
+        self.current_page = widget
+        return name
 
     def indexOf(self, page):
         return next((index for index, (_, candidate) in enumerate(self.pages) if candidate is page), -1)
@@ -345,3 +351,39 @@ def test_a_channel_leaving_a_pipeline_loses_its_page(registry, tab):
     tab.reconcile_channel_pages()
 
     assert tab.ui.channelsParamsTabWidget.get_channels_names() == [FIRST]
+
+
+# ------------------------------------------------------------------------------------- the id of a page, from the registry
+
+def test_a_page_made_before_its_channel_was_committed_gets_its_id_at_the_reconcile(registry, tab):
+    # The (+) of the sample tab: the page is made (Channel_0), then the commit adds the channel to the registry, then the
+    # refresh reconciles. The page exists, so nothing is added: the reconcile must still give it its id.
+    tab_widget = tab.ui.channelsParamsTabWidget
+    page = tab_widget.add_page('Channel_0', with_id=False)
+    channel = registry.add('Channel_0')
+    tab.channels_in_config = ['Channel_0']
+
+    tab.reconcile_channel_pages()
+
+    assert channel_id_of(page) == channel.id
+
+
+def test_a_tab_which_is_not_a_pipeline_tab_gives_its_new_pages_an_id(registry, tab, monkeypatch):
+    # The sample tab is an ExperimentTab, not a PipelineTab: the id must not depend on the kind of tab
+    monkeypatch.setattr(tabs_interfaces, 'create_clearmap_widget', lambda *_, **__: FakePage())
+    tab.channels_ui_name = 'some_channel_page'
+    channel = registry.add(FIRST)
+
+    name, page, creating = tab._get_or_init_channel_ui(FIRST)
+
+    assert creating and name == FIRST
+    assert channel_id_of(page) == channel.id
+
+
+def test_a_page_of_a_channel_the_registry_does_not_know_has_no_id(registry, tab, monkeypatch):
+    monkeypatch.setattr(tabs_interfaces, 'create_clearmap_widget', lambda *_, **__: FakePage())
+    tab.channels_ui_name = 'some_channel_page'
+
+    _, page, _ = tab._get_or_init_channel_ui(f'{FIRST}-{SECOND}')  # A compound channel
+
+    assert channel_id_of(page) is None
