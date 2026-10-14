@@ -85,7 +85,7 @@ import tempfile
 import warnings
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Callable, List, Dict, Iterable
+from typing import Optional, Callable, List, Dict, Iterable, Mapping
 
 import numpy as np
 
@@ -96,6 +96,7 @@ from ClearMap.IO.workspace2 import Workspace2
 from ClearMap.IO.workspace_asset import expression_is_tiled, Asset
 from ClearMap.IO.assets_constants import CONTENT_TYPE_TO_PIPELINE
 
+from ..config.channel import ChannelRegistry
 from ..config.compound_keys import PairKey
 from ..config.config_adjusters.type_hints import SampleManagerProtocol
 from ..config.config_handler import ALTERNATIVES_REG
@@ -185,6 +186,7 @@ class SampleManager(OrchestratorBase):
 
         self.incomplete_channels = []
         self.workspace: Optional[Workspace2] = None  # Defined in update_workspace
+        self._channel_registry = ChannelRegistry()  # Changed in the commits only (see _on_commit), and by setup
 
         self._renamed_channels: dict[str, str] = {}
         self._published_channel_map: dict[str, str] = {}  # last channel->data_type published to the bus
@@ -209,6 +211,7 @@ class SampleManager(OrchestratorBase):
         """
         if src_dir is not None:
             src_dir = Path(src_dir).expanduser().resolve()
+            self._channel_registry = ChannelRegistry()  # Ids do not outlive the experiment: the old handles die
 
             # Invalidate workspace if directory changed
             if self.workspace is not None:
@@ -220,6 +223,7 @@ class SampleManager(OrchestratorBase):
             self.cfg_coordinator.set_base_dir(src_dir)
             # FIXME: add to set_base_dir ?
             self.cfg_coordinator.load('sample')  # need to load at least sample config to know pipelines
+            self._sync_channel_registry(self.channels, renames={})
             if not self.config:
                 if not src_dir.exists():
                     raise FileNotFoundError(f'Specified source directory {src_dir} does not exist')
@@ -326,8 +330,44 @@ class SampleManager(OrchestratorBase):
         return WorkspaceInputs(base_dir=str(Path(self.cfg_coordinator.base_dir).resolve()),
                                sample_id=self.prefix, channels=channels)
 
+    @property
+    def channel_registry(self) -> ChannelRegistry:
+        """
+        The identity of the channels of the sample (see :mod:`ClearMap.config.channel`).
+
+        .. warning::
+            Read only for everyone but the sample manager, which changes it in the commits (post-commit hook),
+            so that it is consistent with the config for every subscriber of the facts of a commit.
+            A new registry replaces it when an experiment is opened: keep the channels, not the registry.
+        """
+        return self._channel_registry
+
     def _on_commit(self, commit_record: CommitRecord) -> None:
+        self._sync_channel_registry(commit_record.channels_after, renames=commit_record.renames)
         self.sync_workspace()
+
+    def _sync_channel_registry(self, channel_names: Iterable[str], *, renames: Mapping[str, str]) -> None:
+        """
+        Bring the registry in line with the channels of the config: the committed renames keep the identity of
+        their channel, the channels which are gone are removed and the new ones added (in the order of the config).
+
+        Idempotent, and based on the names of the config rather than on the previous state of the registry, so it
+        also builds the registry of an experiment which has just been loaded.
+        """
+        channel_names = list(channel_names)
+        registry = self._channel_registry
+
+        renamed_channels = {registry.resolve(old): new for old, new in renames.items() if registry.has_name(old)}
+        if renamed_channels:
+            registry.rename_many(renamed_channels)
+
+        current_names = set(channel_names)
+        for channel in registry.channels:
+            if channel.name not in current_names:
+                registry.remove(channel)
+        for name in channel_names:
+            if not registry.has_name(name):
+                registry.add(name)
 
     def sync_workspace(self) -> None:
         """
