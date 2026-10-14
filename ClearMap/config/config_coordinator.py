@@ -29,6 +29,18 @@ INSTALL_CFG_DIR = Path(__file__).parent
 CURRENT_SCHEMAS_DIR = INSTALL_CFG_DIR / 'schemas' / 'v3.1'
 
 
+def committed_channel_renames(requested: Mapping[str, str], channels_before: Iterable[str],
+                              channels_after: Iterable[str]) -> dict[str, str]:
+    """
+    The requested channel renames that the commit carried out, as told by the channels before and after it:
+    the old name is gone and the new name is new. The adjusters may drop a rename (e.g. of an unknown channel):
+    a fact must describe what was written, not what was asked.
+    """
+    before, after = set(channels_before), set(channels_after)
+    return {old: new for old, new in requested.items()
+            if old in before and old not in after and new in after and new not in before}
+
+
 def _patch_to_config_keys_sets(patch: Dict[str, Any]) -> List[ConfigKeys]:
     out: List[ConfigKeys] = []
     def rec(node, prefix: List[str]):
@@ -474,7 +486,7 @@ class ConfigCoordinator(BusSubscriberMixin):
             if set(channels_before) != set(channels_after):
                 self.publish(ChannelsChanged(before=channels_before, after=channels_after))
 
-            for old, new in rename_map.items():
+            for old, new in committed_channel_renames(rename_map, channels_before, channels_after).items():
                 self.publish(ChannelRenamed(old=old, new=new))
 
     def submit(self, *, sample_manager: Optional[SampleManager] = None, do_run_adjusters: bool = True,
