@@ -1,6 +1,7 @@
 from typing import Any, Dict, Iterable, Mapping
 
 from ...Utils.exceptions import AggregatedValidationError
+from ..channel import folded_channel_name
 from ..compound_keys import compound_channel_parts
 
 __all__ = ['run_semantic_checks']
@@ -20,6 +21,17 @@ def _channels_in_section(config: Mapping[str, Any], section: str) -> Iterable[st
     sec = config.get(section) or {}
     chs = (sec.get("channels") or {})
     return chs.keys()
+
+
+def _validate_channel_names_are_unique_case_insensitive(config: Mapping[str, Any]) -> list[str]:
+    """
+    Channel names become file names, which some file systems fold: ``Fos`` and ``fos`` would be the same files.
+    """
+    names_by_folded_name: dict[str, list[str]] = {}
+    for name in _sample_channels(config):
+        names_by_folded_name.setdefault(folded_channel_name(name), []).append(name)
+    return [f"[sample] channels: names differing only by case: {sorted(names)}"
+            for names in names_by_folded_name.values() if len(names) > 1]
 
 
 def _validate_channels_subset(config: Mapping[str, Any], section: str) -> list[str]:
@@ -142,6 +154,7 @@ def _validate_machine_cross(config: Mapping[str, Any]) -> list[str]:
 def run_semantic_checks(config: Mapping[str, Any], _sv=None) -> None:
     messages: list[str] = []
     if config.get("sample"):
+        messages.extend(_validate_channel_names_are_unique_case_insensitive(config))
         for sec in SECTIONS_WITH_CHANNELS:
             if config.get(sec):
                 messages.extend(_validate_channels_subset(config, sec))

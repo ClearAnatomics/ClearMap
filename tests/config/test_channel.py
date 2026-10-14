@@ -90,14 +90,14 @@ def test_a_name_with_other_than_letters_digits_and_underscores_is_refused(regist
     assert len(registry) == 0
 
 
-def test_names_are_unique_whatever_the_case_when_adding(registry, first):
+def test_names_are_unique_case_insensitive_when_adding(registry, first):
     with pytest.raises(ChannelNameTakenError):
         registry.add(FIRST_NAME.upper())
 
     assert registry.names == [FIRST_NAME]
 
 
-def test_names_are_unique_whatever_the_case_when_renaming(registry, first, second):
+def test_names_are_unique_case_insensitive_when_renaming(registry, first, second):
     with pytest.raises(ChannelNameTakenError):
         registry.rename_many({second: FIRST_NAME.upper()})
 

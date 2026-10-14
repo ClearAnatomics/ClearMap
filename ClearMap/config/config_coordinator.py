@@ -13,6 +13,7 @@ from ClearMap.Utils.events import CfgChanged, ChannelRenamed, ChannelsChanged
 from ClearMap.Utils.exceptions import ChannelNameTakenError
 from ClearMap.Utils.utilities import infer_origin_from_caller, deep_merge
 
+from .channel import folded_channel_name
 from .config_adjusters.type_hints import AdjustmentContext
 from .config_adjusters.adjusters_api import Phase, ConfigKeys, AdjusterScope
 from .config_adjusters.engine import run_adjusters
@@ -32,18 +33,19 @@ CURRENT_SCHEMAS_DIR = INSTALL_CFG_DIR / 'schemas' / 'v3.1'
 
 def refuse_renames_onto_existing_channels(requested: Mapping[str, str], existing_channels: Iterable[str]) -> None:
     """
-    Refuse (before anything changes) to rename a channel to the name of an existing channel: it would take
-    over the settings and the results of that channel. The other channel must be renamed first.
+    Refuse (before anything changes) to rename a channel to the name of another existing channel (whatever the
+    case): it would take over the settings and the results of that channel. The other channel must be renamed
+    first. A channel can change the case of its own name.
 
     Raises
     ------
     ChannelNameTakenError
     """
-    existing = set(existing_channels)
+    existing = list(existing_channels)
     for old, new in requested.items():
-        if new in existing:
-            raise ChannelNameTakenError(f'Cannot rename channel {old!r} to {new!r}: a channel named {new!r} exists. '
-                                        f'Rename it first.', value=new)
+        if folded_channel_name(new) in {folded_channel_name(other) for other in existing if other != old}:
+            raise ChannelNameTakenError(f'Cannot rename channel {old!r} to {new!r}: a channel named {new!r} exists '
+                                        f'(names are unique whatever the case). Rename it first.', value=new)
 
 
 def committed_channel_renames(requested: Mapping[str, str], channels_before: Iterable[str],

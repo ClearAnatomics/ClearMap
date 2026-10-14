@@ -34,6 +34,11 @@ SESSION_LOCAL_MESSAGE = ('{what} is session-local and cannot be pickled or sent 
 V = TypeVar('V')
 
 
+def folded_channel_name(name: str) -> str:
+    """The name as compared for uniqueness: channel names are file names, which some file systems fold"""
+    return name.casefold()
+
+
 def _refuse_to_be_pickled(what: str) -> NoReturn:
     raise ClearMapTypeError(SESSION_LOCAL_MESSAGE.format(what=what))
 
@@ -159,20 +164,16 @@ class ChannelRegistry:
                                           f'only letters, digits and "_" are allowed')
         return name
 
-    @staticmethod
-    def _fold(name: str) -> str:
-        return name.casefold()
-
     def add(self, name: str) -> Channel:
         """Mint the id of a new channel. Raises if the name is invalid or already used (whatever the case)"""
         self.validated_name(name)
-        taken_by = self._id_by_folded_name.get(self._fold(name))
+        taken_by = self._id_by_folded_name.get(folded_channel_name(name))
         if taken_by is not None:
             raise ChannelNameTakenError(f'A channel is already named {self._name_by_id[taken_by]!r} '
                                         f'(names are unique whatever the case): cannot add {name!r}')
         channel_id = ChannelId.new()
         self._name_by_id[channel_id] = name
-        self._id_by_folded_name[self._fold(name)] = channel_id
+        self._id_by_folded_name[folded_channel_name(name)] = channel_id
         return Channel(channel_id, self)
 
     def rename_many(self, new_names: Mapping[Channel, str]) -> None:
@@ -187,18 +188,18 @@ class ChannelRegistry:
 
         channel_ids_by_folded_name: dict[str, list[ChannelId]] = {}
         for channel_id, name in final_names.items():
-            channel_ids_by_folded_name.setdefault(self._fold(name), []).append(channel_id)
+            channel_ids_by_folded_name.setdefault(folded_channel_name(name), []).append(channel_id)
         clashes = sorted(final_names[ids[0]] for ids in channel_ids_by_folded_name.values() if len(ids) > 1)
         if clashes:
             raise ChannelNameTakenError(f'Channels would share a name (names are unique whatever the case): '
                                         f'{", ".join(map(repr, clashes))}')
 
         self._name_by_id = final_names
-        self._id_by_folded_name = {self._fold(name): channel_id for channel_id, name in final_names.items()}
+        self._id_by_folded_name = {folded_channel_name(name): channel_id for channel_id, name in final_names.items()}
 
     def remove(self, channel: Channel) -> None:
         self._known(channel)
-        del self._id_by_folded_name[self._fold(self._name_by_id.pop(channel.id))]
+        del self._id_by_folded_name[folded_channel_name(self._name_by_id.pop(channel.id))]
 
     def name_of(self, channel: Channel) -> str:
         self._known(channel)
@@ -241,7 +242,7 @@ class ChannelRegistry:
         return len(self._name_by_id)
 
     def _channel_of_name(self, name: str) -> Channel:
-        channel_id = self._id_by_folded_name.get(self._fold(name))
+        channel_id = self._id_by_folded_name.get(folded_channel_name(name))
         if channel_id is None or self._name_by_id[channel_id] != name:
             raise UnknownChannelError(f'No channel called {name!r} in this sample (channels: {self.names})')
         return Channel(channel_id, self)
