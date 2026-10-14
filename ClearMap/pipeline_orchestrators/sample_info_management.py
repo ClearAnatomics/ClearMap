@@ -99,7 +99,7 @@ from ClearMap.IO.assets_constants import CONTENT_TYPE_TO_PIPELINE
 from ..config.compound_keys import PairKey
 from ..config.config_adjusters.type_hints import SampleManagerProtocol
 from ..config.config_handler import ALTERNATIVES_REG
-from ..config.config_coordinator import ConfigCoordinator, make_cfg_coordinator_factory
+from ..config.config_coordinator import CommitRecord, ConfigCoordinator, make_cfg_coordinator_factory
 
 from ..Utils.events import ChannelRenamed, WorkspaceChannelsUpdated
 from ..Utils.exceptions import ClearMapConfigError
@@ -192,7 +192,7 @@ class SampleManager(OrchestratorBase):
 
         self.subscribe(ChannelRenamed, self._on_channel_renamed)
         # The workspace is derived from the sample config: update it on every commit, before CfgChanged is published
-        self.cfg_coordinator.add_post_commit_hook(self.sync_workspace)
+        self.cfg_coordinator.add_post_commit_hook(self._on_commit)
 
         self.resource_type_to_folder: Optional[dict] = None
 
@@ -325,6 +325,9 @@ class SampleManager(OrchestratorBase):
             for name, ch_cfg in cfg['channels'].items())
         return WorkspaceInputs(base_dir=str(Path(self.cfg_coordinator.base_dir).resolve()),
                                sample_id=self.prefix, channels=channels)
+
+    def _on_commit(self, commit_record: CommitRecord) -> None:
+        self.sync_workspace()
 
     def sync_workspace(self) -> None:
         """

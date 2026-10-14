@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import warnings
 from contextlib import contextmanager
+from dataclasses import dataclass
 from pathlib import Path
 from threading import RLock
 from types import MappingProxyType
@@ -58,6 +59,30 @@ def committed_channel_renames(requested: Mapping[str, str], channels_before: Ite
     before, after = set(channels_before), set(channels_after)
     return {old: new for old, new in requested.items()
             if old in before and old not in after and new in after and new not in before}
+
+
+@dataclass(frozen=True)
+class CommitRecord:
+    """
+    What a commit did to the channels, taken right after it is written and before the post-commit hooks run:
+    the hooks and the facts published for this commit all describe the same change, whatever the commits
+    nested in the meantime.
+
+    Attributes
+    ----------
+    channels_before, channels_after : tuple[str, ...]
+        The names of the sample channels before and after the commit, in the order of the config.
+    renames : Mapping[str, str]
+        The renames the commit carried out ({old name: new name}), not the ones that were requested
+        (see committed_channel_renames).
+    """
+    channels_before: tuple[str, ...]
+    channels_after: tuple[str, ...]
+    renames: Mapping[str, str]
+
+    @property
+    def channels_changed(self) -> bool:
+        return set(self.channels_before) != set(self.channels_after)
 
 
 def _patch_to_config_keys_sets(patch: Dict[str, Any]) -> List[ConfigKeys]:
@@ -121,7 +146,7 @@ class ConfigCoordinator(BusSubscriberMixin):
 
         self._section_validators = SectionValidators(self._schemas_dir)
         self._active_sections: set[str] = set()
-        self._post_commit_hooks: list[Callable[[], None]] = []
+        self._post_commit_hooks: list[Callable[[CommitRecord], None]] = []
 
     @property
     def _allowed_sections(self):
@@ -134,10 +159,10 @@ class ConfigCoordinator(BusSubscriberMixin):
         """The local sections declared active (empty means no filtering)."""
         return frozenset(self._active_sections)
 
-    def add_post_commit_hook(self, hook: Callable[[], None]) -> None:
+    def add_post_commit_hook(self, hook: Callable[[CommitRecord], None]) -> None:
         """
         Register a callable run after every committed change (submit / submit_patch),
-        *before* CfgChanged is published.
+        *before* CfgChanged is published. It is given the CommitRecord of that commit.
 
         Use it to keep state derived from the config (e.g. the workspace) up to date,
         so that every CfgChanged subscriber sees it consistent with the config, whatever
@@ -145,9 +170,15 @@ class ConfigCoordinator(BusSubscriberMixin):
         """
         self._post_commit_hooks.append(hook)
 
-    def _run_post_commit_hooks(self) -> None:
+    def _run_post_commit_hooks(self, commit_record: CommitRecord) -> None:
         for hook in list(self._post_commit_hooks):
-            hook()
+            hook(commit_record)
+
+    def _record_commit(self, channels_before: list[str], rename_map: Mapping[str, str]) -> CommitRecord:
+        """To be called right after the commit: the channels of the config are the ones it wrote"""
+        channels_after = self.current_channels
+        return CommitRecord(channels_before=tuple(channels_before), channels_after=tuple(channels_after),
+                            renames=committed_channel_renames(rename_map, channels_before, channels_after))
 
     @property
     def workspace_config_path(self):
@@ -464,15 +495,17 @@ class ConfigCoordinator(BusSubscriberMixin):
 
         changed_sections = {k[0] for k in changed_keys if k}
         self.commit(sections=list(changed_sections))
-        self._run_post_commit_hooks()
+        commit_record = self._record_commit(channels_before, rename_map)
+        self._run_post_commit_hooks(commit_record)
 
         self.publish(CfgChanged(changed_keys=tuple(".".join(k) for k in changed_keys)))
+        self._publish_channel_facts(commit_record)
 
-        channels_after = self.current_channels
-        if set(channels_before) != set(channels_after):
-            self.publish(ChannelsChanged(before=channels_before, after=channels_after))
-
-        for old, new in committed_channel_renames(rename_map, channels_before, channels_after).items():
+    def _publish_channel_facts(self, commit_record: CommitRecord) -> None:
+        if commit_record.channels_changed:
+            self.publish(ChannelsChanged(before=list(commit_record.channels_before),
+                                         after=list(commit_record.channels_after)))
+        for old, new in commit_record.renames.items():
             self.publish(ChannelRenamed(old=old, new=new))
 
     def submit(self, *, sample_manager: Optional[SampleManager] = None, phase=Phase.PRE_VALIDATE) -> None:
@@ -489,11 +522,10 @@ class ConfigCoordinator(BusSubscriberMixin):
             if applied_patch:
                 self._merge_patch(working_cfg, applied_patch, allowed_sections=self._adjusted_sections(None))
         self.commit()
-        self._run_post_commit_hooks()
+        commit_record = self._record_commit(channels_before, {})
+        self._run_post_commit_hooks(commit_record)
 
-        channels_after = self.current_channels
-        if set(channels_before) != set(channels_after):
-            self.publish(ChannelsChanged(before=channels_before, after=channels_after))
+        self._publish_channel_facts(commit_record)
 
         changed_keys = _patch_to_config_keys_sets(applied_patch)
         self.publish(CfgChanged(changed_keys=tuple(".".join(k) for k in changed_keys)))
