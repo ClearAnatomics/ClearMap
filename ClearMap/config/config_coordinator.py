@@ -412,14 +412,12 @@ class ConfigCoordinator(BusSubscriberMixin):
                      validate: bool = True, commit: bool = True, origin: str | None = "ui",
                      phase=Phase.PRE_VALIDATE) -> None:
         """
-        Apply `patch` to the working config, then optionally adjust_config (adjusters
+        Apply `patch` to a copy of the working config, then optionally adjust_config (adjusters
         filtered by the patch's changed keys), validate, and commit.
 
-        Equivalent to:
-            self.apply(patch, origin=origin)
-            if run_adjusters: self.adjust_config(changed_keys=_patch_to_config_keys_sets(patch), sample_manager=sample_manager)
-            if validate:    self.validate()
-            if commit:      self.commit()
+        The copy replaces the working config only once validated: if the adjusters or the validators
+        refuse the patch, it raises and nothing changed (neither the working config nor the files),
+        and nothing is published.
         """
         self._refuse_unchecked_commit(commit=commit, do_run_adjusters=do_run_adjusters, validate=validate)
         if not patch:
@@ -440,32 +438,30 @@ class ConfigCoordinator(BusSubscriberMixin):
         clean_patch, rename_map = self._extract_channel_renames(patch)
 
         allowed = self._allowed_sections
-        with self.__edit_session(origin=origin, validate=False) as working_cfg:
-            self._merge_patch(working_cfg, clean_patch, allowed_sections=allowed)
-            changed_keys = _patch_to_config_keys_sets(clean_patch)
+        # The patched copy replaces the working config only once validated: a refused patch leaves no trace
+        try:
+            with self.__edit_session(origin=origin, validate=validate) as working_cfg:
+                self._merge_patch(working_cfg, clean_patch, allowed_sections=allowed)
+                changed_keys = _patch_to_config_keys_sets(clean_patch)
 
-            # Pass rename map to sample manager — the APPLY_RENAMES adjuster
-            # reads ctx.sample_manager.renamed_channels
-            if rename_map and sample_manager is not None:
-                sample_manager.set_renamed_channels(rename_map)
+                # Pass rename map to sample manager — the APPLY_RENAMES adjuster
+                # reads ctx.sample_manager.renamed_channels
+                if rename_map and sample_manager is not None:
+                    sample_manager.set_renamed_channels(rename_map)
 
-            if do_run_adjusters:
-                # The runner merges each adjuster result into the view it is given (in place). Hand it a copy
-                # so that only the returned patch, clipped to the active sections, reaches the working config.
-                patch2 = self.adjust_config(sample_manager=sample_manager, phase=phase, view=deepcopy(working_cfg),
-                                            active_sections=None, changed_keys=changed_keys, apply=False)
-                if patch2:
-                    self._merge_patch(working_cfg, patch2, allowed_sections=allowed)
-                    changed_keys.extend(_patch_to_config_keys_sets(patch2))
-
-            # Clear after adjusters consumed it
+                if do_run_adjusters:
+                    # The runner merges each adjuster result into the view it is given (in place). Hand it a copy
+                    # so that only the returned patch, clipped to the active sections, reaches the working config.
+                    patch2 = self.adjust_config(sample_manager=sample_manager, phase=phase, view=deepcopy(working_cfg),
+                                                active_sections=None, changed_keys=changed_keys, apply=False)
+                    if patch2:
+                        self._merge_patch(working_cfg, patch2, allowed_sections=allowed)
+                        changed_keys.extend(_patch_to_config_keys_sets(patch2))
+        finally:  # The renames are for the adjusters of this patch only, accepted or refused
             if rename_map and sample_manager is not None:
                 sample_manager.clear_renamed_channels()
 
         changed_keys = sorted(set(changed_keys))  # Deduplicate
-
-        if validate:
-            self.validate()
 
         if commit:
             changed_sections = {k[0] for k in changed_keys if k}
@@ -491,11 +487,13 @@ class ConfigCoordinator(BusSubscriberMixin):
         channels_before = self.current_channels
 
         applied_patch = {}
-        if do_run_adjusters:
-            applied_patch = self.adjust_config(sample_manager=sample_manager, changed_keys=None,
-                                               phase=phase, active_sections=None, apply=True)
-        if validate:
-            self.validate()
+        # The adjusted copy replaces the working config only once validated: a refused config leaves no trace
+        with self.__edit_session(origin='adjusters', validate=validate) as working_cfg:
+            if do_run_adjusters:
+                applied_patch = self.adjust_config(sample_manager=sample_manager, changed_keys=None, phase=phase,
+                                                   active_sections=None, view=deepcopy(working_cfg), apply=False)
+                if applied_patch:
+                    self._merge_patch(working_cfg, applied_patch, allowed_sections=self._adjusted_sections(None))
         if commit:
             self.commit()
             self._run_post_commit_hooks()
@@ -534,8 +532,7 @@ class ConfigCoordinator(BusSubscriberMixin):
         if view is None:
             view = self.get_config_view()
 
-        active_sections = set(active_sections) if active_sections is not None else set(self._active_sections)
-        active_sections = active_sections | set(ALTERNATIVES_REG.canonical_global_config_names)
+        active_sections = self._adjusted_sections(active_sections)
 
         ctx = self._build_context(sample_manager)
 
@@ -547,6 +544,11 @@ class ConfigCoordinator(BusSubscriberMixin):
             with self.__edit_session(origin="adjusters", validate=False) as working_cfg:
                 self._merge_patch(working_cfg, patch, allowed_sections=active_sections)
         return patch
+
+    def _adjusted_sections(self, active_sections: Optional[Iterable[str]]) -> set[str]:
+        """The sections the adjusters may write: the given (or the active) local sections, and the global ones."""
+        sections = set(active_sections) if active_sections is not None else set(self._active_sections)
+        return sections | set(ALTERNATIVES_REG.canonical_global_config_names)
 
     def _build_context(self, sample_manager) -> AdjustmentContext:
         if self.scope == AdjusterScope.EXPERIMENT:
