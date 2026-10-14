@@ -1617,7 +1617,7 @@ class GuiController(BusSubscriberMixin):
         for tab in self._tabs:
             # REFACTOR: hide behind refresh() method on GenericTab?
             # FIXME: this will blow up. fix in cfg_to_ui but params must have ref to owner tab
-            tab._create_channels()  # Ensure channel tabs and params are up to date
+            tab.reconcile_channel_pages()  # Channel pages and params follow the config
             tab.params.cfg_to_ui()
 
     def _handle_tab_activation(self, tab_key: str) -> Tuple[bool, str]:

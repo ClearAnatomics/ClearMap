@@ -53,7 +53,7 @@ Typical calling sequence is:
   - sets ``sample_params`` if not ``SampleInfoTab``
   - calls ``tab._set_params``
   - calls ``tab._setup_workers`` (for pipeline tabs)
-  - calls ``tab._create_channels`` (if the tab has channel pages)
+  - calls ``tab.reconcile_channel_pages`` (if the tab has channel pages)
   - calls ``tab._load_config_to_gui`` (via params)
   - calls ``tab._bind_params_signals`` (for tab-specific signals)
 
@@ -134,7 +134,7 @@ from ClearMap.Visualization.Qt import Plot3d as plot_3d
 
 from ClearMap.Utils.exceptions import (ClearMapVRamException, GroupStatsError, MissingRequirementException,
                                        ClearMapWorkspaceError, ClearMapValueError)
-from ClearMap.Utils.events import (ChannelsChanged, CfgChanged, UiPrepareRawDataForClearMap, UiRequestPlotMiniBrain,
+from ClearMap.Utils.events import (CfgChanged, UiPrepareRawDataForClearMap, UiRequestPlotMiniBrain,
                                    UiRequestPlotAtlas, UiOrientationChanged, UiCropChanged, ChannelDefaultsChanged,
                                    UiRequestLandmarksDialog, UiAlignWithChanged, UiVesselGraphFiltersChanged,
                                    RegistrationStatusChanged, UiBatchResultsFolderChanged, UiBatchGroupsChanged,
@@ -142,9 +142,9 @@ from ClearMap.Utils.events import (ChannelsChanged, CfgChanged, UiPrepareRawData
 
 from .dialog_helpers import option_dialog, make_splash, prompt_dialog, abort_retry_popup
 from .dialogs import ResourceTypeToFolderDialog
-from .tabs_interfaces import PostProcessingTab, PreProcessingTab, BatchTab, ExperimentTab, GenericTab
+from .tabs_interfaces import PostProcessingTab, PreProcessingTab, BatchTab, ExperimentTab, GenericTab, PageKey
 from .widgets import (PatternDialog, DataFrameWidget, LandmarksSelectorDialog,
-                      CheckableListWidget, FileDropListWidget, ExtendableTabWidget, ensure_inline_histogram,
+                      CheckableListWidget, FileDropListWidget, ensure_inline_histogram,
                       GraphFilterList, NProcessesWidget, BlockProcessingWidget)
 from .gui_utils_base import (format_long_nb, replace_widget, add_missing_combobox_items,
                              populate_combobox, delete_widget)
@@ -222,9 +222,6 @@ class SampleInfoTab(ExperimentTab):
 
         self.subscribe(UiOrientationChanged, self.update_atlas)
         self.subscribe(UiCropChanged, self.update_atlas)
-
-        self.subscribe(ChannelsChanged, self._on_bus_channels_changed)
-        self.subscribe(UiChannelsChanged, self._on_bus_channels_changed)
 
         self.subscribe(WorkspaceChanged, self._on_workspace_changed)
 
@@ -546,8 +543,7 @@ class StitchingTab(PreProcessingTab["StitchingProcessor"]):
                     self.worker.create_layout_from_ome(channel=chan)
 
     def _load_config_to_gui(self) -> None:
-        desired = self._get_channels()
-        self.reconcile_channel_pages(desired)
+        self.reconcile_channel_pages()
         self.params.reconcile_children_from_view()
         super()._load_config_to_gui()  # == self.params.cfg_to_ui()
         self._update_auto_overlap_availability()  # After cfg_to_ui which would re-untick the toggle
@@ -573,7 +569,6 @@ class StitchingTab(PreProcessingTab["StitchingProcessor"]):
         self.ui.displayStitchingPushButton.clicked.connect(self.plot_stitching_results)
         self.ui.displayStitchingClearPlots.clicked.connect(self.main_window.clear_plots)
 
-        self.subscribe(ChannelsChanged, self._on_bus_channels_changed)
         self.subscribe(CfgChanged, self._on_cfg_changed_extension)
 
     def _on_cfg_changed_extension(self, evt: CfgChanged) -> None:
@@ -821,7 +816,6 @@ class RegistrationTab(PreProcessingTab['RegistrationProcessor']):
 
         self.__populate_atlas_comboboxes()
 
-        self.subscribe(ChannelsChanged, self._on_bus_channels_changed)
         self.subscribe(ChannelDefaultsChanged, self._on_bus_partner_defaults)
         self.subscribe(UiAlignWithChanged, self.handle_align_with_changed)
 
@@ -836,8 +830,6 @@ class RegistrationTab(PreProcessingTab['RegistrationProcessor']):
         self._update_plotable_channels()
 
     def _on_channel_removed(self, channel_name: str) -> None:
-        if channel_name in self.params:
-            self.params.pop(channel_name)
         self._update_plotable_channels()
 
     def _on_bus_partner_defaults(self, event: ChannelDefaultsChanged) -> None:
@@ -1998,7 +1990,7 @@ class ColocalizationTab(PostProcessingTab['ColocalizationProcessor']):
         are excluded. A channel which is not complete yet (path, data type) cannot be colocalized.
 
         Note: return type is intentionally ``list[tuple[str, str]]`` rather than
-        ``list[str]`` — _create_channels is overridden to handle this.
+        ``list[str]`` — _desired_channel_pages is overridden to handle this.
         """
         return self.sample_manager.complete_colocalization_pairs()
 
@@ -2008,16 +2000,13 @@ class ColocalizationTab(PostProcessingTab['ColocalizationProcessor']):
     def _bind_params_signals(self) -> None:
         pass
 
-    def _create_channels(self) -> None:  # override: handles channel pairs
-        if not hasattr(self.ui, 'channelsParamsTabWidget'):
-            return
-        if not isinstance(self.ui.channelsParamsTabWidget, ExtendableTabWidget):
-            warnings.warn(f'Channel tab widget not finalised for {self.name}, skipping channel creation')
-            return
+    def _desired_channel_pages(self) -> list[tuple[PageKey, str]]:  # override: a page is a page of a pair
+        registry = self.sample_manager.channel_registry
+        pages = []
         for channel_a, channel_b in self.sample_manager.complete_colocalization_pairs():
-            pair_key = str(PairKey(channel_a, channel_b, oriented=self.pairs_oriented))
-            if pair_key not in self.ui.channelsParamsTabWidget.get_channels_names():
-                self.add_channel_tab(pair_key)
+            pair_key = PairKey(channel_a, channel_b, oriented=self.pairs_oriented)
+            pages.append((tuple(registry.resolve(channel) for channel in pair_key.as_tuple()), str(pair_key)))
+        return pages
 
     def _bind_channel(self, page_widget: QWidget, channel: str) -> None:
         channel_a, channel_b = PairKey.from_string(channel, oriented=self.pairs_oriented).as_tuple()

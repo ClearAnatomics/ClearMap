@@ -1110,14 +1110,12 @@ class CellMapParams(ChannelsUiParameterCollection):
             self.tab, channel_name, event_bus=self._bus,
             get_view=self._get_view, apply_patch=self._apply_patch)
 
-    def pop(self, channel_name: str):
+    def drop_channel(self, channel_name: str):
         # tear down both algo + perf params
-        if channel_name in self:
-            self[channel_name].teardown()
-            super().pop(channel_name)
         if channel_name in self._perf_params:
             self._perf_params[channel_name].teardown()
             del self._perf_params[channel_name]
+        return super().drop_channel(channel_name)
 
 
 class ChannelCellMapParams(ChannelUiParameter, OrthoviewerSlicingMixin):
@@ -1465,15 +1463,15 @@ class VesselParams(ChannelsUiParameterCollection):
             self.tab, channel_name, event_bus=self._bus,
             get_view=self._get_view, apply_patch=self._apply_patch)
 
-    def pop(self, channel_name: str):
+    def drop_channel(self, channel_name: str):
         # tear down both algo + perf params
-        if channel_name in self:
-            self[channel_name].teardown()
-            super().pop(channel_name)
-            self.shared_binarization_params.set_plotable_channels(self.channels)
         if channel_name in self._perf_params:
             self._perf_params[channel_name].teardown()
             del self._perf_params[channel_name]
+        popped_channel = super().drop_channel(channel_name)
+        if popped_channel is not None:
+            self.shared_binarization_params.set_plotable_channels(self.channels)
+        return popped_channel
 
 
 class VesselBinarizationParams(ChannelUiParameter):

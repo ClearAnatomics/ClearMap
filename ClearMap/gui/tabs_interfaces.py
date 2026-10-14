@@ -9,13 +9,14 @@ import warnings
 from dataclasses import dataclass
 from pathlib import Path
 from contextlib import contextmanager, ExitStack
-from typing import final, Callable, Any, TYPE_CHECKING, TypeVar, Generic, ParamSpec, Tuple
+from typing import final, Callable, Any, TYPE_CHECKING, TypeVar, Generic, ParamSpec, Tuple, Union
 
 import numpy as np
 from PyQt5.QtWidgets import QWhatsThis, QWidget, QApplication
 
 from ClearMap.Utils.event_bus import BusSubscriberMixin, GUI_THREAD
 from ClearMap.Utils.utilities import title_to_snake
+from ClearMap.config.channel import Channel
 from ClearMap.config.compound_keys import is_compound_channel
 from ClearMap.config.config_handler import ConfigHandler, ALTERNATIVES_REG
 
@@ -23,7 +24,6 @@ from .dialog_helpers import get_directory_dlg, make_simple_progress_dialog
 from .exception_handler import handle_exception
 from .gui_utils_base import create_clearmap_widget, replace_widget
 from .widgets import ExtendableTabWidget, SamplePickerDialog
-from ..Utils.events import ChannelsChanged, UiChannelsChanged
 
 if TYPE_CHECKING:
     from PyQt5.QtWidgets import QMainWindow, QToolButton
@@ -44,6 +44,9 @@ PathLike = str | Path
 # bound at the concrete leaf (e.g. CellCounterTab[CellDetector]).
 TWorker = TypeVar('TWorker', bound='PipelineOrchestrator')
 P = ParamSpec('P')
+
+# What a channel page is a page of: a channel, or the channels of a compound (e.g. a colocalization pair)
+PageKey = Union[Channel, Tuple[Channel, ...]]
 
 
 class GenericUi:
@@ -261,20 +264,14 @@ class GenericTab(GenericUi, BusSubscriberMixin):
             warnings.warn(f'Params not set for {self.__class__}. Call set_params before finalise_set_params')
             return
         self._setup_workers()
-        self._create_channels()  # Creates missing channels. FIXME: What about existing but renamed ones?
+        self.reconcile_channel_pages()
         self._load_config_to_gui()
         self._bind_params_signals()
         self.handle_advanced_checked()  # in case channel.QtControl in advanced_controls_names
 
-    def _create_channels(self) -> None:
-        if not hasattr(self.ui, 'channelsParamsTabWidget'):
-            return
-        if not isinstance(self.ui.channelsParamsTabWidget, ExtendableTabWidget):
-            warnings.warn(f'Channel tab widget not finalised for  {self.name}, skipping channel creation')
-            return
-        for channel in self._get_channels():
-            if channel not in self.ui.channelsParamsTabWidget.get_channels_names():
-                self.add_channel_tab(channel)
+    def reconcile_channel_pages(self) -> None:
+        """Make the channel pages of the tab follow the config. Nothing to do for tabs without channel pages"""
+        pass
 
     def get_channel_ui(self, channel: str) -> QWidget | None:
         """Get the UI widget for a specific channel"""
@@ -345,17 +342,6 @@ class GenericTab(GenericUi, BusSubscriberMixin):
     def _on_channel_added(self, channel: str) -> None:
         """Child class should implement this to trigger any action needed when a channel is added"""
         pass
-
-    def remove_channel_tab(self, channel: str) -> None:
-        """Wrapper so removal always triggers the hook."""
-        try:
-            if hasattr(self, 'params') and hasattr(self.params, 'pop'):
-                self.params.pop(channel)
-            else:  # Fallback only to ensure we do through the proper params teardown
-                if hasattr(self.ui, 'channelsParamsTabWidget'):
-                    self.ui.channelsParamsTabWidget.remove_channel_widget(channel)
-        finally:
-            self._on_channel_removed(channel)
 
     def _on_channel_removed(self, channel_name: str) -> None:
         """Child classes should implement this to trigger cleanup actions after a channel is removed"""
@@ -711,6 +697,7 @@ class ExperimentTab(GenericTab):
         self._sample_manager: SampleManager | None = None
         self._exp_controller: ExperimentController | None = None
         self.sample_params: SampleParameters | None = None
+        self._page_names: dict[PageKey, str] = {}  # The name each channel page was last made for
 
     # ------------------------------------------------------------------ #
     #  Raising properties — eliminates "| None has no attribute X" noise  #
@@ -771,37 +758,81 @@ class ExperimentTab(GenericTab):
             self.sample_params = sample_params  # REFACTORING: consider using sample_manager
         super().set_params()
 
-    def reconcile_channel_pages(self, desired_channels: list[str]) -> None:
+    def _desired_channel_pages(self) -> list[tuple[PageKey, str]]:
         """
-        Update the configuration for the channels and the associated page widgets
+        The pages the tab should show, each as (what it is a page of, its current name).
+        The first is the identity, which a rename does not change, so a page can be told from a new one.
+        """
+        registry = self.sample_manager.channel_registry
+        return [(registry.resolve(name), name) for name in self._get_channels()]
 
-        Parameters
-        ----------
-        desired_channels: list[str]
-            The list of channels that should be present
+    def reconcile_channel_pages(self) -> None:
         """
-        if not self.params or not hasattr(self.ui, 'channelsParamsTabWidget'):  # If not setup or tab without channels
+        Make the channel pages follow the config, whatever the changes since the last time (it reads the
+        sample manager, never the payload of an event, so it is the same from any trigger): the pages of the
+        channels which are gone are dropped, those of the new channels are added and the page of a channel
+        which was renamed is made again under its new name.
+
+        .. important::
+            The view follows the config: nothing here writes the config.
+
+        .. note::
+            A renamed page is made again, rather than renamed, because the buttons of a page were bound to
+            the name the channel had then. They become channels (and the pages kept) when the tabs are migrated.
+        """
+        if self._sample_manager is None or not self.params or not hasattr(self.ui, 'channelsParamsTabWidget'):
+            return  # If not setup or tab without channels
+        tab_widget = self.ui.channelsParamsTabWidget
+        if not isinstance(tab_widget, ExtendableTabWidget):
+            warnings.warn(f'Channel tab widget not finalised for {self.name}, skipping channel pages')
             return
 
+        desired = {name: page_of for page_of, name in self._desired_channel_pages()}  # dedupe, keeps the order
+        changed = False
+
+        # 1. Renames: a page whose identity is known under another name is made again under the new one.
+        for name, page_of in desired.items():
+            previous_name = self._page_names.get(page_of)
+            if previous_name is not None and previous_name != name:
+                self._rename_channel_page(previous_name, name)
+                changed = True
+
+        # 2. Drops: a page whose channel is no longer in the config is dropped.
+        for name in tab_widget.get_channels_names():
+            if name not in desired:
+                self._drop_channel_page(name)
+                changed = True
+
+        # 3. Adds: a page for a new channel is added.
+        for name in desired:
+            if name not in tab_widget.get_channels_names():
+                self.add_channel_tab(name)  # will call _setup_channel/_bind_channel
+                changed = True
+
+        # 4. Update the page names mapping to reflect the current state. (Record what is shown now, for the next call.)
+        shown = tab_widget.get_channels_names()
+        self._page_names = {page_of: name for name, page_of in desired.items() if name in shown}
+        if changed:
+            self._after_channels_reconciled(list(desired))
+            self._setup_workers()
+
+    def _drop_channel_page(self, name: str) -> None:
+        self.params.drop_channel(name)
+        self._on_channel_removed(name)
+
+    def _rename_channel_page(self, old_name: str, new_name: str) -> None:
+        """Make the page of ``old_name`` again, in the same place, under ``new_name``"""
         tab_widget = self.ui.channelsParamsTabWidget
-        # ordered list
-        desired_channels = list(dict.fromkeys(desired_channels))  # dedupe, keep order
-
-        # remove obsolete pages
-        obsolete_channels = [c for c in tab_widget.get_channels_names() if c not in desired_channels]
-        for ch in obsolete_channels:
-            self.params.pop(ch)  # self.remove_channel_tab(ch) should be implicit in pop
-            self._on_channel_removed(ch)
-
-        # add missing pages (in desired order)
-        for ch in desired_channels:
-            if ch not in tab_widget.get_channels_names():
-                self.add_channel_tab(ch)  # will call _setup_channel/_bind_channel
-                # setup workers ?
-                # params.add_channel(ch) ??
-
-        self._after_channels_reconciled(desired_channels)
-        self._setup_workers()
+        page, index = tab_widget.get_channel_widget(old_name, return_idx=True)
+        if page is None:  # Already renamed (the user typed the new name in this page): nothing to make again
+            return
+        current_name = tab_widget.current_channel()
+        self._drop_channel_page(old_name)
+        if new_name not in tab_widget.get_channels_names():
+            self.add_channel_tab(new_name)
+        tab_widget.move_channel_widget(new_name, index)
+        tab_widget.setCurrentWidget(tab_widget.get_channel_widget(new_name if current_name == old_name
+                                                                  else current_name))
 
     def _after_channels_reconciled(self, desired_channels: list[str]) -> None:
         """
@@ -810,11 +841,6 @@ class ExperimentTab(GenericTab):
         that depend on the list of channels
         """
         pass
-
-    def _on_bus_channels_changed(self, event: UiChannelsChanged | ChannelsChanged) -> None:  # Support UiChannelsChanged for Sample Tab
-        relevant = set(self._get_channels())
-        desired = [c for c in event.after if c in relevant]
-        self.reconcile_channel_pages(desired)
 
     def _setup_workers(self) -> None:
         """

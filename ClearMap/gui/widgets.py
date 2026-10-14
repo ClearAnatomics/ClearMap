@@ -2231,6 +2231,12 @@ class ExtendableTabWidget(QTabWidget):
             self.removeTab(idx)
             widget.deleteLater()
 
+    def move_channel_widget(self, name, index):
+        """Move the page of channel ``name`` to position ``index`` (among the channel pages)"""
+        widget, current_idx = self.get_channel_widget(name, return_idx=True)
+        if widget is not None and current_idx != index:
+            self.tabBar().moveTab(current_idx, index)
+
     def get_channel_widget(self, name=None, return_idx=False):
         if name is None:
             name = self.current_channel()

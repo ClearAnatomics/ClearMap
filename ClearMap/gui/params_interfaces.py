@@ -16,8 +16,7 @@ from PyQt5.QtWidgets import (QCheckBox, QLabel, QLineEdit, QSpinBox, QFrame,
                              QWidget, QListWidget, QDoubleSpinBox)
 
 from ClearMap.IO.assets_constants import CONTENT_TYPE_TO_PIPELINE
-from ClearMap.Utils.event_bus import BusSubscriberMixin, EventBus, Publishes, GUI_THREAD
-from ClearMap.Utils.events import ChannelsChanged
+from ClearMap.Utils.event_bus import BusSubscriberMixin, EventBus, GUI_THREAD
 from ClearMap.Utils.utilities import set_item_recursive, get_item_recursive, DELETE
 from ClearMap.Utils.exceptions import ConfigNotFoundError, ClearMapValueError
 from ClearMap.config.config_handler import ALTERNATIVES_REG
@@ -1406,7 +1405,39 @@ class UiParameterCollection(BusSubscriberMixin, ABC):
         if self._apply_patch is not None:
             self._apply_patch(patch)
 
+    def drop_channel(self, channel_name):  # FIXME: should be in ChannelsUiParameterCollection. Check calls
+        """
+        Remove the page and the params of a channel from the view. **Does not write the config**: the config is
+        the source of truth, this is for the view to follow it (see ExperimentTab.reconcile_channel_pages).
+        Does nothing if the channel has no params.
+
+        Returns
+        -------
+        The params of the channel that were removed, None if there were none.
+        """
+        popped_channel = self.channel_params.pop(channel_name, None)
+
+        # remove the channel's page from the tab widget if it exists
+        tab_widget = getattr(self.tab, 'channelsParamsTabWidget', None)
+        if tab_widget is not None:
+            tab_widget.remove_channel_widget(channel_name)
+
+        # Disconnect the signals of the params and free their resources
+        if popped_channel is not None:
+            try:
+                popped_channel.teardown()  # Disconnect all signals and free resources
+            except Exception as e:
+                warnings.warn(f'Error during teardown of channel "{channel_name}": {e}')
+        return popped_channel
+
     def pop(self, channel_name):  # FIXME: should be in ChannelsUiParameterCollection. Check calls
+        """
+        The user removes a channel: remove its page, then ask the config to remove it.
+
+        .. important::
+            The page goes first, so that the commit cannot reach the params of a channel which is gone.
+            The other tabs drop their page of the channel when they follow the config.
+        """
         if self._apply_patch is None:
             raise ValueError('Patch sink not set. Please call bind_apply_patch first.')
         if not self.channels:
@@ -1415,38 +1446,13 @@ class UiParameterCollection(BusSubscriberMixin, ABC):
             warnings.warn(f'Could not remove "{channel_name=}" not found in {self.channels=}')
             return None
 
-        channels_before = self.channels[:]
-
-        # 1. Remove from in-memory dict FIRST (prevents re-entrant KeyError)
-        popped_channel = self.channel_params.pop(channel_name)
-
-        # 2. Remove UI widget BEFORE firing events (so reconcile_channel_pages
-        #    won't see it as obsolete and try to pop again)
-        tab_widget = getattr(self.tab, 'channelsParamsTabWidget', None)
-        if tab_widget is not None:
-            tab_widget.remove_channel_widget(channel_name)
-
-        # 3. Notify config (may fire synchronous ChannelsChanged — now harmless)
+        # View goes first, then config. This is to avoid the config being updated while the view is still there.
+        popped_channel = self.drop_channel(channel_name)
         try:
             self._emit_patch(['channels', channel_name], DELETE)
         except Exception as e:
             warnings.warn(f'Could not remove "{channel_name=}" from config: {e}')
             return None
-
-        # popped_channel = self.channel_params.pop(channel_name)
-
-        # 4. Ensure all signals get disconnected and resources freed
-        try:
-            popped_channel.teardown()
-        except Exception as e:
-            warnings.warn(f'Error during teardown of channel "{channel_name}": {e}')
-
-        tab = self.tab.channelsParamsTabWidget
-        tab.remove_channel_widget(channel_name)
-
-        # 5. Bus notification
-        channels_after = self.channels
-        self.publish(ChannelsChanged(before=channels_before, after=channels_after))
         return popped_channel
 
     @property
@@ -1473,8 +1479,6 @@ class UiParameterCollection(BusSubscriberMixin, ABC):
 
 
 class ChannelsUiParameterCollection(UiParameterCollection):
-    publishes = Publishes(ChannelsChanged)
-
     def __init__(self, tab: QWidget, *, pipeline_name: str, event_bus: EventBus,
                  get_view: Callable[[], Mapping[str, Any]] | None = None,
                  apply_patch: Callable[[dict], None] | None = None):
