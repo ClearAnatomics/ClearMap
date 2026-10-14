@@ -23,7 +23,7 @@ from ClearMap.config.config_handler import ConfigHandler, ALTERNATIVES_REG
 from .dialog_helpers import get_directory_dlg, make_simple_progress_dialog
 from .exception_handler import handle_exception
 from .gui_utils_base import create_clearmap_widget, replace_widget
-from .widgets import ExtendableTabWidget, SamplePickerDialog
+from .widgets import ExtendableTabWidget, SamplePickerDialog, set_channel_id
 
 if TYPE_CHECKING:
     from PyQt5.QtWidgets import QMainWindow, QToolButton
@@ -370,6 +370,9 @@ class GenericTab(GenericUi, BusSubscriberMixin):
         else:
             page_widget = create_clearmap_widget(self.channels_ui_name, patch_parent_class='QWidget')
             channel = tab_widget.add_channel_widget(page_widget, name=channel)
+            registry = self.sample_manager.channel_registry if isinstance(self, PipelineTab) else None
+            if registry is not None and registry.has_name(channel):  # A compound channel has no id of its own
+                set_channel_id(page_widget, registry.resolve(channel).id)
             return channel, page_widget, True
 
     def _bind_channel(self, page_widget: QWidget, channel: str) -> None:

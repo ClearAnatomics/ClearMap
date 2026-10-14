@@ -9,8 +9,10 @@ Run: ``pytest tests/gui/test_channel_pages_open_risks.py -v``. Expected: N passe
 """
 import pytest
 
-from ClearMap.config.channel import ChannelRegistry
+from ClearMap.config.channel import ChannelId, ChannelRegistry
 from ClearMap.gui import params_interfaces, tabs_interfaces
+from ClearMap.gui.params import SampleParameters
+from ClearMap.gui.widgets import channel_id_of, set_channel_id
 from ClearMap.gui.params_interfaces import ChannelsUiParameterCollection, ChannelUiParameter
 from ClearMap.gui.tabs_interfaces import ExperimentTab
 from ClearMap.Utils.utilities import DELETE
@@ -18,8 +20,21 @@ from ClearMap.Utils.utilities import DELETE
 FIRST, SECOND, THIRD = 'fos', 'auto', 'nuclei'
 
 
+class FakePage:
+    """A page: the Qt property API only (the page holds the id of its channel)"""
+
+    def __init__(self):
+        self._properties = {}
+
+    def setProperty(self, name, value):
+        self._properties[name] = value
+
+    def property(self, name):
+        return self._properties.get(name)
+
+
 class FakeChannelsTabWidget:
-    """The tab widget: one page per channel, found by tab text (the real ExtendableTabWidget is a Qt widget)"""
+    """The tab widget: one page per channel, found by tab text or by the id of the channel (as the real one)"""
 
     def __init__(self):
         self.pages: list[tuple[str, object]] = []
@@ -37,8 +52,15 @@ class FakeChannelsTabWidget:
                 return (page, index) if return_idx else page
         return (None, -1) if return_idx else None
 
+    def get_channel_widget_by_id(self, channel_id, return_idx=False):
+        for index, (_, page) in enumerate(self.pages):
+            if channel_id_of(page) == channel_id:
+                return (page, index) if return_idx else page
+        return (None, -1) if return_idx else None
+
     def add_page(self, name):
-        page = object()
+        page = FakePage()
+        set_channel_id(page, ChannelId.new())  # As the sample tab does when it makes a page
         self.pages.append((name, page))
         self.current_page = page
         return page
@@ -59,6 +81,13 @@ class FakeChannelsTabWidget:
     def setCurrentWidget(self, page):
         self.current_page = page
 
+    def indexOf(self, page):
+        return next((index for index, (_, candidate) in enumerate(self.pages) if candidate is page), -1)
+
+    def setTabText(self, index, text):
+        _, page = self.pages[index]
+        self.pages[index] = (text, page)
+
 
 class FakeTab:
     def __init__(self):
@@ -75,9 +104,11 @@ class FakeChannelParams:
 
 
 class FakeCollection:
-    """A channels collection with the real ``drop_channel`` and ``pop``, and a patch sink we can make fail"""
+    """A channels collection with the real ``drop_channel``, ``pop`` and rename, and a patch sink we can make fail"""
     drop_channel = ChannelsUiParameterCollection.drop_channel
     pop = ChannelsUiParameterCollection.pop
+    handle_channel_rename_request = SampleParameters.handle_channel_rename_request
+    _revert_rename = SampleParameters._revert_rename
 
     def __init__(self, *, patch_fails: bool = False):
         self.tab = FakeTab()
@@ -89,6 +120,13 @@ class FakeCollection:
     @property
     def channels(self):
         return list(self.channel_params)
+
+    @property
+    def config_channels(self):  # The config knows the channels of the params: a rename is written to both
+        return list(self.channel_params)
+
+    def _publish_channels_changed(self, names):
+        pass
 
     def add(self, name):
         self.tab.channelsParamsTabWidget.add_page(name)
@@ -156,27 +194,28 @@ class FakeNameTab(FakeChannelsTabWidget):
 class SomeChannelParams(ChannelUiParameter):
     @property
     def cfg_subtree(self):
-        return ['sample', 'channels', self.__dict__.get('_name_for_test', '')]
+        return ['sample', 'channels', self.name]
 
 
-def _param_for_page(page_index: int, tab_widget: FakeNameTab):
-    param = object.__new__(SomeChannelParams)  # Skips the Qt construction: only the name is under test
-    param.nameWidget = tab_widget
-    param.page_index = page_index
+def _param_for_channel(tab_widget: FakeNameTab, name: str):
+    """Binds a channel parameter to the page of ``name``, as ``ChannelUiParameter.__init__`` does"""
+    param = object.__new__(SomeChannelParams)  # Skips the Qt construction: only the id and the name are under test
+    param._tab_widget = tab_widget
+    param._channel_id = channel_id_of(tab_widget.get_channel_widget(name))
+    param._channel_name = name
+    param.nameWidget = tab_widget  # Not a line edit: the name setter then only moves the tab text
     return param
 
 
-@pytest.mark.xfail(strict=True, reason='OPEN RISK 2: a channel page remembers its index in the tab widget at its '
-                                       'creation. Removing a page to its left shifts the index, so its name is read '
-                                       'from the wrong tab. The name (or the index) must be looked up again.')
-def test_a_page_still_reads_its_own_name_after_a_page_to_its_left_is_removed():
+def test_a_page_reads_its_own_name_after_a_page_to_its_left_is_removed():
     tab_widget = FakeNameTab()
     tab_widget.add_page(FIRST)
     tab_widget.add_page(SECOND)
-    param_of_second = _param_for_page(page_index=1, tab_widget=tab_widget)
+    param_of_second = _param_for_channel(tab_widget, SECOND)
     tab_widget.remove_channel_widget(FIRST)
 
     assert param_of_second.name == SECOND
+    assert param_of_second.page_index == 0
 
 
 def test_a_page_reads_its_own_name_before_any_removal():
@@ -184,7 +223,24 @@ def test_a_page_reads_its_own_name_before_any_removal():
     tab_widget.add_page(FIRST)
     tab_widget.add_page(SECOND)
 
-    assert _param_for_page(page_index=1, tab_widget=tab_widget).name == SECOND
+    assert _param_for_channel(tab_widget, SECOND).name == SECOND
+
+
+def test_renaming_a_page_after_a_page_to_its_left_is_removed_renames_that_page_only():
+    # The user's case: remove a channel, then rename the one after it. The page was made at index 1 and sits at 0 now.
+    collection = FakeCollection()
+    collection.add(FIRST)
+    collection.add(SECOND)
+    collection.channel_params[SECOND] = _param_for_channel(collection.tab.channelsParamsTabWidget, SECOND)
+    collection.channel_params[SECOND].handle_name_changed = (
+        lambda old, new: collection.patches.append({'$rename': {'channels': {old: new}}}))
+    collection.pop(FIRST)
+
+    collection.handle_channel_rename_request(SECOND, THIRD, requester=collection.channel_params[SECOND])
+
+    assert collection.tab.channelsParamsTabWidget.get_channels_names() == [THIRD]
+    assert collection.channel_params[THIRD].name == THIRD
+    assert collection.patches[-1] == {'$rename': {'channels': {SECOND: THIRD}}}
 
 
 # ------------------------------------------------------------------------------- reconcile: what runs after a change

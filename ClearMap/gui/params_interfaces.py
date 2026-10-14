@@ -24,7 +24,7 @@ from ClearMap.gui.gui_utils_base import disconnect_widget_signal
 from ClearMap.gui.pipeline_model import LinearPipeline, PipelineStep, BINARIZATION_STEPS
 from ClearMap.gui.pipeline_widgets import LinearPipelineWidget
 from ClearMap.gui.widget_monkeypatch_callbacks import _get_sorted_spin_boxes, ensure_compound_box_patched
-from ClearMap.gui.widgets import (ExtendableTabWidget, FileDropListWidget, LandmarksWeightsPanel, GroupsWidgetAdapter,
+from ClearMap.gui.widgets import (ExtendableTabWidget, FileDropListWidget, channel_id_of, LandmarksWeightsPanel, GroupsWidgetAdapter,
                                   NProcessesWidget)
 
 CLEARMAP_VERSION = Version(version('ClearMap'))
@@ -1307,17 +1307,35 @@ class ChannelUiParameter(UiParameter, ABC):
                  get_view: Callable[[], Mapping[str, Any]] | None = None,
                  apply_patch: Callable[[dict], None] | None = None):
         tab_widget = tab.channelsParamsTabWidget
-        page, self.page_index = tab_widget.get_channel_widget(channel_name, return_idx=True)
+        page, _ = tab_widget.get_channel_widget(channel_name, return_idx=True)
         if page is None:
             raise ClearMapValueError(f'Channel {channel_name} not found in tab for {self.__class__.__name__}. '
                                      f'Please add it first.')
+        channel_id = channel_id_of(page)  # The page holds the id of its channel: the one place which says which page
+        if channel_id is None:
+            raise ClearMapValueError(f'The page of channel {channel_name} has no channel id: it was not made from the '
+                                     f'registry of the sample. Add the channel through the sample manager first.')
+        self._tab_widget = tab_widget
+        self._channel_id = channel_id  # Not the page nor its index: both move, the id does not
+        self._channel_name = channel_name  # The channel of the page. Only a rename changes it (see the name setter)
         if name_widget_name is not None:
             self.nameWidget = getattr(page, name_widget_name)
             self.nameWidget.setText(channel_name)  # WARNING: needs to come first since used by all the rest
-            # self.name = channel_name  # WARNING: needs to come first since used by all the rest
         else:
             self.nameWidget = tab_widget
         super().__init__(page, event_bus=event_bus, get_view=get_view, apply_patch=apply_patch)
+
+    @property
+    def page(self):
+        """The page of this channel, found by its id now (None once the channel has no page)"""
+        page, _ = self._tab_widget.get_channel_widget_by_id(self._channel_id, return_idx=True)
+        return page
+
+    @property
+    def page_index(self) -> int:
+        """The index of the page of this channel in the tab widget, found by its id now (-1 if there is none)"""
+        _, index = self._tab_widget.get_channel_widget_by_id(self._channel_id, return_idx=True)
+        return index
 
     @property
     @abstractmethod
@@ -1331,21 +1349,25 @@ class ChannelUiParameter(UiParameter, ABC):
 
     @property
     def name(self):
-        if isinstance(self.nameWidget, QLineEdit):
-            return self.nameWidget.text()
-        elif isinstance(self.nameWidget, ExtendableTabWidget):
-            return self.nameWidget.tabText(self.page_index)
-        else:
-            raise ValueError(f'Unsupported nameWidget type: {type(self.nameWidget)}')
+        """
+        The channel of this page. It is the name the config knows it by: it is not read from a widget, since the text
+        typed in a name field is not a rename until it is committed, and the tab text can be another page's.
+        """
+        return self._channel_name
 
     @name.setter
     def name(self, value):
-        if value == self.name:
+        """Set by the rename (and its revert) only: the config is written by the caller, before this is called"""
+        if value == self._channel_name:
             return
+        self._channel_name = value
         if isinstance(self.nameWidget, QLineEdit):
+            self.nameWidget.blockSignals(True)  # Showing the name is not an edit to commit
             self.nameWidget.setText(value)
-        elif isinstance(self.nameWidget, ExtendableTabWidget):
-            self.nameWidget.setTabText(self.page_index, value)
+            self.nameWidget.blockSignals(False)
+        index = self.page_index
+        if index != -1:
+            self._tab_widget.setTabText(index, value)
 
 
 class UiParameterCollection(BusSubscriberMixin, ABC):

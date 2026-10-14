@@ -8,6 +8,8 @@ import contextlib
 import pytest
 
 from ClearMap.Utils.event_bus import EventBus
+from ClearMap.config.channel import ChannelId
+from ClearMap.gui.widgets import channel_id_of, set_channel_id
 from ClearMap.gui import params, params_interfaces
 from ClearMap.gui.params_interfaces import ChannelUiParameter
 from ClearMap.gui.params import (CellMapParams, ColocalizationParams, RegistrationParams, StitchingParams,
@@ -40,6 +42,20 @@ class FakeWidget:
         return []
 
 
+class FakeChannelPage(FakeWidget):
+    """A page holds the id of its channel, as a page made by the sample tab does (Qt property API)"""
+
+    def __init__(self, name=''):
+        super().__init__(name)
+        self._properties = {}
+
+    def setProperty(self, name, value):
+        self._properties[name] = value
+
+    def property(self, name):
+        return self._properties.get(name)
+
+
 class FakeChannelsTabWidget(FakeWidget):
     """The tab widget holding one page per channel"""
 
@@ -48,8 +64,18 @@ class FakeChannelsTabWidget(FakeWidget):
         self.pages = {}
 
     def get_channel_widget(self, channel_name, return_idx=False):
-        page = self.pages.setdefault(channel_name, FakeWidget(channel_name))
+        if channel_name not in self.pages:
+            page = FakeChannelPage(channel_name)
+            set_channel_id(page, ChannelId.new())  # The page of a channel of the registry holds its id
+            self.pages[channel_name] = page
+        page = self.pages[channel_name]
         return (page, list(self.pages).index(channel_name)) if return_idx else page
+
+    def get_channel_widget_by_id(self, channel_id, return_idx=False):
+        for index, (_, page) in enumerate(self.pages.items()):
+            if channel_id_of(page) == channel_id:
+                return (page, index) if return_idx else page
+        return (None, -1) if return_idx else None
 
     def tabText(self, index):
         return list(self.pages)[index]

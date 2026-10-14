@@ -69,6 +69,7 @@ from PyQt5.QtWidgets import (QWidget, QDialogButtonBox, QListWidget, QListWidget
 from ClearMap import Settings
 from ClearMap.IO.assets_constants import DATA_CONTENT_TYPES
 from ClearMap.IO.tile_patterns import pattern_finders_from_base_dir, ChannelPatternSpec, PatternFinder
+from ClearMap.config.channel import ChannelId
 from ClearMap.Utils.utilities import gpu_params, bytes_to_human, trim_or_pad
 from ClearMap.Visualization import Plot3d as plot_3d
 from ClearMap.Visualization.Qt.widgets import Scatter3D
@@ -2180,6 +2181,23 @@ class PerfMonitor(QWidget):
             print(f'GPU monitor: {err}')
 
 
+#: The Qt property of a channel page which holds the text of its ChannelId. Qt has no id for a tab: the page is it.
+CHANNEL_ID_PROPERTY = 'channel_id'
+
+
+def set_channel_id(page, channel_id: ChannelId) -> None:
+    """Remember the channel of a page on the page itself (the text of its ChannelId, as a Qt property)"""
+    page.setProperty(CHANNEL_ID_PROPERTY, channel_id.value)
+
+
+def channel_id_of(page) -> ChannelId | None:
+    """The ChannelId of a page, recreated from its property; None if the page was not given one"""
+    value = page.property(CHANNEL_ID_PROPERTY)
+    if not value:  # Qt gives None (or an invalid QVariant) for a property which was never set
+        return None
+    return ChannelId(str(value))  # Refused (InvalidChannelIdError) if the property is not the text of an id
+
+
 class ExtendableTabWidget(QTabWidget):
     #: Emitted when the ``(+)`` tab is clicked.
     addTabClicked = pyqtSignal()
@@ -2236,6 +2254,17 @@ class ExtendableTabWidget(QTabWidget):
         widget, current_idx = self.get_channel_widget(name, return_idx=True)
         if widget is not None and current_idx != index:
             self.tabBar().moveTab(current_idx, index)
+
+    def get_channel_widget_by_id(self, channel_id: ChannelId, return_idx=False):
+        """The page of the channel with this id, found by the id its page holds (not by its tab text)"""
+        for i in range(self.last_real_tab_idx):
+            if channel_id_of(self.widget(i)) == channel_id:
+                if return_idx:
+                    return self.widget(i), i
+                return self.widget(i)
+        if return_idx:
+            return None, -1
+        return None
 
     def get_channel_widget(self, name=None, return_idx=False):
         if name is None:

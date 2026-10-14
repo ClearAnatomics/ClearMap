@@ -7,7 +7,8 @@ import pickle
 
 import pytest
 
-from ClearMap.Utils.exceptions import (ChannelNameTakenError, ClearMapTypeError, InvalidChannelNameError,
+from ClearMap.Utils.exceptions import (ChannelNameTakenError, ClearMapTypeError, InvalidChannelIdError,
+                                       InvalidChannelNameError,
                                        UnknownChannelError)
 from ClearMap.config import compound_keys
 from ClearMap.config.channel import CHANNEL_NAME_RE, Channel, ChannelId, ChannelMap, ChannelRegistry
@@ -72,6 +73,33 @@ def test_a_channel_id_wraps_the_string_of_a_uuid():
     assert hash(ChannelId(channel_id.value)) == hash(channel_id)
     with pytest.raises(ClearMapTypeError):
         ChannelId(12)
+
+
+@pytest.mark.parametrize('text', [
+    'auto',                                        # a channel name: short, and not an id
+    '',                                            # empty
+    '0f8fad5b-d9cb-469f-a165-70867728950',         # one character short
+    '0f8fad5b-d9cb-169f-a165-708677289506',        # not version 4
+    '0f8fad5b-d9cb-469f-c165-708677289506',        # not the RFC 4122 variant
+    '0f8fad5bd9cb469fa165708677289506',            # no hyphens
+    '0f8fad5b-d9cb-469f-a165-708677289506 ',       # trailing space
+])
+def test_a_channel_id_refuses_text_which_is_not_a_uuid4(text):
+    with pytest.raises(InvalidChannelIdError):
+        ChannelId(text)
+
+
+def test_a_channel_id_of_uppercase_text_is_the_same_id_as_lowercase():
+    lower = ChannelId('0f8fad5b-d9cb-469f-a165-708677289506')
+    upper = ChannelId('0F8FAD5B-D9CB-469F-A165-708677289506')
+
+    assert upper == lower
+    assert upper.value == lower.value
+
+
+def test_a_channel_id_is_refused_as_a_type_error_when_not_text():
+    with pytest.raises(ClearMapTypeError):
+        ChannelId(None)
 
 
 def test_str_of_a_channel_is_its_name_for_display(registry, first):

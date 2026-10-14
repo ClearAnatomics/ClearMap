@@ -170,8 +170,7 @@ class SampleChannelParameters(ChannelUiParameter):
 
     def connect(self):
         def _on_name_editing_finished():
-            channels_tab_w = self.tab.parent().parent()  #  n+1 is "qt_tabwidget_stackedwidget"
-            old_name = channels_tab_w.tabText(self.page_index)  # still the old name at this time
+            old_name = self.name  # the channel of this page, not the tab at an index which may have moved
             new_name = self.nameWidget.text().strip()
             if not new_name or new_name == old_name:
                 return
@@ -334,38 +333,32 @@ class SampleParameters(ChannelsUiParameterCollection):
             warnings.warn(f'Cannot rename {old_name!r}: not in channel_params')
             return
 
-        tab_widget = self.tab.channelsParamsTabWidget
-        page_idx = requester.page_index
-
-        # 1. Parent updates its own state (dict key + tab text)
+        # 1. Parent updates its own state (dict key). The requester's name (tab text and name field) is set
+        #    through its page, never through an index which may be stale
         self.channel_params[new_name] = self.channel_params.pop(old_name)
-        tab_widget.setTabText(page_idx, new_name)
+        requester.name = new_name
 
         # 2. Child writes config (may fail, but parent already updated, so we can revert to consistent state)
         try:
             requester.handle_name_changed(old_name, new_name)
         except Exception as e:
-            self._revert_rename(old_name, new_name, page_idx, tab_widget, requester)
+            self._revert_rename(old_name, new_name, requester)
             warnings.warn(f'Channel rename {old_name!r}→{new_name!r} failed: {e}')
             return
 
         # 3. Verify config accepted it
         if new_name not in self.config_channels:
-            self._revert_rename(old_name, new_name, page_idx, tab_widget, requester)
+            self._revert_rename(old_name, new_name, requester)
             warnings.warn(f'Channel rename {old_name!r}→{new_name!r} rejected by coordinator.')
             return
 
         # 4. Success
         self._publish_channels_changed(self.config_channels)
 
-    def _revert_rename(self, old_name: str, new_name: str, page_idx: int,
-                       tab_widget, requester: SampleChannelParameters) -> None:
+    def _revert_rename(self, old_name: str, new_name: str, requester: SampleChannelParameters) -> None:
         """Handle failed rename attempt (e.g. refused by coordinator)"""
         self.channel_params[old_name] = self.channel_params.pop(new_name, None)
-        tab_widget.setTabText(page_idx, old_name)
-        requester.nameWidget.blockSignals(True)
-        requester.nameWidget.setText(old_name)
-        requester.nameWidget.blockSignals(False)
+        requester.name = old_name
 
     def _bind_channel_signals(self, channel_params: "SampleChannelParameters"):
         def get_current_index():

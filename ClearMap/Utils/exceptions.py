@@ -726,6 +726,12 @@ class InvalidChannelNameError(ClearMapValueError):
     user_hint = 'Use only letters, digits and "_" in channel names.'
 
 
+class InvalidChannelIdError(ClearMapValueError):
+    """A channel id is not the text of a UUID4 (as written by ``str(uuid.uuid4())``): it is not a channel id at all."""
+    severity = Severity.FATAL
+    user_title = 'Invalid Channel Id'
+
+
 class UnknownChannelError(ClearMapValueError):
     """A channel (by name or handle) is not one of the channels of the sample."""
     severity = Severity.RECOVERABLE

@@ -21,7 +21,8 @@ import uuid
 from collections.abc import Iterable, Iterator, Mapping, MutableMapping
 from typing import NoReturn, TypeVar, Union
 
-from ClearMap.Utils.exceptions import (ChannelNameTakenError, ClearMapTypeError, InvalidChannelNameError,
+from ClearMap.Utils.exceptions import (ChannelNameTakenError, ClearMapTypeError, InvalidChannelIdError,
+                                       InvalidChannelNameError,
                                        UnknownChannelError)
 
 # WARNING: Keep in sync with ``typedefs.schema.yaml#/$defs/channelName`` (the sample channel names).
@@ -43,6 +44,14 @@ def _refuse_to_be_pickled(what: str) -> NoReturn:
     raise ClearMapTypeError(SESSION_LOCAL_MESSAGE.format(what=what))
 
 
+#: The text of a UUID4, as ``str(uuid.uuid4())`` writes it. A channel name of the same shape is possible but
+#: unlikely (names are short), so this makes the collision of a name and an id infinitesimal.
+UUID4_REGEX = re.compile(
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+    re.IGNORECASE
+)
+
+
 class ChannelId:
     """
     The identity of a channel: a value which only means "this channel", unique in the session, never changed by a rename.
@@ -54,9 +63,12 @@ class ChannelId:
     __slots__ = ('_value',)
 
     def __init__(self, value: str):
-        if not isinstance(value, str) or not value:
-            raise ClearMapTypeError(f'A ChannelId wraps the non empty string of a UUID, got {value!r}')
-        self._value = value
+        if not isinstance(value, str):
+            raise ClearMapTypeError(f'A ChannelId wraps the text of a UUID4, got {type(value).__name__}: {value!r}')
+        if UUID4_REGEX.fullmatch(value) is None:
+            raise InvalidChannelIdError(f'{value!r} is not the text of a UUID4 (36 characters, hex digits and '
+                                        f'hyphens, version 4): a channel id is not a channel name')
+        self._value = value.lower()  # One text per UUID: the same id compares equal whatever the case it was read in
 
     @classmethod
     def new(cls) -> 'ChannelId':
