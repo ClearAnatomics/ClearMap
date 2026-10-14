@@ -362,8 +362,7 @@ class ExperimentController(BusSubscriberMixin):
             self.cfg_coordinator.seed_missing_from_defaults(tabs_only=True)
 
             # Normalize once (may add derived sections), then persist atomically
-            self.cfg_coordinator.submit(sample_manager=self.sample_manager, do_run_adjusters=True,
-                                        validate=True, commit=True)
+            self.cfg_coordinator.submit(sample_manager=self.sample_manager)
         finally:
             self._hydrating = False
 
@@ -569,7 +568,7 @@ class ExperimentController(BusSubscriberMixin):
         for name in required - current:
             coord.load(name)
         coord.seed_missing_from_defaults(tabs_only=True)
-        coord.submit(sample_manager=self.sample_manager, do_run_adjusters=True, validate=True, commit=True)
+        coord.submit(sample_manager=self.sample_manager)
         return True
 
     def channel_snapshot(self):
@@ -603,8 +602,7 @@ class ExperimentController(BusSubscriberMixin):
         if not patch:
             return
         # print(f'Applying UI patch keys: {list(patch.keys())}')
-        self.cfg_coordinator.submit_patch(patch, sample_manager=self.sample_manager,
-                                          do_run_adjusters=True, validate=True, commit=True)
+        self.cfg_coordinator.submit_patch(patch, sample_manager=self.sample_manager)
         # self.evt_bus.publish(ConfigChanged({"rev": self.cfg_coordinator._rev}))
 
     # ---- run path (snapshot + launch) ---------------------------------------
@@ -613,8 +611,7 @@ class ExperimentController(BusSubscriberMixin):
         Ensure the on-disk config is fully materialized & valid; take an immutable snapshot
         directory used by pipeline_orchestrators for reproducibility.
         """
-        self.cfg_coordinator.submit(sample_manager=self.sample_manager, do_run_adjusters=True,
-                                    validate=True, commit=True)
+        self.cfg_coordinator.submit(sample_manager=self.sample_manager)
         if not self.use_snapshots:
             if self._exp_dir is None:
                 raise ValueError('Workspace not set')
@@ -779,5 +776,4 @@ class AnalysisGroupController:
         if not patch:
             return
         self.group_cfg_coordinator.submit_patch(
-            patch, sample_manager=None,  # group scope: no SampleManager
-            do_run_adjusters=True, validate=True, commit=True)
+            patch, sample_manager=None)  # group scope: no SampleManager

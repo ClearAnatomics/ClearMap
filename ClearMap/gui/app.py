@@ -1362,8 +1362,7 @@ class GuiController(BusSubscriberMixin):
         if needs_refresh:
             # Still hydrating: the CfgChanged emitted by this submit is deferred to the install below
             self.experiment_controller.cfg_coordinator.submit(  # Force adjusters and validators to run after hydration, to ensure UI is in sync with model
-                sample_manager=self.experiment_controller.sample_manager,
-                do_run_adjusters=True, validate=True, commit=True)
+                sample_manager=self.experiment_controller.sample_manager)
         self._hydrating = False
 
         if needs_refresh:

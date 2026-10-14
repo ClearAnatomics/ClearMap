@@ -81,14 +81,13 @@ class ConfigCoordinator(BusSubscriberMixin):
 
     Primitives
     ----------
-    apply(patch):      merge patch into working model (no validation, no IO)
-    adjust_config(...):  run adjusters to derive config; merge their patch (no validation, no IO)
+    adjust_config(...):  run adjusters; return their patch (no validation, no IO)
     validate():        run validators; raise if invalid (no IO)
     commit():          write working config to disk atomically
 
     One-shots
     ---------
-    submit_patch(patch, ...): apply → [adjust_config(filtered)] → [validate] → [commit]
+    submit_patch(patch, ...): merge → [adjust_config(filtered)] → [validate] → [commit]
     submit(...):               [adjust_config(full)] → [validate] → [commit]
 
     Notes
@@ -373,21 +372,6 @@ class ConfigCoordinator(BusSubscriberMixin):
             # Merge into a default 'global' config (create if missing)
             deep_merge(working_cfg.setdefault('global', {}), patch)
 
-    def _apply(self, patch: Dict[str, Any]) -> None:  # WARNING: why no validate here?
-        """
-        Apply a patch possibly targeting multiple files.
-        Policy: top-level keys select target configs if they exist in working;
-        otherwise, apply into a special 'global' config.
-        """
-        origin = patch.pop('origin', None) or infer_origin_from_caller()
-
-        allowed = self._allowed_sections
-        extra = set(patch.keys()) - allowed - {'origin'}
-        if extra:
-            warnings.warn(f'Applying patch with keys outside active sections: {extra}', RuntimeWarning, stacklevel=2)
-        with self.__edit_session(origin=origin, validate=False) as working_cfg:
-            self._merge_patch(working_cfg, patch, allowed_sections=allowed)
-
     # def apply_section(self, name: str, patch: Dict[str, Any]) -> None:
     #     """
     #     Apply a patch to a single named config section.
@@ -427,36 +411,20 @@ class ConfigCoordinator(BusSubscriberMixin):
         rec(patch)
         return patch, rename_map
 
-    @staticmethod
-    def _refuse_unchecked_commit(*, commit: bool, do_run_adjusters: bool, validate: bool) -> None:
+    def submit_patch(self, patch: dict, *, sample_manager: Optional[SampleManager],
+                     origin: str | None = "ui", phase=Phase.PRE_VALIDATE) -> None:
         """
-        Only configs that went through the adjusters and the validators may be written
-        (and trigger the post-commit hooks and CfgChanged). Skipping them is for in-memory use (e.g. tests).
-        """
-        if commit and not (do_run_adjusters and validate):
-            raise ValueError(f'Refusing to commit a config that skipped the adjusters or the validators '
-                             f'({do_run_adjusters=}, {validate=}). Use commit=False for in-memory changes.')
-
-    def submit_patch(self, patch: dict, *, sample_manager: Optional[SampleManager], do_run_adjusters: bool = True,
-                     validate: bool = True, commit: bool = True, origin: str | None = "ui",
-                     phase=Phase.PRE_VALIDATE) -> None:
-        """
-        Apply `patch` to a copy of the working config, then optionally adjust_config (adjusters
-        filtered by the patch's changed keys), validate, and commit.
+        Apply `patch` to a copy of the working config, then adjust_config (adjusters
+        filtered by the patch's changed keys), validate, and commit. Every committed config went
+        through the adjusters and the validators.
 
         The copy replaces the working config only once validated: if the adjusters or the validators
         refuse the patch, it raises and nothing changed (neither the working config nor the files),
         and nothing is published.
         """
-        self._refuse_unchecked_commit(commit=commit, do_run_adjusters=do_run_adjusters, validate=validate)
         if not patch:
             return
 
-        if not commit:
-            warnings.warn(f'ConfigCoordinator.submit_patch called with commit=False; '
-                          f'working model updated in-memory, but no events were emitted and'
-                          f' nothing was written to disk. Call commit() later to persist '
-                          f'and emit CfgChanged.', RuntimeWarning, stacklevel=2)
         if origin:
             patch = dict(patch)  # copy to avoid mutating caller's dict
             patch['origin'] = origin
@@ -470,7 +438,7 @@ class ConfigCoordinator(BusSubscriberMixin):
         allowed = self._allowed_sections
         # The patched copy replaces the working config only once validated: a refused patch leaves no trace
         try:
-            with self.__edit_session(origin=origin, validate=validate) as working_cfg:
+            with self.__edit_session(origin=origin) as working_cfg:
                 self._merge_patch(working_cfg, clean_patch, allowed_sections=allowed)
                 changed_keys = _patch_to_config_keys_sets(clean_patch)
 
@@ -479,73 +447,64 @@ class ConfigCoordinator(BusSubscriberMixin):
                 if rename_map and sample_manager is not None:
                     sample_manager.set_renamed_channels(rename_map)
 
-                if do_run_adjusters:
-                    # The runner merges each adjuster result into the view it is given (in place). Hand it a copy
-                    # so that only the returned patch, clipped to the active sections, reaches the working config.
-                    patch2 = self.adjust_config(sample_manager=sample_manager, phase=phase, view=deepcopy(working_cfg),
-                                                active_sections=None, changed_keys=changed_keys, apply=False)
-                    if patch2:
-                        self._merge_patch(working_cfg, patch2, allowed_sections=allowed)
-                        changed_keys.extend(_patch_to_config_keys_sets(patch2))
+                # The runner merges each adjuster result into the view it is given (in place). Hand it a copy
+                # so that only the returned patch, clipped to the active sections, reaches the working config.
+                patch2 = self.adjust_config(sample_manager=sample_manager, phase=phase, view=deepcopy(working_cfg),
+                                            active_sections=None, changed_keys=changed_keys)
+                if patch2:
+                    self._merge_patch(working_cfg, patch2, allowed_sections=allowed)
+                    changed_keys.extend(_patch_to_config_keys_sets(patch2))
         finally:  # The renames are for the adjusters of this patch only, accepted or refused
             if rename_map and sample_manager is not None:
                 sample_manager.clear_renamed_channels()
 
         changed_keys = sorted(set(changed_keys))  # Deduplicate
 
-        if commit:
-            changed_sections = {k[0] for k in changed_keys if k}
-            self.commit(sections=list(changed_sections))
-            self._run_post_commit_hooks()
+        changed_sections = {k[0] for k in changed_keys if k}
+        self.commit(sections=list(changed_sections))
+        self._run_post_commit_hooks()
 
-            self.publish(CfgChanged(changed_keys=tuple(".".join(k) for k in changed_keys)))
+        self.publish(CfgChanged(changed_keys=tuple(".".join(k) for k in changed_keys)))
 
-            channels_after = self.current_channels
-            if set(channels_before) != set(channels_after):
-                self.publish(ChannelsChanged(before=channels_before, after=channels_after))
+        channels_after = self.current_channels
+        if set(channels_before) != set(channels_after):
+            self.publish(ChannelsChanged(before=channels_before, after=channels_after))
 
-            for old, new in committed_channel_renames(rename_map, channels_before, channels_after).items():
-                self.publish(ChannelRenamed(old=old, new=new))
+        for old, new in committed_channel_renames(rename_map, channels_before, channels_after).items():
+            self.publish(ChannelRenamed(old=old, new=new))
 
-    def submit(self, *, sample_manager: Optional[SampleManager] = None, do_run_adjusters: bool = True,
-               validate: bool = True, commit: bool = True, phase=Phase.PRE_VALIDATE) -> None:
+    def submit(self, *, sample_manager: Optional[SampleManager] = None, phase=Phase.PRE_VALIDATE) -> None:
         """
-        Run adjusters on the current working config (unfiltered), then optionally
-        validate and commit. Use this when you haven't just applied a new patch.
+        Run adjusters on the current working config (unfiltered), then validate and commit.
+        Use this when you haven't just applied a new patch.
         """
-        self._refuse_unchecked_commit(commit=commit, do_run_adjusters=do_run_adjusters, validate=validate)
         channels_before = self.current_channels
 
-        applied_patch = {}
         # The adjusted copy replaces the working config only once validated: a refused config leaves no trace
-        with self.__edit_session(origin='adjusters', validate=validate) as working_cfg:
-            if do_run_adjusters:
-                applied_patch = self.adjust_config(sample_manager=sample_manager, changed_keys=None, phase=phase,
-                                                   active_sections=None, view=deepcopy(working_cfg), apply=False)
-                if applied_patch:
-                    self._merge_patch(working_cfg, applied_patch, allowed_sections=self._adjusted_sections(None))
-        if commit:
-            self.commit()
-            self._run_post_commit_hooks()
+        with self.__edit_session(origin='adjusters') as working_cfg:
+            applied_patch = self.adjust_config(sample_manager=sample_manager, changed_keys=None, phase=phase,
+                                               active_sections=None, view=deepcopy(working_cfg))
+            if applied_patch:
+                self._merge_patch(working_cfg, applied_patch, allowed_sections=self._adjusted_sections(None))
+        self.commit()
+        self._run_post_commit_hooks()
 
-            channels_after = self.current_channels
-            if set(channels_before) != set(channels_after):
-                self.publish(ChannelsChanged(before=channels_before, after=channels_after))
+        channels_after = self.current_channels
+        if set(channels_before) != set(channels_after):
+            self.publish(ChannelsChanged(before=channels_before, after=channels_after))
 
-            changed_keys = _patch_to_config_keys_sets(applied_patch)
-            self.publish(CfgChanged(changed_keys=tuple(".".join(k) for k in changed_keys)))
+        changed_keys = _patch_to_config_keys_sets(applied_patch)
+        self.publish(CfgChanged(changed_keys=tuple(".".join(k) for k in changed_keys)))
 
     def adjust_config(self, *, sample_manager: Optional[SampleManager] = None,
                       phase: Phase = Phase.PRE_VALIDATE,
                       active_sections: Optional[Iterable[str]] = None,
                       changed_keys: Optional[Iterable[ConfigKeys]] = None,
-                      view: Optional[Mapping[str, Any]] = None,
-                      apply: bool=True) -> Dict[str, Any]:
+                      view: Optional[Mapping[str, Any]] = None) -> Dict[str, Any]:
         """
         Run all config adjusters on the current working config,
         optionally filtered by changed_keys and pipelines.
-        A global patch dict is returned.
-        If `apply` is True (default), the patch is merged into the working config.
+        A global patch dict is returned; the caller merges it (inside an edit session).
 
         Parameters
         ----------
@@ -553,7 +512,6 @@ class ConfigCoordinator(BusSubscriberMixin):
         phase
         active_sections
         changed_keys
-        apply
 
         Returns
         -------
@@ -570,9 +528,6 @@ class ConfigCoordinator(BusSubscriberMixin):
                               changed_keys=changed_keys)
         if patch:
             patch = {k: v for k, v in patch.items() if k in active_sections}
-        if apply and patch:
-            with self.__edit_session(origin="adjusters", validate=False) as working_cfg:
-                self._merge_patch(working_cfg, patch, allowed_sections=active_sections)
         return patch
 
     def _adjusted_sections(self, active_sections: Optional[Iterable[str]]) -> set[str]:
