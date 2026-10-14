@@ -683,6 +683,13 @@ class GroupStatsError(ClearMapException):
     user_hint = 'Ensure all samples in each group have matching density maps with identical dimensions.'
 
 
+class ChannelNameTakenError(ClearMapValueError):
+    """A channel is renamed to the name of another channel (whose settings and results it would take over)."""
+    severity = Severity.RECOVERABLE
+    user_title = 'Channel Name Already Used'
+    user_hint = 'Rename the other channel first, or choose another name.'
+
+
 class ParamsOrientationError(ClearMapValueError):
     """The user-supplied sample orientation axes are invalid.
 

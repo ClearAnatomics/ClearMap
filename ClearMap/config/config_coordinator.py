@@ -10,6 +10,7 @@ from copy import deepcopy
 
 from ClearMap.Utils.event_bus import EventBus, BusSubscriberMixin
 from ClearMap.Utils.events import CfgChanged, ChannelRenamed, ChannelsChanged
+from ClearMap.Utils.exceptions import ChannelNameTakenError
 from ClearMap.Utils.utilities import infer_origin_from_caller, deep_merge
 
 from .config_adjusters.type_hints import AdjustmentContext
@@ -27,6 +28,22 @@ if TYPE_CHECKING:
 
 INSTALL_CFG_DIR = Path(__file__).parent
 CURRENT_SCHEMAS_DIR = INSTALL_CFG_DIR / 'schemas' / 'v3.1'
+
+
+def refuse_renames_onto_existing_channels(requested: Mapping[str, str], existing_channels: Iterable[str]) -> None:
+    """
+    Refuse (before anything changes) to rename a channel to the name of an existing channel: it would take
+    over the settings and the results of that channel. The other channel must be renamed first.
+
+    Raises
+    ------
+    ChannelNameTakenError
+    """
+    existing = set(existing_channels)
+    for old, new in requested.items():
+        if new in existing:
+            raise ChannelNameTakenError(f'Cannot rename channel {old!r} to {new!r}: a channel named {new!r} exists. '
+                                        f'Rename it first.', value=new)
 
 
 def committed_channel_renames(requested: Mapping[str, str], channels_before: Iterable[str],
@@ -448,6 +465,7 @@ class ConfigCoordinator(BusSubscriberMixin):
 
         # Swap $rename directives to channels in patch and extract map for SampleManager
         clean_patch, rename_map = self._extract_channel_renames(patch)
+        refuse_renames_onto_existing_channels(rename_map, channels_before)
 
         allowed = self._allowed_sections
         # The patched copy replaces the working config only once validated: a refused patch leaves no trace
