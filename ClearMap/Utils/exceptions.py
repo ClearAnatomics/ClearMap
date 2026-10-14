@@ -34,6 +34,9 @@ ClearMapException
 ├── ClearMapVRamException
 ├── SmiError
 └── GroupStatsError
+
+ClearMapWarning  (also RuntimeWarning; issued with ``warnings.warn``, not raised)
+└── SubscriberFailedWarning
 """
 from __future__ import annotations
 
@@ -186,6 +189,24 @@ class ClearMapException(Exception):
     @recovery_options.setter
     def recovery_options(self, options: tuple[RecoveryOption, ...]):
         self._instance_options = tuple(options)
+
+
+class ClearMapWarning(ClearMapException, RuntimeWarning):
+    """
+    Base for every ClearMap-specific warning: something went wrong that does not stop the operation
+    (issued with ``warnings.warn``, so the filters, e.g. of the tests, apply to it).
+    """
+    severity = Severity.DEGRADED
+    user_title = 'ClearMap Warning'
+
+
+class SubscriberFailedWarning(ClearMapWarning):
+    """
+    A subscriber raised while handling an event. The event happened: the other subscribers still receive it and the
+    publisher is not concerned (e.g. a config change is committed whether or not a tab fails to show it).
+    The tests turn it into an error (see pytest.ini).
+    """
+    user_title = 'Event Subscriber Failed'
 
 
 # ---------------------------------------------------------------------------

@@ -1,9 +1,13 @@
 import functools
 import inspect
 import threading
+import traceback
+import warnings
 import weakref
 from types import FunctionType
 from typing import Callable, Any, Dict, List, Optional, Type, TypeVar
+
+from ClearMap.Utils.exceptions import SubscriberFailedWarning
 
 
 Evt = TypeVar("Evt")
@@ -15,6 +19,12 @@ GUI_THREAD = 'gui_thread'
 Affinity of the handlers which must run in the GUI thread (they touch widgets). The application registers its
 delivery (:meth:`EventBus.set_delivery`); headless (e.g. in the tests) nothing is, and they are called directly.
 """
+
+
+def report_subscriber_failure(handler: Callable[[Any], None], event: Any) -> None:
+    """Report the exception being handled, raised by *handler* while it handled *event*"""
+    warnings.warn(f'{getattr(handler, "__qualname__", handler)} failed on {type(event).__name__}:\n'
+                  f'{traceback.format_exc()}', SubscriberFailedWarning, stacklevel=2)
 
 
 def deliver_directly(handler: Callable[[Any], None], event: Any) -> None:
@@ -48,6 +58,9 @@ class EventBus:
     Each handler runs according to the *affinity* it was subscribed with: without affinity, it is called
     directly, in the thread of the publisher; otherwise through the delivery registered for its affinity
     (e.g. the :data:`GUI_THREAD` handlers run in the GUI thread). The bus itself knows nothing of Qt.
+
+    A handler that raises is reported (:class:`SubscriberFailedWarning`): the other handlers still receive the
+    event, and the publisher does not see the exception (it is the subscriber's, not the publisher's).
     """
     def __init__(self) -> None:
         self._subs: Dict[Type[Any], List[_Subscription]] = {}
@@ -137,8 +150,12 @@ class EventBus:
         with self._lock:
             subscribed = any(sub is subscription for sub in self._subs.get(event_type, ()))
         cb = subscription.ref() if subscribed else None
-        if cb is not None:
+        if cb is None:
+            return
+        try:
             cb(event)
+        except Exception:  # The failure of one subscriber is its own: the others and the publisher go on
+            report_subscriber_failure(cb, event)
 
     def bridge_to_qt(self, forwarder: Callable[[Type[Any], Any], None]) -> None:
         """Optionally forward all events to a Qt slot/signal."""

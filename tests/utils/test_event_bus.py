@@ -6,6 +6,7 @@ from dataclasses import dataclass
 import pytest
 
 from ClearMap.Utils.event_bus import EventBus, BusSubscriberMixin, GUI_THREAD
+from ClearMap.Utils.exceptions import SubscriberFailedWarning
 
 
 @dataclass(frozen=True)
@@ -20,6 +21,10 @@ class Recorder:
     def on_ping(self, event):
         self.events.append(event)
 
+
+class FailingSubscriber:
+    def on_ping(self, event):
+        raise RuntimeError(f'cannot handle {event}')
 
 def test_unsubscribe_stops_the_delivery():
     """unsubscribe() used to only purge the dead subscribers: a live one kept receiving the events"""
@@ -164,3 +169,28 @@ def test_publishing_an_event_class_instead_of_an_instance_fails_loudly():
 
     with pytest.raises(TypeError, match='instance of Ping'):
         bus.publish(Ping)
+
+
+def test_a_failing_subscriber_is_reported_and_neither_stops_the_others_nor_reaches_the_publisher():
+    bus, failing, recorder = EventBus(), FailingSubscriber(), Recorder()
+    bus.subscribe(Ping, failing.on_ping)
+    bus.subscribe(Ping, recorder.on_ping)
+
+    with pytest.warns(SubscriberFailedWarning, match='FailingSubscriber.on_ping failed on Ping'):
+        bus.publish(Ping(1))  # Does not raise
+
+    assert recorder.events == [Ping(1)]
+
+
+def test_a_failing_gui_subscriber_does_not_break_the_delivery_in_the_gui_thread():
+    """The queued call runs in a Qt slot: an exception escaping it would abort the application"""
+    bus, failing, recorder, delivery = EventBus(), FailingSubscriber(), Recorder(), QueuedDelivery()
+    bus.set_delivery(GUI_THREAD, delivery)
+    bus.subscribe(Ping, failing.on_ping, affinity=GUI_THREAD)
+    bus.subscribe(Ping, recorder.on_ping, affinity=GUI_THREAD)
+    _publish_from_a_worker_thread(bus, Ping(1))
+
+    with pytest.warns(SubscriberFailedWarning):
+        delivery.run_pending()  # Does not raise
+
+    assert recorder.events == [Ping(1)]
