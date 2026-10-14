@@ -525,12 +525,13 @@ class StitchingParams(ChannelsUiParameterCollection):
 
     def add_channel(self, channel_name, data_type=None):
         """
-        Add a channel to the stitching parameters if not already present.
+        Create the stitching parameters of a channel (if not already present)
+        from its entry in the config.
 
         .. warning::
-            This only adds the channel to the config — it **does not**
-            create the UI elements.  UI creation is handled by the tab's
-            ``add_channel_tab()`` method.
+            This **does not** write the config: the config adjusters create the entry
+            of every stitchable channel. It does not create the UI elements either:
+            UI creation is handled by the tab's ``add_channel_tab()`` method.
 
         Parameters
         ----------
@@ -541,8 +542,6 @@ class StitchingParams(ChannelsUiParameterCollection):
         if channel_name in self.channels:
             return
         else:
-            if channel_name not in self.view['channels'].keys():
-                self._update_value(['channels', channel_name], {})  # Adjuster fills w/ defaults
             self.reconcile_children_from_view()  # ensure param object created
 
     def reconcile_children_from_view(self, *_):
@@ -1001,7 +1000,6 @@ class RegistrationParams(ChannelsUiParameterCollection):  # TEST: does not seem 
         if channel_name in self.channels:
             return
         else:
-            self._update_value(['channels', channel_name], {})  # To be materialized w/ defaults
             channel_params = ChannelRegistrationParams(self.tab, channel_name, event_bus=self._bus,
                                                         get_view=self._get_view, apply_patch=self._apply_patch)
             self[channel_name] = channel_params
@@ -1096,7 +1094,6 @@ class CellMapParams(ChannelsUiParameterCollection):
 
     def add_channel(self, channel_name, data_type=None):
         if channel_name not in self.keys():
-            self._update_value(['channels', channel_name], {})  # To be materialized w/ defaults
             dtype = np.uint16  # FIXME: read from stitched file
             self[channel_name] = ChannelCellMapParams(self.tab, channel_name, main_params=self,
                                                       event_bus=self._bus, dtype=dtype,
@@ -1249,7 +1246,6 @@ class TractMapParams(ChannelsUiParameterCollection):
 
     def add_channel(self, channel_name, data_type=None):
         if channel_name not in self.channels:
-            self._update_value(['channels', channel_name], {})
             self[channel_name] = ChannelTractMapParams(self.tab, channel_name, main_params=self, event_bus=self._bus,
                                                        get_view=self._get_view, apply_patch=self._apply_patch)
 
@@ -1355,7 +1351,6 @@ class ColocalizationParams(ChannelsUiParameterCollection):
         if channel_name in self.keys():
             return
         else:
-            self._update_value(['channels', channel_name], {})  # Will be materialized w/ defaults
             self[channel_name] = ChannelColocalizationParams(self.tab, channel_name, main_params=self,
                                                              event_bus=self._bus, get_view=self._get_view,
                                                              apply_patch=self._apply_patch)
@@ -1451,7 +1446,6 @@ class VesselParams(ChannelsUiParameterCollection):
         if channel_name in self.channels:
             return
         else:
-            self._update_value(['binarization', 'single_channels', channel_name], {})  # Will be materialized w/ defaults)
             self[channel_name] = VesselBinarizationParams(self.tab, channel_name, event_bus=self._bus,
                                                             get_view=self._get_view, apply_patch=self._apply_patch)
 
