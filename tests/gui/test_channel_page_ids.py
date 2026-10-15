@@ -102,18 +102,18 @@ def test_an_id_with_no_page_gives_none():
 # ------------------------------------------------------------------------------------ a page made before its channel is known
 
 from ClearMap.config.channel import ChannelRegistry  # noqa: E402
-from ClearMap.gui.widgets import give_channel_id_if_known  # noqa: E402
+from ClearMap.gui.widgets import assign_channel_id_if_known  # noqa: E402
 
 
 def test_a_page_made_before_its_channel_is_known_gets_the_id_once_it_is():
     registry = ChannelRegistry()
     page = FakePage()  # A new channel tab: named before the config is committed, so the registry does not know it yet
 
-    give_channel_id_if_known(page, 'Channel_0', registry)
+    assign_channel_id_if_known(page, 'Channel_0', registry)
     assert channel_id_of(page) is None
 
     channel = registry.add('Channel_0')  # The commit of the channel: the registry knows it now
-    give_channel_id_if_known(page, 'Channel_0', registry)
+    assign_channel_id_if_known(page, 'Channel_0', registry)
 
     assert channel_id_of(page) == channel.id
 
@@ -122,8 +122,8 @@ def test_a_page_keeps_its_id_when_it_is_given_again():
     registry = ChannelRegistry()
     channel = registry.add('auto')
     page = FakePage()
-    give_channel_id_if_known(page, 'auto', registry)
+    assign_channel_id_if_known(page, 'auto', registry)
 
-    give_channel_id_if_known(page, 'auto', registry)
+    assign_channel_id_if_known(page, 'auto', registry)
 
     assert channel_id_of(page) == channel.id

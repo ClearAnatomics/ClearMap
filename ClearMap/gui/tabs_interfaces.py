@@ -23,7 +23,7 @@ from ClearMap.config.config_handler import ConfigHandler, ALTERNATIVES_REG
 from .dialog_helpers import get_directory_dlg, make_simple_progress_dialog
 from .exception_handler import handle_exception
 from .gui_utils_base import create_clearmap_widget, replace_widget
-from .widgets import ExtendableTabWidget, SamplePickerDialog, give_channel_id_if_known
+from .widgets import ExtendableTabWidget, SamplePickerDialog, channel_id_of, assign_channel_id_if_known
 
 if TYPE_CHECKING:
     from PyQt5.QtWidgets import QMainWindow, QToolButton
@@ -369,21 +369,21 @@ class GenericTab(GenericUi, BusSubscriberMixin):
         if creating:
             page = create_clearmap_widget(self.channels_ui_name, patch_parent_class='QWidget')
             channel = tab_widget.add_channel_widget(page, name=channel)
-        self._give_channel_id(page, channel)
+        self._assign_channel_id(page, channel)
         return channel, page, creating
 
     def _channel_registry(self):
         """The registry of the channels of the sample, None for a tab without a sample"""
         return None
 
-    def _give_channel_id(self, page, channel: str) -> None:
+    def _assign_channel_id(self, page, channel: str) -> None:
         """
-        Give the page the id of its channel, if the registry knows the channel. A compound channel has no id of its
+        Assign to the page the id of its channel, if the registry knows the channel. A compound channel has no id of its
         own, and a page made before the commit of its channel (a new channel tab) gets it at the next reconcile.
         """
         registry = self._channel_registry()
         if registry is not None:
-            give_channel_id_if_known(page, channel, registry)
+            assign_channel_id_if_known(page, channel, registry)
 
     def _bind_channel(self, page_widget: QWidget, channel: str) -> None:
         """
@@ -804,13 +804,18 @@ class ExperimentTab(GenericTab):
             return
 
         desired = {name: page_of for page_of, name in self._desired_channel_pages()}  # dedupe, keeps the order
+        registry = self._channel_registry()
         changed = False
 
-        # 0. Ids: a page made before the commit of its channel (a new channel tab) gets its id now.
-        for name in desired:
-            page = tab_widget.get_channel_widget(name)
-            if page is not None:
-                self._give_channel_id(page, name)
+        # 0. Ids. The registry is the truth, the tab only shows it.
+        for tab_name in tab_widget.get_channels_names():
+            page = tab_widget.get_channel_widget(tab_name)
+            page_id = channel_id_of(page)
+            if page_id is None:  # Made before its channel was committed
+                self._assign_channel_id(page, tab_name)
+            elif not registry.has_id(page_id):  # Its channel is gone (registry replaced): step 3 makes it again
+                self._drop_channel_page(tab_name)
+                changed = True
 
         # 1. Renames: a page whose identity is known under another name is made again under the new one.
         for name, page_of in desired.items():
@@ -820,9 +825,9 @@ class ExperimentTab(GenericTab):
                 changed = True
 
         # 2. Drops: a page whose channel is no longer in the config is dropped.
-        for name in tab_widget.get_channels_names():
-            if name not in desired:
-                self._drop_channel_page(name)
+        for tab_name in tab_widget.get_channels_names():
+            if tab_name not in desired:
+                self._drop_channel_page(tab_name)
                 changed = True
 
         # 3. Adds: a page for a new channel is added.

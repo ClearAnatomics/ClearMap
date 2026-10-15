@@ -1322,6 +1322,7 @@ class GuiController(BusSubscriberMixin):
         # Hydration state flags
         self._needs_full_refresh: bool = False
         self._tabs_initialized: bool = False
+        self._reconciled_registry = None  # The channel registry the tabs last followed (see end_hydration)
 
         # Re-entrancy guard for _install_or_update_tabs
         self._installing_tabs: bool = False
@@ -1358,7 +1359,9 @@ class GuiController(BusSubscriberMixin):
         self._needs_full_refresh = False
 
     def end_hydration(self):
-        needs_refresh = self._needs_full_refresh or not self._tabs_initialized
+        # A directory load replaces the channel registry (SampleManager.setup): the tabs must follow the new one
+        registry_replaced = self.experiment_controller.sample_manager.channel_registry is not self._reconciled_registry
+        needs_refresh = self._needs_full_refresh or not self._tabs_initialized or registry_replaced
         if needs_refresh:
             # Still hydrating: the CfgChanged emitted by this submit is deferred to the install below
             self.experiment_controller.cfg_coordinator.submit(  # Force adjusters and validators to run after hydration, to ensure UI is in sync with model
@@ -1619,6 +1622,7 @@ class GuiController(BusSubscriberMixin):
             # FIXME: this will blow up. fix in cfg_to_ui but params must have ref to owner tab
             tab.reconcile_channel_pages()  # Channel pages and params follow the config
             tab.params.cfg_to_ui()
+        self._reconciled_registry = self.experiment_controller.sample_manager.channel_registry
 
     def _handle_tab_activation(self, tab_key: str) -> Tuple[bool, str]:
         """

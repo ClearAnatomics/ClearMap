@@ -233,6 +233,12 @@ class ChannelRegistry:
     def has_name(self, name: str) -> bool:
         return name in self.names
 
+    def has_id(self, channel_id: ChannelId) -> bool:
+        """Whether the channel of this id is one of this registry (an id of a replaced registry is not)"""
+        if not isinstance(channel_id, ChannelId):
+            raise ClearMapTypeError(f'{channel_id!r} is not a ChannelId')
+        return channel_id in self._name_by_id
+
     @property
     def names(self) -> list[str]:
         """The names of the channels, in the order they were added"""

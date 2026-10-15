@@ -271,7 +271,8 @@ class PageTab(ExperimentTab):
         return [(registry.resolve(name), name) for name in self.channels_in_config]
 
     def add_channel_tab(self, name):
-        self.ui.channelsParamsTabWidget.add_page(name)
+        page = self.ui.channelsParamsTabWidget.add_page(name, with_id=False)
+        self._assign_channel_id(page, name)  # As _get_or_init_channel_ui does: the id of its channel, from the registry
         self.params.channel_params[name] = FakeChannelParams(name)
 
     def _on_channel_removed(self, name):
@@ -323,11 +324,8 @@ def test_a_reconcile_without_change_does_nothing_to_the_pages(registry, tab):
     assert tab.ui.channelsParamsTabWidget.get_channel_widget(FIRST) is page_before
 
 
-@pytest.mark.xfail(strict=True, reason='OPEN RISK 4: a channel removed and another added with the same name in one '
-                                       'commit keep the old page: the page is not made again although its channel '
-                                       'changed. It works today only because params are keyed by name; it must be '
-                                       'made again (as on a rename) once the pages are keyed by channel.')
 def test_a_channel_removed_and_re_added_under_the_same_name_gets_a_new_page(registry, tab):
+    """The old page holds the id of the removed channel, which the registry no longer knows"""
     old = registry.add(FIRST)
     tab.channels_in_config = [FIRST]
     tab.reconcile_channel_pages()
@@ -387,3 +385,37 @@ def test_a_page_of_a_channel_the_registry_does_not_know_has_no_id(registry, tab,
     _, page, _ = tab._get_or_init_channel_ui(f'{FIRST}-{SECOND}')  # A compound channel
 
     assert channel_id_of(page) is None
+
+
+def test_the_pages_of_a_replaced_registry_are_made_again_with_the_ids_of_the_new_one(tab):
+    # A directory load replaces the registry (SampleManager.setup): the pages hold ids it does not know
+    tab._sample_manager.channel_registry.add(FIRST)
+    tab._sample_manager.channel_registry.add(SECOND)
+    tab.channels_in_config = [FIRST, SECOND]
+    tab.reconcile_channel_pages()
+    tab_widget = tab.ui.channelsParamsTabWidget
+    old_pages = [tab_widget.get_channel_widget(name) for name in (FIRST, SECOND)]
+    old_params = [tab.params.channel_params[name] for name in (FIRST, SECOND)]
+    new_registry = ChannelRegistry()
+    new_ids = [new_registry.add(name).id for name in (FIRST, SECOND)]
+    tab._sample_manager.channel_registry = new_registry
+
+    tab.reconcile_channel_pages()
+
+    assert tab_widget.get_channels_names() == [FIRST, SECOND]
+    new_pages = [tab_widget.get_channel_widget(name) for name in (FIRST, SECOND)]
+    assert [channel_id_of(page) for page in new_pages] == new_ids
+    assert all(new is not old for new, old in zip(new_pages, old_pages))
+    assert all(tab.params.channel_params[name] is not old for name, old in zip((FIRST, SECOND), old_params))
+    assert all(params.torn_down for params in old_params)
+
+
+def test_pages_of_the_current_registry_are_kept(registry, tab):
+    registry.add(FIRST)
+    tab.channels_in_config = [FIRST]
+    tab.reconcile_channel_pages()
+    page = tab.ui.channelsParamsTabWidget.get_channel_widget(FIRST)
+
+    tab.reconcile_channel_pages()
+
+    assert tab.ui.channelsParamsTabWidget.get_channel_widget(FIRST) is page

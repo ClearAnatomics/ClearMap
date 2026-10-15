@@ -2190,10 +2190,11 @@ def set_channel_id(page, channel_id: ChannelId) -> None:
     page.setProperty(CHANNEL_ID_PROPERTY, channel_id.value)
 
 
-def give_channel_id_if_known(page, channel_name: str, registry) -> None:
+def assign_channel_id_if_known(page, channel_name: str, registry) -> None:
     """
-    Give the page its channel id once the registry knows the channel. A page can be made before the registry does
-    (e.g. a new channel tab, named before its config is committed): it then gets its id at the first reconcile.
+    Assign to the page the id the registry has for its channel, once the registry knows the channel. A page can be
+    made before that (e.g. a new channel tab, named before its config is committed): it then gets its id at the
+    first reconcile.
     """
     if channel_id_of(page) is None and registry.has_name(channel_name):
         set_channel_id(page, registry.resolve(channel_name).id)

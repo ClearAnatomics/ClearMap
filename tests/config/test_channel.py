@@ -102,6 +102,25 @@ def test_a_channel_id_is_refused_as_a_type_error_when_not_text():
         ChannelId(None)
 
 
+def test_a_registry_knows_the_ids_of_its_channels_only(registry, first):
+    other = ChannelRegistry()
+    stranger = other.add(first.name)
+
+    assert registry.has_id(first.id)
+    assert not registry.has_id(stranger.id)  # Same name, another registry (e.g. before a directory load)
+
+
+def test_a_removed_channel_id_is_no_longer_known(registry, first):
+    registry.remove(first)
+
+    assert not registry.has_id(first.id)
+
+
+def test_has_id_refuses_what_is_not_an_id(registry, first):
+    with pytest.raises(ClearMapTypeError):
+        registry.has_id(first.id.value)
+
+
 def test_str_of_a_channel_is_its_name_for_display(registry, first):
     registry.rename_many({first: NEW_NAME})
 
