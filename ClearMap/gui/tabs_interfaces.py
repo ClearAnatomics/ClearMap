@@ -318,17 +318,19 @@ class GenericTab(GenericUi, BusSubscriberMixin):
         #  this triggers the creation of new channel params that don't have UI yet
         if channel not in self.params.keys():
             self._create_channel_params(channel)
-            self._setup_channel(page_widget, channel)
-            self._bind_channel(page_widget, channel)
-            self._connect_children_whats_this(page_widget)
-            self._on_channel_added(channel)
+            self._set_up_channel_page(page_widget, channel)
         else:
             if created:
                 self.params[channel].teardown()
-                self._setup_channel(page_widget, channel)
-                self._bind_channel(page_widget, channel)
-                self._connect_children_whats_this(page_widget)
-                self._on_channel_added(channel)
+                self._set_up_channel_page(page_widget, channel)
+
+    def _set_up_channel_page(self, page_widget: QWidget, channel: str) -> None:
+        """Set up, bind and announce a new page. Setting the widgets up is not an edit: it writes nothing to the config"""
+        with self.params[channel]._suppress_handlers():
+            self._setup_channel(page_widget, channel)
+        self._bind_channel(page_widget, channel)
+        self._connect_children_whats_this(page_widget)
+        self._on_channel_added(channel)
 
     def _create_channel_params(self, channel: str) -> None:
         if isinstance(self, PipelineTab) and not is_compound_channel(channel):
@@ -705,6 +707,9 @@ class GenericTab(GenericUi, BusSubscriberMixin):
 
 
 class ExperimentTab(GenericTab):
+    _reconciling: bool = False  # Whether reconcile_channel_pages is running
+    _reconcile_again: bool = False  # Whether it was asked again meanwhile
+
     def __init__(self, main_window: QMainWindow, ui_file_name: str, tab_idx: int, name: str = ''):
         super().__init__(main_window, ui_file_name, tab_idx, name)
         self._sample_manager: SampleManager | None = None
@@ -796,6 +801,18 @@ class ExperimentTab(GenericTab):
             A renamed page is made again, rather than renamed, because the buttons of a page were bound to
             the name the channel had then. They become channels (and the pages kept) when the tabs are migrated.
         """
+        if self._reconciling:  # Asked from inside a reconcile (e.g. by an event of a commit): once more when done
+            self._reconcile_again = True
+            return
+        self._reconciling = self._reconcile_again = True
+        try:
+            while self._reconcile_again:
+                self._reconcile_again = False
+                self._reconcile_channel_pages_once()
+        finally:
+            self._reconciling = False
+
+    def _reconcile_channel_pages_once(self) -> None:
         if self._sample_manager is None or not self.params or not hasattr(self.ui, 'channelsParamsTabWidget'):
             return  # If not setup or tab without channels
         tab_widget = self.ui.channelsParamsTabWidget
@@ -813,7 +830,7 @@ class ExperimentTab(GenericTab):
             page_id = channel_id_of(page)
             if page_id is None:  # Made before its channel was committed
                 self._assign_channel_id(page, tab_name)
-            elif not registry.has_id(page_id):  # Its channel is gone (registry replaced): step 3 makes it again
+            elif not registry.has_id(page_id):  # Its channel is gone (removed, or the registry was replaced)
                 self._drop_channel_page(tab_name)
                 changed = True
 

@@ -12,6 +12,7 @@ from ClearMap.config.channel import ChannelId
 from ClearMap.gui.widgets import channel_id_of, set_channel_id
 from ClearMap.gui import params, params_interfaces
 from ClearMap.gui.params_interfaces import ChannelUiParameter
+from ClearMap.gui.tabs_interfaces import GenericTab
 from ClearMap.gui.params import (CellMapParams, ColocalizationParams, RegistrationParams, StitchingParams,
                                  TractMapParams, VesselParams)
 
@@ -191,3 +192,80 @@ def test_a_channel_the_adjusters_do_not_stitch_gets_no_stitching_entry_from_its_
     collection.add_channel(CHANNEL_NAME)
 
     assert patches == []
+
+
+# ------------------------------------------------------------------------- setting a page up is not an edit
+
+class SetUpParams:
+    """The params of a page: handlers are suppressed (a widget painted from the config is not an edit) in the context"""
+
+    def __init__(self):
+        self.suppressed = False
+        self.torn_down = False
+
+    @contextlib.contextmanager
+    def _suppress_handlers(self):
+        self.suppressed = True
+        try:
+            yield
+        finally:
+            self.suppressed = False
+
+    def teardown(self):
+        self.torn_down = True
+
+
+class SetUpTab:
+    """The real add_channel_tab around a fake page: what it calls is recorded"""
+    channels_ui_name = 'channel_page'
+    name = 'fake tab'
+    add_channel_tab = GenericTab.add_channel_tab
+    _set_up_channel_page = GenericTab._set_up_channel_page
+
+    def __init__(self, creating, known=False):
+        self.params = {CHANNEL_NAME: SetUpParams()} if known else {}
+        self.creating = creating
+        self.calls = []
+
+    def _get_or_init_channel_ui(self, channel):
+        return channel, FakeWidget('page'), self.creating
+
+    def _create_channel_params(self, channel):
+        self.params[channel] = SetUpParams()
+
+    def _setup_channel(self, page_widget, channel):
+        self.calls.append(('setup', self.params[channel].suppressed))  # Fills combo boxes, which emit signals
+
+    def _bind_channel(self, page_widget, channel):
+        self.calls.append(('bind', self.params[channel].suppressed))
+
+    def _connect_children_whats_this(self, page_widget):
+        self.calls.append(('whats_this', None))
+
+    def _on_channel_added(self, channel):
+        self.calls.append(('added', None))
+
+
+def test_a_new_page_is_set_up_with_the_handlers_of_its_params_suppressed():
+    tab = SetUpTab(creating=True)
+
+    tab.add_channel_tab(CHANNEL_NAME)
+
+    assert tab.calls == [('setup', True), ('bind', False), ('whats_this', None), ('added', None)]
+
+
+def test_a_page_made_again_for_known_params_is_set_up_with_the_handlers_suppressed():
+    tab = SetUpTab(creating=True, known=True)
+
+    tab.add_channel_tab(CHANNEL_NAME)
+
+    assert tab.params[CHANNEL_NAME].torn_down
+    assert tab.calls == [('setup', True), ('bind', False), ('whats_this', None), ('added', None)]
+
+
+def test_a_page_which_already_exists_for_known_params_is_not_set_up_again():
+    tab = SetUpTab(creating=False, known=True)
+
+    tab.add_channel_tab(CHANNEL_NAME)
+
+    assert tab.calls == []

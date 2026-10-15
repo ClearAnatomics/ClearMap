@@ -108,6 +108,9 @@ class PageTab:
     """A tab with the real reconcile and the minimum around it"""
     name = 'fake tab'
     reconcile_channel_pages = ExperimentTab.reconcile_channel_pages
+    _reconcile_channel_pages_once = ExperimentTab._reconcile_channel_pages_once
+    _reconciling = ExperimentTab._reconciling
+    _reconcile_again = ExperimentTab._reconcile_again
     _desired_channel_pages = ExperimentTab._desired_channel_pages
     _drop_channel_page = ExperimentTab._drop_channel_page
     _rename_channel_page = ExperimentTab._rename_channel_page

@@ -197,9 +197,10 @@ class SampleChannelParameters(ChannelUiParameter):
     @param_setter
     def orientation(self, orientation):  # FIXME: only when all 3 are set
         orientation = self.validate_orientation(orientation)
-        self.tab.orientXSpinBox.setValue(orientation[0])
-        self.tab.orientYSpinBox.setValue(orientation[1])
-        self.tab.orientZSpinBox.setValue(orientation[2])
+        for spin_box, value in zip((self.tab.orientXSpinBox, self.tab.orientYSpinBox, self.tab.orientZSpinBox),
+                                   orientation):
+            with QSignalBlocker(spin_box):  # Painting the config is not an edit: the handler has nothing to do
+                spin_box.setValue(value)
 
     def validate_orientation(self, orientation):
         return validate_orientation(orientation, self.name, raise_error=False)

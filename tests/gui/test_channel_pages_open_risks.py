@@ -419,3 +419,73 @@ def test_pages_of_the_current_registry_are_kept(registry, tab):
     tab.reconcile_channel_pages()
 
     assert tab.ui.channelsParamsTabWidget.get_channel_widget(FIRST) is page
+
+
+# ----------------------------------------------------------------------- a reconcile asked from inside a reconcile
+
+def test_a_reconcile_asked_while_one_runs_runs_once_more_after_it_not_inside_it(registry, tab):
+    # A page setup which commits (and so announces the channels again) must not start a second reconcile in the first
+    registry.add(FIRST)
+    registry.add(SECOND)
+    tab.channels_in_config = [FIRST, SECOND]
+    depth, deepest, passes = [0], [0], [0]
+    once = tab._reconcile_channel_pages_once
+    add_page = tab.add_channel_tab
+
+    def counted_once():
+        depth[0] += 1
+        deepest[0] = max(deepest[0], depth[0])
+        passes[0] += 1
+        try:
+            once()
+        finally:
+            depth[0] -= 1
+
+    def add_page_which_announces(name):
+        add_page(name)
+        tab.reconcile_channel_pages()  # As the event of the commit of the page would
+
+    tab._reconcile_channel_pages_once = counted_once
+    tab.add_channel_tab = add_page_which_announces
+
+    tab.reconcile_channel_pages()
+
+    assert tab.ui.channelsParamsTabWidget.get_channels_names() == [FIRST, SECOND]
+    assert deepest[0] == 1  # Never one inside another
+    assert passes[0] == 2  # The announcements of the first pass were answered by one more pass
+    assert not tab._reconciling
+
+
+def test_a_reconcile_asked_while_one_runs_sees_what_changed_meanwhile(registry, tab):
+    registry.add(FIRST)
+    registry.add(SECOND)
+    tab.channels_in_config = [FIRST]
+    add_page = tab.add_channel_tab
+
+    def add_page_while_the_config_changes(name):
+        add_page(name)
+        tab.channels_in_config = [FIRST, SECOND]  # A commit lands during the page setup...
+        tab.reconcile_channel_pages()  # ...and announces itself
+
+    tab.add_channel_tab = add_page_while_the_config_changes
+
+    tab.reconcile_channel_pages()
+
+    assert tab.ui.channelsParamsTabWidget.get_channels_names() == [FIRST, SECOND]
+
+
+def test_a_reconcile_which_fails_does_not_block_the_next_one(registry, tab):
+    registry.add(FIRST)
+    tab.channels_in_config = [FIRST]
+
+    def fail(name):
+        raise RuntimeError('page setup failed')
+
+    original, tab.add_channel_tab = tab.add_channel_tab, fail
+    with pytest.raises(RuntimeError):
+        tab.reconcile_channel_pages()
+    tab.add_channel_tab = original
+
+    tab.reconcile_channel_pages()
+
+    assert tab.ui.channelsParamsTabWidget.get_channels_names() == [FIRST]
