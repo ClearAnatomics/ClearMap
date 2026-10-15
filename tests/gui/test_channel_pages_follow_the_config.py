@@ -125,6 +125,7 @@ class PageTab:
         self._page_names = {}
         self.channels_in_config = []
         self.added, self.removed, self.reconciled = [], [], []
+        self.advanced_applied_with_pages = []  # The pages there were each time the Advanced checkbox was applied
 
     def _get_channels(self):
         return list(self.channels_in_config)
@@ -142,6 +143,9 @@ class PageTab:
 
     def _setup_workers(self):
         pass
+
+    def handle_advanced_checked(self):
+        self.advanced_applied_with_pages.append(self.widget.get_channels_names())
 
     @property
     def widget(self):
@@ -312,3 +316,21 @@ def test_the_page_of_a_pair_follows_the_rename_of_one_of_its_channels(config_wri
 
     assert pair_tab.widget.get_channels_names() == [str(PairKey(NEW_NAME, SECOND, oriented=False))]
     assert set(pair_tab.params.channel_params) == {str(PairKey(NEW_NAME, SECOND, oriented=False))}
+
+
+def test_the_advanced_checkbox_is_applied_once_the_new_pages_exist(tab, registry):
+    registry.add(FIRST)
+    registry.add(SECOND)
+    tab.set_channels(FIRST, SECOND)
+
+    tab.reconcile_channel_pages()
+
+    assert tab.advanced_applied_with_pages == [[FIRST, SECOND]]  # Once, when all the pages are there
+
+
+def test_the_advanced_checkbox_is_not_applied_again_when_no_page_changed(tab, three_pages):
+    tab.advanced_applied_with_pages.clear()
+
+    tab.reconcile_channel_pages()
+
+    assert tab.advanced_applied_with_pages == []

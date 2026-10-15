@@ -859,6 +859,7 @@ class ExperimentTab(GenericTab):
         if changed:
             self._after_channels_reconciled(list(desired))
             self._setup_workers()
+            self.handle_advanced_checked()  # The new pages follow the Advanced checkbox too
 
     def _drop_channel_page(self, name: str) -> None:
         self.params.drop_channel(name)
