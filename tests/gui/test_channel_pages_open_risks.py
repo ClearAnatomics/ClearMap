@@ -249,11 +249,14 @@ def test_renaming_a_page_after_a_page_to_its_left_is_removed_renames_that_page_o
 class RenameRequest:
     """A page whose name was typed over in its name field: the rename of its channel is asked to the collection"""
 
-    def __init__(self, collection, old_name, new_name, *, write_fails_with=None, config_drops_it=False):
+    def __init__(self, collection, old_name, new_name, *, write_fails_with=None, config_drops_it=False, others=()):
         self.collection = collection
         self.old_name, self.new_name = old_name, new_name
         self.dialogs = []
         collection.add(old_name)
+        for other in others:
+            collection.add(other)
+        self.shown = []
         self.requester = _param_for_channel(collection.tab.channelsParamsTabWidget, old_name)
         collection.channel_params[old_name] = self.requester
 
@@ -265,6 +268,7 @@ class RenameRequest:
             collection.patches.append({'$rename': {'channels': {old: new}}})
 
         self.requester.handle_name_changed = handle_name_changed
+        self.requester.show_name = lambda: self.shown.append(self.requester.name)
         if config_drops_it:
             type(collection).config_channels = property(lambda _: [old_name])
 
@@ -305,6 +309,32 @@ def test_a_rename_the_config_drops_puts_the_old_name_back_and_tells_the_user(ren
     assert isinstance(reason, ClearMapValueError)
     assert FIRST in str(reason) and SECOND in str(reason)
     assert FIRST in context and SECOND in context
+
+
+@pytest.mark.parametrize('new_name', [SECOND, SECOND.upper()], ids=['same case', 'other case'])
+def test_a_rename_onto_the_name_of_another_channel_is_refused_before_anything_changes(rename_collection, monkeypatch,
+                                                                                      new_name):
+    # The params of the other channel were overwritten by the ones of the renamed channel, then lost by the revert
+    request = RenameRequest(rename_collection, FIRST, new_name, others=[SECOND])
+    params_before = dict(rename_collection.channel_params)
+
+    request.ask(monkeypatch)
+
+    assert rename_collection.channel_params == params_before  # The same channels, with the same params objects
+    assert list(rename_collection.channel_params) == [FIRST, SECOND]
+    assert rename_collection.patches == []  # The config was not even asked
+    assert request.shown == [FIRST]  # The name field is put back, it holds the text typed over it
+    (reason, parent, _), = request.dialogs
+    assert isinstance(reason, ChannelNameTakenError) and parent is rename_collection.tab
+
+
+def test_a_channel_can_change_the_case_of_its_own_name(rename_collection, monkeypatch):
+    request = RenameRequest(rename_collection, FIRST, FIRST.upper())
+
+    request.ask(monkeypatch)
+
+    assert rename_collection.channels == [FIRST.upper()]
+    assert request.dialogs == []
 
 
 def test_an_accepted_rename_tells_the_user_nothing(rename_collection, monkeypatch):
@@ -587,3 +617,32 @@ def test_a_reconcile_which_fails_does_not_block_the_next_one(registry, tab):
     tab.reconcile_channel_pages()
 
     assert tab.ui.channelsParamsTabWidget.get_channels_names() == [FIRST]
+
+
+# ------------------------------------------------------------------------------------ showing the name of a channel
+
+class FakeLineEdit:
+    """A name field which holds text typed over the name of the channel"""
+
+    def __init__(self, text):
+        self.text, self.blocked_while_set = text, None
+        self._blocked = False
+
+    def blockSignals(self, blocked):
+        self._blocked = blocked
+
+    def setText(self, text):
+        self.text, self.blocked_while_set = text, self._blocked
+
+
+def test_showing_the_name_puts_it_back_in_the_name_field_without_committing_it(monkeypatch):
+    monkeypatch.setattr(params_interfaces, 'QLineEdit', FakeLineEdit)
+    tab_widget = FakeNameTab()
+    tab_widget.add_page(FIRST)
+    param = _param_for_channel(tab_widget, FIRST)
+    param.nameWidget = FakeLineEdit(SECOND)  # Typed over the name of the channel, not committed (refused)
+
+    param.show_name()
+
+    assert (param.nameWidget.text, param.nameWidget.blocked_while_set) == (FIRST, True)
+    assert tab_widget.get_channels_names() == [FIRST]

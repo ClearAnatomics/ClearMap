@@ -1359,16 +1359,18 @@ class ChannelUiParameter(UiParameter, ABC):
     @name.setter
     def name(self, value):
         """Set by the rename (and its revert) only: the config is written by the caller, before this is called"""
-        if value == self._channel_name:
-            return
         self._channel_name = value
+        self.show_name()
+
+    def show_name(self):
+        """Show the name of the channel in its name field (which may hold text typed over it) and on its tab"""
         if isinstance(self.nameWidget, QLineEdit):
             self.nameWidget.blockSignals(True)  # Showing the name is not an edit to commit
-            self.nameWidget.setText(value)
+            self.nameWidget.setText(self._channel_name)
             self.nameWidget.blockSignals(False)
         index = self.page_index
         if index != -1:
-            self._tab_widget.setTabText(index, value)
+            self._tab_widget.setTabText(index, self._channel_name)
 
 
 class UiParameterCollection(BusSubscriberMixin, ABC):

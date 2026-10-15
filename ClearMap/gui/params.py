@@ -19,7 +19,8 @@ from ClearMap.Analysis.graphs.graph_filters import GraphFilter, combined_filters
 from ClearMap.Analysis.graphs.graph_weights import GraphWeight
 from ClearMap.config.atlas import ATLAS_NAMES_MAP
 from ClearMap.config.compound_keys import channel_file_name_token
-from ClearMap.Utils.exceptions import ClearMapValueError
+from ClearMap.config.config_coordinator import refuse_renames_onto_existing_channels
+from ClearMap.Utils.exceptions import ChannelNameTakenError, ClearMapValueError
 from ClearMap.Utils.utilities import (validate_orientation, snake_to_title, set_item_recursive,
                                       DEFAULT_ORIENTATION, trim_or_pad, REPLACE)
 from ClearMap.Utils.event_bus import Publishes, EventBus
@@ -333,6 +334,14 @@ class SampleParameters(ChannelsUiParameterCollection):
         """
         if old_name not in self.channel_params:
             warnings.warn(f'Cannot rename {old_name!r}: not in channel_params')
+            return
+
+        # The rule of the config, applied before this dict changes: it would lose the params of the other channel
+        try:
+            refuse_renames_onto_existing_channels({old_name: new_name}, self.channels)
+        except ChannelNameTakenError as err:
+            requester.show_name()  # Its name field holds the text typed over it
+            handle_exception(err, parent=self.tab, context=f'Rename {old_name!r} → {new_name!r}')
             return
 
         # 1. Parent updates its own state (dict key). The requester's name (tab text and name field) is set
