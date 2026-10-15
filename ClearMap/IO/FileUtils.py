@@ -18,17 +18,20 @@ __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 import os
 import shutil
 import importlib
+import uuid
+from dataclasses import dataclass
+from typing import Iterable
 
 __all__ = ['is_file', 'is_directory', 'file_extension', 'join', 'split',
            'abspath', 'create_directory', 'delete_directory',
-           'copy_file', 'delete_file']
+           'copy_file', 'delete_file', 'Rename', 'FileRenameError', 'check_renames', 'apply_renames']
 
 import warnings
 
 from pathlib import Path
 
 from ClearMap.IO.source.backends import registry
-from ClearMap.Utils.exceptions import ClearMapFileNotFoundError, ClearMapIoException, ClearMapValueError
+from ClearMap.Utils.exceptions import ClearMapFileNotFoundError, ClearMapIoException, ClearMapValueError, Severity
 from ClearMap.Utils.tag_expression import Expression
 
 ##############################################################################
@@ -634,6 +637,144 @@ def normalize_location_spec(location)-> str | Expression | None:
 
     return location
     
+
+###############################################################################
+# ## Renaming
+###############################################################################
+
+# A batch of files and folders is renamed as a whole: checked before anything moves, moved in two steps (so swaps
+# and case-only renames work, also on case-insensitive file systems) and moved back if one of the renames fails.
+
+
+@dataclass(frozen=True)
+class Rename:
+    """A file or folder to move to another name (in the same folder or in another one)"""
+    source: Path
+    target: Path
+
+    def __post_init__(self):
+        object.__setattr__(self, 'source', Path(self.source))
+        object.__setattr__(self, 'target', Path(self.target))
+
+    @property
+    def is_noop(self) -> bool:
+        return self.source == self.target
+
+
+class FileRenameError(ClearMapIoException):
+    """A batch of renames is refused (nothing moved), or failed (what moved was put back, if possible)"""
+    severity = Severity.RECOVERABLE
+    user_title = 'Files Cannot Be Renamed'
+    user_hint = 'Move or rename the files in the way, then try again.'
+
+
+def _key(path: Path) -> str:
+    """How paths are compared for collisions: whatever the case, so the plan is the same on every platform"""
+    return os.path.normcase(str(path)).casefold()
+
+
+def check_renames(renames: Iterable[Rename]) -> list[Rename]:
+    """
+    Check that the batch can be applied as a whole, without touching the disk.
+
+    Returns
+    -------
+    list[Rename]
+        The renames to apply, in the same order (the ones which change nothing are left out).
+
+    Raises
+    ------
+    FileRenameError
+        If a source is missing or used twice, if two renames have the same target, or if a target exists and
+        is not itself moved away by the batch.
+    """
+    renames = [rename for rename in renames if not rename.is_noop]
+
+    sources = [_key(rename.source) for rename in renames]
+    if len(set(sources)) != len(sources):
+        raise FileRenameError(f'Several renames start from the same path: {_duplicates(sources)}')
+    targets = [_key(rename.target) for rename in renames]
+    if len(set(targets)) != len(targets):
+        raise FileRenameError(f'Several renames end at the same path: {_duplicates(targets)}')
+
+    missing = [rename.source for rename in renames if not rename.source.exists()]
+    if missing:
+        raise FileRenameError(f'Cannot rename what does not exist: {", ".join(map(str, missing))}')
+
+    moved_away = set(sources)
+    in_the_way = [rename.target for rename in renames
+                  if rename.target.exists() and _key(rename.target) not in moved_away
+                  and not _is_same_file(rename.source, rename.target)]
+    if in_the_way:
+        raise FileRenameError(f'Cannot rename onto what exists: {", ".join(map(str, in_the_way))}')
+    return renames
+
+
+def apply_renames(renames: Iterable[Rename]) -> list[Rename]:
+    """
+    Apply the batch: check it, move every source to a temporary name, then every temporary name to its target.
+    If a move fails, everything which moved is put back.
+
+    Returns
+    -------
+    list[Rename]
+        The renames which were applied.
+
+    Raises
+    ------
+    FileRenameError
+        If the batch is refused (nothing moved) or one of the moves failed (see :func:`check_renames`).
+    """
+    renames = check_renames(renames)
+    done: list[tuple[Path, Path]] = []  # (from, to) of every move, to put them back in reverse
+    temporary = {rename: _temporary_path(rename.source) for rename in renames}
+    try:
+        for rename in renames:
+            _move(rename.source, temporary[rename], done)
+        for rename in renames:
+            rename.target.parent.mkdir(parents=True, exist_ok=True)
+            _move(temporary[rename], rename.target, done)
+    except Exception as err:
+        stuck = _put_back(done)
+        message = f'Renaming failed ({err}); the files were put back.'
+        if stuck:
+            message = (f'Renaming failed ({err}) and could not put everything back: '
+                       f'{", ".join(f"{path} (was {origin})" for path, origin in stuck)}.')
+        raise FileRenameError(message) from err
+    return renames
+
+
+def _move(source: Path, target: Path, done: list[tuple[Path, Path]]) -> None:
+    source.rename(target)
+    done.append((source, target))
+
+
+def _put_back(done: list[tuple[Path, Path]]) -> list[tuple[Path, Path]]:
+    """Undo the moves in reverse. Returns the (path, origin) of what could not be put back"""
+    stuck = []
+    for source, target in reversed(done):
+        try:
+            target.rename(source)
+        except OSError:
+            stuck.append((target, source))
+    return stuck
+
+
+def _temporary_path(path: Path) -> Path:
+    return path.with_name(f'.{path.name}.renaming-{uuid.uuid4().hex}')
+
+
+def _is_same_file(source: Path, target: Path) -> bool:
+    """Whether target is source under another spelling (e.g. the case on a case-insensitive file system)"""
+    try:
+        return source.samefile(target)
+    except OSError:
+        return False
+
+
+def _duplicates(keys: list[str]) -> str:
+    return ', '.join(sorted({key for key in keys if keys.count(key) > 1}))
+
 
 ###############################################################################
 # ## Tests
