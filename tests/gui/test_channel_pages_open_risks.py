@@ -10,11 +10,12 @@ Run: ``pytest tests/gui/test_channel_pages_open_risks.py -v``. Expected: N passe
 import pytest
 
 from ClearMap.config.channel import ChannelId, ChannelRegistry
-from ClearMap.gui import params_interfaces, tabs_interfaces
+from ClearMap.gui import params, params_interfaces, tabs_interfaces
 from ClearMap.gui.params import SampleParameters
 from ClearMap.gui.widgets import channel_id_of, set_channel_id
 from ClearMap.gui.params_interfaces import ChannelsUiParameterCollection, ChannelUiParameter
 from ClearMap.gui.tabs_interfaces import ExperimentTab
+from ClearMap.Utils.exceptions import ChannelNameTakenError, ClearMapValueError
 from ClearMap.Utils.utilities import DELETE
 
 FIRST, SECOND, THIRD = 'fos', 'auto', 'nuclei'
@@ -115,6 +116,7 @@ class FakeCollection:
     pop = ChannelsUiParameterCollection.pop
     handle_channel_rename_request = SampleParameters.handle_channel_rename_request
     _revert_rename = SampleParameters._revert_rename
+    _refuse_rename = SampleParameters._refuse_rename
 
     def __init__(self, *, patch_fails: bool = False):
         self.tab = FakeTab()
@@ -247,6 +249,79 @@ def test_renaming_a_page_after_a_page_to_its_left_is_removed_renames_that_page_o
     assert collection.tab.channelsParamsTabWidget.get_channels_names() == [THIRD]
     assert collection.channel_params[THIRD].name == THIRD
     assert collection.patches[-1] == {'$rename': {'channels': {SECOND: THIRD}}}
+
+
+# --------------------------------------------------------------------------------------------- a refused rename
+
+class RenameRequest:
+    """A page whose name was typed over in its name field: the rename of its channel is asked to the collection"""
+
+    def __init__(self, collection, old_name, new_name, *, write_fails_with=None, config_drops_it=False):
+        self.collection = collection
+        self.old_name, self.new_name = old_name, new_name
+        self.dialogs = []
+        collection.add(old_name)
+        self.requester = _param_for_channel(collection.tab.channelsParamsTabWidget, old_name)
+        collection.channel_params[old_name] = self.requester
+
+        def handle_name_changed(old, new):
+            if write_fails_with is not None:
+                raise write_fails_with
+            if config_drops_it:
+                return  # The adjusters dropped the rename: the config has no channel of the new name
+            collection.patches.append({'$rename': {'channels': {old: new}}})
+
+        self.requester.handle_name_changed = handle_name_changed
+        if config_drops_it:
+            type(collection).config_channels = property(lambda _: [old_name])
+
+    def ask(self, monkeypatch):
+        monkeypatch.setattr(params, 'handle_exception',
+                            lambda reason, parent=None, context='': self.dialogs.append((reason, parent, context)))
+        self.collection.handle_channel_rename_request(self.old_name, self.new_name, requester=self.requester)
+
+
+@pytest.fixture()
+def rename_collection():
+    class Collection(FakeCollection):  # Own class: a test may change its config_channels
+        pass
+    return Collection()
+
+
+def test_a_rename_the_config_refuses_puts_the_old_name_back_and_tells_the_user_why(rename_collection, monkeypatch):
+    taken = ChannelNameTakenError("Cannot rename channel 'a' to 'b': a channel named 'b' exists")
+    request = RenameRequest(rename_collection, FIRST, SECOND, write_fails_with=taken)
+
+    request.ask(monkeypatch)
+
+    assert rename_collection.channels == [FIRST]
+    assert request.requester.name == FIRST
+    assert rename_collection.tab.channelsParamsTabWidget.get_channels_names() == [FIRST]
+    assert [(reason, parent) for reason, parent, _ in request.dialogs] == [(taken, rename_collection.tab)]
+
+
+def test_a_rename_the_config_drops_puts_the_old_name_back_and_tells_the_user(rename_collection, monkeypatch):
+    request = RenameRequest(rename_collection, FIRST, SECOND, config_drops_it=True)
+
+    request.ask(monkeypatch)
+
+    assert rename_collection.channels == [FIRST]
+    assert request.requester.name == FIRST
+    assert rename_collection.tab.channelsParamsTabWidget.get_channels_names() == [FIRST]
+    (reason, _, context), = request.dialogs
+    assert isinstance(reason, ClearMapValueError)
+    assert FIRST in str(reason) and SECOND in str(reason)
+    assert FIRST in context and SECOND in context
+
+
+def test_an_accepted_rename_tells_the_user_nothing(rename_collection, monkeypatch):
+    request = RenameRequest(rename_collection, FIRST, SECOND)
+
+    request.ask(monkeypatch)
+
+    assert rename_collection.channels == [SECOND]
+    assert request.requester.name == SECOND
+    assert request.dialogs == []
 
 
 # ------------------------------------------------------------------------------- reconcile: what runs after a change

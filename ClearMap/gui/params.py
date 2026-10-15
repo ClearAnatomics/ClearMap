@@ -29,6 +29,7 @@ from ClearMap.Utils.events import (UiChannelRenamed, UiCropChanged, UiOrientatio
                                    UiRequestLandmarksDialog, UiAtlasIdChanged, UiAtlasStructureTreeIdChanged,
                                    UiVesselGraphFiltersChanged, UiBatchResultsFolderChanged, UiBatchGroupsChanged)
 
+from .exception_handler import handle_exception
 from .gui_utils_base import replace_widget
 from .params_mixins import OrthoviewerSlicingMixin
 from .pipeline_model import BINARIZATION_STEPS, PipelineStep, LinearPipeline
@@ -318,7 +319,7 @@ class SampleParameters(ChannelsUiParameterCollection):
           1. Update parent-owned state (dict key, tab text) so synchronous
              cascade sees consistent state
           2. Ask child to write its config
-          3. Verify and revert on failure
+          3. Verify; on failure, revert and tell the user why
 
         Parameters
         ----------
@@ -342,19 +343,24 @@ class SampleParameters(ChannelsUiParameterCollection):
         # 2. Child writes config (may fail, but parent already updated, so we can revert to consistent state)
         try:
             requester.handle_name_changed(old_name, new_name)
-        except Exception as e:
-            self._revert_rename(old_name, new_name, requester)
-            warnings.warn(f'Channel rename {old_name!r}→{new_name!r} failed: {e}')
+        except Exception as err:
+            self._refuse_rename(old_name, new_name, requester, err)
             return
 
         # 3. Verify config accepted it
         if new_name not in self.config_channels:
-            self._revert_rename(old_name, new_name, requester)
-            warnings.warn(f'Channel rename {old_name!r}→{new_name!r} rejected by coordinator.')
+            err = ClearMapValueError(f'The config did not accept the name {new_name!r} for the channel {old_name!r}.')
+            self._refuse_rename(old_name, new_name, requester, err)
             return
 
         # 4. Success
         self._publish_channels_changed(self.config_channels)
+
+    def _refuse_rename(self, old_name: str, new_name: str, requester: SampleChannelParameters,
+                       reason: Exception) -> None:
+        """Put the old name back (params, page, name field), then tell the user why it was refused"""
+        self._revert_rename(old_name, new_name, requester)
+        handle_exception(reason, parent=self.tab, context=f'Rename {old_name!r} → {new_name!r}')
 
     def _revert_rename(self, old_name: str, new_name: str, requester: SampleChannelParameters) -> None:
         """Handle failed rename attempt (e.g. refused by coordinator)"""
