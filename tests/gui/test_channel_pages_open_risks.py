@@ -328,6 +328,22 @@ def test_a_rename_onto_the_name_of_another_channel_is_refused_before_anything_ch
     assert isinstance(reason, ChannelNameTakenError) and parent is rename_collection.tab
 
 
+def test_the_other_channel_can_still_be_renamed_after_a_refused_rename_onto_its_name(rename_collection, monkeypatch):
+    # The user's sequence: refused (onto the name of the other channel), then the other channel gets a free name
+    request = RenameRequest(rename_collection, FIRST, SECOND, others=[SECOND])
+    request.ask(monkeypatch)
+    other = _param_for_channel(rename_collection.tab.channelsParamsTabWidget, SECOND)
+    other.handle_name_changed = lambda old, new: rename_collection.patches.append({'$rename': {'channels': {old: new}}})
+    rename_collection.channel_params[SECOND] = other
+
+    rename_collection.handle_channel_rename_request(SECOND, THIRD, requester=other)
+
+    assert rename_collection.channels == [FIRST, THIRD]
+    assert other.name == THIRD
+    assert rename_collection.patches == [{'$rename': {'channels': {SECOND: THIRD}}}]
+    assert len(request.dialogs) == 1  # The refusal only
+
+
 def test_a_channel_can_change_the_case_of_its_own_name(rename_collection, monkeypatch):
     request = RenameRequest(rename_collection, FIRST, FIRST.upper())
 
