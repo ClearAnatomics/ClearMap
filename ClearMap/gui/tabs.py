@@ -2025,17 +2025,17 @@ class ColocalizationTab(PostProcessingTab['ColocalizationProcessor']):
         group.addButton(page_widget.colocalizationChannelAFirstRadioButton)
         group.addButton(page_widget.colocalizationChannelBFirstRadioButton)
         group.setExclusive(True)
-        self._name_first_channel_radio_buttons(page_widget, channel_a, channel_b)
+        self._name_direction_radio_buttons(page_widget, channel_a, channel_b)
 
     @staticmethod
-    def _name_first_channel_radio_buttons(page_widget: QWidget, channel_a: str, channel_b: str) -> None:
-        """Label the 'First channel' radio buttons with the names of the channels of the pair"""
-        page_widget.colocalizationChannelAFirstRadioButton.setText(channel_a)
-        page_widget.colocalizationChannelBFirstRadioButton.setText(channel_b)
+    def _name_direction_radio_buttons(page_widget: QWidget, channel_a: str, channel_b: str) -> None:
+        """Label the direction radio buttons with the comparison they stand for (first → second)"""
+        page_widget.colocalizationChannelAFirstRadioButton.setText(f'{channel_a} → {channel_b}')
+        page_widget.colocalizationChannelBFirstRadioButton.setText(f'{channel_b} → {channel_a}')
 
     def sort_channels(self, channel_a: str, channel_b: str) -> tuple[str, str]:
         """
-        Return the channels ordered based on the state of the First channel radio buttons
+        Return the channels ordered based on the state of the direction radio buttons
 
         Parameters
         ----------

@@ -46,8 +46,11 @@
       <layout class="QGridLayout" name="gridLayout_2">
        <item row="1" column="0">
         <widget class="QLabel" name="label_5">
+         <property name="toolTip">
+          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Direction of the comparison: first channel → second channel. The result depends on the direction.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+         </property>
          <property name="text">
-          <string>First channel:</string>
+          <string>Compare direction:</string>
          </property>
         </widget>
        </item>
