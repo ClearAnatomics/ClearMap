@@ -16,6 +16,7 @@ import qdarkstyle
 from PyQt5.QtWidgets import QApplication, QDialog
 
 from ClearMap.IO.assets_constants import CHANNELS_ASSETS_TYPES_CONFIG
+from ClearMap.IO.FileUtils import Rename, apply_renames
 from ClearMap.Utils.tag_expression import Expression
 from ClearMap.Utils.utilities import (try_get_item_recursive, set_item_recursive, has_item_recursive, deep_merge,
                                       del_item_recursive)
@@ -513,9 +514,9 @@ class ExperimentUpgrade_2_1_to_3_0(ExperimentConfigConverter):
         if self._aborted:
             return
         else:
-            # Apply renaming
-            for old_name, new_name in files_to_rename:
-                (main_folder / old_name).rename(main_folder / new_name)
+            # Apply renaming. Refused as a whole if it would overwrite a file, put back if it fails
+            apply_renames([Rename(main_folder / old_name, main_folder / new_name)
+                           for old_name, new_name in files_to_rename])
 
     def verify_renaming(self, files_to_rename: dict[str, str] = None):
         dialog = VerifyRenamingDialog(files_to_rename)
