@@ -113,7 +113,7 @@ from ClearMap.IO import source_geometry
 from ClearMap.IO import conversion, dispatch, io_ops
 from ClearMap.IO import FileUtils as file_utils
 from ClearMap.IO.assets_constants import CONTENT_TYPE_TO_PIPELINE
-from ClearMap.IO.assets_specs import TypeSpec, ChannelSpec, StateManager
+from ClearMap.IO.assets_specs import TypeSpec, ChannelSpec, StateManager, ChannelId
 from ClearMap.config.compound_keys import channel_file_name_token
 from ClearMap.IO.source.backends import file_list_backend, registry
 from ClearMap.Utils.tag_expression import Expression
@@ -352,10 +352,12 @@ class Asset:
 
     @property
     def name_parts(self):
+        return self._name_parts_for(self.channel_spec.name if self.channel_spec else None)
+
+    def _name_parts_for(self, channel: ChannelId | None, with_status: bool = True):
         if self.type_spec.is_expression():
             return [self.type_spec.basename]
-        parts = (self.status, self.sample_id,
-                 self.channel_spec.name if self.channel_spec else None,
+        parts = (self.status if with_status else None, self.sample_id, channel,
                  self.type_spec.name)  # WARNING: if only basename, no asset_sub_type
         return [part for part in parts if part]
 
@@ -370,6 +372,25 @@ class Asset:
         str
             The base name of the asset.
         """
+        return self.base_name_for(self.channel_spec.name if self.channel_spec else None)
+
+    def base_name_for(self, channel: ChannelId | None, with_status: bool = True) -> str:
+        """
+        The base name this asset would have for another channel (e.g. when its channel is renamed),
+        everything else being equal.
+
+        Parameters
+        ----------
+        channel : ChannelId | None
+            The channel (a tuple for a compound channel) to name the asset after.
+        with_status : bool
+            Whether to start the name with the status of the workspace (e.g. ``debug``), if it has one.
+
+        Returns
+        -------
+        str
+            The base name of the asset, see :attr:`base_name`.
+        """
         if isinstance(self.type_spec.basename, str) and self.type_spec.basename.startswith('/'):  # If absolute path, use basename
             name = self.type_spec.basename
         elif isinstance(self.type_spec.basename, Expression):
@@ -383,7 +404,7 @@ class Asset:
             name = self.expression.string()
         else:  # Otherwise, build the name
             name = ''
-            for part in self.name_parts:
+            for part in self._name_parts_for(channel, with_status):
                 if isinstance(part, (list, tuple)):  # channel could be a tuple for compound assets
                     part = channel_file_name_token(part)
                 if Expression(part).tags:
