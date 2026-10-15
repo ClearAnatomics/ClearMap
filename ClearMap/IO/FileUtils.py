@@ -657,7 +657,7 @@ class Rename:
         object.__setattr__(self, 'target', Path(self.target))
 
     @property
-    def is_noop(self) -> bool:
+    def is_no_op(self) -> bool:
         return self.source == self.target
 
 
@@ -688,7 +688,7 @@ def check_renames(renames: Iterable[Rename]) -> list[Rename]:
         If a source is missing or used twice, if two renames have the same target, or if a target exists and
         is not itself moved away by the batch.
     """
-    renames = [rename for rename in renames if not rename.is_noop]
+    renames = [rename for rename in renames if not rename.is_no_op]
 
     sources = [_key(rename.source) for rename in renames]
     if len(set(sources)) != len(sources):
