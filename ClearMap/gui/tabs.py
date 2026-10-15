@@ -272,7 +272,8 @@ class SampleInfoTab(ExperimentTab):
         self.remove_channel(self.ui.channelsParamsTabWidget.current_channel())
 
     def remove_channel(self, channel: str) -> None:
-        self.params.pop(channel)
+        if self.params.pop(channel) is None:  # Nothing removed, or the config refused: its channel (and page) stay
+            self.reconcile_channel_pages()
 
     def update_atlas(self, event) -> None:
         channel = event.channel_name

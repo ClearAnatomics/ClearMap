@@ -14,6 +14,7 @@ from ClearMap.gui import params, params_interfaces, tabs_interfaces
 from ClearMap.gui.params import SampleParameters
 from ClearMap.gui.widgets import channel_id_of, set_channel_id
 from ClearMap.gui.params_interfaces import ChannelsUiParameterCollection, ChannelUiParameter
+from ClearMap.gui.tabs import SampleInfoTab
 from ClearMap.gui.tabs_interfaces import ExperimentTab
 from ClearMap.Utils.exceptions import ChannelNameTakenError, ClearMapValueError
 from ClearMap.Utils.utilities import DELETE
@@ -166,25 +167,17 @@ def test_removing_a_channel_removes_its_page_and_params_and_sends_the_removal_on
     assert collection.patches == [{'channels': {FIRST: DELETE}}]
 
 
-@pytest.mark.xfail(strict=True, reason='OPEN RISK 1: if the config refuses the removal, the page and the params are '
-                                       'already gone: the next reconcile re-adds the channel. The page should be '
-                                       'put back (or the removal not done) when the config refuses it.')
-def test_a_refused_removal_leaves_the_page_of_the_channel():
+def test_a_refused_removal_tells_the_user_why_and_removes_nothing_from_the_config(monkeypatch):
     collection = FakeCollection(patch_fails=True)
     collection.add(FIRST)
+    dialogs = []
+    monkeypatch.setattr(params_interfaces, 'handle_exception',
+                        lambda reason, parent=None, context='': dialogs.append((str(reason), parent, context)))
 
-    collection.pop(FIRST)
+    assert collection.pop(FIRST) is None
 
-    assert collection.tab.channelsParamsTabWidget.get_channels_names() == [FIRST]
-    assert FIRST in collection.channels
-
-
-def test_a_refused_removal_warns_so_the_failure_is_not_silent():
-    collection = FakeCollection(patch_fails=True)
-    collection.add(FIRST)
-
-    with pytest.warns(UserWarning, match='Could not remove'):
-        collection.pop(FIRST)
+    assert dialogs == [('config refused the removal', collection.tab, f"Remove '{FIRST}'")]
+    assert collection.patches == []
 
 
 def test_drop_channel_without_params_does_not_fail():
@@ -386,6 +379,36 @@ def test_the_follow_up_work_runs_on_every_reconcile_even_without_a_change(regist
     tab.reconcile_channel_pages()
 
     assert len(tab.after_calls) == 1
+
+
+def test_a_refused_removal_leaves_the_page_of_the_channel(registry, tab, monkeypatch):
+    """Was OPEN RISK 1: the page and the params were dropped before the config was asked, and stayed dropped"""
+    monkeypatch.setattr(params_interfaces, 'handle_exception', lambda *args, **kwargs: 'dismiss')
+    registry.add(FIRST)
+    tab.channels_in_config = [FIRST]
+    tab.params = FakeCollection(patch_fails=True)
+    tab.params.tab = tab.ui
+    tab.reconcile_channel_pages()
+
+    SampleInfoTab.remove_channel(tab, FIRST)
+
+    assert tab.ui.channelsParamsTabWidget.get_channels_names() == [FIRST]
+    assert FIRST in tab.params.channels
+
+
+def test_an_accepted_removal_does_not_make_the_page_again(registry, tab):
+    channel = registry.add(FIRST)
+    tab.channels_in_config = [FIRST]
+    tab.params = FakeCollection()
+    tab.params.tab = tab.ui
+    tab.reconcile_channel_pages()
+    registry.remove(channel)
+    tab.channels_in_config = []
+
+    SampleInfoTab.remove_channel(tab, FIRST)
+
+    assert tab.ui.channelsParamsTabWidget.get_channels_names() == []
+    assert tab.params.channels == []
 
 
 def test_a_reconcile_without_change_does_nothing_to_the_pages(registry, tab):

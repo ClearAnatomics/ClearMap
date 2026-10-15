@@ -20,6 +20,7 @@ from ClearMap.Utils.event_bus import BusSubscriberMixin, EventBus, GUI_THREAD
 from ClearMap.Utils.utilities import set_item_recursive, get_item_recursive, DELETE
 from ClearMap.Utils.exceptions import ConfigNotFoundError, ClearMapValueError
 from ClearMap.config.config_handler import ALTERNATIVES_REG
+from ClearMap.gui.exception_handler import handle_exception
 from ClearMap.gui.gui_utils_base import disconnect_widget_signal
 from ClearMap.gui.pipeline_model import LinearPipeline, PipelineStep, BINARIZATION_STEPS
 from ClearMap.gui.pipeline_widgets import LinearPipelineWidget
@@ -1459,6 +1460,12 @@ class UiParameterCollection(BusSubscriberMixin, ABC):
         .. important::
             The page goes first, so that the commit cannot reach the params of a channel which is gone.
             The other tabs drop their page of the channel when they follow the config.
+
+        Returns
+        -------
+        The params of the channel that were removed. None if there were none or if the config refused the removal,
+        which is then told to the user: the channel is still in the config, so the tab has to make its page again
+        (see SampleInfoTab.remove_channel).
         """
         if self._apply_patch is None:
             raise ValueError('Patch sink not set. Please call bind_apply_patch first.')
@@ -1472,8 +1479,8 @@ class UiParameterCollection(BusSubscriberMixin, ABC):
         popped_channel = self.drop_channel(channel_name)
         try:
             self._emit_patch(['channels', channel_name], DELETE)
-        except Exception as e:
-            warnings.warn(f'Could not remove "{channel_name=}" from config: {e}')
+        except Exception as err:
+            handle_exception(err, parent=self.tab, context=f'Remove {channel_name!r}')
             return None
         return popped_channel
 
