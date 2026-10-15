@@ -147,3 +147,52 @@ def test_what_cannot_be_put_back_is_reported(tmp_path, monkeypatch):
 
     with pytest.raises(FileRenameError, match='could not put everything back'):
         apply_renames([Rename(a, tmp_path / 'c.txt'), Rename(b, tmp_path / 'd.txt')])
+
+
+def test_what_is_inside_a_renamed_folder_is_renamed_before_the_folder(tmp_path):
+    folder = tmp_path / 'a_to_b'
+    folder.mkdir()
+    (folder / 'a_landmarks.pts').write_text('a')
+    (folder / 'b_landmarks.pts').write_text('b')
+
+    apply_renames([Rename(folder, tmp_path / 'x_to_b'),
+                   Rename(folder / 'a_landmarks.pts', folder / 'x_landmarks.pts')])
+
+    assert sorted(path.name for path in (tmp_path / 'x_to_b').iterdir()) == ['b_landmarks.pts', 'x_landmarks.pts']
+    assert not folder.exists()
+
+
+def test_a_failure_while_renaming_inside_a_folder_puts_everything_back(tmp_path, monkeypatch):
+    folder = tmp_path / 'a_to_b'
+    folder.mkdir()
+    (folder / 'a_landmarks.pts').write_text('a')
+    original_rename = Path.rename
+    calls = []
+
+    def failing_rename(self, target):
+        calls.append(self)
+        if len(calls) == 3:  # The folder itself, after what is inside it moved
+            raise PermissionError('locked')
+        return original_rename(self, target)
+
+    monkeypatch.setattr(Path, 'rename', failing_rename)
+
+    with pytest.raises(FileRenameError, match='put back'):
+        apply_renames([Rename(folder, tmp_path / 'x_to_b'),
+                       Rename(folder / 'a_landmarks.pts', folder / 'x_landmarks.pts')])
+
+    monkeypatch.undo()
+    assert [path.name for path in folder.iterdir()] == ['a_landmarks.pts']
+    assert not (tmp_path / 'x_to_b').exists()
+
+
+def test_renames_nested_on_several_levels_move_the_innermost_first(tmp_path):
+    folder, subfolder = tmp_path / 'a', tmp_path / 'a' / 'b'
+    subfolder.mkdir(parents=True)
+    (subfolder / 'c.txt').write_text('c')
+
+    apply_renames([Rename(folder, tmp_path / 'x'),
+                   Rename(subfolder, folder / 'y'),
+                   Rename(subfolder / 'c.txt', subfolder / 'z.txt')])
+
+    assert [str(path.relative_to(tmp_path)) for path in tmp_path.rglob('*') if path.is_file()] == ['x/y/z.txt']

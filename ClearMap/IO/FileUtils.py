@@ -713,7 +713,8 @@ def check_renames(renames: Iterable[Rename]) -> list[Rename]:
 def apply_renames(renames: Iterable[Rename]) -> list[Rename]:
     """
     Apply the batch: check it, move every source to a temporary name, then every temporary name to its target.
-    If a move fails, everything which moved is put back.
+    What is inside a renamed folder (and renamed too) moves first, so give its path as it is before the folder
+    moves. If a move fails, everything which moved is put back.
 
     Returns
     -------
@@ -729,11 +730,12 @@ def apply_renames(renames: Iterable[Rename]) -> list[Rename]:
     done: list[tuple[Path, Path]] = []  # (from, to) of every move, to put them back in reverse
     temporary = {rename: _temporary_path(rename.source) for rename in renames}
     try:
-        for rename in renames:
-            _move(rename.source, temporary[rename], done)
-        for rename in renames:
-            rename.target.parent.mkdir(parents=True, exist_ok=True)
-            _move(temporary[rename], rename.target, done)
+        for same_depth_renames in _by_nesting_depth_innermost_first(renames):  # What is inside a folder moves first
+            for rename in same_depth_renames:
+                _move(rename.source, temporary[rename], done)
+            for rename in same_depth_renames:
+                rename.target.parent.mkdir(parents=True, exist_ok=True)
+                _move(temporary[rename], rename.target, done)
     except Exception as err:
         stuck = _put_back(done)
         message = f'Renaming failed ({err}); the files were put back.'
@@ -742,6 +744,20 @@ def apply_renames(renames: Iterable[Rename]) -> list[Rename]:
                        f'{", ".join(f"{path} (was {origin})" for path, origin in stuck)}.')
         raise FileRenameError(message) from err
     return renames
+
+
+def _by_nesting_depth_innermost_first(renames: list[Rename]) -> list[list[Rename]]:
+    """
+    The renames in groups of the same nesting depth, the most nested group first.
+
+    The nesting depth of a rename is the number of other renames whose source holds its source (the landmarks file
+    of a registration folder which is renamed too: 1). The renames of a group hold none of each other, so they move
+    together, and what is inside a folder moves before the folder does.
+    """
+    sources = {rename.source for rename in renames}
+    nesting_depths = {rename: len(sources.intersection(rename.source.parents)) for rename in renames}
+    return [[rename for rename in renames if nesting_depths[rename] == depth]
+            for depth in sorted(set(nesting_depths.values()), reverse=True)]
 
 
 def _move(source: Path, target: Path, done: list[tuple[Path, Path]]) -> None:
