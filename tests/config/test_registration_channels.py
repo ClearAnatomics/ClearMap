@@ -1,11 +1,14 @@
 """The registrations of the channels, read from the registration config"""
 import pytest
 
-from ClearMap.Utils.exceptions import MissingRequirementException
-from ClearMap.config.registration_channels import (fixed_moving_channels, is_explicitly_not_registered,
-                                                   is_intrinsically_aligned, is_selected_for_registration,
-                                                   may_be_registered, moving_channel_of, needs_registration,
-                                                   registration_pairs, registration_sequence)
+import itertools
+
+from ClearMap.Utils.exceptions import ClearMapConfigError, MissingRequirementException
+from ClearMap.config.registration_channels import (ATLAS, REGISTRATION_DIRECTIONS, fixed_moving_channels,
+                                                   is_explicitly_not_registered, is_intrinsically_aligned,
+                                                   is_selected_for_registration, may_be_registered, needs_registration,
+                                                   registration_direction, registration_pairs, registration_sequence)
+from ClearMap.config.validators._semantic import _validate_registration_refs
 
 
 def config(**channels):
@@ -21,8 +24,10 @@ def test_a_channel_moves_onto_what_it_is_aligned_with():
     assert fixed_moving_channels(config(fos=('auto', 'fos')), 'fos') == ('auto', 'fos')
 
 
-def test_a_channel_aligned_with_nothing_has_no_fixed_channel():
-    assert fixed_moving_channels(config(fos=(None, 'fos')), 'fos') == (None, 'fos')
+@pytest.mark.parametrize('align_with, moving_channel', [(None, 'fos'), (None, 'other'), ('auto', 'intrinsically_aligned'),
+                                                       ('auto', None)])
+def test_a_channel_without_a_computed_registration_has_neither_fixed_nor_moving_channel(align_with, moving_channel):
+    assert fixed_moving_channels(config(fos=(align_with, moving_channel)), 'fos') == (None, None)
 
 
 def test_the_pair_of_a_channel_whose_partner_is_undecided_is_refused():
@@ -82,11 +87,29 @@ def test_the_sequence_stops_at_a_channel_aligned_with_nothing_or_at_the_stop_cha
     assert registration_sequence(registration_config, 'gfp', stop_channel='fos') == ['gfp']
 
 
-@pytest.mark.parametrize('moving_channel, align_with, moving', [('self', 'auto', 'fos'), ('other', 'auto', 'auto'),
-                                                                ('other', None, None), ('other', '', None),
-                                                                ('atlas', 'atlas', 'atlas'), ('fos', 'auto', 'fos')])
-def test_self_and_other_are_resolved_to_the_name_of_the_moving_channel(moving_channel, align_with, moving):
-    assert moving_channel_of(config(fos=(align_with, moving_channel)), 'fos') == moving
+@pytest.mark.parametrize('align_with, moving_channel, direction', [
+    ('auto', 'self', 'self'), ('auto', 'other', 'other'), ('auto', 'intrinsically_aligned', 'intrinsically_aligned'),
+    ('auto', 'fos', 'self'), ('auto', 'auto', 'other'), ('atlas', 'atlas', 'other'),  # The names of older configs
+    ('auto', None, None), (None, 'other', None), ('', 'other', None), (None, 'auto', None)])
+def test_the_direction_is_relative_to_the_channel_whatever_way_it_is_written(align_with, moving_channel, direction):
+    assert registration_direction('fos', {'align_with': align_with, 'moving_channel': moving_channel}) == direction
+
+
+def test_a_moving_channel_which_is_neither_the_channel_nor_its_partner_is_refused():
+    # E.g. the align_with was changed from auto to the atlas, and the moving_channel still says auto
+    with pytest.raises(ClearMapConfigError, match="'auto'"):
+        fixed_moving_channels(config(fos=('atlas', 'auto')), 'fos')
+
+
+@pytest.mark.parametrize('align_with, moving_channel', itertools.product(
+    ['auto', ATLAS, None], [*REGISTRATION_DIRECTIONS, 'fos', 'auto', ATLAS, None]))
+def test_only_the_names_of_channels_or_the_atlas_name_the_results(align_with, moving_channel):
+    # The paths are made of the pair: self, other and intrinsically_aligned must never reach them
+    try:
+        pair = fixed_moving_channels(config(fos=(align_with, moving_channel), auto=(ATLAS, 'other')), 'fos')
+    except ClearMapConfigError:
+        return  # Inconsistent: refused, no path
+    assert pair == (None, None) or set(pair) <= {'fos', 'auto', ATLAS}
 
 
 def test_self_moves_the_channel_onto_its_partner():
@@ -101,3 +124,22 @@ def test_the_pairs_of_self_and_other_are_named_after_the_channels():
     registration_config = config(auto=('atlas', 'other'), fos=('auto', 'self'))
 
     assert registration_pairs(registration_config) == [('atlas', 'auto'), ('fos', 'auto')]
+
+
+# ------------------------------------------------------------------------------------- what the validator accepts
+
+def _registration_errors(fos_align_with, fos_moving_channel):
+    return _validate_registration_refs({'sample': {'channels': {'fos': {}, 'auto': {}}},
+                                        'registration': config(fos=(fos_align_with, fos_moving_channel))})
+
+
+@pytest.mark.parametrize('moving_channel', [*REGISTRATION_DIRECTIONS, ATLAS, 'auto', 'fos', None])
+def test_the_directions_and_the_names_are_valid_moving_channels(moving_channel):
+    assert _registration_errors('auto', moving_channel) == []
+
+
+@pytest.mark.parametrize('align_with', ['self', 'other', 'intrinsically_aligned'])
+def test_a_direction_is_not_a_partner(align_with):
+    (error,) = _registration_errors(align_with, 'other')
+
+    assert 'align_with' in error and align_with in error

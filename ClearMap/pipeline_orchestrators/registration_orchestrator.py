@@ -22,7 +22,7 @@ from ClearMap.IO.assets_specs import TypeSpec
 from ClearMap.Utils.events import (ChannelRenamed, UiAtlasIdChanged,
                                    UiAtlasStructureTreeIdChanged,  RegistrationStatusChanged, WorkspaceChannelsUpdated)
 from ClearMap.Utils.exceptions import (ClearMapAssetError, ParamsOrientationError, MissingRequirementException,
-                                       NotAnOmeFile, MetadataError, ClearMapRuntimeError)
+                                       NotAnOmeFile, MetadataError, ClearMapRuntimeError, ClearMapConfigError)
 from ClearMap.Utils.utilities import (runs_on_ui, check_stopped, DEFAULT_ORIENTATION,
                                       validate_orientation,  sanitize_n_processes)
 
@@ -242,6 +242,9 @@ class RegistrationProcessor(IndependentChannelsPipelineOrchestrator):
                 except ClearMapAssetError:  # Check that align_with is None
                     warnings.warn(f'Could not parametrize {asset_type} for {channel=}')
                     continue
+                except ClearMapConfigError as err:  # Inconsistent moving_channel: refused when it is aligned
+                    warnings.warn(f'Could not parametrize {asset_type} for {channel=}: {err}')
+                    continue
 
     @property
     def all_channels(self) -> list[str]:
@@ -307,7 +310,14 @@ class RegistrationProcessor(IndependentChannelsPipelineOrchestrator):
         return self.registration_status() == RegistrationStatus.REGISTERED
 
     def channel_was_registered(self, channel):
-        fixed_channel, moving_channel = self.get_fixed_moving_channels(channel)
+        try:
+            fixed_channel, moving_channel = self.get_fixed_moving_channels(channel)
+        except ClearMapConfigError as err:
+            # WARNING: Not raised here (asked for every channel, e.g. to list them): the registration refuses it
+            warnings.warn(str(err))
+            return False
+        if fixed_channel is None or moving_channel is None:  # Nothing is registered (e.g. intrinsically aligned)
+            return False
         asset = self.get('aligned', channel=channel)
         return asset.specify({'moving_channel': moving_channel, 'fixed_channel': fixed_channel}).exists
 

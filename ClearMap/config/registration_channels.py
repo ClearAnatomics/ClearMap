@@ -1,14 +1,19 @@
 """
 Which channels each registration aligns, read from the registration config: each channel of
-``channels`` says what it is aligned with (``align_with``) and which of the two moves (``moving_channel``, a name,
-or relative to the channel: ``self`` or ``other``, as in the dunder methods). The other one is fixed.
+``channels`` says what it is aligned with (``align_with``) and how (``moving_channel``, its direction: relative to the
+channel, ``self`` or ``other`` moves, as in the dunder methods, or ``intrinsically_aligned``: nothing moves, the
+channel was acquired with its partner). The other one of the two is fixed.
 The results of a registration are in the folder ``<moving>_to_<fixed>``.
+
+``moving_channel`` may also be a name, as written by older configs: the name of the channel is ``self``, the name of its
+``align_with`` is ``other``. Only the names of channels (and ``atlas``) reach the paths: never ``self``, ``other`` nor
+``intrinsically_aligned`` (see :func:`fixed_moving_channels`).
 """
 from __future__ import annotations
 
 from typing import Mapping
 
-from ClearMap.Utils.exceptions import MissingRequirementException
+from ClearMap.Utils.exceptions import ClearMapConfigError, MissingRequirementException
 
 ATLAS = 'atlas'  # align_with / moving_channel of the atlas: a partner which is not a channel of the sample
 ALIGN_WITH_NOTHING = None  # align_with of a channel which is explicitly not registered
@@ -17,6 +22,7 @@ NOT_SELECTED_FOR_REGISTRATION = (ALIGN_WITH_NOTHING, ALIGN_WITH_UNDECIDED)
 INTRINSICALLY_ALIGNED = 'intrinsically_aligned'  # moving_channel of a channel aligned by construction: needs no registration
 MOVING_SELF = 'self'  # moving_channel: this channel moves (onto its align_with)
 MOVING_OTHER = 'other'  # moving_channel: its align_with moves (onto this channel)
+REGISTRATION_DIRECTIONS = (MOVING_SELF, MOVING_OTHER, INTRINSICALLY_ALIGNED)  # moving_channel of a registered channel
 
 
 def is_selected_for_registration(channel_config: Mapping) -> bool:
@@ -42,18 +48,31 @@ def is_intrinsically_aligned(channel_config: Mapping) -> bool:
     return channel_config.get('moving_channel') == INTRINSICALLY_ALIGNED
 
 
-def moving_channel_of(registration_config: Mapping, channel: str) -> str | None:
+def registration_direction(channel: str, channel_config: Mapping) -> str | None:
     """
-    The moving channel of the registration of channel, by name: self and other resolved (other is None when the
-    partner is not chosen, or explicitly nothing).
+    How the channel is registered with its partner: one of REGISTRATION_DIRECTIONS (the names of older configs read as
+    self or other), or None if it has no partner (aligned with nothing, or partner not chosen yet) or no direction.
+    A direction is kept while the channel has no partner, but it means nothing until it has one again.
+
+    Raises
+    ------
+    ClearMapConfigError
+        If moving_channel is a name which is neither the channel nor its align_with (e.g. left over from another
+        align_with).
     """
-    channel_config = registration_config['channels'][channel]
+    align_with = channel_config.get('align_with')
     moving_channel = channel_config.get('moving_channel')
-    if moving_channel == MOVING_SELF:
-        return channel
-    if moving_channel == MOVING_OTHER:
-        return channel_config.get('align_with') or None
-    return moving_channel
+    if align_with in NOT_SELECTED_FOR_REGISTRATION or moving_channel is None:
+        return None
+    if moving_channel in REGISTRATION_DIRECTIONS:
+        return moving_channel
+    if moving_channel == channel:
+        return MOVING_SELF
+    if moving_channel == align_with:
+        return MOVING_OTHER
+    raise ClearMapConfigError(f'The registration of the channel {channel!r} is aligned with {align_with!r} but its '
+                              f'moving_channel is {moving_channel!r}: it must be one of {REGISTRATION_DIRECTIONS} '
+                              f'(or the name of the channel, or of its align_with). Choose which of the two moves.')
 
 
 def needs_registration(channel_config: Mapping) -> bool:
@@ -78,23 +97,27 @@ def fixed_moving_channels(registration_config: Mapping, channel: str) -> tuple[s
     Returns
     -------
     tuple[str | None, str | None]
-        (fixed, moving), by name (see :func:`moving_channel_of`). The fixed channel is None if the channel is
-        aligned with nothing. The fixed channel is whichever of (channel, align_with) is not the moving one.
+        (fixed, moving): the names of channels or the atlas, which name the results (``<moving>_to_<fixed>``).
+        (None, None) if no registration is computed for the channel: aligned with nothing, intrinsically aligned
+        or without direction.
 
     Raises
     ------
     MissingRequirementException
         If the partner of the channel is not chosen yet (align_with undecided).
+    ClearMapConfigError
+        If moving_channel is inconsistent (see :func:`registration_direction`).
     """
     channel_config = registration_config['channels'][channel]
-    moving_channel = moving_channel_of(registration_config, channel)
     align_with = channel_config['align_with']
-    if align_with is ALIGN_WITH_NOTHING:
-        return None, moving_channel
     if align_with == ALIGN_WITH_UNDECIDED:
         raise MissingRequirementException(f'Channel {channel} missing align_with in registration config')
-    fixed_channel = channel if align_with == moving_channel else align_with
-    return fixed_channel, moving_channel
+    direction = registration_direction(channel, channel_config)
+    if direction == MOVING_SELF:
+        return align_with, channel
+    if direction == MOVING_OTHER:
+        return channel, align_with
+    return None, None
 
 
 def registration_pairs(registration_config: Mapping) -> list[tuple[str, str]]:
