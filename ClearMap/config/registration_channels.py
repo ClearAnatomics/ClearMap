@@ -214,13 +214,21 @@ def check_intrinsically_aligned(registration_config: Mapping, channels: Iterable
 def registration_sequence(registration_config: Mapping, first_channel: str, stop_channel: str = ATLAS) -> list[str]:
     """
     The channels from first_channel along the chain of align_with, until (excluded) stop_channel or a channel
-    aligned with nothing.
+    aligned with nothing (or whose partner is not chosen yet).
+
+    Raises
+    ------
+    ClearMapConfigError
+        If the chain loops (e.g. a channel aligned with itself).
     """
     channels_config = registration_config['channels']
     sequence = [first_channel]
     while True:
         next_channel = channels_config[sequence[-1]]['align_with']
-        if next_channel in (None, stop_channel):
+        if next_channel in NOT_SELECTED_FOR_REGISTRATION or next_channel == stop_channel:
             break
+        if next_channel in sequence:
+            raise ClearMapConfigError(f'The channels are aligned in a loop: {" -> ".join(sequence + [next_channel])}. '
+                                      f'Align one of them with another channel or the atlas.')
         sequence.append(next_channel)
     return sequence

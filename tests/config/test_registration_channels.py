@@ -164,3 +164,17 @@ def test_a_direction_is_not_a_partner(align_with):
 def test_changing_the_partner_keeps_the_direction_relative_to_the_channel(align_with, moving_channel, new_align_with,
                                                                          changes):
     assert partner_change('fos', {'align_with': align_with, 'moving_channel': moving_channel}, new_align_with) == changes
+
+
+@pytest.mark.parametrize('partner', [None, ''])  # Aligned with nothing, or the partner is not chosen yet
+def test_the_sequence_of_a_channel_stops_where_a_channel_has_no_partner(partner):
+    registration_config = config(fos=('raw', 'other'), raw=(partner, 'other'))
+
+    assert registration_sequence(registration_config, 'fos') == ['fos', 'raw']
+
+
+@pytest.mark.parametrize('channels, loop', [(dict(fos=('fos', 'other')), 'fos -> fos'),  # Aligned with itself
+                                            (dict(a=('b', 'other'), b=('a', 'other')), 'a -> b -> a')])
+def test_channels_aligned_in_a_loop_never_reach_the_atlas_and_are_refused(channels, loop):
+    with pytest.raises(ClearMapConfigError, match=loop):
+        registration_sequence(config(**channels), next(iter(channels)))
