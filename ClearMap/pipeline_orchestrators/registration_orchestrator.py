@@ -22,7 +22,8 @@ from ClearMap.IO.assets_specs import TypeSpec
 from ClearMap.Utils.events import (ChannelRenamed, UiAtlasIdChanged,
                                    UiAtlasStructureTreeIdChanged,  RegistrationStatusChanged, WorkspaceChannelsUpdated)
 from ClearMap.Utils.exceptions import (ClearMapAssetError, ParamsOrientationError, MissingRequirementException,
-                                       NotAnOmeFile, MetadataError, ClearMapRuntimeError, ClearMapConfigError)
+                                       NotAnOmeFile, MetadataError, ClearMapRuntimeError, ClearMapConfigError,
+                                       ReversedRegistrationWarning)
 from ClearMap.Utils.utilities import (runs_on_ui, check_stopped, DEFAULT_ORIENTATION,
                                       validate_orientation,  sanitize_n_processes)
 
@@ -30,7 +31,7 @@ from ClearMap.config.atlas import ATLAS_NAMES_MAP
 from ClearMap.config.config_coordinator import ConfigCoordinator
 from ClearMap.config.registration_channels import (ATLAS, fixed_moving_channels, is_intrinsically_aligned,
                                                    is_selected_for_registration, may_be_registered,
-                                                   needs_registration, registration_sequence)
+                                                   needs_registration, registration_sequence, reversed_registrations)
 
 from ClearMap.pipeline_orchestrators.generic_orchestrators import IndependentChannelsPipelineOrchestrator, CanceledProcessing
 from ClearMap.pipeline_orchestrators.sample_info_management import SampleManager
@@ -213,6 +214,12 @@ class RegistrationProcessor(IndependentChannelsPipelineOrchestrator):
             raise MissingRequirementException(f'Channel "{first_channel}" is not aligned to "{stop_channel}": '
                                               f'its registration sequence ({" -> ".join(sequence)}) '
                                               f'ends with align_with={last_align_with!r}.')
+
+        for channel in reversed_registrations(self.registration_config, sequence):  # Scripts may want it: not refused
+            warnings.warn(ReversedRegistrationWarning(
+                f'The registration of the channel "{channel}" was computed with "{channel}" moving onto '
+                f'"{reg_cfg[channel]["align_with"]}": the points transformed through it (from "{first_channel}" to '
+                f'"{stop_channel}") need its inverse, which is not supported yet. They end up at wrong positions.'))
 
         # Compile the list of directories for the registration steps in the sequence while checking that they exist
         directories = []

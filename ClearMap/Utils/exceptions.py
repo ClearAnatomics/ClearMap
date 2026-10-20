@@ -209,6 +209,17 @@ class SubscriberFailedWarning(ClearMapWarning):
     user_title = 'Event Subscriber Failed'
 
 
+class ReversedRegistrationWarning(ClearMapWarning):
+    """
+    Points are transformed through a registration computed the other way round (the channel moved onto its partner,
+    moving_channel: self): the transform maps the points of the partner onto the channel, so the points of the channel
+    need its inverse, which is not supported yet. They end up at wrong positions.
+    """
+    user_title = 'Registration Computed the Other Way Round'
+    user_hint = ('Register the channel with its partner moving onto it (moving_channel: other) to transform its points, '
+                 'or invert the transform yourself.')
+
+
 # ---------------------------------------------------------------------------
 # Standard exceptions forward
 # ---------------------------------------------------------------------------

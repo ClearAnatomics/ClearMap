@@ -11,7 +11,7 @@ The results of a registration are in the folder ``<moving>_to_<fixed>``.
 """
 from __future__ import annotations
 
-from typing import Mapping
+from typing import Iterable, Mapping
 
 from ClearMap.Utils.exceptions import ClearMapConfigError, MissingRequirementException
 
@@ -132,6 +132,16 @@ def registration_pairs(registration_config: Mapping) -> list[tuple[str, str]]:
         fixed_channel, moving_channel = fixed_moving_channels(registration_config, channel)
         pairs.append((moving_channel, fixed_channel))
     return pairs
+
+
+def reversed_registrations(registration_config: Mapping, channels: Iterable[str]) -> list[str]:
+    """
+    The channels among channels whose registration moves the channel itself (moving_channel: self). Transforming
+    the points of a channel towards its partner needs the transform of its partner moving onto it (other): through
+    the registration of one of these, the points need the inverse transform.
+    """
+    channels_config = registration_config['channels']
+    return [channel for channel in channels if registration_direction(channel, channels_config[channel]) == MOVING_SELF]
 
 
 def registration_sequence(registration_config: Mapping, first_channel: str, stop_channel: str = ATLAS) -> list[str]:
