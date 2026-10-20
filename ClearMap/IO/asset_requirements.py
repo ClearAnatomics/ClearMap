@@ -1,5 +1,5 @@
 """
-The assets (files of the workspace) a processing step needs before it runs: FilePath describes one,
+The assets (files of the workspace) a processing step needs before it runs: RequiredAsset describes one,
 ``requires_assets`` refuses to run the step if one is missing.
 """
 import os
@@ -8,8 +8,22 @@ from ClearMap.Utils.exceptions import MissingRequirementException
 from ClearMap.Utils.tag_expression import Expression
 
 
-# FIXME: rename to smth similar to AssetSpec (without conflicting with the existing AssetSpec)
-class FilePath:
+class RequiredAsset:
+    """
+    An asset (file of the workspace) a step needs, as ``Workspace.filename`` names it: the channel is the one of
+    the call, unless the asset sets its own (see requires_assets).
+
+    Parameters
+    ----------
+    base : str
+        The type of the asset (e.g. ``'cells'``, ``'stitched'``).
+    prefix : str, optional
+        The sample id.
+    postfix : str, optional
+        The sub-type of the asset (e.g. ``'filtered'``); asset_sub_type is the same, and takes precedence.
+    extension : str, optional
+        The extension of the file, if the asset type has several.
+    """
     def __init__(self, base, prefix=None, postfix=None, extension=None, asset_sub_type=None):
         self.base = base
         self.prefix = prefix
@@ -22,13 +36,13 @@ def requires_assets(asset_specs):
     Decorator to check if the required files exist before running the function.
     For the case of channel, it can be extracted (in this order) from
     - the kwargs
-    - the FilePath object
+    - the RequiredAsset object
     - the instance to which the wrapped function belongs
 
     Parameters
     ----------
-    asset_specs: List[FilePath]
-        List of FilePath objects
+    asset_specs: List[RequiredAsset]
+        List of RequiredAsset objects
     """
     def decorator(func):
         def wraps(*args, **kwargs):
@@ -37,7 +51,7 @@ def requires_assets(asset_specs):
             for f_p in asset_specs:
                 channel = kwargs.get('channel')  # Get directly from the kwargs
                 if channel is None:
-                    if hasattr(f_p, 'channel'):  # Get from FilePath object
+                    if hasattr(f_p, 'channel'):  # Get from RequiredAsset object
                         channel = f_p.channel
                     else:  # Get the global value from the instance
                         channel = getattr(instance, 'channel', None)

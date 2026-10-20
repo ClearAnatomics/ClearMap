@@ -107,7 +107,7 @@ import ClearMap.Analysis.Measurements.Voxelization as voxelization
 
 from ClearMap.Utils.exceptions import MissingRequirementException, MissingAssetError
 from ClearMap.Utils.utilities import sanitize_n_processes
-from ClearMap.IO.asset_requirements import requires_assets, FilePath
+from ClearMap.IO.asset_requirements import requires_assets, RequiredAsset
 
 from ClearMap.config.config_coordinator import ConfigCoordinator
 
@@ -227,7 +227,7 @@ class CellDetector(ChannelPipelineOrchestrator):
         self.update_watcher_main_progress()
         return coordinates, counts_asset.path
 
-    @requires_assets([FilePath('density', asset_sub_type='counts')])
+    @requires_assets([RequiredAsset('density', asset_sub_type='counts')])
     def plot_voxelized_counts(self, arrange=True, parent=None):
         import ClearMap.Visualization.Plot3d as plot_3d
         scale = self.channel_cfg_view('registration')['resampled_resolution']
@@ -529,7 +529,7 @@ class CellDetector(ChannelPipelineOrchestrator):
         else:
             return pd.DataFrame(np.load(df_path))
 
-    @requires_assets([FilePath('cells', asset_sub_type='filtered'), FilePath('stitched')])
+    @requires_assets([RequiredAsset('cells', asset_sub_type='filtered'), RequiredAsset('stitched')])
     def plot_filtered_cells(self, parent=None, smarties=False):
         import ClearMap.Visualization.Qt.Plot3d as qplot_3d
         from ClearMap.Visualization.Qt.widgets import Scatter3D

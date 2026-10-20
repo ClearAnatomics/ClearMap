@@ -365,7 +365,7 @@ class StitchingProcessor(IndependentChannelsPipelineOrchestrator):
         return [not cfg[channel]['rigid']['skip'] for channel in cfg.keys() if 'rigid' in cfg[channel]].count(True)
 
     # @check_stopped
-    # @requires_assets([FilePath('raw')])
+    # @requires_assets([RequiredAsset('raw')])
     def align_channel_rigid(self, channel, _force=False):
         if not self.sample_manager.check_has_all_tiles(channel):
             if self.sample_manager.use_npy(channel):
@@ -415,7 +415,7 @@ class StitchingProcessor(IndependentChannelsPipelineOrchestrator):
         stitching_rigid.save_layout(self.get_path('layout', channel=channel, asset_sub_type='aligned'),
                                     layout)
 
-    # @requires_assets([FilePath('raw')])  # TODO: optional requires npy + requires that channel is kwarg
+    # @requires_assets([RequiredAsset('raw')])  # TODO: optional requires npy + requires that channel is kwarg
     def get_wobbly_layout(self, channel, overlaps=None):
         if overlaps is None:
             rigid_cfg = self.config['channels'][channel]['rigid']
