@@ -25,6 +25,8 @@ class AdjustmentContext:
     group_base_dir: Optional[Path] = None
 
     run_label: str = ""    # Optional: useful for tracing / provenance
+    # The config as it was before the patch the adjusters run for (None when they run on the config as it is)
+    view_before_patch: Optional[ConfigView] = None
 
 
 TemplateForKey = Callable[[str], Optional[dict]]

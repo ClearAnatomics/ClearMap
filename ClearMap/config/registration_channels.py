@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from typing import Iterable, Mapping
 
+from ClearMap.IO.assets_constants import COMPOUND_REPRESENTATIVE_DATA_TYPES, CONTENT_TYPE_TO_PIPELINE
 from ClearMap.Utils.exceptions import ChannelsNotPixelAlignedError, ClearMapConfigError, MissingRequirementException
 
 ATLAS = 'atlas'  # align_with / moving_channel of the atlas: a partner which is not a channel of the sample
@@ -23,6 +24,7 @@ INTRINSICALLY_ALIGNED = 'intrinsically_aligned'  # moving_channel of a channel a
 MOVING_SELF = 'self'  # moving_channel: this channel moves (onto its align_with)
 MOVING_OTHER = 'other'  # moving_channel: its align_with moves (onto this channel)
 REGISTRATION_DIRECTIONS = (MOVING_SELF, MOVING_OTHER, INTRINSICALLY_ALIGNED)  # moving_channel of a registered channel
+REFERENCE_DATA_TYPE = 'autofluorescence'  # The data type of the channel which the other channels are aligned with
 
 
 def is_selected_for_registration(channel_config: Mapping) -> bool:
@@ -209,6 +211,78 @@ def check_intrinsically_aligned(registration_config: Mapping, channels: Iterable
                 break
     if unmet_requirements:
         raise ChannelsNotPixelAlignedError(channels, unmet_requirements)
+
+
+def default_registration_partners_and_directions(
+        data_types: Mapping[str, str | None]) -> dict[str, tuple[str, str]]:
+    """
+    What each channel of the sample is aligned with by default, and how: ``(align_with, moving_channel)``.
+
+    - The reference channel (the only one of data type autofluorescence) is aligned with the atlas.
+    - The parts of the compound channels of a pipeline (e.g. the TubeMap vessels and arteries) other than their
+      representative part (see COMPOUND_REPRESENTATIVE_DATA_TYPES) are acquired together with it: no registration
+      of their own. This holds once the sample has exactly one representative part.
+    - Every other channel is aligned with the reference channel, which moves onto it. Without a reference channel
+      (yet), it is aligned with nothing (ALIGN_WITH_NOTHING) until there is one: a channel is never aligned with
+      itself.
+
+    Parameters
+    ----------
+    data_types : Mapping[str, str | None]
+        The data type of each channel of the sample.
+
+    Returns
+    -------
+    dict[str, tuple[str, str]]
+        The defaults, by channel.
+    """
+    references = [channel for channel, data_type in data_types.items() if data_type == REFERENCE_DATA_TYPE]
+    reference = references[0] if len(references) == 1 else None
+    defaults = {channel: (ATLAS if data_type == REFERENCE_DATA_TYPE else reference, MOVING_OTHER)
+                for channel, data_type in data_types.items()}
+    for pipeline, representative_data_type in COMPOUND_REPRESENTATIVE_DATA_TYPES.items():
+        parts = [channel for channel, data_type in data_types.items()
+                 if CONTENT_TYPE_TO_PIPELINE.get(data_type) == pipeline]
+        representatives = [channel for channel in parts if data_types[channel] == representative_data_type]
+        if len(representatives) == 1:
+            defaults.update({channel: (representatives[0], INTRINSICALLY_ALIGNED)
+                             for channel in parts if channel != representatives[0]})
+    return defaults
+
+
+def new_defaults_of_unedited_registrations(
+        channels_config: Mapping, data_types_before: Mapping[str, str | None],
+        data_types_after: Mapping[str, str | None]) -> dict[str, dict[str, str]]:
+    """
+    The new defaults of the channels whose registration is unedited, when the defaults change with the data types
+    (see default_registration_partners_and_directions). Unedited: still the default of before (a value set by hand
+    which happens to be the default cannot be told apart, it follows too).
+    A channel whose registration was set otherwise (by hand) is left alone, and so are the new channels
+    (they are created with the defaults).
+
+    Parameters
+    ----------
+    channels_config : Mapping
+        The ``channels`` of the registration config.
+    data_types_before, data_types_after : Mapping[str, str | None]
+        The data type of each channel of the sample, before and after the change (the names of the channels after
+        their renames).
+
+    Returns
+    -------
+    dict[str, dict[str, str]]
+        The new ``align_with`` and ``moving_channel`` of each channel to change.
+    """
+    defaults_before = default_registration_partners_and_directions(data_types_before)
+    defaults_after = default_registration_partners_and_directions(data_types_after)
+    changes = {}
+    for channel, channel_config in channels_config.items():
+        if channel not in defaults_before or channel not in defaults_after:
+            continue
+        current = (channel_config.get('align_with'), channel_config.get('moving_channel'))
+        if current == defaults_before[channel] != defaults_after[channel]:
+            changes[channel] = dict(zip(('align_with', 'moving_channel'), defaults_after[channel]))
+    return changes
 
 
 def registration_sequence(registration_config: Mapping, first_channel: str, stop_channel: str = ATLAS) -> list[str]:

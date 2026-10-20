@@ -472,6 +472,7 @@ class ConfigCoordinator(BusSubscriberMixin):
         # The patched copy replaces the working config only once validated: a refused patch leaves no trace
         try:
             with self.__edit_session(origin=origin) as working_cfg:
+                view_before_patch = deepcopy(working_cfg)
                 self._merge_patch(working_cfg, clean_patch, allowed_sections=allowed)
                 changed_keys = _patch_to_config_keys_sets(clean_patch)
 
@@ -483,7 +484,8 @@ class ConfigCoordinator(BusSubscriberMixin):
                 # The runner merges each adjuster result into the view it is given (in place). Hand it a copy
                 # so that only the returned patch, clipped to the active sections, reaches the working config.
                 patch2 = self.adjust_config(sample_manager=sample_manager, phase=phase, view=deepcopy(working_cfg),
-                                            active_sections=None, changed_keys=changed_keys)
+                                            active_sections=None, changed_keys=changed_keys,
+                                            view_before_patch=view_before_patch)
                 if patch2:
                     self._merge_patch(working_cfg, patch2, allowed_sections=allowed)
                     changed_keys.extend(_patch_to_config_keys_sets(patch2))
@@ -534,7 +536,8 @@ class ConfigCoordinator(BusSubscriberMixin):
                       phase: Phase = Phase.PRE_VALIDATE,
                       active_sections: Optional[Iterable[str]] = None,
                       changed_keys: Optional[Iterable[ConfigKeys]] = None,
-                      view: Optional[Mapping[str, Any]] = None) -> Dict[str, Any]:
+                      view: Optional[Mapping[str, Any]] = None,
+                      view_before_patch: Optional[Mapping[str, Any]] = None) -> Dict[str, Any]:
         """
         Run all config adjusters on the current working config,
         optionally filtered by changed_keys and pipelines.
@@ -546,6 +549,9 @@ class ConfigCoordinator(BusSubscriberMixin):
         phase
         active_sections
         changed_keys
+        view_before_patch
+            The config before the patch which changed changed_keys (for the adjusters which follow a change
+            of what they are derived from, see AdjustmentContext.view_before_patch).
 
         Returns
         -------
@@ -556,7 +562,7 @@ class ConfigCoordinator(BusSubscriberMixin):
 
         active_sections = self._adjusted_sections(active_sections)
 
-        ctx = self._build_context(sample_manager)
+        ctx = self._build_context(sample_manager, view_before_patch=view_before_patch)
 
         patch = run_adjusters(view=view, ctx=ctx, phase=phase, active_sections=active_sections,
                               changed_keys=changed_keys)
@@ -569,7 +575,7 @@ class ConfigCoordinator(BusSubscriberMixin):
         sections = set(active_sections) if active_sections is not None else set(self._active_sections)
         return sections | set(ALTERNATIVES_REG.canonical_global_config_names)
 
-    def _build_context(self, sample_manager) -> AdjustmentContext:
+    def _build_context(self, sample_manager, view_before_patch=None) -> AdjustmentContext:
         if self.scope == AdjusterScope.EXPERIMENT:
             if sample_manager is None:
                 raise ValueError('EXPERIMENT coordinator requires a sample_manager')
@@ -578,6 +584,7 @@ class ConfigCoordinator(BusSubscriberMixin):
                 sample_manager=sample_manager,
                 group_base_dir=None,
                 run_label=str(self.base_dir),
+                view_before_patch=view_before_patch,
             )
         elif self.scope == AdjusterScope.GROUP:
             if sample_manager is not None:

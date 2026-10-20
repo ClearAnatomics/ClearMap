@@ -15,6 +15,7 @@ from typing import Any, Optional, Iterable, Dict, Sequence, List, Set, Tuple
 from ClearMap.Utils.utilities import deep_merge, REPLACE, DELETE, _REPLACE
 
 from ClearMap.config.channel import is_reserved_channel_name
+from ClearMap.config.registration_channels import new_defaults_of_unedited_registrations
 from ClearMap.config.compound_keys import CompoundKey, compound_is_oriented
 
 from ClearMap.config.config_handler import ALTERNATIVES_REG
@@ -584,6 +585,28 @@ def reconcile_generic_instance_containers(view: ConfigView, ctx: AdjustmentConte
             merge_patches(patch, p)
 
     return patch
+
+@patch_adjuster(step=Step.ADJUST, phase=Phase.PRE_VALIDATE, requires_sample_manager=True,
+                watched_keys=(('sample', 'channels'),), owned_keys=(('registration', 'channels'),),
+                kind=AdjusterKind.OTHER)
+def update_unedited_registration_channels(view: ConfigView, ctx: AdjustmentContext) -> ConfigPatch:
+    """
+    The default partners and directions of the registrations depend on the data types of the channels (see
+    default_registration_partners_and_directions), which are chosen after the channels are created and after one
+    another. When a patch changes them, the unedited registrations (still the defaults of before) take the new
+    defaults; the others, set by hand, are left alone.
+    Without the config as it was before the patch, there is nothing to follow.
+    """
+    if ctx.view_before_patch is None:
+        return {}
+    renames = ctx.sample_manager.renamed_channels or {}
+    data_types_before = {renames.get(channel, channel): channel_config.get('data_type', 'undefined')
+                         for channel, channel_config in ctx.view_before_patch['sample']['channels'].items()}
+    data_types_after = {channel: channel_config.get('data_type', 'undefined')
+                        for channel, channel_config in view['sample']['channels'].items()}
+    changes = new_defaults_of_unedited_registrations(view['registration']['channels'], data_types_before, data_types_after)
+    return {'registration': {'channels': changes}} if changes else {}
+
 
 ########################## TEMPLATES CLEANUP ##############
 TEMPLATE_ROOT_KEYS = tuple(spec.abs_templates_path() for spec in INSTANCE_SPECS_REGISTRY.specs

@@ -9,6 +9,7 @@ from copy import deepcopy
 from ClearMap.config.compound_keys import PairKey
 from ClearMap.config.config_adjusters.type_hints import SampleManagerProtocol
 from ClearMap.config.defaults_provider import DefaultsProvider
+from ClearMap.config.registration_channels import REFERENCE_DATA_TYPE, default_registration_partners_and_directions
 
 
 from ClearMap.config.config_adjusters.policy_specs import ContainerSpecRegistry, TemplateKind, InstanceContainerSpec
@@ -328,15 +329,21 @@ class ExperimentTemplatesResolver(TemplateResolverBase):
         return list(self._facts.sample_channels)
 
     def registration_entry_template(self, channel: str) -> Dict[str, Any]:
-        if self._sm.data_type(channel) == 'autofluorescence':
-            tpl_channel_key = 'autofluorescence'
-            reference = 'atlas'
-        else:
-            tpl_channel_key = 'regular'
-            reference = self._facts.alignment_reference or channel
+        """
+        The registration entry of channel: the template of its data type, with what it is aligned with and how
+        (align_with, moving_channel) as the sample defaults say
+        (see default_registration_partners_and_directions).
+        """
+        data_types = {sample_channel: self._sm.data_type(sample_channel) for sample_channel in self._facts.sample_channels}
+        data_types.setdefault(channel, self._sm.data_type(channel))
+        align_with, moving_channel = default_registration_partners_and_directions(data_types)[channel]
+        tpl_channel_key = 'autofluorescence' if data_types[channel] == REFERENCE_DATA_TYPE else 'regular'
         base = self._require_template_dict(section='registration', kind=TemplateKind.CHANNELS, key=tpl_channel_key)
 
-        return deepcopy(self.expand(base, channel=channel, reference=reference))
+        entry = deepcopy(self.expand(base, channel=channel, reference=align_with))
+        entry['moving_channel'] = moving_channel
+        entry['align_with'] = align_with
+        return entry
 
     # -----------------------------------------------------------------
     # Cell map / tract map
