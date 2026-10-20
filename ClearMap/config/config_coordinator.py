@@ -12,7 +12,8 @@ from copy import deepcopy
 from ClearMap.Utils.event_bus import EventBus, BusSubscriberMixin
 from ClearMap.Utils.events import CfgChanged, ChannelRenamed, ChannelsChanged
 from ClearMap.Utils.exceptions import ChannelNameTakenError
-from ClearMap.Utils.utilities import infer_origin_from_caller, deep_merge
+from ClearMap.Utils.utilities import infer_origin_from_caller
+from ClearMap.config.config_adjusters.patch_ops import deep_merge
 
 from .channel import folded_channel_name
 from .config_adjusters.type_hints import AdjustmentContext

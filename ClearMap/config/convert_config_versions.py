@@ -18,8 +18,8 @@ from PyQt5.QtWidgets import QApplication, QDialog
 from ClearMap.IO.assets_constants import CHANNELS_ASSETS_TYPES_CONFIG
 from ClearMap.IO.FileUtils import Rename, apply_renames
 from ClearMap.Utils.tag_expression import Expression
-from ClearMap.Utils.utilities import (try_get_item_recursive, set_item_recursive, has_item_recursive, deep_merge,
-                                      del_item_recursive)
+from ClearMap.Utils.utilities import try_get_item_recursive, set_item_recursive, has_item_recursive, del_item_recursive
+from ClearMap.config.config_adjusters.patch_ops import deep_merge
 from ClearMap.config.config_handler import ConfigHandler, ALTERNATIVES_REG
 from ClearMap.config.registration_channels import MOVING_OTHER
 

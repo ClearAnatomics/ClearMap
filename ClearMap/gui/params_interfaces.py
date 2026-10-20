@@ -17,7 +17,8 @@ from PyQt5.QtWidgets import (QCheckBox, QLabel, QLineEdit, QSpinBox, QFrame,
 
 from ClearMap.IO.assets_constants import CONTENT_TYPE_TO_PIPELINE
 from ClearMap.Utils.event_bus import BusSubscriberMixin, EventBus, GUI_THREAD
-from ClearMap.Utils.utilities import set_item_recursive, get_item_recursive, DELETE
+from ClearMap.Utils.utilities import set_item_recursive, get_item_recursive
+from ClearMap.config.config_adjusters.patch_ops import DELETE
 from ClearMap.Utils.exceptions import ConfigNotFoundError, ClearMapValueError
 from ClearMap.config.config_handler import ALTERNATIVES_REG
 from ClearMap.gui.exception_handler import handle_exception

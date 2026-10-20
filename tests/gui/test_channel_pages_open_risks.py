@@ -19,7 +19,7 @@ from ClearMap.gui.params_interfaces import ChannelsUiParameterCollection, Channe
 from ClearMap.gui.tabs import SampleInfoTab
 from ClearMap.gui.tabs_interfaces import ExperimentTab
 from ClearMap.Utils.exceptions import ChannelNameTakenError, ClearMapConfigError, ClearMapValueError
-from ClearMap.Utils.utilities import DELETE
+from ClearMap.config.config_adjusters.patch_ops import DELETE
 
 FIRST, SECOND, THIRD = 'fos', 'auto', 'nuclei'
 

@@ -82,10 +82,10 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Optional, Tuple, Dict, Iterable, Callable, List, Any, Set
 
-from ClearMap.Utils.utilities import deep_merge, DELETE, _REPLACE
 from ClearMap.config.config_adjusters.type_hints import ConfigKeys, ConfigView, AdjustmentContext, ConfigPatch
 from ClearMap.config.config_adjusters.dict_ops import is_under
-from ClearMap.config.config_adjusters.patch_ops import merge_patches, _iter_patch_paths, iter_patch_items
+from ClearMap.config.config_adjusters.patch_ops import (DELETE, _REPLACE, deep_merge, merge_patches, _iter_patch_paths,
+                                                        iter_patch_items)
 from ClearMap.config.defaults_provider import get_defaults_provider
 from ClearMap.config.config_adjusters.templates_resolver import (BindPolicy, set_current_resolver,
                                                                  ExperimentTemplatesResolver, GroupTemplatesResolver)

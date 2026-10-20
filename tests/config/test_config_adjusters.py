@@ -2,7 +2,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 import pytest
 
-from ClearMap.Utils.utilities import DELETE, deep_merge
+from ClearMap.config.config_adjusters.patch_ops import DELETE, deep_merge
 from ClearMap.config.compound_keys import PairKey
 from ClearMap.config.config_adjusters.adjusters_api import AdjusterScope, Phase
 from ClearMap.config.config_adjusters.engine import run_adjusters

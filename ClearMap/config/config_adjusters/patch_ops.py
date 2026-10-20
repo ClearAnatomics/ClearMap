@@ -3,10 +3,76 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Tuple, Any, Iterable, Mapping, Dict
 
-from ClearMap.Utils.utilities import DELETE, _REPLACE
 from ClearMap.config.config_adjusters.dict_ops import ensure_path_dict
 from ClearMap.config.config_adjusters.type_hints import KeysPath
 from ClearMap.Utils.exceptions import PatchConflictError
+
+
+class _DELETE:
+    """
+    Singleton object to indicate deletion in deep merges.
+    Because of ClearMap's extensive use of multi-processing and pickling,
+    this class ensures that the DELETE object keeps its identity across
+    deep copies and pickling.
+    """
+    __slots__ = ()
+    def __repr__(self) -> str:
+        return "<DELETE>"
+
+    # keep identity across deepcopy
+    def __deepcopy__(self, memo):
+        return self
+
+    # keep identity across pickle / multiprocessing
+    def __reduce__(self):
+        return _get_delete_singleton, ()
+
+def _get_delete_singleton():
+    return DELETE
+
+DELETE = _DELETE()
+
+class _REPLACE:
+    """Replace the destination value at this key with the provided payload."""
+    __slots__ = ('payload',)
+    def __init__(self, payload):
+        self.payload = payload
+
+    def __repr__(self):
+        return f"<REPLACE {type(self.payload).__name__}>"
+
+    # keep identity across deepcopy
+    def __deepcopy__(self, memo):
+        return _REPLACE(deepcopy(self.payload))
+
+    # keep identity across pickle / multiprocessing
+    def __reduce__(self):
+        return _make_replace, (self.payload,)
+
+def _make_replace(payload):
+    return _REPLACE(payload)
+
+def REPLACE(value):
+    return _REPLACE(value)
+
+def deep_merge(dst: Dict[str, Any], src: Dict[str, Any]) -> Dict[str, Any]:
+    for k, v in src.items():
+        if v is DELETE:
+            dst.pop(k, None)
+            continue
+
+        if isinstance(v, _REPLACE):
+            dst[k] = deepcopy(v.payload)
+            continue
+
+        if isinstance(v, dict):
+            sub = dst.get(k)
+            if not isinstance(sub, dict):
+                sub = {}
+            dst[k] = deep_merge(sub, v)  # nested replacement
+        else:
+            dst[k] = deepcopy(v)
+    return dst
 
 
 def merge_patches(dst: dict, src: dict, *, _path: Tuple[str, ...] = ()) -> dict:

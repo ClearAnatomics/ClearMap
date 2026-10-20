@@ -12,8 +12,6 @@ with the @adjuster decorator
 from copy import deepcopy
 from typing import Any, Optional, Iterable, Dict, Sequence, List, Set, Tuple
 
-from ClearMap.Utils.utilities import deep_merge, REPLACE, DELETE, _REPLACE
-
 from ClearMap.config.channel import is_reserved_channel_name
 from ClearMap.config.registration_channels import new_defaults_of_unedited_registrations
 from ClearMap.config.compound_keys import CompoundKey, compound_is_oriented
@@ -27,7 +25,8 @@ from ClearMap.config.config_adjusters.patch_ops import (_strip_template_like_key
                                                         _stable_order_keys,
                                                         _restrict_entry_to_template_keys,
                                                         _strip_template_like_keys_from_entry, merge_patches,
-                                                        _raise_if_rename_map_collides, set_patch_at_path)
+                                                        _raise_if_rename_map_collides, set_patch_at_path,
+                                                        deep_merge, REPLACE, DELETE, _REPLACE)
 from ClearMap.config.config_adjusters.templates_resolver import get_current_resolver
 from ClearMap.config.config_adjusters.adjusters_api import Phase, Step, patch_adjuster, AdjusterKind
 from ClearMap.config.config_adjusters.policy_specs import (InstanceContainerSpec,

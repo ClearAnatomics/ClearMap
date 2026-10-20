@@ -6,7 +6,7 @@ not outlive the experiment (they are minted again when it is opened).
 import pytest
 
 from ClearMap.Utils.exceptions import ChannelNameTakenError, UnknownChannelError
-from ClearMap.Utils.utilities import DELETE
+from ClearMap.config.config_adjusters.patch_ops import DELETE
 from ClearMap.config.channel import ChannelRegistry
 
 CHANNEL, OTHER_CHANNEL, NEW_NAME = 'nuclei_a', 'nuclei_b', 'nuclei_renamed'
