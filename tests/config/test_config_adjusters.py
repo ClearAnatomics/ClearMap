@@ -6,6 +6,7 @@ from ClearMap.Utils.utilities import DELETE, deep_merge
 from ClearMap.config.compound_keys import PairKey
 from ClearMap.config.config_adjusters.adjusters_api import AdjusterScope, Phase
 from ClearMap.config.config_adjusters.engine import run_adjusters
+from ClearMap.config.config_adjusters.policy import _fix_channel_backreferences
 from ClearMap.config.config_adjusters.type_hints import AdjustmentContext
 from ClearMap.config.defaults_provider import DefaultsProvider, get_defaults_provider, set_defaults_provider
 
@@ -253,3 +254,16 @@ def test_machine_and_display_fill_missing():
     display_defaults = get_defaults_provider().get('display')
     assert mpatch['machine']['verbosity'] == machine_defaults['verbosity']
     assert dpatch['display'].keys() == display_defaults.keys()
+
+
+def test_the_channel_renames_leave_the_values_which_are_not_channels_alone():
+    # A channel cannot be named "other" (reserved): if a rename of it ever came through, the moving_channel "other"
+    # of the other channels (a value of the config, relative to their align_with) would not be rewritten
+    channels = {'fos': {'align_with': 'auto', 'moving_channel': 'other'},
+                'auto': {'align_with': 'atlas', 'moving_channel': 'Other'}}
+    patch = {'registration': {'channels': channels}}
+
+    _fix_channel_backreferences({}, {'other': 'renamed', 'Other': 'renamed', 'auto': 'reference'}, patch)
+
+    assert channels == {'fos': {'align_with': 'reference', 'moving_channel': 'other'},
+                        'auto': {'align_with': 'atlas', 'moving_channel': 'Other'}}

@@ -14,6 +14,7 @@ from typing import Any, Optional, Iterable, Dict, Sequence, List, Set, Tuple
 
 from ClearMap.Utils.utilities import deep_merge, REPLACE, DELETE, _REPLACE
 
+from ClearMap.config.channel import is_reserved_channel_name
 from ClearMap.config.compound_keys import CompoundKey, compound_is_oriented
 
 from ClearMap.config.config_handler import ALTERNATIVES_REG
@@ -218,6 +219,8 @@ def _fix_channel_backreferences(view: ConfigView, rename_map: dict[str, str],
                 continue
             for field in fields:
                 val = ch_cfg.get(field)
+                if is_reserved_channel_name(val):  # Not a channel (e.g. moving_channel: other): never renamed
+                    continue
                 if val in rename_map:
                     ch_cfg[field] = rename_map[val]
 

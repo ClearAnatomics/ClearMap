@@ -62,3 +62,27 @@ def test_forbidden_extension_string_fails(src_dir: Path, schemas_dir: Path, sche
     bad['default_tile_extension'] = [forbidden_extension]
     errors = list(validator.iter_errors(bad))
     assert errors, 'Expected validation to fail for non-dot-prefixed extension'
+
+
+@pytest.mark.parametrize('reserved_name', ['self', 'Other', 'intrinsically_aligned', 'undefined', 'None'])
+def test_a_channel_name_reserved_for_a_value_of_the_config_fails(schemas_dir: Path, schema_registry, tmp_repo: Path,
+                                                                 reserved_name: str):
+    validator = Validator(_load_schema(schemas_dir / 'sample.schema.yaml'), registry=schema_registry)
+    config = _load_yaml(tmp_repo / 'sample.yml')
+
+    def errors_about(channel_name: str) -> list[str]:
+        config['channels'] = {channel_name: {}}
+        return [error.message for error in validator.iter_errors(config) if repr(channel_name) in error.message]
+
+    assert errors_about('fos') == []  # The name of a channel
+    assert errors_about(reserved_name), f'Expected a validation error for the reserved channel name {reserved_name!r}'
+
+
+def test_the_values_of_the_registration_which_are_not_channels_stay_valid(schemas_dir: Path, schema_registry,
+                                                                          tmp_repo: Path):
+    schema = _load_schema(schemas_dir / 'registration.schema.yaml')
+    config = _load_yaml(tmp_repo / 'registration.yml')
+    config['channels'] = {'fos': {'align_with': 'atlas', 'moving_channel': 'other'},
+                          'dapi': {'align_with': 'fos', 'moving_channel': 'intrinsically_aligned'}}
+
+    assert not list(Validator(schema, registry=schema_registry).iter_errors(config))

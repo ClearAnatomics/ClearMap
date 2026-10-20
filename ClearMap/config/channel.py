@@ -24,6 +24,7 @@ from typing import NoReturn, TypeVar, Union
 from ClearMap.Utils.exceptions import (ChannelNameTakenError, ClearMapTypeError, InvalidChannelIdError,
                                        InvalidChannelNameError,
                                        UnknownChannelError)
+from ClearMap.config.registration_channels import INTRINSICALLY_ALIGNED, MOVING_OTHER, MOVING_SELF
 
 # WARNING: Keep in sync with ``typedefs.schema.yaml#/$defs/channelName`` (the sample channel names).
 #  No '-': it joins the channels of the compound keys (see compound_keys.py)
@@ -38,6 +39,22 @@ V = TypeVar('V')
 def folded_channel_name(name: str) -> str:
     """The name as compared for uniqueness: channel names are file names, which some file systems fold"""
     return name.casefold()
+
+
+# WARNING: Keep in sync with ``typedefs.schema.yaml#/$defs/channelName``
+#: The values which the config fields holding a channel name accept besides the names of the channels
+#: (``align_with``, ``moving_channel``, ``layout_channel``, ...). A channel of one of these names would be mistaken
+#: for them, and renaming it would rewrite them. Compared whatever the case, as the names are.
+RESERVED_CHANNEL_NAMES = frozenset(folded_channel_name(name) for name in (
+    MOVING_SELF, MOVING_OTHER, INTRINSICALLY_ALIGNED,
+    'undefined',  # Not chosen yet (e.g. the layout_channel of the stitching)
+    'none',  # How None is written in the GUI combo boxes (and in YAML, whatever the case)
+))
+
+
+def is_reserved_channel_name(value) -> bool:
+    """Whether value is one of the values of the config which are not channels (see RESERVED_CHANNEL_NAMES)"""
+    return isinstance(value, str) and folded_channel_name(value) in RESERVED_CHANNEL_NAMES
 
 
 def _refuse_to_be_pickled(what: str) -> NoReturn:
@@ -157,8 +174,9 @@ class ChannelRegistry:
     """
     The channels of one sample: mints their ids, and validates and changes their names.
 
-    Names are made of letters, digits and underscores (``CHANNEL_NAME_RE``) and unique **case insensitively**
-    (``Ch`` and ``ch`` would be the same file on macOS and Windows).
+    Names are made of letters, digits and underscores (``CHANNEL_NAME_RE``), are not reserved
+    (``RESERVED_CHANNEL_NAMES``) and are unique **case insensitively** (``Ch`` and ``ch`` would be the same file on
+    macOS and Windows).
 
     .. warning::
         Owned by the sample manager, changed only inside a config commit (the owner of the one-off side effects
@@ -174,6 +192,9 @@ class ChannelRegistry:
         if not isinstance(name, str) or not CHANNEL_NAME_RE.fullmatch(name):
             raise InvalidChannelNameError(f'{name!r} is not a valid channel name: '
                                           f'only letters, digits and "_" are allowed')
+        if is_reserved_channel_name(name):
+            raise InvalidChannelNameError(f'{name!r} is not a valid channel name: it is reserved (whatever the case) '
+                                          f'for a value of the config ({", ".join(sorted(RESERVED_CHANNEL_NAMES))})')
         return name
 
     def add(self, name: str) -> Channel:
