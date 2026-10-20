@@ -213,6 +213,7 @@ class SampleInfoTab(ExperimentTab):
     def _set_params(self) -> None:
         exp_ctrl = self.main_window.experiment_controller
         self.params = SampleParameters(self.ui, event_bus=self._bus,
+                                       plan_file_renames=exp_ctrl.plan_channel_file_renames,
                                        get_view=exp_ctrl.get_config_view,
                                        apply_patch=exp_ctrl.apply_ui_patch)
 

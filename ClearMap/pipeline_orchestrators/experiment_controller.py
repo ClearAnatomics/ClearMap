@@ -42,14 +42,16 @@ Design Notes
 from collections import defaultdict
 from enum import Enum
 from pathlib import Path
-from typing import Callable, Dict, Iterable, Optional, Tuple, Any, Union
+from typing import Callable, Dict, Iterable, Mapping, Optional, Tuple, Any, Union
 
+from ClearMap.IO.channel_file_renaming import ChannelRenamePlan, plan_channel_file_renames
 from ClearMap.Utils.event_bus import EventBus, BusSubscriberMixin
 from ClearMap.Utils.events import WorkspaceChanged, UiChannelRenamed, UiChannelsChanged, CfgChanged
 from ClearMap.config.config_adjusters.type_hints import AdjusterScope
 from ClearMap.config.config_coordinator import ConfigCoordinator
 from ClearMap.config.config_handler import ConfigHandler
 from ClearMap.config.defaults_provider import DefaultsProvider
+from ClearMap.config.registration_channels import registration_pairs
 from ClearMap.pipeline_orchestrators.group_orchestrators import DensityGroupAnalysisOrchestrator
 from ClearMap.pipeline_orchestrators.processor_launcher import ProcessorLauncher
 
@@ -604,6 +606,18 @@ class ExperimentController(BusSubscriberMixin):
         # print(f'Applying UI patch keys: {list(patch.keys())}')
         self.cfg_coordinator.submit_patch(patch, sample_manager=self.sample_manager)
         # self.evt_bus.publish(ConfigChanged({"rev": self.cfg_coordinator._rev}))
+
+    def plan_channel_file_renames(self, channel_renames: Mapping[str, str]) -> ChannelRenamePlan:
+        """
+        The files to rename with the channels (see :func:`plan_channel_file_renames`). Call it before the
+        rename is committed: the files, the workspace and the registration config still use the old names.
+        Empty if the workspace is not ready (no file can be named after the channels yet).
+        """
+        if not self.sample_manager.workspace_ready:
+            return ChannelRenamePlan()
+        registration_config = self.get_config_view().get('registration') or {'channels': {}}
+        return plan_channel_file_renames(self.sample_manager.workspace, channel_renames,
+                                         registration_pairs(registration_config))
 
     # ---- run path (snapshot + launch) ---------------------------------------
     def seal_and_snapshot(self) -> Path:

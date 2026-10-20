@@ -9,6 +9,8 @@ Run: ``pytest tests/gui/test_channel_pages_open_risks.py -v``. Expected: N passe
 """
 import pytest
 
+from ClearMap.IO.FileUtils import Rename
+from ClearMap.IO.channel_file_renaming import ChannelRenamePlan, NotRenamed
 from ClearMap.config.channel import ChannelId, ChannelRegistry
 from ClearMap.gui import params, params_interfaces, tabs_interfaces
 from ClearMap.gui.params import SampleParameters
@@ -16,7 +18,7 @@ from ClearMap.gui.widgets import channel_id_of, set_channel_id
 from ClearMap.gui.params_interfaces import ChannelsUiParameterCollection, ChannelUiParameter
 from ClearMap.gui.tabs import SampleInfoTab
 from ClearMap.gui.tabs_interfaces import ExperimentTab
-from ClearMap.Utils.exceptions import ChannelNameTakenError, ClearMapValueError
+from ClearMap.Utils.exceptions import ChannelNameTakenError, ClearMapConfigError, ClearMapValueError
 from ClearMap.Utils.utilities import DELETE
 
 FIRST, SECOND, THIRD = 'fos', 'auto', 'nuclei'
@@ -111,6 +113,10 @@ class FakeChannelParams:
         self.torn_down = True
 
 
+def plan_without_files(channel_renames):
+    return ChannelRenamePlan()
+
+
 class FakeCollection:
     """A channels collection with the real ``drop_channel``, ``pop`` and rename, and a patch sink we can make fail"""
     drop_channel = ChannelsUiParameterCollection.drop_channel
@@ -118,9 +124,12 @@ class FakeCollection:
     handle_channel_rename_request = SampleParameters.handle_channel_rename_request
     _revert_rename = SampleParameters._revert_rename
     _refuse_rename = SampleParameters._refuse_rename
+    _vet_file_renames = SampleParameters._vet_file_renames
+    _rename_files = SampleParameters._rename_files
 
     def __init__(self, *, patch_fails: bool = False):
         self.tab = FakeTab()
+        self._plan_file_renames = plan_without_files
         self.channel_params: dict[str, FakeChannelParams] = {}
         self.patches: list[dict] = []
         self._apply_patch = self.patches.append
@@ -361,6 +370,141 @@ def test_an_accepted_rename_tells_the_user_nothing(rename_collection, monkeypatc
     assert rename_collection.channels == [SECOND]
     assert request.requester.name == SECOND
     assert request.dialogs == []
+
+
+# ------------------------------------------------------------------------------- the files of a renamed channel
+
+class FakeRenamingDialog:
+    """The dialog where the user vets the renames: it answers as the test says, with the renames as proposed"""
+    accepted = True
+    shown: list = []
+
+    def __init__(self, renames, *, not_renamed=(), title='', message='', accept_text='', parent=None):
+        self.selected_renames = list(renames)
+        self.not_renamed = list(not_renamed)
+        type(self).shown.append(self)
+
+    def exec(self):
+        return params.QDialog.Accepted if self.accepted else params.QDialog.Rejected
+
+
+@pytest.fixture()
+def renaming_dialog(monkeypatch):
+    class Dialog(FakeRenamingDialog):  # Own class: a test may make the user cancel
+        shown = []
+    monkeypatch.setattr(params, 'VerifyRenamingDialog', Dialog)
+    return Dialog
+
+
+@pytest.fixture()
+def cells_of_first(tmp_path):
+    """A file of the channel FIRST, and the rename the plan proposes for it"""
+    cells = tmp_path / f'{FIRST}_cells.npy'
+    cells.touch()
+    return Rename(cells, tmp_path / f'{SECOND}_cells.npy')
+
+
+def _plan_renaming(collection, rename, planned_with):
+    def plan(channel_renames):
+        planned_with.append((dict(channel_renames), list(collection.patches)))
+        return ChannelRenamePlan(renames=[rename])
+    collection._plan_file_renames = plan
+
+
+def test_the_files_of_a_renamed_channel_are_renamed_once_the_user_accepts(rename_collection, monkeypatch,
+                                                                          renaming_dialog, cells_of_first):
+    planned_with = []
+    _plan_renaming(rename_collection, cells_of_first, planned_with)
+    request = RenameRequest(rename_collection, FIRST, SECOND)
+
+    request.ask(monkeypatch)
+
+    assert planned_with == [({FIRST: SECOND}, [])]  # Planned before the rename: the files have the old names
+    assert rename_collection.channels == [SECOND]
+    assert not cells_of_first.source.exists() and cells_of_first.target.exists()
+    assert request.dialogs == []
+
+
+def test_cancelling_the_renaming_of_the_files_cancels_the_rename_of_the_channel(rename_collection, monkeypatch,
+                                                                                renaming_dialog, cells_of_first):
+    renaming_dialog.accepted = False
+    _plan_renaming(rename_collection, cells_of_first, [])
+    request = RenameRequest(rename_collection, FIRST, SECOND)
+
+    request.ask(monkeypatch)
+
+    assert rename_collection.channels == [FIRST]
+    assert rename_collection.patches == []  # The config was not asked
+    assert request.shown == [FIRST]  # The name field is put back
+    assert cells_of_first.source.exists() and not cells_of_first.target.exists()
+    assert request.dialogs == []
+
+
+def test_a_channel_without_files_is_renamed_without_asking(rename_collection, monkeypatch, renaming_dialog):
+    request = RenameRequest(rename_collection, FIRST, SECOND)
+
+    request.ask(monkeypatch)
+
+    assert rename_collection.channels == [SECOND]
+    assert renaming_dialog.shown == []
+
+
+def test_the_files_left_alone_are_shown_even_if_nothing_is_renamed(rename_collection, monkeypatch, renaming_dialog,
+                                                                   tmp_path):
+    raw = NotRenamed(tmp_path / 'raw', 'raw data is never renamed')
+    rename_collection._plan_file_renames = lambda channel_renames: ChannelRenamePlan(not_renamed=[raw])
+    request = RenameRequest(rename_collection, FIRST, SECOND)
+
+    request.ask(monkeypatch)
+
+    (dialog,) = renaming_dialog.shown
+    assert dialog.not_renamed == [raw]
+    assert rename_collection.channels == [SECOND]
+
+
+def test_a_rename_whose_files_cannot_be_planned_is_cancelled_and_the_user_told_why(rename_collection, monkeypatch,
+                                                                                  renaming_dialog):
+    inconsistent = ClearMapConfigError("moving_channel 'auto' is neither the channel nor its align_with")
+
+    def plan_fails(channel_renames):
+        raise inconsistent
+    rename_collection._plan_file_renames = plan_fails
+    request = RenameRequest(rename_collection, FIRST, SECOND)
+
+    request.ask(monkeypatch)
+
+    assert rename_collection.channels == [FIRST]
+    assert rename_collection.patches == []
+    assert request.shown == [FIRST]
+    (reason, parent, context), = request.dialogs
+    assert reason is inconsistent and parent is rename_collection.tab
+    assert 'keeps its name' in context
+
+
+def test_the_files_are_not_renamed_if_the_config_refuses_the_rename(rename_collection, monkeypatch, renaming_dialog,
+                                                                    cells_of_first):
+    _plan_renaming(rename_collection, cells_of_first, [])
+    request = RenameRequest(rename_collection, FIRST, SECOND, config_drops_it=True)
+
+    request.ask(monkeypatch)
+
+    assert rename_collection.channels == [FIRST]
+    assert cells_of_first.source.exists() and not cells_of_first.target.exists()
+
+
+def test_files_which_cannot_be_renamed_keep_their_names_and_the_user_is_told(rename_collection, monkeypatch,
+                                                                            renaming_dialog, cells_of_first):
+    _plan_renaming(rename_collection, cells_of_first, [])
+    request = RenameRequest(rename_collection, FIRST, SECOND)
+    cells_of_first.target.touch()  # Appeared after the user vetted the renames
+
+    request.ask(monkeypatch)
+
+    assert rename_collection.channels == [SECOND]
+    assert cells_of_first.source.exists()
+    (reason, parent, context), = request.dialogs
+    assert 'onto what exists' in str(reason) and parent is rename_collection.tab
+    assert 'keep their old names' in context
 
 
 # ------------------------------------------------------------------------------- reconcile: what runs after a change

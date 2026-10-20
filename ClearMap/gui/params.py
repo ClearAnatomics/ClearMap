@@ -7,15 +7,17 @@ All the classes that define parameters or group thereof for the tabs of the grap
 import functools
 import string
 import warnings
-from typing import List, Optional, Callable
+from typing import List, Mapping, Optional, Callable
 
 import numpy as np
 
 from PyQt5.QtCore import Qt, QTimer, QSignalBlocker
 from PyQt5.QtWidgets import (QToolBox, QCheckBox, QLabel, QHBoxLayout, QVBoxLayout,
-                             QSpinBox, QLineEdit, QDoubleSpinBox, QRadioButton, QFrame)
+                             QSpinBox, QLineEdit, QDoubleSpinBox, QRadioButton, QFrame, QDialog)
 
 from ClearMap.Analysis.graphs.graph_filters import GraphFilter, combined_filters_name
+from ClearMap.IO.FileUtils import FileRenameError, Rename, apply_renames
+from ClearMap.IO.channel_file_renaming import ChannelRenamePlan
 from ClearMap.Analysis.graphs.graph_weights import GraphWeight
 from ClearMap.config.atlas import ATLAS_NAMES_MAP
 from ClearMap.config.compound_keys import channel_file_name_token
@@ -30,6 +32,7 @@ from ClearMap.Utils.events import (UiChannelRenamed, UiCropChanged, UiOrientatio
                                    UiRequestLandmarksDialog, UiAtlasIdChanged, UiAtlasStructureTreeIdChanged,
                                    UiVesselGraphFiltersChanged, UiBatchResultsFolderChanged, UiBatchGroupsChanged)
 
+from .dialogs import VerifyRenamingDialog
 from .exception_handler import handle_exception
 from .gui_utils_base import replace_widget
 from .params_mixins import OrthoviewerSlicingMixin
@@ -247,7 +250,16 @@ class SampleParameters(ChannelsUiParameterCollection):
 
     cfg_subtree = ['sample']
 
-    def __init__(self, tab, *, event_bus: EventBus, get_view=None, apply_patch=None):
+    def __init__(self, tab, *, event_bus: EventBus,
+                 plan_file_renames: Callable[[Mapping[str, str]], ChannelRenamePlan], get_view=None, apply_patch=None):
+        """
+        Parameters
+        ----------
+        plan_file_renames : Callable[[Mapping[str, str]], ChannelRenamePlan]
+            The files to rename with the channels, by the new name of each renamed channel (by old name), planned
+            before the rename (e.g. :meth:`ExperimentController.plan_channel_file_renames`).
+        """
+        self._plan_file_renames = plan_file_renames
         self.shared_sample_params = SharedSampleParams(tab, event_bus=event_bus,
                                                        get_view=get_view, apply_patch=apply_patch)
         self._last_channels: Optional[List[str]] = None
@@ -317,10 +329,13 @@ class SampleParameters(ChannelsUiParameterCollection):
                                       requester: SampleChannelParameters) -> None:
         """
         Orchestrate rename:
+          0. Ask the user to vet the renaming of the files of the channel (if it has any); cancelling it
+             cancels the rename
           1. Update parent-owned state (dict key, tab text) so synchronous
              cascade sees consistent state
           2. Ask child to write its config
           3. Verify; on failure, revert and tell the user why
+          4. Rename the files the user kept
 
         Parameters
         ----------
@@ -344,6 +359,18 @@ class SampleParameters(ChannelsUiParameterCollection):
             handle_exception(err, parent=self.tab, context=f'Rename {old_name!r} → {new_name!r}')
             return
 
+        # 0. Planned under the old names (the files, the workspace and the registration config still use them)
+        try:
+            file_renames = self._vet_file_renames(old_name, new_name)
+        except Exception as err:  # E.g. an inconsistent registration config: not renamed without its files
+            requester.show_name()
+            handle_exception(err, parent=self.tab, context=f'The renaming of the files of {old_name!r} cannot be '
+                                                           f'planned: the channel keeps its name')
+            return
+        if file_renames is None:  # The user cancelled: the channel keeps its name
+            requester.show_name()
+            return
+
         # 1. Parent updates its own state (dict key). The requester's name (tab text and name field) is set
         #    through its page, never through an index which may be stale
         self.channel_params[new_name] = self.channel_params.pop(old_name)
@@ -364,6 +391,34 @@ class SampleParameters(ChannelsUiParameterCollection):
 
         # 4. Success
         self._publish_channels_changed(self.config_channels)
+        self._rename_files(old_name, new_name, file_renames)
+
+    def _vet_file_renames(self, old_name: str, new_name: str) -> list[Rename] | None:
+        """
+        The renames of the files of the channel, as vetted by the user. None if the user cancelled (the channel
+        keeps its name), empty if the channel has no file.
+        """
+        plan = self._plan_file_renames({old_name: new_name})
+        if not plan:
+            return []
+        dialog = VerifyRenamingDialog(plan.renames, not_renamed=plan.not_renamed,
+                                      title=f'Rename the channel {old_name!r} to {new_name!r}',
+                                      message=f'The files of the channel {old_name!r} are named after it. Unless '
+                                              f'they are renamed too, the pipeline does not find them under the '
+                                              f'name {new_name!r}. Untick a file to leave it as it is.',
+                                      accept_text='Rename the channel and its files', parent=self.tab)
+        if dialog.exec() != QDialog.Accepted:
+            return None
+        return dialog.selected_renames
+
+    def _rename_files(self, old_name: str, new_name: str, file_renames: list[Rename]) -> None:
+        """Rename the files of the renamed channel. If it fails, they keep their old names: tell the user"""
+        try:
+            apply_renames(file_renames)
+        except FileRenameError as err:
+            handle_exception(err, parent=self.tab,
+                             context=f'The channel {old_name!r} is renamed to {new_name!r} but its files keep '
+                                     f'their old names')
 
     def _refuse_rename(self, old_name: str, new_name: str, requester: SampleChannelParameters,
                        reason: Exception) -> None:
