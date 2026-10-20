@@ -3,6 +3,7 @@ from typing import Any, Dict, Iterable, Mapping
 from ...Utils.exceptions import AggregatedValidationError
 from ..channel import folded_channel_name
 from ..compound_keys import compound_channel_parts
+from ..registration_channels import ATLAS, INTRINSICALLY_ALIGNED, MOVING_OTHER, MOVING_SELF
 
 __all__ = ['run_semantic_checks']
 
@@ -60,8 +61,8 @@ def _validate_registration_refs(config: Mapping[str, Any]) -> list[str]:
     known = _sample_channels(config)
     reg = (config.get("registration") or {})
     chs: Dict[str, Any] = (reg.get("channels") or {})
-    tokens_align = {"atlas", "self", "other"}
-    tokens_moving = {"atlas", "intrinsically_aligned", "self", "other"}
+    tokens_align = {ATLAS, MOVING_SELF, MOVING_OTHER}
+    tokens_moving = {ATLAS, INTRINSICALLY_ALIGNED, MOVING_SELF, MOVING_OTHER}
     for ch_name, spec in chs.items():
         spec = spec or {}
         aw = spec.get("align_with")

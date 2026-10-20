@@ -125,6 +125,7 @@ from ClearMap.IO.source.backends.tif_backend import parse_ome_info
 
 from ClearMap.config.atlas import ATLAS_NAMES_MAP, STRUCTURE_TREE_NAMES_MAP
 from ClearMap.config.compound_keys import PairKey, compound_is_oriented
+from ClearMap.config.registration_channels import ATLAS, INTRINSICALLY_ALIGNED
 
 from ClearMap.pipeline_orchestrators.batch_process import BatchProcessor
 
@@ -846,9 +847,9 @@ class RegistrationTab(PreProcessingTab['RegistrationProcessor']):
         if page_widget is None:
             raise ClearMapValueError(f'page_widget cannot be None for {channel=}')
         other_channels = list(set(self.worker.all_channels_to_register) - {channel})
-        populate_combobox(page_widget.alignWithComboBox, [None, 'atlas'] + other_channels)
+        populate_combobox(page_widget.alignWithComboBox, [None, ATLAS] + other_channels)
         populate_combobox(page_widget.movingChannelComboBox,
-                          [None, 'atlas', 'intrinsically_aligned'] + other_channels + [channel])
+                          [None, ATLAS, INTRINSICALLY_ALIGNED] + other_channels + [channel])
 
         partner_channel = self.worker.get_align_with(channel)
         moving_channel = self.worker.get_moving_channel(channel)

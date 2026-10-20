@@ -28,6 +28,9 @@ from ClearMap.Utils.utilities import (runs_on_ui, check_stopped, DEFAULT_ORIENTA
 
 from ClearMap.config.atlas import ATLAS_NAMES_MAP
 from ClearMap.config.config_coordinator import ConfigCoordinator
+from ClearMap.config.registration_channels import (ATLAS, fixed_moving_channels, is_intrinsically_aligned,
+                                                   is_selected_for_registration, may_be_registered,
+                                                   needs_registration, registration_sequence)
 
 from ClearMap.pipeline_orchestrators.generic_orchestrators import IndependentChannelsPipelineOrchestrator, CanceledProcessing
 from ClearMap.pipeline_orchestrators.sample_info_management import SampleManager
@@ -156,8 +159,7 @@ class RegistrationProcessor(IndependentChannelsPipelineOrchestrator):
                 or asset.is_parametrized):  # is_parametrized available only on ExpressionAsset
             return asset
 
-        moving_channel = self.get_moving_channel(channel)
-        if moving_channel in (None, 'intrinsically_aligned'):  # No alignment planned -> no parametrization needed
+        if not needs_registration(self.config['channels'][channel]):  # No alignment planned -> no parametrization
             return asset
 
         fixed_channel, moving_channel = self.get_fixed_moving_channels(channel)
@@ -198,17 +200,10 @@ class RegistrationProcessor(IndependentChannelsPipelineOrchestrator):
             raise ValueError(f'Reference channel "{ref_channel}" not found in registration config')
         return reg_cfg['channels'][ref_channel]
 
-    def get_registration_sequence_channels(self, first_channel, stop_channel='atlas'):
-        out = [first_channel]
-        registration_cfg = self.registration_config['channels']
-        while True:
-            next_channel = registration_cfg[out[-1]]['align_with']
-            if next_channel in (None, stop_channel):
-                break
-            out.append(next_channel)
-        return out
+    def get_registration_sequence_channels(self, first_channel, stop_channel=ATLAS):
+        return registration_sequence(self.registration_config, first_channel, stop_channel)
 
-    def get_transform_directories(self, first_channel, stop_channel='atlas'):
+    def get_transform_directories(self, first_channel, stop_channel=ATLAS):
         reg_cfg = self.registration_config['channels']
         sequence = self.get_registration_sequence_channels(first_channel, stop_channel)
 
@@ -222,7 +217,7 @@ class RegistrationProcessor(IndependentChannelsPipelineOrchestrator):
         # Compile the list of directories for the registration steps in the sequence while checking that they exist
         directories = []
         for channel in sequence:
-            if reg_cfg[channel]['moving_channel'] in (None, 'intrinsically_aligned'):
+            if not needs_registration(reg_cfg[channel]):
                 continue  # Identity: nothing to apply
             result_dir = self.get('aligned', channel=channel).path.parent
             if not result_dir.exists():
@@ -236,7 +231,7 @@ class RegistrationProcessor(IndependentChannelsPipelineOrchestrator):
             channel_cfg = self.config['channels'][channel]
             if channel_cfg['align_with'] is None:
                 continue
-            if channel_cfg['moving_channel'] in (None, 'intrinsically_aligned'):  # No alignment planned -> no param
+            if not needs_registration(channel_cfg):  # No alignment planned -> no param
                 continue
             for asset_type in self._PARAMETRIZED_ASSET_TYPES:
                 try:
@@ -268,10 +263,10 @@ class RegistrationProcessor(IndependentChannelsPipelineOrchestrator):
     @property
     def all_channels_to_register(self) -> list[str]:
         """
-        ALL the channels the config selects for registration, complete or not (superset of
-        :meth:`channels_to_register`), e.g. to list the possible partners in the GUI.
+        ALL the channels which may be registered (selected, or whose partner is not chosen yet), complete or not
+        (superset of :meth:`channels_to_register`), e.g. to list the possible partners in the GUI.
         """
-        return [c for c in self.all_channels if self.config['channels'][c]['align_with'] is not None]
+        return [c for c in self.all_channels if may_be_registered(self.config['channels'][c])]
 
     @property
     def channels_to_resample(self):
@@ -312,32 +307,22 @@ class RegistrationProcessor(IndependentChannelsPipelineOrchestrator):
         return self.registration_status() == RegistrationStatus.REGISTERED
 
     def channel_was_registered(self, channel):
-        align_with = self.get_align_with(channel)
-        moving_channel = self.get_moving_channel(channel)
+        fixed_channel, moving_channel = self.get_fixed_moving_channels(channel)
         asset = self.get('aligned', channel=channel)
-        fixed_channel = channel if align_with == moving_channel else align_with
         return asset.specify({'moving_channel': moving_channel, 'fixed_channel': fixed_channel}).exists
 
     def registration_status(self):
         reg_cfg = self.registration_config
 
-        def is_selected(ch_cfg: dict) -> bool:
-            # user opted-in this channel for registration?
-            align_with = ch_cfg.get('align_with')
-            return align_with not in (None, '', 'none')
-
-        def is_intrinsically_aligned(ch_cfg: dict) -> bool:
-            return ch_cfg.get('moving_channel') == 'intrinsically_aligned'
-
-        any_selected = any(is_selected(reg_cfg['channels'][ch]) and not is_intrinsically_aligned(reg_cfg['channels'][ch])
-                           for ch in self.channels)
+        any_selected = any(is_selected_for_registration(reg_cfg['channels'][ch])
+                           and not is_intrinsically_aligned(reg_cfg['channels'][ch]) for ch in self.channels)
         if not any_selected:
             return RegistrationStatus.NOT_SELECTED
         else:
             ref_channel = self.sample_manager.alignment_reference_channel
             for channel in self.channels:
                 ch_cfg = reg_cfg['channels'][channel]
-                if not is_selected(ch_cfg) or is_intrinsically_aligned(ch_cfg):
+                if not is_selected_for_registration(ch_cfg) or is_intrinsically_aligned(ch_cfg):
                     continue
                 if not ref_channel and ch_cfg['align_with'] == 'autofluorescence':
                     raise ValueError(f'This should not happen, {channel=} set for registration against '
@@ -372,15 +357,7 @@ class RegistrationProcessor(IndependentChannelsPipelineOrchestrator):
                     asset.delete()
 
     def get_fixed_moving_channels(self, channel):
-        moving_channel = self.get_moving_channel(channel)
-        align_with = self.config['channels'][channel]['align_with']
-        if align_with is None:
-            return None, moving_channel
-        if not align_with:
-            raise MissingRequirementException(f'Channel {channel} missing align_with in registration config')
-        # fixed is whichever channel from ('channel', 'align_with') is not 'moving_channel'
-        fixed_channel = channel if align_with == moving_channel else align_with
-        return fixed_channel, moving_channel
+        return fixed_moving_channels(self.config, channel)
 
     def get_elx_asset(self, asset_type, channel):
         fixed_channel, moving_channel = self.get_fixed_moving_channels(channel)
@@ -390,7 +367,7 @@ class RegistrationProcessor(IndependentChannelsPipelineOrchestrator):
             return  self.get(asset_type, channel=channel)
 
     def get_img_to_register(self, channel, other_channel):
-        if other_channel == 'atlas':
+        if other_channel == ATLAS:
             return self.get('atlas', channel=channel, asset_sub_type='reference')
         else:
             return self.get('resampled', channel=other_channel)
@@ -481,7 +458,7 @@ class RegistrationProcessor(IndependentChannelsPipelineOrchestrator):
 
     def align_channel(self, channel):
         fixed_channel, moving_channel = self.get_fixed_moving_channels(channel)
-        if moving_channel is None or moving_channel == 'intrinsically_aligned':
+        if not needs_registration(self.config['channels'][channel]):
             return
         channel_cfg = self.config['channels'][channel]
         run_bspline = any(['bspline' in channel_cfg['params_files']])
