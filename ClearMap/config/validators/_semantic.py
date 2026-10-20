@@ -61,13 +61,13 @@ def _validate_registration_refs(config: Mapping[str, Any]) -> list[str]:
     known = _sample_channels(config)
     reg = (config.get("registration") or {})
     chs: Dict[str, Any] = (reg.get("channels") or {})
-    tokens_align = {ATLAS, MOVING_SELF, MOVING_OTHER}
+    tokens_align_with = {ATLAS, MOVING_SELF, MOVING_OTHER}
     tokens_moving = {ATLAS, INTRINSICALLY_ALIGNED, MOVING_SELF, MOVING_OTHER}
     for ch_name, spec in chs.items():
         spec = spec or {}
         aw = spec.get("align_with")
         mv = spec.get("moving_channel")
-        if isinstance(aw, str) and aw not in tokens_align and aw not in known:
+        if isinstance(aw, str) and aw not in tokens_align_with and aw not in known:
             errs.append(f"[registration] channels.{ch_name}.align_with → unknown '{aw}'")
         if isinstance(mv, str) and mv not in tokens_moving and mv not in known:
             errs.append(f"[registration] channels.{ch_name}.moving_channel → unknown '{mv}'")
