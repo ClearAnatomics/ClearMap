@@ -106,7 +106,8 @@ import ClearMap.ImageProcessing.Experts.Cells as cell_detection
 import ClearMap.Analysis.Measurements.Voxelization as voxelization
 
 from ClearMap.Utils.exceptions import MissingRequirementException, MissingAssetError
-from ClearMap.Utils.utilities import requires_assets, FilePath, sanitize_n_processes
+from ClearMap.Utils.utilities import sanitize_n_processes
+from ClearMap.IO.asset_requirements import requires_assets, FilePath
 
 from ClearMap.config.config_coordinator import ConfigCoordinator
 
