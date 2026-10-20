@@ -12,11 +12,22 @@ __copyright__ = 'Copyright © 2022 by Charly Rousseau'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
+import os
+from pathlib import Path
+from typing import Sequence
+
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (QLabel, QDialogButtonBox, QDialog, QHBoxLayout, QVBoxLayout, QFormLayout,
-                             QPushButton, QLineEdit, QScrollArea, QGroupBox, QCheckBox, QComboBox)
+                             QPushButton, QLineEdit, QGroupBox, QCheckBox, QComboBox, QListWidget, QTableWidget,
+                             QTableWidgetItem)
 
+from ClearMap.IO.FileUtils import FileRenameError, Rename, check_renames
 from ClearMap.IO.assets_constants import DATA_CONTENT_TYPES
+from ClearMap.IO.channel_file_renaming import NotRenamed
+
+RENAMES_TABLE_HEADERS = ['Rename', 'Folder', 'Current name', 'New name']
+FOLDER_SEPARATORS = ('/', '\\')  # Of every platform: a new name typed on one must be valid on all
+SELECTED_COLUMN, FOLDER_COLUMN, CURRENT_NAME_COLUMN, NEW_NAME_COLUMN = range(len(RENAMES_TABLE_HEADERS))
 
 
 class AboutDialog(QDialog):
@@ -90,48 +101,140 @@ class RenameChannelsDialog(QDialog):
 
 
 class VerifyRenamingDialog(QDialog):
-    def __init__(self, files, parent=None):
+    """
+    Let the user vet a batch of renames before anything moves: each rename can be unticked (left as it is) and its
+    new name edited. The files which are left alone whatever the user does are listed with the reason.
+
+    Cancel is the default button: renaming files is only done on an explicit choice.
+    The renames are checked as a whole (see :func:`vetted_renames`) when the user accepts: the dialog stays open
+    and says why if they cannot be applied.
+    """
+    def __init__(self, renames: Sequence[Rename], *, not_renamed: Sequence[NotRenamed] = (), title: str = 'Verify renaming',
+                 message: str = '', accept_text: str = 'Rename', parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Verify Renaming")
-        self.files = files
-        self.selected_files = []
+        self.setWindowTitle(title)
+        self.setModal(True)
+        self.renames = list(renames)
+        self.selected_renames: list[Rename] = []
+        root = _common_folder([rename.source for rename in self.renames] + [entry.path for entry in not_renamed])
 
-        # Set up the layout
-        layout = QVBoxLayout()
-        scroll_area = QScrollArea()
-        scroll_area.setWidgetResizable(True)
-        group_box = QGroupBox()
-        group_layout = QVBoxLayout()
+        layout = QVBoxLayout(self)
+        if message:
+            message_label = QLabel(message)
+            message_label.setWordWrap(True)
+            layout.addWidget(message_label)
+        if root is not None:
+            layout.addWidget(QLabel(f'In {root}'))
 
-        # Create checkboxes for each file
-        self.checkboxes = {}
-        for old_name, new_name in files.items():
-            checkbox = QCheckBox(f"{old_name} -> {new_name}")
-            checkbox.setChecked(True)
-            self.checkboxes[(old_name, new_name)] = checkbox
-            group_layout.addWidget(checkbox)
+        self.renames_table = QTableWidget(len(self.renames), len(RENAMES_TABLE_HEADERS))
+        self.renames_table.setHorizontalHeaderLabels(RENAMES_TABLE_HEADERS)
+        for row, rename in enumerate(self.renames):
+            self._fill_rename_row(row, rename, root)
+        self.renames_table.resizeColumnsToContents()
+        self.renames_table.setVisible(bool(self.renames))
+        layout.addWidget(self.renames_table)
 
-        group_box.setLayout(group_layout)
-        scroll_area.setWidget(group_box)
-        layout.addWidget(scroll_area)
+        if not_renamed:
+            not_renamed_box = QGroupBox('Left as they are')
+            not_renamed_layout = QVBoxLayout(not_renamed_box)
+            not_renamed_list = QListWidget()
+            not_renamed_list.addItems([f'{_relative_to(entry.path, root)}: {entry.reason}' for entry in not_renamed])
+            not_renamed_layout.addWidget(not_renamed_list)
+            layout.addWidget(not_renamed_box)
 
-        # Add OK and Cancel buttons
-        button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        self.error_label = QLabel()
+        self.error_label.setWordWrap(True)
+        self.error_label.setStyleSheet('color: red')
+        self.error_label.setVisible(False)
+        layout.addWidget(self.error_label)
+
+        button_box = QDialogButtonBox()
+        accept_button = button_box.addButton(accept_text, QDialogButtonBox.AcceptRole)
+        cancel_button = button_box.addButton(QDialogButtonBox.Cancel)
+        accept_button.setAutoDefault(False)
+        cancel_button.setDefault(True)  # Enter does not rename anything
         button_box.accepted.connect(self.accept)
         button_box.rejected.connect(self.reject)
         layout.addWidget(button_box)
 
-        self.setLayout(layout)
+    def _fill_rename_row(self, row: int, rename: Rename, root: Path | None) -> None:
+        selected_item = QTableWidgetItem()
+        selected_item.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled)
+        selected_item.setCheckState(Qt.Checked)
+        self.renames_table.setItem(row, SELECTED_COLUMN, selected_item)
+        for column, text in ((FOLDER_COLUMN, str(_relative_to(rename.source.parent, root))),
+                             (CURRENT_NAME_COLUMN, rename.source.name)):
+            read_only_item = QTableWidgetItem(text)
+            read_only_item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
+            self.renames_table.setItem(row, column, read_only_item)
+        self.renames_table.setItem(row, NEW_NAME_COLUMN, QTableWidgetItem(rename.target.name))
 
     def accept(self):
-        # Collect the selected files
-        for (old_name, new_name), checkbox in self.checkboxes.items():
-            if checkbox.isChecked():
-                self.selected_files.append((old_name, new_name))
+        choices = [(self.renames_table.item(row, SELECTED_COLUMN).checkState() == Qt.Checked,
+                    self.renames_table.item(row, NEW_NAME_COLUMN).text())
+                   for row in range(len(self.renames))]
+        try:
+            self.selected_renames = vetted_renames(self.renames, choices)
+        except FileRenameError as err:
+            self.error_label.setText(str(err))
+            self.error_label.setVisible(True)
+            return
         super().accept()
 
-    def get_selected_files(self):
-        return self.selected_files
+
+def vetted_renames(renames: Sequence[Rename], choices: Sequence[tuple[bool, str]]) -> list[Rename]:
+    """
+    The renames as vetted by the user: the ones they kept, each to the new name they chose (in the same folder).
+
+    Parameters
+    ----------
+    renames : Sequence[Rename]
+        The renames proposed to the user.
+    choices : Sequence[tuple[bool, str]]
+        For each rename, whether it is kept and its new name (a file name, not a path).
+
+    Returns
+    -------
+    list[Rename]
+        The renames to apply, checked as a whole (see :func:`ClearMap.IO.FileUtils.check_renames`).
+
+    Raises
+    ------
+    FileRenameError
+        If a new name is not a file name, or if the renames cannot be applied as a whole.
+    """
+    kept = []
+    for rename, (is_kept, new_name) in zip(renames, choices, strict=True):
+        if not is_kept:
+            continue
+        new_name = new_name.strip()
+        if not _is_file_name(new_name):
+            raise FileRenameError(f'{new_name!r} is not a file name (the new name of {rename.source.name}): '
+                                  f'it cannot be empty nor hold a folder')
+        kept.append(Rename(rename.source, rename.source.with_name(new_name)))
+    return check_renames(kept)
+
+
+def _is_file_name(name: str) -> bool:
+    """Whether name names a file in a folder (not a path, on any platform)"""
+    return name not in ('', '.', '..') and not any(separator in name for separator in FOLDER_SEPARATORS)
+
+
+def _common_folder(paths: Sequence[Path]) -> Path | None:
+    """The folder which holds all the paths (None if there are none, or if they share no folder)"""
+    if not paths:
+        return None
+    try:
+        common = Path(os.path.commonpath([path.parent for path in paths]))
+    except ValueError:  # e.g. on different drives
+        return None
+    return common if common.parts else None
+
+
+def _relative_to(path: Path, root: Path | None) -> Path:
+    if root is not None and path.is_relative_to(root):
+        return path.relative_to(root)
+    return path
 
 
 class ResourceTypeToFolderDialog(QDialog):

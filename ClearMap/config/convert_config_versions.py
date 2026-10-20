@@ -509,22 +509,22 @@ class ExperimentUpgrade_2_1_to_3_0(ExperimentConfigConverter):
         files_to_rename = self._compute_new_file_names(files_to_rename)
         files_to_rename = self._compute_elastix_folders_new_names(files_to_rename, folders_to_rename)
 
-        # Verify renaming
-        files_to_rename = self.verify_renaming(files_to_rename)
+        renames = self.verify_renaming([Rename(main_folder / old_name, main_folder / new_name)
+                                        for old_name, new_name in files_to_rename.items()])
         if self._aborted:
             return
         else:
-            # Apply renaming. Refused as a whole if it would overwrite a file, put back if it fails
-            apply_renames([Rename(main_folder / old_name, main_folder / new_name)
-                           for old_name, new_name in files_to_rename])
+            # Refused as a whole if it would overwrite a file, put back if it fails
+            apply_renames(renames)
 
-    def verify_renaming(self, files_to_rename: dict[str, str] = None):
-        dialog = VerifyRenamingDialog(files_to_rename)
+    def verify_renaming(self, renames: list[Rename]) -> list[Rename]:
+        dialog = VerifyRenamingDialog(renames, title='Verify renaming',
+                                      message='The files of the sample are renamed to the names of ClearMap 3. '
+                                              'Untick a file to leave it as it is.')
         if dialog.exec() == QDialog.Accepted:
-            files_to_rename = dialog.get_selected_files()
-        else:
-            self._aborted = True
-        return files_to_rename
+            return dialog.selected_renames
+        self._aborted = True
+        return []
 
     def _compute_elastix_folders_new_names(self, files_to_rename: dict[str, str], folders_to_rename: list[str]):
         """Handle the elastix folders renaming using channel info"""
