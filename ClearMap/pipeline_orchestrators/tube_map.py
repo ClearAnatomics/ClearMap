@@ -121,7 +121,8 @@ from ClearMap.Analysis.graphs.graph_weights import GraphWeight
 from ClearMap.IO.assets_specs import weighted_sub_type
 
 from ClearMap.Utils.events import WorkspaceChannelsUpdated
-from ClearMap.Utils.utilities import get_free_v_ram, clear_cuda_cache, sanitize_n_processes
+from ClearMap.Utils.utilities import sanitize_n_processes
+from ..Utils.nvidia_utils import get_free_v_ram, clear_cuda_cache
 from ClearMap.Utils.exceptions import (PlotGraphError, ClearMapVRamException, ChannelsNotPixelAlignedError,
                                        MissingRequirementException, MissingAssetError, AssetNotFoundError,
                                        ClearMapAssetError, ClearMapValueError)

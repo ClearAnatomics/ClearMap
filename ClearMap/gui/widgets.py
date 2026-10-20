@@ -70,7 +70,8 @@ from ClearMap import Settings
 from ClearMap.IO.assets_constants import DATA_CONTENT_TYPES
 from ClearMap.IO.tile_patterns import pattern_finders_from_base_dir, ChannelPatternSpec, PatternFinder
 from ClearMap.config.channel import ChannelId
-from ClearMap.Utils.utilities import gpu_params, bytes_to_human, trim_or_pad
+from ClearMap.Utils.utilities import bytes_to_human, trim_or_pad
+from ClearMap.Utils.nvidia_utils import gpu_params
 from ClearMap.Visualization import Plot3d as plot_3d
 from ClearMap.Visualization.Qt.widgets import Scatter3D
 from ClearMap.config.atlas import STRUCTURE_TREE_NAMES_MAP

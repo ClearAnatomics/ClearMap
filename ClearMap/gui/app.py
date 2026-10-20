@@ -160,7 +160,8 @@ from ClearMap.Visualization.Qt.DataViewer import DataViewer
 
 from ClearMap.Alignment.Stitching import layout_graph_utils  # noqa: F401 # WARNING: first because otherwise, breaks with pytorch
 
-from ClearMap.Utils.utilities import title_to_snake, snake_to_title, deep_merge, cuda_available
+from ClearMap.Utils.utilities import title_to_snake, snake_to_title, deep_merge
+from ClearMap.Utils.nvidia_utils import cuda_available
 from ClearMap.Utils.event_bus import EventBus, BusSubscriberMixin, GUI_THREAD
 from ClearMap.Utils.events import (CfgChanged, UiRequestRefreshTabs, UiTabActivated, TabActivationResult,
                                    TabsUpdated,  ChannelsSnapshot, ChannelDefaultsChanged)

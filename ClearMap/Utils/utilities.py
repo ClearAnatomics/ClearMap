@@ -5,25 +5,6 @@ utilities
 
 Various utilities that do not have a specific category
 """
-import inspect
-import multiprocessing
-import os
-import re
-import shutil
-import subprocess
-import sys
-import tempfile
-import warnings
-from collections import deque
-from concurrent.futures import ProcessPoolExecutor
-from copy import deepcopy
-from functools import reduce
-from operator import getitem
-from types import MappingProxyType
-from typing import Dict, Any, List
-
-import numpy as np
-import psutil
 
 __author__ = 'Charly Rousseau <charly.rousseau@icm-institute.org>'
 __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
@@ -31,12 +12,28 @@ __copyright__ = 'Copyright © 2022 by Charly Rousseau'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
+import inspect
+import multiprocessing
+import os
+import re
+import shutil
+import sys
+import tempfile
+import warnings
+from concurrent.futures import ProcessPoolExecutor
+from copy import deepcopy
 import functools
+from operator import getitem
+from types import MappingProxyType
+from typing import Dict, Any, List
+
+import numpy as np
+import psutil
 
 from configobj import ConfigObj
 
 from ClearMap.Utils.tag_expression import Expression
-from ClearMap.Utils.exceptions import MissingRequirementException, SmiError, ParamsOrientationError
+from ClearMap.Utils.exceptions import MissingRequirementException, ParamsOrientationError
 
 
 DEFAULT_ORIENTATION = (0, 0, 0)
@@ -69,36 +66,6 @@ def runs_on_pycharm():
 
 def runs_on_ui():
     return 'CLEARMAP_GUI_HOSTED' in os.environ
-
-
-def smi_query(var_name, units=False):
-    cmd = f'nvidia-smi --query-gpu={var_name} --format=noheader,csv'
-    if not units:
-        cmd += ',nounits'
-    output = subprocess.check_output(cmd, shell=True)
-    if "Failed to initialize NVML: Driver/library version mismatch" in output.decode('ascii'):
-        raise SmiError(output)
-    return output
-
-
-def get_free_v_ram():
-    return int(smi_query('memory.free'))
-
-
-def get_percent_v_ram_use():
-    percent = float(smi_query('memory.used')) / float(smi_query('memory.total'))
-    return percent * 100
-
-
-def gpu_util():
-    gpu_percent = smi_query('utilization.gpu', units=True).decode('ascii').replace('%', '').strip()
-    return int(gpu_percent)
-
-
-def gpu_params(dest_file_path):  # Uses 1 query instead of 3 because too time-consuming
-    cmd = 'nvidia-smi --query-gpu=memory.used,memory.total,utilization.gpu --format=noheader,csv,nounits'
-    cmd += f' > {dest_file_path}'
-    subprocess.Popen(cmd, shell=True)
 
 
 class CancelableProcessPoolExecutor(ProcessPoolExecutor):
@@ -217,7 +184,7 @@ def del_item_recursive(d: dict, keys: list) -> None:
 
 def get_item_recursive(container, keys):
     try:
-        return reduce(getitem, keys, container)
+        return functools.reduce(getitem, keys, container)
     except (TypeError, KeyError) as err:
         err_type = type(err).__name__
         err_msg = f'{err_type} attempting to read "{keys}"'
@@ -528,17 +495,6 @@ def validate_arg(arg_name, value, valid_values):
         raise ValueError(f'Unknown {arg_name} "{value}". '
                          f'Supported values are "{valid_values}".')
     return value
-
-
-def clear_cuda_cache():
-    import torch
-    torch.cuda.empty_cache()
-
-
-def cuda_available() -> bool:
-    """Whether torch can use a CUDA device (torch is imported here, so that the callers do not use it directly)"""
-    import torch
-    return torch.cuda.is_available()
 
 
 # def topological_sort(graph, in_degree):
