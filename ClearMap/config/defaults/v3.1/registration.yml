@@ -11,14 +11,14 @@ templates:
     resample: true
     resampled_resolution: [25, 25, 25]
     align_with: "${reference}"   # atlas (constant)
-    moving_channel: "${reference}"   # atlas (constant)
+    moving_channel: "other"   # The atlas moves onto the channel (self: the channel, intrinsically_aligned: neither)
     params_files: ["align_affine.txt", "align_bspline.txt"]
     landmarks_weights: [0, 0]
   regular:
     resample: true
     resampled_resolution: [25, 25, 25]
     align_with: "${reference}"
-    moving_channel: "${reference}"
+    moving_channel: "other"   # The reference channel moves onto the channel
     params_files: ["align_affine.txt"]
     landmarks_weights: [0]
 

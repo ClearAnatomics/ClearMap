@@ -21,6 +21,7 @@ from ClearMap.Utils.tag_expression import Expression
 from ClearMap.Utils.utilities import (try_get_item_recursive, set_item_recursive, has_item_recursive, deep_merge,
                                       del_item_recursive)
 from ClearMap.config.config_handler import ConfigHandler, ALTERNATIVES_REG
+from ClearMap.config.registration_channels import MOVING_OTHER
 
 from ClearMap.gui.dialogs import RenameChannelsDialog, VerifyRenamingDialog
 from ClearMap.gui.dialog_helpers import get_directory_dlg
@@ -285,7 +286,7 @@ def _alignment_to_registration_v3(output_path_base, config_v1, sample_config):
             'resample': resample,
             'resampled_resolution': config_v1['registration']['resampling']['autofluo_sink_resolution'],
             'align_with': 'atlas',
-            'moving_channel': 'atlas',
+            'moving_channel': MOVING_OTHER,  # The atlas moves onto the reference channel
             'params_files': autofluo_params_files,
             'landmarks_weights': [0] * len(autofluo_params_files),
         }
@@ -297,7 +298,7 @@ def _alignment_to_registration_v3(output_path_base, config_v1, sample_config):
                 'resample': resample,
                 'resampled_resolution': config_v1['registration']['resampling']['raw_sink_resolution'],
                 'align_with': reference_channel,
-                'moving_channel': reference_channel,
+                'moving_channel': MOVING_OTHER,  # The reference channel moves onto the channel
                 'params_files': [config_v1['registration']['atlas']['align_channels_affine_file']],
                 'landmarks_weights': [0],
             }

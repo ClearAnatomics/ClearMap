@@ -9,6 +9,7 @@ from ClearMap.config.config_adjusters.engine import run_adjusters
 from ClearMap.config.config_adjusters.policy import _fix_channel_backreferences
 from ClearMap.config.config_adjusters.type_hints import AdjustmentContext
 from ClearMap.config.defaults_provider import DefaultsProvider, get_defaults_provider, set_defaults_provider
+from ClearMap.config.registration_channels import registration_pairs
 
 REQUIRED_SECTIONS = frozenset({'sample', 'stitching', 'registration', 'cell_map', 'tract_map', 'colocalization',
                                'vasculature'})
@@ -199,6 +200,9 @@ def test_registration_reconciles_channels_and_placeholders():
     # A regular channel is aligned with the alignment reference
     assert chs['Ch561']['align_with'] == 'AF'
     assert chs['Ch561']['params_files'] == _template('registration', 'regular')['params_files']
+    # The partner moves onto the channel: the atlas onto the reference, the reference onto the others
+    assert chs['AF']['moving_channel'] == chs['Ch561']['moving_channel'] == 'other'
+    assert registration_pairs(patch['registration']) == [('atlas', 'AF'), ('AF', 'Ch561')]
 
 def test_cell_map_channel_template_applied():
     sm = _FakeSampleManager(['Ch488', 'Ch561'])
