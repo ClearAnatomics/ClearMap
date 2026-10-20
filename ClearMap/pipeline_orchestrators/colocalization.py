@@ -122,6 +122,7 @@ class ColocalizationProcessor(PerCompoundConfigMixin, CompoundChannelPipelineOrc
         return pd.read_feather(self.get_path('cells', channel=channel))
 
     def compute_colocalization(self, channel_a, channel_b):
+        self.sample_manager.check_pixel_aligned(channel_a, channel_b, require_stitched=True)  # Compared voxel for voxel
         # voxel_blob_diameter will also be used to compute the overlap
         voxel_blob_diameter = self.config['comparison']['particle_diameter']
         perf_cfg = self.cfg_coordinator.get_config_view(self.config_name)['performance']

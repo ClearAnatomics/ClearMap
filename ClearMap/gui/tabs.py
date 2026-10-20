@@ -134,7 +134,7 @@ from ClearMap.Visualization.Qt.utils import link_dataviewers_cursors
 from ClearMap.Visualization.Qt import Plot3d as plot_3d
 
 from ClearMap.Utils.exceptions import (ClearMapVRamException, GroupStatsError, MissingRequirementException,
-                                       ClearMapWorkspaceError, ClearMapValueError)
+                                       ClearMapWorkspaceError, ClearMapValueError, ChannelsNotPixelAlignedError)
 from ClearMap.Utils.events import (CfgChanged, UiPrepareRawDataForClearMap, UiRequestPlotMiniBrain,
                                    UiRequestPlotAtlas, UiOrientationChanged, UiCropChanged, ChannelDefaultsChanged,
                                    UiRequestLandmarksDialog, UiAlignWithChanged, UiVesselGraphFiltersChanged,
@@ -143,6 +143,7 @@ from ClearMap.Utils.events import (CfgChanged, UiPrepareRawDataForClearMap, UiRe
 
 from .dialog_helpers import option_dialog, make_splash, prompt_dialog, abort_retry_popup
 from .dialogs import ResourceTypeToFolderDialog
+from .exception_handler import handle_exception
 from .tabs_interfaces import PostProcessingTab, PreProcessingTab, BatchTab, ExperimentTab, GenericTab, PageKey
 from .widgets import (PatternDialog, DataFrameWidget, LandmarksSelectorDialog,
                       CheckableListWidget, FileDropListWidget, ensure_inline_histogram,
@@ -1764,15 +1765,10 @@ class VasculatureTab(PostProcessingTab['BinaryVesselProcessor']):
         """
         # TODO: n_steps = self.params.binarization_params.n_steps
         worker: 'BinaryVesselProcessor' = self.get_worker(substep='binary')
-        worker.assert_input_shapes_match()
-        if not worker.inputs_match:
-            shapes = worker.inputs_shapes
-            if shapes == (None, None):
-                self.main_window.print_error_msg(f'Cannot binarize: input channels not found at '
-                                                 f'{[a.path for a in worker.assets_to_binarize()]}')
-            else:
-                self.main_window.print_error_msg(f'Cannot binarize: shape mismatch between channels '
-                                                 f'({shapes[0]}vx vs {shapes[1]}vx)')
+        try:  # They are combined voxel for voxel
+            worker.check_inputs_pixel_aligned(require_stitched=True)
+        except (ChannelsNotPixelAlignedError, MissingRequirementException) as err:
+            handle_exception(err, parent=self.main_window, context=f'Cannot binarize {channel}')
             return
 
         # Determine step order from the worker

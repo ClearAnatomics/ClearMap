@@ -122,7 +122,7 @@ from ClearMap.IO.assets_specs import weighted_sub_type
 
 from ClearMap.Utils.events import WorkspaceChannelsUpdated
 from ClearMap.Utils.utilities import get_free_v_ram, clear_cuda_cache, sanitize_n_processes
-from ClearMap.Utils.exceptions import (PlotGraphError, ClearMapVRamException,
+from ClearMap.Utils.exceptions import (PlotGraphError, ClearMapVRamException, ChannelsNotPixelAlignedError,
                                        MissingRequirementException, MissingAssetError, AssetNotFoundError,
                                        ClearMapAssetError, ClearMapValueError)
 
@@ -381,8 +381,6 @@ class BinaryVesselProcessor(TubeMapOrchestrator):
         self.sample_manager: Optional[SampleManager] = None
         self.workspace: Optional[Workspace2] = None
 
-        self.inputs_match = False
-        self.inputs_shapes: tuple = (None, None)
 
         self.all_vessels_channel: str = ''
         self.arteries_channel: str = ''
@@ -421,7 +419,10 @@ class BinaryVesselProcessor(TubeMapOrchestrator):
 
             self._follow_sample_compound_channel()
 
-            self.assert_input_shapes_match()
+            try:  # Told now, refused before binarizing (the user may be setting the channels up)
+                self.check_inputs_pixel_aligned()
+            except ChannelsNotPixelAlignedError as err:
+                warnings.warn(str(err))
 
             # Drop steps of channels that are not (or no longer) binarized: removed OR re-typed
             for k in [k for k in self.steps if k not in self.compound_channel]:
@@ -436,29 +437,20 @@ class BinaryVesselProcessor(TubeMapOrchestrator):
 
     # ############################### INPUTS ###############################
 
-    def assert_input_shapes_match(self):
+    def check_inputs_pixel_aligned(self, require_stitched: bool = False) -> None:
         """
-        Ensure that the input shapes (stitched images of the different color channels) match
-        before starting the binarization process since they must overlap.
+        Check that the channels to binarize match pixel for pixel, as they are combined voxel for voxel
+        (see SampleManager.check_pixel_aligned). A single channel has nothing to match.
 
-        .. warning::
-            stitched may not exist when processor is created.
-            if not, check again in the run/binarize method
+        Raises
+        ------
+        ChannelsNotPixelAlignedError
+            Naming each requirement which is not met.
+        MissingRequirementException
+            If require_stitched and the stitched image of one of them is missing.
         """
-        try:
-            assets_to_binarize = self.assets_to_binarize()
-            shapes = [asset.shape() for asset in assets_to_binarize]
-        except FileNotFoundError:
-            warnings.warn('Stitched images not found. Cannot check shapes.')
-            self.inputs_shapes = None, None
-            return
-        if not all([s == shapes[0] for s in shapes]):
-            self.inputs_match = False
-            self.inputs_shapes = shapes
-            raise ValueError(f'Channels to binarize have different shapes. This is not supported yet.'
-                             f'Got shapes: {shapes}')
-        self.inputs_match = True  # WARNING: may need to be reset when changing channels to binarize
-        self.inputs_shapes = shapes
+        if len(self.channels_to_binarize) > 1:
+            self.sample_manager.check_pixel_aligned(*self.channels_to_binarize, require_stitched=require_stitched)
 
     @property
     def channels_to_binarize(self) -> tuple[str, ...]:
@@ -479,13 +471,9 @@ class BinaryVesselProcessor(TubeMapOrchestrator):
         self.combine_binary()
 
     def binarize(self):
-        if not self.inputs_match:
-            self.assert_input_shapes_match()
-        if self.inputs_match:
-            for channel in self.channels_to_binarize:
-                self.binarize_channel(channel)
-        else:
-            raise ValueError('Channels to binarize have different shapes. This is not supported yet.')
+        self.check_inputs_pixel_aligned(require_stitched=True)
+        for channel in self.channels_to_binarize:
+            self.binarize_channel(channel)
 
     def postprocess(self, channel: str) -> None:
         """
