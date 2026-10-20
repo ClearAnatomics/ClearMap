@@ -98,13 +98,14 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Mapping, Any, Optional, Final, Callable, TYPE_CHECKING, Sequence, ClassVar, Iterable
 
-from ClearMap.IO.assets_constants import PIPELINE_NAMES
+from ClearMap.IO.assets_constants import COMPOUND_REPRESENTATIVE_DATA_TYPES, PIPELINE_NAMES
 from ClearMap.IO.workspace2 import Workspace2
 from ClearMap.IO.workspace_asset import Asset
-from ClearMap.config.compound_keys import CompoundKey, compound_channel_key, compound_is_oriented
+from ClearMap.config.compound_keys import (CompoundKey, compound_channel_key, compound_channel_parts,
+                                           compound_is_oriented)
 from ClearMap.Utils.event_bus import BusSubscriberMixin
-from ClearMap.Utils.exceptions import ClearMapRuntimeError, ClearMapValueError, ClearMapConfigError, \
-    ClearMapNotImplementedError, MissingChannelError
+from ClearMap.Utils.exceptions import (ClearMapRuntimeError, ClearMapValueError, ClearMapConfigError,
+                                       ClearMapNotImplementedError, MissingChannelError, MissingRequirementException)
 from ClearMap.Utils.utilities import handle_deprecated_args, deep_freeze, infer_origin_from_caller
 
 if TYPE_CHECKING:    # WARNING: some circular imports below, use only for type checking with quotes
@@ -168,6 +169,39 @@ def register_compound_channel(sample_manager: "SampleManager", pipeline: str,
     if first_registration and not oriented:  # Later calls find the order already adopted: no directory scan
         workspace.adopt_compound_order(compound_channel)
     return compound_channel
+
+
+def representative_channel(sample_manager: "SampleManager", pipeline: str, channel: str | tuple[str, ...]) -> str:
+    """
+    The sample channel read for what the parts of channel, a channel of pipeline, share as they are imaged
+    together (see COMPOUND_REPRESENTATIVE_DATA_TYPES): channel itself for a sample channel, the part of the
+    representative data type of pipeline for a compound channel (a tuple, or its 'a-b' form).
+
+    .. note::
+        Only TubeMap declares a representative data type so far. The compound channels of a pipeline which
+        need one (e.g. to read the atlas of a colocalization pair) get it in COMPOUND_REPRESENTATIVE_DATA_TYPES.
+
+    Raises
+    ------
+    ClearMapValueError
+        If the compound channels of pipeline have no representative part (see the note).
+    MissingRequirementException
+        If the compound channel has no part, or several, of the representative data type.
+    """
+    parts = compound_channel_parts(channel)
+    if parts is None:  # A sample channel
+        return channel
+    data_type = COMPOUND_REPRESENTATIVE_DATA_TYPES.get(pipeline)
+    if data_type is None:
+        raise ClearMapValueError(f'The compound channels of {pipeline} have no representative part: {channel}. '
+                                 f'Only {sorted(COMPOUND_REPRESENTATIVE_DATA_TYPES)} declare one, '
+                                 f'in COMPOUND_REPRESENTATIVE_DATA_TYPES (assets_constants).')
+    representative_parts = [part for part in parts if sample_manager.data_type(part) == data_type]
+    if len(representative_parts) != 1:
+        raise MissingRequirementException(f'The {pipeline} compound channel {channel} needs exactly one part of data '
+                                          f'type "{data_type}" (read for what its parts share, e.g. the atlas), '
+                                          f'got {representative_parts}.')
+    return representative_parts[0]
 
 
 class ProcessorSteps(ABC):

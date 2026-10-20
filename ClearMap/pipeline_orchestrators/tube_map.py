@@ -97,7 +97,8 @@ from ClearMap.IO.workspace_asset import Asset
 from ClearMap.config.compound_keys import compound_channel_key
 from ClearMap.config.config_coordinator import ConfigCoordinator
 
-from ClearMap.pipeline_orchestrators.generic_orchestrators import CompoundChannelPipelineOrchestrator, ProcessorSteps
+from ClearMap.pipeline_orchestrators.generic_orchestrators import (CompoundChannelPipelineOrchestrator, ProcessorSteps,
+                                                                   representative_channel)
 
 import ClearMap.Alignment.Resampling as resampling_module
 import ClearMap.Alignment.Elastix as elastix
@@ -367,13 +368,10 @@ class TubeMapOrchestrator(CompoundChannelPipelineOrchestrator, abstract=True):
     @property
     def representative_channel(self) -> str:
         """
-        The part of compound_channel read for what all the parts share, as they are imaged together:
-        shape, resolution, registration (transforms, atlas, annotator). The all-vessels channel (data
-        type 'vessels'), the one part every TubeMap compound has; not the first part, which is just the
-        first in alphabetical order (see compound_channel_of).
+        The part of the compound channel read for what all the parts share, as they are imaged together
+        (see COMPOUND_REPRESENTATIVE_DATA_TYPES).
         """
-        return self.sample_manager.get_channels_by_type(channel_type='vessels', missing_action='raise',
-                                                        multiple_found_action='raise')
+        return representative_channel(self.sample_manager, self.pipeline, self.compound_channel_of(self.sample_manager))
 
 
 class BinaryVesselProcessor(TubeMapOrchestrator):

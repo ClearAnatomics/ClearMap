@@ -1,4 +1,5 @@
 import re
+from types import MappingProxyType
 
 EXTENSIONS = {
     'image': ['.npy', '.tif', '.tiff'],
@@ -76,6 +77,12 @@ PIPELINE_NAMES = frozenset({*(p for p in CONTENT_TYPE_TO_PIPELINE.values() if p 
 # (the colocalization of a in b is not that of b in a). The parts of the compound channels of
 # the other pipelines are an unordered set (e.g. the TubeMap vessels and arteries).
 ORIENTED_COMPOUND_PIPELINES = frozenset({'Colocalization'})
+# The data type of the part of the compound channels of a pipeline which is read for what the parts share, as they
+# are imaged together: shape, resolution, registration (transforms, atlas, annotator). For TubeMap, the all-vessels
+# channel, the one part every TubeMap compound has (not the first part, which is just the first in alphabetical
+# order). The compound channels of the other pipelines have none so far: their parts are read each on its own. A
+# pipeline whose compound channels need one (e.g. to read the atlas of a colocalization pair) declares it here.
+COMPOUND_REPRESENTATIVE_DATA_TYPES = MappingProxyType({'TubeMap': 'vessels'})
 
 
 # TODO: add link between labels and content types

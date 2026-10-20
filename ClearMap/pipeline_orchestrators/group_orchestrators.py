@@ -15,7 +15,7 @@ from ClearMap.IO import io_ops
 from ClearMap.Analysis.Statistics.group_statistics import (generate_summary_table, group_region_counts,
                                                            remove_p_val_nans, stack_voxelizations, get_colored_p_vals)
 
-from .generic_orchestrators import GroupOrchestratorBase, register_compound_channel
+from .generic_orchestrators import GroupOrchestratorBase, register_compound_channel, representative_channel
 from .utils import init_sample_manager_and_processors
 from ..Alignment.utils import get_all_region_ids
 from ..Analysis.Statistics.group_assets import GroupResultsAssets
@@ -298,10 +298,12 @@ class DensityGroupAnalysisOrchestrator(GroupOrchestratorBase):
 
         return channels
 
-    def _get_annotator(self, sample_dir: Path, channel: str):
+    def _get_annotator(self, sample_dir: Path, channel: str | tuple[str, ...]):
+        """The atlas annotator of channel in the sample (the one of its representative part for a compound channel)"""
         reg = self.get_worker_for_sample(sample_dir, 'registration', channel=None)
         reg.setup_if_needed()
-        return reg.annotators[channel]
+        sample_manager = self.get_sample_manager_for(sample_dir)
+        return reg.annotator_of(representative_channel(sample_manager, self.pipeline, channel))
 
     def run_plots(self, plot_function, comparisons: List[Pair], *,
                   channel: str, plot_kw_args: Dict) -> list['QWebEngineView']:
@@ -358,7 +360,8 @@ class DensityGroupAnalysisOrchestrator(GroupOrchestratorBase):
             #  If provided, used to obtain an annotator and atlas scale for a sample.
             #  Defaults to building full processors via ``init_sample_manager_and_processors``.
 
-            annotator = aligner.annotators[ch or sm.alignment_reference_channel]
+            annotator = aligner.annotator_of(representative_channel(sm, self.pipeline,
+                                                                    ch or sm.alignment_reference_channel))
             atlas_id = aligner.config['atlas']['id']
             atlas_scale = [ATLAS_NAMES_MAP[atlas_id]['resolution']] * 3
             volume_map = annotator.get_lateralised_volume_map(atlas_scale)
