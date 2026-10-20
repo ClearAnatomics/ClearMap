@@ -160,7 +160,7 @@ from ClearMap.Visualization.Qt.DataViewer import DataViewer
 
 from ClearMap.Alignment.Stitching import layout_graph_utils  # noqa: F401 # WARNING: first because otherwise, breaks with pytorch
 
-from ClearMap.Utils.utilities import title_to_snake, snake_to_title, deep_merge
+from ClearMap.Utils.utilities import title_to_snake, snake_to_title, deep_merge, cuda_available
 from ClearMap.Utils.event_bus import EventBus, BusSubscriberMixin, GUI_THREAD
 from ClearMap.Utils.events import (CfgChanged, UiRequestRefreshTabs, UiTabActivated, TabActivationResult,
                                    TabsUpdated,  ChannelsSnapshot, ChannelDefaultsChanged)
@@ -230,13 +230,11 @@ class ClearMapAppBase(QMainWindow, Ui_ClearMapGui):
         self.gpu_bar = QProgressBar() # noqa
         self.vram_bar = QProgressBar() # noqa
 
-        if torch.cuda.is_available():
-            gpu_period = 500
-        else:
-            gpu_period = None
+        gpu_available = cuda_available()
+        gpu_period = 500 if gpu_available else None
         self.perf_monitor = cmp_widgets.PerfMonitor(self, 500, gpu_period)
         self.perf_monitor.cpu_vals_changed.connect(self.update_cpu_bars)
-        if torch.cuda.is_available():
+        if gpu_available:
             self.perf_monitor.gpu_vals_changed.connect(self.update_gpu_bars)
         self.perf_monitor.start()
 

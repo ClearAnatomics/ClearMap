@@ -535,6 +535,12 @@ def clear_cuda_cache():
     torch.cuda.empty_cache()
 
 
+def cuda_available() -> bool:
+    """Whether torch can use a CUDA device (torch is imported here, so that the callers do not use it directly)"""
+    import torch
+    return torch.cuda.is_available()
+
+
 # def topological_sort(graph, in_degree):
 #     queue = deque([node for node in in_degree if in_degree[node] == 0])
 #     sorted_list = []
