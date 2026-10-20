@@ -31,10 +31,7 @@ import psutil
 from configobj import ConfigObj
 
 from ClearMap.Utils.tag_expression import Expression
-from ClearMap.Utils.exceptions import MissingRequirementException, ParamsOrientationError
-
-
-DEFAULT_ORIENTATION = (0, 0, 0)
+from ClearMap.Utils.exceptions import MissingRequirementException
 
 
 colors = {
@@ -477,28 +474,6 @@ def check_stopped(func):
             return
         return func(self, *args, **kwargs)
     return wrapper
-
-
-def validate_orientation(orientation, channel, raise_error=True):
-    """
-    Check that the orientation does not have redundant axes
-
-    Parameters
-    ----------
-    orientation: tuple(int)
-        The orientation to check
-    """
-    defined_axes = [abs(e) for e in orientation if e != 0]
-    if len(defined_axes) != len(set(defined_axes)):
-        if raise_error:
-            raise ParamsOrientationError(f'Number of different defined axes in {orientation} is'
-                                         f'{len(set(defined_axes))}. Defined axes cannot be duplicated. '
-                                         f'Please amend duplicate axes.', channel=channel)
-        else:
-            warnings.warn(f'Invalid orientation {orientation} for {channel},'
-                          f' using default {DEFAULT_ORIENTATION}')
-            return DEFAULT_ORIENTATION
-    return orientation
 
 
 def sanitize_n_processes(processes):

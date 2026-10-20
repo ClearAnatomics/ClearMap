@@ -27,8 +27,8 @@ from ClearMap.config.registration_channels import (INTRINSICALLY_ALIGNED, MOVING
                                                    NOT_SELECTED_FOR_REGISTRATION, REGISTRATION_DIRECTIONS,
                                                    partner_change, registration_direction)
 from ClearMap.Utils.exceptions import ChannelNameTakenError, ClearMapConfigError, ClearMapValueError
-from ClearMap.Utils.utilities import (validate_orientation, snake_to_title, set_item_recursive,
-                                      DEFAULT_ORIENTATION, trim_or_pad, REPLACE)
+from ClearMap.Utils.utilities import snake_to_title, set_item_recursive, trim_or_pad, REPLACE
+from ClearMap.config.orientation import validate_orientation, DEFAULT_ORIENTATION
 from ClearMap.Utils.event_bus import Publishes, EventBus
 from ClearMap.Utils.events import (UiChannelRenamed, UiCropChanged, UiOrientationChanged, UiRequestPlotAtlas,
                                    UiPrepareRawDataForClearMap, UiRequestPlotMiniBrain, UiChannelsChanged,

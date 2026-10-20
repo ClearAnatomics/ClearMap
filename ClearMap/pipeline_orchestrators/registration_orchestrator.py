@@ -24,8 +24,8 @@ from ClearMap.Utils.events import (ChannelRenamed, UiAtlasIdChanged,
 from ClearMap.Utils.exceptions import (ClearMapAssetError, ParamsOrientationError, MissingRequirementException,
                                        NotAnOmeFile, MetadataError, ClearMapRuntimeError, ClearMapConfigError,
                                        ReversedRegistrationWarning)
-from ClearMap.Utils.utilities import (runs_on_ui, check_stopped, DEFAULT_ORIENTATION,
-                                      validate_orientation,  sanitize_n_processes)
+from ClearMap.Utils.utilities import runs_on_ui, check_stopped, sanitize_n_processes
+from ClearMap.config.orientation import DEFAULT_ORIENTATION, validate_orientation
 
 from ClearMap.config.atlas import ATLAS_NAMES_MAP
 from ClearMap.config.config_coordinator import ConfigCoordinator
