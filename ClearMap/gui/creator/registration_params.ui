@@ -38,7 +38,7 @@
    <item row="3" column="0">
     <widget class="QLabel" name="label_4">
      <property name="text">
-      <string>Moving channel:</string>
+      <string>Direction:</string>
      </property>
     </widget>
    </item>
@@ -238,17 +238,62 @@
     </widget>
    </item>
    <item row="3" column="1" colspan="2">
-    <widget class="QComboBox" name="movingChannelComboBox">
-     <item>
-      <property name="text">
-       <string>None</string>
+    <widget class="QFrame" name="movingDirectionFrame">
+     <property name="whatsThis">
+      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;How the channel is aligned with the channel (or the atlas) chosen in &lt;b&gt;Align with&lt;/b&gt;:&lt;/p&gt;&lt;ul&gt;&lt;li&gt;&lt;b&gt;&amp;lt;partner&amp;gt; moves onto &amp;lt;channel&amp;gt;&lt;/b&gt; (the default): the partner is registered onto the channel. The cells, tracts and vessels of the channel can then be transformed to the atlas.&lt;/li&gt;&lt;li&gt;&lt;b&gt;Acquired together&lt;/b&gt;: the channel was acquired at the same time as its partner (same sample, same stage, simultaneous acquisition), so it is already aligned with it: no registration is computed, the one of the partner is used. Required to compare channels locally (e.g. colocalization, multichannel vasculature), where a registration is not precise enough.&lt;/li&gt;&lt;li&gt;&lt;b&gt;&amp;lt;channel&amp;gt; moves onto &amp;lt;partner&amp;gt;&lt;/b&gt; (Advanced): the channel is registered onto its partner. Transforming points (cells, ...) through it needs the inverse transform, which is not supported yet: their coordinates would be wrong.&lt;/li&gt;&lt;/ul&gt;&lt;p&gt;Available once a partner is chosen.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+     </property>
+     <layout class="QHBoxLayout" name="movingDirectionLayout">
+      <property name="leftMargin">
+       <number>0</number>
       </property>
-     </item>
-     <item>
-      <property name="text">
-       <string>atlas</string>
+      <property name="topMargin">
+       <number>0</number>
       </property>
-     </item>
+      <property name="rightMargin">
+       <number>0</number>
+      </property>
+      <property name="bottomMargin">
+       <number>0</number>
+      </property>
+      <item>
+       <widget class="QRadioButton" name="movingOtherRadioButton">
+        <property name="toolTip">
+         <string>The partner is registered onto the channel (the default)</string>
+        </property>
+        <property name="text">
+         <string>Partner moves onto the channel</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QRadioButton" name="intrinsicallyAlignedRadioButton">
+        <property name="toolTip">
+         <string>Acquired at the same time as the partner: already aligned with it, no registration is computed</string>
+        </property>
+        <property name="text">
+         <string>Acquired together</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QRadioButton" name="movingSelfRadioButton">
+        <property name="toolTip">
+         <string>The channel is registered onto its partner: its points cannot be transformed through it yet</string>
+        </property>
+        <property name="text">
+         <string>Channel moves onto the partner</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item row="3" column="3">
+    <widget class="QToolButton" name="movingDirectionFrameInfoToolButton">
+     <property name="icon">
+      <iconset resource="icons.qrc">
+       <normaloff>:/icons/icons/info.svg</normaloff>:/icons/icons/info.svg</iconset>
+     </property>
     </widget>
    </item>
    <item row="2" column="0">

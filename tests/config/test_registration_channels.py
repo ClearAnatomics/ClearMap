@@ -7,7 +7,8 @@ from ClearMap.Utils.exceptions import ClearMapConfigError, MissingRequirementExc
 from ClearMap.config.registration_channels import (ATLAS, REGISTRATION_DIRECTIONS, fixed_moving_channels,
                                                    is_explicitly_not_registered, is_intrinsically_aligned,
                                                    is_selected_for_registration, may_be_registered, needs_registration,
-                                                   registration_direction, registration_pairs, registration_sequence)
+                                                   partner_change, registration_direction, registration_pairs,
+                                                   registration_sequence)
 from ClearMap.config.validators._semantic import _validate_registration_refs
 
 
@@ -143,3 +144,23 @@ def test_a_direction_is_not_a_partner(align_with):
     (error,) = _registration_errors(align_with, 'other')
 
     assert 'align_with' in error and align_with in error
+
+
+# ------------------------------------------------------------------------------------- the partner is changed
+
+@pytest.mark.parametrize('align_with, moving_channel, new_align_with, changes', [
+    ('auto', 'other', 'atlas', {'align_with': 'atlas'}),  # Relative: nothing else to change
+    ('auto', 'self', None, {'align_with': None}),  # Kept while it has no partner
+    (None, 'self', 'atlas', {'align_with': 'atlas'}),  # And used again with the new one
+    ('auto', 'auto', 'atlas', {'align_with': 'atlas', 'moving_channel': 'other'}),  # The name of the old partner
+    ('auto', 'fos', 'atlas', {'align_with': 'atlas', 'moving_channel': 'self'}),  # The name of the channel
+    ('auto', 'auto', None, {'align_with': None, 'moving_channel': 'other'}),
+    ('atlas', 'auto', 'auto', {'align_with': 'auto', 'moving_channel': 'other'}),  # A left-over name: the default
+    (None, 'auto', 'atlas', {'align_with': 'atlas', 'moving_channel': 'other'}),
+    ('', None, 'auto', {'align_with': 'auto', 'moving_channel': 'other'}),  # A first partner: it moves by default
+    ('auto', None, '', {'align_with': ''}),
+    ('auto', 'intrinsically_aligned', 'dapi', {'align_with': 'dapi'}),
+])
+def test_changing_the_partner_keeps_the_direction_relative_to_the_channel(align_with, moving_channel, new_align_with,
+                                                                         changes):
+    assert partner_change('fos', {'align_with': align_with, 'moving_channel': moving_channel}, new_align_with) == changes

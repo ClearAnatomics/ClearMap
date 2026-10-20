@@ -75,6 +75,32 @@ def registration_direction(channel: str, channel_config: Mapping) -> str | None:
                               f'(or the name of the channel, or of its align_with). Choose which of the two moves.')
 
 
+def partner_change(channel: str, channel_config: Mapping, align_with: str | None) -> dict:
+    """
+    The changes of the registration config of channel when its partner becomes align_with (e.g. chosen in the GUI):
+    the direction it had is kept, written relative to the channel (a name would not follow the partner), and a new
+    partner moves onto the channel unless a direction was chosen (the default, see the templates).
+
+    Returns
+    -------
+    dict
+        The new ``align_with``, and the ``moving_channel`` if it changes.
+    """
+    moving_channel = channel_config.get('moving_channel')
+    try:
+        direction = registration_direction(channel, channel_config)
+    except ClearMapConfigError:  # A name left over from another partner: it meant nothing, the default replaces it
+        direction = None
+    if direction is None and moving_channel in REGISTRATION_DIRECTIONS:  # Kept while it had no partner
+        direction = moving_channel
+    if direction is None and align_with not in NOT_SELECTED_FOR_REGISTRATION:
+        direction = MOVING_OTHER
+    changes = {'align_with': align_with}
+    if direction is not None and direction != moving_channel:
+        changes['moving_channel'] = direction
+    return changes
+
+
 def needs_registration(channel_config: Mapping) -> bool:
     """
     Whether a registration is computed for the channel: something moves, and it is not intrinsically aligned.

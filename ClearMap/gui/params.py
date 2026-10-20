@@ -13,7 +13,8 @@ import numpy as np
 
 from PyQt5.QtCore import Qt, QTimer, QSignalBlocker
 from PyQt5.QtWidgets import (QToolBox, QCheckBox, QLabel, QHBoxLayout, QVBoxLayout,
-                             QSpinBox, QLineEdit, QDoubleSpinBox, QRadioButton, QFrame, QDialog)
+                             QSpinBox, QLineEdit, QDoubleSpinBox, QRadioButton, QFrame, QDialog, QButtonGroup,
+                             QMessageBox)
 
 from ClearMap.Analysis.graphs.graph_filters import GraphFilter, combined_filters_name
 from ClearMap.IO.FileUtils import FileRenameError, Rename, apply_renames
@@ -22,7 +23,10 @@ from ClearMap.Analysis.graphs.graph_weights import GraphWeight
 from ClearMap.config.atlas import ATLAS_NAMES_MAP
 from ClearMap.config.compound_keys import channel_file_name_token
 from ClearMap.config.config_coordinator import refuse_renames_onto_existing_channels
-from ClearMap.Utils.exceptions import ChannelNameTakenError, ClearMapValueError
+from ClearMap.config.registration_channels import (INTRINSICALLY_ALIGNED, MOVING_OTHER, MOVING_SELF,
+                                                   NOT_SELECTED_FOR_REGISTRATION, REGISTRATION_DIRECTIONS,
+                                                   partner_change, registration_direction)
+from ClearMap.Utils.exceptions import ChannelNameTakenError, ClearMapConfigError, ClearMapValueError
 from ClearMap.Utils.utilities import (validate_orientation, snake_to_title, set_item_recursive,
                                       DEFAULT_ORIENTATION, trim_or_pad, REPLACE)
 from ClearMap.Utils.event_bus import Publishes, EventBus
@@ -922,12 +926,20 @@ class WobblyChannelStitchingParams(ChannelUiParameter):
 
 
 class ChannelRegistrationParams(ChannelUiParameter):
+    """
+    The registration of a channel. Its direction (moving_channel) is chosen with radio buttons, relative to the channel
+    (see registration_channels): they are painted from the config after the linked widgets (cfg_to_ui) and only
+    available once the channel has a partner (align_with).
+    """
     publishes = Publishes(UiAlignWithChanged)
 
     def __init__(self, tab, channel_name, *, event_bus: EventBus, get_view=None, apply_patch=None):
         super().__init__(tab, channel_name, event_bus=event_bus, get_view=get_view, apply_patch=apply_patch)
         self.tab.landmarksWeightsPanel = LandmarksWeightsPanel(self.tab)
         self.tab.landmarksWeightsLayout.addWidget(self.tab.landmarksWeightsPanel)
+        self._direction_buttons = QButtonGroup(self.tab)
+        for button in self._direction_radio_buttons.values():
+            self._direction_buttons.addButton(button)
 
         self.handle_params_files_changed()  # Initial setup
 
@@ -938,9 +950,8 @@ class ChannelRegistrationParams(ChannelUiParameter):
             'align_with': ParamLink(['align_with'], self.tab.alignWithComboBox,
                                     cast_to_ui=lambda v: 'None' if v is None else v,
                                     cast_from_ui=lambda v: None if v == 'None' else v,
-                                    notify_apply=lambda: self.publish(
-                                        UiAlignWithChanged(channel_name=self.name, align_with=self.align_with))),
-            'moving_channel': ParamLink(['moving_channel'], self.tab.movingChannelComboBox),
+                                    connect=self.handle_align_with_edited),
+            # moving_channel: the direction radio buttons (see _paint_direction and handle_direction_toggled)
             # WARNING: broken by class replacement
             'params_files': ParamLink(['params_files'], self.tab.paramsFilesListWidget,
                                       object_name='paramsFilesListWidget', scope_root=self.tab),
@@ -966,6 +977,71 @@ class ChannelRegistrationParams(ChannelUiParameter):
         if hasattr(self.tab, 'landmarksWeightsPanel'):
             self.tab.landmarksWeightsPanel.weightAtChanged.connect(
                 self.handle_landmarks_weight_changed)
+        for direction, button in self._direction_radio_buttons.items():
+            button.toggled.connect(functools.partial(self.handle_direction_toggled, direction))
+
+    @property
+    def _direction_radio_buttons(self) -> dict[str, QRadioButton]:
+        """The radio button of each direction (moving_channel)"""
+        return {MOVING_OTHER: self.tab.movingOtherRadioButton,
+                INTRINSICALLY_ALIGNED: self.tab.intrinsicallyAlignedRadioButton,
+                MOVING_SELF: self.tab.movingSelfRadioButton}
+
+    def cfg_to_ui(self):
+        super().cfg_to_ui()
+        self._paint_direction()
+
+    def _paint_direction(self) -> None:
+        """
+        Check the radio button of the direction of the config, named after the channel and its partner. Without a
+        partner they are disabled (the direction is kept, it is used again with the next partner).
+        """
+        view = self.view
+        align_with = view.get('align_with')
+        moving_channel = view.get('moving_channel')
+        has_partner = align_with not in NOT_SELECTED_FOR_REGISTRATION
+        try:
+            direction = registration_direction(self.name, view)
+        except ClearMapConfigError:  # A name left over from another partner: none is checked, the registration says why
+            direction = None
+        if direction is None and moving_channel in REGISTRATION_DIRECTIONS:
+            direction = moving_channel
+        partner = align_with if has_partner else 'the partner'
+        texts = {MOVING_OTHER: f'{partner} moves onto {self.name}',
+                 INTRINSICALLY_ALIGNED: f'Acquired together with {partner}',
+                 MOVING_SELF: f'{self.name} moves onto {partner}'}
+        self._painting = True
+        try:
+            self._direction_buttons.setExclusive(False)  # So that none is checked when there is no direction
+            for button_direction, button in self._direction_radio_buttons.items():
+                button.setText(texts[button_direction])
+                button.setChecked(button_direction == direction)
+            self._direction_buttons.setExclusive(True)
+            self.tab.movingDirectionFrame.setEnabled(has_partner)
+        finally:
+            self._painting = False
+
+    def handle_direction_toggled(self, direction: str, checked: bool) -> None:
+        if self._painting or not checked:
+            return
+        self._emit_patch(['moving_channel'], direction)
+        if direction == MOVING_SELF:
+            QMessageBox.warning(self.tab, 'Registration computed the other way round',
+                                f'{self.name} will be registered onto {self.view.get("align_with")}. Images can be '
+                                f'transformed through it, but transforming the points of {self.name} (cells, '
+                                f'tracts, vessels) needs the inverse transform, which is not supported yet: their '
+                                f'coordinates would be wrong.')
+
+    def handle_align_with_edited(self, *_) -> None:
+        """
+        The partner is changed in its combo box: written with the direction, relative to the channel (a new partner
+        moves onto the channel unless a direction was chosen, see :func:`partner_change`).
+        """
+        if self._painting:
+            return
+        align_with = self.align_with
+        self._emit_patch([], partner_change(self.name, self.view, align_with))
+        self.publish(UiAlignWithChanged(channel_name=self.name, align_with=align_with))
 
     @property
     def params_files(self):
