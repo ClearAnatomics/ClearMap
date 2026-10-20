@@ -14,7 +14,7 @@ __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
 import os
 from pathlib import Path
-from typing import Sequence
+from typing import TYPE_CHECKING, Sequence
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (QLabel, QDialogButtonBox, QDialog, QHBoxLayout, QVBoxLayout, QFormLayout,
@@ -23,10 +23,12 @@ from PyQt5.QtWidgets import (QLabel, QDialogButtonBox, QDialog, QHBoxLayout, QVB
 
 from ClearMap.IO.FileUtils import FileRenameError, Rename, check_renames
 from ClearMap.IO.assets_constants import DATA_CONTENT_TYPES
-from ClearMap.IO.channel_file_renaming import NotRenamed
+
+if TYPE_CHECKING:
+    from ClearMap.IO.channel_file_renaming import NotRenamed
 
 RENAMES_TABLE_HEADERS = ['Rename', 'Folder', 'Current name', 'New name']
-FOLDER_SEPARATORS = ('/', '\\')  # Of every platform: a new name typed on one must be valid on all
+FOLDER_SEPARATORS = ('/', '\\')  # Of every platform: a new name typed on one does not hold a folder on another
 SELECTED_COLUMN, FOLDER_COLUMN, CURRENT_NAME_COLUMN, NEW_NAME_COLUMN = range(len(RENAMES_TABLE_HEADERS))
 
 
@@ -109,8 +111,8 @@ class VerifyRenamingDialog(QDialog):
     The renames are checked as a whole (see :func:`vetted_renames`) when the user accepts: the dialog stays open
     and says why if they cannot be applied.
     """
-    def __init__(self, renames: Sequence[Rename], *, not_renamed: Sequence[NotRenamed] = (), title: str = 'Verify renaming',
-                 message: str = '', accept_text: str = 'Rename', parent=None):
+    def __init__(self, renames: Sequence[Rename], *, not_renamed: Sequence['NotRenamed'] = (),
+                 title: str = 'Verify renaming', message: str = '', accept_text: str = 'Rename', parent=None):
         super().__init__(parent)
         self.setWindowTitle(title)
         self.setModal(True)
@@ -131,6 +133,7 @@ class VerifyRenamingDialog(QDialog):
         for row, rename in enumerate(self.renames):
             self._fill_rename_row(row, rename, root)
         self.renames_table.resizeColumnsToContents()
+        self.renames_table.horizontalHeader().setStretchLastSection(True)  # The new names get the room left
         self.renames_table.setVisible(bool(self.renames))
         layout.addWidget(self.renames_table)
 
@@ -162,7 +165,8 @@ class VerifyRenamingDialog(QDialog):
         selected_item.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled)
         selected_item.setCheckState(Qt.Checked)
         self.renames_table.setItem(row, SELECTED_COLUMN, selected_item)
-        for column, text in ((FOLDER_COLUMN, str(_relative_to(rename.source.parent, root))),
+        folder = _relative_to(rename.source.parent, root)
+        for column, text in ((FOLDER_COLUMN, '' if folder == Path('.') else str(folder)),  # '.': the root itself
                              (CURRENT_NAME_COLUMN, rename.source.name)):
             read_only_item = QTableWidgetItem(text)
             read_only_item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
