@@ -3,7 +3,7 @@ import functools
 import traceback
 import warnings
 from abc import ABC, abstractmethod
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from typing import List, Any, Callable, Mapping, Optional, Dict, Type, Tuple, Sequence, Union
 
 from PyQt5.QtCore import QEvent, QObject
@@ -1508,6 +1508,15 @@ class UiParameterCollection(BusSubscriberMixin, ABC):
             self._painting = painting
         for param in self.params:
             param._painting = painting
+
+    @contextmanager
+    def _suppress_handlers(self):
+        """Suppress the handlers of every sub-params (as ``UiParameter._suppress_handlers`` does for a single one)"""
+        with ExitStack() as stack:
+            for param in self.params:
+                if param is not None:
+                    stack.enter_context(param._suppress_handlers())
+            yield
 
 
 class ChannelsUiParameterCollection(UiParameterCollection):
