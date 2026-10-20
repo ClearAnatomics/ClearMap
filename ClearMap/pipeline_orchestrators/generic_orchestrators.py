@@ -106,7 +106,8 @@ from ClearMap.config.compound_keys import (CompoundKey, compound_channel_key, co
 from ClearMap.Utils.event_bus import BusSubscriberMixin
 from ClearMap.Utils.exceptions import (ClearMapRuntimeError, ClearMapValueError, ClearMapConfigError,
                                        ClearMapNotImplementedError, MissingChannelError, MissingRequirementException)
-from ClearMap.Utils.utilities import handle_deprecated_args, deep_freeze, infer_origin_from_caller
+from ClearMap.Utils.utilities import handle_deprecated_args, infer_origin_from_caller
+from ClearMap.config.config_adjusters.dict_ops import deep_freeze
 
 if TYPE_CHECKING:    # WARNING: some circular imports below, use only for type checking with quotes
     from ClearMap.config.config_coordinator import ConfigCoordinator

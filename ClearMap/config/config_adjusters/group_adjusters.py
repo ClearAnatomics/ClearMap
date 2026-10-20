@@ -1,6 +1,6 @@
 from copy import deepcopy
 
-from ClearMap.Utils.utilities import _ensure_list, _dedupe_preserve_order
+from ClearMap.config.config_adjusters.dict_ops import ensure_list, dedupe_preserve_order
 
 from ClearMap.config.config_adjusters.type_hints import AdjustmentContext
 from ClearMap.config.config_adjusters.adjusters_api import Phase, Step, patch_adjuster, AdjusterScope
@@ -11,8 +11,8 @@ def _normalize_groups(groups: dict) -> tuple[dict, bool]:
     changed = False
     out = deepcopy(groups or {})
     for g, items in list(out.items()):
-        norm = [s for s in _ensure_list(items) if s]
-        norm = _dedupe_preserve_order(norm, key=lambda x: x)
+        norm = [s for s in ensure_list(items) if s]
+        norm = dedupe_preserve_order(norm, key=lambda x: x)
         if norm != items:
             out[g] = norm
             changed = True
@@ -108,7 +108,7 @@ def adjust_batch_groups_and_comparisons(view: ConfigView, ctx: AdjustmentContext
             continue
         normalized_pairs.append([a, b])  # keep original order
 
-    deduped_pairs = _dedupe_preserve_order(normalized_pairs, key=lambda x: tuple(x))
+    deduped_pairs = dedupe_preserve_order(normalized_pairs, key=lambda x: tuple(x))
     if deduped_pairs != comps:
         comps = deduped_pairs
         groups_changed = True

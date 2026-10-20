@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import functools
 from copy import deepcopy
-from types import NoneType
+from operator import getitem
+from types import MappingProxyType, NoneType
 from typing import Dict, Any, Set, Tuple, Optional
+
+from configobj import ConfigObj
 
 TuplePath = Tuple[str, ...]
 
@@ -138,3 +142,120 @@ def is_under(prefix: tuple[str, ...], path: tuple[str, ...]) -> bool:
 
     """
     return len(path) >= len(prefix) and path[:len(prefix)] == prefix
+
+
+def del_item_recursive(d: dict, keys: list) -> None:
+    """Delete a nested key from a dict. No-op if path does not exist."""
+    for key in keys[:-1]:
+        d = d.get(key)
+        if not isinstance(d, dict):
+            return
+    d.pop(keys[-1], None)
+
+
+def get_item_recursive(container, keys):
+    try:
+        return functools.reduce(getitem, keys, container)
+    except (TypeError, KeyError) as err:
+        err_type = type(err).__name__
+        err_msg = f'{err_type} attempting to read "{keys}"'
+        if isinstance(container, ConfigObj):
+            err_msg += f' path: {container.filename}'
+        print(f'{err_msg} from "{container}"')
+        raise err
+
+
+def try_get_item_recursive(container, keys, default=Ellipsis):
+    try:
+        return get_item_recursive(container, keys)
+    except (TypeError, KeyError):
+        if default is Ellipsis:
+            raise
+        return default
+
+
+def has_item_recursive(container, keys) -> bool:
+    try:
+        get_item_recursive(container, keys)
+        return True
+    except (TypeError, KeyError):
+        return False
+
+
+def set_item_recursive(dictionary, keys_list, val, fix_missing_keys=True):
+    def add_keys(d, keys):
+        if not keys:
+            return
+        if keys[0] not in d.keys():
+            d[keys[0]] = {}
+        if keys[1:]:  # if keys left
+            if not isinstance(d[keys[0]], dict):
+                # Avoid creating a sub-dict if there is already a non-dict value there
+                raise TypeError(f"Non-dict at {keys[0]} while descending {keys}")
+            add_keys(d[keys[0]], keys[1:])
+
+    if fix_missing_keys:
+        add_keys(dictionary, keys_list[:-1])  # Fix missing keys recursively
+    else: # ensure the path exists and is all dicts
+        cur = dictionary
+        for k in keys_list[:-1]:
+            cur = cur[k]  # KeyError if missing
+            if not isinstance(cur, dict):
+                raise TypeError(f"Non-dict at {k} while descending {keys_list}")
+
+    # Since we ensured it exists and is a dict, write to var will modify in place
+    get_item_recursive(dictionary, keys_list[:-1])[keys_list[-1]] = val
+    return dictionary  # Return the modified dictionary for chaining
+
+
+def deep_freeze(obj) -> object | MappingProxyType:
+    """
+    Recursively make a data structure immutable (freeze it).
+    Only works for dict, list, set, tuple and scalars (str/int/float/None/...).
+
+    .. note::
+        This is faster than deepcopy and more explicit because
+        if we try to modify a frozen object, we get an error immediately.
+
+    Parameters
+    ----------
+    obj: object
+        Typically a nested dict like a config
+
+    Returns
+    -------
+    object | MappingProxyType
+        An immutable version of the input object
+    """
+    if isinstance(obj, dict):
+        # freeze children first, then wrap the dict so callers cannot mutate it
+        frozen = {k: deep_freeze(v) for k, v in obj.items()}
+        return MappingProxyType(frozen)
+    elif isinstance(obj, list):
+        return tuple(deep_freeze(x) for x in obj)
+    elif isinstance(obj, set):
+        return frozenset(deep_freeze(x) for x in obj)
+    elif isinstance(obj, tuple):
+        return tuple(deep_freeze(x) for x in obj)
+    # scalars (str/int/float/None/...) pass through because in python they are already immutable
+    return obj
+
+
+def ensure_list(obj) -> list:
+    if obj is None:
+        return []
+    if isinstance(obj, list):
+        return obj
+    return [obj]
+
+
+def dedupe_preserve_order(seq, key=lambda x: x):
+    seen = set()
+    out = []
+    for x in seq:
+        k = key(x)
+        if k in seen:
+            continue
+        seen.add(k)
+        out.append(x)
+    return out
