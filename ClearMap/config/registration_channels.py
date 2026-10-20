@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import Iterable, Mapping
 
-from ClearMap.Utils.exceptions import ClearMapConfigError, MissingRequirementException
+from ClearMap.Utils.exceptions import ChannelsNotPixelAlignedError, ClearMapConfigError, MissingRequirementException
 
 ATLAS = 'atlas'  # align_with / moving_channel of the atlas: a partner which is not a channel of the sample
 ALIGN_WITH_NOTHING = None  # align_with of a channel which is explicitly not registered
@@ -168,6 +168,47 @@ def reversed_registrations(registration_config: Mapping, channels: Iterable[str]
     """
     channels_config = registration_config['channels']
     return [channel for channel in channels if registration_direction(channel, channels_config[channel]) == MOVING_SELF]
+
+
+def check_intrinsically_aligned(registration_config: Mapping, channels: Iterable[str]) -> None:
+    """
+    Check that the channels are aligned by construction (acquired together): exactly one of them is the root (it is
+    registered on its own), every other one is intrinsically aligned with one of them, and following their align_with
+    leads to the root.
+    Registering them each on its own is not enough: their results would end at the same place, but not pixel for
+    pixel (e.g. with a non rigid registration).
+
+    Raises
+    ------
+    ChannelsNotPixelAlignedError
+        Naming each requirement which is not met.
+    """
+    channels = tuple(channels)
+    channels_config = registration_config.get('channels', {})
+    root_channels = [channel for channel in channels
+                     if not is_intrinsically_aligned(channels_config.get(channel, {}))]
+    unmet_requirements = []
+    if len(root_channels) != 1:
+        unmet_requirements.append(f'exactly one channel must be the root (registered on its own), the others being '
+                                  f'acquired together (moving_channel: {INTRINSICALLY_ALIGNED}), got {root_channels=}')
+    for channel in channels:
+        if channel in root_channels:
+            continue
+        align_with = channels_config[channel].get('align_with')
+        if align_with not in channels:
+            unmet_requirements.append(f'{channel} is acquired together with {align_with!r}, which is not one of them')
+    if not unmet_requirements:  # Each one is aligned with one of them: they must all lead to the root
+        for channel in channels:
+            followed = [channel]
+            for _ in channels:  # A root is reached within as many steps as there are channels, or it is a loop
+                if followed[-1] in root_channels:
+                    break
+                followed.append(channels_config[followed[-1]]['align_with'])
+            else:
+                unmet_requirements.append(f'the channels they are acquired together with make a loop: {" -> ".join(followed)}')
+                break
+    if unmet_requirements:
+        raise ChannelsNotPixelAlignedError(channels, unmet_requirements)
 
 
 def registration_sequence(registration_config: Mapping, first_channel: str, stop_channel: str = ATLAS) -> list[str]:

@@ -29,14 +29,16 @@ ClearMapException
 │   ├── ConfigNotFoundError
 │   ├── ConfigParsingError
 │   ├── AggregatedValidationError
-│   └── PatchConflictError
+│   ├── PatchConflictError
+│   └── ChannelsNotPixelAlignedError
 ├── PlotGraphError
 ├── ClearMapVRamException
 ├── SmiError
 └── GroupStatsError
 
 ClearMapWarning  (also RuntimeWarning; issued with ``warnings.warn``, not raised)
-└── SubscriberFailedWarning
+├── SubscriberFailedWarning
+└── ReversedRegistrationWarning
 """
 from __future__ import annotations
 
@@ -672,6 +674,25 @@ class PatchConflictError(ClearMapConfigError):
 # ---------------------------------------------------------------------------
 # Processing / pipeline
 # ---------------------------------------------------------------------------
+
+class ChannelsNotPixelAlignedError(ClearMapConfigError):
+    """
+    Channels which are processed pixel by pixel together (the parts of a TubeMap compound, a colocalization pair)
+    are not set up as pixel aligned: same atlas settings, shape and resolution, acquired together, stitched together.
+    ``unmet_requirements`` holds one message per requirement which is not met, naming the channels and the setting.
+    """
+    severity = Severity.RECOVERABLE
+    user_title = 'Channels Not Pixel Aligned'
+    user_hint = ('Set the channels up as imaged together: the same orientation, slicing and resolution, the same '
+                 'stitching layout, and all but one acquired together with another of them '
+                 '(registration Direction: Acquired together).')
+
+    def __init__(self, channels: Iterable[str], unmet_requirements: Iterable[str]):
+        self.channels = tuple(channels)
+        self.unmet_requirements = list(unmet_requirements)
+        super().__init__(f'The channels {", ".join(self.channels)} must be pixel aligned: '
+                         + '; '.join(self.unmet_requirements))
+
 
 class PlotGraphError(ClearMapException):
     """The requested graph visualisation cannot be rendered, usually because

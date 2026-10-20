@@ -98,12 +98,14 @@ from ClearMap.IO.assets_constants import CONTENT_TYPE_TO_PIPELINE
 
 from ..config.channel import ChannelRegistry
 from ..config.compound_keys import PairKey
+from ..config.registration_channels import check_intrinsically_aligned
+from ..config.stitching_channels import check_stitched_together
 from ..config.config_adjusters.type_hints import SampleManagerProtocol
 from ..config.config_handler import ALTERNATIVES_REG
 from ..config.config_coordinator import CommitRecord, ConfigCoordinator, make_cfg_coordinator_factory
 
 from ..Utils.events import ChannelRenamed, WorkspaceChannelsUpdated
-from ..Utils.exceptions import ClearMapConfigError
+from ..Utils.exceptions import ChannelsNotPixelAlignedError, ClearMapConfigError, MissingRequirementException
 from ..Utils.tag_expression import Expression
 from ..Utils.event_bus import EventBus
 
@@ -114,6 +116,11 @@ __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://github.com/ClearAnatomics/ClearMap'
+
+
+# The settings of the sample channels which must be equal for them to match pixel for pixel (see check_pixel_aligned):
+# the atlas settings, and the size of the voxels
+PIXEL_ALIGNMENT_SAMPLE_SETTINGS = ('orientation', 'slicing', 'resolution')
 
 
 def adjuster_safe(fn):
@@ -789,6 +796,60 @@ class SampleManager(OrchestratorBase):
             return self.get_channels_by_type('autofluorescence') or None
         except KeyError:
             return None
+
+    def check_pixel_aligned(self, *channels: str, require_stitched: bool = False) -> None:
+        """
+        Check that the channels are set up to match pixel for pixel, as they are processed together (the parts of a
+        TubeMap compound, a colocalization pair): the same atlas settings (orientation, slicing), resolution and
+        stitched shape, acquired together (see check_intrinsically_aligned) and stitched together (see
+        check_stitched_together).
+
+        Parameters
+        ----------
+        channels : str
+            The sample channels.
+        require_stitched : bool
+            Whether their stitched images must exist (before a computation which relies on them). If not, the shapes
+            are only compared when they all exist (e.g. at setup, before the stitching ran).
+
+        Raises
+        ------
+        ChannelsNotPixelAlignedError
+            Naming each requirement which is not met.
+        MissingRequirementException
+            If require_stitched and a stitched image is missing (once the settings are right).
+        """
+        unmet_requirements = []
+        # 1: Sample params must match
+        for setting in PIXEL_ALIGNMENT_SAMPLE_SETTINGS:
+            values = {channel: self.config['channels'][channel].get(setting) for channel in channels}
+            if any(value != values[channels[0]] for value in values.values()):
+                unmet_requirements.append(f'they must have the same {setting}, got '
+                                          f'{", ".join(f"{channel}: {value}" for channel, value in values.items())}')
+        # 2: must be stitched and registered together
+        for section, check_fn in (('registration', check_intrinsically_aligned),
+                                  ('stitching', check_stitched_together)):
+            try:
+                check_fn(self.cfg_coordinator.get_config_view(section), channels)
+            except ChannelsNotPixelAlignedError as err:
+                unmet_requirements.extend(err.unmet_requirements)
+
+        # 3: shape of stitched must match
+        stitched = {channel: self.get('stitched', channel=channel, sample_id=self.prefix) for channel in channels}
+        not_stitched = [channel for channel, asset in stitched.items() if not asset.exists]
+        if not not_stitched:
+            shapes = {channel: tuple(asset.shape()) for channel, asset in stitched.items()}
+            if len(set(shapes.values())) > 1:
+                unmet_requirements.append(f'they must have the same stitched shape, got '
+                                          f'{", ".join(f"{channel}: {shape}" for channel, shape in shapes.items())}')
+        if unmet_requirements:
+            raise ChannelsNotPixelAlignedError(channels, unmet_requirements)
+        if not_stitched:
+            message = (f'The stitched images of {not_stitched} are needed to check that {channels} match pixel '
+                       f'for pixel: run the stitching (or the conversion of the raw data) of these channels first.')
+            if require_stitched:
+                raise MissingRequirementException(message)
+            warnings.warn(message)
 
     def delete_resampled_files(self, channel: str):
         asset = self.get('resampled', channel=channel)
