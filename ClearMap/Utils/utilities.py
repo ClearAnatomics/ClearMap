@@ -16,9 +16,7 @@ import inspect
 import multiprocessing
 import os
 import re
-import shutil
 import sys
-import tempfile
 import warnings
 from concurrent.futures import ProcessPoolExecutor
 from copy import deepcopy
@@ -88,14 +86,6 @@ def is_in_range(src_array, value_range):
     return np.logical_and(src_array >= value_range[0], src_array <= value_range[1])
 
 
-def is_iterable(obj):
-    try:
-        _ = iter(obj)
-        return True
-    except TypeError:
-        return False
-
-
 def title_to_snake(string):
     """
         Convert a human/TitleCase/mixed string into canonical snake_case.
@@ -156,21 +146,6 @@ def title_to_snake(string):
 
 def snake_to_title(string):
     return string.replace('_', ' ').title()
-
-# FIXME: move these functions to config or io utils
-def backup_file(file_path):  # REFACTOR: put in workspace or IO
-    base_path, ext = os.path.splitext(file_path)
-    new_path = base_path + '.bcp' + ext
-    shutil.copy(file_path, new_path)
-
-
-def make_abs(directory, file_name):
-    """Make file_name absolute if it is not"""
-    if os.path.isabs(file_name):
-        f_path = file_name
-    else:
-        f_path = os.path.join(directory, file_name)
-    return f_path
 
 
 def del_item_recursive(d: dict, keys: list) -> None:
@@ -399,15 +374,6 @@ def requires_assets(asset_specs):
     return decorator
 
 
-def check_enough_temp_space(min_temp_space=200):
-    free = get_free_temp_space()
-    return free // (2**30) > min_temp_space  # GB
-
-
-def get_free_temp_space():
-    _, _, free = shutil.disk_usage(tempfile.gettempdir())
-    return free
-
 def bytes_to_human(num):
     """
     Convert bytes to human-readable format.
@@ -495,25 +461,6 @@ def validate_arg(arg_name, value, valid_values):
         raise ValueError(f'Unknown {arg_name} "{value}". '
                          f'Supported values are "{valid_values}".')
     return value
-
-
-# def topological_sort(graph, in_degree):
-#     queue = deque([node for node in in_degree if in_degree[node] == 0])
-#     sorted_list = []
-#
-#     while queue:
-#         node = queue.popleft()
-#         sorted_list.append(node)
-#
-#         for neighbor in graph[node]:
-#             in_degree[neighbor] -= 1
-#             if in_degree[neighbor] == 0:
-#                 queue.append(neighbor)
-#
-#     if len(sorted_list) != len(in_degree):
-#         raise ValueError("Cycle detected in channel dependencies")
-#
-#     return sorted_list
 
 
 def check_stopped(func):
