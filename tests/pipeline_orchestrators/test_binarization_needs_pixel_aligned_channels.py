@@ -17,9 +17,9 @@ def _write_stitched(experiment, channel, shape=SHAPE):
             np.zeros(shape, dtype=np.uint16))
 
 
-def _acquire_arteries_with_the_vessels(experiment):
+def _register_arteries_on_their_own(experiment):
     experiment.apply_ui_patch({'registration': {'channels': {'arteries': {
-        'align_with': 'vessels', 'moving_channel': 'intrinsically_aligned'}}}})
+        'align_with': 'atlas', 'moving_channel': 'other'}}}})
 
 
 @pytest.fixture()
@@ -38,26 +38,26 @@ def binarized(monkeypatch):
 
 
 def test_the_setup_tells_what_is_not_set_up_yet_without_refusing(experiment, vessel_channels):
-    with pytest.warns(UserWarning, match='must be pixel aligned: exactly one of them must be registered on its own'):
+    with pytest.warns(UserWarning, match=r"stitched images of \['arteries', 'vessels'\]"):
         worker = experiment.get_worker('vasculature', substep='binary')
 
     assert worker.channels_to_binarize == ('arteries', 'vessels')
 
 
 def test_channels_registered_each_on_its_own_are_not_binarized(experiment, vessel_channels, binarized):
+    _register_arteries_on_their_own(experiment)
     for channel in ('vessels', 'arteries'):
         _write_stitched(experiment, channel)
     with pytest.warns(UserWarning):
         worker = experiment.get_worker('vasculature', substep='binary')
 
-    with pytest.raises(ChannelsNotPixelAlignedError, match='registered on their own'):
+    with pytest.raises(ChannelsNotPixelAlignedError, match='exactly one channel must be the root'):
         worker.binarize()
 
     assert binarized == []
 
 
 def test_channels_of_other_shapes_are_not_binarized(experiment, vessel_channels, binarized):
-    _acquire_arteries_with_the_vessels(experiment)
     _write_stitched(experiment, 'vessels')
     _write_stitched(experiment, 'arteries', shape=(4, 5, 7))
     with pytest.warns(UserWarning, match='stitched shape'):
@@ -70,7 +70,6 @@ def test_channels_of_other_shapes_are_not_binarized(experiment, vessel_channels,
 
 
 def test_the_binarization_needs_the_stitched_images(experiment, vessel_channels, binarized):
-    _acquire_arteries_with_the_vessels(experiment)
     with pytest.warns(UserWarning, match='stitched images'):
         worker = experiment.get_worker('vasculature', substep='binary')
 
@@ -81,7 +80,6 @@ def test_the_binarization_needs_the_stitched_images(experiment, vessel_channels,
 
 
 def test_channels_imaged_together_are_binarized(experiment, vessel_channels, binarized):
-    _acquire_arteries_with_the_vessels(experiment)
     for channel in ('vessels', 'arteries'):
         _write_stitched(experiment, channel)
     worker = experiment.get_worker('vasculature', substep='binary')
