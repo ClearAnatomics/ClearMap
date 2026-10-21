@@ -9,7 +9,8 @@ import pytest
 
 from ClearMap.Utils.event_bus import EventBus
 from ClearMap.config.channel import ChannelId
-from ClearMap.gui.widgets import channel_id_of, set_channel_id
+from ClearMap.config.compound_keys import compound_channel_parts
+from ClearMap.gui.widgets import ChannelPageId, channel_page_id_of, set_channel_page_id
 from ClearMap.gui import params, params_interfaces
 from ClearMap.gui.params_interfaces import ChannelUiParameter
 from ClearMap.gui.tabs_interfaces import GenericTab
@@ -63,18 +64,21 @@ class FakeChannelsTabWidget(FakeWidget):
     def __init__(self):
         super().__init__('channelsParamsTabWidget')
         self.pages = {}
+        self.ids = {}  # The registry: one id per channel name
 
     def get_channel_widget(self, channel_name, return_idx=False):
         if channel_name not in self.pages:
             page = FakeChannelPage(channel_name)
-            set_channel_id(page, ChannelId.new())  # The page of a channel of the registry holds its id
+            parts = compound_channel_parts(channel_name) or (channel_name,)  # The parts of a pair have the ids
+            ids = tuple(self.ids.setdefault(part, ChannelId.new()) for part in parts)
+            set_channel_page_id(page, ChannelPageId(ids))
             self.pages[channel_name] = page
         page = self.pages[channel_name]
         return (page, list(self.pages).index(channel_name)) if return_idx else page
 
-    def get_channel_widget_by_id(self, channel_id, return_idx=False):
+    def get_channel_widget_by_page_id(self, page_id, return_idx=False):
         for index, (_, page) in enumerate(self.pages.items()):
-            if channel_id_of(page) == channel_id:
+            if channel_page_id_of(page) == page_id:
                 return (page, index) if return_idx else page
         return (None, -1) if return_idx else None
 

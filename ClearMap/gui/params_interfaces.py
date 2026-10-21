@@ -26,7 +26,7 @@ from ClearMap.gui.gui_utils_base import disconnect_widget_signal
 from ClearMap.gui.pipeline_model import LinearPipeline, PipelineStep, BINARIZATION_STEPS
 from ClearMap.gui.pipeline_widgets import LinearPipelineWidget
 from ClearMap.gui.widget_monkeypatch_callbacks import _get_sorted_spin_boxes, ensure_compound_box_patched
-from ClearMap.gui.widgets import (ExtendableTabWidget, FileDropListWidget, channel_id_of, LandmarksWeightsPanel, GroupsWidgetAdapter,
+from ClearMap.gui.widgets import (ExtendableTabWidget, FileDropListWidget, channel_page_id_of, LandmarksWeightsPanel, GroupsWidgetAdapter,
                                   NProcessesWidget)
 
 CLEARMAP_VERSION = Version(version('ClearMap'))
@@ -1313,12 +1313,12 @@ class ChannelUiParameter(UiParameter, ABC):
         if page is None:
             raise ClearMapValueError(f'Channel {channel_name} not found in tab for {self.__class__.__name__}. '
                                      f'Please add it first.')
-        channel_id = channel_id_of(page)  # The page holds the id of its channel: the one place which says which page
-        if channel_id is None:
+        page_id = channel_page_id_of(page)  # The page holds the id of its channel: the one place which says which page
+        if page_id is None:
             raise ClearMapValueError(f'The page of channel {channel_name} has no channel id: it was not made from the '
                                      f'registry of the sample. Add the channel through the sample manager first.')
         self._tab_widget = tab_widget
-        self._channel_id = channel_id  # Not the page nor its index: both move, the id does not
+        self._page_id = page_id  # Not the page nor its index: both move, the id does not
         self._channel_name = channel_name  # The channel of the page. Only a rename changes it (see the name setter)
         if name_widget_name is not None:
             self.nameWidget = getattr(page, name_widget_name)
@@ -1330,13 +1330,13 @@ class ChannelUiParameter(UiParameter, ABC):
     @property
     def page(self):
         """The page of this channel, found by its id now (None once the channel has no page)"""
-        page, _ = self._tab_widget.get_channel_widget_by_id(self._channel_id, return_idx=True)
+        page, _ = self._tab_widget.get_channel_widget_by_page_id(self._page_id, return_idx=True)
         return page
 
     @property
     def page_index(self) -> int:
         """The index of the page of this channel in the tab widget, found by its id now (-1 if there is none)"""
-        _, index = self._tab_widget.get_channel_widget_by_id(self._channel_id, return_idx=True)
+        _, index = self._tab_widget.get_channel_widget_by_page_id(self._page_id, return_idx=True)
         return index
 
     @property

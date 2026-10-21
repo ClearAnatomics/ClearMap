@@ -115,7 +115,7 @@ class PageTab:
     _drop_channel_page = ExperimentTab._drop_channel_page
     _rename_channel_page = ExperimentTab._rename_channel_page
     _channel_registry = ExperimentTab._channel_registry
-    _assign_channel_id = ExperimentTab._assign_channel_id
+    _assign_channel_page_id = ExperimentTab._assign_channel_page_id
 
     def __init__(self, sample_manager, config_writes):
         self._sample_manager = sample_manager

@@ -12,9 +12,10 @@ import pytest
 from ClearMap.IO.FileUtils import Rename
 from ClearMap.IO.channel_file_renaming import ChannelRenamePlan, NotRenamed
 from ClearMap.config.channel import ChannelId, ChannelRegistry
+from ClearMap.config.compound_keys import compound_channel_parts
 from ClearMap.gui import params, params_interfaces, tabs_interfaces
 from ClearMap.gui.params import SampleParameters
-from ClearMap.gui.widgets import channel_id_of, set_channel_id
+from ClearMap.gui.widgets import ChannelPageId, channel_page_id_of, set_channel_page_id
 from ClearMap.gui.params_interfaces import ChannelsUiParameterCollection, ChannelUiParameter
 from ClearMap.gui.tabs import SampleInfoTab
 from ClearMap.gui.tabs_interfaces import ExperimentTab
@@ -56,16 +57,16 @@ class FakeChannelsTabWidget:
                 return (page, index) if return_idx else page
         return (None, -1) if return_idx else None
 
-    def get_channel_widget_by_id(self, channel_id, return_idx=False):
+    def get_channel_widget_by_page_id(self, page_id, return_idx=False):
         for index, (_, page) in enumerate(self.pages):
-            if channel_id_of(page) == channel_id:
+            if channel_page_id_of(page) == page_id:
                 return (page, index) if return_idx else page
         return (None, -1) if return_idx else None
 
     def add_page(self, name, *, with_id=True):
         page = FakePage()
         if with_id:
-            set_channel_id(page, ChannelId.new())  # As the sample tab does when it makes a page
+            set_channel_page_id(page, ChannelPageId((ChannelId.new(),)))  # As the sample tab does when it makes a page
         self.pages.append((name, page))
         self.current_page = page
         return page
@@ -211,7 +212,7 @@ def _param_for_channel(tab_widget: FakeNameTab, name: str):
     """Binds a channel parameter to the page of ``name``, as ``ChannelUiParameter.__init__`` does"""
     param = object.__new__(SomeChannelParams)  # Skips the Qt construction: only the id and the name are under test
     param._tab_widget = tab_widget
-    param._channel_id = channel_id_of(tab_widget.get_channel_widget(name))
+    param._page_id = channel_page_id_of(tab_widget.get_channel_widget(name))
     param._channel_name = name
     param.nameWidget = tab_widget  # Not a line edit: the name setter then only moves the tab text
     return param
@@ -525,12 +526,18 @@ class PageTab(ExperimentTab):
         self.name = 'fake tab'
 
     def _desired_channel_pages(self):
+        """A page of a channel is a page of its Channel, a page of a compound channel of the Channels of its parts"""
         registry = self._sample_manager.channel_registry
-        return [(registry.resolve(name), name) for name in self.channels_in_config]
+        pages = []
+        for name in self.channels_in_config:
+            parts = compound_channel_parts(name)
+            page_of = tuple(registry.resolve(part) for part in parts) if parts else registry.resolve(name)
+            pages.append((page_of, name))
+        return pages
 
     def add_channel_tab(self, name):
         page = self.ui.channelsParamsTabWidget.add_page(name, with_id=False)
-        self._assign_channel_id(page, name)  # As _get_or_init_channel_ui does: the id of its channel, from the registry
+        self._assign_channel_page_id(page, name)  # As _get_or_init_channel_ui does: the id of its channel
         self.params.channel_params[name] = FakeChannelParams(name)
 
     def _on_channel_removed(self, name):
@@ -651,7 +658,7 @@ def test_a_page_made_before_its_channel_was_committed_gets_its_id_at_the_reconci
 
     tab.reconcile_channel_pages()
 
-    assert channel_id_of(page) == channel.id
+    assert channel_page_id_of(page) == ChannelPageId((channel.id,))
 
 
 def test_a_tab_which_is_not_a_pipeline_tab_gives_its_new_pages_an_id(registry, tab, monkeypatch):
@@ -663,16 +670,42 @@ def test_a_tab_which_is_not_a_pipeline_tab_gives_its_new_pages_an_id(registry, t
     name, page, creating = tab._get_or_init_channel_ui(FIRST)
 
     assert creating and name == FIRST
-    assert channel_id_of(page) == channel.id
+    assert channel_page_id_of(page) == ChannelPageId((channel.id,))
 
 
 def test_a_page_of_a_channel_the_registry_does_not_know_has_no_id(registry, tab, monkeypatch):
     monkeypatch.setattr(tabs_interfaces, 'create_clearmap_widget', lambda *_, **__: FakePage())
     tab.channels_ui_name = 'some_channel_page'
 
-    _, page, _ = tab._get_or_init_channel_ui(f'{FIRST}-{SECOND}')  # A compound channel
+    _, page, _ = tab._get_or_init_channel_ui(f'{FIRST}-{SECOND}')  # A compound channel whose parts are not known
 
-    assert channel_id_of(page) is None
+    assert channel_page_id_of(page) is None
+
+
+def test_the_page_of_a_compound_channel_holds_the_ids_of_its_parts(registry, tab, monkeypatch):
+    monkeypatch.setattr(tabs_interfaces, 'create_clearmap_widget', lambda *_, **__: FakePage())
+    tab.channels_ui_name = 'some_channel_page'
+    first, second = registry.add(FIRST), registry.add(SECOND)
+
+    _, page, _ = tab._get_or_init_channel_ui(f'{SECOND}-{FIRST}')  # Oriented: the order of the parts is kept
+
+    assert channel_page_id_of(page) == ChannelPageId((second.id, first.id))
+
+
+def test_the_page_of_a_pair_is_made_again_when_one_of_its_parts_is_replaced(registry, tab):
+    # The second channel is removed then added again under the same name: a new channel, with a new id
+    first, second = registry.add(FIRST), registry.add(SECOND)
+    pair = f'{FIRST}-{SECOND}'
+    tab.channels_in_config = [FIRST, SECOND, pair]
+    tab.reconcile_channel_pages()
+    tab_widget = tab.ui.channelsParamsTabWidget
+    assert channel_page_id_of(tab_widget.get_channel_widget(pair)) == ChannelPageId((first.id, second.id))
+    registry.remove(second)
+    new_second = registry.add(SECOND)
+
+    tab.reconcile_channel_pages()
+
+    assert channel_page_id_of(tab_widget.get_channel_widget(pair)) == ChannelPageId((first.id, new_second.id))
 
 
 def test_the_pages_of_a_replaced_registry_are_made_again_with_the_ids_of_the_new_one(tab):
@@ -692,7 +725,7 @@ def test_the_pages_of_a_replaced_registry_are_made_again_with_the_ids_of_the_new
 
     assert tab_widget.get_channels_names() == [FIRST, SECOND]
     new_pages = [tab_widget.get_channel_widget(name) for name in (FIRST, SECOND)]
-    assert [channel_id_of(page) for page in new_pages] == new_ids
+    assert [channel_page_id_of(page) for page in new_pages] == [ChannelPageId((new_id,)) for new_id in new_ids]
     assert all(new is not old for new, old in zip(new_pages, old_pages))
     assert all(tab.params.channel_params[name] is not old for name, old in zip((FIRST, SECOND), old_params))
     assert all(params.torn_down for params in old_params)

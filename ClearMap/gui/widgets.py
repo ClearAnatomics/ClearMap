@@ -70,6 +70,8 @@ from ClearMap import Settings
 from ClearMap.IO.assets_constants import DATA_CONTENT_TYPES
 from ClearMap.IO.tile_patterns import pattern_finders_from_base_dir, ChannelPatternSpec, PatternFinder
 from ClearMap.config.channel import ChannelId
+from ClearMap.config.compound_keys import compound_channel_parts
+from ClearMap.Utils.exceptions import ClearMapValueError
 from ClearMap.Utils.utilities import bytes_to_human, trim_or_pad
 from ClearMap.Utils.nvidia_utils import gpu_params
 from ClearMap.Visualization import Plot3d as plot_3d
@@ -2182,31 +2184,75 @@ class PerfMonitor(QWidget):
             print(f'GPU monitor: {err}')
 
 
-#: The Qt property of a channel page which holds the text of its ChannelId. Qt has no id for a tab: the page is it.
-CHANNEL_ID_PROPERTY = 'channel_id'
+#: The Qt property of a channel page which holds the text of its ChannelPageId. Qt has no id for a tab: the page is it.
+CHANNEL_PAGE_ID_PROPERTY = 'channel_page_id'
+CHANNEL_PAGE_ID_SEP = ','  # Between the ids of the parts of a compound channel: not in the text of an id
 
 
-def set_channel_id(page, channel_id: ChannelId) -> None:
-    """Remember the channel of a page on the page itself (the text of its ChannelId, as a Qt property)"""
-    page.setProperty(CHANNEL_ID_PROPERTY, channel_id.value)
-
-
-def assign_channel_id_if_known(page, channel_name: str, registry) -> None:
+@dataclass(frozen=True)
+class ChannelPageId:
     """
-    Assign to the page the id the registry has for its channel, once the registry knows the channel. A page can be
-    made before that (e.g. a new channel tab, named before its config is committed): it then gets its id at the
-    first reconcile.
+    The identity of a channel page: which channel it shows. One page, one ChannelPageId.
+
+    For a channel of the sample it is the ChannelId of that channel. A compound channel (e.g. the colocalization
+    pair ``'fos-auto'``) has no id of its own in the registry: its page is identified by the ChannelIds of its parts,
+    in order (a pair can be oriented). The page is found by it, never by its tab text or index, which a rename or a
+    removal moves.
     """
-    if channel_id_of(page) is None and registry.has_name(channel_name):
-        set_channel_id(page, registry.resolve(channel_name).id)
+    channel_ids: tuple[ChannelId, ...]  # The id of the channel, or the ids of the parts of the compound channel
+
+    def __post_init__(self):
+        if not self.channel_ids or not all(isinstance(channel_id, ChannelId) for channel_id in self.channel_ids):
+            raise ClearMapValueError(f'A channel page id is made of one ChannelId or more, got {self.channel_ids!r}')
+
+    @classmethod
+    def of_channel(cls, channel_name: str, registry) -> 'ChannelPageId | None':
+        """
+        The page id of the channel named channel_name (a channel of the sample or a compound channel), or None while
+        the registry does not know it (each part, for a compound channel).
+        """
+        names = compound_channel_parts(channel_name) or (channel_name,)
+        if not all(registry.has_name(name) for name in names):
+            return None
+        return cls(tuple(registry.resolve(name).id for name in names))
+
+    def is_known_by(self, registry) -> bool:
+        """Whether the channel of the page is still in registry (each part of it, for a compound channel)"""
+        return all(registry.has_id(channel_id) for channel_id in self.channel_ids)
+
+    @property
+    def text(self) -> str:
+        return CHANNEL_PAGE_ID_SEP.join(channel_id.value for channel_id in self.channel_ids)
+
+    @classmethod
+    def from_text(cls, text: str) -> 'ChannelPageId':
+        """Refused (InvalidChannelIdError) if text is not made of the texts of ChannelIds"""
+        return cls(tuple(ChannelId(part) for part in text.split(CHANNEL_PAGE_ID_SEP)))
 
 
-def channel_id_of(page) -> ChannelId | None:
-    """The ChannelId of a page, recreated from its property; None if the page was not given one"""
-    value = page.property(CHANNEL_ID_PROPERTY)
+def set_channel_page_id(page, page_id: ChannelPageId) -> None:
+    """Remember the channel of a page on the page itself (the text of its ChannelPageId, as a Qt property)"""
+    page.setProperty(CHANNEL_PAGE_ID_PROPERTY, page_id.text)
+
+
+def assign_channel_page_id_if_known(page, channel_name: str, registry) -> None:
+    """
+    Give the page the id of its channel once the registry knows the channel (each part, for a compound channel).
+    A page can be made before that (e.g. a new channel tab, named before its config is committed): it then gets its
+    id at the first reconcile.
+    """
+    if channel_page_id_of(page) is None:
+        page_id = ChannelPageId.of_channel(channel_name, registry)
+        if page_id is not None:
+            set_channel_page_id(page, page_id)
+
+
+def channel_page_id_of(page) -> ChannelPageId | None:
+    """The ChannelPageId of a page, recreated from its property; None if the page was not given one"""
+    value = page.property(CHANNEL_PAGE_ID_PROPERTY)
     if not value:  # Qt gives None (or an invalid QVariant) for a property which was never set
         return None
-    return ChannelId(str(value))  # Refused (InvalidChannelIdError) if the property is not the text of an id
+    return ChannelPageId.from_text(str(value))
 
 
 class ExtendableTabWidget(QTabWidget):
@@ -2266,10 +2312,10 @@ class ExtendableTabWidget(QTabWidget):
         if widget is not None and current_idx != index:
             self.tabBar().moveTab(current_idx, index)
 
-    def get_channel_widget_by_id(self, channel_id: ChannelId, return_idx=False):
-        """The page of the channel with this id, found by the id its page holds (not by its tab text)"""
+    def get_channel_widget_by_page_id(self, page_id: ChannelPageId, return_idx=False):
+        """The channel page with this id, found by the id it holds (not by its tab text)"""
         for i in range(self.last_real_tab_idx):
-            if channel_id_of(self.widget(i)) == channel_id:
+            if channel_page_id_of(self.widget(i)) == page_id:
                 if return_idx:
                     return self.widget(i), i
                 return self.widget(i)
