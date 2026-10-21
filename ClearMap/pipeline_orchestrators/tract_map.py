@@ -325,7 +325,7 @@ class TractMapProcessor(ChannelPipelineOrchestrator):
                                  return_buffer=False)
 
         with AnnotationManager() as manager:
-            annotator = manager.Annotation(self.registration_processor.annotators[self.channel])
+            annotator = manager.Annotation(self.registration_processor.annotator_of(self.channel))
             labeling_fn = functools.partial(label_points_wrapper, annotator)
             labeling_fn.__name__ = 'label_points'  # for block_processing prints
             perf_cfg = self.cfg_coordinator.get_config_view(self.config_name)['performance']['label']['block_processing']
@@ -388,7 +388,7 @@ class TractMapProcessor(ChannelPipelineOrchestrator):
             df[f'{l}t'] = decimated_coordinates_transformed[:, i]
 
         unique_ids = np.sort(np.unique(decimated_labels))
-        annotator = self.registration_processor.annotators[self.channel]
+        annotator = self.registration_processor.annotator_of(self.channel)
         color_map = {id_: annotator.find(id_, key='id')['rgb'] for id_ in unique_ids}
         color_map[0] = np.array((1, 0, 0))  # default to red
         df['color'] = df['id'].map(color_map)
@@ -403,7 +403,7 @@ class TractMapProcessor(ChannelPipelineOrchestrator):
         self.prepare_watcher_for_substep(1, self.block_re, 'Voxelization', increment_main=True)
 
         voxelization_parameter = dict(
-            shape=source_geometry.shape(self.registration_processor.annotators[self.channel].annotation_file),
+            shape=source_geometry.shape(self.registration_processor.annotator_of(self.channel).annotation_file),
             dtype=None,
             weights=None,
             method='sphere',
@@ -495,14 +495,14 @@ class TractMapProcessor(ChannelPipelineOrchestrator):
         else:
             coordinates = df[['xt', 'yt', 'zt']].values.astype(int)  # required to match integer z
             dv.atlas = self.get('atlas', channel=self.channel, asset_sub_type='annotation').read()
-            dv.structure_names = self.registration_processor.annotators[self.channel].get_names_map()
+            dv.structure_names = self.registration_processor.annotator_of(self.channel).get_names_map()
         if 'hemisphere' in df.columns:
             hemispheres = df['hemisphere']
         else:
             hemispheres = None
 
         unique_ids = np.sort(np.unique(df['id']))
-        annotator = self.registration_processor.annotators[self.channel]
+        annotator = self.registration_processor.annotator_of(self.channel)
         # color_map = {id_: annotator.find(id_, key='id')['rgb'] for id_ in unique_ids}
         color_map = {id_: annotator.convert_label(id_, key='id', value='color_hex_triplet') for id_ in unique_ids}
         color_map[0] = np.array(to_hex((1, 0, 0)))  # default to red

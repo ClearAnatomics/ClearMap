@@ -1346,8 +1346,8 @@ class VesselGraphProcessor(TubeMapOrchestrator):
 
     def _annotate(self):
         """Atlas annotation of the graph (i.e. add property 'region' to vertices)"""
-        annotator = self.registration_processor.annotators[
-            self.representative_channel]  # warning: assuming same annotator for all channels
+        annotator = self.registration_processor.annotator_of(
+            self.representative_channel)  # warning: assuming same annotator for all channels
         self.graph_reduced.annotate_properties(functools.partial(annotator.label_points),
                                                vertex_properties={'coordinates_atlas': 'annotation'},
                                                edge_geometry_properties={'coordinates_atlas': 'annotation'})
@@ -1611,7 +1611,7 @@ class VesselGraphProcessor(TubeMapOrchestrator):
             df['radius_um'] = self.graph_traced.vertex_radii_units()
 
         if self.registration_processor.was_registered:
-            annotator = self.registration_processor.annotators[self.representative_channel]
+            annotator = self.registration_processor.annotator_of(self.representative_channel)
             coordinates_transformed = self.graph_traced.vertex_property('coordinates_atlas')
             atlas_resolution = self.get_alignment_ref_channel_reg_cfg()['resampled_resolution']
             extra_columns = annotator.get_columns(coordinates_transformed, atlas_resolution,
@@ -1623,7 +1623,7 @@ class VesselGraphProcessor(TubeMapOrchestrator):
     @requires_graph('annotated')
     def get_structure_sub_graph(self, structure_id):
         # Assign label of requested structure to all its children
-        annotator = self.registration_processor.annotators[self.representative_channel]
+        annotator = self.registration_processor.annotator_of(self.representative_channel)
         level = annotator.find(structure_id)['level']
         try:
             graph = self.graph_traced
@@ -1639,7 +1639,7 @@ class VesselGraphProcessor(TubeMapOrchestrator):
         return graph.sub_graph(vertex_filter=vertex_filter)
 
     def plot_graph_structure(self, structure_id, plot_type):
-        annotator = self.registration_processor.annotators[self.representative_channel]
+        annotator = self.registration_processor.annotator_of(self.representative_channel)
         structure_name = annotator.get_names_map()[structure_id]
         graph_chunk = self.get_structure_sub_graph(structure_id)
         if not graph_chunk:
@@ -1681,7 +1681,7 @@ class VesselGraphProcessor(TubeMapOrchestrator):
                              f'available steps are "{self.steps.existing_steps}"')
         graph_chunk = graph.sub_slice(chunk_range)
         title = f'{graph_step.title()} Graph'
-        annotator = self.registration_processor.annotators[self.representative_channel]
+        annotator = self.registration_processor.annotator_of(self.representative_channel)
         if graph_step == 'annotated':
             region_color = annotator.label_to_color(graph_chunk.vertex_annotation(), key='id', alpha=True, as_int=False)
         else:

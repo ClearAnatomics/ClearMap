@@ -288,7 +288,7 @@ class CellDetector(ChannelPipelineOrchestrator):
 
         if self.registration_processor.was_registered:  # FIXME: check if should be registered and raise error
             coordinates_transformed = self.transform_coordinates(coordinates)
-            annotator = self.registration_processor.annotators[self.channel]
+            annotator = self.registration_processor.annotator_of(self.channel)
             ref_channel_cfg = self.get_alignment_ref_channel_reg_cfg()
             atlas_resolution = ref_channel_cfg['resampled_resolution']
             extra_columns = annotator.get_columns(coordinates_transformed, atlas_resolution)  # OPTIMISE: parallel
@@ -428,7 +428,7 @@ class CellDetector(ChannelPipelineOrchestrator):
 
             collapsed = pd.concat((collapsed, tmp))
 
-        annotator = self.registration_processor.annotators[self.channel]
+        annotator = self.registration_processor.annotator_of(self.channel)
         if all_regions:  # Add regions even if they are empty
             uniq_ids = np.unique(annotator.atlas)
             tmp = pd.DataFrame({'Structure ID': uniq_ids, 'mock': ''})
@@ -490,7 +490,7 @@ class CellDetector(ChannelPipelineOrchestrator):
         else:
             coordinates = df[['xt', 'yt', 'zt']].values.astype(int)  # required to match integer z
             dv.atlas = self.get('atlas', channel=self.channel, asset_sub_type='annotation').read()
-            dv.structure_names = self.registration_processor.annotators[self.channel].get_names_map()
+            dv.structure_names = self.registration_processor.annotator_of(self.channel).get_names_map()
         if 'hemisphere' in df.columns:
             hemispheres = df['hemisphere']
         else:
@@ -498,7 +498,7 @@ class CellDetector(ChannelPipelineOrchestrator):
 
         if 'id' in df.columns:
             unique_ids = np.sort(np.unique(df['id']))
-            annotator = self.registration_processor.annotators[self.channel]
+            annotator = self.registration_processor.annotator_of(self.channel)
             # color_map = {id_: annotator.find(id_, key='id')['rgb'] for id_ in unique_ids}
             color_map = {id_: annotator.convert_label(id_, key='id', value='color_hex_triplet') for id_ in unique_ids}
             color_map[0] = np.array(to_hex((1, 0, 0)))  # default to red
@@ -662,7 +662,7 @@ class CellDetector(ChannelPipelineOrchestrator):
 
         coordinates_transformed = np.vstack([cells[f'{ax}t'] for ax in 'xyz']).T
 
-        annotator = self.registration_processor.annotators[self.channel]
+        annotator = self.registration_processor.annotator_of(self.channel)
         hemisphere_label = annotator.label_points_hemispheres(coordinates_transformed)
 
         unique_labels = np.sort(df['order'].unique())  # WARNING: ClearMap2 used order as key (now deprecated)
