@@ -4,7 +4,7 @@ the channels which still have it follow the defaults when the data types change.
 """
 import pytest
 
-from ClearMap.config.registration_channels import (default_registration_partners_and_directions,
+from ClearMap.config.registration_channels import (ALIGN_WITH_UNDECIDED, default_registration_partners_and_directions,
                                                    new_defaults_of_unedited_registrations)
 
 
@@ -18,10 +18,11 @@ def test_the_reference_channel_is_aligned_with_the_atlas_and_the_others_with_it(
 
 @pytest.mark.parametrize('data_types', [{'fos': 'nuclei'}, {'fos': 'nuclei', 'raw': 'undefined'},
                                         {'a': 'autofluorescence', 'b': 'autofluorescence', 'fos': 'nuclei'}])
-def test_without_a_single_reference_channel_the_others_are_aligned_with_nothing_never_with_themselves(data_types):
+def test_without_a_single_reference_channel_the_partner_of_the_others_is_undecided_never_themselves(data_types):
     defaults = default_registration_partners_and_directions(data_types)
 
-    assert all(align_with is None for channel, (align_with, _) in defaults.items() if data_types[channel] == 'nuclei')
+    assert all(align_with == ALIGN_WITH_UNDECIDED  # The user chooses: not registered (None) is a choice too
+               for channel, (align_with, _) in defaults.items() if data_types[channel] == 'nuclei')
     assert all(align_with != channel for channel, (align_with, _) in defaults.items())
 
 
@@ -45,7 +46,7 @@ def test_without_exactly_one_all_vessels_channel_the_vessel_parts_are_registered
 def test_a_channel_aligned_as_the_defaults_said_follows_the_new_defaults():
     before = {'fos': 'nuclei'}
     after = {'fos': 'nuclei', 'auto': 'autofluorescence'}
-    channels = {'fos': {'align_with': None, 'moving_channel': 'other'}}
+    channels = {'fos': {'align_with': ALIGN_WITH_UNDECIDED, 'moving_channel': 'other'}}
 
     assert new_defaults_of_unedited_registrations(channels, before, after) == {
         'fos': {'align_with': 'auto', 'moving_channel': 'other'}}

@@ -29,9 +29,10 @@ from ClearMap.config.orientation import DEFAULT_ORIENTATION, validate_orientatio
 
 from ClearMap.config.atlas import ATLAS_NAMES_MAP
 from ClearMap.config.config_coordinator import ConfigCoordinator
-from ClearMap.config.registration_channels import (ATLAS, fixed_moving_channels, is_intrinsically_aligned,
-                                                   is_selected_for_registration, may_be_registered,
-                                                   needs_registration, registration_sequence, reversed_registrations)
+from ClearMap.config.registration_channels import (ATLAS, check_partners_chosen, fixed_moving_channels,
+                                                   is_intrinsically_aligned, is_selected_for_registration,
+                                                   may_be_registered, needs_registration, registration_sequence,
+                                                   reversed_registrations)
 
 from ClearMap.pipeline_orchestrators.generic_orchestrators import IndependentChannelsPipelineOrchestrator, CanceledProcessing
 from ClearMap.pipeline_orchestrators.sample_info_management import SampleManager
@@ -207,6 +208,7 @@ class RegistrationProcessor(IndependentChannelsPipelineOrchestrator):
     def get_transform_directories(self, first_channel, stop_channel=ATLAS):
         reg_cfg = self.registration_config['channels']
         sequence = self.get_registration_sequence_channels(first_channel, stop_channel)
+        check_partners_chosen(self.registration_config, sequence)  # The sequence stops at an undecided partner
 
         # Check that the last channel in the sequence is aligned with the stop_channel
         last_align_with = reg_cfg[sequence[-1]]['align_with']
@@ -464,6 +466,7 @@ class RegistrationProcessor(IndependentChannelsPipelineOrchestrator):
 
     @check_stopped
     def align(self, _force=False):
+        check_partners_chosen(self.config, self.channels_to_register)  # Before any is aligned, not halfway
         try:
             for channel in self.channels_to_register:
                 self.align_channel(channel)

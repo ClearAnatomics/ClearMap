@@ -17,7 +17,8 @@ def first(registry):
     return registry.add(FIRST_NAME)
 
 
-@pytest.mark.parametrize('name', ['self', 'other', 'intrinsically_aligned', 'undefined', 'none', 'None', 'Other'])
+@pytest.mark.parametrize('name', ['self', 'other', 'intrinsically_aligned', 'undefined', 'none', 'None', 'Other',
+                                  '__UNDECIDED__', '__undecided__'])
 def test_a_name_reserved_for_a_value_of_the_config_is_refused_whatever_the_case(registry, first, name):
     with pytest.raises(InvalidChannelNameError, match='reserved'):
         registry.add(name)

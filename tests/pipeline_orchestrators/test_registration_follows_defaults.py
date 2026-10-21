@@ -4,6 +4,9 @@ other channels exist: it follows the defaults (what the channels are aligned wit
 """
 import pytest
 
+from ClearMap.Utils.exceptions import MissingRequirementException
+from ClearMap.config.registration_channels import ALIGN_WITH_UNDECIDED
+
 
 def registration(experiment) -> dict:
     """(align_with, moving_channel) of each channel"""
@@ -20,7 +23,7 @@ def test_a_channel_which_becomes_the_reference_is_aligned_with_the_atlas(experim
 
 def test_the_channels_follow_the_reference_when_it_appears(experiment, channel_editor):
     channel_editor.add('fos', 'nuclei')
-    assert registration(experiment) == {'fos': (None, 'other')}  # Aligned with nothing, not with itself
+    assert registration(experiment) == {'fos': (ALIGN_WITH_UNDECIDED, 'other')}  # To choose, never itself
 
     channel_editor.add('auto', 'autofluorescence')
 
@@ -72,3 +75,24 @@ def test_the_registration_sequence_of_a_lone_channel_ends(experiment, channel_ed
     config = experiment.get_config_view()['registration']
     from ClearMap.config.registration_channels import registration_sequence
     assert registration_sequence(config, 'fos') == ['fos']
+
+
+def test_the_alignment_refuses_to_start_while_a_partner_is_not_chosen(experiment, channel_editor, monkeypatch):
+    channel_editor.add('auto', 'autofluorescence', with_path=True)
+    channel_editor.add('fos', 'nuclei', with_path=True)
+    experiment.apply_ui_patch({'registration': {'channels': {'fos': {'align_with': ALIGN_WITH_UNDECIDED}}}})
+    registration = experiment.get_worker('registration', None)
+    aligned = []
+    monkeypatch.setattr(registration, 'align_channel', aligned.append)
+
+    with pytest.raises(MissingRequirementException, match="'fos' is not chosen"):
+        registration.align()
+    assert aligned == []  # Refused before the first channel, not halfway
+
+
+def test_the_points_of_a_channel_whose_partner_is_not_chosen_cannot_reach_the_atlas(experiment, channel_editor):
+    channel_editor.add('fos', 'nuclei', with_path=True)
+    registration = experiment.get_worker('registration', None)
+
+    with pytest.raises(MissingRequirementException, match="'fos' is not chosen"):
+        registration.get_transform_directories('fos')

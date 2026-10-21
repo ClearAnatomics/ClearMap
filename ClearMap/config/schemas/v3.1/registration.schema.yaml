@@ -37,6 +37,7 @@ properties:
           anyOf:
             - { $ref: "./typedefs.schema.yaml#/$defs/channelName" }
             - { type: "string", const: "atlas" }
+            - { type: "string", const: "__UNDECIDED__" }  # ALIGN_WITH_UNDECIDED: not chosen yet, to choose
             - { type: "null" }
 
         # may be "intrinsically_aligned" or another channel (or null)

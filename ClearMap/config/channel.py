@@ -24,7 +24,7 @@ from typing import NoReturn, TypeVar, Union
 from ClearMap.Utils.exceptions import (ChannelNameTakenError, ClearMapTypeError, InvalidChannelIdError,
                                        InvalidChannelNameError,
                                        UnknownChannelError)
-from ClearMap.config.registration_channels import INTRINSICALLY_ALIGNED, MOVING_OTHER, MOVING_SELF
+from ClearMap.config.registration_channels import ALIGN_WITH_UNDECIDED, INTRINSICALLY_ALIGNED, MOVING_OTHER, MOVING_SELF
 
 # WARNING: Keep in sync with ``typedefs.schema.yaml#/$defs/channelName`` (the sample channel names).
 #  No '-': it joins the channels of the compound keys (see compound_keys.py)
@@ -47,6 +47,7 @@ def folded_channel_name(name: str) -> str:
 #: for them, and renaming it would rewrite them. Compared whatever the case, as the names are.
 RESERVED_CHANNEL_NAMES = frozenset(folded_channel_name(name) for name in (
     MOVING_SELF, MOVING_OTHER, INTRINSICALLY_ALIGNED,
+    ALIGN_WITH_UNDECIDED,  # The partner of a channel is not chosen yet
     'undefined',  # Not chosen yet (e.g. the layout_channel of the stitching)
     'none',  # How None is written in the GUI combo boxes (and in YAML, whatever the case)
 ))

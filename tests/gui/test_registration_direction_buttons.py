@@ -5,7 +5,7 @@ painted from the config, written relative to the channel, available once the cha
 import pytest
 
 from ClearMap.Utils.events import UiAlignWithChanged
-from ClearMap.config.registration_channels import INTRINSICALLY_ALIGNED, MOVING_OTHER, MOVING_SELF
+from ClearMap.config.registration_channels import ALIGN_WITH_UNDECIDED, INTRINSICALLY_ALIGNED, MOVING_OTHER, MOVING_SELF
 from ClearMap.gui import params
 from ClearMap.gui.params import ChannelRegistrationParams
 
@@ -108,7 +108,7 @@ def test_the_buttons_are_named_after_the_channel_and_its_partner():
                      MOVING_SELF: 'fos moves onto auto'}
 
 
-@pytest.mark.parametrize('align_with', [None, ''])
+@pytest.mark.parametrize('align_with', [None, ALIGN_WITH_UNDECIDED])
 def test_without_a_partner_the_buttons_are_disabled_and_show_the_direction_kept(align_with):
     registration = FakeRegistrationParams(align_with, 'self')
 

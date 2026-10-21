@@ -9,7 +9,7 @@ $defs:
   channelName:  # WARNING: Keep in sync with CHANNEL_NAME_RE and RESERVED_CHANNEL_NAMES (ClearMap/config/channel.py)
     type: string
     pattern: '^[A-Za-z0-9_]+$'
-    not: { pattern: '^(?i:self|other|intrinsically_aligned|undefined|none)$' }
+    not: { pattern: '^(?i:self|other|intrinsically_aligned|undefined|none|__undecided__)$' }
 
   compoundChannelName:
     type: string

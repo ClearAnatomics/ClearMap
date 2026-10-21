@@ -18,7 +18,10 @@ from ClearMap.Utils.exceptions import ChannelsNotPixelAlignedError, ClearMapConf
 
 ATLAS = 'atlas'  # align_with / moving_channel of the atlas: a partner which is not a channel of the sample
 ALIGN_WITH_NOTHING = None  # align_with of a channel which is explicitly not registered
-ALIGN_WITH_UNDECIDED = ''  # align_with of a channel whose partner is not chosen yet (in the GUI)
+# align_with of a channel whose partner is not chosen yet: no default could be given (e.g. no reference channel). The
+# user must choose (a channel, the atlas or ALIGN_WITH_NOTHING) before it is registered. A token, not a value: it can
+# be told from an empty string written by accident, and it is a reserved channel name.
+ALIGN_WITH_UNDECIDED = '__UNDECIDED__'
 NOT_SELECTED_FOR_REGISTRATION = (ALIGN_WITH_NOTHING, ALIGN_WITH_UNDECIDED)
 INTRINSICALLY_ALIGNED = 'intrinsically_aligned'  # moving_channel of a channel aligned by construction: needs no registration
 MOVING_SELF = 'self'  # moving_channel: this channel moves (onto its align_with)
@@ -136,16 +139,33 @@ def fixed_moving_channels(registration_config: Mapping, channel: str) -> tuple[s
     ClearMapConfigError
         If moving_channel is inconsistent (see :func:`registration_direction`).
     """
+    check_partners_chosen(registration_config, [channel])
     channel_config = registration_config['channels'][channel]
     align_with = channel_config['align_with']
-    if align_with == ALIGN_WITH_UNDECIDED:
-        raise MissingRequirementException(f'Channel {channel} missing align_with in registration config')
     direction = registration_direction(channel, channel_config)
     if direction == MOVING_SELF:
         return align_with, channel
     if direction == MOVING_OTHER:
         return channel, align_with
     return None, None
+
+
+def check_partners_chosen(registration_config: Mapping, channels: Iterable[str]) -> None:
+    """
+    Check that the partner of each of channels is chosen (its align_with is not undecided).
+
+    Raises
+    ------
+    MissingRequirementException
+        Naming the channels whose partner is not chosen, and what to choose.
+    """
+    undecided = [channel for channel in channels
+                 if registration_config['channels'][channel].get('align_with') == ALIGN_WITH_UNDECIDED]
+    if undecided:
+        raise MissingRequirementException(
+            f'The partner of {", ".join(repr(channel) for channel in undecided)} is not chosen (no default could be '
+            f'given, e.g. no single autofluorescence channel). Choose what each is aligned with (align_with): '
+            f'another channel, the atlas, or None to not register it.')
 
 
 def registration_pairs(registration_config: Mapping) -> list[tuple[str, str]]:
@@ -222,9 +242,9 @@ def default_registration_partners_and_directions(
     - The parts of the compound channels of a pipeline (e.g. the TubeMap vessels and arteries) other than their
       representative part (see COMPOUND_REPRESENTATIVE_DATA_TYPES) are acquired together with it: no registration
       of their own. This holds once the sample has exactly one representative part.
-    - Every other channel is aligned with the reference channel, which moves onto it. Without a reference channel
-      (yet), it is aligned with nothing (ALIGN_WITH_NOTHING) until there is one: a channel is never aligned with
-      itself.
+    - Every other channel is aligned with the reference channel, which moves onto it. Without a single reference
+      channel (none yet, or several), its partner is undecided (ALIGN_WITH_UNDECIDED): the user has to choose it.
+      A channel is never aligned with itself.
 
     Parameters
     ----------
@@ -237,7 +257,7 @@ def default_registration_partners_and_directions(
         The defaults, by channel.
     """
     references = [channel for channel, data_type in data_types.items() if data_type == REFERENCE_DATA_TYPE]
-    reference = references[0] if len(references) == 1 else None
+    reference = references[0] if len(references) == 1 else ALIGN_WITH_UNDECIDED
     defaults = {channel: (ATLAS if data_type == REFERENCE_DATA_TYPE else reference, MOVING_OTHER)
                 for channel, data_type in data_types.items()}
     for pipeline, representative_data_type in COMPOUND_REPRESENTATIVE_DATA_TYPES.items():

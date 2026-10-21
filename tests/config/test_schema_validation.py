@@ -4,6 +4,7 @@ import yaml
 import pytest
 from jsonschema import Draft202012Validator as Validator
 
+from ClearMap.config.registration_channels import ALIGN_WITH_UNDECIDED
 
 from config.conftest import SECTIONS
 
@@ -64,7 +65,8 @@ def test_forbidden_extension_string_fails(src_dir: Path, schemas_dir: Path, sche
     assert errors, 'Expected validation to fail for non-dot-prefixed extension'
 
 
-@pytest.mark.parametrize('reserved_name', ['self', 'Other', 'intrinsically_aligned', 'undefined', 'None'])
+@pytest.mark.parametrize('reserved_name', ['self', 'Other', 'intrinsically_aligned', 'undefined', 'None',
+                                           '__UNDECIDED__', '__undecided__'])
 def test_a_channel_name_reserved_for_a_value_of_the_config_fails(schemas_dir: Path, schema_registry, tmp_repo: Path,
                                                                  reserved_name: str):
     validator = Validator(_load_schema(schemas_dir / 'sample.schema.yaml'), registry=schema_registry)
@@ -83,6 +85,15 @@ def test_the_values_of_the_registration_which_are_not_channels_stay_valid(schema
     schema = _load_schema(schemas_dir / 'registration.schema.yaml')
     config = _load_yaml(tmp_repo / 'registration.yml')
     config['channels'] = {'fos': {'align_with': 'atlas', 'moving_channel': 'other'},
-                          'dapi': {'align_with': 'fos', 'moving_channel': 'intrinsically_aligned'}}
+                          'dapi': {'align_with': 'fos', 'moving_channel': 'intrinsically_aligned'},
+                          'raw': {'align_with': ALIGN_WITH_UNDECIDED, 'moving_channel': 'other'}}
 
     assert not list(Validator(schema, registry=schema_registry).iter_errors(config))
+
+
+def test_an_empty_partner_is_refused_it_is_not_the_undecided_one(schemas_dir: Path, schema_registry, tmp_repo: Path):
+    schema = _load_schema(schemas_dir / 'registration.schema.yaml')
+    config = _load_yaml(tmp_repo / 'registration.yml')
+    config['channels'] = {'fos': {'align_with': '', 'moving_channel': 'other'}}
+
+    assert list(Validator(schema, registry=schema_registry).iter_errors(config))
