@@ -1303,6 +1303,20 @@ class ChannelUiParameter(UiParameter, ABC):
     """
     Base class for channel parameters. Each channel parameter is associated with a channel name
     and a widget in the tab.
+
+    It is the params of ONE channel page of a tab (one tab of its ``channelsParamsTabWidget``), linked to that
+    channel's entry of the config section (``cfg_subtree``). The "channel" of a page is either:
+
+    - a channel of the sample (e.g. ``'fos'``), or
+    - a compound channel (e.g. the colocalization pair ``'fos-dapi'``), which has no id of its own in the registry.
+
+    Either way the page holds one :class:`ClearMap.gui.widgets.ChannelPageId` and the params find their page by
+    it, never by its tab text or index, which a rename or a removal moves. The name is the config key; only a
+    rename changes it.
+
+    Instances are made and held by the :class:`ChannelsUiParameterCollection` of the tab (its ``add_channel``).
+    A page whose params need several sections is a :class:`UiParameterCollection` of these instead
+    (e.g. ``ChannelStitchingParams``: shared, rigid and wobbly).
     """
     def __init__(self, tab: QWidget, channel_name: str, *, event_bus: EventBus,
                  name_widget_name: Optional[str] = None,
@@ -1380,6 +1394,16 @@ class UiParameterCollection(BusSubscriberMixin, ABC):
     This ensures the file remains consistent.
     Although the attributes of contained `UiParameters` are accessible,
     it is recommended to first dereference them to avoid clashes.
+
+    It is used at two levels:
+
+    - the params of a whole tab with channel pages: :class:`ChannelsUiParameterCollection`;
+    - the params of ONE channel page made of several sections (e.g. ``ChannelStitchingParams``), stored in the
+      tab's collection like a :class:`ChannelUiParameter` ("collection of collections").
+
+    In the second case it stands in for a ChannelUiParameter, so it must answer what the tab asks of a page's
+    params: ``cfg_to_ui``, ``teardown``, ``_suppress_handlers``... Each is forwarded to its sub-params
+    (``params``).
     """
     subscriber_affinity = GUI_THREAD  # The handlers touch widgets
 
@@ -1520,6 +1544,16 @@ class UiParameterCollection(BusSubscriberMixin, ABC):
 
 
 class ChannelsUiParameterCollection(UiParameterCollection):
+    """
+    The params of a tab with channel pages: one entry per page, keyed by the name of the page's channel (a channel
+    of the sample, or a compound channel such as a colocalization pair, see :class:`ChannelUiParameter`).
+
+    It is not a container for the parts of a compound channel: a pair is one page, one entry, like any channel.
+    Each subclass's ``add_channel`` decides which params a page gets (a :class:`ChannelUiParameter`, or a
+    :class:`UiParameterCollection` for a page made of several sections). The pages follow the config
+    (``ExperimentTab.reconcile_channel_pages``): ``drop_channel`` removes a page without writing the config,
+    ``pop`` is the user removing a channel.
+    """
     def __init__(self, tab: QWidget, *, pipeline_name: str, event_bus: EventBus,
                  get_view: Callable[[], Mapping[str, Any]] | None = None,
                  apply_patch: Callable[[dict], None] | None = None):
