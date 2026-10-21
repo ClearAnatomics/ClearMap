@@ -7,7 +7,7 @@ All the classes that define parameters or group thereof for the tabs of the grap
 import functools
 import string
 import warnings
-from typing import List, Mapping, Optional, Callable
+from typing import Callable, Iterable, List, Mapping, Optional
 
 import numpy as np
 
@@ -23,7 +23,8 @@ from ClearMap.Analysis.graphs.graph_weights import GraphWeight
 from ClearMap.config.atlas import ATLAS_NAMES_MAP
 from ClearMap.config.compound_keys import channel_file_name_token
 from ClearMap.config.config_coordinator import refuse_renames_onto_existing_channels
-from ClearMap.config.registration_channels import (INTRINSICALLY_ALIGNED, MOVING_OTHER, MOVING_SELF,
+from ClearMap.config.registration_channels import (ALIGN_WITH_NOTHING, ALIGN_WITH_UNDECIDED, ATLAS,
+                                                   INTRINSICALLY_ALIGNED, MOVING_OTHER, MOVING_SELF,
                                                    NOT_SELECTED_FOR_REGISTRATION, REGISTRATION_DIRECTIONS,
                                                    partner_change, registration_direction)
 from ClearMap.Utils.exceptions import ChannelNameTakenError, ClearMapConfigError, ClearMapValueError
@@ -56,6 +57,37 @@ __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
 __copyright__ = 'Copyright © 2022 by Charly Rousseau'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://github.com/ClearAnatomics/ClearMap'
+
+NO_PARTNER_TEXT = 'None'  # The item of the align_with combo box for a channel which is not registered (config: None)
+UNDEFINED_LAYOUT_CHANNEL_TEXT = 'undefined'  # The item of the layout channel combo box when none is chosen (config: None)
+
+
+def align_with_choices(other_channels: Iterable[str]) -> list[str]:
+    """
+    The texts of the align_with combo box of a channel: not chosen yet (the token itself), not registered, the atlas,
+    the other channels. Texts only: None would be an empty item, which no partner is.
+    """
+    return [ALIGN_WITH_UNDECIDED, NO_PARTNER_TEXT, ATLAS, *other_channels]
+
+
+def align_with_to_ui(align_with: str | None) -> str:
+    """The text of the align_with combo box for the partner of the config: None (not registered) is an explicit item"""
+    return NO_PARTNER_TEXT if align_with is ALIGN_WITH_NOTHING else align_with
+
+
+def align_with_from_ui(text: str) -> str | None:
+    """The partner of the config for the text of the align_with combo box (the combo box getter gives None for it)"""
+    return ALIGN_WITH_NOTHING if text == NO_PARTNER_TEXT else text
+
+
+def layout_channel_to_ui(layout_channel: str | None) -> str:
+    """The text of the layout channel combo box for the layout channel of the config (None: none is chosen)"""
+    return layout_channel or UNDEFINED_LAYOUT_CHANNEL_TEXT
+
+
+def layout_channel_from_ui(text: str | None) -> str | None:
+    """The layout channel of the config for the text of the layout channel combo box: None if none is chosen"""
+    return None if text == UNDEFINED_LAYOUT_CHANNEL_TEXT else text
 
 
 class NProcessesParams(UiParameter):
@@ -781,8 +813,8 @@ class GeneralChannelStitchingParams(ChannelUiParameter):
                     UiLayoutChannelChanged(channel_name=self.name,
                                            layout_channel=self.layout_channel)),
                 # extra_connect=self.refresh_layout_channel_items,
-                cast_to_ui=lambda v: v or '',   # show empty when unset
-                cast_from_ui = lambda s: None if (s in ('', 'undefined')) else s  ),  #TEST:
+                cast_to_ui=layout_channel_to_ui,
+                cast_from_ui=layout_channel_from_ui),
             'use_existing_layout': ParamLink(
                 ['use_existing_layout'], self.tab.useExistingLayoutCheckBox, default=False,
                 missing_ok=True,  # WARNING: only if self.layout_channel != self.name
@@ -818,9 +850,9 @@ class GeneralChannelStitchingParams(ChannelUiParameter):
         current = layout_combobox.currentText()
         layout_combobox.blockSignals(True)  # No update during refresh
         layout_combobox.clear()
-        layout_combobox.addItems(['undefined'] + channel_names)
+        layout_combobox.addItems([UNDEFINED_LAYOUT_CHANNEL_TEXT] + channel_names)
         # reselect current value if still valid (else explicit 'undefined')
-        layout_combobox.setCurrentText(current if current in channel_names else 'undefined')
+        layout_combobox.setCurrentText(current if current in channel_names else UNDEFINED_LAYOUT_CHANNEL_TEXT)
         layout_combobox.blockSignals(False)
 
 
@@ -950,8 +982,8 @@ class ChannelRegistrationParams(ChannelUiParameter):
             'resample': ParamLink(['resample'], self.tab.resampleCheckBox),
             'resampled_resolution': ParamLink(['resampled_resolution'], self.tab.resampleResolutionTriplet),
             'align_with': ParamLink(['align_with'], self.tab.alignWithComboBox,
-                                    cast_to_ui=lambda v: 'None' if v is None else v,
-                                    cast_from_ui=lambda v: None if v == 'None' else v,
+                                    cast_to_ui=align_with_to_ui,
+                                    cast_from_ui=align_with_from_ui,
                                     connect=self.handle_align_with_edited),
             # moving_channel: the direction radio buttons (see _paint_direction and handle_direction_toggled)
             # WARNING: broken by class replacement

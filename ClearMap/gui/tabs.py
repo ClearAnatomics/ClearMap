@@ -125,7 +125,6 @@ from ClearMap.IO.source.backends.tif_backend import parse_ome_info
 
 from ClearMap.config.atlas import ATLAS_NAMES_MAP, STRUCTURE_TREE_NAMES_MAP
 from ClearMap.config.compound_keys import PairKey, compound_is_oriented
-from ClearMap.config.registration_channels import ATLAS
 
 from ClearMap.pipeline_orchestrators.batch_process import BatchProcessor
 
@@ -152,7 +151,8 @@ from .gui_utils_base import (format_long_nb, replace_widget, add_missing_combobo
                              populate_combobox, delete_widget)
 from .gui_utils_images import np_to_qpixmap
 from .params import (VesselParams, SampleParameters, StitchingParams, CellMapParams, GroupAnalysisParams,
-                     BatchProcessingParams, RegistrationParams, TractMapParams, ColocalizationParams)
+                     BatchProcessingParams, RegistrationParams, TractMapParams, ColocalizationParams,
+                     align_with_choices, align_with_to_ui)
 
 
 if TYPE_CHECKING:
@@ -850,13 +850,13 @@ class RegistrationTab(PreProcessingTab['RegistrationProcessor']):
         if page_widget is None:
             raise ClearMapValueError(f'page_widget cannot be None for {channel=}')
         other_channels = list(set(self.worker.all_channels_to_register) - {channel})
-        populate_combobox(page_widget.alignWithComboBox, [None, ATLAS] + other_channels)
+        populate_combobox(page_widget.alignWithComboBox, align_with_choices(other_channels))
 
         partner_channel = self.worker.get_align_with(channel)
 
-        # Guards to avoid triggering adjusters too often  # FIXME: check these are not overly harsh: TEST
+        # Showing the partner of the config is not an edit: no signal, or it would be written back to the config
         with QSignalBlocker(page_widget.alignWithComboBox):
-            page_widget.alignWithComboBox.setCurrentText(partner_channel)
+            page_widget.alignWithComboBox.setCurrentText(align_with_to_ui(partner_channel))
 
     def _bind_params_signals(self) -> None:
         self.subscribe(UiRequestLandmarksDialog, self.launch_landmarks_dialog)
