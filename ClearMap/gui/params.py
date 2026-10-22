@@ -676,14 +676,13 @@ class StitchingParams(ChannelsUiParameterCollection):
             tw = self.tab.channelsParamsTabWidget
             page = tw.get_channel_widget(ch)
             if page is not None:  # Skip (defer) otherwise
-                self.channel_params[ch] = ChannelStitchingParams(self.tab, ch, event_bus=self._bus,
-                                                                 get_view=self._get_view,
-                                                                 apply_patch=self._apply_patch)
+                self[ch] = ChannelStitchingParams(self.tab, ch, event_bus=self._bus, get_view=self._get_view,
+                                                  apply_patch=self._apply_patch)
 
     def prune_obsolete_channels(self, desired_channels: tuple):
         for ch in list(self.channel_params.keys()):
             if ch not in desired_channels:
-                self.channel_params.pop(ch)
+                self.drop_channel(ch)
 
     def handle_layout_channel_changed(self, channel, layout_channel):
         self.publish(UiLayoutChannelChanged(channel_name=channel, layout_channel=layout_channel))
