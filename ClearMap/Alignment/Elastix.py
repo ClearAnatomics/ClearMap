@@ -77,6 +77,7 @@ import numpy as np
 
 import ClearMap.Settings as settings
 from ClearMap.IO import conversion, io_ops
+from ClearMap.IO.FileUtils import atomic_write
 from ClearMap.IO.source.backends.tif_backend import TifSource
 from ClearMap.Utils.exceptions import ClearMapValueError, ClearMapRuntimeError
 
@@ -402,27 +403,37 @@ def set_path_transform_files(result_directory):
     rec = re.compile("\(InitialTransformParametersFileName \"(?P<parname>.*)\"\)")
 
     for f in files:
-        fh, tmpfn = tempfile.mkstemp()
         ff = os.path.join(result_directory, f)
-
-        with open(tmpfn, 'w') as newfile, open(ff) as parfile:
+        lines = []
+        with open(ff) as parfile:
             for line in parfile:
-                # print line
                 m = rec.match(line)
                 if m is not None:
                     pn = m.group('parname')
                     if pn != 'NoInitialTransform':
                         pathn, filen = os.path.split(pn)
                         filen = os.path.join(result_directory, filen)
-                        newfile.write(line.replace(pn, filen))
-                    else:
-                        newfile.write(line)
-                else:
-                    newfile.write(line)
+                        line = line.replace(pn, filen)
+                lines.append(line)
+        _replace_text_of_file(ff, ''.join(lines))
 
-        os.close(fh)
-        os.remove(ff)
-        shutil.move(tmpfn, ff)
+
+def _replace_text_of_file(path, text):
+    """
+    Replace the content of the file at path by text, keeping its permissions.
+
+    The text is written to a temporary file next to it, which is then moved over it (atomic_write):
+    we do not use the temp folder, since a move across file systems fails, and a temp file is private.
+    The temporary file is gone after the move, or removed if writing fails.
+    """
+    atomic_write(_write_text_with_mode_of, path, text, mode_source=path)
+
+
+def _write_text_with_mode_of(tmp_path, text, *, mode_source):
+    """Write text to tmp_path, with the permissions of mode_source (the file that tmp_path will replace)"""
+    with open(tmp_path, 'w') as new_file:
+        new_file.write(text)
+    shutil.copymode(mode_source, tmp_path)
 
 
 def set_metric_parameter_file(parameter_file_path, new_metric):
@@ -442,28 +453,18 @@ def set_metric_parameter_file(parameter_file_path, new_metric):
     metric_pattern = re.compile(r'\(Metric "(?P<metric_name>.*)"\)')
     metric_set = False
 
-    try:
-        with tempfile.NamedTemporaryFile('w', delete=False) as temp_file:
-            temp_file_path = temp_file.name
-            with open(parameter_file_path, 'r') as parameter_file:
-                for line in parameter_file:
-                    match = metric_pattern.match(line)
-                    if match:
-                        current_metric = match.group('metric_name')
-                        temp_file.write(line.replace(current_metric, new_metric))
-                        metric_set = True
-                    else:
-                        temp_file.write(line)
-            if not metric_set:
-                temp_file.write(f'(Metric "{new_metric}")\n')
-
-        shutil.move(temp_file_path, parameter_file_path)
-
-    except Exception as error:
-        print(f"Error setting metric in parameter file: {error}")
-        if os.path.exists(temp_file_path):
-            os.remove(temp_file_path)
-        raise error
+    lines = []
+    with open(parameter_file_path, 'r') as parameter_file:
+        for line in parameter_file:
+            match = metric_pattern.match(line)
+            if match:
+                current_metric = match.group('metric_name')
+                line = line.replace(current_metric, new_metric)
+                metric_set = True
+            lines.append(line)
+    if not metric_set:
+        lines.append(f'(Metric "{new_metric}")\n')
+    _replace_text_of_file(parameter_file_path, ''.join(lines))
 
 
 def result_data_file(result_directory):
