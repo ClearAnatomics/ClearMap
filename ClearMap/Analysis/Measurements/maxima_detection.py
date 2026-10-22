@@ -193,7 +193,7 @@ def find_center_of_maxima(source, maxima=None, label=None, verbose=False):
         n_label = label.max()
 
     if n_label > 0:
-        centers = np.array(ndm.center_of_mass(source, label, index=np.arange(1, n_label)))
+        centers = np.array(ndm.center_of_mass(source, label, index=np.arange(1, n_label + 1)))  # Labels 1 to n
     else:
         centers = np.zeros((0, source.ndim))
 

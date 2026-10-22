@@ -1,6 +1,6 @@
 """
 The grey reconstruction behind the h-max transform of the maxima detection (#46) is the one of scikit-image, in the
-type of the seed.
+type of the seed, and every maximum found gets its center.
 """
 import numpy as np
 import pytest
@@ -28,3 +28,12 @@ def test_the_reconstruction_is_the_one_of_scikit_image(dtype):
 
     np.testing.assert_array_equal(reconstructed, reconstruction(seed, mask))
     assert reconstructed.dtype == seed.dtype
+
+
+def test_every_maximum_gets_its_center():
+    maxima = np.zeros((10, 10, 10), dtype=bool)
+    maxima[2, 2, 2] = maxima[7, 7, 7] = True
+
+    centers = maxima_detection.find_center_of_maxima(maxima.astype(float), maxima=maxima)
+
+    np.testing.assert_array_equal(centers, [[2, 2, 2], [7, 7, 7]])
