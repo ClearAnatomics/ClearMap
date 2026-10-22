@@ -410,8 +410,8 @@ def detect_cells_block(source, parameter=default_cell_detection_parameter,
         maxima = run_step('maxima_detection', dog, md.find_maxima, extra_kwargs={'verbose': parameter.get('verbose')},
                           remove_previous_result=False, **default_step_params)
         # center of maxima
-        if parameter_maxima['h_max']:  # FIXME: check if source or dog
-            centers = md.find_center_of_maxima(source, maxima=maxima, verbose=parameter.get('verbose'))
+        if parameter_maxima['h_max']:
+            centers = md.find_center_of_maxima(source.array, maxima=maxima, verbose=parameter.get('verbose'))
         else:
             if parameter_shape:
                 threshold = parameter_shape.get('threshold', 0)
