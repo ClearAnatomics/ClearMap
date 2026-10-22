@@ -42,12 +42,13 @@ def h_max_transform(source, h_max):
     Returns
     -------
     transformed : array
-        H-max transformed image if h is not None.
+        H-max transformed image if h is not None (as float32 for an integer image).
     """
     if h_max is None:
         return source
-    else:
-        return gr.reconstruct(source - h_max, source)
+    # In an unsigned type, source - h_max wraps around below h_max: work in float (exact for 8 and 16-bit images)
+    values = source if np.issubdtype(source.dtype, np.floating) else source.astype(np.float32)
+    return gr.reconstruct(values - h_max, values)
 
 
 def local_max(source, shape=5):
