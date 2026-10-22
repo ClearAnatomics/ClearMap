@@ -19,7 +19,7 @@ __download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 
 import numpy as np
 
-from skimage.filters._rank_order import rank_order
+from skimage.morphology import reconstruction
 
 
 import ClearMap.ImageProcessing.Filter.StructureElement as se
@@ -76,91 +76,10 @@ def reconstruct(seed, mask=None, method='dilation', selem=None, offset=None):
     """
     if mask is None:
         mask = seed.copy()
-
-    if seed.shape != mask.shape:
-        raise ValueError(f'Seed shape {seed.shape} and mask shape {mask.shape} do not match')
-
-    if method == 'dilation' and np.any(seed > mask):
-        raise ValueError('Intensity of seed image must be less than that '
-                         'of the mask image for reconstruction by dilation.')
-    elif method == 'erosion' and np.any(seed < mask):
-        raise ValueError('Intensity of seed image must be greater than that '
-                         'of the mask image for reconstruction by erosion.')
-    try:
-        from skimage.morphology._greyreconstruct import reconstruction_loop
-    except ImportError:
-        try:
-            from skimage.morphology._grayreconstruct import reconstruction_loop  # newer version
-        except ImportError as err:
-            raise ImportError(f'_gr[ea]yreconstruct extension not available; {err}')
-
-    if selem is None:
-        selem = np.ones([3] * seed.ndim, dtype=bool)
-    else:
-        selem = selem.copy()
-
-    if offset is None:
-        if not all([d % 2 == 1 for d in selem.shape]):
-            ValueError('Footprint dimensions must all be odd')
-        offset = np.array([d // 2 for d in selem.shape])
-
-    # Cross out the center of the structural_element
-    selem[tuple(slice(d, d + 1) for d in offset)] = False
-
-    # Make padding for edges of reconstructed image so we can ignore boundaries
-    padding = (np.array(selem.shape) / 2).astype(int)
-    dims = np.zeros(seed.ndim + 1, dtype=int)
-    dims[1:] = np.array(seed.shape) + 2 * padding
-    dims[0] = 2
-    inside_slices = tuple(slice(p, -p) for p in padding)
-    # Set padded region to minimum image intensity and mask along first axis so
-    # we can interleave image and mask pixels when sorting.
-    if method == 'dilation':
-        pad_value = np.min(seed)
-    elif method == 'erosion':
-        pad_value = np.max(seed)
-    images = np.ones(dims, dtype = seed.dtype) * pad_value
-    images[(0,) + inside_slices] = seed
-    images[(1,) + inside_slices] = mask
-
-    # Create a list of strides across the array to get the neighbors within
-    # a flattened array
-    value_stride = np.array(images.strides[1:]) / images.dtype.itemsize
-    image_stride = images.strides[0] // images.dtype.itemsize
-    selem_mgrid = np.mgrid[[slice(-o, d - o)
-                            for d, o in zip(selem.shape, offset)]]
-    selem_offsets = selem_mgrid[:, selem].transpose()
-    nb_strides = np.array([np.sum(value_stride * selem_offset)
-                           for selem_offset in selem_offsets], np.int32)
-
-    images = images.flatten()
-
-    # Erosion goes smallest to largest; dilation goes largest to smallest.
-    index_sorted = np.argsort(images).astype(np.int32)
-    if method == 'dilation':
-        index_sorted = np.flip(index_sorted)
-
-    # Make a linked list of pixels sorted by value. -1 is the list terminator.
-    prev = np.full(len(images), -1, np.int32)
-    next = np.full(len(images), -1, np.int32)
-    prev[index_sorted[1:]] = index_sorted[:-1]
-    next[index_sorted[:-1]] = index_sorted[1:]
-
-    # Cython inner-loop compares the rank of pixel values.
-    if method == 'dilation':
-        value_rank, value_map = rank_order(images)
-    elif method == 'erosion':
-        value_rank, value_map = rank_order(-images)
-        value_map = -value_map
-
-    start = index_sorted[0]
-    reconstruction_loop(value_rank, prev, next, nb_strides, start, image_stride)
-
-    # Reshape reconstructed image to original image shape and remove padding.
-    rec_img = value_map[value_rank[:image_stride]]
-    rec_img.shape = np.array(seed.shape) + 2 * padding
-
-    return rec_img[inside_slices]
+    # Changed from original version made for skimage 0.16 which only kept the type of the seed instead of float64,
+    # to save memory: scikit-image now keeps float32 as float32 itself (same results, time and memory),
+    # and computes integer images in float64. The result is given back in the type of the seed, as the copy did
+    return reconstruction(seed, mask, method=method, footprint=selem, offset=offset).astype(seed.dtype, copy=False)
 
 
 def grey_reconstruct(source, mask=None, sink=None, method=None, shape=3, verbose=False):
