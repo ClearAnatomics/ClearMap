@@ -97,3 +97,14 @@ def test_an_empty_partner_is_refused_it_is_not_the_undecided_one(schemas_dir: Pa
     config['channels'] = {'fos': {'align_with': '', 'moving_channel': 'other'}}
 
     assert list(Validator(schema, registry=schema_registry).iter_errors(config))
+
+
+@pytest.mark.parametrize('reference_channel, valid', [('fos', True), (ALIGN_WITH_UNDECIDED, True), (None, True),
+                                                      ('', False), ('other', False)])
+def test_the_reference_channel_is_a_channel_undecided_or_none(schemas_dir: Path, schema_registry, tmp_repo: Path,
+                                                              reference_channel, valid):
+    schema = _load_schema(schemas_dir / 'registration.schema.yaml')
+    config = _load_yaml(tmp_repo / 'registration.yml')
+    config['reference_channel'] = reference_channel
+
+    assert (not list(Validator(schema, registry=schema_registry).iter_errors(config))) is valid

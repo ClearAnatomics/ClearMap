@@ -7,7 +7,8 @@ atlas:
   structure_tree_id: "ABA json 2022"
   align_files_folder: "Alignment"
 templates:
-  autofluorescence:
+  # The channel to be aligned to the atlas, typically the one holding autofluorescence data
+  aligned_with_atlas:
     resample: true
     resampled_resolution: [25, 25, 25]
     align_with: "${reference}"   # atlas (constant)

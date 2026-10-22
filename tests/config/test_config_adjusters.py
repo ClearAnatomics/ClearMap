@@ -6,10 +6,10 @@ from ClearMap.config.config_adjusters.patch_ops import DELETE, deep_merge
 from ClearMap.config.compound_keys import PairKey
 from ClearMap.config.config_adjusters.adjusters_api import AdjusterScope, Phase
 from ClearMap.config.config_adjusters.engine import run_adjusters
-from ClearMap.config.config_adjusters.policy import _fix_channel_backreferences
+from ClearMap.config.config_adjusters.policy import _fix_channel_backreferences, _registration_state_before_patch
 from ClearMap.config.config_adjusters.type_hints import AdjustmentContext
 from ClearMap.config.defaults_provider import DefaultsProvider, get_defaults_provider, set_defaults_provider
-from ClearMap.config.registration_channels import registration_pairs
+from ClearMap.config.registration_channels import default_reference_channel, registration_pairs
 
 REQUIRED_SECTIONS = frozenset({'sample', 'stitching', 'registration', 'cell_map', 'tract_map', 'colocalization',
                                'vasculature'})
@@ -55,6 +55,10 @@ class _FakeSampleManager:
 
     def data_type(self, channel: str):
         return (self.types or {}).get(channel)
+
+    @property
+    def reference_channel_setting(self):  # As the registration config would say: ref, else the default of the types
+        return self.ref if self.ref is not None else default_reference_channel({c: self.data_type(c) for c in self.chs})
 
     @property
     def alignment_reference_channel(self): return self.ref
@@ -194,9 +198,9 @@ def test_registration_reconciles_channels_and_placeholders():
 
     # Channels were inserted
     assert set(chs.keys()) == {'AF', 'Ch561'}
-    # The autofluorescence (alignment reference) is aligned with the atlas
+    # The reference channel is aligned with the atlas
     assert chs['AF']['align_with'] == 'atlas' and chs['AF']['resample'] is True
-    assert chs['AF']['params_files'] == _template('registration', 'autofluorescence')['params_files']
+    assert chs['AF']['params_files'] == _template('registration', 'aligned_with_atlas')['params_files']
     # A regular channel is aligned with the alignment reference
     assert chs['Ch561']['align_with'] == 'AF'
     assert chs['Ch561']['params_files'] == _template('registration', 'regular')['params_files']
@@ -271,3 +275,16 @@ def test_the_channel_renames_leave_the_values_which_are_not_channels_alone():
 
     assert channels == {'fos': {'align_with': 'reference', 'moving_channel': 'other'},
                         'auto': {'align_with': 'atlas', 'moving_channel': 'Other'}}
+
+
+def test_the_registration_of_before_is_compared_under_the_names_after_the_renames():
+    view_before = {'sample': {'channels': {'auto': {'data_type': 'autofluorescence'}, 'fos': {'data_type': 'nuclei'}}},
+                   'registration': {'reference_channel': 'auto',
+                                    'channels': {'auto': {'align_with': 'atlas'}, 'fos': {'align_with': 'auto'}}}}
+
+    before = _registration_state_before_patch(view_before, {'auto': 'af'})
+
+    assert before.config['reference_channel'] == 'af'
+    assert list(before.config['channels']) == ['af', 'fos']
+    assert before.data_types == {'af': 'autofluorescence', 'fos': 'nuclei'}
+    assert _registration_state_before_patch(None, {'auto': 'af'}) is None  # A loaded config: nothing to compare

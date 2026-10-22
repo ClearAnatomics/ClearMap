@@ -33,8 +33,8 @@ def test_defaults_provider_provides_minimal_sections(src_dir: Path, sections):
                 assert 'rigid' not in cfg['templates']['derived_template']
             case 'registration':
                 assert 'atlas' in cfg and isinstance(cfg['atlas'], dict)
-                assert 'autofluorescence' in cfg['templates']
-                res = cfg['templates']['autofluorescence']['resampled_resolution']
+                assert 'aligned_with_atlas' in cfg['templates']
+                res = cfg['templates']['aligned_with_atlas']['resampled_resolution']
                 assert isinstance(res, list) and len(res) == 3 and all(isinstance(r, (int, float)) for r in res)
             case 'cell_map':
                 assert 'templates' in cfg and 'channel' in cfg['templates']

@@ -29,10 +29,10 @@ from ClearMap.config.orientation import DEFAULT_ORIENTATION, validate_orientatio
 
 from ClearMap.config.atlas import ATLAS_NAMES_MAP
 from ClearMap.config.config_coordinator import ConfigCoordinator
-from ClearMap.config.registration_channels import (ATLAS, check_partners_chosen, fixed_moving_channels,
-                                                   is_intrinsically_aligned, is_selected_for_registration,
-                                                   may_be_registered, needs_registration, registration_sequence,
-                                                   reversed_registrations)
+from ClearMap.config.registration_channels import (ATLAS, check_partners_chosen, checked_reference_channel,
+                                                   fixed_moving_channels, is_intrinsically_aligned,
+                                                   is_selected_for_registration, may_be_registered, needs_registration,
+                                                   registration_sequence, reversed_registrations)
 
 from ClearMap.pipeline_orchestrators.generic_orchestrators import IndependentChannelsPipelineOrchestrator, CanceledProcessing
 from ClearMap.pipeline_orchestrators.sample_info_management import SampleManager
@@ -192,15 +192,12 @@ class RegistrationProcessor(IndependentChannelsPipelineOrchestrator):
 
     @property
     def ref_channel_cfg(self):
+        """The registration config of the reference channel (see checked_reference_channel for what it needs)"""
         if self.sample_manager is None:
             raise ValueError('CellDetector not properly initialized')
-        ref_channel = self.sample_manager.alignment_reference_channel
-        if ref_channel is None:
-            raise ValueError('No alignment reference channel specified in sample manager')
         reg_cfg = self.registration_config
-        if ref_channel not in reg_cfg['channels']:
-            raise ValueError(f'Reference channel "{ref_channel}" not found in registration config')
-        return reg_cfg['channels'][ref_channel]
+        reference_channel = checked_reference_channel(reg_cfg, self.sample_manager.reference_channel_setting)
+        return reg_cfg['channels'][reference_channel]
 
     def get_registration_sequence_channels(self, first_channel, stop_channel=ATLAS):
         return registration_sequence(self.registration_config, first_channel, stop_channel)
@@ -340,16 +337,12 @@ class RegistrationProcessor(IndependentChannelsPipelineOrchestrator):
         if not any_selected:
             return RegistrationStatus.NOT_SELECTED
         else:
-            ref_channel = self.sample_manager.alignment_reference_channel
             for channel in self.channels:
                 ch_cfg = reg_cfg['channels'][channel]
                 if not is_selected_for_registration(ch_cfg) or is_intrinsically_aligned(ch_cfg):
                     continue
-                if not ref_channel and ch_cfg['align_with'] == 'autofluorescence':
-                    raise ValueError(f'This should not happen, {channel=} set for registration against '
-                                     f'autofluorescence but no reference channel found')
-                elif not self.channel_was_registered(channel):
-                        return RegistrationStatus.MISSING_OUTPUTS  # at least one not registered
+                if not self.channel_was_registered(channel):
+                    return RegistrationStatus.MISSING_OUTPUTS  # at least one not registered
             return RegistrationStatus.REGISTERED  # all selected channels are registered
 
     @property

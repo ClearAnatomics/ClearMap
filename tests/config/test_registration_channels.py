@@ -204,3 +204,14 @@ def test_the_sequence_of_a_channel_stops_where_a_channel_has_no_partner(partner)
 def test_channels_aligned_in_a_loop_never_reach_the_atlas_and_are_refused(channels, loop):
     with pytest.raises(ClearMapConfigError, match=loop):
         registration_sequence(config(**channels), next(iter(channels)))
+
+
+@pytest.mark.parametrize('reference_channel, valid', [('auto', True), (ALIGN_WITH_UNDECIDED, True), (None, True),
+                                                      ('gone', False)])
+def test_the_reference_channel_must_be_a_channel_of_the_sample(reference_channel, valid):
+    registration_config = {**config(fos=('auto', 'other')), 'reference_channel': reference_channel}
+
+    errors = _validate_registration_refs({'sample': {'channels': {'fos': {}, 'auto': {}}},
+                                          'registration': registration_config})
+
+    assert (errors == []) is valid

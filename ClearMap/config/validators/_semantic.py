@@ -3,7 +3,7 @@ from typing import Any, Dict, Iterable, Mapping
 from ...Utils.exceptions import AggregatedValidationError
 from ..channel import folded_channel_name
 from ..compound_keys import compound_channel_parts
-from ..registration_channels import ALIGN_WITH_UNDECIDED, ATLAS, REGISTRATION_DIRECTIONS
+from ..registration_channels import ALIGN_WITH_UNDECIDED, ATLAS, REFERENCE_UNDECIDED, REGISTRATION_DIRECTIONS
 
 __all__ = ['run_semantic_checks']
 
@@ -64,6 +64,10 @@ def _validate_registration_refs(config: Mapping[str, Any]) -> list[str]:
     # self and other are relative to the align_with: only directions (moving_channel)
     tokens_align_with = {ATLAS, ALIGN_WITH_UNDECIDED}
     tokens_moving = {ATLAS, *REGISTRATION_DIRECTIONS}
+    reference_channel = reg.get('reference_channel')
+    if (isinstance(reference_channel, str) and reference_channel != REFERENCE_UNDECIDED
+            and reference_channel not in known):
+        errs.append(f"[registration] reference_channel → unknown '{reference_channel}'")
     for ch_name, spec in chs.items():
         spec = spec or {}
         aw = spec.get("align_with")

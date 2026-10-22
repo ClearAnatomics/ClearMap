@@ -98,7 +98,8 @@ from ClearMap.IO.assets_constants import CONTENT_TYPE_TO_PIPELINE
 
 from ..config.channel import ChannelRegistry
 from ..config.compound_keys import PairKey
-from ..config.registration_channels import check_intrinsically_aligned
+from ..config.registration_channels import (NO_REFERENCE, REFERENCE_UNDECIDED, check_intrinsically_aligned,
+                                            reference_channel_setting)
 from ..config.stitching_channels import check_stitched_together
 from ..config.config_adjusters.type_hints import SampleManagerProtocol
 from ..config.config_handler import ALTERNATIVES_REG
@@ -791,11 +792,20 @@ class SampleManager(OrchestratorBase):
 
     @property
     @adjuster_safe
+    def reference_channel_setting(self) -> Optional[str]:
+        """
+        The reference channel of the registration config: a channel, REFERENCE_UNDECIDED or NO_REFERENCE
+        (see reference_channel_setting). The default of the data types while the config does not say.
+        """
+        data_types = {channel: self.data_type(channel) for channel in self.channels}
+        return reference_channel_setting(self.cfg_coordinator.get_config_view('registration'), data_types)
+
+    @property
+    @adjuster_safe
     def alignment_reference_channel(self) -> Optional[str]:
-        try:
-            return self.get_channels_by_type('autofluorescence') or None
-        except KeyError:
-            return None
+        """The reference channel, aligned with the atlas. None while it is not chosen, or when there is none."""
+        reference = self.reference_channel_setting
+        return None if reference in (REFERENCE_UNDECIDED, NO_REFERENCE) else reference
 
     def check_pixel_aligned(self, *channels: str, require_stitched: bool = False) -> None:
         """

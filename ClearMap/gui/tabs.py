@@ -152,7 +152,7 @@ from .gui_utils_base import (format_long_nb, replace_widget, add_missing_combobo
 from .gui_utils_images import np_to_qpixmap
 from .params import (VesselParams, SampleParameters, StitchingParams, CellMapParams, GroupAnalysisParams,
                      BatchProcessingParams, RegistrationParams, TractMapParams, ColocalizationParams,
-                     align_with_choices, align_with_to_ui)
+                     align_with_choices, align_with_to_ui, reference_channel_choices)
 
 
 if TYPE_CHECKING:
@@ -832,7 +832,15 @@ class RegistrationTab(PreProcessingTab['RegistrationProcessor']):
     def _after_channels_reconciled(self, desired_channels: list[str]) -> None:
         for ch in desired_channels:
             self.__update_channel_combo_boxes(ch)
+        self.__update_reference_channel_combo_box()
         self._update_plotable_channels()
+
+    def __update_reference_channel_combo_box(self) -> None:
+        """Any channel of the registration can be the reference channel"""
+        combo_box = self.ui.referenceChannelComboBox
+        populate_combobox(combo_box, reference_channel_choices(self.worker.all_channels))
+        with QSignalBlocker(combo_box):  # Showing the reference channel of the config is not an edit
+            combo_box.setCurrentText(align_with_to_ui(self.worker.sample_manager.reference_channel_setting))
 
     def _on_channel_removed(self, channel_name: str) -> None:
         self._update_plotable_channels()
@@ -863,6 +871,7 @@ class RegistrationTab(PreProcessingTab['RegistrationProcessor']):
         self.subscribe(RegistrationStatusChanged, self._update_plotable_channels)
         for channel in self.worker.channels:
             self.__update_channel_combo_boxes(channel)
+        self.__update_reference_channel_combo_box()
         self._update_plotable_channels()
 
     def _set_params(self) -> None:

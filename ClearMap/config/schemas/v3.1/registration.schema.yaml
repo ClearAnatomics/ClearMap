@@ -16,6 +16,13 @@ properties:
       align_files_folder: { type: string }
     additionalProperties: true
 
+  # The channel aligned with the atlas, which the others are aligned with by default
+  reference_channel:
+    anyOf:
+      - { $ref: "./typedefs.schema.yaml#/$defs/channelName" }
+      - { type: "string", const: "__UNDECIDED__" }  # REFERENCE_UNDECIDED: not chosen yet, to choose
+      - { type: "null" }  # NO_REFERENCE: no channel is aligned with the atlas
+
   channels:
     type: object
     # channel keys must match channelName

@@ -25,7 +25,8 @@ from ClearMap.config.compound_keys import channel_file_name_token
 from ClearMap.config.config_coordinator import refuse_renames_onto_existing_channels
 from ClearMap.config.registration_channels import (ALIGN_WITH_NOTHING, ALIGN_WITH_UNDECIDED, ATLAS,
                                                    INTRINSICALLY_ALIGNED, MOVING_OTHER, MOVING_SELF,
-                                                   NOT_SELECTED_FOR_REGISTRATION, REGISTRATION_DIRECTIONS,
+                                                   NOT_SELECTED_FOR_REGISTRATION, REFERENCE_UNDECIDED,
+                                                   REGISTRATION_DIRECTIONS,
                                                    partner_change, registration_direction)
 from ClearMap.Utils.exceptions import ChannelNameTakenError, ClearMapConfigError, ClearMapValueError
 from ClearMap.Utils.utilities import snake_to_title, trim_or_pad
@@ -78,6 +79,14 @@ def align_with_to_ui(align_with: str | None) -> str:
 def align_with_from_ui(text: str) -> str | None:
     """The partner of the config for the text of the align_with combo box (the combo box getter gives None for it)"""
     return ALIGN_WITH_NOTHING if text == NO_PARTNER_TEXT else text
+
+
+def reference_channel_choices(channels: Iterable[str]) -> list[str]:
+    """
+    The texts of the reference channel combo box: not chosen yet (the token itself), none ('None': no channel is
+    aligned with the atlas), the channels. Translated as the partner of a channel (align_with_to_ui and _from_ui).
+    """
+    return [REFERENCE_UNDECIDED, NO_PARTNER_TEXT, *channels]
 
 
 def layout_channel_to_ui(layout_channel: str | None) -> str:
@@ -1160,6 +1169,19 @@ class SharedRegistrationParams(UiParameter):
         }
 
 
+class ReferenceChannelParams(UiParameter):
+    """The reference channel of the registration (registration.reference_channel), chosen in the tab"""
+    reference_channel: str | None
+
+    def __init__(self, tab, *, event_bus: EventBus, get_view=None, apply_patch=None):
+        self.cfg_subtree = ['registration']  # REFACTOR: section name from config_handler
+        super().__init__(tab, event_bus=event_bus, get_view=get_view, apply_patch=apply_patch)
+
+    def build_params_dict(self):
+        return {'reference_channel': ParamLink(['reference_channel'], self.tab.referenceChannelComboBox,
+                                               cast_to_ui=align_with_to_ui, cast_from_ui=align_with_from_ui)}
+
+
 class RegistrationParams(ChannelsUiParameterCollection):  # TEST: does not seem to follow tab click
     publishes = Publishes(UiRequestLandmarksDialog)   # Bind by number because name may change
 
@@ -1167,6 +1189,8 @@ class RegistrationParams(ChannelsUiParameterCollection):  # TEST: does not seem 
         super().__init__(tab, pipeline_name='Registration', event_bus=event_bus,
                          get_view=get_view, apply_patch=apply_patch)
         self.atlas_params = AtlasParams(tab, event_bus=event_bus, get_view=get_view, apply_patch=apply_patch)
+        self.reference_channel_params = ReferenceChannelParams(tab, event_bus=event_bus, get_view=get_view,
+                                                               apply_patch=apply_patch)
         self.shared_params = SharedRegistrationParams(tab, event_bus=event_bus,
                                                      get_view=get_view, apply_patch=apply_patch)
 
@@ -1183,7 +1207,7 @@ class RegistrationParams(ChannelsUiParameterCollection):  # TEST: does not seem 
 
     @property
     def params(self):
-        return [self.atlas_params, self.shared_params] + list(self.values())
+        return [self.atlas_params, self.reference_channel_params, self.shared_params] + list(self.values())
 
     def get_channel_name(self, channel_idx):
         return self.tab.channelsParamsTabWidget.tabText(channel_idx)
