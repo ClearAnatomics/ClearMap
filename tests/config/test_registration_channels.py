@@ -81,6 +81,12 @@ def test_a_registration_is_needed_when_something_moves_and_is_not_already_aligne
     assert needs_registration({'align_with': 'auto', 'moving_channel': moving_channel}) is needed
 
 
+@pytest.mark.parametrize('moving_channel', ['self', 'other'])  # The user may choose either
+@pytest.mark.parametrize('align_with', [None, ALIGN_WITH_UNDECIDED])
+def test_no_registration_is_needed_without_a_partner_whatever_the_direction_kept(align_with, moving_channel):
+    assert needs_registration({'align_with': align_with, 'moving_channel': moving_channel}) is False
+
+
 def test_the_pairs_are_moving_then_fixed_in_the_order_of_the_channels():
     registration_config = config(auto=('atlas', 'atlas'), fos=('auto', 'fos'), nuc=('auto', 'auto'))
 

@@ -108,10 +108,12 @@ def partner_change(channel: str, channel_config: Mapping, align_with: str | None
 
 def needs_registration(channel_config: Mapping) -> bool:
     """
-    Whether a registration is computed for the channel: something moves, and it is not intrinsically aligned.
-    (Whether the channel is selected for registration at all is :func:`is_selected_for_registration`.)
+    Whether a registration is computed for the channel: its partner is chosen (:func:`is_selected_for_registration`),
+    something moves, and it is not intrinsically aligned. A direction kept while there is no partner (aligned with
+    nothing, or undecided) plans nothing.
     """
-    return channel_config.get('moving_channel') is not None and not is_intrinsically_aligned(channel_config)
+    return (is_selected_for_registration(channel_config) and channel_config.get('moving_channel') is not None
+            and not is_intrinsically_aligned(channel_config))
 
 
 def fixed_moving_channels(registration_config: Mapping, channel: str) -> tuple[str | None, str | None]:

@@ -319,6 +319,8 @@ class RegistrationProcessor(IndependentChannelsPipelineOrchestrator):
         return self.registration_status() == RegistrationStatus.REGISTERED
 
     def channel_was_registered(self, channel):
+        if not needs_registration(self.config['channels'][channel]):  # E.g. no partner chosen yet: nothing to compute
+            return False
         try:
             fixed_channel, moving_channel = self.get_fixed_moving_channels(channel)
         except ClearMapConfigError as err:

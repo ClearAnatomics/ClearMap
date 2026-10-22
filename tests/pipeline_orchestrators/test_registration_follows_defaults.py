@@ -96,3 +96,12 @@ def test_the_points_of_a_channel_whose_partner_is_not_chosen_cannot_reach_the_at
 
     with pytest.raises(MissingRequirementException, match="'fos' is not chosen"):
         registration.get_transform_directories('fos')
+
+
+def test_a_channel_whose_partner_is_not_chosen_is_listed_as_not_registered(experiment, channel_editor):
+    channel_editor.add('fos', 'nuclei', with_path=True)  # Undecided: the GUI lists the registered channels on setup
+    registration = experiment.get_worker('registration', None)
+    registration.setup_if_needed()
+
+    assert registration.channel_was_registered('fos') is False
+    registration.get('aligned', channel='fos')  # Nothing to parametrize: no registration is planned yet
