@@ -3,9 +3,6 @@
 PROG_NAME=$0
 
 BASEDIR=$(dirname "$0")
-if [ -z "$1" ]; then
-    set -- -f ClearMap3.yml
-fi
 
 
 function red(){  #  From https://stackoverflow.com/a/57096493
@@ -40,14 +37,14 @@ usage() {
   cat << EOF >&2
   Usage: $PROG_NAME [-h] [-f <env-file-path>] [-s]
 
-  --file, -f <env-file-path>: The environment file to use. Defaults to ClearMapUi.yml in the current folder
+  --file, -f <env-file-path>: The environment file to use. Defaults to ClearMap3.yml in the current folder
   --spyder, -s : Whether to install the appropriate spyder kernel
 EOF
   exit 1
 }
 
 USE_SPYDER="False"
-ENV_FILE_PATH=''
+ENV_FILE_PATH='ClearMap3.yml'  # Unless -f says otherwise (with or without the other options)
 while [[ $# -gt 0 ]]; do
   case $1 in
     -h|--help)
@@ -69,6 +66,11 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+if [ ! -f "$ENV_FILE_PATH" ]; then
+    red "Environment file '$ENV_FILE_PATH' not found (from $(pwd))"
+    usage
+fi
 
 
 # Get the current commit number and save it to a file
