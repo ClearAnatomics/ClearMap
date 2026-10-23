@@ -27,7 +27,7 @@ from ClearMap.config.config_handler import ConfigHandler
 
 from PyQt5.QtWidgets import QFileDialog, QMessageBox, QInputDialog
 
-from ClearMap.config.utils import parse_flat_yaml, write_flat_yaml
+from ClearMap.config.utils import parse_flat_yaml, set_flat_yaml_value
 from ClearMap.gui.gui_utils_base import ensure_qapp, is_headless
 
 SENTINEL_DIR = pathlib.Path.home() / '.clearmap' / '.first_run_sentinels'
@@ -74,10 +74,8 @@ class MachineConfig:
         return ConfigHandler.copy_if_missing(default_path, user_path)
 
     def _patch_temp_dir_cfg(self, path_str: str):
-        cfg = self._read_cfg()
-        cfg['temp_folder'] = path_str
-        # write back atomically
-        write_flat_yaml(self.cfg_path, cfg)
+        self._ensure_cfg_exists()
+        set_flat_yaml_value(self.cfg_path, 'temp_folder', path_str)  # edit specific line only. keep comments
 
     def _patch_temp_dir_env(self, path_str: str):
         for var in ('TMP', 'TEMP', 'TMPDIR'):

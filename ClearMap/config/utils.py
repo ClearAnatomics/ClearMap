@@ -8,7 +8,10 @@ A set of low level utilities for configuration file parsing and handling.
 
 """
 
+import os
 import re
+import shutil
+from pathlib import Path
 
 from ClearMap.Utils.exceptions import ConfigParsingError
 
@@ -55,6 +58,11 @@ def _handle_configobj_failed_parse(err, cfg_path):
 
 
 def parse_flat_yaml(text: str) -> dict:
+    """
+    Read a flat YAML mapping (one ``key: value`` per line, no list or mapping) without a YAML library, as the
+    early boot must.
+    The comments, whole line or after a value, are left out.
+    """
     out = {}
     for raw in text.splitlines():
         line = raw.strip()
@@ -64,42 +72,93 @@ def parse_flat_yaml(text: str) -> dict:
             continue
 
         k, v = line.split(":", 1)
-        k = k.strip()
-        v = v.strip()
-        if v.lower() == "null":  # None
-            out[k] = None
-        elif v.lower() in ("true", "false"):  # bool
-            out[k] = (v.lower() == "true")
-        elif ((v.startswith('"') and v.endswith('"')) or
-              (v.startswith("'") and v.endswith("'"))):  # string
-            out[k] = v[1:-1]
-        else: # try int, then float, else raw string
-            try:
-                out[k] = int(v)
-            except ValueError:
-                try:
-                    out[k] = float(v)
-                except ValueError:
-                    if '[' in v or '{' in v:  # likely a list or dict
-                        raise ValueError(f"Unsupported complex value in flat YAML: {v}")
-                    else:
-                        out[k] = v  # Assume string
+        out[k.strip()] = _value_of_flat_yaml_text(_split_value_and_comment(v)[0])
     return out
 
 
-def write_flat_yaml(cfg_path, data: dict):
-    lines = []
-    for k, v in data.items():
-        if v is None:
-            lines.append(f"{k}: null")
-        elif isinstance(v, bool):
-            lines.append(f"{k}: {'true' if v else 'false'}")
-        elif isinstance(v, (int, float)):
-            lines.append(f"{k}: {v}")
-        elif isinstance(v, str):
-            lines.append(f'{k}: "{v}"')
-        else:
-            raise ValueError(f"Unsupported value type in flat YAML: {type(v)}")
-    content = "\n".join(lines) + "\n"
-    with cfg_path.open('w', encoding='utf-8') as fh:
-        fh.write(content)
+def _split_value_and_comment(text: str) -> tuple[str, str]:
+    """
+    Split what follows the colon of a flat YAML line in the value and its comment (with its leading spaces).
+    A comment starts with a # after a space, outside a quoted value.
+    """
+    stripped = text.lstrip()
+    quote = stripped[:1]
+    if quote in ('"', "'"):
+        end = 1
+        while True:
+            end = stripped.find(quote, end)
+            if end == -1:
+                raise ValueError(f'Unterminated quoted value in flat YAML: {text}')
+            if quote == "'" and stripped[end + 1:end + 2] == "'":  # '' is a quote in a single-quoted value
+                end += 2
+                continue
+            if quote == '"' and stripped[end - 1] == '\\':
+                end += 1
+                continue
+            break
+        return stripped[:end + 1], stripped[end + 1:]
+    for i, char in enumerate(stripped):
+        if char == '#' and (i == 0 or stripped[i - 1] in ' \t'):
+            value = stripped[:i].rstrip()
+            return value, stripped[len(value):]
+    return stripped.rstrip(), ''
+
+
+def _value_of_flat_yaml_text(v: str):
+    if v.lower() in ("null", "~", ""):  # None
+        return None
+    if v.lower() in ("true", "false"):  # bool
+        return v.lower() == "true"
+    if v.startswith("'"):  # string, '' is a quote
+        return v[1:-1].replace("''", "'")
+    if v.startswith('"'):  # string, only the \" and \\ escapes (all a flat config needs)
+        return v[1:-1].replace('\\"', '"').replace('\\\\', '\\')
+    try:  # try int, then float, else raw string
+        return int(v)
+    except ValueError:
+        try:
+            return float(v)
+        except ValueError:
+            if '[' in v or '{' in v:  # likely a list or dict
+                raise ValueError(f"Unsupported complex value in flat YAML: {v}")
+            return v  # Assume string
+
+
+def _flat_yaml_text_of(value) -> str:
+    if value is None:
+        return "null"
+    if isinstance(value, bool):
+        return 'true' if value else 'false'
+    if isinstance(value, (int, float)):
+        return str(value)
+    if isinstance(value, str):
+        return "'" + value.replace("'", "''") + "'"  # Single quotes: no escapes, a Windows path stays as is
+    raise ValueError(f"Unsupported value type in flat YAML: {type(value)}")
+
+
+def set_flat_yaml_value(cfg_path, key: str, value) -> None:
+    """
+    Set the value of key in a flat YAML file, every other line (and the comment of that one) as it was.
+    The key is added at the end if missing. The file is replaced atomically (a temporary file next to it).
+    """
+    cfg_path = Path(cfg_path)
+    lines = cfg_path.read_text(encoding='utf-8').splitlines(keepends=True)
+    new_line = f'{key}: {_flat_yaml_text_of(value)}'
+    for i, line in enumerate(lines):
+        line_key, colon, rest = line.partition(':')
+        if colon and line_key.strip() == key and not line.lstrip().startswith('#'):
+            comment = _split_value_and_comment(rest.rstrip('\r\n'))[1]
+            lines[i] = new_line + comment + line[len(line.rstrip('\r\n')):]
+            break
+    else:
+        if lines and not lines[-1].endswith('\n'):
+            lines[-1] += '\n'
+        lines.append(new_line + '\n')
+    tmp_path = cfg_path.with_name(f'.tmp-{os.getpid()}-{cfg_path.name}')
+    try:
+        tmp_path.write_text(''.join(lines), encoding='utf-8')
+        shutil.copymode(cfg_path, tmp_path)
+        os.replace(tmp_path, cfg_path)
+    except BaseException:
+        tmp_path.unlink(missing_ok=True)
+        raise
