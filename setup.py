@@ -67,7 +67,7 @@ requirements = [  # pip
 ]
 os_name = platform.system().lower()
 
-OPTIMISE_COMPILATION_FOR_TARGET = os.environ.get('OPTIMISE_CLEARMAP_COMPILATION_FOR_TARGET', True) != 'False' # Cython code will run on the machine where is was compiled
+OPTIMISE_COMPILATION_FOR_TARGET = os.environ.get('OPTIMISE_CLEARMAP_COMPILATION_FOR_TARGET', True) != 'False' # Cython code will run on the machine where it was compiled
 N_PROCS = max(1, cpu_count() - 2)
 
 DEFAULT_COMPILE_ARGS = []
