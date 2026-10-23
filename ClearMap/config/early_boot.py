@@ -308,6 +308,7 @@ def first_boot(*, allow_prompt: bool = True) -> BootResult:
     if (not graphics_resources_py_rc_path.exists() or
             graphics_resources_qrc_path.stat().st_mtime > graphics_resources_py_rc_path.stat().st_mtime):
         subprocess.run(['pyrcc5', graphics_resources_qrc_path, '-o', graphics_resources_py_rc_path], check=True)
+    import ClearMap.gui.creator.graphics_resources_rc  # noqa: F401  (the images of the help, ':/graphics_resources/')
 
     is_first_run = _is_first_run(version_tag)
 
