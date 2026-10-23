@@ -22,8 +22,8 @@ import tempfile
 from functools import cached_property
 from typing import Optional, TypedDict, Any, Dict, TypeAlias
 
+from ClearMap import __version__
 from ClearMap.config.config_handler import ConfigHandler
-from importlib_metadata import version as _pkg_version
 
 from PyQt5.QtWidgets import QFileDialog, QMessageBox, QInputDialog
 
@@ -40,7 +40,7 @@ class MachineConfig:
     Minimal, side-effect-free reader for machine config.
     Caches the parsed file; exposes DEFAULT section as a mapping.
     """
-    _version = _pkg_version('ClearMap')  # required early for filename
+    _version = __version__  # required early for filename
 
     def __init__(self):
         self.min_temp_folder_gb = 5

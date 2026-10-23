@@ -148,8 +148,8 @@ def make_splash(img_source=None, bar_max=100, message=None, res='hd', font_size=
 
     if message is None:
         from packaging.version import Version
-        from importlib_metadata import version
-        clearmap_version = Version(version('ClearMap'))
+        from ClearMap import __version__
+        clearmap_version = Version(__version__)
         message = f"ClearMap {clearmap_version.major}.{clearmap_version.minor}"
 
     # Calculate horizontal centering for the text.

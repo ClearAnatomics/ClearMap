@@ -10,11 +10,11 @@ from typing import Callable, Dict, Tuple
 
 import numpy as np
 from packaging.version import Version
-from importlib_metadata import version as importlib_version
 
 import qdarkstyle
 from PyQt5.QtWidgets import QApplication, QDialog
 
+from ClearMap import __version__
 from ClearMap.IO.assets_constants import CHANNELS_ASSETS_TYPES_CONFIG
 from ClearMap.IO.FileUtils import Rename, apply_renames
 from ClearMap.Utils.tag_expression import Expression
@@ -29,7 +29,7 @@ from ClearMap.gui.dialog_helpers import get_directory_dlg
 from ClearMap.gui.gui_utils_base import ensure_qapp
 
 
-clearmap_version = importlib_version('ClearMap')
+clearmap_version = __version__
 VERSION_SUFFIX = f'v{Version(clearmap_version).major}_{Version(clearmap_version).minor}'
 
 

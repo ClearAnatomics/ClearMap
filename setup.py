@@ -174,9 +174,16 @@ data_files.extend([('', ['start_gui.sh'])])
 packages = find_packages(exclude=('doc', 'tests*', 'pickle_python_2', 'deprecated',
                                   'ClearMap.External.elastix', 'ClearMap.External.geodesic_distance'))
 
+def read_clearmap_version():
+    """The version written in ClearMap/_version.py (read, not imported: ClearMap is not built yet)"""
+    namespace = {}
+    exec((Path(__file__).resolve().parent / 'ClearMap' / '_version.py').read_text(encoding='utf-8'), namespace)
+    return namespace['__version__']
+
+
 setup(
     name='ClearMap',
-    version='3.1.0',
+    version=read_clearmap_version(),
     description='3D cell counting and vasculature analysis for lightsheet microscopy',
     install_requires=requirements,
     packages=packages,

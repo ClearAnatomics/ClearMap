@@ -19,14 +19,14 @@ from functools import cached_property
 
 import configobj
 from packaging.version import Version
-from importlib_metadata import version as importlib_version
 
+from ClearMap import __version__
 from ClearMap.IO.FileUtils import atomic_replace
 from .utils import _handle_configobj_failed_parse, configobj_to_dict
 from ..Utils.path_utils import clean_path, de_duplicate_path
 from ..Utils.utilities import title_to_snake
 
-clearmap_version = importlib_version('ClearMap')
+clearmap_version = __version__
 VERSION_SUFFIX = f'v{Version(clearmap_version).major}_{Version(clearmap_version).minor}'
 
 # FIXME: implement validation

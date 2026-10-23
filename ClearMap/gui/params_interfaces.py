@@ -7,7 +7,6 @@ from contextlib import ExitStack, contextmanager
 from typing import List, Any, Callable, Mapping, Optional, Dict, Type, Tuple, Sequence, Union
 
 from PyQt5.QtCore import QEvent, QObject
-from importlib_metadata import version
 from packaging.version import Version
 
 from PyQt5 import sip
@@ -15,6 +14,7 @@ from PyQt5.QtWidgets import (QCheckBox, QLabel, QLineEdit, QSpinBox, QFrame,
                              QComboBox, QPlainTextEdit, QTextEdit, QGroupBox,
                              QWidget, QListWidget, QDoubleSpinBox)
 
+from ClearMap import __version__
 from ClearMap.IO.assets_constants import CONTENT_TYPE_TO_PIPELINE
 from ClearMap.Utils.event_bus import BusSubscriberMixin, EventBus, GUI_THREAD
 from ClearMap.config.config_adjusters.dict_ops import set_item_recursive, get_item_recursive
@@ -29,7 +29,7 @@ from ClearMap.gui.widget_monkeypatch_callbacks import _get_sorted_spin_boxes, en
 from ClearMap.gui.widgets import (ExtendableTabWidget, FileDropListWidget, channel_page_id_of, LandmarksWeightsPanel, GroupsWidgetAdapter,
                                   NProcessesWidget)
 
-CLEARMAP_VERSION = Version(version('ClearMap'))
+CLEARMAP_VERSION = Version(__version__)
 DEBUG_PAINT_GUARD = True   # FIXME: base on machine params log_level
 
 _UNSET = object()  # sentinel singleton
