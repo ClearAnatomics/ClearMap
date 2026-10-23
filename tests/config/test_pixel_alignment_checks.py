@@ -32,7 +32,7 @@ def test_channels_acquired_together_with_one_of_them_are_intrinsically_aligned(r
 
 def test_channels_registered_each_on_its_own_are_not():
     # Their results end at the same place, but not pixel for pixel
-    with pytest.raises(ChannelsNotPixelAlignedError, match=r"got roots: \['vessels', 'arteries'\]"):
+    with pytest.raises(ChannelsNotPixelAlignedError, match=r"got root_channels=\['vessels', 'arteries'\]"):
         check_intrinsically_aligned(registration(vessels=('auto', 'other'), arteries=('auto', 'other')),
                                     ['vessels', 'arteries'])
 
