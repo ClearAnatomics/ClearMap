@@ -251,10 +251,10 @@ class StitchingProcessor(IndependentChannelsPipelineOrchestrator):
             conversion.convert(tile_planes, tile_column)
 
         # Read now from the planes: the npy columns have no OME metadata to resolve 'auto' from later
-        self._set_auto_overlaps_from_ome_metadata(channel, ome_tile=asset.file_list[0])
+        self._set_auto_overlaps_from_ome_metadata(channel, ome_tile=asset.file_list[0], tile_axes=asset.tile_grid_tag_names)
         self.sample_manager.set_channel_expression(channel, columns_expression)
 
-    def _set_auto_overlaps_from_ome_metadata(self, channel, ome_tile):
+    def _set_auto_overlaps_from_ome_metadata(self, channel, ome_tile, tile_axes):
         """
         Replace the 'auto' overlaps of channel in the stitching config by the values (in pixels) read from the OME
         metadata of ome_tile, for tiles about to lose their metadata (planes stacked into npy columns). Left 'auto'
@@ -264,7 +264,7 @@ class StitchingProcessor(IndependentChannelsPipelineOrchestrator):
         if not rigid_cfg or 'auto' not in (rigid_cfg['overlap_x'], rigid_cfg['overlap_y']):
             return
         try:
-            overlaps, _ = define_auto_stitching_params(ome_tile, rigid_cfg)
+            overlaps, _ = define_auto_stitching_params(ome_tile, rigid_cfg, tile_axes=tile_axes)
         except MetadataError:
             return
         overlaps_patch = {'overlap_x': round(overlaps[0]), 'overlap_y': round(overlaps[1])}
@@ -411,9 +411,11 @@ class StitchingProcessor(IndependentChannelsPipelineOrchestrator):
         raw_asset = self.get('raw', channel=channel)
         if raw_asset.is_expression:
             params_file = raw_asset.file_list[0]
+            tile_axes = raw_asset.tile_grid_tag_names
         else:
             params_file = raw_asset.existing_path
-        overlaps, projection_thickness = define_auto_stitching_params(params_file, rigid_cfg)
+            tile_axes = []
+        overlaps, projection_thickness = define_auto_stitching_params(params_file, rigid_cfg, tile_axes=tile_axes)
         layout = self.get_wobbly_layout(channel, overlaps)
         if rigid_cfg['background_pixels'] is None:
             background_params = rigid_cfg['background_level']
@@ -450,8 +452,8 @@ class StitchingProcessor(IndependentChannelsPipelineOrchestrator):
     def get_wobbly_layout(self, channel, overlaps=None):
         if overlaps is None:
             rigid_cfg = self.config['channels'][channel]['rigid']
-            first_tile_path = self.get('raw', channel=channel).file_list[0]
-            overlaps, _ = define_auto_stitching_params(first_tile_path, rigid_cfg)
+            raw_asset = self.get('raw', channel=channel)
+            overlaps, _ = define_auto_stitching_params(raw_asset.file_list[0], rigid_cfg, tile_axes=raw_asset.tile_grid_tag_names)
         extension = '.npy' if self.sample_manager.use_npy(channel) else None  # TODO: optional requires
         raw_expr = str(self.get_path('raw', channel=channel, extension=extension))
         tag_names = tuple(sorted(Expression(raw_expr).tag_names()))  # sort alphabetically to ensure consistent order
@@ -674,7 +676,8 @@ class StitchingProcessor(IndependentChannelsPipelineOrchestrator):
         from the OME metadata of the tiles, as for the rigid alignment"""
         layout_channel = self.config['channels'][channel]['layout_channel']
         rigid_cfg = self.config['channels'][layout_channel]['rigid']
-        overlaps, _ = define_auto_stitching_params(self.get('raw', channel=layout_channel).file_list[0], rigid_cfg)
+        raw_asset = self.get('raw', channel=layout_channel)
+        overlaps, _ = define_auto_stitching_params(raw_asset.file_list[0], rigid_cfg, tile_axes=raw_asset.tile_grid_tag_names)
         return {axis: round(overlap) for axis, overlap in zip('XY', overlaps)}
 
     def overlay_layout_plane(self, layout):  # REFACTOR: move to e.g. layout class
@@ -739,12 +742,14 @@ def supports_auto_overlap(extension: str) -> bool:
     return str(extension).endswith('ome.tif')
 
 
-def define_auto_stitching_params(img_path, stitching_cfg):
+def define_auto_stitching_params(img_path, stitching_cfg, *, tile_axes):
     """
     Resolve the 'auto' overlaps (and projection thickness) of the rigid stitching.
 
     'auto' overlaps are read from the OME metadata of the tile at ``img_path``, so they can only be
     resolved for ``.ome.tif`` tiles. For any other tile type the overlap must be set explicitly.
+    Only the axes of the mosaic (``tile_axes``: the ``tile_grid_tag_names`` of the tiles asset) have neighbours: along
+    the other one (a single row or column of tiles), an 'auto' overlap is 0.
     The config is not modified.
 
     Returns
@@ -757,7 +762,7 @@ def define_auto_stitching_params(img_path, stitching_cfg):
     overlaps = [stitching_cfg['overlap_x'], stitching_cfg['overlap_y']]
     projection_thickness = list(stitching_cfg['projection_thickness'])  # copy: do not mutate the config
     parsed_overlaps = {}
-    if any(overlap == 'auto' for overlap in overlaps):
+    if any(overlap == 'auto' and axis in tile_axes for axis, overlap in zip('XY', overlaps)):
         try:
             ome_info = parse_ome_info(Path(img_path))
         except NotAnOmeFile as err:
@@ -765,7 +770,9 @@ def define_auto_stitching_params(img_path, stitching_cfg):
                                 f'(no OME metadata). Set overlap_x and overlap_y explicitly for this channel.') from err
         parsed_overlaps = ome_info.get('overlap') or {}
     for i, axis in enumerate('XY'):
-        if overlaps[i] == 'auto':
+        if overlaps[i] == 'auto' and axis not in tile_axes:
+            overlaps[i] = 0  # No neighbour along it
+        elif overlaps[i] == 'auto':
             value = parsed_overlaps.get(axis)
             if value is None:
                 raise MetadataError(f"Could not determine {axis} overlap from OME metadata for file {img_path}. "

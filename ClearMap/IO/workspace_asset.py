@@ -1114,14 +1114,8 @@ class StackedAsset(ExpressionAsset):
 
 class TiledAsset(ExpressionAsset):
     @property
-    def planar_tag_names(self) -> list[str]:
-        """
-        Names of integer tags that define the planar tile grid (X/Y).
-
-        Only integer tags whose names are 'x' or 'y' (case-insensitive)
-        are considered part of the tile grid; any other integer tags
-        (e.g. Z, time, channel) are ignored for the grid shape.
-        """
+    def tile_grid_tag_names(self) -> list[str]:
+        """The names of the integer X and Y tags: the ones of the grid of tiles (not Z, time, channel...)"""
         names: list[str] = []
         for i, t in enumerate(self.expression.tags):
             if t.dtype() is int and t.name is not None:
