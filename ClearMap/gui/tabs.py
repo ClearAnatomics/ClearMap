@@ -1226,8 +1226,8 @@ class CellCounterTab(PostProcessingTab["CellDetector"]):
             self.main_window.popup('No cells file found, cannot display histograms yet')
 
     def __plot_histograms(self, channel: str) -> None:
-        df_path = self.sample_manager.get_path('cells', channel=channel, postfix='raw')
-        cells_df = pd.DataFrame(np.load(df_path))
+        worker = self.get_worker(channel)
+        cells_df, _ = worker.get_coords(coord_type='raw')
         self.cell_size_histogram = self.__plot_histogram(channel, cells_df, 'size', self.cell_size_histogram)
         self.cell_intensity_histogram = self.__plot_histogram(channel, cells_df, 'source', self.cell_intensity_histogram)
 

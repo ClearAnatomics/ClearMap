@@ -270,7 +270,7 @@ class CellDetector(ChannelPipelineOrchestrator):
 
         table_path = self.get_path(**kwargs, extension='.feather')
         if not table_path.exists():
-            table_path = self.get_path(**kwargs)
+            table_path = self.get_path(**kwargs)  # default to old .npy format
 
         loaders = {'.feather': pd.read_feather, '.npy': np.load}
         table = loaders[table_path.suffix](table_path)
