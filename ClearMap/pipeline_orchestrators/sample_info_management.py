@@ -67,7 +67,7 @@ Use :func:`build_sample_manager` rather than constructing
     print(sm.get_channel_resolution('cfos'))        # (1.625, 1.625, 3.0)
 
     raw = sm.get('raw', channel='cfos')
-    print(raw.is_tiled, raw.tile_grid_shape)        # True, array([3, 4])
+    print(raw.is_tiled, raw.tile_grid_shape)        # True, {'X': 3, 'Y': 4}
 
 See also
 --------

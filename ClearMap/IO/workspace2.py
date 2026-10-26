@@ -62,7 +62,7 @@ Advanced users who want direct access::
     # Retrieve a tiled raw dataset
     raw = ws.get('raw', channel='cfos')
     if raw.is_tiled:
-        print(raw.tile_grid_shape)   # e.g. array([3, 4])
+        print(raw.tile_grid_shape)   # e.g. {'X': 3, 'Y': 4}
         print(raw.file_list[:3])     # first few tile paths
 
     # Add a new channel programmatically

@@ -124,3 +124,30 @@ def test_the_auto_overlaps_are_read_from_the_planes_before_they_are_stacked(expe
     rigid = experiment.cfg_coordinator.get_config_view('stitching')['channels'][per_plane_channel]['rigid']
     assert (rigid['overlap_x'], rigid['overlap_y']) == (205, 102)  # In pixels
     assert read_from == ['10-44-28_test_UltraII[00 x 00]_C00_xyz-Table Z0000.ome.tif']
+
+
+@pytest.mark.parametrize('one_file_per_plane', [False, True])
+def test_the_overlay_preview_of_a_single_row_of_tiles(experiment, channel_editor, tmp_path, one_file_per_plane):
+    """A single row of tiles has no Y tag (#155): KeyError: 'Y'"""
+    folder = tmp_path / RAW_FOLDER_NAME / 'row'
+    folder.mkdir(parents=True)
+    for x in range(N_TILES_X):
+        if one_file_per_plane:
+            for z in range(N_PLANES):
+                tifffile.imwrite(folder / f'row_X{x:02d}_C00_xyz-Table Z{z:04d}.ome.tif', _plane(0, x, z),
+                                 photometric='minisblack', metadata=OME_METADATA)
+        else:
+            column = np.stack([_plane(0, x, z) for z in range(N_PLANES)])
+            tifffile.imwrite(folder / f'row_X{x:02d}_C00.ome.tif', column, photometric='minisblack',
+                             metadata={**OME_METADATA, 'axes': 'ZYX'})
+    expression = 'row_X<X,2>_C00_xyz-Table Z<Z,4>.ome.tif' if one_file_per_plane else 'row_X<X,2>_C00.ome.tif'
+    channel_editor.add('test', 'nuclei')
+    experiment.apply_ui_patch({'sample': {'channels': {'test': {'path': str(folder / expression)}}}})
+    experiment.get_worker('stitching').setup_if_needed()
+    overlap = 4
+    experiment.apply_ui_patch({'stitching': {'channels': {'test': {'rigid': {'overlap_x': overlap,
+                                                                              'overlap_y': overlap}}}}})
+
+    overlay = experiment.get_worker('stitching').stitch_overlay('test', color=False)
+
+    assert overlay.shape == (N_TILES_X * PLANE_SHAPE[1] - overlap, PLANE_SHAPE[0])  # x, y

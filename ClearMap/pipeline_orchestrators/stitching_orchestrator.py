@@ -237,17 +237,17 @@ class StitchingProcessor(IndependentChannelsPipelineOrchestrator):
         if 'Z' not in planes_expression.tag_names() or planes_expression.n_tags() < 2:
             return  # One file per tile, or the planes of a single stack (see copy_or_stack)
 
-        tile_positions: list[dict[str, int]] = []  # The values of the tags except Z
-        for plane_position in asset.positions:
-            tile_position = {tag: value for tag, value in plane_position.items() if tag != 'Z'}
-            if tile_position not in tile_positions:
-                tile_positions.append(tile_position)
+        tile_pos_indices: list[dict[str, int]] = []
+        for tag_values in asset.file_tag_values:
+            tile_tag_values = {tag: value for tag, value in tag_values.items() if tag != 'Z'}
+            if tile_tag_values not in tile_pos_indices:
+                tile_pos_indices.append(tile_tag_values)
 
         # In npy, for memmaping in stitching (and a 3D .ome.tif cannot be created yet)
         columns_expression = asset.variant(extension='.npy').expression.without_tag('Z')
-        for tile_position in tile_positions:
-            tile_planes = planes_expression.string(values=tile_position)  # parametrise x/y leave z as tag
-            tile_column = columns_expression.string(values=tile_position)  # parametrise x/y, no z for columns
+        for tile_tag_values in tile_pos_indices:
+            tile_planes = planes_expression.string(values=tile_tag_values)  # parametrise x/y leave z as tag
+            tile_column = columns_expression.string(values=tile_tag_values)  # parametrise x/y, no z for columns
             conversion.convert(tile_planes, tile_column)
 
         # Read now from the planes: the npy columns have no OME metadata to resolve 'auto' from later
@@ -634,22 +634,22 @@ class StitchingProcessor(IndependentChannelsPipelineOrchestrator):
         from ClearMap.Visualization.Color.Color import gray_image_to_rgb
         self.stack_columns(channel)
         asset = self.get('raw', channel=channel, sample_id=self.sample_manager.prefix)
-        positions = asset.positions
-        tile_shape = {k: v for k, v in zip('XYZ', asset.tile_shape)}  # TODO: use asset.tile_grid_shape
+        tile_grid_indices = asset.tile_grid_indices
+        tile_shape = {k: v for k, v in zip('XYZ', asset.tile_shape)}
         middle_z = int(tile_shape['Z'] / 2)
         overlaps = self._get_overlaps(channel)
-        output_shape = self._compute_stitched_shape_from_overlaps(overlaps, positions, tile_shape)
+        output_shape = self._compute_stitched_shape_from_overlaps(overlaps, asset.tile_grid_shape, tile_shape)
         layers = [np.zeros(output_shape, dtype=int), np.zeros(output_shape, dtype=int)]
         if self.sample_manager.has_npy:
             files = asset.variant(extension='.npy').file_list
         else:
             files = asset.file_list
-        for tile_path, pos in zip(files, positions):
+        for tile_path, index in zip(files, tile_grid_indices):
             tile = self.__read_tile_middle_plane(tile_path, middle_z)
 
-            starts = {ax: pos[ax] * tile_shape[ax] - pos[ax] * overlaps[ax] for ax in 'XY'}
+            starts = {ax: index[ax] * tile_shape[ax] - index[ax] * overlaps[ax] for ax in 'XY'}
             ends = {ax: starts[ax] + tile_shape[ax] for ax in starts.keys()}
-            layer = layers[(pos['Y'] + pos['X']) % 2]  # Alternate colors
+            layer = layers[(index['Y'] + index['X']) % 2]  # Alternate colors
             layer[starts['X']: ends['X'], starts['Y']: ends['Y']] = tile
         if color:
             layers[0] = gray_image_to_rgb(layers[0], 'cyan', pseudo_z_score=True, range_max=255)
@@ -666,10 +666,8 @@ class StitchingProcessor(IndependentChannelsPipelineOrchestrator):
             tile = io_ops.read(tile_path)[:, :, middle_z]
         return tile
 
-    def _compute_stitched_shape_from_overlaps(self, overlaps, positions, tile_shape):
-        mosaic_shape = {ax: max([p[ax] for p in positions]) + 1 for ax in 'XY'}  # +1 because 0 indexing
-        output_shape = [tile_shape[ax] * mosaic_shape[ax] - overlaps[ax] * (mosaic_shape[ax] - 1) for ax in 'XY']
-        return output_shape
+    def _compute_stitched_shape_from_overlaps(self, overlaps, tile_grid_shape, tile_shape):
+        return [tile_shape[ax] * tile_grid_shape[ax] - overlaps[ax] * (tile_grid_shape[ax] - 1) for ax in 'XY']
 
     def _get_overlaps(self, channel):
         """The overlaps of the tiles of channel (the ones of its layout channel), in pixels: 'auto' ones are read

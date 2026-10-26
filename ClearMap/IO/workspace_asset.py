@@ -78,7 +78,7 @@ Assets are normally obtained through the workspace, not constructed directly::
 
     if raw.is_tiled:
         print(raw.file_list[:5])      # list of matching files on disk
-        print(raw.tile_grid_shape)    # e.g. array([3, 4])
+        print(raw.tile_grid_shape)    # e.g. {'X': 3, 'Y': 4}
 
     if stitched.exists:
         data = stitched.read()        # returns numpy array
@@ -99,6 +99,7 @@ __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
+import math
 import os
 import warnings
 from copy import deepcopy
@@ -935,15 +936,8 @@ class ExpressionAsset(Asset, ExpressionDataset):
         return names
 
     @property
-    def positions(self) -> list[dict[str, Any]]:
-        """
-        Positions of each file in tag space.
-
-        Returns
-        -------
-        list[dict[str, Any]]
-            For each file, a mapping {tag_name: value}.
-        """
+    def file_tag_values(self) -> list[dict[str, Any]]:
+        """One {tag_name: value} dict per file of file_list (same order): the values of the tags of its name"""
         return [self.expression.values(f) for f in self.file_list]
 
     @property
@@ -974,7 +968,7 @@ class ExpressionAsset(Asset, ExpressionDataset):
 
         mins = {n: None for n in int_names}
         maxs = {n: None for n in int_names}
-        for pos in self.positions:
+        for pos in self.file_tag_values:
             # pos is dict[tag_name -> value]
             for name in int_names:
                 v = pos[name]
@@ -1062,8 +1056,8 @@ class ExpressionAsset(Asset, ExpressionDataset):
         header = getattr(self, 'header', '{} {}')
         hdr_str = header.format(self.type_spec.resource_type, self.type_spec.name)
         tag_names = ', '.join(self.tag_names)
-        tile_lower = tuple(np.min(self.positions, axis=0))
-        tile_upper = tuple(np.max(self.positions, axis=0))
+        tile_lower = tuple(np.min(self.file_tag_values, axis=0))
+        tile_upper = tuple(np.max(self.file_tag_values, axis=0))
         pattern_line = (f'{hdr_str}: {self.expression.string()} {{{self.n_files_present} files,'
                         f' {tag_names}: {tile_lower} -> {tile_upper}}}')
         if self.extensions_to_directories:
@@ -1147,32 +1141,28 @@ class TiledAsset(ExpressionAsset):
         """
         if self.n_files_present == 0:
             return None
-        return int(self.tile_grid_shape.prod())
+        return math.prod(self.tile_grid_shape.values())
 
     @property
-    def tile_grid_shape(self):
-        """
-        The shape of the tile layout grid.
+    def tile_grid_ranges(self) -> dict[str, range]:
+        """The range of the X and Y tag values of the files, as in their names (just 0 along an axis without tag)"""
+        grid_tag_values = [{axis: tag_values.get(axis, 0) for axis in 'XY'} for tag_values in self.file_tag_values]
+        if not grid_tag_values:
+            raise ValueError(f'No tiles found for asset {self} with expression {self.expression}')
+        return {axis: range(min(values[axis] for values in grid_tag_values),
+                            max(values[axis] for values in grid_tag_values) + 1) for axis in 'XY'}
 
-        Returns
-        -------
-        tuple(int)
-            The shape of the tile grid.
-        """
-        planar = self.planar_tag_names
-        if not planar:
-            raise ValueError(f'No planar integer tags (X/Y) found for tiled asset {self} '
-                             f'with expression {self.expression}')
+    @property
+    def tile_grid_indices(self) -> list[dict[str, int]]:
+        """One {'X': column, 'Y': row} dict per file of file_list (same order), counted from the start of the ranges"""
+        ranges = self.tile_grid_ranges
+        return [{axis: tag_values.get(axis, 0) - ranges[axis].start for axis in 'XY'}
+                for tag_values in self.file_tag_values]
 
-        if not self.positions:
-            raise ValueError(f'No indices found for asset {self} with expression {self.expression}')
-
-        # positions is list[dict[tag_name -> value]]
-        indices = np.asarray([[pos[name] for name in planar] for pos in self.positions], dtype=int)
-        # Allow arbitrary origin: use min/max per axis
-        mins = indices.min(axis=0)
-        rel = indices - mins
-        return rel.max(axis=0) + 1  # +1 because indices are 0-based in this relative frame
+    @property
+    def tile_grid_shape(self) -> dict[str, int]:
+        """The {'X': n_columns, 'Y': n_rows} of the grid of tiles"""
+        return {axis: len(axis_range) for axis, axis_range in self.tile_grid_ranges.items()}
 
 
 class AssetCollection:  # FIXME: fix how assets are retrieved
