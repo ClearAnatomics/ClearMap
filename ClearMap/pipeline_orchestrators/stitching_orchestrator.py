@@ -672,9 +672,12 @@ class StitchingProcessor(IndependentChannelsPipelineOrchestrator):
         return output_shape
 
     def _get_overlaps(self, channel):
+        """The overlaps of the tiles of channel (the ones of its layout channel), in pixels: 'auto' ones are read
+        from the OME metadata of the tiles, as for the rigid alignment"""
         layout_channel = self.config['channels'][channel]['layout_channel']
-        overlaps = {k: self.config['channels'][layout_channel]['rigid'][f'overlap_{k.lower()}'] for k in 'XY'}
-        return overlaps
+        rigid_cfg = self.config['channels'][layout_channel]['rigid']
+        overlaps, _ = define_auto_stitching_params(self.get('raw', channel=layout_channel).file_list[0], rigid_cfg)
+        return {axis: round(overlap) for axis, overlap in zip('XY', overlaps)}
 
     def overlay_layout_plane(self, layout):  # REFACTOR: move to e.g. layout class
         """Overlays the sources to check their placement.
