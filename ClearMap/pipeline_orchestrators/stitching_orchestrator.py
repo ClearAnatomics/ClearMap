@@ -358,41 +358,56 @@ class StitchingProcessor(IndependentChannelsPipelineOrchestrator):
         # Get the channels in dependency order (based on layout_channel)
         for stitching_tree in self.get_stitching_order().values():
             for channel in stitching_tree:
-                self.stack_columns(channel)  # If x/y/z, stack first
-                channel_cfg = self.config['channels'][channel]
-
-                has_layout = self.get('layout', channel=channel, asset_sub_type='placed').exists
-                if channel_cfg.get('use_existing_layout'):
-                    if not has_layout:
-                        raise MissingRequirementException(f'Channel {channel} set to use existing layout,'
-                                                          f' but no layout found')
-                    self._stitch_layout_wobbly(channel)
-                    if self.stopped: return
-                    continue
-
-                if channel == channel_cfg['layout_channel']:
-                    if not channel_cfg['rigid']['skip']:
-                        self.align_channel_rigid(channel)
-                    if self.stopped: return
-                    if not channel_cfg['wobbly']['skip']:
-                        self.stitch_channel_wobbly(channel)
-                    else:
-                        self.place_layout_rigid(channel)
-                        if self.stopped: return
-                        self._stitch_layout_wobbly(channel)
-                else:
-                    self._stitch_layout_wobbly(channel)
-
+                self.stitch_channel(channel)
                 if self.stopped:
                     return
 
+    def steps_of(self, channel) -> list[str]:
+        """
+        The steps stitching runs for channel, in order: each one moves the main progress by 1.
+        A skipped step is not run, its result of a previous run is used.
+        """
+        channel_cfg = self.config['channels'][channel]
+        if channel_cfg.get('use_existing_layout') or channel != channel_cfg['layout_channel']:
+            return ['stitching']  # With a layout computed before or for another channel
+        steps = [] if channel_cfg['rigid']['skip'] else ['rigid alignment']
+        if channel_cfg['wobbly']['skip']:
+            return steps + ['stitching']
+        return steps + ['wobbly alignment', 'wobbly placement', 'stitching']
+
+    def n_steps_to_run(self, channels) -> int:
+        """The number of main steps of the progress bar to stitch channels (see :meth:`steps_of`)"""
+        return sum(len(self.steps_of(channel)) for channel in channels)
+
+    def stitch_channel(self, channel):
+        """Stitch channel with the steps of :meth:`steps_of`"""
+        self.stack_columns(channel)  # If x/y/z, stack first
+        channel_cfg = self.config['channels'][channel]
+
+        has_layout = self.get('layout', channel=channel, asset_sub_type='placed').exists
+        if channel_cfg.get('use_existing_layout'):
+            if not has_layout:
+                raise MissingRequirementException(f'Channel {channel} set to use existing layout,'
+                                                  f' but no layout found')
+            self._stitch_layout_wobbly(channel)
+        elif channel == channel_cfg['layout_channel']:
+            if channel_cfg['rigid']['skip'] and not self.channel_was_stitched_rigid(channel):
+                raise MissingRequirementException(f'Rigid alignment of channel {channel} skipped,'
+                                                  f' but no result of a previous run found')
+            if not channel_cfg['rigid']['skip']:
+                self.align_channel_rigid(channel)
+            if self.stopped: return
+            if not channel_cfg['wobbly']['skip']:
+                self.stitch_channel_wobbly(channel)
+            else:
+                self.place_layout_rigid(channel)
+                if self.stopped: return
+                self._stitch_layout_wobbly(channel)
+        else:
+            self._stitch_layout_wobbly(channel)
+
     def channel_was_stitched_rigid(self, channel):
         return self.get('layout', channel=channel, asset_sub_type='aligned_axis').exists
-
-    @property
-    def n_rigid_steps_to_run(self):
-        cfg = self.config['channels']
-        return [not cfg[channel]['rigid']['skip'] for channel in cfg.keys() if 'rigid' in cfg[channel]].count(True)
 
     # @check_stopped
     # @requires_assets([RequiredAsset('raw')])
@@ -462,15 +477,6 @@ class StitchingProcessor(IndependentChannelsPipelineOrchestrator):
         layout = stitching_wobbly.WobblyLayout(expression=raw_expr, tile_axes=tag_names, overlaps=overlaps)
         return layout
 
-    @property
-    def n_wobbly_steps_to_run(self):
-        out = len(self.channels) - 1
-        for channel in self.channels:
-            cfg = self.config['channels'][channel]
-            if 'wobbly' in cfg and not cfg['wobbly']['skip']:
-                out += 3
-        return out
-
     def __align_layout_wobbly(self, channel, layout):
         wobbly_cfg = self.config['channels'][channel]['wobbly']
         max_shifts = [
@@ -538,8 +544,7 @@ class StitchingProcessor(IndependentChannelsPipelineOrchestrator):
             n_slices = len(ref_asset.file_list)  # TODO: find better proxy
         except KeyError:
             n_slices = source_geometry.shape(self.get('raw', channel=channel).file_list[0])[0]
-        self.prepare_watcher_for_substep(n_slices, self.__wobbly_stitching_stitch_re,
-                                         'Stitch layout wobbly', True)
+        self.prepare_watcher_for_substep(n_slices, self.__wobbly_stitching_stitch_re, 'Stitch layout wobbly')
         try:
             self._replace_layout_sources(layout, channel, layout_channel)
             n_processes = self.config['performance']['stitching']['n_processes']

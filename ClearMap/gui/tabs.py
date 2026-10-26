@@ -730,7 +730,7 @@ class StitchingTab(PreProcessingTab["StitchingProcessor"]):
         choice = self.prompt_conversion(channel)
         if choice == 'cancel':
             return
-        n_steps = self.worker.n_rigid_steps_to_run
+        n_steps = 1  # The rigid alignment
         self.wrap_step('Stitching', self.worker.align_channel_rigid,
                        step_args=[channel], step_kw_args={'_force': True},
                        n_steps=n_steps, abort_func=self.worker.stop_process)
@@ -739,33 +739,27 @@ class StitchingTab(PreProcessingTab["StitchingProcessor"]):
 
     def run_stitching(self) -> None:
         """Run the actual stitching steps based on the values in the config file (set from the UI)."""
-        for channel in self.sample_manager.channels:  # FIXME: check if should do and if done
+        stitcher = self.worker
+        for channel in self.sample_manager.channels:  # Idempotent: nothing done if the stitched asset exists
             if not self.sample_manager.is_tiled(channel):  # BYPASS stitching, just copy or stack
-                self.wrap_step('Stitching', self.worker.copy_or_stack, step_args=[channel])
+                self.wrap_step('Stitching', stitcher.copy_or_stack, step_args=[channel])
 
-        n_steps = self.worker.n_rigid_steps_to_run + self.worker.n_wobbly_steps_to_run
-        for stitching_tree in self.worker.get_stitching_order().values():
-            for channel in stitching_tree:
-                cfg = self.params[channel]
-                if not cfg.shared.run:
-                    continue
-                # REFACTOR: self.worker.should_convert_tiles(channel)
-                if self.params[channel].shared.use_npy and not self.sample_manager.has_npy(channel):
-                    self.convert_tiles()
-                kwargs = {'n_steps': n_steps, 'abort_func': self.worker.stop_process, 'close_when_done': False}
-                try:
-                    if channel == cfg.shared.layout_channel and not cfg.shared.use_existing_layout:  # Used as reference
-                        self.wrap_step('Stitching', self.worker.align_channel_rigid,
-                                       step_args=[channel], step_kw_args={'_force': True}, **kwargs)
-                        self.wrap_step(task_name='', func=self.worker.stitch_channel_wobbly,
-                                       step_args=[channel], step_kw_args={'_force': cfg.stitching_rigid.skip}, **kwargs)
-                    else:  # Uses other channel as reference
-                        self.wrap_step('', self.worker._stitch_layout_wobbly,  # REFACTOR: private
-                                       step_args=[channel], **kwargs)
-                except MissingRequirementException as err:
-                    error_msg = str(err).replace('\n', '<br>')
-                    self.main_window.print_status_msg(
-                        f'Skipping stitching for {channel} because of missing requirements: {error_msg}')
+        channels_in_stitching_order = list(itertools.chain.from_iterable(stitcher.get_stitching_order().values()))
+        channels = [channel for channel in channels_in_stitching_order if self.params[channel].shared.run]
+        # REFACTOR: stitcher.should_convert_tiles(channel)
+        if any(self.params[channel].shared.use_npy and not self.sample_manager.has_npy(channel)
+               for channel in channels):
+            self.convert_tiles()  # Before the progress dialog of the stitching: it has its own
+        kwargs = {'n_steps': stitcher.n_steps_to_run(channels), 'abort_func': stitcher.stop_process,
+                  'close_when_done': False}
+        for i, channel in enumerate(channels):
+            try:
+                # Only the first call opens the progress dialog, the others continue its main bar
+                self.wrap_step('Stitching' if i == 0 else '', stitcher.stitch_channel, step_args=[channel], **kwargs)
+            except MissingRequirementException as err:
+                error_msg = str(err).replace('\n', '<br>')
+                self.main_window.print_status_msg(
+                    f'Skipping stitching for {channel} because of missing requirements: {error_msg}')
 
         self.update_plotable_channels()
         self.main_window.progress_watcher.finish()
