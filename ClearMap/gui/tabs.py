@@ -138,7 +138,7 @@ from ClearMap.Utils.events import (CfgChanged, UiPrepareRawDataForClearMap, UiRe
                                    UiRequestPlotAtlas, UiOrientationChanged, UiCropChanged, ChannelDefaultsChanged,
                                    UiRequestLandmarksDialog, UiAlignWithChanged, UiVesselGraphFiltersChanged,
                                    RegistrationStatusChanged, UiBatchResultsFolderChanged, UiBatchGroupsChanged,
-                                   UiChannelsChanged, WorkspaceChanged)
+                                   UiChannelsChanged, WorkspaceChanged, UiRequestShowChannelOrientation)
 
 from .dialog_helpers import option_dialog, make_splash, prompt_dialog, abort_retry_popup
 from .dialogs import ResourceTypeToFolderDialog
@@ -222,6 +222,7 @@ class SampleInfoTab(ExperimentTab):
         self.subscribe(UiPrepareRawDataForClearMap, self.prepare_channel_raw_data)
         self.subscribe(UiRequestPlotMiniBrain, self.plot_mini_brain)
         self.subscribe(UiRequestPlotAtlas, self.display_atlas)
+        self.subscribe(UiRequestShowChannelOrientation, self.go_to_orientation)
 
         self.subscribe(UiOrientationChanged, self.update_atlas)
         self.subscribe(UiCropChanged, self.update_atlas)
@@ -296,10 +297,15 @@ class SampleInfoTab(ExperimentTab):
     # def src_folder(self, folder):
     #     self.exp_controller.exp_dir = folder
 
-    def go_to_orientation(self) -> None:
-        """Jump to the sample orientation (space info) tab"""
-        self.ui.toolBox.setCurrentIndex(2)
-        self.main_window.tabWidget.setCurrentIndex(0)
+    def go_to_orientation(self, event: UiRequestShowChannelOrientation) -> None:
+        """Show the orientation of the channel: the geometry section of its page in this tab"""
+        channels_tab_widget = self.ui.channelsParamsTabWidget
+        page = channels_tab_widget.get_channel_widget(event.channel_name)
+        if page is None:
+            return
+        self.main_window.tabWidget.setCurrentWidget(self.ui)
+        channels_tab_widget.setCurrentWidget(page)
+        page.toolBox.setCurrentWidget(page.geometryPage)
 
     def launch_pattern_wizard(self) -> None:
         """
@@ -812,6 +818,7 @@ class RegistrationTab(PreProcessingTab['RegistrationProcessor']):
         """
         self.ui.registerPushButton.clicked.connect(self.run_registration)
         self.ui.plotRegistrationResultsPushButton.clicked.connect(self.plot_registration_results)
+        self.ui.registrationGoToSampleOrientationPushButton.clicked.connect(self.go_to_reference_channel_orientation)
 
         self.__populate_atlas_comboboxes()
 
@@ -898,6 +905,16 @@ class RegistrationTab(PreProcessingTab['RegistrationProcessor']):
         # self.params[channel].handle_params_files_changed()  # Force update
         page_widget.registrationRunResamplingPushButton.clicked.connect(
             functools.partial(self.resample_channel, channel))
+
+    def go_to_reference_channel_orientation(self) -> None:
+        """
+        Show the orientation of the reference channel (the one aligned with the atlas) in the sample tab,
+        that of the channel page shown there while no channel is the reference
+        """
+        reference_channel = self.sample_manager.reference_channel_setting
+        if reference_channel not in self.sample_manager.channels:  # Undecided or no reference
+            reference_channel = None
+        self.publish(UiRequestShowChannelOrientation(channel_name=reference_channel))
 
     def setup_atlas(self) -> None:
         """Setup the atlas that corresponds to the orientation and cropping of the sample"""

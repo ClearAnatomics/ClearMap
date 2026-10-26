@@ -73,6 +73,10 @@ class UiRequestPlotAtlas:
     channel_index: int
 
 @dataclass(frozen=True)
+class UiRequestShowChannelOrientation:
+    channel_name: Optional[str]  # None: the channel page shown
+
+@dataclass(frozen=True)
 class UiRequestLandmarksDialog:
     page_index: int
 
