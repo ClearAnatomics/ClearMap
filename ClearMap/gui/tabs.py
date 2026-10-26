@@ -1313,7 +1313,7 @@ class CellCounterTab(PostProcessingTab["CellDetector"]):
             self.wrap_step('Filtering cells', detector.filter_cells, n_steps=2 + (1 - is_last_step),
                            abort_func=detector.stop_process, close_when_done=False)
             self.wrap_step('Voxelizing', detector.voxelize, step_args=['filtered'],
-                           step_kw_args={'weights_column': self.params.voxelization_weights},
+                           step_kw_args={'weights_column': self.params[channel].voxelization_weights},
                            save_cfg=False, close_when_done=is_last_step)  # , main_thread=True)
         self.update_cell_number(channel)
         self.plot_cell_filter_results(channel)
