@@ -105,7 +105,7 @@ import ClearMap.ImageProcessing.Experts.Cells as cell_detection
 # noinspection PyPep8Naming
 import ClearMap.Analysis.Measurements.Voxelization as voxelization
 
-from ClearMap.Utils.exceptions import MissingRequirementException, MissingAssetError
+from ClearMap.Utils.exceptions import MissingRequirementException, MissingAssetError, AssetNotFoundError
 from ClearMap.Utils.utilities import sanitize_n_processes
 from ClearMap.IO.asset_requirements import requires_assets, RequiredAsset
 
@@ -270,7 +270,12 @@ class CellDetector(ChannelPipelineOrchestrator):
 
         table_path = self.get_path(**kwargs, extension='.feather')
         if not table_path.exists():
-            table_path = self.get_path(**kwargs)  # default to old .npy format
+            table_path = self.get_path(**kwargs, extension='.npy')  # Old tables
+        if not table_path.exists():
+            raise AssetNotFoundError(f'No cells table ({coord_type}) for channel {self.channel} '
+                                     f'with extension .feather or .npy',
+                                     asset_path=str(table_path.with_suffix('.feather')), asset_type='cells',
+                                     asset_sub_type=coord_type, missing_step_name='cell detection')
 
         loaders = {'.feather': pd.read_feather, '.npy': np.load}
         table = loaders[table_path.suffix](table_path)
