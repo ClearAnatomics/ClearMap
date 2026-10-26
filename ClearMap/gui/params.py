@@ -831,8 +831,9 @@ class GeneralChannelStitchingParams(ChannelUiParameter):
                     UiUseExistingLayoutChanged(channel_name=self.name, use_existing=self.use_existing_layout)))
         }
 
-    def _existing_layout_relevant(self, v: dict) -> bool:
-        return v.get('stitching', {}).get('layout_channel') == self.name
+    def _existing_layout_relevant(self, view: dict) -> bool:
+        """Only a channel which is its own layout channel computes a layout, so can reuse an existing one"""
+        return view.get('layout_channel') == self.name
 
     @property
     def run(self):
