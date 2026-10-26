@@ -318,6 +318,30 @@ def ensure_qapp() -> QApplication:
     return app
 
 
+def run_with_responsive_ui(app: QApplication, progress_watcher, func: Callable, *args, **kwargs):
+    """
+    Run func in a worker thread while keeping the Qt UI responsive.
+
+    Blocks until func completes, periodically processing Qt events and polling progress logs.
+
+    Leaves the progress dialog open for the caller to manage.
+    """
+    from multiprocessing.pool import ThreadPool
+
+    progress_watcher.start_polling()
+    try:
+        with ThreadPool(processes=1) as pool:
+            result = pool.apply_async(func, args, kwargs)
+
+            while not result.ready():
+                result.wait(0.25)
+                app.processEvents()
+
+            return result.get()
+    finally:
+        progress_watcher.stop_polling()
+
+
 def is_headless() -> bool:
     # Best-effort heuristics for “don’t prompt”
     return os.environ.get('CLEARMAP_HEADLESS') == '1' or (

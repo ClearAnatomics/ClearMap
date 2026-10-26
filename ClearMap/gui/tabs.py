@@ -1013,6 +1013,7 @@ class RegistrationTab(PreProcessingTab['RegistrationProcessor']):
                     else:
                         continue
         self.main_window.wrap_in_thread(self.worker.align)  # FIXME: why not wrap_step
+        self.main_window.progress_watcher.finish()
         self.main_window.print_status_msg('Registered')  # The plotable channels follow RegistrationStatusChanged
 
     def _update_plotable_channels(self, event=None) -> None:
@@ -2213,8 +2214,7 @@ class GroupAnalysisTab(BatchTab):
             return
 
         # TODO: set abort callback
-        # Busy rather than progress dialog: the progress is that of each comparison, which reports none,
-        # and the dialog of the progress watcher is closed at the end of the first one
+        # Busy rather than progress dialog: the progress is that of each comparison, which reports none
         try:
             with self.busy_dialog('Computing the p value maps', f'{len(comparisons)} comparison(s)'):
                 self.processor.compute_p_values(comparisons,
@@ -2305,6 +2305,7 @@ class BatchProcessingTab(BatchTab):
     def run_batch_process(self) -> None:
         self.main_window.make_progress_dialog('Analysing samples', n_steps=0, maximum=0)  # TODO: see abort callback
         self.main_window.wrap_in_thread(self.processor.process_folders)
+        self.main_window.progress_watcher.finish()
 
     def _on_results_folder_changed(self, event: UiBatchResultsFolderChanged) -> None:
         folder = event.results_folder

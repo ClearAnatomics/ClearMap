@@ -52,7 +52,6 @@ from copy import deepcopy
 
 from typing import Optional, Callable, List, Dict, Type, Any, Iterable, Tuple
 import atexit
-from multiprocessing.pool import ThreadPool
 from pathlib import Path
 
 from statistics import mode
@@ -607,15 +606,7 @@ class ClearMapAppBase(QMainWindow, Ui_ClearMapGui):
         -------
             The result of the execution of the function func
         """
-        self.progress_watcher.start_polling()
-        with ThreadPool(processes=1) as pool:
-            result = pool.apply_async(func, args, kwargs)
-            while not result.ready():
-                result.wait(0.25)
-                self.app.processEvents()
-        self.progress_watcher.stop_polling()
-        self.progress_watcher.finish()
-        return result.get()
+        return base_utils.run_with_responsive_ui(self.app, self.progress_watcher, func, *args, **kwargs)
 
     def signal_process_finished(self, msg: str = 'Idle, waiting for input'):
         """
