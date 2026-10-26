@@ -916,7 +916,7 @@ class DataFrameWidget(QWidget):  # TODO: optional format attribute with shape of
         for i in range(len(self.df.index)):
             for j in range(self.df.columns.size):
                 v = self.df.iloc[i, j]
-                if self.df.dtypes[j] == np.float_:
+                if self.df.dtypes.iloc[j] == np.float_:
                     self.table.setItem(i, j, QTableWidgetItem(f'{v:.{self.n_digits}}'))
                 else:
                     self.table.setItem(i, j, QTableWidgetItem(f'{v}'))
