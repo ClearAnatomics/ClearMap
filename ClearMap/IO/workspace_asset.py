@@ -941,6 +941,16 @@ class ExpressionAsset(Asset, ExpressionDataset):
         return [self.expression.values(f) for f in self.file_list]
 
     @property
+    def tag_ranges(self) -> dict[str, range]:
+        """The range of the values of each integer tag over the files, as in their names (none without files)"""
+        file_tag_values = self.file_tag_values
+        if not file_tag_values:
+            return {}
+        return {name: range(min(tag_values[name] for tag_values in file_tag_values),
+                            max(tag_values[name] for tag_values in file_tag_values) + 1)
+                for name in self.int_tag_names}
+
+    @property
     def n_files_expected(self) -> Optional[int]:
         """
                 Theoretical number of files implied by the integer tag ranges
@@ -962,30 +972,10 @@ class ExpressionAsset(Asset, ExpressionDataset):
         if not self.file_list:
             return None
 
-        int_names = self.int_tag_names
-        if not int_names:  # We cannot infer any ranges so we assume complete
+        ranges = self.tag_ranges
+        if not ranges:  # We cannot infer any ranges so we assume complete
             return self.n_files_present
-
-        mins = {n: None for n in int_names}
-        maxs = {n: None for n in int_names}
-        for pos in self.file_tag_values:
-            # pos is dict[tag_name -> value]
-            for name in int_names:
-                v = pos[name]
-                mv_min = mins[name]
-                mv_max = maxs[name]
-                mins[name] = v if mv_min is None else min(mv_min, v)
-                maxs[name] = v if mv_max is None else max(mv_max, v)
-
-        expected = 1
-        for name in int_names:
-            lo = mins[name]
-            hi = maxs[name]
-            if lo is None or hi is None:
-                # Could not infer any values for this tag; fall back to present count.
-                return self.n_files_present
-            expected *= (hi - lo + 1)
-        return expected
+        return math.prod(len(tag_range) for tag_range in ranges.values())
 
     @property
     def tile_shape(self):
@@ -1055,9 +1045,10 @@ class ExpressionAsset(Asset, ExpressionDataset):
         # find all existing expressions using self.extensions_to_directories
         header = getattr(self, 'header', '{} {}')
         hdr_str = header.format(self.type_spec.resource_type, self.type_spec.name)
-        tag_names = ', '.join(self.tag_names)
-        tile_lower = tuple(np.min(self.file_tag_values, axis=0))
-        tile_upper = tuple(np.max(self.file_tag_values, axis=0))
+        ranges = self.tag_ranges
+        tag_names = ', '.join(ranges)
+        tile_lower = tuple(tag_range.start for tag_range in ranges.values())
+        tile_upper = tuple(tag_range[-1] for tag_range in ranges.values())
         pattern_line = (f'{hdr_str}: {self.expression.string()} {{{self.n_files_present} files,'
                         f' {tag_names}: {tile_lower} -> {tile_upper}}}')
         if self.extensions_to_directories:
@@ -1140,11 +1131,10 @@ class TiledAsset(ExpressionAsset):
     @property
     def tile_grid_ranges(self) -> dict[str, range]:
         """The range of the X and Y tag values of the files, as in their names (just 0 along an axis without tag)"""
-        grid_tag_values = [{axis: tag_values.get(axis, 0) for axis in 'XY'} for tag_values in self.file_tag_values]
-        if not grid_tag_values:
+        if not self.file_list:
             raise ValueError(f'No tiles found for asset {self} with expression {self.expression}')
-        return {axis: range(min(values[axis] for values in grid_tag_values),
-                            max(values[axis] for values in grid_tag_values) + 1) for axis in 'XY'}
+        ranges = self.tag_ranges
+        return {axis: ranges.get(axis, range(1)) for axis in 'XY'}
 
     @property
     def tile_grid_indices(self) -> list[dict[str, int]]:

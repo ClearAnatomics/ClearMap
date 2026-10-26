@@ -55,3 +55,32 @@ def test_a_single_row_or_column_has_one_tile_along_the_axis_it_has_no_tag_for(tm
     assert asset.tile_grid_indices == [{axis: i, other: 0} for i in range(3)]
     assert asset.tile_grid_shape == {axis: 3, other: 1}
     assert asset.n_files_expected == 3
+
+
+def test_a_tiled_asset_shows_the_first_and_last_values_of_each_tag_in_its_repr(tmp_path):
+    """repr raised TypeError (the minimum of dicts) as soon as the asset had two files"""
+    asset = tiled_asset(tmp_path, 'tiles/t_<Y,2>_<X,2>.tif', *grid_files(range(1, 3), range(4, 7)))
+
+    assert '{6 files, Y, X: (1, 4) -> (2, 6)}' in repr(asset)
+
+
+def test_the_tag_ranges_have_every_integer_tag_of_the_files(tmp_path):
+    asset = tiled_asset(tmp_path, 'tiles/t_<Y,2>_<X,2>_Z<Z,4>.tif',
+                        *(f'tiles/t_{y:02d}_{x:02d}_Z{z:04d}.tif' for y in (1, 2) for x in (4,) for z in range(3)))
+
+    assert asset.tag_ranges == {'Y': range(1, 3), 'X': range(4, 5), 'Z': range(3)}
+    assert asset.tile_grid_ranges == {'X': range(4, 5), 'Y': range(1, 3)}  # Not the planes
+
+
+def test_the_number_of_files_expected_of_planes_counts_the_missing_ones(tmp_path):
+    workspace = Workspace2(tmp_path, sample_id=SAMPLE_ID)
+    workspace.ensure_pipeline('stitching', 'fos', sample_id=SAMPLE_ID, channel_content_type='cells',
+                              create_channel=True)
+    planes = Asset(tmp_path, workspace.asset_types['raw'], workspace['fos'].channel_spec,
+                   expression='planes/Z<Z,4>.tif', sample_id=SAMPLE_ID)
+    for z in (0, 1, 3):  # The plane 2 is missing
+        (tmp_path / 'planes').mkdir(exist_ok=True)
+        (tmp_path / 'planes' / f'Z{z:04d}.tif').write_text('plane')
+
+    assert planes.n_files_present == 3
+    assert planes.n_files_expected == 4
