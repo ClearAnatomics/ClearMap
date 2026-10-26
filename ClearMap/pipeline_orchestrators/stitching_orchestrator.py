@@ -460,8 +460,8 @@ class StitchingProcessor(IndependentChannelsPipelineOrchestrator):
                                                           asset_sub_type='aligned_axis'))
         layout.place(method='optimization', min_quality=-np.inf, lower_to_origin=True, verbose=True)
 
-        stitching_rigid.save_layout(self.get_path('layout', channel=channel, asset_sub_type='aligned'),
-                                    layout)
+        stitching_rigid.save_layout(self.get_path('layout', channel=channel, asset_sub_type='placed'),
+                                    layout)  # The final layout: the one the stitching reads
 
     # @requires_assets([RequiredAsset('raw')])  # TODO: optional requires npy + requires that channel is kwarg
     def get_wobbly_layout(self, channel, overlaps=None):

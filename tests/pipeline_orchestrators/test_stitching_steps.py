@@ -187,6 +187,14 @@ def test_a_skipped_rigid_alignment_without_previous_result_is_reported(stitching
         stitching.stitch_channel('main')
 
 
+def test_a_skipped_wobbly_stitching_places_the_rigid_layout_and_stitches(stitching, experiment):
+    _set_skip(experiment, wobbly=True)
+
+    assert _stitch_and_count(stitching) == stitching.n_steps_to_run(['main', 'derived']) == 3
+    assert stitching.get('stitched', channel='main').exists
+    assert stitching.get('stitched', channel='derived').exists
+
+
 def test_a_channel_with_an_existing_layout_only_stitches(stitching, experiment):
     _stitch_and_count(stitching)
     experiment.apply_ui_patch({'stitching': {'channels': {'main': {'use_existing_layout': True}}}})
