@@ -334,6 +334,23 @@ class Expression:
                 e += p
         return e
 
+    def without_tag(self, tag_name):
+        """
+        The expression without the tag tag_name, the rest of the pattern as it is.
+
+        Examples
+        --------
+        Tiles of one file per Z plane, and one file per tile without the Z tag (their columns):
+
+        >>> planes = Expression('tile_<Y,2>_<X,2>_Z<Z,4>.tif')
+        >>> planes.string({'Y': 0, 'X': 1})  # Before: the planes of tile (0, 1), one file each
+        'tile_00_01_Z<Z,I,4>.tif'
+        >>> planes.without_tag('Z').string({'Y': 0, 'X': 1})  # After: the one file of tile (0, 1)
+        'tile_00_01_Z.tif'
+        """
+        return Expression(''.join(p.tag() if isinstance(p, Tag) else p for p in self.pattern
+                                  if not (isinstance(p, Tag) and p.name == tag_name)))
+
     def tag_max(self, tag_name):
         """
         Return the maximum value (i.e. range[-1]) of a tag in the expression.

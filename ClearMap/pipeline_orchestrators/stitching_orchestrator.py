@@ -93,6 +93,7 @@ class StitchingProcessor(IndependentChannelsPipelineOrchestrator):
         self.update_watcher_main_progress()
 
     def convert_tiles_channel(self, channel, _force=False):
+        self.stack_columns(channel)  # Tiles of one file per plane: their columns are converted
         if self.config['channels'][channel].get('use_npy', False) or _force:
             asset = self.get('raw', channel=channel, prefix=self.sample_manager.prefix)
             n_procs = self.config['performance']['file_conversion']['n_processes']
@@ -224,22 +225,51 @@ class StitchingProcessor(IndependentChannelsPipelineOrchestrator):
                                           sample_manager=self.sample_manager)
 
     def stack_columns(self, channel):
+        """
+        Stack the tiles of channel acquired as one file per Z plane into one npy file per tile (a column), next to
+        the planes, and make the columns the raw data of the channel. Nothing to do for tiles of one file each.
+
+        The planes are recognised by their Z tag besides the tile tags (e.g. ``..._xyz-Table Z<Z,4>.ome.tif``),
+        whatever the text around it. Every use of the tiles calls this first (it is done once).
+        """
         asset = self.get('raw', channel=channel, prefix=self.sample_manager.prefix)
-        exp = asset.expression
+        planes_expression = asset.expression
+        if 'Z' not in planes_expression.tag_names() or planes_expression.n_tags() < 2:
+            return  # One file per tile, or the planes of a single stack (see copy_or_stack)
 
-        x_min, x_max = exp.tag_range('X')
-        y_min, y_max = exp.tag_range('Y')
+        tile_positions: list[dict[str, int]] = []  # The values of the tags except Z
+        for plane_position in asset.positions:
+            tile_position = {tag: value for tag, value in plane_position.items() if tag != 'Z'}
+            if tile_position not in tile_positions:
+                tile_positions.append(tile_position)
 
-        z_expression = '_xyz-Table Z<Z,4>'    # REFACTOR: brittle, find better way
-        if exp.n_tags() >= 3:
-            for y in range(y_min, y_max + 1):
-                for x in range(x_min, x_max + 1):
-                    column_expression = exp.string(values={'X': x, 'Y': y})
-                    dest = column_expression.replace(z_expression, '')
-                    conversion.convert(column_expression, dest)
-            # squash Z axis
-            asset.expression = exp.string().replace(z_expression, '')  # overwrite expression
-            self.sample_manager.set_channel_expression(channel, asset.expression)
+        # In npy, for memmaping in stitching (and a 3D .ome.tif cannot be created yet)
+        columns_expression = asset.variant(extension='.npy').expression.without_tag('Z')
+        for tile_position in tile_positions:
+            tile_planes = planes_expression.string(values=tile_position)  # parametrise x/y leave z as tag
+            tile_column = columns_expression.string(values=tile_position)  # parametrise x/y, no z for columns
+            conversion.convert(tile_planes, tile_column)
+
+        # Read now from the planes: the npy columns have no OME metadata to resolve 'auto' from later
+        self._set_auto_overlaps_from_ome_metadata(channel, ome_tile=asset.file_list[0])
+        self.sample_manager.set_channel_expression(channel, columns_expression)
+
+    def _set_auto_overlaps_from_ome_metadata(self, channel, ome_tile):
+        """
+        Replace the 'auto' overlaps of channel in the stitching config by the values (in pixels) read from the OME
+        metadata of ome_tile, for tiles about to lose their metadata (planes stacked into npy columns). Left 'auto'
+        if the metadata does not have them (the rigid stitching says so then).
+        """
+        rigid_cfg = self.config['channels'].get(channel, {}).get('rigid')
+        if not rigid_cfg or 'auto' not in (rigid_cfg['overlap_x'], rigid_cfg['overlap_y']):
+            return
+        try:
+            overlaps, _ = define_auto_stitching_params(ome_tile, rigid_cfg)
+        except MetadataError:
+            return
+        overlaps_patch = {'overlap_x': round(overlaps[0]), 'overlap_y': round(overlaps[1])}
+        self.cfg_coordinator.submit_patch({'stitching': {'channels': {channel: {'rigid': overlaps_patch}}}},
+                                          sample_manager=self.sample_manager)
 
     def prepare_all_channels_raw_data(self, force: bool = False) -> list[str]:
         """
@@ -367,6 +397,7 @@ class StitchingProcessor(IndependentChannelsPipelineOrchestrator):
     # @check_stopped
     # @requires_assets([RequiredAsset('raw')])
     def align_channel_rigid(self, channel, _force=False):
+        self.stack_columns(channel)
         if not self.sample_manager.check_has_all_tiles(channel):
             if self.sample_manager.use_npy(channel):
                 self.convert_tiles_channel(channel)
@@ -495,6 +526,7 @@ class StitchingProcessor(IndependentChannelsPipelineOrchestrator):
         self.update_watcher_main_progress()
 
     def _stitch_layout_wobbly(self, channel):
+        self.stack_columns(channel)  # The sources of a channel stitched with the layout of another one
         layout_channel = self.config['channels'][channel]['layout_channel']
         layout = stitching_rigid.load_layout(self.get_path('layout', channel=layout_channel,
                                                            asset_sub_type='placed'))
@@ -600,6 +632,7 @@ class StitchingProcessor(IndependentChannelsPipelineOrchestrator):
             The overlay image
         """
         from ClearMap.Visualization.Color.Color import gray_image_to_rgb
+        self.stack_columns(channel)
         asset = self.get('raw', channel=channel, sample_id=self.sample_manager.prefix)
         positions = asset.positions
         tile_shape = {k: v for k, v in zip('XYZ', asset.tile_shape)}  # TODO: use asset.tile_grid_shape
